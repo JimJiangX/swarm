@@ -19,6 +19,7 @@ import (
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/samalba/dockerclient"
+	crontab "gopkg.in/robfig/cron.v2"
 )
 
 type pendingContainer struct {
@@ -50,6 +51,12 @@ func (p *pendingContainer) ToContainer() *cluster.Container {
 type Cluster struct {
 	sync.RWMutex
 
+	allocatedPort int64
+
+	datacenters []*Datacenter
+	networkings []*Networking
+	cron        *crontab.Cron // crontab tasks
+
 	eventHandlers     *cluster.EventHandlers
 	engines           map[string]*cluster.Engine
 	pendingEngines    map[string]*cluster.Engine
@@ -78,6 +85,10 @@ func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery
 		overcommitRatio:   0.05,
 		engineOpts:        engineOptions,
 		createRetry:       0,
+
+		cron:        crontab.New(),
+		datacenters: make([]*Datacenter, 0, 100),
+		networkings: make([]*Networking, 0, 10),
 	}
 
 	if val, ok := options.Float("swarm.overcommit", ""); ok {
@@ -94,6 +105,8 @@ func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery
 	discoveryCh, errCh := cluster.discovery.Watch(nil)
 	go cluster.monitorDiscovery(discoveryCh, errCh)
 	go cluster.monitorPendingEngines()
+
+	cluster.cron.Start()
 
 	return cluster, nil
 }
