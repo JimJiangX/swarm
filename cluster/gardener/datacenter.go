@@ -6,6 +6,7 @@ import (
 	"io"
 	"sync"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/swarm/cluster/gardener/database"
 	"github.com/docker/swarm/cluster/gardener/store"
@@ -24,14 +25,21 @@ type Datacenter struct {
 	nodes []*database.Node
 }
 
-func (c *Cluster) AddDatacenter(cluster database.Cluster,
+func (c *Cluster) AddDatacenter(cl database.Cluster,
 	nodes []*database.Node, stores []*store.Store) error {
-	if cluster.ID == "" {
-		cluster.ID = c.generateUniqueID()
+	if cl.ID == "" {
+		cl.ID = c.generateUniqueID()
 	}
 
-	err := cluster.Insert()
+	log.WithFields(log.Fields{
+		"cluster":   cl.Name,
+		"nodeNum":   len(nodes),
+		"storesNum": len(stores),
+	}).Info("Adding New Datacenter")
+
+	err := cl.Insert()
 	if err != nil {
+		log.Errorf("DB Error,%s", err)
 		return err
 	}
 
@@ -45,7 +53,7 @@ func (c *Cluster) AddDatacenter(cluster database.Cluster,
 
 	dc := &Datacenter{
 		RWMutex: sync.RWMutex{},
-		Cluster: &cluster,
+		Cluster: &cl,
 		stores:  stores,
 		nodes:   nodes,
 	}
@@ -53,6 +61,8 @@ func (c *Cluster) AddDatacenter(cluster database.Cluster,
 	c.Lock()
 	c.datacenters = append(c.datacenters, dc)
 	c.Unlock()
+
+	log.Infof("Added Datacenter:%s", dc.Name)
 
 	return nil
 }
@@ -115,6 +125,8 @@ func (dc *Datacenter) RegisterNode(IDOrName string) error {
 
 	dc.Unlock()
 
+	log.Infof("Register Node:%s to Cluster:%s", IDOrName, dc.Name)
+
 	return err
 }
 
@@ -137,6 +149,8 @@ func (dc *Datacenter) DeregisterNode(IDOrName string) error {
 
 	dc.Unlock()
 
+	log.Infof("Deregister Node:%s of Cluster:%s", IDOrName, dc.Name)
+
 	return err
 }
 
@@ -155,35 +169,60 @@ func (dc *Datacenter) AddNode(addr, name, os_user, os_pwd string, num int) error
 		"password": os_pwd,
 	}
 
-	dir, err := modifyProfile("")
+	log.WithFields(log.Fields{
+		"name":    name,
+		"addr":    addr,
+		"cluster": dc.Cluster.ID,
+	}).Info("Adding new Node")
+
+	dir, script, err := modifyProfile("")
 	if err != nil {
+		log.WithFields(log.Fields{
+			"name":    name,
+			"addr":    addr,
+			"cluster": dc.Cluster.ID,
+			"source":  "",
+		}).Errorf("Modify shell script Error,%s", err)
+
 		return err
 	}
 
-	if err := Distribute("", dir, m); err != nil {
+	if err := Distribute("", dir, script, m); err != nil {
+		log.WithFields(log.Fields{
+			"name":        name,
+			"addr":        addr,
+			"cluster":     dc.Cluster.ID,
+			"source":      dir,
+			"destination": "",
+		}).Errorf("SSH UploadDir Error,%s", err)
+
+		return err
+	}
+
+	if err := node.Insert(); err != nil {
+		log.Errorf("Node:%d Insert INTO DB Error,%s", name, err)
+
 		return err
 	}
 
 	dc.Lock()
-
-	if err := node.Insert(); err != nil {
-
-		dc.Unlock()
-
-		return err
-	}
-
 	dc.nodes = append(dc.nodes, node)
-
 	dc.Unlock()
+
+	log.WithFields(log.Fields{
+		"name":    name,
+		"addr":    addr,
+		"cluster": dc.Cluster.ID,
+	}).Info("Added Node")
 
 	return nil
 }
-func modifyProfile(path string) (string, error) {
-	return "", nil
+
+func modifyProfile(path string) (string, string, error) {
+	return "", "", nil
 }
 
-func Distribute(dst, src string, m map[string]string) error {
+func Distribute(dst, src string, script string, m map[string]string) error {
 
 	if m["port"] == "0" || m["port"] == "" {
 		m["port"] = "22"
@@ -202,15 +241,28 @@ func Distribute(dst, src string, m map[string]string) error {
 		},
 	}
 
+	entry := log.WithFields(log.Fields{
+		"user":        m["user"],
+		"host":        m["host"],
+		"port":        m["port"],
+		"source":      src,
+		"destination": dst,
+	})
+
 	c, err := ssh.New(r)
 	if err != nil {
-		// t.Fatalf("error creating communicator: %s", err)
+		entry.Errorf("error creating communicator: %s", err)
+
 		return err
 	}
 	defer c.Disconnect()
 
-	if err := c.UploadDir("dst", src); err != nil {
-		if err := c.UploadDir("dst", src); err != nil {
+	if err := c.UploadDir(dst, src); err != nil {
+		entry.Errorf("SSH UploadDir Error,%s", err)
+
+		if err := c.UploadDir(dst, src); err != nil {
+			entry.Errorf("SSH UploadDir Error Twice,%s", err)
+
 			return err
 		}
 	}
@@ -218,15 +270,18 @@ func Distribute(dst, src string, m map[string]string) error {
 	buffer := new(bytes.Buffer)
 
 	cmd := remote.Cmd{
-		Command: "echo foo",
+		Command: script,
 		Stdout:  buffer,
 		Stderr:  buffer,
 	}
 
 	err = c.Start(&cmd)
 	if err != nil {
-		// t.Fatalf("error executing remote command: %s", err)
+		log.Errorf("error executing remote command: %s", err)
 	}
+
+	entry.Info("SSH UploadDir Success!")
+
 	return err
 }
 
@@ -250,7 +305,8 @@ func SSHCommand(host, port, user, password, shell string, output io.Writer) erro
 
 	c, err := ssh.New(r)
 	if err != nil {
-		// t.Fatalf("error creating communicator: %s", err)
+		log.Errorf("error creating communicator: %s", err)
+
 		return err
 	}
 	defer c.Disconnect()
