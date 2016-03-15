@@ -137,6 +137,31 @@ func (svc Service) TableName() string {
 	return "tb_service"
 }
 
+func GetService(id string) (Service, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return Service{}, err
+	}
+
+	s := Service{}
+	err = db.QueryRowx("SELECT * FROM tb_service WHERE id=?", id).StructScan(&s)
+
+	return s, err
+}
+
+func (svc *Service) Insert() error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	// insert into database
+	query := "INSERT INTO tb_service (id,name,description,architecture,auto_healing,auto_scaling,high_available,status,backup_space,backup_strategy_id,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:auto_healing,:auto_scaling,:high_available,:status,:backup_space,:backup_strategy_id,:created_at,:finished_at)"
+	_, err = db.Exec(query, svc)
+
+	return err
+}
+
 func (svc *Service) SetServiceStatus(state int, finish time.Time) error {
 	db, err := GetDB(true)
 	if err != nil {
@@ -194,8 +219,4 @@ type User struct {
 
 func (u User) TableName() string {
 	return "tb_users"
-}
-
-func (svc *Service) Insert() error {
-	return nil
 }

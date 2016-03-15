@@ -55,6 +55,7 @@ type Cluster struct {
 
 	datacenters []*Datacenter
 	networkings []*Networking
+	services    []*Service
 	cron        *crontab.Cron // crontab tasks
 
 	eventHandlers     *cluster.EventHandlers
@@ -89,6 +90,7 @@ func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery
 		cron:        crontab.New(),
 		datacenters: make([]*Datacenter, 0, 100),
 		networkings: make([]*Networking, 0, 10),
+		services:    make([]*Service, 0, 100),
 	}
 
 	if val, ok := options.Float("swarm.overcommit", ""); ok {
