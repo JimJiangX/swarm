@@ -13,10 +13,6 @@ func (c *Cluster) ServiceToScheduler(svc *Service) {
 	c.serviceSchedulerCh <- svc
 }
 
-func (c *Cluster) ServiceToExecute(svc *Service) {
-	c.serviceExecuteCh <- svc
-}
-
 func (c *Cluster) ServiceScheduler() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -31,6 +27,7 @@ func (c *Cluster) ServiceScheduler() (err error) {
 			continue
 		}
 
+		svc.Lock()
 		// datacenter scheduler
 
 		// run scheduler on selected datacenter
@@ -39,13 +36,37 @@ func (c *Cluster) ServiceScheduler() (err error) {
 
 		// modify scheduler label
 
-		c.ServiceToExecute(svc)
+		for _, module := range svc.base.Modules {
+
+			list := c.UPMlistNodes(module.Nodes, module.Type)
+
+			config := &cluster.ContainerConfig{}
+
+			pendingContainers, err := c.buildPendingContainers(list, module.Num, config, false)
+			if err != nil {
+
+			}
+
+			for key, value := range pendingContainers {
+				svc.pendingContainers[key] = value
+			}
+
+			atomic.StoreInt64(&svc.Status, 1)
+
+			svc.Unlock()
+
+			c.ServiceToExecute(svc)
+
+		}
 	}
 
 	return err
 }
 
-func (c *Cluster) buildPendingContainers(list []string, defConfig *cluster.ContainerConfig, num int, withImageAffinity bool) ([]*pendingContainer, error) {
+func (c *Cluster) buildPendingContainers(list []*node.Node, num int,
+	defConfig *cluster.ContainerConfig,
+	withImageAffinity bool) (map[string]*pendingContainer, error) {
+
 	swarmID := defConfig.SwarmID()
 	if swarmID != "" {
 		return nil, errors.New("Swarm ID to the container have created")
@@ -53,7 +74,7 @@ func (c *Cluster) buildPendingContainers(list []string, defConfig *cluster.Conta
 
 	c.scheduler.Lock()
 
-	candidates, err := c.Scheduler(list, defConfig, num, false)
+	candidates, err := c.Scheduler(list, defConfig, num, withImageAffinity)
 	if err != nil {
 
 		candidates, err = c.Scheduler(list, defConfig, num, true)
@@ -100,10 +121,10 @@ func (c *Cluster) buildPendingContainers(list []string, defConfig *cluster.Conta
 
 	c.scheduler.Unlock()
 
-	return nil, nil
+	return pendingContainers, nil
 }
 
-func (c *Cluster) Scheduler(list []string, config *cluster.ContainerConfig, num int, withImageAffinity bool) ([]*node.Node, error) {
+func (c *Cluster) Scheduler(list []*node.Node, config *cluster.ContainerConfig, num int, withImageAffinity bool) ([]*node.Node, error) {
 
 	if network := c.Networks().Get(config.HostConfig.NetworkMode); network != nil && network.Scope == "local" {
 		if !config.HaveNodeConstraint() {
@@ -116,7 +137,7 @@ func (c *Cluster) Scheduler(list []string, config *cluster.ContainerConfig, num 
 		config.AddAffinity("image==" + config.Image)
 	}
 
-	nodes, err := c.scheduler.SelectNodesForContainer(c.UPMlistNodes(list), config)
+	nodes, err := c.scheduler.SelectNodesForContainer(list, config)
 
 	if withImageAffinity {
 		config.RemoveAffinity("image==" + config.Image)
@@ -130,7 +151,7 @@ func (c *Cluster) Scheduler(list []string, config *cluster.ContainerConfig, num 
 }
 
 // UPMlistNodes returns all validated engines in the cluster, excluding pendingEngines.
-func (c *Cluster) UPMlistNodes(names []string) []*node.Node {
+func (c *Cluster) UPMlistNodes(names []string, dcTag string) []*node.Node {
 	c.RLock()
 	defer c.RUnlock()
 
@@ -138,7 +159,44 @@ func (c *Cluster) UPMlistNodes(names []string) []*node.Node {
 
 	if len(names) == 0 {
 
-		for _, e := range c.engines {
+		for i := range c.datacenters {
+
+			if c.datacenters[i].Type != dcTag {
+				continue
+			}
+
+			list := c.datacenters[i].listNodeID()
+
+			for _, id := range list {
+
+				e, ok := c.engines[id]
+				if !ok {
+					continue
+				}
+
+				node := node.NewNode(e)
+
+				for _, c := range c.pendingContainers {
+
+					if c.Engine.ID == e.ID && node.Container(c.Config.SwarmID()) == nil {
+						node.AddContainer(c.ToContainer())
+					}
+				}
+
+				out = append(out, node)
+
+			}
+		}
+
+	} else {
+
+		for _, name := range names {
+
+			e, ok := c.engines[name]
+			if !ok {
+				continue
+			}
+
 			node := node.NewNode(e)
 
 			for _, c := range c.pendingContainers {
@@ -148,24 +206,6 @@ func (c *Cluster) UPMlistNodes(names []string) []*node.Node {
 			}
 
 			out = append(out, node)
-		}
-
-	} else {
-
-		for _, name := range names {
-
-			if e, ok := c.engines[name]; ok {
-				node := node.NewNode(e)
-
-				for _, c := range c.pendingContainers {
-					if c.Engine.ID == e.ID && node.Container(c.Config.SwarmID()) == nil {
-						node.AddContainer(c.ToContainer())
-					}
-				}
-
-				out = append(out, node)
-
-			}
 		}
 	}
 
@@ -249,22 +289,4 @@ func (c *Cluster) selectNodeByCluster(nodes []*node.Node, num int, diff bool) ([
 	}
 
 	return nil, errors.New("Not Match")
-}
-
-func (c *Cluster) ServiceExecute() (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Recover From Panic:%v,Error:%s", r, err)
-		}
-	}()
-
-	for {
-		svc := <-c.serviceExecuteCh
-
-		if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
-			continue
-		}
-	}
-
-	return err
 }
