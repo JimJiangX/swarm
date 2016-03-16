@@ -67,12 +67,12 @@ func (c *Cluster) AddDatacenter(cl database.Cluster,
 	return nil
 }
 
-func (dc *Datacenter) ListNode() ([]*database.Node, error) {
+func (dc *Datacenter) ListNode() []*database.Node {
 	dc.RLock()
 	nodes := dc.nodes
 	dc.RUnlock()
 
-	return nodes, nil
+	return nodes
 }
 
 func (dc *Datacenter) isNodeExist(IDOrName string) bool {
@@ -131,7 +131,7 @@ func (dc *Datacenter) listNodeID() []string {
 	if len(nodes) == 0 {
 
 		var err error
-		nodes, err = database.ListNode()
+		nodes, err = database.ListNodeByClusterType(dc.Type)
 		if err != nil {
 			dc.RUnlock()
 			return nil

@@ -162,3 +162,27 @@ func ListNode() ([]*Node, error) {
 
 	return nodes, nil
 }
+
+func ListNodeByClusterType(tag string) ([]*Node, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	query := "SELECT * FROM tb_node WHERE type=? AND status>1"
+
+	rows, err := db.QueryRowx(query, tag).SliceScan()
+	if err != nil {
+		return nil, err
+	}
+
+	nodes := make([]*Node, 0, len(rows))
+
+	for i := range rows {
+		if node, ok := rows[i].(*Node); ok {
+			nodes = append(nodes, node)
+		}
+	}
+
+	return nodes, nil
+}

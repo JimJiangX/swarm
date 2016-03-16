@@ -15,6 +15,9 @@ type Service struct {
 	failureRetry int
 
 	database.Service
+	base *PostServiceRequest
+
+	pendingContainers map[string]*pendingContainer
 
 	units      []*unit
 	users      []database.User
