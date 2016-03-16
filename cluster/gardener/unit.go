@@ -7,7 +7,6 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/gardener/database"
 	consulapi "github.com/hashicorp/consul/api"
-	"github.com/samalba/dockerclient"
 )
 
 const pluginPort = 10000
@@ -40,20 +39,20 @@ type Operator interface {
 	Recover(file string) error
 	Backup() error
 	CreateUsers() error
-	Migrate(e *cluster.Engine, config *dockerclient.ContainerConfig) (string, error)
+	Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (string, error)
 }
 
 type mysqlOperation struct {
 	unit      *database.Unit
 	eng       *cluster.Engine
-	config    *dockerclient.ContainerConfig
+	config    *cluster.ContainerConfig
 	consulCfg *consulapi.Config
 }
 
 type unit struct {
 	database.Unit
 	eng        *cluster.Engine
-	config     *dockerclient.ContainerConfig
+	config     *cluster.ContainerConfig
 	configures map[string]interface{}
 	cmd        map[string]string
 

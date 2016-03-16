@@ -138,3 +138,27 @@ func (n *Node) UpdateStatus(state byte) error {
 
 	return nil
 }
+
+func ListNode() ([]*Node, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	query := "SELECT * FROM tb_node WHERE status>1"
+
+	rows, err := db.QueryRowx(query).SliceScan()
+	if err != nil {
+		return nil, err
+	}
+
+	nodes := make([]*Node, 0, len(rows))
+
+	for i := range rows {
+		if node, ok := rows[i].(*Node); ok {
+			nodes = append(nodes, node)
+		}
+	}
+
+	return nodes, nil
+}
