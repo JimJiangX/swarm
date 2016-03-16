@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/docker/swarm/cluster/gardener/database"
+	"github.com/samalba/dockerclient"
 )
 
 type Service struct {
@@ -15,9 +16,10 @@ type Service struct {
 
 	database.Service
 
-	units  []*unit
-	users  []database.User
-	backup *database.BackupStrategy
+	units      []*unit
+	users      []database.User
+	backup     *database.BackupStrategy
+	authConfig *dockerclient.AuthConfig
 }
 
 func NewService(svc database.Service, retry, unitNum, userNum int) *Service {
