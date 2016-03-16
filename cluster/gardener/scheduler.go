@@ -3,8 +3,10 @@ package gardener
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"sync/atomic"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
 )
@@ -38,7 +40,7 @@ func (c *Cluster) ServiceScheduler() (err error) {
 
 		for _, module := range svc.base.Modules {
 
-			list := c.UPMlistNodes(module.Nodes, module.Type)
+			list := c.listNodes_UPM(module.Nodes, module.Type)
 
 			config := &cluster.ContainerConfig{}
 
@@ -51,13 +53,14 @@ func (c *Cluster) ServiceScheduler() (err error) {
 				svc.pendingContainers[key] = value
 			}
 
-			atomic.StoreInt64(&svc.Status, 1)
-
-			svc.Unlock()
-
-			c.ServiceToExecute(svc)
-
 		}
+
+		// scheduler success
+		atomic.StoreInt64(&svc.Status, 1)
+
+		svc.Unlock()
+
+		c.ServiceToExecute(svc)
 	}
 
 	return err
@@ -77,11 +80,27 @@ func (c *Cluster) buildPendingContainers(list []*node.Node, num int,
 	candidates, err := c.Scheduler(list, defConfig, num, withImageAffinity)
 	if err != nil {
 
-		candidates, err = c.Scheduler(list, defConfig, num, true)
-		if err != nil {
-			c.scheduler.Unlock()
-			return nil, err
+		var retries int64
+		//  fails with image not found, then try to reschedule with image affinity
+		bImageNotFoundError, _ := regexp.MatchString(`image \S* not found`, err.Error())
+		if bImageNotFoundError && !defConfig.HaveNodeConstraint() {
+			// Check if the image exists in the cluster
+			// If exists, retry with a image affinity
+			if c.Image(defConfig.Image) != nil {
+				candidates, err = c.Scheduler(list, defConfig, num, true)
+				retries++
+			}
 		}
+
+		for ; retries < c.createRetry && err != nil; retries++ {
+			log.WithFields(log.Fields{"Name": "Swarm"}).Warnf("Failed to scheduler: %s, retrying", err)
+			candidates, err = c.Scheduler(list, defConfig, num, true)
+		}
+	}
+
+	if err != nil {
+		c.scheduler.Unlock()
+		return nil, err
 	}
 
 	if len(candidates) < num {
@@ -150,8 +169,8 @@ func (c *Cluster) Scheduler(list []*node.Node, config *cluster.ContainerConfig, 
 	return c.selectNodeByCluster(nodes, num, true)
 }
 
-// UPMlistNodes returns all validated engines in the cluster, excluding pendingEngines.
-func (c *Cluster) UPMlistNodes(names []string, dcTag string) []*node.Node {
+// listNodes_UPM returns all validated engines in the cluster, excluding pendingEngines.
+func (c *Cluster) listNodes_UPM(names []string, dcTag string) []*node.Node {
 	c.RLock()
 	defer c.RUnlock()
 
