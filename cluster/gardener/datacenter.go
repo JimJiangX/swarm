@@ -35,7 +35,7 @@ func (c *Cluster) AddDatacenter(cl database.Cluster,
 		"cluster":   cl.Name,
 		"nodeNum":   len(nodes),
 		"storesNum": len(stores),
-	}).Info("Adding New Datacenter")
+	}).Info("Datacenter Initializing")
 
 	err := cl.Insert()
 	if err != nil {
@@ -62,7 +62,7 @@ func (c *Cluster) AddDatacenter(cl database.Cluster,
 	c.datacenters = append(c.datacenters, dc)
 	c.Unlock()
 
-	log.Infof("Added Datacenter:%s", dc.Name)
+	log.Infof("Datacenter Initialized:%s", dc.Name)
 
 	return nil
 }
@@ -73,6 +73,22 @@ func (dc *Datacenter) ListNode() ([]*database.Node, error) {
 	dc.RUnlock()
 
 	return nodes, nil
+}
+
+func (dc *Datacenter) isNodeExist(IDOrName string) bool {
+	dc.RLock()
+
+	for i := range dc.nodes {
+
+		if dc.nodes[i].ID == IDOrName || dc.nodes[i].Name == IDOrName {
+			dc.Unlock()
+			return true
+		}
+	}
+
+	dc.Unlock()
+
+	return false
 }
 
 func (dc *Datacenter) GetNode(IDOrName string) (database.Node, error) {
@@ -104,6 +120,65 @@ func (dc *Datacenter) getNode(IDOrName string) *database.Node {
 	}
 
 	return nil
+}
+
+func (dc *Datacenter) listNodeID() []string {
+	out := make([]string, 0, len(dc.nodes))
+
+	dc.RLock()
+	nodes := dc.nodes
+
+	if len(nodes) == 0 {
+
+		var err error
+		nodes, err = database.ListNode()
+		if err != nil {
+			dc.RUnlock()
+			return nil
+		}
+
+	}
+
+	dc.RUnlock()
+
+	for i := range nodes {
+		out = append(out, nodes[i].ID)
+	}
+
+	return out
+}
+
+func (c *Cluster) DatacenterByNode(IDOrName string) (*Datacenter, error) {
+	c.RLock()
+
+	for i := range c.datacenters {
+
+		if c.datacenters[i].isNodeExist(IDOrName) {
+			c.RUnlock()
+
+			return c.datacenters[i], nil
+		}
+	}
+
+	c.RUnlock()
+
+	node, err := database.GetNode(IDOrName)
+	if err != nil {
+		return nil, err
+	}
+
+	c.RLock()
+	for i := range c.datacenters {
+		if c.datacenters[i].ID == node.ClusterID {
+			c.RUnlock()
+
+			return c.datacenters[i], nil
+		}
+	}
+
+	c.RUnlock()
+
+	return nil, errors.New("Datacenter Not Found")
 }
 
 func (dc *Datacenter) RegisterNode(IDOrName string) error {

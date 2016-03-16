@@ -15,16 +15,13 @@ type Service struct {
 
 	database.Service
 
-	cluster *Cluster
-
 	units  []*unit
 	users  []database.User
 	backup *database.BackupStrategy
 }
 
-func NewService(cl *Cluster, svc database.Service, retry, unitNum, userNum int) *Service {
+func NewService(svc database.Service, retry, unitNum, userNum int) *Service {
 	return &Service{
-		cluster:      cl,
 		Service:      svc,
 		failureRetry: retry,
 		units:        make([]*unit, unitNum),
@@ -32,12 +29,12 @@ func NewService(cl *Cluster, svc database.Service, retry, unitNum, userNum int) 
 	}
 }
 
-func BuildService(cl *Cluster, svc database.Service) (*Service, error) {
+func BuildService(svc database.Service) (*Service, error) {
 	if err := Validate(svc); err != nil {
 		return nil, err
 	}
 
-	return NewService(cl, svc, 2, 0, 0), nil
+	return NewService(svc, 2, 0, 0), nil
 }
 
 func Validate(svc database.Service) error {

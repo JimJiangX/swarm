@@ -1,6 +1,12 @@
 package gardener
 
-import "github.com/samalba/dockerclient"
+import (
+	"strconv"
+	"strings"
+
+	"github.com/docker/swarm/cluster"
+	"github.com/samalba/dockerclient"
+)
 
 func defaultContainerConfig() *dockerclient.ContainerConfig {
 	return &dockerclient.ContainerConfig{
@@ -21,7 +27,7 @@ func defaultContainerConfig() *dockerclient.ContainerConfig {
 	}
 }
 
-func buildContainerConfig(config *dockerclient.ContainerConfig) *dockerclient.ContainerConfig {
+func buildContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerConfig {
 
 	if config.AttachStdout == false {
 		config.AttachStdout = true
@@ -68,4 +74,33 @@ func buildContainerConfig(config *dockerclient.ContainerConfig) *dockerclient.Co
 	}
 
 	return config
+}
+
+// "c;c;c;":3
+func getCPU_Num(s string) int {
+	num := 1
+	for _, char := range s {
+		if char == ';' {
+			num++
+		}
+	}
+
+	return num
+}
+
+// "master:1--standby:1--slave:3"
+func getNodeArch(arch string) map[string]int {
+	s := strings.Split(arch, "--")
+	out := make(map[string]int)
+	for i := range s {
+		parts := strings.Split(s[i], ":")
+		if len(parts) == 2 {
+
+			if n, err := strconv.Atoi(parts[1]); err == nil {
+				out[parts[0]] = n
+			}
+		}
+	}
+
+	return out
 }
