@@ -7,7 +7,6 @@ import (
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
-	"github.com/samalba/dockerclient"
 )
 
 func (c *Cluster) ServiceToScheduler(svc *Service) {
@@ -46,7 +45,7 @@ func (c *Cluster) ServiceScheduler() (err error) {
 	return err
 }
 
-func (c *Cluster) buildPendingContainers(list []string, defConfig *cluster.ContainerConfig, num int, withImageAffinity bool, authConfig *dockerclient.AuthConfig) ([]*pendingContainer, error) {
+func (c *Cluster) buildPendingContainers(list []string, defConfig *cluster.ContainerConfig, num int, withImageAffinity bool) ([]*pendingContainer, error) {
 	swarmID := defConfig.SwarmID()
 	if swarmID != "" {
 		return nil, errors.New("Swarm ID to the container have created")

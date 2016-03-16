@@ -8,22 +8,25 @@ import (
 	"github.com/samalba/dockerclient"
 )
 
-func defaultContainerConfig() *dockerclient.ContainerConfig {
-	return &dockerclient.ContainerConfig{
-		AttachStdout: true,
-		AttachStderr: true,
-		ExposedPorts: make(map[string]struct{}),
-		Env:          make([]string, 0, 5),
-		Cmd:          make([]string, 0, 5),
-		Volumes:      make(map[string]struct{}),
-		Labels:       make(map[string]string),
+func defaultContainerConfig() *cluster.ContainerConfig {
+	return &cluster.ContainerConfig{
 
-		HostConfig: dockerclient.HostConfig{
-			Binds:         make([]string, 0, 5),
-			NetworkMode:   "default",
-			RestartPolicy: dockerclient.RestartPolicy{Name: "no"},
+		ContainerConfig: dockerclient.ContainerConfig{
+			AttachStdout: true,
+			AttachStderr: true,
+			ExposedPorts: make(map[string]struct{}),
+			Env:          make([]string, 0, 5),
+			Cmd:          make([]string, 0, 5),
+			Volumes:      make(map[string]struct{}),
+			Labels:       make(map[string]string),
+
+			HostConfig: dockerclient.HostConfig{
+				Binds:         make([]string, 0, 5),
+				NetworkMode:   "default",
+				RestartPolicy: dockerclient.RestartPolicy{Name: "no"},
+			},
+			NetworkingConfig: dockerclient.NetworkingConfig{},
 		},
-		NetworkingConfig: dockerclient.NetworkingConfig{},
 	}
 }
 
