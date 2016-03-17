@@ -46,7 +46,7 @@ func (c *Cluster) ServiceScheduler() (err error) {
 
 			pendingContainers, err := c.buildPendingContainers(list, module.Num, config, false)
 			if err != nil {
-
+				goto failure
 			}
 
 			for key, value := range pendingContainers {
@@ -61,6 +61,24 @@ func (c *Cluster) ServiceScheduler() (err error) {
 		svc.Unlock()
 
 		c.ServiceToExecute(svc)
+		continue
+
+	failure:
+
+		// scheduler failed
+		for swarmID := range svc.pendingContainers {
+
+			c.scheduler.Lock()
+			delete(c.pendingContainers, swarmID)
+			c.scheduler.Unlock()
+
+		}
+
+		svc.pendingContainers = make(map[string]*pendingContainer)
+		atomic.StoreInt64(&svc.Status, 10)
+
+		svc.Unlock()
+
 	}
 
 	return err

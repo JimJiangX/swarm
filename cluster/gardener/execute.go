@@ -39,18 +39,24 @@ func (c *Cluster) ServiceExecute() (err error) {
 
 			container, err := c.CreateContainer_UPM(swarmID, pending, svc.authConfig)
 			if err != nil {
-
+				goto failure
 			}
 
 			err = c.StartContainer(container)
 			if err != nil {
-
+				goto failure
 			}
 
 		}
 
 		atomic.StoreInt64(&svc.Status, 1)
 
+		svc.Unlock()
+
+		continue
+
+	failure:
+		atomic.StoreInt64(&svc.Status, 10)
 		svc.Unlock()
 	}
 
