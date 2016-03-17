@@ -8,6 +8,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/cluster/gardener/database"
 	"github.com/docker/swarm/scheduler/node"
 )
 
@@ -39,16 +40,23 @@ func (region *Region) ServiceScheduler() (err error) {
 		// modify scheduler label
 
 		for _, module := range svc.base.Modules {
+			// query image from database
+			if module.Config.Image == "" {
+				image, err := database.QueryImage(module.Name, module.Version)
+				if err != nil {
+					goto failure
+				}
+
+				module.Config.Image = image.ID
+			}
 
 			storeType, storeSize := module.Store()
-
 			filters := region.listShortIdleStore(storeType, int64(module.Num)*storeSize)
-
 			list := region.listCandidateNodes(module.Nodes, module.Type, filters...)
 
 			config := cluster.BuildContainerConfig(module.Config.ContainerConfig)
 
-			pendingContainers, err := region.buildPendingContainers(list, module.Num, config, false)
+			pendingContainers, err := region.buildPendingContainers(list, module.Type, module.Num, config, false)
 			if err != nil {
 				goto failure
 			}
@@ -88,16 +96,18 @@ func (region *Region) ServiceScheduler() (err error) {
 	return err
 }
 
-func (region *Region) buildPendingContainers(list []*node.Node, num int,
+func (region *Region) buildPendingContainers(
+	list []*node.Node, Type string, num int,
 	templConfig *cluster.ContainerConfig,
 	withImageAffinity bool) (map[string]*pendingContainer, error) {
+
+	region.scheduler.Lock()
+	defer region.scheduler.Unlock()
 
 	swarmID := templConfig.SwarmID()
 	if swarmID != "" {
 		return nil, errors.New("Swarm ID to the container have created")
 	}
-
-	region.scheduler.Lock()
 
 	candidates, err := region.Scheduler(list, templConfig, num, withImageAffinity)
 	if err != nil {
@@ -121,29 +131,29 @@ func (region *Region) buildPendingContainers(list []*node.Node, num int,
 	}
 
 	if err != nil {
-		region.scheduler.Unlock()
 		return nil, err
 	}
 
 	if len(candidates) < num {
-		region.scheduler.Unlock()
 		return nil, errors.New("Not Enough Nodes")
 	}
 
 	pendingContainers := make(map[string]*pendingContainer, num)
+	preAlloc := newPreAllocResource()
 
 	for i := range candidates {
 
 		engine, ok := region.engines[candidates[i].ID]
 		if !ok {
-			region.scheduler.Unlock()
-			return nil, fmt.Errorf("error creating container")
+			err = errors.New("Engine Not Found")
+			goto failure
 		}
 
-		config := *templConfig
-
-		constraint := fmt.Sprintf("constraint:node==%s", engine.ID)
-		config.Env = append(config.Env, constraint)
+		config, err := region.allocResource(preAlloc, engine, *templConfig, Type)
+		if err != nil {
+			err = fmt.Errorf("error resource alloc")
+			goto failure
+		}
 
 		swarmID := config.SwarmID()
 		if swarmID == "" {
@@ -154,13 +164,20 @@ func (region *Region) buildPendingContainers(list []*node.Node, num int,
 
 		pendingContainers[swarmID] = &pendingContainer{
 			Name:   region.generateUniqueID(),
-			Config: &config,
+			Config: config,
 			Engine: engine,
 		}
 	}
 
 	for key, value := range pendingContainers {
 		region.pendingContainers[key] = value
+	}
+
+	err = preAlloc.consistency()
+
+failure:
+	if err != nil {
+		region.Recycle(preAlloc)
 	}
 
 	region.scheduler.Unlock()
