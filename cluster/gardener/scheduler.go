@@ -46,7 +46,9 @@ func (region *Region) ServiceScheduler() (err error) {
 
 			list := region.listCandidateNodes(module.Nodes, module.Type, filters...)
 
-			pendingContainers, err := region.buildPendingContainers(list, module.Num, &module.Config, false)
+			config := cluster.BuildContainerConfig(module.Config.ContainerConfig)
+
+			pendingContainers, err := region.buildPendingContainers(list, module.Num, config, false)
 			if err != nil {
 				goto failure
 			}
@@ -87,34 +89,34 @@ func (region *Region) ServiceScheduler() (err error) {
 }
 
 func (region *Region) buildPendingContainers(list []*node.Node, num int,
-	defConfig *cluster.ContainerConfig,
+	templConfig *cluster.ContainerConfig,
 	withImageAffinity bool) (map[string]*pendingContainer, error) {
 
-	swarmID := defConfig.SwarmID()
+	swarmID := templConfig.SwarmID()
 	if swarmID != "" {
 		return nil, errors.New("Swarm ID to the container have created")
 	}
 
 	region.scheduler.Lock()
 
-	candidates, err := region.Scheduler(list, defConfig, num, withImageAffinity)
+	candidates, err := region.Scheduler(list, templConfig, num, withImageAffinity)
 	if err != nil {
 
 		var retries int64
 		//  fails with image not found, then try to reschedule with image affinity
 		bImageNotFoundError, _ := regexp.MatchString(`image \S* not found`, err.Error())
-		if bImageNotFoundError && !defConfig.HaveNodeConstraint() {
+		if bImageNotFoundError && !templConfig.HaveNodeConstraint() {
 			// Check if the image exists in the cluster
 			// If exists, retry with a image affinity
-			if region.Image(defConfig.Image) != nil {
-				candidates, err = region.Scheduler(list, defConfig, num, true)
+			if region.Image(templConfig.Image) != nil {
+				candidates, err = region.Scheduler(list, templConfig, num, true)
 				retries++
 			}
 		}
 
 		for ; retries < region.createRetry && err != nil; retries++ {
 			log.WithFields(log.Fields{"Name": "Swarm"}).Warnf("Failed to scheduler: %s, retrying", err)
-			candidates, err = region.Scheduler(list, defConfig, num, true)
+			candidates, err = region.Scheduler(list, templConfig, num, true)
 		}
 	}
 
@@ -138,7 +140,10 @@ func (region *Region) buildPendingContainers(list []*node.Node, num int,
 			return nil, fmt.Errorf("error creating container")
 		}
 
-		config := *defConfig
+		config := *templConfig
+
+		constraint := fmt.Sprintf("constraint:node==%s", engine.ID)
+		config.Env = append(config.Env, constraint)
 
 		swarmID := config.SwarmID()
 		if swarmID == "" {
