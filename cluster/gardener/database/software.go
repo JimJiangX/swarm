@@ -36,3 +36,15 @@ func (sw Software) InsertSoftware() error {
 
 	return nil
 }
+
+func QueryImage(name, version string) (Software, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return Software{}, err
+	}
+
+	sw := Software{}
+	err = db.QueryRowx("SELECT * FROM tb_software WHERE name=? AND version=?", name, version).StructScan(&sw)
+
+	return sw, err
+}

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/docker/swarm/cluster"
 )
 
 const (
@@ -136,6 +138,41 @@ func NewIPinfo(net *Networking, ip uint32) IPInfo {
 func (info IPInfo) String() string {
 
 	return fmt.Sprintf("%s/%d:%s", info.IP, info.Prefix, info.Device)
+}
+
+func (r *Region) getNetworkingSetting(engine *cluster.Engine, name, Type string) ([]IPInfo, error) {
+	networkings := make([]IPInfo, 0, 2)
+
+	ipinfo, err := r.allocIP("", ContainersNetworking)
+	if err != nil {
+		return nil, err
+	}
+
+	device, ok := engine.Labels["internal_NIC"]
+	if !ok {
+
+	}
+	ipinfo.Device = device
+
+	networkings = append(networkings, ipinfo)
+
+	if isProxyType(Type) || isProxyType(name) {
+
+		ipinfo2, err := r.allocIP("", ExternalAccessNetworking)
+		if err != nil {
+			return networkings, err
+		}
+
+		device, ok := engine.Labels["external_NIC"]
+		if !ok {
+
+		}
+		ipinfo2.Device = device
+
+		networkings = append(networkings, ipinfo2)
+	}
+
+	return networkings, err
 }
 
 func (region *Region) allocIP(id, typ string) (IPInfo, error) {
