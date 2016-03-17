@@ -28,7 +28,7 @@ type Datacenter struct {
 func (r *Region) AddDatacenter(cl database.Cluster,
 	nodes []*database.Node, stores []*store.Store) error {
 	if cl.ID == "" {
-		cl.ID = c.generateUniqueID()
+		cl.ID = r.generateUniqueID()
 	}
 
 	log.WithFields(log.Fields{

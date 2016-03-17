@@ -76,14 +76,14 @@ func (region *Region) CreateContainer(swarmID string, pending *pendingContainer,
 			// Check if the image exists in the cluster
 			// If exists, retry with a image affinity
 			if region.Image(config.Image) != nil {
-				container, err = region.createContainer_UPM(swarmID, pending, authConfig)
+				container, err = region.createContainer(swarmID, pending, authConfig)
 				retries++
 			}
 		}
 
 		for ; retries < region.createRetry && err != nil; retries++ {
 			log.WithFields(log.Fields{"Name": "Swarm"}).Warnf("Failed to create container: %s, retrying", err)
-			container, err = region.createContainer_UPM(swarmID, pending, authConfig)
+			container, err = region.createContainer(swarmID, pending, authConfig)
 		}
 	}
 
