@@ -40,7 +40,11 @@ func (region *Region) ServiceScheduler() (err error) {
 
 		for _, module := range svc.base.Modules {
 
-			list := region.listNodes(module.Nodes, module.Type)
+			storeType, storeSize := module.Store()
+
+			filters := region.listShortIdleStore(storeType, int64(module.Num)*storeSize)
+
+			list := region.listCandidateNodes(module.Nodes, module.Type, filters...)
 
 			pendingContainers, err := region.buildPendingContainers(list, module.Num, &module.Config, false)
 			if err != nil {
@@ -186,7 +190,7 @@ func (region *Region) Scheduler(list []*node.Node, config *cluster.ContainerConf
 }
 
 // listNodes returns all validated engines in the cluster, excluding pendingEngines.
-func (r *Region) listNodes(names []string, dcTag string) []*node.Node {
+func (r *Region) listCandidateNodes(names []string, dcTag string, filters ...string) []*node.Node {
 	r.RLock()
 	defer r.RUnlock()
 
@@ -196,13 +200,19 @@ func (r *Region) listNodes(names []string, dcTag string) []*node.Node {
 
 		for i := range r.datacenters {
 
-			if r.datacenters[i].Type != dcTag {
+			if r.datacenters[i].Type != dcTag ||
+				isStringExist(r.datacenters[i].ID, filters) {
+
 				continue
 			}
 
 			list := r.datacenters[i].listNodeID()
 
 			for _, id := range list {
+
+				if isStringExist(id, filters) {
+					continue
+				}
 
 				e, ok := r.engines[id]
 				if !ok {
@@ -227,6 +237,10 @@ func (r *Region) listNodes(names []string, dcTag string) []*node.Node {
 
 		for _, name := range names {
 
+			if isStringExist(name, filters) {
+				continue
+			}
+
 			e, ok := r.engines[name]
 			if !ok {
 				continue
@@ -245,6 +259,17 @@ func (r *Region) listNodes(names []string, dcTag string) []*node.Node {
 	}
 
 	return out
+}
+
+func isStringExist(s string, list []string) bool {
+	for i := range list {
+
+		if s == list[i] {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (r *Region) selectNodeByCluster(nodes []*node.Node, num int, diff bool) ([]*node.Node, error) {

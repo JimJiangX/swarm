@@ -17,4 +17,13 @@ type Module struct {
 	Configures map[string]interface{}
 
 	Config cluster.ContainerConfig
+
+	StoreType string
+	StoreSize int64
+}
+
+func (m Module) Store() (string, int64) {
+
+	return m.StoreType, m.StoreSize
+
 }
