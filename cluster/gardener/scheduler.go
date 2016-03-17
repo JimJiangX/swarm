@@ -144,7 +144,7 @@ func (region *Region) buildPendingContainers(list []*node.Node, num int,
 		}
 
 		pendingContainers[swarmID] = &pendingContainer{
-			Name:   c.generateUniqueID(),
+			Name:   region.generateUniqueID(),
 			Config: &config,
 			Engine: engine,
 		}
@@ -159,9 +159,9 @@ func (region *Region) buildPendingContainers(list []*node.Node, num int,
 	return pendingContainers, nil
 }
 
-func (c *Cluster) Scheduler(list []*node.Node, config *cluster.ContainerConfig, num int, withImageAffinity bool) ([]*node.Node, error) {
+func (region *Region) Scheduler(list []*node.Node, config *cluster.ContainerConfig, num int, withImageAffinity bool) ([]*node.Node, error) {
 
-	if network := c.Networks().Get(config.HostConfig.NetworkMode); network != nil && network.Scope == "local" {
+	if network := region.Networks().Get(config.HostConfig.NetworkMode); network != nil && network.Scope == "local" {
 		if !config.HaveNodeConstraint() {
 			config.AddConstraint("node==~" + network.Engine.Name)
 		}
@@ -172,7 +172,7 @@ func (c *Cluster) Scheduler(list []*node.Node, config *cluster.ContainerConfig, 
 		config.AddAffinity("image==" + config.Image)
 	}
 
-	nodes, err := c.scheduler.SelectNodesForContainer(list, config)
+	nodes, err := region.scheduler.SelectNodesForContainer(list, config)
 
 	if withImageAffinity {
 		config.RemoveAffinity("image==" + config.Image)
@@ -182,36 +182,36 @@ func (c *Cluster) Scheduler(list []*node.Node, config *cluster.ContainerConfig, 
 		return nil, err
 	}
 
-	return c.selectNodeByCluster(nodes, num, true)
+	return region.selectNodeByCluster(nodes, num, true)
 }
 
-// listNodes_UPM returns all validated engines in the cluster, excluding pendingEngines.
-func (c *Cluster) listNodes_UPM(names []string, dcTag string) []*node.Node {
-	c.RLock()
-	defer c.RUnlock()
+// listNodes returns all validated engines in the cluster, excluding pendingEngines.
+func (r *Region) listNodes(names []string, dcTag string) []*node.Node {
+	r.RLock()
+	defer r.RUnlock()
 
-	out := make([]*node.Node, 0, len(c.engines))
+	out := make([]*node.Node, 0, len(r.engines))
 
 	if len(names) == 0 {
 
-		for i := range c.datacenters {
+		for i := range r.datacenters {
 
-			if c.datacenters[i].Type != dcTag {
+			if r.datacenters[i].Type != dcTag {
 				continue
 			}
 
-			list := c.datacenters[i].listNodeID()
+			list := r.datacenters[i].listNodeID()
 
 			for _, id := range list {
 
-				e, ok := c.engines[id]
+				e, ok := r.engines[id]
 				if !ok {
 					continue
 				}
 
 				node := node.NewNode(e)
 
-				for _, c := range c.pendingContainers {
+				for _, c := range r.pendingContainers {
 
 					if c.Engine.ID == e.ID && node.Container(c.Config.SwarmID()) == nil {
 						node.AddContainer(c.ToContainer())
@@ -227,14 +227,14 @@ func (c *Cluster) listNodes_UPM(names []string, dcTag string) []*node.Node {
 
 		for _, name := range names {
 
-			e, ok := c.engines[name]
+			e, ok := r.engines[name]
 			if !ok {
 				continue
 			}
 
 			node := node.NewNode(e)
 
-			for _, c := range c.pendingContainers {
+			for _, c := range r.pendingContainers {
 				if c.Engine.ID == e.ID && node.Container(c.Config.SwarmID()) == nil {
 					node.AddContainer(c.ToContainer())
 				}
@@ -247,7 +247,7 @@ func (c *Cluster) listNodes_UPM(names []string, dcTag string) []*node.Node {
 	return out
 }
 
-func (c *Cluster) selectNodeByCluster(nodes []*node.Node, num int, diff bool) ([]*node.Node, error) {
+func (r *Region) selectNodeByCluster(nodes []*node.Node, num int, diff bool) ([]*node.Node, error) {
 
 	if len(nodes) < num {
 		return nil, errors.New("Not Enough Nodes")
@@ -262,7 +262,7 @@ func (c *Cluster) selectNodeByCluster(nodes []*node.Node, num int, diff bool) ([
 
 	for i := range nodes {
 
-		dc, err := c.DatacenterByNode(nodes[i].ID)
+		dc, err := r.DatacenterByNode(nodes[i].ID)
 		if err != nil {
 			continue
 		}
@@ -303,7 +303,7 @@ func (c *Cluster) selectNodeByCluster(nodes []*node.Node, num int, diff bool) ([
 
 		for i := range nodes {
 
-			dc, err := c.DatacenterByNode(nodes[i].ID)
+			dc, err := r.DatacenterByNode(nodes[i].ID)
 			if err != nil {
 				continue
 			}
