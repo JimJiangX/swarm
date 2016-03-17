@@ -27,10 +27,11 @@ type Service struct {
 
 func NewService(svc database.Service, retry, unitNum, userNum int) *Service {
 	return &Service{
-		Service:      svc,
-		failureRetry: retry,
-		units:        make([]*unit, unitNum),
-		users:        make([]database.User, userNum),
+		Service:           svc,
+		failureRetry:      retry,
+		units:             make([]*unit, unitNum),
+		users:             make([]database.User, userNum),
+		pendingContainers: make(map[string]*pendingContainer),
 	}
 }
 
