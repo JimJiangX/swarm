@@ -3,6 +3,7 @@ package gardener
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 
@@ -13,6 +14,10 @@ import (
 	"github.com/hashicorp/terraform/communicator/remote"
 	"github.com/hashicorp/terraform/communicator/ssh"
 	"github.com/hashicorp/terraform/terraform"
+)
+
+const (
+	LocalDiskStore = "localDiskStore"
 )
 
 type Datacenter struct {
@@ -179,6 +184,69 @@ func (r *Region) DatacenterByNode(IDOrName string) (*Datacenter, error) {
 	r.RUnlock()
 
 	return nil, errors.New("Datacenter Not Found")
+}
+
+func (dc *Datacenter) isIdleStoreEnough(IDOrType string, size int64) bool {
+	dc.RLock()
+
+	store, err := dc.getStore(IDOrType)
+	if err != nil {
+		dc.RUnlock()
+
+		return false
+	}
+
+	dc.RUnlock()
+
+	idle, err := store.IdleSize()
+	if err != nil {
+		return false
+	}
+
+	return idle > size
+}
+
+func (dc *Datacenter) getStore(IDOrType string) (*store.Store, error) {
+	for i := range dc.stores {
+		if IDOrType == dc.stores[i].Type() || IDOrType == dc.stores[i].ID() {
+
+			return dc.stores[i], nil
+		}
+	}
+
+	return nil, fmt.Errorf("Store:%s Not Found", IDOrType)
+}
+
+func (dc *Datacenter) AllocStore(host, IDOrType string, size int64) error {
+	dc.Lock()
+	defer dc.Unlock()
+
+	store, err := dc.getStore(IDOrType)
+	if err != nil {
+		return err
+	}
+
+	err = store.Alloc(host, size)
+
+	return err
+}
+
+func (r *Region) listShortIdleStore(IDOrType string, size int64) []string {
+	if IDOrType == LocalDiskStore {
+		return nil
+	}
+
+	out := make([]string, 0, 100)
+	r.RLock()
+	defer r.RUnlock()
+
+	for i := range r.datacenters {
+		if !r.datacenters[i].isIdleStoreEnough(IDOrType, size) {
+			out = append(out, r.datacenters[i].ID)
+		}
+	}
+
+	return out
 }
 
 func (dc *Datacenter) RegisterNode(IDOrName string) error {
