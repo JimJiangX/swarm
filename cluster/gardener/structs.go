@@ -1,6 +1,6 @@
 package gardener
 
-import "github.com/docker/engine-api/types/container"
+import "github.com/docker/swarm/cluster"
 
 type PostServiceRequest struct {
 	Name    string
@@ -16,6 +16,5 @@ type Module struct {
 	Nodes      []string
 	Configures map[string]interface{}
 
-	Config     container.Config
-	HostConfig container.HostConfig
+	Config cluster.ContainerConfig
 }

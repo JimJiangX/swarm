@@ -11,11 +11,11 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 )
 
-func (c *Cluster) ServiceToScheduler(svc *Service) {
-	c.serviceSchedulerCh <- svc
+func (region *Region) ServiceToScheduler(svc *Service) {
+	region.serviceSchedulerCh <- svc
 }
 
-func (c *Cluster) ServiceScheduler() (err error) {
+func (region *Region) ServiceScheduler() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Recover From Panic:%v,Error:%s", r, err)
@@ -23,7 +23,7 @@ func (c *Cluster) ServiceScheduler() (err error) {
 	}()
 
 	for {
-		svc := <-c.serviceSchedulerCh
+		svc := <-region.serviceSchedulerCh
 
 		if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
 			continue
@@ -40,11 +40,9 @@ func (c *Cluster) ServiceScheduler() (err error) {
 
 		for _, module := range svc.base.Modules {
 
-			list := c.listNodes_UPM(module.Nodes, module.Type)
+			list := region.listNodes(module.Nodes, module.Type)
 
-			config := &cluster.ContainerConfig{}
-
-			pendingContainers, err := c.buildPendingContainers(list, module.Num, config, false)
+			pendingContainers, err := region.buildPendingContainers(list, module.Num, &module.Config, false)
 			if err != nil {
 				goto failure
 			}
@@ -60,7 +58,7 @@ func (c *Cluster) ServiceScheduler() (err error) {
 
 		svc.Unlock()
 
-		c.ServiceToExecute(svc)
+		region.ServiceToExecute(svc)
 		continue
 
 	failure:
@@ -68,9 +66,9 @@ func (c *Cluster) ServiceScheduler() (err error) {
 		// scheduler failed
 		for swarmID := range svc.pendingContainers {
 
-			c.scheduler.Lock()
-			delete(c.pendingContainers, swarmID)
-			c.scheduler.Unlock()
+			region.scheduler.Lock()
+			delete(region.pendingContainers, swarmID)
+			region.scheduler.Unlock()
 
 		}
 
@@ -84,7 +82,7 @@ func (c *Cluster) ServiceScheduler() (err error) {
 	return err
 }
 
-func (c *Cluster) buildPendingContainers(list []*node.Node, num int,
+func (region *Region) buildPendingContainers(list []*node.Node, num int,
 	defConfig *cluster.ContainerConfig,
 	withImageAffinity bool) (map[string]*pendingContainer, error) {
 
@@ -93,9 +91,9 @@ func (c *Cluster) buildPendingContainers(list []*node.Node, num int,
 		return nil, errors.New("Swarm ID to the container have created")
 	}
 
-	c.scheduler.Lock()
+	region.scheduler.Lock()
 
-	candidates, err := c.Scheduler(list, defConfig, num, withImageAffinity)
+	candidates, err := region.Scheduler(list, defConfig, num, withImageAffinity)
 	if err != nil {
 
 		var retries int64
@@ -104,25 +102,25 @@ func (c *Cluster) buildPendingContainers(list []*node.Node, num int,
 		if bImageNotFoundError && !defConfig.HaveNodeConstraint() {
 			// Check if the image exists in the cluster
 			// If exists, retry with a image affinity
-			if c.Image(defConfig.Image) != nil {
-				candidates, err = c.Scheduler(list, defConfig, num, true)
+			if region.Image(defConfig.Image) != nil {
+				candidates, err = region.Scheduler(list, defConfig, num, true)
 				retries++
 			}
 		}
 
-		for ; retries < c.createRetry && err != nil; retries++ {
+		for ; retries < region.createRetry && err != nil; retries++ {
 			log.WithFields(log.Fields{"Name": "Swarm"}).Warnf("Failed to scheduler: %s, retrying", err)
-			candidates, err = c.Scheduler(list, defConfig, num, true)
+			candidates, err = region.Scheduler(list, defConfig, num, true)
 		}
 	}
 
 	if err != nil {
-		c.scheduler.Unlock()
+		region.scheduler.Unlock()
 		return nil, err
 	}
 
 	if len(candidates) < num {
-		c.scheduler.Unlock()
+		region.scheduler.Unlock()
 		return nil, errors.New("Not Enough Nodes")
 	}
 
@@ -130,9 +128,9 @@ func (c *Cluster) buildPendingContainers(list []*node.Node, num int,
 
 	for i := range candidates {
 
-		engine, ok := c.engines[candidates[i].ID]
+		engine, ok := region.engines[candidates[i].ID]
 		if !ok {
-			c.scheduler.Unlock()
+			region.scheduler.Unlock()
 			return nil, fmt.Errorf("error creating container")
 		}
 
@@ -141,7 +139,7 @@ func (c *Cluster) buildPendingContainers(list []*node.Node, num int,
 		swarmID := config.SwarmID()
 		if swarmID == "" {
 			// Associate a Swarm ID to the container we are creating.
-			swarmID = c.generateUniqueID()
+			swarmID = region.generateUniqueID()
 			config.SetSwarmID(swarmID)
 		}
 
@@ -153,10 +151,10 @@ func (c *Cluster) buildPendingContainers(list []*node.Node, num int,
 	}
 
 	for key, value := range pendingContainers {
-		c.pendingContainers[key] = value
+		region.pendingContainers[key] = value
 	}
 
-	c.scheduler.Unlock()
+	region.scheduler.Unlock()
 
 	return pendingContainers, nil
 }

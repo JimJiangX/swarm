@@ -47,16 +47,16 @@ func Validate(svc database.Service) error {
 	return nil
 }
 
-func (c *Cluster) AddService(svc *Service) error {
+func (region *Region) AddService(svc *Service) error {
 	if svc == nil {
 		return errors.New("Service Cannot be nil")
 	}
 
-	c.RLock()
+	region.RLock()
 
-	s, err := c.getService(svc.ID)
+	s, err := region.getService(svc.ID)
 
-	c.RUnlock()
+	region.RUnlock()
 
 	if s != nil || err == nil {
 
@@ -73,18 +73,18 @@ func (c *Cluster) AddService(svc *Service) error {
 		return err
 	}
 
-	c.Lock()
-	c.services = append(c.services, svc)
-	c.Unlock()
+	region.Lock()
+	region.services = append(region.services, svc)
+	region.Unlock()
 
 	return nil
 }
 
-func (c *Cluster) getService(IDOrName string) (*Service, error) {
-	for i := range c.services {
-		if c.services[i].ID == IDOrName ||
-			c.services[i].Name == IDOrName {
-			return c.services[i], nil
+func (region *Region) getService(IDOrName string) (*Service, error) {
+	for i := range region.services {
+		if region.services[i].ID == IDOrName ||
+			region.services[i].Name == IDOrName {
+			return region.services[i], nil
 		}
 	}
 

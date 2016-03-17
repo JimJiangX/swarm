@@ -25,14 +25,14 @@ type Datacenter struct {
 	nodes []*database.Node
 }
 
-func (c *Cluster) AddDatacenter(cl database.Cluster,
+func (r *Region) AddDatacenter(cl database.Cluster,
 	nodes []*database.Node, stores []*store.Store) error {
 	if cl.ID == "" {
 		cl.ID = c.generateUniqueID()
 	}
 
 	log.WithFields(log.Fields{
-		"cluster":   cl.Name,
+		"dc":        cl.Name,
 		"nodeNum":   len(nodes),
 		"storesNum": len(stores),
 	}).Info("Datacenter Initializing")
@@ -58,9 +58,9 @@ func (c *Cluster) AddDatacenter(cl database.Cluster,
 		nodes:   nodes,
 	}
 
-	c.Lock()
-	c.datacenters = append(c.datacenters, dc)
-	c.Unlock()
+	r.Lock()
+	r.datacenters = append(r.datacenters, dc)
+	r.Unlock()
 
 	log.Infof("Datacenter Initialized:%s", dc.Name)
 
@@ -148,35 +148,35 @@ func (dc *Datacenter) listNodeID() []string {
 	return out
 }
 
-func (c *Cluster) DatacenterByNode(IDOrName string) (*Datacenter, error) {
-	c.RLock()
+func (r *Region) DatacenterByNode(IDOrName string) (*Datacenter, error) {
+	r.RLock()
 
-	for i := range c.datacenters {
+	for i := range r.datacenters {
 
-		if c.datacenters[i].isNodeExist(IDOrName) {
-			c.RUnlock()
+		if r.datacenters[i].isNodeExist(IDOrName) {
+			r.RUnlock()
 
-			return c.datacenters[i], nil
+			return r.datacenters[i], nil
 		}
 	}
 
-	c.RUnlock()
+	r.RUnlock()
 
 	node, err := database.GetNode(IDOrName)
 	if err != nil {
 		return nil, err
 	}
 
-	c.RLock()
-	for i := range c.datacenters {
-		if c.datacenters[i].ID == node.ClusterID {
-			c.RUnlock()
+	r.RLock()
+	for i := range r.datacenters {
+		if r.datacenters[i].ID == node.ClusterID {
+			r.RUnlock()
 
-			return c.datacenters[i], nil
+			return r.datacenters[i], nil
 		}
 	}
 
-	c.RUnlock()
+	r.RUnlock()
 
 	return nil, errors.New("Datacenter Not Found")
 }
