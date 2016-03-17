@@ -80,16 +80,16 @@ func (net *Networking) allocIP() (uint32, error) {
 	return 0, ErrNotFoundIP
 }
 
-func (c *Cluster) GetNetworking(typ string) *Networking {
+func (region *Region) GetNetworking(typ string) *Networking {
 
-	c.RLock()
+	region.RLock()
 
-	c.RUnlock()
+	region.RUnlock()
 
-	for i := range c.networkings {
-		if c.networkings[i].Enable &&
-			c.networkings[i].Type == typ {
-			return c.networkings[i]
+	for i := range region.networkings {
+		if region.networkings[i].Enable &&
+			region.networkings[i].Type == typ {
+			return region.networkings[i]
 		}
 	}
 
@@ -102,11 +102,11 @@ type Port struct {
 }
 
 // AllocPorts for alloc ports.
-func (c *Cluster) AllocPorts(num int) []int64 {
+func (region *Region) AllocPorts(num int) []int64 {
 	ports := make([]int64, num)
 
 	for i := 0; i < num; i++ {
-		ports[i] = atomic.AddInt64(&c.allocatedPort, 1)
+		ports[i] = atomic.AddInt64(&region.allocatedPort, 1)
 	}
 
 	return ports
@@ -138,21 +138,21 @@ func (info IPInfo) String() string {
 	return fmt.Sprintf("%s/%d:%s", info.IP, info.Prefix, info.Device)
 }
 
-func (c *Cluster) allocIP(id, typ string) (IPInfo, error) {
-	for i := range c.networkings {
-		if !c.networkings[i].Enable {
+func (region *Region) allocIP(id, typ string) (IPInfo, error) {
+	for i := range region.networkings {
+		if !region.networkings[i].Enable {
 			continue
 		}
 
-		if (id != "" && id == c.networkings[i].ID) ||
-			(typ != "" && typ == c.networkings[i].Type) {
+		if (id != "" && id == region.networkings[i].ID) ||
+			(typ != "" && typ == region.networkings[i].Type) {
 
-			ip, err := c.networkings[i].allocIP()
+			ip, err := region.networkings[i].allocIP()
 			if err != nil {
 				continue
 			}
 
-			return NewIPinfo(c.networkings[i], ip), nil
+			return NewIPinfo(region.networkings[i], ip), nil
 		}
 	}
 

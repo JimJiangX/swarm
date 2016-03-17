@@ -10,11 +10,11 @@ import (
 	"github.com/samalba/dockerclient"
 )
 
-func (c *Cluster) ServiceToExecute(svc *Service) {
-	c.serviceExecuteCh <- svc
+func (r *Region) ServiceToExecute(svc *Service) {
+	r.serviceExecuteCh <- svc
 }
 
-func (c *Cluster) ServiceExecute() (err error) {
+func (region *Region) ServiceExecute() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Recover From Panic:%v,Error:%s", r, err)
@@ -22,7 +22,7 @@ func (c *Cluster) ServiceExecute() (err error) {
 	}()
 
 	for {
-		svc := <-c.serviceExecuteCh
+		svc := <-region.serviceExecuteCh
 
 		if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
 			continue
@@ -37,12 +37,12 @@ func (c *Cluster) ServiceExecute() (err error) {
 
 			// create container
 
-			container, err := c.CreateContainer_UPM(swarmID, pending, svc.authConfig)
+			container, err := region.CreateContainer(swarmID, pending, svc.authConfig)
 			if err != nil {
 				goto failure
 			}
 
-			err = c.StartContainer(container)
+			err = region.StartContainer(container)
 			if err != nil {
 				goto failure
 			}
@@ -64,8 +64,8 @@ func (c *Cluster) ServiceExecute() (err error) {
 }
 
 // CreateContainer aka schedule a brand new container into the cluster.
-func (c *Cluster) CreateContainer_UPM(swarmID string, pending *pendingContainer, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
-	container, err := c.createContainer_UPM(swarmID, pending, authConfig)
+func (region *Region) CreateContainer(swarmID string, pending *pendingContainer, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
+	container, err := region.createContainer(swarmID, pending, authConfig)
 
 	if err != nil {
 		var retries int64
@@ -75,23 +75,23 @@ func (c *Cluster) CreateContainer_UPM(swarmID string, pending *pendingContainer,
 		if bImageNotFoundError && !config.HaveNodeConstraint() {
 			// Check if the image exists in the cluster
 			// If exists, retry with a image affinity
-			if c.Image(config.Image) != nil {
-				container, err = c.createContainer_UPM(swarmID, pending, authConfig)
+			if region.Image(config.Image) != nil {
+				container, err = region.createContainer_UPM(swarmID, pending, authConfig)
 				retries++
 			}
 		}
 
-		for ; retries < c.createRetry && err != nil; retries++ {
+		for ; retries < region.createRetry && err != nil; retries++ {
 			log.WithFields(log.Fields{"Name": "Swarm"}).Warnf("Failed to create container: %s, retrying", err)
-			container, err = c.createContainer_UPM(swarmID, pending, authConfig)
+			container, err = region.createContainer_UPM(swarmID, pending, authConfig)
 		}
 	}
 
 	return container, err
 }
 
-func (c *Cluster) createContainer_UPM(swarmID string, pending *pendingContainer, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
-	c.scheduler.Lock()
+func (region *Region) createContainer(swarmID string, pending *pendingContainer, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
+	region.scheduler.Lock()
 	config := pending.Config
 
 	id := config.SwarmID()
@@ -99,18 +99,18 @@ func (c *Cluster) createContainer_UPM(swarmID string, pending *pendingContainer,
 		swarmID = id
 
 		if swarmID == "" {
-			c.scheduler.Unlock()
+			region.scheduler.Unlock()
 			return nil, fmt.Errorf("Conflict: The swarmID is Null,assign %s to a container", pending.Name)
 		}
 	}
 
 	// Ensure the name is available
-	if !c.checkNameUniqueness(pending.Name) {
-		c.scheduler.Unlock()
+	if !region.checkNameUniqueness(pending.Name) {
+		region.scheduler.Unlock()
 		return nil, fmt.Errorf("Conflict: The name %s is already assigned. You have to delete (or rename) that container to be able to assign %s to a container again.", pending.Name, pending.Name)
 	}
 
-	if network := c.Networks().Get(config.HostConfig.NetworkMode); network != nil && network.Scope == "local" {
+	if network := region.Networks().Get(config.HostConfig.NetworkMode); network != nil && network.Scope == "local" {
 		if !config.HaveNodeConstraint() {
 			config.AddConstraint("node==~" + network.Engine.Name)
 		}
@@ -119,9 +119,9 @@ func (c *Cluster) createContainer_UPM(swarmID string, pending *pendingContainer,
 
 	container, err := pending.Engine.Create(config, pending.Name, true, authConfig)
 
-	c.scheduler.Lock()
-	delete(c.pendingContainers, swarmID)
-	c.scheduler.Unlock()
+	region.scheduler.Lock()
+	delete(region.pendingContainers, swarmID)
+	region.scheduler.Unlock()
 
 	return container, err
 }
