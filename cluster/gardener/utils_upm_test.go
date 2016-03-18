@@ -1,6 +1,30 @@
 package gardener
 
-import "testing"
+import (
+	"regexp"
+	"testing"
+)
+
+func TestGenerateUUID(t *testing.T) {
+	uuid := make(map[string]byte)
+	for length := 2; length <= 128; length *= 2 {
+		t.Log(length)
+		for i := 0; i < 100; i++ {
+			id := generateUUID(length)
+			if _, exist := uuid[id]; exist {
+				t.Fatalf("Should get a new ID!")
+			}
+			// fmt.Println(id)
+			if length == 64 {
+				matched, err := regexp.MatchString(
+					"[\\da-f]{16}[\\da-f]{8}[\\da-f]{8}[\\da-f]{8}[\\da-f]{24}", id)
+				if !matched || err != nil {
+					t.Fatalf("expected match %s %v %s", id, matched, err)
+				}
+			}
+		}
+	}
+}
 
 var iptest = []struct {
 	ip   string

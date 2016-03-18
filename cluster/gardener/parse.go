@@ -1,9 +1,12 @@
 package gardener
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 
+	log "github.com/Sirupsen/logrus"
+	"github.com/docker/docker/pkg/parsers"
 	"github.com/docker/swarm/cluster"
 	"github.com/samalba/dockerclient"
 )
@@ -75,16 +78,40 @@ func buildContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerCon
 	return config
 }
 
-// "c;c;c;":3
-func getCPU_Num(s string) int {
-	num := 1
-	for _, char := range s {
-		if char == ';' {
-			num++
-		}
+func ParseCPUSets(val string) (map[int]bool, error) {
+	return parsers.ParseUintList(val)
+}
+
+func validateContainerConfig(config *cluster.ContainerConfig) error {
+	// validate config
+	swarmID := config.SwarmID()
+	if swarmID != "" {
+		return errors.New("Swarm ID to the container have created")
 	}
 
-	return num
+	if config.CpuShares > 0 || config.HostConfig.CpuShares > 0 {
+		return errors.New("CpuShares > 0,CpuShares should be 0")
+	}
+
+	_, err := parseCpuset(config)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// parse NCPU from config.HostConfig.CpusetCpus
+func parseCpuset(config *cluster.ContainerConfig) (int, error) {
+
+	ncpu, err := strconv.Atoi(config.HostConfig.CpusetCpus)
+
+	log.WithFields(log.Fields{
+		"container ID": config.SwarmID(),
+		"CpusetCpus":   config.HostConfig.CpusetCpus,
+	}).Errorf("Parse CpusetCpus Error,%s", err)
+
+	return ncpu, err
 }
 
 // "master:1--standby:1--slave:3"
