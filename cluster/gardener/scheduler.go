@@ -50,11 +50,15 @@ func (region *Region) ServiceScheduler() (err error) {
 				module.Config.Image = image.ID
 			}
 
+			config := cluster.BuildContainerConfig(module.Config.ContainerConfig)
+			err = validateContainerConfig(config)
+			if err != nil {
+				goto failure
+			}
+
 			storeType, storeSize := module.Store()
 			filters := region.listShortIdleStore(storeType, int64(module.Num)*storeSize)
 			list := region.listCandidateNodes(module.Nodes, module.Type, filters...)
-
-			config := cluster.BuildContainerConfig(module.Config.ContainerConfig)
 
 			pendingContainers, err := region.buildPendingContainers(list, module.Type, module.Num, config, false)
 			if err != nil {
@@ -103,11 +107,6 @@ func (region *Region) buildPendingContainers(
 
 	region.scheduler.Lock()
 	defer region.scheduler.Unlock()
-
-	swarmID := templConfig.SwarmID()
-	if swarmID != "" {
-		return nil, errors.New("Swarm ID to the container have created")
-	}
 
 	candidates, err := region.Scheduler(list, templConfig, num, withImageAffinity)
 	if err != nil {

@@ -38,14 +38,34 @@ func (region *Region) allocResource(preAlloc *preAllocResource, engine *cluster.
 	ports := region.AllocPorts(1)
 	preAlloc.ports = append(preAlloc.ports, ports...)
 
-	ncpu := getCPU_Num(config.Cpuset)
-	config.HostConfig.CpusetCpus = setCPUSets(int(engine.UsedCpus()), ncpu)
+	ncpu, err := parseCpuset(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	// Alloc CPU
+	cpuset, err := allocCPUs(engine, ncpu)
+	if err != nil {
+		return nil, err
+	}
+	config.Cpuset = cpuset
+	config.HostConfig.CpusetCpus = cpuset
 
 	// TODO:Alloc Volume
 	bind, err := region.allocStorage(engine, "", "", 0)
 	config.HostConfig.Binds = append(config.HostConfig.Binds, bind)
 
 	return &config, nil
+}
+
+func allocCPUs(engine *cluster.Engine, ncpu int) (string, error) {
+	total := int(engine.TotalCpus())
+	used := int(engine.UsedCpus())
+	if ncpu > total-used {
+		return "", fmt.Errorf("Engine Alloc CPU Error,%s CPU is Short(%d-%d<%d),", engine.Name, total, used, ncpu)
+	}
+
+	return setCPUSets(used, ncpu), nil
 }
 
 func setCPUSets(used, ncpu int) string {
