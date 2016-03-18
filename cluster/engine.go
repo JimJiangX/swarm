@@ -733,7 +733,7 @@ func (e *Engine) UsedMemory() int64 {
 }
 
 // UsedCpus returns the sum of CPUs reserved by containers.
-func (e *Engine) UsedCpus() int64 {
+func (e *Engine) UsedCpus_swarm() int64 {
 	var r int64
 	e.RLock()
 	for _, c := range e.containers {
