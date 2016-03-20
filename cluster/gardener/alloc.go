@@ -7,7 +7,6 @@ import (
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/gardener/database"
-	"github.com/jmoiron/sqlx"
 )
 
 func (region *Region) allocResource(preAlloc *preAllocResource, engine *cluster.Engine, config cluster.ContainerConfig, Type string) (*cluster.ContainerConfig, error) {
@@ -166,10 +165,10 @@ func (r *Region) Recycle(pendings []*preAllocResource) (err error) {
 	r.Lock()
 
 	for i := range pendings {
-		err = r.recycle(tx, pendings[i])
-		if err != nil {
-			//	return err
-		}
+		ipsStatus := r.recycleNetworking(pendings[i])
+
+		database.TxUpdateMultiIPStatue(tx, ipsStatus)
+		database.DelMultiPorts(tx, pendings[i].ports)
 	}
 
 	r.Unlock()
@@ -177,7 +176,7 @@ func (r *Region) Recycle(pendings []*preAllocResource) (err error) {
 	return tx.Commit()
 }
 
-func (r *Region) recycle(tx *sqlx.Tx, pre *preAllocResource) error {
+func (r *Region) recycleNetworking(pre *preAllocResource) []database.IPStatus {
 	// networking recycle
 	ipsStatus := make([]database.IPStatus, 0, 10)
 
@@ -209,10 +208,7 @@ func (r *Region) recycle(tx *sqlx.Tx, pre *preAllocResource) error {
 		}
 	}
 
-	database.TxUpdateMultiIPStatue(tx, ipsStatus)
-	database.DelMultiPorts(tx, pre.ports)
-
-	return nil
+	return ipsStatus
 }
 
 func (r *Region) allocStorage(engine *cluster.Engine, driver, Type string, size int64) (string, error) {
