@@ -8,7 +8,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
-	"github.com/docker/swarm/cluster/gardener/database"
 	"github.com/docker/swarm/scheduler/node"
 )
 
@@ -21,6 +20,8 @@ func (region *Region) ServiceScheduler() (err error) {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Recover From Panic:%v,Error:%s", r, err)
 		}
+
+		log.Fatal("Service Scheduler Exit,%s", err)
 	}()
 
 	for {
@@ -31,23 +32,18 @@ func (region *Region) ServiceScheduler() (err error) {
 		}
 
 		svc.Lock()
-		// datacenter scheduler
 
-		// run scheduler on selected datacenter
-
-		// container created on selected engine
-
-		// modify scheduler label
+		sourceAlloc := make([]*preAllocResource, 0, len(svc.base.Modules))
 
 		for _, module := range svc.base.Modules {
 			// query image from database
 			if module.Config.Image == "" {
-				image, err := database.QueryImage(module.Name, module.Version)
+				image, err := region.GetImage(module.Name, module.Version)
 				if err != nil {
 					goto failure
 				}
 
-				module.Config.Image = image.ID
+				module.Config.Image = image.Id
 			}
 
 			config := cluster.BuildContainerConfig(module.Config.ContainerConfig)
@@ -60,13 +56,16 @@ func (region *Region) ServiceScheduler() (err error) {
 			filters := region.listShortIdleStore(storeType, int64(module.Num)*storeSize)
 			list := region.listCandidateNodes(module.Nodes, module.Type, filters...)
 
-			pendingContainers, err := region.buildPendingContainers(list, module.Type, module.Num, config, false)
-			if err != nil {
-				goto failure
+			preAlloc, err := region.buildPendingContainers(list, module.Type, module.Num, config, false)
+
+			for key, value := range preAlloc.pendingContainers {
+				svc.pendingContainers[key] = value
 			}
 
-			for key, value := range pendingContainers {
-				svc.pendingContainers[key] = value
+			sourceAlloc = append(sourceAlloc, preAlloc)
+
+			if err != nil {
+				goto failure
 			}
 
 		}
@@ -81,6 +80,7 @@ func (region *Region) ServiceScheduler() (err error) {
 
 	failure:
 
+		err = region.Recycle(sourceAlloc)
 		// scheduler failed
 		for swarmID := range svc.pendingContainers {
 
@@ -91,6 +91,7 @@ func (region *Region) ServiceScheduler() (err error) {
 		}
 
 		svc.pendingContainers = make(map[string]*pendingContainer)
+
 		atomic.StoreInt64(&svc.Status, 10)
 
 		svc.Unlock()
@@ -100,32 +101,30 @@ func (region *Region) ServiceScheduler() (err error) {
 	return err
 }
 
-func (region *Region) buildPendingContainers(
-	list []*node.Node, Type string, num int,
-	templConfig *cluster.ContainerConfig,
-	withImageAffinity bool) (map[string]*pendingContainer, error) {
+func (region *Region) buildPendingContainers(list []*node.Node, Type string, num int,
+	config *cluster.ContainerConfig, withImageAffinity bool) (*preAllocResource, error) {
 
 	region.scheduler.Lock()
 	defer region.scheduler.Unlock()
 
-	candidates, err := region.Scheduler(list, templConfig, num, withImageAffinity)
+	candidates, err := region.Scheduler(list, config, num, withImageAffinity)
 	if err != nil {
 
 		var retries int64
 		//  fails with image not found, then try to reschedule with image affinity
 		bImageNotFoundError, _ := regexp.MatchString(`image \S* not found`, err.Error())
-		if bImageNotFoundError && !templConfig.HaveNodeConstraint() {
+		if bImageNotFoundError && !config.HaveNodeConstraint() {
 			// Check if the image exists in the cluster
 			// If exists, retry with a image affinity
-			if region.Image(templConfig.Image) != nil {
-				candidates, err = region.Scheduler(list, templConfig, num, true)
+			if region.Image(config.Image) != nil {
+				candidates, err = region.Scheduler(list, config, num, true)
 				retries++
 			}
 		}
 
 		for ; retries < region.createRetry && err != nil; retries++ {
 			log.WithFields(log.Fields{"Name": "Swarm"}).Warnf("Failed to scheduler: %s, retrying", err)
-			candidates, err = region.Scheduler(list, templConfig, num, true)
+			candidates, err = region.Scheduler(list, config, num, true)
 		}
 	}
 
@@ -137,21 +136,30 @@ func (region *Region) buildPendingContainers(
 		return nil, errors.New("Not Enough Nodes")
 	}
 
-	pendingContainers := make(map[string]*pendingContainer, num)
+	preAlloc, err := region.pendingAlloc(candidates[0:num], Type, config)
+
+	region.scheduler.Unlock()
+
+	return preAlloc, err
+}
+
+func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
+	templConfig *cluster.ContainerConfig) (*preAllocResource, error) {
+
 	preAlloc := newPreAllocResource()
 
 	for i := range candidates {
 
 		engine, ok := region.engines[candidates[i].ID]
 		if !ok {
-			err = errors.New("Engine Not Found")
-			goto failure
+			return preAlloc, errors.New("Engine Not Found")
+
 		}
 
 		config, err := region.allocResource(preAlloc, engine, *templConfig, Type)
 		if err != nil {
-			err = fmt.Errorf("error resource alloc")
-			goto failure
+			return preAlloc, fmt.Errorf("error resource alloc")
+
 		}
 
 		swarmID := config.SwarmID()
@@ -161,27 +169,27 @@ func (region *Region) buildPendingContainers(
 			config.SetSwarmID(swarmID)
 		}
 
-		pendingContainers[swarmID] = &pendingContainer{
+		preAlloc.pendingContainers[swarmID] = &pendingContainer{
 			Name:   region.generateUniqueID(),
 			Config: config,
 			Engine: engine,
 		}
 	}
 
-	for key, value := range pendingContainers {
+	for key, value := range preAlloc.pendingContainers {
 		region.pendingContainers[key] = value
 	}
 
-	err = preAlloc.consistency()
-
-failure:
+	err := preAlloc.consistency()
 	if err != nil {
-		region.Recycle(preAlloc)
+		return preAlloc, err
 	}
 
-	region.scheduler.Unlock()
+	for _, val := range preAlloc.ports {
+		preAlloc.unit.Ports[val.Name] = val.Port
+	}
 
-	return pendingContainers, nil
+	return preAlloc, nil
 }
 
 func (region *Region) Scheduler(list []*node.Node, config *cluster.ContainerConfig, num int, withImageAffinity bool) ([]*node.Node, error) {
@@ -294,10 +302,8 @@ func isStringExist(s string, list []string) bool {
 }
 
 func (r *Region) selectNodeByCluster(nodes []*node.Node, num int, diff bool) ([]*node.Node, error) {
-
 	if len(nodes) < num {
 		return nil, errors.New("Not Enough Nodes")
-
 	}
 
 	if !diff {
@@ -307,18 +313,14 @@ func (r *Region) selectNodeByCluster(nodes []*node.Node, num int, diff bool) ([]
 	m := make(map[string][]*node.Node)
 
 	for i := range nodes {
-
 		dc, err := r.DatacenterByNode(nodes[i].ID)
 		if err != nil {
 			continue
 		}
 
 		if s, ok := m[dc.ID]; ok {
-
 			m[dc.ID] = append(s, nodes[i])
-
 		} else {
-
 			m[dc.ID] = []*node.Node{nodes[i]}
 
 		}
@@ -329,8 +331,6 @@ func (r *Region) selectNodeByCluster(nodes []*node.Node, num int, diff bool) ([]
 	}
 
 	candidates := make([]*node.Node, num)
-
-	// select nodes
 	seq := 0
 
 	if len(m) >= num {
@@ -348,7 +348,6 @@ func (r *Region) selectNodeByCluster(nodes []*node.Node, num int, diff bool) ([]
 		count := make(map[string]int)
 
 		for i := range nodes {
-
 			dc, err := r.DatacenterByNode(nodes[i].ID)
 			if err != nil {
 				continue
@@ -363,10 +362,8 @@ func (r *Region) selectNodeByCluster(nodes []*node.Node, num int, diff bool) ([]
 				if seq >= num {
 					return candidates, nil
 				}
-
 			}
 		}
-
 	}
 
 	return nil, errors.New("Not Match")

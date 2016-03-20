@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync/atomic"
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/gardener/database"
+	"github.com/jmoiron/sqlx"
 )
 
 func (region *Region) allocResource(preAlloc *preAllocResource, engine *cluster.Engine, config cluster.ContainerConfig, Type string) (*cluster.ContainerConfig, error) {
@@ -35,8 +35,9 @@ func (region *Region) allocResource(preAlloc *preAllocResource, engine *cluster.
 		}
 	}
 
-	ports := region.AllocPorts(1)
-	preAlloc.ports = append(preAlloc.ports, ports...)
+	for key := range preAlloc.unit.Ports {
+		preAlloc.ports = append(preAlloc.ports, database.NewPort(0, key, preAlloc.unit.Name, true))
+	}
 
 	ncpu, err := parseCpuset(&config)
 	if err != nil {
@@ -81,16 +82,20 @@ func setCPUSets(used, ncpu int) string {
 }
 
 type preAllocResource struct {
-	networkings []IPInfo
-	ports       []int64
+	pendingContainers map[string]*pendingContainer
+	unit              *unit
+	networkings       []IPInfo
+	ports             []database.Port
 }
 
 func newPreAllocResource() *preAllocResource {
 	return &preAllocResource{
-		networkings: make([]IPInfo, 0, 10),
-		ports:       make([]int64, 0, 10),
+		networkings:       make([]IPInfo, 0, 10),
+		ports:             make([]database.Port, 0, 10),
+		pendingContainers: make(map[string]*pendingContainer, 3),
 	}
 }
+
 func (pre *preAllocResource) consistency() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -128,26 +133,54 @@ func (pre *preAllocResource) consistency() (err error) {
 	return tx.Commit()
 }
 
-func (r *Region) Recycle(pre *preAllocResource) (err error) {
+func (r *Region) Recycle(pendings []*preAllocResource) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Panic:%v;%s", r, err)
 		}
 	}()
 
-	// ports recycle
-	min := pre.ports[0]
-	for i := range pre.ports {
-		if min < pre.ports[i] {
-			min = pre.ports[i]
+	r.scheduler.Lock()
+	for i := range pendings {
+		if pendings[i] == nil {
+			continue
+		}
+
+		for swarmID := range pendings[i].pendingContainers {
+			delete(r.pendingContainers, swarmID)
 		}
 	}
+	r.scheduler.Unlock()
 
-	atomic.StoreInt64(&r.allocatedPort, min-1)
+	db, err := database.GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 
 	r.Lock()
 
+	for i := range pendings {
+		err = r.recycle(tx, pendings[i])
+		if err != nil {
+			//	return err
+		}
+	}
+
+	r.Unlock()
+
+	return tx.Commit()
+}
+
+func (r *Region) recycle(tx *sqlx.Tx, pre *preAllocResource) error {
 	// networking recycle
+	ipsStatus := make([]database.IPStatus, 0, 10)
+
 	for i := range pre.networkings {
 
 	loop:
@@ -162,8 +195,13 @@ func (r *Region) Recycle(pre *preAllocResource) (err error) {
 			for ip := range r.networkings[n].pool {
 
 				if r.networkings[n].pool[ip].ip == pre.networkings[i].ipuint32 {
-
 					r.networkings[n].pool[ip].allocated = false
+
+					ipsStatus = append(ipsStatus, database.IPStatus{
+						IP:        pre.networkings[i].ipuint32,
+						Prefix:    pre.networkings[i].Prefix,
+						Allocated: r.networkings[n].pool[ip].allocated,
+					})
 
 					break loop
 				}
@@ -171,7 +209,8 @@ func (r *Region) Recycle(pre *preAllocResource) (err error) {
 		}
 	}
 
-	r.Unlock()
+	database.TxUpdateMultiIPStatue(tx, ipsStatus)
+	database.DelMultiPorts(tx, pre.ports)
 
 	return nil
 }

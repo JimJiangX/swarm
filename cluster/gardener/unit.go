@@ -51,6 +51,7 @@ type mysqlOperation struct {
 
 type unit struct {
 	database.Unit
+	Ports      map[string]int
 	eng        *cluster.Engine
 	config     *cluster.ContainerConfig
 	configures map[string]interface{}

@@ -31,30 +31,82 @@ func (net Networking) TableName() string {
 }
 
 type Port struct {
-	Port      int  `db:"port"`
-	Allocated bool `db:"allocated"`
+	Port      int    `db:"port"` //  自增
+	Name      string `db:"name"`
+	UnitID    string `db:"unit_id"`
+	Allocated bool   `db:"allocated"`
 }
 
 func (port Port) TableName() string {
 	return "tb_port"
 }
 
-func TxInsertPorts(tx *sqlx.Tx, ports []int64, allocated bool) error {
-	query := "INSERT INTO tb_port (port,allocated) VALUES (?,?)"
+func NewPort(port int, name, unit string, allocated bool) Port {
+	return Port{
+		Port:      port,
+		Name:      name,
+		UnitID:    unit,
+		Allocated: allocated,
+	}
+}
 
-	stmt, err := tx.Prepare(query)
+func TxInsertPorts(tx *sqlx.Tx, ports []Port, allocated bool) error {
+	query := "INSERT INTO tb_port (port,name,unit_id,allocated) VALUES (:port,:name,:unit_id,:allocated)"
+
+	stmt, err := tx.Preparex(query)
 	if err != nil {
 		return err
 	}
 
 	for i := range ports {
-		_, err = stmt.Exec(ports[i], allocated)
+		result, err := stmt.Exec(&ports[i])
 		if err != nil {
 			return err
+		}
+
+		port, err := result.LastInsertId()
+		if err != nil {
+			return err
+		}
+
+		ports[i].Port = int(port)
+
+	}
+
+	return nil
+}
+
+func DelMultiPorts(tx *sqlx.Tx, ports []Port) error {
+	query := "DELETE FROM tb_port WHERE port=?"
+
+	stmt, err := tx.Preparex(query)
+	if err != nil {
+		return err
+	}
+
+	for i := range ports {
+		_, err := stmt.Exec(ports[i].Port)
+		if err != nil {
+			// return err
 		}
 	}
 
 	return nil
+}
+
+func GetPortsByUnit(IDOrName string) ([]Port, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	var ports []Port
+	err = db.QueryRowx("SELECT * From tb_port WHERE unit_id=?", IDOrName).StructScan(&ports)
+	if err != nil {
+		return nil, err
+	}
+
+	return ports, nil
 }
 
 func InsertNetworking(id, addr, gateway, typ string, prefix, num int) error {
