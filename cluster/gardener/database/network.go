@@ -31,7 +31,7 @@ func (net Networking) TableName() string {
 }
 
 type Port struct {
-	Port      int    `db:"port"` //  自增
+	Port      int    `db:"port"` // auto increment
 	Name      string `db:"name"`
 	UnitID    string `db:"unit_id"`
 	Allocated bool   `db:"allocated"`
