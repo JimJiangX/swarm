@@ -89,7 +89,7 @@ func validateContainerConfig(config *cluster.ContainerConfig) error {
 		return errors.New("Swarm ID to the container have created")
 	}
 
-	if config.CpuShares > 0 || config.HostConfig.CpuShares > 0 {
+	if config.CpuShares != 0 || config.HostConfig.CpuShares != 0 {
 		return errors.New("CpuShares > 0,CpuShares should be 0")
 	}
 

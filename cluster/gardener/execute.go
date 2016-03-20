@@ -19,6 +19,8 @@ func (region *Region) ServiceExecute() (err error) {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Recover From Panic:%v,Error:%s", r, err)
 		}
+
+		log.Fatalf("Service Execute Exit,%s", err)
 	}()
 
 	for {
@@ -31,9 +33,6 @@ func (region *Region) ServiceExecute() (err error) {
 		svc.Lock()
 
 		for swarmID, pending := range svc.pendingContainers {
-			// resource allocation
-
-			// resource prepared
 
 			// create container
 
