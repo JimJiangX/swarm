@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/upmio/MasterGardener/utils"
 )
 
 type Task struct {
@@ -65,7 +64,7 @@ func (bs BackupStrategy) TableName() string {
 
 func NewTask(name, relate, linkto, des string, labels []string, timeout time.Duration) *Task {
 	return &Task{
-		ID:          utils.Generate64UUID(),
+		ID:          "",
 		Name:        name,
 		Related:     relate,
 		Linkto:      linkto,

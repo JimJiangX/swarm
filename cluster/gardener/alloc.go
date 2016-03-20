@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/docker/swarm/cluster"
-	"github.com/upmio/MasterGardener/database"
+	"github.com/docker/swarm/cluster/gardener/database"
 )
 
 func (region *Region) allocResource(preAlloc *preAllocResource, engine *cluster.Engine, config cluster.ContainerConfig, Type string) (*cluster.ContainerConfig, error) {
