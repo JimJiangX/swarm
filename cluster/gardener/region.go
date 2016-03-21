@@ -14,8 +14,7 @@ type Region struct {
 	*Cluster
 
 	// addition by fugr
-	cron          *crontab.Cron // crontab tasks
-	allocatedPort int64
+	cron *crontab.Cron // crontab tasks
 
 	datacenters []*Datacenter
 	networkings []*Networking
