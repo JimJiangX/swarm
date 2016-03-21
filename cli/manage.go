@@ -16,6 +16,7 @@ import (
 	"github.com/docker/leadership"
 	"github.com/docker/swarm/api"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/cluster/gardener"
 	"github.com/docker/swarm/cluster/mesos"
 	"github.com/docker/swarm/cluster/swarm"
 	"github.com/docker/swarm/scheduler"
@@ -289,6 +290,8 @@ func manage(c *cli.Context) {
 		cl, err = mesos.NewCluster(sched, tlsConfig, uri, c.StringSlice("cluster-opt"), engineOpts)
 	case "swarm":
 		cl, err = swarm.NewCluster(sched, tlsConfig, discovery, c.StringSlice("cluster-opt"), engineOpts)
+	case "gardener":
+		cl, err = gardener.NewRegion(sched, tlsConfig, discovery, c.StringSlice("cluster-opt"), engineOpts)
 	default:
 		log.Fatalf("unsupported cluster %q", c.String("cluster-driver"))
 	}
