@@ -36,7 +36,7 @@ func (region *Region) ServiceExecute() (err error) {
 
 			// create container
 
-			container, err := region.CreateContainer(swarmID, pending, svc.authConfig)
+			container, err := region.CreateContainer(pending.Config, swarmID, svc.authConfig)
 			if err != nil {
 				goto failure
 			}
@@ -63,7 +63,14 @@ func (region *Region) ServiceExecute() (err error) {
 }
 
 // CreateContainer aka schedule a brand new container into the cluster.
-func (region *Region) CreateContainer(swarmID string, pending *pendingContainer, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
+func (region *Region) CreateContainer(_ *cluster.ContainerConfig, swarmID string, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
+	region.scheduler.Lock()
+	pending, ok := region.pendingContainers[swarmID]
+	region.scheduler.Unlock()
+	if !ok || pending == nil {
+		return nil, fmt.Errorf("Swarm ID Not Found,%s", swarmID)
+	}
+
 	container, err := region.createContainer(swarmID, pending, authConfig)
 
 	if err != nil {
