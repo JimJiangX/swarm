@@ -35,8 +35,7 @@ func (region *Region) ServiceExecute() (err error) {
 		for swarmID, pending := range svc.pendingContainers {
 
 			// create container
-
-			container, err := region.CreateContainer(pending.Config, swarmID, svc.authConfig)
+			container, err := region.CreateContainerInPending(pending.Config, swarmID, svc.authConfig)
 			if err != nil {
 				goto failure
 			}
@@ -63,7 +62,7 @@ func (region *Region) ServiceExecute() (err error) {
 }
 
 // CreateContainer aka schedule a brand new container into the cluster.
-func (region *Region) CreateContainer(_ *cluster.ContainerConfig, swarmID string, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
+func (region *Region) CreateContainerInPending(_ *cluster.ContainerConfig, swarmID string, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
 	region.scheduler.Lock()
 	pending, ok := region.pendingContainers[swarmID]
 	region.scheduler.Unlock()
