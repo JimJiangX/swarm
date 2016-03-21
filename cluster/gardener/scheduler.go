@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"regexp"
 	"sync/atomic"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/cluster/gardener/database"
 	"github.com/docker/swarm/scheduler/node"
 )
 
@@ -43,7 +45,7 @@ func (region *Region) serviceScheduler() (err error) {
 					goto failure
 				}
 
-				module.Config.Image = image.Id
+				module.Config.Image = image.ImageID
 			}
 
 			config := cluster.BuildContainerConfig(module.Config.ContainerConfig)
@@ -58,16 +60,20 @@ func (region *Region) serviceScheduler() (err error) {
 
 			preAlloc, err := region.BuildPendingContainers(list, module.Type, module.Num, config, false)
 
-			for key, value := range preAlloc.pendingContainers {
-				svc.pendingContainers[key] = value
+			for i := range preAlloc {
+				svc.pendingContainers[preAlloc[i].swarmID] = preAlloc[i].pendingContainer
 			}
 
-			sourceAlloc = append(sourceAlloc, preAlloc)
+			sourceAlloc = append(sourceAlloc, preAlloc...)
 
 			if err != nil {
 				goto failure
 			}
 
+		}
+
+		for i := range sourceAlloc {
+			svc.units = append(svc.units, sourceAlloc[i].unit)
 		}
 
 		// scheduler success
@@ -102,7 +108,7 @@ func (region *Region) serviceScheduler() (err error) {
 }
 
 func (region *Region) BuildPendingContainers(list []*node.Node, Type string, num int,
-	config *cluster.ContainerConfig, withImageAffinity bool) (*preAllocResource, error) {
+	config *cluster.ContainerConfig, withImageAffinity bool) ([]*preAllocResource, error) {
 
 	region.scheduler.Lock()
 	defer region.scheduler.Unlock()
@@ -136,29 +142,68 @@ func (region *Region) BuildPendingContainers(list []*node.Node, Type string, num
 		return nil, errors.New("Not Enough Nodes")
 	}
 
-	preAlloc, err := region.pendingAlloc(candidates[0:num], Type, config)
+	preAllocs, err := region.pendingAlloc(candidates[0:num], Type, config)
 
 	region.scheduler.Unlock()
 
-	return preAlloc, err
+	return preAllocs, err
 }
 
 func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
-	templConfig *cluster.ContainerConfig) (*preAllocResource, error) {
+	templConfig *cluster.ContainerConfig) ([]*preAllocResource, error) {
 
-	preAlloc := newPreAllocResource()
+	allocs := make([]*preAllocResource, 0, 5)
 
 	for i := range candidates {
+		preAlloc := newPreAllocResource()
+		allocs = append(allocs, preAlloc)
 
+		name := region.generateUniqueID()
 		engine, ok := region.engines[candidates[i].ID]
 		if !ok {
-			return preAlloc, errors.New("Engine Not Found")
+			return allocs, errors.New("Engine Not Found")
+		}
 
+		image, err := region.getImageByID(templConfig.Image)
+		if err != nil {
+			return allocs, err
+		}
+
+		configures, err := image.UnmarshalConfigKeySets()
+		if err != nil {
+
+		}
+
+		portBindings, err := image.UnmarshalPorts()
+		if err != nil {
+
+		}
+
+		ports := make([]database.Port, len(portBindings))
+		for i := range portBindings {
+			ports[i] = database.Port{
+				Port:      0,
+				Name:      portBindings[i].Name,
+				UnitID:    name,
+				Proto:     portBindings[i].Proto,
+				Allocated: true,
+			}
+		}
+
+		preAlloc.unit = &unit{
+			Unit: database.Unit{
+				Name:       name,
+				SoftwareID: image.ID,
+				Status:     0,
+				CreatedAt:  time.Now(),
+			},
+			configures: configures,
+			ports:      ports,
 		}
 
 		config, err := region.allocResource(preAlloc, engine, *templConfig, Type)
 		if err != nil {
-			return preAlloc, fmt.Errorf("error resource alloc")
+			return allocs, fmt.Errorf("error resource alloc")
 
 		}
 
@@ -169,27 +214,21 @@ func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 			config.SetSwarmID(swarmID)
 		}
 
-		preAlloc.pendingContainers[swarmID] = &pendingContainer{
-			Name:   region.generateUniqueID(),
+		preAlloc.swarmID = swarmID
+		preAlloc.pendingContainer = &pendingContainer{
+			Name:   name,
 			Config: config,
 			Engine: engine,
 		}
+		region.pendingContainers[swarmID] = preAlloc.pendingContainer
+
+		err = preAlloc.consistency()
+		if err != nil {
+			return allocs, err
+		}
 	}
 
-	for key, value := range preAlloc.pendingContainers {
-		region.pendingContainers[key] = value
-	}
-
-	err := preAlloc.consistency()
-	if err != nil {
-		return preAlloc, err
-	}
-
-	for _, val := range preAlloc.ports {
-		preAlloc.unit.Ports[val.Name] = val.Port
-	}
-
-	return preAlloc, nil
+	return allocs, nil
 }
 
 func (region *Region) Scheduler(list []*node.Node, config *cluster.ContainerConfig, num int, withImageAffinity bool) ([]*node.Node, error) {

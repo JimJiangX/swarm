@@ -2,6 +2,7 @@ package gardener
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -45,6 +46,16 @@ func BuildService(svc database.Service) (*Service, error) {
 
 func Validate(svc database.Service) error {
 	return nil
+}
+
+func (svc *Service) getUnit(name string) (*unit, error) {
+	for i := range svc.units {
+		if svc.units[i].Name == name {
+			return svc.units[i], nil
+		}
+	}
+
+	return nil, fmt.Errorf("Unit Not Found,%s", name)
 }
 
 func (region *Region) AddService(svc *Service) error {
