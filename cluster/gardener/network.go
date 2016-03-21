@@ -66,7 +66,7 @@ func NewNetworking(id, ip, typ, gateway string, prefix, num int) *Networking {
 	return net
 }
 
-func (net *Networking) allocIP() (uint32, error) {
+func (net *Networking) AllocIP() (uint32, error) {
 	net.Rlock.Lock()
 	defer net.Rlock.Unlock()
 
@@ -126,7 +126,7 @@ func (info IPInfo) String() string {
 func (r *Region) getNetworkingSetting(engine *cluster.Engine, name, Type string) ([]IPInfo, error) {
 	networkings := make([]IPInfo, 0, 2)
 
-	ipinfo, err := r.allocIP("", ContainersNetworking)
+	ipinfo, err := r.AllocIP("", ContainersNetworking)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (r *Region) getNetworkingSetting(engine *cluster.Engine, name, Type string)
 
 	if isProxyType(Type) || isProxyType(name) {
 
-		ipinfo2, err := r.allocIP("", ExternalAccessNetworking)
+		ipinfo2, err := r.AllocIP("", ExternalAccessNetworking)
 		if err != nil {
 			return networkings, err
 		}
@@ -158,7 +158,7 @@ func (r *Region) getNetworkingSetting(engine *cluster.Engine, name, Type string)
 	return networkings, err
 }
 
-func (region *Region) allocIP(id, typ string) (IPInfo, error) {
+func (region *Region) AllocIP(id, typ string) (IPInfo, error) {
 	for i := range region.networkings {
 		if !region.networkings[i].Enable {
 			continue
@@ -167,7 +167,7 @@ func (region *Region) allocIP(id, typ string) (IPInfo, error) {
 		if (id != "" && id == region.networkings[i].ID) ||
 			(typ != "" && typ == region.networkings[i].Type) {
 
-			ip, err := region.networkings[i].allocIP()
+			ip, err := region.networkings[i].AllocIP()
 			if err != nil {
 				continue
 			}

@@ -28,6 +28,7 @@ type Region struct {
 func NewRegion(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery discovery.Backend, options cluster.DriverOpts, engineOptions *cluster.EngineOpts) (*Region, error) {
 	log.WithFields(log.Fields{"name": "swarm"}).Debug("Initializing cluster")
 
+	// NewCluster,copy from cluster.go
 	cluster := &Cluster{
 		eventHandlers:     cluster.NewEventHandlers(),
 		engines:           make(map[string]*cluster.Engine),
@@ -69,8 +70,8 @@ func NewRegion(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery 
 	}
 
 	region.cron.Start()
-	go region.ServiceScheduler()
-	go region.ServiceExecute()
+	go region.serviceScheduler()
+	go region.serviceExecute()
 
 	return region, nil
 }

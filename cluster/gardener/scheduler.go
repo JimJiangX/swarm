@@ -15,7 +15,7 @@ func (region *Region) ServiceToScheduler(svc *Service) {
 	region.serviceSchedulerCh <- svc
 }
 
-func (region *Region) ServiceScheduler() (err error) {
+func (region *Region) serviceScheduler() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Recover From Panic:%v,Error:%s", r, err)
@@ -56,7 +56,7 @@ func (region *Region) ServiceScheduler() (err error) {
 			filters := region.listShortIdleStore(storeType, int64(module.Num)*storeSize)
 			list := region.listCandidateNodes(module.Nodes, module.Type, filters...)
 
-			preAlloc, err := region.buildPendingContainers(list, module.Type, module.Num, config, false)
+			preAlloc, err := region.BuildPendingContainers(list, module.Type, module.Num, config, false)
 
 			for key, value := range preAlloc.pendingContainers {
 				svc.pendingContainers[key] = value
@@ -101,7 +101,7 @@ func (region *Region) ServiceScheduler() (err error) {
 	return err
 }
 
-func (region *Region) buildPendingContainers(list []*node.Node, Type string, num int,
+func (region *Region) BuildPendingContainers(list []*node.Node, Type string, num int,
 	config *cluster.ContainerConfig, withImageAffinity bool) (*preAllocResource, error) {
 
 	region.scheduler.Lock()
@@ -215,10 +215,10 @@ func (region *Region) Scheduler(list []*node.Node, config *cluster.ContainerConf
 		return nil, err
 	}
 
-	return region.selectNodeByCluster(nodes, num, true)
+	return region.SelectNodeByCluster(nodes, num, true)
 }
 
-// listNodes returns all validated engines in the cluster, excluding pendingEngines.
+// listCandidateNodes returns all validated engines in the cluster, excluding pendingEngines.
 func (r *Region) listCandidateNodes(names []string, dcTag string, filters ...string) []*node.Node {
 	r.RLock()
 	defer r.RUnlock()
@@ -301,7 +301,7 @@ func isStringExist(s string, list []string) bool {
 	return false
 }
 
-func (r *Region) selectNodeByCluster(nodes []*node.Node, num int, diff bool) ([]*node.Node, error) {
+func (r *Region) SelectNodeByCluster(nodes []*node.Node, num int, diff bool) ([]*node.Node, error) {
 	if len(nodes) < num {
 		return nil, errors.New("Not Enough Nodes")
 	}

@@ -14,7 +14,7 @@ func (r *Region) ServiceToExecute(svc *Service) {
 	r.serviceExecuteCh <- svc
 }
 
-func (region *Region) ServiceExecute() (err error) {
+func (region *Region) serviceExecute() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Recover From Panic:%v,Error:%s", r, err)
@@ -35,7 +35,7 @@ func (region *Region) ServiceExecute() (err error) {
 		for _, pending := range svc.pendingContainers {
 
 			// create container
-			container, err := region.CreateContainerInPending(pending.Config, "", svc.authConfig)
+			container, err := region.createContainerInPending(pending.Config, pending.Name, svc.authConfig)
 			if err != nil {
 				goto failure
 			}
@@ -61,8 +61,8 @@ func (region *Region) ServiceExecute() (err error) {
 	return err
 }
 
-// CreateContainerInPending aka schedule a brand new container into the cluster.
-func (r *Region) CreateContainerInPending(config *cluster.ContainerConfig, name string, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
+// createContainerInPending create new container into the cluster.
+func (r *Region) createContainerInPending(config *cluster.ContainerConfig, name string, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
 	// Ensure the name is available
 	if !r.checkNameUniqueness(name) {
 		return nil, fmt.Errorf("Conflict: The name %s is already assigned. You have to delete (or rename) that container to be able to assign %s to a container again.", name, name)
@@ -79,13 +79,6 @@ func (r *Region) CreateContainerInPending(config *cluster.ContainerConfig, name 
 
 	if !ok || pending == nil || pending.Engine == nil {
 		return nil, fmt.Errorf("Swarm ID Not Found in pendingContainers,%s", swarmID)
-	}
-
-	if network := r.Networks().Get(config.HostConfig.NetworkMode); network != nil && network.Scope == "local" {
-		if !config.HaveNodeConstraint() {
-			config.AddConstraint("node==~" + network.Engine.Name)
-		}
-		config.HostConfig.NetworkMode = network.Name
 	}
 
 	engine := pending.Engine
