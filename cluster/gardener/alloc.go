@@ -34,10 +34,6 @@ func (region *Region) allocResource(preAlloc *preAllocResource, engine *cluster.
 		}
 	}
 
-	for key := range preAlloc.unit.Ports {
-		preAlloc.ports = append(preAlloc.ports, database.NewPort(0, key, preAlloc.unit.Name, true))
-	}
-
 	ncpu, err := parseCpuset(&config)
 	if err != nil {
 		return nil, err
@@ -81,17 +77,15 @@ func setCPUSets(used, ncpu int) string {
 }
 
 type preAllocResource struct {
-	pendingContainers map[string]*pendingContainer
-	unit              *unit
-	networkings       []IPInfo
-	ports             []database.Port
+	unit             *unit
+	swarmID          string
+	networkings      []IPInfo
+	pendingContainer *pendingContainer
 }
 
 func newPreAllocResource() *preAllocResource {
 	return &preAllocResource{
-		networkings:       make([]IPInfo, 0, 10),
-		ports:             make([]database.Port, 0, 10),
-		pendingContainers: make(map[string]*pendingContainer, 3),
+		networkings: make([]IPInfo, 0, 2),
 	}
 }
 
@@ -106,6 +100,7 @@ func (pre *preAllocResource) consistency() (err error) {
 	if err != nil {
 		return err
 	}
+
 	tx, err := db.Beginx()
 	if err != nil {
 		return err
@@ -124,7 +119,7 @@ func (pre *preAllocResource) consistency() (err error) {
 		return err
 	}
 
-	err = database.TxInsertPorts(tx, pre.ports, true)
+	err = database.TxInsertPorts(tx, pre.unit.ports, true)
 	if err != nil {
 		return err
 	}
@@ -145,9 +140,8 @@ func (r *Region) Recycle(pendings []*preAllocResource) (err error) {
 			continue
 		}
 
-		for swarmID := range pendings[i].pendingContainers {
-			delete(r.pendingContainers, swarmID)
-		}
+		swarmID := pendings[i].pendingContainer.Config.SwarmID()
+		delete(r.pendingContainers, swarmID)
 	}
 	r.scheduler.Unlock()
 
@@ -168,7 +162,7 @@ func (r *Region) Recycle(pendings []*preAllocResource) (err error) {
 		ipsStatus := r.recycleNetworking(pendings[i])
 
 		database.TxUpdateMultiIPStatue(tx, ipsStatus)
-		database.DelMultiPorts(tx, pendings[i].ports)
+		database.DelMultiPorts(tx, pendings[i].unit.ports)
 	}
 
 	r.Unlock()

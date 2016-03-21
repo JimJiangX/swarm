@@ -39,6 +39,13 @@ func (region *Region) serviceExecute() (err error) {
 				goto failure
 			}
 
+			unit, err := svc.getUnit(pending.Name)
+			if err != nil {
+				goto failure
+			}
+
+			unit.container = container
+
 			err = region.StartContainer(container)
 			if err != nil {
 				goto failure

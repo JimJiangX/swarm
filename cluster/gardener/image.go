@@ -3,26 +3,45 @@ package gardener
 import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/gardener/database"
-	"github.com/samalba/dockerclient"
 )
 
-func (r *Region) GetImage(IDOrName, version string) (*cluster.Image, error) {
-	image := r.Image(IDOrName)
-	if image != nil {
-		return image, nil
-	}
-	if version != "" {
-		image = r.Image(IDOrName + version)
-		if image != nil {
-			return image, nil
-		}
-	}
+type Image struct {
+	database.Software
+	image *cluster.Image
+}
 
-	sw, err := database.QueryImage(IDOrName, version)
+func (r *Region) GetImage(name, version string) (Image, error) {
+	sw, err := database.QueryImage(name, version)
 	if err != nil {
-		return &cluster.Image{Image: dockerclient.Image{
-			Id: sw.ID}}, nil
+		return Image{}, err
 	}
 
-	return nil, err
+	out := Image{Software: sw}
+
+	image := r.Image(sw.ImageID)
+	if image == nil {
+		return out, nil
+	}
+
+	out.image = image
+
+	return out, nil
+}
+
+func (r *Region) getImageByID(id string) (Image, error) {
+	sw, err := database.QueryImageByID(id)
+	if err != nil {
+		return Image{}, err
+	}
+
+	out := Image{Software: sw}
+
+	image := r.Image(out.ImageID)
+	if image == nil {
+		return out, nil
+	}
+
+	out.image = image
+
+	return out, nil
 }

@@ -34,6 +34,7 @@ type Port struct {
 	Port      int    `db:"port"` // auto increment
 	Name      string `db:"name"`
 	UnitID    string `db:"unit_id"`
+	Proto     string `db:"proto"` // tcp/udp
 	Allocated bool   `db:"allocated"`
 }
 
@@ -41,11 +42,12 @@ func (port Port) TableName() string {
 	return "tb_port"
 }
 
-func NewPort(port int, name, unit string, allocated bool) Port {
+func NewPort(port int, name, unit, proto string, allocated bool) Port {
 	return Port{
 		Port:      port,
 		Name:      name,
 		UnitID:    unit,
+		Proto:     proto,
 		Allocated: allocated,
 	}
 }
