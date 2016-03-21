@@ -54,7 +54,7 @@ func (region *Region) AddService(svc *Service) error {
 
 	region.RLock()
 
-	s, err := region.getService(svc.ID)
+	s, err := region.GetService(svc.ID)
 
 	region.RUnlock()
 
@@ -80,7 +80,7 @@ func (region *Region) AddService(svc *Service) error {
 	return nil
 }
 
-func (region *Region) getService(IDOrName string) (*Service, error) {
+func (region *Region) GetService(IDOrName string) (*Service, error) {
 	for i := range region.services {
 		if region.services[i].ID == IDOrName ||
 			region.services[i].Name == IDOrName {
