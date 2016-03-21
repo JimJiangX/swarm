@@ -2,7 +2,6 @@ package gardener
 
 import (
 	"fmt"
-	"regexp"
 	"sync/atomic"
 
 	log "github.com/Sirupsen/logrus"
@@ -85,19 +84,7 @@ func (r *Region) createContainerInPending(config *cluster.ContainerConfig, name 
 	container, err := engine.Create(config, name, true, authConfig)
 
 	if err != nil {
-		var retries int64
-		//  fails with image not found, then try to reschedule with image affinity
-		bImageNotFoundError, _ := regexp.MatchString(`image \S* not found`, err.Error())
-		if bImageNotFoundError && !config.HaveNodeConstraint() {
-			// Check if the image exists in the cluster
-			// If exists, retry with a image affinity
-			if r.Image(config.Image) != nil {
-				container, err = engine.Create(config, name, true, authConfig)
-				retries++
-			}
-		}
-
-		for ; retries < r.createRetry && err != nil; retries++ {
+		for retries := int64(0); retries < r.createRetry && err != nil; retries++ {
 			log.WithFields(log.Fields{"Name": "Swarm"}).Warnf("Failed to create container: %s, retrying", err)
 			container, err = engine.Create(config, name, true, authConfig)
 		}
