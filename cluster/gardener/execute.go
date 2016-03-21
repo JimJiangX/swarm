@@ -32,10 +32,10 @@ func (region *Region) ServiceExecute() (err error) {
 
 		svc.Lock()
 
-		for swarmID, pending := range svc.pendingContainers {
+		for _, pending := range svc.pendingContainers {
 
 			// create container
-			container, err := region.CreateContainerInPending(pending.Config, swarmID, svc.authConfig)
+			container, err := region.CreateContainerInPending(pending.Config, "", svc.authConfig)
 			if err != nil {
 				goto failure
 			}
@@ -61,72 +61,60 @@ func (region *Region) ServiceExecute() (err error) {
 	return err
 }
 
-// CreateContainer aka schedule a brand new container into the cluster.
-func (region *Region) CreateContainerInPending(_ *cluster.ContainerConfig, swarmID string, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
-	region.scheduler.Lock()
-	pending, ok := region.pendingContainers[swarmID]
-	region.scheduler.Unlock()
-	if !ok || pending == nil {
-		return nil, fmt.Errorf("Swarm ID Not Found,%s", swarmID)
-	}
-
-	container, err := region.createContainer(swarmID, pending, authConfig)
-
-	if err != nil {
-		var retries int64
-		config := pending.Config
-		//  fails with image not found, then try to reschedule with image affinity
-		bImageNotFoundError, _ := regexp.MatchString(`image \S* not found`, err.Error())
-		if bImageNotFoundError && !config.HaveNodeConstraint() {
-			// Check if the image exists in the cluster
-			// If exists, retry with a image affinity
-			if region.Image(config.Image) != nil {
-				container, err = region.createContainer(swarmID, pending, authConfig)
-				retries++
-			}
-		}
-
-		for ; retries < region.createRetry && err != nil; retries++ {
-			log.WithFields(log.Fields{"Name": "Swarm"}).Warnf("Failed to create container: %s, retrying", err)
-			container, err = region.createContainer(swarmID, pending, authConfig)
-		}
-	}
-
-	return container, err
-}
-
-func (region *Region) createContainer(swarmID string, pending *pendingContainer, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
-	region.scheduler.Lock()
-	config := pending.Config
-
-	id := config.SwarmID()
-	if swarmID == "" || id != swarmID {
-		swarmID = id
-
-		if swarmID == "" {
-			region.scheduler.Unlock()
-			return nil, fmt.Errorf("Conflict: The swarmID is Null,assign %s to a container", pending.Name)
-		}
-	}
-
+// CreateContainerInPending aka schedule a brand new container into the cluster.
+func (r *Region) CreateContainerInPending(config *cluster.ContainerConfig, name string, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
 	// Ensure the name is available
-	if !region.checkNameUniqueness(pending.Name) {
-		region.scheduler.Unlock()
-		return nil, fmt.Errorf("Conflict: The name %s is already assigned. You have to delete (or rename) that container to be able to assign %s to a container again.", pending.Name, pending.Name)
+	if !r.checkNameUniqueness(name) {
+		return nil, fmt.Errorf("Conflict: The name %s is already assigned. You have to delete (or rename) that container to be able to assign %s to a container again.", name, name)
 	}
 
-	if network := region.Networks().Get(config.HostConfig.NetworkMode); network != nil && network.Scope == "local" {
+	swarmID := config.SwarmID()
+	if swarmID == "" {
+		return nil, fmt.Errorf("Conflict: The swarmID is Null,assign %s to a container", name)
+	}
+
+	r.scheduler.Lock()
+	pending, ok := r.pendingContainers[swarmID]
+	r.scheduler.Unlock()
+
+	if !ok || pending == nil || pending.Engine == nil {
+		return nil, fmt.Errorf("Swarm ID Not Found in pendingContainers,%s", swarmID)
+	}
+
+	if network := r.Networks().Get(config.HostConfig.NetworkMode); network != nil && network.Scope == "local" {
 		if !config.HaveNodeConstraint() {
 			config.AddConstraint("node==~" + network.Engine.Name)
 		}
 		config.HostConfig.NetworkMode = network.Name
 	}
 
-	container, err := pending.Engine.Create(config, pending.Name, true, authConfig)
+	engine := pending.Engine
+	container, err := engine.Create(config, name, true, authConfig)
 
-	region.scheduler.Lock()
-	delete(region.pendingContainers, swarmID)
-	region.scheduler.Unlock()
+	if err != nil {
+		var retries int64
+		//  fails with image not found, then try to reschedule with image affinity
+		bImageNotFoundError, _ := regexp.MatchString(`image \S* not found`, err.Error())
+		if bImageNotFoundError && !config.HaveNodeConstraint() {
+			// Check if the image exists in the cluster
+			// If exists, retry with a image affinity
+			if r.Image(config.Image) != nil {
+				container, err = engine.Create(config, name, true, authConfig)
+				retries++
+			}
+		}
+
+		for ; retries < r.createRetry && err != nil; retries++ {
+			log.WithFields(log.Fields{"Name": "Swarm"}).Warnf("Failed to create container: %s, retrying", err)
+			container, err = engine.Create(config, name, true, authConfig)
+		}
+	}
+
+	if err == nil && container != nil {
+		r.scheduler.Lock()
+		delete(r.pendingContainers, swarmID)
+		r.scheduler.Unlock()
+	}
 
 	return container, err
 }
