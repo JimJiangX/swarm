@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/docker/swarm/cluster"
 )
@@ -96,22 +95,6 @@ func (region *Region) GetNetworking(typ string) *Networking {
 	}
 
 	return nil
-}
-
-type Port struct {
-	allocated bool
-	port      int
-}
-
-// AllocPorts for alloc ports.
-func (region *Region) AllocPorts(num int) []int64 {
-	ports := make([]int64, num)
-
-	for i := 0; i < num; i++ {
-		ports[i] = atomic.AddInt64(&region.allocatedPort, 1)
-	}
-
-	return ports
 }
 
 type IPInfo struct {
