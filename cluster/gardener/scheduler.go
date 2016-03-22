@@ -35,7 +35,7 @@ func (region *Region) serviceScheduler() (err error) {
 
 		svc.Lock()
 
-		sourceAlloc := make([]*preAllocResource, 0, len(svc.base.Modules))
+		resourceAlloc := make([]*preAllocResource, 0, len(svc.base.Modules))
 
 		for _, module := range svc.base.Modules {
 			// query image from database
@@ -60,11 +60,7 @@ func (region *Region) serviceScheduler() (err error) {
 
 			preAlloc, err := region.BuildPendingContainers(list, module.Type, module.Num, config, false)
 
-			for i := range preAlloc {
-				svc.pendingContainers[preAlloc[i].swarmID] = preAlloc[i].pendingContainer
-			}
-
-			sourceAlloc = append(sourceAlloc, preAlloc...)
+			resourceAlloc = append(resourceAlloc, preAlloc...)
 
 			if err != nil {
 				goto failure
@@ -72,8 +68,9 @@ func (region *Region) serviceScheduler() (err error) {
 
 		}
 
-		for i := range sourceAlloc {
-			svc.units = append(svc.units, sourceAlloc[i].unit)
+		for i := range resourceAlloc {
+			svc.units = append(svc.units, resourceAlloc[i].unit)
+			svc.pendingContainers[resourceAlloc[i].swarmID] = resourceAlloc[i].pendingContainer
 		}
 
 		// scheduler success
@@ -86,17 +83,16 @@ func (region *Region) serviceScheduler() (err error) {
 
 	failure:
 
-		err = region.Recycle(sourceAlloc)
 		// scheduler failed
-		for swarmID := range svc.pendingContainers {
-
+		for i := range resourceAlloc {
 			region.scheduler.Lock()
-			delete(region.pendingContainers, swarmID)
+			delete(region.pendingContainers, resourceAlloc[i].swarmID)
 			region.scheduler.Unlock()
-
 		}
 
 		svc.pendingContainers = make(map[string]*pendingContainer)
+
+		err = region.Recycle(resourceAlloc)
 
 		atomic.StoreInt64(&svc.Status, 10)
 
