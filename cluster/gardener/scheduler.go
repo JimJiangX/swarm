@@ -91,6 +91,7 @@ func (region *Region) serviceScheduler() (err error) {
 		}
 
 		svc.pendingContainers = make(map[string]*pendingContainer)
+		svc.units = make([]*unit, 0, 10)
 
 		err = region.Recycle(resourceAlloc)
 

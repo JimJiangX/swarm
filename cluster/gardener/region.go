@@ -75,3 +75,12 @@ func NewRegion(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery 
 
 	return region, nil
 }
+
+func (r *Region) generateUUID(length int) string {
+	for {
+		id := generateUUID(length)
+		if r.Container(id) == nil {
+			return id
+		}
+	}
+}
