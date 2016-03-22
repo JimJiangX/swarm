@@ -36,15 +36,17 @@ func NewService(svc database.Service, retry, unitNum, userNum int) *Service {
 	}
 }
 
-func BuildService(svc database.Service) (*Service, error) {
-	if err := Validate(svc); err != nil {
+func BuildService(req PostServiceRequest) (*Service, error) {
+	if err := Validate(req); err != nil {
 		return nil, err
 	}
+
+	svc := database.Service{}
 
 	return NewService(svc, 2, 0, 0), nil
 }
 
-func Validate(svc database.Service) error {
+func Validate(req PostServiceRequest) error {
 	return nil
 }
 
