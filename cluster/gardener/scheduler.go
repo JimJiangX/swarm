@@ -83,6 +83,8 @@ func (region *Region) serviceScheduler() (err error) {
 
 	failure:
 
+		err = region.Recycle(resourceAlloc)
+
 		// scheduler failed
 		for i := range resourceAlloc {
 			region.scheduler.Lock()
@@ -93,12 +95,9 @@ func (region *Region) serviceScheduler() (err error) {
 		svc.pendingContainers = make(map[string]*pendingContainer)
 		svc.units = make([]*unit, 0, 10)
 
-		err = region.Recycle(resourceAlloc)
-
 		atomic.StoreInt64(&svc.Status, 10)
 
 		svc.Unlock()
-
 	}
 
 	return err
@@ -176,10 +175,14 @@ func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 
 		}
 
-		ports := make([]database.Port, len(portBindings))
+		ports, err := database.SelectAvailablePorts(len(portBindings))
+		if err != nil {
+			return allocs, err
+		}
+
 		for i := range portBindings {
 			ports[i] = database.Port{
-				Port:      0,
+				Port:      ports[i].Port,
 				Name:      portBindings[i].Name,
 				UnitID:    name,
 				Proto:     portBindings[i].Proto,

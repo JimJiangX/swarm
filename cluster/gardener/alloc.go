@@ -119,7 +119,7 @@ func (pre *preAllocResource) consistency() (err error) {
 		return err
 	}
 
-	err = database.TxInsertPorts(tx, pre.unit.ports, true)
+	err = database.TxUPdatePorts(tx, pre.unit.ports)
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,16 @@ func (r *Region) Recycle(pendings []*preAllocResource) (err error) {
 		ipsStatus := r.recycleNetworking(pendings[i])
 
 		database.TxUpdateMultiIPStatue(tx, ipsStatus)
-		database.DelMultiPorts(tx, pendings[i].unit.ports)
+
+		ports := pendings[i].unit.ports
+		for p := range ports {
+			ports[p] = database.Port{
+				Port:      ports[p].Port,
+				Allocated: false,
+			}
+		}
+
+		database.TxUPdatePorts(tx, ports)
 	}
 
 	r.Unlock()
