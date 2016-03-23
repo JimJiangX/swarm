@@ -7,6 +7,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/gardener/database"
 	consulapi "github.com/hashicorp/consul/api"
+	"github.com/samalba/dockerclient"
 )
 
 const pluginPort = 10000
@@ -38,20 +39,45 @@ type Operator interface {
 	StopService() error
 	Recover(file string) error
 	Backup() error
-	CreateUsers() error
-	Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (string, error)
+	Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (*cluster.Container, error)
 }
 
 type mysqlOperation struct {
 	unit      *database.Unit
-	eng       *cluster.Engine
+	engine    *cluster.Engine
 	config    *cluster.ContainerConfig
 	consulCfg *consulapi.Config
 }
 
+func (mysql *mysqlOperation) HealthCheck() error {
+	return nil
+}
+func (mysql *mysqlOperation) CopyConfig() error {
+	return nil
+}
+func (mysql *mysqlOperation) StartService() error {
+	return nil
+}
+func (mysql *mysqlOperation) StopService() error {
+	return nil
+}
+func (mysql *mysqlOperation) Recover(file string) error {
+	return nil
+}
+func (mysql *mysqlOperation) Backup() error {
+	return nil
+}
+
+func (mysql *mysqlOperation) Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (*cluster.Container, error) {
+	return nil, nil
+}
+
 type unit struct {
 	database.Unit
+	engine     *cluster.Engine
+	config     *cluster.ContainerConfig
 	container  *cluster.Container
+	authConfig *dockerclient.AuthConfig
 	ports      []database.Port
 	configures map[string]interface{}
 	cmd        map[string]string
@@ -84,6 +110,101 @@ func (u *unit) prepareCreateContainer(retry int) error {
 		break
 	}
 
+	return nil
+}
+
+func (u *unit) createContainer() (*cluster.Container, error) {
+
+	container, err := u.engine.Create(u.config, u.Unit.Name, true, u.authConfig)
+	if err == nil && container != nil {
+		u.container = container
+		u.Unit.ContainerID = container.Id
+	}
+
+	return container, err
+}
+
+func (u *unit) updateContainer() error {
+	return nil
+}
+
+func (u *unit) removeContainer() error {
+	return u.engine.RemoveContainer(u.container, true, false)
+}
+
+func (u *unit) startContainer() error {
+	return u.engine.StartContainer(u.Unit.ContainerID)
+}
+
+func (u *unit) stopContainer() error {
+	client := u.engine.Client()
+
+	return client.StopContainer(u.Unit.ContainerID, 5)
+}
+
+func (u *unit) restartContainer() error {
+	client := u.engine.Client()
+
+	return client.StopContainer(u.Unit.ContainerID, 5)
+}
+
+func (u *unit) RenameContainer(name string) error {
+	client := u.engine.Client()
+	return client.RenameContainer(u.container.Id, u.Unit.Name)
+}
+
+func (u *unit) exec(cmd []string) error {
+	client := u.engine.Client()
+
+	id, err := client.ExecCreate(&dockerclient.ExecConfig{
+		AttachStdin:  false,
+		AttachStdout: true,
+		AttachStderr: true,
+		Tty:          false,
+		Cmd:          cmd,
+		Container:    u.container.Id,
+		Detach:       false,
+	})
+	if err != nil {
+		return err
+	}
+
+	return client.ExecStart(id, nil)
+}
+
+func (u *unit) createNetworking() error {
+	return nil
+}
+
+func (u *unit) removeNetworking() error {
+	return nil
+}
+
+func (u *unit) createVolume() (*cluster.Volume, error) {
+	return nil, nil
+}
+
+func (u *unit) updateVolume() error {
+	return nil
+}
+
+func (u *unit) removeVolume() error {
+	return nil
+}
+
+func (u *unit) createVG() error {
+	return nil
+}
+
+func (u *unit) activateVG() error {
+	return nil
+}
+
+func (u *unit) deactivateVG() error {
+	return nil
+}
+
+func (u *unit) extendVG() error {
 	return nil
 }
 
