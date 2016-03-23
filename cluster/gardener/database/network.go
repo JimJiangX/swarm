@@ -2,6 +2,7 @@ package database
 
 import (
 	"encoding/binary"
+	"fmt"
 	"net"
 
 	"github.com/jmoiron/sqlx"
@@ -52,7 +53,84 @@ func NewPort(port int, name, unit, proto string, allocated bool) Port {
 	}
 }
 
-func TxInsertPorts(tx *sqlx.Tx, ports []Port, allocated bool) error {
+func SelectAvailablePorts(num int) ([]Port, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	query := fmt.Sprintf("SELECT * FROM tb_port WHERE allocated=? LIMIT %d", num)
+
+	rows, err := db.Queryx(query, false)
+	if err != nil {
+		return nil, err
+	}
+
+	var ports []Port
+
+	err = rows.StructScan(&ports)
+	if err != nil {
+		return nil, err
+	}
+
+	return ports, nil
+}
+
+func TxUPdatePorts(tx *sqlx.Tx, ports []Port) error {
+	query := "UPDATE tb_port SET name=?,unit_id=?,proto=?,allocated=? WHERE port=?"
+
+	stmt, err := tx.Preparex(query)
+	if err != nil {
+		return err
+	}
+
+	for i := range ports {
+		_, err = stmt.Exec(&ports[i])
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func TxImportPort(start, end int, filter ...int) error {
+	ports := make([]Port, 0, end-start)
+
+loop:
+	for i := start; i < end; i++ {
+		for j := range filter {
+			if i == j {
+				continue loop
+			}
+		}
+
+		ports = append(ports, Port{
+			Port:      i,
+			Allocated: false,
+		})
+	}
+
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = TxInsertPorts(tx, ports)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func TxInsertPorts(tx *sqlx.Tx, ports []Port) error {
 	query := "INSERT INTO tb_port (port,name,unit_id,allocated) VALUES (:port,:name,:unit_id,:allocated)"
 
 	stmt, err := tx.Preparex(query)
