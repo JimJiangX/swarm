@@ -588,13 +588,19 @@ func (c *Cluster) RemoveVolumes(name string) (bool, error) {
 // Pull is exported
 func (c *Cluster) Pull(name string, authConfig *types.AuthConfig, callback func(where, status string, err error)) {
 	var wg sync.WaitGroup
+	ch := make(chan struct{}, 10)
 
 	c.RLock()
 	for _, e := range c.engines {
 		wg.Add(1)
 
 		go func(engine *cluster.Engine) {
-			defer wg.Done()
+			defer func() {
+				wg.Done()
+				<-ch
+			}()
+
+			ch <- struct{}{}
 
 			if callback != nil {
 				callback(engine.Name, "", nil)
@@ -617,6 +623,7 @@ func (c *Cluster) Pull(name string, authConfig *types.AuthConfig, callback func(
 // Load image
 func (c *Cluster) Load(imageReader io.Reader, callback func(where, status string, err error)) {
 	var wg sync.WaitGroup
+	ch := make(chan struct{}, 10)
 
 	c.RLock()
 	pipeWriters := []*io.PipeWriter{}
@@ -627,8 +634,13 @@ func (c *Cluster) Load(imageReader io.Reader, callback func(where, status string
 		pipeWriters = append(pipeWriters, pipeWriter)
 
 		go func(reader *io.PipeReader, engine *cluster.Engine) {
-			defer wg.Done()
-			defer reader.Close()
+			defer func() {
+				wg.Done()
+				reader.Close()
+				<-ch
+			}()
+
+			ch <- struct{}{}
 
 			// call engine load image
 			err := engine.Load(reader)
@@ -665,6 +677,8 @@ func (c *Cluster) Load(imageReader io.Reader, callback func(where, status string
 // Import image
 func (c *Cluster) Import(source string, repository string, tag string, imageReader io.Reader, callback func(what, status string, err error)) {
 	var wg sync.WaitGroup
+	ch := make(chan struct{}, 10)
+
 	c.RLock()
 	pipeWriters := []*io.PipeWriter{}
 
@@ -675,8 +689,13 @@ func (c *Cluster) Import(source string, repository string, tag string, imageRead
 		pipeWriters = append(pipeWriters, pipeWriter)
 
 		go func(reader *io.PipeReader, engine *cluster.Engine) {
-			defer wg.Done()
-			defer reader.Close()
+			defer func() {
+				wg.Done()
+				reader.Close()
+				<-ch
+			}()
+
+			ch <- struct{}{}
 
 			// call engine import
 			err := engine.Import(source, repository, tag, reader)
