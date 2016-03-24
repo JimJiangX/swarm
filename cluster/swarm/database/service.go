@@ -1,6 +1,7 @@
 package database
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -59,15 +60,17 @@ func TxInsertMultiContainer(tx *sqlx.Tx, clist []*Container) error {
 }
 
 type Unit struct {
-	Name          string    `db:"name"`
-	SoftwareID    string    `db:"software_id"`
-	ServiceID     string    `db:"service_id"`
-	ContainerID   string    `db:"container_id"`
-	ConfigID      string    `db:"config_id"`
-	StartupExecID string    `db:"startup_exec_id"`
-	StartupCmd    string    `db:"startup_cmd"`
-	BackupExecID  string    `db:"backup_exec_id"`
-	BackupCmd     string    `db:"backup_cmd"`
+	ID          string `db:"id"`
+	Name        string `db:"name"` // <unit_id_8bit>_<service_name>
+	Type        string `db:"type"` // switch_manager/upproxy/upsql
+	ImageID     string `db:"image_id"`
+	ImageName   string `db:"image_name"` //<image_name>_<image_version>
+	ServiceID   string `db:"service_id"`
+	NodeID      string `db:"node_id"`
+	ContainerID string `db:"container_id"`
+	ConfigID    string `db:"unit_config_id"`
+	NetworkMode string `db:"network_mode"`
+
 	Status        uint32    `db:"status"`
 	CheckInterval int       `db:"check_interval"`
 	CreatedAt     time.Time `db:"created_at`
@@ -78,7 +81,7 @@ func (u Unit) TableName() string {
 }
 
 func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
-	query := "INSERT INTO tb_unit (name,software_id,service_id,container_id,config_id,startup_exec_id,startup_cmd,backup_exec_id,backup_cmd,status,check_interval,create_at) VALUES (:name,:software_id,:service_id,:container_id,:config_id,:startup_exec_id,:startup_cmd,:backup_exec_id,:backup_cmd,:status,:check_interval,:create_at)"
+	query := "INSERT INTO tb_unit (id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,check_interval,create_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:node_id,:container_id,:unit_config_id,:network_mode,:status,:check_interval,:create_at)"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
@@ -101,17 +104,13 @@ func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
 	return nil
 }
 
-type volume struct {
-	Type     string // data or logs
-	VolumeID string // tb_volume
-}
-
 type UnitConfig struct {
-	ID         string `db:"id"`
-	SoftwareID string `db:"software_id"`
-	Version    int    `db:"version"`
-	ParentID   string `db:"parent_id"`
-	Content    string `db:"content"`
+	ID       string    `db:"id"`
+	ImageID  string    `db:"image_id"`
+	Version  int       `db:"version"`
+	ParentID string    `db:"parent_id"`
+	Content  string    `db:"content"`
+	CreateAt time.Time `db:"create_at"`
 }
 
 func (u UnitConfig) TableName() string {
@@ -157,12 +156,12 @@ func (svc *Service) Insert() error {
 
 	// insert into database
 	query := "INSERT INTO tb_service (id,name,description,architecture,auto_healing,auto_scaling,high_available,status,backup_space,backup_strategy_id,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:auto_healing,:auto_scaling,:high_available,:status,:backup_space,:backup_strategy_id,:created_at,:finished_at)"
-	_, err = db.Exec(query, svc)
+	_, err = db.NamedExec(query, svc)
 
 	return err
 }
 
-func (svc *Service) SetServiceStatus(state int, finish time.Time) error {
+func (svc *Service) SetServiceStatus(state int64, finish time.Time) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
@@ -173,7 +172,10 @@ func (svc *Service) SetServiceStatus(state int, finish time.Time) error {
 		if err != nil {
 			return err
 		}
-		// atomic.StoreInt64(&svc.Status, int64(state))
+
+		atomic.StoreInt64(&svc.Status, state)
+
+		return nil
 	}
 
 	_, err = db.Exec("UPDATE tb_service SET status=?,finished_at=? WHERE id=?", state, finish, svc.ID)
@@ -181,7 +183,7 @@ func (svc *Service) SetServiceStatus(state int, finish time.Time) error {
 		return err
 	}
 
-	// atomic.StoreInt64(&svc.Status, int64(state))
+	atomic.StoreInt64(&svc.Status, state)
 	svc.FinishedAt = finish
 
 	return nil
@@ -194,7 +196,10 @@ func (svc *Service) TxSetServiceStatus(tx *sqlx.Tx, state int64, finish time.Tim
 		if err != nil {
 			return err
 		}
-		// atomic.StoreInt64(&svc.Status, state)
+
+		atomic.StoreInt64(&svc.Status, state)
+
+		return nil
 	}
 
 	_, err := tx.Exec("UPDATE tb_service SET status=?,finished_at=? WHERE id=?", state, finish, svc.ID)
@@ -202,7 +207,7 @@ func (svc *Service) TxSetServiceStatus(tx *sqlx.Tx, state int64, finish time.Tim
 		return err
 	}
 
-	// atomic.StoreInt64(&svc.Status, state)
+	atomic.StoreInt64(&svc.Status, state)
 	svc.FinishedAt = finish
 
 	return nil
@@ -210,6 +215,7 @@ func (svc *Service) TxSetServiceStatus(tx *sqlx.Tx, state int64, finish time.Tim
 
 type User struct {
 	ID        string    `db:"id"`
+	ServiceID string    `db:"service_id"`
 	Type      string    `db:"type"`
 	Username  string    `db:"username"`
 	Password  string    `db:"password"`

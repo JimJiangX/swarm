@@ -26,7 +26,7 @@ func (c *Cluster) Insert() error {
 
 	// insert into database
 	query := "INSERT INTO tb_cluster (id,name,type,storage_id,storage_type,datacenter,enabled,max_node,usage_limit) VALUES (:id,:name,:type,:storage_id,:storage_type,:datacenter,:enabled,:max_node,:usage_limit)"
-	_, err = db.Exec(query, c)
+	_, err = db.NamedExec(query, c)
 
 	return err
 }
@@ -61,32 +61,12 @@ func GetCluster(id string) (*Cluster, error) {
 }
 
 type Node struct {
-	ID        string `db:"id"`
-	Name      string `db:"name"`
-	ClusterID string `db:"cluster_id"`
-	Addr      string `db:"admin_ip"`
-	/*
-		NCPU            int   `db:"ncpu"`
-		MemoryByte      int64 `db:"mem_total"`
-		LocalDataVGByte int64 `db:"local_data_vg"`
-		StorageHostID   int   `db:"storage_host_id"`
-
-		Architecture    string `db:"arch"`
-		OperatingSystem string `db:"os"`
-		KernelVersion   string `db:"kernel_version"`
-
-		AdminNIC    string `db:"admin_NIC"`
-		InternalNIC string `db:"internal_NIC"`
-		ExternalNIC string `db:"external_NIC"`
-		HBAWWW      string `db:"HBA_www"`
-
-		DockerID       string `db:"docker_id"`
-		DockertVersion string `db:"docker_version"`
-		APIVersion     string `db:"api_version"`
-		Labels         string `db:"labels"`
-	*/
-	MaxContainer int  `db:"max_container"`
-	Status       byte `db:"status"`
+	ID           string `db:"id"`
+	Name         string `db:"name"`
+	ClusterID    string `db:"cluster_id"`
+	Addr         string `db:"admin_ip"`
+	MaxContainer int    `db:"max_container"`
+	Status       int    `db:"status"`
 
 	RegisterAt   time.Time `db:"register_at"`
 	DeregisterAt time.Time `db:"deregister_at"`
@@ -104,26 +84,25 @@ func (n *Node) Insert() error {
 
 	// insert into database
 	query := "INSERT INTO tb_node (id,name,cluster_id,addr,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:addr,:max_container,:status,:register_at,:deregister_at)"
-	_, err = db.Exec(query, n)
+	_, err = db.NamedExec(query, n)
 
 	return err
 }
 
-func GetNode(id string) (Node, error) {
+func GetNode(IDOrName string) (Node, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return Node{}, err
 	}
 
 	n := Node{}
-	err = db.QueryRowx("SELECT * FROM tb_node WHERE id=?", id).StructScan(&n)
+	err = db.QueryRowx("SELECT * FROM tb_node WHERE id=? OR name=?", IDOrName, IDOrName).StructScan(&n)
 
 	return n, err
 }
 
 // UpdateStatus returns error when Node UPDATE status.
-func (n *Node) UpdateStatus(state byte) error {
-
+func (n *Node) UpdateStatus(state int) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
@@ -145,19 +124,12 @@ func ListNode() ([]*Node, error) {
 		return nil, err
 	}
 
+	var nodes []*Node
 	query := "SELECT * FROM tb_node WHERE status>1"
 
-	rows, err := db.QueryRowx(query).SliceScan()
+	err = db.QueryRowx(query).StructScan(&nodes)
 	if err != nil {
 		return nil, err
-	}
-
-	nodes := make([]*Node, 0, len(rows))
-
-	for i := range rows {
-		if node, ok := rows[i].(*Node); ok {
-			nodes = append(nodes, node)
-		}
 	}
 
 	return nodes, nil
@@ -169,19 +141,12 @@ func ListNodeByClusterType(tag string) ([]*Node, error) {
 		return nil, err
 	}
 
+	var nodes []*Node
 	query := "SELECT * FROM tb_node WHERE type=? AND status>1"
 
-	rows, err := db.QueryRowx(query, tag).SliceScan()
+	err = db.QueryRowx(query, tag).StructScan(&nodes)
 	if err != nil {
 		return nil, err
-	}
-
-	nodes := make([]*Node, 0, len(rows))
-
-	for i := range rows {
-		if node, ok := rows[i].(*Node); ok {
-			nodes = append(nodes, node)
-		}
 	}
 
 	return nodes, nil

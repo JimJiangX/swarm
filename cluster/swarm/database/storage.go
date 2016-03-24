@@ -1,21 +1,17 @@
 package database
 
-import (
-	"time"
-
-	"github.com/jmoiron/sqlx"
-)
+import "time"
 
 type LUN struct {
-	ID            string    `db:"id"`
-	StorageID     string    `db:"storage_id"`
-	RaidGroupID   string    `db:"rg_id"`
-	Mappingto     string    `db:"mapping_to"`
-	Enabled       bool      `db:"enabled"`
-	SizeByte      int64     `db:"size"`
-	Number        int64     `db:"lun_num"`
-	HostLunNumber int64     `db:"host_lun_num"`
-	CreatedAt     time.Time `db:"created_at"`
+	ID           string    `db:"id"`
+	Name         int       `db:"name"`
+	UnitID       string    `db:"unit_id"`
+	StorageLunID int       `db:"storage_lun_id"`
+	RaidGroupID  int       `db:"raid_groups_id"`
+	Mappingto    string    `db:"mapping_to"`
+	SizeByte     int64     `db:"size"`
+	HostLunID    int64     `db:"host_lun_id"`
+	CreatedAt    time.Time `db:"created_at"`
 }
 
 func (l LUN) TableName() string {
@@ -23,9 +19,10 @@ func (l LUN) TableName() string {
 }
 
 type RaidGroup struct {
-	ID        string `db:"id"`
-	StorageID string `db:"storage_id"`
-	Enabled   bool   `db:"enabled"`
+	ID          string `db:"id"`
+	StorageID   string `db:"storage_system_id"`
+	StorageRGID string `db:"storage_rg_id"`
+	Enabled     bool   `db:"enabled"`
 }
 
 func (r RaidGroup) TableName() string {
@@ -33,17 +30,17 @@ func (r RaidGroup) TableName() string {
 }
 
 type HDSStorage struct {
-	ID       string `db:"id"`
-	Vendor   string `db:"vendor"`
-	Unit     string `db:"unit"`
-	LunStart int    `db:"lun_start"`
-	LunEnd   int    `db:"lun_end"`
-	HluStart int    `db:"hlu_start"`
-	HluEnd   int    `db:"hlu_end"`
+	ID        string `db:"id"`
+	Vendor    string `db:"vendor"`
+	AdminUnit string `db:"admin_unit"`
+	LunStart  int    `db:"lun_start"`
+	LunEnd    int    `db:"lun_end"`
+	HluStart  int    `db:"hlu_start"`
+	HluEnd    int    `db:"hlu_end"`
 }
 
 func (hds HDSStorage) TableName() string {
-	return "tb_storage_HDS"
+	return "tb_storage_HITACHI"
 }
 
 type HuaweiStorage struct {
@@ -60,6 +57,7 @@ func (h HuaweiStorage) TableName() string {
 	return "tb_storage_HUAWEI"
 }
 
+/*
 type Volume struct {
 	Name     string `db:"id"`
 	Type     string `db:"type"`
@@ -94,3 +92,4 @@ func TxInsertMultiVolume(tx *sqlx.Tx, volumes []*Volume) error {
 
 	return nil
 }
+*/
