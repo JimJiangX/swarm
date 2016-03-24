@@ -111,21 +111,24 @@ func TxUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int, finish time.Time) error
 		query = "UPDATE tb_task SET status=? WHERE id=?"
 
 		_, err := tx.Exec(query, state, t.ID)
-		if err == nil {
-			atomic.StoreInt32(&t.Status, int32(state))
+		if err != nil {
+			return err
 		}
 
-		return err
+		atomic.StoreInt32(&t.Status, int32(state))
+
+		return nil
 	}
 
 	_, err := tx.Exec(query, state, finish, t.ID)
-	if err == nil {
-
-		atomic.StoreInt32(&t.Status, int32(state))
-		t.FinishedAt = finish
+	if err != nil {
+		return err
 	}
 
-	return err
+	atomic.StoreInt32(&t.Status, int32(state))
+	t.FinishedAt = finish
+
+	return nil
 }
 
 func QueryTask(id string) (*Task, error) {
