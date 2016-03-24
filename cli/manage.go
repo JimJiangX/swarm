@@ -18,7 +18,6 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/mesos"
 	"github.com/docker/swarm/cluster/swarm"
-	"github.com/docker/swarm/experimental"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/filter"
 	"github.com/docker/swarm/scheduler/strategy"
@@ -99,7 +98,7 @@ func loadTLSConfig(ca, cert, key string, verify bool) (*tls.Config, error) {
 }
 
 // Initialize the discovery service.
-func createDiscovery(uri string, c *cli.Context, discoveryOpt []string) discovery.Backend {
+func createDiscovery(uri string, c *cli.Context) discovery.Backend {
 	hb, err := time.ParseDuration(c.String("heartbeat"))
 	if err != nil {
 		log.Fatalf("invalid --heartbeat: %v", err)
@@ -244,8 +243,8 @@ func manage(c *cli.Context) {
 
 	refreshMinInterval := c.Duration("engine-refresh-min-interval")
 	refreshMaxInterval := c.Duration("engine-refresh-max-interval")
-	if refreshMinInterval == time.Duration(0)*time.Second {
-		log.Fatal("minimum refresh interval should be a positive number")
+	if refreshMinInterval <= time.Duration(0)*time.Second {
+		log.Fatal("min refresh interval should be a positive number")
 	}
 	if refreshMaxInterval < refreshMinInterval {
 		log.Fatal("max refresh interval cannot be less than min refresh interval")
@@ -269,7 +268,7 @@ func manage(c *cli.Context) {
 	if uri == "" {
 		log.Fatalf("discovery required to manage a cluster. See '%s manage --help'.", c.App.Name)
 	}
-	discovery := createDiscovery(uri, c, c.StringSlice("discovery-opt"))
+	discovery := createDiscovery(uri, c)
 	s, err := strategy.New(c.String("strategy"))
 	if err != nil {
 		log.Fatal(err)
@@ -321,15 +320,15 @@ func manage(c *cli.Context) {
 		if err != nil {
 			log.Fatalf("invalid --replication-ttl: %v", err)
 		}
+		if leaderTTL <= time.Duration(0)*time.Second {
+			log.Fatalf("--replication-ttl should be a positive number")
+		}
 
 		setupReplication(c, cl, server, discovery, addr, leaderTTL, tlsConfig)
 	} else {
 		server.SetHandler(api.NewPrimary(cl, tlsConfig, &statusHandler{cl, nil, nil}, c.GlobalBool("debug"), c.Bool("cors")))
 	}
 
-	if experimental.ENABLED {
-		log.Warn("WARNING: rescheduling is currently experimental, use at your own risks")
-		cluster.NewWatchdog(cl)
-	}
+	cluster.NewWatchdog(cl)
 	log.Fatal(server.ListenAndServe())
 }

@@ -47,7 +47,7 @@ func getInfo(c *context, w http.ResponseWriter, r *http.Request) {
 		ServerVersion:     "swarm/" + version.VERSION,
 		OperatingSystem:   runtime.GOOS,
 		Architecture:      runtime.GOARCH,
-		NCPU:              int(c.cluster.TotalCpus()),
+		NCPU:              c.cluster.TotalCpus(),
 		MemTotal:          c.cluster.TotalMemory(),
 		HTTPProxy:         os.Getenv("http_proxy"),
 		HTTPSProxy:        os.Getenv("https_proxy"),
@@ -271,8 +271,11 @@ func getNetworks(c *context, w http.ResponseWriter, r *http.Request) {
 func getNetwork(c *context, w http.ResponseWriter, r *http.Request) {
 	var id = mux.Vars(r)["networkid"]
 	if network := c.cluster.Networks().Uniq().Get(id); network != nil {
+		// there could be duplicate container endpoints in network, need to remove redundant
+		// see https://github.com/docker/swarm/issues/1969
+		cleanNetwork := network.RemoveDuplicateEndpoints()
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(network)
+		json.NewEncoder(w).Encode(cleanNetwork)
 		return
 	}
 	httpError(w, fmt.Sprintf("No such network: %s", id), http.StatusNotFound)
@@ -376,6 +379,9 @@ func getContainersJSON(c *context, w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if !filters.Match("status", container.Info.State.StateString()) {
+			continue
+		}
+		if !filters.Match("node", container.Engine.Name) {
 			continue
 		}
 
@@ -587,6 +593,7 @@ func postNetworksCreate(c *context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -606,6 +613,7 @@ func postVolumesCreate(c *context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(volume)
 }
 
@@ -746,7 +754,27 @@ func postContainersStart(c *context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := c.cluster.StartContainer(container); err != nil {
+	hostConfig := &dockerclient.HostConfig{
+		MemorySwappiness: -1,
+	}
+
+	buf, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	r.Body.Close()
+
+	if len(buf) <= 2 {
+		hostConfig = nil
+	} else {
+		if err := json.Unmarshal(buf, hostConfig); err != nil {
+			httpError(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	if err := c.cluster.StartContainer(container, hostConfig); err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

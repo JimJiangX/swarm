@@ -13,8 +13,12 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/context"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/version"
+	engineapi "github.com/docker/engine-api/client"
+	engineapinop "github.com/docker/swarm/api/nopclient"
 	"github.com/samalba/dockerclient"
 	"github.com/samalba/dockerclient/nopclient"
 )
@@ -36,6 +40,9 @@ const (
 	stateUnhealthy
 	// healthy means an engine is reachable
 	stateHealthy
+	// disconnected means engine is removed from discovery
+	stateDisconnected
+
 	// TODO: add maintenance state. Proposal #1486
 	// maintenance means an engine is under maintenance.
 	// There is no action to migrate a node into maintenance state yet.
@@ -43,9 +50,10 @@ const (
 )
 
 var stateText = map[engineState]string{
-	statePending:   "Pending",
-	stateUnhealthy: "Unhealthy",
-	stateHealthy:   "Healthy",
+	statePending:      "Pending",
+	stateUnhealthy:    "Unhealthy",
+	stateHealthy:      "Healthy",
+	stateDisconnected: "Disconnected",
 	//stateMaintenance: "Maintenance",
 }
 
@@ -94,7 +102,7 @@ type Engine struct {
 	IP     string
 	Addr   string
 	Name   string
-	Cpus   int64
+	Cpus   int
 	Memory int64
 	Labels map[string]string
 
@@ -105,6 +113,7 @@ type Engine struct {
 	networks        map[string]*Network
 	volumes         map[string]*Volume
 	client          dockerclient.Client
+	apiClient       engineapi.APIClient
 	eventHandler    EventHandler
 	state           engineState
 	lastError       string
@@ -119,6 +128,7 @@ func NewEngine(addr string, overcommitRatio float64, opts *EngineOpts) *Engine {
 	e := &Engine{
 		Addr:            addr,
 		client:          nopclient.NewNopClient(),
+		apiClient:       engineapinop.NewNopClient(),
 		refreshDelayer:  newDelayer(opts.RefreshMinInterval, opts.RefreshMaxInterval),
 		Labels:          make(map[string]string),
 		stopCh:          make(chan struct{}),
@@ -159,8 +169,13 @@ func (e *Engine) Connect(config *tls.Config) error {
 	if err != nil {
 		return err
 	}
+	// Use HTTP Client used by dockerclient to create engine-api client
+	apiClient, err := engineapi.NewClient("tcp://"+e.Addr, "", c.HTTPClient, nil)
+	if err != nil {
+		return err
+	}
 
-	return e.ConnectWithClient(c)
+	return e.ConnectWithClient(c, apiClient)
 }
 
 // StartMonitorEvents monitors events from the engine
@@ -170,10 +185,13 @@ func (e *Engine) StartMonitorEvents() {
 	e.client.StartMonitorEvents(e.handler, ec)
 
 	go func() {
-		if err := <-ec; err != nil && !strings.Contains(err.Error(), "EOF") {
-			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Errorf("Error monitoring events: %s", err)
-		} else if err != nil {
-			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Debug("EOF monitoring events, restarting")
+		if err := <-ec; err != nil {
+			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Errorf("Error monitoring events: %s.", err)
+			if !strings.Contains(err.Error(), "EOF") {
+				// failing node reconnect should use back-off strategy
+				<-e.refreshDelayer.Wait(e.failureCount)
+			}
+			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Errorf("Restart event monitoring.")
 			e.StartMonitorEvents()
 		}
 		close(ec)
@@ -181,8 +199,9 @@ func (e *Engine) StartMonitorEvents() {
 }
 
 // ConnectWithClient is exported
-func (e *Engine) ConnectWithClient(client dockerclient.Client) error {
+func (e *Engine) ConnectWithClient(client dockerclient.Client, apiClient engineapi.APIClient) error {
 	e.client = client
+	e.apiClient = apiClient
 
 	// Fetch the engine labels.
 	if err := e.updateSpecs(); err != nil {
@@ -214,6 +233,10 @@ func (e *Engine) ConnectWithClient(client dockerclient.Client) error {
 func (e *Engine) Disconnect() {
 	e.Lock()
 	defer e.Unlock()
+	// Resource clean up should be done only once
+	if e.state == stateDisconnected {
+		return
+	}
 
 	// close the chan
 	close(e.stopCh)
@@ -223,6 +246,8 @@ func (e *Engine) Disconnect() {
 		closeIdleConnections(dc.HTTPClient)
 	}
 	e.client = nopclient.NewNopClient()
+	e.apiClient = engineapinop.NewNopClient()
+	e.state = stateDisconnected
 	e.emitEvent("engine_disconnect")
 }
 
@@ -233,9 +258,12 @@ func closeIdleConnections(client *http.Client) {
 }
 
 // isConnected returns true if the engine is connected to a remote docker API
+// note that it's not the same as stateDisconnected. Engine isConnected is also true
+// when it is first created but not yet 'Connect' to a remote docker API.
 func (e *Engine) isConnected() bool {
 	_, ok := e.client.(*nopclient.NopClient)
-	return !ok
+	_, okAPIClient := e.apiClient.(*engineapinop.NopClient)
+	return (!ok && !okAPIClient)
 }
 
 // IsHealthy returns true if the engine is healthy
@@ -323,7 +351,7 @@ func (e *Engine) Status() string {
 	return stateText[e.state]
 }
 
-// incFailureCount increases engine's failure count, and set engine as unhealthy if threshold is crossed
+// incFailureCount increases engine's failure count, and sets engine as unhealthy if threshold is crossed
 func (e *Engine) incFailureCount() {
 	e.Lock()
 	defer e.Unlock()
@@ -364,8 +392,10 @@ func (e *Engine) CheckConnectionErr(err error) {
 
 	// dockerclient defines ErrConnectionRefused error. but if http client is from swarm, it's not using
 	// dockerclient. We need string matching for these cases. Remove the first character to deal with
-	// case sensitive issue
+	// case sensitive issue.
+	// engine-api returns ErrConnectionFailed error, so we check for that as long as dockerclient exists
 	if err == dockerclient.ErrConnectionRefused ||
+		err == engineapi.ErrConnectionFailed ||
 		strings.Contains(err.Error(), "onnection refused") ||
 		strings.Contains(err.Error(), "annot connect to the docker engine endpoint") {
 		// each connection refused instance may increase failure count so
@@ -383,7 +413,7 @@ func (e *Engine) CheckConnectionErr(err error) {
 
 // Gather engine specs (CPU, memory, constraints, ...).
 func (e *Engine) updateSpecs() error {
-	info, err := e.client.Info()
+	info, err := e.apiClient.Info(context.TODO())
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
@@ -393,7 +423,7 @@ func (e *Engine) updateSpecs() error {
 		return fmt.Errorf("cannot get resources for this engine, make sure %s is a Docker Engine, not a Swarm manager", e.Addr)
 	}
 
-	v, err := e.client.Version()
+	v, err := e.apiClient.ServerVersion(context.TODO())
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
@@ -612,6 +642,11 @@ func (e *Engine) updateContainer(c dockerclient.Container, containers map[string
 	if current, exists := e.containers[c.Id]; exists {
 		// The container is already known.
 		container = current
+		// Restarting is a transit state. Unfortunately Docker doesn't always emit
+		// events when it gets out of Restarting state. Force an inspect to update.
+		if container.Info.State != nil && container.Info.State.Restarting {
+			full = true
+		}
 	} else {
 		// This is a brand new container. We need to do a full refresh.
 		container = &Container{
@@ -640,7 +675,7 @@ func (e *Engine) updateContainer(c dockerclient.Container, containers map[string
 		container.Config = BuildContainerConfig(*info.Config)
 
 		// FIXME remove "duplicate" lines and move this to cluster/config.go
-		container.Config.CpuShares = container.Config.CpuShares * e.Cpus / 1024.0
+		container.Config.CpuShares = container.Config.CpuShares * int64(e.Cpus) / 1024.0
 		container.Config.HostConfig.CpuShares = container.Config.CpuShares
 
 		// Save the entire inspect back into the container.
@@ -688,7 +723,7 @@ func (e *Engine) refreshLoop() {
 
 		err = e.RefreshContainers(false)
 		if err == nil {
-			// Do not check error as older daemon don't support this call
+			// Do not check error as older daemon doesn't support this call
 			e.RefreshVolumes()
 			e.RefreshNetworks()
 			e.RefreshImages()
@@ -749,8 +784,8 @@ func (e *Engine) TotalMemory() int64 {
 }
 
 // TotalCpus returns the total cpus + overcommit
-func (e *Engine) TotalCpus() int64 {
-	return e.Cpus + (e.Cpus * e.overcommitRatio / 100)
+func (e *Engine) TotalCpus() int {
+	return e.Cpus + (e.Cpus * int(e.overcommitRatio) / 100)
 }
 
 // Create a new container
@@ -807,7 +842,7 @@ func (e *Engine) Create(config *ContainerConfig, name string, pullImage bool, au
 	return container, err
 }
 
-// RemoveContainer a container from the engine.
+// RemoveContainer removes a container from the engine.
 func (e *Engine) RemoveContainer(container *Container, force, volumes bool) error {
 	err := e.client.RemoveContainer(container.Id, force, volumes)
 	e.CheckConnectionErr(err)
@@ -975,7 +1010,7 @@ func (e *Engine) handler(ev *dockerclient.Event, _ chan error, args ...interface
 		e.RefreshImages()
 	case "container":
 		switch ev.Action {
-		case "die", "kill", "oom", "pause", "start", "stop", "unpause", "rename":
+		case "die", "kill", "oom", "pause", "start", "restart", "stop", "unpause", "rename":
 			e.refreshContainer(ev.ID, true)
 		default:
 			e.refreshContainer(ev.ID, false)
@@ -1027,7 +1062,7 @@ func (e *Engine) AddContainer(container *Container) error {
 	return nil
 }
 
-// Inject an image into the internal state.
+// addImage injects an image into the internal state.
 func (e *Engine) addImage(image *Image) {
 	e.Lock()
 	defer e.Unlock()
@@ -1035,7 +1070,7 @@ func (e *Engine) addImage(image *Image) {
 	e.images = append(e.images, image)
 }
 
-// Remove a container from the internal test.
+// removeContainer removes a container from the internal state.
 func (e *Engine) removeContainer(container *Container) error {
 	e.Lock()
 	defer e.Unlock()
@@ -1047,7 +1082,7 @@ func (e *Engine) removeContainer(container *Container) error {
 	return nil
 }
 
-// Wipes the internal container state.
+// cleanupContainers wipes the internal container state.
 func (e *Engine) cleanupContainers() {
 	e.Lock()
 	e.containers = make(map[string]*Container)
@@ -1055,8 +1090,8 @@ func (e *Engine) cleanupContainers() {
 }
 
 // StartContainer starts a container
-func (e *Engine) StartContainer(id string) error {
-	err := e.client.StartContainer(id, nil)
+func (e *Engine) StartContainer(id string, hostConfig *dockerclient.HostConfig) error {
+	err := e.client.StartContainer(id, hostConfig)
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err

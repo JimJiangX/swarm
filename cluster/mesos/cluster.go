@@ -179,10 +179,10 @@ func (c *Cluster) UnregisterEventHandler(h cluster.EventHandler) {
 }
 
 // StartContainer starts a container
-func (c *Cluster) StartContainer(container *cluster.Container) error {
+func (c *Cluster) StartContainer(container *cluster.Container, hostConfig *dockerclient.HostConfig) error {
 	// if the container was started less than a second ago in detach mode, do not start it
 	if time.Now().Unix()-container.Created > 1 || container.Config.Labels[cluster.SwarmLabelNamespace+".mesos.detach"] != "true" {
-		return container.Engine.StartContainer(container.Id)
+		return container.Engine.StartContainer(container.Id, hostConfig)
 	}
 	return nil
 }
@@ -446,12 +446,12 @@ func (c *Cluster) TotalMemory() int64 {
 }
 
 // TotalCpus return the total memory of the cluster
-func (c *Cluster) TotalCpus() int64 {
+func (c *Cluster) TotalCpus() int {
 	c.RLock()
 	defer c.RUnlock()
-	var totalCpus int64
+	var totalCpus int
 	for _, s := range c.agents {
-		totalCpus += int64(sumScalarResourceValue(s.offers, "cpus"))
+		totalCpus += int(sumScalarResourceValue(s.offers, "cpus"))
 	}
 	return totalCpus
 }
@@ -529,7 +529,7 @@ func (c *Cluster) LaunchTask(t *task.Task) bool {
 		return true
 	}
 
-	// build the offer from it's internal config and set the agentID
+	// build the offer from its internal config and set the agentID
 
 	c.Lock()
 	// TODO: Only use the offer we need

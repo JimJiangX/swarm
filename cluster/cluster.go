@@ -27,7 +27,7 @@ type Cluster interface {
 	Containers() Containers
 
 	// Start a container
-	StartContainer(container *Container) error
+	StartContainer(container *Container, hostConfig *dockerclient.HostConfig) error
 
 	// Return container the matching `IDOrName`
 	// TODO: remove this method from the interface as we can use
@@ -78,7 +78,7 @@ type Cluster interface {
 	TotalMemory() int64
 
 	// Return the number of CPUs in the cluster
-	TotalCpus() int64
+	TotalCpus() int
 
 	// Register an event handler for cluster-wide events.
 	RegisterEventHandler(h EventHandler) error
