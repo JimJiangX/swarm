@@ -3,7 +3,7 @@ package cluster
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/parsers"
-	"github.com/samalba/dockerclient"
+	"github.com/docker/engine-api/client"
 )
 
 // UsedCpus returns the sum of CPUs reserved by containers.
@@ -47,6 +47,7 @@ func getCPUNum(val string) (int64, error) {
 	return ncpu, nil
 }
 
-func (e *Engine) Client() dockerclient.Client {
-	return e.client
+func (e *Engine) EngineAPIClient() client.APIClient {
+
+	return e.apiClient
 }

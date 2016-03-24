@@ -3,7 +3,10 @@ package swarm
 import (
 	"sync/atomic"
 
+	"golang.org/x/net/context"
+
 	"github.com/docker/engine-api/types"
+	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	consulapi "github.com/hashicorp/consul/api"
@@ -124,8 +127,10 @@ func (u *unit) createContainer() (*cluster.Container, error) {
 	return container, err
 }
 
-func (u *unit) updateContainer() error {
-	return nil
+func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
+	client := u.engine.EngineAPIClient()
+
+	return client.ContainerUpdate(context.TODO(), u.container.Id, updateConfig)
 }
 
 func (u *unit) removeContainer(force, rmVolumes bool) error {
@@ -142,26 +147,27 @@ func (u *unit) startContainer() error {
 }
 
 func (u *unit) stopContainer(timeout int) error {
-	client := u.engine.Client()
+	client := u.engine.EngineAPIClient()
 
-	return client.StopContainer(u.Unit.ContainerID, timeout)
+	return client.ContainerStop(context.TODO(), u.Unit.ContainerID, timeout)
 }
 
 func (u *unit) restartContainer(timeout int) error {
-	client := u.engine.Client()
+	client := u.engine.EngineAPIClient()
 
-	return client.StopContainer(u.Unit.ContainerID, timeout)
+	return client.ContainerRestart(context.TODO(), u.Unit.ContainerID, timeout)
 }
 
 func (u *unit) RenameContainer(name string) error {
-	client := u.engine.Client()
-	return client.RenameContainer(u.container.Id, u.Unit.Name)
+	client := u.engine.EngineAPIClient()
+
+	return client.ContainerRename(context.TODO(), u.container.Id, u.Unit.Name)
 }
 
 func (u *unit) exec(cmd []string) error {
-	client := u.engine.Client()
+	client := u.engine.EngineAPIClient()
 
-	id, err := client.ExecCreate(&dockerclient.ExecConfig{
+	resp, err := client.ContainerExecCreate(context.TODO(), types.ExecConfig{
 		AttachStdin:  false,
 		AttachStdout: true,
 		AttachStderr: true,
@@ -170,11 +176,12 @@ func (u *unit) exec(cmd []string) error {
 		Container:    u.container.Id,
 		Detach:       false,
 	})
+
 	if err != nil {
 		return err
 	}
 
-	return client.ExecStart(id, nil)
+	return client.ContainerExecStart(context.TODO(), resp.ID, types.ExecStartCheck{})
 }
 
 func (u *unit) createNetworking() error {
