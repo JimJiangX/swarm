@@ -128,24 +128,29 @@ func (u *unit) updateContainer() error {
 	return nil
 }
 
-func (u *unit) removeContainer() error {
-	return u.engine.RemoveContainer(u.container, true, false)
+func (u *unit) removeContainer(force, rmVolumes bool) error {
+	err := u.engine.RemoveContainer(u.container, force, rmVolumes)
+	if err != nil {
+		err := u.engine.RemoveContainer(u.container, true, rmVolumes)
+	}
+
+	return err
 }
 
 func (u *unit) startContainer() error {
 	return u.engine.StartContainer(u.Unit.ContainerID)
 }
 
-func (u *unit) stopContainer() error {
+func (u *unit) stopContainer(timeout int) error {
 	client := u.engine.Client()
 
-	return client.StopContainer(u.Unit.ContainerID, 5)
+	return client.StopContainer(u.Unit.ContainerID, timeout)
 }
 
-func (u *unit) restartContainer() error {
+func (u *unit) restartContainer(timeout int) error {
 	client := u.engine.Client()
 
-	return client.StopContainer(u.Unit.ContainerID, 5)
+	return client.StopContainer(u.Unit.ContainerID, timeout)
 }
 
 func (u *unit) RenameContainer(name string) error {
