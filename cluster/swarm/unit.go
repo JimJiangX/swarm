@@ -1,11 +1,11 @@
-package gardener
+package swarm
 
 import (
 	"sync/atomic"
 
 	"github.com/docker/engine-api/types"
 	"github.com/docker/swarm/cluster"
-	"github.com/docker/swarm/cluster/gardener/database"
+	"github.com/docker/swarm/cluster/swarm/database"
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/samalba/dockerclient"
 )
