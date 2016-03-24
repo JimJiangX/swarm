@@ -46,7 +46,7 @@ func (region *Region) serviceExecute() (err error) {
 
 			unit.container = container
 
-			err = region.StartContainer(container)
+			err = region.StartContainer(container, nil)
 			if err != nil {
 				goto failure
 			}
