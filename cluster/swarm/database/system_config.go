@@ -26,7 +26,7 @@ type Configurations struct {
 }
 
 func (c Configurations) TableName() string {
-	return "tb_configurations"
+	return "tb_system_config"
 }
 
 func GetConsulClient() []*consulapi.Client {
@@ -58,10 +58,14 @@ func GetConsulClient() []*consulapi.Client {
 func GetConsulConfigFromDB() (*Configurations, error) {
 	db, err := GetDB(true)
 	if err != nil {
-
+		return nil, err
 	}
+
 	c := &Configurations{}
-	err = db.Get(c, "SELECT * FROM tb_configurations LIMIT 1")
+	err = db.Get(c, "SELECT * FROM tb_system_config LIMIT 1")
+	if err != nil {
+		return nil, err
+	}
 
 	return c, err
 }

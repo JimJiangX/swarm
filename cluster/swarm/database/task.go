@@ -33,8 +33,7 @@ type BackupFile struct {
 	UnitID     string    `db:"unit_id"`
 	Type       string    `db:"type"` // full or incremental
 	Path       string    `db:"path"`
-	SizeMB     int64     `db:"size"`
-	Cyclicity  bool      `db:"cyclicity"`
+	SizeByte   int64     `db:"size"`
 	Status     byte      `db:"status"`
 	CreatedAt  time.Time `db:"created_at"`
 }
@@ -44,18 +43,18 @@ func (bf BackupFile) TableName() string {
 }
 
 type BackupStrategy struct {
-	ID        string        `db:"id"`
-	Spec      string        `db:"spec"`
-	Next      time.Time     `db:"next"`
-	Valid     time.Time     `db:"valid"`
-	Enabled   bool          `db:"enabled"`
-	UnitID    string        `db:"unit_id"`
-	BackupDir string        `db:"backup_dir"`
-	MaxSizeMB int64         `db:"max_size"`
-	Retention time.Duration `db:"retention"`
-	Timeout   time.Duration `db:"timeout"`
-	Status    byte          `db:"status"`
-	CreatedAt time.Time     `db:"create_at"`
+	ID          string        `db:"id"`
+	Type        string        `db:"type"` // full/part
+	Spec        string        `db:"spec"`
+	Next        time.Time     `db:"next"`
+	Valid       time.Time     `db:"valid"`
+	Enabled     bool          `db:"enabled"`
+	BackupDir   string        `db:"backup_dir"`
+	MaxSizeByte int64         `db:"max_size"`
+	Retention   time.Duration `db:"retention"`
+	Timeout     time.Duration `db:"timeout"`
+	Status      byte          `db:"status"`
+	CreatedAt   time.Time     `db:"create_at"`
 }
 
 func (bs BackupStrategy) TableName() string {

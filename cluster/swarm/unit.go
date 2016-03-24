@@ -1,8 +1,6 @@
 package swarm
 
 import (
-	"sync/atomic"
-
 	"golang.org/x/net/context"
 
 	"github.com/docker/engine-api/types"
@@ -76,6 +74,7 @@ func (mysql *mysqlOperation) Migrate(e *cluster.Engine, config *cluster.Containe
 }
 
 type unit struct {
+	retry int64
 	database.Unit
 	engine     *cluster.Engine
 	config     *cluster.ContainerConfig
@@ -89,34 +88,12 @@ type unit struct {
 	Operator
 }
 
-func (u *unit) prepareCreateContainer(retry int) error {
-	if retry <= 0 {
-		retry = 1
-	}
-
-	for retry >= 0 {
-		// create container
-		if !atomic.CompareAndSwapUint32(&u.Status, 0, 1) {
-			break
-		}
-
-		//if err := u.createNetworkings(retry); err != nil {
-		//	break
-		//}
-
-		// create volumes
-		// if err := u.createVolumes(retry); err != nil {
-		// 	break
-		// }
-
-		atomic.AddUint32(&u.Status, 1)
-		break
-	}
+func (u *unit) prepareCreateContainer() error {
 
 	return nil
 }
 
-func (u *unit) createContainer() (*cluster.Container, error) {
+func (u *unit) createContainer(authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
 
 	container, err := u.engine.Create(u.config, u.Unit.Name, true, u.authConfig)
 	if err == nil && container != nil {

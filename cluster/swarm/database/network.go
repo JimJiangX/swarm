@@ -11,7 +11,8 @@ import (
 type IP struct {
 	IPAddr       uint32 `db:"ip_addr"`
 	Prefix       uint32 `db:"prefix"`
-	NetworkingID string `db:"network_id"`
+	NetworkingID string `db:"networking_id"`
+	UnitID       string `db:"unit_id"`
 	Allocated    bool   `db:"allocated"`
 }
 
@@ -34,9 +35,9 @@ func (net Networking) TableName() string {
 type Port struct {
 	Port      int    `db:"port"` // auto increment
 	Name      string `db:"name"`
-	UnitID    string `db:"unit_id"`
+	UnitID    string `db:"unit_id" json:"-"`
 	Proto     string `db:"proto"` // tcp/udp
-	Allocated bool   `db:"allocated"`
+	Allocated bool   `db:"allocated" json:"-"`
 }
 
 func (port Port) TableName() string {
@@ -76,10 +77,10 @@ func SelectAvailablePorts(num int) ([]Port, error) {
 	return ports, nil
 }
 
-func TxUPdatePorts(tx *sqlx.Tx, ports []Port) error {
-	query := "UPDATE tb_port SET name=?,unit_id=?,proto=?,allocated=? WHERE port=?"
+func TxUpdatePorts(tx *sqlx.Tx, ports []Port) error {
+	query := "UPDATE tb_port SET name=:name,unit_id=:unit_id,proto=:proto,allocated=:allocated WHERE port=:port"
 
-	stmt, err := tx.Preparex(query)
+	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
 		return err
 	}
@@ -94,11 +95,12 @@ func TxUPdatePorts(tx *sqlx.Tx, ports []Port) error {
 	return nil
 }
 
+// TxImportPort import Port from start to end(includ end)
 func TxImportPort(start, end int, filter ...int) error {
 	ports := make([]Port, 0, end-start)
 
 loop:
-	for i := start; i < end; i++ {
+	for i := start; i <= end; i++ {
 		for j := range filter {
 			if i == j {
 				continue loop
@@ -133,24 +135,16 @@ loop:
 func TxInsertPorts(tx *sqlx.Tx, ports []Port) error {
 	query := "INSERT INTO tb_port (port,name,unit_id,allocated) VALUES (:port,:name,:unit_id,:allocated)"
 
-	stmt, err := tx.Preparex(query)
+	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
 		return err
 	}
 
 	for i := range ports {
-		result, err := stmt.Exec(&ports[i])
+		_, err = stmt.Exec(&ports[i])
 		if err != nil {
 			return err
 		}
-
-		port, err := result.LastInsertId()
-		if err != nil {
-			return err
-		}
-
-		ports[i].Port = int(port)
-
 	}
 
 	return nil
@@ -174,14 +168,14 @@ func DelMultiPorts(tx *sqlx.Tx, ports []Port) error {
 	return nil
 }
 
-func GetPortsByUnit(IDOrName string) ([]Port, error) {
+func GetPortsByUnit(id string) ([]Port, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
 	var ports []Port
-	err = db.QueryRowx("SELECT * From tb_port WHERE unit_id=?", IDOrName).StructScan(&ports)
+	err = db.QueryRowx("SELECT * From tb_port WHERE unit_id=?", id).StructScan(&ports)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +231,7 @@ func insertNetworking(net Networking, ips []IP) error {
 		return err
 	}
 
-	ipQuery := "INSERT INTO tb_ip (ip_addr,prefix,network_id,allocated) VALUES (:ip_addr,:prefix,:network_id,:allocated)"
+	ipQuery := "INSERT INTO tb_ip (ip_addr,prefix,networking_id,unit_id,allocated) VALUES (:ip_addr,:prefix,:networking_id,:unit_id,:allocated)"
 	stmt, err := tx.PrepareNamed(ipQuery)
 	if err != nil {
 		return err
@@ -255,23 +249,24 @@ func insertNetworking(net Networking, ips []IP) error {
 }
 
 type IPStatus struct {
+	UnitID    string
 	IP        uint32
 	Prefix    int
 	Allocated bool
 }
 
-func TxUpdateMultiIPStatue(tx *sqlx.Tx, values []IPStatus) error {
-	query := "UPDATE tb_ip SET allocated=? WHERE ip=? AND prefix=?"
+func TxUpdateMultiIPStatue(tx *sqlx.Tx, val []IPStatus) error {
+	query := "UPDATE tb_ip SET unit_id=:unit_id,allocated=:allocated WHERE ip=:ip AND prefix=:prefix"
 
-	stmt, err := tx.Prepare(query)
+	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
-	for i := range values {
+	for i := range val {
 
-		_, err = stmt.Exec(values[i].Allocated, values[i].IP, values[i].Prefix)
+		_, err = stmt.Exec(&val[i])
 		if err != nil {
 			return err
 		}
