@@ -32,7 +32,6 @@ func (c *Cluster) Insert() error {
 }
 
 func (c *Cluster) UpdateStatus(state bool) error {
-
 	db, err := GetDB(true)
 	if err != nil {
 		return err
@@ -83,7 +82,7 @@ func (n *Node) Insert() error {
 	}
 
 	// insert into database
-	query := "INSERT INTO tb_node (id,name,cluster_id,addr,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:addr,:max_container,:status,:register_at,:deregister_at)"
+	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:max_container,:status,:register_at,:deregister_at)"
 	_, err = db.NamedExec(query, n)
 
 	return err

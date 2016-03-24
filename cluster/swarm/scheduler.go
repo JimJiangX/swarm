@@ -154,7 +154,7 @@ func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 		preAlloc := newPreAllocResource()
 		allocs = append(allocs, preAlloc)
 
-		name := region.generateUniqueID()
+		id := region.generateUniqueID()
 		engine, ok := region.engines[candidates[i].ID]
 		if !ok {
 			return allocs, errors.New("Engine Not Found")
@@ -165,39 +165,31 @@ func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 			return allocs, err
 		}
 
-		configures, err := image.UnmarshalConfigKeySets()
-		if err != nil {
-
-		}
-
-		portBindings, err := image.UnmarshalPorts()
-		if err != nil {
-
-		}
-
-		ports, err := database.SelectAvailablePorts(len(portBindings))
+		ports, err := database.SelectAvailablePorts(len(image.PortSlice))
 		if err != nil {
 			return allocs, err
 		}
 
-		for i := range portBindings {
-			ports[i] = database.Port{
-				Port:      ports[i].Port,
-				Name:      portBindings[i].Name,
-				UnitID:    name,
-				Proto:     portBindings[i].Proto,
-				Allocated: true,
-			}
+		for i := range ports {
+			ports[i].Name = image.PortSlice[i].Name
+			ports[i].UnitID = id
+			ports[i].Proto = image.PortSlice[i].Proto
+			ports[i].Allocated = true
+
 		}
 
 		preAlloc.unit = &unit{
 			Unit: database.Unit{
-				Name:       name,
-				SoftwareID: image.ID,
-				Status:     0,
-				CreatedAt:  time.Now(),
+				ID: id,
+				// Name:      string(id[:8]) + "_",
+				Type:      Type,
+				ImageID:   image.ID,
+				ImageName: image.Name + "_" + image.Version,
+				NodeID:    engine.ID,
+				Status:    0,
+				CreatedAt: time.Now(),
 			},
-			configures: configures,
+			configures: image.KeySets,
 			ports:      ports,
 		}
 
@@ -216,7 +208,7 @@ func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 
 		preAlloc.swarmID = swarmID
 		preAlloc.pendingContainer = &pendingContainer{
-			Name:   name,
+			Name:   id,
 			Config: config,
 			Engine: engine,
 		}

@@ -119,7 +119,7 @@ func (pre *preAllocResource) consistency() (err error) {
 		return err
 	}
 
-	err = database.TxUPdatePorts(tx, pre.unit.ports)
+	err = database.TxUpdatePorts(tx, pre.unit.ports)
 	if err != nil {
 		return err
 	}
@@ -171,7 +171,7 @@ func (r *Region) Recycle(pendings []*preAllocResource) (err error) {
 			}
 		}
 
-		database.TxUPdatePorts(tx, ports)
+		database.TxUpdatePorts(tx, ports)
 	}
 
 	r.Unlock()

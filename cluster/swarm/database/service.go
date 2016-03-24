@@ -7,6 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+/*
 type Container struct {
 	ID             string    `db:"id"`
 	NodeID         string    `db:"node_id"`
@@ -23,7 +24,6 @@ type Container struct {
 	NetworkMode    string    `db:"network_mode"`
 	VolumeDriver   string    `db:"volume_driver"`
 	VolumesFrom    string    `db:"volumes_from"` // JSON of volumes
-	volumes        []volume  `db:"-"`
 	Filesystem     string    `db:"filesystem"`
 	Env            string    `db:"env"`
 	Cmd            string    `db:"cmd"`
@@ -58,6 +58,7 @@ func TxInsertMultiContainer(tx *sqlx.Tx, clist []*Container) error {
 
 	return nil
 }
+*/
 
 type Unit struct {
 	ID          string `db:"id"`

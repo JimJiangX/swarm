@@ -6,19 +6,19 @@ import (
 )
 
 type Image struct {
-	database.Software
+	database.Image
 	image *cluster.Image
 }
 
 func (r *Region) GetImage(name, version string) (Image, error) {
-	sw, err := database.QueryImage(name, version)
+	im, err := database.QueryImage(name, version)
 	if err != nil {
 		return Image{}, err
 	}
 
-	out := Image{Software: sw}
+	out := Image{Image: im}
 
-	image := r.Image(sw.ImageID)
+	image := r.Image(im.ImageID)
 	if image == nil {
 		return out, nil
 	}
@@ -29,12 +29,12 @@ func (r *Region) GetImage(name, version string) (Image, error) {
 }
 
 func (r *Region) getImageByID(id string) (Image, error) {
-	sw, err := database.QueryImageByID(id)
+	im, err := database.QueryImageByID(id)
 	if err != nil {
 		return Image{}, err
 	}
 
-	out := Image{Software: sw}
+	out := Image{Image: im}
 
 	image := r.Image(out.ImageID)
 	if image == nil {
