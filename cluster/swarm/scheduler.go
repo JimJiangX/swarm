@@ -40,7 +40,7 @@ func (region *Region) serviceScheduler() (err error) {
 		for _, module := range svc.base.Modules {
 			// query image from database
 			if module.Config.Image == "" {
-				image, err := region.GetImage(module.Name, module.Version)
+				image, err := region.GetImage(module.Type, module.Version)
 				if err != nil {
 					goto failure
 				}
@@ -148,6 +148,15 @@ func (region *Region) BuildPendingContainers(list []*node.Node, Type string, num
 func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 	templConfig *cluster.ContainerConfig) ([]*preAllocResource, error) {
 
+	image, err := region.getImageByID(templConfig.Image)
+	if err != nil {
+		return nil, err
+	}
+	parentConfig, err := database.GetUnitConfigByID(image.ImageID)
+	if err != nil {
+		return nil, err
+	}
+
 	allocs := make([]*preAllocResource, 0, 5)
 
 	for i := range candidates {
@@ -158,11 +167,6 @@ func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 		engine, ok := region.engines[candidates[i].ID]
 		if !ok {
 			return allocs, errors.New("Engine Not Found")
-		}
-
-		image, err := region.getImageByID(templConfig.Image)
-		if err != nil {
-			return allocs, err
 		}
 
 		ports, err := database.SelectAvailablePorts(len(image.PortSlice))
@@ -178,7 +182,7 @@ func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 
 		}
 
-		preAlloc.unit = &unit{
+		unit := &unit{
 			Unit: database.Unit{
 				ID: id,
 				// Name:      string(id[:8]) + "_",
@@ -189,14 +193,15 @@ func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 				Status:    0,
 				CreatedAt: time.Now(),
 			},
-			configures: image.KeySets,
-			ports:      ports,
+			ports:        ports,
+			parentConfig: parentConfig,
 		}
+
+		preAlloc.unit = unit
 
 		config, err := region.allocResource(preAlloc, engine, *templConfig, Type)
 		if err != nil {
 			return allocs, fmt.Errorf("error resource alloc")
-
 		}
 
 		swarmID := config.SwarmID()
@@ -212,6 +217,8 @@ func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 			Config: config,
 			Engine: engine,
 		}
+		preAlloc.unit.networkings = preAlloc.networkings
+
 		region.pendingContainers[swarmID] = preAlloc.pendingContainer
 
 		err = preAlloc.consistency()

@@ -46,11 +46,6 @@ func (region *Region) serviceExecute() (err error) {
 
 			unit.container = container
 
-			err = region.StartContainer(container, nil)
-			if err != nil {
-				goto failure
-			}
-
 		}
 
 		atomic.StoreInt64(&svc.Status, 1)
