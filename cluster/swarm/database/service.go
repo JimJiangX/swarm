@@ -106,16 +106,66 @@ func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
 }
 
 type UnitConfig struct {
-	ID       string    `db:"id"`
-	ImageID  string    `db:"image_id"`
-	Version  int       `db:"version"`
-	ParentID string    `db:"parent_id"`
-	Content  string    `db:"content"`
-	CreateAt time.Time `db:"create_at"`
+	ID             string    `db:"id"`
+	ImageID        string    `db:"image_id"`
+	ConfigFilePath string    `db:"config_file_path"`
+	Version        int       `db:"version"`
+	ParentID       string    `db:"parent_id"`
+	Content        string    `db:"content"`
+	CreateAt       time.Time `db:"create_at"`
 }
 
 func (u UnitConfig) TableName() string {
 	return "tb_unit_config"
+}
+
+func GetUnitConfigByID(id string) (*UnitConfig, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	config := &UnitConfig{}
+	query := "SELECT * FROM tb_unit_config WHERE id=? OR image_id=?"
+
+	err = db.QueryRowx(query, id, id).StructScan(config)
+
+	return config, err
+}
+
+func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if unit != nil && unit.ID != "" && unit.ConfigID != "" {
+		query := "UPDATE tb_unit SET config_id=? WHERE id=?"
+		_, err = tx.Exec(query, unit.ConfigID, unit.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = TXInsertUnitConfig(tx, &config)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func TXInsertUnitConfig(tx *sqlx.Tx, config *UnitConfig) error {
+	query := "INSERT INTO tb_unit_config (id,image_id,config_file_path,version,parent_id,content,create_at) VALUES (:id,:image_id,:config_file_path,:version,:parent_id,:content,:create_at)"
+
+	_, err := tx.NamedExec(query, config)
+	return err
 }
 
 type Service struct {
