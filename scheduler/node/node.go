@@ -3,6 +3,7 @@ package node
 import (
 	"errors"
 
+	"github.com/docker/docker/pkg/parsers"
 	"github.com/docker/swarm/cluster"
 )
 
@@ -52,8 +53,8 @@ func (n *Node) Container(IDOrName string) *cluster.Container {
 	return n.Containers.Get(IDOrName)
 }
 
-// AddContainer injects a container into the internal state.
-func (n *Node) AddContainer(container *cluster.Container) error {
+// AddContainer_Swarm injects a container into the internal state.
+func (n *Node) AddContainer_Swarm(container *cluster.Container) error {
 	if container.Config != nil {
 		memory := container.Config.Memory
 		cpus := container.Config.CpuShares
@@ -65,4 +66,41 @@ func (n *Node) AddContainer(container *cluster.Container) error {
 	}
 	n.Containers = append(n.Containers, container)
 	return nil
+}
+
+// AddContainer injects a container into the internal state.
+func (n *Node) AddContainer(container *cluster.Container) error {
+	if container.Config != nil {
+		memory := container.Config.Memory
+		cpuset := container.Config.ContainerConfig.HostConfig.CpusetCpus
+		cpus, err := getCPUNum(cpuset)
+		if err != nil {
+			return err
+		}
+
+		if n.TotalMemory-memory < 0 || n.TotalCpus-cpus < 0 {
+			return errors.New("not enough resources")
+		}
+		n.UsedMemory = n.UsedMemory + memory
+		n.UsedCpus = n.UsedCpus + cpus
+	}
+	n.Containers = append(n.Containers, container)
+	return nil
+}
+
+func getCPUNum(val string) (int64, error) {
+	cpus, err := parsers.ParseUintList(val)
+	if err != nil {
+		return 0, err
+	}
+
+	ncpu := int64(0)
+
+	for _, v := range cpus {
+		if v {
+			ncpu++
+		}
+	}
+
+	return ncpu, nil
 }
