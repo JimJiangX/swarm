@@ -5,18 +5,17 @@ import (
 	"errors"
 	"time"
 
-	"golang.org/x/net/context"
-
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/samalba/dockerclient"
+	"golang.org/x/net/context"
 )
 
 var _ Configurer = &mysqlConfig{}
-var _ Operator = &mysqlOperation{}
+var _ Operator = &mysqlOperator{}
 
 const pluginPort = 10000
 
@@ -33,6 +32,20 @@ type mysqlConfig struct {
 	unit    *database.Unit
 	parent  *database.UnitConfig
 	content map[string]interface{}
+}
+
+func newMysqlConfig(unit *database.Unit, parent *database.UnitConfig) Configurer {
+	var content map[string]interface{}
+	err := json.Unmarshal([]byte(parent.Content), &content)
+	if err != nil {
+		// return err
+	}
+
+	return &mysqlConfig{
+		unit:    unit,
+		parent:  parent,
+		content: content,
+	}
 }
 
 func (c *mysqlConfig) Path() string {
@@ -115,49 +128,56 @@ type Operator interface {
 	DeregisterHealthCheck(client *consulapi.Client) error
 }
 
-type mysqlOperation struct {
+type mysqlOperator struct {
 	unit   *database.Unit
 	engine *cluster.Engine
 }
 
-func (mysql *mysqlOperation) RegisterHealthCheck(client *consulapi.Client) error {
+func newMysqlOperator(unit *database.Unit, engine *cluster.Engine) Operator {
+	return &mysqlOperator{
+		unit:   unit,
+		engine: engine,
+	}
+}
+
+func (mysql *mysqlOperator) RegisterHealthCheck(client *consulapi.Client) error {
 	return nil
 }
 
-func (mysql *mysqlOperation) DeregisterHealthCheck(client *consulapi.Client) error {
+func (mysql *mysqlOperator) DeregisterHealthCheck(client *consulapi.Client) error {
 	return nil
 }
 
-func (mysql *mysqlOperation) CopyConfig() error {
+func (mysql *mysqlOperator) CopyConfig() error {
 	return nil
 }
 
-func (mysql *mysqlOperation) StartService() error {
+func (mysql *mysqlOperator) StartService() error {
 
 	cmd := []string{"start mysql service"}
 
 	return containerExec(mysql.engine, mysql.unit.ContainerID, cmd)
 }
 
-func (mysql *mysqlOperation) StopService() error {
+func (mysql *mysqlOperator) StopService() error {
 	cmd := []string{"stop service"}
 
 	return containerExec(mysql.engine, mysql.unit.ContainerID, cmd)
 }
 
-func (mysql *mysqlOperation) Recover(file string) error {
+func (mysql *mysqlOperator) Recover(file string) error {
 	cmd := []string{"recover"}
 
 	return containerExec(mysql.engine, mysql.unit.ContainerID, cmd)
 }
 
-func (mysql *mysqlOperation) Backup() error {
+func (mysql *mysqlOperator) Backup() error {
 	cmd := []string{"backup"}
 
 	return containerExec(mysql.engine, mysql.unit.ContainerID, cmd)
 }
 
-func (mysql *mysqlOperation) Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (*cluster.Container, error) {
+func (mysql *mysqlOperator) Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (*cluster.Container, error) {
 	return nil, nil
 }
 
