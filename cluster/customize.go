@@ -13,13 +13,13 @@ func (e *Engine) UsedCpus() int64 {
 	var r int64
 	e.RLock()
 	for _, c := range e.containers {
-		cpuset := c.Config.ContainerConfig.HostConfig.CpusetCpus
+		cpuset := c.Config.HostConfig.CpusetCpus
 		ncpu, err := getCPUNum(cpuset)
 		if err != nil {
 			log.WithFields(log.Fields{
-				"ID":         c.Id,
+				"ID":         c.ID,
 				"CpusetCpus": cpuset,
-				"CpuShares":  c.Config.CpuShares,
+				"CpuShares":  c.Config.HostConfig.CPUShares,
 			}).Error("Parse CpusetCpus Error")
 		}
 
