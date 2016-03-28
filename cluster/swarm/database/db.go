@@ -1,36 +1,89 @@
 package database
 
 import (
+	"encoding/base64"
 	"errors"
+	"fmt"
+	"strings"
 
+	"github.com/codegangsta/cli"
 	"github.com/jmoiron/sqlx"
 )
 
 var (
-	driverName     string
-	dataSourceName string
-	defaultDB      *sqlx.DB
+	driverName string
+	dbSource   string
+	defaultDB  *sqlx.DB
+
+	FlDB = cli.BoolFlag{
+		Name:  "db",
+		Usage: "use a database",
+	}
+	FlDBDriver = cli.StringFlag{
+		Name:  "dbDriver",
+		Value: "mysql",
+		Usage: "database driver name",
+	}
+	FlDBName = cli.StringFlag{
+		Name:  "dbName",
+		Usage: "database name",
+	}
+	FlDBAuth = cli.StringFlag{
+		Name:  "dbAuth",
+		Usage: "auth for login database",
+	}
+	FlDBHost = cli.StringFlag{
+		Name:  "dbHost",
+		Value: "127.0.0.1",
+		Usage: "connection to database host addr",
+	}
+	FlDBPort = cli.IntFlag{
+		Name:  "dbPort",
+		Value: 3306,
+		Usage: "connection to database port",
+	}
 )
 
+func SetupDB(c *cli.Context) error {
+	auth := c.String("dbAuth")
+	user, password, err := Base64Decode(auth)
+	if err != nil {
+		return err
+	}
+
+	driver := c.String("dbDriver")
+	name := c.String("dbName")
+
+	host := c.String("dbHost")
+	port := c.Int("dbPort")
+
+	source := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8&loc=Asia%%2FShanghai",
+		user, password, host, port, name)
+
+	_, err = Connect(driver, source)
+
+	return err
+}
+
 // MustConnect connects to a database and panics on error.
-func MustConnect(driverName, dataSourceName string) *sqlx.DB {
-	defaultDB = sqlx.MustConnect(driverName, dataSourceName)
+func MustConnect(driver, source string) *sqlx.DB {
+	defaultDB = sqlx.MustConnect(driver, source)
 
 	driverName = driverName
-	dataSourceName = dataSourceName
+	dbSource = source
 
 	return defaultDB
 }
 
 // Connect to a database and verify with a ping.
-func Connect(driverName, dataSourceName string) (*sqlx.DB, error) {
+func Connect(driver, source string) (*sqlx.DB, error) {
 	var err error
 
-	defaultDB, err = sqlx.Connect(driverName, dataSourceName)
+	defaultDB, err = sqlx.Connect(driver, source)
 
 	if err == nil {
 		driverName = driverName
-		dataSourceName = dataSourceName
+		dbSource = source
 	}
 
 	return defaultDB, err
@@ -40,8 +93,8 @@ func GetDB(ping bool) (*sqlx.DB, error) {
 	var err error
 
 	if defaultDB == nil {
-		if driverName != "" && dataSourceName != "" {
-			return Connect(driverName, dataSourceName)
+		if driverName != "" && dbSource != "" {
+			return Connect(driverName, dbSource)
 		}
 
 		return nil, errors.New("DB isnot open.")
@@ -50,9 +103,29 @@ func GetDB(ping bool) (*sqlx.DB, error) {
 	if ping {
 		err = defaultDB.Ping()
 		if err != nil {
-			return Connect(driverName, dataSourceName)
+			return Connect(driverName, dbSource)
 		}
 	}
 
 	return defaultDB, err
+}
+
+// decode base64 string,return username,password
+// http://play.golang.org/p/CNIwzF1L6l
+func Base64Decode(auth string) (username, password string, err error) {
+	authb, err := base64.StdEncoding.DecodeString(auth)
+	if err != nil {
+		return "", "", err
+	}
+	cone := strings.Split(string(authb), ":")
+	username = cone[0]
+	if len(cone) > 1 {
+		password = cone[1]
+	}
+	return username, password, err
+}
+
+func Base64Encode(username, password string) string {
+	src := []byte(username + ":" + password)
+	return base64.StdEncoding.EncodeToString(src)
 }

@@ -120,7 +120,7 @@ func NewIPinfo(net *Networking, ip uint32) IPInfo {
 
 func (info IPInfo) String() string {
 
-	return fmt.Sprintf("%s/%d:%s", info.IP, info.Prefix, info.Device)
+	return fmt.Sprintf("%s/%d:%s", info.IP.String(), info.Prefix, info.Device)
 }
 
 func (r *Region) getNetworkingSetting(engine *cluster.Engine, name, Type string) ([]IPInfo, error) {
