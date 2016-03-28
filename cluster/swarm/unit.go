@@ -19,7 +19,7 @@ import (
 var _ Configurer = &mysqlConfig{}
 var _ Operator = &mysqlOperator{}
 
-const pluginPort = 10000
+const pluginPort = 3333
 
 type Configurer interface {
 	Path() string
@@ -169,7 +169,6 @@ func (mysql *mysqlOperator) Backup() error {
 }
 
 type unit struct {
-	retry int64
 	database.Unit
 	engine       *cluster.Engine
 	config       *cluster.ContainerConfig
@@ -188,7 +187,7 @@ func (u *unit) prepareCreateContainer() error {
 }
 
 func (u *unit) createContainer(authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
-	container, err := u.engine.Create(u.config, u.Unit.Name, true, authConfig)
+	container, err := u.engine.Create(u.config, u.Unit.ID, true, authConfig)
 	if err == nil && container != nil {
 		u.container = container
 		u.Unit.ContainerID = container.Id
@@ -241,7 +240,7 @@ func (u *unit) restartContainer(timeout int) error {
 func (u *unit) RenameContainer(name string) error {
 	client := u.engine.EngineAPIClient()
 
-	return client.ContainerRename(context.TODO(), u.container.Id, u.Unit.Name)
+	return client.ContainerRename(context.TODO(), u.container.Id, u.Unit.ID)
 }
 
 func (u *unit) createNetworking(ip, device string, prefix int) error {
@@ -250,7 +249,9 @@ func (u *unit) createNetworking(ip, device string, prefix int) error {
 		IPCIDR: fmt.Sprintf("%s/%d", ip, prefix),
 	}
 
-	return sdk.CreateIP(config)
+	addr := u.getAddr(pluginPort)
+
+	return sdk.CreateIP(addr, config)
 }
 
 func (u *unit) removeNetworking(ip, device string, prefix int) error {
@@ -259,7 +260,9 @@ func (u *unit) removeNetworking(ip, device string, prefix int) error {
 		IPCIDR: fmt.Sprintf("%s/%d", ip, prefix),
 	}
 
-	return sdk.RemoveIP(config)
+	addr := u.getAddr(pluginPort)
+
+	return sdk.RemoveIP(addr, config)
 }
 
 func (u *unit) createVolume() (*cluster.Volume, error) {
@@ -291,11 +294,29 @@ func (u *unit) extendVG() error {
 }
 
 func (u *unit) RegisterHealthCheck(client *consulapi.Client) error {
-	return nil
+	agent := client.Agent()
+	Service := consulapi.AgentServiceRegistration{
+		ID:                "",
+		Name:              "",
+		Tags:              []string{},
+		Port:              0,
+		Address:           "",
+		EnableTagOverride: false,
+		Check: &consulapi.AgentServiceCheck{
+			Script:            "",
+			DockerContainerID: "",
+			Shell:             "",
+			Interval:          "",
+			Timeout:           "",
+		},
+	}
+
+	return agent.ServiceRegister(&Service)
 }
 
 func (u *unit) DeregisterHealthCheck(client *consulapi.Client) error {
-	return nil
+
+	return client.Agent().ServiceDeregister("")
 }
 
 func (u *unit) Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (*cluster.Container, error) {
@@ -335,4 +356,9 @@ func newVolumeCreateRequest(name, driver string, opts map[string]string) types.V
 		Driver:     driver,
 		DriverOpts: opts,
 	}
+}
+
+func (u unit) getAddr(port int) string {
+
+	return fmt.Sprintf("%s:%d", u.engine.Addr, port)
 }
