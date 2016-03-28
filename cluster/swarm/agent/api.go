@@ -53,88 +53,88 @@ type VolumeFileConfig struct {
 }
 
 //ip
-func CreateIP(opt IPDevConfig) error {
+func CreateIP(addr string, opt IPDevConfig) error {
 	body, err := encodeBody(&opt)
 	if err != nil {
 		return CommonRes{Err: err.Error()}
 	}
 
-	uri := "http://" + getIpAddr() + "/ip/create"
+	uri := "http://" + addr + "/ip/create"
 
 	return HttpPost(uri, body)
 }
 
-func RemoveIP(opt IPDevConfig) error {
+func RemoveIP(addr string, opt IPDevConfig) error {
 	body, err := encodeBody(&opt)
 	if err != nil {
 		return CommonRes{Err: err.Error()}
 	}
 
-	uri := "http://" + getIpAddr() + "/ip/remove"
+	uri := "http://" + addr + "/ip/remove"
 	return HttpPost(uri, body)
 }
 
 //update
-func VolumeUpdate(opt VolumeUpdateOption) error {
+func VolumeUpdate(addr string, opt VolumeUpdateOption) error {
 	body, err := encodeBody(&opt)
 	if err != nil {
 		return CommonRes{Err: err.Error()}
 	}
 
-	uri := "http://" + getIpAddr() + "/VolumeDriver.Update"
+	uri := "http://" + addr + "/VolumeDriver.Update"
 	return HttpPost(uri, body)
 }
 
 //VG
-func SanVgCreate(opt VgConfig) error {
+func SanVgCreate(addr string, opt VgConfig) error {
 	body, err := encodeBody(&opt)
 	if err != nil {
 		return CommonRes{Err: err.Error()}
 	}
 
-	uri := "http://" + getIpAddr() + "/san/vgcreate"
+	uri := "http://" + addr + "/san/vgcreate"
 	return HttpPost(uri, body)
 }
 
-func SanVgExtend(opt VgConfig) error {
+func SanVgExtend(addr string, opt VgConfig) error {
 	body, err := encodeBody(&opt)
 	if err != nil {
 		return CommonRes{Err: err.Error()}
 	}
 
-	uri := "http://" + getIpAddr() + "/san/vgextend"
+	uri := "http://" + addr + "/san/vgextend"
 	return HttpPost(uri, body)
 }
 
 //migrate
 
-func SanActivate(opt ActiveConfig) error {
+func SanActivate(addr string, opt ActiveConfig) error {
 	body, err := encodeBody(&opt)
 	if err != nil {
 		return CommonRes{Err: err.Error()}
 	}
 
-	uri := "http://" + getIpAddr() + "/san/activate"
+	uri := "http://" + addr + "/san/activate"
 	return HttpPost(uri, body)
 }
 
-func SanDeActivate(opt DeactivateConfig) error {
+func SanDeActivate(addr string, opt DeactivateConfig) error {
 	body, err := encodeBody(&opt)
 	if err != nil {
 		return CommonRes{Err: err.Error()}
 	}
 
-	uri := "http://" + getIpAddr() + "/san/deactivate"
+	uri := "http://" + addr + "/san/deactivate"
 	return HttpPost(uri, body)
 }
 
 //file cp
-func FileCpToVolome(opt VolumeFileConfig) error {
+func FileCpToVolome(addr string, opt VolumeFileConfig) error {
 	body, err := encodeBody(&opt)
 	if err != nil {
 		return CommonRes{Err: err.Error()}
 	}
 
-	uri := "http://" + getIpAddr() + "/volume/file/cp"
+	uri := "http://" + addr + "/volume/file/cp"
 	return HttpPost(uri, body)
 }

@@ -50,14 +50,15 @@ func Validate(req PostServiceRequest) error {
 	return nil
 }
 
-func (svc *Service) getUnit(name string) (*unit, error) {
+func (svc *Service) getUnit(IDOrName string) (*unit, error) {
 	for i := range svc.units {
-		if svc.units[i].Name == name {
+		if svc.units[i].ID == IDOrName ||
+			svc.units[i].Name == IDOrName {
 			return svc.units[i], nil
 		}
 	}
 
-	return nil, fmt.Errorf("Unit Not Found,%s", name)
+	return nil, fmt.Errorf("Unit Not Found,%s", IDOrName)
 }
 
 func (region *Region) AddService(svc *Service) error {

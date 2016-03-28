@@ -10,16 +10,16 @@ import (
 
 var (
 	Port = "3333"
-	Ip   = "127.0.0.1"
+	IP   = "127.0.0.1"
 )
 
 func SetAddr(ip, port string) {
 	Port = port
-	Ip = ip
+	IP = ip
 }
 
 func getIpAddr() string {
-	return Ip + ":" + Port
+	return IP + ":" + Port
 }
 
 func HttpPost(uri string, body io.Reader) error {
