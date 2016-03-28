@@ -84,3 +84,7 @@ func (r *Region) generateUUID(length int) string {
 		}
 	}
 }
+
+func (r *Region) RegisterBackupStrategy(svc *Service) error {
+	return nil
+}

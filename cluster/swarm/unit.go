@@ -62,7 +62,7 @@ func (c *mysqlConfig) Merge(data map[string]interface{}) error {
 	if c.content == nil && c.parent != nil {
 		err := json.Unmarshal([]byte(c.parent.Content), &c.content)
 		if err != nil {
-			// return err
+			return err
 		}
 	}
 
@@ -78,7 +78,25 @@ func (c *mysqlConfig) Merge(data map[string]interface{}) error {
 	return nil
 }
 
-func (*mysqlConfig) Verify(data map[string]interface{}) error { return nil }
+func (mysqlConfig) verify(data map[string]interface{}) error {
+	return nil
+}
+
+func (c mysqlConfig) Verify(data map[string]interface{}) error {
+	if len(data) > 0 {
+		if err := c.verify(data); err != nil {
+			return err
+		}
+	}
+
+	if len(c.content) > 0 {
+		if err := c.verify(c.content); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 func (c *mysqlConfig) Set(key string, val interface{}) error {
 	c.content[key] = val
 	return nil
@@ -120,7 +138,7 @@ func (c *mysqlConfig) SaveToDisk() (string, error) {
 }
 
 type Operator interface {
-	CopyConfig() error
+	CopyConfig(opt sdk.VolumeFileConfig) error
 	StartService() error
 	StopService() error
 	Recover(file string) error
@@ -139,7 +157,7 @@ func newMysqlOperator(unit *database.Unit, engine *cluster.Engine) Operator {
 	}
 }
 
-func (mysql *mysqlOperator) CopyConfig() error {
+func (mysql *mysqlOperator) CopyConfig(opt sdk.VolumeFileConfig) error {
 	return nil
 }
 
@@ -181,6 +199,15 @@ type unit struct {
 	Operator
 }
 
+func factory(u *unit) error {
+
+	// Configurer
+
+	// Operator
+
+	return nil
+}
+
 func (u *unit) prepareCreateContainer() error {
 
 	return nil
@@ -191,6 +218,8 @@ func (u *unit) createContainer(authConfig *dockerclient.AuthConfig) (*cluster.Co
 	if err == nil && container != nil {
 		u.container = container
 		u.Unit.ContainerID = container.Id
+
+		//savetoDisk
 	}
 
 	return container, err
@@ -237,7 +266,7 @@ func (u *unit) restartContainer(timeout int) error {
 	return client.ContainerRestart(context.TODO(), u.Unit.ContainerID, timeout)
 }
 
-func (u *unit) RenameContainer(name string) error {
+func (u *unit) renameContainer(name string) error {
 	client := u.engine.EngineAPIClient()
 
 	return client.ContainerRename(context.TODO(), u.container.Id, u.Unit.ID)
@@ -361,4 +390,8 @@ func newVolumeCreateRequest(name, driver string, opts map[string]string) types.V
 func (u unit) getAddr(port int) string {
 
 	return fmt.Sprintf("%s:%d", u.engine.Addr, port)
+}
+
+func (u *unit) saveToDisk() error {
+	return nil
 }
