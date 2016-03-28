@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/samalba/dockerclient"
 )
@@ -103,4 +104,373 @@ func (region *Region) GetService(IDOrName string) (*Service, error) {
 	}
 
 	return nil, errors.New("Service Not Found")
+}
+
+func (svc *Service) CreateContainers() (err error) {
+	if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
+		return nil
+	}
+
+	svc.Lock()
+
+	defer func() {
+		if r := recover(); r != nil || err != nil {
+			atomic.StoreInt64(&svc.Status, 1)
+		}
+
+		svc.Unlock()
+	}()
+
+	for i := range svc.units {
+		err = svc.units[i].prepareCreateContainer()
+		if err != nil {
+			return err
+		}
+
+		_, err = svc.units[i].createContainer(svc.authConfig)
+		if err != nil {
+			return err
+		}
+	}
+
+	atomic.StoreInt64(&svc.Status, 1)
+
+	return nil
+}
+
+func (svc *Service) StartContainers() (err error) {
+	if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
+		return nil
+	}
+
+	svc.Lock()
+
+	defer func() {
+		if r := recover(); r != nil || err != nil {
+			atomic.StoreInt64(&svc.Status, 1)
+		}
+
+		svc.Unlock()
+	}()
+
+	for i := range svc.units {
+		err = svc.units[i].startContainer()
+		if err != nil {
+			return err
+		}
+	}
+
+	atomic.StoreInt64(&svc.Status, 1)
+
+	return nil
+}
+
+func (svc *Service) CopyServiceConfig() (err error) {
+	if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
+		return nil
+	}
+
+	svc.Lock()
+
+	defer func() {
+		if r := recover(); r != nil || err != nil {
+			atomic.StoreInt64(&svc.Status, 1)
+		}
+
+		svc.Unlock()
+	}()
+
+	for i := range svc.units {
+		u := svc.units[i]
+
+		err = u.Merge(map[string]interface{}{})
+		if err != nil {
+			return err
+		}
+
+		err = u.Verify(nil)
+		if err != nil {
+			return err
+		}
+
+		data, err := u.Marshal()
+		if err != nil {
+			return err
+		}
+
+		opt := sdk.VolumeFileConfig{
+			Data: string(data),
+			FDes: u.Path(),
+		}
+
+		err = u.CopyConfig(opt)
+		if err != nil {
+			return err
+		}
+	}
+
+	atomic.StoreInt64(&svc.Status, 1)
+
+	return nil
+}
+
+func (svc *Service) StartService() (err error) {
+	if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
+		return nil
+	}
+
+	svc.Lock()
+
+	defer func() {
+		if r := recover(); r != nil || err != nil {
+			atomic.StoreInt64(&svc.Status, 1)
+		}
+
+		svc.Unlock()
+	}()
+
+	for i := range svc.units {
+		err = svc.units[i].StartService()
+		if err != nil {
+			return err
+		}
+	}
+
+	atomic.StoreInt64(&svc.Status, 1)
+
+	return nil
+}
+
+func (svc *Service) StopContainers() (err error) {
+	if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
+		return nil
+	}
+
+	svc.Lock()
+
+	defer func() {
+		if r := recover(); r != nil || err != nil {
+			atomic.StoreInt64(&svc.Status, 1)
+		}
+
+		svc.Unlock()
+	}()
+
+	for i := range svc.units {
+		err = svc.units[i].stopContainer(0)
+		if err != nil {
+			return err
+		}
+	}
+
+	atomic.StoreInt64(&svc.Status, 1)
+
+	return nil
+}
+
+func (svc *Service) StopService() (err error) {
+	if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
+		return nil
+	}
+
+	svc.Lock()
+
+	defer func() {
+		if r := recover(); r != nil || err != nil {
+			atomic.StoreInt64(&svc.Status, 1)
+		}
+
+		svc.Unlock()
+	}()
+
+	for i := range svc.units {
+		err = svc.units[i].StopService()
+		if err != nil {
+			return err
+		}
+	}
+
+	atomic.StoreInt64(&svc.Status, 1)
+
+	return nil
+}
+
+func (svc *Service) RemoveContainers() (err error) {
+	if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
+		return nil
+	}
+
+	svc.Lock()
+
+	defer func() {
+		if r := recover(); r != nil || err != nil {
+			atomic.StoreInt64(&svc.Status, 1)
+		}
+
+		svc.Unlock()
+	}()
+
+	for i := range svc.units {
+		err = svc.units[i].removeContainer(false, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	atomic.StoreInt64(&svc.Status, 1)
+
+	return nil
+}
+
+func (svc *Service) CreateUsers() (err error) {
+	svc.Lock()
+	defer svc.Unlock()
+
+	users := []database.User{}
+	cmd := []string{}
+
+	// TODO:edit cmd
+	for i := range users {
+		cmd[i] = users[i].Username
+	}
+
+	for i := range svc.units {
+		u := svc.units[i]
+
+		if u.Type == "mysql" {
+			err := containerExec(u.engine, u.ContainerID, cmd)
+			if err != nil {
+
+			}
+		}
+
+	}
+
+	for i := range svc.units {
+		u := svc.units[i]
+
+		if u.Type == "swith manager" {
+			// create proxy users
+		}
+	}
+
+	return nil
+}
+
+func (svc *Service) RefreshTopology() error {
+	svc.RLock()
+	defer svc.RUnlock()
+
+	for i := range svc.units {
+		u := svc.units[i]
+
+		if u.Type == "swith manager" {
+
+			// lock
+
+			// topology
+
+		}
+	}
+
+	return nil
+}
+
+func (svc *Service) InitTopology() error {
+	svc.RLock()
+	defer svc.RUnlock()
+
+	for i := range svc.units {
+		u := svc.units[i]
+
+		if u.Type == "swith manager" {
+
+			// lock
+
+			// topology
+
+		}
+	}
+
+	return nil
+}
+
+func (svc *Service) RegisterServices() (err error) {
+	if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
+		return nil
+	}
+
+	svc.Lock()
+
+	defer func() {
+		if r := recover(); r != nil || err != nil {
+			atomic.StoreInt64(&svc.Status, 1)
+		}
+
+		svc.Unlock()
+	}()
+
+	for i := range svc.units {
+		err = svc.units[i].RegisterHealthCheck(nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	atomic.StoreInt64(&svc.Status, 1)
+
+	return nil
+}
+
+func (svc *Service) DeregisterServices() (err error) {
+	if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
+		return nil
+	}
+
+	svc.Lock()
+
+	defer func() {
+		if r := recover(); r != nil || err != nil {
+			atomic.StoreInt64(&svc.Status, 1)
+		}
+
+		svc.Unlock()
+	}()
+
+	for i := range svc.units {
+		err = svc.units[i].DeregisterHealthCheck(nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	atomic.StoreInt64(&svc.Status, 1)
+
+	return nil
+}
+
+func (svc *Service) Destroy() error {
+	err := svc.StopService()
+	if err != nil {
+		return err
+	}
+
+	err = svc.StopContainers()
+	if err != nil {
+		return err
+	}
+
+	err = svc.RemoveContainers()
+	if err != nil {
+		return err
+	}
+
+	err = svc.DeregisterServices()
+	if err != nil {
+		return err
+	}
+
+	atomic.StoreInt64(&svc.Status, 1)
+
+	return nil
 }

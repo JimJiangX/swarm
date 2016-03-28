@@ -31,32 +31,83 @@ func (region *Region) serviceExecute() (err error) {
 
 		svc.Lock()
 
+		// step := int64(0)
+
 		for _, pending := range svc.pendingContainers {
+
+			u, err := svc.getUnit(pending.Name)
+			if err != nil {
+				svc.Unlock()
+				goto failure
+			}
+
+			err = u.prepareCreateContainer()
+			if err != nil {
+				svc.Unlock()
+				goto failure
+			}
 
 			// create container
 			container, err := region.createContainerInPending(pending.Config, pending.Name, svc.authConfig)
 			if err != nil {
+				svc.Unlock()
 				goto failure
 			}
 
-			unit, err := svc.getUnit(pending.Name)
-			if err != nil {
-				goto failure
-			}
+			u.container = container
 
-			unit.container = container
+			factory(u)
 
+			u.saveToDisk()
 		}
 
-		atomic.StoreInt64(&svc.Status, 1)
+		svc.pendingContainers = nil
 
+		atomic.StoreInt64(&svc.Status, 1)
 		svc.Unlock()
 
+		err = svc.StartContainers()
+		if err != nil {
+
+			goto failure
+		}
+
+		err = svc.CopyServiceConfig()
+		if err != nil {
+
+			goto failure
+		}
+
+		err = svc.StartService()
+		if err != nil {
+
+			goto failure
+		}
+
+		err = svc.CreateUsers()
+		if err != nil {
+
+			goto failure
+		}
+
+		err = svc.InitTopology()
+		if err != nil {
+
+			goto failure
+		}
+
+		err = svc.RegisterServices()
+		if err != nil {
+
+			goto failure
+		}
+
+		atomic.StoreInt64(&svc.Status, 10)
 		continue
 
 	failure:
 		atomic.StoreInt64(&svc.Status, 10)
-		svc.Unlock()
+
 	}
 
 	return err
