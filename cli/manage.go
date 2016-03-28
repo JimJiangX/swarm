@@ -18,6 +18,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/mesos"
 	"github.com/docker/swarm/cluster/swarm"
+	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/filter"
 	"github.com/docker/swarm/scheduler/strategy"
@@ -213,6 +214,13 @@ func manage(c *cli.Context) {
 		tlsConfig *tls.Config
 		err       error
 	)
+
+	if c.Bool("db") {
+		err := database.SetupDB(c)
+		if err != nil {
+			log.Fatal("database setup failed")
+		}
+	}
 
 	// If either --tls or --tlsverify are specified, load the certificates.
 	if c.Bool("tls") || c.Bool("tlsverify") {

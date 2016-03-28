@@ -3,11 +3,13 @@ package swarm
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/samalba/dockerclient"
@@ -123,9 +125,6 @@ type Operator interface {
 	StopService() error
 	Recover(file string) error
 	Backup() error
-	Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (*cluster.Container, error)
-	RegisterHealthCheck(client *consulapi.Client) error
-	DeregisterHealthCheck(client *consulapi.Client) error
 }
 
 type mysqlOperator struct {
@@ -138,14 +137,6 @@ func newMysqlOperator(unit *database.Unit, engine *cluster.Engine) Operator {
 		unit:   unit,
 		engine: engine,
 	}
-}
-
-func (mysql *mysqlOperator) RegisterHealthCheck(client *consulapi.Client) error {
-	return nil
-}
-
-func (mysql *mysqlOperator) DeregisterHealthCheck(client *consulapi.Client) error {
-	return nil
 }
 
 func (mysql *mysqlOperator) CopyConfig() error {
@@ -175,10 +166,6 @@ func (mysql *mysqlOperator) Backup() error {
 	cmd := []string{"backup"}
 
 	return containerExec(mysql.engine, mysql.unit.ContainerID, cmd)
-}
-
-func (mysql *mysqlOperator) Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (*cluster.Container, error) {
-	return nil, nil
 }
 
 type unit struct {
@@ -257,12 +244,22 @@ func (u *unit) RenameContainer(name string) error {
 	return client.ContainerRename(context.TODO(), u.container.Id, u.Unit.Name)
 }
 
-func (u *unit) createNetworking() error {
-	return nil
+func (u *unit) createNetworking(ip, device string, prefix int) error {
+	config := sdk.IPDevConfig{
+		Device: device,
+		IPCIDR: fmt.Sprintf("%s/%d", ip, prefix),
+	}
+
+	return sdk.CreateIP(config)
 }
 
-func (u *unit) removeNetworking() error {
-	return nil
+func (u *unit) removeNetworking(ip, device string, prefix int) error {
+	config := sdk.IPDevConfig{
+		Device: device,
+		IPCIDR: fmt.Sprintf("%s/%d", ip, prefix),
+	}
+
+	return sdk.RemoveIP(config)
 }
 
 func (u *unit) createVolume() (*cluster.Volume, error) {
@@ -291,6 +288,18 @@ func (u *unit) deactivateVG() error {
 
 func (u *unit) extendVG() error {
 	return nil
+}
+
+func (u *unit) RegisterHealthCheck(client *consulapi.Client) error {
+	return nil
+}
+
+func (u *unit) DeregisterHealthCheck(client *consulapi.Client) error {
+	return nil
+}
+
+func (u *unit) Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (*cluster.Container, error) {
+	return nil, nil
 }
 
 // containerExec

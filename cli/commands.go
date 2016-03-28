@@ -1,6 +1,9 @@
 package cli
 
-import "github.com/codegangsta/cli"
+import (
+	"github.com/codegangsta/cli"
+	"github.com/docker/swarm/cluster/swarm/database"
+)
 
 var (
 	commands = []cli.Command{
@@ -29,7 +32,9 @@ var (
 				flRefreshIntervalMin, flRefreshIntervalMax, flFailureRetry, flRefreshRetry,
 				flHeartBeat,
 				flEnableCors,
-				flCluster, flDiscoveryOpt, flClusterOpt},
+				flCluster, flDiscoveryOpt, flClusterOpt,
+				database.FlDB, database.FlDBDriver, database.FlDBName, database.FlDBAuth, database.FlDBHost, database.FlDBPort,
+			},
 			Action: manage,
 		},
 		{
