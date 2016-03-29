@@ -14,9 +14,11 @@ import (
 	"strings"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/parsers/kernel"
 	versionpkg "github.com/docker/docker/pkg/version"
 	apitypes "github.com/docker/engine-api/types"
+	containertypes "github.com/docker/engine-api/types/container"
 	dockerfilters "github.com/docker/engine-api/types/filters"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/experimental"
@@ -71,9 +73,13 @@ func getInfo(c *context, w http.ResponseWriter, r *http.Request) {
 		info.SystemStatus = status
 	}
 
-	if kernelVersion, err := kernel.GetKernelVersion(); err == nil {
-		info.KernelVersion = kernelVersion.String()
+	kernelVersion := "<unknown>"
+	if kv, err := kernel.GetKernelVersion(); err != nil {
+		log.Warnf("Could not get kernel version: %v", err)
+	} else {
+		kernelVersion = kv.String()
 	}
+	info.KernelVersion = kernelVersion
 
 	for _, c := range c.cluster.Containers() {
 		info.Containers++
@@ -86,9 +92,13 @@ func getInfo(c *context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if hostname, err := os.Hostname(); err == nil {
-		info.Name = hostname
+	hostname := "<unknown>"
+	if hn, err := os.Hostname(); err != nil {
+		log.Warnf("Could not get hostname: %v", err)
+	} else {
+		hostname = hn
 	}
+	info.Name = hostname
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(info)
@@ -107,9 +117,13 @@ func getVersion(c *context, w http.ResponseWriter, r *http.Request) {
 		BuildTime:    version.BUILDTIME,
 	}
 
-	if kernelVersion, err := kernel.GetKernelVersion(); err == nil {
-		version.KernelVersion = kernelVersion.String()
+	kernelVersion := "<unknown>"
+	if kv, err := kernel.GetKernelVersion(); err != nil {
+		log.Warnf("Could not get kernel version: %v", err)
+	} else {
+		kernelVersion = kv.String()
 	}
+	version.KernelVersion = kernelVersion
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(version)
@@ -1207,25 +1221,26 @@ func postBuild(c *context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	buildImage := &dockerclient.BuildImage{
-		DockerfileName: r.Form.Get("dockerfile"),
-		RepoName:       r.Form.Get("t"),
-		RemoteURL:      r.Form.Get("remote"),
+	buildImage := &apitypes.ImageBuildOptions{
+		Dockerfile:     r.Form.Get("dockerfile"),
+		Tags:           r.Form["t"],
+		RemoteContext:  r.Form.Get("remote"),
 		NoCache:        boolValue(r, "nocache"),
-		Pull:           boolValue(r, "pull"),
+		PullParent:     boolValue(r, "pull"),
 		Remove:         boolValue(r, "rm"),
 		ForceRemove:    boolValue(r, "forcerm"),
 		SuppressOutput: boolValue(r, "q"),
+		Isolation:      containertypes.Isolation(r.Form.Get("isolation")),
 		Memory:         int64ValueOrZero(r, "memory"),
 		MemorySwap:     int64ValueOrZero(r, "memswap"),
-		CpuShares:      int64ValueOrZero(r, "cpushares"),
-		CpuPeriod:      int64ValueOrZero(r, "cpuperiod"),
-		CpuQuota:       int64ValueOrZero(r, "cpuquota"),
-		CpuSetCpus:     r.Form.Get("cpusetcpus"),
-		CpuSetMems:     r.Form.Get("cpusetmems"),
+		CPUShares:      int64ValueOrZero(r, "cpushares"),
+		CPUPeriod:      int64ValueOrZero(r, "cpuperiod"),
+		CPUQuota:       int64ValueOrZero(r, "cpuquota"),
+		CPUSetCPUs:     r.Form.Get("cpusetcpus"),
+		CPUSetMems:     r.Form.Get("cpusetmems"),
 		CgroupParent:   r.Form.Get("cgroupparent"),
+		ShmSize:        int64ValueOrZero(r, "shmsize"),
 		Context:        r.Body,
-		BuildArgs:      make(map[string]string),
 	}
 
 	buildArgsJSON := r.Form.Get("buildargs")
@@ -1233,11 +1248,21 @@ func postBuild(c *context, w http.ResponseWriter, r *http.Request) {
 		json.Unmarshal([]byte(buildArgsJSON), &buildImage.BuildArgs)
 	}
 
-	authEncoded := r.Header.Get("X-Registry-Auth")
+	ulimitsJSON := r.Form.Get("ulimits")
+	if ulimitsJSON != "" {
+		json.Unmarshal([]byte(ulimitsJSON), &buildImage.Ulimits)
+	}
+
+	labelsJSON := r.Form.Get("labels")
+	if labelsJSON != "" {
+		json.Unmarshal([]byte(labelsJSON), &buildImage.Labels)
+	}
+
+	authEncoded := r.Header.Get("X-Registry-Config")
 	if authEncoded != "" {
-		buf, err := base64.URLEncoding.DecodeString(r.Header.Get("X-Registry-Auth"))
+		buf, err := base64.URLEncoding.DecodeString(r.Header.Get("X-Registry-Config"))
 		if err == nil {
-			json.Unmarshal(buf, &buildImage.Config)
+			json.Unmarshal(buf, &buildImage.AuthConfigs)
 		}
 	}
 
