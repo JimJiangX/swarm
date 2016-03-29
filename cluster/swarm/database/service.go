@@ -106,13 +106,16 @@ func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
 }
 
 type UnitConfig struct {
-	ID             string    `db:"id"`
-	ImageID        string    `db:"image_id"`
-	ConfigFilePath string    `db:"config_file_path"`
-	Version        int       `db:"version"`
-	ParentID       string    `db:"parent_id"`
-	Content        string    `db:"content"`
-	CreateAt       time.Time `db:"create_at"`
+	ID       string `db:"id"`
+	ImageID  string `db:"image_id"`
+	Path     string `db:"config_file_path"`
+	Version  int    `db:"version"`
+	ParentID string `db:"parent_id"`
+	Content  string `db:"content"`
+	// ConfigKeySets string                 `db:"config_key_sets"` // map[string]interface{}
+	// KeySets       map[string]interface{} `db:"-"`
+
+	CreateAt time.Time `db:"create_at"`
 }
 
 func (u UnitConfig) TableName() string {

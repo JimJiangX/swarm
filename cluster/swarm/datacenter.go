@@ -25,13 +25,13 @@ type Datacenter struct {
 
 	*database.Cluster
 
-	stores []*store.Store
+	stores []store.Store
 
 	nodes []*database.Node
 }
 
 func (r *Region) AddDatacenter(cl database.Cluster,
-	nodes []*database.Node, stores []*store.Store) error {
+	nodes []*database.Node, stores []store.Store) error {
 	if cl.ID == "" {
 		cl.ID = r.generateUniqueID()
 	}
@@ -49,7 +49,7 @@ func (r *Region) AddDatacenter(cl database.Cluster,
 	}
 
 	if stores == nil {
-		stores = make([]*store.Store, 0, 3)
+		stores = make([]store.Store, 0, 3)
 	}
 
 	if nodes == nil {
@@ -186,7 +186,7 @@ func (r *Region) DatacenterByNode(IDOrName string) (*Datacenter, error) {
 	return nil, errors.New("Datacenter Not Found")
 }
 
-func (dc *Datacenter) isIdleStoreEnough(IDOrType string, size int64) bool {
+func (dc *Datacenter) isIdleStoreEnough(IDOrType string, num, size int64) bool {
 	dc.RLock()
 
 	store, err := dc.getStore(IDOrType)
@@ -198,17 +198,22 @@ func (dc *Datacenter) isIdleStoreEnough(IDOrType string, size int64) bool {
 
 	dc.RUnlock()
 
-	idle, err := store.IdleSize()
+	idles, err := store.IdleSize()
 	if err != nil {
 		return false
 	}
 
-	return idle > size
+	enough := int64(0)
+	for i := range idles {
+		enough += idles[i] / size
+	}
+
+	return enough >= num
 }
 
-func (dc *Datacenter) getStore(IDOrType string) (*store.Store, error) {
+func (dc *Datacenter) getStore(IDOrType string) (store.Store, error) {
 	for i := range dc.stores {
-		if IDOrType == dc.stores[i].Type() || IDOrType == dc.stores[i].ID() {
+		if IDOrType == dc.stores[i].Vendor() || IDOrType == dc.stores[i].ID() {
 
 			return dc.stores[i], nil
 		}
@@ -226,12 +231,12 @@ func (dc *Datacenter) AllocStore(host, IDOrType string, size int64) error {
 		return err
 	}
 
-	err = store.Alloc(host, size)
+	_, err = store.Alloc(size)
 
 	return err
 }
 
-func (r *Region) listShortIdleStore(IDOrType string, size int64) []string {
+func (r *Region) listShortIdleStore(IDOrType string, num, size int64) []string {
 	if IDOrType == LocalDiskStore {
 		return nil
 	}
@@ -241,7 +246,7 @@ func (r *Region) listShortIdleStore(IDOrType string, size int64) []string {
 	defer r.RUnlock()
 
 	for i := range r.datacenters {
-		if !r.datacenters[i].isIdleStoreEnough(IDOrType, size) {
+		if !r.datacenters[i].isIdleStoreEnough(IDOrType, num, size) {
 			out = append(out, r.datacenters[i].ID)
 		}
 	}

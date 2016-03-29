@@ -1,21 +1,41 @@
 package store
 
-type Store struct{}
+var stores map[string]Store = make(map[string]Store)
 
-func (s Store) IdleSize() (int64, error) {
+type Store interface {
+	ID() string
+	Vendor() string
+	Driver() string
+	IdleSize() ([]int64, error)
 
-	return 31 << 1, nil
+	AddHost(name string, wwwn []string) error
+	DelHost(name string, wwwn []string) error
+
+	Alloc(size int64) (int, error) // create LUN
+	Recycle(lun int) error         // delete LUN
+
+	Mapping(host, unit string, lun int) error
+	DelMapping(host string, lun int) error
+
+	AddSpace(id int) (int64, error)
+	EnableSpace(id int) error
+	DisableSpace(id int) error
 }
 
-func (s Store) ID() string {
-	return ""
-}
+func RegisterStore(id, vendor, addr, user, password, admin string,
+	lstart, lend, hstart, hend int) (Store, error) {
+	var store Store = nil
 
-func (s Store) Type() string {
-	return ""
-}
+	if vendor == "huawei" {
 
-func (s *Store) Alloc(host string, size int64) error {
+		store = NewHuaweiStore(id, vendor, addr, user, password, lstart, lend)
 
-	return nil
+	} else if vendor == "hitachi" {
+
+		store = NewHitachiStore(id, vendor, admin, lstart, lend, hstart, hend)
+	}
+
+	stores[id] = store
+
+	return nil, nil
 }

@@ -55,7 +55,7 @@ func (region *Region) serviceScheduler() (err error) {
 			}
 
 			storeType, storeSize := module.Store()
-			filters := region.listShortIdleStore(storeType, int64(module.Num)*storeSize)
+			filters := region.listShortIdleStore(storeType, int64(module.Num), storeSize)
 			list := region.listCandidateNodes(module.Nodes, module.Type, filters...)
 
 			preAlloc, err := region.BuildPendingContainers(list, module.Type, module.Num, config, false)

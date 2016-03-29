@@ -39,7 +39,7 @@ func (c *mysqlConfig) Path() string {
 		return ""
 	}
 
-	return c.parent.ConfigFilePath
+	return c.parent.Path
 }
 
 func (c *mysqlConfig) Merge(data map[string]interface{}) error {
@@ -102,13 +102,13 @@ func (c *mysqlConfig) SaveToDisk() (string, error) {
 	}
 
 	config := database.UnitConfig{
-		ID:             utils.Generate64UUID(),
-		ImageID:        c.unit.ImageID,
-		Version:        c.parent.Version + 1,
-		ParentID:       c.parent.ID,
-		Content:        string(data),
-		ConfigFilePath: c.Path(),
-		CreateAt:       time.Now(),
+		ID:       utils.Generate64UUID(),
+		ImageID:  c.unit.ImageID,
+		Version:  c.parent.Version + 1,
+		ParentID: c.parent.ID,
+		Content:  string(data),
+		Path:     c.Path(),
+		CreateAt: time.Now(),
 	}
 
 	c.unit.ConfigID = config.ID
