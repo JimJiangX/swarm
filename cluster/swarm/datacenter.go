@@ -8,9 +8,9 @@ import (
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
+	"github.com/docker/swarm/utils"
 	"github.com/hashicorp/terraform/communicator/remote"
 	"github.com/hashicorp/terraform/communicator/ssh"
 	"github.com/hashicorp/terraform/terraform"
@@ -299,7 +299,7 @@ func (dc *Datacenter) DeregisterNode(IDOrName string) error {
 
 func (dc *Datacenter) AddNode(addr, name, os_user, os_pwd string, num int) error {
 	node := &database.Node{
-		ID:           stringid.GenerateRandomID(),
+		ID:           utils.Generate64UUID(),
 		Name:         name,
 		ClusterID:    dc.Cluster.ID,
 		Addr:         addr,

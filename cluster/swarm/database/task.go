@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/docker/swarm/utils"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -63,7 +64,7 @@ func (bs BackupStrategy) TableName() string {
 
 func NewTask(name, relate, linkto, des string, labels []string, timeout time.Duration) *Task {
 	return &Task{
-		ID:          "",
+		ID:          utils.Generate64UUID(),
 		Name:        name,
 		Related:     relate,
 		Linkto:      linkto,
