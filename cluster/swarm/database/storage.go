@@ -29,7 +29,7 @@ func (r RaidGroup) TableName() string {
 	return "tb_raid_group"
 }
 
-type HDSStorage struct {
+type HitachiStorage struct {
 	ID        string `db:"id"`
 	Vendor    string `db:"vendor"`
 	AdminUnit string `db:"admin_unit"`
@@ -39,7 +39,7 @@ type HDSStorage struct {
 	HluEnd    int    `db:"hlu_end"`
 }
 
-func (hds HDSStorage) TableName() string {
+func (hds HitachiStorage) TableName() string {
 	return "tb_storage_HITACHI"
 }
 

@@ -12,13 +12,9 @@ type Image struct {
 	Version string `db:"version"`
 	ImageID string `db:"docker_image_id"`
 	Labels  string `db:"label"`
-	// ConfigFilePath string `db:"config_file_path"`
 
 	PortString string `db:"ports"` // []Port
 	PortSlice  []Port `db:"-"`
-
-	// ConfigKeySets string                 `db:"config_key_sets"` // map[string]interface{}
-	// KeySets       map[string]interface{} `db:"-"`
 
 	TemplateConfigID string    `db:"template_config_id"`
 	UploadAt         time.Time `db:"upload_at"`
