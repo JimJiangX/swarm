@@ -508,11 +508,17 @@ func (c *Cluster) CreateVolume(request *dockerclient.VolumeCreateRequest) (*clus
 	}
 	if node == "" {
 		c.RLock()
+		ch := make(chan struct{}, 10)
+
+		log.WithField("Volume", request.Name).Warnf("Create Volume on all Engines")
+
 		for _, e := range c.engines {
 			wg.Add(1)
 
 			go func(engine *cluster.Engine) {
 				defer wg.Done()
+
+				ch <- struct{}{}
 
 				v, er := engine.CreateVolume(request)
 				if v != nil {
@@ -522,6 +528,8 @@ func (c *Cluster) CreateVolume(request *dockerclient.VolumeCreateRequest) (*clus
 				if er != nil && volume == nil {
 					err = er
 				}
+
+				<-ch
 			}(e)
 		}
 		c.RUnlock()
