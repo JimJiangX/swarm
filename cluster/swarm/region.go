@@ -7,6 +7,7 @@ import (
 	"github.com/docker/docker/pkg/discovery"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler"
+	"github.com/docker/swarm/utils"
 	crontab "gopkg.in/robfig/cron.v2"
 )
 
@@ -78,7 +79,7 @@ func NewRegion(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery 
 
 func (r *Region) generateUUID(length int) string {
 	for {
-		id := generateUUID(length)
+		id := utils.GenerateUUID(length)
 		if r.Container(id) == nil {
 			return id
 		}

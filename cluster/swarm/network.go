@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/utils"
 )
 
 const (
@@ -52,7 +53,7 @@ func NewNetworking(id, ip, typ, gateway string, prefix, num int) *Networking {
 		pool:    make([]*IP, num),
 	}
 
-	addrU32 := IPToUint32(net.ID)
+	addrU32 := utils.IPToUint32(net.ID)
 
 	for i := 0; i < num; i++ {
 		net.pool[i] = &IP{
@@ -110,7 +111,7 @@ type IPInfo struct {
 func NewIPinfo(net *Networking, ip uint32) IPInfo {
 	return IPInfo{
 		Networking: net.ID,
-		IP:         Uint32ToIP(ip),
+		IP:         utils.Uint32ToIP(ip),
 		Type:       net.Type,
 		Gateway:    net.Gateway,
 		Prefix:     net.Prefix,

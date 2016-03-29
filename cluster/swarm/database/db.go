@@ -1,12 +1,11 @@
 package database
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/codegangsta/cli"
+	"github.com/docker/swarm/utils"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -46,7 +45,7 @@ var (
 
 func SetupDB(c *cli.Context) error {
 	auth := c.String("dbAuth")
-	user, password, err := Base64Decode(auth)
+	user, password, err := utils.Base64Decode(auth)
 	if err != nil {
 		return err
 	}
@@ -108,24 +107,4 @@ func GetDB(ping bool) (*sqlx.DB, error) {
 	}
 
 	return defaultDB, err
-}
-
-// decode base64 string,return username,password
-// http://play.golang.org/p/CNIwzF1L6l
-func Base64Decode(auth string) (username, password string, err error) {
-	authb, err := base64.StdEncoding.DecodeString(auth)
-	if err != nil {
-		return "", "", err
-	}
-	cone := strings.Split(string(authb), ":")
-	username = cone[0]
-	if len(cone) > 1 {
-		password = cone[1]
-	}
-	return username, password, err
-}
-
-func Base64Encode(username, password string) string {
-	src := []byte(username + ":" + password)
-	return base64.StdEncoding.EncodeToString(src)
 }

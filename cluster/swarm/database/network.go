@@ -1,10 +1,9 @@
 package database
 
 import (
-	"encoding/binary"
 	"fmt"
-	"net"
 
+	"github.com/docker/swarm/utils"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -193,7 +192,7 @@ func InsertNetworking(id, addr, gateway, typ string, prefix, num int) error {
 	}
 
 	ips := make([]IP, num)
-	addrU32 := IPToUint32(net.Networking)
+	addrU32 := utils.IPToUint32(net.Networking)
 	prefixU32 := uint32(prefix)
 
 	for i := range ips {
@@ -273,18 +272,4 @@ func TxUpdateMultiIPStatue(tx *sqlx.Tx, val []IPStatus) error {
 	}
 
 	return nil
-}
-
-func IPToUint32(ip string) uint32 {
-	addr := net.ParseIP(ip)
-	if addr == nil {
-		return 0
-	}
-	return binary.BigEndian.Uint32(addr.To4())
-}
-
-func Uint32ToIP(cidr uint32) net.IP {
-	addr := make([]byte, 4)
-	binary.BigEndian.PutUint32(addr, cidr)
-	return net.IP(addr)
 }
