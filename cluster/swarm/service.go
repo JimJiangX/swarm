@@ -6,7 +6,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/samalba/dockerclient"
 )
@@ -183,27 +182,7 @@ func (svc *Service) CopyServiceConfig() (err error) {
 	for i := range svc.units {
 		u := svc.units[i]
 
-		err = u.Merge(map[string]interface{}{})
-		if err != nil {
-			return err
-		}
-
-		err = u.Verify(nil)
-		if err != nil {
-			return err
-		}
-
-		data, err := u.Marshal()
-		if err != nil {
-			return err
-		}
-
-		opt := sdk.VolumeFileConfig{
-			Data: string(data),
-			FDes: u.Path(),
-		}
-
-		err = u.CopyConfig(opt)
+		err = u.CopyConfig(map[string]interface{}{})
 		if err != nil {
 			return err
 		}
@@ -230,7 +209,7 @@ func (svc *Service) StartService() (err error) {
 	}()
 
 	for i := range svc.units {
-		err = svc.units[i].StartService()
+		err = svc.units[i].startService()
 		if err != nil {
 			return err
 		}
@@ -284,7 +263,7 @@ func (svc *Service) StopService() (err error) {
 	}()
 
 	for i := range svc.units {
-		err = svc.units[i].StopService()
+		err = svc.units[i].stopService()
 		if err != nil {
 			return err
 		}

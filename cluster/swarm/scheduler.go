@@ -193,8 +193,8 @@ func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 				Status:    0,
 				CreatedAt: time.Now(),
 			},
-			ports:        ports,
-			parentConfig: parentConfig,
+			ports:  ports,
+			parent: parentConfig,
 		}
 
 		preAlloc.unit = unit

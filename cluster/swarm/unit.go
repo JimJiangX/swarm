@@ -8,7 +8,6 @@ import (
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/agent"
-	"github.com/docker/swarm/cluster/swarm/ctypes"
 	"github.com/docker/swarm/cluster/swarm/database"
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/samalba/dockerclient"
@@ -17,51 +16,35 @@ import (
 
 const pluginPort = 3333
 
-type Configurer interface {
-	Path() string
-	Merge(map[string]interface{}) error
-	Verify(map[string]interface{}) error
-	Set(string, interface{}) error
-	Marshal() ([]byte, error)
-	SaveToDisk() (string, error)
-}
-
-type Operator interface {
-	CopyConfig(opt sdk.VolumeFileConfig) error
-	StartService() error
-	StopService() error
-	Recover(file string) error
-	Backup() error
+type ContainerCmd interface {
+	StartContainerCmd() []string
+	StartServiceCmd() []string
+	StopServiceCmd() []string
+	RecoverCmd(file string) []string
+	BackupCmd() []string
 }
 
 type unit struct {
 	database.Unit
-	engine       *cluster.Engine
-	config       *cluster.ContainerConfig
-	container    *cluster.Container
-	parentConfig *database.UnitConfig
-	ports        []database.Port
-	networkings  []IPInfo
+	engine      *cluster.Engine
+	config      *cluster.ContainerConfig
+	container   *cluster.Container
+	parent      *database.UnitConfig
+	ports       []database.Port
+	networkings []IPInfo
 
-	Configurer
-	Operator
+	content map[string]interface{}
+	verify  func(map[string]interface{}) error
+
+	ContainerCmd
 }
 
 func factory(u *unit) error {
 	switch u.Type {
 	case "mysql":
-		// Configurer
-		if u.parentConfig == nil {
-			parentConfig, err := database.GetUnitConfigByID(u.ImageID)
-			if err != nil {
-				return err
-			}
-			u.parentConfig = parentConfig
-		}
-
-		u.Configurer = ctypes.NewMysqlConfig(&u.Unit, u.parentConfig)
-		// Operator
-		u.Operator = ctypes.NewMysqlOperator(&u.Unit, u.engine)
+		u.verify = verifyMysqlConfig
+		// cmd
+		u.ContainerCmd = NewMysqlCmd(&u.Unit)
 
 	default:
 
@@ -117,7 +100,7 @@ func (u *unit) startContainer() error {
 }
 
 func (u *unit) stopContainer(timeout int) error {
-	err := u.StopService()
+	err := u.stopService()
 	if err != nil {
 		return err
 	}
@@ -128,7 +111,7 @@ func (u *unit) stopContainer(timeout int) error {
 }
 
 func (u *unit) restartContainer(timeout int) error {
-	err := u.StopService()
+	err := u.stopService()
 	if err != nil {
 		return err
 	}
@@ -150,7 +133,7 @@ func (u *unit) createNetworking(ip, device string, prefix int) error {
 		IPCIDR: fmt.Sprintf("%s/%d", ip, prefix),
 	}
 
-	addr := u.getAddr(pluginPort)
+	addr := u.getPluginAddr(pluginPort)
 
 	return sdk.CreateIP(addr, config)
 }
@@ -161,7 +144,7 @@ func (u *unit) removeNetworking(ip, device string, prefix int) error {
 		IPCIDR: fmt.Sprintf("%s/%d", ip, prefix),
 	}
 
-	addr := u.getAddr(pluginPort)
+	addr := u.getPluginAddr(pluginPort)
 
 	return sdk.RemoveIP(addr, config)
 }
@@ -224,6 +207,52 @@ func (u *unit) Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (*clu
 	return nil, nil
 }
 
+func (u *unit) CopyConfig(data map[string]interface{}) error {
+	err := u.Merge(data)
+	if err != nil {
+		return err
+	}
+
+	err = u.Verify(data)
+	if err != nil {
+		return err
+	}
+
+	content, err := u.Marshal()
+	if err != nil {
+		return err
+	}
+
+	if _, err = u.SaveToDisk(); err != nil {
+		return err
+	}
+
+	config := sdk.VolumeFileConfig{
+		VgName:    "",
+		LvsName:   "",
+		MountName: "",
+		Data:      string(content),
+		FDes:      u.Path(),
+		Mode:      "0666",
+	}
+
+	err = sdk.FileCopyToVolome(u.getPluginAddr(pluginPort), config)
+
+	return err
+}
+
+func (u *unit) startService() error {
+	cmd := u.StartServiceCmd()
+
+	return containerExec(u.engine, u.ContainerID, cmd)
+}
+
+func (u *unit) stopService() error {
+	cmd := u.StopServiceCmd()
+
+	return containerExec(u.engine, u.ContainerID, cmd)
+}
+
 // containerExec
 func containerExec(engine *cluster.Engine, containerID string, cmd []string) error {
 	client := engine.EngineAPIClient()
@@ -259,7 +288,7 @@ func newVolumeCreateRequest(name, driver string, opts map[string]string) types.V
 	}
 }
 
-func (u unit) getAddr(port int) string {
+func (u unit) getPluginAddr(port int) string {
 
 	return fmt.Sprintf("%s:%d", u.engine.Addr, port)
 }
