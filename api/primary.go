@@ -8,6 +8,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/cluster/swarm"
 	"github.com/gorilla/mux"
 )
 
@@ -120,6 +121,22 @@ func NewPrimary(cluster cluster.Cluster, tlsConfig *tls.Config, status StatusHan
 	eventsHandler := newEventsHandler()
 	cluster.RegisterEventHandler(eventsHandler)
 
+	r := mux.NewRouter()
+
+	if region, ok := cluster.(*swarm.Region); ok {
+		mc := &mcontext{
+			context: context{
+				cluster:       region,
+				eventsHandler: eventsHandler,
+				statusHandler: status,
+				tlsConfig:     tlsConfig,
+			},
+			region: region,
+		}
+
+		setupMasterRouter(r, mc, enableCors)
+	}
+
 	context := &context{
 		cluster:       cluster,
 		eventsHandler: eventsHandler,
@@ -127,7 +144,6 @@ func NewPrimary(cluster cluster.Cluster, tlsConfig *tls.Config, status StatusHan
 		tlsConfig:     tlsConfig,
 	}
 
-	r := mux.NewRouter()
 	setupPrimaryRouter(r, context, enableCors)
 
 	if debug {
