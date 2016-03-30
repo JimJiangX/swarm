@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/samalba/dockerclient"
 )
@@ -16,7 +17,7 @@ type Service struct {
 	failureRetry int
 
 	database.Service
-	base *PostServiceRequest
+	base *structs.PostServiceRequest
 
 	pendingContainers map[string]*pendingContainer
 
@@ -36,7 +37,7 @@ func NewService(svc database.Service, retry, unitNum, userNum int) *Service {
 	}
 }
 
-func BuildService(req PostServiceRequest) (*Service, error) {
+func BuildService(req structs.PostServiceRequest) (*Service, error) {
 	if err := Validate(req); err != nil {
 		return nil, err
 	}
@@ -46,7 +47,7 @@ func BuildService(req PostServiceRequest) (*Service, error) {
 	return NewService(svc, 2, 0, 0), nil
 }
 
-func Validate(req PostServiceRequest) error {
+func Validate(req structs.PostServiceRequest) error {
 	return nil
 }
 

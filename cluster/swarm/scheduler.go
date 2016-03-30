@@ -48,7 +48,7 @@ func (region *Region) serviceScheduler() (err error) {
 				module.Config.Image = image.ImageID
 			}
 
-			config := cluster.BuildContainerConfig(module.Config.ContainerConfig)
+			config := cluster.BuildContainerConfig(module.Config)
 			err = validateContainerConfig(config)
 			if err != nil {
 				goto failure
