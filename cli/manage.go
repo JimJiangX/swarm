@@ -298,7 +298,12 @@ func manage(c *cli.Context) {
 	case "swarm":
 		cl, err = swarm.NewCluster(sched, tlsConfig, discovery, c.StringSlice("cluster-opt"), engineOpts)
 	case "gardener":
-		cl, err = swarm.NewRegion(sched, tlsConfig, discovery, c.StringSlice("cluster-opt"), engineOpts)
+		cluster, err := swarm.NewCluster(sched, tlsConfig, discovery, c.StringSlice("cluster-opt"), engineOpts)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		cl, err = swarm.NewRegion(cluster)
 	default:
 		log.Fatalf("unsupported cluster %q", c.String("cluster-driver"))
 	}
