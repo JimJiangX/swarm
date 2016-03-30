@@ -1,12 +1,8 @@
 package swarm
 
 import (
-	"crypto/tls"
-
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/docker/pkg/discovery"
 	"github.com/docker/swarm/cluster"
-	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/utils"
 	crontab "gopkg.in/robfig/cron.v2"
 )
@@ -26,39 +22,12 @@ type Region struct {
 }
 
 // NewRegion is exported
-func NewRegion(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery discovery.Backend, options cluster.DriverOpts, engineOptions *cluster.EngineOpts) (*Region, error) {
-	log.WithFields(log.Fields{"name": "swarm"}).Debug("Initializing cluster")
-
-	// NewCluster,copy from cluster.go
-	cluster := &Cluster{
-		eventHandlers:     cluster.NewEventHandlers(),
-		engines:           make(map[string]*cluster.Engine),
-		pendingEngines:    make(map[string]*cluster.Engine),
-		scheduler:         scheduler,
-		TLSConfig:         TLSConfig,
-		discovery:         discovery,
-		pendingContainers: make(map[string]*pendingContainer),
-		overcommitRatio:   0.05,
-		engineOpts:        engineOptions,
-		createRetry:       0,
-	}
-
-	if val, ok := options.Float("swarm.overcommit", ""); ok {
-		cluster.overcommitRatio = val
-	}
-
-	if val, ok := options.Int("swarm.createretry", ""); ok {
-		if val < 0 {
-			log.Fatalf("swarm.createretry=%d is invalid", val)
-		}
-		cluster.createRetry = val
-	}
-
-	discoveryCh, errCh := cluster.discovery.Watch(nil)
-	go cluster.monitorDiscovery(discoveryCh, errCh)
-	go cluster.monitorPendingEngines()
-
+func NewRegion(cli cluster.Cluster) (*Region, error) {
 	log.WithFields(log.Fields{"name": "swarm"}).Debug("Initializing Region")
+	cluster, ok := cli.(*Cluster)
+	if !ok {
+		log.Fatal("cluster.Cluster Prototype is not *swarm.Cluster")
+	}
 
 	region := &Region{
 		Cluster:            cluster,
