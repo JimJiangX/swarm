@@ -30,15 +30,13 @@ type Datacenter struct {
 	nodes []*database.Node
 }
 
-func (r *Region) AddDatacenter(cl database.Cluster,
-	nodes []*database.Node, stores []store.Store) error {
+func (r *Region) AddDatacenter(cl database.Cluster, stores []store.Store) error {
 	if cl.ID == "" {
 		cl.ID = r.generateUniqueID()
 	}
 
 	log.WithFields(log.Fields{
 		"dc":        cl.Name,
-		"nodeNum":   len(nodes),
 		"storesNum": len(stores),
 	}).Info("Datacenter Initializing")
 
@@ -52,15 +50,11 @@ func (r *Region) AddDatacenter(cl database.Cluster,
 		stores = make([]store.Store, 0, 3)
 	}
 
-	if nodes == nil {
-		nodes = make([]*database.Node, 0, 100)
-	}
-
 	dc := &Datacenter{
 		RWMutex: sync.RWMutex{},
 		Cluster: &cl,
 		stores:  stores,
-		nodes:   nodes,
+		nodes:   make([]*database.Node, 0, 100),
 	}
 
 	r.Lock()
