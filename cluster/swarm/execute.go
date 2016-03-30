@@ -56,7 +56,10 @@ func (region *Region) serviceExecute() (err error) {
 
 			u.container = container
 
-			factory(u)
+			if err := u.factory(); err != nil {
+				svc.Unlock()
+				goto failure
+			}
 
 			u.saveToDisk()
 		}

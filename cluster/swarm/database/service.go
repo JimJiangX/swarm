@@ -107,16 +107,14 @@ func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
 }
 
 type UnitConfig struct {
-	ID            string `db:"id"`
-	ImageID       string `db:"image_id"`
-	Path          string `db:"config_file_path"`
-	Version       int    `db:"version"`
-	ParentID      string `db:"parent_id"`
-	Content       string `db:"content"`         // map[string]interface{}
-	ConfigKeySets string `db:"config_key_sets"` // map[string]bool
-
-	ContentMap map[string]interface{} `db:"-"`
-	KeySets    map[string]bool        `db:"-"`
+	ID            string          `db:"id"`
+	ImageID       string          `db:"image_id"`
+	Path          string          `db:"config_file_path"`
+	Version       int             `db:"version"`
+	ParentID      string          `db:"parent_id"`
+	Content       string          `db:"content"`         // map[string]interface{}
+	ConfigKeySets string          `db:"config_key_sets"` // map[string]bool
+	KeySets       map[string]bool `db:"-"`
 
 	CreateAt time.Time `db:"create_at"`
 }
@@ -135,28 +133,12 @@ func (c *UnitConfig) encode() error {
 		c.ConfigKeySets = string(data)
 	}
 
-	if len(c.ContentMap) > 0 {
-		data, err := json.Marshal(c.ContentMap)
-		if err != nil {
-			return err
-		}
-
-		c.Content = string(data)
-	}
-
 	return nil
 }
 
 func (c *UnitConfig) decode() error {
 	if len(c.ConfigKeySets) > 0 {
 		err := json.Unmarshal([]byte(c.ConfigKeySets), &c.KeySets)
-		if err != nil {
-			return err
-		}
-	}
-
-	if len(c.Content) > 0 {
-		err := json.Unmarshal([]byte(c.Content), &c.ContentMap)
 		if err != nil {
 			return err
 		}

@@ -1,8 +1,8 @@
 package swarm
 
 import (
-	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -35,39 +35,44 @@ func (u unit) CanModify(data map[string]interface{}) ([]string, bool) {
 	return keys, can
 }
 
+func (u unit) Verify(data map[string]interface{}) error {
+	if len(data) > 0 {
+		if err := u.Validate(data); err != nil {
+			return err
+		}
+	}
+
+	if len(u.content) > 0 {
+		if err := u.Validate(u.content); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (u *unit) Merge(data map[string]interface{}) error {
 	if keys, ok := u.CanModify(data); !ok {
 
 		return fmt.Errorf("Keys cannot set new value,%s", keys)
 	}
 
-	if u.parent.ContentMap == nil {
-		u.content = data
-		return nil
-	}
-
 	if u.content == nil {
-		u.content = make(map[string]interface{})
+		content, err := u.Parse(u.parent.Content)
+		if err != nil {
+			return err
+		}
+
+		if content == nil {
+			u.content = data
+			return nil
+		}
+
+		u.content = content
 	}
 
 	for key, val := range data {
 		u.content[key] = val
-	}
-
-	return nil
-}
-
-func (u unit) Verify(data map[string]interface{}) error {
-	if len(data) > 0 {
-		if err := u.verify(data); err != nil {
-			return err
-		}
-	}
-
-	if len(u.content) > 0 {
-		if err := u.verify(u.content); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -83,21 +88,25 @@ func (u *unit) Set(key string, val interface{}) error {
 	return nil
 }
 
-func (u *unit) Marshal() ([]byte, error) {
+func (u *unit) SaveToDisk(content string) (string, error) {
+	if content == "" {
+		data, err := u.Marshal(u.content)
+		if err != nil {
+			return "", err
+		}
 
-	return json.Marshal(u.content)
-}
+		content = string(data)
+	}
 
-func (u *unit) SaveToDisk() (string, error) {
 	config := database.UnitConfig{
-		ID:         utils.Generate64UUID(),
-		ImageID:    u.ImageID,
-		Version:    u.parent.Version + 1,
-		ParentID:   u.parent.ID,
-		ContentMap: u.content,
-		KeySets:    u.parent.KeySets,
-		Path:       u.Path(),
-		CreateAt:   time.Now(),
+		ID:       utils.Generate64UUID(),
+		ImageID:  u.ImageID,
+		Version:  u.parent.Version + 1,
+		ParentID: u.parent.ID,
+		Content:  content,
+		KeySets:  u.parent.KeySets,
+		Path:     u.Path(),
+		CreateAt: time.Now(),
 	}
 
 	u.Unit.ConfigID = config.ID
@@ -126,6 +135,26 @@ func (mysqlCmd) StopServiceCmd() []string        { return nil }
 func (mysqlCmd) RecoverCmd(file string) []string { return nil }
 func (mysqlCmd) BackupCmd() []string             { return nil }
 
-func verifyMysqlConfig(data map[string]interface{}) error {
+type mysqlConfig struct{}
+
+func (mysqlConfig) Validate(data map[string]interface{}) error {
 	return nil
+}
+
+func (mysqlConfig) Parse(val string) (map[string]interface{}, error) {
+	// ini/json/xml
+	// convert to map[string]interface{}
+
+	if strings.TrimSpace(val) == "" {
+		return nil, nil
+	}
+
+	return nil, nil
+}
+
+func (mysqlConfig) Marshal(data map[string]interface{}) ([]byte, error) {
+	// map[string]interface{} convert to  ini/json/xml
+	// json.Marshal(data)
+
+	return nil, nil
 }

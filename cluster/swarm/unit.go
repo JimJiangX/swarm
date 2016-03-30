@@ -14,14 +14,18 @@ import (
 	"golang.org/x/net/context"
 )
 
-const pluginPort = 3333
-
 type ContainerCmd interface {
 	StartContainerCmd() []string
 	StartServiceCmd() []string
 	StopServiceCmd() []string
 	RecoverCmd(file string) []string
 	BackupCmd() []string
+}
+
+type configParser interface {
+	Validate(data map[string]interface{}) error
+	Parse(data string) (map[string]interface{}, error)
+	Marshal(map[string]interface{}) ([]byte, error)
 }
 
 type unit struct {
@@ -34,15 +38,15 @@ type unit struct {
 	networkings []IPInfo
 
 	content map[string]interface{}
-	verify  func(map[string]interface{}) error
 
+	configParser
 	ContainerCmd
 }
 
-func factory(u *unit) error {
+func (u *unit) factory() error {
 	switch u.Type {
 	case "mysql":
-		u.verify = verifyMysqlConfig
+		u.configParser = &mysqlConfig{}
 		// cmd
 		u.ContainerCmd = NewMysqlCmd(&u.Unit)
 
@@ -218,12 +222,12 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 		return err
 	}
 
-	content, err := u.Marshal()
+	content, err := u.Marshal(u.content)
 	if err != nil {
 		return err
 	}
 
-	if _, err = u.SaveToDisk(); err != nil {
+	if _, err = u.SaveToDisk(string(content)); err != nil {
 		return err
 	}
 
@@ -287,6 +291,8 @@ func newVolumeCreateRequest(name, driver string, opts map[string]string) types.V
 		DriverOpts: opts,
 	}
 }
+
+const pluginPort = 3333
 
 func (u unit) getPluginAddr(port int) string {
 
