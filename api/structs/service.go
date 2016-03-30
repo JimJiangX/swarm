@@ -1,6 +1,6 @@
-package swarm
+package structs
 
-import "github.com/docker/swarm/cluster"
+import "github.com/samalba/dockerclient"
 
 type PostServiceRequest struct {
 	Name    string
@@ -16,7 +16,7 @@ type Module struct {
 	Nodes      []string
 	Configures map[string]interface{}
 
-	Config cluster.ContainerConfig
+	Config dockerclient.ContainerConfig
 
 	StoreType string
 	StoreSize int64
