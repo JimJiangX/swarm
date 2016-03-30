@@ -50,6 +50,7 @@ type VolumeFileConfig struct {
 	MountName string `json:"MountName"`
 	Data      string `json:"Data"`
 	FDes      string `json:"FDes"`
+	Mode      string `json:"mode"`
 }
 
 //ip
@@ -129,7 +130,7 @@ func SanDeActivate(addr string, opt DeactivateConfig) error {
 }
 
 //file cp
-func FileCpToVolome(addr string, opt VolumeFileConfig) error {
+func FileCopyToVolome(addr string, opt VolumeFileConfig) error {
 	body, err := encodeBody(&opt)
 	if err != nil {
 		return CommonRes{Err: err.Error()}

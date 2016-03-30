@@ -1,6 +1,7 @@
 package database
 
 import (
+	"encoding/json"
 	"sync/atomic"
 	"time"
 
@@ -106,20 +107,62 @@ func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
 }
 
 type UnitConfig struct {
-	ID       string `db:"id"`
-	ImageID  string `db:"image_id"`
-	Path     string `db:"config_file_path"`
-	Version  int    `db:"version"`
-	ParentID string `db:"parent_id"`
-	Content  string `db:"content"`
-	// ConfigKeySets string                 `db:"config_key_sets"` // map[string]interface{}
-	// KeySets       map[string]interface{} `db:"-"`
+	ID            string `db:"id"`
+	ImageID       string `db:"image_id"`
+	Path          string `db:"config_file_path"`
+	Version       int    `db:"version"`
+	ParentID      string `db:"parent_id"`
+	Content       string `db:"content"`         // map[string]interface{}
+	ConfigKeySets string `db:"config_key_sets"` // map[string]bool
+
+	ContentMap map[string]interface{} `db:"-"`
+	KeySets    map[string]bool        `db:"-"`
 
 	CreateAt time.Time `db:"create_at"`
 }
 
 func (u UnitConfig) TableName() string {
 	return "tb_unit_config"
+}
+
+func (c *UnitConfig) encode() error {
+	if len(c.KeySets) > 0 {
+		data, err := json.Marshal(c.KeySets)
+		if err != nil {
+			return err
+		}
+
+		c.ConfigKeySets = string(data)
+	}
+
+	if len(c.ContentMap) > 0 {
+		data, err := json.Marshal(c.ContentMap)
+		if err != nil {
+			return err
+		}
+
+		c.Content = string(data)
+	}
+
+	return nil
+}
+
+func (c *UnitConfig) decode() error {
+	if len(c.ConfigKeySets) > 0 {
+		err := json.Unmarshal([]byte(c.ConfigKeySets), &c.KeySets)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(c.Content) > 0 {
+		err := json.Unmarshal([]byte(c.Content), &c.ContentMap)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func GetUnitConfigByID(id string) (*UnitConfig, error) {
@@ -132,6 +175,11 @@ func GetUnitConfigByID(id string) (*UnitConfig, error) {
 	query := "SELECT * FROM tb_unit_config WHERE id=? OR image_id=?"
 
 	err = db.QueryRowx(query, id, id).StructScan(config)
+	if err != nil {
+		return nil, err
+	}
+
+	err = config.decode()
 
 	return config, err
 }
@@ -165,9 +213,15 @@ func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {
 }
 
 func TXInsertUnitConfig(tx *sqlx.Tx, config *UnitConfig) error {
+	err := config.encode()
+	if err != nil {
+		return err
+	}
+
 	query := "INSERT INTO tb_unit_config (id,image_id,config_file_path,version,parent_id,content,create_at) VALUES (:id,:image_id,:config_file_path,:version,:parent_id,:content,:create_at)"
 
-	_, err := tx.NamedExec(query, config)
+	_, err = tx.NamedExec(query, config)
+
 	return err
 }
 
