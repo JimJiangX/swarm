@@ -24,8 +24,8 @@ func postCluster(ctx *mcontext, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.StorageType != "local" && req.StorageID != "" {
-		store := ctx.region.GetStore(req.StorageID)
-		if store != nil {
+		store, err := ctx.region.GetStore(req.StorageID)
+		if err == nil && store != nil {
 			stores = append(stores, store)
 		}
 	}
