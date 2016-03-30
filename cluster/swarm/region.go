@@ -3,6 +3,7 @@ package swarm
 import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/utils"
 	crontab "gopkg.in/robfig/cron.v2"
 )
@@ -16,6 +17,7 @@ type Region struct {
 	datacenters []*Datacenter
 	networkings []*Networking
 	services    []*Service
+	stores      []store.Store
 
 	serviceSchedulerCh chan *Service // scheduler service units
 	serviceExecuteCh   chan *Service // run service containers
@@ -35,6 +37,7 @@ func NewRegion(cli cluster.Cluster) (*Region, error) {
 		datacenters:        make([]*Datacenter, 0, 50),
 		networkings:        make([]*Networking, 0, 50),
 		services:           make([]*Service, 0, 100),
+		stores:             make([]store.Store, 0, 50),
 		serviceSchedulerCh: make(chan *Service, 100),
 		serviceExecuteCh:   make(chan *Service, 100),
 	}
