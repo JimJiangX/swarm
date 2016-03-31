@@ -1,13 +1,13 @@
 #!/bin/bash
 set -o nounset
 
-hostname=$1
-shift
+ipaddr=$1
+user=$2
+passwd=$3
+hostname=$4
+shift 4
 
 CLIDK=/root/SM/OceanStor/clidk.jar
-ipaddr=146.240.104.61
-user='admin'
-passwd='Admin@storage'
 hg_name='DBaaS_hg'
 
 # get host id

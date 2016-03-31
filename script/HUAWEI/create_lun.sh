@@ -1,14 +1,14 @@
 #!/bin/bash
 set -o nounset
 
-rg=$1
-lun_name=$2
-lun_size=$3
+ipaddr=$1
+user=$2
+passwd=$3
+rg=$4
+lun_name=$5
+lun_size=$6
 
 CLIDK=/root/SM/OceanStor/clidk.jar
-ipaddr=146.240.104.61
-user='admin'
-passwd='Admin@storage'
 
 check_num (){
         arg_name=$1

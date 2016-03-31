@@ -1,13 +1,13 @@
 #!/bin/bash
 set -o nounset
 
-lun_id=$1
+admin_unit=$1
+lun_id=$2
 
-unit=AMS2100_83004824
 output=`mktemp /tmp/XXXXX`
 
 
-auluref -unit ${unit} -pathinfo -lu ${lun_id} | grep -v '^$' | sed '1,3d' > $output
+auluref -unit ${admin_unit} -pathinfo -lu ${lun_id} | grep -v '^$' | sed '1,3d' > $output
 
 while read line
 do
@@ -18,7 +18,7 @@ do
 	hostname=`echo $line | awk '{print $3}' | awk -F: '{print $2}'`
 	expect << EOF
 	set timeout 3
-	spawn auhgmap -unit ${unit} -rm $ch $port -gname ${hostname} -hlu ${hostlun_id} -lu ${lun_id}
+	spawn auhgmap -unit ${admin_unit} -rm $ch $port -gname ${hostname} -hlu ${hostlun_id} -lu ${lun_id}
 	expect {
         	"y/n" {send "y\r"}
 	}

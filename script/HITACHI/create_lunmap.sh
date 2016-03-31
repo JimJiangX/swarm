@@ -1,22 +1,21 @@
 #!/bin/bash
 set -o nounset
 
-lun_id=$1
-hostname=$2
-hostlun_id=$3
-
-unit=AMS2100_83004824
+admin_unit=$1
+lun_id=$2
+hostname=$3
+hostlun_id=$4
 output=`mktemp /tmp/XXXXX`
 
-aufibre1 -unit ${unit} -refer | sed  -n '/Link\ Status/,$'p  | grep -v '^$' | awk 'NR>2{print $1, $2}' > $output
+aufibre1 -unit ${admin_unit} -refer | sed  -n '/Link\ Status/,$'p  | grep -v '^$' | awk 'NR>2{print $1, $2}' > $output
 
 while read line
 do
-	auhgwwn -unit ${unit}  -refer -permhg ${line} -gname ${hostname}
+	auhgwwn -unit ${admin_unit}  -refer -permhg ${line} -gname ${hostname}
 	if [ "$?" == "0" ]; then
 	expect << EOF
 	set timeout 3
-	spawn auhgmap -unit ${unit} -add ${line} -gname ${hostname} -hlu ${hostlun_id} -lu ${lun_id}
+	spawn auhgmap -unit ${admin_unit} -add ${line} -gname ${hostname} -hlu ${hostlun_id} -lu ${lun_id}
 	expect {
         	"y/n" {send "y\r"}
 	}

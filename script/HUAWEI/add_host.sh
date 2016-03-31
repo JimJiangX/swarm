@@ -4,16 +4,13 @@ set -o nounset
 
 CLIDK=/root/SM/OceanStor/clidk.jar
 
-
-ipaddr=146.240.104.61
-user='admin'
-passwd='Admin@storage'
+ipaddr=$1
+user=$2
+passwd=$3
+hostname=$4
+shift 4
 
 hg_name='DBaaS_hg'
-
-hostname=$1
-shift
-
 
 output=`java -jar ${CLIDK} -devip ${ipaddr} -u ${user} -p ${passwd} -c 'showhostgroup' | sed '1,6d; $d' | sed '/^admin/d; /^===/d' | awk '$2 == "'${hg_name}'"{print $1}' | tr -d '$' | tr -d '\r'`
 
