@@ -248,37 +248,43 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 func (u *unit) startService() error {
 	cmd := u.StartServiceCmd()
 
-	return containerExec(u.engine, u.ContainerID, cmd)
+	return containerExec(u.engine, u.ContainerID, cmd, false)
 }
 
 func (u *unit) stopService() error {
 	cmd := u.StopServiceCmd()
 
-	return containerExec(u.engine, u.ContainerID, cmd)
+	return containerExec(u.engine, u.ContainerID, cmd, false)
 }
 
 // containerExec
-func containerExec(engine *cluster.Engine, containerID string, cmd []string) error {
+func containerExec(engine *cluster.Engine, containerID string, cmd []string, detach bool) error {
 	client := engine.EngineAPIClient()
 	if client == nil {
 		return errors.New("Engine APIClient is nil")
 	}
 
-	resp, err := client.ContainerExecCreate(context.TODO(), types.ExecConfig{
+	execConfig := types.ExecConfig{
 		AttachStdin:  false,
 		AttachStdout: true,
 		AttachStderr: true,
 		Tty:          false,
 		Cmd:          cmd,
 		Container:    containerID,
-		Detach:       false,
-	})
+		Detach:       detach,
+	}
 
+	if detach {
+		execConfig.AttachStderr = false
+		execConfig.AttachStdout = false
+	}
+
+	resp, err := client.ContainerExecCreate(context.TODO(), execConfig)
 	if err != nil {
 		return err
 	}
 
-	return client.ContainerExecStart(context.TODO(), resp.ID, types.ExecStartCheck{})
+	return client.ContainerExecStart(context.TODO(), resp.ID, types.ExecStartCheck{Detach: detach})
 }
 
 func newVolumeCreateRequest(name, driver string, opts map[string]string) types.VolumeCreateRequest {
