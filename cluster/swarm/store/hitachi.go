@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"sync"
 
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -113,10 +115,10 @@ func (h *hitachiStore) DelHost(name string, wwwn []string) error {
 
 	path := filepath.Join(root, "HITACHI", "del_host.sh")
 
-	parameter := []string{path, h.hs.AdminUnit, name}
-	parameter = append(parameter, wwwn...)
+	param := []string{path, h.hs.AdminUnit, name}
+	param = append(param, wwwn...)
 
-	cmd, err := utils.ExecScript(parameter...)
+	cmd, err := utils.ExecScript(param...)
 	if err != nil {
 		return err
 	}
@@ -131,23 +133,93 @@ func (h *hitachiStore) DelHost(name string, wwwn []string) error {
 	return err
 }
 
-func (h *hitachiStore) Mapping(host, unit string, lun int) error {
+func (h *hitachiStore) Mapping(host, unit, lun string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	return nil
+	l, err := database.GetLUNByID(lun)
+	if err != nil {
+		return err
+	}
+
+	out, err := database.SelectHostLunIDByMapping(host)
+	if err != nil {
+		return err
+	}
+
+	find, val := findIdleNum(h.hs.HluStart, h.hs.HluEnd, out)
+	if !find {
+		return fmt.Errorf("No available Host LUN ID")
+	}
+
+	err = database.LunMapping(lun, host, unit, val)
+	if err != nil {
+		return err
+	}
+
+	root, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	path := filepath.Join(root, "HITACHI", "create_lunmap.sh")
+
+	cmd, err := utils.ExecScript(path, h.hs.AdminUnit, strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val))
+	if err != nil {
+		return err
+	}
+
+	output, err := cmd.Output()
+	if err != nil {
+
+	}
+
+	fmt.Println("Exec Script Error:%s,Output:%s", err, string(output))
+
+	return err
 }
 
-func (h *hitachiStore) DelMapping(host string, lun int) error {
+func (h *hitachiStore) DelMapping(lun string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	return nil
+	l, err := database.GetLUNByID(lun)
+	if err != nil {
+		return err
+	}
+
+	root, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	path := filepath.Join(root, "HITACHI", "del_lunmap.sh")
+
+	cmd, err := utils.ExecScript(path, h.hs.AdminUnit, strconv.Itoa(l.StorageLunID))
+	if err != nil {
+		return err
+	}
+
+	output, err := cmd.Output()
+	if err != nil {
+
+	}
+
+	fmt.Println("Exec Script Error:%s,Output:%s", err, string(output))
+
+	err = database.DelLunMapping(lun, "", "", 0)
+
+	return err
 }
 
 func (h *hitachiStore) AddSpace(id int) (int64, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
+
+	_, err := database.GetRaidGroup(h.ID(), id)
+	if err == nil {
+		return 0, fmt.Errorf("RaidGroup %d is Exist", id)
+	}
 
 	rg := database.RaidGroup{
 		ID:          utils.Generate32UUID(),
@@ -156,7 +228,7 @@ func (h *hitachiStore) AddSpace(id int) (int64, error) {
 		Enabled:     true,
 	}
 
-	err := rg.Insert()
+	err = rg.Insert()
 	if err != nil {
 		return 0, err
 	}
@@ -171,11 +243,8 @@ func (h *hitachiStore) EnableSpace(id int) error {
 	defer h.lock.Unlock()
 
 	err := database.UpdateRaidGroupStatus(h.ID(), id, true)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (h *hitachiStore) DisableSpace(id int) error {
@@ -183,9 +252,24 @@ func (h *hitachiStore) DisableSpace(id int) error {
 	defer h.lock.Unlock()
 
 	err := database.UpdateRaidGroupStatus(h.ID(), id, false)
-	if err != nil {
-		return err
+
+	return err
+}
+
+func findIdleNum(min, max int, filter []int) (bool, int) {
+	sort.Sort(sort.IntSlice(filter))
+
+loop:
+	for val := min; val <= max; val++ {
+
+		for _, in := range filter {
+			if val == in {
+				continue loop
+			}
+		}
+
+		return true, val
 	}
 
-	return nil
+	return false, 0
 }

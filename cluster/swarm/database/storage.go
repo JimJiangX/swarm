@@ -4,18 +4,74 @@ import "time"
 
 type LUN struct {
 	ID           string    `db:"id"`
-	Name         int       `db:"name"`
+	Name         string    `db:"name"`
 	UnitID       string    `db:"unit_id"`
-	StorageLunID int       `db:"storage_lun_id"`
-	RaidGroupID  int       `db:"raid_groups_id"`
-	Mappingto    string    `db:"mapping_to"`
+	RaidGroupID  string    `db:"raid_group_id"`
+	Mappingto    string    `db:"mapping_hostname"`
 	SizeByte     int64     `db:"size"`
-	HostLunID    int64     `db:"host_lun_id"`
+	HostLunID    int       `db:"host_lun_id"`
+	StorageLunID int       `db:"storage_lun_id"`
 	CreatedAt    time.Time `db:"created_at"`
 }
 
 func (l LUN) TableName() string {
 	return "tb_lun"
+}
+
+func InsertLUN(lun LUN) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	query := "INSERT INTO tb_lun (id,name,unit_id,raid_group_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at) VALUES (:id,:name,:unit_id,:raid_group_id,:mapping_hostname,:size,:host_lun_id,:storage_lun_id,:created_at)"
+
+	_, err = db.NamedExec(query, &lun)
+
+	return err
+}
+
+var DelLunMapping = LunMapping
+
+func LunMapping(lun, host, unit string, hlun int) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	query := "UPDATE tb_lun SET unit_id=?,mapping_hostname=?,host_lun_id=? WHERE id=?"
+
+	_, err = db.Exec(query, unit, host, hlun, lun)
+
+	return err
+}
+
+func GetLUNByID(id string) (LUN, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return LUN{}, err
+	}
+
+	var lun LUN
+	query := "SELECT * FROM tb_lun WHRER id=?"
+
+	err = db.QueryRowx(query, id).StructScan(&lun)
+
+	return lun, err
+}
+
+func SelectHostLunIDByMapping(host string) ([]int, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []int
+	query := "SELECT host_lun_id FROM tb_lun WHERE mapping_hostname=?"
+
+	err = db.Select(&out, query, host)
+
+	return out, err
 }
 
 type RaidGroup struct {
@@ -55,16 +111,43 @@ func UpdateRaidGroupStatus(ssid string, rgid int, state bool) error {
 	return err
 }
 
-func SelectRaidGroupByStorageID(id string, state bool) ([]RaidGroup, error) {
+func UpdateRaidGroupStatusByID(id string, state bool) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	query := "UPDATE tb_raid_group SET enabled=? WHERE id=?"
+
+	_, err = db.Exec(query, state, id)
+
+	return err
+}
+
+func SelectRaidGroupByStorageID(id string, state bool) ([]*RaidGroup, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
-	var out []RaidGroup
+	var out []*RaidGroup
 	query := "SELECT * FROM tb_raid_group WHERE storage_system_id=? AND enabled=?"
 
 	err = db.Select(&out, query, id, state)
+
+	return out, err
+}
+
+func GetRaidGroup(id string, rg int) (RaidGroup, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return RaidGroup{}, err
+	}
+
+	out := RaidGroup{}
+	query := "SELECT * FROM tb_raid_group WHERE storage_system_id=? AND storage_rg_id=? LIMIT 1"
+
+	err = db.Get(&out, query, id, rg)
 
 	return out, err
 }
