@@ -16,8 +16,8 @@ type Store interface {
 	Alloc(size int64) (int, error) // create LUN
 	Recycle(lun int) error         // delete LUN
 
-	Mapping(host, unit string, lun int) error
-	DelMapping(host string, lun int) error
+	Mapping(host, unit, lun string) error
+	DelMapping(lun string) error
 
 	AddSpace(id int) (int64, error)
 	EnableSpace(id int) error

@@ -97,14 +97,14 @@ func (h *huaweiStore) DelHost(name string, wwwn []string) error {
 	return nil
 }
 
-func (h *huaweiStore) Mapping(host, unit string, lun int) error {
+func (h *huaweiStore) Mapping(host, unit, lun string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
 	return nil
 }
 
-func (h *huaweiStore) DelMapping(host string, lun int) error {
+func (h *huaweiStore) DelMapping(lun string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
