@@ -2,13 +2,13 @@
 set -o nounset
 
 
-lun_id=$1
+admin_unit=$1
+lun_id=$2
 
-unit=AMS2100_83004824
 
 expect << EOF
 	set timeout 3
-	spawn auludel -unit ${unit} -lu ${lun_id}
+	spawn auludel -unit ${admin_unit} -lu ${lun_id}
 	expect {
        	"y/n" {send "y\r"; exp_continue}
 	"y/n" {send "y\r"; exp_continue}

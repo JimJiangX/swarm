@@ -1,10 +1,12 @@
 #!/bin/bash
 set -o nounset
 
+ipaddr=$1
+user=$2
+passwd=$3
+shift 3
+
 CLIDK=/root/SM/OceanStor/clidk.jar
-ipaddr=146.240.104.61
-user='admin'
-passwd='Admin@storage'
 lun_output=`mktemp /tmp/XXXXX`
 output=`mktemp /tmp/XXXXX`
 
