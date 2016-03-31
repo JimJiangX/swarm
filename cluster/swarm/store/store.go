@@ -8,6 +8,8 @@ type Store interface {
 	Driver() string
 	IdleSize() ([]int64, error)
 
+	Insert() error
+
 	AddHost(name string, wwwn []string) error
 	DelHost(name string, wwwn []string) error
 
@@ -23,16 +25,19 @@ type Store interface {
 }
 
 func RegisterStore(id, vendor, addr, user, password, admin string,
-	lstart, lend, hstart, hend int) (Store, error) {
-	var store Store = nil
+	lstart, lend, hstart, hend int) (store Store, err error) {
 
 	if vendor == "huawei" {
-
-		store = NewHuaweiStore(id, vendor, addr, user, password, lstart, lend)
+		store = NewHuaweiStore(id, vendor, addr, user, password, hstart, hend)
+		err = store.Insert()
 
 	} else if vendor == "hitachi" {
-
 		store = NewHitachiStore(id, vendor, admin, lstart, lend, hstart, hend)
+		err = store.Insert()
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	stores[id] = store

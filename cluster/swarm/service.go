@@ -318,7 +318,7 @@ func (svc *Service) CreateUsers() (err error) {
 		u := svc.units[i]
 
 		if u.Type == "mysql" {
-			err := containerExec(u.engine, u.ContainerID, cmd)
+			err := containerExec(u.engine, u.ContainerID, cmd, false)
 			if err != nil {
 
 			}

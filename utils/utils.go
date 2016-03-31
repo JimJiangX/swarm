@@ -145,7 +145,7 @@ func ParseStringToTime(s string) (time.Time, error) {
 }
 
 // ExecScript returns a command to execute a script
-func ExecScript(script string) (*exec.Cmd, error) {
+func ExecScript(script ...string) (*exec.Cmd, error) {
 	var shell, flag string
 	if runtime.GOOS == "windows" {
 		shell = "cmd"
@@ -154,10 +154,17 @@ func ExecScript(script string) (*exec.Cmd, error) {
 		shell = "/bin/sh"
 		flag = "-c"
 	}
+
 	if other := os.Getenv("SHELL"); other != "" {
 		shell = other
 	}
-	cmd := exec.Command(shell, flag, script)
+
+	slice := make([]string, len(script)+1)
+	slice[0] = flag
+	copy(slice[1:], script)
+
+	cmd := exec.Command(shell, slice...)
+
 	return cmd, nil
 }
 

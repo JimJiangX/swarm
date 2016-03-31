@@ -21,12 +21,52 @@ func (l LUN) TableName() string {
 type RaidGroup struct {
 	ID          string `db:"id"`
 	StorageID   string `db:"storage_system_id"`
-	StorageRGID string `db:"storage_rg_id"`
+	StorageRGID int    `db:"storage_rg_id"`
 	Enabled     bool   `db:"enabled"`
 }
 
 func (r RaidGroup) TableName() string {
 	return "tb_raid_group"
+}
+
+func (rg RaidGroup) Insert() error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	query := "INSERT INTO tb_raid_group (id,storage_system_id,storage_rg_id,enabled) VALUES (:id,:storage_system_id,:storage_rg_id,:enabled)"
+
+	_, err = db.NamedExec(query, &rg)
+
+	return err
+}
+
+func UpdateRaidGroupStatus(ssid string, rgid int, state bool) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	query := "UPDATE tb_raid_group SET enabled=? WHERE storage_system_id=? AND storage_rg_id=?"
+
+	_, err = db.Exec(query, state, ssid, rgid)
+
+	return err
+}
+
+func SelectRaidGroupByStorageID(id string, state bool) ([]RaidGroup, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []RaidGroup
+	query := "SELECT * FROM tb_raid_group WHERE storage_system_id=? AND enabled=?"
+
+	err = db.Select(&out, query, id, state)
+
+	return out, err
 }
 
 type HitachiStorage struct {
@@ -43,6 +83,18 @@ func (hds HitachiStorage) TableName() string {
 	return "tb_storage_HITACHI"
 }
 
+func (hs *HitachiStorage) Insert() error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	query := "INSERT INTO tb_storage_HITACHI (id,vendor,admin_unit,lun_start,lun_end,hlu_start,hlu_end) VALUES (:id,:vendor,:admin_unit,:lun_start,:lun_end,:hlu_start,:hlu_end)"
+	_, err = db.NamedExec(query, hs)
+
+	return err
+}
+
 type HuaweiStorage struct {
 	ID       string `db:"id"`
 	Vendor   string `db:"vendor"`
@@ -55,6 +107,18 @@ type HuaweiStorage struct {
 
 func (h HuaweiStorage) TableName() string {
 	return "tb_storage_HUAWEI"
+}
+
+func (hs *HuaweiStorage) Insert() error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	query := "INSERT INTO tb_storage_HUAWEI (id,vendor,ip_addr,username,password,hlu_start,hlu_end) VALUES (:id,:vendor,:ip_addr,:username,:password,:hlu_start,:hlu_end)"
+	_, err = db.NamedExec(query, hs)
+
+	return err
 }
 
 /*
