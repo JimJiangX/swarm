@@ -6,8 +6,12 @@ lun_id=$2
 
 output=`mktemp /tmp/XXXXX`
 
-
 auluref -unit ${admin_unit} -pathinfo -lu ${lun_id} | grep -v '^$' | sed '1,3d' > $output
+if [ $? -ne 0 ]; then
+	rm -f $output
+	echo "auluref failed !"
+        exit 1
+fi
 
 while read line
 do

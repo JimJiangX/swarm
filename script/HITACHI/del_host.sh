@@ -8,6 +8,11 @@ shift
 output=`mktemp /tmp/XXXXX`
 
 aufibre1 -unit ${admin_unit} -refer | sed  -n '/Link\ Status/,$'p  | grep -v '^$' | awk 'NR>2{print $1, $2}' > $output
+if [ $? -ne 0 ]; then
+	rm -f $output
+	echo "aufibre1 failed !"
+ 	exit 1
+fi
 
 while read line
 do
@@ -22,8 +27,8 @@ do
         			"y/n" {send "y\r"; exp_continue}
 				"y/n" {send "y\r"; exp_continue}
 				"y/n" {send "y\r"}
-}
-expect eof
+				}
+			expect eof
 EOF
 
 		fi
