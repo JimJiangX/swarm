@@ -15,4 +15,9 @@ expect {
 expect eof
 EOF
 
+if [ $? -ne 0 ]; then
+	echo "create lun fail !"
+	exit 1
+fi
+
 echo $lun_id

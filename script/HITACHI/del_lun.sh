@@ -16,3 +16,5 @@ expect << EOF
 }
 expect eof
 EOF
+
+exit $?
