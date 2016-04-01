@@ -6,20 +6,20 @@ type Store interface {
 	ID() string
 	Vendor() string
 	Driver() string
-	IdleSize() (map[int]int64, error)
+	IdleSize() (map[int]int, error)
 
 	Insert() error
 
 	AddHost(name string, wwwn []string) error
 	DelHost(name string, wwwn []string) error
 
-	Alloc(size int64) (string, int, error) // create LUN
-	Recycle(lun int) error                 // delete LUN
+	Alloc(size int) (string, int, error) // create LUN
+	Recycle(lun int) error               // delete LUN
 
 	Mapping(host, unit, lun string) error
 	DelMapping(lun string) error
 
-	AddSpace(id int) (int64, error)
+	AddSpace(id int) (int, error)
 	EnableSpace(id int) error
 	DisableSpace(id int) error
 }
