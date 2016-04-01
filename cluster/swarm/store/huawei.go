@@ -50,7 +50,7 @@ func (h *huaweiStore) Insert() error {
 	return err
 }
 
-func (h *huaweiStore) Alloc(size int64) (string, int, error) {
+func (h *huaweiStore) Alloc(size int) (string, int, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -64,7 +64,7 @@ func (h *huaweiStore) Recycle(lun int) error {
 	return nil
 }
 
-func (h huaweiStore) IdleSize() (map[int]int64, error) {
+func (h huaweiStore) IdleSize() (map[int]int, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
@@ -104,7 +104,7 @@ func (h *huaweiStore) DelMapping(lun string) error {
 	return nil
 }
 
-func (h *huaweiStore) AddSpace(id int) (int64, error) {
+func (h *huaweiStore) AddSpace(id int) (int, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 

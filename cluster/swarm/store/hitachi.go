@@ -51,7 +51,7 @@ func (h *hitachiStore) Insert() error {
 	return h.hs.Insert()
 }
 
-func (h *hitachiStore) Alloc(size int64) (string, int, error) {
+func (h *hitachiStore) Alloc(size int) (string, int, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -61,7 +61,7 @@ func (h *hitachiStore) Alloc(size int64) (string, int, error) {
 	}
 
 	rg := maxIdleSizeRG(out)
-	if out[rg] < size {
+	if out[rg].free < size {
 		return "", 0, fmt.Errorf("Not Enough Space For Alloction,Max:%d < Need:%d", out[rg], size)
 	}
 
@@ -76,6 +76,7 @@ func (h *hitachiStore) Alloc(size int64) (string, int, error) {
 	}
 
 	path, err := getAbsolutePath("HITACHI", "create_lun.sh")
+
 	param := []string{path, h.hs.AdminUnit,
 		strconv.Itoa(rg.StorageRGID),
 		strconv.Itoa(id), strconv.Itoa(int(size))}
@@ -115,9 +116,34 @@ func (h *hitachiStore) Recycle(lun int) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
+	l, err := database.GetLUNByLunID(h.ID(), lun)
+	if err != nil {
+		return err
+	}
+
+	path, err := getAbsolutePath("HITACHI", "del_lun.sh")
+	if err != nil {
+		return err
+	}
+
+	cmd, err := utils.ExecScript(path, h.hs.AdminUnit, strconv.Itoa(lun))
+	if err != nil {
+		return err
+	}
+
+	output, err := cmd.Output()
+	if err != nil {
+
+	}
+
+	fmt.Println("Exec Script Error:%s,Output:%s", err, string(output))
+
+	err = database.DelLUN(l.ID)
+
 	return nil
 }
-func (h hitachiStore) idleSize() (map[*database.RaidGroup]int64, error) {
+
+func (h hitachiStore) idleSize() (map[*database.RaidGroup]space, error) {
 	out, err := database.SelectRaidGroupByStorageID(h.ID(), true)
 	if err != nil {
 		return nil, err
@@ -129,30 +155,66 @@ func (h hitachiStore) idleSize() (map[*database.RaidGroup]int64, error) {
 		rg[i] = val.StorageRGID
 	}
 
-	list := intSliceToString(rg, " ")
+	spaces, err := h.List(rg...)
+	if err != nil {
+		return nil, err
+	}
+
+	var info map[*database.RaidGroup]space
+
+	if len(spaces) > 0 {
+		info = make(map[*database.RaidGroup]space)
+
+		for i := range out {
+		loop:
+			for s := range spaces {
+				if out[i].StorageRGID == spaces[s].id {
+					info[out[i]] = spaces[s]
+					break loop
+				}
+			}
+		}
+	}
+
+	return info, nil
+}
+
+func (h *hitachiStore) List(rg ...int) ([]space, error) {
+	list := ""
+	if len(rg) == 0 {
+		return nil, nil
+
+	} else if len(rg) == 1 {
+		list = strconv.Itoa(rg[0])
+	} else {
+		list = intSliceToString(rg, " ")
+	}
 
 	path, err := getAbsolutePath("HITACHI", "listrg.sh")
 	if err != nil {
 		return nil, err
 	}
-	param := []string{path, h.hs.AdminUnit, list}
 
-	cmd, err := utils.ExecScript(param...)
+	cmd, err := utils.ExecScript(path, h.hs.AdminUnit, list)
 	if err != nil {
 		return nil, err
 	}
 
 	output, err := cmd.Output()
 	if err != nil {
-
+		fmt.Println("Exec Script Error:%s,Output:%s", err, string(output))
+		return nil, err
 	}
 
-	fmt.Println("Exec Script Error:%s,Output:%s", err, string(output))
+	spaces := parseSpace(string(output))
+	if len(spaces) == 0 {
+		return nil, nil
+	}
 
-	return nil, nil
+	return spaces, nil
 }
 
-func (h hitachiStore) IdleSize() (map[int]int64, error) {
+func (h hitachiStore) IdleSize() (map[int]int, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
@@ -161,10 +223,10 @@ func (h hitachiStore) IdleSize() (map[int]int64, error) {
 		return nil, err
 	}
 
-	out := make(map[int]int64)
+	out := make(map[int]int)
 
 	for key, val := range rg {
-		out[key.StorageRGID] = val
+		out[key.StorageRGID] = val.free
 	}
 
 	return out, nil
@@ -252,7 +314,8 @@ func (h *hitachiStore) Mapping(host, unit, lun string) error {
 		return err
 	}
 
-	cmd, err := utils.ExecScript(path, h.hs.AdminUnit, strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val))
+	cmd, err := utils.ExecScript(path, h.hs.AdminUnit,
+		strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val))
 	if err != nil {
 		return err
 	}
@@ -281,7 +344,8 @@ func (h *hitachiStore) DelMapping(lun string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	cmd, err := utils.ExecScript(path, h.hs.AdminUnit, strconv.Itoa(l.StorageLunID))
+	cmd, err := utils.ExecScript(path, h.hs.AdminUnit,
+		strconv.Itoa(l.StorageLunID))
 	if err != nil {
 		return err
 	}
@@ -298,7 +362,7 @@ func (h *hitachiStore) DelMapping(lun string) error {
 	return err
 }
 
-func (h *hitachiStore) AddSpace(id int) (int64, error) {
+func (h *hitachiStore) AddSpace(id int) (int, error) {
 
 	_, err := database.GetRaidGroup(h.ID(), id)
 	if err == nil {
@@ -322,7 +386,17 @@ func (h *hitachiStore) AddSpace(id int) (int64, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
-	return 0, nil
+	spaces, err := h.List(id)
+
+	if err != nil {
+		return 0, err
+	}
+
+	if len(spaces) == 1 {
+		return spaces[0].free, nil
+	}
+
+	return 0, fmt.Errorf("Error happens when scan space %d", id)
 }
 
 func (h *hitachiStore) EnableSpace(id int) error {
@@ -370,15 +444,15 @@ func intSliceToString(input []int, sep string) string {
 	return strings.Join(a, sep)
 }
 
-func maxIdleSizeRG(m map[*database.RaidGroup]int64) *database.RaidGroup {
+func maxIdleSizeRG(m map[*database.RaidGroup]space) *database.RaidGroup {
 	var (
 		key *database.RaidGroup
-		max int64
+		max int
 	)
 
 	for k, val := range m {
-		if val > max {
-			max = val
+		if val.free > max {
+			max = val.free
 			key = k
 		}
 	}
@@ -406,4 +480,54 @@ func getAbsolutePath(path ...string) (string, error) {
 	}
 
 	return abs, nil
+}
+
+type space struct {
+	id     int
+	total  int
+	free   int
+	state  string
+	lunNum int
+}
+
+func parseSpace(output string) []space {
+	var (
+		spaces []space
+		lines  = strings.Split(output, "\n") // lines
+	)
+
+	for i := range lines {
+
+		part := strings.Split(lines[i], " ")
+
+		if len(part) == 5 {
+			var (
+				space = space{}
+				err   error
+			)
+			space.id, err = strconv.Atoi(part[0])
+			if err != nil {
+				continue
+			}
+			space.total, err = strconv.Atoi(part[1])
+			if err != nil {
+				continue
+			}
+			space.free, err = strconv.Atoi(part[2])
+			if err != nil {
+				continue
+			}
+
+			space.state = part[3]
+
+			space.lunNum, err = strconv.Atoi(part[4])
+			if err != nil {
+				continue
+			}
+
+			spaces = append(spaces, space)
+		}
+	}
+
+	return spaces
 }
