@@ -1,7 +1,6 @@
 package store
 
 import (
-	"strconv"
 	"sync"
 
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -51,11 +50,11 @@ func (h *huaweiStore) Insert() error {
 	return err
 }
 
-func (h *huaweiStore) Alloc(size int64) (int, error) {
+func (h *huaweiStore) Alloc(size int64) (string, int, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	return 0, nil
+	return "", 0, nil
 }
 
 func (h *huaweiStore) Recycle(lun int) error {
@@ -65,19 +64,13 @@ func (h *huaweiStore) Recycle(lun int) error {
 	return nil
 }
 
-func (h huaweiStore) IdleSize() ([]int64, error) {
+func (h huaweiStore) IdleSize() (map[int]int64, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
-	spaces, err := database.SelectRaidGroupByStorageID(h.hs.ID, true)
+	_, err := database.SelectRaidGroupByStorageID(h.hs.ID, true)
 	if err != nil {
 		return nil, err
-	}
-
-	rg := ""
-
-	for _, val := range spaces {
-		rg += strconv.Itoa(val.StorageRGID) + " "
 	}
 
 	return nil, nil

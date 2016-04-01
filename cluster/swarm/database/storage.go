@@ -3,15 +3,16 @@ package database
 import "time"
 
 type LUN struct {
-	ID           string    `db:"id"`
-	Name         string    `db:"name"`
-	UnitID       string    `db:"unit_id"`
-	RaidGroupID  string    `db:"raid_group_id"`
-	Mappingto    string    `db:"mapping_hostname"`
-	SizeByte     int64     `db:"size"`
-	HostLunID    int       `db:"host_lun_id"`
-	StorageLunID int       `db:"storage_lun_id"`
-	CreatedAt    time.Time `db:"created_at"`
+	ID              string    `db:"id"`
+	Name            string    `db:"name"`
+	UnitID          string    `db:"unit_id"`
+	RaidGroupID     string    `db:"raid_group_id"`
+	StorageSystemID string    `db:"storage_system_id"`
+	Mappingto       string    `db:"mapping_hostname"`
+	SizeByte        int64     `db:"size"`
+	HostLunID       int       `db:"host_lun_id"`
+	StorageLunID    int       `db:"storage_lun_id"`
+	CreatedAt       time.Time `db:"created_at"`
 }
 
 func (l LUN) TableName() string {
@@ -24,7 +25,7 @@ func InsertLUN(lun LUN) error {
 		return err
 	}
 
-	query := "INSERT INTO tb_lun (id,name,unit_id,raid_group_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at) VALUES (:id,:name,:unit_id,:raid_group_id,:mapping_hostname,:size,:host_lun_id,:storage_lun_id,:created_at)"
+	query := "INSERT INTO tb_lun (id,name,unit_id,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at) VALUES (:id,:name,:unit_id,:raid_group_id,:storage_system_id,:mapping_hostname,:size,:host_lun_id,:storage_lun_id,:created_at)"
 
 	_, err = db.NamedExec(query, &lun)
 
@@ -70,6 +71,20 @@ func SelectHostLunIDByMapping(host string) ([]int, error) {
 	query := "SELECT host_lun_id FROM tb_lun WHERE mapping_hostname=?"
 
 	err = db.Select(&out, query, host)
+
+	return out, err
+}
+
+func SelectLunIDBySystemID(id string) ([]int, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []int
+	query := "SELECT storage_lun_id FROM tb_lun WHERE storage_system_id=?"
+
+	err = db.Select(&out, query, id)
 
 	return out, err
 }

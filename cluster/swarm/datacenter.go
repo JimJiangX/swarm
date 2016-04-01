@@ -225,7 +225,7 @@ func (dc *Datacenter) AllocStore(host, IDOrType string, size int64) error {
 		return err
 	}
 
-	_, err = store.Alloc(size)
+	_, _, err = store.Alloc(size)
 
 	return err
 }
