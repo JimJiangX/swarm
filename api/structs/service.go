@@ -19,10 +19,10 @@ type Module struct {
 	Config dockerclient.ContainerConfig
 
 	StoreType string
-	StoreSize int64
+	StoreSize int
 }
 
-func (m Module) Store() (string, int64) {
+func (m Module) Store() (string, int) {
 
 	return m.StoreType, m.StoreSize
 

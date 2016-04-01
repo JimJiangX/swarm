@@ -9,7 +9,7 @@ type LUN struct {
 	RaidGroupID     string    `db:"raid_group_id"`
 	StorageSystemID string    `db:"storage_system_id"`
 	Mappingto       string    `db:"mapping_hostname"`
-	SizeByte        int64     `db:"size"`
+	SizeByte        int       `db:"size"`
 	HostLunID       int       `db:"host_lun_id"`
 	StorageLunID    int       `db:"storage_lun_id"`
 	CreatedAt       time.Time `db:"created_at"`
@@ -54,11 +54,36 @@ func GetLUNByID(id string) (LUN, error) {
 	}
 
 	var lun LUN
-	query := "SELECT * FROM tb_lun WHRER id=?"
+	query := "SELECT * FROM tb_lun WHRER id=? LIMIT 1"
 
 	err = db.QueryRowx(query, id).StructScan(&lun)
 
 	return lun, err
+}
+
+func GetLUNByLunID(systemID string, id int) (LUN, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return LUN{}, err
+	}
+
+	var lun LUN
+	query := "SELECT * FROM tb_lun WHRER storage_system_id=? AND storage_lun_id=? LIMIT 1"
+
+	err = db.QueryRowx(query, systemID, id).StructScan(&lun)
+
+	return lun, err
+}
+
+func DelLUN(id string) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("DELETE tb_lun WHERE id=?", id)
+
+	return err
 }
 
 func SelectHostLunIDByMapping(host string) ([]int, error) {

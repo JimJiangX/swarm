@@ -180,7 +180,7 @@ func (r *Region) DatacenterByNode(IDOrName string) (*Datacenter, error) {
 	return nil, errors.New("Datacenter Not Found")
 }
 
-func (dc *Datacenter) isIdleStoreEnough(IDOrType string, num, size int64) bool {
+func (dc *Datacenter) isIdleStoreEnough(IDOrType string, num, size int) bool {
 	dc.RLock()
 
 	store, err := dc.getStore(IDOrType)
@@ -197,7 +197,7 @@ func (dc *Datacenter) isIdleStoreEnough(IDOrType string, num, size int64) bool {
 		return false
 	}
 
-	enough := int64(0)
+	enough := 0
 	for i := range idles {
 		enough += idles[i] / size
 	}
@@ -225,12 +225,12 @@ func (dc *Datacenter) AllocStore(host, IDOrType string, size int64) error {
 		return err
 	}
 
-	_, _, err = store.Alloc(size)
+	_, _, err = store.Alloc(int(size))
 
 	return err
 }
 
-func (r *Region) listShortIdleStore(IDOrType string, num, size int64) []string {
+func (r *Region) listShortIdleStore(IDOrType string, num, size int) []string {
 	if IDOrType == LocalDiskStore {
 		return nil
 	}
