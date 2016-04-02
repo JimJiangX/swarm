@@ -3,6 +3,7 @@ package cluster
 import (
 	"io"
 
+	"github.com/docker/engine-api/types"
 	"github.com/samalba/dockerclient"
 )
 
@@ -21,13 +22,13 @@ type Cluster interface {
 	Image(IDOrName string) *Image
 
 	// Remove images from the cluster
-	RemoveImages(name string, force bool) ([]*dockerclient.ImageDelete, error)
+	RemoveImages(name string, force bool) ([]types.ImageDelete, error)
 
 	// Return all containers
 	Containers() Containers
 
 	// Start a container
-	StartContainer(container *Container) error
+	StartContainer(container *Container, hostConfig *dockerclient.HostConfig) error
 
 	// Return container the matching `IDOrName`
 	// TODO: remove this method from the interface as we can use
@@ -38,13 +39,13 @@ type Cluster interface {
 	Networks() Networks
 
 	// Create a network
-	CreateNetwork(request *dockerclient.NetworkCreate) (*dockerclient.NetworkCreateResponse, error)
+	CreateNetwork(request *types.NetworkCreate) (*types.NetworkCreateResponse, error)
 
 	// Remove a network from the cluster
 	RemoveNetwork(network *Network) error
 
 	// Create a volume
-	CreateVolume(request *dockerclient.VolumeCreateRequest) (*Volume, error)
+	CreateVolume(request *types.VolumeCreateRequest) (*Volume, error)
 
 	// Return all volumes
 	Volumes() Volumes
@@ -70,7 +71,7 @@ type Cluster interface {
 	// `status` is the current status, like "", "in progress" or "loaded"
 	Load(imageReader io.Reader, callback func(what, status string, err error))
 
-	// Return some info about the cluster, like nb or containers / images
+	// Return some info about the cluster, like nb of containers / images
 	// It is pretty open, so the implementation decides what to return.
 	Info() [][2]string
 
@@ -90,12 +91,12 @@ type Cluster interface {
 	// Return a random engine
 	RANDOMENGINE() (*Engine, error)
 
-	// RenameContainer rename a container
+	// Rename a container
 	RenameContainer(container *Container, newName string) error
 
-	// BuildImage build an image
-	BuildImage(*dockerclient.BuildImage, io.Writer) error
+	// Build an image
+	BuildImage(*types.ImageBuildOptions, io.Writer) error
 
-	// TagImage tag an image
+	// Tag an image
 	TagImage(IDOrName string, repo string, tag string, force bool) error
 }

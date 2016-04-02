@@ -12,7 +12,7 @@ weight=-89
 # Setup cluster resources
 
 Now that [your underlying network infrastructure is built](02-deploy-infra.md),
-you can deploye and configure the Swarm cluster. A host in a Swarm cluster is
+you can deploy and configure the Swarm cluster. A host in a Swarm cluster is
 called a *node*. So, these instructions refer to each AWS EC2 instances as a
 node and refers to each node by the **Name** it appears as in your EC2
 Dashboard**.
@@ -140,7 +140,7 @@ the Consul container, you launch a Swarm manager container.
     The command is acting on the Swarm port, so it returns information about the
     entire cluster. You have a manager and no nodes.
 
-9. While still on the `master` node, join each node one-by-one to the cluster.
+9. While still on the `manager` node, join each node one-by-one to the cluster.
 
     You can run these commands to join each node from the `manager` node command
     line. The `-H` flag with the `docker` command specifies a node IP address

@@ -14,6 +14,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/discovery"
 	"github.com/docker/docker/pkg/stringid"
+	"github.com/docker/engine-api/types"
 	"github.com/docker/go-units"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler"
@@ -125,8 +126,8 @@ func (c *Cluster) generateUniqueID() string {
 }
 
 // StartContainer starts a container
-func (c *Cluster) StartContainer(container *cluster.Container) error {
-	return container.Engine.StartContainer(container.Id)
+func (c *Cluster) StartContainer(container *cluster.Container, hostConfig *dockerclient.HostConfig) error {
+	return container.Engine.StartContainer(container.Id, hostConfig)
 }
 
 // CreateContainer aka schedule a brand new container into the cluster.
@@ -418,17 +419,17 @@ func (c *Cluster) Image(IDOrName string) *cluster.Image {
 }
 
 // RemoveImages removes all the images that match `name` from the cluster
-func (c *Cluster) RemoveImages(name string, force bool) ([]*dockerclient.ImageDelete, error) {
+func (c *Cluster) RemoveImages(name string, force bool) ([]types.ImageDelete, error) {
 	c.Lock()
 	defer c.Unlock()
 
-	out := []*dockerclient.ImageDelete{}
+	out := []types.ImageDelete{}
 	errs := []string{}
 	var err error
 	for _, e := range c.engines {
 		for _, image := range e.Images() {
 			if image.Match(name, true) {
-				content, err := image.Engine.RemoveImage(image, name, force)
+				content, err := image.Engine.RemoveImage(name, force)
 				if err != nil {
 					errs = append(errs, fmt.Sprintf("%s: %s", image.Engine.Name, err.Error()))
 					continue
@@ -458,7 +459,7 @@ func (c *Cluster) refreshVolumes() {
 }
 
 // CreateNetwork creates a network in the cluster
-func (c *Cluster) CreateNetwork(request *dockerclient.NetworkCreate) (response *dockerclient.NetworkCreateResponse, err error) {
+func (c *Cluster) CreateNetwork(request *types.NetworkCreate) (response *types.NetworkCreateResponse, err error) {
 	var (
 		parts  = strings.SplitN(request.Name, "/", 2)
 		config = &cluster.ContainerConfig{}
@@ -491,7 +492,7 @@ func (c *Cluster) CreateNetwork(request *dockerclient.NetworkCreate) (response *
 }
 
 // CreateVolume creates a volume in the cluster
-func (c *Cluster) CreateVolume(request *dockerclient.VolumeCreateRequest) (*cluster.Volume, error) {
+func (c *Cluster) CreateVolume(request *types.VolumeCreateRequest) (*cluster.Volume, error) {
 	var (
 		wg     sync.WaitGroup
 		volume *cluster.Volume
@@ -865,6 +866,7 @@ func (c *Cluster) Info() [][2]string {
 		}
 		info = append(info, [2]string{"  └ Error", errMsg})
 		info = append(info, [2]string{"  └ UpdatedAt", engine.UpdatedAt().UTC().Format(time.RFC3339)})
+		info = append(info, [2]string{"  └ ServerVersion", engine.Version})
 	}
 
 	return info
@@ -895,12 +897,12 @@ func (c *Cluster) RenameContainer(container *cluster.Container, newName string) 
 }
 
 // BuildImage build an image
-func (c *Cluster) BuildImage(buildImage *dockerclient.BuildImage, out io.Writer) error {
+func (c *Cluster) BuildImage(buildImage *types.ImageBuildOptions, out io.Writer) error {
 	c.scheduler.Lock()
 
 	// get an engine
 	config := cluster.BuildContainerConfig(dockerclient.ContainerConfig{
-		CpuShares: buildImage.CpuShares,
+		CpuShares: buildImage.CPUShares,
 		Memory:    buildImage.Memory,
 		Env:       convertMapToKVStrings(buildImage.BuildArgs),
 	})

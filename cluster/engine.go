@@ -13,9 +13,13 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/context"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/version"
 	engineapi "github.com/docker/engine-api/client"
+	"github.com/docker/engine-api/types"
+	"github.com/docker/engine-api/types/filters"
 	engineapinop "github.com/docker/swarm/api/nopclient"
 	"github.com/samalba/dockerclient"
 	"github.com/samalba/dockerclient/nopclient"
@@ -96,13 +100,14 @@ type EngineOpts struct {
 type Engine struct {
 	sync.RWMutex
 
-	ID     string
-	IP     string
-	Addr   string
-	Name   string
-	Cpus   int
-	Memory int64
-	Labels map[string]string
+	ID      string
+	IP      string
+	Addr    string
+	Name    string
+	Cpus    int
+	Memory  int64
+	Labels  map[string]string
+	Version string
 
 	stopCh          chan struct{}
 	refreshDelayer  *delayer
@@ -183,10 +188,13 @@ func (e *Engine) StartMonitorEvents() {
 	e.client.StartMonitorEvents(e.handler, ec)
 
 	go func() {
-		if err := <-ec; err != nil && !strings.Contains(err.Error(), "EOF") {
-			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Errorf("Error monitoring events: %s", err)
-		} else if err != nil {
-			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Debug("EOF monitoring events, restarting")
+		if err := <-ec; err != nil {
+			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Errorf("Error monitoring events: %s.", err)
+			if !strings.Contains(err.Error(), "EOF") {
+				// failing node reconnect should use back-off strategy
+				<-e.refreshDelayer.Wait(e.failureCount)
+			}
+			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Errorf("Restart event monitoring.")
 			e.StartMonitorEvents()
 		}
 		close(ec)
@@ -346,7 +354,7 @@ func (e *Engine) Status() string {
 	return stateText[e.state]
 }
 
-// incFailureCount increases engine's failure count, and set engine as unhealthy if threshold is crossed
+// incFailureCount increases engine's failure count, and sets engine as unhealthy if threshold is crossed
 func (e *Engine) incFailureCount() {
 	e.Lock()
 	defer e.Unlock()
@@ -408,7 +416,7 @@ func (e *Engine) CheckConnectionErr(err error) {
 
 // Gather engine specs (CPU, memory, constraints, ...).
 func (e *Engine) updateSpecs() error {
-	info, err := e.apiClient.Info()
+	info, err := e.apiClient.Info(context.TODO())
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
@@ -418,7 +426,7 @@ func (e *Engine) updateSpecs() error {
 		return fmt.Errorf("cannot get resources for this engine, make sure %s is a Docker Engine, not a Swarm manager", e.Addr)
 	}
 
-	v, err := e.apiClient.ServerVersion()
+	v, err := e.apiClient.ServerVersion(context.TODO())
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
@@ -433,6 +441,8 @@ func (e *Engine) updateSpecs() error {
 		e.CheckConnectionErr(err)
 		return err
 	}
+	// update version
+	e.Version = v.Version
 
 	e.Lock()
 	defer e.Unlock()
@@ -468,17 +478,17 @@ func (e *Engine) updateSpecs() error {
 }
 
 // RemoveImage deletes an image from the engine.
-func (e *Engine) RemoveImage(image *Image, name string, force bool) ([]*dockerclient.ImageDelete, error) {
-	array, err := e.client.RemoveImage(name, force)
+func (e *Engine) RemoveImage(name string, force bool) ([]types.ImageDelete, error) {
+	rmOpts := types.ImageRemoveOptions{name, force, true}
+	dels, err := e.apiClient.ImageRemove(context.TODO(), rmOpts)
 	e.CheckConnectionErr(err)
 	e.RefreshImages()
-	return array, err
-
+	return dels, err
 }
 
 // RemoveNetwork removes a network from the engine.
 func (e *Engine) RemoveNetwork(network *Network) error {
-	err := e.client.RemoveNetwork(network.ID)
+	err := e.apiClient.NetworkRemove(context.TODO(), network.ID)
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
@@ -509,7 +519,7 @@ func (e *Engine) AddNetwork(network *Network) {
 
 // RemoveVolume deletes a volume from the engine.
 func (e *Engine) RemoveVolume(name string) error {
-	err := e.client.RemoveVolume(name)
+	err := e.apiClient.VolumeRemove(context.TODO(), name)
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
@@ -526,7 +536,8 @@ func (e *Engine) RemoveVolume(name string) error {
 
 // RefreshImages refreshes the list of images on the engine.
 func (e *Engine) RefreshImages() error {
-	images, err := e.client.ListImages(true)
+	imgLstOpts := types.ImageListOptions{All: true}
+	images, err := e.apiClient.ImageList(context.TODO(), imgLstOpts)
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
@@ -534,7 +545,7 @@ func (e *Engine) RefreshImages() error {
 	e.Lock()
 	e.images = nil
 	for _, image := range images {
-		e.images = append(e.images, &Image{Image: *image, Engine: e})
+		e.images = append(e.images, &Image{Image: image, Engine: e})
 	}
 	e.Unlock()
 	return nil
@@ -542,7 +553,8 @@ func (e *Engine) RefreshImages() error {
 
 // RefreshNetworks refreshes the list of networks on the engine.
 func (e *Engine) RefreshNetworks() error {
-	networks, err := e.client.ListNetworks("")
+	netLsOpts := types.NetworkListOptions{filters.NewArgs()}
+	networks, err := e.apiClient.NetworkList(context.TODO(), netLsOpts)
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
@@ -550,7 +562,7 @@ func (e *Engine) RefreshNetworks() error {
 	e.Lock()
 	e.networks = make(map[string]*Network)
 	for _, network := range networks {
-		e.networks[network.ID] = &Network{NetworkResource: *network, Engine: e}
+		e.networks[network.ID] = &Network{NetworkResource: network, Engine: e}
 	}
 	e.Unlock()
 	return nil
@@ -558,14 +570,14 @@ func (e *Engine) RefreshNetworks() error {
 
 // RefreshVolumes refreshes the list of volumes on the engine.
 func (e *Engine) RefreshVolumes() error {
-	volumes, err := e.client.ListVolumes()
+	volumesLsRsp, err := e.apiClient.VolumeList(context.TODO(), filters.NewArgs())
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
 	}
 	e.Lock()
 	e.volumes = make(map[string]*Volume)
-	for _, volume := range volumes {
+	for _, volume := range volumesLsRsp.Volumes {
 		e.volumes[volume.Name] = &Volume{Volume: *volume, Engine: e}
 	}
 	e.Unlock()
@@ -637,6 +649,11 @@ func (e *Engine) updateContainer(c dockerclient.Container, containers map[string
 	if current, exists := e.containers[c.Id]; exists {
 		// The container is already known.
 		container = current
+		// Restarting is a transit state. Unfortunately Docker doesn't always emit
+		// events when it gets out of Restarting state. Force an inspect to update.
+		if container.Info.State != nil && container.Info.State.Restarting {
+			full = true
+		}
 	} else {
 		// This is a brand new container. We need to do a full refresh.
 		container = &Container{
@@ -684,6 +701,12 @@ func (e *Engine) updateContainer(c dockerclient.Container, containers map[string
 // refreshLoop periodically triggers engine refresh.
 func (e *Engine) refreshLoop() {
 	const maxBackoffFactor int = 1000
+	// engine can hot-plug CPU/Mem or update labels. but there is no events
+	// from engine to trigger spec update.
+	// add an update interval and refresh spec for healthy nodes.
+	const specUpdateInterval = 5 * time.Minute
+	lastSpecUpdatedAt := time.Now()
+
 	for {
 		var err error
 
@@ -702,18 +725,23 @@ func (e *Engine) refreshLoop() {
 			return
 		}
 
-		if !e.IsHealthy() {
+		healthy := e.IsHealthy()
+		if !healthy || time.Since(lastSpecUpdatedAt) > specUpdateInterval {
 			if err = e.updateSpecs(); err != nil {
 				log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Errorf("Update engine specs failed: %v", err)
 				continue
 			}
+			lastSpecUpdatedAt = time.Now()
+		}
+
+		if !healthy {
 			e.client.StopAllMonitorEvents()
 			e.StartMonitorEvents()
 		}
 
 		err = e.RefreshContainers(false)
 		if err == nil {
-			// Do not check error as older daemon don't support this call
+			// Do not check error as older daemon doesn't support this call
 			e.RefreshVolumes()
 			e.RefreshNetworks()
 			e.RefreshImages()
@@ -850,18 +878,18 @@ func (e *Engine) RemoveContainer(container *Container, force, volumes bool) erro
 }
 
 // CreateNetwork creates a network in the engine
-func (e *Engine) CreateNetwork(request *dockerclient.NetworkCreate) (*dockerclient.NetworkCreateResponse, error) {
-	response, err := e.client.CreateNetwork(request)
+func (e *Engine) CreateNetwork(request *types.NetworkCreate) (*types.NetworkCreateResponse, error) {
+	response, err := e.apiClient.NetworkCreate(context.TODO(), *request)
 	e.CheckConnectionErr(err)
 
 	e.RefreshNetworks()
 
-	return response, err
+	return &response, err
 }
 
 // CreateVolume creates a volume in the engine
-func (e *Engine) CreateVolume(request *dockerclient.VolumeCreateRequest) (*Volume, error) {
-	volume, err := e.client.CreateVolume(request)
+func (e *Engine) CreateVolume(request *types.VolumeCreateRequest) (*Volume, error) {
+	volume, err := e.apiClient.VolumeCreate(context.TODO(), *request)
 
 	e.RefreshVolumes()
 	e.CheckConnectionErr(err)
@@ -869,7 +897,7 @@ func (e *Engine) CreateVolume(request *dockerclient.VolumeCreateRequest) (*Volum
 	if err != nil {
 		return nil, err
 	}
-	return &Volume{Volume: *volume, Engine: e}, nil
+	return &Volume{Volume: volume, Engine: e}, nil
 
 }
 
@@ -1000,7 +1028,7 @@ func (e *Engine) handler(ev *dockerclient.Event, _ chan error, args ...interface
 		e.RefreshImages()
 	case "container":
 		switch ev.Action {
-		case "die", "kill", "oom", "pause", "start", "stop", "unpause", "rename":
+		case "die", "kill", "oom", "pause", "start", "restart", "stop", "unpause", "rename":
 			e.refreshContainer(ev.ID, true)
 		default:
 			e.refreshContainer(ev.ID, false)
@@ -1052,7 +1080,7 @@ func (e *Engine) AddContainer(container *Container) error {
 	return nil
 }
 
-// Inject an image into the internal state.
+// addImage injects an image into the internal state.
 func (e *Engine) addImage(image *Image) {
 	e.Lock()
 	defer e.Unlock()
@@ -1060,7 +1088,7 @@ func (e *Engine) addImage(image *Image) {
 	e.images = append(e.images, image)
 }
 
-// Remove a container from the internal test.
+// removeContainer removes a container from the internal state.
 func (e *Engine) removeContainer(container *Container) error {
 	e.Lock()
 	defer e.Unlock()
@@ -1072,7 +1100,7 @@ func (e *Engine) removeContainer(container *Container) error {
 	return nil
 }
 
-// Wipes the internal container state.
+// cleanupContainers wipes the internal container state.
 func (e *Engine) cleanupContainers() {
 	e.Lock()
 	e.containers = make(map[string]*Container)
@@ -1080,8 +1108,8 @@ func (e *Engine) cleanupContainers() {
 }
 
 // StartContainer starts a container
-func (e *Engine) StartContainer(id string) error {
-	err := e.client.StartContainer(id, nil)
+func (e *Engine) StartContainer(id string, hostConfig *dockerclient.HostConfig) error {
+	err := e.client.StartContainer(id, hostConfig)
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
@@ -1107,10 +1135,13 @@ func (e *Engine) RenameContainer(container *Container, newName string) error {
 }
 
 // BuildImage builds an image
-func (e *Engine) BuildImage(buildImage *dockerclient.BuildImage) (io.ReadCloser, error) {
-	reader, err := e.client.BuildImage(buildImage)
+func (e *Engine) BuildImage(buildImage *types.ImageBuildOptions) (io.ReadCloser, error) {
+	resp, err := e.apiClient.ImageBuild(context.TODO(), *buildImage)
 	e.CheckConnectionErr(err)
-	return reader, err
+	if err != nil {
+		return nil, err
+	}
+	return resp.Body, nil
 }
 
 // TagImage tags an image

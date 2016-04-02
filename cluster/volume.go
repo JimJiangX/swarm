@@ -1,10 +1,10 @@
 package cluster
 
-import "github.com/samalba/dockerclient"
+import "github.com/docker/engine-api/types"
 
 // Volume is exported
 type Volume struct {
-	dockerclient.Volume
+	types.Volume
 
 	Engine *Engine
 }
@@ -12,7 +12,7 @@ type Volume struct {
 // Volumes represents an array of volumes
 type Volumes []*Volume
 
-// Get returns a volume using it's ID or Name
+// Get returns a volume using its ID or Name
 func (volumes Volumes) Get(name string) *Volume {
 	// Abort immediately if the name is empty.
 	if len(name) == 0 {

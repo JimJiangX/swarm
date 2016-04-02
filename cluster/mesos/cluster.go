@@ -14,6 +14,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/engine-api/types"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/mesos/task"
 	"github.com/docker/swarm/scheduler"
@@ -179,10 +180,10 @@ func (c *Cluster) UnregisterEventHandler(h cluster.EventHandler) {
 }
 
 // StartContainer starts a container
-func (c *Cluster) StartContainer(container *cluster.Container) error {
+func (c *Cluster) StartContainer(container *cluster.Container, hostConfig *dockerclient.HostConfig) error {
 	// if the container was started less than a second ago in detach mode, do not start it
 	if time.Now().Unix()-container.Created > 1 || container.Config.Labels[cluster.SwarmLabelNamespace+".mesos.detach"] != "true" {
-		return container.Engine.StartContainer(container.Id)
+		return container.Engine.StartContainer(container.Id, hostConfig)
 	}
 	return nil
 }
@@ -209,7 +210,7 @@ func (c *Cluster) CreateContainer(config *cluster.ContainerConfig, name string, 
 	}
 }
 
-// RemoveContainer to remove containers on mesos cluster
+// RemoveContainer removes containers on mesos cluster
 func (c *Cluster) RemoveContainer(container *cluster.Container, force, volumes bool) error {
 	c.scheduler.Lock()
 	defer c.scheduler.Unlock()
@@ -248,12 +249,12 @@ func (c *Cluster) Image(IDOrName string) *cluster.Image {
 }
 
 // RemoveImages removes images from the cluster
-func (c *Cluster) RemoveImages(name string, force bool) ([]*dockerclient.ImageDelete, error) {
+func (c *Cluster) RemoveImages(name string, force bool) ([]types.ImageDelete, error) {
 	return nil, errNotSupported
 }
 
 // CreateNetwork creates a network in the cluster
-func (c *Cluster) CreateNetwork(request *dockerclient.NetworkCreate) (*dockerclient.NetworkCreateResponse, error) {
+func (c *Cluster) CreateNetwork(request *types.NetworkCreate) (*types.NetworkCreateResponse, error) {
 	var (
 		parts  = strings.SplitN(request.Name, "/", 2)
 		config = &cluster.ContainerConfig{}
@@ -298,7 +299,7 @@ func (c *Cluster) refreshNetworks() {
 }
 
 // CreateVolume creates a volume in the cluster
-func (c *Cluster) CreateVolume(request *dockerclient.VolumeCreateRequest) (*cluster.Volume, error) {
+func (c *Cluster) CreateVolume(request *types.VolumeCreateRequest) (*cluster.Volume, error) {
 	return nil, errNotSupported
 }
 
@@ -357,11 +358,11 @@ func (c *Cluster) Container(IDOrName string) *cluster.Container {
 }
 
 // RemoveImage removes an image from the cluster
-func (c *Cluster) RemoveImage(image *cluster.Image) ([]*dockerclient.ImageDelete, error) {
+func (c *Cluster) RemoveImage(image *cluster.Image) ([]types.ImageDelete, error) {
 	return nil, errNotSupported
 }
 
-// Pull will pull images on the cluster nodes
+// Pull pulls images on the cluster nodes
 func (c *Cluster) Pull(name string, authConfig *dockerclient.AuthConfig, callback func(where, status string, err error)) {
 
 }
@@ -376,7 +377,7 @@ func (c *Cluster) Import(source string, repository string, tag string, imageRead
 
 }
 
-// RenameContainer Rename a container
+// RenameContainer renames a container
 func (c *Cluster) RenameContainer(container *cluster.Container, newName string) error {
 	//FIXME this doesn't work as the next refreshcontainer will erase this change (this change is in-memory only)
 	container.Config.Labels[cluster.SwarmLabelNamespace+".mesos.name"] = newName
@@ -403,7 +404,7 @@ func (c *Cluster) Volumes() cluster.Volumes {
 	return nil
 }
 
-// listNodes returns all the nodess in the cluster.
+// listNodes returns all the nodes in the cluster.
 func (c *Cluster) listNodes() []*node.Node {
 	c.RLock()
 	defer c.RUnlock()
@@ -434,7 +435,7 @@ func (c *Cluster) listOffers() []*mesosproto.Offer {
 	return list
 }
 
-// TotalMemory return the total memory of the cluster
+// TotalMemory returns the total memory of the cluster
 func (c *Cluster) TotalMemory() int64 {
 	c.RLock()
 	defer c.RUnlock()
@@ -445,7 +446,7 @@ func (c *Cluster) TotalMemory() int64 {
 	return totalMemory
 }
 
-// TotalCpus return the total memory of the cluster
+// TotalCpus returns the total memory of the cluster
 func (c *Cluster) TotalCpus() int {
 	c.RLock()
 	defer c.RUnlock()
@@ -511,7 +512,7 @@ func (c *Cluster) removeOffer(offer *mesosproto.Offer) bool {
 	return found
 }
 
-// LaunchTask method selects node and calls driver to launch a task
+// LaunchTask selects node and calls driver to launch a task
 func (c *Cluster) LaunchTask(t *task.Task) bool {
 	c.scheduler.Lock()
 	//change to explicit lock defer c.scheduler.Unlock()
@@ -529,7 +530,7 @@ func (c *Cluster) LaunchTask(t *task.Task) bool {
 		return true
 	}
 
-	// build the offer from it's internal config and set the agentID
+	// build the offer from its internal config and set the agentID
 
 	c.Lock()
 	// TODO: Only use the offer we need
@@ -604,7 +605,7 @@ func (c *Cluster) LaunchTask(t *task.Task) bool {
 		}
 	}
 
-	log.Debug("Cannot parse docker info from task status, please upgrade Mesos to the last version")
+	log.Debug("Cannot parse docker info from task status, please upgrade Mesos to the latest version")
 	// For mesos <= 0.22 we fallback to a full refresh + using labels
 	// TODO: once 0.23 or 0.24 is released, remove all this block of code as it
 	// doesn't scale very well.
@@ -638,13 +639,13 @@ func (c *Cluster) RANDOMENGINE() (*cluster.Engine, error) {
 	return c.agents[n.ID].engine, nil
 }
 
-// BuildImage build an image
-func (c *Cluster) BuildImage(buildImage *dockerclient.BuildImage, out io.Writer) error {
+// BuildImage builds an image
+func (c *Cluster) BuildImage(buildImage *types.ImageBuildOptions, out io.Writer) error {
 	c.scheduler.Lock()
 
 	// get an engine
 	config := &cluster.ContainerConfig{dockerclient.ContainerConfig{
-		CpuShares: buildImage.CpuShares,
+		CpuShares: buildImage.CPUShares,
 		Memory:    buildImage.Memory,
 	}}
 	nodes, err := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
@@ -667,7 +668,7 @@ func (c *Cluster) BuildImage(buildImage *dockerclient.BuildImage, out io.Writer)
 	return nil
 }
 
-// TagImage tag an image
+// TagImage tags an image
 func (c *Cluster) TagImage(IDOrName string, repo string, tag string, force bool) error {
 	return errNotSupported
 }

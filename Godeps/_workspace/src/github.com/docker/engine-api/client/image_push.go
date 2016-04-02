@@ -10,7 +10,7 @@ import (
 	"github.com/docker/engine-api/types"
 )
 
-// ImagePush request the docker host to push an image to a remote registry.
+// ImagePush requests the docker host to push an image to a remote registry.
 // It executes the privileged function if the operation is unauthorized
 // and it tries one more time.
 // It's up to the caller to handle the io.ReadCloser and close it properly.
@@ -34,5 +34,5 @@ func (cli *Client) ImagePush(ctx context.Context, options types.ImagePushOptions
 
 func (cli *Client) tryImagePush(ctx context.Context, imageID string, query url.Values, registryAuth string) (*serverResponse, error) {
 	headers := map[string][]string{"X-Registry-Auth": {registryAuth}}
-	return cli.postWithContext(ctx, "/images/"+imageID+"/push", query, nil, headers)
+	return cli.post(ctx, "/images/"+imageID+"/push", query, nil, headers)
 }

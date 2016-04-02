@@ -1,5 +1,53 @@
 # Changelog
 
+## 1.2.0 (2016-04-01)
+
+#### Scheduler
+
+- Move rescheduling out of experimental
+- Differentiate constraint errors from affinity errors
+- Printing unsatisfiable constraints for container scheduling failure
+- Enable rescheduling on master manager to prevent replica managers from rescheduling containers
+- Output error when starting a rescheduled container fails
+
+#### API
+
+- Introduce engine-api client to Swarm
+- Implement 'info' and 'version' with engine-api
+- Use apiClient for some volume, network, image operations
+- Print engine version in Info
+- Fix swarm api response status code
+- Support ps node filter
+- Fix HostConfig for /start endpoint
+- Print container 'created' state at ps
+- Update dockerclient to get labels on volumes, networks, images
+- Support private images, labels and other new flags in docker build
+
+#### Node management
+
+- Prevent crash on channel double close
+- Manager retries EventMonitoring on failure.
+- Docker engine updates hostname/domainname
+- Force inspect for containers in Restarting state.
+- Increase max thread count to 50k to accommodate large cluster or heavy workload
+- Force to validate min and max refresh interval to be positive
+- Skip unstable tests from Docker bug 14203
+
+#### Mesos integration
+
+- Support rescind offer in swarm
+- Update mesos tests
+
+#### Misc
+
+- Skip redundant endpoints in "network inspect"
+- Remove parameter which is not used in createDiscovery
+- Validate duration flags:--delay, --timeout, --replication-ttl
+- Fix image matching via id
+- Make port 0 invalid as listening port
+- Improve volume inspect test
+- Add read lock for eventsHandler when only it is necessary
+
 ## 1.1.3 (2016-03-03)
 
 - Fix missing HostConfig for rescheduled containers
