@@ -185,11 +185,13 @@ func getImagesJSON(c *context, w http.ResponseWriter, r *http.Request) {
 	accepteds := filters.Get("node")
 	// this struct helps grouping images
 	// but still keeps their Engine infos as an array.
-	groupImages := make(map[string]dockerclient.Image)
+	groupImages := make(map[string]apitypes.Image)
 	opts := cluster.ImageFilterOptions{
-		All:        boolValue(r, "all"),
-		NameFilter: r.FormValue("filter"),
-		Filters:    filters,
+		apitypes.ImageListOptions{
+			All:       boolValue(r, "all"),
+			MatchName: r.FormValue("filter"),
+			Filters:   filters,
+		},
 	}
 	for _, image := range c.cluster.Images().Filter(opts) {
 		if len(accepteds) != 0 {
@@ -206,16 +208,16 @@ func getImagesJSON(c *context, w http.ResponseWriter, r *http.Request) {
 		}
 
 		// grouping images by Id, and concat their RepoTags
-		if entry, existed := groupImages[image.Id]; existed {
+		if entry, existed := groupImages[image.ID]; existed {
 			entry.RepoTags = append(entry.RepoTags, image.RepoTags...)
 			entry.RepoDigests = append(entry.RepoDigests, image.RepoDigests...)
-			groupImages[image.Id] = entry
+			groupImages[image.ID] = entry
 		} else {
-			groupImages[image.Id] = image.Image
+			groupImages[image.ID] = image.Image
 		}
 	}
 
-	images := []dockerclient.Image{}
+	images := []apitypes.Image{}
 
 	for _, image := range groupImages {
 		// de-duplicate RepoTags
@@ -589,7 +591,7 @@ func deleteContainers(c *context, w http.ResponseWriter, r *http.Request) {
 
 // POST /networks/create
 func postNetworksCreate(c *context, w http.ResponseWriter, r *http.Request) {
-	var request dockerclient.NetworkCreate
+	var request apitypes.NetworkCreate
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		httpError(w, err.Error(), http.StatusBadRequest)
@@ -704,7 +706,7 @@ func postImagesCreate(c *context, w http.ResponseWriter, r *http.Request) {
 // POST /images/load
 func postImagesLoad(c *context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusOK)
 
 	// call cluster to load image on every node
 	wf := NewWriteFlusher(w)
@@ -949,7 +951,7 @@ func proxyNetworkDisconnect(c *context, w http.ResponseWriter, r *http.Request) 
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(buf))
 
 	// Extract container info from r.Body copy
-	var disconnect dockerclient.NetworkDisconnect
+	var disconnect apitypes.NetworkDisconnect
 	if err := json.NewDecoder(bodyCopy).Decode(&disconnect); err != nil {
 		httpError(w, fmt.Sprintf("Container is not specified"), http.StatusNotFound)
 		return
@@ -1005,7 +1007,7 @@ func proxyNetworkConnect(c *context, w http.ResponseWriter, r *http.Request) {
 	r.Body = ioutil.NopCloser(bytes.NewBuffer(buf))
 
 	// Extract container info from r.Body copy
-	var connect dockerclient.NetworkConnect
+	var connect apitypes.NetworkConnect
 	if err := json.NewDecoder(bodyCopy).Decode(&connect); err != nil {
 		httpError(w, fmt.Sprintf("Container is not specified"), http.StatusNotFound)
 		return
@@ -1153,6 +1155,7 @@ func postTagImage(c *context, w http.ResponseWriter, r *http.Request) {
 			httpError(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
+	w.WriteHeader(http.StatusCreated)
 }
 
 // Proxy a request to a random node
@@ -1298,6 +1301,7 @@ func postRenameContainer(c *context, w http.ResponseWriter, r *http.Request) {
 			httpError(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
+	w.WriteHeader(http.StatusNoContent)
 
 }
 

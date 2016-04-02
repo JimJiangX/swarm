@@ -39,7 +39,7 @@ type Cluster interface {
 	Networks() Networks
 
 	// Create a network
-	CreateNetwork(request *dockerclient.NetworkCreate) (*dockerclient.NetworkCreateResponse, error)
+	CreateNetwork(request *types.NetworkCreate) (*types.NetworkCreateResponse, error)
 
 	// Remove a network from the cluster
 	RemoveNetwork(network *Network) error
@@ -71,7 +71,7 @@ type Cluster interface {
 	// `status` is the current status, like "", "in progress" or "loaded"
 	Load(imageReader io.Reader, callback func(what, status string, err error))
 
-	// Return some info about the cluster, like nb or containers / images
+	// Return some info about the cluster, like nb of containers / images
 	// It is pretty open, so the implementation decides what to return.
 	Info() [][2]string
 
@@ -91,12 +91,12 @@ type Cluster interface {
 	// Return a random engine
 	RANDOMENGINE() (*Engine, error)
 
-	// RenameContainer rename a container
+	// Rename a container
 	RenameContainer(container *Container, newName string) error
 
-	// BuildImage build an image
+	// Build an image
 	BuildImage(*types.ImageBuildOptions, io.Writer) error
 
-	// TagImage tag an image
+	// Tag an image
 	TagImage(IDOrName string, repo string, tag string, force bool) error
 }

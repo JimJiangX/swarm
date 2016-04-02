@@ -254,7 +254,7 @@ func (c *Cluster) RemoveImages(name string, force bool) ([]types.ImageDelete, er
 }
 
 // CreateNetwork creates a network in the cluster
-func (c *Cluster) CreateNetwork(request *dockerclient.NetworkCreate) (*dockerclient.NetworkCreateResponse, error) {
+func (c *Cluster) CreateNetwork(request *types.NetworkCreate) (*types.NetworkCreateResponse, error) {
 	var (
 		parts  = strings.SplitN(request.Name, "/", 2)
 		config = &cluster.ContainerConfig{}
@@ -605,7 +605,7 @@ func (c *Cluster) LaunchTask(t *task.Task) bool {
 		}
 	}
 
-	log.Debug("Cannot parse docker info from task status, please upgrade Mesos to the last version")
+	log.Debug("Cannot parse docker info from task status, please upgrade Mesos to the latest version")
 	// For mesos <= 0.22 we fallback to a full refresh + using labels
 	// TODO: once 0.23 or 0.24 is released, remove all this block of code as it
 	// doesn't scale very well.
