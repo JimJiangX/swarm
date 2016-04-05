@@ -18,12 +18,10 @@ type Module struct {
 
 	Config dockerclient.ContainerConfig
 
-	StoreType string
-	StoreSize int
+	stores []DiskStorage
 }
 
-func (m Module) Store() (string, int) {
-
-	return m.StoreType, m.StoreSize
-
+type DiskStorage struct {
+	Type string // "local\ssd\san"
+	Size int
 }

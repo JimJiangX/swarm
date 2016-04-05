@@ -54,7 +54,8 @@ func (region *Region) serviceScheduler() (err error) {
 				goto failure
 			}
 
-			storeType, storeSize := module.Store()
+			// TODO:fix later
+			storeType, storeSize := "", 0
 			filters := region.listShortIdleStore(storeType, module.Num, storeSize)
 			list := region.listCandidateNodes(module.Nodes, module.Type, filters...)
 
