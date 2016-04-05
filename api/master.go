@@ -2,28 +2,63 @@ package api
 
 import (
 	"net/http"
+	"time"
+
+	goctx "golang.org/x/net/context"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster/swarm"
 	"github.com/gorilla/mux"
 )
 
-// Master router context, used by handlers.
-type mcontext struct {
-	context
-	region *swarm.Region
+const enableMaster = true
+
+func (*context) Deadline() (deadline time.Time, ok bool) {
+	return
 }
 
-type mhandler func(c *mcontext, w http.ResponseWriter, r *http.Request)
+func (*context) Done() <-chan struct{} {
+	return nil
+}
 
-var mroutes = map[string]map[string]mhandler{
+func (*context) Err() error {
+	return nil
+}
+
+func (ctx *context) Value(key interface{}) interface{} {
+	return ctx
+}
+
+func fromContext(ctx goctx.Context) (bool, *context, *swarm.Region) {
+	c, ok := ctx.Value(nil).(*context)
+	if !ok {
+		return false, nil, nil
+	}
+
+	r, ok := c.cluster.(*swarm.Region)
+
+	if !ok {
+		return false, c, nil
+	}
+
+	return true, c, r
+}
+
+type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
+
+var masterRoutes = map[string]map[string]ctxHandler{
 	"POST": {
 		"/cluster": postCluster,
 	},
 }
 
-func setupMasterRouter(r *mux.Router, context *mcontext, enableCors bool) {
-	for method, mappings := range mroutes {
+func setupMasterRouter(r *mux.Router, ctx goctx.Context, enableCors bool) {
+	ok, context, _ := fromContext(ctx)
+	if !ok {
+		return
+	}
+
+	for method, mappings := range masterRoutes {
 		for route, fct := range mappings {
 			log.WithFields(log.Fields{"method": method, "route": route}).Debug("Registering HTTP route")
 
@@ -54,7 +89,7 @@ func setupMasterRouter(r *mux.Router, context *mcontext, enableCors bool) {
 						writeCorsHeaders(w, r)
 					}
 					context.apiVersion = mux.Vars(r)["version"]
-					optionsFct(&context.context, w, r)
+					optionsFct(context, w, r)
 				}
 
 				r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).

@@ -2,8 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+
+	goctx "golang.org/x/net/context"
 
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -11,8 +14,10 @@ import (
 	"github.com/docker/swarm/utils"
 )
 
+var UnsupportRegion = errors.New("Unsupported Region")
+
 // POST /cluster
-func postCluster(ctx *mcontext, w http.ResponseWriter, r *http.Request) {
+func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	var (
 		req    = structs.PostClusterRequest{}
 		stores = make([]store.Store, 0, 2)
@@ -23,8 +28,13 @@ func postCluster(ctx *mcontext, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ok, _, region := fromContext(ctx)
+	if !ok && region == nil {
+		httpError(w, UnsupportRegion.Error(), http.StatusInternalServerError)
+	}
+
 	if req.StorageType != "local" && req.StorageID != "" {
-		store, err := ctx.region.GetStore(req.StorageID)
+		store, err := region.GetStore(req.StorageID)
 		if err == nil && store != nil {
 			stores = append(stores, store)
 		}
@@ -42,7 +52,7 @@ func postCluster(ctx *mcontext, w http.ResponseWriter, r *http.Request) {
 		UsageLimit:  req.UsageLimit,
 	}
 
-	err := ctx.region.AddDatacenter(cluster, stores)
+	err := region.AddDatacenter(cluster, stores)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
