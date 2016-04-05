@@ -2,17 +2,15 @@ package store
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
 )
+
+const HITACHI = "HITACHI"
 
 type hitachiStore struct {
 	lock *sync.RWMutex
@@ -75,11 +73,26 @@ func (h *hitachiStore) Alloc(size int) (string, int, error) {
 		return "", 0, fmt.Errorf("No available LUN ID")
 	}
 
-	path, err := getAbsolutePath("HITACHI", "create_lun.sh")
+	uuid := utils.Generate32UUID()
+	lun := database.LUN{
+		ID:              uuid,
+		Name:            "DBAAS_" + string(uuid[:8]),
+		RaidGroupID:     rg.ID,
+		StorageSystemID: h.ID(),
+		SizeByte:        size,
+		StorageLunID:    id,
+		CreatedAt:       time.Now(),
+	}
+
+	err = database.InsertLUN(lun)
+	if err != nil {
+		return "", 0, err
+	}
+
+	path, err := getAbsolutePath(HITACHI, "create_lun.sh")
 
 	param := []string{path, h.hs.AdminUnit,
-		strconv.Itoa(rg.StorageRGID),
-		strconv.Itoa(id), strconv.Itoa(int(size))}
+		strconv.Itoa(rg.StorageRGID), strconv.Itoa(id), strconv.Itoa(int(size))}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
@@ -93,22 +106,6 @@ func (h *hitachiStore) Alloc(size int) (string, int, error) {
 
 	fmt.Println("Exec Script Error:%s,Output:%s", err, string(output))
 
-	uuid := utils.Generate32UUID()
-	lun := database.LUN{
-		ID:              uuid,
-		Name:            string(uuid[:8]),
-		RaidGroupID:     rg.ID,
-		StorageSystemID: h.ID(),
-		SizeByte:        size,
-		StorageLunID:    id,
-		CreatedAt:       time.Now(),
-	}
-
-	err = database.InsertLUN(lun)
-	if err != nil {
-		return "", 0, err
-	}
-
 	return lun.ID, lun.StorageLunID, nil
 }
 
@@ -121,7 +118,7 @@ func (h *hitachiStore) Recycle(lun int) error {
 		return err
 	}
 
-	path, err := getAbsolutePath("HITACHI", "del_lun.sh")
+	path, err := getAbsolutePath(HITACHI, "del_lun.sh")
 	if err != nil {
 		return err
 	}
@@ -133,14 +130,14 @@ func (h *hitachiStore) Recycle(lun int) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-
+		return err
 	}
 
 	fmt.Println("Exec Script Error:%s,Output:%s", err, string(output))
 
 	err = database.DelLUN(l.ID)
 
-	return nil
+	return err
 }
 
 func (h hitachiStore) idleSize() (map[*database.RaidGroup]space, error) {
@@ -190,7 +187,7 @@ func (h *hitachiStore) List(rg ...int) ([]space, error) {
 		list = intSliceToString(rg, " ")
 	}
 
-	path, err := getAbsolutePath("HITACHI", "listrg.sh")
+	path, err := getAbsolutePath(HITACHI, "listrg.sh")
 	if err != nil {
 		return nil, err
 	}
@@ -233,15 +230,16 @@ func (h hitachiStore) IdleSize() (map[int]int, error) {
 }
 
 func (h *hitachiStore) AddHost(name string, wwwn []string) error {
-	path, err := getAbsolutePath("HITACHI", "add_host.sh")
+	path, err := getAbsolutePath(HITACHI, "add_host.sh")
 	if err != nil {
 		return err
 	}
-	param := []string{path, h.hs.AdminUnit, name}
-	param = append(param, wwwn...)
 
 	h.lock.Lock()
 	defer h.lock.Unlock()
+
+	param := []string{path, h.hs.AdminUnit, name}
+	param = append(param, wwwn...)
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
@@ -259,16 +257,16 @@ func (h *hitachiStore) AddHost(name string, wwwn []string) error {
 }
 
 func (h *hitachiStore) DelHost(name string, wwwn []string) error {
-	path, err := getAbsolutePath("HITACHI", "del_host.sh")
+	path, err := getAbsolutePath(HITACHI, "del_host.sh")
 	if err != nil {
 		return err
 	}
 
-	param := []string{path, h.hs.AdminUnit, name}
-	param = append(param, wwwn...)
-
 	h.lock.Lock()
 	defer h.lock.Unlock()
+
+	param := []string{path, h.hs.AdminUnit, name}
+	param = append(param, wwwn...)
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
@@ -309,7 +307,7 @@ func (h *hitachiStore) Mapping(host, unit, lun string) error {
 		return err
 	}
 
-	path, err := getAbsolutePath("HITACHI", "create_lunmap.sh")
+	path, err := getAbsolutePath(HITACHI, "create_lunmap.sh")
 	if err != nil {
 		return err
 	}
@@ -336,7 +334,7 @@ func (h *hitachiStore) DelMapping(lun string) error {
 		return err
 	}
 
-	path, err := getAbsolutePath("HITACHI", "del_lunmap.sh")
+	path, err := getAbsolutePath(HITACHI, "del_lunmap.sh")
 	if err != nil {
 		return err
 	}
@@ -369,6 +367,20 @@ func (h *hitachiStore) AddSpace(id int) (int, error) {
 		return 0, fmt.Errorf("RaidGroup %d is Exist", id)
 	}
 
+	// scan RaidGroup info
+	h.lock.RLock()
+	defer h.lock.RUnlock()
+
+	spaces, err := h.List(id)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(spaces) != 1 {
+
+		return 0, fmt.Errorf("Error happens when scan space %d", id)
+	}
+
 	rg := database.RaidGroup{
 		ID:          utils.Generate32UUID(),
 		StorageID:   h.ID(),
@@ -381,27 +393,15 @@ func (h *hitachiStore) AddSpace(id int) (int, error) {
 		return 0, err
 	}
 
-	// scan RaidGroup info
-
-	h.lock.RLock()
-	defer h.lock.RUnlock()
-
-	spaces, err := h.List(id)
-
-	if err != nil {
-		return 0, err
-	}
-
-	if len(spaces) == 1 {
-		return spaces[0].free, nil
-	}
-
-	return 0, fmt.Errorf("Error happens when scan space %d", id)
+	return spaces[0].free, nil
 }
 
 func (h *hitachiStore) EnableSpace(id int) error {
+	h.lock.Lock()
 
 	err := database.UpdateRaidGroupStatus(h.ID(), id, true)
+
+	h.lock.Unlock()
 
 	return err
 }
@@ -414,120 +414,4 @@ func (h *hitachiStore) DisableSpace(id int) error {
 	h.lock.Unlock()
 
 	return err
-}
-
-func findIdleNum(min, max int, filter []int) (bool, int) {
-	sort.Sort(sort.IntSlice(filter))
-
-loop:
-	for val := min; val <= max; val++ {
-
-		for _, in := range filter {
-			if val == in {
-				continue loop
-			}
-		}
-
-		return true, val
-	}
-
-	return false, 0
-}
-
-func intSliceToString(input []int, sep string) string {
-
-	a := make([]string, len(input))
-	for i, v := range input {
-		a[i] = strconv.Itoa(v)
-	}
-
-	return strings.Join(a, sep)
-}
-
-func maxIdleSizeRG(m map[*database.RaidGroup]space) *database.RaidGroup {
-	var (
-		key *database.RaidGroup
-		max int
-	)
-
-	for k, val := range m {
-		if val.free > max {
-			max = val.free
-			key = k
-		}
-	}
-
-	return key
-}
-
-func getAbsolutePath(path ...string) (string, error) {
-	root, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	abs := filepath.Join(root, filepath.Join(path...))
-
-	finfo, err := os.Stat(abs)
-	if err != nil || os.IsNotExist(err) {
-		// no such file or dir
-		return "", err
-	}
-
-	if !finfo.IsDir() {
-		// it's a directory
-		return "", fmt.Errorf("%s is a directory", abs)
-	}
-
-	return abs, nil
-}
-
-type space struct {
-	id     int
-	total  int
-	free   int
-	state  string
-	lunNum int
-}
-
-func parseSpace(output string) []space {
-	var (
-		spaces []space
-		lines  = strings.Split(output, "\n") // lines
-	)
-
-	for i := range lines {
-
-		part := strings.Split(lines[i], " ")
-
-		if len(part) == 5 {
-			var (
-				space = space{}
-				err   error
-			)
-			space.id, err = strconv.Atoi(part[0])
-			if err != nil {
-				continue
-			}
-			space.total, err = strconv.Atoi(part[1])
-			if err != nil {
-				continue
-			}
-			space.free, err = strconv.Atoi(part[2])
-			if err != nil {
-				continue
-			}
-
-			space.state = part[3]
-
-			space.lunNum, err = strconv.Atoi(part[4])
-			if err != nil {
-				continue
-			}
-
-			spaces = append(spaces, space)
-		}
-	}
-
-	return spaces
 }

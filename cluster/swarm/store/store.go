@@ -1,5 +1,9 @@
 package store
 
+import (
+	"strings"
+)
+
 var stores map[string]Store = make(map[string]Store)
 
 type Store interface {
@@ -27,15 +31,13 @@ type Store interface {
 func RegisterStore(id, vendor, addr, user, password, admin string,
 	lstart, lend, hstart, hend int) (store Store, err error) {
 
-	if vendor == "huawei" {
+	if v := strings.ToUpper(vendor); v == HUAWEI {
 		store = NewHuaweiStore(id, vendor, addr, user, password, hstart, hend)
-		err = store.Insert()
-
-	} else if vendor == "hitachi" {
+	} else if v == HITACHI {
 		store = NewHitachiStore(id, vendor, admin, lstart, lend, hstart, hend)
-		err = store.Insert()
 	}
 
+	err = store.Insert()
 	if err != nil {
 		return nil, err
 	}
