@@ -43,25 +43,6 @@ func (bf BackupFile) TableName() string {
 	return "tb_backup_file"
 }
 
-type BackupStrategy struct {
-	ID          string        `db:"id"`
-	Type        string        `db:"type"` // full/part
-	Spec        string        `db:"spec"`
-	Next        time.Time     `db:"next"`
-	Valid       time.Time     `db:"valid"`
-	Enabled     bool          `db:"enabled"`
-	BackupDir   string        `db:"backup_dir"`
-	MaxSizeByte int64         `db:"max_size"`
-	Retention   time.Duration `db:"retention"`
-	Timeout     time.Duration `db:"timeout"`
-	Status      byte          `db:"status"`
-	CreatedAt   time.Time     `db:"create_at"`
-}
-
-func (bs BackupStrategy) TableName() string {
-	return "tb_backup_strategy"
-}
-
 func NewTask(name, relate, linkto, des string, labels []string, timeout time.Duration) *Task {
 	return &Task{
 		ID:          utils.Generate64UUID(),
@@ -142,4 +123,57 @@ func QueryTask(id string) (*Task, error) {
 	err = db.QueryRowx("SELECT * FROM tb_task WHERE id=?", id).StructScan(t)
 
 	return t, err
+}
+
+type BackupStrategy struct {
+	ID          string        `db:"id"`
+	Type        string        `db:"type"` // full/part
+	Spec        string        `db:"spec"`
+	Next        time.Time     `db:"next"`
+	Valid       time.Time     `db:"valid"`
+	Enabled     bool          `db:"enabled"`
+	BackupDir   string        `db:"backup_dir"`
+	MaxSizeByte int64         `db:"max_size"`
+	Retention   time.Duration `db:"retention"`
+	Timeout     time.Duration `db:"timeout"`
+	Status      byte          `db:"status"`
+	CreatedAt   time.Time     `db:"create_at"`
+}
+
+func (bs BackupStrategy) TableName() string {
+	return "tb_backup_strategy"
+}
+
+func GetBackupStrategy(id string) (*BackupStrategy, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	strategy := &BackupStrategy{}
+	query := "SELECT * FROM tb_backup_strategy WHERE id=?"
+
+	err = db.QueryRowx(query, id).StructScan(strategy)
+	if err != nil {
+		return nil, err
+	}
+
+	return strategy, nil
+}
+
+func (bs *BackupStrategy) UpdateNext(next time.Time, enable bool, state byte) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	query := "UPDATE tb_backup_strategy SET next=?,enabled=?,status=? WHERE id=?"
+	_, err = db.Exec(query, next, enable, state, bs.ID)
+	if err == nil {
+		bs.Next = next
+		bs.Enabled = enable
+		bs.Status = state
+	}
+
+	return err
 }

@@ -244,6 +244,48 @@ func (hs *HuaweiStorage) Insert() error {
 	return err
 }
 
+type LocalVolume struct {
+	ID         string `db:"id"`
+	Name       string `db:"name"`
+	Size       int    `db:"size"`
+	VGName     string `db:"VGname"`
+	Driver     string `db:"driver"`
+	Filesystem string `db:"fstype"`
+}
+
+func (LocalVolume) TableName() string {
+	return "tb_volumes"
+}
+
+func InsertLocalVolume(lv LocalVolume) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	query := "INSERT INTO tb_volumes (id,name,size,VGname,driver,fstype) VALUES (:id,:name,:size,:VGname,:driver,:fstype)"
+	_, err = db.NamedExec(query, &lv)
+
+	return err
+}
+
+func SelectVolumeByVG(name string) ([]LocalVolume, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	lvs := []LocalVolume{}
+	query := "SELECT * FROM tb_volumes WHERE VGname=?"
+
+	err = db.Select(&lvs, query, name)
+	if err != nil {
+		return nil, err
+	}
+
+	return lvs, nil
+}
+
 /*
 type Volume struct {
 	Name     string `db:"id"`
