@@ -49,7 +49,7 @@ func (h *hitachiStore) Insert() error {
 	return h.hs.Insert()
 }
 
-func (h *hitachiStore) Alloc(size int) (string, int, error) {
+func (h *hitachiStore) Alloc(_ string, size int) (string, int, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -211,7 +211,7 @@ func (h *hitachiStore) List(rg ...int) ([]space, error) {
 	return spaces, nil
 }
 
-func (h hitachiStore) IdleSize() (map[int]int, error) {
+func (h hitachiStore) IdleSize() ([]int, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
@@ -220,10 +220,10 @@ func (h hitachiStore) IdleSize() (map[int]int, error) {
 		return nil, err
 	}
 
-	out := make(map[int]int)
-
-	for key, val := range rg {
-		out[key.StorageRGID] = val.free
+	out, i := make([]int, len(rg)), 0
+	for _, val := range rg {
+		out[i] = val.free
+		i++
 	}
 
 	return out, nil

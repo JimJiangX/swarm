@@ -55,7 +55,7 @@ func (h *huaweiStore) Insert() error {
 	return err
 }
 
-func (h *huaweiStore) Alloc(size int) (string, int, error) {
+func (h *huaweiStore) Alloc(_ string, size int) (string, int, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -142,7 +142,7 @@ func (h *huaweiStore) Recycle(lun int) error {
 	return err
 }
 
-func (h huaweiStore) IdleSize() (map[int]int, error) {
+func (h huaweiStore) IdleSize() ([]int, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
@@ -151,10 +151,10 @@ func (h huaweiStore) IdleSize() (map[int]int, error) {
 		return nil, err
 	}
 
-	out := make(map[int]int)
-
-	for key, val := range rg {
-		out[key.StorageRGID] = val.free
+	out, i := make([]int, len(rg)), 0
+	for _, val := range rg {
+		out[i] = val.free
+		i++
 	}
 
 	return out, nil

@@ -10,15 +10,15 @@ type Store interface {
 	ID() string
 	Vendor() string
 	Driver() string
-	IdleSize() (map[int]int, error)
+	IdleSize() ([]int, error)
 
 	Insert() error
 
 	AddHost(name string, wwwn []string) error
 	DelHost(name string, wwwn []string) error
 
-	Alloc(size int) (string, int, error) // create LUN
-	Recycle(lun int) error               // delete LUN
+	Alloc(name string, size int) (string, int, error) // create LUN
+	Recycle(lun int) error                            // delete LUN
 
 	Mapping(host, unit, lun string) error
 	DelMapping(lun string) error
@@ -35,6 +35,8 @@ func RegisterStore(id, vendor, addr, user, password, admin string,
 		store = NewHuaweiStore(id, vendor, addr, user, password, hstart, hend)
 	} else if v == HITACHI {
 		store = NewHitachiStore(id, vendor, admin, lstart, lend, hstart, hend)
+	} else if vendor == LocalDisk {
+
 	}
 
 	err = store.Insert()
