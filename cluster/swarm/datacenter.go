@@ -30,9 +30,9 @@ type Datacenter struct {
 	nodes []*database.Node
 }
 
-func (r *Region) AddDatacenter(cl database.Cluster, stores []store.Store) error {
+func (gd *Gardener) AddDatacenter(cl database.Cluster, stores []store.Store) error {
 	if cl.ID == "" {
-		cl.ID = r.generateUniqueID()
+		cl.ID = gd.generateUniqueID()
 	}
 
 	log.WithFields(log.Fields{
@@ -57,9 +57,9 @@ func (r *Region) AddDatacenter(cl database.Cluster, stores []store.Store) error 
 		nodes:   make([]*database.Node, 0, 100),
 	}
 
-	r.Lock()
-	r.datacenters = append(r.datacenters, dc)
-	r.Unlock()
+	gd.Lock()
+	gd.datacenters = append(gd.datacenters, dc)
+	gd.Unlock()
 
 	log.Infof("Datacenter Initialized:%s", dc.Name)
 
@@ -147,35 +147,35 @@ func (dc *Datacenter) listNodeID() []string {
 	return out
 }
 
-func (r *Region) DatacenterByNode(IDOrName string) (*Datacenter, error) {
-	r.RLock()
+func (gd *Gardener) DatacenterByNode(IDOrName string) (*Datacenter, error) {
+	gd.RLock()
 
-	for i := range r.datacenters {
+	for i := range gd.datacenters {
 
-		if r.datacenters[i].isNodeExist(IDOrName) {
-			r.RUnlock()
+		if gd.datacenters[i].isNodeExist(IDOrName) {
+			gd.RUnlock()
 
-			return r.datacenters[i], nil
+			return gd.datacenters[i], nil
 		}
 	}
 
-	r.RUnlock()
+	gd.RUnlock()
 
 	node, err := database.GetNode(IDOrName)
 	if err != nil {
 		return nil, err
 	}
 
-	r.RLock()
-	for i := range r.datacenters {
-		if r.datacenters[i].ID == node.ClusterID {
-			r.RUnlock()
+	gd.RLock()
+	for i := range gd.datacenters {
+		if gd.datacenters[i].ID == node.ClusterID {
+			gd.RUnlock()
 
-			return r.datacenters[i], nil
+			return gd.datacenters[i], nil
 		}
 	}
 
-	r.RUnlock()
+	gd.RUnlock()
 
 	return nil, errors.New("Datacenter Not Found")
 }
@@ -230,18 +230,18 @@ func (dc *Datacenter) AllocStore(host, IDOrType string, size int64) error {
 	return err
 }
 
-func (r *Region) listShortIdleStore(IDOrType string, num, size int) []string {
+func (gd *Gardener) listShortIdleStore(IDOrType string, num, size int) []string {
 	if IDOrType == LocalDiskStore {
 		return nil
 	}
 
 	out := make([]string, 0, 100)
-	r.RLock()
-	defer r.RUnlock()
+	gd.RLock()
+	defer gd.RUnlock()
 
-	for i := range r.datacenters {
-		if !r.datacenters[i].isIdleStoreEnough(IDOrType, num, size) {
-			out = append(out, r.datacenters[i].ID)
+	for i := range gd.datacenters {
+		if !gd.datacenters[i].isIdleStoreEnough(IDOrType, num, size) {
+			out = append(out, gd.datacenters[i].ID)
 		}
 	}
 

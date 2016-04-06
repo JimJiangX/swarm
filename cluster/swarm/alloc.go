@@ -9,13 +9,13 @@ import (
 	"github.com/docker/swarm/cluster/swarm/database"
 )
 
-func (region *Region) allocResource(preAlloc *preAllocResource, engine *cluster.Engine, config cluster.ContainerConfig, Type string) (*cluster.ContainerConfig, error) {
+func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.Engine, config cluster.ContainerConfig, Type string) (*cluster.ContainerConfig, error) {
 	constraint := fmt.Sprintf("constraint:node==%s", engine.ID)
 	config.Env = append(config.Env, constraint)
 	config.Hostname = engine.ID
 	config.Domainname = engine.Name
 
-	networkings, err := region.getNetworkingSetting(engine, Type, "")
+	networkings, err := gd.getNetworkingSetting(engine, Type, "")
 	preAlloc.networkings = append(preAlloc.networkings, networkings...)
 
 	if err != nil {
@@ -48,7 +48,7 @@ func (region *Region) allocResource(preAlloc *preAllocResource, engine *cluster.
 	config.HostConfig.CpusetCpus = cpuset
 
 	// TODO:Alloc Volume
-	bind, err := region.allocStorage(engine, "", "", 0)
+	bind, err := gd.allocStorage(engine, "", "", 0)
 	config.HostConfig.Binds = append(config.HostConfig.Binds, bind)
 
 	return &config, nil
@@ -127,23 +127,23 @@ func (pre *preAllocResource) consistency() (err error) {
 	return tx.Commit()
 }
 
-func (r *Region) Recycle(pendings []*preAllocResource) (err error) {
+func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Panic:%v;%s", r, err)
 		}
 	}()
 
-	r.scheduler.Lock()
+	gd.scheduler.Lock()
 	for i := range pendings {
 		if pendings[i] == nil {
 			continue
 		}
 
 		swarmID := pendings[i].pendingContainer.Config.SwarmID()
-		delete(r.pendingContainers, swarmID)
+		delete(gd.pendingContainers, swarmID)
 	}
-	r.scheduler.Unlock()
+	gd.scheduler.Unlock()
 
 	db, err := database.GetDB(true)
 	if err != nil {
@@ -156,10 +156,10 @@ func (r *Region) Recycle(pendings []*preAllocResource) (err error) {
 	}
 	defer tx.Rollback()
 
-	r.Lock()
+	gd.Lock()
 
 	for i := range pendings {
-		ipsStatus := r.recycleNetworking(pendings[i])
+		ipsStatus := gd.recycleNetworking(pendings[i])
 
 		database.TxUpdateMultiIPStatue(tx, ipsStatus)
 
@@ -174,35 +174,35 @@ func (r *Region) Recycle(pendings []*preAllocResource) (err error) {
 		database.TxUpdatePorts(tx, ports)
 	}
 
-	r.Unlock()
+	gd.Unlock()
 
 	return tx.Commit()
 }
 
-func (r *Region) recycleNetworking(pre *preAllocResource) []database.IPStatus {
+func (gd *Gardener) recycleNetworking(pre *preAllocResource) []database.IPStatus {
 	// networking recycle
 	ipsStatus := make([]database.IPStatus, 0, 10)
 
 	for i := range pre.networkings {
 
 	loop:
-		for n := range r.networkings {
+		for n := range gd.networkings {
 
-			if r.networkings[n].ID != pre.networkings[i].Networking ||
-				r.networkings[n].Prefix != pre.networkings[i].Prefix {
+			if gd.networkings[n].ID != pre.networkings[i].Networking ||
+				gd.networkings[n].Prefix != pre.networkings[i].Prefix {
 
 				continue loop
 			}
 
-			for ip := range r.networkings[n].pool {
+			for ip := range gd.networkings[n].pool {
 
-				if r.networkings[n].pool[ip].ip == pre.networkings[i].ipuint32 {
-					r.networkings[n].pool[ip].allocated = false
+				if gd.networkings[n].pool[ip].ip == pre.networkings[i].ipuint32 {
+					gd.networkings[n].pool[ip].allocated = false
 
 					ipsStatus = append(ipsStatus, database.IPStatus{
 						IP:        pre.networkings[i].ipuint32,
 						Prefix:    pre.networkings[i].Prefix,
-						Allocated: r.networkings[n].pool[ip].allocated,
+						Allocated: gd.networkings[n].pool[ip].allocated,
 					})
 
 					break loop
@@ -214,7 +214,7 @@ func (r *Region) recycleNetworking(pre *preAllocResource) []database.IPStatus {
 	return ipsStatus
 }
 
-func (r *Region) allocStorage(engine *cluster.Engine, driver, Type string, size int64) (string, error) {
+func (gd *Gardener) allocStorage(engine *cluster.Engine, driver, Type string, size int64) (string, error) {
 
 	return "", nil
 }

@@ -15,19 +15,19 @@ const (
 	Gardener     = "gardener"
 )
 
-func fromContext(ctx goctx.Context) (bool, *context, *swarm.Region) {
+func fromContext(ctx goctx.Context) (bool, *context, *swarm.Gardener) {
 	c, ok := ctx.Value(Gardener).(*context)
 	if !ok {
 		return false, nil, nil
 	}
 
-	r, ok := c.cluster.(*swarm.Region)
+	gd, ok := c.cluster.(*swarm.Gardener)
 
 	if !ok {
 		return false, c, nil
 	}
 
-	return true, c, r
+	return true, c, gd
 }
 
 type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)

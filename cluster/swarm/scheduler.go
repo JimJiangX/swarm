@@ -13,11 +13,11 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 )
 
-func (region *Region) ServiceToScheduler(svc *Service) {
-	region.serviceSchedulerCh <- svc
+func (gd *Gardener) ServiceToScheduler(svc *Service) {
+	gd.serviceSchedulerCh <- svc
 }
 
-func (region *Region) serviceScheduler() (err error) {
+func (gd *Gardener) serviceScheduler() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Recover From Panic:%v,Error:%s", r, err)
@@ -27,7 +27,7 @@ func (region *Region) serviceScheduler() (err error) {
 	}()
 
 	for {
-		svc := <-region.serviceSchedulerCh
+		svc := <-gd.serviceSchedulerCh
 
 		if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
 			continue
@@ -40,7 +40,7 @@ func (region *Region) serviceScheduler() (err error) {
 		for _, module := range svc.base.Modules {
 			// query image from database
 			if module.Config.Image == "" {
-				image, err := region.GetImage(module.Type, module.Version)
+				image, err := gd.GetImage(module.Type, module.Version)
 				if err != nil {
 					goto failure
 				}
@@ -56,10 +56,10 @@ func (region *Region) serviceScheduler() (err error) {
 
 			// TODO:fix later
 			storeType, storeSize := "", 0
-			filters := region.listShortIdleStore(storeType, module.Num, storeSize)
-			list := region.listCandidateNodes(module.Nodes, module.Type, filters...)
+			filters := gd.listShortIdleStore(storeType, module.Num, storeSize)
+			list := gd.listCandidateNodes(module.Nodes, module.Type, filters...)
 
-			preAlloc, err := region.BuildPendingContainers(list, module.Type, module.Num, config, false)
+			preAlloc, err := gd.BuildPendingContainers(list, module.Type, module.Num, config, false)
 
 			resourceAlloc = append(resourceAlloc, preAlloc...)
 
@@ -79,18 +79,18 @@ func (region *Region) serviceScheduler() (err error) {
 
 		svc.Unlock()
 
-		region.ServiceToExecute(svc)
+		gd.ServiceToExecute(svc)
 		continue
 
 	failure:
 
-		err = region.Recycle(resourceAlloc)
+		err = gd.Recycle(resourceAlloc)
 
 		// scheduler failed
 		for i := range resourceAlloc {
-			region.scheduler.Lock()
-			delete(region.pendingContainers, resourceAlloc[i].swarmID)
-			region.scheduler.Unlock()
+			gd.scheduler.Lock()
+			delete(gd.pendingContainers, resourceAlloc[i].swarmID)
+			gd.scheduler.Unlock()
 		}
 
 		svc.pendingContainers = make(map[string]*pendingContainer)
@@ -104,13 +104,13 @@ func (region *Region) serviceScheduler() (err error) {
 	return err
 }
 
-func (region *Region) BuildPendingContainers(list []*node.Node, Type string, num int,
+func (gd *Gardener) BuildPendingContainers(list []*node.Node, Type string, num int,
 	config *cluster.ContainerConfig, withImageAffinity bool) ([]*preAllocResource, error) {
 
-	region.scheduler.Lock()
-	defer region.scheduler.Unlock()
+	gd.scheduler.Lock()
+	defer gd.scheduler.Unlock()
 
-	candidates, err := region.Scheduler(list, config, num, withImageAffinity)
+	candidates, err := gd.Scheduler(list, config, num, withImageAffinity)
 	if err != nil {
 
 		var retries int64
@@ -119,15 +119,15 @@ func (region *Region) BuildPendingContainers(list []*node.Node, Type string, num
 		if bImageNotFoundError && !config.HaveNodeConstraint() {
 			// Check if the image exists in the cluster
 			// If exists, retry with a image affinity
-			if region.Image(config.Image) != nil {
-				candidates, err = region.Scheduler(list, config, num, true)
+			if gd.Image(config.Image) != nil {
+				candidates, err = gd.Scheduler(list, config, num, true)
 				retries++
 			}
 		}
 
-		for ; retries < region.createRetry && err != nil; retries++ {
+		for ; retries < gd.createRetry && err != nil; retries++ {
 			log.WithFields(log.Fields{"Name": "Swarm"}).Warnf("Failed to scheduler: %s, retrying", err)
-			candidates, err = region.Scheduler(list, config, num, true)
+			candidates, err = gd.Scheduler(list, config, num, true)
 		}
 	}
 
@@ -139,17 +139,17 @@ func (region *Region) BuildPendingContainers(list []*node.Node, Type string, num
 		return nil, errors.New("Not Enough Nodes")
 	}
 
-	preAllocs, err := region.pendingAlloc(candidates[0:num], Type, config)
+	preAllocs, err := gd.pendingAlloc(candidates[0:num], Type, config)
 
-	region.scheduler.Unlock()
+	gd.scheduler.Unlock()
 
 	return preAllocs, err
 }
 
-func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
+func (gd *Gardener) pendingAlloc(candidates []*node.Node, Type string,
 	templConfig *cluster.ContainerConfig) ([]*preAllocResource, error) {
 
-	image, err := region.getImageByID(templConfig.Image)
+	image, err := gd.getImageByID(templConfig.Image)
 	if err != nil {
 		return nil, err
 	}
@@ -164,8 +164,8 @@ func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 		preAlloc := newPreAllocResource()
 		allocs = append(allocs, preAlloc)
 
-		id := region.generateUniqueID()
-		engine, ok := region.engines[candidates[i].ID]
+		id := gd.generateUniqueID()
+		engine, ok := gd.engines[candidates[i].ID]
 		if !ok {
 			return allocs, errors.New("Engine Not Found")
 		}
@@ -200,7 +200,7 @@ func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 
 		preAlloc.unit = unit
 
-		config, err := region.allocResource(preAlloc, engine, *templConfig, Type)
+		config, err := gd.allocResource(preAlloc, engine, *templConfig, Type)
 		if err != nil {
 			return allocs, fmt.Errorf("error resource alloc")
 		}
@@ -208,7 +208,7 @@ func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 		swarmID := config.SwarmID()
 		if swarmID == "" {
 			// Associate a Swarm ID to the container we are creating.
-			swarmID = region.generateUniqueID()
+			swarmID = gd.generateUniqueID()
 			config.SetSwarmID(swarmID)
 		}
 
@@ -220,7 +220,7 @@ func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 		}
 		preAlloc.unit.networkings = preAlloc.networkings
 
-		region.pendingContainers[swarmID] = preAlloc.pendingContainer
+		gd.pendingContainers[swarmID] = preAlloc.pendingContainer
 
 		err = preAlloc.consistency()
 		if err != nil {
@@ -231,9 +231,9 @@ func (region *Region) pendingAlloc(candidates []*node.Node, Type string,
 	return allocs, nil
 }
 
-func (region *Region) Scheduler(list []*node.Node, config *cluster.ContainerConfig, num int, withImageAffinity bool) ([]*node.Node, error) {
+func (gd *Gardener) Scheduler(list []*node.Node, config *cluster.ContainerConfig, num int, withImageAffinity bool) ([]*node.Node, error) {
 
-	if network := region.Networks().Get(config.HostConfig.NetworkMode); network != nil && network.Scope == "local" {
+	if network := gd.Networks().Get(config.HostConfig.NetworkMode); network != nil && network.Scope == "local" {
 		if !config.HaveNodeConstraint() {
 			config.AddConstraint("node==~" + network.Engine.Name)
 		}
@@ -244,7 +244,7 @@ func (region *Region) Scheduler(list []*node.Node, config *cluster.ContainerConf
 		config.AddAffinity("image==" + config.Image)
 	}
 
-	nodes, err := region.scheduler.SelectNodesForContainer(list, config)
+	nodes, err := gd.scheduler.SelectNodesForContainer(list, config)
 
 	if withImageAffinity {
 		config.RemoveAffinity("image==" + config.Image)
@@ -254,27 +254,27 @@ func (region *Region) Scheduler(list []*node.Node, config *cluster.ContainerConf
 		return nil, err
 	}
 
-	return region.SelectNodeByCluster(nodes, num, true)
+	return gd.SelectNodeByCluster(nodes, num, true)
 }
 
 // listCandidateNodes returns all validated engines in the cluster, excluding pendingEngines.
-func (r *Region) listCandidateNodes(names []string, dcTag string, filters ...string) []*node.Node {
-	r.RLock()
-	defer r.RUnlock()
+func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...string) []*node.Node {
+	gd.RLock()
+	defer gd.RUnlock()
 
-	out := make([]*node.Node, 0, len(r.engines))
+	out := make([]*node.Node, 0, len(gd.engines))
 
 	if len(names) == 0 {
 
-		for i := range r.datacenters {
+		for i := range gd.datacenters {
 
-			if r.datacenters[i].Type != dcTag ||
-				isStringExist(r.datacenters[i].ID, filters) {
+			if gd.datacenters[i].Type != dcTag ||
+				isStringExist(gd.datacenters[i].ID, filters) {
 
 				continue
 			}
 
-			list := r.datacenters[i].listNodeID()
+			list := gd.datacenters[i].listNodeID()
 
 			for _, id := range list {
 
@@ -282,14 +282,14 @@ func (r *Region) listCandidateNodes(names []string, dcTag string, filters ...str
 					continue
 				}
 
-				e, ok := r.engines[id]
+				e, ok := gd.engines[id]
 				if !ok {
 					continue
 				}
 
 				node := node.NewNode(e)
 
-				for _, c := range r.pendingContainers {
+				for _, c := range gd.pendingContainers {
 
 					if c.Engine.ID == e.ID && node.Container(c.Config.SwarmID()) == nil {
 						node.AddContainer(c.ToContainer())
@@ -309,14 +309,14 @@ func (r *Region) listCandidateNodes(names []string, dcTag string, filters ...str
 				continue
 			}
 
-			e, ok := r.engines[name]
+			e, ok := gd.engines[name]
 			if !ok {
 				continue
 			}
 
 			node := node.NewNode(e)
 
-			for _, c := range r.pendingContainers {
+			for _, c := range gd.pendingContainers {
 				if c.Engine.ID == e.ID && node.Container(c.Config.SwarmID()) == nil {
 					node.AddContainer(c.ToContainer())
 				}
@@ -340,19 +340,19 @@ func isStringExist(s string, list []string) bool {
 	return false
 }
 
-func (r *Region) SelectNodeByCluster(nodes []*node.Node, num int, diff bool) ([]*node.Node, error) {
+func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailable bool) ([]*node.Node, error) {
 	if len(nodes) < num {
 		return nil, errors.New("Not Enough Nodes")
 	}
 
-	if !diff {
+	if !highAvailable {
 		return nodes[0:num:num], nil
 	}
 
 	m := make(map[string][]*node.Node)
 
 	for i := range nodes {
-		dc, err := r.DatacenterByNode(nodes[i].ID)
+		dc, err := gd.DatacenterByNode(nodes[i].ID)
 		if err != nil {
 			continue
 		}
@@ -365,7 +365,7 @@ func (r *Region) SelectNodeByCluster(nodes []*node.Node, num int, diff bool) ([]
 		}
 	}
 
-	if diff && len(m) < 2 {
+	if highAvailable && len(m) < 2 {
 		return nil, errors.New("Not Match")
 	}
 
@@ -387,7 +387,7 @@ func (r *Region) SelectNodeByCluster(nodes []*node.Node, num int, diff bool) ([]
 		count := make(map[string]int)
 
 		for i := range nodes {
-			dc, err := r.DatacenterByNode(nodes[i].ID)
+			dc, err := gd.DatacenterByNode(nodes[i].ID)
 			if err != nil {
 				continue
 			}

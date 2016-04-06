@@ -82,18 +82,18 @@ func (net *Networking) AllocIP() (uint32, error) {
 	return 0, ErrNotFoundIP
 }
 
-func (region *Region) GetNetworking(typ string) *Networking {
+func (gd *Gardener) GetNetworking(typ string) *Networking {
+	gd.RLock()
 
-	region.RLock()
-
-	region.RUnlock()
-
-	for i := range region.networkings {
-		if region.networkings[i].Enable &&
-			region.networkings[i].Type == typ {
-			return region.networkings[i]
+	for i := range gd.networkings {
+		if gd.networkings[i].Enable &&
+			gd.networkings[i].Type == typ {
+			gd.RUnlock()
+			return gd.networkings[i]
 		}
 	}
+
+	gd.RUnlock()
 
 	return nil
 }
@@ -124,10 +124,10 @@ func (info IPInfo) String() string {
 	return fmt.Sprintf("%s/%d:%s", info.IP.String(), info.Prefix, info.Device)
 }
 
-func (r *Region) getNetworkingSetting(engine *cluster.Engine, name, Type string) ([]IPInfo, error) {
+func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, name, Type string) ([]IPInfo, error) {
 	networkings := make([]IPInfo, 0, 2)
 
-	ipinfo, err := r.AllocIP("", ContainersNetworking)
+	ipinfo, err := gd.AllocIP("", ContainersNetworking)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (r *Region) getNetworkingSetting(engine *cluster.Engine, name, Type string)
 
 	if isProxyType(Type) || isProxyType(name) {
 
-		ipinfo2, err := r.AllocIP("", ExternalAccessNetworking)
+		ipinfo2, err := gd.AllocIP("", ExternalAccessNetworking)
 		if err != nil {
 			return networkings, err
 		}
@@ -159,21 +159,21 @@ func (r *Region) getNetworkingSetting(engine *cluster.Engine, name, Type string)
 	return networkings, err
 }
 
-func (region *Region) AllocIP(id, typ string) (IPInfo, error) {
-	for i := range region.networkings {
-		if !region.networkings[i].Enable {
+func (gd *Gardener) AllocIP(id, typ string) (IPInfo, error) {
+	for i := range gd.networkings {
+		if !gd.networkings[i].Enable {
 			continue
 		}
 
-		if (id != "" && id == region.networkings[i].ID) ||
-			(typ != "" && typ == region.networkings[i].Type) {
+		if (id != "" && id == gd.networkings[i].ID) ||
+			(typ != "" && typ == gd.networkings[i].Type) {
 
-			ip, err := region.networkings[i].AllocIP()
+			ip, err := gd.networkings[i].AllocIP()
 			if err != nil {
 				continue
 			}
 
-			return NewIPinfo(region.networkings[i], ip), nil
+			return NewIPinfo(gd.networkings[i], ip), nil
 		}
 	}
 

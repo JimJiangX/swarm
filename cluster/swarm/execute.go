@@ -9,11 +9,11 @@ import (
 	"github.com/samalba/dockerclient"
 )
 
-func (r *Region) ServiceToExecute(svc *Service) {
-	r.serviceExecuteCh <- svc
+func (gd *Gardener) ServiceToExecute(svc *Service) {
+	gd.serviceExecuteCh <- svc
 }
 
-func (region *Region) serviceExecute() (err error) {
+func (gd *Gardener) serviceExecute() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Recover From Panic:%v,Error:%s", r, err)
@@ -23,7 +23,7 @@ func (region *Region) serviceExecute() (err error) {
 	}()
 
 	for {
-		svc := <-region.serviceExecuteCh
+		svc := <-gd.serviceExecuteCh
 
 		if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
 			continue
@@ -48,7 +48,7 @@ func (region *Region) serviceExecute() (err error) {
 			}
 
 			// create container
-			container, err := region.createContainerInPending(pending.Config, pending.Name, svc.authConfig)
+			container, err := gd.createContainerInPending(pending.Config, pending.Name, svc.authConfig)
 			if err != nil {
 				svc.Unlock()
 				goto failure
@@ -117,9 +117,9 @@ func (region *Region) serviceExecute() (err error) {
 }
 
 // createContainerInPending create new container into the cluster.
-func (r *Region) createContainerInPending(config *cluster.ContainerConfig, name string, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
+func (gd *Gardener) createContainerInPending(config *cluster.ContainerConfig, name string, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
 	// Ensure the name is available
-	if !r.checkNameUniqueness(name) {
+	if !gd.checkNameUniqueness(name) {
 		return nil, fmt.Errorf("Conflict: The name %s is already assigned. You have to delete (or rename) that container to be able to assign %s to a container again.", name, name)
 	}
 
@@ -128,9 +128,9 @@ func (r *Region) createContainerInPending(config *cluster.ContainerConfig, name 
 		return nil, fmt.Errorf("Conflict: The swarmID is Null,assign %s to a container", name)
 	}
 
-	r.scheduler.Lock()
-	pending, ok := r.pendingContainers[swarmID]
-	r.scheduler.Unlock()
+	gd.scheduler.Lock()
+	pending, ok := gd.pendingContainers[swarmID]
+	gd.scheduler.Unlock()
 
 	if !ok || pending == nil || pending.Engine == nil {
 		return nil, fmt.Errorf("Swarm ID Not Found in pendingContainers,%s", swarmID)
@@ -140,16 +140,16 @@ func (r *Region) createContainerInPending(config *cluster.ContainerConfig, name 
 	container, err := engine.Create(config, name, true, authConfig)
 
 	if err != nil {
-		for retries := int64(0); retries < r.createRetry && err != nil; retries++ {
+		for retries := int64(0); retries < gd.createRetry && err != nil; retries++ {
 			log.WithFields(log.Fields{"Name": "Swarm"}).Warnf("Failed to create container: %s, retrying", err)
 			container, err = engine.Create(config, name, true, authConfig)
 		}
 	}
 
 	if err == nil && container != nil {
-		r.scheduler.Lock()
-		delete(r.pendingContainers, swarmID)
-		r.scheduler.Unlock()
+		gd.scheduler.Lock()
+		delete(gd.pendingContainers, swarmID)
+		gd.scheduler.Unlock()
 	}
 
 	return container, err

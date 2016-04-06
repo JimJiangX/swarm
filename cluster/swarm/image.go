@@ -10,7 +10,7 @@ type Image struct {
 	image *cluster.Image
 }
 
-func (r *Region) GetImage(name, version string) (Image, error) {
+func (gd *Gardener) GetImage(name, version string) (Image, error) {
 	im, err := database.QueryImage(name, version)
 	if err != nil {
 		return Image{}, err
@@ -18,7 +18,7 @@ func (r *Region) GetImage(name, version string) (Image, error) {
 
 	out := Image{Image: im}
 
-	image := r.Image(im.ImageID)
+	image := gd.Image(im.ImageID)
 	if image == nil {
 		return out, nil
 	}
@@ -28,7 +28,7 @@ func (r *Region) GetImage(name, version string) (Image, error) {
 	return out, nil
 }
 
-func (r *Region) getImageByID(id string) (Image, error) {
+func (gd *Gardener) getImageByID(id string) (Image, error) {
 	im, err := database.QueryImageByID(id)
 	if err != nil {
 		return Image{}, err
@@ -36,7 +36,7 @@ func (r *Region) getImageByID(id string) (Image, error) {
 
 	out := Image{Image: im}
 
-	image := r.Image(out.ImageID)
+	image := gd.Image(out.ImageID)
 	if image == nil {
 		return out, nil
 	}

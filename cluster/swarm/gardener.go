@@ -8,7 +8,7 @@ import (
 	crontab "gopkg.in/robfig/cron.v2"
 )
 
-type Region struct {
+type Gardener struct {
 	*Cluster
 
 	// addition by fugr
@@ -24,15 +24,15 @@ type Region struct {
 	serviceExecuteCh   chan *Service // run service containers
 }
 
-// NewRegion is exported
-func NewRegion(cli cluster.Cluster) (*Region, error) {
+// NewGardener is exported
+func NewGardener(cli cluster.Cluster) (*Gardener, error) {
 	log.WithFields(log.Fields{"name": "swarm"}).Debug("Initializing Region")
 	cluster, ok := cli.(*Cluster)
 	if !ok {
 		log.Fatal("cluster.Cluster Prototype is not *swarm.Cluster")
 	}
 
-	region := &Region{
+	gd := &Gardener{
 		Cluster:            cluster,
 		cron:               crontab.New(),
 		cronJobs:           make(map[crontab.EntryID]*serviceBackup),
@@ -44,44 +44,44 @@ func NewRegion(cli cluster.Cluster) (*Region, error) {
 		serviceExecuteCh:   make(chan *Service, 100),
 	}
 
-	region.cron.Start()
-	go region.serviceScheduler()
-	go region.serviceExecute()
+	gd.cron.Start()
+	go gd.serviceScheduler()
+	go gd.serviceExecute()
 
-	return region, nil
+	return gd, nil
 }
 
-func (r *Region) generateUUID(length int) string {
+func (gd *Gardener) generateUUID(length int) string {
 	for {
 		id := utils.GenerateUUID(length)
-		if r.Container(id) == nil {
+		if gd.Container(id) == nil {
 			return id
 		}
 	}
 }
 
-func (r *Region) RegisterBackupStrategy(strategy *serviceBackup) error {
-	id := r.cron.Schedule(strategy, strategy)
+func (gd *Gardener) RegisterBackupStrategy(strategy *serviceBackup) error {
+	id := gd.cron.Schedule(strategy, strategy)
 	strategy.id = id
 
-	r.Lock()
-	r.cronJobs[id] = strategy
-	r.Unlock()
+	gd.Lock()
+	gd.cronJobs[id] = strategy
+	gd.Unlock()
 
 	return nil
 }
 
-func (r *Region) RemoveCronJob(strategyID string) error {
-	r.Lock()
+func (gd *Gardener) RemoveCronJob(strategyID string) error {
+	gd.Lock()
 
-	for key, val := range r.cronJobs {
+	for key, val := range gd.cronJobs {
 		if val.strategy.ID == strategyID {
-			r.cron.Remove(key)
+			gd.cron.Remove(key)
 			return nil
 		}
 	}
 
-	r.Unlock()
+	gd.Unlock()
 
 	return nil
 }
