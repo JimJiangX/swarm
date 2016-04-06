@@ -14,7 +14,7 @@ import (
 	"github.com/docker/swarm/utils"
 )
 
-var UnsupportRegion = errors.New("Unsupported Region")
+var UnsupportGardener = errors.New("Unsupported Gardener")
 
 // POST /cluster
 func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -28,13 +28,13 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, _, region := fromContext(ctx)
-	if !ok && region == nil {
-		httpError(w, UnsupportRegion.Error(), http.StatusInternalServerError)
+	ok, _, gd := fromContext(ctx)
+	if !ok && gd == nil {
+		httpError(w, UnsupportGardener.Error(), http.StatusInternalServerError)
 	}
 
 	if req.StorageType != "local" && req.StorageID != "" {
-		store, err := region.GetStore(req.StorageID)
+		store, err := gd.GetStore(req.StorageID)
 		if err == nil && store != nil {
 			stores = append(stores, store)
 		}
@@ -52,7 +52,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		UsageLimit:  req.UsageLimit,
 	}
 
-	err := region.AddDatacenter(cluster, stores)
+	err := gd.AddDatacenter(cluster, stores)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return

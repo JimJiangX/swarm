@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	enableMaster = true
-	Gardener     = "gardener"
+	enableGardener = true
+	Gardener       = "gardener"
 )
 
 func fromContext(ctx goctx.Context) (bool, *context, *swarm.Gardener) {
