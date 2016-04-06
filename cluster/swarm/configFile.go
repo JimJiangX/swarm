@@ -133,10 +133,15 @@ func (mysqlCmd) StartContainerCmd() []string     { return nil }
 func (mysqlCmd) StartServiceCmd() []string       { return nil }
 func (mysqlCmd) StopServiceCmd() []string        { return nil }
 func (mysqlCmd) RecoverCmd(file string) []string { return nil }
-func (mysqlCmd) BackupCmd() []string {
-	return []string{"/root/upsql-backup.sh"}
+func (mysqlCmd) BackupCmd(args ...string) []string {
+	cmd := make([]string, len(args)+1)
+	cmd[0] = "/root/upsql-backup.sh"
+	copy(cmd[1:], args)
+
+	return cmd
 }
-func (mysqlCmd) CleanBackupFileCmd() []string { return nil }
+
+func (mysqlCmd) CleanBackupFileCmd(args ...string) []string { return nil }
 
 type mysqlConfig struct{}
 
