@@ -19,7 +19,8 @@ type ContainerCmd interface {
 	StartServiceCmd() []string
 	StopServiceCmd() []string
 	RecoverCmd(file string) []string
-	BackupCmd() []string
+	BackupCmd(args ...string) []string
+	CleanBackupFileCmd(args ...string) []string
 }
 
 type configParser interface {
@@ -258,9 +259,7 @@ func (u *unit) stopService() error {
 }
 
 func (u *unit) backup(args ...string) error {
-	cmd := u.BackupCmd()
-
-	cmd = append(cmd, args...)
+	cmd := u.BackupCmd(args...)
 
 	return containerExec(u.engine, u.ContainerID, cmd, false)
 }

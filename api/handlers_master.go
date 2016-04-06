@@ -14,7 +14,7 @@ import (
 	"github.com/docker/swarm/utils"
 )
 
-var UnsupportGardener = errors.New("Unsupported Gardener")
+var errUnsupportGardener = errors.New("Unsupported Gardener")
 
 // POST /cluster
 func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -30,7 +30,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, UnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
 	}
 
 	if req.StorageType != "local" && req.StorageID != "" {
