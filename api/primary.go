@@ -134,7 +134,7 @@ func NewPrimary(cluster cluster.Cluster, tlsConfig *tls.Config, status StatusHan
 		profilerSetup(r, "/debug/")
 	}
 
-	if enableMaster {
+	if enableGardener {
 		setupMasterRouter(r, context, enableCors)
 	}
 
