@@ -28,7 +28,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, _, gd := fromContext(ctx)
+	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, UnsupportGardener.Error(), http.StatusInternalServerError)
 	}
