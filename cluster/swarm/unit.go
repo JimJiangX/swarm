@@ -257,6 +257,14 @@ func (u *unit) stopService() error {
 	return containerExec(u.engine, u.ContainerID, cmd, false)
 }
 
+func (u *unit) backup(args ...string) error {
+	cmd := u.BackupCmd()
+
+	cmd = append(cmd, args...)
+
+	return containerExec(u.engine, u.ContainerID, cmd, false)
+}
+
 // containerExec
 func containerExec(engine *cluster.Engine, containerID string, cmd []string, detach bool) error {
 	client := engine.EngineAPIClient()

@@ -59,29 +59,3 @@ func (gd *Gardener) generateUUID(length int) string {
 		}
 	}
 }
-
-func (gd *Gardener) RegisterBackupStrategy(strategy *serviceBackup) error {
-	id := gd.cron.Schedule(strategy, strategy)
-	strategy.id = id
-
-	gd.Lock()
-	gd.cronJobs[id] = strategy
-	gd.Unlock()
-
-	return nil
-}
-
-func (gd *Gardener) RemoveCronJob(strategyID string) error {
-	gd.Lock()
-
-	for key, val := range gd.cronJobs {
-		if val.strategy.ID == strategyID {
-			gd.cron.Remove(key)
-			return nil
-		}
-	}
-
-	gd.Unlock()
-
-	return nil
-}

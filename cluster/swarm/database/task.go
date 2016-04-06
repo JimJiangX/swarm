@@ -10,14 +10,14 @@ import (
 )
 
 type Task struct {
-	ID          string        `db:"id"`
-	Name        string        `db:"name"`
+	ID string `db:"id"`
+	//	Name        string        `db:"name"`
 	Related     string        `db:"related"`
 	Linkto      string        `db:"link_to"`
 	Description string        `db:"description"`
 	Labels      string        `db:"labels"`
 	Errors      string        `db:"errors"`
-	Timeout     time.Duration `db:"timeout"`
+	Timeout     time.Duration `db:"timeout"` // s
 	Status      int32         `db:"status"`
 	CreatedAt   time.Time     `db:"create_at"`
 	FinishedAt  time.Time     `db:"finished_at"`
@@ -43,15 +43,16 @@ func (bf BackupFile) TableName() string {
 	return "tb_backup_file"
 }
 
-func NewTask(name, relate, linkto, des string, labels []string, timeout time.Duration) *Task {
+func NewTask(relate, linkto, des string, labels []string, timeout time.Duration) *Task {
 	return &Task{
-		ID:          utils.Generate64UUID(),
-		Name:        name,
+		ID: utils.Generate64UUID(),
+		//	Name:        name,
 		Related:     relate,
 		Linkto:      linkto,
 		Description: des,
 		Labels:      strings.Join(labels, "&;&"),
 		Timeout:     timeout,
+		Status:      0,
 		CreatedAt:   time.Now(),
 	}
 }
@@ -113,6 +114,23 @@ func TxUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int, finish time.Time) error
 	return nil
 }
 
+func TxTaskTimeout(task *Task) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = TxUpdateTaskStatus(tx, task, 2, time.Now())
+
+	return tx.Commit()
+}
+
 func QueryTask(id string) (*Task, error) {
 	db, err := GetDB(true)
 	if err != nil {
@@ -134,8 +152,8 @@ type BackupStrategy struct {
 	Enabled     bool          `db:"enabled"`
 	BackupDir   string        `db:"backup_dir"`
 	MaxSizeByte int64         `db:"max_size"`
-	Retention   time.Duration `db:"retention"`
-	Timeout     time.Duration `db:"timeout"`
+	Retention   time.Time     `db:"retention"`
+	Timeout     time.Duration `db:"timeout"` // s
 	Status      byte          `db:"status"`
 	CreatedAt   time.Time     `db:"create_at"`
 }
@@ -176,4 +194,30 @@ func (bs *BackupStrategy) UpdateNext(next time.Time, enable bool, state byte) er
 	}
 
 	return err
+}
+
+func TXUpdateBackupJob(bs *BackupStrategy, task *Task) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	query := "UPDATE tb_backup_strategy SET status=? WHERE id=?"
+	_, err = tx.Exec(query, bs.Status, bs.ID)
+	if err != nil {
+		return err
+	}
+
+	err = TxInsertTask(tx, task)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
