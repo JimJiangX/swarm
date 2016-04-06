@@ -12,17 +12,21 @@ import (
 
 const (
 	enableGardener = true
-	Gardener       = "gardener"
+	_Gardener      = "gardener"
+	_Context       = "context"
 )
 
-func fromContext(ctx goctx.Context) (bool, *context, *swarm.Gardener) {
-	c, ok := ctx.Value(Gardener).(*context)
+func fromContext(ctx goctx.Context, key string) (bool, *context, *swarm.Gardener) {
+	c, ok := ctx.Value(_Gardener).(*context)
 	if !ok {
 		return false, nil, nil
 	}
 
-	gd, ok := c.cluster.(*swarm.Gardener)
+	if key == _Context {
+		return true, c, nil
+	}
 
+	gd, ok := c.cluster.(*swarm.Gardener)
 	if !ok {
 		return false, c, nil
 	}
@@ -53,7 +57,7 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 					writeCorsHeaders(w, r)
 				}
 				context.apiVersion = mux.Vars(r)["version"]
-				ctx := goctx.WithValue(goctx.TODO(), Gardener, context)
+				ctx := goctx.WithValue(goctx.TODO(), _Gardener, context)
 				localFct(ctx, w, r)
 			}
 			localMethod := method
