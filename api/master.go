@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"time"
 
 	goctx "golang.org/x/net/context"
 
@@ -11,26 +10,13 @@ import (
 	"github.com/gorilla/mux"
 )
 
-const enableMaster = true
-
-func (*context) Deadline() (deadline time.Time, ok bool) {
-	return
-}
-
-func (*context) Done() <-chan struct{} {
-	return nil
-}
-
-func (*context) Err() error {
-	return nil
-}
-
-func (ctx *context) Value(key interface{}) interface{} {
-	return ctx
-}
+const (
+	enableMaster = true
+	Gardener     = "gardener"
+)
 
 func fromContext(ctx goctx.Context) (bool, *context, *swarm.Region) {
-	c, ok := ctx.Value(nil).(*context)
+	c, ok := ctx.Value(Gardener).(*context)
 	if !ok {
 		return false, nil, nil
 	}
@@ -52,11 +38,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	},
 }
 
-func setupMasterRouter(r *mux.Router, ctx goctx.Context, enableCors bool) {
-	ok, context, _ := fromContext(ctx)
-	if !ok {
-		return
-	}
+func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 
 	for method, mappings := range masterRoutes {
 		for route, fct := range mappings {
@@ -71,7 +53,8 @@ func setupMasterRouter(r *mux.Router, ctx goctx.Context, enableCors bool) {
 					writeCorsHeaders(w, r)
 				}
 				context.apiVersion = mux.Vars(r)["version"]
-				localFct(context, w, r)
+				ctx := goctx.WithValue(goctx.TODO(), Gardener, context)
+				localFct(ctx, w, r)
 			}
 			localMethod := method
 
