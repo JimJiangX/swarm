@@ -6,36 +6,36 @@ import (
 	"github.com/docker/swarm/cluster/swarm/store"
 )
 
-func (r Region) GetStore(id string) (store.Store, error) {
-	r.RLock()
+func (gd Gardener) GetStore(id string) (store.Store, error) {
+	gd.RLock()
 
-	for i := range r.stores {
-		if r.stores[i].ID() == id {
-			r.RUnlock()
-			return r.stores[i], nil
+	for i := range gd.stores {
+		if gd.stores[i].ID() == id {
+			gd.RUnlock()
+			return gd.stores[i], nil
 		}
 	}
 
-	r.RUnlock()
+	gd.RUnlock()
 
 	return nil, fmt.Errorf("Store Not Found,%s", id)
 }
 
-func (r *Region) AddStore(store store.Store) error {
-	s, err := r.GetStore(store.ID())
+func (gd *Gardener) AddStore(store store.Store) error {
+	s, err := gd.GetStore(store.ID())
 	if err == nil && s != nil {
 		return fmt.Errorf("Store is exist,%s", store.ID())
 	}
 
-	r.Lock()
-	r.stores = append(r.stores, store)
-	r.Unlock()
+	gd.Lock()
+	gd.stores = append(gd.stores, store)
+	gd.Unlock()
 
 	return nil
 }
 
-func (r *Region) AddStoreSpace(id string, space int) error {
-	s, err := r.GetStore(id)
+func (gd *Gardener) AddStoreSpace(id string, space int) error {
+	s, err := gd.GetStore(id)
 	if err != nil {
 		return err
 	}

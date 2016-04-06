@@ -62,16 +62,16 @@ func (svc *Service) getUnit(IDOrName string) (*unit, error) {
 	return nil, fmt.Errorf("Unit Not Found,%s", IDOrName)
 }
 
-func (region *Region) AddService(svc *Service) error {
+func (gd *Gardener) AddService(svc *Service) error {
 	if svc == nil {
 		return errors.New("Service Cannot be nil")
 	}
 
-	region.RLock()
+	gd.RLock()
 
-	s, err := region.GetService(svc.ID)
+	s, err := gd.GetService(svc.ID)
 
-	region.RUnlock()
+	gd.RUnlock()
 
 	if s != nil || err == nil {
 
@@ -88,18 +88,18 @@ func (region *Region) AddService(svc *Service) error {
 		return err
 	}
 
-	region.Lock()
-	region.services = append(region.services, svc)
-	region.Unlock()
+	gd.Lock()
+	gd.services = append(gd.services, svc)
+	gd.Unlock()
 
 	return nil
 }
 
-func (region *Region) GetService(IDOrName string) (*Service, error) {
-	for i := range region.services {
-		if region.services[i].ID == IDOrName ||
-			region.services[i].Name == IDOrName {
-			return region.services[i], nil
+func (gd *Gardener) GetService(IDOrName string) (*Service, error) {
+	for i := range gd.services {
+		if gd.services[i].ID == IDOrName ||
+			gd.services[i].Name == IDOrName {
+			return gd.services[i], nil
 		}
 	}
 
