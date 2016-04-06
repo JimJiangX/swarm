@@ -133,7 +133,10 @@ func (mysqlCmd) StartContainerCmd() []string     { return nil }
 func (mysqlCmd) StartServiceCmd() []string       { return nil }
 func (mysqlCmd) StopServiceCmd() []string        { return nil }
 func (mysqlCmd) RecoverCmd(file string) []string { return nil }
-func (mysqlCmd) BackupCmd() []string             { return nil }
+func (mysqlCmd) BackupCmd() []string {
+	return []string{"/root/upsql-backup.sh"}
+}
+func (mysqlCmd) CleanBackupFileCmd() []string { return nil }
 
 type mysqlConfig struct{}
 

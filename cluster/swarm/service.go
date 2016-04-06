@@ -454,3 +454,77 @@ func (svc *Service) Destroy() error {
 
 	return nil
 }
+
+// GetRoles returns role of units belong to Service,get infomation from consul server,
+// map[unitID]role
+func (svc *Service) getRoles() (map[string]string, error) {
+
+	return nil, nil
+}
+
+func (svc *Service) GetUnitRole(role string) (*unit, error) {
+	svc.RLock()
+	defer svc.RUnlock()
+
+	roles, err := svc.getRoles()
+	if err != nil {
+		return nil, err
+	}
+
+	for id, r := range roles {
+		if role == r {
+			return svc.getUnit(id)
+		}
+	}
+
+	return nil, fmt.Errorf("Not Found unit role:%s In Service %s", role, svc.ID)
+
+}
+
+func (svc *Service) getUnitByType(Type string) (*unit, error) {
+	for i := range svc.units {
+		if svc.units[i].Type == Type {
+			return svc.units[i], nil
+		}
+	}
+
+	return nil, fmt.Errorf("Not Found unit %s In Service %s", Type, svc.ID)
+}
+
+func (svc *Service) GetSwithManager() (*unit, error) {
+	svc.RLock()
+
+	u, err := svc.getUnitByType("Switch Manager")
+
+	svc.RUnlock()
+
+	return u, err
+}
+
+func (svc *Service) GetSwithManagerAddr() (addr string, port int, err error) {
+	svc.RLock()
+	u, err := svc.getUnitByType("Switch Manager")
+	svc.RUnlock()
+
+	if err != nil {
+		return "", 0, err
+	}
+
+	for i := range u.networkings {
+		if u.networkings[i].Type == ContainersNetworking {
+			addr = u.networkings[i].IP.String()
+
+			break
+		}
+	}
+
+	for i := range u.ports {
+		if u.ports[i].Name == "Http Service" {
+			port = u.ports[i].Port
+
+			return addr, port, nil
+		}
+	}
+
+	return addr, port, fmt.Errorf("Not Found")
+}
