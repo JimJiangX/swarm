@@ -87,13 +87,13 @@ func TxInsertMultiTask(tx *sqlx.Tx, tasks []*Task) error {
 	return nil
 }
 
-func TxUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int, finish time.Time) error {
-	query := "UPDATE tb_task SET status=?,finished_at=? WHERE id=?"
+func TxUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int, finish time.Time, msg string) error {
+	query := "UPDATE tb_task SET status=?,finished_at=?,errors=? WHERE id=?"
 
 	if finish.IsZero() {
-		query = "UPDATE tb_task SET status=? WHERE id=?"
+		query = "UPDATE tb_task SET status=?,errors=? WHERE id=?"
 
-		_, err := tx.Exec(query, state, t.ID)
+		_, err := tx.Exec(query, state, msg, t.ID)
 		if err != nil {
 			return err
 		}
@@ -103,7 +103,7 @@ func TxUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int, finish time.Time) error
 		return nil
 	}
 
-	_, err := tx.Exec(query, state, finish, t.ID)
+	_, err := tx.Exec(query, state, finish, msg, t.ID)
 	if err != nil {
 		return err
 	}
@@ -114,21 +114,36 @@ func TxUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int, finish time.Time) error
 	return nil
 }
 
-func TxTaskTimeout(task *Task) error {
+func UpdateTaskStatus(task *Task, state int32, finishAt time.Time, msg string) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
 	}
 
-	tx, err := db.Beginx()
+	query := "UPDATE tb_task SET status=?,finished_at=?,errors=? WHERE id=?"
+
+	if finishAt.IsZero() {
+		query = "UPDATE tb_task SET status=?,errors=? WHERE id=?"
+
+		_, err := db.Exec(query, state, msg, task.ID)
+		if err != nil {
+			return err
+		}
+
+		atomic.StoreInt32(&task.Status, int32(state))
+
+		return nil
+	}
+
+	_, err = db.Exec(query, state, finishAt, msg, task.ID)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
 
-	err = TxUpdateTaskStatus(tx, task, 2, time.Now())
+	atomic.StoreInt32(&task.Status, int32(state))
+	task.FinishedAt = finishAt
 
-	return tx.Commit()
+	return nil
 }
 
 func QueryTask(id string) (*Task, error) {
