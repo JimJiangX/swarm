@@ -58,7 +58,7 @@ func NewTask(relate, linkto, des string, labels []string, timeout time.Duration)
 }
 
 func TxInsertTask(tx *sqlx.Tx, t *Task) error {
-	query := "INSERT INTO tb_task (id,name,related,link_to,description,labels,errors,timeout,status,create_at,finished_at) VALUES (:id,:name,:related,:link_to,:description,:labels,:errors,:timeout,:status,:create_at,:finished_at)"
+	query := "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,create_at,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:create_at,:finished_at)"
 
 	_, err := tx.NamedExec(query, t)
 
@@ -66,7 +66,7 @@ func TxInsertTask(tx *sqlx.Tx, t *Task) error {
 }
 
 func TxInsertMultiTask(tx *sqlx.Tx, tasks []*Task) error {
-	query := "INSERT INTO tb_task (id,name,related,link_to,description,labels,errors,timeout,status,create_at,finished_at) VALUES (:id,:name,:related,:link_to,:description,:labels,:errors,:timeout,:status,:create_at,:finished_at)"
+	query := "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,create_at,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:create_at,:finished_at)"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {

@@ -162,6 +162,8 @@ func (gd *Gardener) RemoveCronJob(strategyID string) error {
 	for key, val := range gd.cronJobs {
 		if val.strategy.ID == strategyID {
 			gd.cron.Remove(key)
+			gd.Unlock()
+
 			return nil
 		}
 	}
