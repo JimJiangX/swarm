@@ -1,6 +1,8 @@
 package swarm
 
 import (
+	"strings"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/store"
@@ -12,6 +14,7 @@ type Gardener struct {
 	*Cluster
 
 	// addition by fugr
+	host     string
 	cron     *crontab.Cron // crontab tasks
 	cronJobs map[crontab.EntryID]*serviceBackup
 
@@ -25,7 +28,7 @@ type Gardener struct {
 }
 
 // NewGardener is exported
-func NewGardener(cli cluster.Cluster) (*Gardener, error) {
+func NewGardener(cli cluster.Cluster, hosts []string) (*Gardener, error) {
 	log.WithFields(log.Fields{"name": "swarm"}).Debug("Initializing Region")
 	cluster, ok := cli.(*Cluster)
 	if !ok {
@@ -42,6 +45,17 @@ func NewGardener(cli cluster.Cluster) (*Gardener, error) {
 		stores:             make([]store.Store, 0, 50),
 		serviceSchedulerCh: make(chan *Service, 100),
 		serviceExecuteCh:   make(chan *Service, 100),
+	}
+
+	for _, host := range hosts {
+		protoAddrParts := strings.SplitN(host, "://", 2)
+		if len(protoAddrParts) == 1 {
+			protoAddrParts = append([]string{"tcp"}, protoAddrParts...)
+		}
+		if protoAddrParts[0] == "tcp" {
+			gd.host = protoAddrParts[1]
+			break
+		}
 	}
 
 	gd.cron.Start()
