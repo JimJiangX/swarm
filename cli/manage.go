@@ -290,6 +290,13 @@ func manage(c *cli.Context) {
 	}
 
 	sched := scheduler.New(s, fs)
+
+	// see https://github.com/codegangsta/cli/issues/160
+	hosts := c.StringSlice("host")
+	if c.IsSet("host") || c.IsSet("H") {
+		hosts = hosts[1:]
+	}
+
 	var cl cluster.Cluster
 	switch c.String("cluster-driver") {
 	case "mesos-experimental":
@@ -303,18 +310,13 @@ func manage(c *cli.Context) {
 			log.Fatal(err)
 		}
 
-		cl, err = swarm.NewGardener(cluster)
+		cl, err = swarm.NewGardener(cluster, hosts)
+
 	default:
 		log.Fatalf("unsupported cluster %q", c.String("cluster-driver"))
 	}
 	if err != nil {
 		log.Fatal(err)
-	}
-
-	// see https://github.com/codegangsta/cli/issues/160
-	hosts := c.StringSlice("host")
-	if c.IsSet("host") || c.IsSet("H") {
-		hosts = hosts[1:]
 	}
 
 	server := api.NewServer(hosts, tlsConfig)

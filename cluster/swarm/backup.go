@@ -24,15 +24,17 @@ const (
 
 type serviceBackup struct {
 	id       crontab.EntryID
+	server   string
 	strategy *database.BackupStrategy
 	schedule crontab.Schedule
 
 	svc *Service
 }
 
-func NewBackupJob(svc *Service) *serviceBackup {
+func NewBackupJob(addr string, svc *Service) *serviceBackup {
 	return &serviceBackup{
 		svc:      svc,
+		server:   addr,
 		strategy: svc.backup,
 	}
 }
@@ -43,7 +45,8 @@ func (bs *serviceBackup) Run() {
 		return
 	}
 
-	if !strategy.Enabled || strategy.Status != _BackupRunning {
+	if !strategy.Enabled || bs.server == "" ||
+		strategy.Status != _BackupRunning {
 		return
 	}
 
@@ -72,7 +75,7 @@ func (bs *serviceBackup) Run() {
 	}
 	defer smlib.UnLock(addr, port)
 
-	args := []string{"callback url", task.ID, strategy.ID, master.ID, strategy.Type}
+	args := []string{bs.server + "v1.0/task/backup/callback", task.ID, strategy.ID, master.ID, strategy.Type}
 
 	errCh := make(chan error, 1)
 	select {

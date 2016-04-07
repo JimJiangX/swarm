@@ -95,7 +95,7 @@ func (gd *Gardener) AddService(svc *Service) error {
 	gd.Unlock()
 
 	if svc.backup != nil {
-		bs := NewBackupJob(svc)
+		bs := NewBackupJob(gd.host, svc)
 		gd.RegisterBackupStrategy(bs)
 	}
 
