@@ -44,7 +44,7 @@ func (bf BackupFile) TableName() string {
 	return "tb_backup_file"
 }
 
-func TxInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
+func txInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
 	query := "INSERT INTO tb_backup_file (id,task_id,strategy_id,unit_id,type,path,size,status,retention,created_at) VALUES (:id,:task_id,:strategy_id,:unit_id,:type,:path,:size,:status,:retention,:created_at)"
 	_, err := tx.Exec(query, &bf)
 
@@ -134,7 +134,7 @@ func TxBackupTaskDone(task *Task, state int, backupFile BackupFile) error {
 	}
 	defer tx.Rollback()
 
-	err = TxInsertBackupFile(tx, backupFile)
+	err = txInsertBackupFile(tx, backupFile)
 	if err != nil {
 		return err
 	}
@@ -240,6 +240,13 @@ func (bs *BackupStrategy) UpdateNext(next time.Time, enable bool, state byte) er
 		bs.Enabled = enable
 		bs.Status = state
 	}
+
+	return err
+}
+
+func TxInsertBackupStrategy(tx *sqlx.Tx, strategy *BackupStrategy) error {
+	query := "INSERT INTO tb_backup_strategy (id,type,spec,next,valid,enabled,backup_dir,max_size,retention,timeout,status,create_at) VALUES (:id,:type,:spec,:next,:valid,:enabled,:backup_dir,:max_size,:retention,:timeout,:status,:create_at)"
+	_, err := tx.NamedExec(query, strategy)
 
 	return err
 }

@@ -40,6 +40,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	"POST": {
 		"/cluster":              postCluster,
 		"/task/backup/callback": postBackupCallback,
+		"/service":              postService,
 	},
 }
 

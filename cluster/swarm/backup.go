@@ -141,6 +141,7 @@ func (gd *Gardener) RegisterBackupStrategy(strategy *serviceBackup) error {
 			entry := gd.cron.Entry(key)
 			if entry.ID == key {
 				// already exist
+				gd.Unlock()
 
 				return nil
 			}
