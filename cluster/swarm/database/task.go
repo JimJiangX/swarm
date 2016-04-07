@@ -34,13 +34,21 @@ type BackupFile struct {
 	UnitID     string    `db:"unit_id"`
 	Type       string    `db:"type"` // full or incremental
 	Path       string    `db:"path"`
-	SizeByte   int64     `db:"size"`
+	SizeByte   int       `db:"size"`
 	Status     byte      `db:"status"`
+	Retention  time.Time `db:"retention"`
 	CreatedAt  time.Time `db:"created_at"`
 }
 
 func (bf BackupFile) TableName() string {
 	return "tb_backup_file"
+}
+
+func TxInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
+	query := "INSERT INTO tb_backup_file (id,task_id,strategy_id,unit_id,type,path,size,status,retention,created_at) VALUES (:id,:task_id,:strategy_id,:unit_id,:type,:path,:size,:status,:retention,:created_at)"
+	_, err := tx.Exec(query, &bf)
+
+	return err
 }
 
 func NewTask(relate, linkto, des string, labels []string, timeout time.Duration) *Task {
@@ -114,6 +122,31 @@ func TxUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int, finish time.Time, msg s
 	return nil
 }
 
+func TxBackupTaskDone(task *Task, state int, backupFile BackupFile) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = TxInsertBackupFile(tx, backupFile)
+	if err != nil {
+		return err
+	}
+
+	err = TxUpdateTaskStatus(tx, task, state, time.Now(), "")
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func UpdateTaskStatus(task *Task, state int32, finishAt time.Time, msg string) error {
 	db, err := GetDB(true)
 	if err != nil {
@@ -167,7 +200,7 @@ type BackupStrategy struct {
 	Enabled     bool          `db:"enabled"`
 	BackupDir   string        `db:"backup_dir"`
 	MaxSizeByte int64         `db:"max_size"`
-	Retention   time.Time     `db:"retention"`
+	Retention   time.Duration `db:"retention"`
 	Timeout     time.Duration `db:"timeout"` // s
 	Status      byte          `db:"status"`
 	CreatedAt   time.Time     `db:"create_at"`
@@ -235,4 +268,29 @@ func TXUpdateBackupJob(bs *BackupStrategy, task *Task) error {
 	}
 
 	return tx.Commit()
+}
+
+func BackupTaskValidate(taskID, strategyID, unitID string) (int, error) {
+
+	db, err := GetDB(true)
+	if err != nil {
+		return 0, err
+	}
+
+	state := 0
+	err = db.Get(&state, "SELECT status FROM tb_task WHERE id=?", taskID)
+	if err != nil {
+		return 0, err
+	}
+
+	rent := 0
+	err = db.QueryRowx("SELECT retention FROM tb_backup_strategy WHERE id=?", strategyID).Scan(&rent)
+	if err != nil {
+		return 0, err
+	}
+
+	err = db.Get(&state, "SELECT status FROM tb_unit WHERE id=?", unitID)
+
+	return rent, err
+
 }
