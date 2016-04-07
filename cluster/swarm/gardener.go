@@ -6,8 +6,10 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/utils"
+	"github.com/samalba/dockerclient"
 	crontab "gopkg.in/robfig/cron.v2"
 )
 
@@ -77,4 +79,18 @@ func (gd *Gardener) generateUUID(length int) string {
 
 func (gd *Gardener) TLSConfig() *tls.Config {
 	return gd.Cluster.TLSConfig
+}
+
+func (gd *Gardener) RegistryAuthConfig() (*dockerclient.AuthConfig, error) {
+	c, err := database.GetSystemConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	return &dockerclient.AuthConfig{
+		Username:      c.Username,
+		Password:      c.Password,
+		Email:         c.Email,
+		RegistryToken: c.RegistryToken,
+	}, nil
 }

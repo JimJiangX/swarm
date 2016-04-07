@@ -238,15 +238,45 @@ func GetService(id string) (Service, error) {
 	return s, err
 }
 
-func (svc *Service) Insert() error {
+func TxSaveService(svc *Service, strategy *BackupStrategy, task *Task, users []User) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
 	}
 
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = txInsertSerivce(tx, svc)
+	if err != nil {
+		return err
+	}
+
+	err = TxInsertTask(tx, task)
+	if err != nil {
+		return err
+	}
+
+	err = TxInsertBackupStrategy(tx, strategy)
+	if err != nil {
+		return err
+	}
+
+	err = TxInsertMultipleUsers(tx, users)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func txInsertSerivce(tx *sqlx.Tx, svc *Service) error {
 	// insert into database
 	query := "INSERT INTO tb_service (id,name,description,architecture,auto_healing,auto_scaling,high_available,status,backup_space,backup_strategy_id,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:auto_healing,:auto_scaling,:high_available,:status,:backup_space,:backup_strategy_id,:created_at,:finished_at)"
-	_, err = db.NamedExec(query, svc)
+	_, err := tx.NamedExec(query, svc)
 
 	return err
 }
@@ -315,4 +345,26 @@ type User struct {
 
 func (u User) TableName() string {
 	return "tb_users"
+}
+
+func TxInsertMultipleUsers(tx *sqlx.Tx, users []User) error {
+	query := "INSERT INTO tb_users (id,service_id,type,username,password,role,create_at) VALUES (:id,:service_id,:type,:username,:password,:role,:create_at)"
+
+	stmt, err := tx.PrepareNamed(query)
+	if err != nil {
+		return err
+	}
+
+	for i := range users {
+		if users[i] == (User{}) {
+			continue
+		}
+
+		_, err = stmt.Exec(&users[i])
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

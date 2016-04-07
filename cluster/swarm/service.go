@@ -99,6 +99,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *dockerclient.AuthC
 	service.task = task
 	service.backup = strategy
 	service.base = &req
+	service.authConfig = authConfig
 	service.users = converteToUsers(service.ID, req.Users)
 
 	service.Unlock()
@@ -148,11 +149,7 @@ func (gd *Gardener) AddService(svc *Service) error {
 		return errors.New("Service Cannot be nil")
 	}
 
-	gd.RLock()
-
 	s, err := gd.GetService(svc.ID)
-
-	gd.RUnlock()
 
 	if s != nil || err == nil {
 
@@ -163,7 +160,7 @@ func (gd *Gardener) AddService(svc *Service) error {
 		return errors.New("Service Status Conflict")
 	}
 
-	if err := svc.Insert(); err != nil {
+	if err := svc.SaveToDB(); err != nil {
 		atomic.StoreInt64(&svc.Status, 0)
 
 		return err
@@ -181,15 +178,45 @@ func (gd *Gardener) AddService(svc *Service) error {
 	return nil
 }
 
+func (svc *Service) SaveToDB() error {
+	return database.TxSaveService(&svc.Service, svc.backup, svc.task, svc.users)
+}
+
 func (gd *Gardener) GetService(IDOrName string) (*Service, error) {
+	gd.RLock()
+
 	for i := range gd.services {
 		if gd.services[i].ID == IDOrName ||
 			gd.services[i].Name == IDOrName {
+			gd.RUnlock()
+
 			return gd.services[i], nil
 		}
 	}
 
+	gd.RUnlock()
+
 	return nil, errors.New("Service Not Found")
+}
+
+func (gd *Gardener) CreateService(req structs.PostServiceRequest) error {
+	authConfig, err := gd.RegistryAuthConfig()
+	if err != nil {
+		return err
+	}
+
+	svc, err := BuildService(req, authConfig)
+	if err != nil {
+		return err
+	}
+
+	if err := gd.AddService(svc); err != nil {
+		return err
+	}
+
+	gd.ServiceToScheduler(svc)
+
+	return nil
 }
 
 func (svc *Service) CreateContainers() (err error) {

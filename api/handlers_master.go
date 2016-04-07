@@ -90,14 +90,8 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svc, err := swarm.BuildService(req, nil)
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := gd.AddService(svc); err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+	if err := gd.CreateService(req); err != nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 

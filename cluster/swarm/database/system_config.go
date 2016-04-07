@@ -10,19 +10,36 @@ import (
 )
 
 type Configurations struct {
-	ID                    int    `db:"id"`
-	ConsulIPs             string `db:"consul_IPs"`
-	ConsulPort            int    `db:"consul_port"`
-	ConsulDatacenter      string `db:"consul_dc"`
-	ConsulToken           string `db:"consul_token"`
-	ConsulWaitTime        int    `db:"consul_wait_time"`
-	DockerPort            int    `db:"docker_port"`
+	ID int `db:"id"`
+	ConsulConfig
+	HorusConfig
+	RegistryAuthConfig
+
+	DockerPort           int    `db:"docker_port"`
+	SwarmManageEndpoints string `db:"swarm_m_endpoints`
+	Retry                byte   `db:"retry"`
+}
+
+type ConsulConfig struct {
+	ConsulIPs        string `db:"consul_IPs"`
+	ConsulPort       int    `db:"consul_port"`
+	ConsulDatacenter string `db:"consul_dc"`
+	ConsulToken      string `db:"consul_token"`
+	ConsulWaitTime   int    `db:"consul_wait_time"`
+}
+
+type HorusConfig struct {
 	HorusDistributionIP   string `db:"horus_distribution_ip"`
 	HorusDistributionPort int    `db:"horus_distribution_port`
 	HorusEventIP          string `db:"horus_event_ip`
 	HorusEventPort        int    `db:"Horus_enevt_port`
-	SwarmManageEndpoints  string `db:"swarm_m_endpoints`
-	Retry                 byte   `db:"retry"`
+}
+
+type RegistryAuthConfig struct {
+	Username      string `db:"username"`
+	Password      string `db:"password"`
+	Email         string `db:"email"`
+	RegistryToken string `db:"registry_token"`
 }
 
 func (c Configurations) TableName() string {
@@ -31,7 +48,7 @@ func (c Configurations) TableName() string {
 
 func GetConsulClient() []*consulapi.Client {
 	// query data
-	c, err := GetConsulConfigFromDB()
+	c, err := GetSystemConfig()
 
 	port := strconv.Itoa(c.ConsulPort)
 	addrs := strings.Split(c.ConsulIPs, ";&;")
@@ -55,7 +72,7 @@ func GetConsulClient() []*consulapi.Client {
 	return clients
 }
 
-func GetConsulConfigFromDB() (*Configurations, error) {
+func GetSystemConfig() (*Configurations, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
