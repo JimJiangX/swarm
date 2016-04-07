@@ -115,7 +115,7 @@ func parseCpuset(config *cluster.ContainerConfig) (int, error) {
 }
 
 // "master:1--standby:1--slave:3"
-func getNodeArch(arch string) map[string]int {
+func getServiceArch(arch string) (map[string]int, error) {
 	s := strings.Split(arch, "--")
 	out := make(map[string]int)
 	for i := range s {
@@ -124,11 +124,13 @@ func getNodeArch(arch string) map[string]int {
 
 			if n, err := strconv.Atoi(parts[1]); err == nil {
 				out[parts[0]] = n
+			} else {
+				return nil, err
 			}
 		}
 	}
 
-	return out
+	return out, nil
 }
 
 /*

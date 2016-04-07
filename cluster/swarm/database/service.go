@@ -216,7 +216,7 @@ type Service struct {
 	AutoScaling      bool      `db:"auto_scaling"`
 	HighAvailable    bool      `db:"high_available"`
 	Status           int64     `db:"status"`
-	BackupSpaceByte  int64     `db:"backup_space"`
+	BackupSpaceByte  int       `db:"backup_space"`
 	BackupStrategyID string    `db:"backup_strategy_id"`
 	CreatedAt        time.Time `db:"created_at"`
 	FinishedAt       time.Time `db:"finished_at"`

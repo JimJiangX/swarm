@@ -6,9 +6,11 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster/swarm/database"
+	"github.com/docker/swarm/utils"
 	"github.com/samalba/dockerclient"
 	"github.com/yiduoyunQ/smlib"
 )
@@ -26,31 +28,108 @@ type Service struct {
 	units      []*unit
 	users      []database.User
 	backup     *database.BackupStrategy
+	task       *database.Task
 	authConfig *dockerclient.AuthConfig
 }
 
-func NewService(svc database.Service, retry, unitNum, userNum int) *Service {
+func NewService(svc database.Service, retry, unitNum int) *Service {
 	return &Service{
 		Service:           svc,
 		failureRetry:      retry,
 		units:             make([]*unit, unitNum),
-		users:             make([]database.User, userNum),
 		pendingContainers: make(map[string]*pendingContainer),
 	}
 }
 
-func BuildService(req structs.PostServiceRequest) (*Service, error) {
-	if err := Validate(req); err != nil {
+func BuildService(req structs.PostServiceRequest, authConfig *dockerclient.AuthConfig) (*Service, error) {
+	if warnings := Validate(req); len(warnings) > 0 {
+		return nil, errors.New(strings.Join(warnings, ","))
+	}
+
+	strategy := &database.BackupStrategy{
+		ID:          utils.Generate64UUID(),
+		Type:        req.Strategy.Type,
+		Spec:        req.Strategy.Spec,
+		Valid:       req.Strategy.Valid,
+		Enabled:     true,
+		BackupDir:   req.Strategy.BackupDir,
+		MaxSizeByte: req.Strategy.MaxSize,
+		Retention:   req.Strategy.Retention * time.Second,
+		Timeout:     req.Strategy.Timeout * time.Second,
+		Status:      _BackupCreate,
+		CreatedAt:   time.Now(),
+	}
+
+	svc := database.Service{
+		ID:               utils.Generate64UUID(),
+		Name:             req.Name,
+		Description:      req.Description,
+		Architecture:     req.Architecture,
+		AutoHealing:      req.AutoHealing,
+		AutoScaling:      req.AutoScaling,
+		HighAvailable:    req.HighAvailable,
+		Status:           0,
+		BackupSpaceByte:  req.Strategy.MaxSize,
+		BackupStrategyID: strategy.ID,
+		CreatedAt:        time.Now(),
+	}
+
+	arch, err := getServiceArch(req.Architecture)
+	if err != nil {
 		return nil, err
 	}
 
-	svc := database.Service{}
+	nodeNum := 0
+	for _, n := range arch {
+		nodeNum += n
+	}
 
-	return NewService(svc, 2, 0, 0), nil
+	service := NewService(svc, 2, nodeNum)
+
+	task := &database.Task{
+		ID:        utils.Generate64UUID(),
+		Related:   "service",
+		Linkto:    svc.ID,
+		Status:    0,
+		CreatedAt: time.Now(),
+	}
+
+	service.Lock()
+
+	service.task = task
+	service.backup = strategy
+	service.base = &req
+	service.users = converteToUsers(service.ID, req.Users)
+
+	service.Unlock()
+
+	return service, nil
 }
 
-func Validate(req structs.PostServiceRequest) error {
+func Validate(req structs.PostServiceRequest) []string {
+	_, err := getServiceArch(req.Architecture)
+	if err != nil {
+		return []string{err.Error()}
+	}
+
 	return nil
+}
+
+func converteToUsers(service string, users []structs.User) []database.User {
+	list := make([]database.User, len(users))
+	for i := range users {
+		list[i] = database.User{
+			ID:        utils.Generate32UUID(),
+			ServiceID: service,
+			Type:      users[i].Type,
+			Username:  users[i].Username,
+			Password:  users[i].Password,
+			Role:      users[i].Role,
+			CreatedAt: time.Now(),
+		}
+	}
+
+	return list
 }
 
 func (svc *Service) getUnit(IDOrName string) (*unit, error) {
@@ -542,4 +621,8 @@ loop:
 	master, err := svc.getUnit(masterID)
 
 	return addr, port, master, err
+}
+
+func (svc *Service) Task() *database.Task {
+	return svc.task
 }
