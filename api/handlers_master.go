@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	goctx "golang.org/x/net/context"
 
@@ -61,4 +62,53 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(w, "{%q:%q}", "Id", cluster.ID)
+}
+
+// Post /task/backup/callback
+func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	req := structs.BackupTaskCallback{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	task := &database.Task{ID: req.TaskID}
+
+	if req.Error() != nil {
+		err := database.UpdateTaskStatus(task, structs.TaskFailed, time.Now(), req.Error().Error())
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		return
+	}
+
+	rent, err := database.BackupTaskValidate(req.TaskID, req.StrategyID, req.UnitID)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	backupFile := database.BackupFile{
+		ID:         utils.Generate64UUID(),
+		TaskID:     req.TaskID,
+		StrategyID: req.StrategyID,
+		UnitID:     req.UnitID,
+		Type:       req.Type,
+		Path:       req.Path,
+		SizeByte:   req.Size,
+		Status:     req.Status,
+		CreatedAt:  time.Now(),
+	}
+
+	if rent > 0 {
+		backupFile.Retention = backupFile.CreatedAt.Add(time.Duration(rent))
+	}
+
+	err = database.TxBackupTaskDone(task, structs.TaskDone, backupFile)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
