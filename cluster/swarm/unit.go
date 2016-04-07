@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/cluster"
@@ -260,6 +261,11 @@ func (u *unit) stopService() error {
 
 func (u *unit) backup(args ...string) error {
 	cmd := u.BackupCmd(args...)
+
+	log.WithFields(log.Fields{
+		"Name": u.Name,
+		"Cmd":  cmd,
+	}).Debugln("start Backup job")
 
 	return containerExec(u.engine, u.ContainerID, cmd, false)
 }

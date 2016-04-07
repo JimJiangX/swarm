@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	"strings"
 	"time"
 
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -13,6 +12,14 @@ const (
 	_BackupWaiting = iota
 	_BackupRunning
 	_BackupDisabled
+
+	_TaskCreate = iota
+	_TaskRunning
+	_TaskStop
+	_TaskCancel
+	_TaskDone
+	_TaskTimeout
+	_TaskFailed
 )
 
 type serviceBackup struct {
@@ -36,13 +43,13 @@ func (bs *serviceBackup) Run() {
 		return
 	}
 
-	if !strategy.Enabled || strategy.Status != _BackupWaiting {
+	if !strategy.Enabled || strategy.Status != _BackupRunning {
 		return
 	}
 
 	task := database.NewTask("backup_strategy", strategy.ID, "", nil, strategy.Timeout)
 	strategy.Status = _BackupRunning
-	task.Status = 1
+	task.Status = _TaskCreate
 
 	err = database.TXUpdateBackupJob(strategy, task)
 	if err != nil {
@@ -51,40 +58,16 @@ func (bs *serviceBackup) Run() {
 
 	bs.strategy = strategy
 
-	addr, port, err := bs.svc.GetSwithManagerAddr()
+	addr, port, master, err := bs.svc.GetMasterAndSWM()
 	if err != nil {
+		err = database.UpdateTaskStatus(task, _TaskCancel, time.Now(), "Cancel,The Task marked as TaskCancel,"+err.Error())
+
 		return
 	}
-
-	topology, err := smlib.GetTopology(addr, port)
-	if err != nil {
-		return
-	}
-
-	masterID := ""
-loop:
-	for _, val := range topology.DataNodeGroup {
-		for id, node := range val {
-			if strings.EqualFold(node.Type, "master") {
-				masterID = id
-
-				break loop
-			}
-		}
-	}
-
-	if masterID == "" {
-		// Not Found master DB
-		return
-	}
-
-	bs.svc.RLock()
-
-	master, err := bs.svc.getUnit(masterID)
-
-	bs.svc.RUnlock()
 
 	if err := smlib.Lock(addr, port); err != nil {
+		err = database.UpdateTaskStatus(task, _TaskCancel, time.Now(), "TaskCancel,Switch Manager is busy now,"+err.Error())
+
 		return
 	}
 	defer smlib.UnLock(addr, port)
@@ -96,7 +79,7 @@ loop:
 	case errCh <- master.backup(args...):
 
 	case <-time.After(strategy.Timeout):
-
+		err = database.UpdateTaskStatus(task, _TaskTimeout, time.Now(), "Timeout,The Task marked as TaskTimeout")
 	}
 
 	<-errCh
@@ -135,7 +118,7 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 		return time.Time{}
 	}
 
-	err = strategy.UpdateNext(next, true, _BackupWaiting)
+	err = strategy.UpdateNext(next, true, _BackupRunning)
 	if err != nil {
 		return time.Time{}
 	}
@@ -146,10 +129,24 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 }
 
 func (gd *Gardener) RegisterBackupStrategy(strategy *serviceBackup) error {
+	gd.Lock()
+
+	for key, val := range gd.cronJobs {
+		if val.strategy.ID == strategy.strategy.ID &&
+			val.svc.ID == strategy.svc.ID {
+
+			entry := gd.cron.Entry(key)
+			if entry.ID == key {
+				// already exist
+
+				return nil
+			}
+		}
+	}
+
 	id := gd.cron.Schedule(strategy, strategy)
 	strategy.id = id
 
-	gd.Lock()
 	gd.cronJobs[id] = strategy
 	gd.Unlock()
 
@@ -162,9 +159,8 @@ func (gd *Gardener) RemoveCronJob(strategyID string) error {
 	for key, val := range gd.cronJobs {
 		if val.strategy.ID == strategyID {
 			gd.cron.Remove(key)
-			gd.Unlock()
+			delete(gd.cronJobs, key)
 
-			return nil
 		}
 	}
 

@@ -3,12 +3,14 @@ package swarm
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/samalba/dockerclient"
+	"github.com/yiduoyunQ/smlib"
 )
 
 type Service struct {
@@ -460,32 +462,6 @@ func (svc *Service) Destroy() error {
 	return nil
 }
 
-// GetRoles returns role of units belong to Service,get infomation from consul server,
-// map[unitID]role
-func (svc *Service) getRoles() (map[string]string, error) {
-
-	return nil, nil
-}
-
-func (svc *Service) GetUnitRole(role string) (*unit, error) {
-	svc.RLock()
-	defer svc.RUnlock()
-
-	roles, err := svc.getRoles()
-	if err != nil {
-		return nil, err
-	}
-
-	for id, r := range roles {
-		if role == r {
-			return svc.getUnit(id)
-		}
-	}
-
-	return nil, fmt.Errorf("Not Found unit role:%s In Service %s", role, svc.ID)
-
-}
-
 func (svc *Service) getUnitByType(Type string) (*unit, error) {
 	for i := range svc.units {
 		if svc.units[i].Type == Type {
@@ -506,11 +482,9 @@ func (svc *Service) GetSwithManager() (*unit, error) {
 	return u, err
 }
 
-func (svc *Service) GetSwithManagerAddr() (addr string, port int, err error) {
-	svc.RLock()
-	u, err := svc.getUnitByType("Switch Manager")
-	svc.RUnlock()
+func (svc *Service) getSwithManagerAddr() (addr string, port int, err error) {
 
+	u, err := svc.getUnitByType("Switch Manager")
 	if err != nil {
 		return "", 0, err
 	}
@@ -524,7 +498,7 @@ func (svc *Service) GetSwithManagerAddr() (addr string, port int, err error) {
 	}
 
 	for i := range u.ports {
-		if u.ports[i].Name == "Http Service" {
+		if strings.EqualFold(u.ports[i].Name, "Port") {
 			port = u.ports[i].Port
 
 			return addr, port, nil
@@ -532,4 +506,40 @@ func (svc *Service) GetSwithManagerAddr() (addr string, port int, err error) {
 	}
 
 	return addr, port, fmt.Errorf("Not Found")
+}
+
+func (svc *Service) GetMasterAndSWM() (string, int, *unit, error) {
+	svc.RLock()
+	defer svc.RUnlock()
+
+	addr, port, err := svc.getSwithManagerAddr()
+	if err != nil {
+		return addr, port, nil, err
+	}
+
+	topology, err := smlib.GetTopology(addr, port)
+	if err != nil {
+		return addr, port, nil, err
+	}
+
+	masterID := ""
+loop:
+	for _, val := range topology.DataNodeGroup {
+		for id, node := range val {
+			if strings.EqualFold(node.Type, "master") {
+				masterID = id
+
+				break loop
+			}
+		}
+	}
+
+	if masterID == "" {
+		// Not Found master DB
+		return addr, port, nil, fmt.Errorf("Master Unit Not Found")
+	}
+
+	master, err := svc.getUnit(masterID)
+
+	return addr, port, master, err
 }
