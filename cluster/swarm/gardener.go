@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	"crypto/tls"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
@@ -72,4 +73,8 @@ func (gd *Gardener) generateUUID(length int) string {
 			return id
 		}
 	}
+}
+
+func (gd *Gardener) TLSConfig() *tls.Config {
+	return gd.Cluster.TLSConfig
 }

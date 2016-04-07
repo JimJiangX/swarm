@@ -18,11 +18,11 @@ type BackupTaskCallback struct {
 	TaskID     string `json:"task_id"`
 	StrategyID string `json:"strategy_id"`
 	UnitID     string `json:"unit_id"`
-	Type       string `json:"type"`
-	Path       string `json:"path"`
+	Type       string `json:"type,omitempty"`
+	Path       string `json:"path,omitempty"`
 	Status     byte   `json:"status"`
-	Size       int    `json:"size"`
-	Msg        string `json:"msg"`
+	Size       int    `json:"size,omitempty"`
+	Msg        string `json:"msg,omitempty"`
 }
 
 func (bt BackupTaskCallback) Error() error {

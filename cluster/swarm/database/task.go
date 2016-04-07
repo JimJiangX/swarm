@@ -199,7 +199,7 @@ type BackupStrategy struct {
 	Valid       time.Time     `db:"valid"`
 	Enabled     bool          `db:"enabled"`
 	BackupDir   string        `db:"backup_dir"`
-	MaxSizeByte int64         `db:"max_size"`
+	MaxSizeByte int           `db:"max_size"`
 	Retention   time.Duration `db:"retention"`
 	Timeout     time.Duration `db:"timeout"` // s
 	Status      byte          `db:"status"`

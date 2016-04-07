@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	_BackupWaiting = iota
+	_BackupCreate = iota
+	_BackupWaiting
 	_BackupRunning
 	_BackupDisabled
 
@@ -45,8 +46,7 @@ func (bs *serviceBackup) Run() {
 		return
 	}
 
-	if !strategy.Enabled || bs.server == "" ||
-		strategy.Status != _BackupRunning {
+	if !strategy.Enabled || bs.server == "" {
 		return
 	}
 
@@ -121,7 +121,7 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 		return time.Time{}
 	}
 
-	err = strategy.UpdateNext(next, true, _BackupRunning)
+	err = strategy.UpdateNext(next, true, _BackupWaiting)
 	if err != nil {
 		return time.Time{}
 	}

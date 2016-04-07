@@ -9,5 +9,5 @@ type PostClusterRequest struct {
 	UsageLimit float32 `json:"usage_limit"`
 
 	StorageType string `json:"storage_type"`
-	StorageID   string `json:"storage_id"`
+	StorageID   string `json:"storage_id,omitempty"`
 }

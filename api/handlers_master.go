@@ -5,14 +5,20 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	goctx "golang.org/x/net/context"
 
 	"github.com/docker/swarm/api/structs"
+	"github.com/docker/swarm/cluster/swarm"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/utils"
+)
+
+const (
+	StatusUnprocessableEntity = 422
 )
 
 var errUnsupportGardener = errors.New("Unsupported Gardener")
@@ -62,6 +68,39 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(w, "{%q:%q}", "Id", cluster.ID)
+}
+
+// Post /service
+func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	req := structs.PostServiceRequest{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if warnings := swarm.Validate(req); len(warnings) > 0 {
+		httpError(w, strings.Join(warnings, ","), StatusUnprocessableEntity)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	svc, err := swarm.BuildService(req, nil)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := gd.AddService(svc); err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 }
 
 // Post /task/backup/callback
