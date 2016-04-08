@@ -3,10 +3,12 @@ package swarm
 import (
 	"crypto/tls"
 	"strings"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	kvdiscovery "github.com/docker/docker/pkg/discovery/kv"
 	kvstore "github.com/docker/libkv/store"
+	"github.com/docker/libkv/store/consul"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
@@ -35,21 +37,14 @@ type Gardener struct {
 
 // NewGardener is exported
 func NewGardener(cli cluster.Cluster, hosts []string) (*Gardener, error) {
-	log.WithFields(log.Fields{"name": "swarm"}).Debug("Initializing Region")
+	log.WithFields(log.Fields{"name": "swarm"}).Debug("Initializing Gardener")
 	cluster, ok := cli.(*Cluster)
 	if !ok {
 		log.Fatal("cluster.Cluster Prototype is not *swarm.Cluster")
 	}
 
-	kvDiscovery, ok := cluster.discovery.(*kvdiscovery.Discovery)
-	if !ok {
-		log.Fatal("kvDiscovery is only supported with consul, etcd and zookeeper discovery.")
-	}
-	client := kvDiscovery.Store()
-
 	gd := &Gardener{
 		Cluster:            cluster,
-		kvClient:           client,
 		cron:               crontab.New(),
 		cronJobs:           make(map[crontab.EntryID]*serviceBackup),
 		datacenters:        make([]*Datacenter, 0, 50),
@@ -58,6 +53,30 @@ func NewGardener(cli cluster.Cluster, hosts []string) (*Gardener, error) {
 		stores:             make([]store.Store, 0, 50),
 		serviceSchedulerCh: make(chan *Service, 100),
 		serviceExecuteCh:   make(chan *Service, 100),
+	}
+
+	kvDiscovery, ok := cluster.discovery.(*kvdiscovery.Discovery)
+	if ok {
+		gd.kvClient = kvDiscovery.Store()
+	} else {
+		log.Warning("kvDiscovery is only supported with consul, etcd and zookeeper discovery.")
+
+		// query consul config from DB
+		endpoints, _, _, wait, err := database.GetConsulConfig()
+		if err != nil {
+			log.Fatalf("Initializing kvStore,DB Query Error,%s", err)
+		}
+
+		options := &kvstore.Config{
+			TLS:               gd.TLSConfig(),
+			ConnectionTimeout: time.Duration(wait) * time.Second,
+		}
+
+		gd.kvClient, err = consul.New(endpoints, options)
+		if err != nil {
+			log.Fatalf("Initializing kvStore,consul Config Error,%s", err)
+		}
+
 	}
 
 	for _, host := range hosts {
