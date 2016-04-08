@@ -90,11 +90,20 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := gd.CreateService(req); err != nil {
+	svc, err := gd.CreateService(req)
+	if err != nil {
 		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	response := structs.PostServiceResponse{
+		ID:     svc.ID,
+		TaskID: svc.Task().ID,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(response)
 }
 
 // Post /task/backup/callback

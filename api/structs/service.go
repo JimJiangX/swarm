@@ -57,3 +57,8 @@ type BackupStrategy struct {
 	MaxSize   int           // byte
 	BackupDir string        `json:",omitempty"`
 }
+
+type PostServiceResponse struct {
+	ID     string
+	TaskID string
+}
