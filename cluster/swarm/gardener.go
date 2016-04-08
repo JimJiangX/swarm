@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"crypto/tls"
+	"fmt"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/utils"
+	consulapi "github.com/hashicorp/consul/api"
 	"github.com/samalba/dockerclient"
 	crontab "gopkg.in/robfig/cron.v2"
 )
@@ -21,10 +23,11 @@ type Gardener struct {
 	*Cluster
 
 	// addition by fugr
-	host     string
-	cron     *crontab.Cron // crontab tasks
-	kvClient kvstore.Store
-	cronJobs map[crontab.EntryID]*serviceBackup
+	host         string
+	cron         *crontab.Cron // crontab tasks
+	consulClient *consulapi.Client
+	kvClient     kvstore.Store
+	cronJobs     map[crontab.EntryID]*serviceBackup
 
 	datacenters []*Datacenter
 	networkings []*Networking
@@ -60,23 +63,40 @@ func NewGardener(cli cluster.Cluster, hosts []string) (*Gardener, error) {
 		gd.kvClient = kvDiscovery.Store()
 	} else {
 		log.Warning("kvDiscovery is only supported with consul, etcd and zookeeper discovery.")
+	}
 
-		// query consul config from DB
-		endpoints, _, _, wait, err := database.GetConsulConfig()
-		if err != nil {
-			log.Fatalf("Initializing kvStore,DB Query Error,%s", err)
-		}
+	// query consul config from DB
+	endpoints, dc, token, wait, err := database.GetConsulConfig()
+	if err != nil {
+		log.Fatalf("Initializing kvStore,DB Query Error,%s", err)
+	}
 
-		options := &kvstore.Config{
-			TLS:               gd.TLSConfig(),
-			ConnectionTimeout: time.Duration(wait) * time.Second,
-		}
+	if len(endpoints) == 0 {
+		return nil, fmt.Errorf("Consul Config Settings Error")
+	}
 
+	config := consulapi.Config{
+		Address:    endpoints[0],
+		Datacenter: dc,
+		WaitTime:   time.Duration(wait) * time.Second,
+		Token:      token,
+	}
+
+	gd.consulClient, err = consulapi.NewClient(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	options := &kvstore.Config{
+		TLS:               gd.TLSConfig(),
+		ConnectionTimeout: config.WaitTime,
+	}
+
+	if gd.kvClient == nil {
 		gd.kvClient, err = consul.New(endpoints, options)
 		if err != nil {
 			log.Fatalf("Initializing kvStore,consul Config Error,%s", err)
 		}
-
 	}
 
 	for _, host := range hosts {
