@@ -46,14 +46,17 @@ func (c Configurations) TableName() string {
 	return "tb_system_config"
 }
 
-func GetConsulClient() []*consulapi.Client {
+func GetConsulClient() ([]*consulapi.Client, error) {
 	// query data
 	c, err := GetSystemConfig()
+	if err != nil {
+		return nil, err
+	}
 
 	port := strconv.Itoa(c.ConsulPort)
 	addrs := strings.Split(c.ConsulIPs, ";&;")
 
-	clients := make([]*consulapi.Client, len(addrs))
+	clients := make([]*consulapi.Client, 0, len(addrs))
 
 	for i := range addrs {
 		config := consulapi.Config{
@@ -63,13 +66,33 @@ func GetConsulClient() []*consulapi.Client {
 			Token:      c.ConsulToken,
 		}
 
-		clients[i], err = consulapi.NewClient(&config)
-		if err != nil {
-			clients[i] = nil
+		client, err := consulapi.NewClient(&config)
+		if err == nil {
+			clients = append(clients, client)
 		}
 	}
 
-	return clients
+	return clients, nil
+}
+
+func GetConsulConfig() ([]string, string, string, int, error) {
+	// query data
+	c, err := GetSystemConfig()
+	if err != nil {
+		return nil, "", "", 0, err
+	}
+
+	port := strconv.Itoa(c.ConsulPort)
+	addrs := strings.Split(c.ConsulIPs, ";&;")
+
+	endpoints := make([]string, len(addrs))
+
+	for i := range addrs {
+		endpoints[i] = addrs[i] + ":" + port
+	}
+
+	return endpoints, c.ConsulDatacenter, c.ConsulToken, c.ConsulWaitTime, nil
+
 }
 
 func GetSystemConfig() (*Configurations, error) {
