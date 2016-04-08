@@ -50,11 +50,21 @@ func (u *unit) factory() error {
 	case "mysql":
 		u.configParser = &mysqlConfig{}
 		// cmd
-		u.ContainerCmd = NewMysqlCmd(&u.Unit)
+		u.ContainerCmd = &mysqlCmd{}
+
+	case "proxy", "upproxy":
+		u.configParser = &proxyConfig{}
+
+		u.ContainerCmd = &proxyCmd{}
+
+	case "switch manager", "SM":
+		u.configParser = &switchManagerConfig{}
+
+		u.ContainerCmd = &switchManagerCmd{}
 
 	default:
 
-		return fmt.Errorf("Unsupport Type:%s", u.Type)
+		return fmt.Errorf("Unsupported Type:%s", u.Type)
 	}
 
 	return nil

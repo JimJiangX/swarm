@@ -119,15 +119,7 @@ func (u *unit) SaveToDisk(content string) (string, error) {
 	return config.ID, nil
 }
 
-type mysqlCmd struct {
-	unit *database.Unit
-}
-
-func NewMysqlCmd(unit *database.Unit) *mysqlCmd {
-	return &mysqlCmd{
-		unit: unit,
-	}
-}
+type mysqlCmd struct{}
 
 func (mysqlCmd) StartContainerCmd() []string     { return nil }
 func (mysqlCmd) StartServiceCmd() []string       { return nil }
@@ -166,3 +158,33 @@ func (mysqlConfig) Marshal(data map[string]interface{}) ([]byte, error) {
 
 	return nil, nil
 }
+
+type proxyCmd struct{}
+
+func (proxyCmd) StartContainerCmd() []string                { return nil }
+func (proxyCmd) StartServiceCmd() []string                  { return nil }
+func (proxyCmd) StopServiceCmd() []string                   { return nil }
+func (proxyCmd) RecoverCmd(file string) []string            { return nil }
+func (proxyCmd) BackupCmd(args ...string) []string          { return nil }
+func (proxyCmd) CleanBackupFileCmd(args ...string) []string { return nil }
+
+type proxyConfig struct{}
+
+func (proxyConfig) Validate(data map[string]interface{}) error        { return nil }
+func (proxyConfig) Parse(data string) (map[string]interface{}, error) { return nil, nil }
+func (proxyConfig) Marshal(map[string]interface{}) ([]byte, error)    { return nil, nil }
+
+type switchManagerCmd struct{}
+
+func (switchManagerCmd) StartContainerCmd() []string                { return nil }
+func (switchManagerCmd) StartServiceCmd() []string                  { return nil }
+func (switchManagerCmd) StopServiceCmd() []string                   { return nil }
+func (switchManagerCmd) RecoverCmd(file string) []string            { return nil }
+func (switchManagerCmd) BackupCmd(args ...string) []string          { return nil }
+func (switchManagerCmd) CleanBackupFileCmd(args ...string) []string { return nil }
+
+type switchManagerConfig struct{}
+
+func (switchManagerConfig) Validate(data map[string]interface{}) error        { return nil }
+func (switchManagerConfig) Parse(data string) (map[string]interface{}, error) { return nil, nil }
+func (switchManagerConfig) Marshal(map[string]interface{}) ([]byte, error)    { return nil, nil }
