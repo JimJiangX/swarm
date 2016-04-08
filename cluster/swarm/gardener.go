@@ -23,11 +23,13 @@ type Gardener struct {
 	*Cluster
 
 	// addition by fugr
-	host         string
-	cron         *crontab.Cron // crontab tasks
-	consulClient *consulapi.Client
-	kvClient     kvstore.Store
-	cronJobs     map[crontab.EntryID]*serviceBackup
+	host string
+
+	cron               *crontab.Cron // crontab tasks
+	consulClient       *consulapi.Client
+	kvClient           kvstore.Store
+	registryAuthConfig *dockerclient.AuthConfig
+	cronJobs           map[crontab.EntryID]*serviceBackup
 
 	datacenters []*Datacenter
 	networkings []*Networking
@@ -66,7 +68,19 @@ func NewGardener(cli cluster.Cluster, hosts []string) (*Gardener, error) {
 	}
 
 	// query consul config from DB
-	endpoints, dc, token, wait, err := database.GetConsulConfig()
+	sysConfig, err := database.GetSystemConfig()
+	if err != nil {
+		log.Fatalf("DB Error,%s", err)
+	}
+
+	gd.registryAuthConfig = &dockerclient.AuthConfig{
+		Username:      sysConfig.Registry.Username,
+		Password:      sysConfig.Registry.Password,
+		Email:         sysConfig.Registry.Email,
+		RegistryToken: sysConfig.Registry.RegistryToken,
+	}
+
+	endpoints, dc, token, wait, err := sysConfig.GetConsulConfig()
 	if err != nil {
 		log.Fatalf("Initializing kvStore,DB Query Error,%s", err)
 	}
