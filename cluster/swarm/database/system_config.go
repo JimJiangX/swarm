@@ -13,11 +13,10 @@ type Configurations struct {
 	ID int `db:"id"`
 	ConsulConfig
 	HorusConfig
-	RegistryAuthConfig
+	Registry
 
-	DockerPort           int    `db:"docker_port"`
-	SwarmManageEndpoints string `db:"swarm_m_endpoints`
-	Retry                byte   `db:"retry"`
+	DockerPort int  `db:"docker_port"`
+	Retry      byte `db:"retry"`
 }
 
 type ConsulConfig struct {
@@ -35,24 +34,22 @@ type HorusConfig struct {
 	HorusEventPort        int    `db:"Horus_enevt_port`
 }
 
-type RegistryAuthConfig struct {
-	Username      string `db:"username"`
-	Password      string `db:"password"`
-	Email         string `db:"email"`
+type Registry struct {
+	Domain        string `db:"registry_domain"`
+	Address       string `db:"registry_address"`
+	RegistryPort  int    `db:"registry_port"`
+	Username      string `db:"registry_username"`
+	Password      string `db:"registry_password"`
+	Email         string `db:"registry_email"`
 	RegistryToken string `db:"registry_token"`
+	CA_CRT        string `db:"registry_ca_crt"`
 }
 
 func (c Configurations) TableName() string {
 	return "tb_system_config"
 }
 
-func GetConsulClient() ([]*consulapi.Client, error) {
-	// query data
-	c, err := GetSystemConfig()
-	if err != nil {
-		return nil, err
-	}
-
+func (c Configurations) GetConsulClient() ([]*consulapi.Client, error) {
 	port := strconv.Itoa(c.ConsulPort)
 	addrs := strings.Split(c.ConsulIPs, ";&;")
 
@@ -75,12 +72,7 @@ func GetConsulClient() ([]*consulapi.Client, error) {
 	return clients, nil
 }
 
-func GetConsulConfig() ([]string, string, string, int, error) {
-	// query data
-	c, err := GetSystemConfig()
-	if err != nil {
-		return nil, "", "", 0, err
-	}
+func (c Configurations) GetConsulConfig() ([]string, string, string, int, error) {
 
 	port := strconv.Itoa(c.ConsulPort)
 	addrs := strings.Split(c.ConsulIPs, ";&;")
@@ -92,7 +84,6 @@ func GetConsulConfig() ([]string, string, string, int, error) {
 	}
 
 	return endpoints, c.ConsulDatacenter, c.ConsulToken, c.ConsulWaitTime, nil
-
 }
 
 func GetSystemConfig() (*Configurations, error) {
