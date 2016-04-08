@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
+	kvdiscovery "github.com/docker/docker/pkg/discovery/kv"
+	kvstore "github.com/docker/libkv/store"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
@@ -19,6 +21,7 @@ type Gardener struct {
 	// addition by fugr
 	host     string
 	cron     *crontab.Cron // crontab tasks
+	kvClient kvstore.Store
 	cronJobs map[crontab.EntryID]*serviceBackup
 
 	datacenters []*Datacenter
@@ -38,8 +41,15 @@ func NewGardener(cli cluster.Cluster, hosts []string) (*Gardener, error) {
 		log.Fatal("cluster.Cluster Prototype is not *swarm.Cluster")
 	}
 
+	kvDiscovery, ok := cluster.discovery.(*kvdiscovery.Discovery)
+	if !ok {
+		log.Fatal("kvDiscovery is only supported with consul, etcd and zookeeper discovery.")
+	}
+	client := kvDiscovery.Store()
+
 	gd := &Gardener{
 		Cluster:            cluster,
+		kvClient:           client,
 		cron:               crontab.New(),
 		cronJobs:           make(map[crontab.EntryID]*serviceBackup),
 		datacenters:        make([]*Datacenter, 0, 50),
