@@ -27,7 +27,75 @@ type Datacenter struct {
 
 	stores []store.Store
 
-	nodes []*database.Node
+	nodes []*Node
+}
+
+type Node struct {
+	*database.Node
+	task     *database.Task
+	user     string
+	password string
+}
+
+func NewNode(addr, name, cluster, user, password string, num int) *Node {
+	node := &database.Node{
+		ID:           utils.Generate64UUID(),
+		Name:         name,
+		ClusterID:    cluster,
+		Addr:         addr,
+		MaxContainer: num,
+	}
+
+	task := database.NewTask("node", node.ID, "", nil, 0)
+
+	return &Node{
+		Node:     node,
+		task:     task,
+		user:     user,
+		password: password,
+	}
+}
+
+func (node *Node) Task() *database.Task {
+	return node.task
+}
+
+func (node *Node) Insert() error {
+	err := database.TxInsertNodeAndTask(node.Node, node.task)
+	if err != nil {
+		log.Errorf("Node:%s Insert INTO DB Error,%s", node.Name, err)
+	}
+
+	return err
+}
+
+func SaveMultiNodesToDB(nodes []*Node) error {
+	list := make([]*database.Node, len(nodes))
+	tasks := make([]*database.Task, len(nodes))
+
+	for i := range nodes {
+		list[i] = nodes[i].Node
+		tasks[i] = nodes[i].task
+	}
+
+	return database.TxInsertMultiNodeAndTask(list, tasks)
+}
+
+func (gd *Gardener) Datacenter(IDOrName string) (*Datacenter, error) {
+
+	gd.RLock()
+	for i := range gd.datacenters {
+		if gd.datacenters[i].ID == IDOrName || gd.datacenters[i].Name == IDOrName {
+			gd.RUnlock()
+
+			return gd.datacenters[i], nil
+		}
+	}
+
+	gd.RUnlock()
+
+	return nil, fmt.Errorf("Not Found %s", IDOrName)
+
 }
 
 func (gd *Gardener) AddDatacenter(cl database.Cluster, stores []store.Store) error {
@@ -54,7 +122,7 @@ func (gd *Gardener) AddDatacenter(cl database.Cluster, stores []store.Store) err
 		RWMutex: sync.RWMutex{},
 		Cluster: &cl,
 		stores:  stores,
-		nodes:   make([]*database.Node, 0, 100),
+		nodes:   make([]*Node, 0, 100),
 	}
 
 	gd.Lock()
@@ -66,7 +134,7 @@ func (gd *Gardener) AddDatacenter(cl database.Cluster, stores []store.Store) err
 	return nil
 }
 
-func (dc *Datacenter) ListNode() []*database.Node {
+func (dc *Datacenter) ListNode() []*Node {
 	dc.RLock()
 	nodes := dc.nodes
 	dc.RUnlock()
@@ -104,13 +172,13 @@ func (dc *Datacenter) GetNode(IDOrName string) (database.Node, error) {
 
 	if node != nil {
 
-		return *node, nil
+		return *node.Node, nil
 	}
 
 	return database.GetNode(IDOrName)
 }
 
-func (dc *Datacenter) getNode(IDOrName string) *database.Node {
+func (dc *Datacenter) getNode(IDOrName string) *Node {
 	for i := range dc.nodes {
 		if dc.nodes[i].ID == IDOrName || dc.nodes[i].Name == IDOrName {
 
@@ -122,62 +190,40 @@ func (dc *Datacenter) getNode(IDOrName string) *database.Node {
 }
 
 func (dc *Datacenter) listNodeID() []string {
-	out := make([]string, 0, len(dc.nodes))
 
 	dc.RLock()
-	nodes := dc.nodes
+	out := make([]string, 0, len(dc.nodes))
 
-	if len(nodes) == 0 {
-
-		var err error
-		nodes, err = database.ListNodeByClusterType(dc.Type)
-		if err != nil {
-			dc.RUnlock()
-			return nil
-		}
-
+	for i := range dc.nodes {
+		out[i] = dc.nodes[i].ID
 	}
 
 	dc.RUnlock()
 
-	for i := range nodes {
-		out = append(out, nodes[i].ID)
+	if len(out) == 0 {
+
+		var err error
+		nodes, err := database.ListNodeByClusterType(dc.Type)
+		if err != nil {
+			return nil
+		}
+
+		for i := range nodes {
+			out = append(out, nodes[i].ID)
+		}
+
 	}
 
 	return out
 }
 
 func (gd *Gardener) DatacenterByNode(IDOrName string) (*Datacenter, error) {
-	gd.RLock()
-
-	for i := range gd.datacenters {
-
-		if gd.datacenters[i].isNodeExist(IDOrName) {
-			gd.RUnlock()
-
-			return gd.datacenters[i], nil
-		}
-	}
-
-	gd.RUnlock()
-
 	node, err := database.GetNode(IDOrName)
 	if err != nil {
 		return nil, err
 	}
 
-	gd.RLock()
-	for i := range gd.datacenters {
-		if gd.datacenters[i].ID == node.ClusterID {
-			gd.RUnlock()
-
-			return gd.datacenters[i], nil
-		}
-	}
-
-	gd.RUnlock()
-
-	return nil, errors.New("Datacenter Not Found")
+	return gd.Datacenter(node.ClusterID)
 }
 
 func (dc *Datacenter) isIdleStoreEnough(IDOrType string, num, size int) bool {
@@ -256,8 +302,10 @@ func (dc *Datacenter) RegisterNode(IDOrName string) error {
 	dc.RUnlock()
 
 	if node == nil {
-		node = &database.Node{
-			ID: IDOrName,
+		node = &Node{
+			Node: &database.Node{
+				ID: IDOrName,
+			},
 		}
 	}
 
@@ -280,8 +328,10 @@ func (dc *Datacenter) DeregisterNode(IDOrName string) error {
 	dc.RUnlock()
 
 	if node == nil {
-		node = &database.Node{
-			ID: IDOrName,
+		node = &Node{
+			Node: &database.Node{
+				ID: IDOrName,
+			},
 		}
 	}
 
@@ -296,32 +346,25 @@ func (dc *Datacenter) DeregisterNode(IDOrName string) error {
 	return err
 }
 
-func (dc *Datacenter) AddNode(addr, name, os_user, os_pwd string, num int) error {
-	node := &database.Node{
-		ID:           utils.Generate64UUID(),
-		Name:         name,
-		ClusterID:    dc.Cluster.ID,
-		Addr:         addr,
-		MaxContainer: num,
-	}
+func (dc *Datacenter) DistributeNode(node *Node) error {
 
 	m := map[string]string{
-		"host":     addr,
-		"user":     os_user,
-		"password": os_pwd,
+		"host":     node.Addr,
+		"user":     node.user,
+		"password": node.password,
 	}
 
 	log.WithFields(log.Fields{
-		"name":    name,
-		"addr":    addr,
+		"name":    node.Name,
+		"addr":    node.Addr,
 		"cluster": dc.Cluster.ID,
 	}).Info("Adding new Node")
 
 	dir, script, err := modifyProfile("")
 	if err != nil {
 		log.WithFields(log.Fields{
-			"name":    name,
-			"addr":    addr,
+			"name":    node.Name,
+			"addr":    node.Addr,
 			"cluster": dc.Cluster.ID,
 			"source":  "",
 		}).Errorf("Modify shell script Error,%s", err)
@@ -331,8 +374,8 @@ func (dc *Datacenter) AddNode(addr, name, os_user, os_pwd string, num int) error
 
 	if err := Distribute("", dir, script, m); err != nil {
 		log.WithFields(log.Fields{
-			"name":        name,
-			"addr":        addr,
+			"name":        node.Name,
+			"addr":        node.Addr,
 			"cluster":     dc.Cluster.ID,
 			"source":      dir,
 			"destination": "",
@@ -341,19 +384,15 @@ func (dc *Datacenter) AddNode(addr, name, os_user, os_pwd string, num int) error
 		return err
 	}
 
-	if err := node.Insert(); err != nil {
-		log.Errorf("Node:%d Insert INTO DB Error,%s", name, err)
-
-		return err
-	}
-
 	dc.Lock()
+
 	dc.nodes = append(dc.nodes, node)
+
 	dc.Unlock()
 
 	log.WithFields(log.Fields{
-		"name":    name,
-		"addr":    addr,
+		"name":    node.Name,
+		"addr":    node.Addr,
 		"cluster": dc.Cluster.ID,
 	}).Info("Added Node")
 

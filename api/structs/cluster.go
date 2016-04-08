@@ -11,3 +11,22 @@ type PostClusterRequest struct {
 	StorageType string `json:"storage_type"`
 	StorageID   string `json:"storage_id,omitempty"`
 }
+
+type Node struct {
+	Name     string
+	Type     string
+	Address  string
+	Username string
+	Password string
+
+	Port         int `json:",omitempty"`
+	MaxContainer int `json:"max_container,omitempty"`
+}
+
+type PostNodesRequest []Node
+
+type PostNodeResponse struct {
+	ID     string
+	Name   string
+	TaskID string
+}

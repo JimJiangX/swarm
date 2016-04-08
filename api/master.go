@@ -38,9 +38,10 @@ type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 var masterRoutes = map[string]map[string]ctxHandler{
 	"POST": {
-		"/cluster":              postCluster,
-		"/task/backup/callback": postBackupCallback,
-		"/service":              postService,
+		"/cluster":                 postCluster,
+		"/cluster/{name:.*}/nodes": postNodes,
+		"/task/backup/callback":    postBackupCallback,
+		"/service":                 postService,
 	},
 }
 

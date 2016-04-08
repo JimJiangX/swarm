@@ -15,6 +15,7 @@ import (
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/utils"
+	"github.com/gorilla/mux"
 )
 
 const (
@@ -38,6 +39,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	if req.StorageType != "local" && req.StorageID != "" {
@@ -68,6 +70,60 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(w, "{%q:%q}", "Id", cluster.ID)
+}
+
+// Post /cluster/{name:.*}/nodes
+func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	dc, err := gd.Datacenter(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	list := structs.PostNodesRequest{}
+
+	if err := json.NewDecoder(r.Body).Decode(&list); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	nodes := make([]*swarm.Node, len(list))
+	response := make([]structs.PostNodeResponse, len(list))
+
+	for i := range list {
+		nodes[i] = swarm.NewNode(list[i].Address, list[i].Name, dc.ID,
+			list[i].Username, list[i].Password, list[i].MaxContainer)
+
+		response[i] = structs.PostNodeResponse{
+			ID:     nodes[i].ID,
+			Name:   nodes[i].Name,
+			TaskID: nodes[i].Task().ID,
+		}
+
+	}
+
+	err = swarm.SaveMultiNodesToDB(nodes)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(response)
+
+	for i := range nodes {
+		go dc.DistributeNode(nodes[i])
+	}
+
 }
 
 // Post /service
