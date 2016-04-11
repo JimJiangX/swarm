@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -14,9 +15,25 @@ type Configurations struct {
 	ConsulConfig
 	HorusConfig
 	Registry
+	SSHDeliver
 
 	DockerPort int  `db:"docker_port"`
+	PluginPort int  `db:"plugin_port"`
 	Retry      byte `db:"retry"`
+}
+
+type SSHDeliver struct {
+	SourceDir   string `db:"source_dir"`
+	PkgName     string `db:"pkg_name"`
+	ScriptName  string `db:"script_name"`
+	CA_CRT_Name string `db:"ca_crt_name"`
+	Destination string `db:"destination_dir"` // must be exist
+}
+
+func (d SSHDeliver) DestPath() (string, string, string) {
+	return filepath.Join(d.Destination, d.PkgName),
+		filepath.Join(d.Destination, d.ScriptName),
+		filepath.Join(d.Destination, d.CA_CRT_Name)
 }
 
 type ConsulConfig struct {
@@ -72,7 +89,7 @@ func (c Configurations) GetConsulClient() ([]*consulapi.Client, error) {
 	return clients, nil
 }
 
-func (c Configurations) GetConsulConfig() ([]string, string, string, int, error) {
+func (c Configurations) GetConsulConfig() ([]string, string, string, int) {
 
 	port := strconv.Itoa(c.ConsulPort)
 	addrs := strings.Split(c.ConsulIPs, ";&;")
@@ -83,7 +100,11 @@ func (c Configurations) GetConsulConfig() ([]string, string, string, int, error)
 		endpoints[i] = addrs[i] + ":" + port
 	}
 
-	return endpoints, c.ConsulDatacenter, c.ConsulToken, c.ConsulWaitTime, nil
+	return endpoints, c.ConsulDatacenter, c.ConsulToken, c.ConsulWaitTime
+}
+
+func (c Configurations) GetConsulAddrs() []string {
+	return strings.Split(c.ConsulIPs, ";&;")
 }
 
 func GetSystemConfig() (*Configurations, error) {

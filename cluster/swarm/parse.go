@@ -133,6 +133,23 @@ func getServiceArch(arch string) (map[string]int, error) {
 	return out, nil
 }
 
+func parseKVuri(uri string) string {
+	part := strings.SplitN(uri, "://", 2)
+	if len(part) == 1 {
+		uri = part[0]
+	} else {
+		uri = part[1]
+	}
+
+	part = strings.SplitN(uri, "/", 2)
+
+	if len(part) == 2 {
+		return part[1]
+	}
+
+	return ""
+}
+
 /*
 type volume struct {
 	types.Volume
