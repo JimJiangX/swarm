@@ -433,7 +433,7 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, *os.Fil
 	*/
 
 	script := fmt.Sprintf("%s %s %s %s %s %s %s %d %s", path, kvpath, node.Addr, config.ConsulDatacenter, list,
-		config.Registry.Domain, config.Registry.Address, config.Registry.RegistryPort, caFile)
+		config.Registry.Domain, config.Registry.Address, config.Registry.Port, caFile)
 
 	return config, tempFile, script, nil
 }

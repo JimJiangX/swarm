@@ -52,14 +52,14 @@ type HorusConfig struct {
 }
 
 type Registry struct {
-	Domain        string `db:"registry_domain"`
-	Address       string `db:"registry_address"`
-	RegistryPort  int    `db:"registry_port"`
-	Username      string `db:"registry_username"`
-	Password      string `db:"registry_password"`
-	Email         string `db:"registry_email"`
-	RegistryToken string `db:"registry_token"`
-	CA_CRT        string `db:"registry_ca_crt"`
+	Domain   string `db:"registry_domain"`
+	Address  string `db:"registry_address"`
+	Port     int    `db:"registry_port"`
+	Username string `db:"registry_username"`
+	Password string `db:"registry_password"`
+	Email    string `db:"registry_email"`
+	Token    string `db:"registry_token"`
+	CA_CRT   string `db:"registry_ca_crt"`
 }
 
 func (c Configurations) TableName() string {
