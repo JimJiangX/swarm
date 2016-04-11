@@ -23,7 +23,8 @@ type Gardener struct {
 	*Cluster
 
 	// addition by fugr
-	host string
+	host   string
+	kvPath string
 
 	cron               *crontab.Cron // crontab tasks
 	consulClient       *consulapi.Client
@@ -41,7 +42,7 @@ type Gardener struct {
 }
 
 // NewGardener is exported
-func NewGardener(cli cluster.Cluster, hosts []string) (*Gardener, error) {
+func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, error) {
 	log.WithFields(log.Fields{"name": "swarm"}).Debug("Initializing Gardener")
 	cluster, ok := cli.(*Cluster)
 	if !ok {
@@ -50,6 +51,7 @@ func NewGardener(cli cluster.Cluster, hosts []string) (*Gardener, error) {
 
 	gd := &Gardener{
 		Cluster:            cluster,
+		kvPath:             parseKVuri(uri),
 		cron:               crontab.New(),
 		cronJobs:           make(map[crontab.EntryID]*serviceBackup),
 		datacenters:        make([]*Datacenter, 0, 50),
@@ -80,10 +82,7 @@ func NewGardener(cli cluster.Cluster, hosts []string) (*Gardener, error) {
 		RegistryToken: sysConfig.Registry.RegistryToken,
 	}
 
-	endpoints, dc, token, wait, err := sysConfig.GetConsulConfig()
-	if err != nil {
-		log.Fatalf("Initializing kvStore,DB Query Error,%s", err)
-	}
+	endpoints, dc, token, wait := sysConfig.GetConsulConfig()
 
 	if len(endpoints) == 0 {
 		return nil, fmt.Errorf("Consul Config Settings Error")
@@ -156,4 +155,12 @@ func (gd *Gardener) RegistryAuthConfig() (*dockerclient.AuthConfig, error) {
 		Email:         c.Email,
 		RegistryToken: c.RegistryToken,
 	}, nil
+}
+
+func (gd *Gardener) KVPath() string {
+	gd.RLock()
+	path := gd.kvPath
+	gd.RUnlock()
+
+	return path
 }

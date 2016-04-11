@@ -100,7 +100,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	for i := range list {
 		nodes[i] = swarm.NewNode(list[i].Address, list[i].Name, dc.ID,
-			list[i].Username, list[i].Password, list[i].MaxContainer)
+			list[i].Username, list[i].Password, list[i].Port, list[i].MaxContainer)
 
 		response[i] = structs.PostNodeResponse{
 			ID:     nodes[i].ID,
@@ -121,7 +121,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 
 	for i := range nodes {
-		go dc.DistributeNode(nodes[i])
+		go dc.DistributeNode(nodes[i], gd.KVPath())
 	}
 
 }

@@ -5,6 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strconv"
 	"sync"
 
 	log "github.com/Sirupsen/logrus"
@@ -35,9 +39,10 @@ type Node struct {
 	task     *database.Task
 	user     string
 	password string
+	port     int
 }
 
-func NewNode(addr, name, cluster, user, password string, num int) *Node {
+func NewNode(addr, name, cluster, user, password string, port, num int) *Node {
 	node := &database.Node{
 		ID:           utils.Generate64UUID(),
 		Name:         name,
@@ -53,6 +58,7 @@ func NewNode(addr, name, cluster, user, password string, num int) *Node {
 		task:     task,
 		user:     user,
 		password: password,
+		port:     port,
 	}
 }
 
@@ -346,13 +352,7 @@ func (dc *Datacenter) DeregisterNode(IDOrName string) error {
 	return err
 }
 
-func (dc *Datacenter) DistributeNode(node *Node) error {
-
-	m := map[string]string{
-		"host":     node.Addr,
-		"user":     node.user,
-		"password": node.password,
-	}
+func (dc *Datacenter) DistributeNode(node *Node, kvpath string) error {
 
 	log.WithFields(log.Fields{
 		"name":    node.Name,
@@ -360,25 +360,11 @@ func (dc *Datacenter) DistributeNode(node *Node) error {
 		"cluster": dc.Cluster.ID,
 	}).Info("Adding new Node")
 
-	dir, script, err := modifyProfile("")
-	if err != nil {
+	if err := node.Distribute(kvpath); err != nil {
 		log.WithFields(log.Fields{
 			"name":    node.Name,
 			"addr":    node.Addr,
 			"cluster": dc.Cluster.ID,
-			"source":  "",
-		}).Errorf("Modify shell script Error,%s", err)
-
-		return err
-	}
-
-	if err := Distribute("", dir, script, m); err != nil {
-		log.WithFields(log.Fields{
-			"name":        node.Name,
-			"addr":        node.Addr,
-			"cluster":     dc.Cluster.ID,
-			"source":      dir,
-			"destination": "",
 		}).Errorf("SSH UploadDir Error,%s", err)
 
 		return err
@@ -399,35 +385,87 @@ func (dc *Datacenter) DistributeNode(node *Node) error {
 	return nil
 }
 
-func modifyProfile(path string) (string, string, error) {
-	return "", "", nil
+// CA,script,error
+func (node Node) modifyProfile(kvpath string) (*database.Configurations, *os.File, string, error) {
+	config, err := database.GetSystemConfig()
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	// Create a temp dir in the system default temp folder
+	tempDirPath, err := ioutil.TempDir("", node.Name)
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	// Create a file in new temp directory
+	tempFile, err := ioutil.TempFile(tempDirPath, config.CA_CRT_Name)
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	_, err = tempFile.WriteString(config.CA_CRT)
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	_, path, caFile := config.DestPath()
+
+	list := ""
+	addrs := config.GetConsulAddrs()
+
+	for i := range addrs {
+		if i != 0 {
+			list += ","
+		}
+		list += fmt.Sprintf(`"%s"`, addrs[i])
+	}
+	/*
+	   init.sh input
+	   DATACENTER:"" //swarm keyname
+	   ADM_IP:
+	   CS_DATACENTER:""
+	   CS_LIST:""
+	   registry.domain:""
+	   registry.ip:""
+	   registry.port:""
+	   registry.ca_crt.filepath:
+	*/
+
+	script := fmt.Sprintf("%s %s %s %s %s %s %s %d %s", path, kvpath, node.Addr, config.ConsulDatacenter, list,
+		config.Registry.Domain, config.Registry.Address, config.Registry.RegistryPort, caFile)
+
+	return config, tempFile, script, nil
 }
 
-func Distribute(dst, src string, script string, m map[string]string) error {
-
-	if m["port"] == "0" || m["port"] == "" {
-		m["port"] = "22"
+func (node *Node) Distribute(kvpath string) error {
+	if node.port == 0 {
+		node.port = 22
 	}
 
 	r := &terraform.InstanceState{
 		Ephemeral: terraform.EphemeralState{
 			ConnInfo: map[string]string{
 				"type":     "ssh",
-				"user":     m["user"],
-				"password": m["password"],
-				"host":     m["host"],
-				"port":     m["port"],
+				"user":     node.user,
+				"password": node.password,
+				"host":     node.Addr,
+				"port":     strconv.Itoa(node.port),
 				"timeout":  "30s",
 			},
 		},
 	}
 
+	config, caFile, script, err := node.modifyProfile(kvpath)
+	if err != nil {
+		return err
+	}
+
 	entry := log.WithFields(log.Fields{
-		"user":        m["user"],
-		"host":        m["host"],
-		"port":        m["port"],
-		"source":      src,
-		"destination": dst,
+		"host":        node.port,
+		"user":        node.user,
+		"source":      config.SourceDir,
+		"destination": config.Destination,
 	})
 
 	c, err := ssh.New(r)
@@ -438,18 +476,41 @@ func Distribute(dst, src string, script string, m map[string]string) error {
 	}
 	defer c.Disconnect()
 
-	if err := c.UploadDir(dst, src); err != nil {
+	if err := c.UploadDir(config.Destination, config.SourceDir); err != nil {
 		entry.Errorf("SSH UploadDir Error,%s", err)
 
-		if err := c.UploadDir(dst, src); err != nil {
+		if err := c.UploadDir(config.Destination, config.SourceDir); err != nil {
 			entry.Errorf("SSH UploadDir Error Twice,%s", err)
 
 			return err
 		}
 	}
 
-	buffer := new(bytes.Buffer)
+	err = c.Upload(filepath.Join(config.Destination, config.CA_CRT_Name), caFile)
+	if err != nil {
+		entry.Errorf("SSH UploadDir Error,%s", err)
 
+		err = c.Upload(filepath.Join(config.Destination, config.CA_CRT_Name), caFile)
+		if err != nil {
+			entry.Errorf("SSH UploadFile Error Twice,%s", err)
+
+			return err
+		}
+	}
+
+	// Close file
+	err = caFile.Close()
+	if err != nil {
+
+	}
+
+	// Delete the resources we created
+	err = os.RemoveAll(filepath.Dir(caFile.Name()))
+	if err != nil {
+
+	}
+
+	buffer := new(bytes.Buffer)
 	cmd := remote.Cmd{
 		Command: script,
 		Stdout:  buffer,
