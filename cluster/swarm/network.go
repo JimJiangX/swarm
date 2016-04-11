@@ -1,17 +1,14 @@
 package swarm
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
-	"net/http"
 	"strings"
 	"sync"
 
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
 )
 
@@ -42,10 +39,10 @@ type IP struct {
 	ip        uint32
 }
 
-func NewNetworking(id, ip, typ, gateway string, prefix, num int) *Networking {
+func NewNetworking(ip, typ, gateway string, prefix, num int) *Networking {
 	net := &Networking{
 		Rlock:   new(sync.RWMutex),
-		ID:      id,
+		ID:      utils.Generate64UUID(),
 		Type:    typ,
 		IP:      ip,
 		Prefix:  prefix,
@@ -96,6 +93,23 @@ func (gd *Gardener) GetNetworking(typ string) *Networking {
 	gd.RUnlock()
 
 	return nil
+}
+
+func (gd *Gardener) AddNetworking(ip, typ, gateway string, prefix, num int) (*Networking, error) {
+	net := NewNetworking(ip, typ, gateway, prefix, num)
+
+	err := database.TxInsertNetworking(net.ID, ip, gateway, typ, prefix, num)
+	if err != nil {
+		return nil, err
+	}
+
+	gd.Lock()
+
+	gd.networkings = append(gd.networkings, net)
+
+	gd.Unlock()
+
+	return net, nil
 }
 
 type IPInfo struct {
@@ -187,66 +201,4 @@ func isProxyType(name string) bool {
 	}
 
 	return false
-}
-
-type createNetworkingRequest struct {
-	Device string `json:"Device"`
-	IPCIDR string `json:"IpCIDR"` // ip/netmask
-}
-
-func createNetworkingAPI(addr, ip, device string, netmask int) error {
-	obj := createNetworkingRequest{
-		Device: device,
-		IPCIDR: fmt.Sprintf("%s/%d", ip, netmask),
-	}
-
-	buf := bytes.NewBuffer(nil)
-	enc := json.NewEncoder(buf)
-	if err := enc.Encode(obj); err != nil {
-		return err
-	}
-
-	resp, err := http.Post(addr, "application/json", buf)
-	if err != nil {
-		return err
-	}
-
-	if resp.Body != nil {
-		b, err := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			return &statusError{resp.StatusCode, err.Error()}
-		}
-
-		remoteErr := responseErr{}
-		if err := json.Unmarshal(b, &remoteErr); err == nil {
-			if remoteErr.Err != "" ||
-				resp.StatusCode < http.StatusOK ||
-				resp.StatusCode >= http.StatusBadRequest {
-				return &statusError{resp.StatusCode, remoteErr.Err}
-			}
-		}
-
-		// old way...
-		return &statusError{resp.StatusCode, string(b)}
-	}
-
-	return nil
-}
-
-// Response(s) should have an Err field indicating what went
-// wrong. Try to unmarshal into ResponseErr. Otherwise fallback to just
-// return the string(body)
-type responseErr struct {
-	Err string
-}
-
-type statusError struct {
-	status int
-	err    string
-}
-
-// Error returns a formatted string for this error type
-func (e *statusError) Error() string {
-	return fmt.Sprintf("StatusCode:%d %v", e.status, e.err)
 }

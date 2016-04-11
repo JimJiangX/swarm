@@ -24,6 +24,7 @@ const (
 
 var errUnsupportGardener = errors.New("Unsupported Gardener")
 
+// 创建集群
 // POST /cluster
 func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	var (
@@ -69,9 +70,10 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "Id", cluster.ID)
+	fmt.Fprintf(w, "{%q:%q}", "ID", cluster.ID)
 }
 
+// 集群物理机入库
 // Post /cluster/{name:.*}/nodes
 func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
@@ -126,6 +128,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 }
 
+// 创建服务
 // Post /service
 func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostServiceRequest{}
@@ -162,6 +165,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// 备份任务完成结果回调处理
 // Post /task/backup/callback
 func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.BackupTaskCallback{}
@@ -209,4 +213,47 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+// 网络规划
+// Post /networking
+func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	req := structs.PostNetworkingRequest{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	net, err := gd.AddNetworking(req.IP, req.Type, req.Gateway, req.Prefix, req.Num)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "ID", net.ID)
+}
+
+// Load Image
+// Post /image/load
+func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+
+}
+
+// SAN存储系统入库
+// Post /storage/san
+func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+}
+
+// NAS系统登记
+// Post /storage/nas
+func postNasStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
