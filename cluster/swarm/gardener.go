@@ -79,7 +79,7 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 		Username:      sysConfig.Registry.Username,
 		Password:      sysConfig.Registry.Password,
 		Email:         sysConfig.Registry.Email,
-		RegistryToken: sysConfig.Registry.RegistryToken,
+		RegistryToken: sysConfig.Registry.Token,
 	}
 
 	endpoints, dc, token, wait := sysConfig.GetConsulConfig()
@@ -153,7 +153,7 @@ func (gd *Gardener) RegistryAuthConfig() (*dockerclient.AuthConfig, error) {
 		Username:      c.Username,
 		Password:      c.Password,
 		Email:         c.Email,
-		RegistryToken: c.RegistryToken,
+		RegistryToken: c.Registry.Token,
 	}, nil
 }
 

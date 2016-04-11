@@ -245,6 +245,28 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // Load Image
 // Post /image/load
 func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	req := structs.PostLoadImageRequest{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	id, err := gd.LoadImage(req)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "ID", id)
 
 }
 

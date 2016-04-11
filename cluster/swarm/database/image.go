@@ -47,19 +47,36 @@ func (image *Image) decode() error {
 	return json.Unmarshal([]byte(image.PortString), &image.PortSlice)
 }
 
-func InsertImage(image Image) error {
+func TxInsertImage(image Image, config UnitConfig) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
 	}
 
-	image.encode()
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = image.encode()
+	if err != nil {
+		return err
+	}
 
 	query := "INSERT INTO tb_image (enabled,id,name,version,docker_image_id,label,ports,template_config_id,upload_at) VALUES (:enabled,:id,:name,:version,:docker_image_id,:label,:ports,:template_config_id,:upload_at)"
 
-	_, err = db.NamedExec(query, image)
+	_, err = tx.NamedExec(query, &image)
+	if err != nil {
+		return err
+	}
 
-	return err
+	err = TXInsertUnitConfig(tx, &config)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func QueryImage(name, version string) (Image, error) {
