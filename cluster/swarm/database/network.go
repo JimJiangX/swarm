@@ -182,7 +182,7 @@ func GetPortsByUnit(id string) ([]Port, error) {
 	return ports, nil
 }
 
-func InsertNetworking(id, addr, gateway, typ string, prefix, num int) error {
+func TxInsertNetworking(id, addr, gateway, typ string, prefix, num int) error {
 	net := Networking{
 		ID:         id,
 		Networking: addr,

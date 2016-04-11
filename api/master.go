@@ -42,6 +42,10 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/cluster/{name:.*}/nodes": postNodes,
 		"/task/backup/callback":    postBackupCallback,
 		"/service":                 postService,
+		"/networking":              postNetworking,
+		"/image/load":              postImageLoad,
+		"/storage/san":             postSanStorage,
+		"/storage/nas":             postNasStorage,
 	},
 }
 
