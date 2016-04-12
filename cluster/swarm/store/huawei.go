@@ -45,6 +45,25 @@ func (h huaweiStore) Driver() string {
 	return "lvm"
 }
 
+func (h *huaweiStore) Ping() error {
+	path, err := getAbsolutePath(HUAWEI, "connect_test.sh")
+	if err != nil {
+		return err
+	}
+
+	cmd, err := utils.ExecScript(path, h.hs.IPAddr, h.hs.Username, h.hs.Password)
+	if err != nil {
+		return err
+	}
+
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+	}
+
+	return nil
+}
+
 func (h *huaweiStore) Insert() error {
 	h.lock.Lock()
 
@@ -81,7 +100,9 @@ func (h *huaweiStore) Alloc(_ string, size int) (string, int, error) {
 	}
 
 	path, err := getAbsolutePath(HUAWEI, "create_lun.sh")
-
+	if err != nil {
+		return "", 0, err
+	}
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password,
 		strconv.Itoa(rg.StorageRGID), lun.Name, strconv.Itoa(int(size))}
 
@@ -92,10 +113,8 @@ func (h *huaweiStore) Alloc(_ string, size int) (string, int, error) {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return "", 0, err
+		return "", 0, fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
 	}
-
-	fmt.Println("Exec Script Error:%s,Output:%s", err, string(output))
 
 	lun.StorageLunID, err = strconv.Atoi(string(output))
 	if err != nil {
@@ -132,10 +151,8 @@ func (h *huaweiStore) Recycle(lun int) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return err
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
 	}
-
-	fmt.Println("Exec Script Error:%s,Output:%s", err, string(output))
 
 	err = database.DelLUN(l.ID)
 
@@ -180,10 +197,8 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return err
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
 	}
-
-	fmt.Println("Exec Script Error:%s,Output:%s", err, string(output))
 
 	return nil
 }
@@ -209,10 +224,8 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
 	}
-
-	fmt.Println("Exec Script Error:%s,Output:%s", err, string(output))
 
 	return nil
 }
@@ -254,10 +267,8 @@ func (h *huaweiStore) Mapping(host, unit, lun string) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return err
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
 	}
-
-	fmt.Println("Exec Script Error:%s,Output:%s", err, string(output))
 
 	return nil
 }
@@ -284,10 +295,8 @@ func (h *huaweiStore) DelMapping(lun string) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return err
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
 	}
-
-	fmt.Println("Exec Script Error:%s,Output:%s", err, string(output))
 
 	err = database.DelLunMapping(lun, "", "", 0)
 
@@ -357,8 +366,8 @@ func (h *huaweiStore) List(rg ...int) ([]space, error) {
 
 	output, err := cmd.Output()
 	if err != nil {
-		fmt.Println("Exec Script Error:%s,Output:%s", err, string(output))
-		return nil, err
+		return nil, fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+
 	}
 
 	spaces := parseSpace(string(output))
