@@ -47,7 +47,7 @@ func (image *Image) decode() error {
 	return json.Unmarshal([]byte(image.PortString), &image.PortSlice)
 }
 
-func TxInsertImage(image Image, config UnitConfig) error {
+func TxInsertImage(image Image, config UnitConfig, task *Task) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
@@ -72,6 +72,11 @@ func TxInsertImage(image Image, config UnitConfig) error {
 	}
 
 	err = TXInsertUnitConfig(tx, &config)
+	if err != nil {
+		return err
+	}
+
+	err = TxInsertTask(tx, task)
 	if err != nil {
 		return err
 	}
