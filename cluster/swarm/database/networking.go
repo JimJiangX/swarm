@@ -95,7 +95,7 @@ func TxUpdatePorts(tx *sqlx.Tx, ports []Port) error {
 }
 
 // TxImportPort import Port from start to end(includ end)
-func TxImportPort(start, end int, filter ...int) error {
+func TxImportPort(start, end int, filter ...int) (int, error) {
 	ports := make([]Port, 0, end-start)
 
 loop:
@@ -114,21 +114,26 @@ loop:
 
 	db, err := GetDB(true)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	tx, err := db.Beginx()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer tx.Rollback()
 
 	err = TxInsertPorts(tx, ports)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		return 0, err
+	}
+
+	return len(ports), nil
 }
 
 func TxInsertPorts(tx *sqlx.Tx, ports []Port) error {
