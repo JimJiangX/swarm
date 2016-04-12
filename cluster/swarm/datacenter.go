@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -353,6 +354,10 @@ func (dc *Datacenter) DeregisterNode(IDOrName string) error {
 }
 
 func (dc *Datacenter) DistributeNode(node *Node, kvpath string) error {
+	err := database.UpdateTaskStatus(node.task, _TaskRunning, time.Time{}, "")
+	if err != nil {
+		return err
+	}
 
 	log.WithFields(log.Fields{
 		"name":    node.Name,
@@ -382,7 +387,9 @@ func (dc *Datacenter) DistributeNode(node *Node, kvpath string) error {
 		"cluster": dc.Cluster.ID,
 	}).Info("Added Node")
 
-	return nil
+	err = database.UpdateTaskStatus(node.task, _TaskDone, time.Now(), "")
+
+	return err
 }
 
 // CA,script,error

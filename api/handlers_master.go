@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	goctx "golang.org/x/net/context"
 
@@ -175,44 +174,13 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	task := &database.Task{ID: req.TaskID}
-
-	if req.Error() != nil {
-		err := database.UpdateTaskStatus(task, structs.TaskFailed, time.Now(), req.Error().Error())
-		if err != nil {
-			httpError(w, err.Error(), http.StatusInternalServerError)
-		}
-
-		return
-	}
-
-	rent, err := database.BackupTaskValidate(req.TaskID, req.StrategyID, req.UnitID)
+	err := swarm.BackupTaskCallback(req)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	backupFile := database.BackupFile{
-		ID:         utils.Generate64UUID(),
-		TaskID:     req.TaskID,
-		StrategyID: req.StrategyID,
-		UnitID:     req.UnitID,
-		Type:       req.Type,
-		Path:       req.Path,
-		SizeByte:   req.Size,
-		Status:     req.Status,
-		CreatedAt:  time.Now(),
-	}
-
-	if rent > 0 {
-		backupFile.Retention = backupFile.CreatedAt.Add(time.Duration(rent))
-	}
-
-	err = database.TxBackupTaskDone(task, structs.TaskDone, backupFile)
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // 网络规划
