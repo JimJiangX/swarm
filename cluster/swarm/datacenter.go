@@ -407,19 +407,24 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, *os.Fil
 		list += fmt.Sprintf(`"%s"`, addrs[i])
 	}
 	/*
-	   init.sh input
-	   DATACENTER:"" //swarm keyname
-	   ADM_IP:
-	   CS_DATACENTER:""
-	   CS_LIST:""
-	   registry.domain:""
-	   registry.ip:""
-	   registry.port:""
-	   registry.ca_crt.filepath:
+		init.sh input
+		swarm_key=$1
+		adm_ip=$2
+		cs_datacenter=$3
+		cs_list=$4
+		registry_domain=$5
+		registry_ip=$6
+		registry_port=$7
+		registry_username=$8
+		registry_passwd=$9
+		regstry_ca_file=$10
+		DOCKER_PORT=$11
 	*/
 
-	script := fmt.Sprintf("%s %s %s %s %s %s %s %d %s", path, kvpath, node.Addr, config.ConsulDatacenter, list,
-		config.Registry.Domain, config.Registry.Address, config.Registry.Port, caFile)
+	script := fmt.Sprintf("%s %s %s %s %s %s %s %d %s %s %s %d",
+		path, kvpath, node.Addr, config.ConsulDatacenter, list,
+		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
+		config.Registry.Username, config.Registry.Password, caFile, config.DockerPort)
 
 	return config, tempFile, script, nil
 }

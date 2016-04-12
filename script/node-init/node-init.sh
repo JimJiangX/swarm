@@ -7,10 +7,10 @@ cs_list=$4
 registry_domain=$5
 registry_ip=$6
 registry_port=$7
-registry_username=
-registry_passwd=
-regstry_ca_file=$8
-DOCKER_PORT=2375
+registry_username=$8
+registry_passwd=$9
+regstry_ca_file=$10
+DOCKER_PORT=$11
 
 
 # check NIC
