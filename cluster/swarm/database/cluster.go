@@ -179,7 +179,7 @@ func (n *Node) UpdateStatus(state int) error {
 }
 
 // TxUpdateNodeStatus returns error when Node UPDATE status.
-func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int) error {
+func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int, msg string) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
@@ -197,7 +197,7 @@ func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int) error {
 
 	n.Status = nstate
 
-	err = TxUpdateTaskStatus(tx, task, tstate, time.Now(), "")
+	err = TxUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
 	if err != nil {
 		return err
 	}
