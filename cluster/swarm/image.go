@@ -122,7 +122,9 @@ func (gd *Gardener) LoadImage(req structs.PostLoadImageRequest) (string, error) 
 
 	image.PortSlice = ports
 
-	err = database.TxInsertImage(image, unitConfig)
+	task := database.NewTask("load image", image.ID, "", nil, 0)
+
+	err = database.TxInsertImage(image, unitConfig, task)
 	if err != nil {
 		return ImageID, err
 	}
