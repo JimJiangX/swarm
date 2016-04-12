@@ -10,21 +10,6 @@ import (
 	crontab "gopkg.in/robfig/cron.v2"
 )
 
-const (
-	_BackupCreate = iota
-	_BackupWaiting
-	_BackupRunning
-	_BackupDisabled
-
-	_TaskCreate = iota
-	_TaskRunning
-	_TaskStop
-	_TaskCancel
-	_TaskDone
-	_TaskTimeout
-	_TaskFailed
-)
-
 type serviceBackup struct {
 	id       crontab.EntryID
 	server   string
@@ -53,25 +38,24 @@ func (bs *serviceBackup) Run() {
 	}
 
 	task := database.NewTask("backup_strategy", strategy.ID, "", nil, strategy.Timeout)
-	strategy.Status = _BackupRunning
-	task.Status = _TaskCreate
+	task.Status = _StatusTaskCreate
 
-	err = database.TXUpdateBackupJob(strategy, task)
+	err = database.InsertTask(task)
 	if err != nil {
 		return
 	}
 
 	bs.strategy = strategy
 
-	addr, port, master, err := bs.svc.GetMasterAndSWM()
+	addr, port, master, err := bs.svc.GetSwitchManagerAndMaster()
 	if err != nil {
-		err = database.UpdateTaskStatus(task, _TaskCancel, time.Now(), "Cancel,The Task marked as TaskCancel,"+err.Error())
+		err = database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "Cancel,The Task marked as TaskCancel,"+err.Error())
 
 		return
 	}
 
 	if err := smlib.Lock(addr, port); err != nil {
-		err = database.UpdateTaskStatus(task, _TaskCancel, time.Now(), "TaskCancel,Switch Manager is busy now,"+err.Error())
+		err = database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "TaskCancel,Switch Manager is busy now,"+err.Error())
 
 		return
 	}
@@ -84,7 +68,7 @@ func (bs *serviceBackup) Run() {
 	case errCh <- master.backup(args...):
 
 	case <-time.After(strategy.Timeout):
-		err = database.UpdateTaskStatus(task, _TaskTimeout, time.Now(), "Timeout,The Task marked as TaskTimeout")
+		err = database.UpdateTaskStatus(task, _StatusTaskTimeout, time.Now(), "Timeout,The Task marked as TaskTimeout")
 	}
 
 	<-errCh
@@ -117,13 +101,13 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 	}
 
 	if next.IsZero() || next.After(strategy.Valid) {
-		strategy.UpdateNext(next, false, _BackupDisabled)
+		strategy.UpdateNext(next, false)
 		bs.strategy = strategy
 
 		return time.Time{}
 	}
 
-	err = strategy.UpdateNext(next, true, _BackupWaiting)
+	err = strategy.UpdateNext(next, true)
 	if err != nil {
 		return time.Time{}
 	}
@@ -201,7 +185,6 @@ func BackupTaskCallback(req structs.BackupTaskCallback) error {
 		Type:       req.Type,
 		Path:       req.Path,
 		SizeByte:   req.Size,
-		Status:     req.Status,
 		CreatedAt:  time.Now(),
 	}
 
@@ -209,7 +192,7 @@ func BackupTaskCallback(req structs.BackupTaskCallback) error {
 		backupFile.Retention = backupFile.CreatedAt.Add(time.Duration(rent))
 	}
 
-	err = database.TxBackupTaskDone(task, _TaskDone, backupFile)
+	err = database.TxBackupTaskDone(task, _StatusTaskDone, backupFile)
 
 	return err
 }

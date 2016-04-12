@@ -56,7 +56,6 @@ func BuildService(req structs.PostServiceRequest, authConfig *dockerclient.AuthC
 		MaxSizeByte: req.Strategy.MaxSize,
 		Retention:   req.Strategy.Retention * time.Second,
 		Timeout:     req.Strategy.Timeout * time.Second,
-		Status:      _BackupCreate,
 		CreatedAt:   time.Now(),
 	}
 
@@ -610,7 +609,7 @@ func (svc *Service) getSwithManagerAddr() (addr string, port int, err error) {
 	return addr, port, fmt.Errorf("Not Found")
 }
 
-func (svc *Service) GetMasterAndSWM() (string, int, *unit, error) {
+func (svc *Service) GetSwitchManagerAndMaster() (string, int, *unit, error) {
 	svc.RLock()
 	defer svc.RUnlock()
 

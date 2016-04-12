@@ -333,7 +333,7 @@ func (dc *Datacenter) DeregisterNode(IDOrName string) error {
 }
 
 func (dc *Datacenter) DistributeNode(node *Node, kvpath string) error {
-	err := database.UpdateTaskStatus(node.task, _TaskRunning, time.Time{}, "")
+	err := database.UpdateTaskStatus(node.task, _StatusTaskRunning, time.Time{}, "Import node into cluster")
 	if err != nil {
 		return err
 	}
@@ -366,7 +366,7 @@ func (dc *Datacenter) DistributeNode(node *Node, kvpath string) error {
 		"cluster": dc.Cluster.ID,
 	}).Info("Added Node")
 
-	err = database.UpdateTaskStatus(node.task, _TaskDone, time.Now(), "")
+	err = database.UpdateTaskStatus(node.task, _StatusTaskDone, time.Now(), "node get ready to register")
 
 	return err
 }
@@ -591,7 +591,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 
 			nodes[i].Status = 5
 
-			err = database.TxUpdateNodeStatus(nodes[i].Node, nodes[i].task, nodes[i].Status, _TaskDone)
+			err = database.TxUpdateNodeStatus(nodes[i].Node, nodes[i].task, nodes[i].Status, _StatusTaskDone, "node registed")
 
 			// servcie register
 			// TODO:create container test

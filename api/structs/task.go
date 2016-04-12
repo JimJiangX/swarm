@@ -20,16 +20,16 @@ type BackupTaskCallback struct {
 	UnitID     string `json:"unit_id"`
 	Type       string `json:"type,omitempty"`
 	Path       string `json:"path,omitempty"`
-	Status     byte   `json:"status"`
+	Code       byte   `json:"code"`
 	Size       int    `json:"size,omitempty"`
 	Msg        string `json:"msg,omitempty"`
 }
 
 func (bt BackupTaskCallback) Error() error {
-	if bt.Status == 0 {
+	if bt.Code == 0 {
 		return nil
 	}
 
-	return fmt.Errorf("Backup Task Error:%s,unitID:%s ,taskID:%s ,strategyID:%s status:%d",
-		bt.Msg, bt.UnitID, bt.TaskID, bt.StrategyID, bt.Status)
+	return fmt.Errorf("Backup Task Error:%s,unitID:%s ,taskID:%s ,strategyID:%s code:%d",
+		bt.Msg, bt.UnitID, bt.TaskID, bt.StrategyID, bt.Code)
 }
