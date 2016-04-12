@@ -297,7 +297,7 @@ func (h *huaweiStore) DelMapping(lun string) error {
 func (h *huaweiStore) AddSpace(id int) (int, error) {
 	_, err := database.GetRaidGroup(h.ID(), id)
 	if err == nil {
-		return 0, fmt.Errorf("RaidGroup %d is Exist", id)
+		return 0, fmt.Errorf("RaidGroup %d is Exist in %s", id, h.ID())
 	}
 
 	insert := func() error {

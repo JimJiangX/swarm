@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -215,6 +216,26 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%q}", "ID", net.ID)
 }
 
+// Post /networking/ports/import
+func postImportPort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	req := structs.PostImportPortRequest{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	num, err := database.TxImportPort(req.Start, req.End, req.Filters...)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "num", num)
+}
+
 // Load Image
 // Post /image/load
 func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -246,6 +267,75 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // SAN存储系统入库
 // Post /storage/san
 func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	req := structs.PostSANStoreRequest{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	id := utils.Generate64UUID()
+	store, err := store.RegisterStore(id, req.Vendor, req.Addr,
+		req.Username, req.Password, req.Admin,
+		req.LunStart, req.LunEnd, req.HostLunStart, req.HostLunEnd)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = gd.AddStore(store)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "ID", store.ID())
+}
+
+// Post /storage/{name:.*}/raidgroup/add
+func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rg, err := strconv.Atoi(r.Form.Get("rg"))
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	store, err := gd.GetStore(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	size, err := store.AddSpace(rg)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "size", size)
 }
 
 // NAS系统登记

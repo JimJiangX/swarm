@@ -43,9 +43,12 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/task/backup/callback":    postBackupCallback,
 		"/service":                 postService,
 		"/networking":              postNetworking,
+		"/networking/ports/import": postImportPort,
 		"/image/load":              postImageLoad,
 		"/storage/san":             postSanStorage,
 		"/storage/nas":             postNasStorage,
+
+		"/storage/{name:.*}/raidgroup/add": postRGToSanStorage,
 	},
 }
 
