@@ -3,7 +3,9 @@ package swarm
 import (
 	"time"
 
+	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster/swarm/database"
+	"github.com/docker/swarm/utils"
 	"github.com/yiduoyunQ/smlib"
 	crontab "gopkg.in/robfig/cron.v2"
 )
@@ -171,4 +173,43 @@ func (gd *Gardener) RemoveCronJob(strategyID string) error {
 	gd.Unlock()
 
 	return nil
+}
+
+func BackupTaskCallback(req structs.BackupTaskCallback) error {
+	task := &database.Task{ID: req.TaskID}
+
+	if req.Error() != nil {
+		err := database.UpdateTaskStatus(task, structs.TaskFailed, time.Now(), req.Error().Error())
+		if err != nil {
+			return err
+		}
+
+		return req.Error()
+	}
+
+	rent, err := database.BackupTaskValidate(req.TaskID, req.StrategyID, req.UnitID)
+	if err != nil {
+
+		return err
+	}
+
+	backupFile := database.BackupFile{
+		ID:         utils.Generate64UUID(),
+		TaskID:     req.TaskID,
+		StrategyID: req.StrategyID,
+		UnitID:     req.UnitID,
+		Type:       req.Type,
+		Path:       req.Path,
+		SizeByte:   req.Size,
+		Status:     req.Status,
+		CreatedAt:  time.Now(),
+	}
+
+	if rent > 0 {
+		backupFile.Retention = backupFile.CreatedAt.Add(time.Duration(rent))
+	}
+
+	err = database.TxBackupTaskDone(task, _TaskDone, backupFile)
+
+	return err
 }
