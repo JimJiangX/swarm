@@ -160,7 +160,7 @@ func (h huaweiStore) IdleSize() ([]int, error) {
 	return out, nil
 }
 
-func (h *huaweiStore) AddHost(name string, wwwn []string) error {
+func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -188,7 +188,7 @@ func (h *huaweiStore) AddHost(name string, wwwn []string) error {
 	return nil
 }
 
-func (h *huaweiStore) DelHost(name string, wwwn []string) error {
+func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 

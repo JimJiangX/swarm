@@ -14,8 +14,8 @@ type Store interface {
 
 	Insert() error
 
-	AddHost(name string, wwwn []string) error
-	DelHost(name string, wwwn []string) error
+	AddHost(name string, wwwn ...string) error
+	DelHost(name string, wwwn ...string) error
 
 	Alloc(name string, size int) (string, int, error) // create LUN
 	Recycle(lun int) error                            // delete LUN

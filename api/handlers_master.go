@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	goctx "golang.org/x/net/context"
 
@@ -124,6 +125,8 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	for i := range nodes {
 		go dc.DistributeNode(nodes[i], gd.KVPath())
 	}
+
+	go gd.RegisterNodes(name, nodes, time.Second*600)
 
 }
 
