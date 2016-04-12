@@ -27,6 +27,7 @@ func NewLocalDisk(name, vg string, node *database.Node) Store {
 func (l localDisk) ID() string     { return l.node.ID }
 func (l localDisk) Vendor() string { return l.name }
 func (localDisk) Driver() string   { return LocalDisk }
+func (localDisk) Ping() error      { return nil }
 func (l localDisk) IdleSize() ([]int, error) {
 	// api get local disk size
 

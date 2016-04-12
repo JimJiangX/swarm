@@ -13,6 +13,7 @@ type Store interface {
 	ID() string
 	Vendor() string
 	Driver() string
+	Ping() error
 	IdleSize() ([]int, error)
 
 	Insert() error
