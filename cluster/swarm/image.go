@@ -84,7 +84,7 @@ func (gd *Gardener) LoadImage(req structs.PostLoadImageRequest) (string, error) 
 		return buffer.String(), err
 	}
 
-	ImageID, _, err := parsePushImageOutput(buffer.String())
+	ImageID, size, err := parsePushImageOutput(buffer.String())
 	if err != nil {
 		return ImageID, err
 	}
@@ -110,6 +110,7 @@ func (gd *Gardener) LoadImage(req structs.PostLoadImageRequest) (string, error) 
 		Version:          req.Version,
 		ImageID:          ImageID,
 		Labels:           buf.String(),
+		Size:             size,
 		TemplateConfigID: unitConfig.ID,
 		UploadAt:         time.Now(),
 	}

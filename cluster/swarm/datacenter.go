@@ -9,10 +9,12 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/utils"
@@ -37,10 +39,12 @@ type Datacenter struct {
 
 type Node struct {
 	*database.Node
-	task     *database.Task
-	user     string
-	password string
-	port     int
+	task       *database.Task
+	engine     *cluster.Engine
+	localStore store.Store
+	user       string
+	password   string
+	port       int
 }
 
 func NewNode(addr, name, cluster, user, password string, port, num int) *Node {
@@ -567,4 +571,51 @@ func SSHCommand(host, port, user, password, shell string, output io.Writer) erro
 	}
 
 	return c.Start(&cmd)
+}
+
+func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Duration) error {
+	dc, err := gd.Datacenter(name)
+	if err != nil || dc == nil {
+		return err
+	}
+
+	for {
+		for i := range nodes {
+			if nodes[i].Status >= 5 {
+				continue
+			}
+
+			eng := gd.getEngineByAddr(nodes[i].Addr)
+			if eng == nil || !strings.EqualFold(eng.Status(), "Healthy") {
+				continue
+			}
+			nodes[i].engine = eng
+			
+			nodes[i].localStore = store.NewLocalDisk("",eng.Labels["vg"],nodes[i].Node)
+
+			wwwn := eng.Labels["wwwn"]
+			if strings.TrimSpace(wwwn) == "" {
+				continue
+			}
+
+			list := strings.Split(wwwn, ",")
+
+			for i := range dc.stores {
+				if dc.stores[i].Driver() != "lvm" {
+					continue
+				}
+
+				err := dc.stores[i].AddHost(nodes[i].ID, list...)
+				if err != nil {
+					continue
+				}
+			}
+
+			nodes[i].Status = 5
+
+			// servcie register
+			// TODO:create container test
+
+		}
+	}
 }

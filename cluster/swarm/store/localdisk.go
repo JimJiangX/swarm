@@ -11,12 +11,12 @@ import (
 const LocalDisk = "local"
 
 type localDisk struct {
-	node   database.Node
+	node   *database.Node
 	name   string
 	VGName string
 }
 
-func NewLocalDisk(name, vg string, node database.Node) Store {
+func NewLocalDisk(name, vg string, node *database.Node) Store {
 	return &localDisk{
 		node:   node,
 		name:   name,
@@ -47,8 +47,8 @@ func (l localDisk) IdleSize() ([]int, error) {
 
 func (localDisk) Insert() error { return nil }
 
-func (localDisk) AddHost(name string, wwwn []string) error { return nil }
-func (localDisk) DelHost(name string, wwwn []string) error { return nil }
+func (localDisk) AddHost(name string, wwwn ...string) error { return nil }
+func (localDisk) DelHost(name string, wwwn ...string) error { return nil }
 
 func (l localDisk) Alloc(name string, size int) (string, int, error) {
 	idles, err := l.IdleSize()

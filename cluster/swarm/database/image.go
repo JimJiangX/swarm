@@ -14,6 +14,7 @@ type Image struct {
 	Version string `db:"version"`
 	ImageID string `db:"docker_image_id"`
 	Labels  string `db:"label"`
+	Size    int    `db:"size"`
 
 	PortString string `db:"ports"` // []Port
 	PortSlice  []Port `db:"-"`
@@ -64,7 +65,7 @@ func TxInsertImage(image Image, config UnitConfig, task *Task) error {
 		return err
 	}
 
-	query := "INSERT INTO tb_image (enabled,id,name,version,docker_image_id,label,ports,template_config_id,upload_at) VALUES (:enabled,:id,:name,:version,:docker_image_id,:label,:ports,:template_config_id,:upload_at)"
+	query := "INSERT INTO tb_image (enabled,id,name,version,docker_image_id,label,size,ports,template_config_id,upload_at) VALUES (:enabled,:id,:name,:version,:docker_image_id,:label,:size,:ports,:template_config_id,:upload_at)"
 
 	_, err = tx.NamedExec(query, &image)
 	if err != nil {

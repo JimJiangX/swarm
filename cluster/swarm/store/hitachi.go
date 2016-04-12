@@ -229,7 +229,7 @@ func (h hitachiStore) IdleSize() ([]int, error) {
 	return out, nil
 }
 
-func (h *hitachiStore) AddHost(name string, wwwn []string) error {
+func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
 	path, err := getAbsolutePath(HITACHI, "add_host.sh")
 	if err != nil {
 		return err
@@ -256,7 +256,7 @@ func (h *hitachiStore) AddHost(name string, wwwn []string) error {
 	return err
 }
 
-func (h *hitachiStore) DelHost(name string, wwwn []string) error {
+func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 	path, err := getAbsolutePath(HITACHI, "del_host.sh")
 	if err != nil {
 		return err
