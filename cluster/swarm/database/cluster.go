@@ -178,6 +178,33 @@ func (n *Node) UpdateStatus(state int) error {
 	return nil
 }
 
+// TxUpdateNodeStatus returns error when Node UPDATE status.
+func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec("UPDATE tb_node SET status=? WHERE id=?", nstate, n.ID)
+	if err != nil {
+		return err
+	}
+
+	n.Status = nstate
+
+	err = TxUpdateTaskStatus(tx, task, tstate, time.Now(), "")
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func ListNode() ([]*Node, error) {
 	db, err := GetDB(true)
 	if err != nil {

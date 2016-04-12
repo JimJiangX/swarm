@@ -2,6 +2,9 @@ package store
 
 import (
 	"strings"
+	"sync"
+
+	"github.com/docker/swarm/cluster/swarm/database"
 )
 
 var stores map[string]Store = make(map[string]Store)
@@ -45,6 +48,29 @@ func RegisterStore(id, vendor, addr, user, password, admin string,
 	}
 
 	stores[id] = store
+
+	return nil, nil
+}
+
+func GetStoreByID(ID string) (Store, error) {
+	hitachi, huawei, err := database.GetStorageByID(ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if hitachi != nil {
+		return &hitachiStore{
+			lock: new(sync.RWMutex),
+			hs:   *hitachi,
+		}, nil
+	}
+
+	if huawei != nil {
+		return &huaweiStore{
+			lock: new(sync.RWMutex),
+			hs:   *huawei,
+		}, nil
+	}
 
 	return nil, nil
 }

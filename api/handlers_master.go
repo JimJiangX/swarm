@@ -28,11 +28,12 @@ var errUnsupportGardener = errors.New("Unsupported Gardener")
 // POST /cluster
 func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	var (
-		req    = structs.PostClusterRequest{}
-		stores = make([]store.Store, 0, 2)
+		req   = structs.PostClusterRequest{}
+		store store.Store
 	)
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
 		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -44,9 +45,10 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.StorageType != "local" && req.StorageID != "" {
-		store, err := gd.GetStore(req.StorageID)
-		if err == nil && store != nil {
-			stores = append(stores, store)
+		store, err = gd.GetStore(req.StorageID)
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	}
 
@@ -62,7 +64,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		UsageLimit:  req.UsageLimit,
 	}
 
-	err := gd.AddDatacenter(cluster, stores)
+	err = gd.AddDatacenter(cluster, store)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return

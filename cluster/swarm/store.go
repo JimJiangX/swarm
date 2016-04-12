@@ -18,7 +18,16 @@ func (gd Gardener) GetStore(id string) (store.Store, error) {
 
 	gd.RUnlock()
 
-	return nil, fmt.Errorf("Store Not Found,%s", id)
+	store, err := store.GetStoreByID(id)
+	if err == nil && store != nil {
+		gd.Lock()
+		gd.stores = append(gd.stores, store)
+		gd.Unlock()
+
+		return store, nil
+	}
+
+	return nil, fmt.Errorf("Storage Not Found,%s", id)
 }
 
 func (gd *Gardener) AddStore(store store.Store) error {
