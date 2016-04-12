@@ -43,8 +43,11 @@ func RegisterStore(id, vendor, addr, user, password, admin string,
 
 	}
 
-	err = store.Insert()
-	if err != nil {
+	if err := store.Ping(); err != nil {
+		return nil, err
+	}
+
+	if err := store.Insert(); err != nil {
 		return nil, err
 	}
 
