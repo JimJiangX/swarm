@@ -32,7 +32,7 @@ type Datacenter struct {
 
 	*database.Cluster
 
-	stores []store.Store
+	storage store.Store
 
 	nodes []*Node
 }
@@ -109,14 +109,13 @@ func (gd *Gardener) Datacenter(IDOrName string) (*Datacenter, error) {
 
 }
 
-func (gd *Gardener) AddDatacenter(cl database.Cluster, stores []store.Store) error {
+func (gd *Gardener) AddDatacenter(cl database.Cluster, storage store.Store) error {
 	if cl.ID == "" {
 		cl.ID = gd.generateUniqueID()
 	}
 
 	log.WithFields(log.Fields{
-		"dc":        cl.Name,
-		"storesNum": len(stores),
+		"dc": cl.Name,
 	}).Info("Datacenter Initializing")
 
 	err := cl.Insert()
@@ -125,14 +124,10 @@ func (gd *Gardener) AddDatacenter(cl database.Cluster, stores []store.Store) err
 		return err
 	}
 
-	if stores == nil {
-		stores = make([]store.Store, 0, 3)
-	}
-
 	dc := &Datacenter{
 		RWMutex: sync.RWMutex{},
 		Cluster: &cl,
-		stores:  stores,
+		storage: storage,
 		nodes:   make([]*Node, 0, 100),
 	}
 
@@ -240,8 +235,8 @@ func (gd *Gardener) DatacenterByNode(IDOrName string) (*Datacenter, error) {
 func (dc *Datacenter) isIdleStoreEnough(IDOrType string, num, size int) bool {
 	dc.RLock()
 
-	store, err := dc.getStore(IDOrType)
-	if err != nil {
+	store := dc.getStore(IDOrType)
+	if store == nil {
 		dc.RUnlock()
 
 		return false
@@ -262,27 +257,33 @@ func (dc *Datacenter) isIdleStoreEnough(IDOrType string, num, size int) bool {
 	return enough >= num
 }
 
-func (dc *Datacenter) getStore(IDOrType string) (store.Store, error) {
-	for i := range dc.stores {
-		if IDOrType == dc.stores[i].Vendor() || IDOrType == dc.stores[i].ID() {
+func (dc *Datacenter) getStore(IDOrType string) store.Store {
+	if IDOrType == "" {
+		return dc.storage
+	}
 
-			return dc.stores[i], nil
+	if dc.storage != nil {
+		if IDOrType == dc.storage.Vendor() ||
+			IDOrType == dc.storage.ID() ||
+			IDOrType == dc.storage.Driver() {
+
+			return dc.storage
 		}
 	}
 
-	return nil, fmt.Errorf("Store:%s Not Found", IDOrType)
+	return nil
 }
 
 func (dc *Datacenter) AllocStore(host, IDOrType string, size int64) error {
 	dc.Lock()
 	defer dc.Unlock()
 
-	store, err := dc.getStore(IDOrType)
-	if err != nil {
-		return err
+	store := dc.getStore(IDOrType)
+	if store == nil {
+		return fmt.Errorf("Not Enough Storage %s,%d for Host %s", IDOrType, size, host)
 	}
 
-	_, _, err = store.Alloc("", int(size))
+	_, _, err := store.Alloc("", int(size))
 
 	return err
 }
@@ -303,32 +304,6 @@ func (gd *Gardener) listShortIdleStore(IDOrType string, num, size int) []string 
 	}
 
 	return out
-}
-
-func (dc *Datacenter) RegisterNode(IDOrName string) error {
-	dc.RLock()
-
-	node := dc.getNode(IDOrName)
-
-	dc.RUnlock()
-
-	if node == nil {
-		node = &Node{
-			Node: &database.Node{
-				ID: IDOrName,
-			},
-		}
-	}
-
-	dc.Lock()
-
-	err := node.UpdateStatus(1)
-
-	dc.Unlock()
-
-	log.Infof("Register Node:%s to Cluster:%s", IDOrName, dc.Name)
-
-	return err
 }
 
 func (dc *Datacenter) DeregisterNode(IDOrName string) error {
@@ -590,8 +565,8 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 				continue
 			}
 			nodes[i].engine = eng
-			
-			nodes[i].localStore = store.NewLocalDisk("",eng.Labels["vg"],nodes[i].Node)
+
+			nodes[i].localStore = store.NewLocalDisk("", eng.Labels["vg"], nodes[i].Node)
 
 			wwwn := eng.Labels["wwwn"]
 			if strings.TrimSpace(wwwn) == "" {
@@ -600,18 +575,18 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 
 			list := strings.Split(wwwn, ",")
 
-			for i := range dc.stores {
-				if dc.stores[i].Driver() != "lvm" {
-					continue
-				}
+			if dc.storage == nil || dc.storage.Driver() != "lvm" {
+				continue
+			}
 
-				err := dc.stores[i].AddHost(nodes[i].ID, list...)
-				if err != nil {
-					continue
-				}
+			err := dc.storage.AddHost(nodes[i].ID, list...)
+			if err != nil {
+				continue
 			}
 
 			nodes[i].Status = 5
+
+			err = database.TxUpdateNodeStatus(nodes[i].Node, nodes[i].task, nodes[i].Status, _TaskDone)
 
 			// servcie register
 			// TODO:create container test

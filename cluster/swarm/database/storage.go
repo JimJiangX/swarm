@@ -286,6 +286,27 @@ func SelectVolumeByVG(name string) ([]LocalVolume, error) {
 	return lvs, nil
 }
 
+func GetStorageByID(id string) (*HitachiStorage, *HuaweiStorage, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	hitachi, huawei := &HitachiStorage{}, &HuaweiStorage{}
+
+	err = db.Get(hitachi, "SELECT * FROM tb_storage_HITACHI WHERE id=?", id)
+	if err == nil {
+		return hitachi, nil, nil
+	}
+
+	err = db.Get(huawei, "SELECT * FROM tb_storage_HUAWEI WHERE id=?", id)
+	if err == nil {
+		return nil, huawei, nil
+	}
+
+	return nil, nil, err
+}
+
 /*
 type Volume struct {
 	Name     string `db:"id"`
