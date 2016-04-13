@@ -30,11 +30,20 @@ const (
 	_StatusUnitRestoring
 	_StatusUnitNoContent
 
-	_StatusServiceCreating = iota
+	_StatusServiceInit = iota
+	_StatusServcieBuilding
+	_StatusServiceAlloction
+	_StatusServiceAlloctionFailed
+	_StatusServiceCreating
+	_StatusServiceCreateFailed
 	_StatusServiceStarting // start contaier and start service
+	_StatusServiceStartFailed
 	_statusServiceStoping
+	_statusServiceStopFaied
 	_StatusServiceDeleting
+	_StatusServiceDeleteFailed
 	_StatusServiceBackuping
 	_StatusServiceRestoring
+	_StatusServiceRestoreFailed
 	_StatusServiceNoContent
 )

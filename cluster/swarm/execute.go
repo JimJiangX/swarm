@@ -3,9 +3,11 @@ package swarm
 import (
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/samalba/dockerclient"
 )
 
@@ -16,7 +18,7 @@ func (gd *Gardener) ServiceToExecute(svc *Service) {
 func (gd *Gardener) serviceExecute() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("Recover From Panic:%v,Error:%s", r, err)
+			err = fmt.Errorf("Recover From Panic:%v", r)
 		}
 
 		log.Fatalf("Service Execute Exit,%s", err)
@@ -25,25 +27,31 @@ func (gd *Gardener) serviceExecute() (err error) {
 	for {
 		svc := <-gd.serviceExecuteCh
 
-		if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
+		if !atomic.CompareAndSwapInt64(&svc.Status, _StatusServiceAlloction, _StatusServiceCreating) {
 			continue
 		}
 
 		svc.Lock()
 
 		// step := int64(0)
+		var taskErr error
 
 		for _, pending := range svc.pendingContainers {
 
 			u, err := svc.getUnit(pending.Name)
 			if err != nil {
 				svc.Unlock()
+				taskErr = err
+
 				goto failure
 			}
+			atomic.StoreUint32(&u.Status, _StatusUnitCreating)
 
 			err = u.prepareCreateContainer()
 			if err != nil {
 				svc.Unlock()
+				taskErr = fmt.Errorf("Prepare Networking or Volume Failed,%s", err)
+
 				goto failure
 			}
 
@@ -51,6 +59,8 @@ func (gd *Gardener) serviceExecute() (err error) {
 			container, err := gd.createContainerInPending(pending.Config, pending.Name, svc.authConfig)
 			if err != nil {
 				svc.Unlock()
+				taskErr = fmt.Errorf("Container Create Failed %s,%s", pending.Name, err)
+
 				goto failure
 			}
 
@@ -58,59 +68,72 @@ func (gd *Gardener) serviceExecute() (err error) {
 
 			if err := u.factory(); err != nil {
 				svc.Unlock()
+				taskErr = err
+
 				goto failure
 			}
 
-			u.saveToDisk()
+			if err := u.saveToDisk(); err != nil {
+
+			}
 		}
 
 		svc.pendingContainers = nil
 
-		atomic.StoreInt64(&svc.Status, 1)
 		svc.Unlock()
 
 		err = svc.StartContainers()
 		if err != nil {
+			taskErr = err
 
 			goto failure
 		}
 
 		err = svc.CopyServiceConfig()
 		if err != nil {
+			taskErr = err
 
 			goto failure
 		}
 
 		err = svc.StartService()
 		if err != nil {
+			taskErr = err
 
 			goto failure
 		}
 
 		err = svc.CreateUsers()
 		if err != nil {
+			taskErr = err
 
 			goto failure
 		}
 
 		err = svc.InitTopology()
 		if err != nil {
+			taskErr = err
 
 			goto failure
 		}
 
 		err = svc.RegisterServices()
 		if err != nil {
+			taskErr = err
 
 			goto failure
 		}
 
-		atomic.StoreInt64(&svc.Status, 10)
+		database.TxSetServiceStatus(&svc.Service, svc.task,
+			_StatusServiceNoContent, _StatusTaskDone, time.Now(), "")
+
 		continue
 
 	failure:
-		atomic.StoreInt64(&svc.Status, 10)
 
+		//TODO:error handler
+
+		database.TxSetServiceStatus(&svc.Service, svc.task, svc.Status, _StatusTaskFailed, time.Now(), taskErr.Error())
 	}
 
 	return err
