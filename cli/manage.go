@@ -215,13 +215,6 @@ func manage(c *cli.Context) {
 		err       error
 	)
 
-	if c.Bool("db") {
-		err := database.SetupDB(c)
-		if err != nil {
-			log.Fatal("database setup failed")
-		}
-	}
-
 	// If either --tls or --tlsverify are specified, load the certificates.
 	if c.Bool("tls") || c.Bool("tlsverify") {
 		if !c.IsSet("tlscert") || !c.IsSet("tlskey") {
@@ -305,6 +298,10 @@ func manage(c *cli.Context) {
 	case "swarm":
 		cl, err = swarm.NewCluster(sched, tlsConfig, discovery, c.StringSlice("cluster-opt"), engineOpts)
 	case "gardener":
+		if err := database.SetupDB(c); err != nil {
+			log.Fatal("database setup failed")
+		}
+
 		cluster, err := swarm.NewCluster(sched, tlsConfig, discovery, c.StringSlice("cluster-opt"), engineOpts)
 		if err != nil {
 			log.Fatal(err)
