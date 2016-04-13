@@ -133,6 +133,47 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 }
 
+//Post /cluster/{cluster:.*}/nodes/{node:.*}/enable
+func enableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	cluster := mux.Vars(r)["cluster"]
+	name := mux.Vars(r)["node"]
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	dc, err := gd.Datacenter(cluster)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	dc.GetNode(name)
+
+}
+
+//Post /cluster/{cluster:.*}/nodes/{node:.*}/disable
+func disableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	cluster := mux.Vars(r)["cluster"]
+	name := mux.Vars(r)["node"]
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	dc, err := gd.Datacenter(cluster)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	dc.GetNode(name)
+}
+
 // 创建服务
 // Post /service
 func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
