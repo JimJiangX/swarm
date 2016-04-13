@@ -147,11 +147,11 @@ func NewEngine(addr string, overcommitRatio float64, opts *EngineOpts) *Engine {
 }
 
 // HTTPClientAndScheme returns the underlying HTTPClient and the scheme used by the engine
-func (e *Engine) HTTPClientAndScheme() (*http.Client, string) {
+func (e *Engine) HTTPClientAndScheme() (*http.Client, string, error) {
 	if dc, ok := e.client.(*dockerclient.DockerClient); ok {
-		return dc.HTTPClient, dc.URL.Scheme
+		return dc.HTTPClient, dc.URL.Scheme, nil
 	}
-	return nil, ""
+	return nil, "", fmt.Errorf("Possibly lost connection to Engine (name: %s, ID: %s) ", e.Name, e.ID)
 }
 
 // Connect will initialize a connection to the Docker daemon running on the
@@ -192,7 +192,7 @@ func (e *Engine) StartMonitorEvents() {
 			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Errorf("Error monitoring events: %s.", err)
 			if !strings.Contains(err.Error(), "EOF") {
 				// failing node reconnect should use back-off strategy
-				<-e.refreshDelayer.Wait(e.failureCount)
+				<-e.refreshDelayer.Wait(e.getFailureCount())
 			}
 			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Errorf("Restart event monitoring.")
 			e.StartMonitorEvents()
@@ -366,6 +366,13 @@ func (e *Engine) incFailureCount() {
 	}
 }
 
+// getFailureCount returns a copy on the getFailureCount, thread-safe
+func (e *Engine) getFailureCount() int {
+	e.RLock()
+	defer e.RUnlock()
+	return e.failureCount
+}
+
 // UpdatedAt returns the previous updatedAt time
 func (e *Engine) UpdatedAt() time.Time {
 	e.RLock()
@@ -385,7 +392,7 @@ func (e *Engine) CheckConnectionErr(err error) {
 		e.setErrMsg("")
 		// If current state is unhealthy, change it to healthy
 		if e.state == stateUnhealthy {
-			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Infof("Engine came back to life after %d retries. Hooray!", e.failureCount)
+			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Infof("Engine came back to life after %d retries. Hooray!", e.getFailureCount())
 			e.emitEvent("engine_reconnect")
 			e.setState(stateHealthy)
 		}
@@ -412,6 +419,26 @@ func (e *Engine) CheckConnectionErr(err error) {
 		return
 	}
 	// other errors may be ambiguous.
+}
+
+// Update API Version in apiClient
+func (e *Engine) updateClientVersionFromServer(serverVersion string) {
+	// v will be >= 1.6, since this is checked earlier
+	v := version.Version(serverVersion)
+	switch {
+	case v.LessThan(version.Version("1.7")):
+		e.apiClient.UpdateClientVersion("1.18")
+	case v.LessThan(version.Version("1.8")):
+		e.apiClient.UpdateClientVersion("1.19")
+	case v.LessThan(version.Version("1.9")):
+		e.apiClient.UpdateClientVersion("1.20")
+	case v.LessThan(version.Version("1.10")):
+		e.apiClient.UpdateClientVersion("1.21")
+	case v.LessThan(version.Version("1.11")):
+		e.apiClient.UpdateClientVersion("1.22")
+	default:
+		e.apiClient.UpdateClientVersion("1.23")
+	}
 }
 
 // Gather engine specs (CPU, memory, constraints, ...).
@@ -441,8 +468,10 @@ func (e *Engine) updateSpecs() error {
 		e.CheckConnectionErr(err)
 		return err
 	}
-	// update version
+	// update server version
 	e.Version = v.Version
+	// update client version. engine-api handles backward compatibility where needed
+	e.updateClientVersionFromServer(v.Version)
 
 	e.Lock()
 	defer e.Unlock()
@@ -472,6 +501,16 @@ func (e *Engine) updateSpecs() error {
 			message := fmt.Sprintf("Engine (ID: %s, Addr: %s) contains an invalid label (%s) not formatted as \"key=value\".", e.ID, e.Addr, label)
 			return fmt.Errorf(message)
 		}
+
+		// If an engine managed by Swarm contains a label with key "node",
+		// such as node=node1
+		// `docker run -e constraint:node==node1 -d nginx` will not work,
+		// since "node" in constraint will match node.Name instead of label.
+		// Log warn message in this case.
+		if kv[0] == "node" {
+			log.Warnf("Engine (ID: %s, Addr: %s) containers a label (%s) with key of \"node\" which cannot be used in Swarm.", e.ID, e.Addr, label)
+		}
+
 		e.Labels[kv[0]] = kv[1]
 	}
 	return nil
@@ -712,7 +751,7 @@ func (e *Engine) refreshLoop() {
 
 		// Engines keep failing should backoff
 		// e.failureCount and e.opts.FailureRetry are type of int
-		backoffFactor := e.failureCount - e.opts.FailureRetry
+		backoffFactor := e.getFailureCount() - e.opts.FailureRetry
 		if backoffFactor < 0 {
 			backoffFactor = 0
 		} else if backoffFactor > maxBackoffFactor {
