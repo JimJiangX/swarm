@@ -235,7 +235,17 @@ func (svc *Service) SetServiceStatus(state int64, finish time.Time) error {
 	return nil
 }
 
-func (svc *Service) TxSetServiceStatus(tx *sqlx.Tx, state int64, finish time.Time) error {
+func TxSetServiceStatus(svc *Service, task *Task, state, tstate int64, finish time.Time, msg string) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 
 	if finish.IsZero() {
 		_, err := tx.Exec("UPDATE tb_service SET status=? WHERE id=?", state, svc.ID)
@@ -245,18 +255,23 @@ func (svc *Service) TxSetServiceStatus(tx *sqlx.Tx, state int64, finish time.Tim
 
 		atomic.StoreInt64(&svc.Status, state)
 
-		return nil
+	} else {
+
+		_, err := tx.Exec("UPDATE tb_service SET status=?,finished_at=? WHERE id=?", state, finish, svc.ID)
+		if err != nil {
+			return err
+		}
+
+		atomic.StoreInt64(&svc.Status, state)
+		svc.FinishedAt = finish
 	}
 
-	_, err := tx.Exec("UPDATE tb_service SET status=?,finished_at=? WHERE id=?", state, finish, svc.ID)
+	err = TxUpdateTaskStatus(tx, task, int(tstate), finish, msg)
 	if err != nil {
 		return err
 	}
 
-	atomic.StoreInt64(&svc.Status, state)
-	svc.FinishedAt = finish
-
-	return nil
+	return tx.Commit()
 }
 
 type User struct {

@@ -339,7 +339,7 @@ func (dc *Datacenter) DeregisterNode(IDOrName string) error {
 
 func (dc *Datacenter) DistributeNode(node *Node, kvpath string) error {
 	err := database.TxUpdateNodeStatus(node.Node, node.task,
-		_StatusNodeInstalling, _StatusTaskRunning, false, "Installing node into cluster")
+		_StatusNodeInstalling, _StatusTaskRunning, false, "")
 	if err != nil {
 		return err
 	}
@@ -451,16 +451,17 @@ func (node *Node) Distribute(kvpath string) (err error) {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Recover From Panic:%v", r)
 		}
-
+		msg := ""
 		if err == nil {
 			node.Node.Status = _StatusNodeInstalled
 		} else {
 			node.Node.Status = _StatusNodeInstallFailed
 			node.task.Status = _StatusTaskFailed
+			msg = err.Error()
 		}
 
 		r := database.TxUpdateNodeStatus(node.Node, node.task,
-			node.Node.Status, int(node.task.Status), false, "Installed node into cluster")
+			node.Node.Status, int(node.task.Status), false, msg)
 		if r != nil {
 			// TODO:log
 		}
@@ -627,7 +628,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 				continue
 			}
 
-			err = database.TxUpdateNodeStatus(nodes[i].Node, nodes[i].task, _StatusNodeEnable, _StatusTaskDone, true, "node registed")
+			err = database.TxUpdateNodeStatus(nodes[i].Node, nodes[i].task, _StatusNodeEnable, _StatusTaskDone, true, "")
 
 			// servcie register
 			// TODO:create container test

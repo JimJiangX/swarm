@@ -13,8 +13,16 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 )
 
-func (gd *Gardener) ServiceToScheduler(svc *Service) {
+func (gd *Gardener) ServiceToScheduler(svc *Service) error {
+	err := database.TxSetServiceStatus(&svc.Service, svc.task,
+		_StatusServcieBuilding, _StatusTaskRunning, time.Time{}, "")
+	if err != nil {
+		return err
+	}
+
 	gd.serviceSchedulerCh <- svc
+
+	return nil
 }
 
 func (gd *Gardener) serviceScheduler() (err error) {
@@ -29,7 +37,7 @@ func (gd *Gardener) serviceScheduler() (err error) {
 	for {
 		svc := <-gd.serviceSchedulerCh
 
-		if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
+		if !atomic.CompareAndSwapInt64(&svc.Status, _StatusServcieBuilding, _StatusServiceAlloction) {
 			continue
 		}
 
@@ -75,8 +83,6 @@ func (gd *Gardener) serviceScheduler() (err error) {
 		}
 
 		// scheduler success
-		atomic.StoreInt64(&svc.Status, 1)
-
 		svc.Unlock()
 
 		gd.ServiceToExecute(svc)
@@ -96,7 +102,7 @@ func (gd *Gardener) serviceScheduler() (err error) {
 		svc.pendingContainers = make(map[string]*pendingContainer)
 		svc.units = make([]*unit, 0, 10)
 
-		atomic.StoreInt64(&svc.Status, 10)
+		svc.Service.SetServiceStatus(_StatusServiceAlloctionFailed, time.Now())
 
 		svc.Unlock()
 	}
