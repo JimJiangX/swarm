@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -198,4 +199,31 @@ func GetPrivateIP(addr string) (net.IP, error) {
 		}
 	}
 	return nil, fmt.Errorf("private IP not found,%s", addr)
+}
+
+func GetAbsolutePath(isDir bool, path ...string) (string, error) {
+	root, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	abs := filepath.Join(root, filepath.Join(path...))
+
+	finfo, err := os.Stat(abs)
+	if err != nil || os.IsNotExist(err) {
+		// no such file or dir
+		return "", err
+	}
+
+	if isDir && !finfo.IsDir() {
+		// it's a directory
+		return "", fmt.Errorf("%s is not a directory", abs)
+	}
+
+	if !isDir && finfo.IsDir() {
+		// it's a directory
+		return "", fmt.Errorf("%s is a directory", abs)
+	}
+
+	return abs, nil
 }

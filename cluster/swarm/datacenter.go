@@ -54,9 +54,10 @@ func NewNode(addr, name, cluster, user, password string, port, num int) *Node {
 		ClusterID:    cluster,
 		Addr:         addr,
 		MaxContainer: num,
+		Status:       _StatusNodeImport,
 	}
 
-	task := database.NewTask("node", node.ID, "", nil, 0)
+	task := database.NewTask("node", node.ID, "import node", nil, 0)
 
 	return &Node{
 		Node:     node,
@@ -323,7 +324,11 @@ func (dc *Datacenter) DeregisterNode(IDOrName string) error {
 
 	dc.Lock()
 
-	err := node.UpdateStatus(2)
+	err := node.UpdateStatus(_StatusNodeDeregisted)
+
+	if node.engine != nil {
+		node.engine.Disconnect()
+	}
 
 	dc.Unlock()
 
@@ -333,7 +338,8 @@ func (dc *Datacenter) DeregisterNode(IDOrName string) error {
 }
 
 func (dc *Datacenter) DistributeNode(node *Node, kvpath string) error {
-	err := database.UpdateTaskStatus(node.task, _StatusTaskRunning, time.Time{}, "Import node into cluster")
+	err := database.TxUpdateNodeStatus(node.Node, node.task,
+		_StatusNodeInstalling, _StatusTaskRunning, false, "Installing node into cluster")
 	if err != nil {
 		return err
 	}
@@ -376,6 +382,17 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, *os.Fil
 	config, err := database.GetSystemConfig()
 	if err != nil {
 		return nil, nil, "", err
+	}
+
+	if filepath.HasPrefix(config.SourceDir, ".") {
+		dir := strings.SplitN(config.SourceDir, ".", 1)
+		if len(dir) == 2 {
+			config.SourceDir, err = utils.GetAbsolutePath(true, dir[1])
+			if err != nil {
+				return nil, nil, "", err
+			}
+		}
+
 	}
 
 	// Create a temp dir in the system default temp folder
@@ -429,7 +446,26 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, *os.Fil
 	return config, tempFile, script, nil
 }
 
-func (node *Node) Distribute(kvpath string) error {
+func (node *Node) Distribute(kvpath string) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("Recover From Panic:%v", r)
+		}
+
+		if err == nil {
+			node.Node.Status = _StatusNodeInstalled
+		} else {
+			node.Node.Status = _StatusNodeInstallFailed
+			node.task.Status = _StatusTaskFailed
+		}
+
+		r := database.TxUpdateNodeStatus(node.Node, node.task,
+			node.Node.Status, int(node.task.Status), false, "Installed node into cluster")
+		if r != nil {
+			// TODO:log
+		}
+	}()
+
 	if node.port == 0 {
 		node.port = 22
 	}
@@ -559,9 +595,11 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 		return err
 	}
 
+	// TODO: set timeout
+
 	for {
 		for i := range nodes {
-			if nodes[i].Status >= 5 {
+			if nodes[i].Status != _StatusNodeInstalled {
 				continue
 			}
 
@@ -589,9 +627,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 				continue
 			}
 
-			nodes[i].Status = 5
-
-			err = database.TxUpdateNodeStatus(nodes[i].Node, nodes[i].task, nodes[i].Status, _StatusTaskDone, "node registed")
+			err = database.TxUpdateNodeStatus(nodes[i].Node, nodes[i].task, _StatusNodeEnable, _StatusTaskDone, true, "node registed")
 
 			// servcie register
 			// TODO:create container test
