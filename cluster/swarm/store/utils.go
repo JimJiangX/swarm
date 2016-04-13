@@ -69,7 +69,7 @@ func getAbsolutePath(path ...string) (string, error) {
 		return "", err
 	}
 
-	if !finfo.IsDir() {
+	if finfo.IsDir() {
 		// it's a directory
 		return "", fmt.Errorf("%s is a directory", abs)
 	}

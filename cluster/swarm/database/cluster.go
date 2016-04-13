@@ -179,7 +179,7 @@ func (n *Node) UpdateStatus(state int) error {
 }
 
 // TxUpdateNodeStatus returns error when Node UPDATE status.
-func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int, msg string) error {
+func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int, done bool, msg string) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
@@ -190,7 +190,13 @@ func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int, msg string) err
 	}
 	defer tx.Rollback()
 
-	_, err = tx.Exec("UPDATE tb_node SET status=? WHERE id=?", nstate, n.ID)
+	if done {
+		_, err = tx.Exec("UPDATE tb_node SET status=?,register_at=? WHERE id=?", nstate, time.Now(), n.ID)
+	} else {
+		_, err = tx.Exec("UPDATE tb_node SET status=? WHERE id=?", nstate, n.ID)
+	}
+
+	n.Status = nstate
 	if err != nil {
 		return err
 	}

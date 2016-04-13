@@ -17,6 +17,7 @@ const (
 	_StatusNodeFailedTest
 	_StatusNodeEnable
 	_StatusNodeDisable
+	_StatusNodeDeregisted
 
 	_StatusUnitAllocted = iota
 	_StatusUnitCreating
