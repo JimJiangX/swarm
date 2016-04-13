@@ -14,10 +14,6 @@ var (
 	dbSource   string
 	defaultDB  *sqlx.DB
 
-	FlDB = cli.BoolFlag{
-		Name:  "db",
-		Usage: "use a database",
-	}
 	FlDBDriver = cli.StringFlag{
 		Name:  "dbDriver",
 		Value: "mysql",
