@@ -45,8 +45,8 @@ func TestCluster(t *testing.T) {
 	}
 
 	cl5, err := GetCluster("cluster5")
-	if err == nil || cl5 != nil {
-		t.Fatalf("%+v,%v", cl1, err)
+	if err == nil {
+		t.Fatal(err)
 	}
 
 	cl2 := Cluster{ID: clusters[2].ID}
