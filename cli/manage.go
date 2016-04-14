@@ -299,7 +299,7 @@ func manage(c *cli.Context) {
 		cl, err = swarm.NewCluster(sched, tlsConfig, discovery, c.StringSlice("cluster-opt"), engineOpts)
 	case "gardener":
 		if err := database.SetupDB(c); err != nil {
-			log.Fatal("database setup failed")
+			log.Fatalf("database setup failed", err)
 		}
 
 		cluster, err := swarm.NewCluster(sched, tlsConfig, discovery, c.StringSlice("cluster-opt"), engineOpts)

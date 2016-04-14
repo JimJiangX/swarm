@@ -57,6 +57,8 @@ func SetupDB(c *cli.Context) error {
 
 	_, err = Connect(driver, source)
 
+	fmt.Println(driver, source, err)
+
 	return err
 }
 
