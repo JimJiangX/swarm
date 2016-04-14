@@ -1,9 +1,6 @@
 package store
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -53,28 +50,6 @@ func maxIdleSizeRG(m map[*database.RaidGroup]space) *database.RaidGroup {
 	}
 
 	return key
-}
-
-func getAbsolutePath(path ...string) (string, error) {
-	root, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
-	abs := filepath.Join(root, filepath.Join(path...))
-
-	finfo, err := os.Stat(abs)
-	if err != nil || os.IsNotExist(err) {
-		// no such file or dir
-		return "", err
-	}
-
-	if finfo.IsDir() {
-		// it's a directory
-		return "", fmt.Errorf("%s is a directory", abs)
-	}
-
-	return abs, nil
 }
 
 type space struct {
