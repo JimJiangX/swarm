@@ -61,9 +61,9 @@ func TestCluster(t *testing.T) {
 		t.Fatalf("Unexpected,%t != %t", cl2.Enabled, cl3.Enabled)
 	}
 
-	for i := range clusters {
+	for i := range wrong {
 		if err := DeleteCluster(wrong[i].ID); err != nil {
-			t.Fatal(wrong[i].Name, err)
+			t.Error(wrong[i].Name, err)
 		}
 	}
 }
