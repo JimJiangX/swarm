@@ -94,7 +94,6 @@ func SaveMultiNodesToDB(nodes []*Node) error {
 }
 
 func (gd *Gardener) Datacenter(IDOrName string) (*Datacenter, error) {
-
 	gd.RLock()
 	for i := range gd.datacenters {
 		if gd.datacenters[i].ID == IDOrName || gd.datacenters[i].Name == IDOrName {
@@ -106,8 +105,21 @@ func (gd *Gardener) Datacenter(IDOrName string) (*Datacenter, error) {
 
 	gd.RUnlock()
 
-	return nil, fmt.Errorf("Not Found %s", IDOrName)
+	cl, err := database.GetCluster(IDOrName)
+	if err != nil || cl == nil {
+		return nil, fmt.Errorf("Not Found %s,Error %s", IDOrName, err)
+	}
 
+	dc := &Datacenter{
+		Cluster: cl,
+		nodes:   make([]*Node, 0, 100),
+	}
+
+	gd.Lock()
+	gd.datacenters = append(gd.datacenters, dc)
+	gd.Unlock()
+
+	return dc, nil
 }
 
 func (gd *Gardener) AddDatacenter(cl database.Cluster, storage store.Store) error {
@@ -231,6 +243,22 @@ func (gd *Gardener) DatacenterByNode(IDOrName string) (*Datacenter, error) {
 	}
 
 	return gd.Datacenter(node.ClusterID)
+}
+
+func (gd *Gardener) SetNodeStatus(cluster, name string, state int) error {
+	gd.RLock()
+	dc, err := gd.Datacenter(cluster)
+	gd.RLock()
+	if err != nil {
+		return err
+	}
+
+	node, err := dc.GetNode(name)
+	if err != nil {
+		return err
+	}
+
+	return node.UpdateStatus(state)
 }
 
 func (dc *Datacenter) isIdleStoreEnough(IDOrType string, num, size int) bool {
