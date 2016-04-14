@@ -40,7 +40,7 @@ func TestSystemConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.ID != id {
+	if config.ID != int(id) {
 		t.Error("Unexpected")
 	}
 
