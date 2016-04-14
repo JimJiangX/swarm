@@ -202,27 +202,26 @@ func GetPrivateIP(addr string) (net.IP, error) {
 }
 
 func GetAbsolutePath(isDir bool, path ...string) (string, error) {
-	root, err := os.Getwd()
+	dir := filepath.Join(path...)
+	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return "", err
 	}
 
-	abs := filepath.Join(root, filepath.Join(path...))
-
 	finfo, err := os.Stat(abs)
-	if err != nil || os.IsNotExist(err) {
+	if os.IsNotExist(err) {
 		// no such file or dir
-		return "", err
+		return abs, err
 	}
 
 	if isDir && !finfo.IsDir() {
 		// it's a directory
-		return "", fmt.Errorf("%s is not a directory", abs)
+		return abs, fmt.Errorf("%s is not a directory", abs)
 	}
 
 	if !isDir && finfo.IsDir() {
 		// it's a directory
-		return "", fmt.Errorf("%s is a directory", abs)
+		return abs, fmt.Errorf("%s is a directory", abs)
 	}
 
 	return abs, nil

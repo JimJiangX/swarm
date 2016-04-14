@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -11,7 +13,7 @@ func TestGenerateUUID(t *testing.T) {
 	for length := 2; length <= 128; length *= 2 {
 		t.Log(length)
 		for i := 0; i < 100; i++ {
-			id := generateUUID(length)
+			id := GenerateUUID(length)
 			if _, exist := uuid[id]; exist {
 				t.Fatalf("Should get a new ID!")
 			}
@@ -113,4 +115,51 @@ func TestGetPrivateIP(t *testing.T) {
 			t.Error(ip.String(), address[i+1])
 		}
 	}
+}
+
+func TestGetAbsolutePath(t *testing.T) {
+	abs, err := GetAbsolutePath(true, "abc", "def", "ghi")
+	if err != nil {
+		t.Log("expected", abs, err)
+
+		err = os.MkdirAll(abs, os.ModePerm)
+		if err != nil {
+			t.Fatal(abs, err)
+		}
+
+		base, err := GetAbsolutePath(true, "abc")
+		if err != nil {
+			t.Log("expected", base, err)
+		}
+		defer os.RemoveAll(base)
+	}
+
+	abs, err = GetAbsolutePath(true, "./abc", "def", "ghi")
+	if err != nil {
+		t.Fatal(abs, err)
+	}
+
+	abs, err = GetAbsolutePath(true, abs)
+	if err != nil {
+		t.Fatal(abs, err)
+	}
+
+	abs, err = GetAbsolutePath(false, abs)
+	if err == nil {
+		t.Fatal("Unexpected", abs)
+	}
+
+	name := filepath.Join(abs, "aaaa.txt")
+	file, err := os.Create(name)
+	if err != nil {
+		t.Fatal(name, err)
+	}
+	defer file.Close()
+
+	abs, err = GetAbsolutePath(false, name)
+	if err != nil {
+		t.Fatal("Unexpected", abs)
+	}
+
+	t.Log(abs)
 }
