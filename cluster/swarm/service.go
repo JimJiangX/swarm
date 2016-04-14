@@ -491,30 +491,6 @@ func (svc *Service) DeregisterServices() (err error) {
 	return nil
 }
 
-func (svc *Service) Destroy(force, volumes bool, timeout int) error {
-	err := svc.StopService()
-	if err != nil {
-		return err
-	}
-
-	err = svc.StopContainers(timeout)
-	if err != nil {
-		return err
-	}
-
-	err = svc.RemoveContainers(force, volumes)
-	if err != nil {
-		return err
-	}
-
-	err = svc.DeregisterServices()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (svc *Service) getUnitByType(Type string) (*unit, error) {
 	for i := range svc.units {
 		if svc.units[i].Type == Type {
@@ -616,6 +592,10 @@ func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int)
 		return err
 	}
 
+	err = gd.RemoveCronJob(svc.backup.ID)
+
+	return err
+
 	return nil
 }
 
@@ -633,5 +613,7 @@ func (svc *Service) Delete(force, volumes bool, timeout int) error {
 		return err
 	}
 
-	return nil
+	err = svc.DeregisterServices()
+
+	return err
 }
