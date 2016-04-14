@@ -48,7 +48,7 @@ type HorusConfig struct {
 	HorusDistributionIP   string `db:"horus_distribution_ip"`
 	HorusDistributionPort int    `db:"horus_distribution_port"`
 	HorusEventIP          string `db:"horus_event_ip"`
-	HorusEventPort        int    `db:"horus_enevt_port"`
+	HorusEventPort        int    `db:"horus_event_port"`
 }
 
 type Registry struct {

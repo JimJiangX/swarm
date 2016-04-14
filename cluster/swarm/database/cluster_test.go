@@ -44,7 +44,7 @@ func TestCluster(t *testing.T) {
 		t.Fatalf("Unexpected,%s != %s", cl1.ID, clusters[2].ID)
 	}
 
-	cl5, err := GetCluster("cluster5")
+	_, err = GetCluster("cluster5")
 	if err == nil {
 		t.Fatal(err)
 	}
@@ -62,8 +62,8 @@ func TestCluster(t *testing.T) {
 	}
 
 	for i := range clusters {
-		if err := DeleteCluster(wrong[i].ID); err == nil {
-			t.Fatalf("Name should not allowed Duplicate")
+		if err := DeleteCluster(wrong[i].ID); err != nil {
+			t.Fatal(wrong[i].Name, err)
 		}
 	}
 }
