@@ -26,7 +26,7 @@ const (
 var errUnsupportGardener = errors.New("Unsupported Gardener")
 
 // 创建集群
-// POST /cluster
+// POST /clusters
 func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	var (
 		req   = structs.PostClusterRequest{}
@@ -77,7 +77,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // 集群物理机入库
-// Post /cluster/{name:.*}/nodes
+// Post /clusters/{name:.*}/nodes
 func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -133,7 +133,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 }
 
-//Post /cluster/{cluster:.*}/nodes/{node:.*}/enable
+//Post /clusters/{cluster:.*}/nodes/{node:.*}/enable
 func enableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	cluster := mux.Vars(r)["cluster"]
 	name := mux.Vars(r)["node"]
@@ -153,7 +153,7 @@ func enableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-//Post /cluster/{cluster:.*}/nodes/{node:.*}/disable
+//Post /clusters/{cluster:.*}/nodes/{node:.*}/disable
 func disableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	cluster := mux.Vars(r)["cluster"]
 	name := mux.Vars(r)["node"]
@@ -174,7 +174,7 @@ func disableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // 创建服务
-// Post /service
+// Post /services
 func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostServiceRequest{}
 
@@ -211,7 +211,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // 备份任务完成结果回调处理
-// Post /task/backup/callback
+// Post /tasks/backup/callback
 func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.BackupTaskCallback{}
 
@@ -230,7 +230,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 }
 
 // 网络规划
-// Post /networking
+// Post /networkings
 func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostNetworkingRequest{}
 
@@ -256,7 +256,7 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%q}", "ID", net.ID)
 }
 
-// Post /networking/ports/import
+// Post /networkings/ports/import
 func postImportPort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostImportPortRequest{}
 
@@ -381,4 +381,31 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 // NAS系统登记
 // Post /storage/nas
 func postNasStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+}
+
+// Delete /services/{name:.*}
+func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	name := mux.Vars(r)["name"]
+	force := boolValue(r, "force")
+	volumes := boolValue(r, "v")
+	timeout := intValueOrZero(r, "time")
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.DeleteService(name, force, volumes, timeout)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

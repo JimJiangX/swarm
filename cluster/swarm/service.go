@@ -15,6 +15,10 @@ import (
 	"github.com/yiduoyunQ/smlib"
 )
 
+var (
+	ErrServiceNotFound = errors.New("Service Not Found")
+)
+
 type Service struct {
 	sync.RWMutex
 
@@ -178,7 +182,7 @@ func (gd *Gardener) GetService(IDOrName string) (*Service, error) {
 
 	gd.RUnlock()
 
-	return nil, errors.New("Service Not Found")
+	return nil, ErrServiceNotFound
 }
 
 func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, error) {
@@ -314,83 +318,60 @@ func (svc *Service) StartService() (err error) {
 	return nil
 }
 
-func (svc *Service) StopContainers() (err error) {
-	if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
-		return nil
-	}
-
+func (svc *Service) StopContainers(timeout int) error {
 	svc.Lock()
+	err := svc.stopContainers(timeout)
+	svc.Unlock()
 
-	defer func() {
-		if r := recover(); r != nil || err != nil {
-			atomic.StoreInt64(&svc.Status, 1)
-		}
+	return err
 
-		svc.Unlock()
-	}()
+}
+
+func (svc *Service) stopContainers(timeout int) error {
 
 	for i := range svc.units {
-		err = svc.units[i].stopContainer(0)
+		err := svc.units[i].stopContainer(timeout)
 		if err != nil {
 			return err
 		}
 	}
 
-	atomic.StoreInt64(&svc.Status, 1)
+	return nil
+}
+func (svc *Service) StopService() error {
+	svc.Lock()
+	err := svc.stopService()
+	svc.Unlock()
+
+	return err
+}
+
+func (svc *Service) stopService() error {
+	for i := range svc.units {
+		err := svc.units[i].stopService()
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
 
-func (svc *Service) StopService() (err error) {
-	if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
-		return nil
-	}
-
+func (svc *Service) RemoveContainers(force, rmVolumes bool) error {
 	svc.Lock()
+	err := svc.removeContainers(force, rmVolumes)
+	svc.Unlock()
 
-	defer func() {
-		if r := recover(); r != nil || err != nil {
-			atomic.StoreInt64(&svc.Status, 1)
-		}
-
-		svc.Unlock()
-	}()
-
-	for i := range svc.units {
-		err = svc.units[i].stopService()
-		if err != nil {
-			return err
-		}
-	}
-
-	atomic.StoreInt64(&svc.Status, 1)
-
-	return nil
+	return err
 }
 
-func (svc *Service) RemoveContainers() (err error) {
-	if !atomic.CompareAndSwapInt64(&svc.Status, 0, 1) {
-		return nil
-	}
-
-	svc.Lock()
-
-	defer func() {
-		if r := recover(); r != nil || err != nil {
-			atomic.StoreInt64(&svc.Status, 1)
-		}
-
-		svc.Unlock()
-	}()
-
+func (svc *Service) removeContainers(force, rmVolumes bool) error {
 	for i := range svc.units {
-		err = svc.units[i].removeContainer(false, false)
+		err := svc.units[i].removeContainer(force, rmVolumes)
 		if err != nil {
 			return err
 		}
 	}
-
-	atomic.StoreInt64(&svc.Status, 1)
 
 	return nil
 }
@@ -510,18 +491,18 @@ func (svc *Service) DeregisterServices() (err error) {
 	return nil
 }
 
-func (svc *Service) Destroy() error {
+func (svc *Service) Destroy(force, volumes bool, timeout int) error {
 	err := svc.StopService()
 	if err != nil {
 		return err
 	}
 
-	err = svc.StopContainers()
+	err = svc.StopContainers(timeout)
 	if err != nil {
 		return err
 	}
 
-	err = svc.RemoveContainers()
+	err = svc.RemoveContainers(force, volumes)
 	if err != nil {
 		return err
 	}
@@ -618,4 +599,39 @@ loop:
 
 func (svc *Service) Task() *database.Task {
 	return svc.task
+}
+
+func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int) error {
+	svc, err := gd.GetService(name)
+	if err != nil {
+		if err == ErrServiceNotFound {
+			return nil
+		}
+
+		return err
+	}
+
+	err = svc.Delete(force, volumes, timeout)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (svc *Service) Delete(force, volumes bool, timeout int) error {
+	svc.Lock()
+	defer svc.Unlock()
+
+	err := svc.stopContainers(timeout)
+	if err != nil {
+		return err
+	}
+
+	err = svc.removeContainers(force, volumes)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

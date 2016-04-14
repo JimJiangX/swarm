@@ -222,7 +222,7 @@ func (dc *Datacenter) listNodeID() []string {
 	if len(out) == 0 {
 
 		var err error
-		nodes, err := database.ListNodeByClusterType(dc.Type)
+		nodes, err := database.ListNodeByCluster(dc.ID)
 		if err != nil {
 			return nil
 		}
@@ -413,7 +413,7 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, *os.Fil
 	}
 
 	if filepath.HasPrefix(config.SourceDir, ".") {
-		dir := strings.SplitN(config.SourceDir, ".", 1)
+		dir := strings.SplitN(config.SourceDir, ".", 2)
 		if len(dir) == 2 {
 			config.SourceDir, err = utils.GetAbsolutePath(true, dir[1])
 			if err != nil {

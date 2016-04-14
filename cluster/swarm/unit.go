@@ -104,9 +104,6 @@ func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
 
 func (u *unit) removeContainer(force, rmVolumes bool) error {
 	err := u.engine.RemoveContainer(u.container, force, rmVolumes)
-	if err != nil {
-		err = u.engine.RemoveContainer(u.container, true, rmVolumes)
-	}
 
 	return err
 }
@@ -116,10 +113,7 @@ func (u *unit) startContainer() error {
 }
 
 func (u *unit) stopContainer(timeout int) error {
-	err := u.stopService()
-	if err != nil {
-		return err
-	}
+	u.stopService()
 
 	client := u.engine.EngineAPIClient()
 
