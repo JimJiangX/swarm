@@ -38,21 +38,24 @@ type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 var masterRoutes = map[string]map[string]ctxHandler{
 	"POST": {
-		"/cluster":                 postCluster,
-		"/cluster/{name:.*}/nodes": postNodes,
+		"/clusters":                 postCluster,
+		"/clusters/{name:.*}/nodes": postNodes,
 
-		"/cluster/{cluster:.*}/nodes/{node:.*}/enable":  enableOneNode,
-		"/cluster/{cluster:.*}/nodes/{node:.*}/disable": disableOneNode,
+		"/clusters/{cluster:.*}/nodes/{node:.*}/enable":  enableOneNode,
+		"/clusters/{cluster:.*}/nodes/{node:.*}/disable": disableOneNode,
 
-		"/task/backup/callback":    postBackupCallback,
-		"/service":                 postService,
-		"/networking":              postNetworking,
-		"/networking/ports/import": postImportPort,
-		"/image/load":              postImageLoad,
-		"/storage/san":             postSanStorage,
-		"/storage/nas":             postNasStorage,
+		"/tasks/backup/callback":    postBackupCallback,
+		"/services":                 postService,
+		"/networkings":              postNetworking,
+		"/networkings/ports/import": postImportPort,
+		"/image/load":               postImageLoad,
+		"/storage/san":              postSanStorage,
+		"/storage/nas":              postNasStorage,
 
 		"/storage/{name:.*}/raidgroup/add": postRGToSanStorage,
+	},
+	"DELETE": {
+		"services/{name:.*}": deleteService,
 	},
 }
 
