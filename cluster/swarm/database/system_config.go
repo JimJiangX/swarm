@@ -66,6 +66,20 @@ func (c Configurations) TableName() string {
 	return "tb_system_config"
 }
 
+func (c *Configurations) Insert() (int64, error) {
+	query := "INSERT INTO tb_system_config (id,consul_IPs,consul_port,consul_dc,consul_token,consul_wait_time,horus_distribution_ip,horus_distribution_port,horus_event_ip,horus_event_port,registry_domain,registry_address,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,pkg_name,script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry) VALUES (:id,:consul_IPs,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_distribution_ip,:horus_distribution_port,:horus_event_ip,:horus_event_port,:registry_domain,:registry_address,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:pkg_name,:script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry)"
+	db, err := GetDB(true)
+	if err != nil {
+		return 0, err
+	}
+
+	r, err := db.NamedExec(query, c)
+	if err != nil {
+		return 0, err
+	}
+
+	return r.LastInsertId()
+}
 func (c Configurations) GetConsulClient() ([]*consulapi.Client, error) {
 	port := strconv.Itoa(c.ConsulPort)
 	addrs := strings.Split(c.ConsulIPs, ";&;")
@@ -114,10 +128,10 @@ func GetSystemConfig() (*Configurations, error) {
 	}
 
 	c := &Configurations{}
-	err = db.Get(c, "SELECT * FROM tb_system_config LIMIT 1")
+	err = db.QueryRowx("SELECT * FROM tb_system_config LIMIT 1").StructScan(c)
 	if err != nil {
 		return nil, err
 	}
 
-	return c, err
+	return c, nil
 }
