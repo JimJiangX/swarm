@@ -1,6 +1,10 @@
 package database
 
-import "time"
+import (
+	"time"
+
+	"github.com/docker/swarm/utils"
+)
 
 type Cluster struct {
 	ID          string  `db:"id"`
@@ -16,6 +20,20 @@ type Cluster struct {
 
 func (c Cluster) TableName() string {
 	return "tb_cluster"
+}
+
+func NewCluster(name, typ, storageType, storageID, dc string, enable bool, num int, limit float32) Cluster {
+	return Cluster{
+		ID:          utils.Generate64UUID(),
+		Name:        name,
+		Type:        typ,
+		StorageType: storageType,
+		StorageID:   storageID,
+		Datacenter:  dc,
+		Enabled:     enable,
+		MaxNode:     num,
+		UsageLimit:  limit,
+	}
 }
 
 func (c *Cluster) Insert() error {
@@ -47,14 +65,25 @@ func (c *Cluster) UpdateStatus(state bool) error {
 	return nil
 }
 
-func GetCluster(id string) (*Cluster, error) {
+func DeleteCluster(IDOrName string) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("DELETE tb_cluster WHERE id=? OR name=?", IDOrName, IDOrName)
+
+	return err
+}
+
+func GetCluster(IDOrName string) (*Cluster, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
 	c := &Cluster{}
-	err = db.Get(c, "SELECT * FROM tb_cluster WHERE id=?", id)
+	err = db.Get(c, "SELECT * FROM tb_cluster WHERE id=? OR name=?", IDOrName, IDOrName)
 
 	return c, err
 }
@@ -73,6 +102,19 @@ type Node struct {
 
 func (n Node) TableName() string {
 	return "tb_node"
+}
+
+func NewNode(name, clusterID, addr string, num, status int, t1, t2 time.Time) Node {
+	return Node{
+		ID:           utils.Generate64UUID(),
+		Name:         name,
+		ClusterID:    clusterID,
+		Addr:         addr,
+		MaxContainer: num,
+		Status:       status,
+		RegisterAt:   t1,
+		DeregisterAt: t2,
+	}
 }
 
 func (n *Node) Insert() error {
@@ -211,16 +253,16 @@ func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int, done bool, msg 
 	return tx.Commit()
 }
 
-func ListNode() ([]*Node, error) {
+func ListNode(status int) ([]*Node, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
 	var nodes []*Node
-	query := "SELECT * FROM tb_node WHERE status>1"
+	query := "SELECT * FROM tb_node WHERE status=?"
 
-	err = db.QueryRowx(query).StructScan(&nodes)
+	err = db.QueryRowx(query, status).StructScan(&nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -228,16 +270,16 @@ func ListNode() ([]*Node, error) {
 	return nodes, nil
 }
 
-func ListNodeByClusterType(tag string) ([]*Node, error) {
+func ListNodeByCluster(cluster string) ([]*Node, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
 	var nodes []*Node
-	query := "SELECT * FROM tb_node WHERE type=? AND status>1"
+	query := "SELECT * FROM tb_node WHERE cluster_id=?"
 
-	err = db.QueryRowx(query, tag).StructScan(&nodes)
+	err = db.QueryRowx(query, cluster).StructScan(&nodes)
 	if err != nil {
 		return nil, err
 	}

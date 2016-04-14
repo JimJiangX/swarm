@@ -1,0 +1,138 @@
+package database
+
+import (
+	"testing"
+	"time"
+)
+
+func TestCluster(t *testing.T) {
+	clusters := []Cluster{
+		NewCluster("cluster1", "upsql", "local", "", "dc1", true, 256, 0.8),
+		NewCluster("cluster2", "upsql", "ssd", "", "dc1", true, 100000000, 1.44),
+		NewCluster("cluster3", "proxy", "local", "", "dc1", true, 100000000, 1.44),
+		NewCluster("cluster4", "proxy", "local", "", "dc3", false, 100000000, 1.44),
+	}
+	wrong := []Cluster{
+		NewCluster("cluster2", "nomal", "ssd", "", "dc1", false, 1000000000000, 1.44),
+		NewCluster("cluster3", "proxy", "local", "", "dc1", false, 100000000, 1.44),
+		NewCluster("cluster4", "proxy", "local", "", "dc3", false, 100000000, 1.44),
+	}
+
+	for i := range clusters {
+		if err := clusters[i].Insert(); err != nil {
+			t.Fatal(clusters[i].Name, err)
+		}
+	}
+
+	for i := range wrong {
+		if err := wrong[i].Insert(); err == nil {
+			t.Fatal("Name should not allowed Duplicate", wrong[i].Name)
+		}
+	}
+
+	cl1, err := GetCluster("cluster3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cl1.ID != clusters[3].ID {
+		t.Fatalf("Unexpected,%s != %s", cl1.ID, clusters[3].ID)
+	}
+
+	cl5, err := GetCluster("cluster5")
+	if err == nil || cl5 != nil {
+		t.Fatalf("%+v,%v", cl1, err)
+	}
+
+	cl2 := Cluster{ID: clusters[2].ID}
+	if err := cl2.UpdateStatus(false); err != nil {
+		t.Fatal(err)
+	}
+	cl3, err := GetCluster(cl2.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cl2.Enabled != cl3.Enabled {
+		t.Fatalf("Unexpected,%t != %t", cl2.Enabled, cl3.Enabled)
+	}
+
+	for i := range clusters {
+		IDOrName := clusters[i].ID
+		if i%2 == 0 {
+			IDOrName = clusters[i].Name
+		}
+		if err := DeleteCluster(IDOrName); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for i := range clusters {
+		if err := DeleteCluster(wrong[i].ID); err == nil {
+			t.Fatalf("Name should not allowed Duplicate")
+		}
+	}
+}
+
+func TestNode(t *testing.T) {
+	list := []Node{
+		NewNode("node1", "cluster1", "192.168.2.10:8888", 100, 1000, time.Now(), time.Time{}),
+		NewNode("node2", "cluster2", "192.168.2.144:8888", 1000, 1000, time.Time{}, time.Now()),
+		NewNode("node3", "cluster1", "192.168.2.134:8888", 100, 0, time.Time{}, time.Time{}),
+		NewNode("node4", "cluster2", "192.168.2.13:8888", 0, 1000, time.Now(), time.Now()),
+		NewNode("node5", "cluster3", "192.168.2.10:8888", 100, 100100, time.Now(), time.Time{}),
+	}
+
+	for i := range list {
+		err := list[i].Insert()
+		if err != nil {
+			t.Fatal(list[i].Name, err)
+		}
+	}
+
+	node1, err := GetNode(list[3].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	node2, err := GetNode(list[3].Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node1 != node2 {
+		t.Fatal("Unexpected")
+	}
+
+	node1, err = GetNode("node0000")
+	if err == nil {
+		t.Fatal(err)
+	}
+
+	n := Node{ID: list[3].ID}
+	err = n.UpdateStatus(9999)
+	if err != nil {
+		t.Fatal(err)
+	}
+	node3, err := GetNode(list[3].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if n.Status != node3.Status {
+		t.Fatalf("Unexpect,%d != %d", n.Status, node3.Status)
+	}
+
+	nodes1, err := ListNode(100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes1) != 2 {
+		t.Fatal("Unexpect")
+	}
+
+	nodes2, err := ListNodeByCluster("cluster2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes2) != 2 {
+		t.Fatal("Unexpect")
+	}
+
+}
