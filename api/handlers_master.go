@@ -144,14 +144,13 @@ func enableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dc, err := gd.Datacenter(cluster)
+	err := gd.SetNodeStatus(cluster, name, 6)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	dc.GetNode(name)
-
+	w.WriteHeader(http.StatusOK)
 }
 
 //Post /cluster/{cluster:.*}/nodes/{node:.*}/disable
@@ -165,13 +164,13 @@ func disableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dc, err := gd.Datacenter(cluster)
+	err := gd.SetNodeStatus(cluster, name, 7)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	dc.GetNode(name)
+	w.WriteHeader(http.StatusOK)
 }
 
 // 创建服务
