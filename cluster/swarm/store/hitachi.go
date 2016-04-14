@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/docker/swarm/utils"
 )
 
-const HITACHI = "HITACHI"
+var HITACHI = filepath.Join("script", "HITACHI")
 
 type hitachiStore struct {
 	lock *sync.RWMutex
@@ -45,7 +46,7 @@ func (h hitachiStore) Driver() string {
 }
 
 func (h hitachiStore) Ping() error {
-	path, err := getAbsolutePath(HITACHI, "connect_test.sh")
+	path, err := utils.GetAbsolutePath(false, HITACHI, "connect_test.sh")
 	if err != nil {
 		return err
 	}
@@ -108,7 +109,7 @@ func (h *hitachiStore) Alloc(_ string, size int) (string, int, error) {
 		return "", 0, err
 	}
 
-	path, err := getAbsolutePath(HITACHI, "create_lun.sh")
+	path, err := utils.GetAbsolutePath(false, HITACHI, "create_lun.sh")
 	if err != nil {
 		return "", 0, err
 	}
@@ -139,7 +140,7 @@ func (h *hitachiStore) Recycle(lun int) error {
 		return err
 	}
 
-	path, err := getAbsolutePath(HITACHI, "del_lun.sh")
+	path, err := utils.GetAbsolutePath(false, HITACHI, "del_lun.sh")
 	if err != nil {
 		return err
 	}
@@ -206,7 +207,7 @@ func (h *hitachiStore) List(rg ...int) ([]space, error) {
 		list = intSliceToString(rg, " ")
 	}
 
-	path, err := getAbsolutePath(HITACHI, "listrg.sh")
+	path, err := utils.GetAbsolutePath(false, HITACHI, "listrg.sh")
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +249,7 @@ func (h hitachiStore) IdleSize() ([]int, error) {
 }
 
 func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
-	path, err := getAbsolutePath(HITACHI, "add_host.sh")
+	path, err := utils.GetAbsolutePath(false, HITACHI, "add_host.sh")
 	if err != nil {
 		return err
 	}
@@ -273,7 +274,7 @@ func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
 }
 
 func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
-	path, err := getAbsolutePath(HITACHI, "del_host.sh")
+	path, err := utils.GetAbsolutePath(false, HITACHI, "del_host.sh")
 	if err != nil {
 		return err
 	}
@@ -321,7 +322,7 @@ func (h *hitachiStore) Mapping(host, unit, lun string) error {
 		return err
 	}
 
-	path, err := getAbsolutePath(HITACHI, "create_lunmap.sh")
+	path, err := utils.GetAbsolutePath(false, HITACHI, "create_lunmap.sh")
 	if err != nil {
 		return err
 	}
@@ -346,7 +347,7 @@ func (h *hitachiStore) DelMapping(lun string) error {
 		return err
 	}
 
-	path, err := getAbsolutePath(HITACHI, "del_lunmap.sh")
+	path, err := utils.GetAbsolutePath(false, HITACHI, "del_lunmap.sh")
 	if err != nil {
 		return err
 	}

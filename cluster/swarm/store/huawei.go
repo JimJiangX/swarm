@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/docker/swarm/utils"
 )
 
-const HUAWEI = "HUAWEI"
+var HUAWEI = filepath.Join("script", "HUAWEI")
 
 type huaweiStore struct {
 	lock *sync.RWMutex
@@ -46,7 +47,7 @@ func (h huaweiStore) Driver() string {
 }
 
 func (h *huaweiStore) Ping() error {
-	path, err := getAbsolutePath(HUAWEI, "connect_test.sh")
+	path, err := utils.GetAbsolutePath(false, HUAWEI, "connect_test.sh")
 	if err != nil {
 		return err
 	}
@@ -99,7 +100,7 @@ func (h *huaweiStore) Alloc(_ string, size int) (string, int, error) {
 		CreatedAt:       time.Now(),
 	}
 
-	path, err := getAbsolutePath(HUAWEI, "create_lun.sh")
+	path, err := utils.GetAbsolutePath(false, HUAWEI, "create_lun.sh")
 	if err != nil {
 		return "", 0, err
 	}
@@ -139,7 +140,7 @@ func (h *huaweiStore) Recycle(lun int) error {
 		return err
 	}
 
-	path, err := getAbsolutePath(HUAWEI, "del_lun.sh")
+	path, err := utils.GetAbsolutePath(false, HUAWEI, "del_lun.sh")
 	if err != nil {
 		return err
 	}
@@ -181,7 +182,7 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	path, err := getAbsolutePath(HUAWEI, "add_host.sh")
+	path, err := utils.GetAbsolutePath(false, HUAWEI, "add_host.sh")
 	if err != nil {
 		return err
 	}
@@ -207,7 +208,7 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	path, err := getAbsolutePath(HUAWEI, "del_host.sh")
+	path, err := utils.GetAbsolutePath(false, HUAWEI, "del_host.sh")
 	if err != nil {
 		return err
 	}
@@ -254,7 +255,7 @@ func (h *huaweiStore) Mapping(host, unit, lun string) error {
 		return err
 	}
 
-	path, err := getAbsolutePath(HUAWEI, "create_lunmap.sh")
+	path, err := utils.GetAbsolutePath(false, HUAWEI, "create_lunmap.sh")
 	if err != nil {
 		return err
 	}
@@ -279,7 +280,7 @@ func (h *huaweiStore) DelMapping(lun string) error {
 		return err
 	}
 
-	path, err := getAbsolutePath(HUAWEI, "del_lunmap.sh")
+	path, err := utils.GetAbsolutePath(false, HUAWEI, "del_lunmap.sh")
 	if err != nil {
 		return err
 	}
@@ -354,7 +355,7 @@ func (h *huaweiStore) List(rg ...int) ([]space, error) {
 		list = intSliceToString(rg, " ")
 	}
 
-	path, err := getAbsolutePath(HUAWEI, "listrg.sh")
+	path, err := utils.GetAbsolutePath(false, HUAWEI, "listrg.sh")
 	if err != nil {
 		return nil, err
 	}

@@ -3,7 +3,7 @@ package structs
 type PostClusterRequest struct {
 	Name       string `json:"name"`
 	Type       string `json:"type"`
-	Datacenter string `json:"datacenter"`
+	Datacenter string `json:"dc"`
 
 	MaxNode    int     `json:"max_node"`
 	UsageLimit float32 `json:"usage_limit"`
@@ -14,7 +14,6 @@ type PostClusterRequest struct {
 
 type Node struct {
 	Name     string
-	Type     string
 	Address  string
 	Username string
 	Password string

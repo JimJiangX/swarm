@@ -412,15 +412,9 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, *os.Fil
 		return nil, nil, "", err
 	}
 
-	if filepath.HasPrefix(config.SourceDir, ".") {
-		dir := strings.SplitN(config.SourceDir, ".", 2)
-		if len(dir) == 2 {
-			config.SourceDir, err = utils.GetAbsolutePath(true, dir[1])
-			if err != nil {
-				return nil, nil, "", err
-			}
-		}
-
+	config.SourceDir, err = utils.GetAbsolutePath(true, config.SourceDir)
+	if err != nil {
+		return nil, nil, "", err
 	}
 
 	// Create a temp dir in the system default temp folder
