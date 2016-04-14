@@ -27,7 +27,7 @@ type Container struct {
 	Filesystem     string    `db:"filesystem"`
 	Env            string    `db:"env"`
 	Cmd            string    `db:"cmd"`
-	Labels         string    `db:labels`
+	Labels         string    `db:"labels"`
 	CreatedAt      time.Time `db:"create_at"`
 }
 
@@ -74,7 +74,7 @@ type Unit struct {
 
 	Status        uint32    `db:"status"`
 	CheckInterval int       `db:"check_interval"`
-	CreatedAt     time.Time `db:"created_at`
+	CreatedAt     time.Time `db:"created_at"`
 }
 
 func (u Unit) TableName() string {
