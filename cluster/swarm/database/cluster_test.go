@@ -22,6 +22,12 @@ func TestCluster(t *testing.T) {
 		if err := clusters[i].Insert(); err != nil {
 			t.Fatal(clusters[i].Name, err)
 		}
+
+		defer func(id string) {
+			if err := DeleteCluster(id); err != nil {
+				t.Error(id, err)
+			}
+		}(clusters[i].ID)
 	}
 
 	for i := range wrong {
@@ -56,16 +62,6 @@ func TestCluster(t *testing.T) {
 	}
 
 	for i := range clusters {
-		IDOrName := clusters[i].ID
-		if i%2 == 0 {
-			IDOrName = clusters[i].Name
-		}
-		if err := DeleteCluster(IDOrName); err != nil {
-			t.Fatal(IDOrName, err)
-		}
-	}
-
-	for i := range clusters {
 		if err := DeleteCluster(wrong[i].ID); err == nil {
 			t.Fatalf("Name should not allowed Duplicate")
 		}
@@ -86,6 +82,12 @@ func TestNode(t *testing.T) {
 		if err != nil {
 			t.Fatal(list[i].Name, err)
 		}
+
+		defer func(id string) {
+			if err := DeleteNode(id); err != nil {
+				t.Error(id, err)
+			}
+		}(list[i].ID)
 	}
 
 	node1, err := GetNode(list[3].ID)
@@ -152,6 +154,14 @@ func TestNode(t *testing.T) {
 		NewTask("qweafjlahjklkjhfjrtyu", "qwertfajlfjafyuiajlfakfaopsdfghjklbn", "", nil, 888),
 	}
 
+	defer func() {
+		for i := range tasks {
+			if err := DeleteTask(tasks[i].ID); err != nil {
+				t.Error(tasks[i].ID, err)
+			}
+		}
+	}()
+
 	err = TxInsertNodeAndTask(&list[0], tasks[0])
 	if err != nil {
 		t.Fatal(err)
@@ -177,19 +187,4 @@ func TestNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := range list {
-		IDOrName := list[i].ID
-		if i%2 == 0 {
-			IDOrName = list[i].Name
-		}
-		if err := DeleteNode(IDOrName); err != nil {
-			t.Fatal(IDOrName, err)
-		}
-	}
-
-	for i := range tasks {
-		if err := DeleteTask(tasks[i].ID); err != nil {
-			t.Fatal(tasks[i].ID, err)
-		}
-	}
 }
