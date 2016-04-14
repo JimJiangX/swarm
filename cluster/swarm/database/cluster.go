@@ -71,7 +71,7 @@ func DeleteCluster(IDOrName string) error {
 		return err
 	}
 
-	_, err = db.Exec("DELETE tb_cluster WHERE id=? OR name=?", IDOrName, IDOrName)
+	_, err = db.Exec("DELETE FROM tb_cluster WHERE id=? OR name=?", IDOrName, IDOrName)
 
 	return err
 }
@@ -285,4 +285,15 @@ func ListNodeByCluster(cluster string) ([]*Node, error) {
 	}
 
 	return nodes, nil
+}
+
+func DeleteNode(IDOrName string) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("DELETE FROM tb_node WHERE id=? OR name=?", IDOrName, IDOrName)
+
+	return err
 }

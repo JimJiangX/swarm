@@ -61,7 +61,7 @@ func TestCluster(t *testing.T) {
 			IDOrName = clusters[i].Name
 		}
 		if err := DeleteCluster(IDOrName); err != nil {
-			t.Fatal(err)
+			t.Fatal(IDOrName, err)
 		}
 	}
 
@@ -135,4 +135,61 @@ func TestNode(t *testing.T) {
 		t.Fatal("Unexpect")
 	}
 
+	for i := range list {
+		IDOrName := list[i].ID
+		if i%2 == 0 {
+			IDOrName = list[i].Name
+		}
+		if err := DeleteNode(IDOrName); err != nil {
+			t.Fatal(IDOrName, err)
+		}
+	}
+
+	tasks := []*Task{
+		NewTask("qwertyu", "qwertyuiopsdfghjklbn", "tyuighjfdghjkl", nil, 888),
+		NewTask("qweafjlafjrtyu", "qwertyuiajlfakfaopsdfghjklbn", "tyuifajflaghjfdghjkl", nil, 888),
+		NewTask("qwertyu", "qwertyuiopsdfghjklbn", "tyuighjfdghjkl", []string{"jlafjlakf", "jaljflajflajf"}, 888),
+		NewTask("qweafjlahjklkjhfjrtyu", "qwertfajlfjafyuiajlfakfaopsdfghjklbn", "", nil, 888),
+	}
+
+	err = TxInsertNodeAndTask(&list[0], tasks[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	list1 := make([]*Node, len(list))
+	for i := range list {
+		list1[i] = &list[i]
+	}
+
+	err = TxInsertMultiNodeAndTask(list1[1:], tasks[1:])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = TxUpdateNodeStatus(&list[0], tasks[1], 9977, 999, false, "foafghjk")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = TxUpdateNodeStatus(&list[1], tasks[2], 0, 999, true, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := range list {
+		IDOrName := list[i].ID
+		if i%2 == 0 {
+			IDOrName = list[i].Name
+		}
+		if err := DeleteNode(IDOrName); err != nil {
+			t.Fatal(IDOrName, err)
+		}
+	}
+
+	for i := range tasks {
+		if err := DeleteTask(tasks[i].ID); err != nil {
+			t.Fatal(tasks[i].ID, err)
+		}
+	}
 }

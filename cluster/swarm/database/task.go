@@ -202,6 +202,17 @@ func QueryTask(id string) (*Task, error) {
 	return t, err
 }
 
+func DeleteTask(id string) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("DELETE FROM tb_task WHERE id=?", id)
+
+	return err
+}
+
 type BackupStrategy struct {
 	ID          string        `db:"id"`
 	Type        string        `db:"type"` // full/part
