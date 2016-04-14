@@ -40,8 +40,8 @@ func TestCluster(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cl1.ID != clusters[3].ID {
-		t.Fatalf("Unexpected,%s != %s", cl1.ID, clusters[3].ID)
+	if cl1.ID != clusters[2].ID {
+		t.Fatalf("Unexpected,%s != %s", cl1.ID, clusters[2].ID)
 	}
 
 	cl5, err := GetCluster("cluster5")
@@ -80,6 +80,10 @@ func TestNode(t *testing.T) {
 	for i := range list {
 		err := list[i].Insert()
 		if err != nil {
+			if list[i].Name == "node5" {
+				t.Skip("Expected")
+			}
+
 			t.Fatal(list[i].Name, err)
 		}
 
@@ -125,6 +129,11 @@ func TestNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	for i := range nodes1 {
+		if nodes1[i].ID == "" {
+			t.Error("nil value")
+		}
+	}
 	if len(nodes1) != 2 {
 		t.Fatal("Unexpect")
 	}
@@ -132,6 +141,11 @@ func TestNode(t *testing.T) {
 	nodes2, err := ListNodeByCluster("cluster2")
 	if err != nil {
 		t.Fatal(err)
+	}
+	for i := range nodes2 {
+		if nodes1[i].ID == "" {
+			t.Error("nil value")
+		}
 	}
 	if len(nodes2) != 2 {
 		t.Fatal("Unexpect")
