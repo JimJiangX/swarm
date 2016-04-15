@@ -450,16 +450,17 @@ func (node *Node) Distribute(kvpath string) (err error) {
 			err = fmt.Errorf("Recover From Panic:%v", r)
 		}
 
-		nodeState, taskState := 0, 0
+		nodeState, taskState, msg := 0, 0, ""
 		if err == nil {
 			nodeState = _StatusNodeInstalled
 		} else {
 			nodeState = _StatusNodeInstallFailed
 			taskState = _StatusTaskFailed
+			msg = err.Error()
 		}
 
 		r := database.TxUpdateNodeStatus(node.Node, node.task,
-			nodeState, taskState, false, err.Error())
+			nodeState, taskState, false, msg)
 		if r != nil || err != nil {
 			log.Error(err, r)
 		}
