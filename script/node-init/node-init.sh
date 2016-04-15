@@ -12,6 +12,7 @@ registry_passwd=$9
 regstry_ca_file=${10}
 docker_port=${11}
 cur_dir=`dirname $0`
+consul_port=8500
 
 
 # check NIC
@@ -252,6 +253,16 @@ EOF
 }
 
 # install swarm agent
+install_swarm_agent() {
+	# stop swarm-agent
+	#systemctl stop swarm-agent >/dev/null 2>&1
+
+	# copy binary file
+	cp ${cur_dir}/swarm-agent-1.1.3-release/bin/swarm /usr/bin/swarm; chmod 755 /usr/bin/swarm
+
+	nohup swarm join --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/DBaaS  >> /var/log/swarm.log &
+
+}
 
 # install hours agent
 
@@ -261,6 +272,6 @@ install_consul
 install_docker_plugin
 install_docker
 init_docker
-#install_swarm_agent
+install_swarm_agent
 #install_hours_agent
 
