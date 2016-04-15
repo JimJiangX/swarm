@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -436,15 +437,8 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, *os.Fil
 
 	_, path, caFile := config.DestPath()
 
-	list := ""
-	addrs := config.GetConsulAddrs()
-
-	for i := range addrs {
-		if i != 0 {
-			list += ","
-		}
-		list += fmt.Sprintf(`"%s"`, addrs[i])
-	}
+	buffer := bytes.NewBuffer(nil)
+	json.NewEncoder(buffer).Encode(config.GetConsulAddrs())
 	/*
 		init.sh input
 		swarm_key=$1
@@ -461,7 +455,7 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, *os.Fil
 	*/
 
 	script := fmt.Sprintf("%s %s %s %s %s %s %s %d %s %s %s %d",
-		path, kvpath, node.Addr, config.ConsulDatacenter, list,
+		path, kvpath, node.Addr, config.ConsulDatacenter, buffer.String(),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile, config.DockerPort)
 
@@ -539,12 +533,12 @@ func (node *Node) Distribute(kvpath string) (err error) {
 		}
 	}
 
-	name := filepath.Join(config.Destination, filepath.Base(config.SourceDir), config.CA_CRT_Name)
-	if err := c.Upload(name, caFile); err != nil {
-		entry.Errorf("SSH UploadFile %s Error,%s", name, err)
+	_, _, filename := config.DestPath()
+	if err := c.Upload(filename, caFile); err != nil {
+		entry.Errorf("SSH UploadFile %s Error,%s", filename, err)
 
-		if err := c.Upload(name, caFile); err != nil {
-			entry.Errorf("SSH UploadFile %s Error Twice,%s", name, err)
+		if err := c.Upload(filename, caFile); err != nil {
+			entry.Errorf("SSH UploadFile %s Error Twice,%s", filename, err)
 
 			return err
 		}
