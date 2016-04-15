@@ -194,7 +194,7 @@ init_docker() {
 
 	# add cert file
 	mkdir -p ${cert_dir}
-	cp ${cur_dir}/${cert_file} ${cert_dir}/ca.crt
+	cp ${cert_file} ${cert_dir}/ca.crt
 	docker login -u ${registry_username} -p ${registry_passwd}  -e "unionpay.com" ${registry_domain}:${registry_port}
 	if [ $? -ne 0 ]; then
                 echo "init docker failed!"
