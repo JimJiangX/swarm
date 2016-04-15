@@ -11,7 +11,7 @@ registry_username=$8
 registry_passwd=$9
 regstry_ca_file=${10}
 docker_port=${11}
-cur_dir=$(pwd)
+cur_dir=`dirname $0`
 
 
 # check NIC
