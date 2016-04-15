@@ -38,8 +38,10 @@ type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 var masterRoutes = map[string]map[string]ctxHandler{
 	"POST": {
-		"/clusters":                 postCluster,
-		"/clusters/{name:.*}/nodes": postNodes,
+		"/clusters":                   postCluster,
+		"/clusters/{name:.*}/enable":  enableCluster,
+		"/clusters/{name:.*}/disable": disableCluster,
+		"/clusters/{name:.*}/nodes":   postNodes,
 
 		"/clusters/{cluster:.*}/nodes/{node:.*}/enable":  enableOneNode,
 		"/clusters/{cluster:.*}/nodes/{node:.*}/disable": disableOneNode,

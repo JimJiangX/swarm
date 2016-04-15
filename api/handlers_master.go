@@ -76,6 +76,55 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%q}", "ID", cluster.ID)
 }
 
+// Post /clusters/{name:.*}/enable
+func enableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	dc, err := gd.Datacenter(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = dc.SetStatus(true)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// Post /clusters/{name:.*}/disable
+func disableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	dc, err := gd.Datacenter(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = dc.SetStatus(false)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // 集群物理机入库
 // Post /clusters/{name:.*}/nodes
 func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -89,7 +138,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	dc, err := gd.Datacenter(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -121,16 +170,15 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
-
 	for i := range nodes {
 		go dc.DistributeNode(nodes[i], gd.KVPath())
 	}
 
 	go gd.RegisterNodes(name, nodes, time.Second*600)
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(response)
 }
 
 //Post /clusters/{cluster:.*}/nodes/{node:.*}/enable

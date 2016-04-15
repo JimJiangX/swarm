@@ -153,6 +153,14 @@ func (gd *Gardener) AddDatacenter(cl database.Cluster, storage store.Store) erro
 	return nil
 }
 
+func (dc *Datacenter) SetStatus(enable bool) error {
+	dc.Lock()
+	err := dc.UpdateStatus(enable)
+	dc.Unlock()
+
+	return err
+}
+
 func (dc *Datacenter) ListNode() []*Node {
 	dc.RLock()
 	nodes := dc.nodes
