@@ -31,9 +31,11 @@ type SSHDeliver struct {
 }
 
 func (d SSHDeliver) DestPath() (string, string, string) {
+	base := filepath.Base(d.SourceDir)
+
 	return filepath.Join(d.Destination, d.PkgName),
-		filepath.Join(d.Destination, d.ScriptName),
-		filepath.Join(d.Destination, d.CA_CRT_Name)
+		filepath.Join(d.Destination, base, d.ScriptName),
+		filepath.Join(d.Destination, base, d.CA_CRT_Name)
 }
 
 type ConsulConfig struct {
