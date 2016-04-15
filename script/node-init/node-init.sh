@@ -11,6 +11,7 @@ registry_username=$8
 registry_passwd=$9
 regstry_ca_file=${10}
 docker_port=${11}
+cur_dir=$(pwd)
 
 
 # check NIC
@@ -44,7 +45,7 @@ install_consul_agent() {
 EOF
 
 	# copy binary file
-	cp consul-agent-0.6.4-release/bin/consul /usr/bin/consul; chmod 755 /usr/bin/consul
+	cp ${cur_dir}/consul-agent-0.6.4-release/bin/consul /usr/bin/consul; chmod 755 /usr/bin/consul
 
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/consul
@@ -114,7 +115,7 @@ install_docker() {
 	systemctl stop docker >/dev/null 2>&1
 
 	# copy the binary & set the permissions
-	cp docker-1.10.3-release/bin/docker /usr/bin/docker; chmod +x /usr/bin/docker
+	cp ${cur_dir}/docker-1.10.3-release/bin/docker /usr/bin/docker; chmod +x /usr/bin/docker
 	
 
 	# create the systemd files
@@ -193,7 +194,7 @@ init_docker() {
 
 	# add cert file
 	mkdir -p ${cert_dir}
-	cp ${cert_file} ${cert_dir}/ca.crt
+	cp ${cur_dir}/${cert_file} ${cert_dir}/ca.crt
 	docker login -u ${registry_username} -p ${registry_passwd}  -e "unionpay.com" ${registry_domain}:${registry_port}
 	if [ $? -ne 0 ]; then
                 echo "init docker failed!"
@@ -210,10 +211,10 @@ install_docker_plugin() {
 	systemctl stop local-volume-plugin > /dev/null 2>&1
 
 	# copy binary file
-	cp dbaas_volume_plugin-1.5.3/bin/local_volume_plugin /usr/bin/local_volume_plugin; chmod 755 /usr/bin/local_volume_plugin
+	cp ${cur_dir}/dbaas_volume_plugin-1.5.3/bin/local_volume_plugin /usr/bin/local_volume_plugin; chmod 755 /usr/bin/local_volume_plugin
 
 	# copy script
-	cp script/*.sh ${script_dir}
+	cp ${cur_dir}/script/*.sh ${script_dir}
 	chmod +x ${script_dir}/*.sh
 
 
