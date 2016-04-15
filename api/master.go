@@ -57,7 +57,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/storage/{name:.*}/raidgroup/add": postRGToSanStorage,
 	},
 	"DELETE": {
-		"services/{name:.*}": deleteService,
+		"services/{name:.*}":                  deleteService,
+		"/clusters/{name:.*}/nodes/{node:.*}": deleteNode,
 	},
 }
 

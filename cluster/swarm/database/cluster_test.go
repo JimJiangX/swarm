@@ -70,11 +70,11 @@ func TestCluster(t *testing.T) {
 
 func TestNode(t *testing.T) {
 	list := []Node{
-		NewNode("node1", "cluster1", "192.168.2.10:8888", 100, 1000, time.Now(), time.Time{}),
-		NewNode("node2", "cluster2", "192.168.2.144:8888", 1000, 1000, time.Time{}, time.Now()),
-		NewNode("node3", "cluster1", "192.168.2.134:8888", 100, 0, time.Time{}, time.Time{}),
-		NewNode("node4", "cluster2", "192.168.2.13:8888", 0, 1000, time.Now(), time.Now()),
-		NewNode("node5", "cluster3", "192.168.2.10:8888", 100, 100100, time.Now(), time.Time{}),
+		NewNode("node1", "cluster1", "192.168.2.10:8888", "", 100, 1000, time.Now(), time.Time{}),
+		NewNode("node2", "cluster2", "192.168.2.144:8888", "ahfafja", 1000, 1000, time.Time{}, time.Now()),
+		NewNode("node3", "cluster1", "192.168.2.134:8888", "foaufafajf", 100, 0, time.Time{}, time.Time{}),
+		NewNode("node4", "cluster2", "192.168.2.13:8888", "", 0, 1000, time.Now(), time.Now()),
+		NewNode("node5", "cluster3", "192.168.2.10:8888", "xxxxxxxx", 100, 100100, time.Now(), time.Time{}),
 	}
 
 	for i := range list {
@@ -191,14 +191,18 @@ func TestNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = TxUpdateNodeStatus(&list[0], tasks[1], 9977, 999, false, "foafghjk")
+	err = TxUpdateNodeStatus(&list[0], tasks[1], 9977, 999, "foafghjk")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = TxUpdateNodeStatus(&list[1], tasks[2], 0, 999, true, "")
+	err = TxUpdateNodeStatus(&list[1], tasks[2], 0, 999, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	err = TxUpdateNodeRegister(&list[1], tasks[2], 0, 999, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
 }
