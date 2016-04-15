@@ -93,6 +93,7 @@ type Node struct {
 	Name         string `db:"name"`
 	ClusterID    string `db:"cluster_id"`
 	Addr         string `db:"admin_ip"`
+	EngineID     string `db:"engine_id"`
 	MaxContainer int    `db:"max_container"`
 	Status       int    `db:"status"`
 
@@ -104,12 +105,13 @@ func (n Node) TableName() string {
 	return "tb_node"
 }
 
-func NewNode(name, clusterID, addr string, num, status int, t1, t2 time.Time) Node {
+func NewNode(name, clusterID, addr, eng string, num, status int, t1, t2 time.Time) Node {
 	return Node{
 		ID:           utils.Generate64UUID(),
 		Name:         name,
 		ClusterID:    clusterID,
 		Addr:         addr,
+		EngineID:     eng,
 		MaxContainer: num,
 		Status:       status,
 		RegisterAt:   t1,
@@ -124,7 +126,7 @@ func (n *Node) Insert() error {
 	}
 
 	// insert into database
-	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:max_container,:status,:register_at,:deregister_at)"
+	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:max_container,:status,:register_at,:deregister_at)"
 	_, err = db.NamedExec(query, n)
 
 	return err
@@ -221,7 +223,7 @@ func (n *Node) UpdateStatus(state int) error {
 }
 
 // TxUpdateNodeStatus returns error when Node UPDATE status.
-func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int, done bool, msg string) error {
+func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int, msg string) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
@@ -232,10 +234,37 @@ func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int, done bool, msg 
 	}
 	defer tx.Rollback()
 
-	if done {
-		_, err = tx.Exec("UPDATE tb_node SET status=?,register_at=? WHERE id=?", nstate, time.Now(), n.ID)
+	_, err = tx.Exec("UPDATE tb_node SET status=? WHERE id=?", nstate, n.ID)
+	if err != nil {
+		return err
+	}
+
+	n.Status = nstate
+
+	err = TxUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// TxUpdateNodeRegister returns error when Node UPDATE infomation.
+func TxUpdateNodeRegister(n *Node, task *Task, nstate, tstate int, eng, msg string) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if eng != "" {
+		_, err = tx.Exec("UPDATE tb_node SET engine_id=?,status=?,register_at=? WHERE id=?", eng, nstate, time.Now(), n.ID)
 	} else {
-		_, err = tx.Exec("UPDATE tb_node SET status=? WHERE id=?", nstate, n.ID)
+		_, err = tx.Exec("UPDATE tb_node SET status=?,register_at=? WHERE id=?", nstate, time.Now(), n.ID)
 	}
 	if err != nil {
 		return err

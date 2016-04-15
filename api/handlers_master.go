@@ -457,3 +457,23 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// Delete /clusters/{name:.*}/nodes/{node:.*}
+func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	node := mux.Vars(r)["node"]
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	dc, err := gd.Datacenter(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	dc.GetNode(node)
+}

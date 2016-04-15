@@ -378,7 +378,7 @@ func (dc *Datacenter) DistributeNode(node *Node, kvpath string) error {
 		"cluster": dc.Cluster.ID,
 	})
 	err := database.TxUpdateNodeStatus(node.Node, node.task,
-		_StatusNodeInstalling, _StatusTaskRunning, false, "")
+		_StatusNodeInstalling, _StatusTaskRunning, "")
 	if err != nil {
 		entry.Error(err)
 		return err
@@ -460,7 +460,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 		}
 
 		r := database.TxUpdateNodeStatus(node.Node, node.task,
-			nodeState, taskState, false, msg)
+			nodeState, taskState, msg)
 		if r != nil || err != nil {
 			log.Error(err, r)
 		}
@@ -551,8 +551,9 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	}
 
 	err = c.Start(&cmd)
+	cmd.Wait()
 	if err != nil || cmd.ExitStatus != 0 {
-		err = fmt.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
+		err = fmt.Errorf("Executing Remote Command:%s,Exited:%d,%s,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
 	}
 
 	entry.Info("SSH UploadDir:", err)
@@ -592,7 +593,12 @@ func SSHCommand(host, port, user, password, shell string, output io.Writer) erro
 		Stderr:  output,
 	}
 
-	return c.Start(&cmd)
+	err = c.Start(&cmd)
+	if err != nil || cmd.ExitStatus != 0 {
+		err = fmt.Errorf("Executing Remote Command: %s,Exited:%d,%s", cmd.Command, cmd.ExitStatus, err)
+	}
+
+	return err
 }
 
 func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Duration) error {
@@ -635,7 +641,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 				continue
 			}
 
-			err = database.TxUpdateNodeStatus(nodes[i].Node, nodes[i].task, _StatusNodeEnable, _StatusTaskDone, true, "")
+			err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, _StatusNodeEnable, _StatusTaskDone, eng.ID, "")
 
 			// servcie register
 			// TODO:create container test
