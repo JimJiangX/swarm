@@ -1,6 +1,7 @@
 package database
 
 import (
+	"runtime/debug"
 	"testing"
 )
 
@@ -21,6 +22,12 @@ func TestConnect(t *testing.T) {
 }
 
 func TestMustConnect(t *testing.T) {
+	defer func() {
+		if err := recover(); err != nil {
+			debug.PrintStack()
+			t.Fatal(err)
+		}
+	}()
 	db := MustConnect(driverName, dbSource)
 	if db == nil {
 		t.FailNow()

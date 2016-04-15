@@ -30,6 +30,7 @@ func TestSystemConfig(t *testing.T) {
 		PluginPort: 0,
 		Retry:      0,
 	}
+	t.Log(test.DestPath())
 
 	id, err := test.Insert()
 	if err != nil {
