@@ -237,8 +237,6 @@ func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int, done bool, msg 
 	} else {
 		_, err = tx.Exec("UPDATE tb_node SET status=? WHERE id=?", nstate, n.ID)
 	}
-
-	n.Status = nstate
 	if err != nil {
 		return err
 	}
