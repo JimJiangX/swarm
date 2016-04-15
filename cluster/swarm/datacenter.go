@@ -374,24 +374,22 @@ func (dc *Datacenter) DeregisterNode(IDOrName string) error {
 }
 
 func (dc *Datacenter) DistributeNode(node *Node, kvpath string) error {
-	err := database.TxUpdateNodeStatus(node.Node, node.task,
-		_StatusNodeInstalling, _StatusTaskRunning, false, "")
-	if err != nil {
-		return err
-	}
-
-	log.WithFields(log.Fields{
+	entry := log.WithFields(log.Fields{
 		"name":    node.Name,
 		"addr":    node.Addr,
 		"cluster": dc.Cluster.ID,
-	}).Info("Adding new Node")
+	})
+	err := database.TxUpdateNodeStatus(node.Node, node.task,
+		_StatusNodeInstalling, _StatusTaskRunning, false, "")
+	if err != nil {
+		entry.Error(err)
+		return err
+	}
+
+	entry.Info("Adding new Node")
 
 	if err := node.Distribute(kvpath); err != nil {
-		log.WithFields(log.Fields{
-			"name":    node.Name,
-			"addr":    node.Addr,
-			"cluster": dc.Cluster.ID,
-		}).Errorf("SSH UploadDir Error,%s", err)
+		entry.Errorf("SSH UploadDir Error,%s", err)
 
 		return err
 	}
@@ -402,13 +400,7 @@ func (dc *Datacenter) DistributeNode(node *Node, kvpath string) error {
 
 	dc.Unlock()
 
-	log.WithFields(log.Fields{
-		"name":    node.Name,
-		"addr":    node.Addr,
-		"cluster": dc.Cluster.ID,
-	}).Info("Added Node")
-
-	err = database.UpdateTaskStatus(node.task, _StatusTaskDone, time.Now(), "node get ready to register")
+	entry.Info("Init Node done")
 
 	return err
 }
@@ -481,19 +473,20 @@ func (node *Node) Distribute(kvpath string) (err error) {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Recover From Panic:%v", r)
 		}
-		msg := ""
+
+		nodeState, taskState, msg := 0, 0, ""
 		if err == nil {
-			node.Node.Status = _StatusNodeInstalled
+			nodeState = _StatusNodeInstalled
 		} else {
-			node.Node.Status = _StatusNodeInstallFailed
-			node.task.Status = _StatusTaskFailed
+			nodeState = _StatusNodeInstallFailed
+			taskState = _StatusTaskFailed
 			msg = err.Error()
 		}
 
 		r := database.TxUpdateNodeStatus(node.Node, node.task,
-			node.Node.Status, int(node.task.Status), false, msg)
+			nodeState, taskState, false, msg)
 		if r != nil {
-			// TODO:log
+			log.Error(r, msg)
 		}
 	}()
 
@@ -516,6 +509,8 @@ func (node *Node) Distribute(kvpath string) (err error) {
 
 	config, caFile, script, err := node.modifyProfile(kvpath)
 	if err != nil {
+		log.Error(err)
+
 		return err
 	}
 
@@ -544,11 +539,12 @@ func (node *Node) Distribute(kvpath string) (err error) {
 		}
 	}
 
-	err = c.Upload(filepath.Join(config.Destination, config.CA_CRT_Name), caFile)
+	dest := filepath.Join(config.Destination, filepath.Base(config.SourceDir))
+	err = c.Upload(dest, caFile)
 	if err != nil {
 		entry.Errorf("SSH UploadDir Error,%s", err)
 
-		err = c.Upload(filepath.Join(config.Destination, config.CA_CRT_Name), caFile)
+		err = c.Upload(dest, caFile)
 		if err != nil {
 			entry.Errorf("SSH UploadFile Error Twice,%s", err)
 
@@ -629,6 +625,8 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 	// TODO: set timeout
 
 	for {
+		time.Sleep(time.Second)
+
 		for i := range nodes {
 			if nodes[i].Status != _StatusNodeInstalled {
 				continue
