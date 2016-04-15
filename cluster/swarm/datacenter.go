@@ -6,9 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -407,38 +404,23 @@ func (dc *Datacenter) DistributeNode(node *Node, kvpath string) error {
 }
 
 // CA,script,error
-func (node Node) modifyProfile(kvpath string) (*database.Configurations, *os.File, string, error) {
+func (node Node) modifyProfile(kvpath string) (*database.Configurations, string, error) {
 	config, err := database.GetSystemConfig()
 	if err != nil {
-		return nil, nil, "", err
+		return nil, "", err
 	}
 
 	config.SourceDir, err = utils.GetAbsolutePath(true, config.SourceDir)
 	if err != nil {
-		return nil, nil, "", err
-	}
-
-	// Create a temp dir in the system default temp folder
-	tempDirPath, err := ioutil.TempDir("", node.Name)
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	// Create a file in new temp directory
-	tempFile, err := ioutil.TempFile(tempDirPath, config.CA_CRT_Name)
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	_, err = tempFile.WriteString(config.CA_CRT)
-	if err != nil {
-		return nil, nil, "", err
+		return nil, "", err
 	}
 
 	_, path, caFile := config.DestPath()
 
-	buffer := bytes.NewBuffer(nil)
-	json.NewEncoder(buffer).Encode(config.GetConsulAddrs())
+	buf, err := json.Marshal(config.GetConsulAddrs())
+	if err != nil {
+		return nil, "", err
+	}
 	/*
 		init.sh input
 		swarm_key=$1
@@ -455,11 +437,11 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, *os.Fil
 	*/
 
 	script := fmt.Sprintf("%s %s %s %s %s %s %s %d %s %s %s %d",
-		path, kvpath, node.Addr, config.ConsulDatacenter, buffer.String(),
+		path, kvpath, node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile, config.DockerPort)
 
-	return config, tempFile, script, nil
+	return config, script, nil
 }
 
 func (node *Node) Distribute(kvpath string) (err error) {
@@ -501,7 +483,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 		},
 	}
 
-	config, caFile, script, err := node.modifyProfile(kvpath)
+	config, script, err := node.modifyProfile(kvpath)
 	if err != nil {
 		log.Error(err)
 
@@ -533,27 +515,19 @@ func (node *Node) Distribute(kvpath string) (err error) {
 		}
 	}
 
+	log.Info("Registry.CA_CRT", len(config.Registry.CA_CRT), config.Registry.CA_CRT)
+
+	caBuf := bytes.NewBufferString(config.Registry.CA_CRT)
 	_, _, filename := config.DestPath()
-	if err := c.Upload(filename, caFile); err != nil {
+
+	if err := c.Upload(filename, caBuf); err != nil {
 		entry.Errorf("SSH UploadFile %s Error,%s", filename, err)
 
-		if err := c.Upload(filename, caFile); err != nil {
+		if err := c.Upload(filename, caBuf); err != nil {
 			entry.Errorf("SSH UploadFile %s Error Twice,%s", filename, err)
 
 			return err
 		}
-	}
-
-	// Close file
-	err = caFile.Close()
-	if err != nil {
-
-	}
-
-	// Delete the resources we created
-	err = os.RemoveAll(filepath.Dir(caFile.Name()))
-	if err != nil {
-
 	}
 
 	buffer := new(bytes.Buffer)
@@ -564,10 +538,11 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	}
 
 	err = c.Start(&cmd)
-	if err != nil {
-		log.Errorf("Executing Remote Command: %s %s", script, err)
+	if err != nil || cmd.ExitStatus != 0 {
+		err = fmt.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", script, cmd.ExitStatus, err, buffer.String())
 	}
-	entry.Info("SSH UploadDir:", buffer.String())
+
+	entry.Info("SSH UploadDir:", err)
 
 	return err
 }
