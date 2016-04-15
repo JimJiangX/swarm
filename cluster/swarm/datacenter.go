@@ -565,10 +565,9 @@ func (node *Node) Distribute(kvpath string) (err error) {
 
 	err = c.Start(&cmd)
 	if err != nil {
-		log.Errorf("error executing remote command: %s", err)
+		log.Errorf("Executing Remote Command: %s %s", script, err)
 	}
-
-	entry.Info("SSH UploadDir Success!")
+	entry.Info("SSH UploadDir:", buffer.String())
 
 	return err
 }
