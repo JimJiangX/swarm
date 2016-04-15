@@ -450,19 +450,18 @@ func (node *Node) Distribute(kvpath string) (err error) {
 			err = fmt.Errorf("Recover From Panic:%v", r)
 		}
 
-		nodeState, taskState, msg := 0, 0, ""
+		nodeState, taskState := 0, 0
 		if err == nil {
 			nodeState = _StatusNodeInstalled
 		} else {
 			nodeState = _StatusNodeInstallFailed
 			taskState = _StatusTaskFailed
-			msg = err.Error()
 		}
 
 		r := database.TxUpdateNodeStatus(node.Node, node.task,
-			nodeState, taskState, false, msg)
-		if r != nil {
-			log.Error(r, msg)
+			nodeState, taskState, false, err.Error())
+		if r != nil || err != nil {
+			log.Error(err, r)
 		}
 	}()
 
@@ -518,7 +517,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	log.Info("Registry.CA_CRT", len(config.Registry.CA_CRT), config.Registry.CA_CRT)
 
 	caBuf := bytes.NewBufferString(config.Registry.CA_CRT)
-	_, _, filename := config.DestPath()
+	_, scriptName, filename := config.DestPath()
 
 	if err := c.Upload(filename, caBuf); err != nil {
 		entry.Errorf("SSH UploadFile %s Error,%s", filename, err)
@@ -531,6 +530,19 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	}
 
 	buffer := new(bytes.Buffer)
+	// chmod script file
+	chmod := remote.Cmd{
+		Command: "chmod 755 " + scriptName,
+		Stdout:  buffer,
+		Stderr:  buffer,
+	}
+
+	err = c.Start(&chmod)
+	if err != nil || chmod.ExitStatus != 0 {
+		err = fmt.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", chmod.Command, chmod.ExitStatus, err, buffer.String())
+		return err
+	}
+
 	cmd := remote.Cmd{
 		Command: script,
 		Stdout:  buffer,
@@ -539,7 +551,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 
 	err = c.Start(&cmd)
 	if err != nil || cmd.ExitStatus != 0 {
-		err = fmt.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", script, cmd.ExitStatus, err, buffer.String())
+		err = fmt.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
 	}
 
 	entry.Info("SSH UploadDir:", err)
