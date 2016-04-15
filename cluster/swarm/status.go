@@ -8,7 +8,9 @@ const (
 	_StatusTaskDone
 	_StatusTaskTimeout
 	_StatusTaskFailed
+)
 
+const (
 	_StatusNodeImport = iota
 	_StatusNodeInstalling
 	_StatusNodeInstalled
@@ -16,9 +18,11 @@ const (
 	_StatusNodeTesting
 	_StatusNodeFailedTest
 	_StatusNodeEnable
-	//_StatusNodeDisable
+	_StatusNodeDisable
 	_StatusNodeDeregisted
+)
 
+const (
 	_StatusUnitAllocted = iota
 	_StatusUnitCreating
 	_StatusUnitStarting // start contaier and start service
@@ -29,7 +33,9 @@ const (
 	_StatusUnitBackuping
 	_StatusUnitRestoring
 	_StatusUnitNoContent
+)
 
+const (
 	_StatusServiceInit = iota
 	_StatusServcieBuilding
 	_StatusServiceAlloction

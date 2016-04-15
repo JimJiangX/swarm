@@ -539,14 +539,12 @@ func (node *Node) Distribute(kvpath string) (err error) {
 		}
 	}
 
-	dest := filepath.Join(config.Destination, filepath.Base(config.SourceDir))
-	err = c.Upload(dest, caFile)
-	if err != nil {
-		entry.Errorf("SSH UploadDir Error,%s", err)
+	name := filepath.Join(config.Destination, filepath.Base(config.SourceDir), config.CA_CRT_Name)
+	if err := c.Upload(name, caFile); err != nil {
+		entry.Errorf("SSH UploadFile %s Error,%s", name, err)
 
-		err = c.Upload(dest, caFile)
-		if err != nil {
-			entry.Errorf("SSH UploadFile Error Twice,%s", err)
+		if err := c.Upload(name, caFile); err != nil {
+			entry.Errorf("SSH UploadFile %s Error Twice,%s", name, err)
 
 			return err
 		}
