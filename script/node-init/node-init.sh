@@ -9,22 +9,14 @@ registry_ip=$6
 registry_port=$7
 registry_username=$8
 registry_passwd=$9
-regstry_ca_file=$10
-DOCKER_PORT=$11
+regstry_ca_file=${10}
+docker_port=${11}
 
 
 # check NIC
-check_nic() {
-	
-}
 
 # install consul agent
 install_consul_agent() {
-	IP_ADDR=$adm_ip
-	CS_LIST=$cs_list
-	CS_NUM=`echo ${CS_LIST} | awk -F\, '{print NF}'`
-	DC_NAME=$cs_datacenter
-
 	# stop consul
 	systemctl stop consul >/dev/null 2>&1
 
@@ -37,18 +29,16 @@ install_consul_agent() {
 	cat << EOF > /etc/consul.d/config.json
 {
   "server": false,
-  "datacenter": "${DC_NAME}",
+  "datacenter": "${cs_datacenter}",
   "data_dir": "/usr/local/consul",
   "node_name": "${HOSTNAME}",
   "disable_update_check": true,
   "log_level": "INFO",
   "addresses": {
-    "http": "${IP_ADDR}",
-    "rpc": "${IP_ADDR}"
+    "http": "${adm_ip}",
+    "rpc": "${adm_ip}"
   },
-  "start_join": [
-    ${CS_LIST}
- ]
+  "start_join": ${cs_list}
 }
 
 EOF
@@ -65,7 +55,7 @@ EOF
 ## ServiceRestart : consul
 
 #
-CONSUL_OPTS="agent -config-dir=/etc/consul.d -bind=${IP_ADDR}"
+CONSUL_OPTS="agent -config-dir=/etc/consul.d -bind=${adm_ip}"
 
 EOF
 
@@ -136,7 +126,7 @@ install_docker() {
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS="-H tcp://0.0.0.0:${DOCKER_PORT} -H unix:///var/run/docker.sock --label HBA_WWN="${wwn}"  "
+DOCKER_OPTS="-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label HBA_WWN="${wwn}"  "
 
 EOF
 
