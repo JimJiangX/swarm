@@ -18,7 +18,7 @@ consul_port=8500
 # check NIC
 
 # install consul agent
-install_consul_agent() {
+install_consul() {
 	# stop consul
 	systemctl stop consul >/dev/null 2>&1
 
