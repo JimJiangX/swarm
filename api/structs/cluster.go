@@ -17,6 +17,8 @@ type Node struct {
 	Address  string
 	Username string
 	Password string
+	HDD      string `json:"hdd"`
+	SSD      string `json:"ssd"`
 
 	Port         int `json:",omitempty"`
 	MaxContainer int `json:"max_container,omitempty"`

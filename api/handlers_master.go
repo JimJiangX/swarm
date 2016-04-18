@@ -154,7 +154,8 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	for i := range list {
 		nodes[i] = swarm.NewNode(list[i].Address, list[i].Name, dc.ID,
-			list[i].Username, list[i].Password, list[i].Port, list[i].MaxContainer)
+			list[i].Username, list[i].Password, list[i].HDD, list[i].SSD,
+			list[i].Port, list[i].MaxContainer)
 
 		response[i] = structs.PostNodeResponse{
 			ID:     nodes[i].ID,

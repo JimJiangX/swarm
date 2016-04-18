@@ -40,17 +40,20 @@ type Node struct {
 	task       *database.Task
 	engine     *cluster.Engine
 	localStore store.Store
+	hdd        string
+	ssd        string
 	user       string
 	password   string
 	port       int
 }
 
-func NewNode(addr, name, cluster, user, password string, port, num int) *Node {
+func NewNode(addr, name, cluster, user, password, hdd, ssd string, port, num int) *Node {
 	node := &database.Node{
-		ID:           utils.Generate64UUID(),
-		Name:         name,
-		ClusterID:    cluster,
-		Addr:         addr,
+		ID:        utils.Generate64UUID(),
+		Name:      name,
+		ClusterID: cluster,
+		Addr:      addr,
+
 		MaxContainer: num,
 		Status:       _StatusNodeImport,
 	}
@@ -63,6 +66,8 @@ func NewNode(addr, name, cluster, user, password string, port, num int) *Node {
 		user:     user,
 		password: password,
 		port:     port,
+		hdd:      hdd,
+		ssd:      ssd,
 	}
 }
 
@@ -436,10 +441,11 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, string,
 		DOCKER_PORT=$11
 	*/
 
-	script := fmt.Sprintf("%s %s %s %s '%s' %s %s %d %s %s %s %d",
+	script := fmt.Sprintf("%s %s %s %s '%s' %s %s %d %s %s %s %d %s %s",
 		path, kvpath, node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
-		config.Registry.Username, config.Registry.Password, caFile, config.DockerPort)
+		config.Registry.Username, config.Registry.Password, caFile,
+		config.DockerPort, node.hdd, node.ssd)
 
 	return config, script, nil
 }
@@ -539,7 +545,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	}
 
 	err = c.Start(&chmod)
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 3)
 	if err != nil || chmod.ExitStatus != 0 {
 		log.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", chmod.Command, chmod.ExitStatus, err, buffer.String())
 
