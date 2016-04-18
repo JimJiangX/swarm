@@ -539,10 +539,16 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	}
 
 	err = c.Start(&chmod)
-	chmod.Wait()
+	time.Sleep(time.Second)
 	if err != nil || chmod.ExitStatus != 0 {
-		err = fmt.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", chmod.Command, chmod.ExitStatus, err, buffer.String())
-		return err
+		log.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", chmod.Command, chmod.ExitStatus, err, buffer.String())
+
+		if err := c.Start(&chmod); err != nil || chmod.ExitStatus != 0 {
+			err = fmt.Errorf("Executing Remote Command Twice: %s,Exited:%d,%s,Output:%s", chmod.Command, chmod.ExitStatus, err, buffer.String())
+			log.Error(err)
+
+			return err
+		}
 	}
 
 	cmd := remote.Cmd{
@@ -552,14 +558,21 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	}
 
 	err = c.Start(&cmd)
-	cmd.Wait()
+	time.Sleep(time.Second)
 	if err != nil || cmd.ExitStatus != 0 {
-		err = fmt.Errorf("Executing Remote Command:%s,Exited:%d,%s,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
+		log.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
+
+		if err := c.Start(&cmd); err != nil || cmd.ExitStatus != 0 {
+			err = fmt.Errorf("Executing Remote Command Twice: %s,Exited:%d,%s,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
+			log.Error(err)
+
+			return err
+		}
 	}
 
-	entry.Info("SSH UploadDir:", err)
+	entry.Info("SSH Remote PKG Install Successed! Output:\n", buffer.String())
 
-	return err
+	return nil
 }
 
 func SSHCommand(host, port, user, password, shell string, output io.Writer) error {
@@ -595,20 +608,21 @@ func SSHCommand(host, port, user, password, shell string, output io.Writer) erro
 	}
 
 	err = c.Start(&cmd)
-	cmd.Wait()
+	time.Sleep(time.Second)
 	if err != nil || cmd.ExitStatus != 0 {
-		log.Error("Executing Remote Command: %s,Exited:%d,%s", cmd.Command, cmd.ExitStatus, err)
+		log.Errorf("Executing Remote Command: %s,Exited:%d,%s", cmd.Command, cmd.ExitStatus, err)
 
-		time.Sleep(5 * time.Second)
-
-		err := c.Start(&cmd)
-		cmd.Wait()
-		if err != nil {
+		if err := c.Start(&cmd); err != nil || cmd.ExitStatus != 0 {
 			err = fmt.Errorf("Executing Remote Command Twice: %s,Exited:%d,%s", cmd.Command, cmd.ExitStatus, err)
+			log.Error(err)
+
+			return err
 		}
 	}
 
-	return err
+	log.Info("SSH Remote Execute Successed!")
+
+	return nil
 }
 
 func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Duration) error {
@@ -659,9 +673,10 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 				log.Error(eng.Addr, "TxUpdateNodeRegister", err)
 				continue
 			}
-			continue
 
 			nodes[i].localStore = store.NewLocalDisk("", eng.Labels["vg"], nodes[i].Node)
+
+			continue
 
 			wwwn := eng.Labels["wwwn"]
 			if strings.TrimSpace(wwwn) == "" {

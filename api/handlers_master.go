@@ -174,7 +174,11 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		go dc.DistributeNode(nodes[i], gd.KVPath())
 	}
 
-	go gd.RegisterNodes(name, nodes, time.Second*600)
+	min := 600
+	if len(nodes) > 5 {
+		min = len(nodes) * 120
+	}
+	go gd.RegisterNodes(name, nodes, time.Second*time.Duration(min))
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
