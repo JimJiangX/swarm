@@ -208,6 +208,8 @@ func TxInsertNetworking(id, addr, gateway, typ string, prefix, num int) error {
 			Allocated:    false,
 		}
 
+		fmt.Println(i, addrU32, utils.Uint32ToIP(addrU32).String())
+
 		addrU32++
 	}
 
@@ -216,6 +218,15 @@ func TxInsertNetworking(id, addr, gateway, typ string, prefix, num int) error {
 	return insertNetworking(net, ips)
 }
 
+func UpdateNetworkingStatus(id string, enable bool) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("UPDATE tb_networking SET enabled=? WHERE id=?", enable, id)
+
+	return err
+}
 func insertNetworking(net Networking, ips []IP) error {
 	db, err := GetDB(true)
 	if err != nil {

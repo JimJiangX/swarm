@@ -22,10 +22,11 @@ const (
 )
 
 var ErrNotFoundIP = errors.New("IP not found")
+var ErrNotFoundNetworking = errors.New("Networking not found")
 
 type Networking struct {
-	Enable  bool
-	Rlock   *sync.RWMutex
+	Enable bool
+	*sync.RWMutex
 	ID      string
 	IP      string
 	Type    string
@@ -41,7 +42,7 @@ type IP struct {
 
 func NewNetworking(ip, typ, gateway string, prefix, num int) *Networking {
 	net := &Networking{
-		Rlock:   new(sync.RWMutex),
+		RWMutex: new(sync.RWMutex),
 		ID:      utils.Generate64UUID(),
 		Type:    typ,
 		IP:      ip,
@@ -65,8 +66,8 @@ func NewNetworking(ip, typ, gateway string, prefix, num int) *Networking {
 }
 
 func (net *Networking) AllocIP() (uint32, error) {
-	net.Rlock.Lock()
-	defer net.Rlock.Unlock()
+	net.Lock()
+	defer net.Unlock()
 
 	for i := range net.pool {
 		if !net.pool[i].allocated {
@@ -93,6 +94,33 @@ func (gd *Gardener) GetNetworking(typ string) *Networking {
 	gd.RUnlock()
 
 	return nil
+}
+
+func (gd *Gardener) SetNetworkingStatus(IDOrIP string, enable bool) error {
+	var net *Networking
+	gd.RLock()
+	for i := range gd.networkings {
+		if gd.networkings[i].ID == IDOrIP &&
+			gd.networkings[i].IP == IDOrIP {
+			net = gd.networkings[i]
+
+			break
+		}
+	}
+
+	gd.RUnlock()
+	if net == nil {
+		return ErrNotFoundNetworking
+	}
+	net.Lock()
+
+	net.Enable = enable
+
+	err := database.UpdateNetworkingStatus(net.ID, enable)
+
+	net.Unlock()
+
+	return err
 }
 
 func (gd *Gardener) AddNetworking(ip, typ, gateway string, prefix, num int) (*Networking, error) {
