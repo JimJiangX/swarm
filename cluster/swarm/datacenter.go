@@ -539,6 +539,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	}
 
 	err = c.Start(&chmod)
+	chmod.Wait()
 	if err != nil || chmod.ExitStatus != 0 {
 		err = fmt.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", chmod.Command, chmod.ExitStatus, err, buffer.String())
 		return err
@@ -594,8 +595,17 @@ func SSHCommand(host, port, user, password, shell string, output io.Writer) erro
 	}
 
 	err = c.Start(&cmd)
+	cmd.Wait()
 	if err != nil || cmd.ExitStatus != 0 {
-		err = fmt.Errorf("Executing Remote Command: %s,Exited:%d,%s", cmd.Command, cmd.ExitStatus, err)
+		log.Error("Executing Remote Command: %s,Exited:%d,%s", cmd.Command, cmd.ExitStatus, err)
+
+		time.Sleep(5 * time.Second)
+
+		err := c.Start(&cmd)
+		cmd.Wait()
+		if err != nil {
+			err = fmt.Errorf("Executing Remote Command Twice: %s,Exited:%d,%s", cmd.Command, cmd.ExitStatus, err)
+		}
 	}
 
 	return err
@@ -607,14 +617,19 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 		log.Error("%s Not Found,%s", name, err)
 		return err
 	}
+	config, err := database.GetSystemConfig()
+	if err != nil {
+		return err
+	}
 
-	max := time.Now().Add(timeout)
+	deadline := time.Now().Add(timeout)
 
 	// TODO: set timeout
 
 	for {
-		if time.Now().After(max) {
-			return nil
+		if time.Now().After(deadline) {
+			log.Error("RegisterNodes Timeout:%d", timeout)
+			return fmt.Errorf("Timeout %ds", timeout)
 		}
 		time.Sleep(10 * time.Second)
 
@@ -624,14 +639,17 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 				continue
 			}
 
-			eng := gd.getEngineByAddr(nodes[i].Addr)
+			addr := fmt.Sprintf("%s:%d", nodes[i].Addr, config.DockerPort)
+			eng := gd.getEngineByAddr(addr)
+
 			if status := ""; eng == nil || !strings.EqualFold(eng.Status(), "Healthy") {
 				if eng != nil {
 					status = eng.Status()
 				} else {
 					status = "engine is nil"
 				}
-				log.Warnf("Engine %s Status:%s", nodes[i].Addr, status)
+
+				log.Warnf("Engine %s Status:%s", addr, status)
 				continue
 			}
 			nodes[i].engine = eng
