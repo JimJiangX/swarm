@@ -549,8 +549,13 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	if err != nil || chmod.ExitStatus != 0 {
 		log.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", chmod.Command, chmod.ExitStatus, err, buffer.String())
 
-		if err := c.Start(&chmod); err != nil || chmod.ExitStatus != 0 {
-			err = fmt.Errorf("Executing Remote Command Twice: %s,Exited:%d,%s,Output:%s", chmod.Command, chmod.ExitStatus, err, buffer.String())
+		cp := remote.Cmd{
+			Command: "chmod 755 " + scriptName,
+			Stdout:  buffer,
+			Stderr:  buffer,
+		}
+		if err := c.Start(&cp); err != nil || cp.ExitStatus != 0 {
+			err = fmt.Errorf("Executing Remote Command Twice: %s,Exited:%d,%s,Output:%s", cp.Command, cp.ExitStatus, err, buffer.String())
 			log.Error(err)
 
 			return err
@@ -568,8 +573,13 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	if err != nil || cmd.ExitStatus != 0 {
 		log.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
 
-		if err := c.Start(&cmd); err != nil || cmd.ExitStatus != 0 {
-			err = fmt.Errorf("Executing Remote Command Twice: %s,Exited:%d,%s,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
+		cp := remote.Cmd{
+			Command: script,
+			Stdout:  buffer,
+			Stderr:  buffer,
+		}
+		if err := c.Start(&cp); err != nil || cp.ExitStatus != 0 {
+			err = fmt.Errorf("Executing Remote Command Twice: %s,Exited:%d,%s,Output:%s", cp.Command, cp.ExitStatus, err, buffer.String())
 			log.Error(err)
 
 			return err
@@ -618,8 +628,13 @@ func SSHCommand(host, port, user, password, shell string, output io.Writer) erro
 	if err != nil || cmd.ExitStatus != 0 {
 		log.Errorf("Executing Remote Command: %s,Exited:%d,%s", cmd.Command, cmd.ExitStatus, err)
 
-		if err := c.Start(&cmd); err != nil || cmd.ExitStatus != 0 {
-			err = fmt.Errorf("Executing Remote Command Twice: %s,Exited:%d,%s", cmd.Command, cmd.ExitStatus, err)
+		cp := remote.Cmd{
+			Command: shell,
+			Stdout:  output,
+			Stderr:  output,
+		}
+		if err := c.Start(&cp); err != nil || cp.ExitStatus != 0 {
+			err = fmt.Errorf("Executing Remote Command Twice: %s,Exited:%d,%s", cp.Command, cp.ExitStatus, err)
 			log.Error(err)
 
 			return err
