@@ -309,6 +309,56 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%q}", "ID", net.ID)
 }
 
+// Post /networkings/{name:.*}/enable
+func enableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.SetNetworkingStatus(name, true)
+
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// Post /networkings/{name:.*}/disable
+func disableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.SetNetworkingStatus(name, false)
+
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // Post /networkings/ports/import
 func postImportPort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostImportPortRequest{}
