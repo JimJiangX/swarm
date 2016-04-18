@@ -85,8 +85,7 @@ func (c *Configurations) Insert() (int64, error) {
 }
 func (c Configurations) GetConsulClient() ([]*consulapi.Client, error) {
 	port := strconv.Itoa(c.ConsulPort)
-	addrs := strings.Split(c.ConsulIPs, ";&;")
-
+	addrs := strings.Split(c.ConsulIPs, ",")
 	clients := make([]*consulapi.Client, 0, len(addrs))
 
 	for i := range addrs {
@@ -107,10 +106,8 @@ func (c Configurations) GetConsulClient() ([]*consulapi.Client, error) {
 }
 
 func (c Configurations) GetConsulConfig() ([]string, string, string, int) {
-
 	port := strconv.Itoa(c.ConsulPort)
-	addrs := strings.Split(c.ConsulIPs, ";&;")
-
+	addrs := strings.Split(c.ConsulIPs, ",")
 	endpoints := make([]string, len(addrs))
 
 	for i := range addrs {
@@ -121,7 +118,7 @@ func (c Configurations) GetConsulConfig() ([]string, string, string, int) {
 }
 
 func (c Configurations) GetConsulAddrs() []string {
-	return strings.Split(c.ConsulIPs, ";&;")
+	return strings.Split(c.ConsulIPs, ",")
 }
 
 func GetSystemConfig() (*Configurations, error) {
