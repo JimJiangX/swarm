@@ -604,6 +604,7 @@ func SSHCommand(host, port, user, password, shell string, output io.Writer) erro
 func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Duration) error {
 	dc, err := gd.Datacenter(name)
 	if err != nil || dc == nil {
+		log.Error("%s Not Found,%s", name, err)
 		return err
 	}
 
@@ -614,14 +615,23 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 
 		for i := range nodes {
 			if nodes[i].Status != _StatusNodeInstalled {
+				log.Warnf("Node Status Not Match,%s:%d!=%d", nodes[i].Addr, nodes[i].Status, _StatusNodeInstalled)
 				continue
 			}
 
 			eng := gd.getEngineByAddr(nodes[i].Addr)
 			if eng == nil || !strings.EqualFold(eng.Status(), "Healthy") {
+				log.Warnf("Engine %s Status isnot Healthy", nodes[i].Addr)
 				continue
 			}
 			nodes[i].engine = eng
+
+			err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, _StatusNodeEnable, _StatusTaskDone, eng.ID, "")
+			if err != nil {
+				log.Error(eng.Addr, "TxUpdateNodeRegister", err)
+				continue
+			}
+			continue
 
 			nodes[i].localStore = store.NewLocalDisk("", eng.Labels["vg"], nodes[i].Node)
 
