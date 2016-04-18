@@ -436,7 +436,7 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, string,
 		DOCKER_PORT=$11
 	*/
 
-	script := fmt.Sprintf("%s %s %s %s %s %s %s %d %s %s %s %d",
+	script := fmt.Sprintf("%s %s %s %s '%s' %s %s %d %s %s %s %d",
 		path, kvpath, node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile, config.DockerPort)
@@ -491,7 +491,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	}
 
 	entry := log.WithFields(log.Fields{
-		"host":        node.port,
+		"host":        node.Addr,
 		"user":        node.user,
 		"source":      config.SourceDir,
 		"destination": config.Destination,
