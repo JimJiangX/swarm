@@ -608,10 +608,15 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 		return err
 	}
 
+	max := time.Now().Add(timeout)
+
 	// TODO: set timeout
 
 	for {
-		time.Sleep(time.Second)
+		if time.Now().After(max) {
+			return nil
+		}
+		time.Sleep(10 * time.Second)
 
 		for i := range nodes {
 			if nodes[i].Status != _StatusNodeInstalled {
@@ -620,8 +625,13 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 			}
 
 			eng := gd.getEngineByAddr(nodes[i].Addr)
-			if eng == nil || !strings.EqualFold(eng.Status(), "Healthy") {
-				log.Warnf("Engine %s Status isnot Healthy", nodes[i].Addr)
+			if status := ""; eng == nil || !strings.EqualFold(eng.Status(), "Healthy") {
+				if eng != nil {
+					status = eng.Status()
+				} else {
+					status = "engine is nil"
+				}
+				log.Warnf("Engine %s Status:%s", nodes[i].Addr, status)
 				continue
 			}
 			nodes[i].engine = eng
