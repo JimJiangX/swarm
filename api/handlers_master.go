@@ -383,7 +383,7 @@ func postImportPort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 func postDisablePort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	port := intValueOrZero(r, "port")
 	if port == 0 {
-		httpError(w, "port must be in 1~65535", http.StatusBadRequest)
+		httpError(w, "port must be between 1~65535", http.StatusBadRequest)
 		return
 	}
 

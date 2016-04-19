@@ -1,5 +1,11 @@
 package sdk
 
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
 //common
 type CommonRes struct {
 	Err string `json:"Err"`
@@ -22,6 +28,17 @@ type VgConfig struct {
 	HostLunId []int  `json:"HostLunId"`
 	VgName    string `json:"VgName"`
 	Type      string `json:"Type"`
+}
+
+type VgInfo struct {
+	VgName string `json:"VgName"`
+	VgSize int    `json:"VgSize"`
+	VgFree int    `json:"VgFree"`
+}
+
+type VgListRes struct {
+	Err string   `json:"Err"`
+	Vgs []VgInfo `json:"Vgs"`
 }
 
 //ip.go
@@ -51,6 +68,29 @@ type VolumeFileConfig struct {
 	Data      string `json:"Data"`
 	FDes      string `json:"FDes"`
 	Mode      string `json:"mode"`
+}
+
+//get vglist
+func GetVgList(addr string) ([]VgInfo, error) {
+	uri := "http://" + addr + "/san/vglist"
+	resp, err := http.Get(uri)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Unexpected Response StatusCode:%d", resp.StatusCode)
+	}
+	res := &VgListRes{}
+	if err := json.NewDecoder(resp.Body).Decode(res); err != nil {
+		return nil, fmt.Errorf("Parse Response Body Error:%s ", err.Error())
+	}
+
+	if len(res.Err) > 0 {
+		return nil, fmt.Errorf("%s", res.Err)
+	}
+
+	return res.Vgs, nil
 }
 
 //ip

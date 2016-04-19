@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	NodesNetworking          = "nodes networking"
-	ContainersNetworking     = "containers networking"
-	ExternalAccessNetworking = "External Access Networking"
+	NodesNetworking          = "nodes_networking"
+	ContainersNetworking     = "internal_access_networking"
+	ExternalAccessNetworking = "external_access_networking"
 
 	networkingLabelKey      = "upm.ip"
 	proxynetworkingLabelKey = "upm.proxyip"
