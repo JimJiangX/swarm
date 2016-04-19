@@ -11,16 +11,76 @@ registry_username=$8
 registry_passwd=$9
 regstry_ca_file=${10}
 docker_port=${11}
+hdd_dev=${12}
+ssd_dev=${13}
 cur_dir=`dirname $0`
 consul_port=8500
 
+hdd_vgname=${HOSTNAME}_HDD_VG
+ssd_vgname=${HOSTNAME}_SSD_VG
 
 # check NIC
+
+
+
+# init VG
+init_hdd_vg() {
+	local hdd_dev_list=''
+	if [ ${hdd_dev} == "null" ]; then
+		hdd_dev=''
+		return
+	fi
+
+	hdd_dev_array=( ${hdd_dev/\,/\ } )
+		
+	for dev_name in ${hdd_dev_array[@]}
+	do
+		pvcreate /dev/${dev_name}
+		if [ $? -ne 0 ]; then
+			echo "${dev_name} pvcreate failed"
+			exit 2
+		fi
+		hdd_dev_list=${hdd_dev_list}" /dev/${dev_name}"
+	done
+
+	vgcreate ${hdd_vgname} ${hdd_dev_list}
+	if [ $? -ne 0 ]; then
+		echo "${hdd_dev} vgcreate failed"
+		exit 2
+	fi	
+}
+
+# init VG
+init_ssd_vg() {
+	local hdd_dev_list=''
+	if [ ${ssd_dev} == "null" ]; then
+		ssd_dev=''
+		return
+	fi
+
+	ssd_dev_array=( ${ssd_dev/\,/\ } )
+		
+	for dev_name in ${ssd_dev_array[@]}
+	do
+		pvcreate /dev/${dev_name}
+		if [ $? -ne 0 ]; then
+			echo "${dev_name} pvcreate failed"
+			exit 2
+		fi
+		ssd_dev_list=${ssd_dev_list}" /dev/${dev_name}"
+	done
+
+	vgcreate ${ssd_vgname} ${ssd_dev_list}
+	if [ $? -ne 0 ]; then
+		echo "${ssd_dev} vgcreate failed"
+		exit 2
+	fi	
+}
 
 # install consul agent
 install_consul() {
 	# stop consul
-	systemctl stop consul >/dev/null 2>&1
+	pkill consul >/dev/null 2>&1
 
 	# check consul dir
 	if [ ! -d /etc/consul.d ]; then
@@ -83,7 +143,6 @@ WantedBy=multi-user.target
 
 EOF
 
-
 	chmod 644 /etc/sysconfig/consul
 	chmod 644 /usr/lib/systemd/system/consul.service
 
@@ -112,8 +171,10 @@ install_docker() {
 	
 	wwn=${wwn:2}
 
+		
+
 	# stop docker
-	systemctl stop docker >/dev/null 2>&1
+	pkill docker >/dev/null 2>&1
 
 	# copy the binary & set the permissions
 	cp ${cur_dir}/docker-1.10.3-release/bin/docker /usr/bin/docker; chmod +x /usr/bin/docker
@@ -128,7 +189,7 @@ install_docker() {
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS="-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label HBA_WWN="${wwn}"  "
+DOCKER_OPTS="-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label HBA_WWN="${wwn}" --label HDD_VG="${hdd_vgname}" --label SSD_VG="${ssd_vgname}""
 
 EOF
 
@@ -209,7 +270,7 @@ init_docker() {
 install_docker_plugin() {
 	local script_dir=/opt
 
-	systemctl stop local-volume-plugin > /dev/null 2>&1
+	pkill local-volume-plugin > /dev/null 2>&1
 
 	# copy binary file
 	cp ${cur_dir}/dbaas_volume_plugin-1.5.3/bin/local_volume_plugin /usr/bin/local_volume_plugin; chmod 755 /usr/bin/local_volume_plugin
@@ -217,8 +278,6 @@ install_docker_plugin() {
 	# copy script
 	cp ${cur_dir}/script/*.sh ${script_dir}
 	chmod +x ${script_dir}/*.sh
-
-
 
 	cat << EOF > /usr/lib/systemd/system/local-volume-plugin.service
 [Unit]
@@ -237,7 +296,6 @@ WantedBy=multi-user.target
 
 EOF
 
-
 	chmod 644 /usr/lib/systemd/system/local-volume-plugin.service
 
 	# reload
@@ -255,12 +313,51 @@ EOF
 # install swarm agent
 install_swarm_agent() {
 	# stop swarm-agent
-	#systemctl stop swarm-agent >/dev/null 2>&1
+	pkill swarm >/dev/null 2>&1
 
 	# copy binary file
-	cp ${cur_dir}/swarm-agent-1.1.3-release/bin/swarm /usr/bin/swarm; chmod 755 /usr/bin/swarm
+	cp ${cur_dir}/swarm-agent-1.2.0-release/bin/swarm /usr/bin/swarm; chmod 755 /usr/bin/swarm
 
-	nohup swarm join --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/DBaaS  >> /var/log/swarm.log &
+	#nohup swarm join --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/DBaaS  >> /var/log/swarm.log &
+	# create systemd config file
+	cat << EOF > /etc/sysconfig/swarm-agent
+## Path           : System/Management
+## Description    : docker swarm
+## Type           : string
+## Default        : ""
+## ServiceRestart : swarm
+
+#
+SWARM_AGENT_OPTS="join --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/DBaaS"
+
+EOF
+
+	cat << EOF > /usr/lib/systemd/system/swarm-agent.service
+[Unit]
+Description=Docker Swarm agent
+Documentation=https://docs.docker.com
+After=network.target
+Requires=consul.service
+
+[Service]
+Type=notify
+EnvironmentFile=/etc/sysconfig/swarm-agent
+ExecStart=/usr/bin/swarm  \$SWARM_AGENT_OPTS
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+
+	chmod 644 /etc/sysconfig/swarm-agent
+	chmod 644 /usr/lib/systemd/system/swarm-agent.service
+
+	# reload
+	systemctl daemon-reload
+
+	# Enable & start the service
+	systemctl enable swarm-agent
+	systemctl start swarm-agent
 
 }
 
@@ -268,6 +365,8 @@ install_swarm_agent() {
 
 
 #check_nic
+init_hdd_vg
+init_ssd_vg
 install_consul
 install_docker_plugin
 install_docker
@@ -275,3 +374,4 @@ init_docker
 install_swarm_agent
 #install_hours_agent
 
+exit 0
