@@ -3,7 +3,7 @@ package structs
 type PostLoadImageRequest struct {
 	Name    string
 	Version string
-	Path    string            `json:"path"`
+	Path    string
 	Labels  map[string]string `json:",omitempty"`
 
 	ImageConfig
