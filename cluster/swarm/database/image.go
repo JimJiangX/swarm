@@ -90,7 +90,7 @@ type UnitConfig struct {
 	ConfigKeySets string          `db:"config_key_sets"` // map[string]bool
 	KeySets       map[string]bool `db:"-"`
 
-	CreateAt time.Time `db:"create_at"`
+	CreatedAt time.Time `db:"created_at"`
 }
 
 func (u UnitConfig) TableName() string {
@@ -146,7 +146,7 @@ func TXInsertUnitConfig(tx *sqlx.Tx, config *UnitConfig) error {
 		return err
 	}
 
-	query := "INSERT INTO tb_unit_config (id,image_id,config_file_path,version,parent_id,content,create_at) VALUES (:id,:image_id,:config_file_path,:version,:parent_id,:content,:create_at)"
+	query := "INSERT INTO tb_unit_config (id,image_id,config_file_path,version,parent_id,content,created_at) VALUES (:id,:image_id,:config_file_path,:version,:parent_id,:content,:created_at)"
 
 	_, err = tx.NamedExec(query, config)
 

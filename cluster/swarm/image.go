@@ -108,10 +108,10 @@ func (gd *Gardener) LoadImage(req structs.PostLoadImageRequest) (string, error) 
 
 	err = database.TxInsertImage(image, unitConfig, task)
 	if err != nil {
-		return ImageID, err
+		return image.ID, err
 	}
 
-	return ImageID, nil
+	return image.ID, nil
 }
 
 func parsePushImageOutput(in string) (string, int, error) {
