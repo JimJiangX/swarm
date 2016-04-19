@@ -99,14 +99,14 @@ func (u *unit) SaveToDisk(content string) (string, error) {
 	}
 
 	config := database.UnitConfig{
-		ID:       utils.Generate64UUID(),
-		ImageID:  u.ImageID,
-		Version:  u.parent.Version + 1,
-		ParentID: u.parent.ID,
-		Content:  content,
-		KeySets:  u.parent.KeySets,
-		Path:     u.Path(),
-		CreateAt: time.Now(),
+		ID:        utils.Generate64UUID(),
+		ImageID:   u.ImageID,
+		Version:   u.parent.Version + 1,
+		ParentID:  u.parent.ID,
+		Content:   content,
+		KeySets:   u.parent.KeySets,
+		Path:      u.Path(),
+		CreatedAt: time.Now(),
 	}
 
 	u.Unit.ConfigID = config.ID
