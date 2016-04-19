@@ -441,8 +441,8 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, string,
 		DOCKER_PORT=$11
 	*/
 
-	script := fmt.Sprintf("%s %s %s %s '%s' %s %s %d %s %s %s %d %s %s",
-		path, kvpath, node.Addr, config.ConsulDatacenter, string(buf),
+	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s",
+		path, path, kvpath, node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile,
 		config.DockerPort, node.hdd, node.ssd)
@@ -524,7 +524,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	log.Info("Registry.CA_CRT", len(config.Registry.CA_CRT), config.Registry.CA_CRT)
 
 	caBuf := bytes.NewBufferString(config.Registry.CA_CRT)
-	_, scriptName, filename := config.DestPath()
+	_, _, filename := config.DestPath()
 
 	if err := c.Upload(filename, caBuf); err != nil {
 		entry.Errorf("SSH UploadFile %s Error,%s", filename, err)
@@ -537,31 +537,6 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	}
 
 	buffer := new(bytes.Buffer)
-	// chmod script file
-	chmod := remote.Cmd{
-		Command: "chmod 755 " + scriptName,
-		Stdout:  buffer,
-		Stderr:  buffer,
-	}
-
-	err = c.Start(&chmod)
-	time.Sleep(time.Second * 3)
-	if err != nil || chmod.ExitStatus != 0 {
-		log.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", chmod.Command, chmod.ExitStatus, err, buffer.String())
-
-		cp := remote.Cmd{
-			Command: "chmod 755 " + scriptName,
-			Stdout:  buffer,
-			Stderr:  buffer,
-		}
-		if err := c.Start(&cp); err != nil || cp.ExitStatus != 0 {
-			err = fmt.Errorf("Executing Remote Command Twice: %s,Exited:%d,%s,Output:%s", cp.Command, cp.ExitStatus, err, buffer.String())
-			log.Error(err)
-
-			return err
-		}
-	}
-
 	cmd := remote.Cmd{
 		Command: script,
 		Stdout:  buffer,
@@ -569,7 +544,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	}
 
 	err = c.Start(&cmd)
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 3)
 	if err != nil || cmd.ExitStatus != 0 {
 		log.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
 
@@ -579,7 +554,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 			Stderr:  buffer,
 		}
 		if err := c.Start(&cp); err != nil || cp.ExitStatus != 0 {
-			err = fmt.Errorf("Executing Remote Command Twice: %s,Exited:%d,%s,Output:%s", cp.Command, cp.ExitStatus, err, buffer.String())
+			err = fmt.Errorf("Twice Executing Remote Command: %s,Exited:%d,%s,Output:%s", cp.Command, cp.ExitStatus, err, buffer.String())
 			log.Error(err)
 
 			return err
@@ -624,7 +599,7 @@ func SSHCommand(host, port, user, password, shell string, output io.Writer) erro
 	}
 
 	err = c.Start(&cmd)
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 3)
 	if err != nil || cmd.ExitStatus != 0 {
 		log.Errorf("Executing Remote Command: %s,Exited:%d,%s", cmd.Command, cmd.ExitStatus, err)
 
