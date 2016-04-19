@@ -175,20 +175,20 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, Type string,
 		if !ok {
 			return allocs, errors.New("Engine Not Found")
 		}
+		/*
+			ports, err := database.SelectAvailablePorts(len(image.PortSlice))
+			if err != nil {
+				return allocs, err
+			}
 
-		ports, err := database.SelectAvailablePorts(len(image.PortSlice))
-		if err != nil {
-			return allocs, err
-		}
+			for i := range ports {
+				ports[i].Name = image.PortSlice[i].Name
+				ports[i].UnitID = id
+				ports[i].Proto = image.PortSlice[i].Proto
+				ports[i].Allocated = true
 
-		for i := range ports {
-			ports[i].Name = image.PortSlice[i].Name
-			ports[i].UnitID = id
-			ports[i].Proto = image.PortSlice[i].Proto
-			ports[i].Allocated = true
-
-		}
-
+			}
+		*/
 		unit := &unit{
 			Unit: database.Unit{
 				ID: id,
@@ -200,7 +200,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, Type string,
 				Status:    0,
 				CreatedAt: time.Now(),
 			},
-			ports:  ports,
+			ports:  nil,
 			parent: parentConfig,
 		}
 

@@ -62,24 +62,13 @@ func (gd *Gardener) LoadImage(req structs.PostLoadImageRequest) (string, error) 
 	}
 
 	buffer := bytes.NewBuffer(nil)
-	script := "docker load -i " + req.Url
-
-	err = SSHCommand(req.RegistryAddr, "", req.Username, req.Password, script, buffer)
-	if err != nil {
-		return buffer.String(), err
-	}
 
 	oldName := fmt.Sprint("%s:%s", req.Name, req.Version)
 	newName := fmt.Sprint("%s:%d/%s", config.Registry.Domain, config.Registry.Port, oldName)
-	script = fmt.Sprintf("docker tag %s %s", oldName, newName)
+	script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
 
-	err = SSHCommand(req.RegistryAddr, "", req.Username, req.Password, script, buffer)
-	if err != nil {
-		return buffer.String(), err
-	}
-
-	script = fmt.Sprint("docker push %s", newName)
-	err = SSHCommand(req.RegistryAddr, "", req.Username, req.Password, script, buffer)
+	err = SSHCommand(config.Registry.Address, strconv.Itoa(config.Registry.Port),
+		config.Registry.Username, config.Registry.Password, script, buffer)
 	if err != nil {
 		return buffer.String(), err
 	}
@@ -114,14 +103,6 @@ func (gd *Gardener) LoadImage(req structs.PostLoadImageRequest) (string, error) 
 		TemplateConfigID: unitConfig.ID,
 		UploadAt:         time.Now(),
 	}
-
-	ports := make([]database.Port, len(req.Ports))
-
-	for i := range req.Ports {
-		ports[i] = database.NewPort(0, req.Ports[i].Name, "", req.Ports[i].Proto, false)
-	}
-
-	image.PortSlice = ports
 
 	task := database.NewTask("load image", image.ID, "", nil, 0)
 

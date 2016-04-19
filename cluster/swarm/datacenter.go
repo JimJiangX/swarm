@@ -609,7 +609,7 @@ func SSHCommand(host, port, user, password, shell string, output io.Writer) erro
 			Stderr:  output,
 		}
 		if err := c.Start(&cp); err != nil || cp.ExitStatus != 0 {
-			err = fmt.Errorf("Executing Remote Command Twice: %s,Exited:%d,%s", cp.Command, cp.ExitStatus, err)
+			err = fmt.Errorf("Twice Executing Remote Command: %s,Exited:%d,%s", cp.Command, cp.ExitStatus, err)
 			log.Error(err)
 
 			return err
