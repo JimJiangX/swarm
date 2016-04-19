@@ -63,8 +63,8 @@ func (gd *Gardener) LoadImage(req structs.PostLoadImageRequest) (string, error) 
 
 	buffer := bytes.NewBuffer(nil)
 
-	oldName := fmt.Sprint("%s:%s", req.Name, req.Version)
-	newName := fmt.Sprint("%s:%d/%s", config.Registry.Domain, config.Registry.Port, oldName)
+	oldName := fmt.Sprintf("%s:%s", req.Name, req.Version)
+	newName := fmt.Sprintf("%s:%d/%s", config.Registry.Domain, config.Registry.Port, oldName)
 	script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
 
 	err = SSHCommand(config.Registry.Address, strconv.Itoa(config.Registry.Port),
@@ -81,7 +81,7 @@ func (gd *Gardener) LoadImage(req structs.PostLoadImageRequest) (string, error) 
 	unitConfig := database.UnitConfig{
 		ID:       utils.Generate64UUID(),
 		ImageID:  ImageID,
-		Path:     req.Path,
+		Path:     req.ConfigPath,
 		Version:  0,
 		ParentID: "",
 		Content:  req.Content,
