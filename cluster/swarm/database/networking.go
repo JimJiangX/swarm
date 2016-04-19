@@ -107,7 +107,7 @@ func TxUpdatePorts(tx *sqlx.Tx, ports []Port) error {
 
 // TxImportPort import Port from start to end(includ end)
 func TxImportPort(start, end int, filter ...int) (int, error) {
-	ports := make([]Port, 0, end-start)
+	ports := make([]Port, 0, end-start+1)
 
 loop:
 	for i := start; i <= end; i++ {
