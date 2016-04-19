@@ -53,6 +53,17 @@ func NewPort(port int, name, unit, proto string, allocated bool) Port {
 	}
 }
 
+func SetPortAllocated(port int, allocated bool) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("UPDATE tb_port SET allocated=? WHERE port=?", allocated, port)
+
+	return err
+}
+
 func SelectAvailablePorts(num int) ([]Port, error) {
 	db, err := GetDB(true)
 	if err != nil {

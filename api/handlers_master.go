@@ -77,7 +77,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // Post /clusters/{name:.*}/enable
-func enableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func postEnableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
 	ok, _, gd := fromContext(ctx, _Gardener)
@@ -101,7 +101,7 @@ func enableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // Post /clusters/{name:.*}/disable
-func disableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func postDisableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
 	ok, _, gd := fromContext(ctx, _Gardener)
@@ -187,7 +187,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 //Post /clusters/{cluster:.*}/nodes/{node:.*}/enable
-func enableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func postEnableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	cluster := mux.Vars(r)["cluster"]
 	name := mux.Vars(r)["node"]
 
@@ -207,7 +207,7 @@ func enableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 //Post /clusters/{cluster:.*}/nodes/{node:.*}/disable
-func disableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func postDisableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	cluster := mux.Vars(r)["cluster"]
 	name := mux.Vars(r)["node"]
 
@@ -310,7 +310,7 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // Post /networkings/{name:.*}/enable
-func enableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func postEnableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
 	if err := r.ParseForm(); err != nil {
@@ -335,7 +335,7 @@ func enableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 }
 
 // Post /networkings/{name:.*}/disable
-func disableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func postDisableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
 	if err := r.ParseForm(); err != nil {
@@ -377,6 +377,23 @@ func postImportPort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(w, "{%q:%q}", "num", num)
+}
+
+// Post /networkings/ports/{port:.*}/disable
+func postDisablePort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	port := intValueOrZero(r, "port")
+	if port == 0 {
+		httpError(w, "port must be in 1~65535", http.StatusBadRequest)
+		return
+	}
+
+	err := database.SetPortAllocated(port, true)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // Load Image
