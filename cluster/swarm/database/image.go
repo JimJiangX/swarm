@@ -36,7 +36,7 @@ func TxInsertImage(image Image, config UnitConfig, task *Task) error {
 	}
 	defer tx.Rollback()
 
-	query := "INSERT INTO tb_image (enabled,id,name,version,docker_image_id,label,size,ports,template_config_id,upload_at) VALUES (:enabled,:id,:name,:version,:docker_image_id,:label,:size,:ports,:template_config_id,:upload_at)"
+	query := "INSERT INTO tb_image (enabled,id,name,version,docker_image_id,label,size,template_config_id,upload_at) VALUES (:enabled,:id,:name,:version,:docker_image_id,:label,:size,:template_config_id,:upload_at)"
 
 	_, err = tx.NamedExec(query, &image)
 	if err != nil {
