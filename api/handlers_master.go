@@ -376,7 +376,7 @@ func postImportPort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "num", num)
+	fmt.Fprintf(w, "{%q:%d}", "num", num)
 }
 
 // Post /networkings/ports/{port:.*}/disable
@@ -548,4 +548,6 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	dc.GetNode(node)
+
+	w.WriteHeader(http.StatusNoContent)
 }
