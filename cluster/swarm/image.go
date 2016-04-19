@@ -68,7 +68,7 @@ func (gd *Gardener) LoadImage(req structs.PostLoadImageRequest) (string, error) 
 	script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
 
 	err = SSHCommand(config.Registry.Address,
-		config.Registry.OsUsername, config.Registry.OsPassword, script, 0, 300, buffer)
+		config.Registry.OsUsername, config.Registry.OsPassword, script, buffer)
 	if err != nil {
 		return buffer.String(), err
 	}
