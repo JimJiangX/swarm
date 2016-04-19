@@ -11,5 +11,5 @@ type PostNetworkingRequest struct {
 type PostImportPortRequest struct {
 	Start   int
 	End     int
-	Filters []int
+	Filters []int `json:"_"`
 }
