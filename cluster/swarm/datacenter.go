@@ -472,10 +472,6 @@ func (node *Node) Distribute(kvpath string) (err error) {
 		}
 	}()
 
-	if node.port == 0 {
-		node.port = 22
-	}
-
 	r := &terraform.InstanceState{
 		Ephemeral: terraform.EphemeralState{
 			ConnInfo: map[string]string{
@@ -484,7 +480,6 @@ func (node *Node) Distribute(kvpath string) (err error) {
 				"password": node.password,
 				"host":     node.Addr,
 				"port":     strconv.Itoa(node.port),
-				"timeout":  "30s",
 			},
 		},
 	}
@@ -566,11 +561,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	return nil
 }
 
-func SSHCommand(host, port, user, password, shell string, output io.Writer) error {
-	if port == "0" || port == "" {
-		port = "22"
-	}
-
+func SSHCommand(host, user, password, shell string, port, wait int, output io.Writer) error {
 	r := &terraform.InstanceState{
 		Ephemeral: terraform.EphemeralState{
 			ConnInfo: map[string]string{
@@ -578,8 +569,7 @@ func SSHCommand(host, port, user, password, shell string, output io.Writer) erro
 				"user":     user,
 				"password": password,
 				"host":     host,
-				"port":     port,
-				"timeout":  "30s",
+				"port":     strconv.Itoa(port),
 			},
 		},
 	}
@@ -599,7 +589,7 @@ func SSHCommand(host, port, user, password, shell string, output io.Writer) erro
 	}
 
 	err = c.Start(&cmd)
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * time.Duration(wait))
 	if err != nil || cmd.ExitStatus != 0 {
 		log.Errorf("Executing Remote Command: %s,Exited:%d,%s", cmd.Command, cmd.ExitStatus, err)
 
