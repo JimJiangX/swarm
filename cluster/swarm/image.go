@@ -79,14 +79,14 @@ func (gd *Gardener) LoadImage(req structs.PostLoadImageRequest) (string, error) 
 	}
 
 	unitConfig := database.UnitConfig{
-		ID:       utils.Generate64UUID(),
-		ImageID:  ImageID,
-		Path:     req.ConfigPath,
-		Version:  0,
-		ParentID: "",
-		Content:  req.Content,
-		KeySets:  req.KeySet,
-		CreateAt: time.Now(),
+		ID:        utils.Generate64UUID(),
+		ImageID:   ImageID,
+		Path:      req.ConfigPath,
+		Version:   0,
+		ParentID:  "",
+		Content:   req.Content,
+		KeySets:   req.KeySet,
+		CreatedAt: time.Now(),
 	}
 
 	buf := bytes.NewBuffer(nil)
