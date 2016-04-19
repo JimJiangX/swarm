@@ -26,7 +26,7 @@ func TestTXInsertUnitConfig(t *testing.T) {
 		Content:       "",
 		ConfigKeySets: "",
 		KeySets:       map[string]bool{"abc": false, "def": true},
-		CreateAt:      time.Now(),
+		CreatedAt:     time.Now(),
 	}
 
 	err = TXInsertUnitConfig(tx, config)
@@ -35,6 +35,11 @@ func TestTXInsertUnitConfig(t *testing.T) {
 	}
 
 	err = tx.Commit()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = DeleteUnitConfig(config.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

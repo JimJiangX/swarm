@@ -152,3 +152,14 @@ func TXInsertUnitConfig(tx *sqlx.Tx, config *UnitConfig) error {
 
 	return err
 }
+
+func DeleteUnitConfig(id string) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("DELETE FROM tb_unit_config WHERE id=?", id)
+
+	return err
+}
