@@ -44,11 +44,7 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 	if err != nil {
 		return nil, err
 	}
-<<<<<<< HEAD
 
-=======
-	config.Cpuset = cpuset
->>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 	config.HostConfig.CpusetCpus = cpuset
 
 	// TODO:Alloc Volume

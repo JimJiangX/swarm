@@ -8,10 +8,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-<<<<<<< HEAD
 	"github.com/docker/engine-api/types/container"
-=======
->>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/scheduler/node"
@@ -60,11 +57,7 @@ func (gd *Gardener) serviceScheduler() (err error) {
 				module.Config.Image = image.ImageID
 			}
 
-<<<<<<< HEAD
 			config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
-=======
-			config := cluster.BuildContainerConfig(module.Config)
->>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 			err = validateContainerConfig(config)
 			if err != nil {
 				goto failure
@@ -246,20 +239,11 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, Type string,
 }
 
 func (gd *Gardener) Scheduler(list []*node.Node, config *cluster.ContainerConfig, num int, withImageAffinity bool) ([]*node.Node, error) {
-
-<<<<<<< HEAD
 	if network := gd.Networks().Get(string(config.HostConfig.NetworkMode)); network != nil && network.Scope == "local" {
 		if !config.HaveNodeConstraint() {
 			config.AddConstraint("node==~" + network.Engine.Name)
 		}
 		config.HostConfig.NetworkMode = container.NetworkMode(network.Name)
-=======
-	if network := gd.Networks().Get(config.HostConfig.NetworkMode); network != nil && network.Scope == "local" {
-		if !config.HaveNodeConstraint() {
-			config.AddConstraint("node==~" + network.Engine.Name)
-		}
-		config.HostConfig.NetworkMode = network.Name
->>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 	}
 
 	if withImageAffinity {
