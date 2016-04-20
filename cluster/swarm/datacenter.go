@@ -504,6 +504,12 @@ func (node *Node) Distribute(kvpath string) (err error) {
 
 		return err
 	}
+	err = c.Connect(nil)
+	if err != nil {
+		log.Errorf("communicator connection error: %s", err)
+
+		return err
+	}
 	defer c.Disconnect()
 
 	if err := c.UploadDir(config.Destination, config.SourceDir); err != nil {
@@ -539,7 +545,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	}
 
 	err = c.Start(&cmd)
-	time.Sleep(time.Second * 3)
+	cmd.Wait()
 	if err != nil || cmd.ExitStatus != 0 {
 		log.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
 
@@ -548,7 +554,9 @@ func (node *Node) Distribute(kvpath string) (err error) {
 			Stdout:  buffer,
 			Stderr:  buffer,
 		}
-		if err := c.Start(&cp); err != nil || cp.ExitStatus != 0 {
+		err = c.Start(&cp)
+		cp.Wait()
+		if err != nil || cp.ExitStatus != 0 {
 			err = fmt.Errorf("Twice Executing Remote Command: %s,Exited:%d,%s,Output:%s", cp.Command, cp.ExitStatus, err, buffer.String())
 			log.Error(err)
 
@@ -579,6 +587,12 @@ func SSHCommand(host, user, password, shell string, output io.Writer) error {
 
 		return err
 	}
+	err = c.Connect(nil)
+	if err != nil {
+		log.Errorf("communicator connection error: %s", err)
+
+		return err
+	}
 	defer c.Disconnect()
 
 	cmd := remote.Cmd{
@@ -588,7 +602,7 @@ func SSHCommand(host, user, password, shell string, output io.Writer) error {
 	}
 
 	err = c.Start(&cmd)
-	time.Sleep(time.Second * 5)
+	cmd.Wait()
 	if err != nil || cmd.ExitStatus != 0 {
 		log.Errorf("Executing Remote Command: %s,Exited:%d,%s", cmd.Command, cmd.ExitStatus, err)
 
@@ -597,7 +611,9 @@ func SSHCommand(host, user, password, shell string, output io.Writer) error {
 			Stdout:  output,
 			Stderr:  output,
 		}
-		if err := c.Start(&cp); err != nil || cp.ExitStatus != 0 {
+		err = c.Start(&cp)
+		cp.Wait()
+		if err != nil || cp.ExitStatus != 0 {
 			err = fmt.Errorf("Twice Executing Remote Command: %s,Exited:%d,%s", cp.Command, cp.ExitStatus, err)
 			log.Error(err)
 
