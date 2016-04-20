@@ -56,8 +56,13 @@ func (n *Node) Container(IDOrName string) *cluster.Container {
 // AddContainer_Swarm injects a container into the internal state.
 func (n *Node) AddContainer_Swarm(container *cluster.Container) error {
 	if container.Config != nil {
+<<<<<<< HEAD
 		memory := container.Config.HostConfig.Memory
 		cpus := container.Config.HostConfig.CPUShares
+=======
+		memory := container.Config.Memory
+		cpus := container.Config.CpuShares
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 		if n.TotalMemory-memory < 0 || n.TotalCpus-cpus < 0 {
 			return errors.New("not enough resources")
 		}
@@ -71,8 +76,13 @@ func (n *Node) AddContainer_Swarm(container *cluster.Container) error {
 // AddContainer injects a container into the internal state.
 func (n *Node) AddContainer(container *cluster.Container) error {
 	if container.Config != nil {
+<<<<<<< HEAD
 		memory := container.Config.HostConfig.Memory
 		cpuset := container.Config.HostConfig.CpusetCpus
+=======
+		memory := container.Config.Memory
+		cpuset := container.Config.ContainerConfig.HostConfig.CpusetCpus
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 		cpus, err := getCPUNum(cpuset)
 		if err != nil {
 			return err

@@ -11,6 +11,10 @@ import (
 	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	consulapi "github.com/hashicorp/consul/api"
+<<<<<<< HEAD
+=======
+	"github.com/samalba/dockerclient"
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 	"golang.org/x/net/context"
 )
 
@@ -83,11 +87,19 @@ func (u *unit) prepareCreateContainer() error {
 	return nil
 }
 
+<<<<<<< HEAD
 func (u *unit) createContainer(authConfig *types.AuthConfig) (*cluster.Container, error) {
 	container, err := u.engine.Create(u.config, u.Unit.ID, true, authConfig)
 	if err == nil && container != nil {
 		u.container = container
 		u.Unit.ContainerID = container.ID
+=======
+func (u *unit) createContainer(authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
+	container, err := u.engine.Create(u.config, u.Unit.ID, true, authConfig)
+	if err == nil && container != nil {
+		u.container = container
+		u.Unit.ContainerID = container.Id
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 
 		//savetoDisk
 	}
@@ -98,7 +110,11 @@ func (u *unit) createContainer(authConfig *types.AuthConfig) (*cluster.Container
 func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
 	client := u.engine.EngineAPIClient()
 
+<<<<<<< HEAD
 	return client.ContainerUpdate(context.TODO(), u.container.ID, updateConfig)
+=======
+	return client.ContainerUpdate(context.TODO(), u.container.Id, updateConfig)
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 }
 
 func (u *unit) removeContainer(force, rmVolumes bool) error {
@@ -133,7 +149,11 @@ func (u *unit) restartContainer(timeout int) error {
 func (u *unit) renameContainer(name string) error {
 	client := u.engine.EngineAPIClient()
 
+<<<<<<< HEAD
 	return client.ContainerRename(context.TODO(), u.container.ID, u.Unit.ID)
+=======
+	return client.ContainerRename(context.TODO(), u.container.Id, u.Unit.ID)
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 }
 
 func (u *unit) createNetworking(ip, device string, prefix int) error {
@@ -189,11 +209,20 @@ func (u *unit) extendVG() error {
 func (u *unit) RegisterHealthCheck(client *consulapi.Client) error {
 	agent := client.Agent()
 	Service := consulapi.AgentServiceRegistration{
+<<<<<<< HEAD
 		ID:      "",
 		Name:    "",
 		Tags:    []string{},
 		Port:    0,
 		Address: "",
+=======
+		ID:                "",
+		Name:              "",
+		Tags:              []string{},
+		Port:              0,
+		Address:           "",
+		EnableTagOverride: false,
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 		Check: &consulapi.AgentServiceCheck{
 			Script:            "",
 			DockerContainerID: "",

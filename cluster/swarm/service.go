@@ -8,10 +8,17 @@ import (
 	"sync/atomic"
 	"time"
 
+<<<<<<< HEAD
 	"github.com/docker/engine-api/types"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
+=======
+	"github.com/docker/swarm/api/structs"
+	"github.com/docker/swarm/cluster/swarm/database"
+	"github.com/docker/swarm/utils"
+	"github.com/samalba/dockerclient"
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 	"github.com/yiduoyunQ/smlib"
 )
 
@@ -33,7 +40,11 @@ type Service struct {
 	users      []database.User
 	backup     *database.BackupStrategy
 	task       *database.Task
+<<<<<<< HEAD
 	authConfig *types.AuthConfig
+=======
+	authConfig *dockerclient.AuthConfig
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 }
 
 func NewService(svc database.Service, retry, unitNum int) *Service {
@@ -45,7 +56,11 @@ func NewService(svc database.Service, retry, unitNum int) *Service {
 	}
 }
 
+<<<<<<< HEAD
 func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) (*Service, error) {
+=======
+func BuildService(req structs.PostServiceRequest, authConfig *dockerclient.AuthConfig) (*Service, error) {
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 	if warnings := Validate(req); len(warnings) > 0 {
 		return nil, errors.New(strings.Join(warnings, ","))
 	}

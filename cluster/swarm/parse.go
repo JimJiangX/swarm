@@ -7,22 +7,36 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/parsers"
+<<<<<<< HEAD
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/engine-api/types/network"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/swarm/cluster"
+=======
+	"github.com/docker/swarm/cluster"
+	"github.com/samalba/dockerclient"
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 )
 
 func defaultContainerConfig() *cluster.ContainerConfig {
 	return &cluster.ContainerConfig{
+<<<<<<< HEAD
 		Config: container.Config{
 			AttachStdout: true,
 			AttachStderr: true,
 			ExposedPorts: make(map[nat.Port]struct{}),
+=======
+
+		ContainerConfig: dockerclient.ContainerConfig{
+			AttachStdout: true,
+			AttachStderr: true,
+			ExposedPorts: make(map[string]struct{}),
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 			Env:          make([]string, 0, 5),
 			Cmd:          make([]string, 0, 5),
 			Volumes:      make(map[string]struct{}),
 			Labels:       make(map[string]string),
+<<<<<<< HEAD
 		},
 		HostConfig: container.HostConfig{
 			Binds:         make([]string, 0, 5),
@@ -30,6 +44,16 @@ func defaultContainerConfig() *cluster.ContainerConfig {
 			RestartPolicy: container.RestartPolicy{Name: "no"},
 		},
 		NetworkingConfig: network.NetworkingConfig{},
+=======
+
+			HostConfig: dockerclient.HostConfig{
+				Binds:         make([]string, 0, 5),
+				NetworkMode:   "default",
+				RestartPolicy: dockerclient.RestartPolicy{Name: "no"},
+			},
+			NetworkingConfig: dockerclient.NetworkingConfig{},
+		},
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 	}
 }
 
@@ -44,7 +68,11 @@ func buildContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerCon
 	}
 
 	if config.ExposedPorts == nil {
+<<<<<<< HEAD
 		config.ExposedPorts = make(map[nat.Port]struct{})
+=======
+		config.ExposedPorts = make(map[string]struct{})
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 	}
 
 	if config.Cmd == nil {
@@ -67,9 +95,15 @@ func buildContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerCon
 		config.HostConfig.NetworkMode = "default"
 	}
 
+<<<<<<< HEAD
 	if config.HostConfig.RestartPolicy == (container.RestartPolicy{}) {
 
 		config.HostConfig.RestartPolicy = container.RestartPolicy{
+=======
+	if config.HostConfig.RestartPolicy == (dockerclient.RestartPolicy{}) {
+
+		config.HostConfig.RestartPolicy = dockerclient.RestartPolicy{
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 			Name:              "no",
 			MaximumRetryCount: 0,
 		}
@@ -89,8 +123,13 @@ func validateContainerConfig(config *cluster.ContainerConfig) error {
 		return errors.New("Swarm ID to the container have created")
 	}
 
+<<<<<<< HEAD
 	if config.HostConfig.CPUShares != 0 {
 		return errors.New("CPUShares > 0,CPUShares should be 0")
+=======
+	if config.CpuShares != 0 || config.HostConfig.CpuShares != 0 {
+		return errors.New("CpuShares > 0,CpuShares should be 0")
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 	}
 
 	_, err := parseCpuset(config)

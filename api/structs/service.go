@@ -3,8 +3,12 @@ package structs
 import (
 	"time"
 
+<<<<<<< HEAD
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/engine-api/types/network"
+=======
+	"github.com/samalba/dockerclient"
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 )
 
 type PostServiceRequest struct {
@@ -40,9 +44,13 @@ type Module struct {
 	Stores     []DiskStorage          `json:",omitempty"`
 	Configures map[string]interface{} `json:",omitempty"`
 
+<<<<<<< HEAD
 	Config           container.Config
 	HostConfig       container.HostConfig
 	NetworkingConfig network.NetworkingConfig `json:"-"`
+=======
+	Config dockerclient.ContainerConfig
+>>>>>>> e056ca3b05a8c415f2be027510f5a8c735cc8d77
 }
 
 type DiskStorage struct {
