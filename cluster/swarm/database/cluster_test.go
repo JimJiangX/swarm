@@ -81,7 +81,7 @@ func TestNode(t *testing.T) {
 		err := list[i].Insert()
 		if err != nil {
 			if list[i].Name == "node5" {
-				t.Skip("Expected")
+				t.Log("Expected")
 			}
 
 			t.Fatal(list[i].Name, err)
