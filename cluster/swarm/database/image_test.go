@@ -18,12 +18,13 @@ func TestTXInsertUnitConfig(t *testing.T) {
 	defer tx.Rollback()
 
 	config := &UnitConfig{
-		ID:            "test1",
-		ImageID:       "image1",
-		Path:          "/root/abc",
-		Version:       0,
-		ParentID:      "",
-		Content:       "",
+		ID:       "test1",
+		ImageID:  "image1",
+		Path:     "/root/abc",
+		Version:  0,
+		ParentID: "",
+		Content: `qwertazwk,ol.p;/['sxecrfvtgbyhn 
+		ujmiyuiop[]\][as"""dfghjkl'';'zxcvbnm,./'"'''""`,
 		ConfigKeySets: "",
 		KeySets:       map[string]bool{"abc": false, "def": true},
 		CreatedAt:     time.Now(),
@@ -34,12 +35,14 @@ func TestTXInsertUnitConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = tx.Commit()
-	if err != nil {
-		t.Fatal(err)
-	}
+	defer func(id string) {
+		err := DeleteUnitConfig(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}(config.ID)
 
-	err = DeleteUnitConfig(config.ID)
+	err = tx.Commit()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -2,7 +2,6 @@ package swarm
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -58,7 +57,7 @@ func (u *unit) Merge(data map[string]interface{}) error {
 	}
 
 	if u.content == nil {
-		content, err := u.Parse(u.parent.Content)
+		content, err := u.Parse([]byte(u.parent.Content))
 		if err != nil {
 			return err
 		}
@@ -88,14 +87,13 @@ func (u *unit) Set(key string, val interface{}) error {
 	return nil
 }
 
-func (u *unit) SaveToDisk(content string) (string, error) {
-	if content == "" {
-		data, err := u.Marshal(u.content)
+func (u *unit) SaveToDisk(content []byte) (_ string, err error) {
+	if len(content) == 0 {
+		content, err = u.Marshal(u.content)
 		if err != nil {
 			return "", err
 		}
 
-		content = string(data)
 	}
 
 	config := database.UnitConfig{
@@ -103,7 +101,7 @@ func (u *unit) SaveToDisk(content string) (string, error) {
 		ImageID:   u.ImageID,
 		Version:   u.parent.Version + 1,
 		ParentID:  u.parent.ID,
-		Content:   content,
+		Content:   string(content),
 		KeySets:   u.parent.KeySets,
 		Path:      u.Path(),
 		CreatedAt: time.Now(),
@@ -111,7 +109,7 @@ func (u *unit) SaveToDisk(content string) (string, error) {
 
 	u.Unit.ConfigID = config.ID
 
-	err := database.SaveUnitConfigToDisk(&u.Unit, config)
+	err = database.SaveUnitConfigToDisk(&u.Unit, config)
 	if err != nil {
 		return "", err
 	}
@@ -141,11 +139,11 @@ func (mysqlConfig) Validate(data map[string]interface{}) error {
 	return nil
 }
 
-func (mysqlConfig) Parse(val string) (map[string]interface{}, error) {
+func (mysqlConfig) Parse(val []byte) (map[string]interface{}, error) {
 	// ini/json/xml
 	// convert to map[string]interface{}
 
-	if strings.TrimSpace(val) == "" {
+	if len(val) == 0 {
 		return nil, nil
 	}
 
@@ -171,7 +169,7 @@ func (proxyCmd) CleanBackupFileCmd(args ...string) []string { return nil }
 type proxyConfig struct{}
 
 func (proxyConfig) Validate(data map[string]interface{}) error        { return nil }
-func (proxyConfig) Parse(data string) (map[string]interface{}, error) { return nil, nil }
+func (proxyConfig) Parse(data []byte) (map[string]interface{}, error) { return nil, nil }
 func (proxyConfig) Marshal(map[string]interface{}) ([]byte, error)    { return nil, nil }
 
 type switchManagerCmd struct{}
@@ -186,5 +184,5 @@ func (switchManagerCmd) CleanBackupFileCmd(args ...string) []string { return nil
 type switchManagerConfig struct{}
 
 func (switchManagerConfig) Validate(data map[string]interface{}) error        { return nil }
-func (switchManagerConfig) Parse(data string) (map[string]interface{}, error) { return nil, nil }
+func (switchManagerConfig) Parse(data []byte) (map[string]interface{}, error) { return nil, nil }
 func (switchManagerConfig) Marshal(map[string]interface{}) ([]byte, error)    { return nil, nil }

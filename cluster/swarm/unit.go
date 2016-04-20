@@ -26,7 +26,7 @@ type ContainerCmd interface {
 
 type configParser interface {
 	Validate(data map[string]interface{}) error
-	Parse(data string) (map[string]interface{}, error)
+	Parse(data []byte) (map[string]interface{}, error)
 	Marshal(map[string]interface{}) ([]byte, error)
 }
 
@@ -233,7 +233,7 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 		return err
 	}
 
-	if _, err = u.SaveToDisk(string(content)); err != nil {
+	if _, err = u.SaveToDisk(content); err != nil {
 		return err
 	}
 
