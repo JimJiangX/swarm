@@ -11,7 +11,6 @@ import (
 	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	consulapi "github.com/hashicorp/consul/api"
-	"github.com/samalba/dockerclient"
 	"golang.org/x/net/context"
 )
 
@@ -84,11 +83,11 @@ func (u *unit) prepareCreateContainer() error {
 	return nil
 }
 
-func (u *unit) createContainer(authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
+func (u *unit) createContainer(authConfig *types.AuthConfig) (*cluster.Container, error) {
 	container, err := u.engine.Create(u.config, u.Unit.ID, true, authConfig)
 	if err == nil && container != nil {
 		u.container = container
-		u.Unit.ContainerID = container.Id
+		u.Unit.ContainerID = container.ID
 
 		//savetoDisk
 	}
@@ -99,7 +98,7 @@ func (u *unit) createContainer(authConfig *dockerclient.AuthConfig) (*cluster.Co
 func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
 	client := u.engine.EngineAPIClient()
 
-	return client.ContainerUpdate(context.TODO(), u.container.Id, updateConfig)
+	return client.ContainerUpdate(context.TODO(), u.container.ID, updateConfig)
 }
 
 func (u *unit) removeContainer(force, rmVolumes bool) error {
@@ -134,7 +133,7 @@ func (u *unit) restartContainer(timeout int) error {
 func (u *unit) renameContainer(name string) error {
 	client := u.engine.EngineAPIClient()
 
-	return client.ContainerRename(context.TODO(), u.container.Id, u.Unit.ID)
+	return client.ContainerRename(context.TODO(), u.container.ID, u.Unit.ID)
 }
 
 func (u *unit) createNetworking(ip, device string, prefix int) error {
@@ -190,12 +189,11 @@ func (u *unit) extendVG() error {
 func (u *unit) RegisterHealthCheck(client *consulapi.Client) error {
 	agent := client.Agent()
 	Service := consulapi.AgentServiceRegistration{
-		ID:                "",
-		Name:              "",
-		Tags:              []string{},
-		Port:              0,
-		Address:           "",
-		EnableTagOverride: false,
+		ID:      "",
+		Name:    "",
+		Tags:    []string{},
+		Port:    0,
+		Address: "",
 		Check: &consulapi.AgentServiceCheck{
 			Script:            "",
 			DockerContainerID: "",

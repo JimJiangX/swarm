@@ -8,6 +8,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	kvdiscovery "github.com/docker/docker/pkg/discovery/kv"
+	"github.com/docker/engine-api/types"
 	kvstore "github.com/docker/libkv/store"
 	"github.com/docker/libkv/store/consul"
 	"github.com/docker/swarm/cluster"
@@ -143,13 +144,13 @@ func (gd *Gardener) TLSConfig() *tls.Config {
 	return gd.Cluster.TLSConfig
 }
 
-func (gd *Gardener) RegistryAuthConfig() (*dockerclient.AuthConfig, error) {
+func (gd *Gardener) RegistryAuthConfig() (*types.AuthConfig, error) {
 	c, err := database.GetSystemConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	return &dockerclient.AuthConfig{
+	return &types.AuthConfig{
 		Username:      c.Username,
 		Password:      c.Password,
 		Email:         c.Email,

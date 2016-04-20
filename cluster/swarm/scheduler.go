@@ -8,6 +8,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/scheduler/node"
@@ -56,7 +57,7 @@ func (gd *Gardener) serviceScheduler() (err error) {
 				module.Config.Image = image.ImageID
 			}
 
-			config := cluster.BuildContainerConfig(module.Config)
+			config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
 			err = validateContainerConfig(config)
 			if err != nil {
 				goto failure
@@ -239,11 +240,11 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, Type string,
 
 func (gd *Gardener) Scheduler(list []*node.Node, config *cluster.ContainerConfig, num int, withImageAffinity bool) ([]*node.Node, error) {
 
-	if network := gd.Networks().Get(config.HostConfig.NetworkMode); network != nil && network.Scope == "local" {
+	if network := gd.Networks().Get(string(config.HostConfig.NetworkMode)); network != nil && network.Scope == "local" {
 		if !config.HaveNodeConstraint() {
 			config.AddConstraint("node==~" + network.Engine.Name)
 		}
-		config.HostConfig.NetworkMode = network.Name
+		config.HostConfig.NetworkMode = container.NetworkMode(network.Name)
 	}
 
 	if withImageAffinity {

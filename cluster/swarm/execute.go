@@ -6,9 +6,9 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/engine-api/types"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/samalba/dockerclient"
 )
 
 func (gd *Gardener) ServiceToExecute(svc *Service) {
@@ -140,7 +140,7 @@ func (gd *Gardener) serviceExecute() (err error) {
 }
 
 // createContainerInPending create new container into the cluster.
-func (gd *Gardener) createContainerInPending(config *cluster.ContainerConfig, name string, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
+func (gd *Gardener) createContainerInPending(config *cluster.ContainerConfig, name string, authConfig *types.AuthConfig) (*cluster.Container, error) {
 	// Ensure the name is available
 	if !gd.checkNameUniqueness(name) {
 		return nil, fmt.Errorf("Conflict: The name %s is already assigned. You have to delete (or rename) that container to be able to assign %s to a container again.", name, name)

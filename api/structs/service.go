@@ -3,7 +3,8 @@ package structs
 import (
 	"time"
 
-	"github.com/samalba/dockerclient"
+	"github.com/docker/engine-api/types/container"
+	"github.com/docker/engine-api/types/network"
 )
 
 type PostServiceRequest struct {
@@ -39,7 +40,9 @@ type Module struct {
 	Stores     []DiskStorage          `json:",omitempty"`
 	Configures map[string]interface{} `json:",omitempty"`
 
-	Config dockerclient.ContainerConfig
+	Config           container.Config
+	HostConfig       container.HostConfig
+	NetworkingConfig network.NetworkingConfig `json:"-"`
 }
 
 type DiskStorage struct {

@@ -7,29 +7,29 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/parsers"
+	"github.com/docker/engine-api/types/container"
+	"github.com/docker/engine-api/types/network"
+	"github.com/docker/go-connections/nat"
 	"github.com/docker/swarm/cluster"
-	"github.com/samalba/dockerclient"
 )
 
 func defaultContainerConfig() *cluster.ContainerConfig {
 	return &cluster.ContainerConfig{
-
-		ContainerConfig: dockerclient.ContainerConfig{
+		Config: container.Config{
 			AttachStdout: true,
 			AttachStderr: true,
-			ExposedPorts: make(map[string]struct{}),
+			ExposedPorts: make(map[nat.Port]struct{}),
 			Env:          make([]string, 0, 5),
 			Cmd:          make([]string, 0, 5),
 			Volumes:      make(map[string]struct{}),
 			Labels:       make(map[string]string),
-
-			HostConfig: dockerclient.HostConfig{
-				Binds:         make([]string, 0, 5),
-				NetworkMode:   "default",
-				RestartPolicy: dockerclient.RestartPolicy{Name: "no"},
-			},
-			NetworkingConfig: dockerclient.NetworkingConfig{},
 		},
+		HostConfig: container.HostConfig{
+			Binds:         make([]string, 0, 5),
+			NetworkMode:   "default",
+			RestartPolicy: container.RestartPolicy{Name: "no"},
+		},
+		NetworkingConfig: network.NetworkingConfig{},
 	}
 }
 
@@ -44,7 +44,7 @@ func buildContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerCon
 	}
 
 	if config.ExposedPorts == nil {
-		config.ExposedPorts = make(map[string]struct{})
+		config.ExposedPorts = make(map[nat.Port]struct{})
 	}
 
 	if config.Cmd == nil {
@@ -67,9 +67,9 @@ func buildContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerCon
 		config.HostConfig.NetworkMode = "default"
 	}
 
-	if config.HostConfig.RestartPolicy == (dockerclient.RestartPolicy{}) {
+	if config.HostConfig.RestartPolicy == (container.RestartPolicy{}) {
 
-		config.HostConfig.RestartPolicy = dockerclient.RestartPolicy{
+		config.HostConfig.RestartPolicy = container.RestartPolicy{
 			Name:              "no",
 			MaximumRetryCount: 0,
 		}
@@ -89,8 +89,8 @@ func validateContainerConfig(config *cluster.ContainerConfig) error {
 		return errors.New("Swarm ID to the container have created")
 	}
 
-	if config.CpuShares != 0 || config.HostConfig.CpuShares != 0 {
-		return errors.New("CpuShares > 0,CpuShares should be 0")
+	if config.HostConfig.CPUShares != 0 {
+		return errors.New("CPUShares > 0,CPUShares should be 0")
 	}
 
 	_, err := parseCpuset(config)
