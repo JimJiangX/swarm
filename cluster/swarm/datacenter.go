@@ -39,7 +39,7 @@ type Node struct {
 	*database.Node
 	task       *database.Task
 	engine     *cluster.Engine
-	localStore store.Store
+	localStore []store.Store
 	hdd        string
 	ssd        string
 	user       string
@@ -674,9 +674,11 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 				log.Error(eng.Addr, "TxUpdateNodeRegister", err)
 				continue
 			}
-
-			nodes[i].localStore = store.NewLocalDisk("", eng.Labels["vg"], nodes[i].Node)
-
+			//hdd
+			ld := store.NewLocalDisk(eng.Labels["vg"], eng.Labels["vg"],
+				fmt.Sprintf("%s:%d", nodes[i].Addr, pluginPort), nodes[i].Node)
+			nodes[i].localStore = append(nodes[i].localStore, ld)
+			// ssd
 			continue
 
 			wwwn := eng.Labels["wwwn"]

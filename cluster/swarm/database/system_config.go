@@ -17,9 +17,9 @@ type Configurations struct {
 	Registry
 	SSHDeliver
 
-	DockerPort int  `db:"docker_port"`
-	PluginPort int  `db:"plugin_port"`
-	Retry      byte `db:"retry"`
+	DockerPort int `db:"docker_port"`
+	PluginPort int `db:"plugin_port"`
+	Retry      int `db:"retry"`
 }
 
 type SSHDeliver struct {

@@ -16,7 +16,6 @@ import (
 	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/utils"
 	consulapi "github.com/hashicorp/consul/api"
-	"github.com/samalba/dockerclient"
 	crontab "gopkg.in/robfig/cron.v2"
 )
 
@@ -24,13 +23,14 @@ type Gardener struct {
 	*Cluster
 
 	// addition by fugr
-	host   string
-	kvPath string
+	host         string
+	kvPath       string
+	failureRetry int
 
 	cron               *crontab.Cron // crontab tasks
 	consulClient       *consulapi.Client
 	kvClient           kvstore.Store
-	registryAuthConfig *dockerclient.AuthConfig
+	registryAuthConfig *types.AuthConfig
 	cronJobs           map[crontab.EntryID]*serviceBackup
 
 	datacenters []*Datacenter
@@ -75,8 +75,14 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	if err != nil {
 		log.Fatalf("DB Error,%s", err)
 	}
+	if sysConfig.Retry > 0 {
+		gd.failureRetry = sysConfig.Retry
+	}
+	if sysConfig.PluginPort > 0 {
+		pluginPort = sysConfig.PluginPort
+	}
 
-	gd.registryAuthConfig = &dockerclient.AuthConfig{
+	gd.registryAuthConfig = &types.AuthConfig{
 		Username:      sysConfig.Registry.Username,
 		Password:      sysConfig.Registry.Password,
 		Email:         sysConfig.Registry.Email,
@@ -145,6 +151,10 @@ func (gd *Gardener) TLSConfig() *tls.Config {
 }
 
 func (gd *Gardener) RegistryAuthConfig() (*types.AuthConfig, error) {
+	if gd.registryAuthConfig != nil {
+		return gd.registryAuthConfig, nil
+	}
+
 	c, err := database.GetSystemConfig()
 	if err != nil {
 		return nil, err

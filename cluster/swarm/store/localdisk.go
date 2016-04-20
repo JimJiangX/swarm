@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
 )
@@ -12,26 +13,39 @@ const LocalDisk = "local"
 
 type localDisk struct {
 	node   *database.Node
-	name   string
+	vendor string
+	addr   string
 	VGName string
 }
 
-func NewLocalDisk(name, vg string, node *database.Node) Store {
+func NewLocalDisk(vendor, vg, addr string, node *database.Node) Store {
 	return &localDisk{
 		node:   node,
-		name:   name,
+		addr:   addr,
+		vendor: vendor,
 		VGName: vg,
 	}
 }
 
 func (l localDisk) ID() string     { return l.node.ID }
-func (l localDisk) Vendor() string { return l.name }
+func (l localDisk) Vendor() string { return l.vendor }
 func (localDisk) Driver() string   { return LocalDisk }
 func (localDisk) Ping() error      { return nil }
 func (l localDisk) IdleSize() ([]int, error) {
 	// api get local disk size
+	list, err := sdk.GetVgList(l.addr)
+	if err != nil {
+		return nil, err
+	}
 
 	total := 0
+
+	for i := range list {
+		if l.VGName == list[i].VgName {
+			total = list[i].VgSize
+			break
+		}
+	}
 
 	// allocated size
 	lvs, err := database.SelectVolumeByVG(l.VGName)
@@ -60,7 +74,7 @@ func (l localDisk) Alloc(name string, size int) (string, int, error) {
 	sort.Sort(sort.Reverse(sort.IntSlice(idles)))
 
 	if idles[0] < size {
-		return "", 0, fmt.Errorf("%s is shortage,%d<%d", l.name, idles[0], size)
+		return "", 0, fmt.Errorf("%s is shortage,%d<%d", l.Vendor(), idles[0], size)
 	}
 
 	lv := database.LocalVolume{

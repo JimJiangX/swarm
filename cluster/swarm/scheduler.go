@@ -9,6 +9,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/types/container"
+	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/scheduler/node"
@@ -29,7 +30,7 @@ func (gd *Gardener) ServiceToScheduler(svc *Service) error {
 func (gd *Gardener) serviceScheduler() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("Recover From Panic:%v,Error:%s", r, err)
+			err = fmt.Errorf("Recover From Panic:%v,Error:%v", r, err)
 		}
 
 		log.Fatal("Service Scheduler Exit,%s", err)
@@ -46,36 +47,15 @@ func (gd *Gardener) serviceScheduler() (err error) {
 
 		resourceAlloc := make([]*preAllocResource, 0, len(svc.base.Modules))
 
-		for _, module := range svc.base.Modules {
-			// query image from database
-			if module.Config.Image == "" {
-				image, err := gd.GetImage(module.Type, module.Version)
-				if err != nil {
-					goto failure
-				}
+		for i := range svc.base.Modules {
 
-				module.Config.Image = image.ImageID
+			preAlloc, err := gd.BuildPendingContainersPerModule(&svc.base.Modules[i])
+			if len(preAlloc) > 0 {
+				resourceAlloc = append(resourceAlloc, preAlloc...)
 			}
-
-			config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
-			err = validateContainerConfig(config)
 			if err != nil {
 				goto failure
 			}
-
-			// TODO:fix later
-			storeType, storeSize := "", 0
-			filters := gd.listShortIdleStore(storeType, module.Num, storeSize)
-			list := gd.listCandidateNodes(module.Nodes, module.Type, filters...)
-
-			preAlloc, err := gd.BuildPendingContainers(list, module.Type, module.Num, config, false)
-
-			resourceAlloc = append(resourceAlloc, preAlloc...)
-
-			if err != nil {
-				goto failure
-			}
-
 		}
 
 		for i := range resourceAlloc {
@@ -109,6 +89,31 @@ func (gd *Gardener) serviceScheduler() (err error) {
 	}
 
 	return err
+}
+
+func (gd *Gardener) BuildPendingContainersPerModule(module *structs.Module) ([]*preAllocResource, error) {
+	// query image from database
+	if module.Config.Image == "" {
+		image, err := gd.GetImage(module.Name, module.Version)
+		if err != nil {
+			return nil, err
+		}
+
+		module.Config.Image = image.ImageID
+	}
+
+	config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
+	err := validateContainerConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO:fix later
+	storeType, storeSize := "", 0
+	filters := gd.listShortIdleStore(storeType, module.Num, storeSize)
+	list := gd.listCandidateNodes(module.Nodes, module.Type, filters...)
+
+	return gd.BuildPendingContainers(list, module.Type, module.Num, config, false)
 }
 
 func (gd *Gardener) BuildPendingContainers(list []*node.Node, Type string, num int,

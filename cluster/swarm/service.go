@@ -37,10 +37,9 @@ type Service struct {
 	authConfig *types.AuthConfig
 }
 
-func NewService(svc database.Service, retry, unitNum int) *Service {
+func NewService(svc database.Service, unitNum int) *Service {
 	return &Service{
 		Service:           svc,
-		failureRetry:      retry,
 		units:             make([]*unit, unitNum),
 		pendingContainers: make(map[string]*pendingContainer),
 	}
@@ -88,7 +87,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		nodeNum += n
 	}
 
-	service := NewService(svc, 2, nodeNum)
+	service := NewService(svc, nodeNum)
 
 	service.Lock()
 	defer service.Unlock()
@@ -110,12 +109,24 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 }
 
 func Validate(req structs.PostServiceRequest) []string {
+	warnings := make([]string, 0, 10)
 	_, err := getServiceArch(req.Architecture)
 	if err != nil {
-		return []string{err.Error()}
+		warnings = append(warnings, fmt.Sprintf("Parse 'Architecture' Failed,%s", err.Error()))
 	}
 
-	return nil
+	for _, module := range req.Modules {
+		_, err := database.QueryImage(module.Name, module.Version)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("Not Found Image:%s:%s,%s", module.Name, module.Version, err.Error()))
+		}
+	}
+
+	if len(warnings) == 0 {
+		return nil
+	}
+
+	return warnings
 }
 
 func converteToUsers(service string, users []structs.User) []database.User {
@@ -196,6 +207,8 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, err
 	if err != nil {
 		return nil, err
 	}
+
+	svc.failureRetry = gd.failureRetry
 
 	if err := gd.AddService(svc); err != nil {
 		return svc, err

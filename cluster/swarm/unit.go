@@ -313,7 +313,7 @@ func newVolumeCreateRequest(name, driver string, opts map[string]string) types.V
 	}
 }
 
-const pluginPort = 3333
+var pluginPort = 3333
 
 func (u unit) getPluginAddr(port int) string {
 
