@@ -131,11 +131,18 @@ func (h *hitachiStore) Alloc(_ string, size int) (string, int, error) {
 	return lun.ID, lun.StorageLunID, nil
 }
 
-func (h *hitachiStore) Recycle(lun int) error {
+func (h *hitachiStore) Recycle(id string, lun int) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
-
-	l, err := database.GetLUNByLunID(h.ID(), lun)
+	var (
+		l   database.LUN
+		err error
+	)
+	if len(id) > 0 {
+		l, err = database.GetLUNByID(id)
+	} else {
+		l, err = database.GetLUNByLunID(h.ID(), lun)
+	}
 	if err != nil {
 		return err
 	}

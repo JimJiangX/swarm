@@ -131,11 +131,19 @@ func (h *huaweiStore) Alloc(_ string, size int) (string, int, error) {
 
 }
 
-func (h *huaweiStore) Recycle(lun int) error {
+func (h *huaweiStore) Recycle(id string, lun int) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	l, err := database.GetLUNByLunID(h.ID(), lun)
+	var (
+		l   database.LUN
+		err error
+	)
+	if len(id) > 0 {
+		l, err = database.GetLUNByID(id)
+	} else {
+		l, err = database.GetLUNByLunID(h.ID(), lun)
+	}
 	if err != nil {
 		return err
 	}

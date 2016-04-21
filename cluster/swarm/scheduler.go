@@ -111,10 +111,10 @@ func (gd *Gardener) BuildPendingContainersPerModule(module *structs.Module) ([]*
 	filters := gd.listShortIdleStore(module.Stores, module.Type, module.Num)
 	list := gd.listCandidateNodes(module.Nodes, module.Type, filters...)
 
-	return gd.BuildPendingContainers(list, module.Type, module.Num, config, false)
+	return gd.BuildPendingContainers(list, module.Type, module.Num, module.Stores, config, false)
 }
 
-func (gd *Gardener) BuildPendingContainers(list []*node.Node, Type string, num int,
+func (gd *Gardener) BuildPendingContainers(list []*node.Node, Type string, num int, stores []structs.DiskStorage,
 	config *cluster.ContainerConfig, withImageAffinity bool) ([]*preAllocResource, error) {
 
 	gd.scheduler.Lock()
@@ -149,14 +149,14 @@ func (gd *Gardener) BuildPendingContainers(list []*node.Node, Type string, num i
 		return nil, errors.New("Not Enough Nodes")
 	}
 
-	preAllocs, err := gd.pendingAlloc(candidates[0:num], Type, config)
+	preAllocs, err := gd.pendingAlloc(candidates[0:num], Type, stores, config)
 
 	gd.scheduler.Unlock()
 
 	return preAllocs, err
 }
 
-func (gd *Gardener) pendingAlloc(candidates []*node.Node, Type string,
+func (gd *Gardener) pendingAlloc(candidates []*node.Node, Type string, stores []structs.DiskStorage,
 	templConfig *cluster.ContainerConfig) ([]*preAllocResource, error) {
 
 	image, err := gd.getImageByID(templConfig.Image)
@@ -171,9 +171,6 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, Type string,
 	allocs := make([]*preAllocResource, 0, 5)
 
 	for i := range candidates {
-		preAlloc := newPreAllocResource()
-		allocs = append(allocs, preAlloc)
-
 		id := gd.generateUniqueID()
 		engine, ok := gd.engines[candidates[i].ID]
 		if !ok {
@@ -182,7 +179,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, Type string,
 		/*
 			ports, err := database.SelectAvailablePorts(len(image.PortSlice))
 			if err != nil {
-				return allocs, err
+				return preAlloc, err
 			}
 
 			for i := range ports {
@@ -208,37 +205,45 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, Type string,
 			parent: parentConfig,
 		}
 
-		preAlloc.unit = unit
-
-		config, err := gd.allocResource(preAlloc, engine, *templConfig, Type)
-		if err != nil {
-			return allocs, fmt.Errorf("error resource alloc")
-		}
-
-		swarmID := config.SwarmID()
-		if swarmID == "" {
-			// Associate a Swarm ID to the container we are creating.
-			swarmID = gd.generateUniqueID()
-			config.SetSwarmID(swarmID)
-		}
-
-		preAlloc.swarmID = swarmID
-		preAlloc.pendingContainer = &pendingContainer{
-			Name:   id,
-			Config: config,
-			Engine: engine,
-		}
-		preAlloc.unit.networkings = preAlloc.networkings
-
-		gd.pendingContainers[swarmID] = preAlloc.pendingContainer
-
-		err = preAlloc.consistency()
+		preAlloc, err := gd.pendingAllocOneNode(engine, unit, stores, templConfig)
+		allocs = append(allocs, preAlloc)
 		if err != nil {
 			return allocs, err
 		}
 	}
 
 	return allocs, nil
+}
+
+func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stores []structs.DiskStorage, templConfig *cluster.ContainerConfig) (*preAllocResource, error) {
+	preAlloc := newPreAllocResource()
+	preAlloc.unit = unit
+
+	config, err := gd.allocResource(preAlloc, engine, *templConfig, unit.Type)
+	if err != nil {
+		return preAlloc, fmt.Errorf("error resource alloc")
+	}
+
+	swarmID := config.SwarmID()
+	if swarmID == "" {
+		// Associate a Swarm ID to the container we are creating.
+		swarmID = gd.generateUniqueID()
+		config.SetSwarmID(swarmID)
+	}
+
+	preAlloc.swarmID = swarmID
+	preAlloc.pendingContainer = &pendingContainer{
+		Name:   unit.ID,
+		Config: config,
+		Engine: engine,
+	}
+	preAlloc.unit.networkings = preAlloc.networkings
+
+	gd.pendingContainers[swarmID] = preAlloc.pendingContainer
+
+	err = preAlloc.consistency()
+
+	return preAlloc, nil
 }
 
 func (gd *Gardener) Scheduler(list []*node.Node, config *cluster.ContainerConfig, num int, withImageAffinity bool) ([]*node.Node, error) {

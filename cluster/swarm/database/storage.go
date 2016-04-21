@@ -269,6 +269,17 @@ func InsertLocalVolume(lv LocalVolume) error {
 	return err
 }
 
+func DeleteLocalVoume(id string) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("DELETE tb_volumes WHERE id=?", id)
+
+	return err
+}
+
 func SelectVolumeByVG(name string) ([]LocalVolume, error) {
 	db, err := GetDB(true)
 	if err != nil {

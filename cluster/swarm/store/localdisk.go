@@ -123,8 +123,9 @@ func (l localDisk) Alloc(name string, size int) (string, int, error) {
 	return lv.ID, size, nil
 }
 
-func (localDisk) Recycle(lun int) error {
-	return nil
+func (localDisk) Recycle(id string, _ int) error {
+
+	return database.DeleteLocalVoume(id)
 }
 
 func (localDisk) Mapping(host, unit, lun string) error { return nil }
