@@ -20,7 +20,7 @@ type Node struct {
 	HDD      string `json:"hdd"`
 	SSD      string `json:"ssd"`
 
-	Port         int `json:",omitempty"`
+	Port         int `json:",omitempty"` // ssh port
 	MaxContainer int `json:"max_container,omitempty"`
 }
 

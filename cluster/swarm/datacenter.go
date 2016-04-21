@@ -12,6 +12,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
@@ -19,10 +20,6 @@ import (
 	"github.com/hashicorp/terraform/communicator/remote"
 	"github.com/hashicorp/terraform/communicator/ssh"
 	"github.com/hashicorp/terraform/terraform"
-)
-
-const (
-	LocalDiskStore = "localDiskStore"
 )
 
 type Datacenter struct {
@@ -42,9 +39,9 @@ type Node struct {
 	localStore store.Store
 	hdd        string
 	ssd        string
-	user       string
-	password   string
-	port       int
+	user       string // os user
+	password   string // os password
+	port       int    // ssh port
 }
 
 func NewNode(addr, name, cluster, user, password, hdd, ssd string, port, num int) *Node {
@@ -328,18 +325,45 @@ func (dc *Datacenter) AllocStore(host, IDOrType string, size int64) error {
 	return err
 }
 
-func (gd *Gardener) listShortIdleStore(IDOrType string, num, size int) []string {
-	if IDOrType == LocalDiskStore {
-		return nil
-	}
-
+func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType string, num int) []string {
 	out := make([]string, 0, 100)
 	gd.RLock()
 	defer gd.RUnlock()
 
-	for i := range gd.datacenters {
-		if !gd.datacenters[i].isIdleStoreEnough(IDOrType, num, size) {
-			out = append(out, gd.datacenters[i].ID)
+	for _, dc := range gd.datacenters {
+		// check dc
+		if IDOrType != "" && !(dc.Type == IDOrType || dc.ID == IDOrType) {
+			out = append(out, dc.ID)
+			continue
+		}
+
+		for _, v := range volumes {
+			// when storage is HITACHI or HUAWEI
+			if v.Type == store.SANStore {
+				if !dc.isIdleStoreEnough("", num/2, v.Size) {
+					out = append(out, dc.ID)
+				}
+				continue
+			}
+
+			for _, node := range dc.nodes {
+				if node.localStore == nil {
+					out = append(out, node.ID)
+					continue
+				}
+
+				idle, err := node.localStore.IdleSize()
+				if err != nil {
+					out = append(out, node.ID)
+					continue
+				}
+
+				if idle[v.Type] < v.Size {
+					out = append(out, node.ID)
+					continue
+				}
+
+			}
 		}
 	}
 

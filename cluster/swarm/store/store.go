@@ -39,8 +39,8 @@ func RegisterStore(id, vendor, addr, user, password, admin string,
 		store = NewHuaweiStore(id, vendor, addr, user, password, hstart, hend)
 	} else if v == HITACHI {
 		store = NewHitachiStore(id, vendor, admin, lstart, lend, hstart, hend)
-	} else if vendor == LocalDisk {
-
+	} else if vendor == LocalDiskStore {
+		return nil, nil
 	}
 
 	if err := store.Ping(); err != nil {

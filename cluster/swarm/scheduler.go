@@ -108,9 +108,7 @@ func (gd *Gardener) BuildPendingContainersPerModule(module *structs.Module) ([]*
 		return nil, err
 	}
 
-	// TODO:fix later
-	storeType, storeSize := "", 0
-	filters := gd.listShortIdleStore(storeType, module.Num, storeSize)
+	filters := gd.listShortIdleStore(module.Stores, module.Type, module.Num)
 	list := gd.listCandidateNodes(module.Nodes, module.Type, filters...)
 
 	return gd.BuildPendingContainers(list, module.Type, module.Num, config, false)
@@ -277,24 +275,23 @@ func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...
 
 	if len(names) == 0 {
 
-		for i := range gd.datacenters {
+		for _, dc := range gd.datacenters {
 
-			if gd.datacenters[i].Type != dcTag ||
-				isStringExist(gd.datacenters[i].ID, filters) {
+			if dc.Type != dcTag || isStringExist(dc.ID, filters) {
 
 				continue
 			}
 
-			list := gd.datacenters[i].listNodeID()
+			list := dc.listNodeID()
 
 			for _, id := range list {
 
-				if isStringExist(id, filters) {
+				e, ok := gd.engines[id]
+				if !ok {
 					continue
 				}
 
-				e, ok := gd.engines[id]
-				if !ok {
+				if isStringExist(id, filters) {
 					continue
 				}
 
@@ -302,8 +299,14 @@ func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...
 
 				for _, c := range gd.pendingContainers {
 
-					if c.Engine.ID == e.ID && node.Container(c.Config.SwarmID()) == nil {
-						node.AddContainer(c.ToContainer())
+					if c.Engine.ID == e.ID &&
+						node.Container(c.Config.SwarmID()) == nil {
+
+						err := node.AddContainer(c.ToContainer())
+						if err != nil {
+							log.Error(e.ID, err.Error())
+							continue
+						}
 					}
 				}
 
@@ -316,20 +319,26 @@ func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...
 
 		for _, name := range names {
 
-			if isStringExist(name, filters) {
+			e, ok := gd.engines[name]
+			if !ok {
 				continue
 			}
 
-			e, ok := gd.engines[name]
-			if !ok {
+			if isStringExist(name, filters) {
 				continue
 			}
 
 			node := node.NewNode(e)
 
 			for _, c := range gd.pendingContainers {
-				if c.Engine.ID == e.ID && node.Container(c.Config.SwarmID()) == nil {
-					node.AddContainer(c.ToContainer())
+				if c.Engine.ID == e.ID &&
+					node.Container(c.Config.SwarmID()) == nil {
+
+					err := node.AddContainer(c.ToContainer())
+					if err != nil {
+						log.Error(e.ID, err.Error())
+						continue
+					}
 				}
 			}
 
