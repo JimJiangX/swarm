@@ -23,9 +23,8 @@ type Gardener struct {
 	*Cluster
 
 	// addition by fugr
-	host         string
-	kvPath       string
-	failureRetry int
+	host   string
+	kvPath string
 
 	cron               *crontab.Cron // crontab tasks
 	consulClient       *consulapi.Client
@@ -75,9 +74,10 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	if err != nil {
 		log.Fatalf("DB Error,%s", err)
 	}
-	if sysConfig.Retry > 0 {
-		gd.failureRetry = sysConfig.Retry
+	if sysConfig.Retry > 0 && cluster.createRetry == 0 {
+		cluster.createRetry = sysConfig.Retry
 	}
+
 	if sysConfig.PluginPort > 0 {
 		pluginPort = sysConfig.PluginPort
 	}

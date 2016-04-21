@@ -23,7 +23,7 @@ var (
 type Service struct {
 	sync.RWMutex
 
-	failureRetry int
+	failureRetry int64
 
 	database.Service
 	base *structs.PostServiceRequest
@@ -129,7 +129,7 @@ func Validate(req structs.PostServiceRequest) []string {
 			warnings = append(warnings, err.Error())
 		}
 
-		config.Validate()
+		err = config.Validate()
 		if err != nil {
 			warnings = append(warnings, err.Error())
 		}
@@ -221,7 +221,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, err
 		return nil, err
 	}
 
-	svc.failureRetry = gd.failureRetry
+	svc.failureRetry = gd.createRetry
 
 	if err := gd.AddService(svc); err != nil {
 		return svc, err

@@ -98,7 +98,7 @@ func validateContainerConfig(config *cluster.ContainerConfig) error {
 		return err
 	}
 
-	return nil
+	return config.Validate()
 }
 
 // parse NCPU from config.HostConfig.CpusetCpus
