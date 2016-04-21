@@ -205,6 +205,18 @@ func GetNode(IDOrName string) (Node, error) {
 	return n, err
 }
 
+func GetAllNodes() ([]Node, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	var nodes []Node
+	err = db.QueryRowx("SELECT * FROM tb_node").StructScan(&nodes)
+
+	return nodes, err
+}
+
 // UpdateStatus returns error when Node UPDATE status.
 func (n *Node) UpdateStatus(state int) error {
 	db, err := GetDB(true)

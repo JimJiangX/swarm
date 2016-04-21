@@ -311,7 +311,6 @@ func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...
 				}
 
 				out = append(out, node)
-
 			}
 		}
 
@@ -369,11 +368,27 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		return nodes[0:num:num], nil
 	}
 
+	all, err := database.GetAllNodes()
+	if err != nil {
+		all = nil
+	}
+
 	m := make(map[string][]*node.Node)
 
 	for i := range nodes {
-		dc, err := gd.DatacenterByNode(nodes[i].ID)
-		if err != nil {
+		var dc *Datacenter = nil
+
+		if len(all) == 0 {
+			dc, err = gd.DatacenterByNode(nodes[i].ID)
+		} else {
+			for index := range all {
+				if nodes[i].ID == all[index].ID {
+					dc, err = gd.Datacenter(all[index].ClusterID)
+					break
+				}
+			}
+		}
+		if err != nil || dc == nil {
 			continue
 		}
 
@@ -381,8 +396,8 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 			m[dc.ID] = append(s, nodes[i])
 		} else {
 			m[dc.ID] = []*node.Node{nodes[i]}
-
 		}
+
 	}
 
 	if highAvailable && len(m) < 2 {
@@ -407,8 +422,19 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		count := make(map[string]int)
 
 		for i := range nodes {
-			dc, err := gd.DatacenterByNode(nodes[i].ID)
-			if err != nil {
+			var dc *Datacenter = nil
+
+			if len(all) == 0 {
+				dc, err = gd.DatacenterByNode(nodes[i].ID)
+			} else {
+				for index := range all {
+					if nodes[i].ID == all[index].ID {
+						dc, err = gd.Datacenter(all[index].ClusterID)
+						break
+					}
+				}
+			}
+			if err != nil || dc == nil {
 				continue
 			}
 

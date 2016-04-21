@@ -151,6 +151,14 @@ func TestNode(t *testing.T) {
 		t.Fatal("Unexpect")
 	}
 
+	nodes, err := GetAllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes) != len(list) {
+		t.Fatalf("Unexpected,%d!=%d", len(nodes), len(list))
+	}
+
 	for i := range list {
 		IDOrName := list[i].ID
 		if i%2 == 0 {

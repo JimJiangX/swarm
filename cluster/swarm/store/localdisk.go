@@ -78,6 +78,7 @@ func (localDisk) Insert() error { return nil }
 func (localDisk) AddHost(name string, wwwn ...string) error { return nil }
 func (localDisk) DelHost(name string, wwwn ...string) error { return nil }
 
+// name with suffix by vgName
 func (l localDisk) Alloc(name string, size int) (string, int, error) {
 	idles, err := l.IdleSize()
 	if err != nil || len(idles) == 0 {
