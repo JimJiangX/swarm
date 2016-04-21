@@ -230,7 +230,7 @@ func (h *hitachiStore) List(rg ...int) ([]space, error) {
 	return spaces, nil
 }
 
-func (h hitachiStore) IdleSize() ([]int, error) {
+func (h hitachiStore) IdleSize() (map[string]int, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
@@ -239,10 +239,9 @@ func (h hitachiStore) IdleSize() ([]int, error) {
 		return nil, err
 	}
 
-	out, i := make([]int, len(rg)), 0
-	for _, val := range rg {
-		out[i] = val.free
-		i++
+	out := make(map[string]int, len(rg))
+	for key, val := range rg {
+		out[key.ID] = val.free
 	}
 
 	return out, nil

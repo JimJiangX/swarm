@@ -160,7 +160,7 @@ func (h *huaweiStore) Recycle(lun int) error {
 	return err
 }
 
-func (h huaweiStore) IdleSize() ([]int, error) {
+func (h huaweiStore) IdleSize() (map[string]int, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
@@ -169,10 +169,9 @@ func (h huaweiStore) IdleSize() ([]int, error) {
 		return nil, err
 	}
 
-	out, i := make([]int, len(rg)), 0
-	for _, val := range rg {
-		out[i] = val.free
-		i++
+	out := make(map[string]int, len(rg))
+	for key, val := range rg {
+		out[key.ID] = val.free
 	}
 
 	return out, nil

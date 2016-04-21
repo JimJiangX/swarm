@@ -39,7 +39,7 @@ type Node struct {
 	*database.Node
 	task       *database.Task
 	engine     *cluster.Engine
-	localStore []store.Store
+	localStore store.Store
 	hdd        string
 	ssd        string
 	user       string
@@ -547,7 +547,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	err = c.Start(&cmd)
 	cmd.Wait()
 	if err != nil || cmd.ExitStatus != 0 {
-		log.Errorf("Executing Remote Command: %s,Exited:%d,%s,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
+		log.Errorf("Executing Remote Command: %s,Exited:%d,%v,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
 
 		cp := remote.Cmd{
 			Command: script,
@@ -557,7 +557,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 		err = c.Start(&cp)
 		cp.Wait()
 		if err != nil || cp.ExitStatus != 0 {
-			err = fmt.Errorf("Twice Executing Remote Command: %s,Exited:%d,%s,Output:%s", cp.Command, cp.ExitStatus, err, buffer.String())
+			err = fmt.Errorf("Twice Executing Remote Command: %s,Exited:%d,%v,Output:%s", cp.Command, cp.ExitStatus, err, buffer.String())
 			log.Error(err)
 
 			return err
@@ -604,7 +604,7 @@ func SSHCommand(host, user, password, shell string, output io.Writer) error {
 	err = c.Start(&cmd)
 	cmd.Wait()
 	if err != nil || cmd.ExitStatus != 0 {
-		log.Errorf("Executing Remote Command: %s,Exited:%d,%s", cmd.Command, cmd.ExitStatus, err)
+		log.Errorf("Executing Remote Command: %s,Exited:%d,%v", cmd.Command, cmd.ExitStatus, err)
 
 		cp := remote.Cmd{
 			Command: shell,
@@ -614,7 +614,7 @@ func SSHCommand(host, user, password, shell string, output io.Writer) error {
 		err = c.Start(&cp)
 		cp.Wait()
 		if err != nil || cp.ExitStatus != 0 {
-			err = fmt.Errorf("Twice Executing Remote Command: %s,Exited:%d,%s", cp.Command, cp.ExitStatus, err)
+			err = fmt.Errorf("Twice Executing Remote Command: %s,Exited:%d,%v", cp.Command, cp.ExitStatus, err)
 			log.Error(err)
 
 			return err
@@ -634,12 +634,11 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 	}
 	config, err := database.GetSystemConfig()
 	if err != nil {
+		log.Error(err.Error())
 		return err
 	}
 
 	deadline := time.Now().Add(timeout)
-
-	// TODO: set timeout
 
 	for {
 		if time.Now().After(deadline) {
@@ -674,34 +673,56 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 				log.Error(eng.Addr, "TxUpdateNodeRegister", err)
 				continue
 			}
-			//hdd
-			ld := store.NewLocalDisk(eng.Labels["vg"], eng.Labels["vg"],
-				fmt.Sprintf("%s:%d", nodes[i].Addr, pluginPort), nodes[i].Node)
-			nodes[i].localStore = append(nodes[i].localStore, ld)
-			// ssd
-			continue
 
-			wwwn := eng.Labels["wwwn"]
-			if strings.TrimSpace(wwwn) == "" {
-				continue
+			vgs := make([]store.VG, 0, 2)
+			//SSD
+			if ssd := eng.Labels["SSD_VG"]; ssd != "" {
+				vgs = append(vgs, store.VG{
+					Vendor: "SSD",
+					Name:   ssd,
+				})
+			}
+			// HDD
+			if hdd := eng.Labels["HDD_VG"]; hdd != "" {
+				vgs = append(vgs, store.VG{
+					Vendor: "HDD",
+					Name:   hdd,
+				})
 			}
 
-			list := strings.Split(wwwn, ",")
+			pluginAddr := fmt.Sprintf("%s:%d", nodes[i].Addr, pluginPort)
+			nodes[i].localStore = store.NewLocalDisk(pluginAddr, nodes[i].Node, vgs)
 
-			if dc.storage == nil || dc.storage.Driver() != "lvm" {
-				continue
-			}
+			wwn := eng.Labels["HBA_WWN"]
+			if strings.TrimSpace(wwn) != "" {
 
-			err := dc.storage.AddHost(nodes[i].ID, list...)
-			if err != nil {
-				continue
+				list := strings.Split(wwn, ",")
+
+				if dc.storage == nil || dc.storage.Driver() != "lvm" {
+					continue
+				}
+
+				err := dc.storage.AddHost(nodes[i].ID, list...)
+				if err != nil {
+					log.WithFields(log.Fields{
+						"Host":    nodes[i].Name,
+						"Addr":    addr,
+						"Storage": dc.storage.ID(),
+						"Vendor":  dc.storage.Vendor(),
+					}).Errorf("Add Host To Storage Error:%s", err.Error())
+
+					continue
+				}
 			}
 
 			err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, _StatusNodeEnable, _StatusTaskDone, eng.ID, "")
+			if err != nil {
+				log.WithField("Host", nodes[i].Name).Errorf("Node Registed,Error:%s", err)
 
+				continue
+			}
 			// servcie register
 			// TODO:create container test
-
 		}
 	}
 }

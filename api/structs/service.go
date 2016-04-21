@@ -32,7 +32,7 @@ type User struct {
 type Module struct {
 	Name    string
 	Version string
-	Type    string
+	Type    string // upsql\upproxy\sm
 	Arch    string // split by `-` ,"nMaster-mStandby-xSlave"
 	Num     int
 
@@ -47,7 +47,7 @@ type Module struct {
 
 type DiskStorage struct {
 	Name string // DATA / LOG
-	Type string // "local\ssd\san"
+	Type string // "hdd\ssd\san"
 	Size int
 }
 

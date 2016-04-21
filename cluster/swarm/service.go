@@ -10,6 +10,7 @@ import (
 
 	"github.com/docker/engine-api/types"
 	"github.com/docker/swarm/api/structs"
+	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
 	"github.com/yiduoyunQ/smlib"
@@ -110,6 +111,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 
 func Validate(req structs.PostServiceRequest) []string {
 	warnings := make([]string, 0, 10)
+
 	_, err := getServiceArch(req.Architecture)
 	if err != nil {
 		warnings = append(warnings, fmt.Sprintf("Parse 'Architecture' Failed,%s", err.Error()))
@@ -119,6 +121,17 @@ func Validate(req structs.PostServiceRequest) []string {
 		_, err := database.QueryImage(module.Name, module.Version)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("Not Found Image:%s:%s,%s", module.Name, module.Version, err.Error()))
+		}
+
+		config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
+		err = validateContainerConfig(config)
+		if err != nil {
+			warnings = append(warnings, err.Error())
+		}
+
+		config.Validate()
+		if err != nil {
+			warnings = append(warnings, err.Error())
 		}
 	}
 

@@ -14,7 +14,7 @@ type Store interface {
 	Vendor() string
 	Driver() string
 	Ping() error
-	IdleSize() ([]int, error)
+	IdleSize() (map[string]int, error)
 
 	Insert() error
 

@@ -237,7 +237,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if warnings := swarm.Validate(req); len(warnings) > 0 {
-		httpError(w, strings.Join(warnings, ","), StatusUnprocessableEntity)
+		httpError(w, strings.Join(warnings, ";"), http.StatusConflict)
 		return
 	}
 

@@ -302,6 +302,8 @@ func manage(c *cli.Context) {
 			log.Fatalf("database setup failed", err)
 		}
 
+		api.EnableGardener(true)
+
 		cluster, err := swarm.NewCluster(sched, tlsConfig, discovery, c.StringSlice("cluster-opt"), engineOpts)
 		if err != nil {
 			log.Fatal(err)

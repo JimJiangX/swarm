@@ -11,10 +11,19 @@ import (
 )
 
 const (
-	enableGardener = true
-	_Gardener      = "gardener"
-	_Context       = "context"
+	_Gardener = "gardener"
+	_Context  = "gardener context"
 )
+
+var enableGardener = false
+
+func EnableGardener(enable bool) {
+	enableGardener = enable
+}
+
+func IsGardenerEnable() bool {
+	return enableGardener
+}
 
 func fromContext(ctx goctx.Context, key string) (bool, *context, *swarm.Gardener) {
 	c, ok := ctx.Value(_Gardener).(*context)
