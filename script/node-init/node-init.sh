@@ -35,7 +35,7 @@ init_hdd_vg() {
 		
 	for dev_name in ${hdd_dev_array[@]}
 	do
-		pvcreate /dev/${dev_name}
+		pvcreate -ffy /dev/${dev_name}
 		if [ $? -ne 0 ]; then
 			echo "${dev_name} pvcreate failed"
 			exit 2
@@ -43,7 +43,7 @@ init_hdd_vg() {
 		hdd_dev_list=${hdd_dev_list}" /dev/${dev_name}"
 	done
 
-	vgcreate ${hdd_vgname} ${hdd_dev_list}
+	vgcreate -fy ${hdd_vgname} ${hdd_dev_list}
 	if [ $? -ne 0 ]; then
 		echo "${hdd_dev} vgcreate failed"
 		exit 2
@@ -62,7 +62,7 @@ init_ssd_vg() {
 		
 	for dev_name in ${ssd_dev_array[@]}
 	do
-		pvcreate /dev/${dev_name}
+		pvcreate -ffy /dev/${dev_name}
 		if [ $? -ne 0 ]; then
 			echo "${dev_name} pvcreate failed"
 			exit 2
@@ -70,7 +70,7 @@ init_ssd_vg() {
 		ssd_dev_list=${ssd_dev_list}" /dev/${dev_name}"
 	done
 
-	vgcreate ${ssd_vgname} ${ssd_dev_list}
+	vgcreate -fy ${ssd_vgname} ${ssd_dev_list}
 	if [ $? -ne 0 ]; then
 		echo "${ssd_dev} vgcreate failed"
 		exit 2
@@ -189,7 +189,7 @@ install_docker() {
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS="-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label HBA_WWN="${wwn}" --label HDD_VG="${hdd_vgname}" --label SSD_VG="${ssd_vgname}""
+DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label HBA_WWN="${wwn}" --label HDD_VG="${hdd_vgname}" --label SSD_VG="${ssd_vgname}"
 
 EOF
 
