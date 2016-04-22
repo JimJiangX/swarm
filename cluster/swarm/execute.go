@@ -66,13 +66,6 @@ func (gd *Gardener) serviceExecute() (err error) {
 
 			u.container = container
 
-			if err := u.factory(); err != nil {
-				svc.Unlock()
-				taskErr = err
-
-				goto failure
-			}
-
 			if err := u.saveToDisk(); err != nil {
 
 			}

@@ -27,6 +27,7 @@ type configParser interface {
 	Validate(data map[string]interface{}) error
 	Parse(data []byte) (map[string]interface{}, error)
 	Marshal(map[string]interface{}) ([]byte, error)
+	PortSlice() (bool, []port)
 }
 
 type unit struct {

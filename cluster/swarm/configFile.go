@@ -133,7 +133,9 @@ func (mysqlCmd) BackupCmd(args ...string) []string {
 
 func (mysqlCmd) CleanBackupFileCmd(args ...string) []string { return nil }
 
-type mysqlConfig struct{}
+type mysqlConfig struct {
+	port port
+}
 
 func (mysqlConfig) Validate(data map[string]interface{}) error {
 	return nil
@@ -157,6 +159,19 @@ func (mysqlConfig) Marshal(data map[string]interface{}) ([]byte, error) {
 	return nil, nil
 }
 
+type port struct {
+	port  int
+	proto string
+	name  string
+}
+
+func (c mysqlConfig) PortSlice() (bool, []port) {
+	if c.port != (port{}) {
+		return true, []port{c.port}
+	}
+	return false, []port{port{proto: "tcp", name: ""}}
+}
+
 type proxyCmd struct{}
 
 func (proxyCmd) StartContainerCmd() []string                { return nil }
@@ -166,11 +181,19 @@ func (proxyCmd) RecoverCmd(file string) []string            { return nil }
 func (proxyCmd) BackupCmd(args ...string) []string          { return nil }
 func (proxyCmd) CleanBackupFileCmd(args ...string) []string { return nil }
 
-type proxyConfig struct{}
+type proxyConfig struct {
+	port port
+}
 
 func (proxyConfig) Validate(data map[string]interface{}) error        { return nil }
 func (proxyConfig) Parse(data []byte) (map[string]interface{}, error) { return nil, nil }
 func (proxyConfig) Marshal(map[string]interface{}) ([]byte, error)    { return nil, nil }
+func (c proxyConfig) PortSlice() (bool, []port) {
+	if c.port != (port{}) {
+		return true, []port{c.port}
+	}
+	return false, []port{port{proto: "tcp", name: ""}}
+}
 
 type switchManagerCmd struct{}
 
@@ -181,8 +204,16 @@ func (switchManagerCmd) RecoverCmd(file string) []string            { return nil
 func (switchManagerCmd) BackupCmd(args ...string) []string          { return nil }
 func (switchManagerCmd) CleanBackupFileCmd(args ...string) []string { return nil }
 
-type switchManagerConfig struct{}
+type switchManagerConfig struct {
+	ports []port
+}
 
 func (switchManagerConfig) Validate(data map[string]interface{}) error        { return nil }
 func (switchManagerConfig) Parse(data []byte) (map[string]interface{}, error) { return nil, nil }
 func (switchManagerConfig) Marshal(map[string]interface{}) ([]byte, error)    { return nil, nil }
+func (c switchManagerConfig) PortSlice() (bool, []port) {
+	if c.ports != nil {
+		return true, c.ports
+	}
+	return false, []port{port{proto: "tcp", name: ""}, port{proto: "tcp", name: ""}}
+}

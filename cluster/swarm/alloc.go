@@ -17,9 +17,24 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 	config.Hostname = engine.ID
 	config.Domainname = engine.Name
 
+	allocated, need := preAlloc.unit.PortSlice()
+	if !allocated && len(need) > 0 {
+		ports, err := database.SelectAvailablePorts(len(need))
+		if err != nil {
+			return nil, err
+		}
+		for i := range ports {
+			ports[i].Name = need[i].name
+			ports[i].UnitID = preAlloc.unit.Unit.ID
+			ports[i].Proto = need[i].proto
+			ports[i].Allocated = true
+		}
+
+		preAlloc.unit.ports = ports
+	}
+
 	networkings, err := gd.getNetworkingSetting(engine, Type, "")
 	preAlloc.networkings = append(preAlloc.networkings, networkings...)
-
 	if err != nil {
 		return nil, err
 	}
