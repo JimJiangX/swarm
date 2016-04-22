@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/docker/pkg/parsers"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/engine-api/types/network"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/utils"
 )
 
 func defaultContainerConfig() *cluster.ContainerConfig {
@@ -79,7 +79,7 @@ func buildContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerCon
 }
 
 func ParseCPUSets(val string) (map[int]bool, error) {
-	return parsers.ParseUintList(val)
+	return utils.ParseUintList(val)
 }
 
 func validateContainerConfig(config *cluster.ContainerConfig) error {

@@ -14,8 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/context"
-
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/pkg/version"
@@ -26,6 +24,7 @@ import (
 	engineapinop "github.com/docker/swarm/api/nopclient"
 	"github.com/samalba/dockerclient"
 	"github.com/samalba/dockerclient/nopclient"
+	"golang.org/x/net/context"
 )
 
 const (

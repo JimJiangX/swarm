@@ -3,8 +3,8 @@ package node
 import (
 	"errors"
 
-	"github.com/docker/docker/pkg/parsers"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/utils"
 )
 
 // Node is an abstract type used by the scheduler.
@@ -74,7 +74,7 @@ func (n *Node) AddContainer(container *cluster.Container) error {
 	if container.Config != nil {
 		memory := container.Config.HostConfig.Memory
 		cpuset := container.Config.HostConfig.CpusetCpus
-		cpus, err := getCPUNum(cpuset)
+		cpus, err := utils.GetCPUNum(cpuset)
 		if err != nil {
 			return err
 		}
@@ -87,21 +87,4 @@ func (n *Node) AddContainer(container *cluster.Container) error {
 	}
 	n.Containers = append(n.Containers, container)
 	return nil
-}
-
-func getCPUNum(val string) (int64, error) {
-	cpus, err := parsers.ParseUintList(val)
-	if err != nil {
-		return 0, err
-	}
-
-	ncpu := int64(0)
-
-	for _, v := range cpus {
-		if v {
-			ncpu++
-		}
-	}
-
-	return ncpu, nil
 }
