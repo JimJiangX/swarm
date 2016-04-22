@@ -5,8 +5,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
+	"github.com/docker/swarm/cluster/swarm/store"
 )
 
 func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.Engine, config cluster.ContainerConfig, Type string) (*cluster.ContainerConfig, error) {
@@ -47,10 +49,6 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 
 	config.HostConfig.CpusetCpus = cpuset
 
-	// TODO:Alloc Volume
-	bind, err := gd.allocStorage(engine, "", "", 0)
-	config.HostConfig.Binds = append(config.HostConfig.Binds, bind)
-
 	return &config, nil
 }
 
@@ -78,14 +76,18 @@ func setCPUSets(used, ncpu int) string {
 
 type preAllocResource struct {
 	unit             *unit
+	pendingContainer *pendingContainer
 	swarmID          string
 	networkings      []IPInfo
-	pendingContainer *pendingContainer
+	localStore       []string
+	sanStore         []string
 }
 
 func newPreAllocResource() *preAllocResource {
 	return &preAllocResource{
 		networkings: make([]IPInfo, 0, 2),
+		localStore:  make([]string, 0, 2),
+		sanStore:    make([]string, 0, 2),
 	}
 }
 
@@ -106,6 +108,11 @@ func (pre *preAllocResource) consistency() (err error) {
 		return err
 	}
 	defer tx.Rollback()
+
+	err = database.TxInsertUnit(tx, &pre.unit.Unit)
+	if err != nil {
+		return err
+	}
 
 	ipTables := make([]database.IPStatus, len(pre.networkings))
 	for i := range pre.networkings {
@@ -159,6 +166,7 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 	gd.Lock()
 
 	for i := range pendings {
+
 		ipsStatus := gd.recycleNetworking(pendings[i])
 
 		database.TxUpdateMultiIPStatue(tx, ipsStatus)
@@ -172,6 +180,21 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 		}
 
 		database.TxUpdatePorts(tx, ports)
+
+		for _, local := range pendings[i].localStore {
+			database.DeleteLocalVoume(local)
+		}
+
+		for _, lun := range pendings[i].sanStore {
+			dc, err := gd.DatacenterByNode(pendings[i].unit.Unit.NodeID)
+			if err != nil || dc == nil || dc.storage == nil {
+				continue
+			}
+
+			dc.storage.Recycle(lun, 0)
+		}
+
+		database.TxDelUnit(tx, pendings[i].unit.Unit.ID)
 	}
 
 	gd.Unlock()
@@ -214,7 +237,63 @@ func (gd *Gardener) recycleNetworking(pre *preAllocResource) []database.IPStatus
 	return ipsStatus
 }
 
-func (gd *Gardener) allocStorage(engine *cluster.Engine, driver, Type string, size int64) (string, error) {
+func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engine, config *cluster.ContainerConfig, need []structs.DiskStorage) error {
+	dc, err := gd.DatacenterByEngine(engine.ID)
+	if err != nil || dc == nil {
+		return fmt.Errorf("Not Found Datacenter By Engine,%v", err)
+	}
 
-	return "", nil
+	dc.RLock()
+	defer dc.RUnlock()
+	node := dc.getNode(engine.ID)
+	if node == nil {
+		return fmt.Errorf("Not Found Node By Engine")
+	}
+
+	for i := range need {
+		if strings.Contains(need[i].Type, store.LocalDiskStore) {
+			if node.localStore == nil {
+				return fmt.Errorf("Not Found LoaclStorage of Node %s", engine.ID)
+			}
+			part := strings.SplitN(need[i].Type, ":", 2)
+			if len(part) == 1 {
+				part = append(part, "HDD")
+			}
+			vgName := engine.Labels[part[1]+"_VG"]
+			if vgName == "" {
+				return fmt.Errorf("Not Found VG_Name of %s", need[i].Type)
+			}
+
+			name := fmt.Sprintf("%s/%s/%s", string([]byte(penging.unit.ID)[:8]), need[i].Name, vgName)
+			lunID, _, err := node.localStore.Alloc(name, need[i].Size)
+			if err != nil {
+				return err
+			}
+
+			penging.localStore = append(penging.localStore, lunID)
+			config.HostConfig.Binds = append(config.HostConfig.Binds, name)
+			continue
+		}
+
+		if dc.storage == nil {
+			return fmt.Errorf("Not Found Datacenter Storage")
+		}
+
+		lunID, _, err := dc.storage.Alloc("", need[i].Size)
+		if err != nil {
+			return err
+		}
+		penging.sanStore = append(penging.sanStore, lunID)
+
+		err = dc.storage.Mapping(node.ID, penging.unit.ID, lunID)
+		if err != nil {
+			return err
+		}
+
+		name := fmt.Sprintf("%s/%s", string([]byte(penging.unit.ID)[:8]), need[i].Name)
+		config.HostConfig.Binds = append(config.HostConfig.Binds, name)
+		continue
+	}
+
+	return nil
 }

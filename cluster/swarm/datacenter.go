@@ -207,7 +207,9 @@ func (dc *Datacenter) GetNode(IDOrName string) (database.Node, error) {
 
 func (dc *Datacenter) getNode(IDOrName string) *Node {
 	for i := range dc.nodes {
-		if dc.nodes[i].ID == IDOrName || dc.nodes[i].Name == IDOrName {
+		if dc.nodes[i].ID == IDOrName ||
+			dc.nodes[i].Name == IDOrName ||
+			dc.nodes[i].EngineID == IDOrName {
 
 			return dc.nodes[i]
 		}
@@ -245,6 +247,15 @@ func (dc *Datacenter) listNodeID() []string {
 }
 
 func (gd *Gardener) DatacenterByNode(IDOrName string) (*Datacenter, error) {
+	node, err := database.GetNode(IDOrName)
+	if err != nil {
+		return nil, err
+	}
+
+	return gd.Datacenter(node.ClusterID)
+}
+
+func (gd *Gardener) DatacenterByEngine(IDOrName string) (*Datacenter, error) {
 	node, err := database.GetNode(IDOrName)
 	if err != nil {
 		return nil, err

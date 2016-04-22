@@ -81,6 +81,13 @@ func (u Unit) TableName() string {
 	return "tb_unit"
 }
 
+func TxInsertUnit(tx *sqlx.Tx, unit *Unit) error {
+	query := "INSERT INTO tb_unit (id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,check_interval,create_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:node_id,:container_id,:unit_config_id,:network_mode,:status,:check_interval,:create_at)"
+	_, err := tx.NamedExec(query, unit)
+
+	return err
+}
+
 func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
 	query := "INSERT INTO tb_unit (id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,check_interval,create_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:node_id,:container_id,:unit_config_id,:network_mode,:status,:check_interval,:create_at)"
 
@@ -103,6 +110,13 @@ func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
 	}
 
 	return nil
+}
+
+func TxDelUnit(tx *sqlx.Tx, id string) error {
+
+	_, err := tx.Exec("DELETE tb_unit WHERE id=?", id)
+
+	return err
 }
 
 func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {

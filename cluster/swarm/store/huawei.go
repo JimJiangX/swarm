@@ -141,7 +141,8 @@ func (h *huaweiStore) Recycle(id string, lun int) error {
 	)
 	if len(id) > 0 {
 		l, err = database.GetLUNByID(id)
-	} else {
+	}
+	if err != nil && lun > 0 {
 		l, err = database.GetLUNByLunID(h.ID(), lun)
 	}
 	if err != nil {
@@ -153,7 +154,7 @@ func (h *huaweiStore) Recycle(id string, lun int) error {
 		return err
 	}
 
-	cmd, err := utils.ExecScript(path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(lun))
+	cmd, err := utils.ExecScript(path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID))
 	if err != nil {
 		return err
 	}

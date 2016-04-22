@@ -200,7 +200,7 @@ func GetNode(IDOrName string) (Node, error) {
 	}
 
 	n := Node{}
-	err = db.QueryRowx("SELECT * FROM tb_node WHERE id=? OR name=?", IDOrName, IDOrName).StructScan(&n)
+	err = db.QueryRowx("SELECT * FROM tb_node WHERE id=? OR name=? OR engine_id=?", IDOrName, IDOrName, IDOrName).StructScan(&n)
 
 	return n, err
 }

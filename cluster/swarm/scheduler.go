@@ -224,6 +224,11 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stor
 		return preAlloc, fmt.Errorf("error resource alloc")
 	}
 
+	err = gd.allocStorage(preAlloc, engine, config, stores)
+	if err != nil {
+		return preAlloc, nil
+	}
+
 	swarmID := config.SwarmID()
 	if swarmID == "" {
 		// Associate a Swarm ID to the container we are creating.
@@ -243,7 +248,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stor
 
 	err = preAlloc.consistency()
 
-	return preAlloc, nil
+	return preAlloc, err
 }
 
 func (gd *Gardener) Scheduler(list []*node.Node, config *cluster.ContainerConfig, num int, withImageAffinity bool) ([]*node.Node, error) {
