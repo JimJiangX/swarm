@@ -3,6 +3,7 @@ package swarm
 import (
 	"errors"
 	"fmt"
+	"strconv"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/types"
@@ -80,6 +81,26 @@ func (u *unit) prepareCreateContainer() error {
 	}
 
 	// prepare for volumes
+	binds := u.config.HostConfig.Binds
+
+	for _, name := range binds {
+
+		lvs, err := database.GetLocalVoume(name)
+		if len(lvs) != 1 || err != nil {
+			continue
+		}
+
+		req := &types.VolumeCreateRequest{
+			Name:       lvs[0].Name,
+			Driver:     lvs[0].Driver,
+			DriverOpts: map[string]string{"size": strconv.Itoa(lvs[0].Size), "fstype": lvs[0].Filesystem, "vgname": lvs[0].VGName},
+			Labels:     nil,
+		}
+		_, err = u.engine.CreateVolume(req)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

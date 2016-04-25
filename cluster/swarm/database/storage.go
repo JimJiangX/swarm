@@ -269,15 +269,29 @@ func InsertLocalVolume(lv LocalVolume) error {
 	return err
 }
 
-func DeleteLocalVoume(id string) error {
+func DeleteLocalVoume(IDOrName string) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("DELETE tb_volumes WHERE id=?", id)
+	_, err = db.Exec("DELETE tb_volumes WHERE id=? OR name=?", IDOrName, IDOrName)
 
 	return err
+}
+
+func GetLocalVoume(IDOrName string) ([]LocalVolume, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	query := "SELECT * FROM tb_volumes WHERE id=? OR name=?"
+	lvs := []LocalVolume{}
+
+	err = db.QueryRowx(query, IDOrName, IDOrName).StructScan(&lvs)
+
+	return lvs, err
 }
 
 func SelectVolumeByVG(name string) ([]LocalVolume, error) {
