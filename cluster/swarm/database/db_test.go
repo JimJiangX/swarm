@@ -48,5 +48,17 @@ func TestGetDB(t *testing.T) {
 	if err != nil || db == nil {
 		t.Fatal("With Ping", err, db)
 	}
+}
 
+func TestGetTX(t *testing.T) {
+	tx, err := GetTX()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+
+	err = tx.Commit()
+	if err != nil {
+		t.Fatal(err)
+	}
 }

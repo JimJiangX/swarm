@@ -113,12 +113,7 @@ func (pre *preAllocResource) consistency() (err error) {
 		}
 	}()
 
-	db, err := database.GetDB(true)
-	if err != nil {
-		return err
-	}
-
-	tx, err := db.Beginx()
+	tx, err := database.GetTX()
 	if err != nil {
 		return err
 	}
@@ -167,12 +162,7 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 	}
 	gd.scheduler.Unlock()
 
-	db, err := database.GetDB(true)
-	if err != nil {
-		return err
-	}
-
-	tx, err := db.Beginx()
+	tx, err := database.GetTX()
 	if err != nil {
 		return err
 	}

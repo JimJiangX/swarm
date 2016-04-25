@@ -215,6 +215,8 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, svcN
 		return preAlloc, fmt.Errorf("error resource alloc")
 	}
 
+	preAlloc.unit.config = config
+
 	err = gd.allocStorage(preAlloc, engine, config, svcName, stores)
 	if err != nil {
 		return preAlloc, nil

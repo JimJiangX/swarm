@@ -105,3 +105,12 @@ func GetDB(ping bool) (*sqlx.DB, error) {
 
 	return defaultDB, err
 }
+
+func GetTX() (*sqlx.Tx, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	return db.Beginx()
+}
