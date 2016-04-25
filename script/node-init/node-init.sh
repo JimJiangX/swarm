@@ -19,9 +19,9 @@ consul_port=8500
 hdd_vgname=${HOSTNAME}_HDD_VG
 ssd_vgname=${HOSTNAME}_SSD_VG
 
-# check NIC
-
-
+adm_nic=bond0
+int_nic=bond1
+ext_nic=bond2
 
 # init VG
 init_hdd_vg() {
@@ -171,7 +171,24 @@ install_docker() {
 	
 	wwn=${wwn:2}
 
-		
+	# check nic
+	ifconfig $adm_nic >/dev/null 2>&1 
+	if [ $? -ne 0 ]; then
+		echo "not find adm_nic ${adm_nic}"
+		exit 2
+	fi
+
+	ifconfig $int_nic >/dev/null 2>&1 
+	if [ $? -ne 0 ]; then
+		echo "not find int_nic ${int_nic}"
+		exit 2
+	fi
+
+	ifconfig $ext_nic >/dev/null 2>&1 
+	if [ $? -ne 0 ]; then
+		echo "not find ext_nic ${ext_nic}"
+		exit 2
+	fi
 
 	# stop docker
 	pkill docker >/dev/null 2>&1
@@ -189,7 +206,7 @@ install_docker() {
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label HBA_WWN="${wwn}" --label HDD_VG="${hdd_vgname}" --label SSD_VG="${ssd_vgname}"
+DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label HBA_WWN="${wwn}" --label HDD_VG="${hdd_vgname}" --label SSD_VG="${ssd_vgname}" --label ADM_NIC="${adm_nic}" --label INT_NIC="${int_nic}" --label EXT_NIC="${ext_nic}"
 
 EOF
 
@@ -364,7 +381,6 @@ EOF
 # install hours agent
 
 
-#check_nic
 init_hdd_vg
 init_ssd_vg
 install_consul
