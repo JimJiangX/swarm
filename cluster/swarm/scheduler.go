@@ -180,7 +180,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcName, Type string, 
 		unit := &unit{
 			Unit: database.Unit{
 				ID:        id,
-				Name:      string(id[:8]) + "_",
+				Name:      string(id[:8]) + "_" + svcName,
 				Type:      Type,
 				ImageID:   image.ID,
 				ImageName: image.Name + "_" + image.Version,
@@ -196,7 +196,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcName, Type string, 
 			return allocs, err
 		}
 
-		preAlloc, err := gd.pendingAllocOneNode(engine, unit, svcName, stores, templConfig)
+		preAlloc, err := gd.pendingAllocOneNode(engine, unit, stores, templConfig)
 		allocs = append(allocs, preAlloc)
 		if err != nil {
 			return allocs, err
@@ -206,7 +206,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcName, Type string, 
 	return allocs, nil
 }
 
-func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, svcName string, stores []structs.DiskStorage, templConfig *cluster.ContainerConfig) (*preAllocResource, error) {
+func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stores []structs.DiskStorage, templConfig *cluster.ContainerConfig) (*preAllocResource, error) {
 	preAlloc := newPreAllocResource()
 	preAlloc.unit = unit
 
@@ -217,7 +217,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, svcN
 
 	preAlloc.unit.config = config
 
-	err = gd.allocStorage(preAlloc, engine, config, svcName, stores)
+	err = gd.allocStorage(preAlloc, engine, config, stores)
 	if err != nil {
 		return preAlloc, nil
 	}

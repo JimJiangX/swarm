@@ -242,7 +242,7 @@ func (gd *Gardener) recycleNetworking(pre *preAllocResource) []database.IPStatus
 	return ipsStatus
 }
 
-func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engine, config *cluster.ContainerConfig, svcName string, need []structs.DiskStorage) error {
+func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engine, config *cluster.ContainerConfig, need []structs.DiskStorage) error {
 	dc, err := gd.DatacenterByEngine(engine.ID)
 	if err != nil || dc == nil {
 		return fmt.Errorf("Not Found Datacenter By Engine,%v", err)
@@ -256,7 +256,7 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 	}
 
 	for i := range need {
-		name := fmt.Sprintf("%s_%s_%s_LV:/DBAAS%s", string([]byte(penging.unit.ID)[:8]), svcName, need[i].Name, need[i].Name)
+		name := fmt.Sprintf("%s_%s_LV:/DBAAS%s", penging.unit.Unit.Name, need[i].Name, need[i].Name)
 
 		if strings.Contains(need[i].Type, store.LocalDiskStore) {
 			if node.localStore == nil {
