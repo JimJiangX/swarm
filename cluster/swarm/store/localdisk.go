@@ -2,7 +2,6 @@ package store
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -78,39 +77,21 @@ func (localDisk) Insert() error { return nil }
 func (localDisk) AddHost(name string, wwwn ...string) error { return nil }
 func (localDisk) DelHost(name string, wwwn ...string) error { return nil }
 
-// name with suffix by vgName
-func (l localDisk) Alloc(name string, size int) (string, int, error) {
+func (l localDisk) Alloc(name, vg string, size int) (string, int, error) {
 	idles, err := l.IdleSize()
 	if err != nil || len(idles) == 0 {
 		return "", 0, err
 	}
 
-	max := 0
-	vgName := ""
-
-	for key, val := range idles {
-
-		if strings.HasSuffix(name, key) {
-			vgName = key
-			max = val
-			break
-		}
-
-		if val > max {
-			vgName = key
-			max = val
-		}
-	}
-
-	if max < size {
-		return "", 0, fmt.Errorf("%s is shortage,%d<%d", l.Vendor(), max, size)
+	if idles[vg] < size {
+		return "", 0, fmt.Errorf("%s is shortage,%d<%d", vg, idles[vg], size)
 	}
 
 	lv := database.LocalVolume{
 		ID:         utils.Generate64UUID(),
 		Name:       name,
 		Size:       size,
-		VGName:     vgName,
+		VGName:     vg,
 		Driver:     l.Driver(),
 		Filesystem: "xfs",
 	}

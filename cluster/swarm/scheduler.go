@@ -49,7 +49,7 @@ func (gd *Gardener) serviceScheduler() (err error) {
 
 		for i := range svc.base.Modules {
 
-			preAlloc, err := gd.BuildPendingContainersPerModule(&svc.base.Modules[i])
+			preAlloc, err := gd.BuildPendingContainersPerModule(svc.Name, &svc.base.Modules[i])
 			if len(preAlloc) > 0 {
 				resourceAlloc = append(resourceAlloc, preAlloc...)
 			}
@@ -91,7 +91,7 @@ func (gd *Gardener) serviceScheduler() (err error) {
 	return err
 }
 
-func (gd *Gardener) BuildPendingContainersPerModule(module *structs.Module) ([]*preAllocResource, error) {
+func (gd *Gardener) BuildPendingContainersPerModule(svcName string, module *structs.Module) ([]*preAllocResource, error) {
 	// query image from database
 	if module.Config.Image == "" {
 		image, err := gd.GetImage(module.Name, module.Version)
@@ -111,10 +111,10 @@ func (gd *Gardener) BuildPendingContainersPerModule(module *structs.Module) ([]*
 	filters := gd.listShortIdleStore(module.Stores, module.Type, module.Num)
 	list := gd.listCandidateNodes(module.Nodes, module.Type, filters...)
 
-	return gd.BuildPendingContainers(list, module.Type, module.Num, module.Stores, config, false)
+	return gd.BuildPendingContainers(list, svcName, module.Type, module.Num, module.Stores, config, false)
 }
 
-func (gd *Gardener) BuildPendingContainers(list []*node.Node, Type string, num int, stores []structs.DiskStorage,
+func (gd *Gardener) BuildPendingContainers(list []*node.Node, svcName, Type string, num int, stores []structs.DiskStorage,
 	config *cluster.ContainerConfig, withImageAffinity bool) ([]*preAllocResource, error) {
 
 	gd.scheduler.Lock()
@@ -149,14 +149,14 @@ func (gd *Gardener) BuildPendingContainers(list []*node.Node, Type string, num i
 		return nil, errors.New("Not Enough Nodes")
 	}
 
-	preAllocs, err := gd.pendingAlloc(candidates[0:num], Type, stores, config)
+	preAllocs, err := gd.pendingAlloc(candidates[0:num], svcName, Type, stores, config)
 
 	gd.scheduler.Unlock()
 
 	return preAllocs, err
 }
 
-func (gd *Gardener) pendingAlloc(candidates []*node.Node, Type string, stores []structs.DiskStorage,
+func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcName, Type string, stores []structs.DiskStorage,
 	templConfig *cluster.ContainerConfig) ([]*preAllocResource, error) {
 
 	image, err := gd.getImageByID(templConfig.Image)
@@ -196,7 +196,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, Type string, stores []
 			return allocs, err
 		}
 
-		preAlloc, err := gd.pendingAllocOneNode(engine, unit, stores, templConfig)
+		preAlloc, err := gd.pendingAllocOneNode(engine, unit, svcName, stores, templConfig)
 		allocs = append(allocs, preAlloc)
 		if err != nil {
 			return allocs, err
@@ -206,7 +206,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, Type string, stores []
 	return allocs, nil
 }
 
-func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stores []structs.DiskStorage, templConfig *cluster.ContainerConfig) (*preAllocResource, error) {
+func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, svcName string, stores []structs.DiskStorage, templConfig *cluster.ContainerConfig) (*preAllocResource, error) {
 	preAlloc := newPreAllocResource()
 	preAlloc.unit = unit
 
@@ -215,7 +215,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stor
 		return preAlloc, fmt.Errorf("error resource alloc")
 	}
 
-	err = gd.allocStorage(preAlloc, engine, config, stores)
+	err = gd.allocStorage(preAlloc, engine, config, svcName, stores)
 	if err != nil {
 		return preAlloc, nil
 	}

@@ -252,7 +252,7 @@ func (gd *Gardener) recycleNetworking(pre *preAllocResource) []database.IPStatus
 	return ipsStatus
 }
 
-func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engine, config *cluster.ContainerConfig, need []structs.DiskStorage) error {
+func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engine, config *cluster.ContainerConfig, svcName string, need []structs.DiskStorage) error {
 	dc, err := gd.DatacenterByEngine(engine.ID)
 	if err != nil || dc == nil {
 		return fmt.Errorf("Not Found Datacenter By Engine,%v", err)
@@ -266,6 +266,8 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 	}
 
 	for i := range need {
+		name := fmt.Sprintf("%s_%s_%s_LV:/DBAAS%s", string([]byte(penging.unit.ID)[:8]), svcName, need[i].Name, need[i].Name)
+
 		if strings.Contains(need[i].Type, store.LocalDiskStore) {
 			if node.localStore == nil {
 				return fmt.Errorf("Not Found LoaclStorage of Node %s", engine.ID)
@@ -279,8 +281,7 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 				return fmt.Errorf("Not Found VG_Name of %s", need[i].Type)
 			}
 
-			name := fmt.Sprintf("%s/%s/%s", string([]byte(penging.unit.ID)[:8]), need[i].Name, vgName)
-			lunID, _, err := node.localStore.Alloc(name, need[i].Size)
+			lunID, _, err := node.localStore.Alloc(name, vgName, need[i].Size)
 			if err != nil {
 				return err
 			}
@@ -294,7 +295,7 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 			return fmt.Errorf("Not Found Datacenter Storage")
 		}
 
-		lunID, _, err := dc.storage.Alloc("", need[i].Size)
+		lunID, _, err := dc.storage.Alloc(name, need[i].Type, need[i].Size)
 		if err != nil {
 			return err
 		}
@@ -305,7 +306,6 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 			return err
 		}
 
-		name := fmt.Sprintf("%s/%s", string([]byte(penging.unit.ID)[:8]), need[i].Name)
 		config.HostConfig.Binds = append(config.HostConfig.Binds, name)
 		continue
 	}

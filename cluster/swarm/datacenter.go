@@ -322,20 +322,6 @@ func (dc *Datacenter) getStore(IDOrType string) store.Store {
 	return nil
 }
 
-func (dc *Datacenter) AllocStore(host, IDOrType string, size int64) error {
-	dc.Lock()
-	defer dc.Unlock()
-
-	store := dc.getStore(IDOrType)
-	if store == nil {
-		return fmt.Errorf("Not Enough Storage %s,%d for Host %s", IDOrType, size, host)
-	}
-
-	_, _, err := store.Alloc("", int(size))
-
-	return err
-}
-
 func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType string, num int) []string {
 	out := make([]string, 0, 100)
 	gd.RLock()

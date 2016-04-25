@@ -69,7 +69,7 @@ func (h *hitachiStore) Insert() error {
 	return h.hs.Insert()
 }
 
-func (h *hitachiStore) Alloc(_ string, size int) (string, int, error) {
+func (h *hitachiStore) Alloc(name, vendor string, size int) (string, int, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -93,20 +93,14 @@ func (h *hitachiStore) Alloc(_ string, size int) (string, int, error) {
 		return "", 0, fmt.Errorf("No available LUN ID")
 	}
 
-	uuid := utils.Generate32UUID()
 	lun := database.LUN{
-		ID:              uuid,
-		Name:            "DBAAS_" + string(uuid[:8]),
+		ID:              utils.Generate64UUID(),
+		Name:            name,
 		RaidGroupID:     rg.ID,
 		StorageSystemID: h.ID(),
 		SizeByte:        size,
 		StorageLunID:    id,
 		CreatedAt:       time.Now(),
-	}
-
-	err = database.InsertLUN(lun)
-	if err != nil {
-		return "", 0, err
 	}
 
 	path, err := utils.GetAbsolutePath(false, HITACHI, "create_lun.sh")
@@ -123,10 +117,13 @@ func (h *hitachiStore) Alloc(_ string, size int) (string, int, error) {
 
 	output, err := cmd.Output()
 	if err != nil {
-
+		return "", 0, fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
 	}
 
-	fmt.Println("Exec Script Error:%s,Output:%s", err, string(output))
+	err = database.InsertLUN(lun)
+	if err != nil {
+		return "", 0, err
+	}
 
 	return lun.ID, lun.StorageLunID, nil
 }

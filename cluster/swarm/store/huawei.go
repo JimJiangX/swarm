@@ -75,7 +75,7 @@ func (h *huaweiStore) Insert() error {
 	return err
 }
 
-func (h *huaweiStore) Alloc(_ string, size int) (string, int, error) {
+func (h *huaweiStore) Alloc(name, vendor string, size int) (string, int, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -89,10 +89,9 @@ func (h *huaweiStore) Alloc(_ string, size int) (string, int, error) {
 		return "", 0, fmt.Errorf("Not Enough Space For Alloction,Max:%d < Need:%d", out[rg], size)
 	}
 
-	uuid := utils.Generate32UUID()
 	lun := database.LUN{
-		ID:              uuid,
-		Name:            "DBAAS_" + string(uuid[:8]),
+		ID:              utils.Generate64UUID(),
+		Name:            name,
 		RaidGroupID:     rg.ID,
 		StorageSystemID: h.ID(),
 		SizeByte:        size,

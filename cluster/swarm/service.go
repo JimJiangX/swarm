@@ -133,6 +133,17 @@ func Validate(req structs.PostServiceRequest) []string {
 		if err != nil {
 			warnings = append(warnings, err.Error())
 		}
+
+		lvNames := make([]string, 0, len(module.Stores))
+		for _, ds := range module.Stores {
+			for i := range lvNames {
+				if lvNames[i] == ds.Name {
+					warnings = append(warnings, fmt.Sprintf("Storage Name '%s' Duplicate in one Module:%s", ds.Name, module.Name))
+				}
+			}
+
+			lvNames = append(lvNames, ds.Name)
+		}
 	}
 
 	if len(warnings) == 0 {
