@@ -7,6 +7,8 @@ import (
 	"github.com/docker/swarm/cluster/swarm/database"
 )
 
+const scriptPath = "script"
+
 var stores map[string]Store = make(map[string]Store)
 
 type Store interface {
@@ -35,10 +37,10 @@ type Store interface {
 func RegisterStore(id, vendor, addr, user, password, admin string,
 	lstart, lend, hstart, hend int) (store Store, err error) {
 
-	if v := strings.ToUpper(vendor); v == HUAWEI {
-		store = NewHuaweiStore(id, vendor, addr, user, password, hstart, hend)
-	} else if v == HITACHI {
-		store = NewHitachiStore(id, vendor, admin, lstart, lend, hstart, hend)
+	if v := strings.ToUpper(vendor); HUAWEI == v {
+		store = NewHuaweiStore(id, HUAWEI, addr, user, password, hstart, hend)
+	} else if HITACHI == v {
+		store = NewHitachiStore(id, HITACHI, admin, lstart, lend, hstart, hend)
 	} else if vendor == LocalDiskStore {
 		return nil, nil
 	}
