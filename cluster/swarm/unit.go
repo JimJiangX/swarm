@@ -28,7 +28,7 @@ type ContainerCmd interface {
 type configParser interface {
 	Validate(data map[string]interface{}) error
 	ParseData(data []byte) (config.Configer, error)
-	defaultUserConfig(svc *Service) (map[string]interface{}, error)
+	defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error)
 	Marshal() ([]byte, error)
 	PortSlice() (bool, []port)
 }

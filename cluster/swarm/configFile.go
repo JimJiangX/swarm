@@ -108,7 +108,26 @@ func (mysqlConfig) Validate(data map[string]interface{}) error {
 	return nil
 }
 
-func (c mysqlConfig) defaultUserConfig(svc *Service) (map[string]interface{}, error) {
+func (c mysqlConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error) {
+	m := make(map[string]interface{}, 10)
+	if len(u.networkings) == 1 {
+		m["mysqld::bind-address"] = u.networkings[0].IP.String()
+	} else {
+		return nil, fmt.Errorf("Unexpected,more than 1 IPAddress allocated")
+	}
+
+	if len(u.ports) == 1 {
+		m["mysqld::port"] = u.ports[0].Port
+		m["mysqld::server-id"] = u.ports[0].Port
+	} else {
+		return nil, fmt.Errorf("Unexpected,more than 1 port allocated")
+	}
+
+	m["mysqld::character_set_server"] = "gbk"
+	m["mysqld::log-bin"] = fmt.Sprintf("/DBAASLOG/BIN/%s-binlog", u.Name)
+	m["mysqld::innodb_buffer_pool_size"] = int(float64(u.config.HostConfig.Memory) * 0.75)
+	m["mysqld::relay_log"] = fmt.Sprintf("/DBAASLOG/REL/%s-relay", u.Name)
+
 	return nil, nil
 }
 
@@ -167,20 +186,48 @@ func (proxyCmd) BackupCmd(args ...string) []string          { return nil }
 func (proxyCmd) CleanBackupFileCmd(args ...string) []string { return nil }
 
 type proxyConfig struct {
-	port port
+	ports []port
 }
 
 func (proxyConfig) Validate(data map[string]interface{}) error     { return nil }
 func (proxyConfig) ParseData(data []byte) (config.Configer, error) { return nil, nil }
 func (proxyConfig) Marshal() ([]byte, error)                       { return nil, nil }
 func (c proxyConfig) PortSlice() (bool, []port) {
-	if c.port != (port{}) {
-		return true, []port{c.port}
+
+	return false, []port{
+		port{proto: "tcp", name: "proxy_data_port"},
+		port{proto: "tcp", name: "proxy_admin_port"},
 	}
-	return false, []port{port{proto: "tcp", name: ""}}
 }
-func (c proxyConfig) defaultUserConfig(svc *Service) (map[string]interface{}, error) {
-	return nil, nil
+func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error) {
+	m := make(map[string]interface{}, 10)
+	m["upsql-proxy::proxy-domain"] = svc.ID
+	m["upsql-proxy::proxy-name"] = u.ID
+	if len(u.networkings) == 2 && len(u.ports) == 2 {
+		adminAddr, dataAddr := "", ""
+		adminPort, dataPort := 0, 0
+		for i := range u.networkings {
+			if u.networkings[i].Type == ContainersNetworking {
+				adminAddr = u.networkings[i].IP.String()
+			} else if u.networkings[i].Type == ExternalAccessNetworking {
+				dataAddr = u.networkings[i].IP.String()
+			}
+		}
+
+		for i := range u.ports {
+			if u.ports[i].Name == "proxy_data_port" {
+				dataPort = u.ports[i].Port
+			} else if u.ports[i].Name == "proxy_admin_port" {
+				adminPort = u.ports[i].Port
+			}
+		}
+		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", dataAddr, dataPort)
+		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", adminAddr, adminPort)
+	}
+
+	m["upsql-proxy::event-threads-count"] = u.config.HostConfig.CpusetCpus
+
+	return m, nil
 }
 
 type switchManagerCmd struct{}
@@ -203,8 +250,33 @@ func (c switchManagerConfig) PortSlice() (bool, []port) {
 	if c.ports != nil {
 		return true, c.ports
 	}
-	return false, []port{port{proto: "tcp", name: ""}, port{proto: "tcp", name: ""}}
+	return false, []port{port{proto: "tcp", name: "Port"}, port{proto: "tcp", name: "ProxyPort"}}
 }
-func (c switchManagerConfig) defaultUserConfig(svc *Service) (map[string]interface{}, error) {
+func (c switchManagerConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error) {
+	sys, err := database.GetSystemConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	m := make(map[string]interface{}, 10)
+	m["domain"] = svc.ID
+	m["name"] = u.ID
+	port, proxyPort := 0, 0
+	for i := range u.ports {
+		if u.ports[i].Name == "Port" {
+			port = u.ports[i].Port
+		} else if u.ports[i].Name == "ProxyPort" {
+			proxyPort = u.ports[i].Port
+		}
+	}
+	m["ProxyPort"] = proxyPort
+	m["Port"] = port
+
+	// consul
+	m["ConsulBindNetworkName"] = u.engine.Labels["ADM_NIC"]
+	m["ConsulPort"] = sys.ConsulPort
+
+	m["SwarmUserAgent"] = "1.22"
+
 	return nil, nil
 }

@@ -322,7 +322,12 @@ func (svc *Service) CopyServiceConfig() (err error) {
 	for i := range svc.units {
 		u := svc.units[i]
 
-		err = u.CopyConfig(map[string]interface{}{})
+		defConfig, err := u.defaultUserConfig(svc, u)
+		if err != nil {
+			return err
+		}
+
+		err = u.CopyConfig(defConfig)
 		if err != nil {
 			return err
 		}
