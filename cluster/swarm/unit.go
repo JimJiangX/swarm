@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/astaxie/beego/config"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/cluster"
@@ -26,8 +27,9 @@ type ContainerCmd interface {
 
 type configParser interface {
 	Validate(data map[string]interface{}) error
-	Parse(data []byte) (map[string]interface{}, error)
-	Marshal(map[string]interface{}) ([]byte, error)
+	ParseData(data []byte) (config.Configer, error)
+	defaultUserConfig(svc *Service) (map[string]interface{}, error)
+	Marshal() ([]byte, error)
 	PortSlice() (bool, []port)
 }
 
@@ -40,15 +42,13 @@ type unit struct {
 	ports       []database.Port
 	networkings []IPInfo
 
-	content map[string]interface{}
-
 	configParser
 	ContainerCmd
 }
 
 func (u *unit) factory() error {
 	switch u.Type {
-	case "mysql":
+	case "mysql", "upsql":
 		u.configParser = &mysqlConfig{}
 		// cmd
 		u.ContainerCmd = &mysqlCmd{}
@@ -238,7 +238,7 @@ func (u *unit) Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (*clu
 }
 
 func (u *unit) CopyConfig(data map[string]interface{}) error {
-	err := u.Merge(data)
+	c, err := u.ParseData([]byte(u.parent.Content))
 	if err != nil {
 		return err
 	}
@@ -248,12 +248,17 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 		return err
 	}
 
-	content, err := u.Marshal(u.content)
+	for key, val := range data {
+
+		c.Set(key, fmt.Sprintf("%v", val))
+	}
+
+	content, err := u.Marshal()
 	if err != nil {
 		return err
 	}
 
-	if _, err = u.SaveToDisk(content); err != nil {
+	if _, err = u.SaveConfigToDisk(content); err != nil {
 		return err
 	}
 

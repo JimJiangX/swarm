@@ -2,8 +2,11 @@ package swarm
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"time"
 
+	"github.com/astaxie/beego/config"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
 )
@@ -41,39 +44,6 @@ func (u unit) Verify(data map[string]interface{}) error {
 		}
 	}
 
-	if len(u.content) > 0 {
-		if err := u.Validate(u.content); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (u *unit) Merge(data map[string]interface{}) error {
-	if keys, ok := u.CanModify(data); !ok {
-
-		return fmt.Errorf("Keys cannot set new value,%s", keys)
-	}
-
-	if u.content == nil {
-		content, err := u.Parse([]byte(u.parent.Content))
-		if err != nil {
-			return err
-		}
-
-		if content == nil {
-			u.content = data
-			return nil
-		}
-
-		u.content = content
-	}
-
-	for key, val := range data {
-		u.content[key] = val
-	}
-
 	return nil
 }
 
@@ -82,19 +52,15 @@ func (u *unit) Set(key string, val interface{}) error {
 		return fmt.Errorf("%s cannot Set new Value", key)
 	}
 
-	u.content[key] = val
+	return u.set(key, val)
+}
+
+func (u *unit) set(key string, val interface{}) error {
 
 	return nil
 }
 
-func (u *unit) SaveToDisk(content []byte) (_ string, err error) {
-	if len(content) == 0 {
-		content, err = u.Marshal(u.content)
-		if err != nil {
-			return "", err
-		}
-
-	}
+func (u *unit) SaveConfigToDisk(content []byte) (_ string, err error) {
 
 	config := database.UnitConfig{
 		ID:        utils.Generate64UUID(),
@@ -134,29 +100,48 @@ func (mysqlCmd) BackupCmd(args ...string) []string {
 func (mysqlCmd) CleanBackupFileCmd(args ...string) []string { return nil }
 
 type mysqlConfig struct {
-	port port
+	config config.Configer
+	port   port
 }
 
 func (mysqlConfig) Validate(data map[string]interface{}) error {
 	return nil
 }
 
-func (mysqlConfig) Parse(val []byte) (map[string]interface{}, error) {
-	// ini/json/xml
-	// convert to map[string]interface{}
-
-	if len(val) == 0 {
-		return nil, nil
-	}
-
+func (c mysqlConfig) defaultUserConfig(svc *Service) (map[string]interface{}, error) {
 	return nil, nil
 }
 
-func (mysqlConfig) Marshal(data map[string]interface{}) ([]byte, error) {
-	// map[string]interface{} convert to  ini/json/xml
-	// json.Marshal(data)
+func (c *mysqlConfig) ParseData(data []byte) (config.Configer, error) {
+	// ini/json/xml
+	// convert to map[string]interface{}
 
-	return nil, nil
+	configer, err := config.NewConfigData("ini", data)
+	if err != nil {
+		return nil, err
+	}
+
+	c.config = configer
+
+	return c.config, nil
+}
+
+func (c mysqlConfig) Marshal() ([]byte, error) {
+	// convert to ini/json/xml
+
+	tmpfile, err := ioutil.TempFile("", "serviceConfig")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(tmpfile.Name())
+	defer tmpfile.Close()
+
+	err = c.config.SaveConfigFile(tmpfile.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	return ioutil.ReadAll(tmpfile)
 }
 
 type port struct {
@@ -185,14 +170,17 @@ type proxyConfig struct {
 	port port
 }
 
-func (proxyConfig) Validate(data map[string]interface{}) error        { return nil }
-func (proxyConfig) Parse(data []byte) (map[string]interface{}, error) { return nil, nil }
-func (proxyConfig) Marshal(map[string]interface{}) ([]byte, error)    { return nil, nil }
+func (proxyConfig) Validate(data map[string]interface{}) error     { return nil }
+func (proxyConfig) ParseData(data []byte) (config.Configer, error) { return nil, nil }
+func (proxyConfig) Marshal() ([]byte, error)                       { return nil, nil }
 func (c proxyConfig) PortSlice() (bool, []port) {
 	if c.port != (port{}) {
 		return true, []port{c.port}
 	}
 	return false, []port{port{proto: "tcp", name: ""}}
+}
+func (c proxyConfig) defaultUserConfig(svc *Service) (map[string]interface{}, error) {
+	return nil, nil
 }
 
 type switchManagerCmd struct{}
@@ -208,12 +196,15 @@ type switchManagerConfig struct {
 	ports []port
 }
 
-func (switchManagerConfig) Validate(data map[string]interface{}) error        { return nil }
-func (switchManagerConfig) Parse(data []byte) (map[string]interface{}, error) { return nil, nil }
-func (switchManagerConfig) Marshal(map[string]interface{}) ([]byte, error)    { return nil, nil }
+func (switchManagerConfig) Validate(data map[string]interface{}) error     { return nil }
+func (switchManagerConfig) ParseData(data []byte) (config.Configer, error) { return nil, nil }
+func (switchManagerConfig) Marshal() ([]byte, error)                       { return nil, nil }
 func (c switchManagerConfig) PortSlice() (bool, []port) {
 	if c.ports != nil {
 		return true, c.ports
 	}
 	return false, []port{port{proto: "tcp", name: ""}, port{proto: "tcp", name: ""}}
+}
+func (c switchManagerConfig) defaultUserConfig(svc *Service) (map[string]interface{}, error) {
+	return nil, nil
 }

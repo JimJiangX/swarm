@@ -111,8 +111,8 @@ func TxImportPort(start, end int, filter ...int) (int, error) {
 
 loop:
 	for i := start; i <= end; i++ {
-		for j := range filter {
-			if i == j {
+		for _, val := range filter {
+			if i == val {
 				continue loop
 			}
 		}
