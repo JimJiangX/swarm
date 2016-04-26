@@ -32,7 +32,7 @@ func (net Networking) TableName() string {
 }
 
 type Port struct {
-	Port      int    `db:"port"` // auto increment
+	Port      int    `db:"port"`
 	Name      string `db:"name"`
 	UnitID    string `db:"unit_id" json:"-"`
 	Proto     string `db:"proto"` // tcp/udp
@@ -148,7 +148,7 @@ loop:
 }
 
 func TxInsertPorts(tx *sqlx.Tx, ports []Port) error {
-	query := "INSERT INTO tb_port (port,name,unit_id,allocated) VALUES (:port,:name,:unit_id,:allocated)"
+	query := "INSERT INTO tb_port (port,name,unit_id,proto,allocated) VALUES (:port,:name,:unit_id,:proto,:allocated)"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
