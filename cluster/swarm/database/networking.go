@@ -184,7 +184,7 @@ func GetPortsByUnit(id string) ([]Port, error) {
 	}
 
 	var ports []Port
-	err = db.QueryRowx("SELECT * From tb_port WHERE unit_id=?", id).StructScan(&ports)
+	err = db.Select(&ports, "SELECT * FROM tb_port WHERE unit_id=?", id)
 	if err != nil {
 		return nil, err
 	}
@@ -232,6 +232,7 @@ func UpdateNetworkingStatus(id string, enable bool) error {
 
 	return err
 }
+
 func insertNetworking(net Networking, ips []IP) error {
 	db, err := GetDB(true)
 	if err != nil {
@@ -285,7 +286,6 @@ func TxUpdateMultiIPStatue(tx *sqlx.Tx, val []IPStatus) error {
 	defer stmt.Close()
 
 	for i := range val {
-
 		_, err = stmt.Exec(&val[i])
 		if err != nil {
 			return err
