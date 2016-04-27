@@ -6,12 +6,7 @@ import (
 )
 
 func TestTXInsertUnitConfig(t *testing.T) {
-	db, err := GetDB(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx, err := db.Beginx()
+	tx, err := GetTX()
 	if err != nil {
 		t.Fatal(err)
 	}

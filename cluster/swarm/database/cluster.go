@@ -91,6 +91,21 @@ func GetCluster(IDOrName string) (*Cluster, error) {
 	return c, nil
 }
 
+func ListCluster() ([]Cluster, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	var clusters []Cluster
+	err = db.Select(&clusters, "SELECT * FROM tb_cluster")
+	if err != nil {
+		return nil, err
+	}
+
+	return clusters, nil
+}
+
 type Node struct {
 	ID           string `db:"id"`
 	Name         string `db:"name"`
@@ -136,12 +151,7 @@ func (n *Node) Insert() error {
 }
 
 func TxInsertNodeAndTask(node *Node, task *Task) error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
-	}
-
-	tx, err := db.Beginx()
+	tx, err := GetTX()
 	if err != nil {
 		return err
 	}
@@ -163,12 +173,7 @@ func TxInsertNodeAndTask(node *Node, task *Task) error {
 }
 
 func TxInsertMultiNodeAndTask(nodes []*Node, tasks []*Task) error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
-	}
-
-	tx, err := db.Beginx()
+	tx, err := GetTX()
 	if err != nil {
 		return err
 	}
@@ -214,10 +219,19 @@ func GetAllNodes() ([]Node, error) {
 		return nil, err
 	}
 
-	var nodes []Node
-	err = db.QueryRowx("SELECT * FROM tb_node").StructScan(&nodes)
+	nodes := make([]Node, 0, 50)
+	rows, err := db.Queryx("SELECT * FROM tb_node")
 	if err != nil {
 		return nil, err
+	}
+
+	for rows.Next() {
+		node := Node{}
+		err := rows.StructScan(&node)
+		if err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, node)
 	}
 
 	return nodes, nil
@@ -242,11 +256,7 @@ func (n *Node) UpdateStatus(state int) error {
 
 // TxUpdateNodeStatus returns error when Node UPDATE status.
 func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int, msg string) error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
-	}
-	tx, err := db.Beginx()
+	tx, err := GetTX()
 	if err != nil {
 		return err
 	}
@@ -269,11 +279,7 @@ func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int, msg string) err
 
 // TxUpdateNodeRegister returns error when Node UPDATE infomation.
 func TxUpdateNodeRegister(n *Node, task *Task, nstate, tstate int, eng, msg string) error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
-	}
-	tx, err := db.Beginx()
+	tx, err := GetTX()
 	if err != nil {
 		return err
 	}
@@ -298,18 +304,25 @@ func TxUpdateNodeRegister(n *Node, task *Task, nstate, tstate int, eng, msg stri
 	return tx.Commit()
 }
 
-func ListNode(status int) ([]*Node, error) {
+func ListNode(status int) ([]Node, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
-	var nodes []*Node
-	query := "SELECT * FROM tb_node WHERE status=?"
-
-	err = db.QueryRowx(query, status).StructScan(&nodes)
+	nodes := make([]Node, 0, 50)
+	rows, err := db.Queryx("SELECT * FROM tb_node WHERE status=?", status)
 	if err != nil {
 		return nil, err
+	}
+
+	for rows.Next() {
+		node := Node{}
+		err := rows.StructScan(&node)
+		if err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, node)
 	}
 
 	return nodes, nil
@@ -321,12 +334,19 @@ func ListNodeByCluster(cluster string) ([]*Node, error) {
 		return nil, err
 	}
 
-	var nodes []*Node
-	query := "SELECT * FROM tb_node WHERE cluster_id=?"
-
-	err = db.QueryRowx(query, cluster).StructScan(&nodes)
+	nodes := make([]*Node, 0, 50)
+	rows, err := db.Queryx("SELECT * FROM tb_node WHERE cluster_id=?", cluster)
 	if err != nil {
 		return nil, err
+	}
+
+	for rows.Next() {
+		node := &Node{}
+		err := rows.StructScan(node)
+		if err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, node)
 	}
 
 	return nodes, nil

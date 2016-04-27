@@ -234,12 +234,7 @@ func UpdateNetworkingStatus(id string, enable bool) error {
 }
 
 func insertNetworking(net Networking, ips []IP) error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
-	}
-
-	tx, err := db.Beginx()
+	tx, err := GetTX()
 	if err != nil {
 		return err
 	}
