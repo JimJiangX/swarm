@@ -85,6 +85,11 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if warnings := req.Validate(); warnings != "" {
+		httpError(w, warnings, http.StatusBadRequest)
+		return
+	}
+
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
