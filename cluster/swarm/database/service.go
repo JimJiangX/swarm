@@ -299,7 +299,7 @@ func (u User) TableName() string {
 }
 
 func TxInsertMultipleUsers(tx *sqlx.Tx, users []User) error {
-	query := "INSERT INTO tb_users (id,service_id,type,username,password,role,create_at) VALUES (:id,:service_id,:type,:username,:password,:role,:create_at)"
+	query := "INSERT INTO tb_users (id,service_id,type,username,password,role,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:created_at)"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {

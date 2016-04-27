@@ -25,6 +25,52 @@ const (
 
 var errUnsupportGardener = errors.New("Unsupported Gardener")
 
+// GET /clusters/{name:.*}
+func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	_ = name
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+// GET /clusters
+func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+// GET /clusters/{name:.*}/nodes
+func getNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	_ = name
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+// GET /clusters/{name:.*}/nodes/{node:.*}
+func getNodesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	cluster := mux.Vars(r)["name"]
+	node := mux.Vars(r)["node"]
+	_, _ = cluster, node
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 // 创建集群
 // POST /clusters
 func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {

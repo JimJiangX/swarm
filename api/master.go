@@ -46,6 +46,12 @@ func fromContext(ctx goctx.Context, key string) (bool, *context, *swarm.Gardener
 type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 var masterRoutes = map[string]map[string]ctxHandler{
+	"GET": {
+		"/clusters":                           getClusters,
+		"/clusters/{name:.*}":                 getClustersByNameOrID,
+		"/clusters/{name:.*}/nodes":           getNodes,
+		"/clusters/{name:.*}/nodes/{node:.*}": getNodesByNameOrID,
+	},
 	"POST": {
 		"/clusters":                   postCluster,
 		"/clusters/{name:.*}/enable":  postEnableCluster,

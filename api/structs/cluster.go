@@ -12,6 +12,8 @@ type PostClusterRequest struct {
 	StorageID   string `json:"storage_id,omitempty"`
 }
 
+type ClusterRespone struct{}
+
 type Node struct {
 	Name     string
 	Address  string
