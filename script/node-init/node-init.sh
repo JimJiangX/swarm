@@ -187,7 +187,7 @@ install_docker() {
 	ifconfig $ext_nic >/dev/null 2>&1 
 	if [ $? -ne 0 ]; then
 		echo "not find ext_nic ${ext_nic}"
-		exit 2
+		ext_nic=""
 	fi
 
 	# stop docker
