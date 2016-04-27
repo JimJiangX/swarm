@@ -283,6 +283,8 @@ init_docker() {
 
 }
 
+# register docker
+
 # install docker plugin
 install_docker_plugin() {
 	local script_dir=/opt
@@ -326,6 +328,8 @@ EOF
                 exit 2
         fi
 }
+
+# register docker plugin
 
 # install swarm agent
 install_swarm_agent() {
@@ -378,16 +382,73 @@ EOF
 
 }
 
-# install hours agent
+# register swarm-agent
+
+# install horus agent
+install_horus_agent() {
+	# stop swarm-agent
+	pkill horus-agent >/dev/null 2>&1
+
+	# copy binary file
+	cp ${cur_dir}/horus-agent-1.0.0/bin/swarm /usr/bin/horus-agent; chmod 755 /usr/bin/horus-agent
+	cp -r ${cur_dir}/horus-agent-1.0.0/scripts /usr/local/horus-agent/; chmod -R /usr/local/horus-agent/scripts
+
+	# create systemd config file
+	cat << EOF > /etc/sysconfig/horus-agent
+## Path           : System/Management
+## Description    : horus agent
+## Type           : string
+## Default        : ""
+## ServiceRestart : horus-agent
+
+#
+HORUS_AGENT_OPTS="-consulip ${adm_ip}:${consul_port} -datacenter ${cs_datacenter} -hsrv ${hsrv_ip}:${hsrv_port} -ip ${adm_ip} -logfile /var/log/horus-agent/horus-agent.log -name ${node_id}horus-agent -nets ${adm_nic}#${int_nic}#${ext_nic} -port ${horus_agent_port} -node ${node_id}"
+
+EOF
+
+	cat << EOF > /usr/lib/systemd/system/horus-agent.service
+[Unit]
+Description=Horus agent
+Documentation=
+After=network.target
+Requires=consul.service
+
+[Service]
+Type=notify
+EnvironmentFile=/etc/sysconfig/horus-agent
+ExecStart=/usr/bin/horus-agent  \$HORUS_AGENT_OPTS
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+
+	chmod 644 /etc/sysconfig/horus-agent
+	chmod 644 /usr/lib/systemd/system/horus-agent.service
+
+	# reload
+	systemctl daemon-reload
+
+	# Enable & start the service
+	systemctl enable horus-agent
+	systemctl start horus-agent
+
+}
+
 
 
 init_hdd_vg
 init_ssd_vg
 install_consul
 install_docker_plugin
+#register_docker_plugin
 install_docker
 init_docker
+#register_docker
 install_swarm_agent
-#install_hours_agent
+#register_swarm_agent
+#install_horus_agent
+#register_horus_agent
+
 
 exit 0
