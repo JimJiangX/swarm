@@ -274,9 +274,8 @@ func (c switchManagerConfig) defaultUserConfig(svc *Service, u *unit) (map[strin
 
 	// consul
 	m["ConsulBindNetworkName"] = u.engine.Labels["ADM_NIC"]
+	m["SwarmHostKey"] = leaderElectionPath
 	m["ConsulPort"] = sys.ConsulPort
-
-	m["SwarmUserAgent"] = "1.22"
 
 	return nil, nil
 }

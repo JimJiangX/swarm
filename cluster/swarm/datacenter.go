@@ -185,10 +185,10 @@ func (dc *Datacenter) isNodeExist(IDOrName string) bool {
 	return false
 }
 
-func (dc *Datacenter) GetNode(IDOrName string) (database.Node, error) {
+func (dc *Datacenter) GetNode(IDOrName string) (*Node, error) {
 
 	if len(IDOrName) == 0 {
-		return database.Node{}, errors.New("Not Found Node")
+		return nil, errors.New("Not Found Node")
 	}
 
 	dc.RLock()
@@ -199,10 +199,10 @@ func (dc *Datacenter) GetNode(IDOrName string) (database.Node, error) {
 
 	if node != nil {
 
-		return *node.Node, nil
+		return node, nil
 	}
 
-	return database.GetNode(IDOrName)
+	return nil, errors.New("Not Found Node")
 }
 
 func (dc *Datacenter) getNode(IDOrName string) *Node {

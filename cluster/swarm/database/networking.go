@@ -77,11 +77,16 @@ func SelectAvailablePorts(num int) ([]Port, error) {
 		return nil, err
 	}
 
-	var ports []Port
+	ports := make([]Port, 0, num)
 
-	err = rows.StructScan(&ports)
-	if err != nil {
-		return nil, err
+	for rows.Next() {
+		port := Port{}
+		err = rows.StructScan(&port)
+		if err != nil {
+			return nil, err
+		}
+
+		ports = append(ports, port)
 	}
 
 	return ports, nil

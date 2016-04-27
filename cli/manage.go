@@ -140,6 +140,7 @@ func setupReplication(c *cli.Context, cluster cluster.Cluster, server *api.Serve
 	}
 	client := kvDiscovery.Store()
 	p := path.Join(kvDiscovery.Prefix(), leaderElectionPath)
+	swarm.UpdateleaderElectionPath(p)
 
 	candidate := leadership.NewCandidate(client, p, addr, leaderTTL)
 	follower := leadership.NewFollower(client, p)

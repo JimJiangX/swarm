@@ -19,6 +19,12 @@ import (
 	crontab "gopkg.in/robfig/cron.v2"
 )
 
+var leaderElectionPath = "docker/swarm/leader"
+
+func UpdateleaderElectionPath(path string) {
+	leaderElectionPath = path
+}
+
 type Gardener struct {
 	*Cluster
 

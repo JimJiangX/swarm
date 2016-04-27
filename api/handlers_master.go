@@ -541,13 +541,11 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dc, err := gd.Datacenter(name)
+	err := gd.SetNodeStatus(name, node, 8)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	dc.GetNode(node)
 
 	w.WriteHeader(http.StatusNoContent)
 }
