@@ -81,10 +81,10 @@ func TestNode(t *testing.T) {
 		err := list[i].Insert()
 		if err != nil {
 			if list[i].Name == "node5" {
-				t.Log("Expected")
+				t.Log("Expected:", err)
+			} else {
+				t.Fatal(list[i].Name, err)
 			}
-
-			t.Fatal(list[i].Name, err)
 		}
 
 		defer func(id string) {
@@ -155,7 +155,7 @@ func TestNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(nodes) != len(list) {
+	if len(nodes) != len(list)-1 {
 		t.Fatalf("Unexpected,%d!=%d", len(nodes), len(list))
 	}
 
@@ -194,7 +194,7 @@ func TestNode(t *testing.T) {
 		list1[i] = &list[i]
 	}
 
-	err = TxInsertMultiNodeAndTask(list1[1:], tasks[1:])
+	err = TxInsertMultiNodeAndTask(list1[1:4], tasks[1:])
 	if err != nil {
 		t.Fatal(err)
 	}

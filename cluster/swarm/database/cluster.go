@@ -84,8 +84,11 @@ func GetCluster(IDOrName string) (*Cluster, error) {
 
 	c := &Cluster{}
 	err = db.Get(c, "SELECT * FROM tb_cluster WHERE id=? OR name=?", IDOrName, IDOrName)
+	if err != nil {
+		return nil, err
+	}
 
-	return c, err
+	return c, nil
 }
 
 type Node struct {
@@ -213,8 +216,11 @@ func GetAllNodes() ([]Node, error) {
 
 	var nodes []Node
 	err = db.QueryRowx("SELECT * FROM tb_node").StructScan(&nodes)
+	if err != nil {
+		return nil, err
+	}
 
-	return nodes, err
+	return nodes, nil
 }
 
 // UpdateStatus returns error when Node UPDATE status.
