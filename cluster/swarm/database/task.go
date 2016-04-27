@@ -134,12 +134,7 @@ func TxUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int, finish time.Time, msg s
 }
 
 func TxBackupTaskDone(task *Task, state int, backupFile BackupFile) error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
-	}
-
-	tx, err := db.Beginx()
+	tx, err := GetTX()
 	if err != nil {
 		return err
 	}
@@ -272,7 +267,6 @@ func TxInsertBackupStrategy(tx *sqlx.Tx, strategy *BackupStrategy) error {
 }
 
 func BackupTaskValidate(taskID, strategyID, unitID string) (int, error) {
-
 	db, err := GetDB(true)
 	if err != nil {
 		return 0, err

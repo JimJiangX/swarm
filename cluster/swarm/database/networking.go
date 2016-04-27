@@ -70,23 +70,12 @@ func SelectAvailablePorts(num int) ([]Port, error) {
 		return nil, err
 	}
 
+	var ports []Port
 	query := fmt.Sprintf("SELECT * FROM tb_port WHERE allocated=? LIMIT %d", num)
 
-	rows, err := db.Queryx(query, false)
+	err = db.Select(&ports, query, false)
 	if err != nil {
 		return nil, err
-	}
-
-	ports := make([]Port, 0, num)
-
-	for rows.Next() {
-		port := Port{}
-		err = rows.StructScan(&port)
-		if err != nil {
-			return nil, err
-		}
-
-		ports = append(ports, port)
 	}
 
 	return ports, nil
@@ -195,7 +184,7 @@ func GetPortsByUnit(id string) ([]Port, error) {
 	}
 
 	var ports []Port
-	err = db.QueryRowx("SELECT * From tb_port WHERE unit_id=?", id).StructScan(&ports)
+	err = db.Select(&ports, "SELECT * FROM tb_port WHERE unit_id=?", id)
 	if err != nil {
 		return nil, err
 	}
@@ -243,13 +232,9 @@ func UpdateNetworkingStatus(id string, enable bool) error {
 
 	return err
 }
-func insertNetworking(net Networking, ips []IP) error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
-	}
 
-	tx, err := db.Beginx()
+func insertNetworking(net Networking, ips []IP) error {
+	tx, err := GetTX()
 	if err != nil {
 		return err
 	}
@@ -296,7 +281,6 @@ func TxUpdateMultiIPStatue(tx *sqlx.Tx, val []IPStatus) error {
 	defer stmt.Close()
 
 	for i := range val {
-
 		_, err = stmt.Exec(&val[i])
 		if err != nil {
 			return err

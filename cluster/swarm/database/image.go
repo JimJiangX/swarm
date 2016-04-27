@@ -25,12 +25,7 @@ func (Image) TableName() string {
 }
 
 func TxInsertImage(image Image, config UnitConfig, task *Task) error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
-	}
-
-	tx, err := db.Beginx()
+	tx, err := GetTX()
 	if err != nil {
 		return err
 	}

@@ -81,7 +81,7 @@ func DelLUN(id string) error {
 		return err
 	}
 
-	_, err = db.Exec("DELETE tb_lun WHERE id=?", id)
+	_, err = db.Exec("DELETE FROM tb_lun WHERE id=?", id)
 
 	return err
 }
@@ -96,6 +96,9 @@ func SelectHostLunIDByMapping(host string) ([]int, error) {
 	query := "SELECT host_lun_id FROM tb_lun WHERE mapping_hostname=?"
 
 	err = db.Select(&out, query, host)
+	if err != nil {
+		return nil, err
+	}
 
 	return out, err
 }
@@ -110,6 +113,9 @@ func SelectLunIDBySystemID(id string) ([]int, error) {
 	query := "SELECT storage_lun_id FROM tb_lun WHERE storage_system_id=?"
 
 	err = db.Select(&out, query, id)
+	if err != nil {
+		return nil, err
+	}
 
 	return out, err
 }
@@ -289,9 +295,12 @@ func GetLocalVoume(IDOrName string) ([]LocalVolume, error) {
 	query := "SELECT * FROM tb_volumes WHERE id=? OR name=?"
 	lvs := []LocalVolume{}
 
-	err = db.QueryRowx(query, IDOrName, IDOrName).StructScan(&lvs)
+	err = db.Select(&lvs, query, IDOrName, IDOrName)
+	if err != nil {
+		return nil, err
+	}
 
-	return lvs, err
+	return lvs, nil
 }
 
 func SelectVolumeByVG(name string) ([]LocalVolume, error) {

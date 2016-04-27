@@ -82,14 +82,14 @@ func (u Unit) TableName() string {
 }
 
 func TxInsertUnit(tx *sqlx.Tx, unit *Unit) error {
-	query := "INSERT INTO tb_unit (id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,check_interval,create_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:node_id,:container_id,:unit_config_id,:network_mode,:status,:check_interval,:create_at)"
+	query := "INSERT INTO tb_unit (id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,check_interval,created_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:node_id,:container_id,:unit_config_id,:network_mode,:status,:check_interval,:created_at)"
 	_, err := tx.NamedExec(query, unit)
 
 	return err
 }
 
 func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
-	query := "INSERT INTO tb_unit (id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,check_interval,create_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:node_id,:container_id,:unit_config_id,:network_mode,:status,:check_interval,:create_at)"
+	query := "INSERT INTO tb_unit (id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,check_interval,created_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:node_id,:container_id,:unit_config_id,:network_mode,:status,:check_interval,:created_at)"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
@@ -114,26 +114,21 @@ func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
 
 func TxDelUnit(tx *sqlx.Tx, id string) error {
 
-	_, err := tx.Exec("DELETE tb_unit WHERE id=?", id)
+	_, err := tx.Exec("DELETE FROM tb_unit WHERE id=?", id)
 
 	return err
 }
 
 func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
-	}
-
-	tx, err := db.Beginx()
+	tx, err := GetTX()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	if unit != nil && unit.ID != "" && unit.ConfigID != "" {
-		query := "UPDATE tb_unit SET config_id=? WHERE id=?"
-		_, err = tx.Exec(query, unit.ConfigID, unit.ID)
+	if unit != nil && unit.ID != "" {
+		query := "UPDATE tb_unit SET unit_config_id=? WHERE id=?"
+		_, err = tx.Exec(query, config.ID, unit.ID)
 		if err != nil {
 			return err
 		}
@@ -144,7 +139,14 @@ func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {
 		return err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	unit.ConfigID = config.ID
+
+	return nil
 }
 
 type Service struct {
@@ -179,12 +181,7 @@ func GetService(id string) (Service, error) {
 }
 
 func TxSaveService(svc *Service, strategy *BackupStrategy, task *Task, users []User) error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
-	}
-
-	tx, err := db.Beginx()
+	tx, err := GetTX()
 	if err != nil {
 		return err
 	}
@@ -250,12 +247,7 @@ func (svc *Service) SetServiceStatus(state int64, finish time.Time) error {
 }
 
 func TxSetServiceStatus(svc *Service, task *Task, state, tstate int64, finish time.Time, msg string) error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
-	}
-
-	tx, err := db.Beginx()
+	tx, err := GetTX()
 	if err != nil {
 		return err
 	}
@@ -266,18 +258,11 @@ func TxSetServiceStatus(svc *Service, task *Task, state, tstate int64, finish ti
 		if err != nil {
 			return err
 		}
-
-		atomic.StoreInt64(&svc.Status, state)
-
 	} else {
-
 		_, err := tx.Exec("UPDATE tb_service SET status=?,finished_at=? WHERE id=?", state, finish, svc.ID)
 		if err != nil {
 			return err
 		}
-
-		atomic.StoreInt64(&svc.Status, state)
-		svc.FinishedAt = finish
 	}
 
 	err = TxUpdateTaskStatus(tx, task, int(tstate), finish, msg)
@@ -285,7 +270,18 @@ func TxSetServiceStatus(svc *Service, task *Task, state, tstate int64, finish ti
 		return err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	if !finish.IsZero() {
+		svc.FinishedAt = finish
+	}
+
+	atomic.StoreInt64(&svc.Status, state)
+
+	return nil
 }
 
 type User struct {
