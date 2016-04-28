@@ -448,7 +448,7 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, string,
 		return nil, "", err
 	}
 	/*
-		init.sh input
+		#!/bin/bash
 		swarm_key=$1
 		adm_ip=$2
 		cs_datacenter=$3
@@ -458,15 +458,29 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, string,
 		registry_port=$7
 		registry_username=$8
 		registry_passwd=$9
-		regstry_ca_file=$10
-		DOCKER_PORT=$11
+		regstry_ca_file=${10}
+		docker_port=${11}
+		hdd_dev=${12}
+		ssd_dev=${13}
+		horus_agent_port=${14}
+		consul_port=${15}
+		node_id=${16}
+		cur_dir=`dirname $0`
+
+		hdd_vgname=${HOSTNAME}_HDD_VG
+		ssd_vgname=${HOSTNAME}_SSD_VG
+
+		adm_nic=bond0
+		int_nic=bond1
+		ext_nic=bond2
 	*/
 
-	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s",
+	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %d %s",
 		path, path, kvpath, node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile,
-		config.DockerPort, node.hdd, node.ssd)
+		config.DockerPort, node.hdd, node.ssd,
+		config.HorusAgentPort, config.ConsulPort, node.ID)
 
 	return config, script, nil
 }

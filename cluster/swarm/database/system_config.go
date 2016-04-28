@@ -50,6 +50,7 @@ type ConsulConfig struct {
 type HorusConfig struct {
 	HorusDistributionIP   string `db:"horus_distribution_ip"`
 	HorusDistributionPort int    `db:"horus_distribution_port"`
+	HorusAgentPort        int    `db:"horus_agent_port`
 	HorusEventIP          string `db:"horus_event_ip"`
 	HorusEventPort        int    `db:"horus_event_port"`
 }
@@ -72,7 +73,7 @@ func (c Configurations) TableName() string {
 }
 
 func (c *Configurations) Insert() (int64, error) {
-	query := "INSERT INTO tb_system_config (consul_IPs,consul_port,consul_dc,consul_token,consul_wait_time,horus_distribution_ip,horus_distribution_port,horus_event_ip,horus_event_port,registry_domain,registry_address,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,pkg_name,script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry) VALUES (:consul_IPs,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_distribution_ip,:horus_distribution_port,:horus_event_ip,:horus_event_port,:registry_domain,:registry_address,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:pkg_name,:script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry)"
+	query := "INSERT INTO tb_system_config (consul_IPs,consul_port,consul_dc,consul_token,consul_wait_time,horus_distribution_ip,horus_distribution_port,horus_agent_port,horus_event_ip,horus_event_port,registry_domain,registry_address,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,pkg_name,script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry) VALUES (:consul_IPs,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_distribution_ip,:horus_distribution_port,:horus_agent_port,:horus_event_ip,:horus_event_port,:registry_domain,:registry_address,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:pkg_name,:script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry)"
 	db, err := GetDB(true)
 	if err != nil {
 		return 0, err
