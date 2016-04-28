@@ -13,8 +13,10 @@ regstry_ca_file=${10}
 docker_port=${11}
 hdd_dev=${12}
 ssd_dev=${13}
+horus_agent_port=${14}
+consul_port=${15}
+node_id=${16}
 cur_dir=`dirname $0`
-consul_port=8500
 
 hdd_vgname=${HOSTNAME}_HDD_VG
 ssd_vgname=${HOSTNAME}_SSD_VG
@@ -390,8 +392,8 @@ install_horus_agent() {
 	pkill horus-agent >/dev/null 2>&1
 
 	# copy binary file
-	cp ${cur_dir}/horus-agent-1.0.0/bin/swarm /usr/bin/horus-agent; chmod 755 /usr/bin/horus-agent
-	cp -r ${cur_dir}/horus-agent-1.0.0/scripts /usr/local/horus-agent/; chmod -R /usr/local/horus-agent/scripts
+	cp ${cur_dir}/horus-agent-1.0.0/bin/horus-agent /usr/bin/horus-agent; chmod 755 /usr/bin/horus-agent
+	cp -r ${cur_dir}/horus-agent-1.0.0/scripts /usr/local/horus-agent/scripts; chmod -R /usr/local/horus-agent/scripts/*.sh
 
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/horus-agent
@@ -447,7 +449,7 @@ init_docker
 #register_docker
 install_swarm_agent
 #register_swarm_agent
-#install_horus_agent
+install_horus_agent
 #register_horus_agent
 
 
