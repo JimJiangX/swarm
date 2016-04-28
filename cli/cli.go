@@ -45,7 +45,7 @@ func Run() {
 
 	// logs
 	app.Before = func(c *cli.Context) error {
-		log.SetOutput(os.Stdout)
+		log.SetOutput(os.Stderr)
 		level, err := log.ParseLevel(c.String("log-level"))
 		if err != nil {
 			log.Fatalf(err.Error())
