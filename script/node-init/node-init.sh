@@ -16,6 +16,8 @@ ssd_dev=${13}
 horus_agent_port=${14}
 consul_port=${15}
 node_id=${16}
+horus_server_ip=${17}
+horus_server_port=${18}
 cur_dir=`dirname $0`
 
 hdd_vgname=${HOSTNAME}_HDD_VG
@@ -404,7 +406,7 @@ install_horus_agent() {
 ## ServiceRestart : horus-agent
 
 #
-HORUS_AGENT_OPTS="-consulip ${adm_ip}:${consul_port} -datacenter ${cs_datacenter} -hsrv ${hsrv_ip}:${hsrv_port} -ip ${adm_ip} -logfile /var/log/horus-agent/horus-agent.log -name ${node_id}horus-agent -nets ${adm_nic}#${int_nic}#${ext_nic} -port ${horus_agent_port} -node ${node_id}"
+HORUS_AGENT_OPTS="-consulip ${adm_ip}:${consul_port} -datacenter ${cs_datacenter} -hsrv ${horus_server_ip}:${horus_server_port} -ip ${adm_ip} -logfile /var/log/horus-agent.log -name ${node_id}horus-agent -nets ${adm_nic}#${int_nic}#${ext_nic} -port ${horus_agent_port} -node ${node_id}"
 
 EOF
 
