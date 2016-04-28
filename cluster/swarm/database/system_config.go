@@ -50,7 +50,7 @@ type ConsulConfig struct {
 type HorusConfig struct {
 	HorusServerIP   string `db:"horus_server_ip"`
 	HorusServerPort int    `db:"horus_server_port"`
-	HorusAgentPort  int    `db:"horus_agent_port`
+	HorusAgentPort  int    `db:"horus_agent_port"`
 	HorusEventIP    string `db:"horus_event_ip"`
 	HorusEventPort  int    `db:"horus_event_port"`
 }
