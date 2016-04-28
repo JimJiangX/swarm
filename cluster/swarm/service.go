@@ -59,8 +59,8 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		Enabled:     true,
 		BackupDir:   req.Strategy.BackupDir,
 		MaxSizeByte: req.Strategy.MaxSize,
-		Retention:   req.Strategy.Retention * time.Second,
-		Timeout:     req.Strategy.Timeout * time.Second,
+		Retention:   int(req.Strategy.Retention * time.Second),
+		Timeout:     int(req.Strategy.Timeout * time.Second),
 		CreatedAt:   time.Now(),
 	}
 

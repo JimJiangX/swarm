@@ -67,7 +67,7 @@ func (bs *serviceBackup) Run() {
 	select {
 	case errCh <- master.backup(args...):
 
-	case <-time.After(strategy.Timeout):
+	case <-time.After(time.Duration(strategy.Timeout)):
 		err = database.UpdateTaskStatus(task, _StatusTaskTimeout, time.Now(), "Timeout,The Task marked as TaskTimeout")
 	}
 

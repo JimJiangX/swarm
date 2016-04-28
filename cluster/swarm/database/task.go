@@ -12,15 +12,15 @@ import (
 type Task struct {
 	ID string `db:"id"`
 	//	Name        string        `db:"name"`
-	Related     string        `db:"related"`
-	Linkto      string        `db:"link_to"`
-	Description string        `db:"description"`
-	Labels      string        `db:"labels"`
-	Errors      string        `db:"errors"`
-	Timeout     time.Duration `db:"timeout"` // s
-	Status      int32         `db:"status"`
-	CreatedAt   time.Time     `db:"create_at"`
-	FinishedAt  time.Time     `db:"finished_at"`
+	Related     string    `db:"related"`
+	Linkto      string    `db:"link_to"`
+	Description string    `db:"description"`
+	Labels      string    `db:"labels"`
+	Errors      string    `db:"errors"`
+	Timeout     int       `db:"timeout"` // s
+	Status      int32     `db:"status"`
+	CreatedAt   time.Time `db:"create_at"`
+	FinishedAt  time.Time `db:"finished_at"`
 }
 
 func (t Task) TableName() string {
@@ -50,7 +50,7 @@ func txInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
 	return err
 }
 
-func NewTask(relate, linkto, des string, labels []string, timeout time.Duration) *Task {
+func NewTask(relate, linkto, des string, labels []string, timeout int) *Task {
 	return &Task{
 		ID: utils.Generate64UUID(),
 		//	Name:        name,
@@ -192,7 +192,7 @@ func QueryTask(id string) (*Task, error) {
 	}
 
 	t := &Task{}
-	err = db.QueryRowx("SELECT * FROM tb_task WHERE id=?", id).StructScan(t)
+	err = db.Get(t, "SELECT * FROM tb_task WHERE id=?", id)
 
 	return t, err
 }
@@ -209,17 +209,17 @@ func DeleteTask(id string) error {
 }
 
 type BackupStrategy struct {
-	ID          string        `db:"id"`
-	Type        string        `db:"type"` // full/part
-	Spec        string        `db:"spec"`
-	Next        time.Time     `db:"next"`
-	Valid       time.Time     `db:"valid"`
-	Enabled     bool          `db:"enabled"`
-	BackupDir   string        `db:"backup_dir"`
-	MaxSizeByte int           `db:"max_size"`
-	Retention   time.Duration `db:"retention"`
-	Timeout     time.Duration `db:"timeout"` // s
-	CreatedAt   time.Time     `db:"create_at"`
+	ID          string    `db:"id"`
+	Type        string    `db:"type"` // full/part
+	Spec        string    `db:"spec"`
+	Next        time.Time `db:"next"`
+	Valid       time.Time `db:"valid"`
+	Enabled     bool      `db:"enabled"`
+	BackupDir   string    `db:"backup_dir"`
+	MaxSizeByte int       `db:"max_size"`
+	Retention   int       `db:"retention"`
+	Timeout     int       `db:"timeout"` // s
+	CreatedAt   time.Time `db:"create_at"`
 }
 
 func (bs BackupStrategy) TableName() string {
@@ -235,7 +235,7 @@ func GetBackupStrategy(id string) (*BackupStrategy, error) {
 	strategy := &BackupStrategy{}
 	query := "SELECT * FROM tb_backup_strategy WHERE id=?"
 
-	err = db.QueryRowx(query, id).StructScan(strategy)
+	err = db.Get(strategy, query, id)
 	if err != nil {
 		return nil, err
 	}
