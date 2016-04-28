@@ -465,6 +465,8 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, string,
 		horus_agent_port=${14}
 		consul_port=${15}
 		node_id=${16}
+		horus_server_ip=${17}
+		horus_server_port=${18}
 		cur_dir=`dirname $0`
 
 		hdd_vgname=${HOSTNAME}_HDD_VG
@@ -475,12 +477,12 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, string,
 		ext_nic=bond2
 	*/
 
-	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %d %s",
+	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %d %s %s %d",
 		path, path, kvpath, node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile,
 		config.DockerPort, node.hdd, node.ssd,
-		config.HorusAgentPort, config.ConsulPort, node.ID)
+		config.HorusAgentPort, config.ConsulPort, node.ID, config.HorusServerIP, config.HorusServerPort)
 
 	return config, script, nil
 }

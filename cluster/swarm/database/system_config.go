@@ -48,11 +48,11 @@ type ConsulConfig struct {
 }
 
 type HorusConfig struct {
-	HorusDistributionIP   string `db:"horus_distribution_ip"`
-	HorusDistributionPort int    `db:"horus_distribution_port"`
-	HorusAgentPort        int    `db:"horus_agent_port`
-	HorusEventIP          string `db:"horus_event_ip"`
-	HorusEventPort        int    `db:"horus_event_port"`
+	HorusServerIP   string `db:"horus_server_ip"`
+	HorusServerPort int    `db:"horus_server_port"`
+	HorusAgentPort  int    `db:"horus_agent_port`
+	HorusEventIP    string `db:"horus_event_ip"`
+	HorusEventPort  int    `db:"horus_event_port"`
 }
 
 type Registry struct {
