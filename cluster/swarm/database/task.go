@@ -45,7 +45,7 @@ func (bf BackupFile) TableName() string {
 
 func txInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
 	query := "INSERT INTO tb_backup_file (id,task_id,strategy_id,unit_id,type,path,size,retention,created_at) VALUES (:id,:task_id,:strategy_id,:unit_id,:type,:path,:size,:retention,:created_at)"
-	_, err := tx.Exec(query, &bf)
+	_, err := tx.NamedExec(query, &bf)
 
 	return err
 }

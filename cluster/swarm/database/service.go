@@ -175,7 +175,7 @@ func GetService(id string) (Service, error) {
 	}
 
 	s := Service{}
-	err = db.QueryRowx("SELECT * FROM tb_service WHERE id=?", id).StructScan(&s)
+	err = db.Get(&s, "SELECT * FROM tb_service WHERE id=?", id)
 
 	return s, err
 }
