@@ -56,7 +56,7 @@ func GetLUNByID(id string) (LUN, error) {
 	var lun LUN
 	query := "SELECT * FROM tb_lun WHRER id=? LIMIT 1"
 
-	err = db.QueryRowx(query, id).StructScan(&lun)
+	err = db.Get(&lun, query, id)
 
 	return lun, err
 }
@@ -70,7 +70,7 @@ func GetLUNByLunID(systemID string, id int) (LUN, error) {
 	var lun LUN
 	query := "SELECT * FROM tb_lun WHRER storage_system_id=? AND storage_lun_id=? LIMIT 1"
 
-	err = db.QueryRowx(query, systemID, id).StructScan(&lun)
+	err = db.Get(&lun, query, systemID, id)
 
 	return lun, err
 }

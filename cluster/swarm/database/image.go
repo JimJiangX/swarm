@@ -58,7 +58,7 @@ func QueryImage(name, version string) (Image, error) {
 	}
 
 	image := Image{}
-	err = db.QueryRowx("SELECT * FROM tb_image WHERE name=? AND version=?", name, version).StructScan(&image)
+	err = db.Get(&image, "SELECT * FROM tb_image WHERE name=? AND version=?", name, version)
 
 	return image, err
 }
@@ -70,7 +70,7 @@ func QueryImageByID(id string) (Image, error) {
 	}
 
 	image := Image{}
-	err = db.QueryRowx("SELECT * FROM tb_image WHERE id=? OR image_id=?", id, id).StructScan(&image)
+	err = db.Get(&image, "SELECT * FROM tb_image WHERE id=? OR image_id=?", id, id)
 
 	return image, err
 }
@@ -124,8 +124,7 @@ func GetUnitConfigByID(id string) (*UnitConfig, error) {
 
 	config := &UnitConfig{}
 	query := "SELECT * FROM tb_unit_config WHERE id=? OR image_id=?"
-
-	err = db.QueryRowx(query, id, id).StructScan(config)
+	err = db.Get(&config, query, id, id)
 	if err != nil {
 		return nil, err
 	}

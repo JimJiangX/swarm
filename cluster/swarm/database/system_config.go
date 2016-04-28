@@ -130,7 +130,7 @@ func GetSystemConfig() (*Configurations, error) {
 	}
 
 	c := &Configurations{}
-	err = db.QueryRowx("SELECT * FROM tb_system_config LIMIT 1").StructScan(c)
+	err = db.Get(c, "SELECT * FROM tb_system_config LIMIT 1")
 	if err != nil {
 		return nil, err
 	}

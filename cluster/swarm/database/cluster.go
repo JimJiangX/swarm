@@ -97,7 +97,7 @@ func ListCluster() ([]Cluster, error) {
 		return nil, err
 	}
 
-	var clusters []Cluster
+	clusters := make([]Cluster, 0, 10)
 	err = db.Select(&clusters, "SELECT * FROM tb_cluster")
 	if err != nil {
 		return nil, err
@@ -207,10 +207,10 @@ func GetNode(IDOrName string) (Node, error) {
 		return Node{}, err
 	}
 
-	n := Node{}
-	err = db.QueryRowx("SELECT * FROM tb_node WHERE id=? OR name=? OR engine_id=?", IDOrName, IDOrName, IDOrName).StructScan(&n)
+	node := Node{}
+	err = db.Get(&node, "SELECT * FROM tb_node WHERE id=? OR name=? OR engine_id=?", IDOrName, IDOrName, IDOrName)
 
-	return n, err
+	return node, err
 }
 
 func GetAllNodes() ([]Node, error) {
@@ -220,18 +220,9 @@ func GetAllNodes() ([]Node, error) {
 	}
 
 	nodes := make([]Node, 0, 50)
-	rows, err := db.Queryx("SELECT * FROM tb_node")
+	err = db.Select(&nodes, "SELECT * FROM tb_node")
 	if err != nil {
 		return nil, err
-	}
-
-	for rows.Next() {
-		node := Node{}
-		err := rows.StructScan(&node)
-		if err != nil {
-			return nil, err
-		}
-		nodes = append(nodes, node)
 	}
 
 	return nodes, nil
@@ -311,18 +302,9 @@ func ListNode(status int) ([]Node, error) {
 	}
 
 	nodes := make([]Node, 0, 50)
-	rows, err := db.Queryx("SELECT * FROM tb_node WHERE status=?", status)
+	err = db.Select(&nodes, "SELECT * FROM tb_node WHERE status=?", status)
 	if err != nil {
 		return nil, err
-	}
-
-	for rows.Next() {
-		node := Node{}
-		err := rows.StructScan(&node)
-		if err != nil {
-			return nil, err
-		}
-		nodes = append(nodes, node)
 	}
 
 	return nodes, nil
@@ -335,18 +317,9 @@ func ListNodeByCluster(cluster string) ([]*Node, error) {
 	}
 
 	nodes := make([]*Node, 0, 50)
-	rows, err := db.Queryx("SELECT * FROM tb_node WHERE cluster_id=?", cluster)
+	err = db.Select(&nodes, "SELECT * FROM tb_node WHERE cluster_id=?", cluster)
 	if err != nil {
 		return nil, err
-	}
-
-	for rows.Next() {
-		node := &Node{}
-		err := rows.StructScan(node)
-		if err != nil {
-			return nil, err
-		}
-		nodes = append(nodes, node)
 	}
 
 	return nodes, nil
