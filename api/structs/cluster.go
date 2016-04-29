@@ -21,15 +21,15 @@ type PostClusterRequest struct {
 func (req PostClusterRequest) Validate() string {
 	warnings := make([]string, 0, 5)
 	if req.Name == "" {
-		warnings = append(warnings, "Name is null")
+		warnings = append(warnings, "'name' is null")
 	}
 
-	if !strings.EqualFold(req.Type, "upsql") && strings.EqualFold(req.Type, "proxy") {
-		warnings = append(warnings, "Type is either 'upsql' or 'proxy'")
+	if !strings.EqualFold(req.Type, "upsql") && !strings.EqualFold(req.Type, "proxy") {
+		warnings = append(warnings, "'type' is either 'upsql' or 'proxy'")
 	}
 
 	if req.Datacenter == "" {
-		warnings = append(warnings, "dc is null")
+		warnings = append(warnings, "'dc' is null")
 	}
 
 	if len(warnings) == 0 {

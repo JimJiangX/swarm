@@ -8,11 +8,6 @@ import (
 	"github.com/docker/swarm/utils"
 )
 
-const (
-	LocalDiskStore = "local"
-	SANStore       = "san"
-)
-
 type localDisk struct {
 	node *database.Node
 	addr string
@@ -42,7 +37,7 @@ func (l localDisk) Vendor() string {
 	return vendor
 }
 
-func (localDisk) Driver() string { return LocalDiskStore }
+func (localDisk) Driver() string { return LocalStorageDriver }
 func (localDisk) Ping() error    { return nil }
 func (l localDisk) IdleSize() (map[string]int, error) {
 	// api get local disk size

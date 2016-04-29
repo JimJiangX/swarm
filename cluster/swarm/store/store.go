@@ -7,7 +7,17 @@ import (
 	"github.com/docker/swarm/cluster/swarm/database"
 )
 
-const scriptPath = "script"
+const (
+	scriptPath = "script"
+	HITACHI    = "HITACHI"
+	HUAWEI     = "HUAWEI"
+
+	LocalDiskStore = "local"
+	SANStore       = "san"
+
+	SAN_StorageDriver  = "lvm"
+	LocalStorageDriver = "host"
+)
 
 var stores map[string]Store = make(map[string]Store)
 

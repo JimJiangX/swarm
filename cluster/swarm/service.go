@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -51,41 +52,40 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		return nil, errors.New(strings.Join(warnings, ","))
 	}
 
+	des, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
 	strategy := &database.BackupStrategy{
 		ID:          utils.Generate64UUID(),
-		Type:        req.Strategy.Type,
-		Spec:        req.Strategy.Spec,
-		Valid:       req.Strategy.Valid,
+		Type:        req.BackupStrategy.Type,
+		Spec:        req.BackupStrategy.Spec,
+		Valid:       req.BackupStrategy.Valid,
 		Enabled:     true,
-		BackupDir:   req.Strategy.BackupDir,
-		MaxSizeByte: req.Strategy.MaxSize,
-		Retention:   int(req.Strategy.Retention * time.Second),
-		Timeout:     int(req.Strategy.Timeout * time.Second),
+		BackupDir:   req.BackupStrategy.BackupDir,
+		MaxSizeByte: req.BackupStrategy.MaxSize,
+		Retention:   int(req.BackupStrategy.Retention * time.Second),
+		Timeout:     int(req.BackupStrategy.Timeout * time.Second),
 		CreatedAt:   time.Now(),
 	}
 
 	svc := database.Service{
 		ID:               utils.Generate64UUID(),
 		Name:             req.Name,
-		Description:      req.Description,
+		Description:      string(des),
 		Architecture:     req.Architecture,
 		AutoHealing:      req.AutoHealing,
 		AutoScaling:      req.AutoScaling,
 		HighAvailable:    req.HighAvailable,
 		Status:           _StatusServiceInit,
-		BackupSpaceByte:  req.Strategy.MaxSize,
 		BackupStrategyID: strategy.ID,
 		CreatedAt:        time.Now(),
 	}
 
-	arch, err := getServiceArch(req.Architecture)
+	_, nodeNum, err := getServiceArch(req.Architecture)
 	if err != nil {
 		return nil, err
-	}
-
-	nodeNum := 0
-	for _, n := range arch {
-		nodeNum += n
 	}
 
 	service := NewService(svc, nodeNum)
@@ -112,7 +112,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 func Validate(req structs.PostServiceRequest) []string {
 	warnings := make([]string, 0, 10)
 
-	_, err := getServiceArch(req.Architecture)
+	arch, _, err := getServiceArch(req.Architecture)
 	if err != nil {
 		warnings = append(warnings, fmt.Sprintf("Parse 'Architecture' Failed,%s", err.Error()))
 	}
@@ -123,13 +123,17 @@ func Validate(req structs.PostServiceRequest) []string {
 			warnings = append(warnings, fmt.Sprintf("Not Found Image:%s:%s,%s", module.Name, module.Version, err.Error()))
 		}
 
-		config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
-		err = validateContainerConfig(config)
+		_, num, err := getServiceArch(module.Arch)
 		if err != nil {
-			warnings = append(warnings, err.Error())
+			warnings = append(warnings, fmt.Sprintf("%s,%s", module.Arch, err))
 		}
 
-		err = config.Validate()
+		if arch[module.Type] != num {
+			warnings = append(warnings, fmt.Sprintf("%s nodeNum  unequal Architecture,(%s)", module.Type, module.Arch))
+		}
+
+		config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
+		err = validateContainerConfig(config)
 		if err != nil {
 			warnings = append(warnings, err.Error())
 		}

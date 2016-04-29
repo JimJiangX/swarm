@@ -92,6 +92,10 @@ func (gd *Gardener) serviceScheduler() (err error) {
 }
 
 func (gd *Gardener) BuildPendingContainersPerModule(svcName string, module *structs.Module) ([]*preAllocResource, error) {
+	_, num, err := getServiceArch(module.Arch)
+	if err != nil {
+		return nil, err
+	}
 	// query image from database
 	if module.Config.Image == "" {
 		image, err := gd.GetImage(module.Name, module.Version)
@@ -103,15 +107,14 @@ func (gd *Gardener) BuildPendingContainersPerModule(svcName string, module *stru
 	}
 
 	config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
-	err := validateContainerConfig(config)
-	if err != nil {
+	if err := validateContainerConfig(config); err != nil {
 		return nil, err
 	}
 
-	filters := gd.listShortIdleStore(module.Stores, module.Type, module.Num)
+	filters := gd.listShortIdleStore(module.Stores, module.Type, num)
 	list := gd.listCandidateNodes(module.Nodes, module.Type, filters...)
 
-	return gd.BuildPendingContainers(list, svcName, module.Type, module.Num, module.Stores, config, false)
+	return gd.BuildPendingContainers(list, svcName, module.Type, num, module.Stores, config, false)
 }
 
 func (gd *Gardener) BuildPendingContainers(list []*node.Node, svcName, Type string, num int, stores []structs.DiskStorage,

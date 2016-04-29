@@ -158,7 +158,6 @@ type Service struct {
 	AutoScaling      bool      `db:"auto_scaling"`
 	HighAvailable    bool      `db:"high_available"`
 	Status           int64     `db:"status"`
-	BackupSpaceByte  int       `db:"backup_space"`
 	BackupStrategyID string    `db:"backup_strategy_id"`
 	CreatedAt        time.Time `db:"created_at"`
 	FinishedAt       time.Time `db:"finished_at"`
@@ -212,7 +211,7 @@ func TxSaveService(svc *Service, strategy *BackupStrategy, task *Task, users []U
 
 func txInsertSerivce(tx *sqlx.Tx, svc *Service) error {
 	// insert into database
-	query := "INSERT INTO tb_service (id,name,description,architecture,auto_healing,auto_scaling,high_available,status,backup_space,backup_strategy_id,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:auto_healing,:auto_scaling,:high_available,:status,:backup_space,:backup_strategy_id,:created_at,:finished_at)"
+	query := "INSERT INTO tb_service (id,name,description,architecture,auto_healing,auto_scaling,high_available,status,backup_strategy_id,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:auto_healing,:auto_scaling,:high_available,:status,:backup_strategy_id,:created_at,:finished_at)"
 	_, err := tx.NamedExec(query, svc)
 
 	return err

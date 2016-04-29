@@ -70,7 +70,7 @@ func SelectAvailablePorts(num int) ([]Port, error) {
 		return nil, err
 	}
 
-	var ports []Port
+	ports := make([]Port, 0, num)
 	query := fmt.Sprintf("SELECT * FROM tb_port WHERE allocated=? LIMIT %d", num)
 
 	err = db.Select(&ports, query, false)

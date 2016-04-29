@@ -228,7 +228,7 @@ CREATE TABLE `tb_lun` (
   `unit_id` varchar(128) DEFAULT NULL COMMENT '所属UNIT ID',
   `mapping_hostname` varchar(45) DEFAULT NULL COMMENT 'LUN 映射主机名称',
   `host_lun_id` int(11) DEFAULT NULL COMMENT '在映射主机上的LUN ID',
-  `create_at` datetime NOT NULL,
+  `created_at` datetime NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;

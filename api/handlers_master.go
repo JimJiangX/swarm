@@ -9,21 +9,20 @@ import (
 	"strings"
 	"time"
 
-	goctx "golang.org/x/net/context"
-
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster/swarm"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/utils"
 	"github.com/gorilla/mux"
+	goctx "golang.org/x/net/context"
 )
 
 const (
 	StatusUnprocessableEntity = 422
 )
 
-var errUnsupportGardener = errors.New("Unsupported Gardener")
+var ErrUnsupportGardener = errors.New("Unsupported Gardener")
 
 // GET /clusters/{name:.*}
 func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -32,7 +31,7 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 }
@@ -41,7 +40,7 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 }
@@ -53,7 +52,7 @@ func getNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 }
@@ -66,7 +65,7 @@ func getNodesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 }
@@ -92,7 +91,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -104,16 +103,10 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	cluster := database.Cluster{
-		ID:          utils.Generate64UUID(),
-		Name:        req.Name,
-		Type:        req.Type,
-		StorageType: req.StorageType,
-		StorageID:   req.StorageID,
-		Datacenter:  req.Datacenter,
-		Enabled:     true,
-		MaxNode:     req.MaxNode,
-		UsageLimit:  req.UsageLimit,
+	cluster, err := swarm.AddNewCluster(req)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	err = gd.AddDatacenter(cluster, store)
@@ -133,7 +126,7 @@ func postEnableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -157,7 +150,7 @@ func postDisableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -183,7 +176,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -244,7 +237,7 @@ func postEnableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -264,7 +257,7 @@ func postDisableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -294,13 +287,13 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	svc, err := gd.CreateService(req)
 	if err != nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -345,7 +338,7 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -371,7 +364,7 @@ func postEnableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -396,7 +389,7 @@ func postDisableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -459,7 +452,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -487,7 +480,7 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -528,7 +521,7 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -568,7 +561,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -588,7 +581,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, errUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 

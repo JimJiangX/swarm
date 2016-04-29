@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -114,23 +115,32 @@ func parseCpuset(config *cluster.ContainerConfig) (int, error) {
 	return ncpu, err
 }
 
-// "master:1--standby:1--slave:3"
-func getServiceArch(arch string) (map[string]int, error) {
-	s := strings.Split(arch, "--")
-	out := make(map[string]int)
+// "master:1#standby:1#slave:3"
+func getServiceArch(arch string) (map[string]int, int, error) {
+	s := strings.Split(arch, "#")
+	out, count := make(map[string]int, len(s)), 0
+
 	for i := range s {
 		parts := strings.Split(s[i], ":")
-		if len(parts) == 2 {
+		if len(parts) == 1 {
+			out[parts[0]] = 1
+			count += 1
+
+		} else if len(parts) == 2 {
 
 			if n, err := strconv.Atoi(parts[1]); err == nil {
 				out[parts[0]] = n
+				count += n
+
 			} else {
-				return nil, err
+				return nil, 0, fmt.Errorf("%s,%s", err, s[i])
 			}
+		} else {
+			return nil, 0, fmt.Errorf("Unexpected format in %s", s[i])
 		}
 	}
 
-	return out, nil
+	return out, count, nil
 }
 
 func parseKVuri(uri string) string {
@@ -149,80 +159,3 @@ func parseKVuri(uri string) string {
 
 	return ""
 }
-
-/*
-type volume struct {
-	types.Volume
-	v              database.Volume
-	FilesystemType string
-	bind           string
-}
-
-func createVolume(name, typ, driver, mountpoint, bind,
-	nodeID, vg, lunID string, size int64) *Volume {
-
-	return &Volume{
-		Volume: types.Volume{
-			Name:       name,
-			Driver:     driver,
-			Mountpoint: mountpoint,
-		},
-		v: database.Volume{
-			Name:     name,
-			Type:     typ,
-			SizeByte: size,
-			NodeID:   nodeID,
-			LunID:    lunID,
-			VGName:   vg,
-		},
-		FilesystemType: "xfs",
-		bind:           bind,
-	}
-}
-
-const (
-	LocalDisk    = "localdisk"
-	defaultLocal = "local"
-	NASDisk      = "NasDisk"
-)
-
-func parseVolumes(labels map[string]string) []*Volume {
-	volumes := make([]*volume, 0, len(labels))
-
-	for i := range v {
-		var bind string
-		if v[i].Name == "" {
-			v[i].Name = utils.Generate16UUID()
-		}
-		if v[i].Mountpoint == "/DBAASDAT" {
-			if v[i].Driver == "" {
-				v[i].Driver = LocalDisk
-			}
-			v[i].Type = "-DAT"
-			bind = "/" + v[i].Name + v[i].Type + ":" + v[i].Mountpoint
-
-		} else if v[i].Mountpoint == "/DBAASLOG" {
-
-			if v[i].Driver == "" {
-				v[i].Driver = LocalDisk
-			}
-			v[i].Type = "-LOG"
-			bind = "/" + v[i].Name + v[i].Type + ":" + v[i].Mountpoint
-
-		} else if v[i].Mountpoint == "/BACKUP" {
-
-			if v[i].Driver == "" {
-				v[i].Driver = NASDisk
-			}
-			v[i].Type = "/NASBAK"
-
-			bind = v[i].Type + "/" + v[i].Name + ":" + v[i].Mountpoint
-		}
-
-		volumes[i] = createVolume(v[i].Name, v[i].Type, v[i].Driver, bind,
-			v[i].Mountpoint, node, "", "", int64(v[i].SizeMB)*MiB)
-	}
-
-	return volumes
-}
-*/

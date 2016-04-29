@@ -32,6 +32,31 @@ type Datacenter struct {
 	nodes []*Node
 }
 
+func AddNewCluster(req structs.PostClusterRequest) (database.Cluster, error) {
+	if req.StorageType == store.LocalDiskStore {
+		req.StorageID = ""
+	}
+
+	cluster := database.Cluster{
+		ID:          utils.Generate64UUID(),
+		Name:        req.Name,
+		Type:        req.Type,
+		StorageType: req.StorageType,
+		StorageID:   req.StorageID,
+		Datacenter:  req.Datacenter,
+		Enabled:     true,
+		MaxNode:     req.MaxNode,
+		UsageLimit:  req.UsageLimit,
+	}
+
+	err := cluster.Insert()
+	if err != nil {
+		return database.Cluster{}, err
+	}
+
+	return cluster, nil
+}
+
 type Node struct {
 	*database.Node
 	task       *database.Task
@@ -130,12 +155,6 @@ func (gd *Gardener) AddDatacenter(cl database.Cluster, storage store.Store) erro
 	log.WithFields(log.Fields{
 		"dc": cl.Name,
 	}).Info("Datacenter Initializing")
-
-	err := cl.Insert()
-	if err != nil {
-		log.Errorf("DB Error,%s", err)
-		return err
-	}
 
 	dc := &Datacenter{
 		RWMutex: sync.RWMutex{},
@@ -679,7 +698,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 
 	for {
 		if time.Now().After(deadline) {
-			log.Error("RegisterNodes Timeout:%d", timeout)
+			log.Warnf("RegisterNodes Timeout:%d", timeout)
 			return fmt.Errorf("Timeout %ds", timeout)
 		}
 		time.Sleep(10 * time.Second)

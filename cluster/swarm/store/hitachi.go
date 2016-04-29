@@ -10,8 +10,6 @@ import (
 	"github.com/docker/swarm/utils"
 )
 
-const HITACHI = "HITACHI"
-
 type hitachiStore struct {
 	lock *sync.RWMutex
 	hs   database.HitachiStorage
@@ -41,7 +39,7 @@ func (h hitachiStore) Vendor() string {
 }
 
 func (h hitachiStore) Driver() string {
-	return "lvm"
+	return SAN_StorageDriver
 }
 
 func (h hitachiStore) Ping() error {

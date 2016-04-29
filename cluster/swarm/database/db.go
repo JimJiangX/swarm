@@ -53,7 +53,7 @@ func SetupDB(c *cli.Context) error {
 	host := c.String("dbHost")
 	port := c.Int("dbPort")
 
-	source := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8&loc=Asia%%2FShanghai",
+	source := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=True&charset=utf8&loc=Asia%%2FShanghai",
 		user, password, host, port, name)
 
 	_, err = Connect(driver, source)

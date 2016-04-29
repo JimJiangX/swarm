@@ -10,8 +10,6 @@ import (
 	"github.com/docker/swarm/utils"
 )
 
-const HUAWEI = "HUAWEI"
-
 type huaweiStore struct {
 	lock *sync.RWMutex
 	hs   database.HuaweiStorage
@@ -42,7 +40,7 @@ func (h huaweiStore) Vendor() string {
 }
 
 func (h huaweiStore) Driver() string {
-	return "lvm"
+	return SAN_StorageDriver
 }
 
 func (h *huaweiStore) Ping() error {

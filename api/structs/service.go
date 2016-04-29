@@ -10,15 +10,15 @@ import (
 type PostServiceRequest struct {
 	Name         string
 	Description  string `json:",omitempty"`
-	Architecture string
+	Architecture string `json:"arch"`
 
 	AutoHealing   bool `json:",omitempty"`
 	AutoScaling   bool `json:",omitempty"`
 	HighAvailable bool `json:",omitempty"`
 
-	Modules  []Module
-	Users    []User         `json:",omitempty"`
-	Strategy BackupStrategy `json:",omitempty"`
+	Modules        []Module
+	Users          []User         `json:",omitempty"`
+	BackupStrategy BackupStrategy `json:"backup_strategy,omitempty"`
 }
 
 type User struct {
@@ -30,18 +30,16 @@ type User struct {
 }
 
 type Module struct {
-	Name    string
-	Version string
-	Type    string // upsql\upproxy\sm
-	Arch    string // split by `-` ,"nMaster-mStandby-xSlave"
-	Num     int
-
+	Name       string
+	Version    string
+	Type       string                 // upsql\upproxy\sm
+	Arch       string                 `json:"arch"`
 	Nodes      []string               `json:",omitempty"`
 	Stores     []DiskStorage          `json:",omitempty"`
 	Configures map[string]interface{} `json:",omitempty"`
 
-	Config           container.Config
-	HostConfig       container.HostConfig
+	Config           container.Config         `json:",omitempty"`
+	HostConfig       container.HostConfig     `json:"host_config",omitempty"`
 	NetworkingConfig network.NetworkingConfig `json:"-"`
 }
 

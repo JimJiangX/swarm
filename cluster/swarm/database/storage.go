@@ -54,7 +54,7 @@ func GetLUNByID(id string) (LUN, error) {
 	}
 
 	var lun LUN
-	query := "SELECT * FROM tb_lun WHRER id=? LIMIT 1"
+	query := "SELECT * FROM tb_lun WHERE id=? LIMIT 1"
 
 	err = db.Get(&lun, query, id)
 
@@ -68,7 +68,7 @@ func GetLUNByLunID(systemID string, id int) (LUN, error) {
 	}
 
 	var lun LUN
-	query := "SELECT * FROM tb_lun WHRER storage_system_id=? AND storage_lun_id=? LIMIT 1"
+	query := "SELECT * FROM tb_lun WHERE storage_system_id=? AND storage_lun_id=? LIMIT 1"
 
 	err = db.Get(&lun, query, systemID, id)
 
@@ -281,7 +281,7 @@ func DeleteLocalVoume(IDOrName string) error {
 		return err
 	}
 
-	_, err = db.Exec("DELETE tb_volumes WHERE id=? OR name=?", IDOrName, IDOrName)
+	_, err = db.Exec("DELETE FROM tb_volumes WHERE id=? OR name=?", IDOrName, IDOrName)
 
 	return err
 }

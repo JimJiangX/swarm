@@ -3,11 +3,10 @@ package api
 import (
 	"net/http"
 
-	goctx "golang.org/x/net/context"
-
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster/swarm"
 	"github.com/gorilla/mux"
+	goctx "golang.org/x/net/context"
 )
 
 const (
