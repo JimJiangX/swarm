@@ -394,8 +394,14 @@ install_horus_agent() {
 	pkill horus-agent >/dev/null 2>&1
 
 	# copy binary file
+	mkdir -p /usr/local/horus-agent
 	cp ${cur_dir}/horus-agent-1.0.0/bin/horus-agent /usr/bin/horus-agent; chmod 755 /usr/bin/horus-agent
-	cp -r ${cur_dir}/horus-agent-1.0.0/scripts /usr/local/horus-agent/scripts; chmod -R /usr/local/horus-agent/scripts/*.sh
+	cp -r ${cur_dir}/horus-agent-1.0.0/scripts /usr/local/horus-agent/scripts; chmod -R +x /usr/local/horus-agent/scripts/*.sh
+
+	local nets_dev="${adm_nic}#${int_nic}"
+	if [ ${ext_nic} != ""  ]; then
+		local nets_dev="${nets_dev}#${ext_nic}"
+	fi
 
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/horus-agent
@@ -406,7 +412,7 @@ install_horus_agent() {
 ## ServiceRestart : horus-agent
 
 #
-HORUS_AGENT_OPTS="-consulip ${adm_ip}:${consul_port} -datacenter ${cs_datacenter} -hsrv ${horus_server_ip}:${horus_server_port} -ip ${adm_ip} -logfile /var/log/horus-agent.log -name ${node_id}horus-agent -nets ${adm_nic}#${int_nic}#${ext_nic} -port ${horus_agent_port} -node ${node_id}"
+HORUS_AGENT_OPTS="-consulip ${adm_ip}:${consul_port} -datacenter ${cs_datacenter} -hsrv ${horus_server_ip}:${horus_server_port} -ip ${adm_ip} -logfile /var/log/horus-agent.log -name ${node_id}horus-agent -nets ${nets_dev} -port ${horus_agent_port} -node ${node_id}"
 
 EOF
 
