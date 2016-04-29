@@ -40,11 +40,11 @@ type BackupFile struct {
 }
 
 func (bf BackupFile) TableName() string {
-	return "tb_backup_file"
+	return "tb_backup_files"
 }
 
 func txInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
-	query := "INSERT INTO tb_backup_file (id,task_id,strategy_id,unit_id,type,path,size,retention,created_at) VALUES (:id,:task_id,:strategy_id,:unit_id,:type,:path,:size,:retention,:created_at)"
+	query := "INSERT INTO tb_backup_files (id,task_id,strategy_id,unit_id,type,path,size,retention,created_at) VALUES (:id,:task_id,:strategy_id,:unit_id,:type,:path,:size,:retention,:created_at)"
 	_, err := tx.NamedExec(query, &bf)
 
 	return err
@@ -219,7 +219,7 @@ type BackupStrategy struct {
 	MaxSizeByte int       `db:"max_size"`
 	Retention   int       `db:"retention"`
 	Timeout     int       `db:"timeout"` // s
-	CreatedAt   time.Time `db:"create_at"`
+	CreatedAt   time.Time `db:"created_at"`
 }
 
 func (bs BackupStrategy) TableName() string {
@@ -260,7 +260,7 @@ func (bs *BackupStrategy) UpdateNext(next time.Time, enable bool) error {
 }
 
 func TxInsertBackupStrategy(tx *sqlx.Tx, strategy *BackupStrategy) error {
-	query := "INSERT INTO tb_backup_strategy (id,type,spec,next,valid,enabled,backup_dir,max_size,retention,timeout,create_at) VALUES (:id,:type,:spec,:next,:valid,:enabled,:backup_dir,:max_size,:retention,:timeout,:create_at)"
+	query := "INSERT INTO tb_backup_strategy (id,type,spec,next,valid,enabled,backup_dir,max_size,retention,timeout,created_at) VALUES (:id,:type,:spec,:next,:valid,:enabled,:backup_dir,:max_size,:retention,:timeout,:created_at)"
 	_, err := tx.NamedExec(query, strategy)
 
 	return err

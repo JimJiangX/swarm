@@ -53,12 +53,46 @@ func GetLUNByID(id string) (LUN, error) {
 		return LUN{}, err
 	}
 
-	var lun LUN
+	lun := LUN{}
 	query := "SELECT * FROM tb_lun WHERE id=? LIMIT 1"
 
 	err = db.Get(&lun, query, id)
 
 	return lun, err
+}
+
+func ListLUNByName(name string) ([]LUN, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	list := make([]LUN, 0, 4)
+	query := "SELECT * FROM tb_lun WHERE name=?"
+
+	err = db.Select(&list, query, name)
+	if err != nil {
+		return nil, err
+	}
+
+	return list, err
+}
+
+func ListLUNByUnitID(id string) ([]LUN, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	list := make([]LUN, 0, 4)
+	query := "SELECT * FROM tb_lun WHERE id=?"
+
+	err = db.Select(&list, query, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return list, err
 }
 
 func GetLUNByLunID(systemID string, id int) (LUN, error) {
@@ -67,7 +101,7 @@ func GetLUNByLunID(systemID string, id int) (LUN, error) {
 		return LUN{}, err
 	}
 
-	var lun LUN
+	lun := LUN{}
 	query := "SELECT * FROM tb_lun WHERE storage_system_id=? AND storage_lun_id=? LIMIT 1"
 
 	err = db.Get(&lun, query, systemID, id)
@@ -286,21 +320,22 @@ func DeleteLocalVoume(IDOrName string) error {
 	return err
 }
 
-func GetLocalVoume(IDOrName string) ([]LocalVolume, error) {
+func GetLocalVoume(IDOrName string) (LocalVolume, error) {
+	lv := LocalVolume{}
+
 	db, err := GetDB(true)
 	if err != nil {
-		return nil, err
+		return lv, err
 	}
 
 	query := "SELECT * FROM tb_volumes WHERE id=? OR name=?"
-	lvs := []LocalVolume{}
 
-	err = db.Select(&lvs, query, IDOrName, IDOrName)
+	err = db.Get(&lv, query, IDOrName, IDOrName)
 	if err != nil {
-		return nil, err
+		return lv, err
 	}
 
-	return lvs, nil
+	return lv, nil
 }
 
 func SelectVolumeByVG(name string) ([]LocalVolume, error) {

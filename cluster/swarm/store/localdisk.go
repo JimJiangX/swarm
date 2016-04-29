@@ -37,7 +37,7 @@ func (l localDisk) Vendor() string {
 	return vendor
 }
 
-func (localDisk) Driver() string { return LocalStorageDriver }
+func (localDisk) Driver() string { return LocalStoreDriver }
 func (localDisk) Ping() error    { return nil }
 func (l localDisk) IdleSize() (map[string]int, error) {
 	// api get local disk size
@@ -88,7 +88,7 @@ func (l localDisk) Alloc(name, vg string, size int) (string, int, error) {
 		Size:       size,
 		VGName:     vg,
 		Driver:     l.Driver(),
-		Filesystem: "xfs",
+		Filesystem: DefaultFilesystemType,
 	}
 
 	err = database.InsertLocalVolume(lv)

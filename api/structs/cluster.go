@@ -1,10 +1,6 @@
 package structs
 
-import (
-	"strings"
-
-	"github.com/docker/engine-api/types"
-)
+import "github.com/docker/engine-api/types"
 
 type PostClusterRequest struct {
 	Name       string `json:"name"`
@@ -16,27 +12,6 @@ type PostClusterRequest struct {
 
 	StorageType string `json:"storage_type"`
 	StorageID   string `json:"storage_id,omitempty"`
-}
-
-func (req PostClusterRequest) Validate() string {
-	warnings := make([]string, 0, 5)
-	if req.Name == "" {
-		warnings = append(warnings, "'name' is null")
-	}
-
-	if !strings.EqualFold(req.Type, "upsql") && !strings.EqualFold(req.Type, "proxy") {
-		warnings = append(warnings, "'type' is either 'upsql' or 'proxy'")
-	}
-
-	if req.Datacenter == "" {
-		warnings = append(warnings, "'dc' is null")
-	}
-
-	if len(warnings) == 0 {
-		return ""
-	}
-
-	return strings.Join(warnings, ",")
 }
 
 type ListClusterResource []ClusterResource

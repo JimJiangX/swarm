@@ -174,7 +174,7 @@ func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, name, Type stri
 		return nil, err
 	}
 
-	device, ok := engine.Labels["INT_NIC"]
+	device, ok := engine.Labels[_Internal_NIC_Lable]
 	if !ok {
 
 	}
@@ -189,7 +189,7 @@ func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, name, Type stri
 			return networkings, err
 		}
 
-		device, ok := engine.Labels["EXT_NIC"]
+		device, ok := engine.Labels[_External_NIC_Lable]
 		if !ok {
 
 		}

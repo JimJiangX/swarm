@@ -75,5 +75,5 @@ const (
 
 var (
 	supportedServiceTypes = []string{_MysqlType, _ProxyType, _SwitchManagerType}
-	supportedStoreTypes   = []string{store.LocalDiskStore, store.SANStore}
+	supportedStoreTypes   = []string{store.LocalDiskStore, store.SANStore, store.HITACHI, store.HUAWEI}
 )

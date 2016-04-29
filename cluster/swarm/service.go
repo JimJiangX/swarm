@@ -48,7 +48,7 @@ func NewService(svc database.Service, unitNum int) *Service {
 }
 
 func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) (*Service, error) {
-	if warnings := Validate(req); len(warnings) > 0 {
+	if warnings := ValidService(req); len(warnings) > 0 {
 		return nil, errors.New(strings.Join(warnings, ","))
 	}
 
@@ -109,7 +109,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 	return service, nil
 }
 
-func Validate(req structs.PostServiceRequest) []string {
+func ValidService(req structs.PostServiceRequest) []string {
 	warnings := make([]string, 0, 10)
 
 	arch, _, err := getServiceArch(req.Architecture)
@@ -118,6 +118,10 @@ func Validate(req structs.PostServiceRequest) []string {
 	}
 
 	for _, module := range req.Modules {
+		if !isStringExist(module.Type, supportedServiceTypes) {
+			warnings = append(warnings, fmt.Sprintf("Unsupported '%s' Yet", module.Type))
+		}
+
 		_, err := database.QueryImage(module.Name, module.Version)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("Not Found Image:%s:%s,%s", module.Name, module.Version, err.Error()))
@@ -438,7 +442,7 @@ func (svc *Service) CreateUsers() (err error) {
 	for i := range svc.units {
 		u := svc.units[i]
 
-		if u.Type == "mysql" {
+		if u.Type == _MysqlType {
 			err := containerExec(u.engine, u.ContainerID, cmd, false)
 			if err != nil {
 
@@ -450,7 +454,7 @@ func (svc *Service) CreateUsers() (err error) {
 	for i := range svc.units {
 		u := svc.units[i]
 
-		if u.Type == "swith manager" {
+		if u.Type == _SwitchManagerType {
 			// create proxy users
 		}
 	}
@@ -465,7 +469,7 @@ func (svc *Service) RefreshTopology() error {
 	for i := range svc.units {
 		u := svc.units[i]
 
-		if u.Type == "swith manager" {
+		if u.Type == _SwitchManagerType {
 
 			// lock
 
@@ -484,7 +488,7 @@ func (svc *Service) InitTopology() error {
 	for i := range svc.units {
 		u := svc.units[i]
 
-		if u.Type == "swith manager" {
+		if u.Type == _SwitchManagerType {
 
 			// lock
 

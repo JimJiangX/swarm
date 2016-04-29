@@ -12,6 +12,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
+	"github.com/docker/swarm/cluster/swarm/store"
 	consulapi "github.com/hashicorp/consul/api"
 	"golang.org/x/net/context"
 )
@@ -48,17 +49,17 @@ type unit struct {
 
 func (u *unit) factory() error {
 	switch u.Type {
-	case "mysql", "upsql":
+	case "mysql", _MysqlType:
 		u.configParser = &mysqlConfig{}
 		// cmd
 		u.ContainerCmd = &mysqlCmd{}
 
-	case "proxy", "upproxy":
+	case _ProxyType, "upproxy":
 		u.configParser = &proxyConfig{}
 
 		u.ContainerCmd = &proxyCmd{}
 
-	case "switch manager", "SM":
+	case _SwitchManagerType, "SM":
 		u.configParser = &switchManagerConfig{}
 
 		u.ContainerCmd = &switchManagerCmd{}
@@ -84,25 +85,95 @@ func (u *unit) prepareCreateContainer() error {
 	binds := u.config.HostConfig.Binds
 
 	for _, name := range binds {
+		lv, err1 := database.GetLocalVoume(name)
+		if err1 == nil {
+			req := &types.VolumeCreateRequest{
+				Name:       lv.Name,
+				Driver:     lv.Driver,
+				DriverOpts: map[string]string{"size": strconv.Itoa(lv.Size), "fstype": lv.Filesystem, "vgname": lv.VGName},
+				Labels:     nil,
+			}
+			_, err := u.engine.CreateVolume(req)
+			if err != nil {
+				return err
+			}
 
-		lvs, err := database.GetLocalVoume(name)
-		if len(lvs) != 1 || err != nil {
-			continue
-		}
-
-		req := &types.VolumeCreateRequest{
-			Name:       lvs[0].Name,
-			Driver:     lvs[0].Driver,
-			DriverOpts: map[string]string{"size": strconv.Itoa(lvs[0].Size), "fstype": lvs[0].Filesystem, "vgname": lvs[0].VGName},
-			Labels:     nil,
-		}
-		_, err = u.engine.CreateVolume(req)
-		if err != nil {
-			return err
+		} else {
+			_, err := u.createSanStoreageVolume(name)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
+}
+
+func (u *unit) createLocalDiskVolume(name string) (*cluster.Volume, error) {
+	lv, err := database.GetLocalVoume(name)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &types.VolumeCreateRequest{
+		Name:       lv.Name,
+		Driver:     lv.Driver,
+		DriverOpts: map[string]string{"size": strconv.Itoa(lv.Size), "fstype": lv.Filesystem, "vgname": lv.VGName},
+		Labels:     nil,
+	}
+	v, err := u.engine.CreateVolume(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return v, nil
+}
+
+func (u *unit) createSanStoreageVolume(name string) (*cluster.Volume, error) {
+	list, err := database.ListLUNByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	storage, err := store.GetStoreByID(list[0].StorageSystemID)
+	if err != nil {
+		return nil, err
+	}
+
+	l, size := make([]int, len(list)), 0
+	for i := range list {
+		l[i] = list[i].StorageLunID
+		size += list[i].SizeByte
+	}
+
+	config := sdk.VgConfig{
+		HostLunId: l,
+		VgName:    u.Name + "_SAN_VG",
+		Type:      storage.Vendor(),
+	}
+	addr := u.getPluginAddr(pluginPort)
+	err = sdk.SanVgCreate(addr, config)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &types.VolumeCreateRequest{
+		Name:   name,
+		Driver: storage.Driver(),
+		DriverOpts: map[string]string{
+			"size":   strconv.Itoa(size),
+			"fstype": store.DefaultFilesystemType,
+			"vgname": config.VgName,
+		},
+		Labels: nil,
+	}
+
+	v, err := u.engine.CreateVolume(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return v, nil
 }
 
 func (u *unit) createContainer(authConfig *types.AuthConfig) (*cluster.Container, error) {
@@ -327,17 +398,6 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 	}
 
 	return client.ContainerExecStart(context.TODO(), resp.ID, types.ExecStartCheck{Detach: detach})
-}
-
-func newVolumeCreateRequest(name, driver string, opts map[string]string) types.VolumeCreateRequest {
-	if opts == nil {
-		opts = make(map[string]string)
-	}
-	return types.VolumeCreateRequest{
-		Name:       name,
-		Driver:     driver,
-		DriverOpts: opts,
-	}
 }
 
 var pluginPort = 3333

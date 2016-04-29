@@ -40,7 +40,7 @@ func (h huaweiStore) Vendor() string {
 }
 
 func (h huaweiStore) Driver() string {
-	return SAN_StorageDriver
+	return SAN_StoreDriver
 }
 
 func (h *huaweiStore) Ping() error {
@@ -72,7 +72,7 @@ func (h *huaweiStore) Insert() error {
 	return err
 }
 
-func (h *huaweiStore) Alloc(name, vendor string, size int) (string, int, error) {
+func (h *huaweiStore) Alloc(name, _ string, size int) (string, int, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 

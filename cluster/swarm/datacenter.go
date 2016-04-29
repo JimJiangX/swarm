@@ -32,6 +32,31 @@ type Datacenter struct {
 	nodes []*Node
 }
 
+func ValidDatacenter(req structs.PostClusterRequest) string {
+	warnings := make([]string, 0, 5)
+	if req.Name == "" {
+		warnings = append(warnings, "'name' is null")
+	}
+
+	if !isStringExist(req.StorageType, supportedStoreTypes) {
+		warnings = append(warnings, fmt.Sprintf("Unsupported '%s' Yet", req.StorageType))
+	}
+
+	if req.StorageType != store.LocalDiskStore && req.StorageID == "" {
+		warnings = append(warnings, "missing 'StorageID' when 'StorageType' is 'local'")
+	}
+
+	if req.Datacenter == "" {
+		warnings = append(warnings, "'dc' is null")
+	}
+
+	if len(warnings) == 0 {
+		return ""
+	}
+
+	return strings.Join(warnings, ",")
+}
+
 func AddNewCluster(req structs.PostClusterRequest) (database.Cluster, error) {
 	if req.StorageType == store.LocalDiskStore {
 		req.StorageID = ""
@@ -732,16 +757,16 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 
 			vgs := make([]store.VG, 0, 2)
 			//SSD
-			if ssd := eng.Labels["SSD_VG"]; ssd != "" {
+			if ssd := eng.Labels[_SSD_VG_Lable]; ssd != "" {
 				vgs = append(vgs, store.VG{
-					Vendor: "SSD",
+					Vendor: _SSD,
 					Name:   ssd,
 				})
 			}
 			// HDD
-			if hdd := eng.Labels["HDD_VG"]; hdd != "" {
+			if hdd := eng.Labels[_HDD_VG_Label]; hdd != "" {
 				vgs = append(vgs, store.VG{
-					Vendor: "HDD",
+					Vendor: _HDD,
 					Name:   hdd,
 				})
 			}
@@ -749,12 +774,12 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 			pluginAddr := fmt.Sprintf("%s:%d", nodes[i].Addr, pluginPort)
 			nodes[i].localStore = store.NewLocalDisk(pluginAddr, nodes[i].Node, vgs)
 
-			wwn := eng.Labels["HBA_WWN"]
+			wwn := eng.Labels[_SAN_HBA_WWN_Lable]
 			if strings.TrimSpace(wwn) != "" {
 
 				list := strings.Split(wwn, ",")
 
-				if dc.storage == nil || dc.storage.Driver() != "lvm" {
+				if dc.storage == nil || dc.storage.Driver() != store.SAN_StoreDriver {
 					continue
 				}
 

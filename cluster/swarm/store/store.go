@@ -15,8 +15,10 @@ const (
 	LocalDiskStore = "local"
 	SANStore       = "san"
 
-	SAN_StorageDriver  = "lvm"
-	LocalStorageDriver = "host"
+	SAN_StoreDriver  = "lvm"
+	LocalStoreDriver = "host"
+
+	DefaultFilesystemType = "xfs"
 )
 
 var stores map[string]Store = make(map[string]Store)

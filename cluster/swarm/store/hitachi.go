@@ -39,7 +39,7 @@ func (h hitachiStore) Vendor() string {
 }
 
 func (h hitachiStore) Driver() string {
-	return SAN_StorageDriver
+	return SAN_StoreDriver
 }
 
 func (h hitachiStore) Ping() error {
@@ -66,7 +66,7 @@ func (h *hitachiStore) Insert() error {
 	return h.hs.Insert()
 }
 
-func (h *hitachiStore) Alloc(name, vendor string, size int) (string, int, error) {
+func (h *hitachiStore) Alloc(name, _ string, size int) (string, int, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
