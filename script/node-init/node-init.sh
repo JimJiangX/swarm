@@ -365,7 +365,6 @@ After=network.target
 Requires=consul.service
 
 [Service]
-Type=notify
 EnvironmentFile=/etc/sysconfig/swarm-agent
 ExecStart=/usr/bin/swarm  \$SWARM_AGENT_OPTS
 
@@ -383,7 +382,10 @@ EOF
 	# Enable & start the service
 	systemctl enable swarm-agent
 	systemctl start swarm-agent
-
+	if [ $? -ne 0 ]; then
+		echo "start swarm-agent failed!"
+		exit 2
+	fi
 }
 
 # register swarm-agent
@@ -399,7 +401,7 @@ install_horus_agent() {
 	cp -r ${cur_dir}/horus-agent-1.0.0/scripts /usr/local/horus-agent/scripts; chmod -R +x /usr/local/horus-agent/scripts/*.sh
 
 	local nets_dev="${adm_nic}#${int_nic}"
-	if [ ${ext_nic} != ""  ]; then
+	if [ ! ${ext_nic} ]; then
 		local nets_dev="${nets_dev}#${ext_nic}"
 	fi
 
@@ -412,7 +414,7 @@ install_horus_agent() {
 ## ServiceRestart : horus-agent
 
 #
-HORUS_AGENT_OPTS="-consulip ${adm_ip}:${consul_port} -datacenter ${cs_datacenter} -hsrv ${horus_server_ip}:${horus_server_port} -ip ${adm_ip} -logfile /var/log/horus-agent.log -name ${node_id}horus-agent -nets ${nets_dev} -port ${horus_agent_port} -node ${node_id}"
+HORUS_AGENT_OPTS="-consulip ${adm_ip}:${consul_port} -datacenter ${cs_datacenter} -hsrv ${horus_server_ip}:${horus_server_port} -ip ${adm_ip} -name ${node_id} -nets ${nets_dev} -port ${horus_agent_port} "
 
 EOF
 
@@ -424,7 +426,6 @@ After=network.target
 Requires=consul.service
 
 [Service]
-Type=notify
 EnvironmentFile=/etc/sysconfig/horus-agent
 ExecStart=/usr/bin/horus-agent  \$HORUS_AGENT_OPTS
 
@@ -442,6 +443,10 @@ EOF
 	# Enable & start the service
 	systemctl enable horus-agent
 	systemctl start horus-agent
+	if [ $? -ne 0 ]; then
+		echo "start horus-agent failed!"
+		exit 2
+	fi
 
 }
 
