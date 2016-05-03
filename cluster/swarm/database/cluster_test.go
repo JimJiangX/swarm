@@ -125,7 +125,7 @@ func TestNode(t *testing.T) {
 		t.Fatalf("Unexpect,%d != %d", n.Status, node3.Status)
 	}
 
-	nodes1, err := ListNode(100)
+	nodes1, err := ListNode(1000)
 	if err != nil {
 		t.Fatal(err)
 	}

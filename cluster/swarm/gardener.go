@@ -21,6 +21,13 @@ import (
 
 var leaderElectionPath = "docker/swarm/leader"
 
+func init() {
+	log.SetFormatter(&log.TextFormatter{
+		ForceColors:   true,
+		FullTimestamp: true,
+	})
+}
+
 func UpdateleaderElectionPath(path string) {
 	leaderElectionPath = path
 }
