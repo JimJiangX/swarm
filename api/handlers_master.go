@@ -291,7 +291,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	svc, err := gd.CreateService(req)
 	if err != nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -546,6 +546,7 @@ func postNasStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // Delete /services/{name:.*}
+// TODO:Not Done Yet
 func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)

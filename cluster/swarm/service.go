@@ -647,7 +647,6 @@ func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int)
 
 	return err
 
-	return nil
 }
 
 func (svc *Service) Delete(force, volumes bool, timeout int) error {
