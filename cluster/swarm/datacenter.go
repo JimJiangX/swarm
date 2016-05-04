@@ -230,7 +230,6 @@ func (dc *Datacenter) isNodeExist(IDOrName string) bool {
 }
 
 func (dc *Datacenter) GetNode(IDOrName string) (*Node, error) {
-
 	if len(IDOrName) == 0 {
 		return nil, errors.New("Not Found Node")
 	}
@@ -308,10 +307,8 @@ func (gd *Gardener) DatacenterByEngine(IDOrName string) (*Datacenter, error) {
 	return gd.Datacenter(node.ClusterID)
 }
 
-func (gd *Gardener) SetNodeStatus(cluster, name string, state int) error {
-	gd.RLock()
-	dc, err := gd.Datacenter(cluster)
-	gd.RLock()
+func (gd *Gardener) SetNodeStatus(name string, state int) error {
+	dc, err := gd.DatacenterByNode(name)
 	if err != nil {
 		return err
 	}
@@ -322,6 +319,40 @@ func (gd *Gardener) SetNodeStatus(cluster, name string, state int) error {
 	}
 
 	return node.UpdateStatus(state)
+}
+
+func (dc *Datacenter) RemoveNode(NameOrID string) error {
+	index := 0
+	dc.Lock()
+	for i := range dc.nodes {
+		if dc.nodes[i].ID == NameOrID ||
+			dc.nodes[i].Name == NameOrID ||
+			dc.nodes[i].EngineID == NameOrID {
+
+			index = i
+			break
+		}
+	}
+
+	dc.nodes = append(dc.nodes[:index], dc.nodes[index+1:]...)
+	dc.Unlock()
+
+	return nil
+}
+
+func (gd *Gardener) DeleteNode(NameOrID string) error {
+	dc, err := gd.DatacenterByNode(NameOrID)
+	if err != nil {
+		return err
+	}
+
+	err = database.DeleteNode(NameOrID)
+	if err != nil {
+		dc.Unlock()
+		return err
+	}
+
+	return dc.RemoveNode(NameOrID)
 }
 
 func (dc *Datacenter) isIdleStoreEnough(IDOrType string, num, size int) bool {

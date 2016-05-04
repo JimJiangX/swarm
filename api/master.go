@@ -57,8 +57,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/clusters/{name:.*}/disable": postDisableCluster,
 		"/clusters/{name:.*}/nodes":   postNodes,
 
-		"/clusters/{cluster:.*}/nodes/{node:.*}/enable":  postEnableOneNode,
-		"/clusters/{cluster:.*}/nodes/{node:.*}/disable": postDisableOneNode,
+		"/clusters/nodes/{node:.*}/enable":  postEnableNode,
+		"/clusters/nodes/{node:.*}/disable": postDisableNode,
 
 		"/tasks/backup/callback":               postBackupCallback,
 		"/services":                            postService,
@@ -74,8 +74,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/storage/{name:.*}/raidgroup/add": postRGToSanStorage,
 	},
 	"DELETE": {
-		"services/{name:.*}":                  deleteService,
-		"/clusters/{name:.*}/nodes/{node:.*}": deleteNode,
+		"services/{name:.*}":        deleteService,
+		"/clusters/nodes/{node:.*}": deleteNode,
 	},
 }
 

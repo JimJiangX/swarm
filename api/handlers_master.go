@@ -230,9 +230,8 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-//Post /clusters/{cluster:.*}/nodes/{node:.*}/enable
-func postEnableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	cluster := mux.Vars(r)["cluster"]
+//Post /clusters/nodes/{node:.*}/enable
+func postEnableNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["node"]
 
 	ok, _, gd := fromContext(ctx, _Gardener)
@@ -241,7 +240,7 @@ func postEnableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err := gd.SetNodeStatus(cluster, name, 6)
+	err := gd.SetNodeStatus(name, 6)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -250,9 +249,8 @@ func postEnableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 }
 
-//Post /clusters/{cluster:.*}/nodes/{node:.*}/disable
-func postDisableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	cluster := mux.Vars(r)["cluster"]
+//Post /clusters/nodes/{node:.*}/disable
+func postDisableNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["node"]
 
 	ok, _, gd := fromContext(ctx, _Gardener)
@@ -261,7 +259,7 @@ func postDisableOneNode(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err := gd.SetNodeStatus(cluster, name, 7)
+	err := gd.SetNodeStatus(name, 7)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -574,9 +572,8 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Delete /clusters/{name:.*}/nodes/{node:.*}
+// Delete /clusters/nodes/{node:.*}
 func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
 	node := mux.Vars(r)["node"]
 
 	ok, _, gd := fromContext(ctx, _Gardener)
@@ -585,7 +582,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := gd.SetNodeStatus(name, node, 8)
+	err := gd.DeleteNode(node)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
