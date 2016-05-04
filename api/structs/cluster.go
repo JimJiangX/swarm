@@ -14,6 +14,7 @@ type PostClusterRequest struct {
 	StorageID   string `json:"storage_id,omitempty"`
 }
 
+// ListClusterResource used for GET: /clusters Response Body structure
 type ListClusterResource []ClusterResource
 
 type ClusterResource struct {
@@ -38,9 +39,17 @@ type NodeResource struct {
 	Resource
 }
 
-type NodeRespect struct {
+// NodeInfo used for GET: /clusters/{name:.*}/nodes/{node:.*} Resonse structure
+type NodeInfo struct {
 	NodeResource
-	Containers []types.ContainerJSONBase
+	Containers []types.ContainerNode
+}
+
+// ClusterInspect used for GET: /clusters/{name:.*} Response structure
+type ClusterInspect struct {
+	ID    string
+	Name  string
+	Nodes []NodeInfo
 }
 
 type Node struct {
@@ -48,8 +57,8 @@ type Node struct {
 	Address  string
 	Username string
 	Password string
-	HDD      string `json:"hdd"`
-	SSD      string `json:"ssd"`
+	HDD      []string `json:"hdd"`
+	SSD      []string `json:"ssd"`
 
 	Port         int `json:",omitempty"` // ssh port
 	MaxContainer int `json:"max_container,omitempty"`

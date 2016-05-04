@@ -87,14 +87,14 @@ type Node struct {
 	task       *database.Task
 	engine     *cluster.Engine
 	localStore store.Store
-	hdd        string
-	ssd        string
+	hdd        []string
+	ssd        []string
 	user       string // os user
 	password   string // os password
 	port       int    // ssh port
 }
 
-func NewNode(addr, name, cluster, user, password, hdd, ssd string, port, num int) *Node {
+func NewNode(addr, name, cluster, user, password string, hdd, ssd []string, port, num int) *Node {
 	node := &database.Node{
 		ID:        utils.Generate64UUID(),
 		Name:      name,
@@ -639,12 +639,19 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, string,
 		int_nic=bond1
 		ext_nic=bond2
 	*/
+	hdd, ssd := "null", "null"
+	if len(node.hdd) > 0 {
+		hdd = strings.Join(node.hdd, ",")
+	}
+	if len(node.ssd) > 0 {
+		ssd = strings.Join(node.ssd, ",")
+	}
 
 	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %d %s %s %d",
 		path, path, kvpath, node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile,
-		config.DockerPort, node.hdd, node.ssd,
+		config.DockerPort, hdd, ssd,
 		config.HorusAgentPort, config.ConsulPort, node.ID, config.HorusServerIP, config.HorusServerPort)
 
 	return config, script, nil
