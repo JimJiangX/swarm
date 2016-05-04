@@ -125,12 +125,12 @@ func TestPort(t *testing.T) {
 
 func TestNetwork(t *testing.T) {
 	networkId := randNetworkId()
-	err := TxInsertNetworking(networkId, randIp(), "255.255.255.0", "tcp", 1, 2)
+	networking, _, err := TxInsertNetworking("192.168.2.14", "192.168.2.144", "255.255.255.0", "tcp", 24)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = UpdateNetworkingStatus(networkId, false)
+	err = UpdateNetworkingStatus(networking.ID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
