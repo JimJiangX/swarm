@@ -94,6 +94,10 @@ func validateContainerConfig(config *cluster.ContainerConfig) error {
 		return errors.New("CPUShares > 0,CPUShares should be 0")
 	}
 
+	if config.HostConfig.CpusetCpus == "" {
+		return errors.New("CpusetCpus is null,CpusetCpus should not be null")
+	}
+
 	_, err := parseCpuset(config)
 	if err != nil {
 		return err
@@ -104,15 +108,15 @@ func validateContainerConfig(config *cluster.ContainerConfig) error {
 
 // parse NCPU from config.HostConfig.CpusetCpus
 func parseCpuset(config *cluster.ContainerConfig) (int, error) {
-
 	ncpu, err := strconv.Atoi(config.HostConfig.CpusetCpus)
-
-	log.WithFields(log.Fields{
-		"container ID": config.SwarmID(),
-		"CpusetCpus":   config.HostConfig.CpusetCpus,
-	}).Errorf("Parse CpusetCpus Error,%s", err)
-
-	return ncpu, err
+	if err != nil {
+		log.WithFields(log.Fields{
+			"container ID": config.SwarmID(),
+			"CpusetCpus":   config.HostConfig.CpusetCpus,
+		}).Errorf("Parse CpusetCpus Error,%s", err)
+		return 0, err
+	}
+	return ncpu, nil
 }
 
 // "master:1#standby:1#slave:3"

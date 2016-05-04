@@ -192,35 +192,46 @@ func GetPortsByUnit(id string) ([]Port, error) {
 	return ports, nil
 }
 
-func TxInsertNetworking(id, addr, gateway, typ string, prefix, num int) error {
+func TxInsertNetworking(start, end, gateway, typ string, prefix int) (Networking, []IP, error) {
+	startU32 := utils.IPToUint32(start)
+	endU32 := utils.IPToUint32(end)
+	if move := uint(32 - prefix); (startU32 >> move) != (endU32 >> move) {
+		return Networking{}, nil, fmt.Errorf("%s-%s is different network segments", start, end)
+	}
+	if startU32 > endU32 {
+		startU32, endU32 = endU32, startU32
+	}
 	net := Networking{
-		ID:         id,
-		Networking: addr,
+		ID:         utils.Generate64UUID(),
+		Networking: fmt.Sprintf("%s/%d", start, prefix),
 		Type:       typ,
 		Gateway:    gateway,
 		Enabled:    true,
 	}
 
-	ips := make([]IP, num)
-	addrU32 := utils.IPToUint32(net.Networking)
 	prefixU32 := uint32(prefix)
-
+	num := int(endU32 - startU32 + 1)
+	ips := make([]IP, num)
 	for i := range ips {
 		ips[i] = IP{
-			IPAddr:       addrU32,
+			IPAddr:       startU32,
 			Prefix:       prefixU32,
 			NetworkingID: net.ID,
 			Allocated:    false,
 		}
 
-		fmt.Println(i, addrU32, utils.Uint32ToIP(addrU32).String())
+		fmt.Println(i, startU32, utils.Uint32ToIP(startU32).String())
 
-		addrU32++
+		startU32++
 	}
 
 	// insert to database
+	err := insertNetworking(net, ips)
+	if err != nil {
+		return Networking{}, nil, err
+	}
 
-	return insertNetworking(net, ips)
+	return net, ips, nil
 }
 
 func UpdateNetworkingStatus(id string, enable bool) error {

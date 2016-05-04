@@ -342,7 +342,7 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	net, err := gd.AddNetworking(req.IP, req.Type, req.Gateway, req.Prefix, req.Num)
+	net, err := gd.AddNetworking(req.Start, req.End, req.Type, req.Gateway, req.Prefix)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return

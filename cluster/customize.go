@@ -19,7 +19,6 @@ func (e *Engine) UsedCpus() int64 {
 			log.WithFields(log.Fields{
 				"ID":         c.ID,
 				"CpusetCpus": cpuset,
-				"CpuShares":  c.Config.HostConfig.CPUShares,
 			}).Error("Parse CpusetCpus Error")
 		}
 

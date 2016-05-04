@@ -94,7 +94,7 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 					writeCorsHeaders(w, r)
 				}
 				context.apiVersion = mux.Vars(r)["version"]
-				ctx := goctx.WithValue(goctx.TODO(), _Gardener, context)
+				ctx := goctx.WithValue(goctx.Background(), _Gardener, context)
 				localFct(ctx, w, r)
 			}
 			localMethod := method

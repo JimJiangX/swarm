@@ -26,13 +26,10 @@ var ErrNotFoundNetworking = errors.New("Networking not found")
 
 type Networking struct {
 	Enable bool
+	Prefix int
 	*sync.RWMutex
-	ID      string
-	IP      string
-	Type    string
-	Gateway string
-	Prefix  int
-	pool    []*IP
+	database.Networking
+	pool []*IP
 }
 
 type IP struct {
@@ -40,29 +37,26 @@ type IP struct {
 	ip        uint32
 }
 
-func NewNetworking(ip, typ, gateway string, prefix, num int) *Networking {
-	net := &Networking{
-		RWMutex: new(sync.RWMutex),
-		ID:      utils.Generate64UUID(),
-		Type:    typ,
-		IP:      ip,
-		Prefix:  prefix,
-		Gateway: gateway,
-		pool:    make([]*IP, num),
+func NewNetworking(net database.Networking, ips []database.IP) (*Networking, error) {
+	if len(ips) == 0 {
+		return nil, fmt.Errorf("Unsupport Networking With No IP")
+	}
+	networking := &Networking{
+		RWMutex:    new(sync.RWMutex),
+		Enable:     true,
+		Prefix:     int(ips[0].Prefix),
+		Networking: net,
+		pool:       make([]*IP, len(ips)),
 	}
 
-	addrU32 := utils.IPToUint32(net.ID)
-
-	for i := 0; i < num; i++ {
-		net.pool[i] = &IP{
-			ip:        addrU32,
+	for i, num := 0, len(ips); i < num; i++ {
+		networking.pool[i] = &IP{
+			ip:        ips[i].IPAddr,
 			allocated: false,
 		}
-
-		addrU32++
 	}
 
-	return net
+	return networking, nil
 }
 
 func (net *Networking) AllocIP() (uint32, error) {
@@ -101,7 +95,7 @@ func (gd *Gardener) SetNetworkingStatus(IDOrIP string, enable bool) error {
 	gd.RLock()
 	for i := range gd.networkings {
 		if gd.networkings[i].ID == IDOrIP &&
-			gd.networkings[i].IP == IDOrIP {
+			gd.networkings[i].Networking.Networking == IDOrIP {
 			net = gd.networkings[i]
 
 			break
@@ -123,21 +117,24 @@ func (gd *Gardener) SetNetworkingStatus(IDOrIP string, enable bool) error {
 	return err
 }
 
-func (gd *Gardener) AddNetworking(ip, typ, gateway string, prefix, num int) (*Networking, error) {
-	net := NewNetworking(ip, typ, gateway, prefix, num)
+func (gd *Gardener) AddNetworking(start, end, typ, gateway string, prefix int) (*Networking, error) {
+	net, ips, err := database.TxInsertNetworking(start, end, gateway, typ, prefix)
+	if err != nil {
+		return nil, err
+	}
 
-	err := database.TxInsertNetworking(net.ID, ip, gateway, typ, prefix, num)
+	networking, err := NewNetworking(net, ips)
 	if err != nil {
 		return nil, err
 	}
 
 	gd.Lock()
 
-	gd.networkings = append(gd.networkings, net)
+	gd.networkings = append(gd.networkings, networking)
 
 	gd.Unlock()
 
-	return net, nil
+	return networking, nil
 }
 
 type IPInfo struct {

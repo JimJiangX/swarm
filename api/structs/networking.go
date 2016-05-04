@@ -2,8 +2,8 @@ package structs
 
 type PostNetworkingRequest struct {
 	Prefix  int
-	Num     int
-	IP      string
+	Start   string
+	End     string
 	Type    string
 	Gateway string
 }
