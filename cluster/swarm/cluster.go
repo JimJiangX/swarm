@@ -153,7 +153,7 @@ func (c *Cluster) CreateContainer(config *cluster.ContainerConfig, name string, 
 		bImageNotFoundError, _ := regexp.MatchString(`image \S* not found`, err.Error())
 		if (bImageNotFoundError || client.IsErrImageNotFound(err)) && !config.HaveNodeConstraint() {
 			// Check if the image exists in the cluster
-			// If exists, retry with a image affinity
+			// If exists, retry with an image affinity
 			if c.Image(config.Image) != nil {
 				container, err = c.createContainer(config, name, true, authConfig)
 				retries++
@@ -865,8 +865,8 @@ func (c *Cluster) TotalMemory() int64 {
 }
 
 // TotalCpus return the total memory of the cluster
-func (c *Cluster) TotalCpus() int {
-	var totalCpus int
+func (c *Cluster) TotalCpus() int64 {
+	var totalCpus int64
 	for _, engine := range c.engines {
 		totalCpus += engine.TotalCpus()
 	}
@@ -890,6 +890,7 @@ func (c *Cluster) Info() [][2]string {
 			engineName = engine.Name
 		}
 		info = append(info, [2]string{" " + engineName, engine.Addr})
+		info = append(info, [2]string{"  └ ID", engine.ID})
 		info = append(info, [2]string{"  └ Status", engine.Status()})
 		info = append(info, [2]string{"  └ Containers", fmt.Sprintf("%d", len(engine.Containers()))})
 		info = append(info, [2]string{"  └ Reserved CPUs", fmt.Sprintf("%d / %d", engine.UsedCpus(), engine.TotalCpus())})
