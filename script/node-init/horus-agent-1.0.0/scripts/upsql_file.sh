@@ -38,15 +38,15 @@ done <$VARFILE
  #upsql.error_file_size
 errsize=`docker exec $INSTANCE du -m $errfile 2>/dev/null | awk '{print $1}'`
 
-if [ "$errsize" = "" ];then
-	errsize="err"
-fi
+#if [ "$errsize" = "" ];then
+#	errsize="err"
+#fi
 
 #upsql.slow_query_file_size
 qrysize=`docker exec  $INSTANCE du -m $queryfile 2>/dev/null | awk '{print $1}' `
-if [ "$qrysize" = "" ];then
-	qrysize="err"
-fi
+#if [ "$qrysize" = "" ];then
+#	qrysize=""
+#fi
 
 if [ "$qrysize" != "err" ] && [ $qrysize -ge $QUOTA ] ;then
 	qrysize=`docker exec  $INSTANCE  >$queryfile;du -m $queryfile 2>/dev/null | awk '{print $1}' `
