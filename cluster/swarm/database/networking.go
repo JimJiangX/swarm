@@ -275,6 +275,37 @@ func insertNetworking(net Networking, ips []IP) error {
 	return tx.Commit()
 }
 
+func TxDeleteNetworking(id string) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec("DELETE FROM tb_networking WHERE id=?", id)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec("DELETE FROM tb_ip WHERE networking_id=?", id)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func CountIPByNetwrokingAndStatus(networking string, allocation bool) (int, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	err = db.Get(&count, "SELECT COUNT(*) from tb_ip WHERE networking_id=? AND allocated=?", networking, allocation)
+
+	return count, err
+}
+
 type IPStatus struct {
 	UnitID    string
 	IP        uint32

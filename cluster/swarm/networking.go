@@ -74,7 +74,22 @@ func (net *Networking) AllocIP() (uint32, error) {
 	return 0, ErrNotFoundIP
 }
 
-func (gd *Gardener) GetNetworking(typ string) *Networking {
+func (gd *Gardener) GetNetworking(id string) *Networking {
+	gd.RLock()
+
+	for i := range gd.networkings {
+		if gd.networkings[i].Type == id {
+			gd.RUnlock()
+			return gd.networkings[i]
+		}
+	}
+
+	gd.RUnlock()
+
+	return nil
+}
+
+func (gd *Gardener) GetNetworkingByType(typ string) *Networking {
 	gd.RLock()
 
 	for i := range gd.networkings {
@@ -226,4 +241,30 @@ func isProxyType(name string) bool {
 	}
 
 	return false
+}
+
+func (gd *Gardener) RemoveNetworking(ID string) error {
+	count, err := database.CountIPByNetwrokingAndStatus(ID, true)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return fmt.Errorf("networking %d is using")
+	}
+
+	err = database.TxDeleteNetworking(ID)
+	if err != nil {
+		return err
+	}
+
+	gd.RLock()
+	for i := range gd.networkings {
+		if gd.networkings[i].ID == ID {
+			gd.networkings = append(gd.networkings[:i], gd.networkings[i+1:]...)
+			break
+		}
+	}
+	gd.RUnlock()
+
+	return nil
 }
