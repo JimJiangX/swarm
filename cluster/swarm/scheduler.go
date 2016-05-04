@@ -154,8 +154,6 @@ func (gd *Gardener) BuildPendingContainers(list []*node.Node, svcName, Type stri
 
 	preAllocs, err := gd.pendingAlloc(candidates[0:num], svcName, Type, stores, config)
 
-	gd.scheduler.Unlock()
-
 	return preAllocs, err
 }
 

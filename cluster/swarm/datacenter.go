@@ -340,7 +340,66 @@ func (dc *Datacenter) RemoveNode(NameOrID string) error {
 	return nil
 }
 
-func (gd *Gardener) DeleteNode(NameOrID string) error {
+func (gd *Gardener) GetEngine(NameOrID string) (*cluster.Engine, error) {
+	gd.RLock()
+	eng, ok := gd.engines[NameOrID]
+
+	if !ok {
+		for _, engine := range gd.engines {
+			if engine.ID == NameOrID ||
+				engine.Name == NameOrID {
+				eng = engine
+				ok = true
+				break
+			}
+		}
+	}
+
+	if !ok {
+		for _, engine := range gd.pendingEngines {
+			if engine.ID == NameOrID ||
+				engine.Name == NameOrID {
+				eng = engine
+				ok = true
+				break
+			}
+		}
+	}
+	gd.RUnlock()
+
+	if eng != nil && ok {
+		return eng, nil
+	}
+
+	return nil, fmt.Errorf("Not Found Engine %s", NameOrID)
+}
+
+func (gd *Gardener) RemoveNode(NameOrID string) error {
+	node, err := database.GetNode(NameOrID)
+	if err != nil {
+		return err
+	}
+
+	eng, err := gd.GetEngine(node.EngineID)
+	if err != nil {
+		log.Warn(err)
+	}
+	if eng != nil {
+		eng.RefreshContainers(false)
+		if num := len(eng.Containers()); num != 0 {
+			return fmt.Errorf("%d Containers Has Created On Node %s", num, NameOrID)
+		}
+
+		gd.scheduler.Lock()
+		for _, pending := range gd.pendingContainers {
+			if pending.Engine.ID == node.EngineID {
+				gd.scheduler.Unlock()
+				return fmt.Errorf("Containers Has Created On Node %s", NameOrID)
+			}
+		}
+		gd.scheduler.Unlock()
+	}
+
 	dc, err := gd.DatacenterByNode(NameOrID)
 	if err != nil {
 		return err
@@ -355,6 +414,35 @@ func (gd *Gardener) DeleteNode(NameOrID string) error {
 	return dc.RemoveNode(NameOrID)
 }
 
+func (gd *Gardener) RemoveDatacenter(NameOrID string) error {
+	cl, err := database.GetCluster(NameOrID)
+	if err != nil {
+		return err
+	}
+	count, err := database.CountNodeNumOfCluster(cl.ID)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return fmt.Errorf("%d Nodes In Cluster %s", count, NameOrID)
+	}
+
+	err = database.DeleteCluster(NameOrID)
+	if err != nil {
+		return err
+	}
+
+	gd.Lock()
+	for i := range gd.datacenters {
+		if gd.datacenters[i].ID == cl.ID {
+			gd.datacenters = append(gd.datacenters[:i], gd.datacenters[i+1:]...)
+			break
+		}
+	}
+	gd.Unlock()
+
+	return nil
+}
 func (dc *Datacenter) isIdleStoreEnough(IDOrType string, num, size int) bool {
 	dc.RLock()
 

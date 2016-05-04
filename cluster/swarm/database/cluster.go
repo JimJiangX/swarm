@@ -325,6 +325,18 @@ func ListNodeByCluster(cluster string) ([]*Node, error) {
 	return nodes, nil
 }
 
+func CountNodeNumOfCluster(cluster string) (int, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	err = db.Get(&count, "SELECT COUNT(*) from tb_node WHERE cluster_id=?", cluster)
+
+	return count, err
+}
+
 func DeleteNode(IDOrName string) error {
 	db, err := GetDB(true)
 	if err != nil {
