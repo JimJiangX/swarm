@@ -19,7 +19,7 @@ type Task struct {
 	Errors      string    `db:"errors"`
 	Timeout     int       `db:"timeout"` // s
 	Status      int32     `db:"status"`
-	CreatedAt   time.Time `db:"create_at"`
+	CreatedAt   time.Time `db:"created_at"`
 	FinishedAt  time.Time `db:"finished_at"`
 }
 
@@ -69,7 +69,7 @@ func InsertTask(task *Task) error {
 	if err != nil {
 		return err
 	}
-	query := "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,create_at,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:create_at,:finished_at)"
+	query := "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,created_at,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:finished_at)"
 
 	_, err = db.NamedExec(query, task)
 
@@ -77,7 +77,7 @@ func InsertTask(task *Task) error {
 }
 
 func TxInsertTask(tx *sqlx.Tx, t *Task) error {
-	query := "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,create_at,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:create_at,:finished_at)"
+	query := "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,created_at,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:finished_at)"
 
 	_, err := tx.NamedExec(query, t)
 
@@ -85,7 +85,7 @@ func TxInsertTask(tx *sqlx.Tx, t *Task) error {
 }
 
 func TxInsertMultiTask(tx *sqlx.Tx, tasks []*Task) error {
-	query := "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,create_at,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:create_at,:finished_at)"
+	query := "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,created_at,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:finished_at)"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {

@@ -52,6 +52,11 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		return nil, errors.New(strings.Join(warnings, ","))
 	}
 
+	valid, err := utils.ParseStringToTime(req.BackupStrategy.Valid)
+	if err != nil {
+		return nil, err
+	}
+
 	des, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -61,7 +66,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		ID:          utils.Generate64UUID(),
 		Type:        req.BackupStrategy.Type,
 		Spec:        req.BackupStrategy.Spec,
-		Valid:       req.BackupStrategy.Valid,
+		Valid:       valid,
 		Enabled:     true,
 		BackupDir:   req.BackupStrategy.BackupDir,
 		MaxSizeByte: req.BackupStrategy.MaxSize,

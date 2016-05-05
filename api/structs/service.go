@@ -52,7 +52,7 @@ type DiskStorage struct {
 type BackupStrategy struct {
 	Type      string        // full/incremental
 	Spec      string        // cron spec
-	Valid     time.Time     // xxM-xxD-xxH-xxM-xxS
+	Valid     string        // "2006-01-02 15:04:05"
 	Timeout   time.Duration // xx Sec
 	Retention time.Duration // s
 	MaxSize   int           // byte

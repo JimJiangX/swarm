@@ -133,17 +133,17 @@ func Uint32ToIP(cidr uint32) net.IP {
 	return net.IP(addr)
 }
 
-const layout = "2006-01-02 15:04:05"
+const defaultTimeLayout = "2006-01-02 15:04:05"
 
 func TimeToString(t time.Time) string {
 	if !t.IsZero() {
-		return t.Format(layout)
+		return t.Format(defaultTimeLayout)
 	}
 	return ""
 }
 
 func ParseStringToTime(s string) (time.Time, error) {
-	return time.Parse(layout, s)
+	return time.Parse(defaultTimeLayout, s)
 }
 
 // ExecScript returns a command to execute a script
