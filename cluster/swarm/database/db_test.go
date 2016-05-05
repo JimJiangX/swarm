@@ -6,7 +6,7 @@ import (
 )
 
 func init() {
-	dbSource = "root:111111@tcp(127.0.0.1:3306)/DBaaS?parseTime=Truecharset=utf8&loc=Asia%2FShanghai"
+	dbSource = "root:111111@tcp(127.0.0.1:3306)/DBaaS?parseTime=True&charset=utf8&loc=Asia%2FShanghai"
 	driverName = "mysql"
 }
 

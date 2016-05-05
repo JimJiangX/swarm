@@ -129,6 +129,8 @@ func TestNetwork(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	defer TxDeleteNetworking(networking.ID)
+
 	err = UpdateNetworkingStatus(networking.ID, false)
 	if err != nil {
 		t.Fatal(err)

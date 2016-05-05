@@ -11,7 +11,7 @@ import (
 )
 
 type Configurations struct {
-	ID int `db:"id"`
+	ID int `db:"id"` // auto_increment
 	ConsulConfig
 	HorusConfig
 	Registry
@@ -73,7 +73,7 @@ func (c Configurations) TableName() string {
 }
 
 func (c *Configurations) Insert() (int64, error) {
-	query := "INSERT INTO tb_system_config (consul_IPs,consul_port,consul_dc,consul_token,consul_wait_time,horus_distribution_ip,horus_distribution_port,horus_agent_port,horus_event_ip,horus_event_port,registry_domain,registry_address,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,pkg_name,script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry) VALUES (:consul_IPs,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_distribution_ip,:horus_distribution_port,:horus_agent_port,:horus_event_ip,:horus_event_port,:registry_domain,:registry_address,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:pkg_name,:script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry)"
+	query := "INSERT INTO tb_system_config (consul_IPs,consul_port,consul_dc,consul_token,consul_wait_time,horus_server_ip,horus_server_port,horus_agent_port,horus_event_ip,horus_event_port,registry_domain,registry_address,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,pkg_name,script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password) VALUES (:consul_IPs,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_server_ip,:horus_server_port,:horus_agent_port,:horus_event_ip,:horus_event_port,:registry_domain,:registry_address,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:pkg_name,:script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:registry_os_username,:registry_os_password)"
 	db, err := GetDB(true)
 	if err != nil {
 		return 0, err
@@ -137,4 +137,15 @@ func GetSystemConfig() (*Configurations, error) {
 	}
 
 	return c, nil
+}
+
+func deleteSystemConfig(id int64) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("DELETE FROM tb_system_config WHERE id=?", id)
+
+	return err
 }

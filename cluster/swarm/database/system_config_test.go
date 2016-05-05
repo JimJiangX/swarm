@@ -37,6 +37,8 @@ func TestSystemConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	defer deleteSystemConfig(id)
+
 	config, err := GetSystemConfig()
 	if err != nil {
 		t.Fatal(err)
