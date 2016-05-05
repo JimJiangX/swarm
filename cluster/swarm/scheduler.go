@@ -136,12 +136,12 @@ func (gd *Gardener) BuildPendingContainersPerModule(svcName string, module *stru
 		return nil, err
 	}
 
-	entry.WithField("NodeNum", num).Infof("Build Container Config:%s", config)
+	entry.WithField("NodeNum", num).Infof("Build Container Config:%+v", config)
 
 	filters := gd.listShortIdleStore(module.Stores, module.Type, num)
 	list := gd.listCandidateNodes(module.Nodes, module.Type, filters...)
 
-	entry.Debug("filters num:%d,candidate nodes num:%d", len(filters), len(list))
+	entry.Debugf("filters num:%d,candidate nodes num:%d", len(filters), len(list))
 
 	if len(list) < num {
 		err := fmt.Errorf("Not Enough Candidate Nodes For Allocation,%d<%d", len(list), num)
@@ -359,20 +359,25 @@ func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...
 		for _, dc := range gd.datacenters {
 
 			if dc.Type != dcTag || isStringExist(dc.ID, filters) {
+				log.Debug(dc.Type, dcTag, dc.ID, filters)
 
 				continue
 			}
 
 			list := dc.listNodeID()
+			log.Debug(list)
 
 			for _, id := range list {
 
 				e, ok := gd.engines[id]
 				if !ok {
+					log.Debugf("Not Found Engine %s", id)
+
 					continue
 				}
 
 				if isStringExist(id, filters) {
+					log.Debug(id, "IN", filters)
 					continue
 				}
 
@@ -397,10 +402,13 @@ func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...
 
 	} else {
 
+		log.Debugf("Candidate From Assigned %s", names)
+
 		for _, name := range names {
 
 			e, ok := gd.engines[name]
 			if !ok {
+				log.Debugf("Not Found Engine %s", name)
 				continue
 			}
 
@@ -425,6 +433,8 @@ func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...
 			out = append(out, node)
 		}
 	}
+
+	log.Debugf("Candidate Nodes:%s", out)
 
 	return out
 }
