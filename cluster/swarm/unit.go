@@ -49,7 +49,7 @@ type unit struct {
 
 func (u *unit) factory() error {
 	switch u.Type {
-	case "mysql", _MysqlType:
+	case _UpsqlType, _MysqlType:
 		u.configParser = &mysqlConfig{}
 		// cmd
 		u.ContainerCmd = &mysqlCmd{}

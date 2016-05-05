@@ -37,7 +37,7 @@ func (gd *Gardener) GetImage(name, version string) (Image, error) {
 	return out, nil
 }
 
-func (gd *Gardener) getImageByID(id string) (Image, error) {
+func (gd *Gardener) GetImageByID(id string) (Image, error) {
 	im, err := database.QueryImageByID(id)
 	if err != nil {
 		return Image{}, err

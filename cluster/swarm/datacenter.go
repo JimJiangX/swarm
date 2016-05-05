@@ -394,6 +394,7 @@ func (gd *Gardener) RemoveNode(NameOrID string) error {
 		for _, pending := range gd.pendingContainers {
 			if pending.Engine.ID == node.EngineID {
 				gd.scheduler.Unlock()
+
 				return fmt.Errorf("Containers Has Created On Node %s", NameOrID)
 			}
 		}
@@ -883,7 +884,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 
 			vgs := make([]store.VG, 0, 2)
 			//SSD
-			if ssd := eng.Labels[_SSD_VG_Lable]; ssd != "" {
+			if ssd := eng.Labels[_SSD_VG_Label]; ssd != "" {
 				vgs = append(vgs, store.VG{
 					Vendor: _SSD,
 					Name:   ssd,

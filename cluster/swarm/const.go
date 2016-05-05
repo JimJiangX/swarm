@@ -57,14 +57,15 @@ const (
 )
 
 const (
-	_MysqlType         = "upsql"          // cluster_type,networking_type
+	_MysqlType         = "mysql" // cluster_type,networking_type
+	_UpsqlType         = "upsql"
 	_ProxyType         = "proxy"          // cluster_type,networking_type
 	_SwitchManagerType = "switch_manager" // cluster_type,networking_type
 
-	_SSD          = "SSD_VG"
+	_SSD          = "SSD"
 	_HDD          = "HDD"
 	_HDD_VG_Label = "HDD_VG"
-	_SSD_VG_Lable = "SSD_VG"
+	_SSD_VG_Label = "SSD_VG"
 
 	_SAN_HBA_WWN_Lable = "HBA_WWN"
 
@@ -74,6 +75,6 @@ const (
 )
 
 var (
-	supportedServiceTypes = []string{_MysqlType, _ProxyType, _SwitchManagerType}
+	supportedServiceTypes = []string{_MysqlType, _UpsqlType, _ProxyType, _SwitchManagerType}
 	supportedStoreTypes   = []string{store.LocalDiskStore, store.SANStore, store.HITACHI, store.HUAWEI}
 )

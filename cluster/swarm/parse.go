@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -85,25 +84,34 @@ func ParseCPUSets(val string) (map[int]bool, error) {
 
 func validateContainerConfig(config *cluster.ContainerConfig) error {
 	// validate config
+	msg := make([]string, 0, 5)
 	swarmID := config.SwarmID()
 	if swarmID != "" {
-		return errors.New("Swarm ID to the container have created")
+		msg = append(msg, "Swarm ID to the container have created")
 	}
 
 	if config.HostConfig.CPUShares != 0 {
-		return errors.New("CPUShares > 0,CPUShares should be 0")
+		msg = append(msg, "CPUShares > 0,CPUShares should be 0")
 	}
 
 	if config.HostConfig.CpusetCpus == "" {
-		return errors.New("CpusetCpus is null,CpusetCpus should not be null")
+		msg = append(msg, "CpusetCpus is null,CpusetCpus should not be null")
 	}
 
 	_, err := parseCpuset(config)
 	if err != nil {
-		return err
+		msg = append(msg, err.Error())
 	}
 
-	return config.Validate()
+	if err := config.Validate(); err != nil {
+		msg = append(msg, err.Error())
+	}
+
+	if len(msg) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("Errors:%s", msg)
 }
 
 // parse NCPU from config.HostConfig.CpusetCpus
@@ -113,9 +121,11 @@ func parseCpuset(config *cluster.ContainerConfig) (int, error) {
 		log.WithFields(log.Fields{
 			"container ID": config.SwarmID(),
 			"CpusetCpus":   config.HostConfig.CpusetCpus,
-		}).Errorf("Parse CpusetCpus Error,%s", err)
+		}).Errorf("Parse CpusetCpus %s Error:%s", config.HostConfig.CpusetCpus, err)
+
 		return 0, err
 	}
+
 	return ncpu, nil
 }
 

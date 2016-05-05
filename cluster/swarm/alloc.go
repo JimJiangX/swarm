@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -21,6 +22,8 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 	if !allocated && len(need) > 0 {
 		ports, err := database.SelectAvailablePorts(len(need))
 		if err != nil {
+			log.Errorf("Alloc Ports Error:%s", err.Error())
+
 			return nil, err
 		}
 		for i := range ports {
@@ -36,6 +39,8 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 	networkings, err := gd.getNetworkingSetting(engine, Type, "")
 	preAlloc.networkings = append(preAlloc.networkings, networkings...)
 	if err != nil {
+		log.Errorf("Alloc Networking Error:%s", err.Error())
+
 		return nil, err
 	}
 
@@ -53,12 +58,16 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 
 	ncpu, err := parseCpuset(&config)
 	if err != nil {
+		log.Error(err)
+
 		return nil, err
 	}
 
 	// Alloc CPU
 	cpuset, err := allocCPUs(engine, ncpu)
 	if err != nil {
+		log.Errorf("Alloc CPU %d Error:%s", ncpu, err.Error())
+
 		return nil, err
 	}
 

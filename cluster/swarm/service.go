@@ -122,6 +122,9 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 
 func ValidService(req structs.PostServiceRequest) []string {
 	warnings := make([]string, 0, 10)
+	if req.Name == "" {
+		warnings = append(warnings, "Service Name should not be null")
+	}
 
 	arch, _, err := getServiceArch(req.Architecture)
 	if err != nil {
@@ -132,12 +135,17 @@ func ValidService(req structs.PostServiceRequest) []string {
 		if !isStringExist(module.Type, supportedServiceTypes) {
 			warnings = append(warnings, fmt.Sprintf("Unsupported '%s' Yet", module.Type))
 		}
-
-		_, err := database.QueryImage(module.Name, module.Version)
-		if err != nil {
-			warnings = append(warnings, fmt.Sprintf("Not Found Image:%s:%s,%s", module.Name, module.Version, err.Error()))
+		if module.Config.Image == "" {
+			_, err := database.QueryImage(module.Name, module.Version)
+			if err != nil {
+				warnings = append(warnings, fmt.Sprintf("Not Found Image:%s:%s,Error%s", module.Name, module.Version, err.Error()))
+			}
+		} else {
+			_, err := database.QueryImageByID(module.Config.Image)
+			if err != nil {
+				warnings = append(warnings, fmt.Sprintf("Not Found Image:%s,Error%s", module.Config.Image, err.Error()))
+			}
 		}
-
 		_, num, err := getServiceArch(module.Arch)
 		if err != nil {
 			warnings = append(warnings, fmt.Sprintf("%s,%s", module.Arch, err))
