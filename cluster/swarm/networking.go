@@ -105,12 +105,11 @@ func (gd *Gardener) GetNetworkingByType(typ string) *Networking {
 	return nil
 }
 
-func (gd *Gardener) SetNetworkingStatus(IDOrIP string, enable bool) error {
+func (gd *Gardener) SetNetworkingStatus(ID string, enable bool) error {
 	var net *Networking
 	gd.RLock()
 	for i := range gd.networkings {
-		if gd.networkings[i].ID == IDOrIP &&
-			gd.networkings[i].Networking.Networking == IDOrIP {
+		if gd.networkings[i].ID == ID {
 			net = gd.networkings[i]
 
 			break

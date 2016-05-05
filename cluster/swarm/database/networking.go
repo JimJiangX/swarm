@@ -20,11 +20,10 @@ func (ip IP) TableName() string {
 }
 
 type Networking struct {
-	ID         string `db:"id"`
-	Networking string `db:"networking"`
-	Type       string `db:"type"`
-	Gateway    string `db"gateway"`
-	Enabled    bool   `db:"enabled"`
+	ID      string `db:"id"`
+	Type    string `db:"type"`
+	Gateway string `db"gateway"`
+	Enabled bool   `db:"enabled"`
 }
 
 func (net Networking) TableName() string {
@@ -202,11 +201,10 @@ func TxInsertNetworking(start, end, gateway, typ string, prefix int) (Networking
 		startU32, endU32 = endU32, startU32
 	}
 	net := Networking{
-		ID:         utils.Generate64UUID(),
-		Networking: fmt.Sprintf("%s/%d", start, prefix),
-		Type:       typ,
-		Gateway:    gateway,
-		Enabled:    true,
+		ID:      utils.Generate64UUID(),
+		Type:    typ,
+		Gateway: gateway,
+		Enabled: true,
 	}
 
 	prefixU32 := uint32(prefix)
