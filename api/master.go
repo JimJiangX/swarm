@@ -77,7 +77,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"services/{name:.*}":        deleteService,
 		"/clusters/{name:.*}":       deleteCluster,
 		"/clusters/nodes/{node:.*}": deleteNode,
-		"/netwrokings/{name:.*}":    deleteNetworking,
+		"/networkings/{name:.*}":    deleteNetworking,
 	},
 }
 
