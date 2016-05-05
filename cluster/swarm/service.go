@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
@@ -54,11 +55,13 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 
 	valid, err := utils.ParseStringToTime(req.BackupStrategy.Valid)
 	if err != nil {
+		log.Error("Parse Request.BackupStrategy.Valid to time.Time", err)
 		return nil, err
 	}
 
 	des, err := json.Marshal(req)
 	if err != nil {
+		log.Error("JSON Marshal", err)
 		return nil, err
 	}
 
@@ -90,6 +93,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 
 	_, nodeNum, err := getServiceArch(req.Architecture)
 	if err != nil {
+		log.Error("Parse Service.Architecture", err)
 		return nil, err
 	}
 
@@ -108,6 +112,8 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 
 	if err := service.SaveToDB(); err != nil {
 		atomic.StoreInt64(&svc.Status, _StatusServiceInit)
+
+		log.Error("Service Save To DB", err)
 		return nil, err
 	}
 
@@ -163,6 +169,8 @@ func ValidService(req structs.PostServiceRequest) []string {
 		return nil
 	}
 
+	log.Warnf("Service Valid warning:", warnings)
+
 	return warnings
 }
 
@@ -196,14 +204,13 @@ func (svc *Service) getUnit(IDOrName string) (*unit, error) {
 
 func (gd *Gardener) AddService(svc *Service) error {
 	if svc == nil {
-		return errors.New("Service Cannot be nil")
+		return errors.New("Service Cannot be nil pointer")
 	}
 
 	s, err := gd.GetService(svc.ID)
 
 	if s != nil || err == nil {
-
-		return errors.New("Service exist")
+		return fmt.Errorf("Service %s Existed,%v", svc.ID, err)
 	}
 
 	gd.Lock()
@@ -234,30 +241,55 @@ func (gd *Gardener) GetService(IDOrName string) (*Service, error) {
 	return nil, ErrServiceNotFound
 }
 
-func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, error) {
+func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, err error) {
+
 	authConfig, err := gd.RegistryAuthConfig()
 	if err != nil {
+		log.Error("get Registry Auth Config", err)
 		return nil, err
 	}
 
 	svc, err := BuildService(req, authConfig)
 	if err != nil {
+		log.Error("Build Service", err)
 		return nil, err
 	}
+
+	defer func() {
+		if err != nil {
+			if svc.backup != nil && svc.backup.ID != "" {
+				gd.RemoveCronJob(svc.backup.ID)
+			}
+			svc.Delete(true, true, 0)
+			log.WithField("Service Name", svc.Name).Errorf("Servcie Cleaned,%v", err)
+		}
+	}()
+
+	log.WithFields(log.Fields{
+		"Servcie Name": svc.Name,
+		"Service ID":   svc.ID,
+		"Task ID":      svc.task.ID,
+	}).Info("Service Saved Into Database")
 
 	svc.failureRetry = gd.createRetry
 
 	if err := gd.AddService(svc); err != nil {
-		return svc, err
-	}
+		log.Error("Service Add to Gardener")
 
-	if err := gd.ServiceToScheduler(svc); err != nil {
 		return svc, err
 	}
 
 	if svc.backup != nil {
 		bs := NewBackupJob(gd.host, svc)
-		gd.RegisterBackupStrategy(bs)
+		err := gd.RegisterBackupStrategy(bs)
+		if err != nil {
+			log.Error("Add BackupStrategy to Gardener.Crontab", err)
+		}
+	}
+
+	if err := gd.ServiceToScheduler(svc); err != nil {
+		log.Error("Service Add To Scheduler", err)
+		return svc, err
 	}
 
 	return svc, nil
