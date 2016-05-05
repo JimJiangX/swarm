@@ -371,7 +371,7 @@ func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...
 				continue
 			}
 
-			node := gd.checkNode(list[i].ID, filters)
+			node := gd.checkNode(list[i].EngineID, filters)
 			if node != nil {
 				out = append(out, node)
 			}
