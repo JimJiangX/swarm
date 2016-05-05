@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/docker/swarm/utils"
+	"github.com/jmoiron/sqlx"
 )
 
 type Cluster struct {
@@ -318,6 +319,34 @@ func ListNodeByCluster(cluster string) ([]*Node, error) {
 
 	nodes := make([]*Node, 0, 50)
 	err = db.Select(&nodes, "SELECT * FROM tb_node WHERE cluster_id=?", cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
+}
+
+func ListNodeByClusterType(Type string, enabled bool) ([]Node, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	clist := make([]string, 0, 5)
+
+	err = db.Select(&clist, "SELECT id FROM tb_cluster WHERE type=? AND enabled=?", Type, enabled)
+	if err != nil {
+		return nil, err
+	}
+
+	query, args, err := sqlx.In("SELECT * FROM tb_node WHERE cluster_id IN (?);", clist)
+	if err != nil {
+		return nil, err
+	}
+
+	nodes := make([]Node, 0, 50)
+
+	err = db.Select(&nodes, query, args...)
 	if err != nil {
 		return nil, err
 	}

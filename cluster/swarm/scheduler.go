@@ -356,87 +356,74 @@ func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...
 
 	if len(names) == 0 {
 
-		for _, dc := range gd.datacenters {
+		list, err := database.ListNodeByClusterType(dcTag, true)
+		if err != nil {
+			log.Errorf("Search in Database Error: %s", err.Error())
 
-			if dc.Type != dcTag || isStringExist(dc.ID, filters) {
-				log.Debug(dc.Type, dcTag, dc.ID, filters)
+			return nil
+		}
+
+		for i := range list {
+
+			if list[i].Status != _StatusNodeEnable ||
+				isStringExist(list[i].ClusterID, filters) {
 
 				continue
 			}
 
-			list := dc.listNodeID()
-			log.Debug(list)
-
-			for _, id := range list {
-
-				e, ok := gd.engines[id]
-				if !ok {
-					log.Debugf("Not Found Engine %s", id)
-
-					continue
-				}
-
-				if isStringExist(id, filters) {
-					log.Debug(id, "IN", filters)
-					continue
-				}
-
-				node := node.NewNode(e)
-
-				for _, c := range gd.pendingContainers {
-
-					if c.Engine.ID == e.ID &&
-						node.Container(c.Config.SwarmID()) == nil {
-
-						err := node.AddContainer(c.ToContainer())
-						if err != nil {
-							log.Error(e.ID, err.Error())
-							continue
-						}
-					}
-				}
-
+			node := gd.checkNode(list[i].ID, filters)
+			if node != nil {
 				out = append(out, node)
 			}
 		}
 
 	} else {
 
-		log.Debugf("Candidate From Assigned %s", names)
+		log.Debugf("Candidates From Assigned %s", names)
 
 		for _, name := range names {
 
-			e, ok := gd.engines[name]
-			if !ok {
-				log.Debugf("Not Found Engine %s", name)
-				continue
+			node := gd.checkNode(name, filters)
+			if node != nil {
+				out = append(out, node)
 			}
-
-			if isStringExist(name, filters) {
-				continue
-			}
-
-			node := node.NewNode(e)
-
-			for _, c := range gd.pendingContainers {
-				if c.Engine.ID == e.ID &&
-					node.Container(c.Config.SwarmID()) == nil {
-
-					err := node.AddContainer(c.ToContainer())
-					if err != nil {
-						log.Error(e.ID, err.Error())
-						continue
-					}
-				}
-			}
-
-			out = append(out, node)
 		}
 	}
 
-	log.Debugf("Candidate Nodes:%s", out)
+	log.Debugf("Candidate Nodes:%d", len(out))
 
 	return out
+}
+
+func (gd *Gardener) checkNode(id string, filters []string) *node.Node {
+	e, ok := gd.engines[id]
+	if !ok {
+		log.Debugf("Not Found Engine %s", id)
+
+		return nil
+	}
+
+	if isStringExist(id, filters) {
+		log.Debug(id, "IN", filters)
+		return nil
+	}
+
+	node := node.NewNode(e)
+
+	for _, c := range gd.pendingContainers {
+
+		if c.Engine.ID == e.ID && node.Container(c.Config.SwarmID()) == nil {
+
+			err := node.AddContainer(c.ToContainer())
+			if err != nil {
+				log.Error(e.ID, err.Error())
+
+				return nil
+			}
+		}
+	}
+
+	return node
 }
 
 func isStringExist(s string, list []string) bool {
