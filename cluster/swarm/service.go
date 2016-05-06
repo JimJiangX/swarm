@@ -299,7 +299,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, e
 		log.Error("Service Add To Scheduler", err)
 		return svc, err
 	}
-
+	log.Debugf("[**MG**] ServiceToScheduler ok:%v", svc)
 	return svc, nil
 }
 

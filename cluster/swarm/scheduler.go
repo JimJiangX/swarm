@@ -44,6 +44,7 @@ func (gd *Gardener) serviceScheduler() (err error) {
 			"Action": "Alloc",
 		})
 
+		log.Debugf("[**MG**] start serviceScheduler:%s", svc.Name)
 		if !atomic.CompareAndSwapInt64(&svc.Status, _StatusServcieBuilding, _StatusServiceAlloction) {
 			entry.Error("Status Conflict")
 			continue
@@ -73,12 +74,13 @@ func (gd *Gardener) serviceScheduler() (err error) {
 		svc.Unlock()
 
 		entry.Info("Alloction Success")
+		log.Debugf("[**MG**]Alloction OK and put  to the ServiceToExecute: %v", resourceAlloc)
 
 		gd.ServiceToExecute(svc)
 		continue
 
 	failure:
-
+		log.Debugf("[**MG**]serviceScheduler fail hehe: %v", resourceAlloc)
 		err = gd.Recycle(resourceAlloc)
 		if err != nil {
 			entry.Error("Recycle Failed", err)
@@ -138,8 +140,14 @@ func (gd *Gardener) BuildPendingContainersPerModule(svcName string, module *stru
 
 	entry.WithField("NodeNum", num).Infof("Build Container Config:%+v", config)
 
+	log.Debug("[**MG**] generate config  and  validate ok")
+
 	filters := gd.listShortIdleStore(module.Stores, module.Type, num)
+
+	log.Debugf("[** MG **] %s,%s,%s:first filters of storage:%s", module.Stores, module.Type, num, filters)
+
 	list := gd.listCandidateNodes(module.Nodes, module.Type, filters...)
+	log.Debugf("[**MG**] now listCandidateNodes result:%v ", list)
 
 	entry.Debugf("filters num:%d,candidate nodes num:%d", len(filters), len(list))
 
@@ -198,10 +206,10 @@ func (gd *Gardener) BuildPendingContainers(list []*node.Node, svcName, Type stri
 
 	preAllocs, err := gd.pendingAlloc(candidates[0:num], svcName, Type, stores, config)
 	if err != nil {
-		entry.Error("Allocation Failed", err)
+		entry.Error("gd.pendingAlloc: preAllocs Allocation Failed", err)
 	}
 
-	entry.Info("Allocation Succeed!")
+	entry.Info(" gd.pendingAlloc: Allocation Succeed!")
 
 	return preAllocs, err
 }
@@ -260,13 +268,13 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcName, Type string, 
 		preAlloc, err := gd.pendingAllocOneNode(engine, unit, stores, templConfig)
 		allocs = append(allocs, preAlloc)
 		if err != nil {
-			entry.Error("Alloc Resource", err)
+			entry.Error("pendingAlloc :Alloc Resource", err)
 
 			return allocs, err
 		}
 	}
 
-	entry.Info("Allocation Succeed!")
+	entry.Info("pendingAlloc: Allocation Succeed!")
 
 	return allocs, nil
 }
@@ -341,9 +349,11 @@ func (gd *Gardener) Scheduler(list []*node.Node, config *cluster.ContainerConfig
 	}
 
 	if err != nil {
+		log.Debugf("[**MG**] gd.scheduler.SelectNodesForContainer fail(swarm level) :", err)
 		return nil, err
 	}
 
+	log.Debugf("[**MG**] gd.scheduler.SelectNodesForContainer ok(swarm level) ndoes:%v", nodes)
 	return gd.SelectNodeByCluster(nodes, num, true)
 }
 
@@ -448,6 +458,7 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 
 	all, err := database.GetAllNodes()
 	if err != nil {
+		log.Warnf("[**MG**]SelectNodeByCluster::database.GetAllNodes fail", err)
 		all = nil
 	}
 
@@ -462,11 +473,15 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 			for index := range all {
 				if nodes[i].ID == all[index].ID {
 					dc, err = gd.Datacenter(all[index].ClusterID)
+					if err != nil {
+						log.Warnf("[**MG**] SelectNodeByCluster::database.Datacenter fail", err)
+					}
 					break
 				}
 			}
 		}
 		if err != nil || dc == nil {
+
 			continue
 		}
 
@@ -477,6 +492,8 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		}
 
 	}
+
+	log.Warnf("[**MG**]highAvailable:%v, num :%d ,m length:%d", highAvailable, num, len(m))
 
 	if highAvailable && len(m) < 2 {
 		return nil, errors.New("Not Match")
@@ -529,5 +546,6 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		}
 	}
 
+	log.Debugf("[**MG**]hehe SelectNodeByCluster end with Not Match ")
 	return nil, errors.New("Not Match")
 }
