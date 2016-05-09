@@ -124,7 +124,7 @@ func GetUnitConfigByID(id string) (*UnitConfig, error) {
 
 	config := &UnitConfig{}
 	query := "SELECT * FROM tb_unit_config WHERE id=? OR image_id=?"
-	err = db.Get(&config, query, id, id)
+	err = db.Get(config, query, id, id)
 	if err != nil {
 		return nil, err
 	}
