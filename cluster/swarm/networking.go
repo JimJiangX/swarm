@@ -20,7 +20,6 @@ type Networking struct {
 	Prefix int
 	*sync.RWMutex
 	database.Networking
-	pool []*IP
 }
 
 type IP struct {
@@ -37,85 +36,108 @@ func NewNetworking(net database.Networking, ips []database.IP) (*Networking, err
 		Enable:     true,
 		Prefix:     int(ips[0].Prefix),
 		Networking: net,
-		pool:       make([]*IP, len(ips)),
-	}
-
-	for i, num := 0, len(ips); i < num; i++ {
-		networking.pool[i] = &IP{
-			ip:        ips[i].IPAddr,
-			allocated: false,
-		}
 	}
 
 	return networking, nil
 }
 
+func newNetworking(net database.Networking, prefix int) *Networking {
+
+	networking := &Networking{
+		RWMutex:    new(sync.RWMutex),
+		Enable:     true,
+		Prefix:     prefix,
+		Networking: net,
+	}
+
+	return networking
+}
+
 func (net *Networking) AllocIP() (uint32, error) {
-	net.Lock()
-	defer net.Unlock()
-
-	for i := range net.pool {
-		if !net.pool[i].allocated {
-			net.pool[i].allocated = true
-
-			return net.pool[i].ip, nil
-		}
+	list, err := database.GetMultiIPByNetwrokingAndStatus(net.ID, false, 1)
+	if err == nil && len(list) == 1 {
+		return list[0].IPAddr, nil
 	}
 
 	return 0, ErrNotFoundIP
 }
 
-func (gd *Gardener) GetNetworking(id string) *Networking {
+func (gd *Gardener) GetNetworking(id string) (*Networking, error) {
 	gd.RLock()
 
 	for i := range gd.networkings {
 		if gd.networkings[i].Type == id {
 			gd.RUnlock()
-			return gd.networkings[i]
+			return gd.networkings[i], nil
 		}
 	}
 
 	gd.RUnlock()
 
-	return nil
+	net, prefix, err := database.GetNetworkingByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	networking := newNetworking(net, prefix)
+
+	gd.Lock()
+	gd.networkings = append(gd.networkings, networking)
+	gd.Unlock()
+
+	return networking, nil
 }
 
-func (gd *Gardener) GetNetworkingByType(typ string) *Networking {
+func (gd *Gardener) GetNetworkingByType(typ string) (*Networking, error) {
 	gd.RLock()
 
 	for i := range gd.networkings {
 		if gd.networkings[i].Enable &&
 			gd.networkings[i].Type == typ {
 			gd.RUnlock()
-			return gd.networkings[i]
+			return gd.networkings[i], nil
 		}
 	}
 
 	gd.RUnlock()
 
-	return nil
+	out, err := database.ListNetworkingByType(typ)
+	if err != nil {
+		return nil, err
+	}
+
+	list := make([]*Networking, 0, len(out))
+	for i := range out {
+		ips, err := database.GetMultiIPByNetwrokingAndStatus(out[i].ID, false, 1)
+		if err != nil || len(ips) == 0 {
+			continue
+		}
+
+		networking, err := NewNetworking(out[i], ips)
+		if err != nil {
+			continue
+		}
+
+		list = append(list, networking)
+	}
+
+	gd.Lock()
+	gd.networkings = append(gd.networkings, list...)
+	gd.Unlock()
+
+	return list[0], nil
 }
 
 func (gd *Gardener) SetNetworkingStatus(ID string, enable bool) error {
-	var net *Networking
-	gd.RLock()
-	for i := range gd.networkings {
-		if gd.networkings[i].ID == ID {
-			net = gd.networkings[i]
-
-			break
-		}
+	net, err := gd.GetNetworking(ID)
+	if err != nil {
+		return err
 	}
 
-	gd.RUnlock()
-	if net == nil {
-		return ErrNotFoundNetworking
-	}
 	net.Lock()
 
 	net.Enable = enable
-
-	err := database.UpdateNetworkingStatus(net.ID, enable)
+	err = database.UpdateNetworkingStatus(net.ID, enable)
 
 	net.Unlock()
 

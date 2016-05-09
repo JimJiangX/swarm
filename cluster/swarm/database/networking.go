@@ -9,7 +9,7 @@ import (
 
 type IP struct {
 	IPAddr       uint32 `db:"ip_addr"`
-	Prefix       uint32 `db:"prefix"`
+	Prefix       int    `db:"prefix"`
 	NetworkingID string `db:"networking_id"`
 	UnitID       string `db:"unit_id"`
 	Allocated    bool   `db:"allocated"`
@@ -191,6 +191,44 @@ func GetPortsByUnit(id string) ([]Port, error) {
 	return ports, nil
 }
 
+func GetNetworkingByID(id string) (Networking, int, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return Networking{}, 0, err
+	}
+
+	net := Networking{}
+
+	err = db.Get(&net, "SELECT * FROM tb_networking WHERE id=?", id)
+	if err != nil {
+		return net, 0, err
+	}
+
+	prefix := 0
+	err = db.Get(&prefix, "SELECT prefix FROM tb_ip WHERE networking_id=? LIMIT 1", id)
+	if err != nil {
+		return Networking{}, 0, err
+	}
+
+	return net, prefix, nil
+}
+
+func ListNetworkingByType(typ string) ([]Networking, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	list := make([]Networking, 0, 5)
+
+	err = db.Select(&list, "SELECT * FROM tb_networking WHERE type=?", typ)
+	if err != nil {
+		return nil, err
+	}
+
+	return list, nil
+}
+
 func TxInsertNetworking(start, end, gateway, typ string, prefix int) (Networking, []IP, error) {
 	startU32 := utils.IPToUint32(start)
 	endU32 := utils.IPToUint32(end)
@@ -207,13 +245,12 @@ func TxInsertNetworking(start, end, gateway, typ string, prefix int) (Networking
 		Enabled: true,
 	}
 
-	prefixU32 := uint32(prefix)
 	num := int(endU32 - startU32 + 1)
 	ips := make([]IP, num)
 	for i := range ips {
 		ips[i] = IP{
 			IPAddr:       startU32,
-			Prefix:       prefixU32,
+			Prefix:       prefix,
 			NetworkingID: net.ID,
 			Allocated:    false,
 		}
@@ -304,15 +341,25 @@ func CountIPByNetwrokingAndStatus(networking string, allocation bool) (int, erro
 	return count, err
 }
 
-type IPStatus struct {
-	UnitID    string
-	IP        uint32
-	Prefix    int
-	Allocated bool
+func GetMultiIPByNetwrokingAndStatus(networking string, allocation bool, num int) ([]IP, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]IP, num)
+	query := fmt.Sprintf("SELECT * from tb_ip WHERE networking_id=? AND allocated=? LIMIT %d", num)
+
+	err = db.Select(&out, query, networking, allocation)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
-func TxUpdateMultiIPStatue(tx *sqlx.Tx, val []IPStatus) error {
-	query := "UPDATE tb_ip SET unit_id=:unit_id,allocated=:allocated WHERE ip=:ip AND prefix=:prefix"
+func TxUpdateMultiIPValue(tx *sqlx.Tx, val []IP) error {
+	query := "UPDATE tb_ip SET unit_id=:unit_id,allocated=:allocated WHERE ip_addr=:ip_addr AND prefix=:prefix"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {

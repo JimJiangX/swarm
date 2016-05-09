@@ -133,14 +133,18 @@ func (pre *preAllocResource) consistency() (err error) {
 		return err
 	}
 
-	ipTables := make([]database.IPStatus, len(pre.networkings))
+	ipTables := make([]database.IP, len(pre.networkings))
 	for i := range pre.networkings {
-		ipTables[i].Allocated = true
-		ipTables[i].IP = pre.networkings[i].ipuint32
-		ipTables[i].Prefix = pre.networkings[i].Prefix
+		ipTables[i] = database.IP{
+			Allocated:    true,
+			UnitID:       pre.unit.ID,
+			NetworkingID: pre.networkings[i].Networking,
+			IPAddr:       pre.networkings[i].ipuint32,
+			Prefix:       pre.networkings[i].Prefix,
+		}
 	}
 
-	err = database.TxUpdateMultiIPStatue(tx, ipTables)
+	err = database.TxUpdateMultiIPValue(tx, ipTables)
 	if err != nil {
 		return err
 	}
@@ -181,9 +185,9 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 
 	for i := range pendings {
 
-		ipsStatus := gd.recycleNetworking(pendings[i])
+		ips := gd.recycleNetworking(pendings[i])
 
-		database.TxUpdateMultiIPStatue(tx, ipsStatus)
+		database.TxUpdateMultiIPValue(tx, ips)
 
 		ports := pendings[i].unit.ports
 		for p := range ports {
@@ -216,39 +220,21 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 	return tx.Commit()
 }
 
-func (gd *Gardener) recycleNetworking(pre *preAllocResource) []database.IPStatus {
+func (gd *Gardener) recycleNetworking(pre *preAllocResource) []database.IP {
 	// networking recycle
-	ipsStatus := make([]database.IPStatus, 0, 10)
+	ips := make([]database.IP, 0, len(pre.networkings)*2)
 
 	for i := range pre.networkings {
-
-	loop:
-		for n := range gd.networkings {
-
-			if gd.networkings[n].ID != pre.networkings[i].Networking ||
-				gd.networkings[n].Prefix != pre.networkings[i].Prefix {
-
-				continue loop
-			}
-
-			for ip := range gd.networkings[n].pool {
-
-				if gd.networkings[n].pool[ip].ip == pre.networkings[i].ipuint32 {
-					gd.networkings[n].pool[ip].allocated = false
-
-					ipsStatus = append(ipsStatus, database.IPStatus{
-						IP:        pre.networkings[i].ipuint32,
-						Prefix:    pre.networkings[i].Prefix,
-						Allocated: gd.networkings[n].pool[ip].allocated,
-					})
-
-					break loop
-				}
-			}
-		}
+		ips = append(ips, database.IP{
+			IPAddr:       pre.networkings[i].ipuint32,
+			Prefix:       pre.networkings[i].Prefix,
+			NetworkingID: pre.networkings[i].Networking,
+			UnitID:       "",
+			Allocated:    false,
+		})
 	}
 
-	return ipsStatus
+	return ips
 }
 
 func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engine, config *cluster.ContainerConfig, need []structs.DiskStorage) error {
