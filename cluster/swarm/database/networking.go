@@ -341,7 +341,7 @@ func CountIPByNetwrokingAndStatus(networking string, allocation bool) (int, erro
 	return count, err
 }
 
-func GetMultiIPByNetwrokingAndStatus(networking string, allocation bool, num int) ([]IP, error) {
+func GetMultiIPByNetworking(networking string, allocation bool, num int) ([]IP, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
@@ -352,6 +352,43 @@ func GetMultiIPByNetwrokingAndStatus(networking string, allocation bool, num int
 
 	err = db.Select(&out, query, networking, allocation)
 	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func TXAllocIPByNetworking(id, unit string, num int) ([]IP, error) {
+	tx, err := GetTX()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	out := make([]IP, num)
+	query := tx.Rebind(fmt.Sprintf("SELECT * FROM tb_ip WHERE networking_id=? AND allocated=? LIMIT %d for update;", num))
+
+	err = tx.Select(&out, query, id, false)
+	if err != nil {
+		return nil, err
+	}
+
+	stmt, err := tx.PrepareNamed("UPDATE tb_ip SET allocated=:allocated,unit_id=:unit_id WHERE ip_addr=:ip_addr AND prefix=:prefix")
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range out {
+		out[i].Allocated = true
+		out[i].UnitID = unit
+
+		_, err = stmt.Exec(&out[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
 

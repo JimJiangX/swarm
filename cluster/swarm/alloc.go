@@ -36,7 +36,7 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 		preAlloc.unit.ports = ports
 	}
 
-	networkings, err := gd.getNetworkingSetting(engine, Type, "")
+	networkings, err := gd.getNetworkingSetting(engine, preAlloc.unit.ID, Type, "")
 	preAlloc.networkings = append(preAlloc.networkings, networkings...)
 	if err != nil {
 		log.Errorf("Alloc Networking Error:%s", err.Error())
@@ -132,23 +132,23 @@ func (pre *preAllocResource) consistency() (err error) {
 	if err != nil {
 		return err
 	}
-
-	ipTables := make([]database.IP, len(pre.networkings))
-	for i := range pre.networkings {
-		ipTables[i] = database.IP{
-			Allocated:    true,
-			UnitID:       pre.unit.ID,
-			NetworkingID: pre.networkings[i].Networking,
-			IPAddr:       pre.networkings[i].ipuint32,
-			Prefix:       pre.networkings[i].Prefix,
+	/*
+		ipTables := make([]database.IP, len(pre.networkings))
+		for i := range pre.networkings {
+			ipTables[i] = database.IP{
+				Allocated:    true,
+				UnitID:       pre.unit.ID,
+				NetworkingID: pre.networkings[i].Networking,
+				IPAddr:       pre.networkings[i].ipuint32,
+				Prefix:       pre.networkings[i].Prefix,
+			}
 		}
-	}
 
-	err = database.TxUpdateMultiIPValue(tx, ipTables)
-	if err != nil {
-		return err
-	}
-
+		err = database.TxUpdateMultiIPValue(tx, ipTables)
+		if err != nil {
+			return err
+		}
+	*/
 	err = database.TxUpdatePorts(tx, pre.unit.ports)
 	if err != nil {
 		return err

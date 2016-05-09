@@ -42,7 +42,6 @@ func NewNetworking(net database.Networking, ips []database.IP) (*Networking, err
 }
 
 func newNetworking(net database.Networking, prefix int) *Networking {
-
 	networking := &Networking{
 		RWMutex:    new(sync.RWMutex),
 		Enable:     true,
@@ -51,15 +50,6 @@ func newNetworking(net database.Networking, prefix int) *Networking {
 	}
 
 	return networking
-}
-
-func (net *Networking) AllocIP() (uint32, error) {
-	list, err := database.GetMultiIPByNetwrokingAndStatus(net.ID, false, 1)
-	if err == nil && len(list) == 1 {
-		return list[0].IPAddr, nil
-	}
-
-	return 0, ErrNotFoundIP
 }
 
 func (gd *Gardener) GetNetworking(id string) (*Networking, error) {
@@ -108,7 +98,7 @@ func (gd *Gardener) GetNetworkingByType(typ string) (*Networking, error) {
 
 	list := make([]*Networking, 0, len(out))
 	for i := range out {
-		ips, err := database.GetMultiIPByNetwrokingAndStatus(out[i].ID, false, 1)
+		ips, err := database.GetMultiIPByNetworking(out[i].ID, false, 1)
 		if err != nil || len(ips) == 0 {
 			continue
 		}
@@ -174,14 +164,14 @@ type IPInfo struct {
 	ipuint32   uint32
 }
 
-func NewIPinfo(net *Networking, ip uint32) IPInfo {
+func NewIPinfo(net database.Networking, ip database.IP) IPInfo {
 	return IPInfo{
 		Networking: net.ID,
-		IP:         utils.Uint32ToIP(ip),
+		IP:         utils.Uint32ToIP(ip.IPAddr),
 		Type:       net.Type,
 		Gateway:    net.Gateway,
-		Prefix:     net.Prefix,
-		ipuint32:   ip,
+		Prefix:     ip.Prefix,
+		ipuint32:   ip.IPAddr,
 	}
 }
 
@@ -190,10 +180,10 @@ func (info IPInfo) String() string {
 	return fmt.Sprintf("%s/%d:%s", info.IP.String(), info.Prefix, info.Device)
 }
 
-func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, name, Type string) ([]IPInfo, error) {
+func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit, name, Type string) ([]IPInfo, error) {
 	networkings := make([]IPInfo, 0, 2)
 
-	ipinfo, err := gd.AllocIP("", _ContainersNetworking)
+	ipinfo, err := gd.AllocIP("", _ContainersNetworking, unit)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +198,7 @@ func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, name, Type stri
 
 	if isProxyType(Type) || isProxyType(name) {
 
-		ipinfo2, err := gd.AllocIP("", _ExternalAccessNetworking)
+		ipinfo2, err := gd.AllocIP("", _ExternalAccessNetworking, unit)
 		if err != nil {
 			return networkings, err
 		}
@@ -225,21 +215,27 @@ func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, name, Type stri
 	return networkings, err
 }
 
-func (gd *Gardener) AllocIP(id, typ string) (IPInfo, error) {
-	for i := range gd.networkings {
-		if !gd.networkings[i].Enable {
-			continue
+func (gd *Gardener) AllocIP(id, typ, unit string) (_ IPInfo, err error) {
+	var networkings []database.Networking
+
+	if len(id) > 0 {
+		networking, _, err := database.GetNetworkingByID(id)
+		if err == nil {
+			networkings = []database.Networking{networking}
 		}
+	}
 
-		if (id != "" && id == gd.networkings[i].ID) ||
-			(typ != "" && typ == gd.networkings[i].Type) {
+	if len(networkings) == 0 && len(typ) > 0 {
+		networkings, err = database.ListNetworkingByType(typ)
+		if err != nil {
+			return IPInfo{}, err
+		}
+	}
 
-			ip, err := gd.networkings[i].AllocIP()
-			if err != nil {
-				continue
-			}
-
-			return NewIPinfo(gd.networkings[i], ip), nil
+	for i := range networkings {
+		ip, err := database.TXAllocIPByNetworking(networkings[i].ID, unit, 1)
+		if err == nil && len(ip) == 1 {
+			return NewIPinfo(networkings[i], ip[0]), nil
 		}
 	}
 
