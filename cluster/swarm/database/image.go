@@ -70,7 +70,7 @@ func QueryImageByID(id string) (Image, error) {
 	}
 
 	image := Image{}
-	err = db.Get(&image, "SELECT * FROM tb_image WHERE id=? OR image_id=?", id, id)
+	err = db.Get(&image, "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?", id, id)
 
 	return image, err
 }

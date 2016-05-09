@@ -469,9 +469,14 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 
 		if len(all) == 0 {
 			dc, err = gd.DatacenterByNode(nodes[i].ID)
+			if err != nil {
+				log.Warnf("[**MG**]SelectNodeByCluster::DatacenterByNode fail", err)
+			}
+			log.Debugf("[**MG**]len(all) == 0the dc :%v", dc)
 		} else {
 			for index := range all {
-				if nodes[i].ID == all[index].ID {
+				log.Debugf("the nodes[i].ID == all[index].ID :%s:%s  ", nodes[i].ID, all[index].EngineID)
+				if nodes[i].ID == all[index].EngineID {
 					dc, err = gd.Datacenter(all[index].ClusterID)
 					if err != nil {
 						log.Warnf("[**MG**] SelectNodeByCluster::database.Datacenter fail", err)
@@ -479,9 +484,11 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 					break
 				}
 			}
-		}
-		if err != nil || dc == nil {
+			log.Debugf("[**MG**]len(all) != 0 the dc :%v", dc)
 
+		}
+		log.Debugf("[**MG**]HEHE ERR:%v ; dc:%v", err, dc)
+		if err != nil || dc == nil {
 			continue
 		}
 
@@ -495,9 +502,9 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 
 	log.Warnf("[**MG**]highAvailable:%v, num :%d ,m length:%d", highAvailable, num, len(m))
 
-	if highAvailable && len(m) < 2 {
-		return nil, errors.New("Not Match")
-	}
+	//	if highAvailable && len(m) < 2 {
+	//		return nil, errors.New("Not Match")
+	//	}
 
 	candidates := make([]*node.Node, num)
 	seq := 0

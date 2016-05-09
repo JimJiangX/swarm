@@ -144,16 +144,16 @@ func SaveMultiNodesToDB(nodes []*Node) error {
 }
 
 func (gd *Gardener) Datacenter(IDOrName string) (*Datacenter, error) {
-	gd.RLock()
-	for i := range gd.datacenters {
-		if gd.datacenters[i].ID == IDOrName || gd.datacenters[i].Name == IDOrName {
-			gd.RUnlock()
+	//	gd.RLock()
+	//	for i := range gd.datacenters {
+	//		if gd.datacenters[i].ID == IDOrName || gd.datacenters[i].Name == IDOrName {
+	//			gd.RUnlock()
 
-			return gd.datacenters[i], nil
-		}
-	}
+	//			return gd.datacenters[i], nil
+	//		}
+	//	}
 
-	gd.RUnlock()
+	//	gd.RUnlock()
 
 	cl, err := database.GetCluster(IDOrName)
 	if err != nil || cl == nil {

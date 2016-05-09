@@ -27,6 +27,30 @@ adm_nic=bond0
 int_nic=bond1
 ext_nic=bond2
 
+
+
+reg_to_horus_server() {
+	local component_type=$1
+
+	curl -X POST -H "Content-Type: application/json" -d "{ "endpoint": "${node_id}","name": "${node_id}--${component_type}","type": "${component_type}","checktype": "health" }" http://${horus_server_ip}:${horus_server_port}/v1/component/register
+	if [ $? != 0 ]; then
+		echo "${component_type} register to horus server failed"
+		exit 2
+	fi
+}
+
+
+reg_to_consul() {
+	local component_type=$1
+	local component_port=$2
+
+	curl -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}--${component_type}'","Name": "'${node_id}--${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Port": '${component_port}', "Check": { "tcp": "'${adm_ip}':'${component_port}'", "Interval": "10s", "timeout": "3s" }}' http://${adm_ip}:${consul_port}/v1/agent/register
+	if [ $? != 0 ]; then
+		echo "${component_type} register to consul failed"
+		exit 2
+	fi
+
+
 # init VG
 init_hdd_vg() {
 	local hdd_dev_list=''
@@ -268,6 +292,8 @@ EOF
 
 }
 
+
+
 init_docker() {
 	local cert_file=$regstry_ca_file
 	local cert_dir="/etc/docker/certs.d/${registry_domain}:${registry_port}"
@@ -455,15 +481,21 @@ EOF
 init_hdd_vg
 init_ssd_vg
 install_consul
+reg_for_horus_server ConsulAgent
 install_docker_plugin
-#register_docker_plugin
+reg_to_consul DockerPlugin ${docker_plugin_port}
+reg_to_horus_server DockerPlugin 
 install_docker
 init_docker
-#register_docker
+reg_to_consul Docker ${docker_port}
+reg_to_horus_server Docker
 install_swarm_agent
-#register_swarm_agent
+reg_to_consul SwarmAgent ${swarm_agent_port}
+reg_to_horus_server SwarmAgent
 install_horus_agent
-#register_horus_agent
+reg_to_consul HorusAgent ${horus_agent_port}
+reg_to_horus_server HorusAgent
+
 
 
 exit 0
