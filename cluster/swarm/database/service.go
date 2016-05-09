@@ -150,17 +150,19 @@ func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {
 }
 
 type Service struct {
-	ID               string    `db:"id"`
-	Name             string    `db:"name"`
-	Description      string    `db:"description"`
-	Architecture     string    `db:"architecture"`
-	AutoHealing      bool      `db:"auto_healing"`
-	AutoScaling      bool      `db:"auto_scaling"`
-	HighAvailable    bool      `db:"high_available"`
-	Status           int64     `db:"status"`
-	BackupStrategyID string    `db:"backup_strategy_id"`
-	CreatedAt        time.Time `db:"created_at"`
-	FinishedAt       time.Time `db:"finished_at"`
+	ID                   string    `db:"id"`
+	Name                 string    `db:"name"`
+	Description          string    `db:"description"`
+	Architecture         string    `db:"architecture"`
+	AutoHealing          bool      `db:"auto_healing"`
+	AutoScaling          bool      `db:"auto_scaling"`
+	HighAvailable        bool      `db:"high_available"`
+	Status               int64     `db:"status"`
+	BackupStrategyID     string    `db:"backup_strategy_id"`
+	BackupMaxSizeByte    int       `db:"backup_max_size"`
+	BackupFilesRetention int       `db:"backup_files_retention"`
+	CreatedAt            time.Time `db:"created_at"`
+	FinishedAt           time.Time `db:"finished_at"`
 }
 
 func (svc Service) TableName() string {

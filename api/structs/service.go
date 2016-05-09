@@ -16,9 +16,11 @@ type PostServiceRequest struct {
 	AutoScaling   bool `json:",omitempty"`
 	HighAvailable bool `json:",omitempty"`
 
-	Modules        []Module
-	Users          []User          `json:",omitempty"`
-	BackupStrategy *BackupStrategy `json:"backup_strategy,omitempty"`
+	Modules         []Module
+	Users           []User          `json:",omitempty"`
+	BackupRetention time.Duration   // s
+	BackupMaxSize   int             // byte
+	BackupStrategy  *BackupStrategy `json:"backup_strategy,omitempty"`
 }
 
 type User struct {
@@ -53,10 +55,8 @@ type BackupStrategy struct {
 	Type      string        // full/incremental
 	Spec      string        // cron spec
 	Valid     string        // "2006-01-02 15:04:05"
-	Timeout   time.Duration // xx Sec
-	Retention time.Duration // s
-	MaxSize   int           // byte
 	BackupDir string        `json:",omitempty"`
+	Timeout   time.Duration // xx Sec
 }
 
 type PostServiceResponse struct {

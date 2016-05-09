@@ -70,30 +70,30 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		}
 
 		strategy = &database.BackupStrategy{
-			ID:          utils.Generate64UUID(),
-			Type:        req.BackupStrategy.Type,
-			Spec:        req.BackupStrategy.Spec,
-			Valid:       valid,
-			Enabled:     true,
-			BackupDir:   req.BackupStrategy.BackupDir,
-			MaxSizeByte: req.BackupStrategy.MaxSize,
-			Retention:   int(req.BackupStrategy.Retention * time.Second),
-			Timeout:     int(req.BackupStrategy.Timeout * time.Second),
-			CreatedAt:   time.Now(),
+			ID:        utils.Generate64UUID(),
+			Type:      req.BackupStrategy.Type,
+			Spec:      req.BackupStrategy.Spec,
+			Valid:     valid,
+			Enabled:   true,
+			BackupDir: req.BackupStrategy.BackupDir,
+			Timeout:   int(req.BackupStrategy.Timeout * time.Second),
+			CreatedAt: time.Now(),
 		}
 	}
 
 	svc := database.Service{
-		ID:               utils.Generate64UUID(),
-		Name:             req.Name,
-		Description:      string(des),
-		Architecture:     req.Architecture,
-		AutoHealing:      req.AutoHealing,
-		AutoScaling:      req.AutoScaling,
-		HighAvailable:    req.HighAvailable,
-		Status:           _StatusServiceInit,
-		BackupStrategyID: strategy.ID,
-		CreatedAt:        time.Now(),
+		ID:                   utils.Generate64UUID(),
+		Name:                 req.Name,
+		Description:          string(des),
+		Architecture:         req.Architecture,
+		AutoHealing:          req.AutoHealing,
+		AutoScaling:          req.AutoScaling,
+		HighAvailable:        req.HighAvailable,
+		Status:               _StatusServiceInit,
+		BackupStrategyID:     strategy.ID,
+		BackupMaxSizeByte:    req.BackupMaxSize,
+		BackupFilesRetention: int(req.BackupRetention * time.Second),
+		CreatedAt:            time.Now(),
 	}
 
 	_, nodeNum, err := getServiceArch(req.Architecture)

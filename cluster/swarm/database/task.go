@@ -209,17 +209,15 @@ func DeleteTask(id string) error {
 }
 
 type BackupStrategy struct {
-	ID          string    `db:"id"`
-	Type        string    `db:"type"` // full/part
-	Spec        string    `db:"spec"`
-	Next        time.Time `db:"next"`
-	Valid       time.Time `db:"valid"`
-	Enabled     bool      `db:"enabled"`
-	BackupDir   string    `db:"backup_dir"`
-	MaxSizeByte int       `db:"max_size"`
-	Retention   int       `db:"retention"`
-	Timeout     int       `db:"timeout"` // s
-	CreatedAt   time.Time `db:"created_at"`
+	ID        string    `db:"id"`
+	Type      string    `db:"type"` // full/part
+	Spec      string    `db:"spec"`
+	Next      time.Time `db:"next"`
+	Valid     time.Time `db:"valid"`
+	Enabled   bool      `db:"enabled"`
+	BackupDir string    `db:"backup_dir"`
+	Timeout   int       `db:"timeout"` // s
+	CreatedAt time.Time `db:"created_at"`
 }
 
 func (bs BackupStrategy) TableName() string {
