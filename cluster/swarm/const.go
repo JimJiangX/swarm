@@ -62,6 +62,9 @@ const (
 	_ProxyType         = "proxy"          // cluster_type,networking_type
 	_SwitchManagerType = "switch_manager" // cluster_type,networking_type
 
+	_UnitRole_Master        = "master"
+	_UnitRole_SwitchManager = "switch_manager"
+
 	_SSD          = "SSD"
 	_HDD          = "HDD"
 	_HDD_VG_Label = "HDD_VG"

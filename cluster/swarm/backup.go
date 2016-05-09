@@ -6,7 +6,6 @@ import (
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
-	"github.com/yiduoyunQ/smlib"
 	crontab "gopkg.in/robfig/cron.v2"
 )
 
@@ -33,48 +32,12 @@ func (bs *serviceBackup) Run() {
 		return
 	}
 
-	if !strategy.Enabled || bs.server == "" {
+	if !strategy.Enabled || bs.server == "" || bs.svc == nil {
 		return
 	}
-
-	task := database.NewTask("backup_strategy", strategy.ID, "", nil, strategy.Timeout)
-	task.Status = _StatusTaskCreate
-
-	err = database.InsertTask(task)
-	if err != nil {
-		return
-	}
-
 	bs.strategy = strategy
 
-	addr, port, master, err := bs.svc.GetSwitchManagerAndMaster()
-	if err != nil {
-		err = database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "Cancel,The Task marked as TaskCancel,"+err.Error())
-
-		return
-	}
-
-	if err := smlib.Lock(addr, port); err != nil {
-		err = database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "TaskCancel,Switch Manager is busy now,"+err.Error())
-
-		return
-	}
-	defer smlib.UnLock(addr, port)
-
-	args := []string{bs.server + "v1.0/task/backup/callback", task.ID, strategy.ID, master.ID, strategy.Type}
-
-	errCh := make(chan error, 1)
-	select {
-	case errCh <- master.backup(args...):
-
-	case <-time.After(time.Duration(strategy.Timeout)):
-		err = database.UpdateTaskStatus(task, _StatusTaskTimeout, time.Now(), "Timeout,The Task marked as TaskTimeout")
-	}
-
-	<-errCh
-
-	return
-
+	bs.svc.TryBackupTask(bs.server, "", strategy.ID, strategy.Type, strategy.Timeout)
 }
 
 func (bs *serviceBackup) Next(time.Time) time.Time {

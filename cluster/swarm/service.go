@@ -53,29 +53,34 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		return nil, errors.New(strings.Join(warnings, ","))
 	}
 
-	valid, err := utils.ParseStringToTime(req.BackupStrategy.Valid)
-	if err != nil {
-		log.Error("Parse Request.BackupStrategy.Valid to time.Time", err)
-		return nil, err
-	}
-
 	des, err := json.Marshal(req)
 	if err != nil {
-		log.Error("JSON Marshal", err)
+		log.Errorf("JSON Marshal Error:%s", err.Error())
 		return nil, err
 	}
 
-	strategy := &database.BackupStrategy{
-		ID:          utils.Generate64UUID(),
-		Type:        req.BackupStrategy.Type,
-		Spec:        req.BackupStrategy.Spec,
-		Valid:       valid,
-		Enabled:     true,
-		BackupDir:   req.BackupStrategy.BackupDir,
-		MaxSizeByte: req.BackupStrategy.MaxSize,
-		Retention:   int(req.BackupStrategy.Retention * time.Second),
-		Timeout:     int(req.BackupStrategy.Timeout * time.Second),
-		CreatedAt:   time.Now(),
+	strategy := &database.BackupStrategy{}
+
+	if req.BackupStrategy != nil {
+
+		valid, err := utils.ParseStringToTime(req.BackupStrategy.Valid)
+		if err != nil {
+			log.Error("Parse Request.BackupStrategy.Valid to time.Time", err)
+			return nil, err
+		}
+
+		strategy = &database.BackupStrategy{
+			ID:          utils.Generate64UUID(),
+			Type:        req.BackupStrategy.Type,
+			Spec:        req.BackupStrategy.Spec,
+			Valid:       valid,
+			Enabled:     true,
+			BackupDir:   req.BackupStrategy.BackupDir,
+			MaxSizeByte: req.BackupStrategy.MaxSize,
+			Retention:   int(req.BackupStrategy.Retention * time.Second),
+			Timeout:     int(req.BackupStrategy.Timeout * time.Second),
+			CreatedAt:   time.Now(),
+		}
 	}
 
 	svc := database.Service{
@@ -651,7 +656,7 @@ func (svc *Service) GetSwitchManagerAndMaster() (string, int, *unit, error) {
 loop:
 	for _, val := range topology.DataNodeGroup {
 		for id, node := range val {
-			if strings.EqualFold(node.Type, "master") {
+			if strings.EqualFold(node.Type, _UnitRole_Master) {
 				masterID = id
 
 				break loop
@@ -667,6 +672,78 @@ loop:
 	master, err := svc.getUnit(masterID)
 
 	return addr, port, master, err
+}
+
+func (svc *Service) TryBackupTask(host, unitID, strategyID, strategyType string, timeout int) error {
+
+	task := database.NewTask("backup_strategy", strategyID, "", nil, timeout)
+	task.Status = _StatusTaskCreate
+
+	err := database.InsertTask(task)
+	if err != nil {
+		return err
+	}
+
+	backup := &unit{}
+
+	for retries := 3; ; retries-- {
+		if retries != 3 {
+			time.Sleep(time.Second * 60)
+		}
+
+		addr, port, master, err := svc.GetSwitchManagerAndMaster()
+		if err != nil {
+			if retries > 0 {
+				continue
+			}
+			err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "Cancel,The Task marked as TaskCancel,"+err.Error())
+			return fmt.Errorf("Errors:%v,%v", err, err1)
+		}
+
+		if err := smlib.Lock(addr, port); err != nil {
+			if retries > 0 {
+				continue
+			}
+			err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "TaskCancel,Switch Manager is busy now,"+err.Error())
+			return fmt.Errorf("Errors:%v,%v", err, err1)
+		}
+
+		backup = master
+		defer smlib.UnLock(addr, port)
+
+		break
+	}
+
+	if unitID != "" {
+		svc.RLock()
+		backup, err = svc.getUnit(unitID)
+		svc.RUnlock()
+
+		if err != nil {
+			return err
+		}
+	}
+
+	args := []string{host + "v1.0/task/backup/callback", task.ID, strategyID, backup.ID, strategyType}
+
+	errCh := make(chan error, 1)
+
+	select {
+	case errCh <- backup.backup(args...):
+
+	case <-time.After(time.Duration(timeout)):
+
+		err = database.UpdateTaskStatus(task, _StatusTaskTimeout, time.Now(), "Timeout,The Task marked as TaskTimeout")
+
+		return fmt.Errorf("Task Timeout,Service:%s,BackupStrategy:%s,Task:%s,Error:%v", svc.ID, strategyID, task.ID, err)
+	}
+
+	msg := <-errCh
+	if msg == nil {
+		return nil
+	}
+
+	return fmt.Errorf("Backup %s Task Faild,%v", unitID, msg)
 }
 
 func (svc *Service) Task() *database.Task {

@@ -279,7 +279,7 @@ func BackupTaskValidate(taskID, strategyID, unitID string) (int, error) {
 	}
 
 	rent := 0
-	err = db.QueryRowx("SELECT retention FROM tb_backup_strategy WHERE id=?", strategyID).Scan(&rent)
+	err = db.Get(&rent, "SELECT retention FROM tb_backup_strategy WHERE id=?", strategyID)
 	if err != nil {
 		return 0, err
 	}

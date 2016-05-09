@@ -420,11 +420,11 @@ func (gd *Gardener) checkNode(id string, filters []string) *node.Node {
 
 	node := node.NewNode(e)
 
-	for _, c := range gd.pendingContainers {
+	for _, pc := range gd.pendingContainers {
 
-		if c.Engine.ID == e.ID && node.Container(c.Config.SwarmID()) == nil {
+		if pc.Engine.ID == e.ID && node.Container(pc.Config.SwarmID()) == nil {
 
-			err := node.AddContainer(c.ToContainer())
+			err := node.AddContainer(pc.ToContainer())
 			if err != nil {
 				log.Error(e.ID, err.Error())
 
@@ -472,7 +472,7 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 			if err != nil {
 				log.Warnf("[**MG**]SelectNodeByCluster::DatacenterByNode fail", err)
 			}
-			log.Debugf("[**MG**]len(all) == 0the dc :%v", dc)
+			log.Debugf("[**MG**]len(all) == 0 the dc :%v", dc)
 		} else {
 			for index := range all {
 				log.Debugf("the nodes[i].ID == all[index].ID :%s:%s  ", nodes[i].ID, all[index].EngineID)
