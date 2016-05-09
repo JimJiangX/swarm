@@ -50,34 +50,51 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/clusters/{name:.*}":                 getClustersByNameOrID,
 		"/clusters/{name:.*}/nodes":           getNodes,
 		"/clusters/{name:.*}/nodes/{node:.*}": getNodesByNameOrID,
+		"/tasks":           getTasks,
+		"/tasks/{name:.*}": getTask,
 	},
 	"POST": {
-		"/clusters":                   postCluster,
-		"/clusters/{name:.*}/enable":  postEnableCluster,
-		"/clusters/{name:.*}/disable": postDisableCluster,
-		"/clusters/{name:.*}/nodes":   postNodes,
-
+		"/clusters":                         postCluster,
+		"/clusters/{name:.*}/enable":        postEnableCluster,
+		"/clusters/{name:.*}/disable":       postDisableCluster,
+		"/clusters/{name:.*}/nodes":         postNodes,
 		"/clusters/nodes/{node:.*}/enable":  postEnableNode,
 		"/clusters/nodes/{node:.*}/disable": postDisableNode,
 
-		"/tasks/backup/callback":               postBackupCallback,
-		"/services":                            postService,
+		"/services":                                   postService,
+		"/services/{name:.*}/backup_strategy":         postStrategyToService,
+		"/services/backup_strategy/{name:.*}/disable": postDisableServiceStrategy,
+		"/services/backup_strategy/{name:.*}/enable":  postEnableServiceStrategy,
+
 		"/networkings":                         postNetworking,
 		"/networkings/ports":                   postImportPort,
 		"/networkings/ports/{port:.*}/disable": postDisablePort,
 		"/networkings/{name:.*}/enable":        postEnableNetworking,
 		"/networkings/{name:.*}/disable":       postDisableNetworking,
-		"/image/load":                          postImageLoad,
-		"/storage/san":                         postSanStorage,
-		"/storage/nas":                         postNasStorage,
 
-		"/storage/{name:.*}/raidgroup/add": postRGToSanStorage,
+		"/image/load":               postImageLoad,
+		"/image/{image:.*}/enable":  postEnableImage,
+		"/image/{image:.*}/disable": postDisableImage,
+
+		"/storage/nas":                              postNasStorage,
+		"/storage/san":                              postSanStorage,
+		"/storage/san/{name:.*}/raid_group":         postRGToSanStorage,
+		"/storage/san/raid_group/{name:.*}/enable":  postEnableRaidGroup,
+		"/storage/san/raid_group/{name:.*}/disable": postDisableRaidGroup,
+
+		"/tasks/backup/callback": postBackupCallback,
 	},
 	"DELETE": {
-		"services/{name:.*}":        deleteService,
+		"/services/{name:.*}":                 deleteService,
+		"/services/backup_strategy/{name:.*}": deleteBackupStrategy,
+
 		"/clusters/{name:.*}":       deleteCluster,
 		"/clusters/nodes/{node:.*}": deleteNode,
-		"/networkings/{name:.*}":    deleteNetworking,
+
+		"/networkings/{name:.*}": deleteNetworking,
+
+		"/storage/{name:.*}":            deleteStorage,
+		"/storage/raid_group/{name:.*}": deleteRaidGroup,
 	},
 }
 

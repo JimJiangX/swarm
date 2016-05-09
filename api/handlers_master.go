@@ -70,6 +70,12 @@ func getNodesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// GET /tasks
+func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
+// GET /tasks/{name:.*}
+func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
 // 创建集群
 // POST /clusters
 func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -296,14 +302,24 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := structs.PostServiceResponse{
-		ID:     svc.ID,
-		TaskID: svc.Task().ID,
+		ID:               svc.ID,
+		BackupStrategyID: svc.BackupStrategyID,
+		TaskID:           svc.Task().ID,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(response)
 }
+
+// POST /services/{name:.*}/backup_strategy
+func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
+// POST /services/backup_strategy/{name:.*}/disable
+func postDisableServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
+// POST 	/services/backup_strategy/{name:.*}/enable
+func postEnableServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
 // 备份任务完成结果回调处理
 // Post /tasks/backup/callback
@@ -463,8 +479,13 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(w, "{%q:%q}", "ID", id)
-
 }
+
+// POST /image/{image:.*}/enable
+func postEnableImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
+// POST 	/image/{image:.*}/disable
+func postDisableImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
 // SAN存储系统入库
 // Post /storage/san
@@ -540,6 +561,12 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	fmt.Fprintf(w, "{%q:%q}", "size", size)
 }
 
+// POST /storage/san/raid_group/{name:.*}/enable
+func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
+// POST /storage/san/raid_group/{name:.*}/disable
+func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
 // NAS系统登记
 // Post /storage/nas
 func postNasStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -572,6 +599,9 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// Delete /services/backup_strategy/{name:.*}
+func deleteBackupStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
 // Delete /clusters/{name:.*}
 func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -630,3 +660,9 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// Delete /storage/{name:.*}
+func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
+// Delete /storage/raid_group/{name:.*}
+func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}

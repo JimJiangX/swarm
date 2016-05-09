@@ -17,8 +17,8 @@ type PostServiceRequest struct {
 	HighAvailable bool `json:",omitempty"`
 
 	Modules        []Module
-	Users          []User         `json:",omitempty"`
-	BackupStrategy BackupStrategy `json:"backup_strategy,omitempty"`
+	Users          []User          `json:",omitempty"`
+	BackupStrategy *BackupStrategy `json:"backup_strategy,omitempty"`
 }
 
 type User struct {
@@ -60,6 +60,7 @@ type BackupStrategy struct {
 }
 
 type PostServiceResponse struct {
-	ID     string
-	TaskID string
+	ID               string
+	TaskID           string
+	BackupStrategyID string `json:"backup_strategy_id,omitempty"`
 }
