@@ -75,6 +75,13 @@ const (
 	_Internal_NIC_Lable = "INT_NIC"
 	_External_NIC_Lable = "EXT_NIC"
 	_Admin_NIC_Lable    = "ADM_NIC"
+
+	_NodesNetworking          = "nodes_networking"
+	_ContainersNetworking     = "internal_access_networking"
+	_ExternalAccessNetworking = "external_access_networking"
+
+	_NetworkingLabelKey      = "upm.ip"
+	_ProxyNetworkingLabelKey = "upm.proxyip"
 )
 
 var (

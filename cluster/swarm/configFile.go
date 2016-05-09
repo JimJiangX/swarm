@@ -207,9 +207,9 @@ func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interf
 		adminAddr, dataAddr := "", ""
 		adminPort, dataPort := 0, 0
 		for i := range u.networkings {
-			if u.networkings[i].Type == ContainersNetworking {
+			if u.networkings[i].Type == _ContainersNetworking {
 				adminAddr = u.networkings[i].IP.String()
-			} else if u.networkings[i].Type == ExternalAccessNetworking {
+			} else if u.networkings[i].Type == _ExternalAccessNetworking {
 				dataAddr = u.networkings[i].IP.String()
 			}
 		}

@@ -620,7 +620,7 @@ func (svc *Service) getSwithManagerAddr() (addr string, port int, err error) {
 	}
 
 	for i := range u.networkings {
-		if u.networkings[i].Type == ContainersNetworking {
+		if u.networkings[i].Type == _ContainersNetworking {
 			addr = u.networkings[i].IP.String()
 
 			break

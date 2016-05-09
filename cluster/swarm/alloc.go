@@ -49,10 +49,10 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 	}
 
 	for i := range networkings {
-		if networkings[i].Type == ContainersNetworking {
-			config.Labels[networkingLabelKey] = networkings[i].String()
-		} else if networkings[i].Type == ExternalAccessNetworking {
-			config.Labels[proxynetworkingLabelKey] = networkings[i].String()
+		if networkings[i].Type == _ContainersNetworking {
+			config.Labels[_NetworkingLabelKey] = networkings[i].String()
+		} else if networkings[i].Type == _ExternalAccessNetworking {
+			config.Labels[_ProxyNetworkingLabelKey] = networkings[i].String()
 		}
 	}
 

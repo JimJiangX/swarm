@@ -12,15 +12,6 @@ import (
 	"github.com/docker/swarm/utils"
 )
 
-const (
-	NodesNetworking          = "nodes_networking"
-	ContainersNetworking     = "internal_access_networking"
-	ExternalAccessNetworking = "external_access_networking"
-
-	networkingLabelKey      = "upm.ip"
-	proxynetworkingLabelKey = "upm.proxyip"
-)
-
 var ErrNotFoundIP = errors.New("IP not found")
 var ErrNotFoundNetworking = errors.New("Networking not found")
 
@@ -180,7 +171,7 @@ func (info IPInfo) String() string {
 func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, name, Type string) ([]IPInfo, error) {
 	networkings := make([]IPInfo, 0, 2)
 
-	ipinfo, err := gd.AllocIP("", ContainersNetworking)
+	ipinfo, err := gd.AllocIP("", _ContainersNetworking)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +186,7 @@ func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, name, Type stri
 
 	if isProxyType(Type) || isProxyType(name) {
 
-		ipinfo2, err := gd.AllocIP("", ExternalAccessNetworking)
+		ipinfo2, err := gd.AllocIP("", _ExternalAccessNetworking)
 		if err != nil {
 			return networkings, err
 		}
