@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
-	"github.com/ngaut/log"
 	crontab "gopkg.in/robfig/cron.v2"
 )
 
