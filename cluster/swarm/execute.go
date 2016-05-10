@@ -32,29 +32,32 @@ func (gd *Gardener) serviceExecute() (err error) {
 		}
 
 		svc.Lock()
-
+		log.Debugf("[**MG**]serviceExecute: get server: %v", svc)
 		// step := int64(0)
 		var taskErr error
 
 		for _, pending := range svc.pendingContainers {
-
+			log.Debugf("[mg]svc.getUnit :%s", pending)
 			u, err := svc.getUnit(pending.Name)
-			if err != nil {
+			if err != nil || u == nil {
 				svc.Unlock()
 				taskErr = err
-
+				log.Errorf("%s:getunit err:%v", pending.Name, err)
 				goto failure
 			}
+			log.Debugf("[mg]the unit:%v", u)
 			atomic.StoreUint32(&u.Status, _StatusUnitCreating)
 
+			log.Debugf("[mg]start prepareCreateContainer")
 			err = u.prepareCreateContainer()
 			if err != nil {
 				svc.Unlock()
-				taskErr = fmt.Errorf("Prepare Networking or Volume Failed,%s", err)
-
+				taskErr = fmt.Errorf("%s:Prepare Networking or Volume Failed,%s", pending.Name, err)
+				log.Error(taskErr.Error())
 				goto failure
 			}
 
+			log.Debugf("[mg]create container")
 			// create container
 			container, err := gd.createContainerInPending(pending.Config, pending.Name, svc.authConfig)
 			if err != nil {
@@ -70,11 +73,12 @@ func (gd *Gardener) serviceExecute() (err error) {
 
 			}
 		}
-
+		log.Debugf("[mg]hehe")
 		svc.pendingContainers = nil
 
 		svc.Unlock()
 
+		log.Debugf("[mg]start server ")
 		err = svc.StartContainers()
 		if err != nil {
 			taskErr = err
