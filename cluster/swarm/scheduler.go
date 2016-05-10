@@ -257,6 +257,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcName, Type string, 
 				Status:    0,
 				CreatedAt: time.Now(),
 			},
+			engine: engine,
 			ports:  nil,
 			parent: parentConfig,
 		}

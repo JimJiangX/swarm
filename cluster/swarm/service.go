@@ -43,7 +43,7 @@ type Service struct {
 func NewService(svc database.Service, unitNum int) *Service {
 	return &Service{
 		Service:           svc,
-		units:             make([]*unit, unitNum),
+		units:             make([]*unit, 0, unitNum),
 		pendingContainers: make(map[string]*pendingContainer, unitNum),
 	}
 }
@@ -250,8 +250,7 @@ func converteToUsers(service string, users []structs.User) []database.User {
 
 func (svc *Service) getUnit(IDOrName string) (*unit, error) {
 	for i := range svc.units {
-		if svc.units[i].ID == IDOrName ||
-			svc.units[i].Name == IDOrName {
+		if svc.units[i].ID == IDOrName || svc.units[i].Name == IDOrName {
 			return svc.units[i], nil
 		}
 	}
