@@ -46,10 +46,13 @@ func (l localDisk) IdleSize() (map[string]int, error) {
 		return nil, err
 	}
 
+	fmt.Println("get vg list: %v", list)
+
 	out := make(map[string]int, len(list))
 
 	for i := range list {
-		free := list[i].VgSize
+		// free := list[i].VgSize * 1024 * 1024
+		free := list[i].VgSize * 1000 * 1000
 
 		// allocated size
 		lvs, err := database.SelectVolumeByVG(list[i].VgName)
@@ -57,13 +60,15 @@ func (l localDisk) IdleSize() (map[string]int, error) {
 			return nil, err
 		}
 
+		fmt.Println("get lvs list: %v", lvs)
+
 		for i := range lvs {
 			free -= lvs[i].Size
 		}
 
 		out[list[i].VgName] = free
 	}
-
+	fmt.Println("get out list: %v", out)
 	return out, nil
 }
 
@@ -78,8 +83,14 @@ func (l localDisk) Alloc(name, vg string, size int) (string, int, error) {
 		return "", 0, err
 	}
 
-	if idles[vg] < size {
-		return "", 0, fmt.Errorf("%s is shortage,%d<%d", vg, idles[vg], size)
+	vgsizes, ok := idles[vg]
+
+	if !ok {
+		return "", 0, fmt.Errorf("%s:don't get vg size", vg)
+	}
+
+	if vgsizes < size {
+		return "", 0, fmt.Errorf("%s is shortage,%d<%d", vg, vgsizes, size)
 	}
 
 	lv := database.LocalVolume{
