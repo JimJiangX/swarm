@@ -144,24 +144,35 @@ func SaveMultiNodesToDB(nodes []*Node) error {
 }
 
 func (gd *Gardener) Datacenter(IDOrName string) (*Datacenter, error) {
-	//	gd.RLock()
-	//	for i := range gd.datacenters {
-	//		if gd.datacenters[i].ID == IDOrName || gd.datacenters[i].Name == IDOrName {
-	//			gd.RUnlock()
+	gd.RLock()
+	for i := range gd.datacenters {
+		if gd.datacenters[i].ID == IDOrName || gd.datacenters[i].Name == IDOrName {
+			gd.RUnlock()
 
-	//			return gd.datacenters[i], nil
-	//		}
-	//	}
+			return gd.datacenters[i], nil
+		}
+	}
 
-	//	gd.RUnlock()
+	gd.RUnlock()
 
+	//If Not Found
 	cl, err := database.GetCluster(IDOrName)
 	if err != nil || cl == nil {
 		return nil, fmt.Errorf("Not Found %s,Error %s", IDOrName, err)
 	}
 
+	var storage store.Store
+	if cl.StorageType != store.LocalDiskStore && cl.StorageID != "" {
+		storage, err = gd.GetStore(cl.StorageID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	dc := &Datacenter{
+		RWMutex: sync.RWMutex{},
 		Cluster: cl,
+		storage: storage,
 		nodes:   make([]*Node, 0, 100),
 	}
 
