@@ -119,6 +119,21 @@ func TxDelUnit(tx *sqlx.Tx, id string) error {
 	return err
 }
 
+func ListUnitByServiceID(ID string) ([]*Unit, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	units := make([]*Unit, 0, 5)
+	err = db.Select(&units, "SELECT * FROM tb_unit WHERE service_id=?", ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return units, nil
+}
+
 func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {
 	tx, err := GetTX()
 	if err != nil {
@@ -193,19 +208,25 @@ func TxSaveService(svc *Service, strategy *BackupStrategy, task *Task, users []U
 		return err
 	}
 
-	err = TxInsertTask(tx, task)
-	if err != nil {
-		return err
+	if task != nil {
+		err = TxInsertTask(tx, task)
+		if err != nil {
+			return err
+		}
 	}
 
-	err = TxInsertBackupStrategy(tx, strategy)
-	if err != nil {
-		return err
+	if strategy != nil {
+		err = TxInsertBackupStrategy(tx, strategy)
+		if err != nil {
+			return err
+		}
 	}
 
-	err = TxInsertMultipleUsers(tx, users)
-	if err != nil {
-		return err
+	if len(users) > 0 {
+		err = TxInsertMultipleUsers(tx, users)
+		if err != nil {
+			return err
+		}
 	}
 
 	return tx.Commit()
@@ -247,14 +268,8 @@ func (svc *Service) SetServiceStatus(state int64, finish time.Time) error {
 	return nil
 }
 
-func TxUpdateServiceBackupStrategy(service, old_strategy, new_strategy string) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	_, err = tx.Exec("UPDATE tb_service SET backup_strategy_id=? WHERE id=?", new_strategy, service)
+func TxUpdateServiceBackupStrategy(tx *sqlx.Tx, service, old_strategy, new_strategy string) error {
+	_, err := tx.Exec("UPDATE tb_service SET backup_strategy_id=? WHERE id=?", new_strategy, service)
 	if err != nil {
 		return err
 	}
@@ -271,7 +286,7 @@ func TxUpdateServiceBackupStrategy(service, old_strategy, new_strategy string) e
 		return err
 	}
 
-	return tx.Commit()
+	return nil
 }
 
 func TxSetServiceStatus(svc *Service, task *Task, state, tstate int64, finish time.Time, msg string) error {

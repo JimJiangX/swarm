@@ -123,6 +123,28 @@ func (gd *Gardener) RemoveCronJob(strategyID string) error {
 	return nil
 }
 
+func (gd *Gardener) ReplaceServiceBackupStrategy(NameOrID string, req structs.BackupStrategy) (*database.BackupStrategy, error) {
+	service, err := gd.GetService(NameOrID)
+	if err != nil {
+		return nil, err
+	}
+
+	strategy, err := service.ReplaceBackupStrategy(req)
+	if err != nil {
+		return strategy, err
+	}
+
+	if service.backup != nil {
+		bs := NewBackupJob(gd.host, service)
+		err := gd.RegisterBackupStrategy(bs)
+		if err != nil {
+			log.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
+		}
+	}
+
+	return strategy, err
+}
+
 func (gd *Gardener) EnableServiceBackupStrategy(NameOrID, strategy string) error {
 	backup, err := database.GetBackupStrategy(strategy)
 	if err != nil {
@@ -140,13 +162,24 @@ func (gd *Gardener) EnableServiceBackupStrategy(NameOrID, strategy string) error
 
 			return nil
 		} else {
-			err := database.TxUpdateServiceBackupStrategy(NameOrID, svc.BackupStrategyID, backup.ID)
+			tx, err := database.GetTX()
 			if err != nil {
 				return err
 			}
+			defer tx.Rollback()
+
+			err = database.TxUpdateServiceBackupStrategy(tx, NameOrID, svc.BackupStrategyID, backup.ID)
+			if err != nil {
+				return err
+			}
+			if err := tx.Commit(); err != nil {
+				return err
+			}
+			svc.Lock()
 			svc.backup.Enabled = false
 			backup.Enabled = true
 			svc.backup = backup
+			svc.Unlock()
 
 			bs := NewBackupJob(gd.host, svc)
 			err = gd.RegisterBackupStrategy(bs)
@@ -157,7 +190,6 @@ func (gd *Gardener) EnableServiceBackupStrategy(NameOrID, strategy string) error
 			return err
 		}
 	}
-	// when not found service in Gardener
 
 	return nil
 }

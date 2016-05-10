@@ -76,7 +76,6 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 // GET /tasks/{name:.*}
 func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
-// 创建集群
 // POST /clusters
 func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	var (
@@ -175,7 +174,6 @@ func postDisableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 }
 
-// 集群物理机入库
 // Post /clusters/{name:.*}/nodes
 func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
@@ -274,7 +272,6 @@ func postDisableNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusOK)
 }
 
-// 创建服务
 // Post /services
 func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostServiceRequest{}
@@ -313,15 +310,71 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /services/{name:.*}/backup_strategy
-func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	req := structs.BackupStrategy{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	strategy, err := gd.ReplaceServiceBackupStrategy(name, req)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "ID", strategy.ID)
+}
+
+// POST 	/services/{service:.*}/backup_strategy/{name:.*}/enable
+func postEnableServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	service := mux.Vars(r)["service"]
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.EnableServiceBackupStrategy(service, name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
 
 // POST /services/backup_strategy/{name:.*}/disable
-func postDisableServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+func postDisableServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
 
-// POST 	/services/backup_strategy/{name:.*}/enable
-func postEnableServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
 
-// 备份任务完成结果回调处理
+	err := gd.DisableBackupStrategy(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // Post /tasks/backup/callback
 func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.BackupTaskCallback{}
@@ -340,7 +393,6 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 }
 
-// 网络规划
 // Post /networkings
 func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostNetworkingRequest{}
@@ -371,11 +423,6 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 func postEnableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
-	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
@@ -383,7 +430,6 @@ func postEnableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 	}
 
 	err := gd.SetNetworkingStatus(name, true)
-
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -395,11 +441,6 @@ func postEnableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 // Post /networkings/{name:.*}/disable
 func postDisableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
-
-	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
@@ -439,6 +480,11 @@ func postImportPort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 // Post /networkings/ports/{port:.*}/disable
 func postDisablePort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	port := intValueOrZero(r, "port")
 	if port == 0 {
 		httpError(w, "port must be between 1~65535", http.StatusBadRequest)
@@ -482,12 +528,13 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /image/{image:.*}/enable
-func postEnableImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+func postEnableImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+
+}
 
 // POST 	/image/{image:.*}/disable
 func postDisableImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
-// SAN存储系统入库
 // Post /storage/san
 func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostSANStoreRequest{}
@@ -567,7 +614,6 @@ func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 // POST /storage/san/raid_group/{name:.*}/disable
 func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
-// NAS系统登记
 // Post /storage/nas
 func postNasStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }

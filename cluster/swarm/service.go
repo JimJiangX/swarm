@@ -59,26 +59,14 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		return nil, err
 	}
 
-	strategy := &database.BackupStrategy{}
+	strategy, err := newBackupStrategy(req.BackupStrategy)
+	if err != nil {
+		return nil, err
+	}
 
-	if req.BackupStrategy != nil {
-
-		valid, err := utils.ParseStringToTime(req.BackupStrategy.Valid)
-		if err != nil {
-			log.Error("Parse Request.BackupStrategy.Valid to time.Time", err)
-			return nil, err
-		}
-
-		strategy = &database.BackupStrategy{
-			ID:        utils.Generate64UUID(),
-			Type:      req.BackupStrategy.Type,
-			Spec:      req.BackupStrategy.Spec,
-			Valid:     valid,
-			Enabled:   true,
-			BackupDir: req.BackupStrategy.BackupDir,
-			Timeout:   int(req.BackupStrategy.Timeout * time.Second),
-			CreatedAt: time.Now(),
-		}
+	strategyID := ""
+	if strategy != nil {
+		strategyID = strategy.ID
 	}
 
 	svc := database.Service{
@@ -90,7 +78,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		AutoScaling:          req.AutoScaling,
 		HighAvailable:        req.HighAvailable,
 		Status:               _StatusServiceInit,
-		BackupStrategyID:     strategy.ID,
+		BackupStrategyID:     strategyID,
 		BackupMaxSizeByte:    req.BackupMaxSize,
 		BackupFilesRetention: int(req.BackupRetention * time.Second),
 		CreatedAt:            time.Now(),
@@ -123,6 +111,29 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 	}
 
 	return service, nil
+}
+
+func newBackupStrategy(strategy *structs.BackupStrategy) (*database.BackupStrategy, error) {
+	if strategy == nil {
+		return nil, nil
+	}
+
+	valid, err := utils.ParseStringToTime(strategy.Valid)
+	if err != nil {
+		log.Error("Parse Request.BackupStrategy.Valid to time.Time", err)
+		return nil, err
+	}
+
+	return &database.BackupStrategy{
+		ID:        utils.Generate64UUID(),
+		Type:      strategy.Type,
+		Spec:      strategy.Spec,
+		Valid:     valid,
+		Enabled:   true,
+		BackupDir: strategy.BackupDir,
+		Timeout:   int(strategy.Timeout * time.Second),
+		CreatedAt: time.Now(),
+	}, nil
 }
 
 func ValidService(req structs.PostServiceRequest) []string {
@@ -187,6 +198,39 @@ func ValidService(req structs.PostServiceRequest) []string {
 	return warnings
 }
 
+func (svc *Service) ReplaceBackupStrategy(req structs.BackupStrategy) (*database.BackupStrategy, error) {
+	backup, err := newBackupStrategy(&req)
+	if err != nil || backup == nil {
+		return nil, fmt.Errorf("With Non BackupStrategy,Error:%v", err)
+	}
+
+	tx, err := database.GetTX()
+	if err != nil {
+		return nil, fmt.Errorf("DB TX Error:%s", err.Error())
+	}
+	defer tx.Rollback()
+
+	err = database.TxInsertBackupStrategy(tx, backup)
+	if err != nil {
+		return nil, fmt.Errorf("Tx Insert Backup Strategy Error:%s", err.Error())
+	}
+
+	err = database.TxUpdateServiceBackupStrategy(tx, svc.ID, svc.BackupStrategyID, backup.ID)
+	if err != nil {
+		return nil, fmt.Errorf("Tx Update Service Backup Strategy Error:%s", err.Error())
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	svc.Lock()
+	svc.backup = backup
+	svc.BackupStrategyID = backup.ID
+	svc.Unlock()
+
+	return backup, nil
+}
+
 func converteToUsers(service string, users []structs.User) []database.User {
 	list := make([]database.User, len(users))
 	for i := range users {
@@ -237,12 +281,11 @@ func (svc *Service) SaveToDB() error {
 	return database.TxSaveService(&svc.Service, svc.backup, svc.task, svc.users)
 }
 
-func (gd *Gardener) GetService(IDOrName string) (*Service, error) {
+func (gd *Gardener) GetService(NameOrID string) (*Service, error) {
 	gd.RLock()
 
 	for i := range gd.services {
-		if gd.services[i].ID == IDOrName ||
-			gd.services[i].Name == IDOrName {
+		if gd.services[i].ID == NameOrID || gd.services[i].Name == NameOrID {
 			gd.RUnlock()
 
 			return gd.services[i], nil
@@ -251,11 +294,53 @@ func (gd *Gardener) GetService(IDOrName string) (*Service, error) {
 
 	gd.RUnlock()
 
-	return nil, ErrServiceNotFound
+	service, err := database.GetService(NameOrID)
+	if err != nil {
+		return nil, err
+	}
+
+	base := &structs.PostServiceRequest{}
+
+	if len(service.Description) > 0 {
+		err := json.Unmarshal([]byte(service.Description), base)
+		if err != nil {
+			log.Warnf("JSON Unmarshal Service.Description Error:%s,Description:%s", err.Error(), service.Description)
+		}
+	}
+
+	var backup *database.BackupStrategy
+	if service.BackupStrategyID != "" {
+		backup, err = database.GetBackupStrategy(service.BackupStrategyID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	units, err := database.ListUnitByServiceID(service.ID)
+	if err != nil {
+		return nil, err
+	}
+	authConfig, err := gd.RegistryAuthConfig()
+	if err != nil {
+		log.Errorf("Registry Auth Config Error:%s", err.Error())
+		return nil, err
+	}
+
+	// TODO:rebuild units
+
+	svc := NewService(service, len(units))
+	svc.backup = backup
+	svc.base = base
+	svc.authConfig = authConfig
+
+	gd.Lock()
+	gd.services = append(gd.services, svc)
+	gd.Unlock()
+
+	return svc, nil
 }
 
 func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, err error) {
-
 	authConfig, err := gd.RegistryAuthConfig()
 	if err != nil {
 		log.Error("get Registry Auth Config", err)

@@ -182,6 +182,7 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 	defer tx.Rollback()
 
 	gd.Lock()
+	defer gd.Unlock()
 
 	for i := range pendings {
 
@@ -214,8 +215,6 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 
 		database.TxDelUnit(tx, pendings[i].unit.Unit.ID)
 	}
-
-	gd.Unlock()
 
 	return tx.Commit()
 }
