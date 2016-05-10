@@ -49,6 +49,7 @@ reg_to_consul() {
 		echo "${component_type} register to consul failed"
 		exit 2
 	fi
+}
 
 
 # init VG
@@ -56,6 +57,7 @@ init_hdd_vg() {
 	local hdd_dev_list=''
 	if [ ${hdd_dev} == "null" ]; then
 		hdd_dev=''
+		hdd_vgname=''
 		return
 	fi
 
@@ -83,6 +85,7 @@ init_ssd_vg() {
 	local hdd_dev_list=''
 	if [ ${ssd_dev} == "null" ]; then
 		ssd_dev=''
+		ssd_vgname=''
 		return
 	fi
 
@@ -234,7 +237,7 @@ install_docker() {
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label HBA_WWN="${wwn}" --label HDD_VG="${hdd_vgname}" --label SSD_VG="${ssd_vgname}" --label ADM_NIC="${adm_nic}" --label INT_NIC="${int_nic}" --label EXT_NIC="${ext_nic}"
+DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label SSD_VG=${ssd_vgname} --label ADM_NIC=${adm_nic} --label INT_NIC=${int_nic} --label EXT_NIC=${ext_nic}
 
 EOF
 
