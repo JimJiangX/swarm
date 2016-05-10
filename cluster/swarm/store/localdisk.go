@@ -83,14 +83,13 @@ func (l localDisk) Alloc(name, vg string, size int) (string, int, error) {
 		return "", 0, err
 	}
 
-	vgsizes, ok := idles[vg]
-
+	vgsize, ok := idles[vg]
 	if !ok {
 		return "", 0, fmt.Errorf("%s:don't get vg size", vg)
 	}
 
-	if vgsizes < size {
-		return "", 0, fmt.Errorf("%s is shortage,%d<%d", vg, vgsizes, size)
+	if vgsize < size {
+		return "", 0, fmt.Errorf("%s is shortage,%d<%d", vg, vgsize, size)
 	}
 
 	lv := database.LocalVolume{

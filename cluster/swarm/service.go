@@ -44,7 +44,7 @@ func NewService(svc database.Service, unitNum int) *Service {
 	return &Service{
 		Service:           svc,
 		units:             make([]*unit, unitNum),
-		pendingContainers: make(map[string]*pendingContainer),
+		pendingContainers: make(map[string]*pendingContainer, unitNum),
 	}
 }
 
@@ -264,10 +264,13 @@ func (gd *Gardener) AddService(svc *Service) error {
 		return errors.New("Service Cannot be nil pointer")
 	}
 
-	s, err := gd.GetService(svc.ID)
+	gd.RLock()
+	for i := range gd.services {
+		if gd.services[i].ID == svc.ID || gd.services[i].Name == svc.Name {
+			gd.RUnlock()
 
-	if s != nil || err == nil {
-		return fmt.Errorf("Service %s Existed,%v", svc.ID, err)
+			return fmt.Errorf("Service %s Existed", svc.Name)
+		}
 	}
 
 	gd.Lock()
@@ -372,7 +375,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, e
 	svc.failureRetry = gd.createRetry
 
 	if err := gd.AddService(svc); err != nil {
-		log.Error("Service Add to Gardener")
+		log.WithField("Service Name", svc.Name).Errorf("Service Add to Gardener Error:%s", err.Error())
 
 		return svc, err
 	}
@@ -514,7 +517,6 @@ func (svc *Service) StopContainers(timeout int) error {
 }
 
 func (svc *Service) stopContainers(timeout int) error {
-
 	for i := range svc.units {
 		err := svc.units[i].stopContainer(timeout)
 		if err != nil {
@@ -657,7 +659,6 @@ func (svc *Service) RegisterServices() (err error) {
 }
 
 func (svc *Service) DeregisterServices() (err error) {
-
 	svc.Lock()
 
 	defer func() {

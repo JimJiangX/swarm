@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"fmt"
+	"runtime/debug"
 	"sync/atomic"
 	"time"
 
@@ -22,6 +23,8 @@ func (gd *Gardener) serviceExecute() (err error) {
 		}
 
 		log.Fatalf("Service Execute Exit,%s", err)
+
+		debug.PrintStack()
 	}()
 
 	for {

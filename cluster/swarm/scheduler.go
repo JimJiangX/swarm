@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"runtime/debug"
 	"sync/atomic"
 	"time"
 
@@ -34,6 +35,8 @@ func (gd *Gardener) serviceScheduler() (err error) {
 		}
 
 		log.Fatal("Service Scheduler Exit,%s", err)
+
+		debug.PrintStack()
 	}()
 
 	for {

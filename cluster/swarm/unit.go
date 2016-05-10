@@ -348,18 +348,27 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 }
 
 func (u *unit) startService() error {
+	if u.ContainerCmd == nil {
+		return nil
+	}
 	cmd := u.StartServiceCmd()
 
 	return containerExec(u.engine, u.ContainerID, cmd, false)
 }
 
 func (u *unit) stopService() error {
+	if u.ContainerCmd == nil {
+		return nil
+	}
 	cmd := u.StopServiceCmd()
 
 	return containerExec(u.engine, u.ContainerID, cmd, false)
 }
 
 func (u *unit) backup(args ...string) error {
+	if u.ContainerCmd == nil {
+		return nil
+	}
 	cmd := u.BackupCmd(args...)
 
 	log.WithFields(log.Fields{
