@@ -34,9 +34,8 @@ func (gd *Gardener) serviceScheduler() (err error) {
 			err = fmt.Errorf("Recover From Panic:%v,Error:%v", r, err)
 		}
 
-		log.Fatal("Service Scheduler Exit,%s", err)
-
 		debug.PrintStack()
+		log.Fatal("Service Scheduler Exit,%s", err)
 	}()
 
 	for {

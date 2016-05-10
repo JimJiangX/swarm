@@ -21,10 +21,9 @@ func (gd *Gardener) serviceExecute() (err error) {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Recover From Panic:%v", r)
 		}
+		debug.PrintStack()
 
 		log.Fatalf("Service Execute Exit,%s", err)
-
-		debug.PrintStack()
 	}()
 
 	for {
