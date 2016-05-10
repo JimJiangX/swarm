@@ -272,6 +272,7 @@ func (gd *Gardener) AddService(svc *Service) error {
 			return fmt.Errorf("Service %s Existed", svc.Name)
 		}
 	}
+	gd.RUnlock()
 
 	gd.Lock()
 	gd.services = append(gd.services, svc)
@@ -332,9 +333,11 @@ func (gd *Gardener) GetService(NameOrID string) (*Service, error) {
 	// TODO:rebuild units
 
 	svc := NewService(service, len(units))
+	svc.Lock()
 	svc.backup = backup
 	svc.base = base
 	svc.authConfig = authConfig
+	svc.Unlock()
 
 	gd.Lock()
 	gd.services = append(gd.services, svc)
