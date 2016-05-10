@@ -787,10 +787,6 @@ func (c *Cluster) Container(IDOrName string) *cluster.Container {
 	if len(IDOrName) == 0 {
 		return nil
 	}
-
-	c.RLock()
-	defer c.RUnlock()
-
 	return c.Containers().Get(IDOrName)
 }
 
@@ -828,9 +824,9 @@ func (c *Cluster) listNodes() []*node.Node {
 	out := make([]*node.Node, 0, len(c.engines))
 	for _, e := range c.engines {
 		node := node.NewNode(e)
-		for _, c := range c.pendingContainers {
-			if c.Engine.ID == e.ID && node.Container(c.Config.SwarmID()) == nil {
-				node.AddContainer(c.ToContainer())
+		for _, pc := range c.pendingContainers {
+			if pc.Engine.ID == e.ID && node.Container(pc.Config.SwarmID()) == nil {
+				node.AddContainer(pc.ToContainer())
 			}
 		}
 		out = append(out, node)
@@ -855,7 +851,7 @@ func (c *Cluster) listEngines() []*cluster.Engine {
 	return out
 }
 
-// TotalMemory return the total memory of the cluster
+// TotalMemory returns the total memory of the cluster
 func (c *Cluster) TotalMemory() int64 {
 	var totalMemory int64
 	for _, engine := range c.engines {
@@ -864,7 +860,7 @@ func (c *Cluster) TotalMemory() int64 {
 	return totalMemory
 }
 
-// TotalCpus return the total memory of the cluster
+// TotalCpus returns the total memory of the cluster
 func (c *Cluster) TotalCpus() int64 {
 	var totalCpus int64
 	for _, engine := range c.engines {
@@ -922,11 +918,8 @@ func (c *Cluster) RANDOMENGINE() (*cluster.Engine, error) {
 	return c.engines[nodes[0].ID], nil
 }
 
-// RenameContainer rename a container
+// RenameContainer renames a container
 func (c *Cluster) RenameContainer(container *cluster.Container, newName string) error {
-	c.RLock()
-	defer c.RUnlock()
-
 	// check new name whether available
 	if !c.checkNameUniqueness(newName) {
 		return fmt.Errorf("Conflict: The name %s is already assigned. You have to delete (or rename) that container to be able to assign %s to a container again.", newName, newName)
@@ -937,7 +930,7 @@ func (c *Cluster) RenameContainer(container *cluster.Container, newName string) 
 	return err
 }
 
-// BuildImage build an image
+// BuildImage builds an image
 func (c *Cluster) BuildImage(buildImage *types.ImageBuildOptions, out io.Writer) error {
 	c.scheduler.Lock()
 
@@ -966,7 +959,7 @@ func (c *Cluster) BuildImage(buildImage *types.ImageBuildOptions, out io.Writer)
 	return nil
 }
 
-// TagImage tag an image
+// TagImage tags an image
 func (c *Cluster) TagImage(IDOrName string, repo string, tag string, force bool) error {
 	c.RLock()
 	defer c.RUnlock()
