@@ -296,7 +296,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, e
 		bs := NewBackupJob(gd.host, svc)
 		err := gd.RegisterBackupStrategy(bs)
 		if err != nil {
-			log.Error("Add BackupStrategy to Gardener.Crontab", err)
+			log.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
 		}
 	}
 

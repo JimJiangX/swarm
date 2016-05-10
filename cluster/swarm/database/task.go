@@ -241,6 +241,20 @@ func GetBackupStrategy(id string) (*BackupStrategy, error) {
 	return strategy, nil
 }
 
+func UpdateBackupStrategyStatus(id string, enable bool) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("UPDATE tb_backup_strategy SET enabled=? WHERE id=?", enable, id)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (bs *BackupStrategy) UpdateNext(next time.Time, enable bool) error {
 	db, err := GetDB(true)
 	if err != nil {

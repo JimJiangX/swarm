@@ -1,11 +1,13 @@
 package swarm
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
+	"github.com/ngaut/log"
 	crontab "gopkg.in/robfig/cron.v2"
 )
 
@@ -63,7 +65,7 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 		next = bs.schedule.Next(time.Now())
 	}
 
-	if next.IsZero() || next.After(strategy.Valid) {
+	if !strategy.Enabled || next.IsZero() || next.After(strategy.Valid) {
 		strategy.UpdateNext(next, false)
 		bs.strategy = strategy
 
@@ -113,13 +115,56 @@ func (gd *Gardener) RemoveCronJob(strategyID string) error {
 		if val.strategy.ID == strategyID {
 			gd.cron.Remove(key)
 			delete(gd.cronJobs, key)
-
 		}
 	}
 
 	gd.Unlock()
 
 	return nil
+}
+
+func (gd *Gardener) EnableServiceBackupStrategy(NameOrID, strategy string) error {
+	backup, err := database.GetBackupStrategy(strategy)
+	if err != nil {
+		return fmt.Errorf("Not Found BackupStrategy,%s", err.Error())
+	}
+
+	svc, err := gd.GetService(NameOrID)
+	if err == nil && svc != nil {
+		if svc.backup.ID == backup.ID {
+			err := database.UpdateBackupStrategyStatus(backup.ID, true)
+			if err != nil {
+				return err
+			}
+			svc.backup.Enabled = true
+
+			return nil
+		} else {
+			err := database.TxUpdateServiceBackupStrategy(NameOrID, svc.BackupStrategyID, backup.ID)
+			if err != nil {
+				return err
+			}
+			svc.backup.Enabled = false
+			backup.Enabled = true
+			svc.backup = backup
+
+			bs := NewBackupJob(gd.host, svc)
+			err = gd.RegisterBackupStrategy(bs)
+			if err != nil {
+				log.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
+			}
+
+			return err
+		}
+	}
+	// when not found service in Gardener
+
+	return nil
+}
+
+func (gd *Gardener) DisableBackupStrategy(id string) error {
+
+	return database.UpdateBackupStrategyStatus(id, false)
 }
 
 func BackupTaskCallback(req structs.BackupTaskCallback) error {

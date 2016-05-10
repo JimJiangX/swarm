@@ -233,9 +233,9 @@ func (gd *Gardener) AllocIP(id, typ, unit string) (_ IPInfo, err error) {
 	}
 
 	for i := range networkings {
-		ip, err := database.TXAllocIPByNetworking(networkings[i].ID, unit, 1)
-		if err == nil && len(ip) == 1 {
-			return NewIPinfo(networkings[i], ip[0]), nil
+		ip, err := database.TXAllocIPByNetworking(networkings[i].ID, unit)
+		if err == nil {
+			return NewIPinfo(networkings[i], ip), nil
 		}
 	}
 

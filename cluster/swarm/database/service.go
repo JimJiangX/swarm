@@ -169,14 +169,14 @@ func (svc Service) TableName() string {
 	return "tb_service"
 }
 
-func GetService(id string) (Service, error) {
+func GetService(NameOrID string) (Service, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return Service{}, err
 	}
 
 	s := Service{}
-	err = db.Get(&s, "SELECT * FROM tb_service WHERE id=?", id)
+	err = db.Get(&s, "SELECT * FROM tb_service WHERE id=? OR name=?", NameOrID, NameOrID)
 
 	return s, err
 }
@@ -245,6 +245,33 @@ func (svc *Service) SetServiceStatus(state int64, finish time.Time) error {
 	svc.FinishedAt = finish
 
 	return nil
+}
+
+func TxUpdateServiceBackupStrategy(service, old_strategy, new_strategy string) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec("UPDATE tb_service SET backup_strategy_id=? WHERE id=?", new_strategy, service)
+	if err != nil {
+		return err
+	}
+
+	if len(old_strategy) > 0 {
+		_, err = tx.Exec("UPDATE tb_backup_strategy SET enabled=? WHERE id=?", old_strategy, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = tx.Exec("UPDATE tb_backup_strategy SET enabled=? WHERE id=?", new_strategy, true)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func TxSetServiceStatus(svc *Service, task *Task, state, tstate int64, finish time.Time, msg string) error {
