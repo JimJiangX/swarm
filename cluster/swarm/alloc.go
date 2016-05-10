@@ -247,7 +247,15 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 	defer dc.RUnlock()
 	node := dc.getNode(engine.ID)
 	if node == nil {
-		return fmt.Errorf("Not Found Node By Engine")
+		log.Warn("Not Found Node By Engine")
+
+		node, err = gd.GetNode(engine.ID)
+		if err != nil {
+			err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err.Error())
+			log.Error(err)
+
+			return err
+		}
 	}
 
 	for i := range need {

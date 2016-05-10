@@ -248,11 +248,11 @@ func (dc *Datacenter) GetNode(IDOrName string) (*Node, error) {
 	return nil, errors.New("Not Found Node")
 }
 
-func (dc *Datacenter) getNode(IDOrName string) *Node {
+func (dc *Datacenter) getNode(NameOrID string) *Node {
 	for i := range dc.nodes {
-		if dc.nodes[i].ID == IDOrName ||
-			dc.nodes[i].Name == IDOrName ||
-			dc.nodes[i].EngineID == IDOrName {
+		if dc.nodes[i].ID == NameOrID ||
+			dc.nodes[i].Name == NameOrID ||
+			dc.nodes[i].EngineID == NameOrID {
 
 			return dc.nodes[i]
 		}
@@ -287,6 +287,44 @@ func (dc *Datacenter) listNodeID() []string {
 	}
 
 	return out
+}
+
+func (gd *Gardener) GetNode(NameOrID string) (*Node, error) {
+	n, err := database.GetNode(NameOrID)
+	if err != nil {
+		return nil, err
+	}
+
+	eng, err := gd.GetEngine(n.EngineID)
+	if err != nil {
+		return nil, err
+	}
+
+	node := &Node{
+		Node:   &n,
+		engine: eng,
+	}
+
+	vgs := make([]store.VG, 0, 2)
+	//SSD
+	if ssd := eng.Labels[_SSD_VG_Label]; ssd != "" {
+		vgs = append(vgs, store.VG{
+			Vendor: _SSD,
+			Name:   ssd,
+		})
+	}
+	// HDD
+	if hdd := eng.Labels[_HDD_VG_Label]; hdd != "" {
+		vgs = append(vgs, store.VG{
+			Vendor: _HDD,
+			Name:   hdd,
+		})
+	}
+
+	pluginAddr := fmt.Sprintf("%s:%d", node.Addr, pluginPort)
+	node.localStore = store.NewLocalDisk(pluginAddr, node.Node, vgs)
+
+	return node, nil
 }
 
 func (gd *Gardener) DatacenterByNode(IDOrName string) (*Datacenter, error) {
