@@ -165,17 +165,15 @@ func TestTxBackupTaskDone(t *testing.T) {
 
 func TestBackupStrategy(t *testing.T) {
 	bs := BackupStrategy{
-		ID:          "BackupStrategyID001",
-		Type:        "BackupStrategyType001",
-		Spec:        "BackupStrategySpec001",
-		Next:        time.Now(),
-		Valid:       time.Now(),
-		Enabled:     true,
-		BackupDir:   "BackupStrategyBackupDir001",
-		MaxSizeByte: 1,
-		Retention:   1011,
-		Timeout:     1012,
-		CreatedAt:   time.Now(),
+		ID:        "BackupStrategyID001",
+		Type:      "BackupStrategyType001",
+		Spec:      "BackupStrategySpec001",
+		Next:      time.Now(),
+		Valid:     time.Now(),
+		Enabled:   true,
+		BackupDir: "BackupStrategyBackupDir001",
+		Timeout:   1012,
+		CreatedAt: time.Now(),
 	}
 
 	tx, err := GetTX()
@@ -200,9 +198,7 @@ func TestBackupStrategy(t *testing.T) {
 		bs.CreatedAt.Format("2006-01-02 15:04:05") != bs1.CreatedAt.Format("2006-01-02 15:04:05") ||
 		bs.Enabled != bs1.Enabled ||
 		bs.ID != bs1.ID ||
-		bs.MaxSizeByte != bs1.MaxSizeByte ||
 		bs.Next.Format("2006-01-02 15:04:05") != bs1.Next.Format("2006-01-02 15:04:05") ||
-		bs.Retention != bs1.Retention ||
 		bs.Spec != bs1.Spec ||
 		bs.Timeout != bs1.Timeout ||
 		bs.Type != bs1.Type ||
@@ -229,9 +225,7 @@ func TestBackupStrategy(t *testing.T) {
 		bs.CreatedAt.Format("2006-01-02 15:04:05") != bs2.CreatedAt.Format("2006-01-02 15:04:05") ||
 		bs.Enabled != bs2.Enabled ||
 		bs.ID != bs2.ID ||
-		bs.MaxSizeByte != bs2.MaxSizeByte ||
 		bs.Next.Format("2006-01-02 15:04:05") != bs2.Next.Format("2006-01-02 15:04:05") ||
-		bs.Retention != bs2.Retention ||
 		bs.Spec != bs2.Spec ||
 		bs.Timeout != bs2.Timeout ||
 		bs.Type != bs2.Type ||

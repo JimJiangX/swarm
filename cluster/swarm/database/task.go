@@ -258,7 +258,7 @@ func (bs *BackupStrategy) UpdateNext(next time.Time, enable bool) error {
 }
 
 func TxInsertBackupStrategy(tx *sqlx.Tx, strategy *BackupStrategy) error {
-	query := "INSERT INTO tb_backup_strategy (id,type,spec,next,valid,enabled,backup_dir,max_size,retention,timeout,created_at) VALUES (:id,:type,:spec,:next,:valid,:enabled,:backup_dir,:max_size,:retention,:timeout,:created_at)"
+	query := "INSERT INTO tb_backup_strategy (id,type,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:type,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
 	_, err := tx.NamedExec(query, strategy)
 
 	return err
@@ -276,14 +276,17 @@ func BackupTaskValidate(taskID, strategyID, unitID string) (int, error) {
 		return 0, err
 	}
 
-	rent := 0
-	err = db.Get(&rent, "SELECT retention FROM tb_backup_strategy WHERE id=?", strategyID)
+	enabled := false
+	err = db.Get(&enabled, "SELECT enabled FROM tb_backup_strategy WHERE id=?", strategyID)
 	if err != nil {
 		return 0, err
 	}
 
-	err = db.Get(&state, "SELECT status FROM tb_unit WHERE id=?", unitID)
+	unit := Unit{}
+	err = db.Get(&unit, "SELECT * FROM tb_unit WHERE id=?", unitID)
+
+	rent := 0
+	err = db.Get(&rent, "SELECT backup_files_retention FROM tb_service WHERE id=?", unit.ID)
 
 	return rent, err
-
 }

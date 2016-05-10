@@ -120,30 +120,30 @@ func TestUnit(t *testing.T) {
 
 func TestService(t *testing.T) {
 	service := Service{
-		ID:               "serviceId001",
-		Name:             "serviceName001",
-		Description:      "serviceDescription001",
-		Architecture:     "serviceArchitecture001",
-		AutoHealing:      true,
-		AutoScaling:      true,
-		HighAvailable:    true,
-		Status:           1,
-		BackupStrategyID: "serviceBackupStrategyID001",
-		CreatedAt:        time.Now(),
-		FinishedAt:       time.Now(),
+		ID:                   "serviceId001",
+		Name:                 "serviceName001",
+		Description:          "serviceDescription001",
+		Architecture:         "serviceArchitecture001",
+		AutoHealing:          true,
+		AutoScaling:          true,
+		HighAvailable:        true,
+		Status:               1,
+		BackupStrategyID:     "serviceBackupStrategyID001",
+		BackupMaxSizeByte:    79294802,
+		BackupFilesRetention: 3258011085015,
+		CreatedAt:            time.Now(),
+		FinishedAt:           time.Now(),
 	}
 	backupStrategy := BackupStrategy{
-		ID:          "backupStrategyId001",
-		Type:        "backupStrategyType001",
-		Spec:        "backupStrategySpec001",
-		Next:        time.Now(),
-		Valid:       time.Now(),
-		Enabled:     true,
-		BackupDir:   "backupStrategyBackupDir001",
-		MaxSizeByte: 1,
-		Retention:   1011,
-		Timeout:     1012,
-		CreatedAt:   time.Now(),
+		ID:        "backupStrategyId001",
+		Type:      "backupStrategyType001",
+		Spec:      "backupStrategySpec001",
+		Next:      time.Now(),
+		Valid:     time.Now(),
+		Enabled:   true,
+		BackupDir: "backupStrategyBackupDir001",
+		Timeout:   1012,
+		CreatedAt: time.Now(),
 	}
 	task := Task{
 		ID: "taskId001",
@@ -196,6 +196,8 @@ func TestService(t *testing.T) {
 		service.AutoHealing != service1.AutoHealing ||
 		service.AutoScaling != service1.AutoScaling ||
 		service.BackupStrategyID != service1.BackupStrategyID ||
+		service.BackupFilesRetention != service1.BackupFilesRetention ||
+		service.BackupMaxSizeByte != service1.BackupMaxSizeByte ||
 		service.CreatedAt.Format("2006-01-02 15:04:05") != service1.CreatedAt.Format("2006-01-02 15:04:05") ||
 		service.Description != service1.Description ||
 		service.FinishedAt.Format("2006-01-02 15:04:05") != service1.FinishedAt.Format("2006-01-02 15:04:05") ||
@@ -224,6 +226,8 @@ func TestService(t *testing.T) {
 		service.AutoHealing != service2.AutoHealing ||
 		service.AutoScaling != service2.AutoScaling ||
 		service.BackupStrategyID != service2.BackupStrategyID ||
+		service.BackupFilesRetention != service2.BackupFilesRetention ||
+		service.BackupMaxSizeByte != service2.BackupMaxSizeByte ||
 		service.CreatedAt.Format("2006-01-02 15:04:05") != service2.CreatedAt.Format("2006-01-02 15:04:05") ||
 		service.Description != service2.Description ||
 		service.FinishedAt.Format("2006-01-02 15:04:05") != service2.FinishedAt.Format("2006-01-02 15:04:05") ||
@@ -254,6 +258,8 @@ func TestService(t *testing.T) {
 		service.AutoHealing != service3.AutoHealing ||
 		service.AutoScaling != service3.AutoScaling ||
 		service.BackupStrategyID != service3.BackupStrategyID ||
+		service.BackupFilesRetention != service3.BackupFilesRetention ||
+		service.BackupMaxSizeByte != service3.BackupMaxSizeByte ||
 		service.CreatedAt.Format("2006-01-02 15:04:05") != service3.CreatedAt.Format("2006-01-02 15:04:05") ||
 		service.Description != service3.Description ||
 		service.FinishedAt.Format("2006-01-02 15:04:05") != service3.FinishedAt.Format("2006-01-02 15:04:05") ||
@@ -293,6 +299,8 @@ func TestService(t *testing.T) {
 		service.AutoHealing != service4.AutoHealing ||
 		service.AutoScaling != service4.AutoScaling ||
 		service.BackupStrategyID != service4.BackupStrategyID ||
+		service.BackupFilesRetention != service4.BackupFilesRetention ||
+		service.BackupMaxSizeByte != service4.BackupMaxSizeByte ||
 		service.CreatedAt.Format("2006-01-02 15:04:05") != service4.CreatedAt.Format("2006-01-02 15:04:05") ||
 		service.Description != service4.Description ||
 		service.FinishedAt.Format("2006-01-02 15:04:05") != service4.FinishedAt.Format("2006-01-02 15:04:05") ||

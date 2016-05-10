@@ -213,7 +213,7 @@ func TxSaveService(svc *Service, strategy *BackupStrategy, task *Task, users []U
 
 func txInsertSerivce(tx *sqlx.Tx, svc *Service) error {
 	// insert into database
-	query := "INSERT INTO tb_service (id,name,description,architecture,auto_healing,auto_scaling,high_available,status,backup_strategy_id,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:auto_healing,:auto_scaling,:high_available,:status,:backup_strategy_id,:created_at,:finished_at)"
+	query := "INSERT INTO tb_service (id,name,description,architecture,auto_healing,auto_scaling,high_available,status,backup_strategy_id,backup_max_size,backup_files_retention,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:auto_healing,:auto_scaling,:high_available,:status,:backup_strategy_id,:backup_max_size,:backup_files_retention,:created_at,:finished_at)"
 	_, err := tx.NamedExec(query, svc)
 
 	return err
