@@ -128,7 +128,6 @@ func TestService(t *testing.T) {
 		AutoScaling:          true,
 		HighAvailable:        true,
 		Status:               1,
-		BackupStrategyID:     "serviceBackupStrategyID001",
 		BackupMaxSizeByte:    79294802,
 		BackupFilesRetention: 3258011085015,
 		CreatedAt:            time.Now(),
@@ -137,6 +136,7 @@ func TestService(t *testing.T) {
 	backupStrategy := BackupStrategy{
 		ID:        "backupStrategyId001",
 		Type:      "backupStrategyType001",
+		ServiceID: service.ID,
 		Spec:      "backupStrategySpec001",
 		Next:      time.Now(),
 		Valid:     time.Now(),
@@ -195,7 +195,6 @@ func TestService(t *testing.T) {
 	if service.Architecture != service1.Architecture ||
 		service.AutoHealing != service1.AutoHealing ||
 		service.AutoScaling != service1.AutoScaling ||
-		service.BackupStrategyID != service1.BackupStrategyID ||
 		service.BackupFilesRetention != service1.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service1.BackupMaxSizeByte ||
 		service.CreatedAt.Format("2006-01-02 15:04:05") != service1.CreatedAt.Format("2006-01-02 15:04:05") ||
@@ -225,7 +224,6 @@ func TestService(t *testing.T) {
 	if service.Architecture != service2.Architecture ||
 		service.AutoHealing != service2.AutoHealing ||
 		service.AutoScaling != service2.AutoScaling ||
-		service.BackupStrategyID != service2.BackupStrategyID ||
 		service.BackupFilesRetention != service2.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service2.BackupMaxSizeByte ||
 		service.CreatedAt.Format("2006-01-02 15:04:05") != service2.CreatedAt.Format("2006-01-02 15:04:05") ||
@@ -257,7 +255,6 @@ func TestService(t *testing.T) {
 	if service.Architecture != service3.Architecture ||
 		service.AutoHealing != service3.AutoHealing ||
 		service.AutoScaling != service3.AutoScaling ||
-		service.BackupStrategyID != service3.BackupStrategyID ||
 		service.BackupFilesRetention != service3.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service3.BackupMaxSizeByte ||
 		service.CreatedAt.Format("2006-01-02 15:04:05") != service3.CreatedAt.Format("2006-01-02 15:04:05") ||
@@ -298,7 +295,6 @@ func TestService(t *testing.T) {
 	if service.Architecture != service4.Architecture ||
 		service.AutoHealing != service4.AutoHealing ||
 		service.AutoScaling != service4.AutoScaling ||
-		service.BackupStrategyID != service4.BackupStrategyID ||
 		service.BackupFilesRetention != service4.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service4.BackupMaxSizeByte ||
 		service.CreatedAt.Format("2006-01-02 15:04:05") != service4.CreatedAt.Format("2006-01-02 15:04:05") ||
