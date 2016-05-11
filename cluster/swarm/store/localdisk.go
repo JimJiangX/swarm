@@ -51,8 +51,8 @@ func (l localDisk) IdleSize() (map[string]int, error) {
 	out := make(map[string]int, len(list))
 
 	for i := range list {
-		free := list[i].VgSize * 1024 * 1024
-		//		free := list[i].VgSize * 1000 * 1000
+		free := list[i].VgSize
+		// free := list[i].VgSize * 1000 * 1000
 
 		// allocated size
 		lvs, err := database.SelectVolumeByVG(list[i].VgName)
