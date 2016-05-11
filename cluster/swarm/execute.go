@@ -140,11 +140,6 @@ func (gd *Gardener) serviceExecute() (err error) {
 
 // createContainerInPending create new container into the cluster.
 func (gd *Gardener) createContainerInPending(config *cluster.ContainerConfig, name string, authConfig *types.AuthConfig) (*cluster.Container, error) {
-	// Ensure the name is available
-	if !gd.checkNameUniqueness(name) {
-		return nil, fmt.Errorf("Conflict: The name %s is already assigned. You have to delete (or rename) that container to be able to assign %s to a container again.", name, name)
-	}
-
 	swarmID := config.SwarmID()
 	if swarmID == "" {
 		return nil, fmt.Errorf("Conflict: The swarmID is Null,assign %s to a container", name)
