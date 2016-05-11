@@ -258,7 +258,7 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 	}
 
 	for i := range need {
-		name := fmt.Sprintf("%s_%s_LV:/DBAAS%s", penging.unit.Unit.Name, need[i].Name, need[i].Name)
+		name := fmt.Sprintf("%s_%s_LV", penging.unit.Unit.Name, need[i].Name)
 
 		if strings.Contains(need[i].Type, store.LocalDiskStore) {
 			if node.localStore == nil {

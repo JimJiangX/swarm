@@ -124,7 +124,6 @@ func (h *huaweiStore) Alloc(name, _ string, size int) (string, int, error) {
 	}
 
 	return lun.ID, lun.StorageLunID, nil
-
 }
 
 func (h *huaweiStore) Recycle(id string, lun int) error {
