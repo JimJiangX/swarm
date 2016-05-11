@@ -109,6 +109,17 @@ func GetLUNByLunID(systemID string, id int) (LUN, error) {
 	return lun, err
 }
 
+func CountLUNByRaidGroupID(rg string) (int, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return 0, err
+	}
+	count := 0
+	err = db.Get(&count, "SELECT COUNT(*) from tb_lun WHERE raid_group_id=?", rg)
+
+	return count, err
+}
+
 func DelLUN(id string) error {
 	db, err := GetDB(true)
 	if err != nil {
@@ -230,6 +241,17 @@ func GetRaidGroup(id string, rg int) (RaidGroup, error) {
 	err = db.Get(&out, query, id, rg)
 
 	return out, err
+}
+
+func DeleteRaidGroup(id string, rg int) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("DELETE FROM tb_raid_group WHERE storage_system_id=? AND storage_rg_id=?", id, rg)
+
+	return err
 }
 
 type HitachiStorage struct {

@@ -76,11 +76,11 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/image/{image:.*}/enable":  postEnableImage,
 		"/image/{image:.*}/disable": postDisableImage,
 
-		"/storage/nas":                              postNasStorage,
-		"/storage/san":                              postSanStorage,
-		"/storage/san/{name:.*}/raid_group":         postRGToSanStorage,
-		"/storage/san/raid_group/{name:.*}/enable":  postEnableRaidGroup,
-		"/storage/san/raid_group/{name:.*}/disable": postDisableRaidGroup,
+		"/storage/nas":                                      postNasStorage,
+		"/storage/san":                                      postSanStorage,
+		"/storage/san/{name:.*}/raid_group":                 postRGToSanStorage,
+		"/storage/san/{name:.*}/raid_group/{rg:.*}/enable":  postEnableRaidGroup,
+		"/storage/san/{name:.*}/raid_group/{rg:.*}/disable": postDisableRaidGroup,
 
 		"/tasks/backup/callback": postBackupCallback,
 	},
@@ -93,9 +93,9 @@ var masterRoutes = map[string]map[string]ctxHandler{
 
 		"/networkings/{name:.*}": deleteNetworking,
 
-		"/storage/{name:.*}":            deleteStorage,
-		"/storage/raid_group/{name:.*}": deleteRaidGroup,
-		"/image/{image:.*}":             deleteImage,
+		"/storage/{name:.*}":                        deleteStorage,
+		"/storage/san/{name:.*}/raid_group/{rg:.*}": deleteRaidGroup,
+		"/image/{image:.*}":                         deleteImage,
 	},
 }
 

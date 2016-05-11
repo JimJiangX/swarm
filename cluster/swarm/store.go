@@ -3,19 +3,18 @@ package swarm
 import (
 	"fmt"
 
+	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
 )
 
 func (gd Gardener) GetStore(id string) (store.Store, error) {
 	gd.RLock()
-
 	for i := range gd.stores {
 		if gd.stores[i].ID() == id {
 			gd.RUnlock()
 			return gd.stores[i], nil
 		}
 	}
-
 	gd.RUnlock()
 
 	store, err := store.GetStoreByID(id)
@@ -52,4 +51,46 @@ func (gd *Gardener) AddStoreSpace(id string, space int) error {
 	_, err = s.AddSpace(space)
 
 	return err
+}
+
+func (gd *Gardener) UpdateStoreSpaceStatus(id string, space int, state bool) error {
+	storage, err := gd.GetStore(id)
+	if err != nil {
+		return err
+	}
+
+	if state {
+		if err := storage.EnableSpace(space); err != nil {
+			return err
+		}
+	} else {
+		if err := storage.DisableSpace(space); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (gd *Gardener) RemoveStoreSpace(id string, space int) error {
+	_, err := gd.GetStore(id)
+	if err != nil {
+		return err
+	}
+
+	rg, err := database.GetRaidGroup(id, space)
+	if err != nil {
+		return err
+	}
+
+	count, err := database.CountLUNByRaidGroupID(rg.ID)
+	if err != nil {
+		return err
+	}
+
+	if count > 0 {
+		return fmt.Errorf("Store %s RaidGroup %d is using,cannot Remove", id, space)
+	}
+
+	return database.DeleteRaidGroup(id, space)
 }

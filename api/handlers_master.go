@@ -603,14 +603,14 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%q}", "ID", store.ID())
 }
 
-// Post /storage/{name:.*}/raidgroup/add
+// Post /storage/san/{name:.*}/raidgroup
 func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-
 	if err := r.ParseForm(); err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	name := mux.Vars(r)["name"]
 
 	rg, err := strconv.Atoi(r.Form.Get("rg"))
 	if err != nil {
@@ -638,14 +638,68 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "size", size)
+	fmt.Fprintf(w, "{%q:%d}", "Size", size)
 }
 
-// POST /storage/san/raid_group/{name:.*}/enable
-func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+// POST /storage/san/{name:.*}/raid_group/{rg:.*}/enable
+func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-// POST /storage/san/raid_group/{name:.*}/disable
-func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+	san := mux.Vars(r)["name"]
+
+	rg, err := strconv.Atoi(r.Form.Get("rg"))
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = gd.UpdateStoreSpaceStatus(san, rg, true)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// POST /storage/san/{name:.*}/raid_group/{rg:.*}/disable
+func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	san := mux.Vars(r)["name"]
+
+	rg, err := strconv.Atoi(r.Form.Get("rg"))
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = gd.UpdateStoreSpaceStatus(san, rg, false)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
 
 // Post /storage/nas
 func postNasStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -758,8 +812,35 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 // Delete /storage/{name:.*}
 func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
-// Delete /storage/raid_group/{name:.*}
-func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+// Delete /storage/san/{name:.*}/raid_group/{rg:.*}
+func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	san := mux.Vars(r)["name"]
+
+	rg, err := strconv.Atoi(r.Form.Get("rg"))
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = gd.RemoveStoreSpace(san, rg)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
 
 // Delete /image/{image:.*}
 func deleteImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
