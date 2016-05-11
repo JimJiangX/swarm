@@ -413,7 +413,7 @@ var pluginPort = 3333
 
 func (u unit) getPluginAddr(port int) string {
 
-	return fmt.Sprintf("%s:%d", u.engine.Addr, port)
+	return fmt.Sprintf("%s:%d", u.engine.IP, port)
 }
 
 func (u *unit) saveToDisk() error {

@@ -231,6 +231,25 @@ func (svc *Service) ReplaceBackupStrategy(req structs.BackupStrategy) (*database
 	return backup, nil
 }
 
+func (gd *Gardener) DeleteServiceBackupStrategy(strategy string) error {
+	service, err := database.TxDeleteServiceBackupStrategy(strategy)
+	if err != nil {
+		return err
+	}
+	if err == nil && service != "" {
+		svc, err := gd.GetService(service)
+		if err != nil {
+			return err
+		}
+		svc.Lock()
+		svc.backup = nil
+		svc.BackupStrategyID = ""
+		svc.Unlock()
+	}
+
+	return nil
+}
+
 func converteToUsers(service string, users []structs.User) []database.User {
 	list := make([]database.User, len(users))
 	for i := range users {

@@ -281,9 +281,11 @@ func TxUpdateServiceBackupStrategy(tx *sqlx.Tx, service, old_strategy, new_strat
 		}
 	}
 
-	_, err = tx.Exec("UPDATE tb_backup_strategy SET enabled=? WHERE id=?", new_strategy, true)
-	if err != nil {
-		return err
+	if new_strategy != "" {
+		_, err = tx.Exec("UPDATE tb_backup_strategy SET enabled=? WHERE id=?", new_strategy, true)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

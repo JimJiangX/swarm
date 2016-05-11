@@ -1,6 +1,7 @@
 package database
 
 import (
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -269,6 +270,40 @@ func (bs *BackupStrategy) UpdateNext(next time.Time, enable bool) error {
 	}
 
 	return err
+}
+
+func TxDeleteServiceBackupStrategy(id string) (string, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return "", fmt.Errorf("DB Error:%s", err.Error())
+	}
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return "", fmt.Errorf("DB TX Error:%s", err.Error())
+	}
+	defer tx.Rollback()
+
+	service := ""
+	err = db.Get(&service, "SELECT id FROM tb_service WHERE backup_strategy_id=?", id)
+	if err == nil && service != "" {
+		_, err = tx.Exec("UPDATE tb_service SET backup_strategy_id=? WHERE id=?", "", service)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	_, err = tx.Exec("DELETE FROM tb_backup_strategy WHERE id=?", id)
+	if err != nil {
+		return "", err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return "", err
+	}
+
+	return service, nil
 }
 
 func TxInsertBackupStrategy(tx *sqlx.Tx, strategy *BackupStrategy) error {
