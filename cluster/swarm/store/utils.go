@@ -43,6 +43,9 @@ func maxIdleSizeRG(m map[*database.RaidGroup]space) *database.RaidGroup {
 	)
 
 	for k, val := range m {
+		if !k.Enabled {
+			continue
+		}
 		if val.free > max {
 			max = val.free
 			key = k

@@ -497,9 +497,7 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 				}
 			}
 			log.Debugf("[**MG**]len(all) != 0 the dc :%v", dc)
-
 		}
-		log.Debugf("[**MG**]HEHE ERR:%v ; dc:%v", err, dc)
 		if err != nil || dc == nil {
 			continue
 		}
@@ -509,7 +507,6 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		} else {
 			m[dc.ID] = []*node.Node{nodes[i]}
 		}
-
 	}
 
 	log.Warnf("[**MG**]highAvailable:%v, num :%d ,m length:%d", highAvailable, num, len(m))
@@ -565,6 +562,6 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		}
 	}
 
-	log.Debugf("[**MG**]hehe SelectNodeByCluster end with Not Match ")
+	log.Debugf("[**MG**]SelectNodeByCluster end with Not Match ")
 	return nil, errors.New("Not Match")
 }

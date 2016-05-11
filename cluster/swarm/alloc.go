@@ -242,11 +242,9 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 		return fmt.Errorf("Not Found Datacenter By Engine,%v", err)
 	}
 
-	dc.RLock()
-	defer dc.RUnlock()
-	node := dc.getNode(engine.ID)
-	if node == nil {
-		log.Warn("Not Found Node By Engine")
+	node, err := dc.GetNode(engine.ID)
+	if node == nil || err != nil {
+		log.Warnf("Not Found Node By Engine ID %s Error:%v", engine.ID, err)
 
 		node, err = gd.GetNode(engine.ID)
 		if err != nil {

@@ -409,6 +409,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, e
 		return svc, err
 	}
 	log.Debugf("[**MG**] ServiceToScheduler ok:%v", svc)
+
 	return svc, nil
 }
 
