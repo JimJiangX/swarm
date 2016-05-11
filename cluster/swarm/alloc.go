@@ -133,23 +133,7 @@ func (pre *preAllocResource) consistency() (err error) {
 	if err != nil {
 		return err
 	}
-	/*
-		ipTables := make([]database.IP, len(pre.networkings))
-		for i := range pre.networkings {
-			ipTables[i] = database.IP{
-				Allocated:    true,
-				UnitID:       pre.unit.ID,
-				NetworkingID: pre.networkings[i].Networking,
-				IPAddr:       pre.networkings[i].ipuint32,
-				Prefix:       pre.networkings[i].Prefix,
-			}
-		}
 
-		err = database.TxUpdateMultiIPValue(tx, ipTables)
-		if err != nil {
-			return err
-		}
-	*/
 	err = database.TxUpdatePorts(tx, pre.unit.ports)
 	if err != nil {
 		return err
@@ -279,6 +263,8 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 
 			penging.localStore = append(penging.localStore, lunID)
 			config.HostConfig.Binds = append(config.HostConfig.Binds, name)
+			config.HostConfig.VolumeDriver = node.localStore.Driver()
+
 			continue
 		}
 
@@ -298,6 +284,8 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 		}
 
 		config.HostConfig.Binds = append(config.HostConfig.Binds, name)
+		config.HostConfig.VolumeDriver = dc.storage.Driver()
+
 		continue
 	}
 
