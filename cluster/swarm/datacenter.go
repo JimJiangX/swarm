@@ -301,6 +301,15 @@ func (dc *Datacenter) listNodeID() []string {
 }
 
 func (gd *Gardener) GetNode(NameOrID string) (*Node, error) {
+	dc, err := gd.DatacenterByNode(NameOrID)
+	if dc != nil && err == nil {
+
+		node, err := dc.GetNode(NameOrID)
+		if node != nil && err == nil {
+			return node, nil
+		}
+	}
+
 	n, err := database.GetNode(NameOrID)
 	if err != nil {
 		return nil, err
@@ -335,6 +344,12 @@ func (gd *Gardener) GetNode(NameOrID string) (*Node, error) {
 	pluginAddr := fmt.Sprintf("%s:%d", node.Addr, pluginPort)
 	node.localStore = store.NewLocalDisk(pluginAddr, node.Node, vgs)
 
+	if dc != nil {
+		dc.Lock()
+		dc.nodes = append(dc.nodes, node)
+		dc.Unlock()
+	}
+
 	return node, nil
 }
 
@@ -363,8 +378,10 @@ func (gd *Gardener) SetNodeStatus(name string, state int) error {
 	}
 
 	node, err := dc.GetNode(name)
-	if err != nil {
-		return err
+	if node == nil {
+		if node, err = gd.GetNode(name); err != nil {
+			return err
+		}
 	}
 
 	return node.UpdateStatus(state)
@@ -457,7 +474,6 @@ func (gd *Gardener) RemoveNode(NameOrID string) error {
 
 	err = database.DeleteNode(NameOrID)
 	if err != nil {
-		dc.Unlock()
 		return err
 	}
 
