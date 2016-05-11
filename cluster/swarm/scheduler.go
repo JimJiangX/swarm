@@ -131,6 +131,10 @@ func (gd *Gardener) BuildPendingContainersPerModule(svcName string, module *stru
 
 		return nil, err
 	}
+	if !image.Enabled {
+		entry.Errorf("Image %s is Disabled", image.ImageID)
+		return nil, err
+	}
 	module.Config.Image = image.ImageID
 
 	config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
@@ -227,6 +231,11 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcName, Type string, 
 
 		return nil, err
 	}
+	if !image.Enabled {
+		entry.Errorf("Image %s is Disabled", image.ImageID)
+		return nil, err
+	}
+
 	parentConfig, err := database.GetUnitConfigByID(image.ImageID)
 	if err != nil {
 		entry.Error("Not Found Template Config File,Error:%s", err.Error())

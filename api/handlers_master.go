@@ -532,11 +532,41 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 // POST /image/{image:.*}/enable
 func postEnableImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	image := mux.Vars(r)["image"]
 
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.UpdateImageStatus(image, true)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // POST 	/image/{image:.*}/disable
-func postDisableImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+func postDisableImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	image := mux.Vars(r)["image"]
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.UpdateImageStatus(image, false)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
 
 // Post /storage/san
 func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -730,3 +760,22 @@ func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
 // Delete /storage/raid_group/{name:.*}
 func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
+// Delete /image/{image:.*}
+func deleteImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	image := mux.Vars(r)["image"]
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.RemoveImage(image)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}

@@ -63,16 +63,38 @@ func QueryImage(name, version string) (Image, error) {
 	return image, err
 }
 
-func QueryImageByID(id string) (Image, error) {
+func QueryImageByID(ID string) (Image, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return Image{}, err
 	}
 
 	image := Image{}
-	err = db.Get(&image, "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?", id, id)
+	err = db.Get(&image, "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?", ID, ID)
 
 	return image, err
+}
+
+func UpdateImageStatus(ID string, enable bool) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("UPDATE tb_image SET enabled=? WHERE id=? OR docker_image_id=?", enable, ID, ID)
+
+	return err
+}
+
+func DeleteImage(ID string) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("DELETE FROM tb_image WHERE id=? OR docker_image_id=?", ID, ID)
+
+	return err
 }
 
 type UnitConfig struct {
