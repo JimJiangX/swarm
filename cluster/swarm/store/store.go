@@ -16,7 +16,7 @@ const (
 	SANStore       = "san"
 
 	SAN_StoreDriver  = "lvm"
-	LocalStoreDriver = "host"
+	LocalStoreDriver = "lvm"
 
 	DefaultFilesystemType = "xfs"
 )

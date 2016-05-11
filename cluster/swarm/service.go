@@ -59,16 +59,6 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		return nil, err
 	}
 
-	strategy, err := newBackupStrategy(req.BackupStrategy)
-	if err != nil {
-		return nil, err
-	}
-
-	strategyID := ""
-	if strategy != nil {
-		strategyID = strategy.ID
-	}
-
 	svc := database.Service{
 		ID:                   utils.Generate64UUID(),
 		Name:                 req.Name,
@@ -78,10 +68,14 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		AutoScaling:          req.AutoScaling,
 		HighAvailable:        req.HighAvailable,
 		Status:               _StatusServiceInit,
-		BackupStrategyID:     strategyID,
 		BackupMaxSizeByte:    req.BackupMaxSize,
 		BackupFilesRetention: int(req.BackupRetention * time.Second),
 		CreatedAt:            time.Now(),
+	}
+
+	strategy, err := newBackupStrategy(svc.ID, req.BackupStrategy)
+	if err != nil {
+		return nil, err
 	}
 
 	_, nodeNum, err := getServiceArch(req.Architecture)
@@ -113,7 +107,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 	return service, nil
 }
 
-func newBackupStrategy(strategy *structs.BackupStrategy) (*database.BackupStrategy, error) {
+func newBackupStrategy(service string, strategy *structs.BackupStrategy) (*database.BackupStrategy, error) {
 	if strategy == nil {
 		return nil, nil
 	}
@@ -127,6 +121,7 @@ func newBackupStrategy(strategy *structs.BackupStrategy) (*database.BackupStrate
 	return &database.BackupStrategy{
 		ID:        utils.Generate64UUID(),
 		Type:      strategy.Type,
+		ServiceID: service,
 		Spec:      strategy.Spec,
 		Valid:     valid,
 		Enabled:   true,
@@ -198,56 +193,45 @@ func ValidService(req structs.PostServiceRequest) []string {
 	return warnings
 }
 
+func (svc *Service) BackupStrategy() *database.BackupStrategy {
+	svc.RLock()
+	backup := svc.backup
+	svc.RUnlock()
+
+	return backup
+}
+
 func (svc *Service) ReplaceBackupStrategy(req structs.BackupStrategy) (*database.BackupStrategy, error) {
-	backup, err := newBackupStrategy(&req)
+	backup, err := newBackupStrategy(svc.ID, &req)
 	if err != nil || backup == nil {
-		return nil, fmt.Errorf("With Non BackupStrategy,Error:%v", err)
+		return nil, fmt.Errorf("With non Backup Strategy,Error:%v", err)
 	}
 
-	tx, err := database.GetTX()
-	if err != nil {
-		return nil, fmt.Errorf("DB TX Error:%s", err.Error())
-	}
-	defer tx.Rollback()
-
-	err = database.TxInsertBackupStrategy(tx, backup)
+	err = database.InsertBackupStrategy(backup)
 	if err != nil {
 		return nil, fmt.Errorf("Tx Insert Backup Strategy Error:%s", err.Error())
 	}
 
-	err = database.TxUpdateServiceBackupStrategy(tx, svc.ID, svc.BackupStrategyID, backup.ID)
-	if err != nil {
-		return nil, fmt.Errorf("Tx Update Service Backup Strategy Error:%s", err.Error())
-	}
-
-	if err = tx.Commit(); err != nil {
-		return nil, err
-	}
 	svc.Lock()
 	svc.backup = backup
-	svc.BackupStrategyID = backup.ID
 	svc.Unlock()
 
 	return backup, nil
 }
 
 func (gd *Gardener) DeleteServiceBackupStrategy(strategy string) error {
-	service, err := database.TxDeleteServiceBackupStrategy(strategy)
+	backup, err := database.GetBackupStrategy(strategy)
 	if err != nil {
 		return err
 	}
-	if err == nil && service != "" {
-		svc, err := gd.GetService(service)
-		if err != nil {
-			return err
-		}
-		svc.Lock()
-		svc.backup = nil
-		svc.BackupStrategyID = ""
-		svc.Unlock()
+
+	if backup.Enabled {
+		return fmt.Errorf("Backup Strategy %s is using,Cannot Delete", strategy)
 	}
 
-	return nil
+	err = database.DeleteBackupStrategy(strategy)
+
+	return err
 }
 
 func converteToUsers(service string, users []structs.User) []database.User {
@@ -331,10 +315,15 @@ func (gd *Gardener) GetService(NameOrID string) (*Service, error) {
 	}
 
 	var backup *database.BackupStrategy
-	if service.BackupStrategyID != "" {
-		backup, err = database.GetBackupStrategy(service.BackupStrategyID)
-		if err != nil {
-			return nil, err
+	strategies, err := database.GetBackupStrategyByServiceID(service.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range strategies {
+		if strategies[i].Enabled {
+			backup = &strategies[i]
+			break
 		}
 	}
 
@@ -854,7 +843,11 @@ func (svc *Service) TryBackupTask(host, unitID, strategyID, strategyType string,
 }
 
 func (svc *Service) Task() *database.Task {
-	return svc.task
+	svc.RLock()
+	task := svc.task
+	svc.RUnlock()
+
+	return task
 }
 
 func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int) error {

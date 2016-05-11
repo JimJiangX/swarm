@@ -211,6 +211,7 @@ func DeleteTask(id string) error {
 
 type BackupStrategy struct {
 	ID        string    `db:"id"`
+	ServiceID string    `db:"service_id"`
 	Type      string    `db:"type"` // full/part
 	Spec      string    `db:"spec"`
 	Next      time.Time `db:"next"`
@@ -235,6 +236,23 @@ func GetBackupStrategy(id string) (*BackupStrategy, error) {
 	query := "SELECT * FROM tb_backup_strategy WHERE id=?"
 
 	err = db.Get(strategy, query, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return strategy, nil
+}
+
+func GetBackupStrategyByServiceID(id string) ([]BackupStrategy, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	strategy := make([]BackupStrategy, 0, 3)
+	query := "SELECT * FROM tb_backup_strategy WHERE service_id=?"
+
+	err = db.Select(&strategy, query, id)
 	if err != nil {
 		return nil, err
 	}
@@ -272,43 +290,34 @@ func (bs *BackupStrategy) UpdateNext(next time.Time, enable bool) error {
 	return err
 }
 
-func TxDeleteServiceBackupStrategy(id string) (string, error) {
+func DeleteBackupStrategy(id string) error {
 	db, err := GetDB(true)
 	if err != nil {
-		return "", fmt.Errorf("DB Error:%s", err.Error())
+		return fmt.Errorf("DB Error:%s", err.Error())
 	}
 
-	tx, err := db.Beginx()
+	_, err = db.Exec("DELETE FROM tb_backup_strategy WHERE id=?", id)
 	if err != nil {
-		return "", fmt.Errorf("DB TX Error:%s", err.Error())
-	}
-	defer tx.Rollback()
-
-	service := ""
-	err = db.Get(&service, "SELECT id FROM tb_service WHERE backup_strategy_id=?", id)
-	if err == nil && service != "" {
-		_, err = tx.Exec("UPDATE tb_service SET backup_strategy_id=? WHERE id=?", "", service)
-		if err != nil {
-			return "", err
-		}
+		return err
 	}
 
-	_, err = tx.Exec("DELETE FROM tb_backup_strategy WHERE id=?", id)
-	if err != nil {
-		return "", err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return "", err
-	}
-
-	return service, nil
+	return nil
 }
 
 func TxInsertBackupStrategy(tx *sqlx.Tx, strategy *BackupStrategy) error {
-	query := "INSERT INTO tb_backup_strategy (id,type,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:type,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
+	query := "INSERT INTO tb_backup_strategy (id,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:type,:service_id,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
 	_, err := tx.NamedExec(query, strategy)
+
+	return err
+}
+
+func InsertBackupStrategy(strategy *BackupStrategy) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+	query := "INSERT INTO tb_backup_strategy (id,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:type,:service_id,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
+	_, err = db.NamedExec(query, strategy)
 
 	return err
 }
@@ -325,8 +334,8 @@ func BackupTaskValidate(taskID, strategyID, unitID string) (int, error) {
 		return 0, err
 	}
 
-	enabled := false
-	err = db.Get(&enabled, "SELECT enabled FROM tb_backup_strategy WHERE id=?", strategyID)
+	service := ""
+	err = db.Get(&service, "SELECT service_id FROM tb_backup_strategy WHERE id=?", strategyID)
 	if err != nil {
 		return 0, err
 	}
@@ -335,7 +344,7 @@ func BackupTaskValidate(taskID, strategyID, unitID string) (int, error) {
 	err = db.Get(&unit, "SELECT * FROM tb_unit WHERE id=?", unitID)
 
 	rent := 0
-	err = db.Get(&rent, "SELECT backup_files_retention FROM tb_service WHERE id=?", unit.ID)
+	err = db.Get(&rent, "SELECT backup_files_retention FROM tb_service WHERE id=?", service)
 
 	return rent, err
 }

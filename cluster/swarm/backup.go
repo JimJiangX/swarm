@@ -61,11 +61,9 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 		}
 	}
 
-	if strategy.Enabled {
-		next = bs.schedule.Next(time.Now())
-	}
+	next = bs.schedule.Next(time.Now())
 
-	if !strategy.Enabled || next.IsZero() || next.After(strategy.Valid) {
+	if next.IsZero() || next.After(strategy.Valid) {
 		strategy.UpdateNext(next, false)
 		bs.strategy = strategy
 
@@ -74,7 +72,7 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 
 	err = strategy.UpdateNext(next, true)
 	if err != nil {
-		return time.Time{}
+		return next
 	}
 
 	bs.strategy = strategy
@@ -145,53 +143,34 @@ func (gd *Gardener) ReplaceServiceBackupStrategy(NameOrID string, req structs.Ba
 	return strategy, err
 }
 
-func (gd *Gardener) EnableServiceBackupStrategy(NameOrID, strategy string) error {
+func (gd *Gardener) EnableServiceBackupStrategy(strategy string) error {
 	backup, err := database.GetBackupStrategy(strategy)
+	if err != nil || backup == nil {
+		return fmt.Errorf("Not Found BackupStrategy,%v", err)
+	}
+
+	err = database.UpdateBackupStrategyStatus(strategy, true)
 	if err != nil {
-		return fmt.Errorf("Not Found BackupStrategy,%s", err.Error())
+		return err
 	}
+	backup.Enabled = true
 
-	svc, err := gd.GetService(NameOrID)
+	svc, err := gd.GetService(backup.ServiceID)
 	if err == nil && svc != nil {
-		if svc.backup.ID == backup.ID {
-			err := database.UpdateBackupStrategyStatus(backup.ID, true)
-			if err != nil {
-				return err
-			}
-			svc.backup.Enabled = true
+		svc.Lock()
+		svc.backup = backup
+		svc.Unlock()
 
-			return nil
-		} else {
-			tx, err := database.GetTX()
-			if err != nil {
-				return err
-			}
-			defer tx.Rollback()
-
-			err = database.TxUpdateServiceBackupStrategy(tx, NameOrID, svc.BackupStrategyID, backup.ID)
-			if err != nil {
-				return err
-			}
-			if err := tx.Commit(); err != nil {
-				return err
-			}
-			svc.Lock()
-			svc.backup.Enabled = false
-			backup.Enabled = true
-			svc.backup = backup
-			svc.Unlock()
-
-			bs := NewBackupJob(gd.host, svc)
-			err = gd.RegisterBackupStrategy(bs)
-			if err != nil {
-				log.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
-			}
-
-			return err
+		bs := NewBackupJob(gd.host, svc)
+		err = gd.RegisterBackupStrategy(bs)
+		if err != nil {
+			log.Error("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
 		}
+
+		return err
 	}
 
-	return nil
+	return err
 }
 
 func (gd *Gardener) DisableBackupStrategy(id string) error {

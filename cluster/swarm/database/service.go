@@ -173,7 +173,6 @@ type Service struct {
 	AutoScaling          bool      `db:"auto_scaling"`
 	HighAvailable        bool      `db:"high_available"`
 	Status               int64     `db:"status"`
-	BackupStrategyID     string    `db:"backup_strategy_id"`
 	BackupMaxSizeByte    int       `db:"backup_max_size"`
 	BackupFilesRetention int       `db:"backup_files_retention"`
 	CreatedAt            time.Time `db:"created_at"`
@@ -234,7 +233,7 @@ func TxSaveService(svc *Service, strategy *BackupStrategy, task *Task, users []U
 
 func txInsertSerivce(tx *sqlx.Tx, svc *Service) error {
 	// insert into database
-	query := "INSERT INTO tb_service (id,name,description,architecture,auto_healing,auto_scaling,high_available,status,backup_strategy_id,backup_max_size,backup_files_retention,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:auto_healing,:auto_scaling,:high_available,:status,:backup_strategy_id,:backup_max_size,:backup_files_retention,:created_at,:finished_at)"
+	query := "INSERT INTO tb_service (id,name,description,architecture,auto_healing,auto_scaling,high_available,status,backup_max_size,backup_files_retention,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:auto_healing,:auto_scaling,:high_available,:status,:backup_max_size,:backup_files_retention,:created_at,:finished_at)"
 	_, err := tx.NamedExec(query, svc)
 
 	return err
@@ -264,29 +263,6 @@ func (svc *Service) SetServiceStatus(state int64, finish time.Time) error {
 
 	atomic.StoreInt64(&svc.Status, state)
 	svc.FinishedAt = finish
-
-	return nil
-}
-
-func TxUpdateServiceBackupStrategy(tx *sqlx.Tx, service, old_strategy, new_strategy string) error {
-	_, err := tx.Exec("UPDATE tb_service SET backup_strategy_id=? WHERE id=?", new_strategy, service)
-	if err != nil {
-		return err
-	}
-
-	if len(old_strategy) > 0 {
-		_, err = tx.Exec("UPDATE tb_backup_strategy SET enabled=? WHERE id=?", old_strategy, false)
-		if err != nil {
-			return err
-		}
-	}
-
-	if new_strategy != "" {
-		_, err = tx.Exec("UPDATE tb_backup_strategy SET enabled=? WHERE id=?", new_strategy, true)
-		if err != nil {
-			return err
-		}
-	}
 
 	return nil
 }

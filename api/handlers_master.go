@@ -297,10 +297,14 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	strategy := ""
+	if backup := svc.BackupStrategy(); backup != nil {
+		strategy = backup.ID
+	}
 
 	response := structs.PostServiceResponse{
 		ID:               svc.ID,
-		BackupStrategyID: svc.BackupStrategyID,
+		BackupStrategyID: strategy,
 		TaskID:           svc.Task().ID,
 	}
 
@@ -336,10 +340,9 @@ func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	fmt.Fprintf(w, "{%q:%q}", "ID", strategy.ID)
 }
 
-// POST 	/services/{service:.*}/backup_strategy/{name:.*}/enable
+// POST 	/services/backup_strategy/{name:.*}/enable
 func postEnableServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
-	service := mux.Vars(r)["service"]
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
@@ -347,7 +350,7 @@ func postEnableServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http
 		return
 	}
 
-	err := gd.EnableServiceBackupStrategy(service, name)
+	err := gd.EnableServiceBackupStrategy(name)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
