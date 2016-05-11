@@ -15,8 +15,9 @@ import (
 func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.Engine, config cluster.ContainerConfig, Type string) (*cluster.ContainerConfig, error) {
 	constraint := fmt.Sprintf("constraint:node==%s", engine.ID)
 	config.Env = append(config.Env, constraint)
-	config.Hostname = engine.ID
-	config.Domainname = engine.Name
+	// conflicting options:hostname and the network mode
+	// config.Hostname = engine.ID
+	// config.Domainname = engine.Name
 
 	allocated, need := preAlloc.unit.PortSlice()
 	if !allocated && len(need) > 0 {
