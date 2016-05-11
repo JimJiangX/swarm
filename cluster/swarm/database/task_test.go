@@ -165,13 +165,14 @@ func TestTxBackupTaskDone(t *testing.T) {
 
 func TestBackupStrategy(t *testing.T) {
 	bs := BackupStrategy{
-		ID:        "BackupStrategyID001",
-		Type:      "BackupStrategyType001",
-		Spec:      "BackupStrategySpec001",
+		ID:        "BackupStrategyID002",
+		Type:      "BackupStrategyType002",
+		ServiceID: "service0002",
+		Spec:      "BackupStrategySpec002",
 		Next:      time.Now(),
 		Valid:     time.Now(),
 		Enabled:   true,
-		BackupDir: "BackupStrategyBackupDir001",
+		BackupDir: "BackupStrategyBackupDir002",
 		Timeout:   1012,
 		CreatedAt: time.Now(),
 	}

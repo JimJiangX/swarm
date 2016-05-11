@@ -156,7 +156,7 @@ func TestNode(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(nodes) != len(list)-1 {
-		t.Fatalf("Unexpected,%d!=%d", len(nodes), len(list))
+		t.Fatalf("Unexpected,%d!=%d", len(nodes), len(list)-1)
 	}
 
 	for i := range list {

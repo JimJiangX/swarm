@@ -287,7 +287,7 @@ func insertNetworking(net Networking, ips []IP) error {
 
 	defer tx.Rollback()
 
-	query := "INSERT INTO tb_networking (id,networking,type,gateway,enabled) VALUES (:id,:networking,:type,:gateway,:enabled)"
+	query := "INSERT INTO tb_networking (id,type,gateway,enabled) VALUES (:id,:type,:gateway,:enabled)"
 	_, err = tx.NamedExec(query, &net)
 	if err != nil {
 		return err

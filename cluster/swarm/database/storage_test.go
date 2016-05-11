@@ -316,9 +316,9 @@ func TestLocalVolume(t *testing.T) {
 
 func TestHisHuaStorage(t *testing.T) {
 	hitachiStorage := HitachiStorage{
-		ID:        "HitachiStorageId001",
-		Vendor:    "HitachiStorageVendor001",
-		AdminUnit: "HitachiStorageAdminUnit001",
+		ID:        "HitachiStorageId002",
+		Vendor:    "HitachiStorageVendor002",
+		AdminUnit: "HitachiStorageAdminUnit002",
 		LunStart:  1,
 		LunEnd:    5,
 		HluStart:  11,
@@ -330,11 +330,11 @@ func TestHisHuaStorage(t *testing.T) {
 	}
 
 	huaweiStorage := HuaweiStorage{
-		ID:       "HuaweiStorageID001",
-		Vendor:   "HuaweiStorageVendor001",
+		ID:       "HuaweiStorageID002",
+		Vendor:   "HuaweiStorageVendor002",
 		IPAddr:   "146.240.104.1",
-		Username: "HuaweiStorageUsername001",
-		Password: "HuaweiStoragePassword001",
+		Username: "HuaweiStorageUsername002",
+		Password: "HuaweiStoragePassword002",
 		HluStart: 1,
 		HluEnd:   5,
 	}

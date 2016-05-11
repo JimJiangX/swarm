@@ -214,10 +214,10 @@ type BackupStrategy struct {
 	ServiceID string    `db:"service_id"`
 	Type      string    `db:"type"` // full/part
 	Spec      string    `db:"spec"`
+	BackupDir string    `db:"backup_dir"`
 	Next      time.Time `db:"next"`
 	Valid     time.Time `db:"valid"`
 	Enabled   bool      `db:"enabled"`
-	BackupDir string    `db:"backup_dir"`
 	Timeout   int       `db:"timeout"` // s
 	CreatedAt time.Time `db:"created_at"`
 }
