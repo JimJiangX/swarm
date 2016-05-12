@@ -112,6 +112,16 @@ func (gd *Gardener) BuildPendingContainersPerModule(svcName string, module *stru
 		"Module":  module.Type,
 	})
 
+	config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
+	config = buildContainerConfig(config)
+
+	if err := validateContainerConfig(config); err != nil {
+		entry.Warnf("Container Config Validate:%s", err.Error())
+
+		return nil, err
+	}
+	entry.Infof("Build Container Config,Validate OK:%+v", config)
+
 	_, num, err := getServiceArch(module.Arch)
 	if err != nil {
 		entry.Errorf("Parse Module.Arch:%s,Error:%v", module.Arch, err)
@@ -123,22 +133,10 @@ func (gd *Gardener) BuildPendingContainersPerModule(svcName string, module *stru
 	if err != nil {
 		return nil, err
 	}
-	module.Config.Image = image
-	module.Config.Labels[_ImageIDInRegistryLabelKey] = imageID_Label
-
-	config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
-	if err := validateContainerConfig(config); err != nil {
-		entry.Warnf("Container Config Validate:%s", err.Error())
-
-		return nil, err
-	}
-
-	entry.WithField("NodeNum", num).Infof("Build Container Config:%+v", config)
-
-	log.Debug("[**MG**] generate config  and  validate ok")
+	config.Config.Image = image
+	config.Config.Labels[_ImageIDInRegistryLabelKey] = imageID_Label
 
 	filters := gd.listShortIdleStore(module.Stores, module.Type, num)
-
 	log.Debugf("[** MG **] %s,%s,%s:first filters of storage:%s", module.Stores, module.Type, num, filters)
 
 	list := gd.listCandidateNodes(module.Nodes, module.Type, filters...)

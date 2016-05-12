@@ -35,7 +35,6 @@ func defaultContainerConfig() *cluster.ContainerConfig {
 }
 
 func buildContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerConfig {
-
 	if config.AttachStdout == false {
 		config.AttachStdout = true
 	}
@@ -57,7 +56,7 @@ func buildContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerCon
 	}
 
 	if config.Labels == nil {
-		config.Labels = make(map[string]string)
+		config.Labels = make(map[string]string, 5)
 	}
 
 	if config.HostConfig.Binds == nil {
