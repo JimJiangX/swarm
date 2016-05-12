@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/astaxie/beego/config"
@@ -85,7 +86,8 @@ func (u *unit) prepareCreateContainer() error {
 	binds := u.config.HostConfig.Binds
 
 	for _, name := range binds {
-		lv, err1 := database.GetLocalVoume(name)
+		parts := strings.SplitN(name, ":", 2)
+		lv, err1 := database.GetLocalVoume(parts[0])
 		if err1 == nil {
 			req := &types.VolumeCreateRequest{
 				Name:       lv.Name,
@@ -99,7 +101,7 @@ func (u *unit) prepareCreateContainer() error {
 			}
 
 		} else {
-			_, err := u.createSanStoreageVolume(name)
+			_, err := u.createSanStoreageVolume(parts[0])
 			if err != nil {
 				return err
 			}
@@ -131,8 +133,8 @@ func (u *unit) createLocalDiskVolume(name string) (*cluster.Volume, error) {
 
 func (u *unit) createSanStoreageVolume(name string) (*cluster.Volume, error) {
 	list, err := database.ListLUNByName(name)
-	if err != nil {
-		return nil, err
+	if err != nil || len(list) == 0 {
+		return nil, fmt.Errorf("LUN:%d,Error:%v", len(list), err)
 	}
 
 	storage, err := store.GetStoreByID(list[0].StorageSystemID)

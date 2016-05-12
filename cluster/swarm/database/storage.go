@@ -353,11 +353,8 @@ func GetLocalVoume(IDOrName string) (LocalVolume, error) {
 	query := "SELECT * FROM tb_volumes WHERE id=? OR name=?"
 
 	err = db.Get(&lv, query, IDOrName, IDOrName)
-	if err != nil {
-		return lv, err
-	}
 
-	return lv, nil
+	return lv, err
 }
 
 func SelectVolumeByVG(name string) ([]LocalVolume, error) {
