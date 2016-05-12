@@ -82,6 +82,8 @@ const (
 
 	_NetworkingLabelKey      = "upm.ip"
 	_ProxyNetworkingLabelKey = "upm.proxyip"
+
+	_ImageIDInRegistryLabelKey = "registry.imageID"
 )
 
 var (

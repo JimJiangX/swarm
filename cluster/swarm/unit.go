@@ -111,6 +111,27 @@ func (u *unit) prepareCreateContainer() error {
 	return nil
 }
 
+func (u *unit) pullImage(authConfig *types.AuthConfig) error {
+	if u.config.Image == "" || u.engine == nil {
+		return fmt.Errorf("params error,image:%s,Engine:%+v", u.config.Image, u.engine)
+	}
+
+	err := u.engine.Pull(u.config.Image, authConfig)
+	if err != nil {
+		// try again
+		err := u.engine.Pull(u.config.Image, authConfig)
+		if err != nil {
+			return err
+		}
+	}
+
+	if image := u.engine.Image(u.config.Image); image != nil {
+		return nil
+	}
+
+	return err
+}
+
 func (u *unit) createLocalDiskVolume(name string) (*cluster.Volume, error) {
 	lv, err := database.GetLocalVoume(name)
 	if err != nil {

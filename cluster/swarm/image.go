@@ -12,6 +12,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
+	"github.com/ngaut/log"
 )
 
 type Image struct {
@@ -152,5 +153,39 @@ func parsePushImageOutput(in string) (string, int, error) {
 	}
 
 	return "", 0, fmt.Errorf("Parse Output Error,%s", in)
+}
 
+func (gd *Gardener) GetImageName(id, name, version string) (string, string, error) {
+	var (
+		image Image
+		err   error
+	)
+	// query image from database
+	if id != "" {
+		image, err = gd.GetImageByID(id)
+	}
+
+	if (err != nil || image.ID == "") && name != "" {
+		image, err = gd.GetImage(name, version)
+	}
+
+	if err != nil {
+		log.Errorf("Not Found Image %s:%s,Error:%s", name, version, err.Error())
+
+		return "", "", err
+	}
+
+	if !image.Enabled {
+		log.Errorf("Image %s is Disabled", image.ImageID)
+		return "", "", err
+	}
+
+	config, err := database.GetSystemConfig()
+	if err != nil {
+		return "", "", err
+	}
+
+	imageName := fmt.Sprintf("%s:%d/%s:%s", config.Registry.Domain, config.Registry.Port, image.Name, image.Version)
+
+	return imageName, image.ImageID, nil
 }

@@ -50,6 +50,22 @@ func (gd *Gardener) serviceExecute() (err error) {
 			log.Debugf("[mg]the unit:%v", u)
 			atomic.StoreUint32(&u.Status, _StatusUnitCreating)
 
+			log.Debugf("[mg]start pull image %s", u.config.Image)
+			authConfig, err := gd.RegistryAuthConfig()
+			if err != nil {
+				svc.Unlock()
+				taskErr = err
+				log.Errorf("get RegistryAuthConfig Error:%s", err.Error())
+				goto failure
+			}
+
+			if err := u.pullImage(authConfig); err != nil {
+				svc.Unlock()
+				taskErr = err
+				log.Errorf("pullImage Error:%s", err.Error())
+				goto failure
+			}
+
 			log.Debugf("[mg]start prepareCreateContainer")
 			err = u.prepareCreateContainer()
 			if err != nil {

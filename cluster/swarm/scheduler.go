@@ -119,23 +119,12 @@ func (gd *Gardener) BuildPendingContainersPerModule(svcName string, module *stru
 		return nil, err
 	}
 
-	// query image from database
-	image := Image{}
-	if module.Config.Image == "" {
-		image, err = gd.GetImage(module.Name, module.Version)
-	} else {
-		image, err = gd.GetImageByID(module.Config.Image)
-	}
+	image, imageID_Label, err := gd.GetImageName(module.Config.Image, module.Name, module.Version)
 	if err != nil {
-		entry.Errorf("Not Found Image %s:%s,Error:%s", module.Name, module.Version, err.Error())
-
 		return nil, err
 	}
-	if !image.Enabled {
-		entry.Errorf("Image %s is Disabled", image.ImageID)
-		return nil, err
-	}
-	module.Config.Image = image.ImageID
+	module.Config.Image = image
+	module.Config.Labels[_ImageIDInRegistryLabelKey] = imageID_Label
 
 	config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
 	if err := validateContainerConfig(config); err != nil {
@@ -225,14 +214,13 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcName, Type string, 
 
 	entry := log.WithFields(log.Fields{"Name": svcName, "Module": Type})
 
-	image, err := gd.GetImageByID(templConfig.Image)
-	if err != nil {
-		entry.Error("Not Found Image %s,Error:%s", templConfig.Image, err.Error())
-
-		return nil, err
+	imageID, ok := templConfig.Labels[_ImageIDInRegistryLabelKey]
+	if !ok || imageID == "" {
+		return nil, fmt.Errorf("Missing Value of ContainerConfig.Labels[_ImageIDInRegistryLabelKey]")
 	}
-	if !image.Enabled {
-		entry.Errorf("Image %s is Disabled", image.ImageID)
+
+	image, err := database.QueryImageByID(imageID)
+	if err != nil {
 		return nil, err
 	}
 
