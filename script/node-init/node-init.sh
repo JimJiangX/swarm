@@ -19,6 +19,7 @@ node_id=${16}
 horus_server_ip=${17}
 horus_server_port=${18}
 cur_dir=`dirname $0`
+docker_plugin_port=3333
 
 hdd_vgname=${HOSTNAME}_HDD_VG
 ssd_vgname=${HOSTNAME}_SSD_VG
@@ -40,11 +41,40 @@ reg_to_horus_server() {
 }
 
 
+
+reg_to_consul_for_swarm() {
+	local component_type=SwarmAgent
+
+	mkdir -p /opt/DBaaS/scrpit/
+
+	cat << EOF > /opt/DBaaS/scrpit/check_swarmagent.sh
+#!/bin/bash
+ps -ef | grep -v "grep" | grep "/usr/bin/swarm join"
+if [ $? -en 0 ]; then
+	exit 2
+else
+	exit 0
+fi
+EOF
+	chmod +x /opt/DBaaS/scrpit/check_swarmagent.sh
+
+	curl -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Check": {"Script": "/opt/DBaaS/scrpit/check_swarmagent.sh ", "Interval": "10s" }}' http://${adm_ip}:${consul_port}/v1/agent/service/register
+
+	if [ $? != 0 ]; then
+		echo "${component_type} register to consul failed"
+		exit 2
+	fi
+}
+
+
+# init VG
+
+
 reg_to_consul() {
 	local component_type=$1
 	local component_port=$2
 
-	curl -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Port": '${component_port}', "Check": { "tcp": "'${adm_ip}':'${component_port}'", "Interval": "10s", "timeout": "3s" }}' http://${adm_ip}:${consul_port}/v1/agent/register
+	curl -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Port": '${component_port}', "Check": { "tcp": "'${adm_ip}':'${component_port}'", "Interval": "10s", "timeout": "3s" }}' http://${adm_ip}:${consul_port}/v1/agent/service/register
 	if [ $? != 0 ]; then
 		echo "${component_type} register to consul failed"
 		exit 2
@@ -484,7 +514,6 @@ EOF
 init_hdd_vg
 init_ssd_vg
 install_consul
-reg_to_horus_server ConsulAgent
 install_docker_plugin
 reg_to_consul DockerPlugin ${docker_plugin_port}
 reg_to_horus_server DockerPlugin 
@@ -493,7 +522,7 @@ init_docker
 reg_to_consul Docker ${docker_port}
 reg_to_horus_server Docker
 install_swarm_agent
-reg_to_consul SwarmAgent ${swarm_agent_port}
+reg_to_consul_for_swarm
 reg_to_horus_server SwarmAgent
 install_horus_agent
 reg_to_consul HorusAgent ${horus_agent_port}
