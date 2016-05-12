@@ -156,24 +156,10 @@ func (gd *Gardener) Datacenter(IDOrName string) (*Datacenter, error) {
 	gd.RUnlock()
 
 	//If Not Found
-	cl, err := database.GetCluster(IDOrName)
-	if err != nil || cl == nil {
-		return nil, fmt.Errorf("Not Found %s,Error %s", IDOrName, err)
-	}
 
-	var storage store.Store
-	if cl.StorageType != store.LocalDiskStore && cl.StorageID != "" {
-		storage, err = gd.GetStore(cl.StorageID)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	dc := &Datacenter{
-		RWMutex: sync.RWMutex{},
-		Cluster: cl,
-		storage: storage,
-		nodes:   make([]*Node, 0, 100),
+	dc, err := gd.rebuildDatacenter(IDOrName)
+	if err != nil {
+		return nil, err
 	}
 
 	gd.Lock()
@@ -315,34 +301,10 @@ func (gd *Gardener) GetNode(NameOrID string) (*Node, error) {
 		return nil, err
 	}
 
-	eng, err := gd.GetEngine(n.EngineID)
+	node, err := gd.rebuildNode(n)
 	if err != nil {
 		return nil, err
 	}
-
-	node := &Node{
-		Node:   &n,
-		engine: eng,
-	}
-
-	vgs := make([]store.VG, 0, 2)
-	//SSD
-	if ssd := eng.Labels[_SSD_VG_Label]; ssd != "" {
-		vgs = append(vgs, store.VG{
-			Vendor: _SSD,
-			Name:   ssd,
-		})
-	}
-	// HDD
-	if hdd := eng.Labels[_HDD_VG_Label]; hdd != "" {
-		vgs = append(vgs, store.VG{
-			Vendor: _HDD,
-			Name:   hdd,
-		})
-	}
-
-	pluginAddr := fmt.Sprintf("%s:%d", node.Addr, pluginPort)
-	node.localStore = store.NewLocalDisk(pluginAddr, node.Node, vgs)
 
 	if dc != nil {
 		dc.Lock()
@@ -509,6 +471,7 @@ func (gd *Gardener) RemoveDatacenter(NameOrID string) error {
 
 	return nil
 }
+
 func (dc *Datacenter) isIdleStoreEnough(IDOrType string, num, size int) bool {
 	dc.RLock()
 
@@ -551,13 +514,125 @@ func (dc *Datacenter) getStore(IDOrType string) store.Store {
 	return nil
 }
 
+func (gd *Gardener) rebuildDatacenters() error {
+	list, err := database.ListCluster()
+	if err != nil {
+		return err
+	}
+
+	for i := range list {
+		dc, err := gd.rebuildDatacenter(list[i].ID)
+		if err != nil {
+			continue
+		}
+		nodes, err := database.ListNodeByCluster(list[i].ID)
+		if err != nil {
+			continue
+		}
+		out := make([]*Node, 0, len(nodes))
+		for n := range nodes {
+			node, err := gd.rebuildNode(*nodes[n])
+			if err != nil {
+				continue
+			}
+			out = append(out, node)
+		}
+
+		dc.Lock()
+		dc.nodes = append(dc.nodes, out...)
+		dc.Unlock()
+
+		gd.Lock()
+		gd.datacenters = append(gd.datacenters, dc)
+		gd.Unlock()
+	}
+
+	return nil
+}
+
+func (gd *Gardener) rebuildDatacenter(NameOrID string) (*Datacenter, error) {
+	cl, err := database.GetCluster(NameOrID)
+	if err != nil || cl == nil {
+		return nil, fmt.Errorf("Not Found %s,Error %s", NameOrID, err)
+	}
+
+	var storage store.Store
+	if cl.StorageType != store.LocalDiskStore && cl.StorageID != "" {
+		storage, err = gd.GetStore(cl.StorageID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	dc := &Datacenter{
+		RWMutex: sync.RWMutex{},
+		Cluster: cl,
+		storage: storage,
+		nodes:   make([]*Node, 0, 100),
+	}
+
+	return dc, nil
+}
+
+func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
+	eng, err := gd.GetEngine(n.EngineID)
+	if err != nil {
+		return nil, err
+	}
+
+	node := &Node{
+		Node:   &n,
+		engine: eng,
+	}
+
+	vgs := make([]store.VG, 0, 2)
+	//SSD
+	if ssd := eng.Labels[_SSD_VG_Label]; ssd != "" {
+		vgs = append(vgs, store.VG{
+			Vendor: _SSD,
+			Name:   ssd,
+		})
+	}
+	// HDD
+	if hdd := eng.Labels[_HDD_VG_Label]; hdd != "" {
+		vgs = append(vgs, store.VG{
+			Vendor: _HDD,
+			Name:   hdd,
+		})
+	}
+
+	pluginAddr := fmt.Sprintf("%s:%d", eng.IP, pluginPort)
+	node.localStore = store.NewLocalDisk(pluginAddr, node.Node, vgs)
+
+	return node, nil
+}
+
 func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType string, num int) []string {
-	out := make([]string, 0, 100)
+	gd.RLock()
+	length := len(gd.datacenters)
+	gd.RUnlock()
+
+	if length == 0 {
+		err := gd.rebuildDatacenters()
+		if err != nil {
+			return nil
+		}
+	}
+
 	gd.RLock()
 	defer gd.RUnlock()
-
+	out := make([]string, 0, 100)
 	for _, dc := range gd.datacenters {
 		// check dc
+		if dc == nil {
+			continue
+		}
+
+		if !dc.Enabled {
+			out = append(out, dc.ID)
+			continue
+		}
+
 		if IDOrType != "" && !(dc.Type == IDOrType || dc.ID == IDOrType) {
 			out = append(out, dc.ID)
 			continue
@@ -569,9 +644,11 @@ func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType s
 				if !dc.isIdleStoreEnough("", num/2, v.Size) {
 					out = append(out, dc.ID)
 				}
-				continue
 			}
 
+			if !strings.Contains(v.Type, store.LocalDiskStore) {
+				continue
+			}
 			for _, node := range dc.nodes {
 				if node.localStore == nil {
 					out = append(out, node.ID)
@@ -588,7 +665,6 @@ func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType s
 					out = append(out, node.ID)
 					continue
 				}
-
 			}
 		}
 	}
@@ -963,7 +1039,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 				})
 			}
 
-			pluginAddr := fmt.Sprintf("%s:%d", nodes[i].Addr, pluginPort)
+			pluginAddr := fmt.Sprintf("%s:%d", eng.IP, pluginPort)
 			nodes[i].localStore = store.NewLocalDisk(pluginAddr, nodes[i].Node, vgs)
 
 			wwn := eng.Labels[_SAN_HBA_WWN_Lable]

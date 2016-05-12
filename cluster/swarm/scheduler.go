@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"regexp"
 	"runtime/debug"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -295,6 +297,24 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stor
 		return preAlloc, err
 	}
 
+	config.Env = append(config.Env, fmt.Sprintf("C_NAME=%s", unit.Name))
+	ip := ""
+	for i := range preAlloc.networkings {
+		if preAlloc.networkings[i].Type == _ContainersNetworking {
+			ip = preAlloc.networkings[i].IP.String()
+		}
+	}
+	config.Env = append(config.Env, fmt.Sprintf("IPADDR=%s", ip))
+
+	portSlice := make([]string, len(unit.ports))
+	for i := range unit.ports {
+		portSlice[i] = strconv.Itoa(unit.ports[i].Port)
+	}
+	config.Env = append(config.Env, fmt.Sprintf("PORT=%s", strings.Join(portSlice, ",")))
+
+	config.Labels["container_ip"] = ip
+	config.Labels["unit_id"] = unit.ID
+
 	preAlloc.unit.config = config
 
 	err = gd.allocStorage(preAlloc, engine, config, stores)
@@ -313,7 +333,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stor
 
 	preAlloc.swarmID = swarmID
 	preAlloc.pendingContainer = &pendingContainer{
-		Name:   unit.ID,
+		Name:   unit.Name,
 		Config: config,
 		Engine: engine,
 	}

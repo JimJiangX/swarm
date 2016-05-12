@@ -413,15 +413,13 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, e
 	return svc, nil
 }
 
-func (svc *Service) CreateContainers() (err error) {
+func (svc *Service) CreateContainers(authConfig *types.AuthConfig) (err error) {
 	if val := atomic.LoadInt64(&svc.Status); val != _StatusServiceCreating {
 		return fmt.Errorf("Status Conflict,%d!=_StatusServiceCreating", val)
 	}
-
 	svc.Lock()
-
 	defer func() {
-		if r := recover(); r != nil || err != nil {
+		if err != nil {
 			atomic.StoreInt64(&svc.Status, _StatusServiceCreateFailed)
 		}
 
@@ -429,6 +427,11 @@ func (svc *Service) CreateContainers() (err error) {
 	}()
 
 	for i := range svc.units {
+		err = svc.units[i].pullImage(authConfig)
+		if err != nil {
+			return err
+		}
+
 		err = svc.units[i].prepareCreateContainer()
 		if err != nil {
 			return err
@@ -444,12 +447,11 @@ func (svc *Service) CreateContainers() (err error) {
 }
 
 func (svc *Service) StartContainers() (err error) {
-	if val := atomic.LoadInt64(&svc.Status); val != _StatusServiceStarting {
-		return fmt.Errorf("Status Conflict,%d!=_StatusServiceStarting", val)
+	if !atomic.CompareAndSwapInt64(&svc.Status, _StatusServiceCreating, _StatusServiceStarting) {
+		return fmt.Errorf("Status Conflict,%d!=_StatusServiceStarting", svc.Status)
 	}
 
 	svc.Lock()
-
 	defer func() {
 		if err != nil {
 			atomic.StoreInt64(&svc.Status, _StatusServiceStartFailed)
@@ -469,14 +471,14 @@ func (svc *Service) StartContainers() (err error) {
 }
 
 func (svc *Service) CopyServiceConfig() (err error) {
-	if val := atomic.LoadInt64(&svc.Status); val != _StatusServiceStarting {
-		return fmt.Errorf("Status Conflict,%d!=_StatusServiceStarting", val)
+	if val := atomic.LoadInt64(&svc.Status); val != _StatusServiceCreating {
+		return fmt.Errorf("Status Conflict,%d!=_StatusServiceCreating", val)
 	}
-	svc.Lock()
 
+	svc.Lock()
 	defer func() {
 		if err != nil {
-			atomic.StoreInt64(&svc.Status, _StatusServiceStartFailed)
+			atomic.StoreInt64(&svc.Status, _StatusServiceCreateFailed)
 		}
 
 		svc.Unlock()
@@ -503,9 +505,7 @@ func (svc *Service) StartService() (err error) {
 	if val := atomic.LoadInt64(&svc.Status); val != _StatusServiceStarting {
 		return fmt.Errorf("Status Conflict,%d!=_StatusServiceStarting", val)
 	}
-
 	svc.Lock()
-
 	defer func() {
 		if err != nil {
 			atomic.StoreInt64(&svc.Status, _StatusServiceStartFailed)
@@ -716,7 +716,6 @@ func (svc *Service) GetSwithManager() (*unit, error) {
 }
 
 func (svc *Service) getSwithManagerAddr() (addr string, port int, err error) {
-
 	u, err := svc.getUnitByType("Switch Manager")
 	if err != nil {
 		return "", 0, err
