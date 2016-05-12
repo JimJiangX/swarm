@@ -117,12 +117,6 @@ func newPreAllocResource() *preAllocResource {
 }
 
 func (pre *preAllocResource) consistency() (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("preAllocResource consistency Panic:%v;%v", r, err)
-		}
-	}()
-
 	tx, err := database.GetTX()
 	if err != nil {
 		return err
@@ -143,18 +137,11 @@ func (pre *preAllocResource) consistency() (err error) {
 }
 
 func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Panic:%v;%s", r, err)
-		}
-	}()
-
 	gd.scheduler.Lock()
 	for i := range pendings {
 		if pendings[i] == nil {
 			continue
 		}
-
 		swarmID := pendings[i].pendingContainer.Config.SwarmID()
 		delete(gd.pendingContainers, swarmID)
 	}
