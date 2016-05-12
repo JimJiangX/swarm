@@ -117,6 +117,9 @@ func newPreAllocResource() *preAllocResource {
 }
 
 func (pre *preAllocResource) consistency() (err error) {
+	if pre.unit == nil {
+		return nil
+	}
 	tx, err := database.GetTX()
 	if err != nil {
 		return err
@@ -139,7 +142,10 @@ func (pre *preAllocResource) consistency() (err error) {
 func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 	gd.scheduler.Lock()
 	for i := range pendings {
-		if pendings[i] == nil {
+		if pendings[i] == nil ||
+			pendings[i].pendingContainer == nil ||
+			pendings[i].pendingContainer.Config == nil {
+
 			continue
 		}
 		swarmID := pendings[i].pendingContainer.Config.SwarmID()
@@ -157,20 +163,25 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 	defer gd.Unlock()
 
 	for i := range pendings {
-
-		ips := gd.recycleNetworking(pendings[i])
-
-		database.TxUpdateMultiIPValue(tx, ips)
-
-		ports := pendings[i].unit.ports
-		for p := range ports {
-			ports[p] = database.Port{
-				Port:      ports[p].Port,
-				Allocated: false,
-			}
+		if pendings[i] == nil {
+			continue
 		}
 
-		database.TxUpdatePorts(tx, ports)
+		if len(pendings[i].networkings) > 0 {
+			ips := gd.recycleNetworking(pendings[i])
+			database.TxUpdateMultiIPValue(tx, ips)
+		}
+
+		if pendings[i].unit != nil {
+			ports := pendings[i].unit.ports
+			for p := range ports {
+				ports[p] = database.Port{
+					Allocated: false,
+				}
+			}
+			database.TxUpdatePorts(tx, ports)
+			database.TxDelUnit(tx, pendings[i].unit.Unit.ID)
+		}
 
 		for _, local := range pendings[i].localStore {
 			database.DeleteLocalVoume(local)
@@ -181,11 +192,8 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 			if err != nil || dc == nil || dc.storage == nil {
 				continue
 			}
-
 			dc.storage.Recycle(lun, 0)
 		}
-
-		database.TxDelUnit(tx, pendings[i].unit.Unit.ID)
 	}
 
 	return tx.Commit()

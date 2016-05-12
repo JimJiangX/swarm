@@ -62,7 +62,7 @@ func (gd *Gardener) serviceScheduler() (err error) {
 				resourceAlloc = append(resourceAlloc, preAlloc...)
 			}
 			if err != nil {
-				entry.WithField("Module", svc.base.Modules[i].Name).Error("Alloction Failed", err)
+				entry.WithField("Module", svc.base.Modules[i].Name).Errorf("Alloction Failed %s", err.Error())
 				goto failure
 			}
 		}
@@ -82,7 +82,7 @@ func (gd *Gardener) serviceScheduler() (err error) {
 		continue
 
 	failure:
-		log.Debugf("[**MG**]serviceScheduler fail hehe: %v", resourceAlloc)
+		log.Debugf("[**MG**]serviceScheduler Failed: %v", resourceAlloc)
 		err = gd.Recycle(resourceAlloc)
 		if err != nil {
 			entry.Error("Recycle Failed", err)
@@ -199,12 +199,13 @@ func (gd *Gardener) BuildPendingContainers(list []*node.Node, svcName, Type stri
 
 	preAllocs, err := gd.pendingAlloc(candidates[0:num], svcName, Type, stores, config)
 	if err != nil {
-		entry.Error("gd.pendingAlloc: preAllocs Allocation Failed", err)
+		entry.Errorf("gd.pendingAlloc: preAllocs Allocation Failed %s", err.Error())
+		return preAllocs, err
 	}
 
-	entry.Info(" gd.pendingAlloc: Allocation Succeed!")
+	entry.Info("gd.pendingAlloc: Allocation Succeed!")
 
-	return preAllocs, err
+	return preAllocs, nil
 }
 
 func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcName, Type string, stores []structs.DiskStorage,
@@ -266,7 +267,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcName, Type string, 
 		preAlloc, err := gd.pendingAllocOneNode(engine, unit, stores, templConfig)
 		allocs = append(allocs, preAlloc)
 		if err != nil {
-			entry.Error("pendingAlloc :Alloc Resource", err)
+			entry.Errorf("pendingAlloc:Alloc Resource %s", err.Error())
 
 			return allocs, err
 		}
