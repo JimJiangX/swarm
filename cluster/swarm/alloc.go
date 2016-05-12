@@ -262,6 +262,7 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 			}
 
 			penging.localStore = append(penging.localStore, lunID)
+			name = fmt.Sprintf("%s:/DBAAS%s", name, need[i].Name)
 			config.HostConfig.Binds = append(config.HostConfig.Binds, name)
 			config.HostConfig.VolumeDriver = node.localStore.Driver()
 
@@ -283,6 +284,7 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 			return err
 		}
 
+		name = fmt.Sprintf("%s:/DBAAS%s", name, need[i].Name)
 		config.HostConfig.Binds = append(config.HostConfig.Binds, name)
 		config.HostConfig.VolumeDriver = dc.storage.Driver()
 
