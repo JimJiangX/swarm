@@ -94,3 +94,16 @@ func (gd *Gardener) RemoveStoreSpace(id string, space int) error {
 
 	return database.DeleteRaidGroup(id, space)
 }
+
+func (gd *Gardener) RemoveStore(storage string) error {
+	count, err := database.CountClusterByStorage(storage)
+	if err != nil {
+		return err
+	}
+
+	if count > 0 {
+		return fmt.Errorf("Store %s is using,cannot be removed", storage)
+	}
+
+	return database.DeleteStorageByID(storage)
+}

@@ -809,8 +809,24 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Delete /storage/{name:.*}
-func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+// Delete /storage/san/{name:.*}
+func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.RemoveStore(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
 
 // Delete /storage/san/{name:.*}/raid_group/{rg:.*}
 func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {

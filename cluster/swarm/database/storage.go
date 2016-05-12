@@ -397,3 +397,28 @@ func GetStorageByID(id string) (*HitachiStorage, *HuaweiStorage, error) {
 
 	return nil, nil, err
 }
+
+func DeleteStorageByID(id string) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	r, err := db.Exec("DELETE FROM tb_storage_HITACHI WHERE id=?", id)
+	if err == nil {
+		num, err := r.RowsAffected()
+		if num > 0 && err == nil {
+			return nil
+		}
+	}
+
+	r, err = db.Exec("DELETE FROM tb_storage_HUAWEI WHERE id=?", id)
+	if err == nil {
+		num, err := r.RowsAffected()
+		if num > 0 && err == nil {
+			return nil
+		}
+	}
+
+	return err
+}

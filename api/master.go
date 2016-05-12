@@ -93,9 +93,10 @@ var masterRoutes = map[string]map[string]ctxHandler{
 
 		"/networkings/{name:.*}": deleteNetworking,
 
-		"/storage/{name:.*}":                        deleteStorage,
+		"/storage/san/{name:.*}":                    deleteStorage,
 		"/storage/san/{name:.*}/raid_group/{rg:.*}": deleteRaidGroup,
-		"/image/{image:.*}":                         deleteImage,
+
+		"/image/{image:.*}": deleteImage,
 	},
 }
 

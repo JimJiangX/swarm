@@ -107,6 +107,18 @@ func ListCluster() ([]Cluster, error) {
 	return clusters, nil
 }
 
+func CountClusterByStorage(storage string) (int, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	err = db.Get(&count, "SELECT COUNT(*) from tb_cluster WHERE storage_id=?", storage)
+
+	return count, err
+}
+
 type Node struct {
 	ID           string `db:"id"`
 	Name         string `db:"name"`
