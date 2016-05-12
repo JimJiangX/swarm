@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -981,9 +982,23 @@ func buildImagePullOptions(image string) (types.ImagePullOptions, error) {
 	}, nil
 }
 
+// encodeAuthToBase64 serializes the auth configuration as JSON base64 payload
+func encodeAuthToBase64(authConfig types.AuthConfig) (string, error) {
+	buf, err := json.Marshal(authConfig)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(buf), nil
+}
+
 // Pull an image on the engine
 func (e *Engine) Pull(image string, authConfig *types.AuthConfig) error {
 	pullOpts, err := buildImagePullOptions(image)
+	if err != nil {
+		return err
+	}
+	// FIXME:added by fugr,delete when docker fix these
+	pullOpts.RegistryAuth, err = encodeAuthToBase64(*authConfig)
 	if err != nil {
 		return err
 	}
