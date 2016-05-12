@@ -471,8 +471,8 @@ func (svc *Service) StartContainers() (err error) {
 }
 
 func (svc *Service) CopyServiceConfig() (err error) {
-	if val := atomic.LoadInt64(&svc.Status); val != _StatusServiceCreating {
-		return fmt.Errorf("Status Conflict,%d!=_StatusServiceCreating", val)
+	if val := atomic.LoadInt64(&svc.Status); val != _StatusServiceStarting {
+		return fmt.Errorf("Status Conflict,%d!=_StatusServiceStarting", val)
 	}
 
 	svc.Lock()
