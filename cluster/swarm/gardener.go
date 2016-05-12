@@ -115,10 +115,11 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 		Token:      token,
 	}
 
-	gd.consulClient, err = consulapi.NewClient(&config)
+	consulClient, err := consulapi.NewClient(&config)
 	if err != nil {
 		return nil, err
 	}
+	gd.setConsulClient(consulClient)
 
 	options := &kvstore.Config{
 		TLS:               gd.TLSConfig(),
@@ -187,4 +188,47 @@ func (gd *Gardener) KVPath() string {
 	gd.RUnlock()
 
 	return path
+}
+
+func (gd *Gardener) setConsulClient(client *consulapi.Client) {
+	gd.Lock()
+	gd.consulClient = client
+	gd.Unlock()
+}
+
+func (gd *Gardener) consulAPIClient(full bool) (*consulapi.Client, error) {
+	gd.RLock()
+	if !full && gd.consulClient != nil {
+		gd.RUnlock()
+		return gd.consulClient, nil
+	}
+
+	gd.RUnlock()
+
+	sysConfig, err := database.GetSystemConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	endpoints, dc, token, wait := sysConfig.GetConsulConfig()
+
+	if len(endpoints) == 0 {
+		return nil, fmt.Errorf("Consul Config Settings Error")
+	}
+
+	config := consulapi.Config{
+		Address:    endpoints[0],
+		Datacenter: dc,
+		WaitTime:   time.Duration(wait) * time.Second,
+		Token:      token,
+	}
+
+	client, err := consulapi.NewClient(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	gd.setConsulClient(client)
+
+	return client, nil
 }

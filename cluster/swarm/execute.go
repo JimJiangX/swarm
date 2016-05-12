@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	"encoding/json"
 	"fmt"
 	"runtime/debug"
 	"sync/atomic"
@@ -10,6 +11,7 @@ import (
 	"github.com/docker/engine-api/types"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
+	consulapi "github.com/hashicorp/consul/api"
 )
 
 func (gd *Gardener) ServiceToExecute(svc *Service) {
@@ -50,16 +52,16 @@ func (gd *Gardener) serviceExecute() (err error) {
 
 		svc.Unlock()
 
-		log.Debug("[mg]CopyServiceConfig")
-		err = svc.CopyServiceConfig()
+		log.Debug("[mg]starting containers")
+		err = svc.StartContainers()
 		if err != nil {
 			taskErr = err
 
 			goto failure
 		}
 
-		log.Debug("[mg]starting containers")
-		err = svc.StartContainers()
+		log.Debug("[mg]CopyServiceConfig")
+		err = svc.CopyServiceConfig()
 		if err != nil {
 			taskErr = err
 
@@ -156,12 +158,37 @@ func createContainerInPending(gd *Gardener, svc *Service) error {
 		u.container = container
 		u.Unit.ContainerID = container.ID
 
+		err = gd.SaveContainerToConsul(container)
+		if err != nil {
+			// return err
+		}
+
 		if err := u.saveToDisk(); err != nil {
-			return err
+			// return err
 		}
 	}
 
 	return nil
+}
+
+func (gd *Gardener) SaveContainerToConsul(container *cluster.Container) error {
+	client, err := gd.consulAPIClient(true)
+	if err != nil {
+		return err
+	}
+
+	buf, err := json.Marshal(container)
+	if err != nil {
+		return err
+	}
+
+	pair := &consulapi.KVPair{
+		Key:   "/DBAAS/Conatainers/" + container.Info.Name,
+		Value: buf,
+	}
+	_, err = client.KV().Put(pair, nil)
+
+	return err
 }
 
 // createContainerInPending create new container into the cluster.
