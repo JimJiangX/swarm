@@ -451,7 +451,7 @@ func (svc *Service) StartContainers() (err error) {
 	svc.Lock()
 
 	defer func() {
-		if r := recover(); r != nil || err != nil {
+		if err != nil {
 			atomic.StoreInt64(&svc.Status, _StatusServiceStartFailed)
 		}
 
@@ -475,7 +475,7 @@ func (svc *Service) CopyServiceConfig() (err error) {
 	svc.Lock()
 
 	defer func() {
-		if r := recover(); r != nil || err != nil {
+		if err != nil {
 			atomic.StoreInt64(&svc.Status, _StatusServiceStartFailed)
 		}
 
@@ -507,7 +507,7 @@ func (svc *Service) StartService() (err error) {
 	svc.Lock()
 
 	defer func() {
-		if r := recover(); r != nil || err != nil {
+		if err != nil {
 			atomic.StoreInt64(&svc.Status, _StatusServiceStartFailed)
 		}
 
@@ -658,7 +658,7 @@ func (svc *Service) RegisterServices() (err error) {
 	svc.Lock()
 
 	defer func() {
-		if r := recover(); r != nil || err != nil {
+		if err != nil {
 
 		}
 
@@ -679,7 +679,7 @@ func (svc *Service) DeregisterServices() (err error) {
 	svc.Lock()
 
 	defer func() {
-		if r := recover(); r != nil || err != nil {
+		if err != nil {
 		}
 
 		svc.Unlock()
@@ -778,7 +778,6 @@ loop:
 }
 
 func (svc *Service) TryBackupTask(host, unitID, strategyID, strategyType string, timeout int) error {
-
 	task := database.NewTask("backup_strategy", strategyID, "", nil, timeout)
 	task.Status = _StatusTaskCreate
 

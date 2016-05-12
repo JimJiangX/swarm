@@ -66,7 +66,7 @@ func (gd *Gardener) serviceExecute() (err error) {
 				goto failure
 			}
 
-			log.Debugf("[mg]start prepareCreateContainer")
+			log.Debug("[mg]start prepareCreateContainer")
 			err = u.prepareCreateContainer()
 			if err != nil {
 				svc.Unlock()
@@ -75,7 +75,7 @@ func (gd *Gardener) serviceExecute() (err error) {
 				goto failure
 			}
 
-			log.Debugf("[mg]create container")
+			log.Debug("[mg]create container")
 			// create container
 			container, err := gd.createContainerInPending(pending.Config, pending.Name, svc.authConfig)
 			if err != nil {
@@ -91,12 +91,11 @@ func (gd *Gardener) serviceExecute() (err error) {
 
 			}
 		}
-		log.Debugf("[mg]hehe")
 		svc.pendingContainers = nil
 
 		svc.Unlock()
 
-		log.Debugf("[mg]start server ")
+		log.Debug("[mg]starting containers")
 		err = svc.StartContainers()
 		if err != nil {
 			taskErr = err
@@ -104,34 +103,35 @@ func (gd *Gardener) serviceExecute() (err error) {
 			goto failure
 		}
 
+		log.Debug("[mg]CopyServiceConfig")
 		err = svc.CopyServiceConfig()
 		if err != nil {
 			taskErr = err
 
 			goto failure
 		}
-
+		log.Debug("[mg]StartService")
 		err = svc.StartService()
 		if err != nil {
 			taskErr = err
 
 			goto failure
 		}
-
+		log.Debug("[mg]CreateUsers")
 		err = svc.CreateUsers()
 		if err != nil {
 			taskErr = err
 
 			goto failure
 		}
-
+		log.Debug("[mg]InitTopology")
 		err = svc.InitTopology()
 		if err != nil {
 			taskErr = err
 
 			goto failure
 		}
-
+		log.Debug("[mg]RegisterServices")
 		err = svc.RegisterServices()
 		if err != nil {
 			taskErr = err
@@ -139,15 +139,18 @@ func (gd *Gardener) serviceExecute() (err error) {
 			goto failure
 		}
 
+		log.Debug("[mg]TxSetServiceStatus")
+
 		database.TxSetServiceStatus(&svc.Service, svc.task,
 			_StatusServiceNoContent, _StatusTaskDone, time.Now(), "")
 
+		log.Debug("[mg]exec done")
 		continue
 
 	failure:
 
 		//TODO:error handler
-
+		log.Error("Exec Error:%v", taskErr)
 		database.TxSetServiceStatus(&svc.Service, svc.task, svc.Status, _StatusTaskFailed, time.Now(), taskErr.Error())
 	}
 
