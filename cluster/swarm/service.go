@@ -447,10 +447,9 @@ func (svc *Service) CreateContainers(authConfig *types.AuthConfig) (err error) {
 }
 
 func (svc *Service) StartContainers() (err error) {
-	if !atomic.CompareAndSwapInt64(&svc.Status, _StatusServiceCreating, _StatusServiceStarting) {
-		return fmt.Errorf("Status Conflict,%d!=_StatusServiceStarting", svc.Status)
+	if val := atomic.LoadInt64(&svc.Status); val != _StatusServiceStarting {
+		return fmt.Errorf("Status Conflict,%d!=_StatusServiceStarting", val)
 	}
-
 	svc.Lock()
 	defer func() {
 		if err != nil {
@@ -471,10 +470,9 @@ func (svc *Service) StartContainers() (err error) {
 }
 
 func (svc *Service) CopyServiceConfig() (err error) {
-	if val := atomic.LoadInt64(&svc.Status); val != _StatusServiceStarting {
-		return fmt.Errorf("Status Conflict,%d!=_StatusServiceStarting", val)
+	if !atomic.CompareAndSwapInt64(&svc.Status, _StatusServiceCreating, _StatusServiceStarting) {
+		return fmt.Errorf("Status Conflict,%d!=_StatusServiceStarting", svc.Status)
 	}
-
 	svc.Lock()
 	defer func() {
 		if err != nil {

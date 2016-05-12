@@ -224,7 +224,7 @@ func (u *unit) removeContainer(force, rmVolumes bool) error {
 }
 
 func (u *unit) startContainer() error {
-	return u.engine.StartContainer(u.Unit.ContainerID, nil)
+	return u.engine.StartContainer(u.Unit.Name, nil)
 }
 
 func (u *unit) stopContainer(timeout int) error {

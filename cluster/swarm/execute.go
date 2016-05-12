@@ -38,62 +38,25 @@ func (gd *Gardener) serviceExecute() (err error) {
 		// step := int64(0)
 		var taskErr error
 
-		for _, pending := range svc.pendingContainers {
-			log.Debugf("[mg]svc.getUnit :%s", pending)
-			u, err := svc.getUnit(pending.Name)
-			if err != nil || u == nil {
-				svc.Unlock()
-				taskErr = err
-				log.Errorf("%s:getunit err:%v", pending.Name, err)
-				goto failure
-			}
-			log.Debugf("[mg]the unit:%v", u)
-			atomic.StoreUint32(&u.Status, _StatusUnitCreating)
+		err = createContainerInPending(gd, svc)
+		if err != nil {
+			svc.Unlock()
+			taskErr = err
 
-			log.Debugf("[mg]start pull image %s", u.config.Image)
-			authConfig, err := gd.RegistryAuthConfig()
-			if err != nil {
-				svc.Unlock()
-				taskErr = err
-				log.Errorf("get RegistryAuthConfig Error:%s", err.Error())
-				goto failure
-			}
-
-			if err := u.pullImage(authConfig); err != nil {
-				svc.Unlock()
-				taskErr = err
-				log.Errorf("pullImage Error:%s", err.Error())
-				goto failure
-			}
-
-			log.Debug("[mg]start prepareCreateContainer")
-			err = u.prepareCreateContainer()
-			if err != nil {
-				svc.Unlock()
-				taskErr = fmt.Errorf("%s:Prepare Networking or Volume Failed,%s", pending.Name, err)
-				log.Error(taskErr.Error())
-				goto failure
-			}
-
-			log.Debug("[mg]create container")
-			// create container
-			container, err := gd.createContainerInPending(pending.Config, pending.Name, svc.authConfig)
-			if err != nil {
-				svc.Unlock()
-				taskErr = fmt.Errorf("Container Create Failed %s,%s", pending.Name, err)
-
-				goto failure
-			}
-
-			u.container = container
-
-			if err := u.saveToDisk(); err != nil {
-
-			}
+			goto failure
 		}
+
 		svc.pendingContainers = nil
 
 		svc.Unlock()
+
+		log.Debug("[mg]CopyServiceConfig")
+		err = svc.CopyServiceConfig()
+		if err != nil {
+			taskErr = err
+
+			goto failure
+		}
 
 		log.Debug("[mg]starting containers")
 		err = svc.StartContainers()
@@ -103,13 +66,6 @@ func (gd *Gardener) serviceExecute() (err error) {
 			goto failure
 		}
 
-		log.Debug("[mg]CopyServiceConfig")
-		err = svc.CopyServiceConfig()
-		if err != nil {
-			taskErr = err
-
-			goto failure
-		}
 		log.Debug("[mg]StartService")
 		err = svc.StartService()
 		if err != nil {
@@ -155,6 +111,57 @@ func (gd *Gardener) serviceExecute() (err error) {
 	}
 
 	return err
+}
+
+func createContainerInPending(gd *Gardener, svc *Service) error {
+	for _, pending := range svc.pendingContainers {
+		log.Debugf("[mg]svc.getUnit :%s", pending)
+		u, err := svc.getUnit(pending.Name)
+		if err != nil || u == nil {
+			log.Errorf("%s:getunit err:%v", pending.Name, err)
+			return err
+		}
+		log.Debugf("[mg]the unit:%v", u)
+		atomic.StoreUint32(&u.Status, _StatusUnitCreating)
+
+		log.Debugf("[mg]start pull image %s", u.config.Image)
+		authConfig, err := gd.RegistryAuthConfig()
+		if err != nil {
+			log.Errorf("get RegistryAuthConfig Error:%s", err.Error())
+			return err
+		}
+
+		if err := u.pullImage(authConfig); err != nil {
+			log.Errorf("pullImage Error:%s", err.Error())
+			return err
+		}
+
+		log.Debug("[mg]start prepareCreateContainer")
+		err = u.prepareCreateContainer()
+		if err != nil {
+			err = fmt.Errorf("%s:Prepare Networking or Volume Failed,%s", pending.Name, err)
+			log.Error(err.Error())
+			return err
+		}
+
+		log.Debug("[mg]create container")
+		// create container
+		container, err := gd.createContainerInPending(pending.Config, pending.Name, svc.authConfig)
+		if err != nil {
+			err = fmt.Errorf("Container Create Failed %s,%s", pending.Name, err)
+			log.Error(err.Error())
+			return err
+		}
+
+		u.container = container
+		u.Unit.ContainerID = container.ID
+
+		if err := u.saveToDisk(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // createContainerInPending create new container into the cluster.
