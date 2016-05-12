@@ -32,7 +32,7 @@ ext_nic=bond2
 reg_to_horus_server() {
 	local component_type=$1
 
-	curl -X POST -H "Content-Type: application/json" -d "{ "endpoint": "${node_id}","name": "${node_id}--${component_type}","type": "${component_type}","checktype": "health" }" http://${horus_server_ip}:${horus_server_port}/v1/component/register
+	curl -X POST -H "Content-Type: application/json" -d '{ "endpoint": "'${node_id}'","name": "'${node_id}':'${component_type}'","type": "'${component_type}'","checktype": "health" }' http://${horus_server_ip}:${horus_server_port}/v1/component/register
 	if [ $? != 0 ]; then
 		echo "${component_type} register to horus server failed"
 		exit 2
@@ -44,7 +44,7 @@ reg_to_consul() {
 	local component_type=$1
 	local component_port=$2
 
-	curl -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}--${component_type}'","Name": "'${node_id}--${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Port": '${component_port}', "Check": { "tcp": "'${adm_ip}':'${component_port}'", "Interval": "10s", "timeout": "3s" }}' http://${adm_ip}:${consul_port}/v1/agent/register
+	curl -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Port": '${component_port}', "Check": { "tcp": "'${adm_ip}':'${component_port}'", "Interval": "10s", "timeout": "3s" }}' http://${adm_ip}:${consul_port}/v1/agent/register
 	if [ $? != 0 ]; then
 		echo "${component_type} register to consul failed"
 		exit 2
@@ -484,7 +484,7 @@ EOF
 init_hdd_vg
 init_ssd_vg
 install_consul
-reg_for_horus_server ConsulAgent
+reg_to_horus_server ConsulAgent
 install_docker_plugin
 reg_to_consul DockerPlugin ${docker_plugin_port}
 reg_to_horus_server DockerPlugin 
