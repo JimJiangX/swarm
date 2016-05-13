@@ -5,7 +5,7 @@ import "time"
 type LUN struct {
 	ID              string    `db:"id"`
 	Name            string    `db:"name"`
-	UnitID          string    `db:"unit_id"`
+	VGName          string    `db:"vg_name"`
 	RaidGroupID     string    `db:"raid_group_id"`
 	StorageSystemID string    `db:"storage_system_id"`
 	Mappingto       string    `db:"mapping_hostname"`
@@ -19,30 +19,40 @@ func (l LUN) TableName() string {
 	return "tb_lun"
 }
 
-func InsertLUN(lun LUN) error {
-	db, err := GetDB(true)
+func TxInsertLUNAndVolume(lun LUN, lv LocalVolume) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	query := "INSERT INTO tb_lun (id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at) VALUES (:id,:name,:vg_name,:raid_group_id,:storage_system_id,:mapping_hostname,:size,:host_lun_id,:storage_lun_id,:created_at)"
+
+	_, err = tx.NamedExec(query, &lun)
 	if err != nil {
 		return err
 	}
 
-	query := "INSERT INTO tb_lun (id,name,unit_id,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at) VALUES (:id,:name,:unit_id,:raid_group_id,:storage_system_id,:mapping_hostname,:size,:host_lun_id,:storage_lun_id,:created_at)"
+	lvquery := "INSERT INTO tb_volumes (id,name,unit_id,size,VGname,driver,fstype) VALUES (:id,:name,:unit_id,:size,:VGname,:driver,:fstype)"
+	_, err = tx.NamedExec(lvquery, &lv)
+	if err != nil {
+		return err
+	}
 
-	_, err = db.NamedExec(query, &lun)
-
-	return err
+	return tx.Commit()
 }
 
 var DelLunMapping = LunMapping
 
-func LunMapping(lun, host, unit string, hlun int) error {
+func LunMapping(lun, host, vgName string, hlun int) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
 	}
 
-	query := "UPDATE tb_lun SET unit_id=?,mapping_hostname=?,host_lun_id=? WHERE id=?"
+	query := "UPDATE tb_lun SET vg_name=?,mapping_hostname=?,host_lun_id=? WHERE id=?"
 
-	_, err = db.Exec(query, unit, host, hlun, lun)
+	_, err = db.Exec(query, vgName, host, hlun, lun)
 
 	return err
 }
@@ -78,16 +88,16 @@ func ListLUNByName(name string) ([]LUN, error) {
 	return list, err
 }
 
-func ListLUNByUnitID(id string) ([]LUN, error) {
+func ListLUNByVgName(name string) ([]LUN, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
 	list := make([]LUN, 0, 4)
-	query := "SELECT * FROM tb_lun WHERE id=?"
+	query := "SELECT * FROM tb_lun WHERE vg_name=?"
 
-	err = db.Select(&list, query, id)
+	err = db.Select(&list, query, name)
 	if err != nil {
 		return nil, err
 	}
@@ -307,9 +317,10 @@ func (hs *HuaweiStorage) Insert() error {
 }
 
 type LocalVolume struct {
+	Size       int    `db:"size"`
 	ID         string `db:"id"`
 	Name       string `db:"name"`
-	Size       int    `db:"size"`
+	UnitID     string `db:"unit_id"`
 	VGName     string `db:"VGname"`
 	Driver     string `db:"driver"`
 	Filesystem string `db:"fstype"`
@@ -325,7 +336,7 @@ func InsertLocalVolume(lv LocalVolume) error {
 		return err
 	}
 
-	query := "INSERT INTO tb_volumes (id,name,size,VGname,driver,fstype) VALUES (:id,:name,:size,:VGname,:driver,:fstype)"
+	query := "INSERT INTO tb_volumes (id,name,unit_id,size,VGname,driver,fstype) VALUES (:id,:name,:unit_id,:size,:VGname,:driver,:fstype)"
 	_, err = db.NamedExec(query, &lv)
 
 	return err
@@ -342,7 +353,7 @@ func DeleteLocalVoume(IDOrName string) error {
 	return err
 }
 
-func GetLocalVoume(IDOrName string) (LocalVolume, error) {
+func GetLocalVoume(NameOrID string) (LocalVolume, error) {
 	lv := LocalVolume{}
 
 	db, err := GetDB(true)
@@ -352,7 +363,7 @@ func GetLocalVoume(IDOrName string) (LocalVolume, error) {
 
 	query := "SELECT * FROM tb_volumes WHERE id=? OR name=?"
 
-	err = db.Get(&lv, query, IDOrName, IDOrName)
+	err = db.Get(&lv, query, NameOrID, NameOrID)
 
 	return lv, err
 }
@@ -367,6 +378,23 @@ func SelectVolumeByVG(name string) ([]LocalVolume, error) {
 	query := "SELECT * FROM tb_volumes WHERE VGname=?"
 
 	err = db.Select(&lvs, query, name)
+	if err != nil {
+		return nil, err
+	}
+
+	return lvs, nil
+}
+
+func SelectVolumesByUnitID(id string) ([]LocalVolume, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	lvs := make([]LocalVolume, 0, 5)
+	query := "SELECT * FROM tb_volumes WHERE unit_id=?"
+
+	err = db.Select(&lvs, query, id)
 	if err != nil {
 		return nil, err
 	}

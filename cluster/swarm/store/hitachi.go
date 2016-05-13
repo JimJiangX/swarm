@@ -66,7 +66,7 @@ func (h *hitachiStore) Insert() error {
 	return h.hs.Insert()
 }
 
-func (h *hitachiStore) Alloc(name, _ string, size int) (string, int, error) {
+func (h *hitachiStore) Alloc(name, unit, vg string, size int) (string, int, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -90,16 +90,6 @@ func (h *hitachiStore) Alloc(name, _ string, size int) (string, int, error) {
 		return "", 0, fmt.Errorf("No available LUN ID")
 	}
 
-	lun := database.LUN{
-		ID:              utils.Generate64UUID(),
-		Name:            name,
-		RaidGroupID:     rg.ID,
-		StorageSystemID: h.ID(),
-		SizeByte:        size,
-		StorageLunID:    id,
-		CreatedAt:       time.Now(),
-	}
-
 	path, err := utils.GetAbsolutePath(false, scriptPath, HITACHI, "create_lun.sh")
 	if err != nil {
 		return "", 0, err
@@ -111,13 +101,33 @@ func (h *hitachiStore) Alloc(name, _ string, size int) (string, int, error) {
 	if err != nil {
 		return "", 0, err
 	}
-
 	output, err := cmd.Output()
 	if err != nil {
 		return "", 0, fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
 	}
 
-	err = database.InsertLUN(lun)
+	lun := database.LUN{
+		ID:              utils.Generate64UUID(),
+		Name:            name,
+		VGName:          vg,
+		RaidGroupID:     rg.ID,
+		StorageSystemID: h.ID(),
+		SizeByte:        size,
+		StorageLunID:    id,
+		CreatedAt:       time.Now(),
+	}
+
+	lv := database.LocalVolume{
+		ID:         utils.Generate64UUID(),
+		Name:       name,
+		Size:       size,
+		UnitID:     unit,
+		VGName:     vg,
+		Driver:     h.Driver(),
+		Filesystem: DefaultFilesystemType,
+	}
+
+	err = database.TxInsertLUNAndVolume(lun, lv)
 	if err != nil {
 		return "", 0, err
 	}
@@ -299,7 +309,7 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 	return err
 }
 
-func (h *hitachiStore) Mapping(host, unit, lun string) error {
+func (h *hitachiStore) Mapping(host, vg, lun string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -318,7 +328,7 @@ func (h *hitachiStore) Mapping(host, unit, lun string) error {
 		return fmt.Errorf("No available Host LUN ID")
 	}
 
-	err = database.LunMapping(lun, host, unit, val)
+	err = database.LunMapping(lun, host, vg, val)
 	if err != nil {
 		return err
 	}

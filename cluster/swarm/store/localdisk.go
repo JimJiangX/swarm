@@ -77,7 +77,7 @@ func (localDisk) Insert() error { return nil }
 func (localDisk) AddHost(name string, wwwn ...string) error { return nil }
 func (localDisk) DelHost(name string, wwwn ...string) error { return nil }
 
-func (l localDisk) Alloc(name, vg string, size int) (string, int, error) {
+func (l localDisk) Alloc(name, unit, vg string, size int) (string, int, error) {
 	idles, err := l.IdleSize()
 	if err != nil || len(idles) == 0 {
 		return "", 0, err
@@ -85,17 +85,18 @@ func (l localDisk) Alloc(name, vg string, size int) (string, int, error) {
 
 	vgsize, ok := idles[vg]
 	if !ok {
-		return "", 0, fmt.Errorf("%s:don't get vg size", vg)
+		return "", 0, fmt.Errorf("doesn't get VG %s", vg)
 	}
 
 	if vgsize < size {
-		return "", 0, fmt.Errorf("%s is shortage,%d<%d", vg, vgsize, size)
+		return "", 0, fmt.Errorf("VG %s is shortage,%d<%d", vg, vgsize, size)
 	}
 
 	lv := database.LocalVolume{
 		ID:         utils.Generate64UUID(),
 		Name:       name,
 		Size:       size,
+		UnitID:     unit,
 		VGName:     vg,
 		Driver:     l.Driver(),
 		Filesystem: DefaultFilesystemType,

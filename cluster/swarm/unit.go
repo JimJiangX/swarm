@@ -87,24 +87,28 @@ func (u *unit) prepareCreateContainer() error {
 
 	for _, name := range binds {
 		parts := strings.SplitN(name, ":", 2)
-		lv, err1 := database.GetLocalVoume(parts[0])
-		if err1 == nil {
-			req := &types.VolumeCreateRequest{
-				Name:       lv.Name,
-				Driver:     lv.Driver,
-				DriverOpts: map[string]string{"size": strconv.Itoa(lv.Size), "fstype": lv.Filesystem, "vgname": lv.VGName},
-				Labels:     nil,
-			}
-			_, err := u.engine.CreateVolume(req)
-			if err != nil {
-				return err
-			}
+		lv, err := database.GetLocalVoume(parts[0])
+		if err != nil {
+			return err
+		}
 
-		} else {
-			_, err := u.createSanStoreageVolume(parts[0])
+		// if volume create on san storage,should created VG before create Volume
+		if strings.Contains(lv.VGName, "_SAN_VG") {
+			err := u.createSanStoreageVG(parts[0])
 			if err != nil {
 				return err
 			}
+		}
+
+		req := &types.VolumeCreateRequest{
+			Name:       lv.Name,
+			Driver:     lv.Driver,
+			DriverOpts: map[string]string{"size": strconv.Itoa(lv.Size), "fstype": lv.Filesystem, "vgname": lv.VGName},
+			Labels:     nil,
+		}
+		_, err = u.engine.CreateVolume(req)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -152,15 +156,15 @@ func (u *unit) createLocalDiskVolume(name string) (*cluster.Volume, error) {
 	return v, nil
 }
 
-func (u *unit) createSanStoreageVolume(name string) (*cluster.Volume, error) {
+func (u *unit) createSanStoreageVG(name string) error {
 	list, err := database.ListLUNByName(name)
 	if err != nil || len(list) == 0 {
-		return nil, fmt.Errorf("LUN:%d,Error:%v", len(list), err)
+		return fmt.Errorf("LUN:%d,Error:%v", len(list), err)
 	}
 
 	storage, err := store.GetStoreByID(list[0].StorageSystemID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	l, size := make([]int, len(list)), 0
@@ -171,32 +175,13 @@ func (u *unit) createSanStoreageVolume(name string) (*cluster.Volume, error) {
 
 	config := sdk.VgConfig{
 		HostLunId: l,
-		VgName:    u.Name + "_SAN_VG",
+		VgName:    list[0].VGName,
 		Type:      storage.Vendor(),
 	}
+
 	addr := u.getPluginAddr(pluginPort)
-	err = sdk.SanVgCreate(addr, config)
-	if err != nil {
-		return nil, err
-	}
 
-	req := &types.VolumeCreateRequest{
-		Name:   name,
-		Driver: storage.Driver(),
-		DriverOpts: map[string]string{
-			"size":   strconv.Itoa(size),
-			"fstype": store.DefaultFilesystemType,
-			"vgname": config.VgName,
-		},
-		Labels: nil,
-	}
-
-	v, err := u.engine.CreateVolume(req)
-	if err != nil {
-		return nil, err
-	}
-
-	return v, nil
+	return sdk.SanVgCreate(addr, config)
 }
 
 func (u *unit) createContainer(authConfig *types.AuthConfig) (*cluster.Container, error) {

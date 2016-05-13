@@ -72,7 +72,7 @@ func (h *huaweiStore) Insert() error {
 	return err
 }
 
-func (h *huaweiStore) Alloc(name, _ string, size int) (string, int, error) {
+func (h *huaweiStore) Alloc(name, unit, vg string, size int) (string, int, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -86,22 +86,12 @@ func (h *huaweiStore) Alloc(name, _ string, size int) (string, int, error) {
 		return "", 0, fmt.Errorf("Not Enough Space For Alloction,Max:%d < Need:%d", out[rg], size)
 	}
 
-	lun := database.LUN{
-		ID:              utils.Generate64UUID(),
-		Name:            name,
-		RaidGroupID:     rg.ID,
-		StorageSystemID: h.ID(),
-		SizeByte:        size,
-		StorageLunID:    0,
-		CreatedAt:       time.Now(),
-	}
-
 	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "create_lun.sh")
 	if err != nil {
 		return "", 0, err
 	}
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password,
-		strconv.Itoa(rg.StorageRGID), lun.Name, strconv.Itoa(int(size))}
+		strconv.Itoa(rg.StorageRGID), name, strconv.Itoa(int(size))}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
@@ -113,12 +103,33 @@ func (h *huaweiStore) Alloc(name, _ string, size int) (string, int, error) {
 		return "", 0, fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
 	}
 
-	lun.StorageLunID, err = strconv.Atoi(string(output))
+	storageLunID, err := strconv.Atoi(string(output))
 	if err != nil {
 		return "", 0, err
 	}
 
-	err = database.InsertLUN(lun)
+	lun := database.LUN{
+		ID:              utils.Generate64UUID(),
+		Name:            name,
+		VGName:          vg,
+		RaidGroupID:     rg.ID,
+		StorageSystemID: h.ID(),
+		SizeByte:        size,
+		StorageLunID:    storageLunID,
+		CreatedAt:       time.Now(),
+	}
+
+	lv := database.LocalVolume{
+		ID:         utils.Generate64UUID(),
+		Name:       name,
+		Size:       size,
+		UnitID:     unit,
+		VGName:     vg,
+		Driver:     h.Driver(),
+		Filesystem: DefaultFilesystemType,
+	}
+
+	err = database.TxInsertLUNAndVolume(lun, lv)
 	if err != nil {
 		return "", 0, err
 	}
@@ -234,7 +245,7 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 	return nil
 }
 
-func (h *huaweiStore) Mapping(host, unit, lun string) error {
+func (h *huaweiStore) Mapping(host, vg, lun string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -253,7 +264,7 @@ func (h *huaweiStore) Mapping(host, unit, lun string) error {
 		return fmt.Errorf("No available Host LUN ID")
 	}
 
-	err = database.LunMapping(lun, host, unit, val)
+	err = database.LunMapping(lun, host, vg, val)
 	if err != nil {
 		return err
 	}

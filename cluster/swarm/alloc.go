@@ -251,12 +251,12 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 				return fmt.Errorf("Not Found VG_Name of %s", need[i].Type)
 			}
 
-			lunID, _, err := node.localStore.Alloc(name, vgName, need[i].Size)
+			lvID, _, err := node.localStore.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
 			if err != nil {
 				return err
 			}
 
-			penging.localStore = append(penging.localStore, lunID)
+			penging.localStore = append(penging.localStore, lvID)
 			name = fmt.Sprintf("%s:/DBAAS%s", name, need[i].Name)
 			config.HostConfig.Binds = append(config.HostConfig.Binds, name)
 			config.HostConfig.VolumeDriver = node.localStore.Driver()
@@ -267,14 +267,15 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 		if dc.storage == nil {
 			return fmt.Errorf("Not Found Datacenter Storage")
 		}
+		vgName := penging.unit.Unit.Name + "_SAN_VG"
 
-		lunID, _, err := dc.storage.Alloc(name, need[i].Type, need[i].Size)
+		lunID, _, err := dc.storage.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
 		if err != nil {
 			return err
 		}
 		penging.sanStore = append(penging.sanStore, lunID)
 
-		err = dc.storage.Mapping(node.ID, penging.unit.ID, lunID)
+		err = dc.storage.Mapping(node.ID, vgName, lunID)
 		if err != nil {
 			return err
 		}
