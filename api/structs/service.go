@@ -46,7 +46,7 @@ type Module struct {
 }
 
 type DiskStorage struct {
-	Name string // DATA / LOG
+	Name string // DAT/LOG/CNF
 	Type string // "local:HDD/SSD,san"
 	Size int
 }

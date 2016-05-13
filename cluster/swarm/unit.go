@@ -352,7 +352,6 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 			cnf = i
 			break
 		}
-
 		if strings.Contains(volumes[i].Name, "_DAT_LV") {
 			cnf = i
 		}
@@ -361,7 +360,7 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 	config := sdk.VolumeFileConfig{
 		VgName:    volumes[cnf].VGName,
 		LvsName:   volumes[cnf].Name,
-		MountName: "",
+		MountName: "/" + volumes[cnf].Name,
 		Data:      string(content),
 		FDes:      u.Path(),
 		Mode:      "0666",

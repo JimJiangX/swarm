@@ -180,13 +180,19 @@ func ValidService(req structs.PostServiceRequest) []string {
 
 		lvNames := make([]string, 0, len(module.Stores))
 		for _, ds := range module.Stores {
-			for i := range lvNames {
-				if lvNames[i] == ds.Name {
-					warnings = append(warnings, fmt.Sprintf("Storage Name '%s' Duplicate in one Module:%s", ds.Name, module.Name))
-				}
+			if isStringExist(ds.Name, lvNames) {
+				warnings = append(warnings, fmt.Sprintf("Storage Name '%s' Duplicate in one Module:%s", ds.Name, module.Name))
+			} else {
+				lvNames = append(lvNames, ds.Name)
 			}
 
-			lvNames = append(lvNames, ds.Name)
+			if !isStringExist(ds.Name, supportedStoreNames) {
+				warnings = append(warnings, fmt.Sprintf("Unsupported Storage Name '%s' Yet,should be one of %s", ds.Name, supportedStoreNames))
+			}
+
+			if !isStringExist(ds.Type, supportedStoreTypes) {
+				warnings = append(warnings, fmt.Sprintf("Unsupported Storage Type '%s' Yet,should be one of %s", ds.Type, supportedStoreTypes))
+			}
 		}
 	}
 
