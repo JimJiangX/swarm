@@ -337,19 +337,39 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 		return err
 	}
 
-	if _, err = u.SaveConfigToDisk(content); err != nil {
+	if err := u.SaveConfigToDisk(content); err != nil {
 		return err
 	}
 
+	volumes, err := database.SelectVolumesByUnitID(u.ID)
+	if err != nil {
+		return err
+	}
+
+	cnf := 0
+	for i := range volumes {
+		if strings.Contains(volumes[i].Name, "_CNF_LV") {
+			cnf = i
+			break
+		}
+
+		if strings.Contains(volumes[i].Name, "_DAT_LV") {
+			cnf = i
+		}
+	}
+
 	config := sdk.VolumeFileConfig{
-		VgName:    "",
-		LvsName:   "",
+		VgName:    volumes[cnf].VGName,
+		LvsName:   volumes[cnf].Name,
 		MountName: "",
 		Data:      string(content),
 		FDes:      u.Path(),
 		Mode:      "0666",
 	}
 
+	log.Debugf("default:%s\ndefaultUser:%v\nconfig:%s", u.parent.Content, data, config.Data)
+
+	log.Debugf("VolumeFileConfig:%+v", config)
 	err = sdk.FileCopyToVolome(u.getPluginAddr(pluginPort), config)
 
 	return err

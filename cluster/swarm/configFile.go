@@ -60,8 +60,7 @@ func (u *unit) set(key string, val interface{}) error {
 	return nil
 }
 
-func (u *unit) SaveConfigToDisk(content []byte) (_ string, err error) {
-
+func (u *unit) SaveConfigToDisk(content []byte) error {
 	config := database.UnitConfig{
 		ID:        utils.Generate64UUID(),
 		ImageID:   u.ImageID,
@@ -75,12 +74,9 @@ func (u *unit) SaveConfigToDisk(content []byte) (_ string, err error) {
 
 	u.Unit.ConfigID = config.ID
 
-	err = database.SaveUnitConfigToDisk(&u.Unit, config)
-	if err != nil {
-		return "", err
-	}
+	err := database.SaveUnitConfigToDisk(&u.Unit, config)
 
-	return config.ID, nil
+	return err
 }
 
 type mysqlCmd struct{}
@@ -128,12 +124,13 @@ func (c mysqlConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interf
 	m["mysqld::innodb_buffer_pool_size"] = int(float64(u.config.HostConfig.Memory) * 0.75)
 	m["mysqld::relay_log"] = fmt.Sprintf("/DBAASLOG/REL/%s-relay", u.Name)
 
-	return nil, nil
+	return m, nil
 }
 
 func (c *mysqlConfig) ParseData(data []byte) (config.Configer, error) {
-	// ini/json/xml
-	// convert to map[string]interface{}
+	if len(data) == 0 {
+		return nil, fmt.Errorf("mysqlConfig Parse null Data")
+	}
 
 	configer, err := config.NewConfigData("ini", data)
 	if err != nil {
@@ -146,21 +143,19 @@ func (c *mysqlConfig) ParseData(data []byte) (config.Configer, error) {
 }
 
 func (c mysqlConfig) Marshal() ([]byte, error) {
-	// convert to ini/json/xml
-
 	tmpfile, err := ioutil.TempFile("", "serviceConfig")
 	if err != nil {
 		return nil, err
 	}
+	tmpfile.Close()
 	defer os.Remove(tmpfile.Name())
-	defer tmpfile.Close()
 
 	err = c.config.SaveConfigFile(tmpfile.Name())
 	if err != nil {
 		return nil, err
 	}
 
-	return ioutil.ReadAll(tmpfile)
+	return ioutil.ReadFile(tmpfile.Name())
 }
 
 type port struct {
@@ -277,5 +272,5 @@ func (c switchManagerConfig) defaultUserConfig(svc *Service, u *unit) (map[strin
 	m["SwarmHostKey"] = leaderElectionPath
 	m["ConsulPort"] = sys.ConsulPort
 
-	return nil, nil
+	return m, nil
 }

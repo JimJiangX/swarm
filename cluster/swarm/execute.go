@@ -154,6 +154,7 @@ func createContainerInPending(gd *Gardener, svc *Service) error {
 			log.Error(err.Error())
 			return err
 		}
+		log.Debug("container created:", container)
 
 		u.container = container
 		u.Unit.ContainerID = container.ID
