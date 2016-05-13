@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/astaxie/beego/config"
@@ -13,7 +14,14 @@ import (
 
 func (u unit) Path() string {
 	if u.parent == nil {
-		return ""
+		return "/"
+	}
+
+	if strings.HasPrefix(u.parent.Path, "/DBAAS") {
+		parts := strings.SplitN(u.parent.Path, "/", 3)
+		if len(parts) == 3 {
+			return parts[2]
+		}
 	}
 
 	return u.parent.Path
@@ -47,17 +55,20 @@ func (u unit) Verify(data map[string]interface{}) error {
 	return nil
 }
 
-func (u *unit) Set(key string, val interface{}) error {
+func (u *unit) SetServiceConfig(key string, val interface{}) error {
 	if !u.parent.KeySets[key] {
-		return fmt.Errorf("%s cannot Set new Value", key)
+		return fmt.Errorf("Key %s cannot Set new Value", key)
 	}
 
-	return u.set(key, val)
+	return u.setServiceConfig(key, val)
 }
 
-func (u *unit) set(key string, val interface{}) error {
+func (u *unit) setServiceConfig(key string, val interface{}) error {
+	if u.configParser == nil {
+		return fmt.Errorf("Unit %s configParser is nil", u.Name)
+	}
 
-	return nil
+	return u.configParser.Set(key, val)
 }
 
 func (u *unit) SaveConfigToDisk(content []byte) error {
@@ -127,6 +138,14 @@ func (c mysqlConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interf
 	return m, nil
 }
 
+func (c *mysqlConfig) Set(key string, val interface{}) error {
+	if c.config == nil {
+		return fmt.Errorf("mysqlConfig Configer is nil")
+	}
+
+	return c.config.Set(key, fmt.Sprintf("%v", val))
+}
+
 func (c *mysqlConfig) ParseData(data []byte) (config.Configer, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("mysqlConfig Parse null Data")
@@ -181,12 +200,50 @@ func (proxyCmd) BackupCmd(args ...string) []string          { return nil }
 func (proxyCmd) CleanBackupFileCmd(args ...string) []string { return nil }
 
 type proxyConfig struct {
-	ports []port
+	config config.Configer
+	ports  []port
 }
 
-func (proxyConfig) Validate(data map[string]interface{}) error     { return nil }
-func (proxyConfig) ParseData(data []byte) (config.Configer, error) { return nil, nil }
-func (proxyConfig) Marshal() ([]byte, error)                       { return nil, nil }
+func (c *proxyConfig) Set(key string, val interface{}) error {
+	if c.config == nil {
+		return fmt.Errorf("mysqlConfig Configer is nil")
+	}
+
+	return c.config.Set(key, fmt.Sprintf("%v", val))
+}
+
+func (proxyConfig) Validate(data map[string]interface{}) error { return nil }
+func (c *proxyConfig) ParseData(data []byte) (config.Configer, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("proxyConfig Parse null Data")
+	}
+
+	configer, err := config.NewConfigData("ini", data)
+	if err != nil {
+		return nil, err
+	}
+
+	c.config = configer
+
+	return c.config, nil
+}
+
+func (c *proxyConfig) Marshal() ([]byte, error) {
+	tmpfile, err := ioutil.TempFile("", "serviceConfig")
+	if err != nil {
+		return nil, err
+	}
+	tmpfile.Close()
+	defer os.Remove(tmpfile.Name())
+
+	err = c.config.SaveConfigFile(tmpfile.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	return ioutil.ReadFile(tmpfile.Name())
+}
+
 func (c proxyConfig) PortSlice() (bool, []port) {
 
 	return false, []port{
@@ -194,6 +251,7 @@ func (c proxyConfig) PortSlice() (bool, []port) {
 		port{proto: "tcp", name: "proxy_admin_port"},
 	}
 }
+
 func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error) {
 	m := make(map[string]interface{}, 10)
 	m["upsql-proxy::proxy-domain"] = svc.ID
@@ -235,12 +293,50 @@ func (switchManagerCmd) BackupCmd(args ...string) []string          { return nil
 func (switchManagerCmd) CleanBackupFileCmd(args ...string) []string { return nil }
 
 type switchManagerConfig struct {
-	ports []port
+	config config.Configer
+	ports  []port
 }
 
-func (switchManagerConfig) Validate(data map[string]interface{}) error     { return nil }
-func (switchManagerConfig) ParseData(data []byte) (config.Configer, error) { return nil, nil }
-func (switchManagerConfig) Marshal() ([]byte, error)                       { return nil, nil }
+func (c *switchManagerConfig) Set(key string, val interface{}) error {
+	if c.config == nil {
+		return fmt.Errorf("switchManagerConfig Configer is nil")
+	}
+
+	return c.config.Set(key, fmt.Sprintf("%v", val))
+}
+
+func (switchManagerConfig) Validate(data map[string]interface{}) error { return nil }
+func (c *switchManagerConfig) ParseData(data []byte) (config.Configer, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("proxyConfig Parse null Data")
+	}
+
+	configer, err := config.NewConfigData("ini", data)
+	if err != nil {
+		return nil, err
+	}
+
+	c.config = configer
+
+	return c.config, nil
+}
+
+func (c *switchManagerConfig) Marshal() ([]byte, error) {
+	tmpfile, err := ioutil.TempFile("", "serviceConfig")
+	if err != nil {
+		return nil, err
+	}
+	tmpfile.Close()
+	defer os.Remove(tmpfile.Name())
+
+	err = c.config.SaveConfigFile(tmpfile.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	return ioutil.ReadFile(tmpfile.Name())
+}
+
 func (c switchManagerConfig) PortSlice() (bool, []port) {
 	if c.ports != nil {
 		return true, c.ports

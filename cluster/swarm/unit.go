@@ -33,6 +33,7 @@ type configParser interface {
 	defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error)
 	Marshal() ([]byte, error)
 	PortSlice() (bool, []port)
+	Set(key string, val interface{}) error
 }
 
 type unit struct {
@@ -317,7 +318,7 @@ func (u *unit) Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (*clu
 }
 
 func (u *unit) CopyConfig(data map[string]interface{}) error {
-	c, err := u.ParseData([]byte(u.parent.Content))
+	_, err := u.ParseData([]byte(u.parent.Content))
 	if err != nil {
 		return err
 	}
@@ -328,8 +329,9 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 	}
 
 	for key, val := range data {
-
-		c.Set(key, fmt.Sprintf("%v", val))
+		if err := u.Set(key, val); err != nil {
+			return err
+		}
 	}
 
 	content, err := u.Marshal()
@@ -360,7 +362,7 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 	config := sdk.VolumeFileConfig{
 		VgName:    volumes[cnf].VGName,
 		LvsName:   volumes[cnf].Name,
-		MountName: "/" + volumes[cnf].Name,
+		MountName: volumes[cnf].Name,
 		Data:      string(content),
 		FDes:      u.Path(),
 		Mode:      "0666",
