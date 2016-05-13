@@ -35,13 +35,13 @@ func defaultContainerConfig() *cluster.ContainerConfig {
 }
 
 func buildContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerConfig {
-	if config.AttachStdout == false {
-		config.AttachStdout = true
-	}
-
-	if config.AttachStderr == false {
-		config.AttachStderr = true
-	}
+	// TODO: make sure later
+	config.AttachStdin = true
+	config.AttachStdout = true
+	config.AttachStderr = true
+	config.Tty = true
+	config.OpenStdin = true
+	config.StdinOnce = true
 
 	if config.ExposedPorts == nil {
 		config.ExposedPorts = make(map[nat.Port]struct{})
