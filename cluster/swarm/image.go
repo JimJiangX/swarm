@@ -73,13 +73,22 @@ func (gd *Gardener) RemoveImage(id string) error {
 }
 
 func (gd *Gardener) LoadImage(req structs.PostLoadImageRequest) (string, error) {
+	parser, _, err := initialize(req.Name)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = parser.ParseData([]byte(req.Content))
+	if err != nil {
+		return "", fmt.Errorf("Parse PostLoadImageRequest.Content Error:%s", err.Error())
+	}
+
 	config, err := database.GetSystemConfig()
 	if err != nil {
 		return "", err
 	}
 
 	buffer := bytes.NewBuffer(nil)
-
 	oldName := fmt.Sprintf("%s:%s", req.Name, req.Version)
 	newName := fmt.Sprintf("%s:%d/%s", config.Registry.Domain, config.Registry.Port, oldName)
 	script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
