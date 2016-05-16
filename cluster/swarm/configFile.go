@@ -92,9 +92,16 @@ func (u *unit) SaveConfigToDisk(content []byte) error {
 
 type mysqlCmd struct{}
 
-func (mysqlCmd) StartContainerCmd() []string     { return nil }
-func (mysqlCmd) StartServiceCmd() []string       { return nil }
-func (mysqlCmd) StopServiceCmd() []string        { return nil }
+func (mysqlCmd) StartContainerCmd() []string { return nil }
+func (mysqlCmd) InitServiceCmd() []string {
+	return []string{"/root/upsql-init.sh"}
+}
+func (mysqlCmd) StartServiceCmd() []string {
+	return []string{"/root/upsql.service", "start"}
+}
+func (mysqlCmd) StopServiceCmd() []string {
+	return []string{"/root/upsql.service", "stop"}
+}
 func (mysqlCmd) RecoverCmd(file string) []string { return nil }
 func (mysqlCmd) BackupCmd(args ...string) []string {
 	cmd := make([]string, len(args)+1)
@@ -196,6 +203,7 @@ func (c mysqlConfig) PortSlice() (bool, []port) {
 type proxyCmd struct{}
 
 func (proxyCmd) StartContainerCmd() []string                { return nil }
+func (proxyCmd) InitServiceCmd() []string                   { return nil }
 func (proxyCmd) StartServiceCmd() []string                  { return nil }
 func (proxyCmd) StopServiceCmd() []string                   { return nil }
 func (proxyCmd) RecoverCmd(file string) []string            { return nil }
@@ -289,6 +297,7 @@ func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interf
 type switchManagerCmd struct{}
 
 func (switchManagerCmd) StartContainerCmd() []string                { return nil }
+func (switchManagerCmd) InitServiceCmd() []string                   { return nil }
 func (switchManagerCmd) StartServiceCmd() []string                  { return nil }
 func (switchManagerCmd) StopServiceCmd() []string                   { return nil }
 func (switchManagerCmd) RecoverCmd(file string) []string            { return nil }

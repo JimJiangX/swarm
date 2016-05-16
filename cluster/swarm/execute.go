@@ -44,7 +44,6 @@ func (gd *Gardener) serviceExecute() (err error) {
 		if err != nil {
 			svc.Unlock()
 			taskErr = err
-
 			goto failure
 		}
 
@@ -56,7 +55,6 @@ func (gd *Gardener) serviceExecute() (err error) {
 		err = svc.StartContainers()
 		if err != nil {
 			taskErr = err
-
 			goto failure
 		}
 
@@ -64,7 +62,13 @@ func (gd *Gardener) serviceExecute() (err error) {
 		err = svc.CopyServiceConfig()
 		if err != nil {
 			taskErr = err
+			goto failure
+		}
 
+		log.Debug("[mg]InitService")
+		err = svc.InitService()
+		if err != nil {
+			taskErr = err
 			goto failure
 		}
 
@@ -72,28 +76,24 @@ func (gd *Gardener) serviceExecute() (err error) {
 		err = svc.StartService()
 		if err != nil {
 			taskErr = err
-
 			goto failure
 		}
 		log.Debug("[mg]CreateUsers")
 		err = svc.CreateUsers()
 		if err != nil {
 			taskErr = err
-
 			goto failure
 		}
 		log.Debug("[mg]InitTopology")
 		err = svc.InitTopology()
 		if err != nil {
 			taskErr = err
-
 			goto failure
 		}
 		log.Debug("[mg]RegisterServices")
 		err = svc.RegisterServices()
 		if err != nil {
 			taskErr = err
-
 			goto failure
 		}
 

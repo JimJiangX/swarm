@@ -20,6 +20,7 @@ import (
 
 type ContainerCmd interface {
 	StartContainerCmd() []string
+	InitServiceCmd() []string
 	StartServiceCmd() []string
 	StopServiceCmd() []string
 	RecoverCmd(file string) []string
@@ -374,6 +375,15 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 	err = sdk.FileCopyToVolome(u.getPluginAddr(pluginPort), config)
 
 	return err
+}
+
+func (u *unit) initService() error {
+	if u.ContainerCmd == nil {
+		return nil
+	}
+	cmd := u.InitServiceCmd()
+
+	return containerExec(u.engine, u.ContainerID, cmd, false)
 }
 
 func (u *unit) startService() error {

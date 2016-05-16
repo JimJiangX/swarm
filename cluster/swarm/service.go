@@ -507,6 +507,29 @@ func (svc *Service) CopyServiceConfig() (err error) {
 	return nil
 }
 
+func (svc *Service) InitService() (err error) {
+	if val := atomic.LoadInt64(&svc.Status); val != _StatusServiceStarting {
+		return fmt.Errorf("Status Conflict,%d!=_StatusServiceStarting", val)
+	}
+	svc.Lock()
+	defer func() {
+		if err != nil {
+			atomic.StoreInt64(&svc.Status, _StatusServiceStartFailed)
+		}
+
+		svc.Unlock()
+	}()
+
+	for i := range svc.units {
+		err = svc.units[i].initService()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (svc *Service) StartService() (err error) {
 	if val := atomic.LoadInt64(&svc.Status); val != _StatusServiceStarting {
 		return fmt.Errorf("Status Conflict,%d!=_StatusServiceStarting", val)
