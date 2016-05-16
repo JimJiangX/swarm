@@ -110,7 +110,8 @@ func (gd *Gardener) serviceExecute() (err error) {
 
 		log.Debug("[mg]RegisterToHorus")
 
-		err = svc.RegisterToHorus(horusServerAddr, "", "", sysConfig.HorusAgentPort)
+		err = svc.RegisterToHorus(horusServerAddr,
+			sysConfig.MonUsername, sysConfig.MonPassword, sysConfig.HorusAgentPort)
 		if err != nil {
 			taskErr = err
 			goto failure
