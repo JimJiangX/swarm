@@ -90,6 +90,35 @@ func (u *unit) SaveConfigToDisk(content []byte) error {
 	return err
 }
 
+func initialize(name string) (configParser, ContainerCmd, error) {
+	var (
+		parser configParser
+		cmder  ContainerCmd
+	)
+	switch name {
+	case _UpsqlType, _MysqlType:
+		parser = &mysqlConfig{}
+
+		cmder = &mysqlCmd{}
+
+	case _ProxyType, "upproxy":
+		parser = &proxyConfig{}
+
+		cmder = &proxyCmd{}
+
+	case _SwitchManagerType, "SM":
+		parser = &switchManagerConfig{}
+
+		cmder = &switchManagerCmd{}
+
+	default:
+
+		return nil, nil, fmt.Errorf("Unsupported Type:%s", name)
+	}
+
+	return parser, cmder, nil
+}
+
 type mysqlCmd struct{}
 
 func (mysqlCmd) StartContainerCmd() []string { return nil }

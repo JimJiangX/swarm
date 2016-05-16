@@ -51,26 +51,13 @@ type unit struct {
 }
 
 func (u *unit) factory() error {
-	switch u.Type {
-	case _UpsqlType, _MysqlType:
-		u.configParser = &mysqlConfig{}
-		// cmd
-		u.ContainerCmd = &mysqlCmd{}
-
-	case _ProxyType, "upproxy":
-		u.configParser = &proxyConfig{}
-
-		u.ContainerCmd = &proxyCmd{}
-
-	case _SwitchManagerType, "SM":
-		u.configParser = &switchManagerConfig{}
-
-		u.ContainerCmd = &switchManagerCmd{}
-
-	default:
-
-		return fmt.Errorf("Unsupported Type:%s", u.Type)
+	parser, cmder, err := initialize(u.Type)
+	if err != nil || parser == nil || cmder == nil {
+		return fmt.Errorf("Unexpected Error,%s:%v", u.Type, err)
 	}
+
+	u.configParser = parser
+	u.ContainerCmd = cmder
 
 	return nil
 }
