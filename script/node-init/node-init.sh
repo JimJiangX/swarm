@@ -141,7 +141,7 @@ init_ssd_vg() {
 # install consul agent
 install_consul() {
 	# stop consul
-	pkill consul >/dev/null 2>&1
+	pkill -9 consul >/dev/null 2>&1
 
 	# check consul dir
 	if [ ! -d /etc/consul.d ]; then
@@ -252,7 +252,7 @@ install_docker() {
 	fi
 
 	# stop docker
-	pkill docker >/dev/null 2>&1
+	pkill -9 docker >/dev/null 2>&1
 
 	# copy the binary & set the permissions
 	cp ${cur_dir}/docker-1.10.3-release/bin/docker /usr/bin/docker; chmod +x /usr/bin/docker
@@ -352,7 +352,7 @@ init_docker() {
 install_docker_plugin() {
 	local script_dir=/opt
 
-	pkill local-volume-plugin > /dev/null 2>&1
+	pkill -9 local-volume-plugin > /dev/null 2>&1
 
 	# copy binary file
 	cp ${cur_dir}/dbaas_volume_plugin-1.5.3/bin/local_volume_plugin /usr/bin/local_volume_plugin; chmod 755 /usr/bin/local_volume_plugin
@@ -397,7 +397,7 @@ EOF
 # install swarm agent
 install_swarm_agent() {
 	# stop swarm-agent
-	pkill swarm >/dev/null 2>&1
+	pkill -9 swarm >/dev/null 2>&1
 
 	# copy binary file
 	cp ${cur_dir}/swarm-agent-1.2.0-release/bin/swarm /usr/bin/swarm; chmod 755 /usr/bin/swarm
@@ -452,7 +452,7 @@ EOF
 # install horus agent
 install_horus_agent() {
 	# stop swarm-agent
-	pkill horus-agent >/dev/null 2>&1
+	pkill -9 horus-agent >/dev/null 2>&1
 
 	# copy binary file
 	mkdir -p /usr/local/horus-agent
