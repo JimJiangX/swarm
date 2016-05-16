@@ -117,10 +117,13 @@ func (mysqlConfig) Validate(data map[string]interface{}) error {
 
 func (c mysqlConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error) {
 	m := make(map[string]interface{}, 10)
+	if svc == nil || u == nil {
+		return m, fmt.Errorf("params maybe nil")
+	}
 	if len(u.networkings) == 1 {
 		m["mysqld::bind-address"] = u.networkings[0].IP.String()
 	} else {
-		return nil, fmt.Errorf("Unexpected,more than 1 IPAddress allocated")
+		return nil, fmt.Errorf("Unexpected IPAddress allocated")
 	}
 
 	if len(u.ports) == 1 {
