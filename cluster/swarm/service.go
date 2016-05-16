@@ -706,16 +706,32 @@ func (svc *Service) RegisterServices() (err error) {
 
 func (svc *Service) DeregisterServices() (err error) {
 	svc.Lock()
-
 	defer func() {
 		if err != nil {
 		}
-
 		svc.Unlock()
 	}()
 
 	for i := range svc.units {
 		err = svc.units[i].DeregisterHealthCheck(nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (svc *Service) RegisterToHorus(addr, user, password string, agentPort int) (err error) {
+	svc.Lock()
+	defer func() {
+		if err != nil {
+		}
+		svc.Unlock()
+	}()
+
+	for i := range svc.units {
+		err = svc.units[i].registerToHorus(addr, user, password, agentPort)
 		if err != nil {
 			return err
 		}

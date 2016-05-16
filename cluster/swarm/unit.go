@@ -458,3 +458,25 @@ func (u unit) getPluginAddr(port int) string {
 func (u *unit) saveToDisk() error {
 	return nil
 }
+
+func (u *unit) registerToHorus(addr, user, password string, agentPort int) error {
+	if u.engine == nil {
+		return errors.New("Engine is nil")
+	}
+	obj := registerService{
+		Endpoint:      u.ID,
+		CollectorName: u.Name,
+		User:          user,
+		Password:      password,
+		Type:          u.Type,
+		CollectorIP:   u.engine.IP,
+		CollectorPort: agentPort,
+		MetricTags:    u.NodeID,
+		Network:       nil,
+		Status:        "on",
+		Table:         "host",
+		CheckType:     "health",
+	}
+
+	return registerToHorus(addr, obj)
+}

@@ -34,6 +34,12 @@ func (gd *Gardener) serviceExecute() (err error) {
 		if !atomic.CompareAndSwapInt64(&svc.Status, _StatusServiceAlloction, _StatusServiceCreating) {
 			continue
 		}
+		sysConfig, err := database.GetSystemConfig()
+		if err != nil {
+			log.Errorf("Query Database Error:%s", err.Error())
+			continue
+		}
+		horusServerAddr := fmt.Sprintf("%s:%d", sysConfig.HorusServerIP, sysConfig.HorusServerPort)
 
 		svc.Lock()
 		log.Debugf("[**MG**]serviceExecute: get server: %v", svc)
@@ -101,6 +107,14 @@ func (gd *Gardener) serviceExecute() (err error) {
 
 		database.TxSetServiceStatus(&svc.Service, svc.task,
 			_StatusServiceNoContent, _StatusTaskDone, time.Now(), "")
+
+		log.Debug("[mg]RegisterToHorus")
+
+		err = svc.RegisterToHorus(horusServerAddr, "", "", sysConfig.HorusAgentPort)
+		if err != nil {
+			taskErr = err
+			goto failure
+		}
 
 		log.Debug("[mg]exec done")
 		continue
