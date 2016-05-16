@@ -7,11 +7,27 @@ import (
 	"time"
 )
 
+func insertLUN(t *testing.T, lun LUN) error {
+	db, err := GetDB(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	query := "INSERT INTO tb_lun (id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at) VALUES (:id,:name,:vg_name,:raid_group_id,:storage_system_id,:mapping_hostname,:size,:host_lun_id,:storage_lun_id,:created_at)"
+
+	_, err = db.NamedExec(query, &lun)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return err
+}
+
 func TestLun(t *testing.T) {
 	lun := LUN{
 		ID:              "lunId001",
 		Name:            "lunName001",
-		UnitID:          "lunUnitId001",
+		VGName:          "lunName001_VG",
 		RaidGroupID:     "lunRaidGroupId001",
 		StorageSystemID: "lunStorageSystemId001",
 		Mappingto:       "lunMapingto001",
@@ -20,7 +36,7 @@ func TestLun(t *testing.T) {
 		StorageLunID:    1,
 		CreatedAt:       time.Now(),
 	}
-	err := InsertLUN(lun)
+	err := insertLUN(t, lun)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,12 +48,12 @@ func TestLun(t *testing.T) {
 	}()
 
 	host := "lunMapingto099"
-	unit := "lunUnitId099"
 	hlun := 99
+	vgName := ""
 	lun.Mappingto = host
-	lun.UnitID = unit
+	lun.VGName = ""
 	lun.HostLunID = hlun
-	err = LunMapping(lun.ID, host, unit, hlun)
+	err = LunMapping(lun.ID, host, vgName, hlun)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +70,7 @@ func TestLun(t *testing.T) {
 		lun.SizeByte != lun1.SizeByte ||
 		lun.StorageLunID != lun1.StorageLunID ||
 		lun.StorageSystemID != lun1.StorageSystemID ||
-		lun.UnitID != lun1.UnitID {
+		lun.VGName != lun1.VGName {
 		t.Fatal("GetLUNByID not equals", string(b), string(b1))
 	}
 
@@ -70,14 +86,14 @@ func TestLun(t *testing.T) {
 		lun.SizeByte != lun2.SizeByte ||
 		lun.StorageLunID != lun2.StorageLunID ||
 		lun.StorageSystemID != lun2.StorageSystemID ||
-		lun.UnitID != lun2.UnitID {
+		lun.VGName != lun2.VGName {
 		t.Fatal("GetLUNByLunID not equals", string(b), string(b2))
 	}
 
 	hostLun := LUN{
 		ID:              "lunId002",
 		Name:            "lunName002",
-		UnitID:          "lunUnitId002",
+		VGName:          "lunUnitId002_VG",
 		RaidGroupID:     "lunRaidGroupId002",
 		StorageSystemID: "lunStorageSystemId002",
 		Mappingto:       "lunMapingto099",
@@ -86,7 +102,7 @@ func TestLun(t *testing.T) {
 		StorageLunID:    2,
 		CreatedAt:       time.Now(),
 	}
-	err = InsertLUN(hostLun)
+	err = insertLUN(t, hostLun)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +124,7 @@ func TestLun(t *testing.T) {
 	systemLun := LUN{
 		ID:              "lunId003",
 		Name:            "lunName003",
-		UnitID:          "lunUnitId003",
+		VGName:          "lunUnitId003_VG",
 		RaidGroupID:     "lunRaidGroupId003",
 		StorageSystemID: "lunStorageSystemId002",
 		Mappingto:       "lunMapingto003",
@@ -117,7 +133,7 @@ func TestLun(t *testing.T) {
 		StorageLunID:    3,
 		CreatedAt:       time.Now(),
 	}
-	err = InsertLUN(systemLun)
+	err = insertLUN(t, systemLun)
 	if err != nil {
 		t.Fatal(err)
 	}

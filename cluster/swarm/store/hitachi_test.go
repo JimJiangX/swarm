@@ -3,6 +3,8 @@ package store
 import (
 	"testing"
 	"time"
+
+	"github.com/docker/swarm/cluster/swarm/database"
 )
 
 func TestHitachiPing(t *testing.T) {
@@ -20,7 +22,7 @@ func TestHitachiInsert(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		db, err := GetDB(true)
+		db, err := database.GetDB(true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -37,7 +39,7 @@ func TestHitachiAlloc(t *testing.T) {
 	loop := 10
 	for i := 0; i < loop; i++ {
 		go func(i int) {
-			lunID, lunStorageLunID, err := hitachiStore.Alloc("LunName" + string(i))
+			lunID, lunStorageLunID, err := hitachiStore.Alloc("LunName"+string(i), "Unit0001", "unit0001_VG", 1<<30)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -62,7 +64,7 @@ func TestHitachiHost(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err := hitachiStore.DelHost("Name"+index, "wwwnA"+index, "wwwnB"+index)
+			err = hitachiStore.DelHost("Name"+index, "wwwnA"+index, "wwwnB"+index)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -82,7 +84,7 @@ func TestHitachiMapping(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err := hitachiStore.DelMapping("lun" + index)
+			err = hitachiStore.DelMapping("lun" + index)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -104,11 +106,11 @@ func TestHitachiSpace(t *testing.T) {
 			if space <= 0 {
 				t.Fatal("space <= 0")
 			}
-			err := hitachiStore.EnableSpace(i)
+			err = hitachiStore.EnableSpace(i)
 			if err != nil {
 				t.Fatal(err)
 			}
-			err := hitachiStore.DisableSpace(i)
+			err = hitachiStore.DisableSpace(i)
 			if err != nil {
 				t.Fatal(err)
 			}
