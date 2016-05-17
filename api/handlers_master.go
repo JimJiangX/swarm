@@ -305,7 +305,6 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			Name:   nodes[i].Name,
 			TaskID: nodes[i].Task().ID,
 		}
-
 	}
 
 	err = swarm.SaveMultiNodesToDB(nodes)
@@ -411,17 +410,32 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // POST /services/{name:.*}/start
 func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
+
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
-	_ = name
+
+	svc, err := gd.GetService(name)
+	if err != nil {
+		httpError(w, fmt.Sprintf("Not Found Service %s,Error:%s", name, err.Error()), http.StatusInternalServerError)
+		return
+	}
+
+	err = svc.StartService()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // POST /services/{name:.*}/stop
 func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
+
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
@@ -433,6 +447,7 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 // POST /services/{name:.*}/backup
 func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
+
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
@@ -444,6 +459,7 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 // POST /services/{name:.*}/recover
 func postServiceRecover(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
+
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
@@ -455,6 +471,7 @@ func postServiceRecover(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 // POST /services/{name:.*}/backup_strategy
 func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
+
 	req := structs.BackupStrategy{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -482,6 +499,7 @@ func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 // POST 	/services/backup_strategy/{name:.*}/update
 func postUpdateServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
+
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
