@@ -61,10 +61,25 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/clusters/nodes/{node:.*}/enable":  postEnableNode,
 		"/clusters/nodes/{node:.*}/disable": postDisableNode,
 
-		"/services":                                   postService,
+		"/services":                   postService,
+		"/services/{name:.*}/start":   postServiceStart,
+		"/services/{name:.*}/stop":    postServiceStop,
+		"/services/{name:.*}/backup":  postServiceBackup,
+		"/services/{name:.*}/recover": postServiceRecover,
+
 		"/services/{name:.*}/backup_strategy":         postStrategyToService,
+		"/services/backup_strategy/{name:.*}/update":  postUpdateServiceStrategy,
 		"/services/backup_strategy/{name:.*}/enable":  postEnableServiceStrategy,
 		"/services/backup_strategy/{name:.*}/disable": postDisableServiceStrategy,
+
+		"/units/{unit:.*}/start":      postUnitStart,
+		"/units/{unit:.*}/stop":       postUnitStop,
+		"/units/{unit:.*}/backup":     postUnitBackup,
+		"/units/{unit:.*}/recover":    postUnitRecover,
+		"/units/{unit:.*}/migrate":    postUnitMigrate,
+		"/units/{unit:.*}/rebuild":    postUnitRebuild,
+		"/units/{unit:.*}/isolate":    postUnitIsolate,
+		"/units/{unit:.*}/switchback": postUnitSwitchback,
 
 		"/networkings":                         postNetworking,
 		"/networkings/ports":                   postImportPort,

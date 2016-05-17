@@ -125,7 +125,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%q}", "ID", cluster.ID)
 }
 
-// Post /clusters/{name:.*}/enable
+// POST /clusters/{name:.*}/enable
 func postEnableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -149,7 +149,7 @@ func postEnableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 }
 
-// Post /clusters/{name:.*}/disable
+// POST /clusters/{name:.*}/disable
 func postDisableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -174,7 +174,7 @@ func postDisableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 }
 
-// Post /clusters/{name:.*}/nodes
+// POST /clusters/{name:.*}/nodes
 func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -234,7 +234,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-//Post /clusters/nodes/{node:.*}/enable
+//POST /clusters/nodes/{node:.*}/enable
 func postEnableNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["node"]
 
@@ -253,7 +253,7 @@ func postEnableNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-//Post /clusters/nodes/{node:.*}/disable
+//POST /clusters/nodes/{node:.*}/disable
 func postDisableNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["node"]
 
@@ -272,7 +272,7 @@ func postDisableNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusOK)
 }
 
-// Post /services
+// POST /services
 func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostServiceRequest{}
 
@@ -313,6 +313,50 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// POST /services/{name:.*}/start
+func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+	_ = name
+}
+
+// POST /services/{name:.*}/stop
+func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+	_ = name
+}
+
+// POST /services/{name:.*}/backup
+func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+	_ = name
+}
+
+// POST /services/{name:.*}/recover
+func postServiceRecover(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+	_ = name
+}
+
 // POST /services/{name:.*}/backup_strategy
 func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
@@ -338,6 +382,17 @@ func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(w, "{%q:%q}", "ID", strategy.ID)
+}
+
+// POST 	/services/backup_strategy/{name:.*}/update
+func postUpdateServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+	_ = name
 }
 
 // POST 	/services/backup_strategy/{name:.*}/enable
@@ -378,7 +433,31 @@ func postDisableServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *htt
 	w.WriteHeader(http.StatusOK)
 }
 
-// Post /tasks/backup/callback
+// POST /units/{unit:.*}/start
+func postUnitStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
+// POST 	/units/{unit:.*}/stop
+func postUnitStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
+// POST /units/{unit:.*}/backup
+func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
+// POST /units/{unit:.*}/recover
+func postUnitRecover(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
+// POST /units/{unit:.*}/migrate
+func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
+// POST /units/{unit:.*}/rebuild
+func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
+// POST /units/{unit:.*}/isolate
+func postUnitIsolate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
+// POST /units/{unit:.*}/switchback
+func postUnitSwitchback(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+
+// POST /tasks/backup/callback
 func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.BackupTaskCallback{}
 
@@ -396,7 +475,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 }
 
-// Post /networkings
+// POST /networkings
 func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostNetworkingRequest{}
 
@@ -422,7 +501,7 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%q}", "ID", net.ID)
 }
 
-// Post /networkings/{name:.*}/enable
+// POST /networkings/{name:.*}/enable
 func postEnableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -441,7 +520,7 @@ func postEnableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusOK)
 }
 
-// Post /networkings/{name:.*}/disable
+// POST /networkings/{name:.*}/disable
 func postDisableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -461,7 +540,7 @@ func postDisableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusOK)
 }
 
-// Post /networkings/ports/import
+// POST /networkings/ports/import
 func postImportPort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostImportPortRequest{}
 
@@ -481,7 +560,7 @@ func postImportPort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%d}", "num", num)
 }
 
-// Post /networkings/ports/{port:.*}/disable
+// POST /networkings/ports/{port:.*}/disable
 func postDisablePort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
@@ -504,7 +583,7 @@ func postDisablePort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 }
 
 // Load Image
-// Post /image/load
+// POST /image/load
 func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostLoadImageRequest{}
 
@@ -568,7 +647,7 @@ func postDisableImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 }
 
-// Post /storage/san
+// POST /storage/san
 func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostSANStoreRequest{}
 
@@ -603,7 +682,7 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%q}", "ID", store.ID())
 }
 
-// Post /storage/san/{name:.*}/raidgroup
+// POST /storage/san/{name:.*}/raidgroup
 func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
@@ -701,11 +780,11 @@ func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusOK)
 }
 
-// Post /storage/nas
+// POST /storage/nas
 func postNasStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
-// Delete /services/{name:.*}
+// DELETE /services/{name:.*}
 // TODO:Not Done Yet
 func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
@@ -733,7 +812,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Delete /services/backup_strategy/{name:.*}
+// DELETE /services/backup_strategy/{name:.*}
 func deleteBackupStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -752,7 +831,7 @@ func deleteBackupStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Delete /clusters/{name:.*}
+// DELETE /clusters/{name:.*}
 func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -771,7 +850,7 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Delete /clusters/nodes/{node:.*}
+// DELETE /clusters/nodes/{node:.*}
 func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	node := mux.Vars(r)["node"]
 
@@ -790,7 +869,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Delete /netwrokings/{name:.*}
+// DELETE /netwrokings/{name:.*}
 func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -809,7 +888,7 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Delete /storage/san/{name:.*}
+// DELETE /storage/san/{name:.*}
 func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -828,7 +907,7 @@ func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Delete /storage/san/{name:.*}/raid_group/{rg:.*}
+// DELETE /storage/san/{name:.*}/raid_group/{rg:.*}
 func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
@@ -858,7 +937,7 @@ func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Delete /image/{image:.*}
+// DELETE /image/{image:.*}
 func deleteImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	image := mux.Vars(r)["image"]
 
