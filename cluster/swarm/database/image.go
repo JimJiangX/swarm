@@ -122,12 +122,19 @@ func (c *UnitConfig) encode() error {
 		}
 
 		c.ConfigKeySets = string(data)
+	} else {
+		c.ConfigKeySets = "{}"
 	}
 
 	return nil
 }
 
 func (c *UnitConfig) decode() error {
+	if c.ConfigKeySets == "{}" {
+		c.KeySets = nil
+		return nil
+	}
+
 	if len(c.ConfigKeySets) > 0 {
 		err := json.Unmarshal([]byte(c.ConfigKeySets), &c.KeySets)
 		if err != nil {
