@@ -183,7 +183,7 @@ func TxInsertNodeAndTask(node *Node, task *Task) error {
 	defer tx.Rollback()
 
 	// insert into database
-	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:max_container,:status,:register_at,:deregister_at)"
+	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:max_container,:status,:register_at,:deregister_at)"
 	_, err = tx.NamedExec(query, node)
 	if err != nil {
 		return err
