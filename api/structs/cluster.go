@@ -71,3 +71,16 @@ type PostNodeResponse struct {
 	Name   string
 	TaskID string
 }
+
+type ClusterInfoResponse struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Type        string  `json:"type"`
+	StorageType string  `json:"storage_type"`
+	StorageID   string  `json:"storage_id,omitempty"`
+	Datacenter  string  `json:"dc"`
+	Enabled     bool    `json:"enabled"`
+	MaxNode     int     `json:"max_node"`
+	NodeNum     int     `json:"node_num"`
+	UsageLimit  float32 `json:"usage_limit"`
+}

@@ -26,14 +26,42 @@ var ErrUnsupportGardener = errors.New("Unsupported Gardener")
 
 // GET /clusters/{name:.*}
 func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-	_ = name
-
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	name := mux.Vars(r)["name"]
+
+	cl, err := database.GetCluster(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	num, err := database.CountNodeByCluster(cl.ID)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := structs.ClusterInfoResponse{
+		ID:          cl.ID,
+		Name:        cl.Name,
+		Type:        cl.Type,
+		StorageType: cl.StorageType,
+		StorageID:   cl.StorageID,
+		Datacenter:  cl.Datacenter,
+		Enabled:     cl.Enabled,
+		MaxNode:     cl.MaxNode,
+		NodeNum:     num,
+		UsageLimit:  cl.UsageLimit,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
 }
 
 // GET /clusters
@@ -43,6 +71,39 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	clusters, err := database.ListCluster()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	lists := make([]structs.ClusterInfoResponse, len(clusters))
+
+	for i := range clusters {
+		num, err := database.CountNodeByCluster(clusters[i].ID)
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		lists[i] = structs.ClusterInfoResponse{
+			ID:          clusters[i].ID,
+			Name:        clusters[i].Name,
+			Type:        clusters[i].Type,
+			StorageType: clusters[i].StorageType,
+			StorageID:   clusters[i].StorageID,
+			Datacenter:  clusters[i].Datacenter,
+			Enabled:     clusters[i].Enabled,
+			MaxNode:     clusters[i].MaxNode,
+			NodeNum:     num,
+			UsageLimit:  clusters[i].UsageLimit,
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(lists)
 }
 
 // GET /clusters/{name:.*}/nodes

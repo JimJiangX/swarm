@@ -338,6 +338,21 @@ func ListNodeByCluster(cluster string) ([]*Node, error) {
 	return nodes, nil
 }
 
+func CountNodeByCluster(cluster string) (int, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return 0, err
+	}
+
+	num := 0
+	err = db.Select(&num, "SELECT COUNT(*) FROM tb_node WHERE cluster_id=?", cluster)
+	if err != nil {
+		return 0, err
+	}
+
+	return num, nil
+}
+
 func ListNodeByClusterType(Type string, enabled bool) ([]Node, error) {
 	db, err := GetDB(true)
 	if err != nil {
