@@ -479,7 +479,7 @@ func (gd *Gardener) RemoveDatacenter(NameOrID string) error {
 	if err != nil {
 		return err
 	}
-	count, err := database.CountNodeNumOfCluster(cl.ID)
+	count, err := database.CountNodeByCluster(cl.ID)
 	if err != nil {
 		return err
 	}

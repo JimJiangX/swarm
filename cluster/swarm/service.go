@@ -313,6 +313,10 @@ func (gd *Gardener) GetService(NameOrID string) (*Service, error) {
 
 	gd.RUnlock()
 
+	return gd.rebuildService(NameOrID)
+}
+
+func (gd *Gardener) rebuildService(NameOrID string) (*Service, error) {
 	service, err := database.GetService(NameOrID)
 	if err != nil {
 		return nil, err
@@ -364,6 +368,7 @@ func (gd *Gardener) GetService(NameOrID string) (*Service, error) {
 	gd.Unlock()
 
 	return svc, nil
+
 }
 
 func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, err error) {
@@ -421,15 +426,15 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, e
 }
 
 func (svc *Service) CreateContainers(authConfig *types.AuthConfig) (err error) {
-	if val := atomic.LoadInt64(&svc.Status); val != _StatusServiceCreating {
-		return fmt.Errorf("Status Conflict,%d!=_StatusServiceCreating", val)
+	if err = svc.checkStatus(_StatusServiceCreating); err != nil {
+		return err
 	}
+
 	svc.Lock()
 	defer func() {
 		if err != nil {
-			atomic.StoreInt64(&svc.Status, _StatusServiceCreateFailed)
+			svc.SetServiceStatus(_StatusServiceCreateFailed, time.Now())
 		}
-
 		svc.Unlock()
 	}()
 
@@ -454,16 +459,16 @@ func (svc *Service) CreateContainers(authConfig *types.AuthConfig) (err error) {
 }
 
 func (svc *Service) StartContainers() (err error) {
-	if !atomic.CompareAndSwapInt64(&svc.Status, _StatusServiceCreating, _StatusServiceStarting) {
-		return fmt.Errorf("Status Conflict,%d!=_StatusServiceStarting", svc.Status)
+	err = svc.statusCAS(_StatusServiceCreating, _StatusServiceStarting)
+	if err != nil {
+		return err
 	}
 
 	svc.Lock()
 	defer func() {
 		if err != nil {
-			atomic.StoreInt64(&svc.Status, _StatusServiceStartFailed)
+			svc.SetServiceStatus(_StatusServiceStartFailed, time.Now())
 		}
-
 		svc.Unlock()
 	}()
 
@@ -478,16 +483,15 @@ func (svc *Service) StartContainers() (err error) {
 }
 
 func (svc *Service) CopyServiceConfig() (err error) {
-	if val := atomic.LoadInt64(&svc.Status); val != _StatusServiceStarting {
-		return fmt.Errorf("Status Conflict,%d!=_StatusServiceStarting", val)
+	if err = svc.checkStatus(_StatusServiceStarting); err != nil {
+		return err
 	}
 
 	svc.Lock()
 	defer func() {
 		if err != nil {
-			atomic.StoreInt64(&svc.Status, _StatusServiceCreateFailed)
+			svc.SetServiceStatus(_StatusServiceCreateFailed, time.Now())
 		}
-
 		svc.Unlock()
 	}()
 
@@ -509,15 +513,15 @@ func (svc *Service) CopyServiceConfig() (err error) {
 }
 
 func (svc *Service) InitService() (err error) {
-	if val := atomic.LoadInt64(&svc.Status); val != _StatusServiceStarting {
-		return fmt.Errorf("Status Conflict,%d!=_StatusServiceStarting", val)
+	if err = svc.checkStatus(_StatusServiceStarting); err != nil {
+		return err
 	}
+
 	svc.Lock()
 	defer func() {
 		if err != nil {
-			atomic.StoreInt64(&svc.Status, _StatusServiceStartFailed)
+			svc.SetServiceStatus(_StatusServiceStartFailed, time.Now())
 		}
-
 		svc.Unlock()
 	}()
 
@@ -531,16 +535,32 @@ func (svc *Service) InitService() (err error) {
 	return nil
 }
 
+func (svc *Service) checkStatus(expected int64) error {
+	val := atomic.LoadInt64(&svc.Status)
+	if val == expected {
+		return nil
+	}
+
+	return fmt.Errorf("Status Conflict:expected %d but got %d", expected, val)
+}
+
+func (svc *Service) statusCAS(expected, value int64) error {
+	if atomic.CompareAndSwapInt64(&svc.Status, expected, value) {
+		return nil
+	}
+
+	return fmt.Errorf("Status Conflict:expected %d but got %d", expected, atomic.LoadInt64(&svc.Status))
+}
+
 func (svc *Service) StartService() (err error) {
-	if val := atomic.LoadInt64(&svc.Status); val != _StatusServiceStarting {
-		return fmt.Errorf("Status Conflict,%d!=_StatusServiceStarting", val)
+	if err = svc.checkStatus(_StatusServiceStarting); err != nil {
+		return err
 	}
 	svc.Lock()
 	defer func() {
 		if err != nil {
-			atomic.StoreInt64(&svc.Status, _StatusServiceStartFailed)
+			svc.SetServiceStatus(_StatusServiceStartFailed, time.Now())
 		}
-
 		svc.Unlock()
 	}()
 
