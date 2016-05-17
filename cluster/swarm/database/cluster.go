@@ -66,6 +66,18 @@ func (c *Cluster) UpdateStatus(state bool) error {
 	return nil
 }
 
+// UpdateParams Updates MaxNode\UsageLimit
+func (c *Cluster) UpdateParams() error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.NamedExec("UPDATE tb_cluster SET max_node=:max_node,usage_limit=:usage_limit WHERE id=:id OR name=:name", c)
+
+	return err
+}
+
 func DeleteCluster(IDOrName string) error {
 	db, err := GetDB(true)
 	if err != nil {

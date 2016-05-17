@@ -186,6 +186,40 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%q}", "ID", cluster.ID)
 }
 
+func floatValueOrZero(r *http.Request, k string) float64 {
+	val, err := strconv.ParseFloat(r.FormValue(k), 64)
+	if err != nil {
+		return 0
+	}
+	return val
+}
+
+// POST /clusters/{name:.*}/update
+func postUpdateClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	limit := float32(floatValueOrZero(r, "usage_limit"))
+	max := intValueOrZero(r, "max_node")
+	name := mux.Vars(r)["name"]
+
+	err := gd.UpdateDatacenterParams(name, max, limit)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // POST /clusters/{name:.*}/enable
 func postEnableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]

@@ -194,6 +194,38 @@ func (gd *Gardener) AddDatacenter(cl database.Cluster, storage store.Store) erro
 	return nil
 }
 
+func (gd *Gardener) UpdateDatacenterParams(NameOrID string, max int, limit float32) error {
+	dc, err := gd.Datacenter(NameOrID)
+	if err != nil {
+		return err
+	}
+	modify := false
+	dc.Lock()
+	old := *dc.Cluster
+
+	if max > 0 && old.MaxNode != max {
+		old.MaxNode = max
+		modify = true
+	}
+	if limit > 0 && old.UsageLimit != limit {
+		old.UsageLimit = limit
+		modify = true
+	}
+
+	if modify {
+		err := old.UpdateParams()
+		if err != nil {
+			dc.Unlock()
+			return err
+		}
+
+		dc.Cluster = &old
+	}
+	dc.Unlock()
+
+	return nil
+}
+
 func (dc *Datacenter) SetStatus(enable bool) error {
 	dc.Lock()
 	err := dc.UpdateStatus(enable)

@@ -55,6 +55,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	},
 	"POST": {
 		"/clusters":                         postCluster,
+		"/clusters/{name:.*}/update":        postUpdateClusterParams,
 		"/clusters/{name:.*}/enable":        postEnableCluster,
 		"/clusters/{name:.*}/disable":       postDisableCluster,
 		"/clusters/{name:.*}/nodes":         postNodes,
