@@ -490,7 +490,7 @@ func (svc *Service) CopyServiceConfig() (err error) {
 	svc.Lock()
 	defer func() {
 		if err != nil {
-			svc.SetServiceStatus(_StatusServiceCreateFailed, time.Now())
+			svc.SetServiceStatus(_StatusServiceStartFailed, time.Now())
 		}
 		svc.Unlock()
 	}()

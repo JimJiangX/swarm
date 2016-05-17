@@ -122,19 +122,12 @@ func (c *UnitConfig) encode() error {
 		}
 
 		c.ConfigKeySets = string(data)
-	} else {
-		c.ConfigKeySets = "{}"
 	}
 
 	return nil
 }
 
 func (c *UnitConfig) decode() error {
-	if c.ConfigKeySets == "{}" {
-		c.KeySets = nil
-		return nil
-	}
-
 	if len(c.ConfigKeySets) > 0 {
 		err := json.Unmarshal([]byte(c.ConfigKeySets), &c.KeySets)
 		if err != nil {
@@ -169,7 +162,7 @@ func TXInsertUnitConfig(tx *sqlx.Tx, config *UnitConfig) error {
 		return err
 	}
 
-	query := "INSERT INTO tb_unit_config (id,image_id,config_file_path,version,parent_id,content,created_at) VALUES (:id,:image_id,:config_file_path,:version,:parent_id,:content,:created_at)"
+	query := "INSERT INTO tb_unit_config (id,image_id,config_file_path,version,parent_id,content,config_key_sets,created_at) VALUES (:id,:image_id,:config_file_path,:version,:parent_id,:content,:config_key_sets,:created_at)"
 
 	_, err = tx.NamedExec(query, config)
 
