@@ -15,6 +15,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
+	consulapi "github.com/hashicorp/consul/api"
 	"github.com/yiduoyunQ/smlib"
 )
 
@@ -683,9 +684,11 @@ func (svc *Service) InitTopology() error {
 	return nil
 }
 
-func (svc *Service) RegisterServices() (err error) {
+func (svc *Service) RegisterServices(client *consulapi.Client) (err error) {
+	if client == nil {
+		return fmt.Errorf("consul client is nil")
+	}
 	svc.Lock()
-
 	defer func() {
 		if err != nil {
 
@@ -695,7 +698,7 @@ func (svc *Service) RegisterServices() (err error) {
 	}()
 
 	for i := range svc.units {
-		err = svc.units[i].RegisterHealthCheck(nil)
+		err = svc.units[i].RegisterHealthCheck(client)
 		if err != nil {
 			return err
 		}

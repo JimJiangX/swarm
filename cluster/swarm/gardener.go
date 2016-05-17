@@ -197,13 +197,15 @@ func (gd *Gardener) setConsulClient(client *consulapi.Client) {
 }
 
 func (gd *Gardener) consulAPIClient(full bool) (*consulapi.Client, error) {
-	gd.RLock()
-	if !full && gd.consulClient != nil {
-		gd.RUnlock()
-		return gd.consulClient, nil
-	}
+	if !full {
+		gd.RLock()
+		if gd.consulClient != nil {
+			gd.RUnlock()
+			return gd.consulClient, nil
+		}
 
-	gd.RUnlock()
+		gd.RUnlock()
+	}
 
 	sysConfig, err := database.GetSystemConfig()
 	if err != nil {

@@ -277,8 +277,11 @@ func (u *unit) extendVG() error {
 }
 
 func (u *unit) RegisterHealthCheck(client *consulapi.Client) error {
+	if client == nil {
+		return fmt.Errorf("consul client is nil")
+	}
 	agent := client.Agent()
-	Service := consulapi.AgentServiceRegistration{
+	service := consulapi.AgentServiceRegistration{
 		ID:      "",
 		Name:    "",
 		Tags:    []string{},
@@ -293,7 +296,7 @@ func (u *unit) RegisterHealthCheck(client *consulapi.Client) error {
 		},
 	}
 
-	return agent.ServiceRegister(&Service)
+	return agent.ServiceRegister(&service)
 }
 
 func (u *unit) DeregisterHealthCheck(client *consulapi.Client) error {

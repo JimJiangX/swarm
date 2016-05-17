@@ -41,6 +41,12 @@ func (gd *Gardener) serviceExecute() (err error) {
 		}
 		horusServerAddr := fmt.Sprintf("%s:%d", sysConfig.HorusServerIP, sysConfig.HorusServerPort)
 
+		consulClient, err := gd.consulAPIClient(false)
+		if err != nil {
+			log.Error("consul client is nil", err)
+			continue
+		}
+
 		svc.Lock()
 		log.Debugf("[**MG**]serviceExecute: get server: %v", svc)
 		// step := int64(0)
@@ -78,12 +84,6 @@ func (gd *Gardener) serviceExecute() (err error) {
 			goto failure
 		}
 
-		log.Debug("[mg]StartService")
-		err = svc.StartService()
-		if err != nil {
-			taskErr = err
-			goto failure
-		}
 		log.Debug("[mg]CreateUsers")
 		err = svc.CreateUsers()
 		if err != nil {
@@ -96,8 +96,9 @@ func (gd *Gardener) serviceExecute() (err error) {
 			taskErr = err
 			goto failure
 		}
+
 		log.Debug("[mg]RegisterServices")
-		err = svc.RegisterServices()
+		err = svc.RegisterServices(consulClient)
 		if err != nil {
 			taskErr = err
 			goto failure
