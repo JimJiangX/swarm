@@ -357,7 +357,7 @@ func CountNodeByCluster(cluster string) (int, error) {
 	}
 
 	num := 0
-	err = db.Select(&num, "SELECT COUNT(*) FROM tb_node WHERE cluster_id=?", cluster)
+	err = db.Get(&num, "SELECT COUNT(*) FROM tb_node WHERE cluster_id=?", cluster)
 	if err != nil {
 		return 0, err
 	}
