@@ -203,34 +203,25 @@ func (gd *Gardener) consulAPIClient(full bool) (*consulapi.Client, error) {
 			gd.RUnlock()
 			return gd.consulClient, nil
 		}
-
 		gd.RUnlock()
 	}
 
-	sysConfig, err := database.GetSystemConfig()
+	config, err := database.GetSystemConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	endpoints, dc, token, wait := sysConfig.GetConsulConfig()
-
-	if len(endpoints) == 0 {
-		return nil, fmt.Errorf("Consul Config Settings Error")
-	}
-
-	config := consulapi.Config{
-		Address:    endpoints[0],
-		Datacenter: dc,
-		WaitTime:   time.Duration(wait) * time.Second,
-		Token:      token,
-	}
-
-	client, err := consulapi.NewClient(&config)
+	clients, err := config.GetConsulClient()
 	if err != nil {
 		return nil, err
 	}
+	for i := range clients {
+		_, err := clients[i].Status().Leader()
+		if err == nil {
+			gd.setConsulClient(clients[i])
+			return clients[i], nil
+		}
+	}
 
-	gd.setConsulClient(client)
-
-	return client, nil
+	return nil, fmt.Errorf("Not Found Alive Consul Server %s:%d", config.ConsulIPs, config.ConsulPort)
 }

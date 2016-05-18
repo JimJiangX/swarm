@@ -634,9 +634,8 @@ func (svc *Service) removeContainers(force, rmVolumes bool) error {
 	return nil
 }
 
-func (svc *Service) CreateUsers() (err error) {
+func (svc *Service) CreateUsers() error {
 	svc.Lock()
-	defer svc.Unlock()
 
 	users := []database.User{}
 	cmd := []string{}
@@ -655,54 +654,27 @@ func (svc *Service) CreateUsers() (err error) {
 
 			}
 		}
-
 	}
 
-	for i := range svc.units {
-		u := svc.units[i]
+	svc.getUnitByType(_UnitRole_SwitchManager)
 
-		if u.Type == _SwitchManagerType {
-			// create proxy users
-		}
-	}
+	svc.Unlock()
 
 	return nil
 }
 
 func (svc *Service) RefreshTopology() error {
 	svc.RLock()
-	defer svc.RUnlock()
-
-	for i := range svc.units {
-		u := svc.units[i]
-
-		if u.Type == _SwitchManagerType {
-
-			// lock
-
-			// topology
-
-		}
-	}
+	svc.getUnitByType(_UnitRole_SwitchManager)
+	svc.RUnlock()
 
 	return nil
 }
 
 func (svc *Service) InitTopology() error {
 	svc.RLock()
-	defer svc.RUnlock()
-
-	for i := range svc.units {
-		u := svc.units[i]
-
-		if u.Type == _SwitchManagerType {
-
-			// lock
-
-			// topology
-
-		}
-	}
+	svc.getUnitByType(_UnitRole_SwitchManager)
+	svc.RUnlock()
 
 	return nil
 }
@@ -712,52 +684,50 @@ func (svc *Service) RegisterServices(client *consulapi.Client) (err error) {
 		return fmt.Errorf("consul client is nil")
 	}
 	svc.Lock()
-	defer func() {
-		if err != nil {
-
-		}
-
-		svc.Unlock()
-	}()
 
 	for i := range svc.units {
 		err = svc.units[i].RegisterHealthCheck(client)
 		if err != nil {
+			svc.Unlock()
+
 			return err
 		}
 	}
+	svc.Unlock()
 
 	return nil
 }
 
 func (svc *Service) DeregisterServices(client *consulapi.Client) error {
+	if client == nil {
+		return fmt.Errorf("consul client is nil")
+	}
 	svc.Lock()
-	defer svc.Unlock()
 
 	for i := range svc.units {
 		err := svc.units[i].DeregisterHealthCheck(client)
 		if err != nil {
+			svc.Unlock()
 			return err
 		}
 	}
+	svc.Unlock()
 
 	return nil
 }
 
-func (svc *Service) RegisterToHorus(addr, user, password string, agentPort int) (err error) {
+func (svc *Service) RegisterToHorus(addr, user, password string, agentPort int) error {
 	svc.Lock()
-	defer func() {
-		if err != nil {
-		}
-		svc.Unlock()
-	}()
 
 	for i := range svc.units {
-		err = svc.units[i].registerToHorus(addr, user, password, agentPort)
+		err := svc.units[i].registerToHorus(addr, user, password, agentPort)
 		if err != nil {
+			svc.Unlock()
+
 			return err
 		}
 	}
+	svc.Unlock()
 
 	return nil
 }
@@ -774,16 +744,14 @@ func (svc *Service) getUnitByType(Type string) (*unit, error) {
 
 func (svc *Service) GetSwithManager() (*unit, error) {
 	svc.RLock()
-
-	u, err := svc.getUnitByType("Switch Manager")
-
+	u, err := svc.getUnitByType(_UnitRole_SwitchManager)
 	svc.RUnlock()
 
 	return u, err
 }
 
 func (svc *Service) getSwithManagerAddr() (addr string, port int, err error) {
-	u, err := svc.getUnitByType("Switch Manager")
+	u, err := svc.getUnitByType(_UnitRole_SwitchManager)
 	if err != nil {
 		return "", 0, err
 	}

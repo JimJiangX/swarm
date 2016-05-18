@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"runtime/debug"
@@ -31,92 +32,28 @@ func (gd *Gardener) serviceExecute() (err error) {
 	for {
 		svc := <-gd.serviceExecuteCh
 
-		if !atomic.CompareAndSwapInt64(&svc.Status, _StatusServiceAlloction, _StatusServiceCreating) {
-			continue
-		}
-		sysConfig, err := database.GetSystemConfig()
+		err = svc.statusCAS(_StatusServiceAlloction, _StatusServiceCreating)
 		if err != nil {
-			log.Errorf("Query Database Error:%s", err.Error())
-			continue
-		}
-		horusServerAddr := fmt.Sprintf("%s:%d", sysConfig.HorusServerIP, sysConfig.HorusServerPort)
-
-		consulClient, err := gd.consulAPIClient(false)
-		if err != nil {
-			log.Error("consul client is nil", err)
+			log.Error(err)
 			continue
 		}
 
-		svc.Lock()
-		log.Debugf("[**MG**]serviceExecute: get server: %v", svc)
-		// step := int64(0)
-		var taskErr error
+		log.Debugf("[mg]Execute Service:%v", svc)
 
-		err = createContainerInPending(gd, svc)
+		err = gd.createServiceContainers(svc)
 		if err != nil {
-			svc.Unlock()
-			taskErr = err
+
 			goto failure
 		}
 
-		svc.pendingContainers = nil
-
-		svc.Unlock()
-
-		log.Debug("[mg]starting containers")
-		err = svc.StartContainers()
+		err = gd.InitAndStartService(svc)
 		if err != nil {
-			taskErr = err
-			goto failure
-		}
-
-		log.Debug("[mg]CopyServiceConfig")
-		err = svc.CopyServiceConfig()
-		if err != nil {
-			taskErr = err
-			goto failure
-		}
-
-		log.Debug("[mg]InitService")
-		err = svc.InitService()
-		if err != nil {
-			taskErr = err
-			goto failure
-		}
-
-		log.Debug("[mg]CreateUsers")
-		err = svc.CreateUsers()
-		if err != nil {
-			taskErr = err
-			goto failure
-		}
-		log.Debug("[mg]InitTopology")
-		err = svc.InitTopology()
-		if err != nil {
-			taskErr = err
-			goto failure
-		}
-
-		log.Debug("[mg]RegisterServices")
-		err = svc.RegisterServices(consulClient)
-		if err != nil {
-			taskErr = err
 			goto failure
 		}
 
 		log.Debug("[mg]TxSetServiceStatus")
-
-		database.TxSetServiceStatus(&svc.Service, svc.task,
+		err = database.TxSetServiceStatus(&svc.Service, svc.task,
 			_StatusServiceNoContent, _StatusTaskDone, time.Now(), "")
-
-		log.Debug("[mg]RegisterToHorus")
-
-		err = svc.RegisterToHorus(horusServerAddr,
-			sysConfig.MonUsername, sysConfig.MonPassword, sysConfig.HorusAgentPort)
-		if err != nil {
-			taskErr = err
-			goto failure
-		}
 
 		log.Debug("[mg]exec done")
 		continue
@@ -124,15 +61,29 @@ func (gd *Gardener) serviceExecute() (err error) {
 	failure:
 
 		//TODO:error handler
-		log.Error("Exec Error:%v", taskErr)
-		database.TxSetServiceStatus(&svc.Service, svc.task, svc.Status, _StatusTaskFailed, time.Now(), taskErr.Error())
+		log.Errorf("Exec Error:%v", err)
+		err = database.TxSetServiceStatus(&svc.Service, svc.task, svc.Status, _StatusTaskFailed, time.Now(), err.Error())
+		if err != nil {
+			log.Errorf("Save Service %s Status Error:%v", svc.Name, err)
+		}
 	}
 
 	return err
 }
 
-func createContainerInPending(gd *Gardener, svc *Service) error {
+func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
+	svc.Lock()
+	defer func() {
+		if err != nil {
+			log.Error(err)
+			atomic.StoreInt64(&svc.Status, _StatusServiceCreateFailed)
+		}
+
+		svc.Unlock()
+	}()
+
 	for _, pending := range svc.pendingContainers {
+
 		log.Debugf("[mg]svc.getUnit :%s", pending)
 		u, err := svc.getUnit(pending.Name)
 		if err != nil || u == nil {
@@ -140,7 +91,6 @@ func createContainerInPending(gd *Gardener, svc *Service) error {
 			return err
 		}
 		log.Debugf("[mg]the unit:%v", u)
-		atomic.StoreUint32(&u.Status, _StatusUnitCreating)
 
 		log.Debugf("[mg]start pull image %s", u.config.Image)
 		authConfig, err := gd.RegistryAuthConfig()
@@ -154,7 +104,7 @@ func createContainerInPending(gd *Gardener, svc *Service) error {
 			return err
 		}
 
-		log.Debug("[mg]start prepareCreateContainer")
+		log.Debug("[mg]prepare for Creating Container")
 		err = u.prepareCreateContainer()
 		if err != nil {
 			err = fmt.Errorf("%s:Prepare Networking or Volume Failed,%s", pending.Name, err)
@@ -163,7 +113,6 @@ func createContainerInPending(gd *Gardener, svc *Service) error {
 		}
 
 		log.Debug("[mg]create container")
-		// create container
 		container, err := gd.createContainerInPending(pending.Config, pending.Name, svc.authConfig)
 		if err != nil {
 			err = fmt.Errorf("Container Create Failed %s,%s", pending.Name, err)
@@ -185,27 +134,9 @@ func createContainerInPending(gd *Gardener, svc *Service) error {
 		}
 	}
 
+	svc.pendingContainers = nil
+
 	return nil
-}
-
-func (gd *Gardener) SaveContainerToConsul(container *cluster.Container) error {
-	client, err := gd.consulAPIClient(true)
-	if err != nil {
-		return err
-	}
-
-	buf, err := json.Marshal(container)
-	if err != nil {
-		return err
-	}
-
-	pair := &consulapi.KVPair{
-		Key:   "/DBAAS/Conatainers/" + container.Info.Name,
-		Value: buf,
-	}
-	_, err = client.KV().Put(pair, nil)
-
-	return err
 }
 
 // createContainerInPending create new container into the cluster.
@@ -240,4 +171,78 @@ func (gd *Gardener) createContainerInPending(config *cluster.ContainerConfig, na
 	}
 
 	return container, err
+}
+
+func (gd *Gardener) InitAndStartService(svc *Service) error {
+
+	log.Debug("[mg]Starting Containers")
+	if err := svc.StartContainers(); err != nil {
+		return err
+	}
+
+	log.Debug("[mg]Copy Service Config")
+	if err := svc.CopyServiceConfig(); err != nil {
+		return err
+	}
+
+	log.Debug("[mg]Init & Start Service")
+	if err := svc.InitService(); err != nil {
+		return err
+	}
+
+	log.Debug("[mg]Create Users")
+	if err := svc.CreateUsers(); err != nil {
+		return err
+	}
+
+	log.Debug("[mg]InitTopology")
+	if err := svc.InitTopology(); err != nil {
+		return err
+	}
+
+	consulClient, err := gd.consulAPIClient(false)
+	if err != nil {
+		log.Error("consul client is nil", err)
+		return err
+	}
+	log.Debug("[mg]RegisterServices")
+	if err := svc.RegisterServices(consulClient); err != nil {
+		return err
+	}
+
+	sys, err := database.GetSystemConfig()
+	if err != nil {
+		log.Errorf("Query Database Error:%s", err.Error())
+		return err
+	}
+	horusServerAddr := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
+
+	log.Debug("[mg]RegisterToHorus")
+	err = svc.RegisterToHorus(horusServerAddr, sys.MonUsername, sys.MonPassword, sys.HorusAgentPort)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (gd *Gardener) SaveContainerToConsul(container *cluster.Container) error {
+	client, err := gd.consulAPIClient(true)
+	if err != nil {
+		return err
+	}
+
+	buf := bytes.NewBuffer(nil)
+	err = json.NewEncoder(buf).Encode(container)
+	if err != nil {
+		return err
+	}
+
+	pair := &consulapi.KVPair{
+		Key:   "/DBAAS/Conatainers/" + container.ID,
+		Value: buf.Bytes(),
+	}
+	_, err = client.KV().Put(pair, nil)
+
+	return err
 }
