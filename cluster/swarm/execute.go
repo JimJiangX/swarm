@@ -174,29 +174,42 @@ func (gd *Gardener) createContainerInPending(config *cluster.ContainerConfig, na
 }
 
 func (gd *Gardener) InitAndStartService(svc *Service) error {
-
-	log.Debug("[mg]Starting Containers")
-	if err := svc.StartContainers(); err != nil {
+	err := svc.statusCAS(_StatusServiceCreating, _StatusServiceStarting)
+	if err != nil {
+		return err
+	}
+	svc.Lock()
+	defer func() {
+		if err != nil {
+			// mark failed
+			atomic.StoreInt64(&svc.Status, _StatusServiceStartFailed)
+		} else {
+			atomic.StoreInt64(&svc.Status, _StatusServiceNoContent)
+		}
+		svc.Unlock()
+	}()
+	log.Debug("[mg]starting Containers")
+	if err := svc.startContainers(); err != nil {
 		return err
 	}
 
-	log.Debug("[mg]Copy Service Config")
-	if err := svc.CopyServiceConfig(); err != nil {
+	log.Debug("[mg]copy Service Config")
+	if err := svc.copyServiceConfig(); err != nil {
 		return err
 	}
 
-	log.Debug("[mg]Init & Start Service")
-	if err := svc.InitService(); err != nil {
+	log.Debug("[mg]init & Start Service")
+	if err := svc.initService(); err != nil {
 		return err
 	}
 
-	log.Debug("[mg]Create Users")
-	if err := svc.CreateUsers(); err != nil {
+	log.Debug("[mg]create Users")
+	if err := svc.createUsers(); err != nil {
 		return err
 	}
 
-	log.Debug("[mg]InitTopology")
-	if err := svc.InitTopology(); err != nil {
+	log.Debug("[mg]initTopology")
+	if err := svc.initTopology(); err != nil {
 		return err
 	}
 
@@ -205,8 +218,8 @@ func (gd *Gardener) InitAndStartService(svc *Service) error {
 		log.Error("consul client is nil", err)
 		return err
 	}
-	log.Debug("[mg]RegisterServices")
-	if err := svc.RegisterServices(consulClient); err != nil {
+	log.Debug("[mg]registerServices")
+	if err := svc.registerServices(consulClient); err != nil {
 		return err
 	}
 
@@ -217,8 +230,8 @@ func (gd *Gardener) InitAndStartService(svc *Service) error {
 	}
 	horusServerAddr := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
 
-	log.Debug("[mg]RegisterToHorus")
-	err = svc.RegisterToHorus(horusServerAddr, sys.MonUsername, sys.MonPassword, sys.HorusAgentPort)
+	log.Debug("[mg]registerToHorus")
+	err = svc.registerToHorus(horusServerAddr, sys.MonUsername, sys.MonPassword, sys.HorusAgentPort)
 	if err != nil {
 		return err
 	}

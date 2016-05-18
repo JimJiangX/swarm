@@ -423,60 +423,46 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, e
 		log.Error("Service Add To Scheduler", err)
 		return svc, err
 	}
-	log.Debugf("[**MG**] ServiceToScheduler ok:%v", svc)
+	log.Debugf("[mg] ServiceToScheduler ok:%v", svc)
 
 	return svc, nil
 }
 
-func (svc *Service) CreateContainers(authConfig *types.AuthConfig) (err error) {
-	if err = svc.checkStatus(_StatusServiceCreating); err != nil {
+func (svc *Service) StartService() error {
+	err := svc.statusCAS(_StatusServiceNoContent, _StatusServiceStarting)
+	if err != nil {
 		return err
 	}
-
 	svc.Lock()
 	defer func() {
 		if err != nil {
-			svc.SetServiceStatus(_StatusServiceCreateFailed, time.Now())
+			svc.SetServiceStatus(_StatusServiceStartFailed, time.Now())
+		} else {
+			atomic.StoreInt64(&svc.Status, _StatusServiceNoContent)
 		}
 		svc.Unlock()
 	}()
 
-	for i := range svc.units {
-		err = svc.units[i].pullImage(authConfig)
-		if err != nil {
-			return err
-		}
-
-		err = svc.units[i].prepareCreateContainer()
-		if err != nil {
-			return err
-		}
-
-		_, err = svc.units[i].createContainer(svc.authConfig)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (svc *Service) StartContainers() (err error) {
-	err = svc.statusCAS(_StatusServiceCreating, _StatusServiceStarting)
+	err = svc.startContainers()
 	if err != nil {
 		return err
 	}
 
-	svc.Lock()
-	defer func() {
-		if err != nil {
-			svc.SetServiceStatus(_StatusServiceStartFailed, time.Now())
-		}
-		svc.Unlock()
-	}()
+	err = svc.startService()
+	if err != nil {
+		return err
+	}
 
+	err = svc.refreshTopology()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+func (svc *Service) startContainers() error {
 	for i := range svc.units {
-		err = svc.units[i].startContainer()
+		err := svc.units[i].startContainer()
 		if err != nil {
 			return err
 		}
@@ -485,19 +471,7 @@ func (svc *Service) StartContainers() (err error) {
 	return nil
 }
 
-func (svc *Service) CopyServiceConfig() (err error) {
-	if err = svc.checkStatus(_StatusServiceStarting); err != nil {
-		return err
-	}
-
-	svc.Lock()
-	defer func() {
-		if err != nil {
-			svc.SetServiceStatus(_StatusServiceStartFailed, time.Now())
-		}
-		svc.Unlock()
-	}()
-
+func (svc *Service) copyServiceConfig() error {
 	for i := range svc.units {
 		u := svc.units[i]
 
@@ -515,21 +489,9 @@ func (svc *Service) CopyServiceConfig() (err error) {
 	return nil
 }
 
-func (svc *Service) InitService() (err error) {
-	if err = svc.checkStatus(_StatusServiceStarting); err != nil {
-		return err
-	}
-
-	svc.Lock()
-	defer func() {
-		if err != nil {
-			svc.SetServiceStatus(_StatusServiceStartFailed, time.Now())
-		}
-		svc.Unlock()
-	}()
-
+func (svc *Service) initService() error {
 	for i := range svc.units {
-		err = svc.units[i].initService()
+		err := svc.units[i].initService()
 		if err != nil {
 			return err
 		}
@@ -555,20 +517,9 @@ func (svc *Service) statusCAS(expected, value int64) error {
 	return fmt.Errorf("Status Conflict:expected %d but got %d", expected, atomic.LoadInt64(&svc.Status))
 }
 
-func (svc *Service) StartService() (err error) {
-	if err = svc.checkStatus(_StatusServiceStarting); err != nil {
-		return err
-	}
-	svc.Lock()
-	defer func() {
-		if err != nil {
-			svc.SetServiceStatus(_StatusServiceStartFailed, time.Now())
-		}
-		svc.Unlock()
-	}()
-
+func (svc *Service) startService() error {
 	for i := range svc.units {
-		err = svc.units[i].startService()
+		err := svc.units[i].startService()
 		if err != nil {
 			return err
 		}
@@ -583,7 +534,6 @@ func (svc *Service) StopContainers(timeout int) error {
 	svc.Unlock()
 
 	return err
-
 }
 
 func (svc *Service) stopContainers(timeout int) error {
@@ -617,7 +567,11 @@ func (svc *Service) stopService() error {
 
 func (svc *Service) RemoveContainers(force, rmVolumes bool) error {
 	svc.Lock()
-	err := svc.removeContainers(force, rmVolumes)
+	err := svc.stopService()
+	if err != nil {
+		return err
+	}
+	err = svc.removeContainers(force, rmVolumes)
 	svc.Unlock()
 
 	return err
@@ -634,9 +588,7 @@ func (svc *Service) removeContainers(force, rmVolumes bool) error {
 	return nil
 }
 
-func (svc *Service) CreateUsers() error {
-	svc.Lock()
-
+func (svc *Service) createUsers() error {
 	users := []database.User{}
 	cmd := []string{}
 
@@ -658,42 +610,33 @@ func (svc *Service) CreateUsers() error {
 
 	svc.getUnitByType(_UnitRole_SwitchManager)
 
-	svc.Unlock()
-
 	return nil
 }
 
-func (svc *Service) RefreshTopology() error {
-	svc.RLock()
+func (svc *Service) refreshTopology() error {
 	svc.getUnitByType(_UnitRole_SwitchManager)
-	svc.RUnlock()
 
 	return nil
 }
 
-func (svc *Service) InitTopology() error {
-	svc.RLock()
+func (svc *Service) initTopology() error {
 	svc.getUnitByType(_UnitRole_SwitchManager)
-	svc.RUnlock()
 
 	return nil
 }
 
-func (svc *Service) RegisterServices(client *consulapi.Client) (err error) {
+func (svc *Service) registerServices(client *consulapi.Client) (err error) {
 	if client == nil {
 		return fmt.Errorf("consul client is nil")
 	}
-	svc.Lock()
 
 	for i := range svc.units {
 		err = svc.units[i].RegisterHealthCheck(client)
 		if err != nil {
-			svc.Unlock()
 
 			return err
 		}
 	}
-	svc.Unlock()
 
 	return nil
 }
@@ -716,18 +659,13 @@ func (svc *Service) DeregisterServices(client *consulapi.Client) error {
 	return nil
 }
 
-func (svc *Service) RegisterToHorus(addr, user, password string, agentPort int) error {
-	svc.Lock()
-
+func (svc *Service) registerToHorus(addr, user, password string, agentPort int) error {
 	for i := range svc.units {
 		err := svc.units[i].registerToHorus(addr, user, password, agentPort)
 		if err != nil {
-			svc.Unlock()
-
 			return err
 		}
 	}
-	svc.Unlock()
 
 	return nil
 }
