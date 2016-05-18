@@ -34,6 +34,7 @@ type configParser interface {
 	defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error)
 	Marshal() ([]byte, error)
 	PortSlice() (bool, []port)
+	HealthCheck() (healthCheck, error)
 	Set(key string, val interface{}) error
 }
 
@@ -280,19 +281,37 @@ func (u *unit) RegisterHealthCheck(client *consulapi.Client) error {
 	if client == nil {
 		return fmt.Errorf("consul client is nil")
 	}
+
+	check, err := u.HealthCheck()
+	if err != nil {
+		return err
+	}
+
+	containerID := u.ContainerID
+	addr := ""
+	if u.container != nil {
+		containerID = u.container.ID
+
+		if u.container.Engine != nil {
+			addr = u.container.Engine.IP
+		} else if u.engine != nil {
+			addr = u.engine.IP
+		}
+	}
+
 	agent := client.Agent()
 	service := consulapi.AgentServiceRegistration{
-		ID:      "",
-		Name:    "",
-		Tags:    []string{},
-		Port:    0,
-		Address: "",
+		ID:      u.ID,
+		Name:    u.Name,
+		Tags:    check.Tags,
+		Port:    check.Port,
+		Address: addr,
 		Check: &consulapi.AgentServiceCheck{
-			Script:            "",
-			DockerContainerID: "",
-			Shell:             "",
-			Interval:          "",
-			Timeout:           "",
+			Script:            check.Script,
+			DockerContainerID: containerID,
+			Shell:             check.Shell,
+			Interval:          check.Interval,
+			TTL:               check.TTL,
 		},
 	}
 

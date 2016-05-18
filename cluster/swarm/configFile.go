@@ -152,21 +152,28 @@ func (mysqlConfig) Validate(data map[string]interface{}) error {
 }
 
 func (c mysqlConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error) {
+	found := false
 	m := make(map[string]interface{}, 10)
 	if svc == nil || u == nil {
 		return m, fmt.Errorf("params maybe nil")
 	}
+
 	if len(u.networkings) == 1 {
 		m["mysqld::bind-address"] = u.networkings[0].IP.String()
 	} else {
 		return nil, fmt.Errorf("Unexpected IPAddress allocated")
 	}
 
-	if len(u.ports) == 1 {
-		m["mysqld::port"] = u.ports[0].Port
-		m["mysqld::server-id"] = u.ports[0].Port
-	} else {
-		return nil, fmt.Errorf("Unexpected,more than 1 port allocated")
+	found = false
+	for i := range u.ports {
+		if u.ports[i].Name == "mysqld::port" {
+			m["mysqld::port"] = u.ports[i].Port
+			m["mysqld::server-id"] = u.ports[i].Port
+			found = true
+		}
+	}
+	if !found {
+		return nil, fmt.Errorf("Unexpected port allocation")
 	}
 
 	m["mysqld::character_set_server"] = "gbk"
@@ -226,7 +233,36 @@ func (c mysqlConfig) PortSlice() (bool, []port) {
 	if c.port != (port{}) {
 		return true, []port{c.port}
 	}
-	return false, []port{port{proto: "tcp", name: ""}}
+	return false, []port{port{proto: "tcp", name: "mysqld::port"}}
+}
+
+type healthCheck struct {
+	Port     int
+	Script   string
+	Shell    string
+	Interval string
+	Timeout  string
+	TTL      string
+	Tags     []string
+}
+
+func (c mysqlConfig) HealthCheck() (healthCheck, error) {
+	if c.config == nil {
+		return healthCheck{}, fmt.Errorf("params not ready")
+	}
+
+	port, err := c.config.Int("mysqld::port")
+	if err != nil {
+		return healthCheck{}, err
+	}
+	return healthCheck{
+		Port:     port,
+		Script:   "",
+		Shell:    "",
+		Interval: "10s",
+		TTL:      "15s",
+		Tags:     nil,
+	}, nil
 }
 
 type proxyCmd struct{}
@@ -291,12 +327,30 @@ func (c proxyConfig) PortSlice() (bool, []port) {
 		port{proto: "tcp", name: "proxy_admin_port"},
 	}
 }
+func (c proxyConfig) HealthCheck() (healthCheck, error) {
+	if c.config == nil {
+		return healthCheck{}, fmt.Errorf("params not ready")
+	}
+
+	port, err := c.config.Int("proxy_admin_port")
+	if err != nil {
+		return healthCheck{}, err
+	}
+	return healthCheck{
+		Port:     port,
+		Script:   "",
+		Shell:    "",
+		Interval: "10s",
+		TTL:      "15s",
+		Tags:     nil,
+	}, nil
+}
 
 func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error) {
 	m := make(map[string]interface{}, 10)
 	m["upsql-proxy::proxy-domain"] = svc.ID
 	m["upsql-proxy::proxy-name"] = u.ID
-	if len(u.networkings) == 2 && len(u.ports) == 2 {
+	if len(u.networkings) == 2 && len(u.ports) >= 2 {
 		adminAddr, dataAddr := "", ""
 		adminPort, dataPort := 0, 0
 		for i := range u.networkings {
@@ -310,8 +364,10 @@ func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interf
 		for i := range u.ports {
 			if u.ports[i].Name == "proxy_data_port" {
 				dataPort = u.ports[i].Port
+				m["proxy_data_port"] = dataPort
 			} else if u.ports[i].Name == "proxy_admin_port" {
 				adminPort = u.ports[i].Port
+				m["proxy_admin_port"] = adminPort
 			}
 		}
 		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", dataAddr, dataPort)
@@ -382,7 +438,27 @@ func (c switchManagerConfig) PortSlice() (bool, []port) {
 	if c.ports != nil {
 		return true, c.ports
 	}
-	return false, []port{port{proto: "tcp", name: "Port"}, port{proto: "tcp", name: "ProxyPort"}}
+	return false, []port{port{proto: "tcp", name: "Port"},
+		port{proto: "tcp", name: "ProxyPort"}}
+}
+
+func (c switchManagerConfig) HealthCheck() (healthCheck, error) {
+	if c.config == nil {
+		return healthCheck{}, fmt.Errorf("params not ready")
+	}
+
+	port, err := c.config.Int("Port")
+	if err != nil {
+		return healthCheck{}, err
+	}
+	return healthCheck{
+		Port:     port,
+		Script:   "",
+		Shell:    "",
+		Interval: "10s",
+		TTL:      "15s",
+		Tags:     nil,
+	}, nil
 }
 func (c switchManagerConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error) {
 	sys, err := database.GetSystemConfig()
