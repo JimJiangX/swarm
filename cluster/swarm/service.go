@@ -389,7 +389,10 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, e
 			if svc.backup != nil && svc.backup.ID != "" {
 				gd.RemoveCronJob(svc.backup.ID)
 			}
-			svc.Delete(true, true, 0)
+			client, err := gd.consulAPIClient(true)
+			if err != nil {
+			}
+			svc.Delete(client, true, true, 0)
 			log.WithField("Service Name", svc.Name).Errorf("Servcie Cleaned,%v", err)
 		}
 	}()
@@ -727,16 +730,12 @@ func (svc *Service) RegisterServices(client *consulapi.Client) (err error) {
 	return nil
 }
 
-func (svc *Service) DeregisterServices() (err error) {
+func (svc *Service) DeregisterServices(client *consulapi.Client) error {
 	svc.Lock()
-	defer func() {
-		if err != nil {
-		}
-		svc.Unlock()
-	}()
+	defer svc.Unlock()
 
 	for i := range svc.units {
-		err = svc.units[i].DeregisterHealthCheck(nil)
+		err := svc.units[i].DeregisterHealthCheck(client)
 		if err != nil {
 			return err
 		}
@@ -933,7 +932,12 @@ func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int)
 		return err
 	}
 
-	err = svc.Delete(force, volumes, timeout)
+	client, err := gd.consulAPIClient(true)
+	if err != nil {
+
+	}
+
+	err = svc.Delete(client, force, volumes, timeout)
 	if err != nil {
 		return err
 	}
@@ -944,7 +948,7 @@ func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int)
 
 }
 
-func (svc *Service) Delete(force, volumes bool, timeout int) error {
+func (svc *Service) Delete(client *consulapi.Client, force, volumes bool, timeout int) error {
 	svc.Lock()
 	defer svc.Unlock()
 
@@ -958,7 +962,7 @@ func (svc *Service) Delete(force, volumes bool, timeout int) error {
 		return err
 	}
 
-	err = svc.DeregisterServices()
+	err = svc.DeregisterServices(client)
 
 	return err
 }

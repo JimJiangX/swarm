@@ -319,8 +319,11 @@ func (u *unit) RegisterHealthCheck(client *consulapi.Client) error {
 }
 
 func (u *unit) DeregisterHealthCheck(client *consulapi.Client) error {
+	if client == nil {
+		return fmt.Errorf("consul client is nil")
+	}
 
-	return client.Agent().ServiceDeregister("")
+	return client.Agent().ServiceDeregister(u.ID)
 }
 
 func (u *unit) Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (*cluster.Container, error) {
