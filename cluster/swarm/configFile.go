@@ -376,6 +376,21 @@ func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interf
 
 	m["upsql-proxy::event-threads-count"] = u.config.HostConfig.CpusetCpus
 
+	//TODO:proxy connect to switch manager (ip:port) settings
+	swm, err := svc.getUnitByType("_SwitchManagerType")
+	if err != nil {
+	}
+	swmProxyPort := 0
+	for i := range swm.ports {
+		if swm.ports[i].Name == "ProxyPort" {
+			swmProxyPort = swm.ports[i].Port
+			break
+		}
+	}
+	if len(swm.networkings) == 1 {
+		m["switchManagerAddress"] = fmt.Sprintf("%s:%d", swm.networkings[0].IP.String(), swmProxyPort)
+	}
+
 	return m, nil
 }
 
