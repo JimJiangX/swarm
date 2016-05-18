@@ -433,6 +433,7 @@ func (svc *Service) StartService() error {
 	if err != nil {
 		return err
 	}
+
 	svc.Lock()
 	defer func() {
 		if err != nil {
@@ -529,8 +530,13 @@ func (svc *Service) startService() error {
 }
 
 func (svc *Service) StopContainers(timeout int) error {
+	err := svc.checkStatus(_StatusServiceNoContent)
+	if err != nil {
+		return err
+	}
+
 	svc.Lock()
-	err := svc.stopContainers(timeout)
+	err = svc.stopContainers(timeout)
 	svc.Unlock()
 
 	return err
@@ -547,8 +553,13 @@ func (svc *Service) stopContainers(timeout int) error {
 	return nil
 }
 func (svc *Service) StopService() error {
+	err := svc.checkStatus(_StatusServiceNoContent)
+	if err != nil {
+		return err
+	}
+
 	svc.Lock()
-	err := svc.stopService()
+	err = svc.stopService()
 	svc.Unlock()
 
 	return err
@@ -566,12 +577,24 @@ func (svc *Service) stopService() error {
 }
 
 func (svc *Service) RemoveContainers(force, rmVolumes bool) error {
+	if !force {
+		err := svc.checkStatus(_StatusServiceNoContent)
+		if err != nil {
+			return err
+		}
+	}
+
 	svc.Lock()
+
 	err := svc.stopService()
 	if err != nil {
+		svc.Lock()
+
 		return err
 	}
+
 	err = svc.removeContainers(force, rmVolumes)
+
 	svc.Unlock()
 
 	return err

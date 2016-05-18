@@ -441,7 +441,19 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
-	_ = name
+	svc, err := gd.GetService(name)
+	if err != nil {
+		httpError(w, fmt.Sprintf("Not Found Service %s,Error:%s", name, err.Error()), http.StatusInternalServerError)
+		return
+	}
+
+	err = svc.StopService()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // POST /services/{name:.*}/backup
