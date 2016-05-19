@@ -109,7 +109,7 @@ func NewNode(addr, name, cluster, user, password string, hdd, ssd []string, port
 
 	return &Node{
 		Node:     node,
-		task:     task,
+		task:     &task,
 		user:     user,
 		password: password,
 		port:     port,
@@ -123,7 +123,7 @@ func (node *Node) Task() *database.Task {
 }
 
 func (node *Node) Insert() error {
-	err := database.TxInsertNodeAndTask(node.Node, node.task)
+	err := database.TxInsertNodeAndTask(*node.Node, *node.task)
 	if err != nil {
 		log.Errorf("Node:%s Insert INTO DB Error,%s", node.Name, err)
 	}

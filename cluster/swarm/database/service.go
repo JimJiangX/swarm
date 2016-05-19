@@ -67,7 +67,7 @@ type Unit struct {
 	ImageID     string `db:"image_id"`
 	ImageName   string `db:"image_name"` //<image_name>_<image_version>
 	ServiceID   string `db:"service_id"`
-	NodeID      string `db:"node_id"`
+	NodeID      string `db:"node_id"` // engine.ID
 	ContainerID string `db:"container_id"`
 	ConfigID    string `db:"unit_config_id"`
 	NetworkMode string `db:"network_mode"`
@@ -81,9 +81,9 @@ func (u Unit) TableName() string {
 	return "tb_unit"
 }
 
-func TxInsertUnit(tx *sqlx.Tx, unit *Unit) error {
+func TxInsertUnit(tx *sqlx.Tx, unit Unit) error {
 	query := "INSERT INTO tb_unit (id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,check_interval,created_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:node_id,:container_id,:unit_config_id,:network_mode,:status,:check_interval,:created_at)"
-	_, err := tx.NamedExec(query, unit)
+	_, err := tx.NamedExec(query, &unit)
 
 	return err
 }
@@ -110,6 +110,19 @@ func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
 	}
 
 	return nil
+}
+
+func UpdateUnitInfo(unit Unit) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	query := "UPDATE tb_unit SET name=:name,type:=type,image_id=:image_id,image_name=:image_name,service_id=:service_id,node_id=:node_id,container_id=:container_id,unit_config_id=:unit_config_id,network_mode=:network_mode,status=:status,check_interval:=check_interval,=:created_at WHERE id=:id"
+
+	_, err = db.NamedExec(query, &unit)
+
+	return err
 }
 
 func TxDelUnit(tx *sqlx.Tx, id string) error {
@@ -195,7 +208,7 @@ func GetService(NameOrID string) (Service, error) {
 	return s, err
 }
 
-func TxSaveService(svc *Service, strategy *BackupStrategy, task *Task, users []User) error {
+func TxSaveService(svc Service, strategy *BackupStrategy, task *Task, users []User) error {
 	tx, err := GetTX()
 	if err != nil {
 		return err
@@ -208,14 +221,14 @@ func TxSaveService(svc *Service, strategy *BackupStrategy, task *Task, users []U
 	}
 
 	if task != nil {
-		err = TxInsertTask(tx, task)
+		err = TxInsertTask(tx, *task)
 		if err != nil {
 			return err
 		}
 	}
 
 	if strategy != nil {
-		err = TxInsertBackupStrategy(tx, strategy)
+		err = TxInsertBackupStrategy(tx, *strategy)
 		if err != nil {
 			return err
 		}
@@ -231,10 +244,10 @@ func TxSaveService(svc *Service, strategy *BackupStrategy, task *Task, users []U
 	return tx.Commit()
 }
 
-func txInsertSerivce(tx *sqlx.Tx, svc *Service) error {
+func txInsertSerivce(tx *sqlx.Tx, svc Service) error {
 	// insert into database
 	query := "INSERT INTO tb_service (id,name,description,architecture,auto_healing,auto_scaling,high_available,status,backup_max_size,backup_files_retention,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:auto_healing,:auto_scaling,:high_available,:status,:backup_max_size,:backup_files_retention,:created_at,:finished_at)"
-	_, err := tx.NamedExec(query, svc)
+	_, err := tx.NamedExec(query, &svc)
 
 	return err
 }

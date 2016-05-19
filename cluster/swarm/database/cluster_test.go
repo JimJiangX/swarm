@@ -169,12 +169,11 @@ func TestNode(t *testing.T) {
 		}
 	}
 
-	tasks := []*Task{
-		NewTask("qwertyu", "qwertyuiopsdfghjklbn", "tyuighjfdghjkl", nil, 888),
-		NewTask("qweafjlafjrtyu", "qwertyuiajlfakfaopsdfghjklbn", "tyuifajflaghjfdghjkl", nil, 888),
-		NewTask("qwertyu", "qwertyuiopsdfghjklbn", "tyuighjfdghjkl", []string{"jlafjlakf", "jaljflajflajf"}, 888),
-		NewTask("qweafjlahjklkjhfjrtyu", "qwertfajlfjafyuiajlfakfaopsdfghjklbn", "", nil, 888),
-	}
+	t0 := NewTask("qwertyu", "qwertyuiopsdfghjklbn", "tyuighjfdghjkl", nil, 888)
+	t1 := NewTask("qweafjlafjrtyu", "qwertyuiajlfakfaopsdfghjklbn", "tyuifajflaghjfdghjkl", nil, 888)
+	t2 := NewTask("qwertyu", "qwertyuiopsdfghjklbn", "tyuighjfdghjkl", []string{"jlafjlakf", "jaljflajflajf"}, 888)
+	t3 := NewTask("qweafjlahjklkjhfjrtyu", "qwertfajlfjafyuiajlfakfaopsdfghjklbn", "", nil, 888)
+	tasks := []*Task{&t0, &t1, &t2, &t3}
 
 	defer func() {
 		for i := range tasks {
@@ -184,7 +183,7 @@ func TestNode(t *testing.T) {
 		}
 	}()
 
-	err = TxInsertNodeAndTask(&list[0], tasks[0])
+	err = TxInsertNodeAndTask(list[0], *tasks[0])
 	if err != nil {
 		t.Fatal(err)
 	}

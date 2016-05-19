@@ -51,8 +51,8 @@ func txInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
 	return err
 }
 
-func NewTask(relate, linkto, des string, labels []string, timeout int) *Task {
-	return &Task{
+func NewTask(relate, linkto, des string, labels []string, timeout int) Task {
+	return Task{
 		ID: utils.Generate64UUID(),
 		//	Name:        name,
 		Related:     relate,
@@ -65,22 +65,22 @@ func NewTask(relate, linkto, des string, labels []string, timeout int) *Task {
 	}
 }
 
-func InsertTask(task *Task) error {
+func InsertTask(task Task) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
 	}
 	query := "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,created_at,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:finished_at)"
 
-	_, err = db.NamedExec(query, task)
+	_, err = db.NamedExec(query, &task)
 
 	return err
 }
 
-func TxInsertTask(tx *sqlx.Tx, t *Task) error {
+func TxInsertTask(tx *sqlx.Tx, t Task) error {
 	query := "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,created_at,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:finished_at)"
 
-	_, err := tx.NamedExec(query, t)
+	_, err := tx.NamedExec(query, &t)
 
 	return err
 }
@@ -304,20 +304,20 @@ func DeleteBackupStrategy(id string) error {
 	return nil
 }
 
-func TxInsertBackupStrategy(tx *sqlx.Tx, strategy *BackupStrategy) error {
+func TxInsertBackupStrategy(tx *sqlx.Tx, strategy BackupStrategy) error {
 	query := "INSERT INTO tb_backup_strategy (id,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:type,:service_id,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
-	_, err := tx.NamedExec(query, strategy)
+	_, err := tx.NamedExec(query, &strategy)
 
 	return err
 }
 
-func InsertBackupStrategy(strategy *BackupStrategy) error {
+func InsertBackupStrategy(strategy BackupStrategy) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
 	}
 	query := "INSERT INTO tb_backup_strategy (id,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:type,:service_id,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
-	_, err = db.NamedExec(query, strategy)
+	_, err = db.NamedExec(query, &strategy)
 
 	return err
 }

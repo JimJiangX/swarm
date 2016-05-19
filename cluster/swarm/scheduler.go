@@ -48,7 +48,7 @@ func (gd *Gardener) serviceScheduler() (err error) {
 			"Action": "Alloc",
 		})
 
-		log.Debugf("[**MG**] start serviceScheduler:%s", svc.Name)
+		log.Debugf("[mg] start serviceScheduler:%s", svc.Name)
 		if !atomic.CompareAndSwapInt64(&svc.Status, _StatusServcieBuilding, _StatusServiceAlloction) {
 			entry.Error("Status Conflict")
 			continue
@@ -59,7 +59,7 @@ func (gd *Gardener) serviceScheduler() (err error) {
 		resourceAlloc := make([]*preAllocResource, 0, len(svc.base.Modules))
 
 		for i := range svc.base.Modules {
-			preAlloc, err := gd.BuildPendingContainersPerModule(svc.Name, &svc.base.Modules[i])
+			preAlloc, err := gd.BuildPendingContainersPerModule(svc, &svc.base.Modules[i])
 			if len(preAlloc) > 0 {
 				resourceAlloc = append(resourceAlloc, preAlloc...)
 			}
@@ -78,13 +78,13 @@ func (gd *Gardener) serviceScheduler() (err error) {
 		svc.Unlock()
 
 		entry.Info("Alloction Success")
-		log.Debugf("[**MG**]Alloction OK and put  to the ServiceToExecute: %v", resourceAlloc)
+		log.Debugf("[MG]Alloction OK and put  to the ServiceToExecute: %v", resourceAlloc)
 
 		gd.ServiceToExecute(svc)
 		continue
 
 	failure:
-		log.Debugf("[**MG**]serviceScheduler Failed: %v", resourceAlloc)
+		log.Debugf("[MG]serviceScheduler Failed: %v", resourceAlloc)
 		err = gd.Recycle(resourceAlloc)
 		if err != nil {
 			entry.Error("Recycle Failed", err)
@@ -108,9 +108,9 @@ func (gd *Gardener) serviceScheduler() (err error) {
 	return err
 }
 
-func (gd *Gardener) BuildPendingContainersPerModule(svcName string, module *structs.Module) ([]*preAllocResource, error) {
+func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module *structs.Module) ([]*preAllocResource, error) {
 	entry := log.WithFields(log.Fields{
-		"svcName": svcName,
+		"svcName": svc.Name,
 		"Module":  module.Type,
 	})
 
@@ -139,10 +139,10 @@ func (gd *Gardener) BuildPendingContainersPerModule(svcName string, module *stru
 	config.Config.Labels[_ImageIDInRegistryLabelKey] = imageID_Label
 
 	filters := gd.listShortIdleStore(module.Stores, module.Type, num)
-	log.Debugf("[** MG **] %s,%s,%s:first filters of storage:%s", module.Stores, module.Type, num, filters)
+	log.Debugf("[MG] %s,%s,%s:first filters of storage:%s", module.Stores, module.Type, num, filters)
 
 	list := gd.listCandidateNodes(module.Nodes, module.Type, filters...)
-	log.Debugf("[**MG**] now listCandidateNodes result:%v ", list)
+	log.Debugf("[MG] now listCandidateNodes result:%v ", list)
 
 	entry.Debugf("filters num:%d,candidate nodes num:%d", len(filters), len(list))
 
@@ -153,13 +153,13 @@ func (gd *Gardener) BuildPendingContainersPerModule(svcName string, module *stru
 		return nil, err
 	}
 
-	return gd.BuildPendingContainers(list, svcName, module.Type, num, module.Stores, config, false)
+	return gd.BuildPendingContainers(list, svc, module.Type, num, module.Stores, config, false)
 }
 
-func (gd *Gardener) BuildPendingContainers(list []*node.Node, svcName, Type string, num int, stores []structs.DiskStorage,
+func (gd *Gardener) BuildPendingContainers(list []*node.Node, svc *Service, Type string, num int, stores []structs.DiskStorage,
 	config *cluster.ContainerConfig, withImageAffinity bool) ([]*preAllocResource, error) {
 
-	entry := log.WithFields(log.Fields{"Name": svcName, "Module": Type})
+	entry := log.WithFields(log.Fields{"Name": svc.Name, "Module": Type})
 
 	gd.scheduler.Lock()
 	defer gd.scheduler.Unlock()
@@ -199,7 +199,7 @@ func (gd *Gardener) BuildPendingContainers(list []*node.Node, svcName, Type stri
 		return nil, err
 	}
 
-	preAllocs, err := gd.pendingAlloc(candidates[0:num], svcName, Type, stores, config)
+	preAllocs, err := gd.pendingAlloc(candidates[0:num], svc, Type, stores, config)
 	if err != nil {
 		entry.Errorf("gd.pendingAlloc: preAllocs Allocation Failed %s", err.Error())
 		return preAllocs, err
@@ -210,10 +210,10 @@ func (gd *Gardener) BuildPendingContainers(list []*node.Node, svcName, Type stri
 	return preAllocs, nil
 }
 
-func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcName, Type string, stores []structs.DiskStorage,
+func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type string, stores []structs.DiskStorage,
 	templConfig *cluster.ContainerConfig) ([]*preAllocResource, error) {
 
-	entry := log.WithFields(log.Fields{"Name": svcName, "Module": Type})
+	entry := log.WithFields(log.Fields{"Name": svc.Name, "Module": Type})
 
 	imageID, ok := templConfig.Labels[_ImageIDInRegistryLabelKey]
 	if !ok || imageID == "" {
@@ -246,14 +246,17 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcName, Type string, 
 
 		unit := &unit{
 			Unit: database.Unit{
-				ID:        id,
-				Name:      string(id[:8]) + "_" + svcName,
-				Type:      Type,
-				ImageID:   image.ID,
-				ImageName: image.Name + "_" + image.Version,
-				NodeID:    engine.ID,
-				Status:    0,
-				CreatedAt: time.Now(),
+				ID:            id,
+				Name:          string(id[:8]) + "_" + svc.Name,
+				Type:          Type,
+				ServiceID:     svc.ID,
+				ImageID:       image.ID,
+				ImageName:     image.Name + "_" + image.Version,
+				NodeID:        engine.ID,
+				Status:        0,
+				CheckInterval: 0,
+				NetworkMode:   templConfig.HostConfig.NetworkMode.NetworkName(),
+				CreatedAt:     time.Now(),
 			},
 			engine: engine,
 			ports:  nil,

@@ -28,7 +28,7 @@ func TestUnit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = TxInsertUnit(tx, &unit)
+	err = TxInsertUnit(tx, unit)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +181,7 @@ func TestService(t *testing.T) {
 	users = append(users, user1)
 	users = append(users, user2)
 
-	err := TxSaveService(&service, &backupStrategy, &task, users)
+	err := TxSaveService(service, &backupStrategy, &task, users)
 	if err != nil {
 		t.Fatal(err)
 	}

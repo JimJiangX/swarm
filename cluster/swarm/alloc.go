@@ -126,7 +126,7 @@ func (pre *preAllocResource) consistency() (err error) {
 	}
 	defer tx.Rollback()
 
-	err = database.TxInsertUnit(tx, &pre.unit.Unit)
+	err = database.TxInsertUnit(tx, pre.unit.Unit)
 	if err != nil {
 		return err
 	}

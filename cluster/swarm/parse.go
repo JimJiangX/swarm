@@ -64,7 +64,7 @@ func buildContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerCon
 	}
 
 	if config.HostConfig.NetworkMode == "" {
-		config.HostConfig.NetworkMode = "default"
+		config.HostConfig.NetworkMode = "host"
 	}
 
 	if config.HostConfig.RestartPolicy == (container.RestartPolicy{}) {

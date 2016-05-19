@@ -278,14 +278,14 @@ func (hds HitachiStorage) TableName() string {
 	return "tb_storage_HITACHI"
 }
 
-func (hs *HitachiStorage) Insert() error {
+func (hs HitachiStorage) Insert() error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
 	}
 
 	query := "INSERT INTO tb_storage_HITACHI (id,vendor,admin_unit,lun_start,lun_end,hlu_start,hlu_end) VALUES (:id,:vendor,:admin_unit,:lun_start,:lun_end,:hlu_start,:hlu_end)"
-	_, err = db.NamedExec(query, hs)
+	_, err = db.NamedExec(query, &hs)
 
 	return err
 }
@@ -304,14 +304,14 @@ func (h HuaweiStorage) TableName() string {
 	return "tb_storage_HUAWEI"
 }
 
-func (hs *HuaweiStorage) Insert() error {
+func (hs HuaweiStorage) Insert() error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
 	}
 
 	query := "INSERT INTO tb_storage_HUAWEI (id,vendor,ip_addr,username,password,hlu_start,hlu_end) VALUES (:id,:vendor,:ip_addr,:username,:password,:hlu_start,:hlu_end)"
-	_, err = db.NamedExec(query, hs)
+	_, err = db.NamedExec(query, &hs)
 
 	return err
 }

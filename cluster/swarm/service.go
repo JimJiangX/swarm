@@ -90,7 +90,8 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 	service.Lock()
 	defer service.Unlock()
 
-	service.task = database.NewTask("service", svc.ID, "create service", nil, 0)
+	task := database.NewTask("service", svc.ID, "create service", nil, 0)
+	service.task = &task
 
 	service.backup = strategy
 	service.base = &req
@@ -220,7 +221,7 @@ func (svc *Service) ReplaceBackupStrategy(req structs.BackupStrategy) (*database
 		return nil, fmt.Errorf("With non Backup Strategy,Error:%v", err)
 	}
 
-	err = database.InsertBackupStrategy(backup)
+	err = database.InsertBackupStrategy(*backup)
 	if err != nil {
 		return nil, fmt.Errorf("Tx Insert Backup Strategy Error:%s", err.Error())
 	}
@@ -297,7 +298,7 @@ func (gd *Gardener) AddService(svc *Service) error {
 }
 
 func (svc *Service) SaveToDB() error {
-	return database.TxSaveService(&svc.Service, svc.backup, svc.task, svc.users)
+	return database.TxSaveService(svc.Service, svc.backup, svc.task, svc.users)
 }
 
 func (gd *Gardener) GetService(NameOrID string) (*Service, error) {
@@ -793,7 +794,7 @@ func (svc *Service) TryBackupTask(host, unitID, strategyID, strategyType string,
 			if retries > 0 {
 				continue
 			}
-			err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "Cancel,The Task marked as TaskCancel,"+err.Error())
+			err1 := database.UpdateTaskStatus(&task, _StatusTaskCancel, time.Now(), "Cancel,The Task marked as TaskCancel,"+err.Error())
 			return fmt.Errorf("Errors:%v,%v", err, err1)
 		}
 
@@ -801,7 +802,7 @@ func (svc *Service) TryBackupTask(host, unitID, strategyID, strategyType string,
 			if retries > 0 {
 				continue
 			}
-			err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "TaskCancel,Switch Manager is busy now,"+err.Error())
+			err1 := database.UpdateTaskStatus(&task, _StatusTaskCancel, time.Now(), "TaskCancel,Switch Manager is busy now,"+err.Error())
 			return fmt.Errorf("Errors:%v,%v", err, err1)
 		}
 
@@ -830,7 +831,7 @@ func (svc *Service) TryBackupTask(host, unitID, strategyID, strategyType string,
 
 	case <-time.After(time.Duration(timeout)):
 
-		err = database.UpdateTaskStatus(task, _StatusTaskTimeout, time.Now(), "Timeout,The Task marked as TaskTimeout")
+		err = database.UpdateTaskStatus(&task, _StatusTaskTimeout, time.Now(), "Timeout,The Task marked as TaskTimeout")
 
 		return fmt.Errorf("Task Timeout,Service:%s,BackupStrategy:%s,Task:%s,Error:%v", svc.ID, strategyID, task.ID, err)
 	}

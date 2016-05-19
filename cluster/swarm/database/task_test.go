@@ -31,10 +31,10 @@ func TestTxInsertTask(t *testing.T) {
 }
 
 func TestTxInsertMultiTask(t *testing.T) {
-	tasks := []*Task{
-		NewTask("TaskRelated003", "TaskLinkto003", "TaskDescription003", []string{"TaskLabels031", "TaskLabels031"}, 1031),
-		NewTask("TaskRelated004", "TaskLinkto004", "TaskDescription004", []string{"TaskLabels041", "TaskLabels041"}, 1041),
-	}
+	t1 := NewTask("TaskRelated003", "TaskLinkto003", "TaskDescription003", []string{"TaskLabels031", "TaskLabels031"}, 1031)
+	t2 := NewTask("TaskRelated004", "TaskLinkto004", "TaskDescription004", []string{"TaskLabels041", "TaskLabels041"}, 1041)
+
+	tasks := []*Task{&t1, &t2}
 	tx, err := GetTX()
 	if err != nil {
 		t.Fatal(err)
@@ -181,7 +181,7 @@ func TestBackupStrategy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = TxInsertBackupStrategy(tx, &bs)
+	err = TxInsertBackupStrategy(tx, bs)
 	if err != nil {
 		t.Fatal(err)
 	}

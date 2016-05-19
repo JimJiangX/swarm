@@ -179,8 +179,6 @@ func (u *unit) createContainer(authConfig *types.AuthConfig) (*cluster.Container
 	if err == nil && container != nil {
 		u.container = container
 		u.Unit.ContainerID = container.ID
-
-		//savetoDisk
 	}
 
 	return container, err
@@ -468,7 +466,8 @@ func (u unit) getPluginAddr(port int) string {
 }
 
 func (u *unit) saveToDisk() error {
-	return nil
+
+	return database.UpdateUnitInfo(u.Unit)
 }
 
 func (u *unit) registerToHorus(addr, user, password string, agentPort int) error {

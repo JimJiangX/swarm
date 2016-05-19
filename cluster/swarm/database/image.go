@@ -24,7 +24,7 @@ func (Image) TableName() string {
 	return "tb_image"
 }
 
-func TxInsertImage(image Image, config UnitConfig, task *Task) error {
+func TxInsertImage(image Image, config UnitConfig, task Task) error {
 	tx, err := GetTX()
 	if err != nil {
 		return err
