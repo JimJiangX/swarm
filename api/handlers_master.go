@@ -194,7 +194,7 @@ func floatValueOrZero(r *http.Request, k string) float64 {
 	return val
 }
 
-// POST /clusters/{name:.*}/update
+// POST /clusters/{name}/update
 func postUpdateClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
@@ -220,7 +220,7 @@ func postUpdateClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.R
 	w.WriteHeader(http.StatusOK)
 }
 
-// POST /clusters/{name:.*}/enable
+// POST /clusters/{name}/enable
 func postEnableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -244,7 +244,7 @@ func postEnableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 }
 
-// POST /clusters/{name:.*}/disable
+// POST /clusters/{name}/disable
 func postDisableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -269,7 +269,7 @@ func postDisableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 }
 
-// POST /clusters/{name:.*}/nodes
+// POST /clusters/{name}/nodes
 func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -328,7 +328,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-//POST /clusters/nodes/{node:.*}/enable
+//POST /clusters/nodes/{node}/enable
 func postEnableNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["node"]
 
@@ -347,7 +347,7 @@ func postEnableNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-//POST /clusters/nodes/{node:.*}/disable
+//POST /clusters/nodes/{node}/disable
 func postDisableNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["node"]
 
@@ -665,7 +665,7 @@ func postDisableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusOK)
 }
 
-// POST /networkings/ports/import
+// POST /ports
 func postImportPort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostImportPortRequest{}
 
@@ -685,7 +685,7 @@ func postImportPort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%d}", "num", num)
 }
 
-// POST /networkings/ports/{port:.*}/disable
+// POST /ports/{port:[0-9]+}/disable
 func postDisablePort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
@@ -807,7 +807,7 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%q}", "ID", store.ID())
 }
 
-// POST /storage/san/{name:.*}/raidgroup
+// POST /storage/san/{name}/raidgroup
 func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
@@ -845,7 +845,7 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	fmt.Fprintf(w, "{%q:%d}", "Size", size)
 }
 
-// POST /storage/san/{name:.*}/raid_group/{rg:.*}/enable
+// POST /storage/san/{name}/raid_group/{rg:[0-9]+}/enable
 func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
@@ -875,7 +875,7 @@ func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 }
 
-// POST /storage/san/{name:.*}/raid_group/{rg:.*}/disable
+// POST /storage/san/{name}/raid_group/{rg:[0-9]+}/disable
 func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
@@ -909,7 +909,7 @@ func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 func postNasStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
-// DELETE /services/{name:.*}
+// DELETE /services/{name}
 // TODO:Not Done Yet
 func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
@@ -956,7 +956,7 @@ func deleteBackupStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// DELETE /clusters/{name:.*}
+// DELETE /clusters/{name}
 func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -1013,7 +1013,7 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// DELETE /storage/san/{name:.*}
+// DELETE /storage/san/{name}
 func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -1032,7 +1032,7 @@ func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// DELETE /storage/san/{name:.*}/raid_group/{rg:.*}
+// DELETE /storage/san/{name}/raid_group/{rg:[0-9]+}
 func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
