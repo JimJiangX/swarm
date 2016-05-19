@@ -24,6 +24,30 @@ const (
 	_StatusNodeDeregisted
 )
 
+func ParseNodeStatus(status int) string {
+	switch status {
+	case _StatusNodeImport:
+		return "importing"
+	case _StatusNodeInstalling:
+		return "installing"
+	case _StatusNodeInstalled:
+		return "install failed"
+	case _StatusNodeTesting:
+		return "testing"
+	case _StatusNodeFailedTest:
+		return "test failed"
+	case _StatusNodeEnable:
+		return "enable"
+	case _StatusNodeDisable:
+		return "disable"
+	case _StatusNodeDeregisted:
+		return "deregister"
+	default:
+	}
+
+	return ""
+}
+
 const (
 	_StatusUnitAllocted = iota
 	_StatusUnitCreating

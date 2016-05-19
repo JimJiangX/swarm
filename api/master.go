@@ -48,8 +48,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	"GET": {
 		"/clusters":                        getClusters,
 		"/clusters/{name:.*}":              getClustersByNameOrID,
-		"/clusters/{name:.*}/nodes":        getNodes,
-		"/clusters/{name}/nodes/{node:.*}": getNodesByNameOrID,
+		"/clusters/{name:.*}/nodes":        getNodesResourceByCluster,
+		"/clusters/{name}/nodes/{node:.*}": getNodeResourceByNameOrID,
 		"/tasks":           getTasks,
 		"/tasks/{name:.*}": getTask,
 	},

@@ -94,12 +94,14 @@ type Node struct {
 	port       int    // ssh port
 }
 
-func NewNode(addr, name, cluster, user, password string, hdd, ssd []string, port, num int) *Node {
+func NewNode(addr, name, cluster, user, password, room, seat string, hdd, ssd []string, port, num int) *Node {
 	node := &database.Node{
 		ID:        utils.Generate64UUID(),
 		Name:      name,
 		ClusterID: cluster,
 		Addr:      addr,
+		Room:      room,
+		Seat:      seat,
 
 		MaxContainer: num,
 		Status:       _StatusNodeImport,

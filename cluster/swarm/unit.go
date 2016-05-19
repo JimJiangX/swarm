@@ -377,12 +377,20 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 		}
 	}
 
+	path := u.Path()
+	if strings.HasPrefix(path, "/DBAAS") {
+		parts := strings.SplitN(path, "/", 3)
+		if len(parts) == 3 {
+			path = parts[2]
+		}
+	}
+
 	config := sdk.VolumeFileConfig{
 		VgName:    volumes[cnf].VGName,
 		LvsName:   volumes[cnf].Name,
 		MountName: volumes[cnf].Name,
 		Data:      string(content),
-		FDes:      u.Path(),
+		FDes:      path,
 		Mode:      "0666",
 	}
 

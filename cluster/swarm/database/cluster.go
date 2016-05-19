@@ -138,6 +138,8 @@ type Node struct {
 	ClusterID    string `db:"cluster_id"`
 	Addr         string `db:"admin_ip"`
 	EngineID     string `db:"engine_id"`
+	Room         string `db:"room"`
+	Seat         string `db:"seat"`
 	MaxContainer int    `db:"max_container"`
 	Status       int    `db:"status"`
 
@@ -170,7 +172,7 @@ func (n Node) Insert() error {
 	}
 
 	// insert into database
-	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:max_container,:status,:register_at,:deregister_at)"
+	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
 	_, err = db.NamedExec(query, &n)
 
 	return err
@@ -184,7 +186,7 @@ func TxInsertNodeAndTask(node Node, task Task) error {
 	defer tx.Rollback()
 
 	// insert into database
-	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:max_container,:status,:register_at,:deregister_at)"
+	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
 	_, err = tx.NamedExec(query, &node)
 	if err != nil {
 		return err
@@ -206,7 +208,7 @@ func TxInsertMultiNodeAndTask(nodes []*Node, tasks []*Task) error {
 	defer tx.Rollback()
 
 	// insert into database
-	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:max_container,:status,:register_at,:deregister_at)"
+	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {

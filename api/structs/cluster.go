@@ -40,16 +40,16 @@ type NodeResource struct {
 }
 
 // NodeInfo used for GET: /clusters/{name:.*}/nodes/{node:.*} Resonse structure
-type NodeInfo struct {
+type NodeResourceInfo struct {
 	NodeResource
 	Containers []types.ContainerNode
 }
 
 // ClusterInspect used for GET: /clusters/{name:.*} Response structure
-type ClusterInspect struct {
+type ClusterResourceInspect struct {
 	ID    string
 	Name  string
-	Nodes []NodeInfo
+	Nodes []NodeResourceInfo
 }
 
 type Node struct {
@@ -62,6 +62,9 @@ type Node struct {
 
 	Port         int `json:",omitempty"` // ssh port
 	MaxContainer int `json:"max_container,omitempty"`
+
+	Room string `json:",omitempty"`
+	Seat string `json:",omitempty"`
 }
 
 type PostNodesRequest []Node
@@ -83,4 +86,30 @@ type ClusterInfoResponse struct {
 	MaxNode     int     `json:"max_node"`
 	NodeNum     int     `json:"node_num"`
 	UsageLimit  float32 `json:"usage_limit"`
+}
+
+type PerClusterInfoResponse struct {
+	ID          string        `json:"id"`
+	Name        string        `json:"name"`
+	Type        string        `json:"type"`
+	StorageType string        `json:"storage_type"`
+	StorageID   string        `json:"storage_id,omitempty"`
+	Datacenter  string        `json:"dc"`
+	Enabled     bool          `json:"enabled"`
+	MaxNode     int           `json:"max_node"`
+	UsageLimit  float32       `json:"usage_limit"`
+	Nodes       []NodeInspect `json:"nodes,omitempty"`
+}
+
+type NodeInspect struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	ClusterID    string `json:"cluster_id"`
+	Addr         string `json:"admin_ip"`
+	EngineID     string `json:"engine_id,omitempty"`
+	Room         string `json:",omitempty"`
+	Seat         string `json:",omitempty"`
+	MaxContainer int    `json:"max_container"`
+	Status       string `json:"status"`
+	RegisterAt   string `json:"register_at"`
 }
