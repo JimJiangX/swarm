@@ -248,8 +248,8 @@ func (c mysqlConfig) HealthCheck() (healthCheck, error) {
 		Script:   "/opt/DBaaS/scrpit/check_db.sh ",
 		Shell:    "",
 		Interval: "10s",
-		TTL:      "15s",
-		Tags:     nil,
+		//TTL:      "15s",
+		Tags: nil,
 	}, nil
 }
 

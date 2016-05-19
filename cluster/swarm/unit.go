@@ -320,6 +320,8 @@ func (u *unit) RegisterHealthCheck(client *consulapi.Client, context *Service) e
 		},
 	}
 
+	log.Debugf("%v", service)
+
 	return agent.ServiceRegister(&service)
 }
 
@@ -469,6 +471,13 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 	if err != nil {
 		return err
 	}
+
+	log.WithFields(log.Fields{
+		"Container": containerID,
+		"Engine":    engine.Addr,
+		"Cmd":       cmd,
+		"ExecID":    resp.ID,
+	}).Info("Start Exec")
 
 	return client.ContainerExecStart(context.TODO(), resp.ID, types.ExecStartCheck{Detach: detach})
 }
