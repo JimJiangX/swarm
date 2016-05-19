@@ -21,7 +21,7 @@ type ClusterResource struct {
 	ID    string
 	Name  string
 	Total Resource
-	Nodes []NodeResource `json:",omitempty"`
+	Nodes []NodeResource
 }
 
 type Resource struct {
@@ -80,7 +80,7 @@ type ClusterInfoResponse struct {
 	Name        string  `json:"name"`
 	Type        string  `json:"type"`
 	StorageType string  `json:"storage_type"`
-	StorageID   string  `json:"storage_id,omitempty"`
+	StorageID   string  `json:"storage_id"`
 	Datacenter  string  `json:"dc"`
 	Enabled     bool    `json:"enabled"`
 	MaxNode     int     `json:"max_node"`
@@ -93,12 +93,12 @@ type PerClusterInfoResponse struct {
 	Name        string        `json:"name"`
 	Type        string        `json:"type"`
 	StorageType string        `json:"storage_type"`
-	StorageID   string        `json:"storage_id,omitempty"`
+	StorageID   string        `json:"storage_id"`
 	Datacenter  string        `json:"dc"`
 	Enabled     bool          `json:"enabled"`
 	MaxNode     int           `json:"max_node"`
 	UsageLimit  float32       `json:"usage_limit"`
-	Nodes       []NodeInspect `json:"nodes,omitempty"`
+	Nodes       []NodeInspect `json:"nodes"`
 }
 
 type NodeInspect struct {
@@ -106,10 +106,11 @@ type NodeInspect struct {
 	Name         string `json:"name"`
 	ClusterID    string `json:"cluster_id"`
 	Addr         string `json:"admin_ip"`
-	EngineID     string `json:"engine_id,omitempty"`
-	Room         string `json:",omitempty"`
-	Seat         string `json:",omitempty"`
+	EngineID     string `json:"engine_id"`
+	DockerStatus string `json:"docker_status"`
+	Room         string `json:"room"`
+	Seat         string `json:"seat"`
 	MaxContainer int    `json:"max_container"`
-	Status       string `json:"status"`
+	Status       int    `json:"status"`
 	RegisterAt   string `json:"register_at"`
 }

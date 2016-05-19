@@ -48,12 +48,12 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	list := make([]structs.NodeInspect, len(nodes))
 	for i, node := range nodes {
-		status := swarm.ParseNodeStatus(node.Status)
 
+		dockerStatus := ""
 		if node.EngineID != "" {
 			eng, err := gd.GetEngine(node.EngineID)
 			if err == nil && eng != nil {
-				status = eng.Status()
+				dockerStatus = eng.Status()
 			}
 		}
 
@@ -63,10 +63,11 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 			ClusterID:    node.ClusterID,
 			Addr:         node.Addr,
 			EngineID:     node.EngineID,
+			DockerStatus: dockerStatus,
 			Room:         node.Room,
 			Seat:         node.Seat,
 			MaxContainer: node.MaxContainer,
-			Status:       status,
+			Status:       node.Status,
 			RegisterAt:   node.RegisterAt.String(),
 		}
 	}

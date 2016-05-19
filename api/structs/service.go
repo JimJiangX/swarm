@@ -62,5 +62,5 @@ type BackupStrategy struct {
 type PostServiceResponse struct {
 	ID               string
 	TaskID           string
-	BackupStrategyID string `json:"backup_strategy_id,omitempty"`
+	BackupStrategyID string `json:"backup_strategy_id"`
 }
