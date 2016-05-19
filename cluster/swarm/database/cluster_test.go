@@ -36,11 +36,18 @@ func TestCluster(t *testing.T) {
 		}
 	}
 
-	cl1, err := GetCluster("cluster3")
+	cl0, err := GetCluster("cluster3")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cl1.ID != clusters[2].ID {
+	if cl0.ID != clusters[2].ID {
+		t.Fatalf("Unexpected,%s != %s", cl0.ID, clusters[2].ID)
+	}
+	cl1, err := GetCluster(clusters[2].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cl1.Name != clusters[2].Name {
 		t.Fatalf("Unexpected,%s != %s", cl1.ID, clusters[2].ID)
 	}
 
