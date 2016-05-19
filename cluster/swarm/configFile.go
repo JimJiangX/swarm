@@ -144,7 +144,6 @@ func (mysqlCmd) CleanBackupFileCmd(args ...string) []string { return nil }
 
 type mysqlConfig struct {
 	config config.Configer
-	port   port
 }
 
 func (mysqlConfig) Validate(data map[string]interface{}) error {
@@ -230,9 +229,6 @@ type port struct {
 }
 
 func (c mysqlConfig) PortSlice() (bool, []port) {
-	if c.port != (port{}) {
-		return true, []port{c.port}
-	}
 	return false, []port{port{proto: "tcp", name: "mysqld::port"}}
 }
 
@@ -257,7 +253,7 @@ func (c mysqlConfig) HealthCheck() (healthCheck, error) {
 	}
 	return healthCheck{
 		Port:     port,
-		Script:   "",
+		Script:   "/opt/DBaaS/scrpit/check_db.sh ",
 		Shell:    "",
 		Interval: "10s",
 		TTL:      "15s",
@@ -277,7 +273,6 @@ func (proxyCmd) CleanBackupFileCmd(args ...string) []string { return nil }
 
 type proxyConfig struct {
 	config config.Configer
-	ports  []port
 }
 
 func (c *proxyConfig) Set(key string, val interface{}) error {
@@ -406,7 +401,6 @@ func (switchManagerCmd) CleanBackupFileCmd(args ...string) []string { return nil
 
 type switchManagerConfig struct {
 	config config.Configer
-	ports  []port
 }
 
 func (c *switchManagerConfig) Set(key string, val interface{}) error {
@@ -450,9 +444,6 @@ func (c *switchManagerConfig) Marshal() ([]byte, error) {
 }
 
 func (c switchManagerConfig) PortSlice() (bool, []port) {
-	if c.ports != nil {
-		return true, c.ports
-	}
 	return false, []port{port{proto: "tcp", name: "Port"},
 		port{proto: "tcp", name: "ProxyPort"}}
 }

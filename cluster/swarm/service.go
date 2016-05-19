@@ -655,7 +655,7 @@ func (svc *Service) registerServices(client *consulapi.Client) (err error) {
 	}
 
 	for i := range svc.units {
-		err = svc.units[i].RegisterHealthCheck(client)
+		err = svc.units[i].RegisterHealthCheck(client, svc)
 		if err != nil {
 
 			return err

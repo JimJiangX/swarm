@@ -118,7 +118,7 @@ func getNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GET /clusters/{name:.*}/nodes/{node:.*}
+// GET /clusters/{name}/nodes/{node:.*}
 func getNodesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	cluster := mux.Vars(r)["name"]
 	node := mux.Vars(r)["node"]

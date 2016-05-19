@@ -275,7 +275,7 @@ func (u *unit) extendVG() error {
 	return nil
 }
 
-func (u *unit) RegisterHealthCheck(client *consulapi.Client) error {
+func (u *unit) RegisterHealthCheck(client *consulapi.Client, context *Service) error {
 	if client == nil {
 		return fmt.Errorf("consul client is nil")
 	}
@@ -283,6 +283,13 @@ func (u *unit) RegisterHealthCheck(client *consulapi.Client) error {
 	check, err := u.HealthCheck()
 	if err != nil {
 		return err
+	}
+
+	if u.Type == _UpsqlType {
+		swm, err := context.getUnitByType(_UnitRole_SwitchManager)
+		if err == nil && swm != nil {
+			check.Tags = []string{fmt.Sprintf("swm_key=%s/%s/topology", context.ID, swm.ID)}
+		}
 	}
 
 	containerID := u.ContainerID
@@ -305,7 +312,7 @@ func (u *unit) RegisterHealthCheck(client *consulapi.Client) error {
 		Port:    check.Port,
 		Address: addr,
 		Check: &consulapi.AgentServiceCheck{
-			Script:            check.Script,
+			Script:            check.Script + u.Name,
 			DockerContainerID: containerID,
 			Shell:             check.Shell,
 			Interval:          check.Interval,
