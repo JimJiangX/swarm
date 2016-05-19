@@ -163,7 +163,7 @@ func TestNode(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(nodes) != len(list)-1 {
-		t.Fatalf("Unexpected,%d!=%d", len(nodes), len(list)-1)
+		t.Error("Unexpected,%d!=%d", len(nodes), len(list)-1)
 	}
 
 	for i := range list {
@@ -172,7 +172,7 @@ func TestNode(t *testing.T) {
 			IDOrName = list[i].Name
 		}
 		if err := DeleteNode(IDOrName); err != nil {
-			t.Fatal(IDOrName, err)
+			t.Error(IDOrName, err)
 		}
 	}
 

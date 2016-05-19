@@ -156,7 +156,6 @@ func (gd *Gardener) Datacenter(IDOrName string) (*Datacenter, error) {
 	gd.RUnlock()
 
 	//If Not Found
-
 	dc, err := gd.rebuildDatacenter(IDOrName)
 	if err != nil {
 		return nil, err
