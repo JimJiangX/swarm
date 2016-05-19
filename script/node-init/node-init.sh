@@ -199,8 +199,12 @@ init_ssd_vg() {
 
 # install consul agent
 install_consul() {
+	
 	# stop consul
 	pkill -9 consul >/dev/null 2>&1
+
+	# remove data dir
+        rm -rf /usr/local/consul/*
 
 	# check consul dir
 	if [ ! -d /etc/consul.d ]; then
