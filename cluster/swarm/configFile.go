@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/astaxie/beego/config"
@@ -15,13 +14,6 @@ import (
 func (u unit) Path() string {
 	if u.parent == nil {
 		return "/"
-	}
-
-	if strings.HasPrefix(u.parent.Path, "/DBAAS") {
-		parts := strings.SplitN(u.parent.Path, "/", 3)
-		if len(parts) == 3 {
-			return parts[2]
-		}
 	}
 
 	return u.parent.Path

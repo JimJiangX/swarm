@@ -40,13 +40,38 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	num, err := database.CountNodeByCluster(cl.ID)
+	nodes, err := database.ListNodeByCluster(cl.ID)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	resp := structs.ClusterInfoResponse{
+	list := make([]structs.NodeInspect, len(nodes))
+	for i, node := range nodes {
+		status := swarm.ParseNodeStatus(node.Status)
+
+		if node.EngineID != "" {
+			eng, err := gd.GetEngine(node.EngineID)
+			if err == nil && eng != nil {
+				status = eng.Status()
+			}
+		}
+
+		list[i] = structs.NodeInspect{
+			ID:           node.ID,
+			Name:         node.Name,
+			ClusterID:    node.ClusterID,
+			Addr:         node.Addr,
+			EngineID:     node.EngineID,
+			Room:         node.Room,
+			Seat:         node.Seat,
+			MaxContainer: node.MaxContainer,
+			Status:       status,
+			RegisterAt:   node.RegisterAt.String(),
+		}
+	}
+
+	resp := structs.PerClusterInfoResponse{
 		ID:          cl.ID,
 		Name:        cl.Name,
 		Type:        cl.Type,
@@ -55,8 +80,8 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		Datacenter:  cl.Datacenter,
 		Enabled:     cl.Enabled,
 		MaxNode:     cl.MaxNode,
-		NodeNum:     num,
 		UsageLimit:  cl.UsageLimit,
+		Nodes:       list,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -107,7 +132,7 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /clusters/{name:.*}/nodes
-func getNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func getNodesResourceByCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 	_ = name
 
@@ -119,7 +144,7 @@ func getNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /clusters/{name}/nodes/{node:.*}
-func getNodesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func getNodeResourceByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	cluster := mux.Vars(r)["name"]
 	node := mux.Vars(r)["node"]
 	_, _ = cluster, node
@@ -295,10 +320,10 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	nodes := make([]*swarm.Node, len(list))
 	response := make([]structs.PostNodeResponse, len(list))
 
-	for i := range list {
-		nodes[i] = swarm.NewNode(list[i].Address, list[i].Name, dc.ID,
-			list[i].Username, list[i].Password, list[i].HDD, list[i].SSD,
-			list[i].Port, list[i].MaxContainer)
+	for i, l := range list {
+		nodes[i] = swarm.NewNode(l.Address, l.Name, dc.ID,
+			l.Username, l.Password, l.Room, l.Seat, l.HDD, l.SSD,
+			l.Port, l.MaxContainer)
 
 		response[i] = structs.PostNodeResponse{
 			ID:     nodes[i].ID,
