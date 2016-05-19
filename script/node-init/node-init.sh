@@ -40,10 +40,7 @@ reg_to_horus_server() {
 	fi
 }
 
-
-
-reg_to_consul_for_swarm() {
-	local component_type=SwarmAgent
+create_check_script() {
 
 	mkdir -p /opt/DBaaS/scrpit/
 
@@ -57,6 +54,66 @@ else
 fi
 EOF
 	chmod +x /opt/DBaaS/scrpit/check_swarmagent.sh
+	
+	cat << EOF > /opt/DBaaS/scrpit/check_db.sh
+#!/bin/bash
+
+container_name=$1
+
+docker inspect $container_name > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+	 exit 2
+ fi
+
+ docker exec $container_name /root/check_db
+
+ exit $?
+EOF
+	chmod +x /opt/DBaaS/scrpit/check_db.sh
+
+
+	cat << EOF > /opt/DBaaS/scrpit/check_proxy.sh
+#!/bin/bash
+
+container_name=$1
+
+docker inspect $container_name > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+	 exit 2
+ fi
+
+ docker exec $container_name /root/check_proxy
+
+ exit $?
+EOF
+	chmod +x /opt/DBaaS/scrpit/check_proxy.sh
+
+	cat << EOF > /opt/DBaaS/scrpit/check_swm.sh
+#!/bin/bash
+
+container_name=$1
+output=`mktemp /tmp/XXXXX`
+
+
+docker inspect $container_name > $output 2>&1
+if [ $? -ne 0 ]; then
+	 exit 2
+ fi
+
+ ip_addr=`cat /tmp/abc| grep IPADDR | awk -F= '{print $2}' | sed 's/",//g'`
+ port=`cat /tmp/abc| grep PORT | awk -F= '{print $2}' | sed 's/",//g'`
+
+ rm -f $output
+
+ curl -X POST http;//${ip_addr}:${port}/ping > /dev/null  2>&1
+ exit $?	
+EOF
+	chmod +x /opt/DBaaS/script/check_swm.sh
+}
+
+
+reg_to_consul_for_swarm() {
+	local component_type=SwarmAgent
 
 	curl -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Check": {"Script": "/opt/DBaaS/scrpit/check_swarmagent.sh ", "Interval": "10s" }}' http://${adm_ip}:${consul_port}/v1/agent/service/register
 
@@ -511,6 +568,7 @@ EOF
 
 
 
+create_check_script
 init_hdd_vg
 init_ssd_vg
 install_consul
