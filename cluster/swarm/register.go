@@ -46,7 +46,7 @@ import (
 }
 ]
 */
-const registerURL = "v1/agent/register"
+const registerURL = "/v1/agent/register"
 
 type registerService struct {
 	Endpoint      string
