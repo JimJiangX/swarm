@@ -180,7 +180,7 @@ func (info IPInfo) String() string {
 	return fmt.Sprintf("%s/%d:%s", info.IP.String(), info.Prefix, info.Device)
 }
 
-func (gd *Gardener) listIPInfoByUnitID(id string) ([]IPInfo, error) {
+func getIPInfoByUnitID(id string) ([]IPInfo, error) {
 	ips, err := database.ListIPByUnitID(id)
 	if err != nil {
 		return nil, err

@@ -103,7 +103,7 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 		log.Errorf("Cannot Query unit ports By UnitID %s,Error:%s", u.ID, err.Error())
 	}
 
-	u.networkings, err = gd.listIPInfoByUnitID(u.ID)
+	u.networkings, err = getIPInfoByUnitID(u.ID)
 	if err != nil {
 		log.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err.Error())
 	}
@@ -113,6 +113,20 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 	}
 
 	return u, nil
+}
+
+func (u *unit) getNetworkings() ([]IPInfo, error) {
+	if len(u.networkings) > 0 {
+		return u.networkings, nil
+	}
+	networkings, err := getIPInfoByUnitID(u.ID)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err.Error())
+	}
+
+	u.networkings = networkings
+
+	return u.networkings, nil
 }
 
 func (u *unit) prepareCreateContainer() error {
@@ -345,14 +359,19 @@ func (u *unit) RegisterHealthCheck(client *consulapi.Client, context *Service) e
 	}
 
 	containerID := u.ContainerID
-	addr := ""
-	if u.container != nil {
+	if u.container != nil && containerID != u.container.ID {
 		containerID = u.container.ID
+		u.ContainerID = u.container.ID
+	}
 
-		if u.container.Engine != nil {
-			addr = u.container.Engine.IP
-		} else if u.engine != nil {
-			addr = u.engine.IP
+	addr := ""
+	ips, err := u.getNetworkings()
+	if err != nil {
+		return err
+	}
+	for i := range ips {
+		if ips[i].Type == _ContainersNetworking {
+			addr = ips[i].IP.String()
 		}
 	}
 
@@ -364,11 +383,11 @@ func (u *unit) RegisterHealthCheck(client *consulapi.Client, context *Service) e
 		Port:    check.Port,
 		Address: addr,
 		Check: &consulapi.AgentServiceCheck{
-			Script:            check.Script + u.Name,
-			DockerContainerID: containerID,
-			Shell:             check.Shell,
-			Interval:          check.Interval,
-			TTL:               check.TTL,
+			Script: check.Script + u.Name,
+			// DockerContainerID: containerID,
+			Shell:    check.Shell,
+			Interval: check.Interval,
+			TTL:      check.TTL,
 		},
 	}
 

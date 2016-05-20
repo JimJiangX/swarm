@@ -118,7 +118,7 @@ func UpdateUnitInfo(unit Unit) error {
 		return err
 	}
 
-	query := "UPDATE tb_unit SET name=:name,type:=type,image_id=:image_id,image_name=:image_name,service_id=:service_id,node_id=:node_id,container_id=:container_id,unit_config_id=:unit_config_id,network_mode=:network_mode,status=:status,check_interval:=check_interval,=:created_at WHERE id=:id"
+	query := "UPDATE tb_unit SET name=:name,type=:type,image_id=:image_id,image_name=:image_name,service_id=:service_id,node_id=:node_id,container_id=:container_id,unit_config_id=:unit_config_id,network_mode=:network_mode,status=:status,check_interval=:check_interval,=:created_at WHERE id=:id"
 
 	_, err = db.NamedExec(query, &unit)
 
