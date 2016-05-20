@@ -634,12 +634,11 @@ func (svc *Service) createUsers() error {
 
 		if u.Type == _MysqlType {
 			inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+			if inspect.ExitCode != 0 {
+				err = fmt.Errorf("%s create users cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+			}
 			if err != nil {
 				return err
-			}
-
-			if inspect.ExitCode != 0 {
-				return fmt.Errorf("%s create users cmd:%s exitCode:%d,%v", u.Name, cmd, inspect.ExitCode, inspect)
 			}
 		}
 

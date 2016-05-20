@@ -8,7 +8,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/astaxie/beego/config"
-	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/cluster"
@@ -464,12 +463,11 @@ func (u *unit) initService() error {
 	cmd := u.InitServiceCmd()
 
 	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	if inspect.ExitCode != 0 {
+		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+	}
 	if err != nil {
 		return err
-	}
-
-	if inspect.ExitCode != 0 {
-		return fmt.Errorf("%s init service cmd:%s exitCode:%d,%v", u.Name, cmd, inspect.ExitCode, inspect)
 	}
 
 	return nil
@@ -482,12 +480,11 @@ func (u *unit) startService() error {
 	cmd := u.StartServiceCmd()
 
 	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	if inspect.ExitCode != 0 {
+		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+	}
 	if err != nil {
 		return err
-	}
-
-	if inspect.ExitCode != 0 {
-		return fmt.Errorf("%s start service cmd:%s exitCode:%d,%v", u.Name, cmd, inspect.ExitCode, inspect)
 	}
 
 	return nil
@@ -500,12 +497,11 @@ func (u *unit) stopService() error {
 	cmd := u.StopServiceCmd()
 
 	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	if inspect.ExitCode != 0 {
+		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+	}
 	if err != nil {
 		return err
-	}
-
-	if inspect.ExitCode != 0 {
-		return fmt.Errorf("%s stop service cmd:%s exitCode:%d,%v", u.Name, cmd, inspect.ExitCode, inspect)
 	}
 
 	return nil
@@ -523,69 +519,14 @@ func (u *unit) backup(args ...string) error {
 	}).Debugln("start Backup job")
 
 	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	if inspect.ExitCode != 0 {
+		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+	}
 	if err != nil {
 		return err
 	}
 
-	if inspect.ExitCode != 0 {
-		return fmt.Errorf("%s backup cmd:%s exitCode:%d,%v", u.Name, cmd, inspect.ExitCode, inspect)
-	}
-
 	return nil
-}
-
-// containerExec exec cmd in containeID,It returns ContainerExecInspect.
-func containerExec(engine *cluster.Engine, containerID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
-	inspect := types.ContainerExecInspect{}
-	cl := engine.EngineAPIClient()
-	if cl == nil {
-		return inspect, errors.New("Engine APIClient is nil")
-	}
-
-	execConfig := types.ExecConfig{
-		AttachStdin:  false,
-		AttachStdout: true,
-		AttachStderr: true,
-		Tty:          false,
-		Cmd:          cmd,
-		Container:    containerID,
-		Detach:       detach,
-	}
-
-	if detach {
-		execConfig.AttachStderr = false
-		execConfig.AttachStdout = false
-	}
-
-	exec, err := cl.ContainerExecCreate(context.TODO(), execConfig)
-	if err != nil {
-		return inspect, err
-	}
-
-	log.WithFields(log.Fields{
-		"Container":  containerID,
-		"Engine":     engine.Addr,
-		"ExecID":     exec.ID,
-		"ExecConfig": execConfig,
-	}).Info("Start Exec")
-
-	err = cl.ContainerExecStart(context.TODO(), exec.ID, types.ExecStartCheck{Detach: detach})
-	if err != nil {
-		return inspect, err
-	}
-
-	inspect, err = cl.ContainerExecInspect(context.Background(), exec.ID)
-	if err != nil {
-		// If we can't connect, then the daemon probably died.
-		if err != client.ErrConnectionFailed {
-			return inspect, fmt.Errorf("Engine:%s %s,%s", engine.Name, engine.Addr, err)
-		}
-		log.Errorf("Container %s Exec:%v,Error:%s", containerID, execConfig, err.Error())
-
-		return inspect, err
-	}
-
-	return inspect, nil
 }
 
 var pluginPort = 3333
