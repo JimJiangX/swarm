@@ -355,10 +355,18 @@ func (gd *Gardener) rebuildService(NameOrID string) (*Service, error) {
 		return nil, err
 	}
 
-	// TODO:rebuild units
-
 	svc := NewService(service, len(units))
 	svc.Lock()
+
+	for i := range units {
+		// rebuild units
+		u, err := gd.rebuildUnit(units[i])
+		if err != nil {
+			return nil, err
+		}
+
+		svc.units = append(svc.units, &u)
+	}
 	svc.backup = backup
 	svc.base = base
 	svc.authConfig = authConfig
@@ -625,11 +633,16 @@ func (svc *Service) createUsers() error {
 		u := svc.units[i]
 
 		if u.Type == _MysqlType {
-			err := containerExec(u.engine, u.ContainerID, cmd, false)
+			inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
 			if err != nil {
+				return err
+			}
 
+			if inspect.ExitCode != 0 {
+				return fmt.Errorf("%s create users cmd:%s exitCode:%d,%v", u.Name, cmd, inspect.ExitCode, inspect)
 			}
 		}
+
 	}
 
 	svc.getUnitByType(_UnitRole_SwitchManager)

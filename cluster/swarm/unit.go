@@ -8,6 +8,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/astaxie/beego/config"
+	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/cluster"
@@ -61,6 +62,58 @@ func (u *unit) factory() error {
 	u.ContainerCmd = cmder
 
 	return nil
+}
+
+func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
+	u := unit{
+		Unit: table,
+	}
+	c := gd.Container(table.ContainerID)
+	if c == nil {
+		c = gd.Container(table.Name)
+	}
+	if c != nil {
+		u.container = c
+		u.engine = c.Engine
+		u.config = c.Config
+	}
+
+	if u.engine == nil && u.NodeID != "" {
+		node, err := gd.GetNode(u.NodeID)
+		if err != nil {
+			log.Errorf("Not Found Node %s,Error:%s", u.NodeID, err.Error())
+		} else if node != nil && node.engine != nil {
+			u.engine = node.engine
+		}
+	}
+
+	if u.ConfigID != "" {
+		config, err := database.GetUnitConfigByID(u.ConfigID)
+		if err == nil {
+			u.parent = config
+		} else {
+			log.Errorf("Cannot Query unit Parent Config By ConfigID %s,Error:%s", u.ConfigID, err.Error())
+		}
+
+	}
+
+	ports, err := database.GetPortsByUnit(u.ID)
+	if err == nil {
+		u.ports = ports
+	} else {
+		log.Errorf("Cannot Query unit ports By UnitID %s,Error:%s", u.ID, err.Error())
+	}
+
+	u.networkings, err = gd.listIPInfoByUnitID(u.ID)
+	if err != nil {
+		log.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err.Error())
+	}
+
+	if err := u.factory(); err != nil {
+		return u, err
+	}
+
+	return u, nil
 }
 
 func (u *unit) prepareCreateContainer() error {
@@ -410,7 +463,16 @@ func (u *unit) initService() error {
 	}
 	cmd := u.InitServiceCmd()
 
-	return containerExec(u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	if err != nil {
+		return err
+	}
+
+	if inspect.ExitCode != 0 {
+		return fmt.Errorf("%s init service cmd:%s exitCode:%d,%v", u.Name, cmd, inspect.ExitCode, inspect)
+	}
+
+	return nil
 }
 
 func (u *unit) startService() error {
@@ -419,7 +481,16 @@ func (u *unit) startService() error {
 	}
 	cmd := u.StartServiceCmd()
 
-	return containerExec(u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	if err != nil {
+		return err
+	}
+
+	if inspect.ExitCode != 0 {
+		return fmt.Errorf("%s start service cmd:%s exitCode:%d,%v", u.Name, cmd, inspect.ExitCode, inspect)
+	}
+
+	return nil
 }
 
 func (u *unit) stopService() error {
@@ -428,7 +499,16 @@ func (u *unit) stopService() error {
 	}
 	cmd := u.StopServiceCmd()
 
-	return containerExec(u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	if err != nil {
+		return err
+	}
+
+	if inspect.ExitCode != 0 {
+		return fmt.Errorf("%s stop service cmd:%s exitCode:%d,%v", u.Name, cmd, inspect.ExitCode, inspect)
+	}
+
+	return nil
 }
 
 func (u *unit) backup(args ...string) error {
@@ -442,14 +522,24 @@ func (u *unit) backup(args ...string) error {
 		"Cmd":  cmd,
 	}).Debugln("start Backup job")
 
-	return containerExec(u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	if err != nil {
+		return err
+	}
+
+	if inspect.ExitCode != 0 {
+		return fmt.Errorf("%s backup cmd:%s exitCode:%d,%v", u.Name, cmd, inspect.ExitCode, inspect)
+	}
+
+	return nil
 }
 
-// containerExec
-func containerExec(engine *cluster.Engine, containerID string, cmd []string, detach bool) error {
-	client := engine.EngineAPIClient()
-	if client == nil {
-		return errors.New("Engine APIClient is nil")
+// containerExec exec cmd in containeID,It returns ContainerExecInspect.
+func containerExec(engine *cluster.Engine, containerID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
+	inspect := types.ContainerExecInspect{}
+	cl := engine.EngineAPIClient()
+	if cl == nil {
+		return inspect, errors.New("Engine APIClient is nil")
 	}
 
 	execConfig := types.ExecConfig{
@@ -467,19 +557,35 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 		execConfig.AttachStdout = false
 	}
 
-	resp, err := client.ContainerExecCreate(context.TODO(), execConfig)
+	exec, err := cl.ContainerExecCreate(context.TODO(), execConfig)
 	if err != nil {
-		return err
+		return inspect, err
 	}
 
 	log.WithFields(log.Fields{
-		"Container": containerID,
-		"Engine":    engine.Addr,
-		"Cmd":       cmd,
-		"ExecID":    resp.ID,
+		"Container":  containerID,
+		"Engine":     engine.Addr,
+		"ExecID":     exec.ID,
+		"ExecConfig": execConfig,
 	}).Info("Start Exec")
 
-	return client.ContainerExecStart(context.TODO(), resp.ID, types.ExecStartCheck{Detach: detach})
+	err = cl.ContainerExecStart(context.TODO(), exec.ID, types.ExecStartCheck{Detach: detach})
+	if err != nil {
+		return inspect, err
+	}
+
+	inspect, err = cl.ContainerExecInspect(context.Background(), exec.ID)
+	if err != nil {
+		// If we can't connect, then the daemon probably died.
+		if err != client.ErrConnectionFailed {
+			return inspect, fmt.Errorf("Engine:%s %s,%s", engine.Name, engine.Addr, err)
+		}
+		log.Errorf("Container %s Exec:%v,Error:%s", containerID, execConfig, err.Error())
+
+		return inspect, err
+	}
+
+	return inspect, nil
 }
 
 var pluginPort = 3333
@@ -514,4 +620,18 @@ func (u *unit) registerToHorus(addr, user, password string, agentPort int) error
 	}
 
 	return registerToHorus(addr, obj)
+}
+
+func (gd *Gardener) unitContainer(u *unit) *cluster.Container {
+	ID := u.ContainerID
+	if u.container != nil && u.ContainerID != u.container.ID {
+		ID = u.container.ID
+		u.ContainerID = u.container.ID
+	}
+	c := gd.Container(ID)
+	if c != nil {
+		u.container = c
+	}
+
+	return u.container
 }

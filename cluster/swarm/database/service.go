@@ -132,13 +132,13 @@ func TxDelUnit(tx *sqlx.Tx, id string) error {
 	return err
 }
 
-func ListUnitByServiceID(ID string) ([]*Unit, error) {
+func ListUnitByServiceID(ID string) ([]Unit, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
-	units := make([]*Unit, 0, 5)
+	units := make([]Unit, 0, 5)
 	err = db.Select(&units, "SELECT * FROM tb_unit WHERE service_id=?", ID)
 	if err != nil {
 		return nil, err

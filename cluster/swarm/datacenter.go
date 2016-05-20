@@ -378,6 +378,7 @@ func (gd *Gardener) SetNodeStatus(name string, state int) error {
 			return err
 		}
 	}
+	//TODO: check status
 
 	return node.UpdateStatus(state)
 }

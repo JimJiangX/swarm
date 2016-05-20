@@ -180,6 +180,26 @@ func (info IPInfo) String() string {
 	return fmt.Sprintf("%s/%d:%s", info.IP.String(), info.Prefix, info.Device)
 }
 
+func (gd *Gardener) listIPInfoByUnitID(id string) ([]IPInfo, error) {
+	ips, err := database.ListIPByUnitID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]IPInfo, len(ips))
+
+	for i := range ips {
+		net, _, err := database.GetNetworkingByID(ips[i].NetworkingID)
+		if err != nil {
+			return nil, err
+		}
+
+		out[i] = NewIPinfo(net, ips[i])
+	}
+
+	return out, nil
+}
+
 func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit, name, Type string) ([]IPInfo, error) {
 	networkings := make([]IPInfo, 0, 2)
 

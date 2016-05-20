@@ -152,6 +152,9 @@ func GetUnitConfigByID(id string) (*UnitConfig, error) {
 	}
 
 	err = config.decode()
+	if err != nil {
+		return nil, err
+	}
 
 	return config, err
 }
