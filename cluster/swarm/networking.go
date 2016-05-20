@@ -285,14 +285,14 @@ func (gd *Gardener) RemoveNetworking(ID string) error {
 		return err
 	}
 
-	gd.RLock()
+	gd.Lock()
 	for i := range gd.networkings {
 		if gd.networkings[i].ID == ID {
 			gd.networkings = append(gd.networkings[:i], gd.networkings[i+1:]...)
 			break
 		}
 	}
-	gd.RUnlock()
+	gd.Unlock()
 
 	return nil
 }

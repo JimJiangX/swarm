@@ -378,25 +378,29 @@ func (gd *Gardener) SetNodeStatus(name string, state int) error {
 			return err
 		}
 	}
-	//TODO: check status
+
+	if node.Status != _StatusNodeDisable ||
+		node.Status != _StatusNodeEnable ||
+		node.Status != _StatusNodeDeregisted {
+
+		return fmt.Errorf("Node %s Status:%d,Forbidding Changing Status to %d", name, node.Status, state)
+	}
 
 	return node.UpdateStatus(state)
 }
 
 func (dc *Datacenter) RemoveNode(NameOrID string) error {
-	index := 0
 	dc.Lock()
 	for i := range dc.nodes {
 		if dc.nodes[i].ID == NameOrID ||
 			dc.nodes[i].Name == NameOrID ||
 			dc.nodes[i].EngineID == NameOrID {
 
-			index = i
+			dc.nodes = append(dc.nodes[:i], dc.nodes[i+1:]...)
 			break
 		}
 	}
 
-	dc.nodes = append(dc.nodes[:index], dc.nodes[index+1:]...)
 	dc.Unlock()
 
 	return nil

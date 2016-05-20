@@ -83,7 +83,7 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 			return inspect, err
 		}
 		if status != 0 {
-			err = fmt.Errorf("Container %s Engine %s:%s ExecID %s,ExitCode:%d,ExecInspect:%v", containerID, engine.Name, engine.Addr, exec.ID, inspect)
+			err = fmt.Errorf("Container %s Engine %s:%s ExecID %s,ExitCode:%d,ExecInspect:%v", containerID, engine.Name, engine.Addr, exec.ID, status, inspect)
 		}
 	}
 

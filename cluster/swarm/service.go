@@ -885,8 +885,20 @@ func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int)
 	}
 
 	err = gd.RemoveCronJob(svc.backup.ID)
+	if err != nil {
+		return err
+	}
 
-	return err
+	gd.Lock()
+	for i := range gd.services {
+		if gd.services[i].ID == name || gd.services[i].Name == name {
+			gd.datacenters = append(gd.datacenters[:i], gd.datacenters[i+1:]...)
+			break
+		}
+	}
+	gd.Unlock()
+
+	return nil
 
 }
 
