@@ -372,7 +372,7 @@ func (u *unit) RegisterHealthCheck(client *consulapi.Client, context *Service) e
 		},
 	}
 
-	log.Debugf("%v", service)
+	log.Debugf("AgentServiceRegistration:%v %v", service, service.Check)
 
 	return agent.ServiceRegister(&service)
 }
