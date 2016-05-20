@@ -99,7 +99,7 @@ func initialize(name string) (configParser, ContainerCmd, error) {
 
 		cmder = &proxyCmd{}
 
-	case _SwitchManagerType, "SM":
+	case _SwitchManagerType, "swm":
 		parser = &switchManagerConfig{}
 
 		cmder = &switchManagerCmd{}

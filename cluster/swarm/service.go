@@ -145,9 +145,13 @@ func ValidService(req structs.PostServiceRequest) []string {
 	}
 
 	for _, module := range req.Modules {
-		if !isStringExist(module.Type, supportedServiceTypes) {
-			warnings = append(warnings, fmt.Sprintf("Unsupported '%s' Yet", module.Type))
+		if _, _, err := initialize(module.Type); err != nil {
+			warnings = append(warnings, err.Error())
 		}
+
+		//if !isStringExist(module.Type, supportedServiceTypes) {
+		//	warnings = append(warnings, fmt.Sprintf("Unsupported '%s' Yet", module.Type))
+		//}
 		if module.Config.Image == "" {
 			image, err := database.QueryImage(module.Name, module.Version)
 			if err != nil {
