@@ -114,7 +114,9 @@ func initialize(name string) (configParser, ContainerCmd, error) {
 
 type mysqlCmd struct{}
 
-func (mysqlCmd) StartContainerCmd() []string { return nil }
+func (mysqlCmd) StartContainerCmd() []string {
+	return []string{"/bin/bash"}
+}
 func (mysqlCmd) InitServiceCmd() []string {
 	return []string{"/root/upsql-init.sh"}
 }
@@ -256,7 +258,9 @@ func (c mysqlConfig) HealthCheck() (healthCheck, error) {
 
 type proxyCmd struct{}
 
-func (proxyCmd) StartContainerCmd() []string { return nil }
+func (proxyCmd) StartContainerCmd() []string {
+	return []string{"/bin/bash"}
+}
 func (proxyCmd) InitServiceCmd() []string {
 	return []string{"/root/upproxy.service", "start"}
 }
@@ -380,7 +384,7 @@ func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interf
 			}
 		}
 		if len(swm.networkings) == 1 {
-			m["switchManagerAddress"] = fmt.Sprintf("%s:%d", swm.networkings[0].IP.String(), swmProxyPort)
+			m["adm-cli::adm-svr-address"] = fmt.Sprintf("%s:%d", swm.networkings[0].IP.String(), swmProxyPort)
 		}
 	}
 
@@ -389,10 +393,18 @@ func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interf
 
 type switchManagerCmd struct{}
 
-func (switchManagerCmd) StartContainerCmd() []string                { return nil }
-func (switchManagerCmd) InitServiceCmd() []string                   { return nil }
-func (switchManagerCmd) StartServiceCmd() []string                  { return nil }
-func (switchManagerCmd) StopServiceCmd() []string                   { return nil }
+func (switchManagerCmd) StartContainerCmd() []string {
+	return []string{"/bin/bash"}
+}
+func (switchManagerCmd) InitServiceCmd() []string {
+	return []string{"/root/swm.service", "start"}
+}
+func (switchManagerCmd) StartServiceCmd() []string {
+	return []string{"/root/swm.service", "start"}
+}
+func (switchManagerCmd) StopServiceCmd() []string {
+	return []string{"/root/swm.service", "stop"}
+}
 func (switchManagerCmd) RecoverCmd(file string) []string            { return nil }
 func (switchManagerCmd) BackupCmd(args ...string) []string          { return nil }
 func (switchManagerCmd) CleanBackupFileCmd(args ...string) []string { return nil }
