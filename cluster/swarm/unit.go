@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/astaxie/beego/config"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
@@ -80,7 +80,7 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 	if u.engine == nil && u.NodeID != "" {
 		node, err := gd.GetNode(u.NodeID)
 		if err != nil {
-			log.Errorf("Not Found Node %s,Error:%s", u.NodeID, err.Error())
+			logrus.Errorf("Not Found Node %s,Error:%s", u.NodeID, err.Error())
 		} else if node != nil && node.engine != nil {
 			u.engine = node.engine
 		}
@@ -91,7 +91,7 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 		if err == nil {
 			u.parent = config
 		} else {
-			log.Errorf("Cannot Query unit Parent Config By ConfigID %s,Error:%s", u.ConfigID, err.Error())
+			logrus.Errorf("Cannot Query unit Parent Config By ConfigID %s,Error:%s", u.ConfigID, err.Error())
 		}
 
 	}
@@ -100,12 +100,12 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 	if err == nil {
 		u.ports = ports
 	} else {
-		log.Errorf("Cannot Query unit ports By UnitID %s,Error:%s", u.ID, err.Error())
+		logrus.Errorf("Cannot Query unit ports By UnitID %s,Error:%s", u.ID, err.Error())
 	}
 
 	u.networkings, err = getIPInfoByUnitID(u.ID)
 	if err != nil {
-		log.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err.Error())
+		logrus.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err.Error())
 	}
 
 	if err := u.factory(); err != nil {
@@ -391,7 +391,7 @@ func (u *unit) RegisterHealthCheck(client *consulapi.Client, context *Service) e
 		},
 	}
 
-	log.Debugf("AgentServiceRegistration:%v %v", service, service.Check)
+	logrus.Debugf("AgentServiceRegistration:%v %v", service, service.Check)
 
 	return agent.ServiceRegister(&service)
 }
@@ -467,9 +467,9 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 		Mode:      "0666",
 	}
 
-	log.Debugf("default:%s\ndefaultUser:%v\nconfig:%s", u.parent.Content, data, config.Data)
+	logrus.Debugf("default:%s\ndefaultUser:%v\nconfig:%s", u.parent.Content, data, config.Data)
 
-	log.Debugf("VolumeFileConfig:%+v", config)
+	logrus.Debugf("VolumeFileConfig:%+v", config)
 	err = sdk.FileCopyToVolome(u.getPluginAddr(pluginPort), config)
 
 	return err
@@ -532,7 +532,7 @@ func (u *unit) backup(args ...string) error {
 	}
 	cmd := u.BackupCmd(args...)
 
-	log.WithFields(log.Fields{
+	logrus.WithFields(logrus.Fields{
 		"Name": u.Name,
 		"Cmd":  cmd,
 	}).Debugln("start Backup job")

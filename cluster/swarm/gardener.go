@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	kvdiscovery "github.com/docker/docker/pkg/discovery/kv"
 	"github.com/docker/engine-api/types"
 	kvstore "github.com/docker/libkv/store"
@@ -22,7 +22,7 @@ import (
 var leaderElectionPath = "docker/swarm/leader"
 
 func init() {
-	log.SetFormatter(&log.TextFormatter{
+	logrus.SetFormatter(&logrus.TextFormatter{
 		ForceColors:   true,
 		FullTimestamp: true,
 	})
@@ -56,10 +56,10 @@ type Gardener struct {
 
 // NewGardener is exported
 func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, error) {
-	log.WithFields(log.Fields{"name": "swarm"}).Debug("Initializing Gardener")
+	logrus.WithFields(logrus.Fields{"name": "swarm"}).Debug("Initializing Gardener")
 	cluster, ok := cli.(*Cluster)
 	if !ok {
-		log.Fatal("cluster.Cluster Prototype is not *swarm.Cluster")
+		logrus.Fatal("cluster.Cluster Prototype is not *swarm.Cluster")
 	}
 
 	gd := &Gardener{
@@ -79,13 +79,13 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	if ok {
 		gd.kvClient = kvDiscovery.Store()
 	} else {
-		log.Warning("kvDiscovery is only supported with consul, etcd and zookeeper discovery.")
+		logrus.Warning("kvDiscovery is only supported with consul, etcd and zookeeper discovery.")
 	}
 
 	// query consul config from DB
 	sysConfig, err := database.GetSystemConfig()
 	if err != nil {
-		log.Fatalf("DB Error,%s", err)
+		logrus.Fatalf("DB Error,%s", err)
 	}
 	if sysConfig.Retry > 0 && cluster.createRetry == 0 {
 		cluster.createRetry = sysConfig.Retry
@@ -129,7 +129,7 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	if gd.kvClient == nil {
 		gd.kvClient, err = consul.New(endpoints, options)
 		if err != nil {
-			log.Fatalf("Initializing kvStore,consul Config Error,%s", err)
+			logrus.Fatalf("Initializing kvStore,consul Config Error,%s", err)
 		}
 	}
 

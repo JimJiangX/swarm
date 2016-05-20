@@ -147,6 +147,17 @@ func ListUnitByServiceID(ID string) ([]Unit, error) {
 	return units, nil
 }
 
+func CountUnitByNode(id string) (int, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return 0, err
+	}
+	count := 0
+	err = db.Get(&count, "SELECT COUNT(*) from tb_unit WHERE node_id=?", id)
+
+	return count, err
+}
+
 func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {
 	tx, err := GetTX()
 	if err != nil {

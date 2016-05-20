@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -23,7 +23,7 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 	if !allocated && len(need) > 0 {
 		ports, err := database.SelectAvailablePorts(len(need))
 		if err != nil {
-			log.Errorf("Alloc Ports Error:%s", err.Error())
+			logrus.Errorf("Alloc Ports Error:%s", err.Error())
 
 			return nil, err
 		}
@@ -40,7 +40,7 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 	networkings, err := gd.getNetworkingSetting(engine, preAlloc.unit.ID, Type, "")
 	preAlloc.networkings = append(preAlloc.networkings, networkings...)
 	if err != nil {
-		log.Errorf("Alloc Networking Error:%s", err.Error())
+		logrus.Errorf("Alloc Networking Error:%s", err.Error())
 
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 
 	ncpu, err := parseCpuset(&config)
 	if err != nil {
-		log.Error(err)
+		logrus.Error(err)
 
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 	// Alloc CPU
 	cpuset, err := allocCPUs(engine, ncpu)
 	if err != nil {
-		log.Errorf("Alloc CPU %d Error:%s", ncpu, err.Error())
+		logrus.Errorf("Alloc CPU %d Error:%s", ncpu, err.Error())
 
 		return nil, err
 	}
@@ -224,12 +224,12 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 
 	node, err := dc.GetNode(engine.ID)
 	if node == nil || err != nil {
-		log.Warnf("Not Found Node By Engine ID %s Error:%v", engine.ID, err)
+		logrus.Warnf("Not Found Node By Engine ID %s Error:%v", engine.ID, err)
 
 		node, err = gd.GetNode(engine.ID)
 		if err != nil {
 			err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err.Error())
-			log.Error(err)
+			logrus.Error(err)
 
 			return err
 		}

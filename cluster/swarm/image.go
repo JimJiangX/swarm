@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -179,13 +179,13 @@ func (gd *Gardener) GetImageName(id, name, version string) (string, string, erro
 	}
 
 	if err != nil {
-		log.Errorf("Not Found Image %s:%s,Error:%s", name, version, err.Error())
+		logrus.Errorf("Not Found Image %s:%s,Error:%s", name, version, err.Error())
 
 		return "", "", err
 	}
 
 	if !image.Enabled {
-		log.Errorf("Image %s is Disabled", image.ImageID)
+		logrus.Errorf("Image %s is Disabled", image.ImageID)
 		return "", "", err
 	}
 

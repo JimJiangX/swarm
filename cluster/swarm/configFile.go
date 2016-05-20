@@ -256,10 +256,16 @@ func (c mysqlConfig) HealthCheck() (healthCheck, error) {
 
 type proxyCmd struct{}
 
-func (proxyCmd) StartContainerCmd() []string                { return nil }
-func (proxyCmd) InitServiceCmd() []string                   { return nil }
-func (proxyCmd) StartServiceCmd() []string                  { return nil }
-func (proxyCmd) StopServiceCmd() []string                   { return nil }
+func (proxyCmd) StartContainerCmd() []string { return nil }
+func (proxyCmd) InitServiceCmd() []string {
+	return []string{"/root/upproxy.service", "start"}
+}
+func (proxyCmd) StartServiceCmd() []string {
+	return []string{"/root/upproxy.service", "start"}
+}
+func (proxyCmd) StopServiceCmd() []string {
+	return []string{"/root/upproxy.service", "stop"}
+}
 func (proxyCmd) RecoverCmd(file string) []string            { return nil }
 func (proxyCmd) BackupCmd(args ...string) []string          { return nil }
 func (proxyCmd) CleanBackupFileCmd(args ...string) []string { return nil }
@@ -364,19 +370,18 @@ func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interf
 
 	m["upsql-proxy::event-threads-count"] = u.config.HostConfig.CpusetCpus
 
-	//TODO:proxy connect to switch manager (ip:port) settings
 	swm, err := svc.getUnitByType("_SwitchManagerType")
-	if err != nil {
-	}
-	swmProxyPort := 0
-	for i := range swm.ports {
-		if swm.ports[i].Name == "ProxyPort" {
-			swmProxyPort = swm.ports[i].Port
-			break
+	if err == nil && swm != nil {
+		swmProxyPort := 0
+		for i := range swm.ports {
+			if swm.ports[i].Name == "ProxyPort" {
+				swmProxyPort = swm.ports[i].Port
+				break
+			}
 		}
-	}
-	if len(swm.networkings) == 1 {
-		m["switchManagerAddress"] = fmt.Sprintf("%s:%d", swm.networkings[0].IP.String(), swmProxyPort)
+		if len(swm.networkings) == 1 {
+			m["switchManagerAddress"] = fmt.Sprintf("%s:%d", swm.networkings[0].IP.String(), swmProxyPort)
+		}
 	}
 
 	return m, nil
