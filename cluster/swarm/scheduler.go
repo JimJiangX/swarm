@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
@@ -37,18 +37,18 @@ func (gd *Gardener) serviceScheduler() (err error) {
 		}
 
 		debug.PrintStack()
-		log.Fatal("Service Scheduler Exit,%s", err)
+		logrus.Fatal("Service Scheduler Exit,%s", err)
 	}()
 
 	for {
 		svc := <-gd.serviceSchedulerCh
 
-		entry := log.WithFields(log.Fields{
+		entry := logrus.WithFields(logrus.Fields{
 			"Name":   svc.Name,
 			"Action": "Alloc",
 		})
 
-		log.Debugf("[mg] start serviceScheduler:%s", svc.Name)
+		logrus.Debugf("[mg] start serviceScheduler:%s", svc.Name)
 		if !atomic.CompareAndSwapInt64(&svc.Status, _StatusServcieBuilding, _StatusServiceAlloction) {
 			entry.Error("Status Conflict")
 			continue
@@ -78,13 +78,13 @@ func (gd *Gardener) serviceScheduler() (err error) {
 		svc.Unlock()
 
 		entry.Info("Alloction Success")
-		log.Debugf("[MG]Alloction OK and put  to the ServiceToExecute: %v", resourceAlloc)
+		logrus.Debugf("[MG]Alloction OK and put  to the ServiceToExecute: %v", resourceAlloc)
 
 		gd.ServiceToExecute(svc)
 		continue
 
 	failure:
-		log.Debugf("[MG]serviceScheduler Failed: %v", resourceAlloc)
+		logrus.Debugf("[MG]serviceScheduler Failed: %v", resourceAlloc)
 		err = gd.Recycle(resourceAlloc)
 		if err != nil {
 			entry.Error("Recycle Failed", err)
@@ -109,7 +109,7 @@ func (gd *Gardener) serviceScheduler() (err error) {
 }
 
 func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module *structs.Module) ([]*preAllocResource, error) {
-	entry := log.WithFields(log.Fields{
+	entry := logrus.WithFields(logrus.Fields{
 		"svcName": svc.Name,
 		"Module":  module.Type,
 	})
@@ -139,10 +139,10 @@ func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module *struct
 	config.Config.Labels[_ImageIDInRegistryLabelKey] = imageID_Label
 
 	filters := gd.listShortIdleStore(module.Stores, module.Type, num)
-	log.Debugf("[MG] %s,%s,%s:first filters of storage:%s", module.Stores, module.Type, num, filters)
+	logrus.Debugf("[MG] %s,%s,%s:first filters of storage:%s", module.Stores, module.Type, num, filters)
 
 	list := gd.listCandidateNodes(module.Nodes, module.Type, filters...)
-	log.Debugf("[MG] now listCandidateNodes result:%v ", list)
+	logrus.Debugf("[MG] now listCandidateNodes result:%v ", list)
 
 	entry.Debugf("filters num:%d,candidate nodes num:%d", len(filters), len(list))
 
@@ -159,7 +159,7 @@ func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module *struct
 func (gd *Gardener) BuildPendingContainers(list []*node.Node, svc *Service, Type string, num int, stores []structs.DiskStorage,
 	config *cluster.ContainerConfig, withImageAffinity bool) ([]*preAllocResource, error) {
 
-	entry := log.WithFields(log.Fields{"Name": svc.Name, "Module": Type})
+	entry := logrus.WithFields(logrus.Fields{"Name": svc.Name, "Module": Type})
 
 	gd.scheduler.Lock()
 	defer gd.scheduler.Unlock()
@@ -213,7 +213,7 @@ func (gd *Gardener) BuildPendingContainers(list []*node.Node, svc *Service, Type
 func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type string, stores []structs.DiskStorage,
 	templConfig *cluster.ContainerConfig) ([]*preAllocResource, error) {
 
-	entry := log.WithFields(log.Fields{"Name": svc.Name, "Module": Type})
+	entry := logrus.WithFields(logrus.Fields{"Name": svc.Name, "Module": Type})
 
 	imageID, ok := templConfig.Labels[_ImageIDInRegistryLabelKey]
 	if !ok || imageID == "" {
@@ -253,6 +253,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type str
 				ImageID:       image.ID,
 				ImageName:     image.Name + "_" + image.Version,
 				NodeID:        engine.ID,
+				ConfigID:      parentConfig.ID,
 				Status:        0,
 				CheckInterval: 0,
 				NetworkMode:   templConfig.HostConfig.NetworkMode.NetworkName(),
@@ -287,7 +288,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stor
 	preAlloc := newPreAllocResource()
 	preAlloc.unit = unit
 
-	entry := log.WithFields(log.Fields{
+	entry := logrus.WithFields(logrus.Fields{
 		"Engine": engine.Name,
 		"Unit":   unit.Name,
 	})
@@ -371,11 +372,11 @@ func (gd *Gardener) Scheduler(list []*node.Node, config *cluster.ContainerConfig
 	}
 
 	if err != nil {
-		log.Debugf("[**MG**] gd.scheduler.SelectNodesForContainer fail(swarm level) :", err)
+		logrus.Debugf("[**MG**] gd.scheduler.SelectNodesForContainer fail(swarm level) :", err)
 		return nil, err
 	}
 
-	log.Debugf("[**MG**] gd.scheduler.SelectNodesForContainer ok(swarm level) ndoes:%v", nodes)
+	logrus.Debugf("[**MG**] gd.scheduler.SelectNodesForContainer ok(swarm level) ndoes:%v", nodes)
 	return gd.SelectNodeByCluster(nodes, num, true)
 }
 
@@ -390,7 +391,7 @@ func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...
 
 		list, err := database.ListNodeByClusterType(dcTag, true)
 		if err != nil {
-			log.Errorf("Search in Database Error: %s", err.Error())
+			logrus.Errorf("Search in Database Error: %s", err.Error())
 
 			return nil
 		}
@@ -411,7 +412,7 @@ func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...
 
 	} else {
 
-		log.Debugf("Candidates From Assigned %s", names)
+		logrus.Debugf("Candidates From Assigned %s", names)
 
 		for _, name := range names {
 
@@ -422,7 +423,7 @@ func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...
 		}
 	}
 
-	log.Debugf("Candidate Nodes:%d", len(out))
+	logrus.Debugf("Candidate Nodes:%d", len(out))
 
 	return out
 }
@@ -430,13 +431,13 @@ func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...
 func (gd *Gardener) checkNode(id string, filters []string) *node.Node {
 	e, ok := gd.engines[id]
 	if !ok {
-		log.Debugf("Not Found Engine %s", id)
+		logrus.Debugf("Not Found Engine %s", id)
 
 		return nil
 	}
 
 	if isStringExist(id, filters) {
-		log.Debug(id, "IN", filters)
+		logrus.Debug(id, "IN", filters)
 		return nil
 	}
 
@@ -448,7 +449,7 @@ func (gd *Gardener) checkNode(id string, filters []string) *node.Node {
 
 			err := node.AddContainer(pc.ToContainer())
 			if err != nil {
-				log.Error(e.ID, err.Error())
+				logrus.Error(e.ID, err.Error())
 
 				return nil
 			}
@@ -480,7 +481,7 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 
 	all, err := database.GetAllNodes()
 	if err != nil {
-		log.Warnf("[**MG**]SelectNodeByCluster::database.GetAllNodes fail", err)
+		logrus.Warnf("[**MG**]SelectNodeByCluster::database.GetAllNodes fail", err)
 		all = nil
 	}
 
@@ -492,21 +493,21 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		if len(all) == 0 {
 			dc, err = gd.DatacenterByNode(nodes[i].ID)
 			if err != nil {
-				log.Warnf("[**MG**]SelectNodeByCluster::DatacenterByNode fail", err)
+				logrus.Warnf("[**MG**]SelectNodeByCluster::DatacenterByNode fail", err)
 			}
-			log.Debugf("[**MG**]len(all) == 0 the dc :%v", dc)
+			logrus.Debugf("[**MG**]len(all) == 0 the dc :%v", dc)
 		} else {
 			for index := range all {
-				log.Debugf("the nodes[i].ID == all[index].ID :%s:%s  ", nodes[i].ID, all[index].EngineID)
+				logrus.Debugf("the nodes[i].ID == all[index].ID :%s:%s  ", nodes[i].ID, all[index].EngineID)
 				if nodes[i].ID == all[index].EngineID {
 					dc, err = gd.Datacenter(all[index].ClusterID)
 					if err != nil {
-						log.Warnf("[**MG**] SelectNodeByCluster::database.Datacenter fail", err)
+						logrus.Warnf("[**MG**] SelectNodeByCluster::database.Datacenter fail", err)
 					}
 					break
 				}
 			}
-			log.Debugf("[**MG**]len(all) != 0 the dc :%v", dc)
+			logrus.Debugf("[**MG**]len(all) != 0 the dc :%v", dc)
 		}
 		if err != nil || dc == nil {
 			continue
@@ -519,7 +520,7 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		}
 	}
 
-	log.Warnf("[**MG**]highAvailable:%v, num :%d ,m length:%d", highAvailable, num, len(m))
+	logrus.Warnf("[**MG**]highAvailable:%v, num :%d ,m length:%d", highAvailable, num, len(m))
 
 	//	if highAvailable && len(m) < 2 {
 	//		return nil, errors.New("Not Match")
@@ -572,6 +573,6 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		}
 	}
 
-	log.Debugf("[**MG**]SelectNodeByCluster end with Not Match ")
+	logrus.Debugf("[**MG**]SelectNodeByCluster end with Not Match ")
 	return nil, errors.New("Not Match")
 }

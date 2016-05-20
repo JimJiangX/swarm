@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
@@ -136,7 +136,7 @@ func (gd *Gardener) ReplaceServiceBackupStrategy(NameOrID string, req structs.Ba
 		bs := NewBackupJob(gd.host, service)
 		err := gd.RegisterBackupStrategy(bs)
 		if err != nil {
-			log.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
+			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
 		}
 	}
 
@@ -164,7 +164,7 @@ func (gd *Gardener) EnableServiceBackupStrategy(strategy string) error {
 		bs := NewBackupJob(gd.host, svc)
 		err = gd.RegisterBackupStrategy(bs)
 		if err != nil {
-			log.Error("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
+			logrus.Error("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
 		}
 
 		return err

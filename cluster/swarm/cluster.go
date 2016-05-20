@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/discovery"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/engine-api/client"
@@ -71,7 +71,7 @@ type Cluster struct {
 
 // NewCluster is exported
 func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery discovery.Backend, options cluster.DriverOpts, engineOptions *cluster.EngineOpts) (cluster.Cluster, error) {
-	log.WithFields(log.Fields{"name": "swarm"}).Debug("Initializing cluster")
+	logrus.WithFields(logrus.Fields{"name": "swarm"}).Debug("Initializing cluster")
 
 	cluster := &Cluster{
 		eventHandlers:     cluster.NewEventHandlers(),
@@ -88,9 +88,9 @@ func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery
 
 	if val, ok := options.Float("swarm.overcommit", ""); ok {
 		if val <= float64(-1) {
-			log.Fatalf("swarm.overcommit should be larger than -1, %f is invalid", val)
+			logrus.Fatalf("swarm.overcommit should be larger than -1, %f is invalid", val)
 		} else if val < float64(0) {
-			log.Warn("-1 < swarm.overcommit < 0 will make swarm take less resource than docker engine offers")
+			logrus.Warn("-1 < swarm.overcommit < 0 will make swarm take less resource than docker engine offers")
 			cluster.overcommitRatio = val
 		} else {
 			cluster.overcommitRatio = val
@@ -99,7 +99,7 @@ func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery
 
 	if val, ok := options.Int("swarm.createretry", ""); ok {
 		if val < 0 {
-			log.Fatalf("swarm.createretry can not be negative, %d is invalid", val)
+			logrus.Fatalf("swarm.createretry can not be negative, %d is invalid", val)
 		}
 		cluster.createRetry = val
 	}
@@ -161,7 +161,7 @@ func (c *Cluster) CreateContainer(config *cluster.ContainerConfig, name string, 
 		}
 
 		for ; retries < c.createRetry && err != nil; retries++ {
-			log.WithFields(log.Fields{"Name": "Swarm"}).Warnf("Failed to create container: %s, retrying", err)
+			logrus.WithFields(logrus.Fields{"Name": "Swarm"}).Warnf("Failed to create container: %s, retrying", err)
 			container, err = c.createContainer(config, name, false, authConfig)
 		}
 	}
@@ -272,7 +272,7 @@ func (c *Cluster) addEngine(addr string) bool {
 
 	engine := cluster.NewEngine(addr, c.overcommitRatio, c.engineOpts)
 	if err := engine.RegisterEventHandler(c); err != nil {
-		log.Error(err)
+		logrus.Error(err)
 	}
 	// Add it to pending engine map, indexed by address. This will prevent
 	// duplicates from entering
@@ -293,7 +293,7 @@ func (c *Cluster) validatePendingEngine(engine *cluster.Engine) bool {
 	// Attempt a connection to the engine. Since this is slow, don't get a hold
 	// of the lock yet.
 	if err := engine.Connect(c.TLSConfig); err != nil {
-		log.WithFields(log.Fields{"Addr": engine.Addr}).Debugf("Failed to validate pending node: %s", err)
+		logrus.WithFields(logrus.Fields{"Addr": engine.Addr}).Debugf("Failed to validate pending node: %s", err)
 		return false
 	}
 
@@ -309,7 +309,7 @@ func (c *Cluster) validatePendingEngine(engine *cluster.Engine) bool {
 	// Make sure the engine ID is unique.
 	if old, exists := c.engines[engine.ID]; exists {
 		if old.Addr != engine.Addr {
-			log.Errorf("ID duplicated. %s shared by %s and %s", engine.ID, old.Addr, engine.Addr)
+			logrus.Errorf("ID duplicated. %s shared by %s and %s", engine.ID, old.Addr, engine.Addr)
 			// Keep this engine in pendingEngines table and show its error.
 			// If it's ID duplication from VM clone, user see this message and can fix it.
 			// If the engine is rebooted and get new IP from DHCP, previous address will be removed
@@ -317,7 +317,7 @@ func (c *Cluster) validatePendingEngine(engine *cluster.Engine) bool {
 			// In both cases, retry may fix the problem.
 			engine.HandleIDConflict(old.Addr)
 		} else {
-			log.Debugf("node %q (name: %q) with address %q is already registered", engine.ID, engine.Name, engine.Addr)
+			logrus.Debugf("node %q (name: %q) with address %q is already registered", engine.ID, engine.Name, engine.Addr)
 			engine.Disconnect()
 			// Remove it from pendingEngines table
 			delete(c.pendingEngines, engine.Addr)
@@ -331,7 +331,7 @@ func (c *Cluster) validatePendingEngine(engine *cluster.Engine) bool {
 	engine.ValidationComplete()
 	c.engines[engine.ID] = engine
 
-	log.Infof("Registered Engine %s at %s", engine.Name, engine.Addr)
+	logrus.Infof("Registered Engine %s at %s", engine.Name, engine.Addr)
 	return true
 }
 
@@ -350,7 +350,7 @@ func (c *Cluster) removeEngine(addr string) bool {
 	} else {
 		delete(c.engines, engine.ID)
 	}
-	log.Infof("Removed Engine %s", engine.Name)
+	logrus.Infof("Removed Engine %s", engine.Name)
 	return true
 }
 
@@ -375,7 +375,7 @@ func (c *Cluster) monitorDiscovery(ch <-chan discovery.Entries, errCh <-chan err
 				c.addEngine(entry.String())
 			}
 		case err := <-errCh:
-			log.Errorf("Discovery error: %v", err)
+			logrus.Errorf("Discovery error: %v", err)
 		}
 	}
 }
@@ -524,7 +524,7 @@ func (c *Cluster) CreateVolume(request *types.VolumeCreateRequest) (*cluster.Vol
 		c.RLock()
 		ch := make(chan struct{}, 10)
 
-		log.WithField("Volume", request.Name).Warnf("Create Volume on all Engines")
+		logrus.WithField("Volume", request.Name).Warnf("Create Volume on all Engines")
 
 		for _, e := range c.engines {
 			wg.Add(1)
@@ -671,7 +671,7 @@ func (c *Cluster) Load(imageReader io.Reader, callback func(where, status string
 	// copy image-reader to multi-writer
 	_, err := io.Copy(multiWriter, imageReader)
 	if err != nil {
-		log.Error(err)
+		logrus.Error(err)
 	}
 
 	// close pipe writers
@@ -729,7 +729,7 @@ func (c *Cluster) Import(source string, repository string, tag string, imageRead
 	// copy image-reader to muti-writer
 	_, err := io.Copy(multiWriter, imageReader)
 	if err != nil {
-		log.Error(err)
+		logrus.Error(err)
 	}
 
 	// close pipe writers

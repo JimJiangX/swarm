@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
@@ -56,7 +56,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 
 	des, err := json.Marshal(req)
 	if err != nil {
-		log.Errorf("JSON Marshal Error:%s", err.Error())
+		logrus.Errorf("JSON Marshal Error:%s", err.Error())
 		return nil, err
 	}
 
@@ -81,7 +81,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 
 	_, nodeNum, err := getServiceArch(req.Architecture)
 	if err != nil {
-		log.Error("Parse Service.Architecture", err)
+		logrus.Error("Parse Service.Architecture", err)
 		return nil, err
 	}
 
@@ -102,7 +102,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 	if err := service.SaveToDB(); err != nil {
 		atomic.StoreInt64(&svc.Status, _StatusServiceInit)
 
-		log.Error("Service Save To DB", err)
+		logrus.Error("Service Save To DB", err)
 		return nil, err
 	}
 
@@ -116,7 +116,7 @@ func newBackupStrategy(service string, strategy *structs.BackupStrategy) (*datab
 
 	valid, err := utils.ParseStringToTime(strategy.Valid)
 	if err != nil {
-		log.Error("Parse Request.BackupStrategy.Valid to time.Time", err)
+		logrus.Error("Parse Request.BackupStrategy.Valid to time.Time", err)
 		return nil, err
 	}
 
@@ -145,9 +145,13 @@ func ValidService(req structs.PostServiceRequest) []string {
 	}
 
 	for _, module := range req.Modules {
-		if !isStringExist(module.Type, supportedServiceTypes) {
-			warnings = append(warnings, fmt.Sprintf("Unsupported '%s' Yet", module.Type))
+		if _, _, err := initialize(module.Type); err != nil {
+			warnings = append(warnings, err.Error())
 		}
+
+		//if !isStringExist(module.Type, supportedServiceTypes) {
+		//	warnings = append(warnings, fmt.Sprintf("Unsupported '%s' Yet", module.Type))
+		//}
 		if module.Config.Image == "" {
 			image, err := database.QueryImage(module.Name, module.Version)
 			if err != nil {
@@ -202,7 +206,7 @@ func ValidService(req structs.PostServiceRequest) []string {
 		return nil
 	}
 
-	log.Warnf("Service Valid warning:", warnings)
+	logrus.Warnf("Service Valid warning:", warnings)
 
 	return warnings
 }
@@ -328,7 +332,7 @@ func (gd *Gardener) rebuildService(NameOrID string) (*Service, error) {
 	if len(service.Description) > 0 {
 		err := json.Unmarshal([]byte(service.Description), base)
 		if err != nil {
-			log.Warnf("JSON Unmarshal Service.Description Error:%s,Description:%s", err.Error(), service.Description)
+			logrus.Warnf("JSON Unmarshal Service.Description Error:%s,Description:%s", err.Error(), service.Description)
 		}
 	}
 
@@ -351,14 +355,22 @@ func (gd *Gardener) rebuildService(NameOrID string) (*Service, error) {
 	}
 	authConfig, err := gd.RegistryAuthConfig()
 	if err != nil {
-		log.Errorf("Registry Auth Config Error:%s", err.Error())
+		logrus.Errorf("Registry Auth Config Error:%s", err.Error())
 		return nil, err
 	}
 
-	// TODO:rebuild units
-
 	svc := NewService(service, len(units))
 	svc.Lock()
+
+	for i := range units {
+		// rebuild units
+		u, err := gd.rebuildUnit(units[i])
+		if err != nil {
+			return nil, err
+		}
+
+		svc.units = append(svc.units, &u)
+	}
 	svc.backup = backup
 	svc.base = base
 	svc.authConfig = authConfig
@@ -375,13 +387,13 @@ func (gd *Gardener) rebuildService(NameOrID string) (*Service, error) {
 func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, err error) {
 	authConfig, err := gd.RegistryAuthConfig()
 	if err != nil {
-		log.Error("get Registry Auth Config", err)
+		logrus.Error("get Registry Auth Config", err)
 		return nil, err
 	}
 
 	svc, err := BuildService(req, authConfig)
 	if err != nil {
-		log.Error("Build Service", err)
+		logrus.Error("Build Service", err)
 		return nil, err
 	}
 
@@ -394,11 +406,11 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, e
 			if err != nil {
 			}
 			svc.Delete(client, true, true, 0)
-			log.WithField("Service Name", svc.Name).Errorf("Servcie Cleaned,%v", err)
+			logrus.WithField("Service Name", svc.Name).Errorf("Servcie Cleaned,%v", err)
 		}
 	}()
 
-	log.WithFields(log.Fields{
+	logrus.WithFields(logrus.Fields{
 		"Servcie Name": svc.Name,
 		"Service ID":   svc.ID,
 		"Task ID":      svc.task.ID,
@@ -407,7 +419,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, e
 	svc.failureRetry = gd.createRetry
 
 	if err := gd.AddService(svc); err != nil {
-		log.WithField("Service Name", svc.Name).Errorf("Service Add to Gardener Error:%s", err.Error())
+		logrus.WithField("Service Name", svc.Name).Errorf("Service Add to Gardener Error:%s", err.Error())
 
 		return svc, err
 	}
@@ -416,15 +428,15 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, e
 		bs := NewBackupJob(gd.host, svc)
 		err := gd.RegisterBackupStrategy(bs)
 		if err != nil {
-			log.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
+			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
 		}
 	}
 
 	if err := gd.ServiceToScheduler(svc); err != nil {
-		log.Error("Service Add To Scheduler", err)
+		logrus.Error("Service Add To Scheduler", err)
 		return svc, err
 	}
-	log.Debugf("[mg] ServiceToScheduler ok:%v", svc)
+	logrus.Debugf("[mg] ServiceToScheduler ok:%v", svc)
 
 	return svc, nil
 }
@@ -625,11 +637,15 @@ func (svc *Service) createUsers() error {
 		u := svc.units[i]
 
 		if u.Type == _MysqlType {
-			err := containerExec(u.engine, u.ContainerID, cmd, false)
+			inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+			if inspect.ExitCode != 0 {
+				err = fmt.Errorf("%s create users cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+			}
 			if err != nil {
-
+				return err
 			}
 		}
+
 	}
 
 	svc.getUnitByType(_UnitRole_SwitchManager)
@@ -873,8 +889,20 @@ func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int)
 	}
 
 	err = gd.RemoveCronJob(svc.backup.ID)
+	if err != nil {
+		return err
+	}
 
-	return err
+	gd.Lock()
+	for i := range gd.services {
+		if gd.services[i].ID == name || gd.services[i].Name == name {
+			gd.datacenters = append(gd.datacenters[:i], gd.datacenters[i+1:]...)
+			break
+		}
+	}
+	gd.Unlock()
+
+	return nil
 
 }
 

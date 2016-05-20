@@ -118,7 +118,7 @@ func UpdateUnitInfo(unit Unit) error {
 		return err
 	}
 
-	query := "UPDATE tb_unit SET name=:name,type:=type,image_id=:image_id,image_name=:image_name,service_id=:service_id,node_id=:node_id,container_id=:container_id,unit_config_id=:unit_config_id,network_mode=:network_mode,status=:status,check_interval:=check_interval,=:created_at WHERE id=:id"
+	query := "UPDATE tb_unit SET name=:name,type=:type,image_id=:image_id,image_name=:image_name,service_id=:service_id,node_id=:node_id,container_id=:container_id,unit_config_id=:unit_config_id,network_mode=:network_mode,status=:status,check_interval=:check_interval,=:created_at WHERE id=:id"
 
 	_, err = db.NamedExec(query, &unit)
 
@@ -132,19 +132,30 @@ func TxDelUnit(tx *sqlx.Tx, id string) error {
 	return err
 }
 
-func ListUnitByServiceID(ID string) ([]*Unit, error) {
+func ListUnitByServiceID(ID string) ([]Unit, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
-	units := make([]*Unit, 0, 5)
+	units := make([]Unit, 0, 5)
 	err = db.Select(&units, "SELECT * FROM tb_unit WHERE service_id=?", ID)
 	if err != nil {
 		return nil, err
 	}
 
 	return units, nil
+}
+
+func CountUnitByNode(id string) (int, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return 0, err
+	}
+	count := 0
+	err = db.Get(&count, "SELECT COUNT(*) from tb_unit WHERE node_id=?", id)
+
+	return count, err
 }
 
 func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {

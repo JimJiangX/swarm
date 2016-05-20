@@ -213,6 +213,21 @@ func GetNetworkingByID(id string) (Networking, int, error) {
 	return net, prefix, nil
 }
 
+func ListIPByUnitID(unit string) ([]IP, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]IP, 0, 2)
+	err = db.Select(&out, "SELECT * from tb_ip WHERE unit_id=?", unit)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 func ListNetworkingByType(typ string) ([]Networking, error) {
 	db, err := GetDB(true)
 	if err != nil {

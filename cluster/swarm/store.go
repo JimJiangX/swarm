@@ -105,5 +105,19 @@ func (gd *Gardener) RemoveStore(storage string) error {
 		return fmt.Errorf("Store %s is using,cannot be removed", storage)
 	}
 
-	return database.DeleteStorageByID(storage)
+	err = database.DeleteStorageByID(storage)
+	if err != nil {
+		return err
+	}
+
+	gd.Lock()
+	for i := range gd.stores {
+		if gd.stores[i].ID() == storage {
+			gd.stores = append(gd.stores[:i], gd.stores[i+1:]...)
+			break
+		}
+	}
+	gd.Unlock()
+
+	return nil
 }

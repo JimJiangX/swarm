@@ -54,8 +54,8 @@ type registerService struct {
 	User          string `json:",omitempty"`
 	Password      string `json:"pwd,omitempty"`
 	Type          string
-	CollectorIP   string
-	CollectorPort int
+	CollectorIP   string `json:"colletorip"`   // spell error
+	CollectorPort int    `json:"colletorport"` // spell error
 	MetricTags    string
 	Network       []string `json:",omitempty"`
 	Status        string

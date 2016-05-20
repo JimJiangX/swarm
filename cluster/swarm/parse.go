@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/engine-api/types/network"
 	"github.com/docker/go-connections/nat"
@@ -117,7 +117,7 @@ func validateContainerConfig(config *cluster.ContainerConfig) error {
 func parseCpuset(config *cluster.ContainerConfig) (int, error) {
 	ncpu, err := strconv.Atoi(config.HostConfig.CpusetCpus)
 	if err != nil {
-		log.WithFields(log.Fields{
+		logrus.WithFields(logrus.Fields{
 			"container ID": config.SwarmID(),
 			"CpusetCpus":   config.HostConfig.CpusetCpus,
 		}).Errorf("Parse CpusetCpus %s Error:%s", config.HostConfig.CpusetCpus, err)

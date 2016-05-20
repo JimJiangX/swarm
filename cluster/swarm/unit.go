@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/astaxie/beego/config"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
@@ -61,6 +61,72 @@ func (u *unit) factory() error {
 	u.ContainerCmd = cmder
 
 	return nil
+}
+
+func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
+	u := unit{
+		Unit: table,
+	}
+	c := gd.Container(table.ContainerID)
+	if c == nil {
+		c = gd.Container(table.Name)
+	}
+	if c != nil {
+		u.container = c
+		u.engine = c.Engine
+		u.config = c.Config
+	}
+
+	if u.engine == nil && u.NodeID != "" {
+		node, err := gd.GetNode(u.NodeID)
+		if err != nil {
+			logrus.Errorf("Not Found Node %s,Error:%s", u.NodeID, err.Error())
+		} else if node != nil && node.engine != nil {
+			u.engine = node.engine
+		}
+	}
+
+	if u.ConfigID != "" {
+		config, err := database.GetUnitConfigByID(u.ConfigID)
+		if err == nil {
+			u.parent = config
+		} else {
+			logrus.Errorf("Cannot Query unit Parent Config By ConfigID %s,Error:%s", u.ConfigID, err.Error())
+		}
+
+	}
+
+	ports, err := database.GetPortsByUnit(u.ID)
+	if err == nil {
+		u.ports = ports
+	} else {
+		logrus.Errorf("Cannot Query unit ports By UnitID %s,Error:%s", u.ID, err.Error())
+	}
+
+	u.networkings, err = getIPInfoByUnitID(u.ID)
+	if err != nil {
+		logrus.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err.Error())
+	}
+
+	if err := u.factory(); err != nil {
+		return u, err
+	}
+
+	return u, nil
+}
+
+func (u *unit) getNetworkings() ([]IPInfo, error) {
+	if len(u.networkings) > 0 {
+		return u.networkings, nil
+	}
+	networkings, err := getIPInfoByUnitID(u.ID)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err.Error())
+	}
+
+	u.networkings = networkings
+
+	return u.networkings, nil
 }
 
 func (u *unit) prepareCreateContainer() error {
@@ -293,14 +359,19 @@ func (u *unit) RegisterHealthCheck(client *consulapi.Client, context *Service) e
 	}
 
 	containerID := u.ContainerID
-	addr := ""
-	if u.container != nil {
+	if u.container != nil && containerID != u.container.ID {
 		containerID = u.container.ID
+		u.ContainerID = u.container.ID
+	}
 
-		if u.container.Engine != nil {
-			addr = u.container.Engine.IP
-		} else if u.engine != nil {
-			addr = u.engine.IP
+	addr := ""
+	ips, err := u.getNetworkings()
+	if err != nil {
+		return err
+	}
+	for i := range ips {
+		if ips[i].Type == _ContainersNetworking {
+			addr = ips[i].IP.String()
 		}
 	}
 
@@ -312,13 +383,15 @@ func (u *unit) RegisterHealthCheck(client *consulapi.Client, context *Service) e
 		Port:    check.Port,
 		Address: addr,
 		Check: &consulapi.AgentServiceCheck{
-			Script:            check.Script + u.Name,
-			DockerContainerID: containerID,
-			Shell:             check.Shell,
-			Interval:          check.Interval,
-			TTL:               check.TTL,
+			Script: check.Script + u.Name,
+			// DockerContainerID: containerID,
+			Shell:    check.Shell,
+			Interval: check.Interval,
+			TTL:      check.TTL,
 		},
 	}
+
+	logrus.Debugf("AgentServiceRegistration:%v %v", service, service.Check)
 
 	return agent.ServiceRegister(&service)
 }
@@ -394,9 +467,9 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 		Mode:      "0666",
 	}
 
-	log.Debugf("default:%s\ndefaultUser:%v\nconfig:%s", u.parent.Content, data, config.Data)
+	logrus.Debugf("default:%s\ndefaultUser:%v\nconfig:%s", u.parent.Content, data, config.Data)
 
-	log.Debugf("VolumeFileConfig:%+v", config)
+	logrus.Debugf("VolumeFileConfig:%+v", config)
 	err = sdk.FileCopyToVolome(u.getPluginAddr(pluginPort), config)
 
 	return err
@@ -408,7 +481,15 @@ func (u *unit) initService() error {
 	}
 	cmd := u.InitServiceCmd()
 
-	return containerExec(u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	if inspect.ExitCode != 0 {
+		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+	}
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (u *unit) startService() error {
@@ -417,7 +498,15 @@ func (u *unit) startService() error {
 	}
 	cmd := u.StartServiceCmd()
 
-	return containerExec(u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	if inspect.ExitCode != 0 {
+		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+	}
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (u *unit) stopService() error {
@@ -426,7 +515,15 @@ func (u *unit) stopService() error {
 	}
 	cmd := u.StopServiceCmd()
 
-	return containerExec(u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	if inspect.ExitCode != 0 {
+		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+	}
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (u *unit) backup(args ...string) error {
@@ -435,42 +532,20 @@ func (u *unit) backup(args ...string) error {
 	}
 	cmd := u.BackupCmd(args...)
 
-	log.WithFields(log.Fields{
+	logrus.WithFields(logrus.Fields{
 		"Name": u.Name,
 		"Cmd":  cmd,
 	}).Debugln("start Backup job")
 
-	return containerExec(u.engine, u.ContainerID, cmd, false)
-}
-
-// containerExec
-func containerExec(engine *cluster.Engine, containerID string, cmd []string, detach bool) error {
-	client := engine.EngineAPIClient()
-	if client == nil {
-		return errors.New("Engine APIClient is nil")
+	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	if inspect.ExitCode != 0 {
+		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
-
-	execConfig := types.ExecConfig{
-		AttachStdin:  false,
-		AttachStdout: true,
-		AttachStderr: true,
-		Tty:          false,
-		Cmd:          cmd,
-		Container:    containerID,
-		Detach:       detach,
-	}
-
-	if detach {
-		execConfig.AttachStderr = false
-		execConfig.AttachStdout = false
-	}
-
-	resp, err := client.ContainerExecCreate(context.TODO(), execConfig)
 	if err != nil {
 		return err
 	}
 
-	return client.ContainerExecStart(context.TODO(), resp.ID, types.ExecStartCheck{Detach: detach})
+	return nil
 }
 
 var pluginPort = 3333
@@ -505,4 +580,18 @@ func (u *unit) registerToHorus(addr, user, password string, agentPort int) error
 	}
 
 	return registerToHorus(addr, obj)
+}
+
+func (gd *Gardener) unitContainer(u *unit) *cluster.Container {
+	ID := u.ContainerID
+	if u.container != nil && u.ContainerID != u.container.ID {
+		ID = u.container.ID
+		u.ContainerID = u.container.ID
+	}
+	c := gd.Container(ID)
+	if c != nil {
+		u.container = c
+	}
+
+	return u.container
 }

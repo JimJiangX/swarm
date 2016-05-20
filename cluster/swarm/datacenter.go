@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -127,7 +127,7 @@ func (node *Node) Task() *database.Task {
 func (node *Node) Insert() error {
 	err := database.TxInsertNodeAndTask(*node.Node, *node.task)
 	if err != nil {
-		log.Errorf("Node:%s Insert INTO DB Error,%s", node.Name, err)
+		logrus.Errorf("Node:%s Insert INTO DB Error,%s", node.Name, err)
 	}
 
 	return err
@@ -175,7 +175,7 @@ func (gd *Gardener) AddDatacenter(cl database.Cluster, storage store.Store) erro
 		cl.ID = gd.generateUniqueID()
 	}
 
-	log.WithFields(log.Fields{
+	logrus.WithFields(logrus.Fields{
 		"dc": cl.Name,
 	}).Info("Datacenter Initializing")
 
@@ -190,7 +190,7 @@ func (gd *Gardener) AddDatacenter(cl database.Cluster, storage store.Store) erro
 	gd.datacenters = append(gd.datacenters, dc)
 	gd.Unlock()
 
-	log.Infof("Datacenter Initialized:%s", dc.Name)
+	logrus.Infof("Datacenter Initialized:%s", dc.Name)
 
 	return nil
 }
@@ -379,23 +379,28 @@ func (gd *Gardener) SetNodeStatus(name string, state int) error {
 		}
 	}
 
+	if node.Status != _StatusNodeDisable ||
+		node.Status != _StatusNodeEnable ||
+		node.Status != _StatusNodeDeregisted {
+
+		return fmt.Errorf("Node %s Status:%d,Forbidding Changing Status to %d", name, node.Status, state)
+	}
+
 	return node.UpdateStatus(state)
 }
 
 func (dc *Datacenter) RemoveNode(NameOrID string) error {
-	index := 0
 	dc.Lock()
 	for i := range dc.nodes {
 		if dc.nodes[i].ID == NameOrID ||
 			dc.nodes[i].Name == NameOrID ||
 			dc.nodes[i].EngineID == NameOrID {
 
-			index = i
+			dc.nodes = append(dc.nodes[:i], dc.nodes[i+1:]...)
 			break
 		}
 	}
 
-	dc.nodes = append(dc.nodes[:index], dc.nodes[index+1:]...)
 	dc.Unlock()
 
 	return nil
@@ -443,7 +448,7 @@ func (gd *Gardener) RemoveNode(NameOrID string) error {
 
 	eng, err := gd.GetEngine(node.EngineID)
 	if err != nil {
-		log.Warn(err)
+		logrus.Warn(err)
 	}
 	if eng != nil {
 		eng.RefreshContainers(false)
@@ -460,6 +465,11 @@ func (gd *Gardener) RemoveNode(NameOrID string) error {
 			}
 		}
 		gd.scheduler.Unlock()
+	}
+
+	count, err := database.CountUnitByNode(node.ID)
+	if err != nil || count != 0 {
+		return fmt.Errorf("Count Unit ByNode,%v,count:%d", err, count)
 	}
 
 	dc, err := gd.DatacenterByNode(NameOrID)
@@ -730,13 +740,13 @@ func (dc *Datacenter) DeregisterNode(IDOrName string) error {
 
 	dc.Unlock()
 
-	log.Infof("Deregister Node:%s of Cluster:%s", IDOrName, dc.Name)
+	logrus.Infof("Deregister Node:%s of Cluster:%s", IDOrName, dc.Name)
 
 	return err
 }
 
 func (dc *Datacenter) DistributeNode(node *Node, kvpath string) error {
-	entry := log.WithFields(log.Fields{
+	entry := logrus.WithFields(logrus.Fields{
 		"name":    node.Name,
 		"addr":    node.Addr,
 		"cluster": dc.Cluster.ID,
@@ -850,7 +860,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 		r := database.TxUpdateNodeStatus(node.Node, node.task,
 			nodeState, taskState, msg)
 		if r != nil || err != nil {
-			log.Error(err, r)
+			logrus.Error(err, r)
 		}
 	}()
 
@@ -868,12 +878,12 @@ func (node *Node) Distribute(kvpath string) (err error) {
 
 	config, script, err := node.modifyProfile(kvpath)
 	if err != nil {
-		log.Error(err)
+		logrus.Error(err)
 
 		return err
 	}
 
-	entry := log.WithFields(log.Fields{
+	entry := logrus.WithFields(logrus.Fields{
 		"host":        node.Addr,
 		"user":        node.user,
 		"source":      config.SourceDir,
@@ -888,7 +898,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	}
 	err = c.Connect(nil)
 	if err != nil {
-		log.Errorf("communicator connection error: %s", err)
+		logrus.Errorf("communicator connection error: %s", err)
 
 		return err
 	}
@@ -904,7 +914,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 		}
 	}
 
-	log.Info("Registry.CA_CRT", len(config.Registry.CA_CRT), config.Registry.CA_CRT)
+	logrus.Info("Registry.CA_CRT", len(config.Registry.CA_CRT), config.Registry.CA_CRT)
 
 	caBuf := bytes.NewBufferString(config.Registry.CA_CRT)
 	_, _, filename := config.DestPath()
@@ -929,7 +939,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	err = c.Start(&cmd)
 	cmd.Wait()
 	if err != nil || cmd.ExitStatus != 0 {
-		log.Errorf("Executing Remote Command: %s,Exited:%d,%v,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
+		logrus.Errorf("Executing Remote Command: %s,Exited:%d,%v,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
 
 		cp := remote.Cmd{
 			Command: script,
@@ -940,7 +950,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 		cp.Wait()
 		if err != nil || cp.ExitStatus != 0 {
 			err = fmt.Errorf("Twice Executing Remote Command: %s,Exited:%d,%v,Output:%s", cp.Command, cp.ExitStatus, err, buffer.String())
-			log.Error(err)
+			logrus.Error(err)
 
 			return err
 		}
@@ -965,13 +975,13 @@ func SSHCommand(host, user, password, shell string, output io.Writer) error {
 
 	c, err := ssh.New(r)
 	if err != nil {
-		log.Errorf("error creating communicator: %s", err)
+		logrus.Errorf("error creating communicator: %s", err)
 
 		return err
 	}
 	err = c.Connect(nil)
 	if err != nil {
-		log.Errorf("communicator connection error: %s", err)
+		logrus.Errorf("communicator connection error: %s", err)
 
 		return err
 	}
@@ -986,7 +996,7 @@ func SSHCommand(host, user, password, shell string, output io.Writer) error {
 	err = c.Start(&cmd)
 	cmd.Wait()
 	if err != nil || cmd.ExitStatus != 0 {
-		log.Errorf("Executing Remote Command: %s,Exited:%d,%v", cmd.Command, cmd.ExitStatus, err)
+		logrus.Errorf("Executing Remote Command: %s,Exited:%d,%v", cmd.Command, cmd.ExitStatus, err)
 
 		cp := remote.Cmd{
 			Command: shell,
@@ -997,13 +1007,13 @@ func SSHCommand(host, user, password, shell string, output io.Writer) error {
 		cp.Wait()
 		if err != nil || cp.ExitStatus != 0 {
 			err = fmt.Errorf("Twice Executing Remote Command: %s,Exited:%d,%v", cp.Command, cp.ExitStatus, err)
-			log.Error(err)
+			logrus.Error(err)
 
 			return err
 		}
 	}
 
-	log.Info("SSH Remote Execute Successed!")
+	logrus.Info("SSH Remote Execute Successed!")
 
 	return nil
 }
@@ -1011,12 +1021,12 @@ func SSHCommand(host, user, password, shell string, output io.Writer) error {
 func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Duration) error {
 	dc, err := gd.Datacenter(name)
 	if err != nil || dc == nil {
-		log.Error("%s Not Found,%s", name, err)
+		logrus.Error("%s Not Found,%s", name, err)
 		return err
 	}
 	config, err := database.GetSystemConfig()
 	if err != nil {
-		log.Error(err.Error())
+		logrus.Error(err.Error())
 		return err
 	}
 
@@ -1024,14 +1034,14 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 
 	for {
 		if time.Now().After(deadline) {
-			log.Warnf("RegisterNodes Timeout:%d", timeout)
+			logrus.Warnf("RegisterNodes Timeout:%d", timeout)
 			return fmt.Errorf("Timeout %ds", timeout)
 		}
 		time.Sleep(10 * time.Second)
 
 		for i := range nodes {
 			if nodes[i].Status != _StatusNodeInstalled {
-				log.Warnf("Node Status Not Match,%s:%d!=%d", nodes[i].Addr, nodes[i].Status, _StatusNodeInstalled)
+				logrus.Warnf("Node Status Not Match,%s:%d!=%d", nodes[i].Addr, nodes[i].Status, _StatusNodeInstalled)
 				continue
 			}
 
@@ -1045,14 +1055,14 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 					status = "engine is nil"
 				}
 
-				log.Warnf("Engine %s Status:%s", addr, status)
+				logrus.Warnf("Engine %s Status:%s", addr, status)
 				continue
 			}
 			nodes[i].engine = eng
 
 			err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, _StatusNodeEnable, _StatusTaskDone, eng.ID, "")
 			if err != nil {
-				log.Error(eng.Addr, "TxUpdateNodeRegister", err)
+				logrus.Error(eng.Addr, "TxUpdateNodeRegister", err)
 				continue
 			}
 
@@ -1086,7 +1096,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 
 				err := dc.storage.AddHost(nodes[i].ID, list...)
 				if err != nil {
-					log.WithFields(log.Fields{
+					logrus.WithFields(logrus.Fields{
 						"Host":    nodes[i].Name,
 						"Addr":    addr,
 						"Storage": dc.storage.ID(),
@@ -1099,7 +1109,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 
 			err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, _StatusNodeEnable, _StatusTaskDone, eng.ID, "")
 			if err != nil {
-				log.WithField("Host", nodes[i].Name).Errorf("Node Registed,Error:%s", err)
+				logrus.WithField("Host", nodes[i].Name).Errorf("Node Registed,Error:%s", err)
 
 				continue
 			}

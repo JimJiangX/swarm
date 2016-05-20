@@ -76,6 +76,7 @@ func (u *unit) SaveConfigToDisk(content []byte) error {
 	}
 
 	u.Unit.ConfigID = config.ID
+	u.parent = &config
 
 	err := database.SaveUnitConfigToDisk(&u.Unit, config)
 
@@ -98,7 +99,7 @@ func initialize(name string) (configParser, ContainerCmd, error) {
 
 		cmder = &proxyCmd{}
 
-	case _SwitchManagerType, "SM":
+	case _SwitchManagerType, "swm":
 		parser = &switchManagerConfig{}
 
 		cmder = &switchManagerCmd{}
@@ -113,7 +114,9 @@ func initialize(name string) (configParser, ContainerCmd, error) {
 
 type mysqlCmd struct{}
 
-func (mysqlCmd) StartContainerCmd() []string { return nil }
+func (mysqlCmd) StartContainerCmd() []string {
+	return []string{"/bin/bash"}
+}
 func (mysqlCmd) InitServiceCmd() []string {
 	return []string{"/root/upsql-init.sh"}
 }
@@ -248,17 +251,25 @@ func (c mysqlConfig) HealthCheck() (healthCheck, error) {
 		Script:   "/opt/DBaaS/scrpit/check_db.sh ",
 		Shell:    "",
 		Interval: "10s",
-		TTL:      "15s",
-		Tags:     nil,
+		//TTL:      "15s",
+		Tags: nil,
 	}, nil
 }
 
 type proxyCmd struct{}
 
-func (proxyCmd) StartContainerCmd() []string                { return nil }
-func (proxyCmd) InitServiceCmd() []string                   { return nil }
-func (proxyCmd) StartServiceCmd() []string                  { return nil }
-func (proxyCmd) StopServiceCmd() []string                   { return nil }
+func (proxyCmd) StartContainerCmd() []string {
+	return []string{"/bin/bash"}
+}
+func (proxyCmd) InitServiceCmd() []string {
+	return []string{"/root/upproxy.service", "start"}
+}
+func (proxyCmd) StartServiceCmd() []string {
+	return []string{"/root/upproxy.service", "start"}
+}
+func (proxyCmd) StopServiceCmd() []string {
+	return []string{"/root/upproxy.service", "stop"}
+}
 func (proxyCmd) RecoverCmd(file string) []string            { return nil }
 func (proxyCmd) BackupCmd(args ...string) []string          { return nil }
 func (proxyCmd) CleanBackupFileCmd(args ...string) []string { return nil }
@@ -363,19 +374,18 @@ func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interf
 
 	m["upsql-proxy::event-threads-count"] = u.config.HostConfig.CpusetCpus
 
-	//TODO:proxy connect to switch manager (ip:port) settings
 	swm, err := svc.getUnitByType("_SwitchManagerType")
-	if err != nil {
-	}
-	swmProxyPort := 0
-	for i := range swm.ports {
-		if swm.ports[i].Name == "ProxyPort" {
-			swmProxyPort = swm.ports[i].Port
-			break
+	if err == nil && swm != nil {
+		swmProxyPort := 0
+		for i := range swm.ports {
+			if swm.ports[i].Name == "ProxyPort" {
+				swmProxyPort = swm.ports[i].Port
+				break
+			}
 		}
-	}
-	if len(swm.networkings) == 1 {
-		m["switchManagerAddress"] = fmt.Sprintf("%s:%d", swm.networkings[0].IP.String(), swmProxyPort)
+		if len(swm.networkings) == 1 {
+			m["adm-cli::adm-svr-address"] = fmt.Sprintf("%s:%d", swm.networkings[0].IP.String(), swmProxyPort)
+		}
 	}
 
 	return m, nil
@@ -383,10 +393,18 @@ func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interf
 
 type switchManagerCmd struct{}
 
-func (switchManagerCmd) StartContainerCmd() []string                { return nil }
-func (switchManagerCmd) InitServiceCmd() []string                   { return nil }
-func (switchManagerCmd) StartServiceCmd() []string                  { return nil }
-func (switchManagerCmd) StopServiceCmd() []string                   { return nil }
+func (switchManagerCmd) StartContainerCmd() []string {
+	return []string{"/bin/bash"}
+}
+func (switchManagerCmd) InitServiceCmd() []string {
+	return []string{"/root/swm.service", "start"}
+}
+func (switchManagerCmd) StartServiceCmd() []string {
+	return []string{"/root/swm.service", "start"}
+}
+func (switchManagerCmd) StopServiceCmd() []string {
+	return []string{"/root/swm.service", "stop"}
+}
 func (switchManagerCmd) RecoverCmd(file string) []string            { return nil }
 func (switchManagerCmd) BackupCmd(args ...string) []string          { return nil }
 func (switchManagerCmd) CleanBackupFileCmd(args ...string) []string { return nil }
