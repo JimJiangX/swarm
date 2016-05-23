@@ -106,7 +106,6 @@ func LoadImage(req structs.PostLoadImageRequest) (string, error) {
 
 	unitConfig := database.UnitConfig{
 		ID:        utils.Generate64UUID(),
-		ImageID:   imageID,
 		Path:      req.ConfigPath,
 		Version:   0,
 		ParentID:  "",
@@ -129,6 +128,7 @@ func LoadImage(req structs.PostLoadImageRequest) (string, error) {
 		TemplateConfigID: unitConfig.ID,
 		UploadAt:         time.Now(),
 	}
+	unitConfig.ImageID = image.ID
 
 	task := database.NewTask("load image", image.ID, "", nil, 0)
 

@@ -228,7 +228,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type str
 		return nil, err
 	}
 
-	parentConfig, err := database.GetUnitConfigByID(image.ImageID)
+	parentConfig, err := database.GetUnitConfigByID(image.ID)
 	if err != nil {
 		entry.Error("Not Found Template Config File,Error:%s", err.Error())
 
