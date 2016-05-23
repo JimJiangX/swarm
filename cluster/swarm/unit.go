@@ -421,7 +421,7 @@ func (u *unit) RegisterHealthCheck(client *consulapi.Client, context *Service) e
 			// DockerContainerID: containerID,
 			Shell:    check.Shell,
 			Interval: check.Interval,
-			TTL:      check.TTL,
+			// TTL:      check.TTL,
 		},
 	}
 
