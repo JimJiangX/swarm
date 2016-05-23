@@ -144,6 +144,26 @@ func (u *unit) getNetworkings() ([]IPInfo, error) {
 	return u.networkings, nil
 }
 
+func (u *unit) getNetworkingAddr(networking, portName string) (addr string, port int, err error) {
+	for i := range u.networkings {
+		if u.networkings[i].Type == networking {
+			addr = u.networkings[i].IP.String()
+
+			break
+		}
+	}
+
+	for i := range u.ports {
+		if u.ports[i].Name == "Port" {
+			port = u.ports[i].Port
+
+			return addr, port, nil
+		}
+	}
+
+	return "", 0, fmt.Errorf("Not Found Required networking:%s Port:%s", networking, portName)
+}
+
 func (u *unit) prepareCreateContainer() error {
 	for i := range u.networkings {
 		n := u.networkings[i]
@@ -579,6 +599,10 @@ func (u *unit) registerToHorus(addr, user, password string, agentPort int) error
 	if u.engine == nil {
 		return errors.New("Engine is nil")
 	}
+	node, err := database.GetNode(u.NodeID)
+	if err != nil {
+		return err
+	}
 	obj := registerService{
 		Endpoint:      u.ID,
 		CollectorName: u.Name,
@@ -587,7 +611,7 @@ func (u *unit) registerToHorus(addr, user, password string, agentPort int) error
 		Type:          u.Type,
 		CollectorIP:   u.engine.IP,
 		CollectorPort: agentPort,
-		MetricTags:    u.NodeID,
+		MetricTags:    node.ID,
 		Network:       nil,
 		Status:        "on",
 		Table:         "host",

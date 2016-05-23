@@ -16,6 +16,7 @@ import (
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
 	consulapi "github.com/hashicorp/consul/api"
+	swm_structs "github.com/yiduoyunQ/sm/sm-svr/structs"
 	"github.com/yiduoyunQ/smlib"
 )
 
@@ -656,8 +657,33 @@ func (svc *Service) refreshTopology() error {
 }
 
 func (svc *Service) initTopology() error {
-	svc.getUnitByType(_UnitRole_SwitchManager)
+	swm, err := svc.getUnitByType(_UnitRole_SwitchManager)
+	if err != nil {
+		return err
+	}
 
+	addr, port, err := swm.getNetworkingAddr(_ContainersNetworking, "Port")
+	if err != nil {
+		return err
+	}
+
+	topolony := swm_structs.MgmPost{
+		DbaasType:           "",  //  string   `json:"dbaas-type"`
+		DbRootUser:          "",  //  string   `json:"db-root-user"`
+		DbRootPassword:      "",  //  string   `json:"db-root-password"`
+		DbReplicateUser:     "",  //  string   `json:"db-replicate-user"`
+		DbReplicatePassword: "",  //  string   `json:"db-replicate-password"`
+		SwarmApiVersion:     "",  //  string   `json:"swarm-api-version,omitempty"`
+		ProxyNames:          nil, //  []string `json:"proxy-names"`
+		Users:               nil, //  []User   `json:"users"`
+		DataNode:            nil, //  map[string]DatabaseInfo `json:"data-node"`
+	}
+
+	err = smlib.InitSm(addr, port, topolony)
+	if err != nil {
+		logrus.Error("%s Init Topology Error %s", svc.Name, err)
+	}
+	// TODO:return error when the InitSm is done
 	return nil
 }
 
@@ -724,29 +750,13 @@ func (svc *Service) GetSwithManager() (*unit, error) {
 	return u, err
 }
 
-func (svc *Service) getSwithManagerAddr() (addr string, port int, err error) {
-	u, err := svc.getUnitByType(_UnitRole_SwitchManager)
+func (svc *Service) getSwithManagerAddr() (string, int, error) {
+	swm, err := svc.getUnitByType(_UnitRole_SwitchManager)
 	if err != nil {
 		return "", 0, err
 	}
 
-	for i := range u.networkings {
-		if u.networkings[i].Type == _ContainersNetworking {
-			addr = u.networkings[i].IP.String()
-
-			break
-		}
-	}
-
-	for i := range u.ports {
-		if strings.EqualFold(u.ports[i].Name, "Port") {
-			port = u.ports[i].Port
-
-			return addr, port, nil
-		}
-	}
-
-	return addr, port, fmt.Errorf("Not Found")
+	return swm.getNetworkingAddr(_ContainersNetworking, "Port")
 }
 
 func (svc *Service) GetSwitchManagerAndMaster() (string, int, *unit, error) {
