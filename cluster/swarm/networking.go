@@ -296,3 +296,13 @@ func (gd *Gardener) RemoveNetworking(ID string) error {
 
 	return nil
 }
+
+func (gd *Gardener) ListPorts(start, end, limit int) ([]database.Port, error) {
+	if start == 0 && end == 0 {
+		return nil, fmt.Errorf("'start' 'end' cannot both be '0'")
+	}
+
+	return database.ListPorts(start, end, limit)
+}
+
+func (gd *Gardener) ListNetworkings()

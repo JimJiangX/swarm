@@ -182,8 +182,29 @@ func GetPortsByUnit(id string) ([]Port, error) {
 		return nil, err
 	}
 
-	var ports []Port
+	ports := make([]Port, 0, 2)
 	err = db.Select(&ports, "SELECT * FROM tb_port WHERE unit_id=?", id)
+	if err != nil {
+		return nil, err
+	}
+
+	return ports, nil
+}
+
+func ListPorts(start, end, limit int) ([]Port, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	ports := make([]Port, 0, limit)
+	if end != 0 {
+		query := fmt.Sprintf("SELECT * FROM tb_port WHERE port>=? AND port<=? limit %d", limit)
+		err = db.Select(&ports, query, start, end)
+	} else {
+		query := fmt.Sprintf("SELECT * FROM tb_port WHERE port>=? limit %d", limit)
+		err = db.Select(&ports, query, start)
+	}
 	if err != nil {
 		return nil, err
 	}

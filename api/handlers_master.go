@@ -132,7 +132,19 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(lists)
 }
 
-// GET /clusters/{name:.*}/nodes
+// GET /clusters/nodes/{name:.*}
+func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	_ = name
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+// GET /clusters/resources
 func getNodesResourceByCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 	_ = name
@@ -155,6 +167,43 @@ func getNodeResourceByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+// GET /ports
+func getPorts(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	start := intValueOrZero(r, "start")
+	end := intValueOrZero(r, "end")
+	limit := intValueOrZero(r, "limit")
+
+	if limit == 0 || limit > 1000 {
+		limit = 1000
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ports, err := gd.ListPorts(start, end, limit)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(ports)
+}
+
+// GET /networkings
+func getNetworkings(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+
 }
 
 // GET /tasks
