@@ -880,13 +880,15 @@ func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int)
 
 	client, err := gd.consulAPIClient(true)
 	if err != nil {
-
+		logrus.Warnf("consul client Error:%s", err.Error())
 	}
 
 	err = svc.Delete(client, force, volumes, timeout)
 	if err != nil {
 		return err
 	}
+
+	// TODO: delete database records
 
 	err = gd.RemoveCronJob(svc.backup.ID)
 	if err != nil {
@@ -920,7 +922,7 @@ func (svc *Service) Delete(client *consulapi.Client, force, volumes bool, timeou
 		return err
 	}
 
-	err = svc.DeregisterServices(client)
+	svc.DeregisterServices(client)
 
 	return err
 }

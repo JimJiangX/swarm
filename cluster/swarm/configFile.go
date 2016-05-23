@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/astaxie/beego/config"
@@ -183,7 +184,7 @@ func (c *mysqlConfig) Set(key string, val interface{}) error {
 		return fmt.Errorf("mysqlConfig Configer is nil")
 	}
 
-	return c.config.Set(key, fmt.Sprintf("%v", val))
+	return c.config.Set(strings.ToLower(key), fmt.Sprintf("%v", val))
 }
 
 func (c *mysqlConfig) ParseData(data []byte) (config.Configer, error) {
@@ -292,7 +293,7 @@ func (c *proxyConfig) Set(key string, val interface{}) error {
 		return fmt.Errorf("mysqlConfig Configer is nil")
 	}
 
-	return c.config.Set(key, fmt.Sprintf("%v", val))
+	return c.config.Set(strings.ToLower(key), fmt.Sprintf("%v", val))
 }
 
 func (proxyConfig) Validate(data map[string]interface{}) error { return nil }
@@ -447,7 +448,7 @@ func (c *switchManagerConfig) Set(key string, val interface{}) error {
 		return fmt.Errorf("switchManagerConfig Configer is nil")
 	}
 
-	return c.config.Set(key, fmt.Sprintf("%v", val))
+	return c.config.Set(strings.ToLower(key), fmt.Sprintf("%v", val))
 }
 
 func (switchManagerConfig) Validate(data map[string]interface{}) error { return nil }

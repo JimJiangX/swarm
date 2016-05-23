@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-var defaultContent = `
+var defaultMysqlContent = `
 ################
 ##UpSQL 5.6.19##
 ################
@@ -149,9 +149,95 @@ func TestMysqlConfig(t *testing.T) {
 		data["mysqld::bind-address"] = "127.0.0.1"
 	}
 
-	t.Log("Default Config:\n", defaultContent)
+	t.Log("Default Config:\n", defaultMysqlContent)
 
-	_, err = config.ParseData([]byte(defaultContent))
+	_, err = config.ParseData([]byte(defaultMysqlContent))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = config.Validate(data)
+	if err != nil {
+		t.Error(err)
+	}
+
+	for key, val := range data {
+		if err := config.Set(key, val); err != nil {
+			t.Error(err)
+		}
+	}
+
+	content, err := config.Marshal()
+	if err != nil {
+		t.Error(err)
+	}
+
+	t.Log("config ini:\n", string(content))
+}
+
+var defaultSWMConfig = `
+#sm --defaults-file=/tmp/sm.conf
+#required
+### sm
+Domain =  <service_id>
+Name = <unit_id>
+Port = <adm_port>
+ProxyPort = <proxy_port>
+#optional(default value)
+### sm
+LockRetryTimes = 10
+LockRetryInterval = 1s
+HealthCheckInterval = 10s
+### consul
+ConsulBindNetworkName = <adm_nic>
+ConsulPort            = <consul_port>
+ConsulRetryTimes      = 1
+ConsulRetryInterval   = 1s
+ConsulRetryTimeout    = 1s
+ConsulRetryTimeoutAll = 1s
+### swarm
+# example DBAAS/DOCKER/SWARM/leader
+SwarmHostKey = <swarm_leader_key>
+SwarmSocketPath = /DBAASDAT/upsql.sock
+SwarmRetryTimes      = 2
+SwarmRetryInterval   = 2s
+SwarmRetryTimeout    = 2s
+SwarmRetryTimeoutAll = 2s
+SwarmHealthCheckApp        = /root/check_db
+SwarmHealthCheckUser        = check
+SwarmHealthCheckPassword    = 123.com
+SwarmHealthCheckConfigFile  = /DBAASDAT/my.cnf
+SwarmHealthCheckTimeout = 5s
+SwarmHealthCheckReadTimeout = 5s
+GtidDiff                = 3
+GtidDiffRetryTimes      = 3
+GtidDiffRetryInterval   = 3s
+GtidDiffRetryTimeout    = 3s
+GtidDiffRetryTimeoutAll = 3
+`
+
+func TestSwitchManagerConfig(t *testing.T) {
+	config := new(switchManagerConfig)
+
+	data, err := config.defaultUserConfig(nil, nil)
+	if err != nil {
+		t.Logf("Expected Error:%s", err.Error())
+
+		data = make(map[string]interface{}, 10)
+		data["domain"] = "service_00001"
+		data["name"] = "unit_00001"
+		data["ProxyPort"] = 9000
+		data["Port"] = 8000
+
+		// consul
+		data["ConsulBindNetworkName"] = "ConsulBindNetworkName"
+		data["SwarmHostKey"] = leaderElectionPath
+		data["ConsulPort"] = 4000
+	}
+
+	t.Log("Default Config:\n", defaultSWMConfig)
+
+	_, err = config.ParseData([]byte(defaultSWMConfig))
 	if err != nil {
 		t.Fatal(err)
 	}

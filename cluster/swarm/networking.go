@@ -212,7 +212,7 @@ func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit string, re
 
 			device, ok := engine.Labels[_Internal_NIC_Lable]
 			if !ok {
-				device = "bound1"
+				device = "bond1"
 			}
 			ipinfo.Device = device
 
@@ -227,7 +227,7 @@ func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit string, re
 
 			device, ok := engine.Labels[_External_NIC_Lable]
 			if !ok {
-				device = "bound2"
+				device = "bond2"
 			}
 			ipinfo.Device = device
 
