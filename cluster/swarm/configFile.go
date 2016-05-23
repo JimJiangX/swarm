@@ -360,7 +360,7 @@ func (c proxyConfig) HealthCheck() (healthCheck, error) {
 		return healthCheck{}, fmt.Errorf("params not ready")
 	}
 
-	port, err := c.config.Int("proxy_admin_port")
+	port, err := c.config.Int("adm-cli::proxy_admin_port")
 	if err != nil {
 		return healthCheck{}, err
 	}
@@ -392,10 +392,9 @@ func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interf
 		for i := range u.ports {
 			if u.ports[i].Name == "proxy_data_port" {
 				dataPort = u.ports[i].Port
-				m["proxy_data_port"] = dataPort
 			} else if u.ports[i].Name == "proxy_admin_port" {
 				adminPort = u.ports[i].Port
-				m["proxy_admin_port"] = adminPort
+				m["adm-cli::proxy_admin_port"] = adminPort
 			}
 		}
 		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", dataAddr, dataPort)
