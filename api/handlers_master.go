@@ -179,10 +179,20 @@ func getPorts(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	resp := make([]structs.PortResponse, len(ports))
+	for i := range ports {
+		resp[i] = structs.PortResponse{
+			Port:      ports[i].Port,
+			Name:      ports[i].Name,
+			UnitID:    ports[i].UnitID,
+			Proto:     ports[i].Proto,
+			Allocated: ports[i].Allocated,
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(ports)
+	json.NewEncoder(w).Encode(resp)
 }
 
 // GET /networkings

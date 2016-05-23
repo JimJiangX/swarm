@@ -32,3 +32,11 @@ type IPInfo struct {
 	UnitID       string `json:"unit_id"`
 	Allocated    string `json:"allocated"`
 }
+
+type PortResponse struct {
+	Port      int    `json:"port"`
+	Name      string `json:"name"`
+	UnitID    string `json:"unit_id"`
+	Proto     string `json:"proto"` // tcp/udp
+	Allocated bool   `json:"allocated"`
+}
