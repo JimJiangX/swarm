@@ -50,17 +50,17 @@ const registerURL = "/v1/agent/register"
 
 type registerService struct {
 	Endpoint      string
-	CollectorName string `json:",omitempty"`
-	User          string `json:",omitempty"`
-	Password      string `json:"pwd,omitempty"`
-	Type          string
-	CollectorIP   string `json:"colletorip"`   // spell error
-	CollectorPort int    `json:"colletorport"` // spell error
-	MetricTags    string
-	Network       []string `json:",omitempty"`
-	Status        string
-	Table         string
-	CheckType     string
+	CollectorName string   `json:"colletorname,omitempty"`
+	User          string   `json:"user,omitempty"`
+	Password      string   `json:"pwd,omitempty"`
+	Type          string   `json:"type"`
+	CollectorIP   string   `json:"colletorip"`   // spell error
+	CollectorPort int      `json:"colletorport"` // spell error
+	MetricTags    string   `json:"metrictags"`
+	Network       []string `json:"network,omitempty"`
+	Status        string   `json:"status"`
+	Table         string   `json:"table"`
+	CheckType     string   `json:"checktype"`
 }
 
 func registerToHorus(addr string, obj ...registerService) error {

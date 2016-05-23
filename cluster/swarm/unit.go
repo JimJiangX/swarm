@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -596,19 +595,25 @@ func (u *unit) saveToDisk() error {
 }
 
 func (u *unit) registerToHorus(addr, user, password string, agentPort int) error {
-	if u.engine == nil {
-		return errors.New("Engine is nil")
-	}
 	node, err := database.GetNode(u.NodeID)
 	if err != nil {
 		return err
 	}
+	typ := u.Type
+	if u.Type == _SwitchManagerType {
+		typ = "swm"
+	} else if u.Type == _ProxyType {
+		typ = "upproxy"
+	} else if u.Type == _MysqlType || u.Type == _UpsqlType {
+		typ = "upsql"
+	}
+
 	obj := registerService{
 		Endpoint:      u.ID,
 		CollectorName: u.Name,
 		User:          user,
 		Password:      password,
-		Type:          u.Type,
+		Type:          typ,
 		CollectorIP:   u.engine.IP,
 		CollectorPort: agentPort,
 		MetricTags:    node.ID,

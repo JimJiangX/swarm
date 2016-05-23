@@ -681,7 +681,7 @@ func (svc *Service) initTopology() error {
 
 	err = smlib.InitSm(addr, port, topolony)
 	if err != nil {
-		logrus.Error("%s Init Topology Error %s", svc.Name, err)
+		logrus.Errorf("%s Init Topology Error %s", svc.Name, err)
 	}
 	// TODO:return error when the InitSm is done
 	return nil
