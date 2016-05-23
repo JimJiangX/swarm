@@ -92,12 +92,6 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 // GET /clusters
 func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	clusters, err := database.ListCluster()
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
@@ -180,17 +174,7 @@ func getPorts(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	end := intValueOrZero(r, "end")
 	limit := intValueOrZero(r, "limit")
 
-	if limit == 0 || limit > 1000 {
-		limit = 1000
-	}
-
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	ports, err := gd.ListPorts(start, end, limit)
+	ports, err := swarm.ListPorts(start, end, limit)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -203,7 +187,15 @@ func getPorts(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 // GET /networkings
 func getNetworkings(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	resp, err := swarm.ListNetworkings()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
 }
 
 // GET /tasks
@@ -792,13 +784,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	id, err := gd.LoadImage(req)
+	id, err := swarm.LoadImage(req)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -813,13 +799,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 func postEnableImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	image := mux.Vars(r)["image"]
 
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	err := gd.UpdateImageStatus(image, true)
+	err := swarm.UpdateImageStatus(image, true)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -832,13 +812,7 @@ func postEnableImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 func postDisableImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	image := mux.Vars(r)["image"]
 
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	err := gd.UpdateImageStatus(image, false)
+	err := swarm.UpdateImageStatus(image, false)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return

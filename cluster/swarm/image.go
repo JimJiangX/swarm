@@ -56,7 +56,7 @@ func (gd *Gardener) GetImageByID(id string) (Image, error) {
 	return out, nil
 }
 
-func (gd *Gardener) UpdateImageStatus(id string, enable bool) error {
+func UpdateImageStatus(id string, enable bool) error {
 
 	return database.UpdateImageStatus(id, enable)
 }
@@ -72,7 +72,7 @@ func (gd *Gardener) RemoveImage(id string) error {
 	return nil
 }
 
-func (gd *Gardener) LoadImage(req structs.PostLoadImageRequest) (string, error) {
+func LoadImage(req structs.PostLoadImageRequest) (string, error) {
 	parser, _, err := initialize(req.Name)
 	if err != nil {
 		return "", err
@@ -101,7 +101,7 @@ func (gd *Gardener) LoadImage(req structs.PostLoadImageRequest) (string, error) 
 
 	imageID, size, err := parsePushImageOutput(buffer.String())
 	if err != nil {
-		return imageID, err
+		return "", err
 	}
 
 	unitConfig := database.UnitConfig{
@@ -134,10 +134,10 @@ func (gd *Gardener) LoadImage(req structs.PostLoadImageRequest) (string, error) 
 
 	err = database.TxInsertImage(image, unitConfig, task)
 	if err != nil {
-		return imageID, err
+		return "", err
 	}
 
-	return imageID, nil
+	return image.ID, nil
 }
 
 func parsePushImageOutput(in string) (string, int, error) {

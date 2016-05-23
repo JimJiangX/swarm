@@ -265,6 +265,37 @@ func ListNetworkingByType(typ string) ([]Networking, error) {
 	return list, nil
 }
 
+func ListNetworking() ([]Networking, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	list := make([]Networking, 0, 5)
+
+	err = db.Select(&list, "SELECT * FROM tb_networking")
+	if err != nil {
+		return nil, err
+	}
+
+	return list, nil
+}
+
+func ListIPByNetworking(id string) ([]IP, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	list := make([]IP, 0, 100)
+	err = db.Select(&list, "SELECT * FROM tb_ip WHERE networking_id=?", id)
+	if err != nil {
+		return nil, err
+	}
+
+	return list, nil
+}
+
 func TxInsertNetworking(start, end, gateway, typ string, prefix int) (Networking, []IP, error) {
 	startU32 := utils.IPToUint32(start)
 	endU32 := utils.IPToUint32(end)

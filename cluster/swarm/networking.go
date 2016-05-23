@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
@@ -297,7 +298,10 @@ func (gd *Gardener) RemoveNetworking(ID string) error {
 	return nil
 }
 
-func (gd *Gardener) ListPorts(start, end, limit int) ([]database.Port, error) {
+func ListPorts(start, end, limit int) ([]database.Port, error) {
+	if limit == 0 || limit > 1000 {
+		limit = 1000
+	}
 	if start == 0 && end == 0 {
 		return nil, fmt.Errorf("'start' 'end' cannot both be '0'")
 	}
@@ -305,4 +309,47 @@ func (gd *Gardener) ListPorts(start, end, limit int) ([]database.Port, error) {
 	return database.ListPorts(start, end, limit)
 }
 
-func (gd *Gardener) ListNetworkings()
+func ListNetworkings() ([]structs.ListNetworkingsResponse, error) {
+	list, err := database.ListNetworking()
+	if err != nil {
+		return nil, err
+	}
+	resp := make([]structs.ListNetworkingsResponse, len(list))
+	for i := range list {
+		out, err := database.ListIPByNetworking(list[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		min, max, total, used := statistic(out)
+
+		resp[i] = structs.ListNetworkingsResponse{
+			ID:      list[i].ID,
+			Type:    list[i].Type,
+			Gateway: list[i].Gateway,
+			Enabled: list[i].Enabled,
+			Total:   total,
+			Used:    used,
+			Start:   utils.Uint32ToIP(min.IPAddr).String(),
+			End:     utils.Uint32ToIP(max.IPAddr).String(),
+		}
+	}
+
+	return resp, nil
+}
+
+func statistic(list []database.IP) (database.IP, database.IP, int, int) {
+	min, max, total, used := 0, 0, len(list), 0
+	for i := range list {
+		if list[i].IPAddr < list[min].IPAddr {
+			min = i
+		}
+		if list[i].IPAddr > list[max].IPAddr {
+			max = i
+		}
+		if list[i].Allocated {
+			used++
+		}
+	}
+
+	return list[min], list[max], total, used
+}
