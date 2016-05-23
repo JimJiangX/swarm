@@ -12,32 +12,40 @@ import (
 	"github.com/docker/swarm/cluster/swarm/store"
 )
 
-func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.Engine, config cluster.ContainerConfig, Type string) (*cluster.ContainerConfig, error) {
+func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.Engine, config cluster.ContainerConfig) (*cluster.ContainerConfig, error) {
+	// TODO:clone config pointer params values
 	constraint := fmt.Sprintf("constraint:node==%s", engine.ID)
 	config.Env = append(config.Env, constraint)
 	// conflicting options:hostname and the network mode
 	// config.Hostname = engine.ID
 	// config.Domainname = engine.Name
 
-	allocated, need := preAlloc.unit.PortSlice()
-	if !allocated && len(need) > 0 {
-		ports, err := database.SelectAvailablePorts(len(need))
+	req := preAlloc.unit.Requirement()
+
+	if len(req.ports) > 0 {
+		ports, err := database.SelectAvailablePorts(len(req.ports))
 		if err != nil {
 			logrus.Errorf("Alloc Ports Error:%s", err.Error())
 
 			return nil, err
 		}
-		for i := range ports {
-			ports[i].Name = need[i].name
+		for i := range req.ports {
+			ports[i].Name = req.ports[i].name
+			ports[i].Proto = req.ports[i].proto
 			ports[i].UnitID = preAlloc.unit.Unit.ID
-			ports[i].Proto = need[i].proto
 			ports[i].Allocated = true
 		}
 
 		preAlloc.unit.ports = ports
 	}
 
-	networkings, err := gd.getNetworkingSetting(engine, preAlloc.unit.ID, Type, "")
+	portSlice := make([]string, len(preAlloc.unit.ports))
+	for i := range preAlloc.unit.ports {
+		portSlice[i] = strconv.Itoa(preAlloc.unit.ports[i].Port)
+	}
+	config.Env = append(config.Env, fmt.Sprintf("PORT=%s", strings.Join(portSlice, ",")))
+
+	networkings, err := gd.getNetworkingSetting(engine, preAlloc.unit.ID, req)
 	preAlloc.networkings = append(preAlloc.networkings, networkings...)
 	if err != nil {
 		logrus.Errorf("Alloc Networking Error:%s", err.Error())
@@ -45,12 +53,11 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 		return nil, err
 	}
 
-	if config.Labels == nil {
-		config.Labels = make(map[string]string)
-	}
-
 	for i := range networkings {
 		if networkings[i].Type == _ContainersNetworking {
+			ip := networkings[i].IP.String()
+			config.Env = append(config.Env, fmt.Sprintf("IPADDR=%s", ip))
+			config.Labels["container_ip"] = ip
 			config.Labels[_NetworkingLabelKey] = networkings[i].String()
 		} else if networkings[i].Type == _ExternalAccessNetworking {
 			config.Labels[_ProxyNetworkingLabelKey] = networkings[i].String()

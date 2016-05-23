@@ -201,39 +201,41 @@ func getIPInfoByUnitID(id string) ([]IPInfo, error) {
 	return out, nil
 }
 
-func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit, name, Type string) ([]IPInfo, error) {
+func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit string, req require) ([]IPInfo, error) {
 	networkings := make([]IPInfo, 0, 2)
+	for _, net := range req.networkings {
+		if net.Type == _ContainersNetworking {
+			ipinfo, err := gd.AllocIP("", _ContainersNetworking, unit)
+			if err != nil {
+				return nil, err
+			}
 
-	ipinfo, err := gd.AllocIP("", _ContainersNetworking, unit)
-	if err != nil {
-		return nil, err
-	}
+			device, ok := engine.Labels[_Internal_NIC_Lable]
+			if !ok {
+				device = "bound1"
+			}
+			ipinfo.Device = device
 
-	device, ok := engine.Labels[_Internal_NIC_Lable]
-	if !ok {
+			networkings = append(networkings, ipinfo)
 
-	}
-	ipinfo.Device = device
+		} else if net.Type == _ExternalAccessNetworking {
 
-	networkings = append(networkings, ipinfo)
+			ipinfo, err := gd.AllocIP("", _ExternalAccessNetworking, unit)
+			if err != nil {
+				return networkings, err
+			}
 
-	if isProxyType(Type) || isProxyType(name) {
+			device, ok := engine.Labels[_External_NIC_Lable]
+			if !ok {
+				device = "bound2"
+			}
+			ipinfo.Device = device
 
-		ipinfo2, err := gd.AllocIP("", _ExternalAccessNetworking, unit)
-		if err != nil {
-			return networkings, err
+			networkings = append(networkings, ipinfo)
 		}
-
-		device, ok := engine.Labels[_External_NIC_Lable]
-		if !ok {
-
-		}
-		ipinfo2.Device = device
-
-		networkings = append(networkings, ipinfo2)
 	}
 
-	return networkings, err
+	return networkings, nil
 }
 
 func (gd *Gardener) AllocIP(id, typ, unit string) (_ IPInfo, err error) {

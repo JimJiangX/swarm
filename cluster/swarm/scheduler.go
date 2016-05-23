@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"runtime/debug"
-	"strconv"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -138,10 +136,15 @@ func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module *struct
 	config.Config.Image = image
 	config.Config.Labels[_ImageIDInRegistryLabelKey] = imageID_Label
 
-	filters := gd.listShortIdleStore(module.Stores, module.Type, num)
+	// TODO:maybe remove
+	tag := module.Type
+	if module.Type == _SwitchManagerType {
+		tag = _ProxyType
+	}
+	filters := gd.listShortIdleStore(module.Stores, tag, num)
 	logrus.Debugf("[MG] %s,%s,%s:first filters of storage:%s", module.Stores, module.Type, num, filters)
 
-	list := gd.listCandidateNodes(module.Nodes, module.Type, filters...)
+	list := gd.listCandidateNodes(module.Nodes, tag, filters...)
 	logrus.Debugf("[MG] now listCandidateNodes result:%v ", list)
 
 	entry.Debugf("filters num:%d,candidate nodes num:%d", len(filters), len(list))
@@ -293,7 +296,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stor
 		"Unit":   unit.Name,
 	})
 
-	config, err := gd.allocResource(preAlloc, engine, *templConfig, unit.Type)
+	config, err := gd.allocResource(preAlloc, engine, *templConfig)
 	if err != nil {
 		err = fmt.Errorf("Alloc Resource Error:%s", err.Error())
 		entry.Error(err)
@@ -302,21 +305,6 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stor
 	}
 
 	config.Env = append(config.Env, fmt.Sprintf("C_NAME=%s", unit.Name))
-	ip := ""
-	for i := range preAlloc.networkings {
-		if preAlloc.networkings[i].Type == _ContainersNetworking {
-			ip = preAlloc.networkings[i].IP.String()
-		}
-	}
-	config.Env = append(config.Env, fmt.Sprintf("IPADDR=%s", ip))
-
-	portSlice := make([]string, len(unit.ports))
-	for i := range unit.ports {
-		portSlice[i] = strconv.Itoa(unit.ports[i].Port)
-	}
-	config.Env = append(config.Env, fmt.Sprintf("PORT=%s", strings.Join(portSlice, ",")))
-
-	config.Labels["container_ip"] = ip
 	config.Labels["unit_id"] = unit.ID
 
 	preAlloc.unit.config = config

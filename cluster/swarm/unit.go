@@ -27,13 +27,28 @@ type ContainerCmd interface {
 	BackupCmd(args ...string) []string
 	CleanBackupFileCmd(args ...string) []string
 }
+type port struct {
+	port  int
+	proto string
+	name  string
+}
+
+type netRequire struct {
+	Type string
+	num  int
+}
+
+type require struct {
+	ports       []port
+	networkings []netRequire
+}
 
 type configParser interface {
 	Validate(data map[string]interface{}) error
 	ParseData(data []byte) (config.Configer, error)
 	defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error)
 	Marshal() ([]byte, error)
-	PortSlice() (bool, []port)
+	Requirement() require
 	HealthCheck() (healthCheck, error)
 	Set(key string, val interface{}) error
 }

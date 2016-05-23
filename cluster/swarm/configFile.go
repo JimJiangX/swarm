@@ -217,14 +217,23 @@ func (c mysqlConfig) Marshal() ([]byte, error) {
 	return ioutil.ReadFile(tmpfile.Name())
 }
 
-type port struct {
-	port  int
-	proto string
-	name  string
-}
-
-func (c mysqlConfig) PortSlice() (bool, []port) {
-	return false, []port{port{proto: "tcp", name: "mysqld::port"}}
+func (mysqlConfig) Requirement() require {
+	ports := []port{
+		port{
+			proto: "tcp",
+			name:  "mysqld::port",
+		},
+	}
+	nets := []netRequire{
+		netRequire{
+			Type: _ContainersNetworking,
+			num:  1,
+		},
+	}
+	return require{
+		ports:       ports,
+		networkings: nets,
+	}
 }
 
 type healthCheck struct {
@@ -318,13 +327,33 @@ func (c *proxyConfig) Marshal() ([]byte, error) {
 	return ioutil.ReadFile(tmpfile.Name())
 }
 
-func (c proxyConfig) PortSlice() (bool, []port) {
-
-	return false, []port{
-		port{proto: "tcp", name: "proxy_data_port"},
-		port{proto: "tcp", name: "proxy_admin_port"},
+func (proxyConfig) Requirement() require {
+	ports := []port{
+		port{
+			proto: "tcp",
+			name:  "proxy_data_port",
+		},
+		port{
+			proto: "tcp",
+			name:  "proxy_admin_port",
+		},
+	}
+	nets := []netRequire{
+		netRequire{
+			Type: _ContainersNetworking,
+			num:  1,
+		},
+		netRequire{
+			Type: _ExternalAccessNetworking,
+			num:  1,
+		},
+	}
+	return require{
+		ports:       ports,
+		networkings: nets,
 	}
 }
+
 func (c proxyConfig) HealthCheck() (healthCheck, error) {
 	if c.config == nil {
 		return healthCheck{}, fmt.Errorf("params not ready")
@@ -453,9 +482,27 @@ func (c *switchManagerConfig) Marshal() ([]byte, error) {
 	return ioutil.ReadFile(tmpfile.Name())
 }
 
-func (c switchManagerConfig) PortSlice() (bool, []port) {
-	return false, []port{port{proto: "tcp", name: "Port"},
-		port{proto: "tcp", name: "ProxyPort"}}
+func (switchManagerConfig) Requirement() require {
+	ports := []port{
+		port{
+			proto: "tcp",
+			name:  "Port",
+		},
+		port{
+			proto: "tcp",
+			name:  "ProxyPort",
+		},
+	}
+	nets := []netRequire{
+		netRequire{
+			Type: _ContainersNetworking,
+			num:  1,
+		},
+	}
+	return require{
+		ports:       ports,
+		networkings: nets,
+	}
 }
 
 func (c switchManagerConfig) HealthCheck() (healthCheck, error) {
