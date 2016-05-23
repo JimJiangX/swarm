@@ -237,7 +237,7 @@ func (svc *Service) ReplaceBackupStrategy(req structs.BackupStrategy) (*database
 	return backup, nil
 }
 
-func (gd *Gardener) DeleteServiceBackupStrategy(strategy string) error {
+func DeleteServiceBackupStrategy(strategy string) error {
 	backup, err := database.GetBackupStrategy(strategy)
 	if err != nil {
 		return err
@@ -270,9 +270,9 @@ func converteToUsers(service string, users []structs.User) []database.User {
 }
 
 func (svc *Service) getUnit(IDOrName string) (*unit, error) {
-	for i := range svc.units {
-		if svc.units[i].ID == IDOrName || svc.units[i].Name == IDOrName {
-			return svc.units[i], nil
+	for _, u := range svc.units {
+		if u.ID == IDOrName || u.Name == IDOrName {
+			return u, nil
 		}
 	}
 
@@ -475,8 +475,8 @@ func (svc *Service) StartService() error {
 	return nil
 }
 func (svc *Service) startContainers() error {
-	for i := range svc.units {
-		err := svc.units[i].startContainer()
+	for _, u := range svc.units {
+		err := u.startContainer()
 		if err != nil {
 			return err
 		}
@@ -486,9 +486,7 @@ func (svc *Service) startContainers() error {
 }
 
 func (svc *Service) copyServiceConfig() error {
-	for i := range svc.units {
-		u := svc.units[i]
-
+	for _, u := range svc.units {
 		defConfig, err := u.defaultUserConfig(svc, u)
 		if err != nil {
 			return err
@@ -504,8 +502,8 @@ func (svc *Service) copyServiceConfig() error {
 }
 
 func (svc *Service) initService() error {
-	for i := range svc.units {
-		err := svc.units[i].initService()
+	for _, u := range svc.units {
+		err := u.initService()
 		if err != nil {
 			return err
 		}
@@ -532,8 +530,8 @@ func (svc *Service) statusCAS(expected, value int64) error {
 }
 
 func (svc *Service) startService() error {
-	for i := range svc.units {
-		err := svc.units[i].startService()
+	for _, u := range svc.units {
+		err := u.startService()
 		if err != nil {
 			return err
 		}
@@ -556,8 +554,8 @@ func (svc *Service) StopContainers(timeout int) error {
 }
 
 func (svc *Service) stopContainers(timeout int) error {
-	for i := range svc.units {
-		err := svc.units[i].stopContainer(timeout)
+	for _, u := range svc.units {
+		err := u.stopContainer(timeout)
 		if err != nil {
 			return err
 		}
@@ -579,8 +577,8 @@ func (svc *Service) StopService() error {
 }
 
 func (svc *Service) stopService() error {
-	for i := range svc.units {
-		err := svc.units[i].stopService()
+	for _, u := range svc.units {
+		err := u.stopService()
 		if err != nil {
 			return err
 		}
@@ -614,8 +612,8 @@ func (svc *Service) RemoveContainers(force, rmVolumes bool) error {
 }
 
 func (svc *Service) removeContainers(force, rmVolumes bool) error {
-	for i := range svc.units {
-		err := svc.units[i].removeContainer(force, rmVolumes)
+	for _, u := range svc.units {
+		err := u.removeContainer(force, rmVolumes)
 		if err != nil {
 			return err
 		}
@@ -633,9 +631,7 @@ func (svc *Service) createUsers() error {
 		cmd[i] = users[i].Username
 	}
 
-	for i := range svc.units {
-		u := svc.units[i]
-
+	for _, u := range svc.units {
 		if u.Type == _MysqlType {
 			inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
 			if inspect.ExitCode != 0 {
@@ -670,8 +666,8 @@ func (svc *Service) registerServices(client *consulapi.Client) (err error) {
 		return fmt.Errorf("consul client is nil")
 	}
 
-	for i := range svc.units {
-		err = svc.units[i].RegisterHealthCheck(client, svc)
+	for _, u := range svc.units {
+		err = u.RegisterHealthCheck(client, svc)
 		if err != nil {
 
 			return err
@@ -687,8 +683,8 @@ func (svc *Service) DeregisterServices(client *consulapi.Client) error {
 	}
 	svc.Lock()
 
-	for i := range svc.units {
-		err := svc.units[i].DeregisterHealthCheck(client)
+	for _, u := range svc.units {
+		err := u.DeregisterHealthCheck(client)
 		if err != nil {
 			svc.Unlock()
 			return err
@@ -700,10 +696,10 @@ func (svc *Service) DeregisterServices(client *consulapi.Client) error {
 }
 
 func (svc *Service) registerToHorus(addr, user, password string, agentPort int) error {
-	for i := range svc.units {
-		err := svc.units[i].registerToHorus(addr, user, password, agentPort)
+	for _, u := range svc.units {
+		err := u.registerToHorus(addr, user, password, agentPort)
 		if err != nil {
-			return err
+			logrus.Errorf("container %s register To Horus Error:%s", u.Name, err.Error())
 		}
 	}
 
@@ -711,9 +707,9 @@ func (svc *Service) registerToHorus(addr, user, password string, agentPort int) 
 }
 
 func (svc *Service) getUnitByType(Type string) (*unit, error) {
-	for i := range svc.units {
-		if svc.units[i].Type == Type {
-			return svc.units[i], nil
+	for _, u := range svc.units {
+		if u.Type == Type {
+			return u, nil
 		}
 	}
 

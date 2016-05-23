@@ -223,17 +223,16 @@ func (gd *Gardener) InitAndStartService(svc *Service) error {
 		return err
 	}
 
+	logrus.Debug("[mg]registerToHorus")
 	sys, err := database.GetSystemConfig()
 	if err != nil {
 		logrus.Errorf("Query Database Error:%s", err.Error())
-		return err
+		return nil
 	}
 	horusServerAddr := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-
-	logrus.Debug("[mg]registerToHorus")
 	err = svc.registerToHorus(horusServerAddr, sys.MonUsername, sys.MonPassword, sys.HorusAgentPort)
 	if err != nil {
-		return err
+		logrus.Warnf("register To Horus Error:%s", err.Error())
 	}
 
 	return nil
