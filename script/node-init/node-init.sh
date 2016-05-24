@@ -84,7 +84,7 @@ if [ \$? -ne 0 ]; then
 	 exit 2
  fi
 
- docker exec \$container_name /root/check_proxy
+ docker exec \$container_name /root/check_proxy --default-file /DBAASCNF/upsql-proxy.conf
 
  exit \$?
 EOF
