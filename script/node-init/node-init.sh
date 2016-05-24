@@ -48,7 +48,7 @@ create_check_script() {
 	cat << EOF > ${dir}/check_swarmagent.sh
 #!/bin/bash
 ps -ef | grep -v "grep" | grep "/usr/bin/swarm join"
-if [ \$? -en 0 ]; then
+if [ \$? -ne 0 ]; then
 	exit 2
 else
 	exit 0
@@ -415,6 +415,7 @@ init_docker() {
 # install docker plugin
 install_docker_plugin() {
 	local script_dir=/usr/local/local_volume_plugin/scripts
+	mkdir -p ${script_dir}
 
 	pkill -9 local-volume-plugin > /dev/null 2>&1
 
