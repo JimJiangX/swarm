@@ -422,7 +422,7 @@ install_docker_plugin() {
 	cp ${cur_dir}/dbaas_volume_plugin-1.6.1/bin/local_volume_plugin /usr/bin/local_volume_plugin; chmod 755 /usr/bin/local_volume_plugin
 
 	# copy script
-	cp ${cur_dir}/scripts/*.sh ${script_dir}
+	cp ${cur_dir}/dbaas_volume_plugin-1.6.1/scripts/*.sh ${script_dir}
 	chmod +x ${script_dir}/*.sh
 
 	cat << EOF > /usr/lib/systemd/system/local-volume-plugin.service
