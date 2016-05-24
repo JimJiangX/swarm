@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/astaxie/beego/config"
@@ -375,9 +376,28 @@ func (u *unit) extendVG() error {
 	return nil
 }
 
-func (u *unit) RegisterHealthCheck(client *consulapi.Client, context *Service) error {
-	if client == nil {
-		return fmt.Errorf("consul client is nil")
+func (u *unit) RegisterHealthCheck(config database.ConsulConfig, context *Service) error {
+	address := ""
+	if u.engine != nil {
+		address = fmt.Sprintf("%s:%d", u.engine.IP, config.ConsulPort)
+	} else {
+		node, err := database.GetNode(u.NodeID)
+		if err != nil {
+			logrus.Errorf("Not Found Node %s,Error:%s", u.NodeID, err.Error())
+			return err
+		}
+		address = fmt.Sprintf("%s:%d", node.Addr, config.ConsulPort)
+	}
+	c := consulapi.Config{
+		Address:    address,
+		Datacenter: config.ConsulDatacenter,
+		WaitTime:   time.Duration(config.ConsulWaitTime) * time.Second,
+		Token:      config.ConsulToken,
+	}
+	client, err := consulapi.NewClient(&c)
+	if err != nil {
+		logrus.Errorf("%s Register HealthCheck Error,%s %v", u.Name, err.Error(), c)
+		return err
 	}
 
 	check, err := u.HealthCheck()
@@ -409,7 +429,6 @@ func (u *unit) RegisterHealthCheck(client *consulapi.Client, context *Service) e
 		}
 	}
 
-	agent := client.Agent()
 	service := consulapi.AgentServiceRegistration{
 		ID:      u.ID,
 		Name:    u.Name,
@@ -427,7 +446,7 @@ func (u *unit) RegisterHealthCheck(client *consulapi.Client, context *Service) e
 
 	logrus.Debugf("AgentServiceRegistration:%v %v", service, service.Check)
 
-	return agent.ServiceRegister(&service)
+	return client.Agent().ServiceRegister(&service)
 }
 
 func (u *unit) DeregisterHealthCheck(client *consulapi.Client) error {

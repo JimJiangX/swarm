@@ -258,7 +258,7 @@ func (c mysqlConfig) HealthCheck() (healthCheck, error) {
 	}
 	return healthCheck{
 		Port:     port,
-		Script:   "/opt/DBaaS/scrpit/check_db.sh ",
+		Script:   "/opt/DBaaS/script/check_db.sh ",
 		Shell:    "",
 		Interval: "10s",
 		//TTL:      "15s",

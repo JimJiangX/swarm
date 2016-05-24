@@ -174,7 +174,12 @@ func (gd *Gardener) createContainerInPending(config *cluster.ContainerConfig, na
 }
 
 func (gd *Gardener) InitAndStartService(svc *Service) error {
-	err := svc.statusCAS(_StatusServiceCreating, _StatusServiceStarting)
+	sys, err := database.GetSystemConfig()
+	if err != nil {
+		logrus.Errorf("Query Database Error:%s", err.Error())
+		return nil
+	}
+	err = svc.statusCAS(_StatusServiceCreating, _StatusServiceStarting)
 	if err != nil {
 		return err
 	}
@@ -213,22 +218,13 @@ func (gd *Gardener) InitAndStartService(svc *Service) error {
 		return err
 	}
 
-	consulClient, err := gd.consulAPIClient(false)
-	if err != nil {
-		logrus.Error("consul client is nil", err)
-		return err
-	}
 	logrus.Debug("[mg]registerServices")
-	if err := svc.registerServices(consulClient); err != nil {
+	if err := svc.registerServices(sys.ConsulConfig); err != nil {
 		return err
 	}
 
 	logrus.Debug("[mg]registerToHorus")
-	sys, err := database.GetSystemConfig()
-	if err != nil {
-		logrus.Errorf("Query Database Error:%s", err.Error())
-		return nil
-	}
+
 	horusServerAddr := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
 	err = svc.registerToHorus(horusServerAddr, sys.MonUsername, sys.MonPassword, sys.HorusAgentPort)
 	if err != nil {

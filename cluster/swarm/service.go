@@ -687,13 +687,9 @@ func (svc *Service) initTopology() error {
 	return nil
 }
 
-func (svc *Service) registerServices(client *consulapi.Client) (err error) {
-	if client == nil {
-		return fmt.Errorf("consul client is nil")
-	}
-
+func (svc *Service) registerServices(config database.ConsulConfig) (err error) {
 	for _, u := range svc.units {
-		err = u.RegisterHealthCheck(client, svc)
+		err = u.RegisterHealthCheck(config, svc)
 		if err != nil {
 
 			return err
