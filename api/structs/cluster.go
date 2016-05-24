@@ -14,6 +14,11 @@ type PostClusterRequest struct {
 	StorageID   string `json:"storage_id,omitempty"`
 }
 
+type UpdateClusterParamsRequest struct {
+	MaxNode    int     `json:"max_node"`
+	UsageLimit float32 `json:"usage_limit"`
+}
+
 // ListClusterResource used for GET: /clusters Response Body structure
 type ListClusterResource []ClusterResource
 

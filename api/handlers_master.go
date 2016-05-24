@@ -273,22 +273,21 @@ func floatValueOrZero(r *http.Request, k string) float64 {
 
 // POST /clusters/{name}/update
 func postUpdateClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	req := structs.UpdateClusterParamsRequest{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	name := mux.Vars(r)["name"]
+
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	limit := float32(floatValueOrZero(r, "usage_limit"))
-	max := intValueOrZero(r, "max_node")
-	name := mux.Vars(r)["name"]
-
-	err := gd.UpdateDatacenterParams(name, max, limit)
+	err = gd.UpdateDatacenterParams(name, req.MaxNode, req.UsageLimit)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -882,18 +881,12 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 // POST /storage/san/{name}/raidgroup
 func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+	req := struct{ ID int }{}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
 	name := mux.Vars(r)["name"]
-
-	rg, err := strconv.Atoi(r.Form.Get("rg"))
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
@@ -907,7 +900,7 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	size, err := store.AddSpace(rg)
+	size, err := store.AddSpace(req.ID)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -926,8 +919,7 @@ func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 	}
 
 	san := mux.Vars(r)["name"]
-
-	rg, err := strconv.Atoi(r.Form.Get("rg"))
+	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
