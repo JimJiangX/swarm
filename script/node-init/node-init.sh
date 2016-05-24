@@ -118,7 +118,7 @@ EOF
 reg_to_consul_for_swarm() {
 	local component_type=SwarmAgent
 
-	curl -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Check": {"Script": "/opt/DBaaS/scrpit/check_swarmagent.sh ", "Interval": "10s" }}' http://${adm_ip}:${consul_port}/v1/agent/service/register
+	curl -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Check": {"Script": "/opt/DBaaS/script/check_swarmagent.sh ", "Interval": "10s" }}' http://${adm_ip}:${consul_port}/v1/agent/service/register
 
 	if [ $? != 0 ]; then
 		echo "${component_type} register to consul failed"
@@ -414,15 +414,15 @@ init_docker() {
 
 # install docker plugin
 install_docker_plugin() {
-	local script_dir=/opt
+	local script_dir=/usr/local/local_volume_plugin/scripts
 
 	pkill -9 local-volume-plugin > /dev/null 2>&1
 
 	# copy binary file
-	cp ${cur_dir}/dbaas_volume_plugin-1.5.3/bin/local_volume_plugin /usr/bin/local_volume_plugin; chmod 755 /usr/bin/local_volume_plugin
+	cp ${cur_dir}/dbaas_volume_plugin-1.6.1/bin/local_volume_plugin /usr/bin/local_volume_plugin; chmod 755 /usr/bin/local_volume_plugin
 
 	# copy script
-	cp ${cur_dir}/script/*.sh ${script_dir}
+	cp ${cur_dir}/dbaas_volume_plugin-1.6.1/scripts/*.sh ${script_dir}
 	chmod +x ${script_dir}/*.sh
 
 	cat << EOF > /usr/lib/systemd/system/local-volume-plugin.service
@@ -520,8 +520,8 @@ install_horus_agent() {
 
 	# copy binary file
 	mkdir -p /usr/local/horus-agent
-	cp ${cur_dir}/horus-agent-1.0.0/bin/horus-agent /usr/bin/horus-agent; chmod 755 /usr/bin/horus-agent
-	cp -r ${cur_dir}/horus-agent-1.0.0/scripts /usr/local/horus-agent/scripts; chmod -R +x /usr/local/horus-agent/scripts/*.sh
+	cp ${cur_dir}/horus-agent-1.3.1/bin/horus-agent /usr/bin/horus-agent; chmod 755 /usr/bin/horus-agent
+	cp -r ${cur_dir}/horus-agent-1.3.1/scripts /usr/local/horus-agent/scripts; chmod -R +x /usr/local/horus-agent/scripts/*.sh
 
 	local nets_dev="${adm_nic}#${int_nic}"
 	if [ ! -z "${ext_nic}" ]; then
