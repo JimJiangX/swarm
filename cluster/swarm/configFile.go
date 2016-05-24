@@ -366,7 +366,7 @@ func (c proxyConfig) HealthCheck() (healthCheck, error) {
 	}
 	return healthCheck{
 		Port:     port,
-		Script:   "",
+		Script:   "/opt/DBaaS/script/check_proxy.sh ",
 		Shell:    "",
 		Interval: "10s",
 		TTL:      "15s",
@@ -516,7 +516,7 @@ func (c switchManagerConfig) HealthCheck() (healthCheck, error) {
 	}
 	return healthCheck{
 		Port:     port,
-		Script:   "",
+		Script:   "/opt/DBaaS/script/check_switchmanager.sh ",
 		Shell:    "",
 		Interval: "10s",
 		TTL:      "15s",
