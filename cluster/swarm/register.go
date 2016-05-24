@@ -46,7 +46,6 @@ import (
 }
 ]
 */
-const registerURL = "/v1/agent/register"
 
 type registerService struct {
 	Endpoint      string
@@ -63,13 +62,49 @@ type registerService struct {
 	CheckType     string   `json:"checktype"`
 }
 
-func registerToHorus(addr string, obj ...registerService) error {
+func registerToHorus(addr string, obj []registerService) error {
 	buffer := bytes.NewBuffer(nil)
 	if err := json.NewEncoder(buffer).Encode(obj); err != nil {
 		return err
 	}
 
-	resp, err := http.Post("http://"+addr+registerURL, "application/json", buffer)
+	url := fmt.Sprintf("http://%s/v1/agent/register", addr)
+	resp, err := http.Post(url, "application/json", buffer)
+	if err != nil {
+		return err
+	}
+
+	if resp.Body != nil {
+		defer resp.Body.Close()
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		res := struct {
+			Err string
+		}{}
+
+		err := json.NewDecoder(resp.Body).Decode(&res)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("StatusCode:%d,Error:%s", resp.StatusCode, res.Err)
+	}
+
+	return nil
+}
+
+type deregisterService struct {
+	Endpoint string
+}
+
+func deregisterToHorus(addr string, obj []deregisterService) error {
+	buffer := bytes.NewBuffer(nil)
+	if err := json.NewEncoder(buffer).Encode(obj); err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("http://%s/v1/agent/deregister", addr)
+	resp, err := http.Post(url, "application/json", buffer)
 	if err != nil {
 		return err
 	}

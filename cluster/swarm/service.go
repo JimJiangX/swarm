@@ -376,6 +376,7 @@ func (gd *Gardener) rebuildService(NameOrID string) (*Service, error) {
 
 	svc := NewService(service, len(units))
 	svc.Lock()
+	defer svc.Unlock()
 
 	for i := range units {
 		// rebuild units
@@ -389,7 +390,6 @@ func (gd *Gardener) rebuildService(NameOrID string) (*Service, error) {
 	svc.backup = backup
 	svc.base = base
 	svc.authConfig = authConfig
-	svc.Unlock()
 
 	gd.Lock()
 	gd.services = append(gd.services, svc)
@@ -414,14 +414,22 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, e
 
 	defer func() {
 		if err != nil {
+			logrus.WithField("Service Name", svc.Name).Errorf("Servcie Cleaned,%v", err)
+
 			if svc.backup != nil && svc.backup.ID != "" {
 				gd.RemoveCronJob(svc.backup.ID)
 			}
-			client, err := gd.consulAPIClient(true)
+			sys, err := database.GetSystemConfig()
 			if err != nil {
+				return
 			}
-			svc.Delete(client, true, true, 0)
-			logrus.WithField("Service Name", svc.Name).Errorf("Servcie Cleaned,%v", err)
+			clients, err := sys.GetConsulClient()
+			if err != nil || len(clients) == 0 {
+				return
+			}
+
+			horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
+			svc.Delete(clients[0], horus, true, true, 0)
 		}
 	}()
 
@@ -572,6 +580,7 @@ func (svc *Service) stopContainers(timeout int) error {
 	for _, u := range svc.units {
 		err := u.stopContainer(timeout)
 		if err != nil {
+			logrus.Errorf("container %s stop error:%s", u.Name, err.Error())
 			return err
 		}
 	}
@@ -595,7 +604,8 @@ func (svc *Service) stopService() error {
 	for _, u := range svc.units {
 		err := u.stopService()
 		if err != nil {
-			return err
+			// return err
+			logrus.Errorf("container %s stop service error:%s", u.Name, err.Error())
 		}
 	}
 
@@ -614,7 +624,7 @@ func (svc *Service) RemoveContainers(force, rmVolumes bool) error {
 
 	err := svc.stopService()
 	if err != nil {
-		svc.Lock()
+		svc.Unlock()
 
 		return err
 	}
@@ -630,6 +640,8 @@ func (svc *Service) removeContainers(force, rmVolumes bool) error {
 	for _, u := range svc.units {
 		err := u.removeContainer(force, rmVolumes)
 		if err != nil {
+			logrus.Errorf("container %s remove,-f=%b -v=%b,error:%s", u.Name, force, rmVolumes, err.Error())
+
 			return err
 		}
 	}
@@ -732,14 +744,30 @@ func (svc *Service) DeregisterServices(client *consulapi.Client) error {
 }
 
 func (svc *Service) registerToHorus(addr, user, password string, agentPort int) error {
-	for _, u := range svc.units {
-		err := u.registerToHorus(addr, user, password, agentPort)
+	params := make([]registerService, len(svc.units))
+
+	for i, u := range svc.units {
+		obj, err := u.registerHorus(user, password, agentPort)
 		if err != nil {
-			logrus.Errorf("container %s register To Horus Error:%s", u.Name, err.Error())
+			err = fmt.Errorf("container %s register Horus Error:%s", u.Name, err.Error())
+			logrus.Error(err)
+
+			return err
 		}
+		params[i] = obj
 	}
 
-	return nil
+	return registerToHorus(addr, params)
+}
+
+func (svc *Service) deregisterInHorus(addr string) error {
+	endpoints := make([]deregisterService, len(svc.units))
+
+	for i, u := range svc.units {
+		endpoints[i] = deregisterService{Endpoint: u.ID}
+	}
+
+	return deregisterToHorus(addr, endpoints)
 }
 
 func (svc *Service) getUnitByType(Type string) (*unit, error) {
@@ -894,12 +922,17 @@ func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int)
 		return err
 	}
 
-	client, err := gd.consulAPIClient(true)
+	sys, err := database.GetSystemConfig()
 	if err != nil {
-		logrus.Warnf("consul client Error:%s", err.Error())
+		return err
+	}
+	clients, err := sys.GetConsulClient()
+	if err != nil || len(clients) == 0 {
+		return fmt.Errorf("GetConsulClient error %v %v", err, sys)
 	}
 
-	err = svc.Delete(client, force, volumes, timeout)
+	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
+	err = svc.Delete(clients[0], horus, force, volumes, timeout)
 	if err != nil {
 		return err
 	}
@@ -914,7 +947,7 @@ func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int)
 	gd.Lock()
 	for i := range gd.services {
 		if gd.services[i].ID == name || gd.services[i].Name == name {
-			gd.datacenters = append(gd.datacenters[:i], gd.datacenters[i+1:]...)
+			gd.services = append(gd.services[:i], gd.services[i+1:]...)
 			break
 		}
 	}
@@ -924,9 +957,14 @@ func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int)
 
 }
 
-func (svc *Service) Delete(client *consulapi.Client, force, volumes bool, timeout int) error {
+func (svc *Service) Delete(client *consulapi.Client, horus string, force, volumes bool, timeout int) error {
 	svc.Lock()
 	defer svc.Unlock()
+
+	if err := svc.stopService(); err != nil {
+		logrus.Error("%s stop Service error:%s", svc.Name, err.Error())
+		return err
+	}
 
 	err := svc.stopContainers(timeout)
 	if err != nil {
@@ -938,7 +976,15 @@ func (svc *Service) Delete(client *consulapi.Client, force, volumes bool, timeou
 		return err
 	}
 
-	svc.DeregisterServices(client)
+	err = svc.deregisterInHorus(horus)
+	if err != nil {
+		logrus.Error("%s deregister In Horus error:%s", svc.Name, err.Error())
+	}
 
-	return err
+	err = svc.DeregisterServices(client)
+	if err != nil {
+		logrus.Error("%s deregister In consul error:%s", svc.Name, err.Error())
+	}
+
+	return nil
 }
