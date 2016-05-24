@@ -415,6 +415,7 @@ init_docker() {
 # install docker plugin
 install_docker_plugin() {
 	local script_dir=/usr/local/local_volume_plugin/scripts
+	mkdir -p ${script_dir}
 
 	pkill -9 local-volume-plugin > /dev/null 2>&1
 
