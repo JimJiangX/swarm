@@ -42,9 +42,10 @@ reg_to_horus_server() {
 
 create_check_script() {
 
-	mkdir -p /opt/DBaaS/scrpit/
+	local dir=/opt/DBaaS/script
+	mkdir -p ${dir}
 
-	cat << EOF > /opt/DBaaS/scrpit/check_swarmagent.sh
+	cat << EOF > ${dir}/check_swarmagent.sh
 #!/bin/bash
 ps -ef | grep -v "grep" | grep "/usr/bin/swarm join"
 if [ \$? -en 0 ]; then
@@ -54,9 +55,9 @@ else
 fi
 EOF
 
-	chmod +x /opt/DBaaS/scrpit/check_swarmagent.sh
+	chmod +x ${dir}/check_swarmagent.sh
 	
-	cat << EOF > /opt/DBaaS/scrpit/check_db.sh
+	cat << EOF > ${dir}/check_db.sh
 #!/bin/bash
 
 container_name=\$1
@@ -70,10 +71,10 @@ if [ \$? -ne 0 ]; then
 
  exit \$?
 EOF
-	chmod +x /opt/DBaaS/scrpit/check_db.sh
+	chmod +x ${dir}/check_db.sh
 
 
-	cat << EOF > /opt/DBaaS/scrpit/check_proxy.sh
+	cat << EOF > ${dir}/check_proxy.sh
 #!/bin/bash
 
 container_name=\$1
@@ -87,9 +88,9 @@ if [ \$? -ne 0 ]; then
 
  exit \$?
 EOF
-	chmod +x /opt/DBaaS/scrpit/check_proxy.sh
+	chmod +x ${dir}/check_proxy.sh
 
-	cat << EOF > /opt/DBaaS/scrpit/check_switchmanager.sh
+	cat << EOF > ${dir}/check_switchmanager.sh
 #!/bin/bash
 
 container_name=\$1
@@ -110,7 +111,7 @@ if [ \$? -ne 0 ]; then
  exit \$?	
 EOF
 
-	chmod +x /opt/DBaaS/scrpit/check_switchmanager.sh
+	chmod +x ${dir}/check_switchmanager.sh
 }
 
 
