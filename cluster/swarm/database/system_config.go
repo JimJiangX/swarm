@@ -16,12 +16,20 @@ type Configurations struct {
 	HorusConfig
 	Registry
 	SSHDeliver
+	Users
 
-	MonUsername string `db:"mon_username"`
-	MonPassword string `db:"mon_password"`
-	DockerPort  int    `db:"docker_port"`
-	PluginPort  int    `db:"plugin_port"`
-	Retry       int64  `db:"retry"`
+	DockerPort int   `db:"docker_port"`
+	PluginPort int   `db:"plugin_port"`
+	Retry      int64 `db:"retry"`
+}
+
+type Users struct {
+	MonitorUsername   string `db:"mon_username"`
+	MonitorPassword   string `db:"mon_password"`
+	ReplicateUsername string `db:"repl_username"`
+	ReplicatePassword string `db:"repl_password"`
+	DBAUsername       string `db:"cup_dba_username"`
+	DBAPassword       string `db:"cup_dba_password"`
 }
 
 type SSHDeliver struct {
@@ -75,7 +83,7 @@ func (c Configurations) TableName() string {
 }
 
 func (c Configurations) Insert() (int64, error) {
-	query := "INSERT INTO tb_system_config (consul_IPs,consul_port,consul_dc,consul_token,consul_wait_time,horus_server_ip,horus_server_port,horus_agent_port,horus_event_ip,horus_event_port,registry_domain,registry_address,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,pkg_name,script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password) VALUES (:consul_IPs,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_server_ip,:horus_server_port,:horus_agent_port,:horus_event_ip,:horus_event_port,:registry_domain,:registry_address,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:pkg_name,:script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:registry_os_username,:registry_os_password)"
+	query := "INSERT INTO tb_system_config (consul_IPs,consul_port,consul_dc,consul_token,consul_wait_time,horus_server_ip,horus_server_port,horus_agent_port,horus_event_ip,horus_event_port,registry_domain,registry_address,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,pkg_name,script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password) VALUES (:consul_IPs,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_server_ip,:horus_server_port,:horus_agent_port,:horus_event_ip,:horus_event_port,:registry_domain,:registry_address,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:pkg_name,:script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:registry_os_username,:registry_os_password,:mon_username,:mon_password,:repl_username,:repl_password,:cup_dba_username,:cup_dba_password)"
 	db, err := GetDB(true)
 	if err != nil {
 		return 0, err

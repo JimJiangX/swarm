@@ -227,7 +227,7 @@ func (gd *Gardener) initAndStartService(svc *Service) error {
 	logrus.Debug("[mg]registerToHorus")
 
 	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-	err = svc.registerToHorus(horus, sys.MonUsername, sys.MonPassword, sys.HorusAgentPort)
+	err = svc.registerToHorus(horus, sys.MonitorUsername, sys.MonitorPassword, sys.HorusAgentPort)
 	if err != nil {
 		logrus.Warnf("register To Horus Error:%s", err.Error())
 	}

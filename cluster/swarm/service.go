@@ -16,6 +16,7 @@ import (
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
 	consulapi "github.com/hashicorp/consul/api"
+	"github.com/yiduoyunQ/sm/sm-svr/consts"
 	swm_structs "github.com/yiduoyunQ/sm/sm-svr/structs"
 	"github.com/yiduoyunQ/smlib"
 )
@@ -671,19 +672,19 @@ func (svc *Service) createUsers() error {
 
 	}
 
-	svc.getUnitByType(_UnitRole_SwitchManager)
+	svc.getSwithManagerUnit()
 
 	return nil
 }
 
 func (svc *Service) refreshTopology() error {
-	svc.getUnitByType(_UnitRole_SwitchManager)
+	svc.getSwithManagerUnit()
 
 	return nil
 }
 
 func (svc *Service) initTopology() error {
-	swm, err := svc.getUnitByType(_UnitRole_SwitchManager)
+	swm, err := svc.getSwithManagerUnit()
 	if err != nil {
 		return err
 	}
@@ -692,24 +693,78 @@ func (svc *Service) initTopology() error {
 	if err != nil {
 		return err
 	}
+	if swm.engine != nil {
+		addr = swm.engine.IP
+	}
+
+	proxys, err := svc.getUnitByType(_ProxyType)
+	if err != nil {
+		return err
+	}
+	proxyNames := make([]string, len(proxys))
+	for i := range proxys {
+		proxyNames[i] = proxys[i].ID
+	}
+
+	users := make([]swm_structs.User, len(svc.users))
+	for i := range svc.users {
+		users[i] = swm_structs.User{
+			Id:       svc.users[i].ID,
+			Type:     svc.users[i].Type,
+			UserName: svc.users[i].Username,
+			Password: svc.users[i].Password,
+			Role:     svc.users[i].Role,
+			ReadOnly: false,
+		}
+	}
+
+	sqls, err := svc.getUnitByType(_UpsqlType)
+	if err != nil {
+		return err
+	}
+	arch := consts.Type_M
+	if len(sqls) == 1 {
+		arch = consts.Type_M
+	} else if len(sqls) == 2 {
+		arch = consts.Type_M_SB
+	} else if len(sqls) > 2 {
+		arch = consts.Type_M_SB_SL
+	}
+
+	dataNodes := make(map[string]swm_structs.DatabaseInfo, len(sqls))
+	for i := range sqls {
+		ip, dataPort, err := swm.getNetworkingAddr(_ContainersNetworking, "mysqld::port")
+		if err != nil {
+			return err
+		}
+		dataNodes[sqls[i].ID] = swm_structs.DatabaseInfo{
+			Ip:   ip,
+			Port: dataPort,
+		}
+	}
+
+	sys, err := database.GetSystemConfig()
+	if err != nil {
+		return err
+	}
 
 	topolony := swm_structs.MgmPost{
-		DbaasType:           "",  //  string   `json:"dbaas-type"`
-		DbRootUser:          "",  //  string   `json:"db-root-user"`
-		DbRootPassword:      "",  //  string   `json:"db-root-password"`
-		DbReplicateUser:     "",  //  string   `json:"db-replicate-user"`
-		DbReplicatePassword: "",  //  string   `json:"db-replicate-password"`
-		SwarmApiVersion:     "",  //  string   `json:"swarm-api-version,omitempty"`
-		ProxyNames:          nil, //  []string `json:"proxy-names"`
-		Users:               nil, //  []User   `json:"users"`
-		DataNode:            nil, //  map[string]DatabaseInfo `json:"data-node"`
+		DbaasType:           arch,                  //  string   `json:"dbaas-type"`
+		DbRootUser:          sys.DBAUsername,       //  string   `json:"db-root-user"`
+		DbRootPassword:      sys.DBAPassword,       //  string   `json:"db-root-password"`
+		DbReplicateUser:     sys.ReplicateUsername, //  string   `json:"db-replicate-user"`
+		DbReplicatePassword: sys.ReplicatePassword, //  string   `json:"db-replicate-password"`
+		SwarmApiVersion:     "1.22",                //  string   `json:"swarm-api-version,omitempty"`
+		ProxyNames:          proxyNames,            //  []string `json:"proxy-names"`
+		Users:               users,                 //  []User   `json:"users"`
+		DataNode:            dataNodes,             //  map[string]DatabaseInfo `json:"data-node"`
 	}
 
 	err = smlib.InitSm(addr, port, topolony)
 	if err != nil {
 		logrus.Errorf("%s Init Topology Error %s", svc.Name, err)
 	}
-	// TODO:return error when the InitSm is done
+
 	return nil
 }
 
@@ -770,40 +825,45 @@ func (svc *Service) deregisterInHorus(addr string) error {
 	return deregisterToHorus(addr, endpoints)
 }
 
-func (svc *Service) getUnitByType(Type string) (*unit, error) {
+func (svc *Service) getUnitByType(Type string) ([]*unit, error) {
+	units := make([]*unit, 0, len(svc.units))
 	for _, u := range svc.units {
 		if u.Type == Type {
-			return u, nil
+			units = append(units, u)
 		}
+	}
+	if len(units) > 0 {
+		return units, nil
 	}
 
 	return nil, fmt.Errorf("Not Found unit %s In Service %s", Type, svc.ID)
 }
 
-func (svc *Service) GetSwithManager() (*unit, error) {
-	svc.RLock()
-	u, err := svc.getUnitByType(_UnitRole_SwitchManager)
-	svc.RUnlock()
+func (svc *Service) getSwithManagerUnit() (*unit, error) {
+	units, err := svc.getUnitByType(_UnitRole_SwitchManager)
 
-	return u, err
-}
-
-func (svc *Service) getSwithManagerAddr() (string, int, error) {
-	swm, err := svc.getUnitByType(_UnitRole_SwitchManager)
-	if err != nil {
-		return "", 0, err
+	if err != nil || len(units) != 1 {
+		return nil, fmt.Errorf("Unexpected num about %s unit,got %d,error:%v", _UnitRole_SwitchManager, len(units), err)
 	}
 
-	return swm.getNetworkingAddr(_ContainersNetworking, "Port")
+	return units[0], nil
 }
 
 func (svc *Service) GetSwitchManagerAndMaster() (string, int, *unit, error) {
 	svc.RLock()
 	defer svc.RUnlock()
 
-	addr, port, err := svc.getSwithManagerAddr()
+	swm, err := svc.getSwithManagerUnit()
 	if err != nil {
-		return addr, port, nil, err
+		return "", 0, nil, err
+	}
+
+	addr, port, err := swm.getNetworkingAddr(_ContainersNetworking, "Port")
+	if err != nil {
+		return "", 0, nil, err
+	}
+	if swm.engine != nil {
+		addr = swm.engine.IP
 	}
 
 	topology, err := smlib.GetTopology(addr, port)

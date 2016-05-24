@@ -81,7 +81,7 @@ const (
 )
 
 const (
-	_MysqlType         = "mysql" // cluster_type,networking_type
+	_MysqlType         = "upsql" // cluster_type,networking_type
 	_UpsqlType         = "upsql"
 	_ProxyType         = "proxy"          // cluster_type,networking_type
 	_SwitchManagerType = "switch_manager" // cluster_type,networking_type

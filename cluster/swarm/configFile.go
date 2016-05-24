@@ -90,7 +90,7 @@ func initialize(name string) (configParser, ContainerCmd, error) {
 		cmder  ContainerCmd
 	)
 	switch name {
-	case _UpsqlType, _MysqlType:
+	case _UpsqlType:
 		parser = &mysqlConfig{}
 
 		cmder = &mysqlCmd{}
@@ -403,8 +403,8 @@ func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interf
 
 	m["upsql-proxy::event-threads-count"] = u.config.HostConfig.CpusetCpus
 
-	swm, err := svc.getUnitByType("_SwitchManagerType")
-	if err == nil && swm != nil {
+	swm, err := svc.getSwithManagerUnit()
+	if err == nil {
 		swmProxyPort := 0
 		for i := range swm.ports {
 			if swm.ports[i].Name == "ProxyPort" {

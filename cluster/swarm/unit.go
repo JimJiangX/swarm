@@ -406,7 +406,7 @@ func (u *unit) RegisterHealthCheck(config database.ConsulConfig, context *Servic
 	}
 
 	if u.Type == _UpsqlType {
-		swm, err := context.getUnitByType(_UnitRole_SwitchManager)
+		swm, err := context.getSwithManagerUnit()
 		if err == nil && swm != nil {
 			check.Tags = []string{fmt.Sprintf("swm_key=%s/%s/topology", context.ID, swm.ID)}
 		}
@@ -642,7 +642,7 @@ func (u *unit) registerHorus(user, password string, agentPort int) (registerServ
 		typ = "swm"
 	case _ProxyType, "upproxy":
 		typ = "upproxy"
-	case _MysqlType, _UpsqlType:
+	case _UpsqlType:
 		typ = "upsql"
 	default:
 		return registerService{}, fmt.Errorf("Unsupported 'Type':'%s'", u.Type)
