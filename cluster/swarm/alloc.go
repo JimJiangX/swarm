@@ -176,7 +176,7 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 		}
 
 		if len(pendings[i].networkings) > 0 {
-			ips := gd.recycleNetworking(pendings[i])
+			ips := pendings[i].recycleNetworking()
 			database.TxUpdateMultiIPValue(tx, ips)
 		}
 
@@ -189,12 +189,13 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 			}
 			database.TxUpdatePorts(tx, ports)
 			database.TxDelUnit(tx, pendings[i].unit.Unit.ID)
+			database.TxDeleteVolumes(tx, pendings[i].unit.Unit.ID)
 		}
 
 		for _, local := range pendings[i].localStore {
-			database.DeleteLocalVoume(local)
+			database.TxDeleteVolumes(tx, local)
 		}
-
+		gd.Unlock()
 		for _, lun := range pendings[i].sanStore {
 			dc, err := gd.DatacenterByNode(pendings[i].unit.Unit.NodeID)
 			if err != nil || dc == nil || dc.storage == nil {
@@ -202,12 +203,13 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 			}
 			dc.storage.Recycle(lun, 0)
 		}
+		gd.Lock()
 	}
 
 	return tx.Commit()
 }
 
-func (gd *Gardener) recycleNetworking(pre *preAllocResource) []database.IP {
+func (pre *preAllocResource) recycleNetworking() []database.IP {
 	// networking recycle
 	ips := make([]database.IP, 0, len(pre.networkings)*2)
 

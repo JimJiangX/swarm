@@ -1,6 +1,10 @@
 package database
 
-import "time"
+import (
+	"time"
+
+	"github.com/jmoiron/sqlx"
+)
 
 type LUN struct {
 	ID              string    `db:"id"`
@@ -353,6 +357,12 @@ func DeleteLocalVoume(IDOrName string) error {
 	return err
 }
 
+func TxDeleteVolumes(tx *sqlx.Tx, NameOrID string) error {
+	_, err := tx.Exec("DELETE FROM tb_volumes WHERE id=? OR name=? OR unit_id=?", NameOrID, NameOrID, NameOrID)
+
+	return err
+
+}
 func GetLocalVoume(NameOrID string) (LocalVolume, error) {
 	lv := LocalVolume{}
 
