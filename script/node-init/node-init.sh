@@ -48,7 +48,7 @@ create_check_script() {
 	cat << EOF > ${dir}/check_swarmagent.sh
 #!/bin/bash
 ps -ef | grep -v "grep" | grep "/usr/bin/swarm join"
-if [ \$? -en 0 ]; then
+if [ \$? -ne 0 ]; then
 	exit 2
 else
 	exit 0
