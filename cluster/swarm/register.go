@@ -49,7 +49,7 @@ import (
 
 type registerService struct {
 	Endpoint      string
-	CollectorName string   `json:"colletorname,omitempty"`
+	CollectorName string   `json:"collectorname,omitempty"`
 	User          string   `json:"user,omitempty"`
 	Password      string   `json:"pwd,omitempty"`
 	Type          string   `json:"type"`
