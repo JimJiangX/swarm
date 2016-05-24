@@ -84,7 +84,7 @@ if [ \$? -ne 0 ]; then
 	 exit 2
  fi
 
- docker exec \$container_name /root/check_proxy
+ docker exec \$container_name /root/check_proxy --default-file /DBAASCNF/upsql-proxy.conf
 
  exit \$?
 EOF
@@ -102,8 +102,8 @@ if [ \$? -ne 0 ]; then
 	 exit 2
  fi
 
- ip_addr=\`cat /tmp/abc| grep IPADDR | awk -F= '{print \$2}' | sed 's/",//g'\`
- port=\`cat /tmp/abc| grep PORT | awk -F= '{print \$2}' | sed 's/",//g'\`
+ ip_addr=\`cat \$output | grep IPADDR | awk -F= '{print \$2}' | sed 's/",//g'\`
+ port=\`cat \$output | grep PORT | awk -F= '{print \$2}' | sed 's/",//g'\`
 
  rm -f \$output
 
