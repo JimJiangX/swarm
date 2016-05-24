@@ -76,6 +76,9 @@ func SelectAvailablePorts(num int) ([]Port, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(ports) != num {
+		return nil, fmt.Errorf("Cannot get required num=%d available ports", num)
+	}
 
 	return ports, nil
 }

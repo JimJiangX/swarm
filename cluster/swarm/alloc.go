@@ -22,13 +22,14 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 
 	req := preAlloc.unit.Requirement()
 
-	if len(req.ports) > 0 {
-		ports, err := database.SelectAvailablePorts(len(req.ports))
-		if err != nil {
-			logrus.Errorf("Alloc Ports Error:%s", err.Error())
+	if length := len(req.ports); length > 0 {
+		ports, err := database.SelectAvailablePorts(length)
+		if err != nil || len(ports) < length {
+			logrus.Errorf("Alloc Ports Error:%v", err)
 
 			return nil, err
 		}
+
 		for i := range req.ports {
 			ports[i].Name = req.ports[i].name
 			ports[i].Proto = req.ports[i].proto
@@ -36,7 +37,7 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 			ports[i].Allocated = true
 		}
 
-		preAlloc.unit.ports = ports
+		preAlloc.unit.ports = ports[0:length]
 	}
 
 	portSlice := make([]string, len(preAlloc.unit.ports))
