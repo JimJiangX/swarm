@@ -322,6 +322,17 @@ func InsertBackupStrategy(strategy BackupStrategy) error {
 	return err
 }
 
+func UpdateBackupStrategy(strategy BackupStrategy) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+	query := "UPDATE tb_backup_strategy SET type=:type,service_id=:service_id,spec=:spec,next=:next,valid=:valid,enabled=:enabled,backup_dir=:backup_dir,timeout=:timeout,created_at=:created_at WHERE id=:id"
+	_, err = db.NamedExec(query, &strategy)
+
+	return err
+}
+
 func BackupTaskValidate(taskID, strategyID, unitID string) (int, error) {
 	db, err := GetDB(true)
 	if err != nil {

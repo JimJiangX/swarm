@@ -228,7 +228,7 @@ func (svc *Service) ReplaceBackupStrategy(req structs.BackupStrategy) (*database
 
 	err = database.InsertBackupStrategy(*backup)
 	if err != nil {
-		return nil, fmt.Errorf("Tx Insert Backup Strategy Error:%s", err.Error())
+		return nil, fmt.Errorf("Insert Backup Strategy Error:%s", err.Error())
 	}
 
 	svc.Lock()
@@ -236,6 +236,20 @@ func (svc *Service) ReplaceBackupStrategy(req structs.BackupStrategy) (*database
 	svc.Unlock()
 
 	return backup, nil
+}
+
+func (svc *Service) UpdateBackupStrategy(backup database.BackupStrategy) error {
+	err := database.UpdateBackupStrategy(backup)
+	if err != nil {
+		return fmt.Errorf("Insert Backup Strategy Error:%s", err.Error())
+	}
+
+	svc.Lock()
+	svc.backup = &backup
+	svc.Unlock()
+
+	return nil
+
 }
 
 func DeleteServiceBackupStrategy(strategy string) error {

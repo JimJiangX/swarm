@@ -134,13 +134,42 @@ func (gd *Gardener) ReplaceServiceBackupStrategy(NameOrID string, req structs.Ba
 
 	if service.backup != nil {
 		bs := NewBackupJob(gd.host, service)
-		err := gd.RegisterBackupStrategy(bs)
+		err = gd.RegisterBackupStrategy(bs)
 		if err != nil {
 			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
 		}
 	}
 
 	return strategy, err
+}
+func (gd *Gardener) UpdateServiceBackupStrategy(NameOrID string, req structs.BackupStrategy) error {
+	service, err := gd.GetService(NameOrID)
+	if err != nil {
+		return err
+	}
+
+	backup, err := newBackupStrategy(service.ID, &req)
+	if err != nil || backup == nil {
+		return fmt.Errorf("With non Backup Strategy,Error:%v", err)
+	}
+	if service.backup != nil && service.backup.ID != "" {
+		backup.ID = service.backup.ID
+	}
+	err = service.UpdateBackupStrategy(*backup)
+	if err != nil {
+		return err
+	}
+
+	if service.backup != nil {
+		gd.RemoveCronJob(backup.ID)
+		bs := NewBackupJob(gd.host, service)
+		err = gd.RegisterBackupStrategy(bs)
+		if err != nil {
+			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
+		}
+	}
+
+	return err
 }
 
 func (gd *Gardener) EnableServiceBackupStrategy(strategy string) error {
