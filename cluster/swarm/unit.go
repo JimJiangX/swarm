@@ -533,6 +533,10 @@ func (u *unit) initService() error {
 		return nil
 	}
 	cmd := u.InitServiceCmd()
+	if len(cmd) == 0 {
+		logrus.Warnf("%s InitServiceCmd is nil", u.Name)
+		return nil
+	}
 
 	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
@@ -550,6 +554,10 @@ func (u *unit) startService() error {
 		return nil
 	}
 	cmd := u.StartServiceCmd()
+	if len(cmd) == 0 {
+		logrus.Warnf("%s StartServiceCmd is nil", u.Name)
+		return nil
+	}
 
 	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
@@ -567,6 +575,10 @@ func (u *unit) stopService() error {
 		return nil
 	}
 	cmd := u.StopServiceCmd()
+	if len(cmd) == 0 {
+		logrus.Warnf("%s StopServiceCmd is nil", u.Name)
+		return nil
+	}
 
 	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
@@ -584,7 +596,10 @@ func (u *unit) backup(args ...string) error {
 		return nil
 	}
 	cmd := u.BackupCmd(args...)
-
+	if len(cmd) == 0 {
+		logrus.Warnf("%s BackupCmd is nil", u.Name)
+		return nil
+	}
 	logrus.WithFields(logrus.Fields{
 		"Name": u.Name,
 		"Cmd":  cmd,
@@ -613,21 +628,27 @@ func (u *unit) saveToDisk() error {
 	return database.UpdateUnitInfo(u.Unit)
 }
 
-func (u *unit) registerToHorus(addr, user, password string, agentPort int) error {
+func (u *unit) deregisterInHorus() error { return nil }
+
+func (u *unit) registerHorus(user, password string, agentPort int) (registerService, error) {
 	node, err := database.GetNode(u.NodeID)
 	if err != nil {
-		return err
-	}
-	typ := u.Type
-	if u.Type == _SwitchManagerType {
-		typ = "swm"
-	} else if u.Type == _ProxyType {
-		typ = "upproxy"
-	} else if u.Type == _MysqlType || u.Type == _UpsqlType {
-		typ = "upsql"
+		return registerService{}, err
 	}
 
-	obj := registerService{
+	typ := u.Type
+	switch u.Type {
+	case _SwitchManagerType, "switch manager", "switchmanager":
+		typ = "swm"
+	case _ProxyType, "upproxy":
+		typ = "upproxy"
+	case _MysqlType, _UpsqlType:
+		typ = "upsql"
+	default:
+		return registerService{}, fmt.Errorf("Unsupported 'Type':'%s'", u.Type)
+	}
+
+	return registerService{
 		Endpoint:      u.ID,
 		CollectorName: u.Name,
 		User:          user,
@@ -640,9 +661,7 @@ func (u *unit) registerToHorus(addr, user, password string, agentPort int) error
 		Status:        "on",
 		Table:         "host",
 		CheckType:     "health",
-	}
-
-	return registerToHorus(addr, obj)
+	}, nil
 }
 
 func (gd *Gardener) unitContainer(u *unit) *cluster.Container {
