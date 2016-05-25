@@ -1039,7 +1039,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 				if nodes[i].Status < _StatusNodeEnable && nodes[i].Status != _StatusNodeInstalled {
 					nodes[i].Status = _StatusNodeInstallFailed
 				}
-				err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, nodes[i].Status, _StatusTaskTimeout, nodes[i].ID, fmt.Sprintf("Node Register Timeout %ds", timeout))
+				err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, nodes[i].Status, _StatusTaskTimeout, "", fmt.Sprintf("Node Register Timeout %ds", timeout))
 				if err != nil {
 					logrus.Error(nodes[i].Name, "TxUpdateNodeRegister", err)
 				}
@@ -1067,13 +1067,13 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 				logrus.Warnf("Engine %s Status:%s", addr, status)
 				continue
 			}
-			nodes[i].engine = eng
 
 			err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, _StatusNodeTesting, _StatusTaskRunning, eng.ID, "")
 			if err != nil {
 				logrus.Error(eng.Addr, "TxUpdateNodeRegister", err)
 				continue
 			}
+			nodes[i].engine = eng
 
 			vgs := make([]store.VG, 0, 2)
 			//SSD
@@ -1122,8 +1122,6 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 
 				continue
 			}
-			// servcie register
-			// TODO:create container test
 		}
 	}
 }
