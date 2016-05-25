@@ -20,7 +20,6 @@ import (
 
 const (
 	StatusUnprocessableEntity = 422
-	timeParseTemplate         = "2006-01-02 15:04:05"
 )
 
 var ErrUnsupportGardener = errors.New("Unsupported Gardener")
