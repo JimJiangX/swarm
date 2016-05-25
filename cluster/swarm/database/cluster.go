@@ -306,7 +306,6 @@ func TxUpdateNodeRegister(n *Node, task *Task, nstate, tstate int, eng, msg stri
 
 	if eng != "" {
 		_, err = tx.Exec("UPDATE tb_node SET engine_id=?,status=?,register_at=? WHERE id=?", eng, nstate, time.Now(), n.ID)
-		n.EngineID = eng
 	} else {
 		_, err = tx.Exec("UPDATE tb_node SET status=?,register_at=? WHERE id=?", nstate, time.Now(), n.ID)
 	}

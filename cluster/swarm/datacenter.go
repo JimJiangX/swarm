@@ -1034,17 +1034,8 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 
 	for {
 		if time.Now().After(deadline) {
-			logrus.Warnf("RegisterNodes Timeout:%d", timeout)
-			for i := range nodes {
-				if nodes[i].Status < _StatusNodeEnable && nodes[i].Status != _StatusNodeInstalled {
-					nodes[i].Status = _StatusNodeInstallFailed
-				}
-				err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, nodes[i].Status, _StatusTaskTimeout, "", fmt.Sprintf("Node Register Timeout %ds", timeout))
-				if err != nil {
-					logrus.Error(nodes[i].Name, "TxUpdateNodeRegister", err)
-				}
-			}
-			return fmt.Errorf("Timeout %ds", timeout)
+			err := dealWithTimeout(nodes)
+			return fmt.Errorf("Timeout %ds,%v", timeout, err)
 		}
 		time.Sleep(30 * time.Second)
 
@@ -1053,67 +1044,16 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 				logrus.Warnf("Node Status Not Match,%s:%d!=%d", nodes[i].Addr, nodes[i].Status, _StatusNodeInstalled)
 				continue
 			}
-
-			addr := fmt.Sprintf("%s:%d", nodes[i].Addr, config.DockerPort)
-			eng := gd.getEngineByAddr(addr)
-
-			if status := ""; eng == nil || !strings.EqualFold(eng.Status(), "Healthy") {
-				if eng != nil {
-					status = eng.Status()
-				} else {
-					status = "engine is nil"
-				}
-
-				logrus.Warnf("Engine %s Status:%s", addr, status)
+			eng, err := gd.updateNodeEngine(nodes[i], config.DockerPort)
+			if err != nil || eng == nil {
+				logrus.Error(err)
 				continue
 			}
 
-			err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, _StatusNodeTesting, _StatusTaskRunning, eng.ID, "")
+			err = initNodeStores(dc, nodes[i], eng)
 			if err != nil {
-				logrus.Error(eng.Addr, "TxUpdateNodeRegister", err)
+				logrus.Error(err)
 				continue
-			}
-			nodes[i].engine = eng
-
-			vgs := make([]store.VG, 0, 2)
-			//SSD
-			if ssd := eng.Labels[_SSD_VG_Label]; ssd != "" {
-				vgs = append(vgs, store.VG{
-					Vendor: _SSD,
-					Name:   ssd,
-				})
-			}
-			// HDD
-			if hdd := eng.Labels[_HDD_VG_Label]; hdd != "" {
-				vgs = append(vgs, store.VG{
-					Vendor: _HDD,
-					Name:   hdd,
-				})
-			}
-
-			pluginAddr := fmt.Sprintf("%s:%d", eng.IP, pluginPort)
-			nodes[i].localStore = store.NewLocalDisk(pluginAddr, nodes[i].Node, vgs)
-
-			wwn := eng.Labels[_SAN_HBA_WWN_Lable]
-			if strings.TrimSpace(wwn) != "" {
-
-				list := strings.Split(wwn, ",")
-
-				if dc.storage == nil || dc.storage.Driver() != store.SAN_StoreDriver {
-					continue
-				}
-
-				err := dc.storage.AddHost(nodes[i].ID, list...)
-				if err != nil {
-					logrus.WithFields(logrus.Fields{
-						"Host":    nodes[i].Name,
-						"Addr":    addr,
-						"Storage": dc.storage.ID(),
-						"Vendor":  dc.storage.Vendor(),
-					}).Errorf("Add Host To Storage Error:%s", err.Error())
-
-					continue
-				}
 			}
 
 			err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, _StatusNodeEnable, _StatusTaskDone, eng.ID, "")
@@ -1124,4 +1064,87 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 			}
 		}
 	}
+}
+
+func dealWithTimeout(nodes []*Node) error {
+	logrus.Warnf("RegisterNodes Timeout")
+	for i := range nodes {
+		if nodes[i].Status >= _StatusNodeEnable {
+			continue
+		}
+		if nodes[i].Status != _StatusNodeInstalled {
+			nodes[i].Status = _StatusNodeInstallFailed
+		}
+		err := database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, nodes[i].Status, _StatusTaskTimeout, "", "Node Register Timeout")
+		if err != nil {
+			logrus.Error(nodes[i].Name, "TxUpdateNodeRegister", err)
+		}
+	}
+	return nil
+}
+
+func (gd *Gardener) updateNodeEngine(node *Node, dockerPort int) (*cluster.Engine, error) {
+	addr := fmt.Sprintf("%s:%d", node.Addr, dockerPort)
+	eng := gd.getEngineByAddr(addr)
+
+	if status := ""; eng == nil || !strings.EqualFold(eng.Status(), "Healthy") {
+		if eng != nil {
+			status = eng.Status()
+		} else {
+			status = "engine is nil"
+		}
+
+		err := fmt.Errorf("Engine %s Status:%s", addr, status)
+		return nil, err
+	}
+
+	err := database.TxUpdateNodeRegister(node.Node, node.task, _StatusNodeTesting, _StatusTaskRunning, eng.ID, "")
+	if err != nil {
+		logrus.Error(eng.Addr, "TxUpdateNodeRegister", err)
+		return nil, err
+	}
+	node.engine = eng
+	node.EngineID = eng.ID
+
+	return eng, nil
+}
+
+func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
+	vgs := make([]store.VG, 0, 2)
+	//SSD
+	if ssd := eng.Labels[_SSD_VG_Label]; ssd != "" {
+		vgs = append(vgs, store.VG{
+			Vendor: _SSD,
+			Name:   ssd,
+		})
+	}
+	// HDD
+	if hdd := eng.Labels[_HDD_VG_Label]; hdd != "" {
+		vgs = append(vgs, store.VG{
+			Vendor: _HDD,
+			Name:   hdd,
+		})
+	}
+
+	pluginAddr := fmt.Sprintf("%s:%d", eng.IP, pluginPort)
+	node.localStore = store.NewLocalDisk(pluginAddr, node.Node, vgs)
+
+	wwn := eng.Labels[_SAN_HBA_WWN_Lable]
+	if strings.TrimSpace(wwn) != "" {
+		list := strings.Split(wwn, ",")
+		if dc.storage == nil || dc.storage.Driver() != store.SAN_StoreDriver {
+			return nil
+		}
+
+		err := dc.storage.AddHost(node.ID, list...)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"Host":    node.Name,
+				"Storage": dc.storage.ID(),
+				"Vendor":  dc.storage.Vendor(),
+			}).Errorf("Add Host To Storage Error:%s", err.Error())
+		}
+	}
+
+	return nil
 }
