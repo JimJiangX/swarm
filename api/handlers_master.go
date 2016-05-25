@@ -20,6 +20,7 @@ import (
 
 const (
 	StatusUnprocessableEntity = 422
+	timeParseTemplate         = "2006-01-02 15:04:05"
 )
 
 var ErrUnsupportGardener = errors.New("Unsupported Gardener")
@@ -68,7 +69,7 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 			Seat:         node.Seat,
 			MaxContainer: node.MaxContainer,
 			Status:       node.Status,
-			RegisterAt:   node.RegisterAt.String(),
+			RegisterAt:   utils.TimeToString(node.RegisterAt),
 		}
 	}
 

@@ -1,9 +1,13 @@
 package api
 
 import (
+	"bufio"
+	"encoding/json"
+	"io"
 	"net/http"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
+	"github.com/docker/docker/pkg/ioutils"
 	"github.com/docker/swarm/cluster/swarm"
 	"github.com/gorilla/mux"
 	goctx "golang.org/x/net/context"
@@ -123,15 +127,18 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 
 	for method, mappings := range masterRoutes {
 		for route, fct := range mappings {
-			log.WithFields(log.Fields{"method": method, "route": route}).Debug("Registering HTTP route")
+			logrus.WithFields(logrus.Fields{"method": method, "route": route}).Debug("Registering HTTP route")
 
 			localRoute := route
 			localFct := fct
 
 			wrap := func(w http.ResponseWriter, r *http.Request) {
-				log.WithFields(log.Fields{"method": r.Method, "uri": r.RequestURI}).Debug("HTTP request received")
+				logrus.WithFields(logrus.Fields{"method": r.Method, "uri": r.RequestURI}).Debug("HTTP request received")
 				if enableCors {
 					writeCorsHeaders(w, r)
+				}
+				if logrus.GetLevel() == logrus.DebugLevel {
+					DebugRequestMiddleware(r)
 				}
 				context.apiVersion = mux.Vars(r)["version"]
 				ctx := goctx.WithValue(goctx.Background(), _Gardener, context)
@@ -147,7 +154,7 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 				optionsFct := optionsHandler
 
 				wrap := func(w http.ResponseWriter, r *http.Request) {
-					log.WithFields(log.Fields{"method": optionsMethod, "uri": r.RequestURI}).
+					logrus.WithFields(logrus.Fields{"method": optionsMethod, "uri": r.RequestURI}).
 						Debug("HTTP request received")
 					if enableCors {
 						writeCorsHeaders(w, r)
@@ -164,4 +171,41 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 
 		}
 	}
+}
+
+// DebugRequestMiddleware dumps the request to logger
+func DebugRequestMiddleware(r *http.Request) error {
+	if r.Method != "POST" {
+		return nil
+	}
+
+	maxBodySize := 20 << 1 // 1MB
+	if r.ContentLength > int64(maxBodySize) {
+		return nil
+	}
+
+	body := r.Body
+	bufReader := bufio.NewReaderSize(body, maxBodySize)
+	r.Body = ioutils.NewReadCloserWrapper(bufReader, func() error { return body.Close() })
+
+	b, err := bufReader.Peek(maxBodySize)
+	if err != io.EOF {
+		// either there was an error reading, or the buffer is full (in which case the request is too large)
+		return err
+	}
+
+	var postForm map[string]interface{}
+	if err := json.Unmarshal(b, &postForm); err == nil {
+		if _, exists := postForm["password"]; exists {
+			postForm["password"] = "*****"
+		}
+		formStr, errMarshal := json.Marshal(postForm)
+		if errMarshal == nil {
+			logrus.Debugf("form data: %s", string(formStr))
+		} else {
+			logrus.Debugf("form data: %q", postForm)
+		}
+	}
+
+	return err
 }
