@@ -269,22 +269,86 @@ func DeleteServiceBackupStrategy(strategy string) error {
 }
 
 func converteToUsers(service string, users []structs.User) []database.User {
-	list := make([]database.User, len(users))
+	list := make([]database.User, 0, len(users)+5)
+	now := time.Now()
 	for i := range users {
-		list[i] = database.User{
-			ID:        utils.Generate32UUID(),
-			ServiceID: service,
-			Type:      users[i].Type,
-			Username:  users[i].Username,
-			Password:  users[i].Password,
-			Role:      users[i].Role,
-			CreatedAt: time.Now(),
+		if users[i].Type != _User_Type_Proxy &&
+			users[i].Role != _User_DB &&
+			users[i].Role != _User_Application {
+			continue
 		}
+
+		list = append(list, database.User{
+			ID:         utils.Generate32UUID(),
+			ServiceID:  service,
+			Type:       users[i].Type,
+			Username:   users[i].Username,
+			Password:   users[i].Password,
+			Role:       users[i].Role,
+			Permission: "",
+			CreatedAt:  now,
+		})
 	}
+
+	sys, err := database.GetSystemConfig()
+	if err != nil {
+		logrus.Error(err)
+	}
+
+	list = append(list,
+		database.User{
+			ID:         utils.Generate32UUID(),
+			ServiceID:  service,
+			Type:       _User_Type_DB,
+			Username:   sys.MonitorUsername,
+			Password:   sys.MonitorPassword,
+			Role:       _User_Monitor,
+			Permission: "",
+			CreatedAt:  now,
+		},
+		database.User{
+			ID:         utils.Generate32UUID(),
+			ServiceID:  service,
+			Type:       _User_Type_DB,
+			Username:   sys.ApplicationUsername,
+			Password:   sys.ApplicationPassword,
+			Role:       _User_Application,
+			Permission: "",
+			CreatedAt:  now,
+		},
+		database.User{
+			ID:         utils.Generate32UUID(),
+			ServiceID:  service,
+			Type:       _User_Type_DB,
+			Username:   sys.DBAUsername,
+			Password:   sys.DBAPassword,
+			Role:       _User_DBA,
+			Permission: "",
+			CreatedAt:  now,
+		},
+		database.User{
+			ID:         utils.Generate32UUID(),
+			ServiceID:  service,
+			Type:       _User_Type_DB,
+			Username:   sys.DBUsername,
+			Password:   sys.DBPassword,
+			Role:       _User_DB,
+			Permission: "",
+			CreatedAt:  now,
+		},
+		database.User{
+			ID:         utils.Generate32UUID(),
+			ServiceID:  service,
+			Type:       _User_Type_DB,
+			Username:   sys.ReplicationUsername,
+			Password:   sys.ReplicationPassword,
+			Role:       _User_Replication,
+			Permission: "",
+			CreatedAt:  now,
+		})
 
 	return list
 }
-
 func (svc *Service) getUnit(IDOrName string) (*unit, error) {
 	for _, u := range svc.units {
 		if u.ID == IDOrName || u.Name == IDOrName {
@@ -722,15 +786,15 @@ func (svc *Service) initTopology() error {
 	}
 
 	topolony := swm_structs.MgmPost{
-		DbaasType:           arch,                  //  string   `json:"dbaas-type"`
-		DbRootUser:          sys.DBAUsername,       //  string   `json:"db-root-user"`
-		DbRootPassword:      sys.DBAPassword,       //  string   `json:"db-root-password"`
-		DbReplicateUser:     sys.ReplicateUsername, //  string   `json:"db-replicate-user"`
-		DbReplicatePassword: sys.ReplicatePassword, //  string   `json:"db-replicate-password"`
-		SwarmApiVersion:     "1.22",                //  string   `json:"swarm-api-version,omitempty"`
-		ProxyNames:          proxyNames,            //  []string `json:"proxy-names"`
-		Users:               users,                 //  []User   `json:"users"`
-		DataNode:            dataNodes,             //  map[string]DatabaseInfo `json:"data-node"`
+		DbaasType:           arch,                    //  string   `json:"dbaas-type"`
+		DbRootUser:          sys.DBAUsername,         //  string   `json:"db-root-user"`
+		DbRootPassword:      sys.DBAPassword,         //  string   `json:"db-root-password"`
+		DbReplicateUser:     sys.ReplicationUsername, //  string   `json:"db-replicate-user"`
+		DbReplicatePassword: sys.ReplicationPassword, //  string   `json:"db-replicate-password"`
+		SwarmApiVersion:     "1.22",                  //  string   `json:"swarm-api-version,omitempty"`
+		ProxyNames:          proxyNames,              //  []string `json:"proxy-names"`
+		Users:               users,                   //  []User   `json:"users"`
+		DataNode:            dataNodes,               //  map[string]DatabaseInfo `json:"data-node"`
 	}
 
 	err = smlib.InitSm(addr, port, topolony)

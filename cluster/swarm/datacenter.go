@@ -379,8 +379,8 @@ func (gd *Gardener) SetNodeStatus(name string, state int) error {
 		}
 	}
 
-	if node.Status != _StatusNodeDisable ||
-		node.Status != _StatusNodeEnable ||
+	if node.Status != _StatusNodeDisable &&
+		node.Status != _StatusNodeEnable &&
 		node.Status != _StatusNodeDeregisted {
 
 		return fmt.Errorf("Node %s Status:%d,Forbidding Changing Status to %d", name, node.Status, state)

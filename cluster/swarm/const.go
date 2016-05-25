@@ -115,3 +115,15 @@ var (
 	supportedStoreTypes   = []string{store.LocalDiskStore, store.LocalDiskStore + ":SSD", store.LocalDiskStore + ":HDD", store.SANStore, store.HITACHI, store.HUAWEI}
 	supportedStoreNames   = []string{"DAT", "LOG", "CNF"}
 )
+
+const (
+	_User_DB          = "db"
+	_User_DBA         = "cup_dba"
+	_User_Application = "ap"
+	_User_Monitor     = "mon"
+	_User_Replication = "repl"
+	_User_Check       = "check"
+
+	_User_Type_DB    = "db"
+	_User_Type_Proxy = "proxy"
+)

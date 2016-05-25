@@ -26,8 +26,8 @@ type Configurations struct {
 type Users struct {
 	MonitorUsername     string `db:"mon_username"`
 	MonitorPassword     string `db:"mon_password"`
-	ReplicateUsername   string `db:"repl_username"`
-	ReplicatePassword   string `db:"repl_password"`
+	ReplicationUsername string `db:"repl_username"`
+	ReplicationPassword string `db:"repl_password"`
 	ApplicationUsername string `db:"ap_username"`
 	ApplicationPassword string `db:"ap_password"`
 	DBAUsername         string `db:"cup_dba_username"`

@@ -330,13 +330,14 @@ func TxSetServiceStatus(svc *Service, task *Task, state, tstate int64, finish ti
 }
 
 type User struct {
-	ID        string    `db:"id"`
-	ServiceID string    `db:"service_id"`
-	Type      string    `db:"type"`
-	Username  string    `db:"username"`
-	Password  string    `db:"password"`
-	Role      string    `db:"role"`
-	CreatedAt time.Time `db:"created_at"`
+	ID         string    `db:"id"`
+	ServiceID  string    `db:"service_id"`
+	Type       string    `db:"type"`
+	Username   string    `db:"username"`
+	Password   string    `db:"password"`
+	Role       string    `db:"role"`
+	Permission string    `db:"permission"`
+	CreatedAt  time.Time `db:"created_at"`
 }
 
 func (u User) TableName() string {
