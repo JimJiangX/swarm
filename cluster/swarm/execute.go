@@ -209,11 +209,6 @@ func (gd *Gardener) initAndStartService(svc *Service) error {
 		return err
 	}
 
-	logrus.Debug("[mg]create Users")
-	if err := svc.createUsers(); err != nil {
-		return err
-	}
-
 	logrus.Debug("[mg]initTopology")
 	if err := svc.initTopology(); err != nil {
 		return err

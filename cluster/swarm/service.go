@@ -650,33 +650,6 @@ func (svc *Service) removeContainers(force, rmVolumes bool) error {
 	return nil
 }
 
-func (svc *Service) createUsers() error {
-	users := []database.User{}
-	cmd := []string{}
-
-	// TODO:edit cmd
-	for i := range users {
-		cmd[i] = users[i].Username
-	}
-
-	for _, u := range svc.units {
-		if u.Type == _MysqlType {
-			inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
-			if inspect.ExitCode != 0 {
-				err = fmt.Errorf("%s create users cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
-			}
-			if err != nil {
-				return err
-			}
-		}
-
-	}
-
-	svc.getSwithManagerUnit()
-
-	return nil
-}
-
 func (svc *Service) refreshTopology() error {
 	svc.getSwithManagerUnit()
 
