@@ -1035,9 +1035,18 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 	for {
 		if time.Now().After(deadline) {
 			logrus.Warnf("RegisterNodes Timeout:%d", timeout)
+			for i := range nodes {
+				if nodes[i].Status < _StatusNodeEnable && nodes[i].Status != _StatusNodeInstalled {
+					nodes[i].Status = _StatusNodeInstallFailed
+				}
+				err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, nodes[i].Status, _StatusTaskTimeout, nodes[i].ID, fmt.Sprintf("Node Register Timeout %ds", timeout))
+				if err != nil {
+					logrus.Error(nodes[i].Name, "TxUpdateNodeRegister", err)
+				}
+			}
 			return fmt.Errorf("Timeout %ds", timeout)
 		}
-		time.Sleep(10 * time.Second)
+		time.Sleep(30 * time.Second)
 
 		for i := range nodes {
 			if nodes[i].Status != _StatusNodeInstalled {
@@ -1060,7 +1069,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 			}
 			nodes[i].engine = eng
 
-			err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, _StatusNodeEnable, _StatusTaskDone, eng.ID, "")
+			err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, _StatusNodeTesting, _StatusTaskRunning, eng.ID, "")
 			if err != nil {
 				logrus.Error(eng.Addr, "TxUpdateNodeRegister", err)
 				continue
