@@ -519,6 +519,8 @@ install_horus_agent() {
 	# stop swarm-agent
 	pkill -9 horus-agent >/dev/null 2>&1
 
+	zypper --non-interactive install sysstat
+
 	# copy binary file
 	mkdir -p /usr/local/horus-agent
 	cp ${cur_dir}/horus-agent-1.3.1/bin/horus-agent /usr/bin/horus-agent; chmod 755 /usr/bin/horus-agent
