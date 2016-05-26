@@ -1,7 +1,6 @@
 package database
 
 import (
-	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -118,7 +117,6 @@ func (c Configurations) GetConsulClient() ([]*consulapi.Client, error) {
 		if err == nil {
 			clients = append(clients, client)
 		}
-		fmt.Println(config)
 	}
 
 	return clients, nil
