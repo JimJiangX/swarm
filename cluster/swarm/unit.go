@@ -289,11 +289,12 @@ func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
 }
 
 func (u *unit) removeContainer(force, rmVolumes bool) error {
-	if u.engine == nil {
+	engine := u.engine
+	if engine == nil {
 		if u.container == nil || u.container.Engine == nil {
 			return fmt.Errorf("Unit %s Engine is null", u.Name)
 		} else {
-			u.engine = u.container.Engine
+			engine = u.container.Engine
 		}
 	}
 
@@ -308,7 +309,7 @@ func (u *unit) removeContainer(force, rmVolumes bool) error {
 		}
 	}
 
-	err := u.engine.RemoveContainer(c, force, rmVolumes)
+	err := engine.RemoveContainer(c, force, rmVolumes)
 	if err != nil {
 		return err
 	}
