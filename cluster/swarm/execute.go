@@ -266,7 +266,7 @@ func (gd *Gardener) SaveContainerToConsul(container *cluster.Container) error {
 	}
 
 	pair := &consulapi.KVPair{
-		Key:   "/DBAAS/Conatainers/" + container.ID,
+		Key:   "DBAAS/Conatainers/" + container.ID,
 		Value: buf.Bytes(),
 	}
 	_, err = client.KV().Put(pair, nil)
