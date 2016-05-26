@@ -125,9 +125,8 @@ func UpdateUnitInfo(unit Unit) error {
 	return err
 }
 
-func TxDelUnit(tx *sqlx.Tx, id string) error {
-
-	_, err := tx.Exec("DELETE FROM tb_unit WHERE id=?", id)
+func TxDeleteUnit(tx *sqlx.Tx, NameOrID string) error {
+	_, err := tx.Exec("DELETE FROM tb_unit WHERE id=? OR name=? OR service_id=?", NameOrID, NameOrID, NameOrID)
 
 	return err
 }
@@ -246,7 +245,7 @@ func TxSaveService(svc Service, strategy *BackupStrategy, task *Task, users []Us
 	}
 
 	if len(users) > 0 {
-		err = TxInsertMultipleUsers(tx, users)
+		err = TxInsertUsers(tx, users)
 		if err != nil {
 			return err
 		}
@@ -329,6 +328,12 @@ func TxSetServiceStatus(svc *Service, task *Task, state, tstate int64, finish ti
 	return nil
 }
 
+func txDeleteService(tx *sqlx.Tx, NameOrID string) error {
+	_, err := tx.Exec("DELETE FROM tb_service WHERE id=? OR name=?", NameOrID, NameOrID)
+
+	return err
+}
+
 type User struct {
 	ID         string    `db:"id"`
 	ServiceID  string    `db:"service_id"`
@@ -344,7 +349,7 @@ func (u User) TableName() string {
 	return "tb_users"
 }
 
-func TxInsertMultipleUsers(tx *sqlx.Tx, users []User) error {
+func TxInsertUsers(tx *sqlx.Tx, users []User) error {
 	query := "INSERT INTO tb_users (id,service_id,type,username,password,role,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:created_at)"
 
 	stmt, err := tx.PrepareNamed(query)
@@ -364,4 +369,71 @@ func TxInsertMultipleUsers(tx *sqlx.Tx, users []User) error {
 	}
 
 	return nil
+}
+
+func txDeleteUsers(tx *sqlx.Tx, id string) error {
+	_, err := tx.Exec("DELETE FROM tb_users WHERE id=? OR service_id=?", id, id)
+
+	return err
+}
+func DeteleServiceRelation(serviceID string) error {
+	units, err := ListUnitByServiceID(serviceID)
+	if err != nil {
+		return err
+	}
+
+	// recycle networking & ports & volumes
+	ips := make([]IP, 0, 20)
+	ports := make([]Port, 0, 20)
+	volumes := make([]LocalVolume, 0, 20)
+	for i := range units {
+		ipl, err := ListIPByUnitID(units[i].ID)
+		if err == nil {
+			ips = append(ips, ipl...)
+		}
+		pl, err := GetPortsByUnit(units[i].ID)
+		if err == nil {
+			ports = append(ports, pl...)
+		}
+
+		vl, err := SelectVolumesByUnitID(units[i].ID)
+		if err == nil {
+			volumes = append(volumes, vl...)
+		}
+	}
+	for i := range ips {
+		ips[i].Allocated = false
+		ips[i].UnitID = ""
+	}
+	for i := range ports {
+		ports[i].Allocated = false
+		ports[i].Name = ""
+		ports[i].UnitID = ""
+		ports[i].Proto = ""
+	}
+
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = TxUpdateMultiIPValue(tx, ips)
+	err = TxUpdatePorts(tx, ports)
+
+	for i := range units {
+		err = TxDeleteVolumes(tx, units[i].ID)
+		err = txDeleteUnitConfig(tx, units[i].ConfigID)
+	}
+
+	err = txDeleteBackupStrategy(tx, serviceID)
+	err = txDeleteUsers(tx, serviceID)
+	err = TxDeleteUnit(tx, serviceID)
+
+	err = txDeleteService(tx, serviceID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }

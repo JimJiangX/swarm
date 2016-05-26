@@ -304,6 +304,12 @@ func DeleteBackupStrategy(id string) error {
 	return nil
 }
 
+func txDeleteBackupStrategy(tx *sqlx.Tx, id string) error {
+	_, err := tx.Exec("DELETE FROM tb_backup_strategy WHERE id=? OR service_id=?", id, id)
+
+	return err
+
+}
 func TxInsertBackupStrategy(tx *sqlx.Tx, strategy BackupStrategy) error {
 	query := "INSERT INTO tb_backup_strategy (id,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:type,:service_id,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
 	_, err := tx.NamedExec(query, &strategy)

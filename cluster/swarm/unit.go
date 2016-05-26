@@ -296,6 +296,7 @@ func (u *unit) removeContainer(force, rmVolumes bool) error {
 			u.engine = u.container.Engine
 		}
 	}
+
 	c := u.container
 	if c == nil {
 		c = &cluster.Container{

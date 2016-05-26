@@ -1005,7 +1005,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := gd.DeleteService(name, force, volumes, timeout)
+	err := gd.RemoveService(name, force, volumes, timeout)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return

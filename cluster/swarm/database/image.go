@@ -182,3 +182,9 @@ func DeleteUnitConfig(id string) error {
 
 	return err
 }
+
+func txDeleteUnitConfig(tx *sqlx.Tx, id string) error {
+	_, err := tx.Exec("DELETE FROM tb_unit_config WHERE id=?", id)
+
+	return err
+}

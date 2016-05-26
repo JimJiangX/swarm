@@ -692,8 +692,8 @@ func (svc *Service) stopService() error {
 	for _, u := range svc.units {
 		err := u.stopService()
 		if err != nil {
-			// return err
 			logrus.Errorf("container %s stop service error:%s", u.Name, err.Error())
+			// return err
 		}
 	}
 
@@ -1027,7 +1027,7 @@ func (svc *Service) Task() *database.Task {
 	return svc.task
 }
 
-func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int) error {
+func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int) error {
 	svc, err := gd.GetService(name)
 	if err != nil {
 		if err == ErrServiceNotFound {
@@ -1052,7 +1052,11 @@ func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int)
 		return err
 	}
 
-	// TODO: delete database records
+	// delete database records relation svc.ID
+	err = database.DeteleServiceRelation(svc.ID)
+	if err != nil {
+		return err
+	}
 
 	err = gd.RemoveCronJob(svc.backup.ID)
 	if err != nil {
@@ -1069,7 +1073,6 @@ func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int)
 	gd.Unlock()
 
 	return nil
-
 }
 
 func (svc *Service) Delete(client *consulapi.Client, horus string, force, volumes bool, timeout int) error {
@@ -1078,12 +1081,12 @@ func (svc *Service) Delete(client *consulapi.Client, horus string, force, volume
 
 	if err := svc.stopService(); err != nil {
 		logrus.Error("%s stop Service error:%s", svc.Name, err.Error())
-		return err
+		// return err
 	}
 
 	err := svc.stopContainers(timeout)
 	if err != nil {
-		return err
+		// return err
 	}
 
 	err = svc.removeContainers(force, volumes)

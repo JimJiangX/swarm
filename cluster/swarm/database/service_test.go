@@ -91,7 +91,7 @@ func TestUnit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = TxDelUnit(tx, unit2.ID)
+	err = TxDeleteUnit(tx, unit2.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -188,7 +188,7 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 				}
 			}
 			database.TxUpdatePorts(tx, ports)
-			database.TxDelUnit(tx, pendings[i].unit.Unit.ID)
+			database.TxDeleteUnit(tx, pendings[i].unit.Unit.ServiceID)
 			database.TxDeleteVolumes(tx, pendings[i].unit.Unit.ID)
 		}
 
