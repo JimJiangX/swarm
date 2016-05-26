@@ -49,7 +49,7 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 	networkings, err := gd.getNetworkingSetting(engine, preAlloc.unit.ID, req)
 	preAlloc.networkings = append(preAlloc.networkings, networkings...)
 	if err != nil {
-		logrus.Errorf("Alloc Networking Error:%s", err.Error())
+		logrus.Errorf("Alloc Networking Error:%s", err)
 
 		return err
 	}
@@ -75,7 +75,7 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 	// Alloc CPU
 	cpuset, err := allocCPUs(engine, ncpu)
 	if err != nil {
-		logrus.Errorf("Alloc CPU %d Error:%s", ncpu, err.Error())
+		logrus.Errorf("Alloc CPU %d Error:%s", ncpu, err)
 
 		return err
 	}
@@ -238,7 +238,7 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 
 		node, err = gd.GetNode(engine.ID)
 		if err != nil {
-			err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err.Error())
+			err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
 			logrus.Error(err)
 
 			return err

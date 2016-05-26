@@ -64,7 +64,7 @@ func (gd *Gardener) serviceScheduler() (err error) {
 				resourceAlloc = append(resourceAlloc, preAlloc...)
 			}
 			if err != nil {
-				entry.WithField("Module", svc.base.Modules[i].Name).Errorf("Alloction Failed %s", err.Error())
+				entry.WithField("Module", svc.base.Modules[i].Name).Errorf("Alloction Failed %s", err)
 				goto failure
 			}
 		}
@@ -118,7 +118,7 @@ func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module *struct
 	config = buildContainerConfig(config)
 
 	if err := validateContainerConfig(config); err != nil {
-		entry.Warnf("Container Config Validate:%s", err.Error())
+		entry.Warnf("Container Config Validate:%s", err)
 
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func (gd *Gardener) BuildPendingContainers(list []*node.Node, svc *Service, Type
 
 	preAllocs, err := gd.pendingAlloc(candidates[0:num], svc, Type, stores, config)
 	if err != nil {
-		entry.Errorf("gd.pendingAlloc: preAllocs Allocation Failed %s", err.Error())
+		entry.Errorf("gd.pendingAlloc: preAllocs Allocation Failed %s", err)
 		return preAllocs, err
 	}
 
@@ -238,7 +238,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type str
 
 	parentConfig, err := database.GetUnitConfigByID(image.ID)
 	if err != nil {
-		entry.Error("Not Found Template Config File,Error:%s", err.Error())
+		entry.Errorf("Not Found Template Config File,Error:%s", err)
 
 		return nil, err
 	}
@@ -286,7 +286,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type str
 		preAlloc, err := gd.pendingAllocOneNode(engine, unit, stores, config)
 		allocs = append(allocs, preAlloc)
 		if err != nil {
-			entry.Errorf("pendingAlloc:Alloc Resource %s", err.Error())
+			entry.Errorf("pendingAlloc:Alloc Resource %s", err)
 
 			return allocs, err
 		}
@@ -308,7 +308,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stor
 
 	err := gd.allocResource(preAlloc, engine, config)
 	if err != nil {
-		err = fmt.Errorf("Alloc Resource Error:%s", err.Error())
+		err = fmt.Errorf("Alloc Resource Error:%s", err)
 		entry.Error(err)
 
 		return preAlloc, err
@@ -321,7 +321,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stor
 
 	err = gd.allocStorage(preAlloc, engine, config, stores)
 	if err != nil {
-		entry.Errorf("Alloc Storage Error:%s", err.Error())
+		entry.Errorf("Alloc Storage Error:%s", err)
 
 		return preAlloc, err
 	}
@@ -347,7 +347,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stor
 
 	err = preAlloc.consistency()
 	if err != nil {
-		entry.Errorf("Pending Allocation Resouces,Consistency Error:%s", err.Error())
+		entry.Errorf("Pending Allocation Resouces,Consistency Error:%s", err)
 	}
 
 	return preAlloc, err
@@ -391,7 +391,7 @@ func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...
 
 		list, err := database.ListNodeByClusterType(dcTag, true)
 		if err != nil {
-			logrus.Errorf("Search in Database Error: %s", err.Error())
+			logrus.Errorf("Search in Database Error: %s", err)
 
 			return nil
 		}

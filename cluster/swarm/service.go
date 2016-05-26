@@ -140,6 +140,11 @@ func ValidService(req structs.PostServiceRequest) []string {
 		warnings = append(warnings, "Service Name should not be null")
 	}
 
+	_, err := database.GetService(req.Name)
+	if err == nil {
+		warnings = append(warnings, "Service Name exist")
+	}
+
 	arch, _, err := getServiceArch(req.Architecture)
 	if err != nil {
 		warnings = append(warnings, fmt.Sprintf("Parse 'Architecture' Failed,%s", err.Error()))
@@ -479,21 +484,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, *da
 	defer func() {
 		if err != nil {
 			logrus.WithField("Service Name", svc.Name).Errorf("Servcie Cleaned,%v", err)
-
-			if svc.backup != nil && svc.backup.ID != "" {
-				gd.RemoveCronJob(svc.backup.ID)
-			}
-			sys, err := database.GetSystemConfig()
-			if err != nil {
-				return
-			}
-			clients, err := sys.GetConsulClient()
-			if err != nil || len(clients) == 0 {
-				return
-			}
-
-			horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-			svc.Delete(clients[0], horus, true, true, 0)
+			gd.RemoveService(svc.Name, true, true, 0)
 		}
 	}()
 
@@ -1028,12 +1019,15 @@ func (svc *Service) Task() *database.Task {
 }
 
 func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int) error {
-	svc, err := gd.GetService(name)
+	service, err := database.GetService(name)
+	if err != nil {
+		return nil
+	}
+	svc, err := gd.GetService(service.ID)
 	if err != nil {
 		if err == ErrServiceNotFound {
 			return nil
 		}
-
 		return err
 	}
 
