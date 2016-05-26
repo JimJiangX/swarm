@@ -164,12 +164,10 @@ func (u *unit) getNetworkingAddr(networking, portName string) (addr string, port
 }
 
 func (u *unit) prepareCreateContainer() error {
-	for i := range u.networkings {
-		n := u.networkings[i]
-		err := u.createNetworking(n.IP.String(), n.Device, n.Prefix)
-		if err != nil {
-			return err
-		}
+
+	err := u.createNetworking()
+	if err != nil {
+		return err
 	}
 
 	// prepare for volumes
@@ -291,7 +289,30 @@ func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
 }
 
 func (u *unit) removeContainer(force, rmVolumes bool) error {
-	err := u.engine.RemoveContainer(u.container, force, rmVolumes)
+	if u.engine == nil {
+		if u.container == nil || u.container.Engine == nil {
+			return fmt.Errorf("Unit %s Engine is null", u.Name)
+		} else {
+			u.engine = u.container.Engine
+		}
+	}
+	c := u.container
+	if c == nil {
+		c = &cluster.Container{
+			Container: types.Container{
+				ID: u.ContainerID,
+			}}
+		if u.ContainerID == "" {
+			c.ID = u.Name
+		}
+	}
+
+	err := u.engine.RemoveContainer(c, force, rmVolumes)
+	if err != nil {
+		return err
+	}
+
+	err = u.removeNetworking()
 
 	return err
 }
@@ -325,26 +346,39 @@ func (u *unit) renameContainer(name string) error {
 	return client.ContainerRename(context.TODO(), u.container.ID, u.Unit.ID)
 }
 
-func (u *unit) createNetworking(ip, device string, prefix int) error {
-	config := sdk.IPDevConfig{
-		Device: device,
-		IPCIDR: fmt.Sprintf("%s/%d", ip, prefix),
-	}
-
+func (u *unit) createNetworking() error {
 	addr := u.getPluginAddr(pluginPort)
 
-	return sdk.CreateIP(addr, config)
+	for _, net := range u.networkings {
+		config := sdk.IPDevConfig{
+			Device: net.Device,
+			IPCIDR: fmt.Sprintf("%s/%d", net.IP.String(), net.Prefix),
+		}
+
+		err := sdk.CreateIP(addr, config)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (u *unit) removeNetworking(ip, device string, prefix int) error {
-	config := sdk.IPDevConfig{
-		Device: device,
-		IPCIDR: fmt.Sprintf("%s/%d", ip, prefix),
-	}
-
+func (u *unit) removeNetworking() error {
 	addr := u.getPluginAddr(pluginPort)
 
-	return sdk.RemoveIP(addr, config)
+	for _, net := range u.networkings {
+		config := sdk.IPDevConfig{
+			Device: net.Device,
+			IPCIDR: fmt.Sprintf("%s/%d", net.IP.String(), net.Prefix),
+		}
+
+		if err := sdk.RemoveIP(addr, config); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (u *unit) createVolume() (*cluster.Volume, error) {

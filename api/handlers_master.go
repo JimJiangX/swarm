@@ -552,10 +552,26 @@ func postServiceRecover(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	_ = name
 }
 
+// POST /services/{name:.*}/recreate
+func postServiceRecreate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+	err := gd.RecreateAndStartService(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // POST /services/{name:.*}/backup_strategy
 func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
-
 	req := structs.BackupStrategy{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

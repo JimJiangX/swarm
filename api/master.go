@@ -69,11 +69,12 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/clusters/nodes/{node}/enable":  postEnableNode,
 		"/clusters/nodes/{node}/disable": postDisableNode,
 
-		"/services":                   postService,
-		"/services/{name:.*}/start":   postServiceStart,
-		"/services/{name:.*}/stop":    postServiceStop,
-		"/services/{name:.*}/backup":  postServiceBackup,
-		"/services/{name:.*}/recover": postServiceRecover,
+		"/services":                    postService,
+		"/services/{name:.*}/start":    postServiceStart,
+		"/services/{name:.*}/stop":     postServiceStop,
+		"/services/{name:.*}/backup":   postServiceBackup,
+		"/services/{name:.*}/recover":  postServiceRecover,
+		"/services/{name:.*}/recreate": postServiceRecreate,
 
 		"/services/{name:.*}/backup_strategy":         postStrategyToService,
 		"/services/backup_strategy/{name:.*}/update":  postUpdateServiceStrategy,

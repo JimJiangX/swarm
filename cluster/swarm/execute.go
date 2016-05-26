@@ -62,12 +62,19 @@ func (gd *Gardener) serviceExecute() (err error) {
 		}
 		svc.Unlock()
 		logrus.Debug("[mg]exec done")
+
 		continue
 
 	failure:
 
-		//TODO:error handler
 		logrus.Errorf("Exec Error:%v", err)
+
+		for _, u := range svc.units {
+			if err := u.removeContainer(true, true); err != nil {
+				logrus.Errorf("remove container %s ,error:%s", u.Name, err)
+			}
+		}
+
 		err = database.TxSetServiceStatus(&svc.Service, svc.task, svc.Status, _StatusTaskFailed, time.Now(), err.Error())
 		if err != nil {
 			logrus.Errorf("Save Service %s Status Error:%v", svc.Name, err)
@@ -78,10 +85,40 @@ func (gd *Gardener) serviceExecute() (err error) {
 	return err
 }
 
+func (gd *Gardener) RecreateAndStartService(NameOrID string) error {
+	var svc *Service
+	gd.Lock()
+	for i := range gd.services {
+		if gd.services[i].ID == NameOrID || gd.services[i].Name == NameOrID {
+			svc = gd.services[i]
+			break
+		}
+	}
+	gd.Unlock()
+
+	if svc == nil {
+		return fmt.Errorf("Not Found Service %s", NameOrID)
+	}
+
+	val := atomic.LoadInt64(&svc.Status)
+	if val == _StatusServiceAlloction ||
+		val == _StatusServiceCreateFailed ||
+		val == _StatusServiceStartFailed {
+
+		return fmt.Errorf("Status Conflict:expected %d/%d/%d but got %d",
+			_StatusServiceAlloction, _StatusServiceCreateFailed, _StatusServiceStartFailed, val)
+	}
+
+	gd.ServiceToExecute(svc)
+
+	return nil
+}
+
 func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 	defer func() {
 		if err != nil {
-			logrus.Error(err)
+			logrus.Errorf("%s create Service Containers error:%s", svc.Name, err)
+
 			atomic.StoreInt64(&svc.Status, _StatusServiceCreateFailed)
 		}
 	}()
@@ -114,6 +151,14 @@ func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 
 	if err == nil {
 		svc.pendingContainers = nil
+	} else {
+		gd.scheduler.Lock()
+		for id, value := range svc.pendingContainers {
+			if _, ok := gd.pendingContainers[id]; !ok {
+				gd.pendingContainers[id] = value
+			}
+		}
+		gd.scheduler.Unlock()
 	}
 
 	return err
@@ -181,7 +226,7 @@ func (gd *Gardener) createContainerInPending(swarmID string, authConfig *types.A
 	pending, ok := gd.pendingContainers[swarmID]
 	gd.scheduler.Unlock()
 
-	if !ok || pending == nil || pending.Engine == nil {
+	if !ok || pending == nil || pending.Engine == nil || pending.Config == nil {
 		return nil, fmt.Errorf("Swarm ID Not Found in pendingContainers,%s", swarmID)
 	}
 
