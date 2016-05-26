@@ -462,19 +462,15 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svc, err := gd.CreateService(req)
+	svc, strategy, err := gd.CreateService(req)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	strategy := ""
-	if backup := svc.BackupStrategy(); backup != nil {
-		strategy = backup.ID
-	}
 
 	response := structs.PostServiceResponse{
 		ID:               svc.ID,
-		BackupStrategyID: strategy,
+		BackupStrategyID: strategy.ID,
 		TaskID:           svc.Task().ID,
 	}
 

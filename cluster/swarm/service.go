@@ -464,17 +464,17 @@ func (gd *Gardener) rebuildService(NameOrID string) (*Service, error) {
 
 }
 
-func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, err error) {
+func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, *database.BackupStrategy, error) {
 	authConfig, err := gd.RegistryAuthConfig()
 	if err != nil {
 		logrus.Error("get Registry Auth Config", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	svc, err := BuildService(req, authConfig)
 	if err != nil {
 		logrus.Error("Build Service", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	defer func() {
@@ -506,27 +506,32 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, e
 
 	svc.failureRetry = gd.createRetry
 
-	if err := gd.AddService(svc); err != nil {
+	err = gd.AddService(svc)
+	if err != nil {
 		logrus.WithField("Service Name", svc.Name).Errorf("Service Add to Gardener Error:%s", err.Error())
 
-		return svc, err
+		return svc, nil, err
 	}
+
+	svc.RLock()
+	defer svc.RUnlock()
 
 	if svc.backup != nil {
 		bs := NewBackupJob(gd.host, svc)
-		err := gd.RegisterBackupStrategy(bs)
+		err = gd.RegisterBackupStrategy(bs)
 		if err != nil {
 			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
 		}
 	}
 
-	if err := gd.ServiceToScheduler(svc); err != nil {
+	err = gd.ServiceToScheduler(svc)
+	if err != nil {
 		logrus.Error("Service Add To Scheduler", err)
-		return svc, err
+		return svc, svc.backup, err
 	}
 	logrus.Debugf("[mg] ServiceToScheduler ok:%v", svc)
 
-	return svc, nil
+	return svc, svc.backup, nil
 }
 
 func (svc *Service) StartService() error {
@@ -1002,11 +1007,8 @@ func (svc *Service) TryBackupTask(host, unitID, strategyID, strategyType string,
 }
 
 func (svc *Service) Task() *database.Task {
-	svc.RLock()
-	task := svc.task
-	svc.RUnlock()
 
-	return task
+	return svc.task
 }
 
 func (gd *Gardener) DeleteService(name string, force, volumes bool, timeout int) error {
