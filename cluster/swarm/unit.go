@@ -439,8 +439,8 @@ func (u *unit) RegisterHealthCheck(config database.ConsulConfig, context *Servic
 	}
 
 	if u.Type == _UpsqlType {
-		swm, err := context.getSwithManagerUnit()
-		if err == nil && swm != nil {
+		swm := context.getSwithManagerUnit()
+		if swm != nil {
 			check.Tags = []string{fmt.Sprintf("swm_key=%s/%s/topology", context.ID, swm.ID)}
 		}
 	}

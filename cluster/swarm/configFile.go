@@ -403,8 +403,8 @@ func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interf
 
 	m["upsql-proxy::event-threads-count"] = u.config.HostConfig.CpusetCpus
 
-	swm, err := svc.getSwithManagerUnit()
-	if err == nil {
+	swm := svc.getSwithManagerUnit()
+	if swm != nil {
 		swmProxyPort := 0
 		for i := range swm.ports {
 			if swm.ports[i].Name == "ProxyPort" {

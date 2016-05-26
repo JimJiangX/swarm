@@ -16,7 +16,6 @@ import (
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
 	consulapi "github.com/hashicorp/consul/api"
-	"github.com/yiduoyunQ/sm/sm-svr/consts"
 	swm_structs "github.com/yiduoyunQ/sm/sm-svr/structs"
 	"github.com/yiduoyunQ/smlib"
 )
@@ -745,11 +744,12 @@ func (svc *Service) refreshTopology() error {
 }
 
 func (svc *Service) initTopology() error {
-	swm, err := svc.getSwithManagerUnit()
-	if err != nil {
-		return err
+	swm := svc.getSwithManagerUnit()
+	sqls := svc.getUnitByType(_UpsqlType)
+	proxys := svc.getUnitByType(_ProxyType)
+	if len(proxys) == 0 || len(sqls) == 0 || swm == nil {
+		return nil
 	}
-
 	addr, port, err := swm.getNetworkingAddr(_ContainersNetworking, "Port")
 	if err != nil {
 		return err
@@ -758,10 +758,6 @@ func (svc *Service) initTopology() error {
 		addr = swm.engine.IP
 	}
 
-	proxys, err := svc.getUnitByType(_ProxyType)
-	if err != nil {
-		return err
-	}
 	proxyNames := make([]string, len(proxys))
 	for i := range proxys {
 		proxyNames[i] = proxys[i].ID
@@ -779,17 +775,16 @@ func (svc *Service) initTopology() error {
 		}
 	}
 
-	sqls, err := svc.getUnitByType(_UpsqlType)
-	if err != nil {
-		return err
-	}
-	arch := consts.Type_M
-	if len(sqls) == 1 {
-		arch = consts.Type_M
-	} else if len(sqls) == 2 {
-		arch = consts.Type_M_SB
-	} else if len(sqls) > 2 {
-		arch = consts.Type_M_SB_SL
+	arch := _DB_Type_M
+	switch num := len(sqls); {
+	case num == 1:
+		arch = _DB_Type_M
+	case num == 2:
+		arch = _DB_Type_M_SB
+	case num > 2:
+		arch = _DB_Type_M_SB_SL
+	default:
+		return fmt.Errorf("get %d units by type:%d", num, _UpsqlType)
 	}
 
 	dataNodes := make(map[string]swm_structs.DatabaseInfo, len(sqls))
@@ -886,7 +881,7 @@ func (svc *Service) deregisterInHorus(addr string) error {
 	return deregisterToHorus(addr, endpoints)
 }
 
-func (svc *Service) getUnitByType(Type string) ([]*unit, error) {
+func (svc *Service) getUnitByType(Type string) []*unit {
 	units := make([]*unit, 0, len(svc.units))
 	for _, u := range svc.units {
 		if u.Type == Type {
@@ -894,29 +889,31 @@ func (svc *Service) getUnitByType(Type string) ([]*unit, error) {
 		}
 	}
 	if len(units) > 0 {
-		return units, nil
+		return units
 	}
 
-	return nil, fmt.Errorf("Not Found unit %s In Service %s", Type, svc.ID)
+	logrus.Warnf("Not Found unit %s In Service %s", Type, svc.ID)
+
+	return nil
 }
 
-func (svc *Service) getSwithManagerUnit() (*unit, error) {
-	units, err := svc.getUnitByType(_UnitRole_SwitchManager)
-
-	if err != nil || len(units) != 1 {
-		return nil, fmt.Errorf("Unexpected num about %s unit,got %d,error:%v", _UnitRole_SwitchManager, len(units), err)
+func (svc *Service) getSwithManagerUnit() *unit {
+	units := svc.getUnitByType(_UnitRole_SwitchManager)
+	if len(units) != 1 {
+		logrus.Warnf("Unexpected num about %s unit,got %d", _UnitRole_SwitchManager, len(units))
+		return nil
 	}
 
-	return units[0], nil
+	return units[0]
 }
 
 func (svc *Service) GetSwitchManagerAndMaster() (string, int, *unit, error) {
 	svc.RLock()
 	defer svc.RUnlock()
 
-	swm, err := svc.getSwithManagerUnit()
-	if err != nil {
-		return "", 0, nil, err
+	swm := svc.getSwithManagerUnit()
+	if swm == nil {
+		return "", 0, nil, nil
 	}
 
 	addr, port, err := swm.getNetworkingAddr(_ContainersNetworking, "Port")
@@ -971,7 +968,7 @@ func (svc *Service) TryBackupTask(host, unitID, strategyID, strategyType string,
 		}
 
 		addr, port, master, err := svc.GetSwitchManagerAndMaster()
-		if err != nil {
+		if err != nil || master == nil {
 			if retries > 0 {
 				continue
 			}
