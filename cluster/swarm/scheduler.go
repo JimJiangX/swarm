@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"runtime/debug"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
+	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/scheduler/node"
 )
 
@@ -164,10 +166,16 @@ func (gd *Gardener) BuildPendingContainers(list []*node.Node, svc *Service, Type
 
 	entry := logrus.WithFields(logrus.Fields{"Name": svc.Name, "Module": Type})
 
+	highAvaliable := false
+	for i := range stores {
+		if !strings.Contains(stores[i].Type, store.LocalDiskStore) {
+			highAvaliable = true
+		}
+	}
 	gd.scheduler.Lock()
 	defer gd.scheduler.Unlock()
 
-	candidates, err := gd.Scheduler(list, config, num, withImageAffinity)
+	candidates, err := gd.Scheduler(list, config, num, withImageAffinity, highAvaliable)
 	if err != nil {
 		entry.Warnf("Failed to scheduler: %s", err)
 
@@ -178,14 +186,14 @@ func (gd *Gardener) BuildPendingContainers(list []*node.Node, svc *Service, Type
 			// Check if the image exists in the cluster
 			// If exists, retry with a image affinity
 			if gd.Image(config.Image) != nil {
-				candidates, err = gd.Scheduler(list, config, num, true)
+				candidates, err = gd.Scheduler(list, config, num, true, highAvaliable)
 				retries++
 			}
 		}
 
 		for ; retries < gd.createRetry && err != nil; retries++ {
 			entry.Warnf("Failed to scheduler: %s, retrying", err)
-			candidates, err = gd.Scheduler(list, config, num, true)
+			candidates, err = gd.Scheduler(list, config, num, true, highAvaliable)
 		}
 	}
 
@@ -341,7 +349,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stor
 	return preAlloc, err
 }
 
-func (gd *Gardener) Scheduler(list []*node.Node, config *cluster.ContainerConfig, num int, withImageAffinity bool) ([]*node.Node, error) {
+func (gd *Gardener) Scheduler(list []*node.Node, config *cluster.ContainerConfig, num int, withImageAffinity, highAvaliable bool) ([]*node.Node, error) {
 	if network := gd.Networks().Get(string(config.HostConfig.NetworkMode)); network != nil && network.Scope == "local" {
 		if !config.HaveNodeConstraint() {
 			config.AddConstraint("node==~" + network.Engine.Name)
@@ -365,7 +373,7 @@ func (gd *Gardener) Scheduler(list []*node.Node, config *cluster.ContainerConfig
 	}
 
 	logrus.Debugf("[**MG**] gd.scheduler.SelectNodesForContainer ok(swarm level) ndoes:%v", nodes)
-	return gd.SelectNodeByCluster(nodes, num, true)
+	return gd.SelectNodeByCluster(nodes, num, highAvaliable)
 }
 
 // listCandidateNodes returns all validated engines in the cluster, excluding pendingEngines.
