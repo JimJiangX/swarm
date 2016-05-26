@@ -129,11 +129,13 @@ func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 		u.Unit.ContainerID = container.ID
 
 		if err := u.saveToDisk(); err != nil {
+			logrus.Errorf("update unit %s value error:%s,value:%v", u.Name, err, u)
 			return err
 		}
 
 		err = gd.SaveContainerToConsul(container)
 		if err != nil {
+			logrus.Errorf("Save Container To Consul error:%s", err.Error())
 			// return err
 		}
 	}
