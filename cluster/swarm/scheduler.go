@@ -246,7 +246,9 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type str
 	allocs := make([]*preAllocResource, 0, 5)
 
 	for i := range candidates {
+		config := cloneContainerConfig(templConfig)
 		id := gd.generateUniqueID()
+
 		engine, ok := gd.engines[candidates[i].ID]
 		if !ok || engine == nil {
 			err := fmt.Errorf("Engine %s Not Found", candidates[i].ID)
@@ -267,7 +269,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type str
 				ConfigID:      parentConfig.ID,
 				Status:        0,
 				CheckInterval: 0,
-				NetworkMode:   templConfig.HostConfig.NetworkMode.NetworkName(),
+				NetworkMode:   config.HostConfig.NetworkMode.NetworkName(),
 				CreatedAt:     time.Now(),
 			},
 			engine: engine,
@@ -281,7 +283,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type str
 			return allocs, err
 		}
 
-		preAlloc, err := gd.pendingAllocOneNode(engine, unit, stores, templConfig)
+		preAlloc, err := gd.pendingAllocOneNode(engine, unit, stores, config)
 		allocs = append(allocs, preAlloc)
 		if err != nil {
 			entry.Errorf("pendingAlloc:Alloc Resource %s", err.Error())
@@ -295,7 +297,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type str
 	return allocs, nil
 }
 
-func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stores []structs.DiskStorage, templConfig *cluster.ContainerConfig) (*preAllocResource, error) {
+func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stores []structs.DiskStorage, config *cluster.ContainerConfig) (*preAllocResource, error) {
 	preAlloc := newPreAllocResource()
 	preAlloc.unit = unit
 
@@ -304,7 +306,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stor
 		"Unit":   unit.Name,
 	})
 
-	config, err := gd.allocResource(preAlloc, engine, *templConfig)
+	err := gd.allocResource(preAlloc, engine, config)
 	if err != nil {
 		err = fmt.Errorf("Alloc Resource Error:%s", err.Error())
 		entry.Error(err)
@@ -329,6 +331,8 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stor
 		// Associate a Swarm ID to the container we are creating.
 		swarmID = gd.generateUniqueID()
 		config.SetSwarmID(swarmID)
+	} else {
+		logrus.Warnf("ContainerConfig.SwarmID() Should be null bug got %s", swarmID)
 	}
 
 	preAlloc.swarmID = swarmID

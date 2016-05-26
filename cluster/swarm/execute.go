@@ -125,14 +125,15 @@ func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 		logrus.Debug("container created:", container)
 
 		u.container = container
+		u.config = container.Config
 		u.Unit.ContainerID = container.ID
+
+		if err := u.saveToDisk(); err != nil {
+			return err
+		}
 
 		err = gd.SaveContainerToConsul(container)
 		if err != nil {
-			// return err
-		}
-
-		if err := u.saveToDisk(); err != nil {
 			// return err
 		}
 	}

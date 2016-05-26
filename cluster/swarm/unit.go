@@ -220,11 +220,11 @@ func (u *unit) pullImage(authConfig *types.AuthConfig) error {
 		}
 	}
 
-	if image := u.engine.Image(u.config.Image); image != nil {
-		return nil
+	if image := u.engine.Image(u.config.Image); image == nil {
+		return fmt.Errorf("Not Found Image %s On Engine %s:%s", u.config.Image, u.engine.ID, u.engine.Addr)
 	}
 
-	return err
+	return nil
 }
 
 func (u *unit) createLocalDiskVolume(name string) (*cluster.Volume, error) {

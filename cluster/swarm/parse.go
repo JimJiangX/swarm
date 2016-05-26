@@ -77,6 +77,44 @@ func buildContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerCon
 	return config
 }
 
+func cloneContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerConfig {
+	logrus.Debugf("ContainerConfig %+v", config)
+
+	clone := *config
+	clone.ExposedPorts = make(map[nat.Port]struct{})
+	clone.Cmd = make([]string, 0, 5)
+	clone.Env = make([]string, 0, 5)
+	clone.Labels = make(map[string]string, 5)
+	clone.HostConfig.Binds = make([]string, 0, 5)
+	clone.Volumes = make(map[string]struct{})
+	clone.Entrypoint = make([]string, 0)
+	clone.OnBuild = make([]string, 0)
+
+	if len(config.Cmd) > 0 {
+		clone.Cmd = append(clone.Cmd, config.Cmd...)
+	}
+	if len(config.Env) > 0 {
+		clone.Env = append(clone.Env, config.Env...)
+	}
+	if len(config.HostConfig.Binds) > 0 {
+		clone.HostConfig.Binds = append(clone.HostConfig.Binds, config.HostConfig.Binds...)
+	}
+
+	if len(config.ExposedPorts) > 0 {
+		for key, value := range config.ExposedPorts {
+			clone.ExposedPorts[key] = value
+		}
+	}
+
+	if len(config.Labels) > 0 {
+		for key, value := range config.Labels {
+			clone.Labels[key] = value
+		}
+	}
+
+	return &clone
+}
+
 func ParseCPUSets(val string) (map[int]bool, error) {
 	return utils.ParseUintList(val)
 }

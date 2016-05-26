@@ -12,7 +12,7 @@ import (
 	"github.com/docker/swarm/cluster/swarm/store"
 )
 
-func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.Engine, config cluster.ContainerConfig) (*cluster.ContainerConfig, error) {
+func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.Engine, config *cluster.ContainerConfig) error {
 	// TODO:clone config pointer params values
 	constraint := fmt.Sprintf("constraint:node==%s", engine.ID)
 	config.Env = append(config.Env, constraint)
@@ -27,7 +27,7 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 		if err != nil || len(ports) < length {
 			logrus.Errorf("Alloc Ports Error:%v", err)
 
-			return nil, err
+			return err
 		}
 
 		for i := range req.ports {
@@ -51,7 +51,7 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 	if err != nil {
 		logrus.Errorf("Alloc Networking Error:%s", err.Error())
 
-		return nil, err
+		return err
 	}
 
 	for i := range networkings {
@@ -65,11 +65,11 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 		}
 	}
 
-	ncpu, err := parseCpuset(&config)
+	ncpu, err := parseCpuset(config)
 	if err != nil {
 		logrus.Error(err)
 
-		return nil, err
+		return err
 	}
 
 	// Alloc CPU
@@ -77,12 +77,12 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 	if err != nil {
 		logrus.Errorf("Alloc CPU %d Error:%s", ncpu, err.Error())
 
-		return nil, err
+		return err
 	}
 
 	config.HostConfig.CpusetCpus = cpuset
 
-	return &config, nil
+	return nil
 }
 
 func allocCPUs(engine *cluster.Engine, ncpu int) (string, error) {
