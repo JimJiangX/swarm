@@ -85,73 +85,93 @@ func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 		}
 	}()
 
-	for _, pending := range svc.pendingContainers {
+	length := len(svc.pendingContainers)
+	errCh := make(chan error, length)
 
-		logrus.Debugf("[mg]svc.getUnit :%v", pending)
-		u, err := svc.getUnit(pending.Name)
-		if err != nil || u == nil {
-			logrus.Errorf("%s:getunit err:%v", pending.Name, err)
-			return err
-		}
-		logrus.Debugf("[mg]the unit:%v", u)
+	for swarmID := range svc.pendingContainers {
+		go func(gd *Gardener, swarmID string) {
+			err := svc.createPendingContainer(gd, swarmID)
+			if err != nil {
+				logrus.Errorf("swarmID %s,Error:%s", swarmID, err)
+			}
 
-		logrus.Debugf("[mg]start pull image %s", u.config.Image)
-		authConfig, err := gd.RegistryAuthConfig()
-		if err != nil {
-			logrus.Errorf("get RegistryAuthConfig Error:%s", err.Error())
-			return err
-		}
+			errCh <- err
 
-		if err := u.pullImage(authConfig); err != nil {
-			logrus.Errorf("pullImage Error:%s", err.Error())
-			return err
-		}
+		}(gd, swarmID)
+	}
 
-		logrus.Debug("[mg]prepare for Creating Container")
-		err = u.prepareCreateContainer()
-		if err != nil {
-			err = fmt.Errorf("%s:Prepare Networking or Volume Failed,%s", pending.Name, err)
-			logrus.Error(err.Error())
-			return err
-		}
-
-		logrus.Debug("[mg]create container")
-		container, err := gd.createContainerInPending(pending.Config, pending.Name, svc.authConfig)
-		if err != nil {
-			err = fmt.Errorf("Container Create Failed %s,%s", pending.Name, err)
-			logrus.Error(err.Error())
-			return err
-		}
-		logrus.Debug("container created:", container)
-
-		u.container = container
-		u.config = container.Config
-		u.Unit.ContainerID = container.ID
-
-		if err := u.saveToDisk(); err != nil {
-			logrus.Errorf("update unit %s value error:%s,value:%v", u.Name, err, u)
-			return err
-		}
-
-		err = gd.SaveContainerToConsul(container)
-		if err != nil {
-			logrus.Errorf("Save Container To Consul error:%s", err.Error())
-			// return err
+	for i := 0; i < length; i++ {
+		err1 := <-errCh
+		if err1 != nil {
+			err = err1
 		}
 	}
 
-	svc.pendingContainers = nil
+	if err == nil {
+		svc.pendingContainers = nil
+	}
+
+	return err
+}
+
+func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) error {
+	if swarmID == "" {
+		return fmt.Errorf("The swarmID is Null")
+	}
+	pending := svc.pendingContainers[swarmID]
+	if pending == nil || pending.Config == nil || pending.Engine == nil {
+		return fmt.Errorf("pendingContainer or ContainerConfig or Engine is nil")
+	}
+	logrus.Debugf("[mg]svc.getUnit :%v", pending)
+
+	u, err := svc.getUnit(pending.Name)
+	if err != nil || u == nil {
+		return fmt.Errorf("%s:getunit err:%v", pending.Name, err)
+	}
+	logrus.Debugf("[mg]the unit:%v", u)
+
+	logrus.Debugf("[mg]start pull image %s", u.config.Image)
+	authConfig, err := gd.RegistryAuthConfig()
+	if err != nil {
+		return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
+	}
+
+	if err := u.pullImage(authConfig); err != nil {
+		return fmt.Errorf("pullImage Error:%s", err)
+	}
+
+	logrus.Debug("[mg]prepare for Creating Container")
+	err = u.prepareCreateContainer()
+	if err != nil {
+		return fmt.Errorf("%s:Prepare Networking or Volume Failed,%s", pending.Name, err)
+	}
+
+	logrus.Debug("[mg]create container")
+	container, err := gd.createContainerInPending(swarmID, svc.authConfig)
+	if err != nil {
+		return fmt.Errorf("Container Create Failed %s,%s", pending.Name, err)
+	}
+	logrus.Debug("container created:", container)
+
+	u.container = container
+	u.config = container.Config
+	u.Unit.ContainerID = container.ID
+
+	if err := u.saveToDisk(); err != nil {
+		return fmt.Errorf("update unit %s value error:%s,value:%v", u.Name, err, u)
+	}
+
+	err = gd.SaveContainerToConsul(container)
+	if err != nil {
+		logrus.Errorf("Save Container To Consul error:%s", err.Error())
+		// return err
+	}
 
 	return nil
 }
 
 // createContainerInPending create new container into the cluster.
-func (gd *Gardener) createContainerInPending(config *cluster.ContainerConfig, name string, authConfig *types.AuthConfig) (*cluster.Container, error) {
-	swarmID := config.SwarmID()
-	if swarmID == "" {
-		return nil, fmt.Errorf("Conflict: The swarmID is Null,assign %s to a container", name)
-	}
-
+func (gd *Gardener) createContainerInPending(swarmID string, authConfig *types.AuthConfig) (*cluster.Container, error) {
 	gd.scheduler.Lock()
 	pending, ok := gd.pendingContainers[swarmID]
 	gd.scheduler.Unlock()
@@ -161,12 +181,12 @@ func (gd *Gardener) createContainerInPending(config *cluster.ContainerConfig, na
 	}
 
 	engine := pending.Engine
-	container, err := engine.Create(config, name, true, authConfig)
+	container, err := engine.Create(pending.Config, pending.Name, true, authConfig)
 
 	if err != nil {
 		for retries := int64(0); retries < gd.createRetry && err != nil; retries++ {
 			logrus.WithFields(logrus.Fields{"Name": "Swarm"}).Warnf("Failed to create container: %s, retrying", err)
-			container, err = engine.Create(config, name, true, authConfig)
+			container, err = engine.Create(pending.Config, pending.Name, true, authConfig)
 		}
 	}
 

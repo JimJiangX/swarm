@@ -200,8 +200,10 @@ func (gd *Gardener) consulAPIClient(full bool) (*consulapi.Client, error) {
 	if !full {
 		gd.RLock()
 		if gd.consulClient != nil {
-			gd.RUnlock()
-			return gd.consulClient, nil
+			if _, err := gd.consulClient.Status().Leader(); err == nil {
+				gd.RUnlock()
+				return gd.consulClient, nil
+			}
 		}
 		gd.RUnlock()
 	}
@@ -218,7 +220,10 @@ func (gd *Gardener) consulAPIClient(full bool) (*consulapi.Client, error) {
 	for i := range clients {
 		_, err := clients[i].Status().Leader()
 		if err == nil {
+			gd.Lock()
 			gd.setConsulClient(clients[i])
+			gd.Unlock()
+
 			return clients[i], nil
 		}
 	}
