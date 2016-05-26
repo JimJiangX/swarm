@@ -595,14 +595,33 @@ func (svc *Service) copyServiceConfig() error {
 }
 
 func (svc *Service) initService() error {
+	wg := new(sync.WaitGroup)
+	errCh := make(chan error, 5)
 	for _, u := range svc.units {
-		err := u.initService()
-		if err != nil {
-			return err
+		wg.Add(1)
+
+		go func(u *unit, wg *sync.WaitGroup, ch chan error) {
+			defer wg.Done()
+
+			err := u.initService()
+			if err != nil {
+				logrus.Errorf("container %s init service error:%s", u.Name, err)
+				ch <- err
+			}
+		}(u, wg, errCh)
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	var err error = nil
+	for err1 := range errCh {
+		if err1 != nil {
+			err = err1
 		}
 	}
 
-	return nil
+	return err
 }
 
 func (svc *Service) checkStatus(expected int64) error {
@@ -807,7 +826,7 @@ func (svc *Service) initTopology() error {
 		logrus.Errorf("%s Init Topology Error %s", svc.Name, err)
 	}
 
-	return nil
+	return err
 }
 
 func (svc *Service) registerServices(config database.ConsulConfig) (err error) {

@@ -86,7 +86,7 @@ func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 		}
 	}()
 
-	errCh := make(chan error, len(svc.pendingContainers))
+	errCh := make(chan error, 5)
 	wg := new(sync.WaitGroup)
 
 	for swarmID := range svc.pendingContainers {
