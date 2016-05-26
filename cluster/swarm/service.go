@@ -774,7 +774,7 @@ func (svc *Service) initTopology() error {
 		if err != nil {
 			return err
 		}
-		dataNodes[sqls[i].ID] = swm_structs.DatabaseInfo{
+		dataNodes[sqls[i].Name] = swm_structs.DatabaseInfo{
 			Ip:   ip,
 			Port: dataPort,
 		}

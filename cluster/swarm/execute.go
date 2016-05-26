@@ -87,7 +87,7 @@ func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 
 	for _, pending := range svc.pendingContainers {
 
-		logrus.Debugf("[mg]svc.getUnit :%s", pending)
+		logrus.Debugf("[mg]svc.getUnit :%v", pending)
 		u, err := svc.getUnit(pending.Name)
 		if err != nil || u == nil {
 			logrus.Errorf("%s:getunit err:%v", pending.Name, err)
