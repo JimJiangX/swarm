@@ -775,7 +775,7 @@ func (svc *Service) initTopology() error {
 
 	dataNodes := make(map[string]swm_structs.DatabaseInfo, len(sqls))
 	for i := range sqls {
-		ip, dataPort, err := swm.getNetworkingAddr(_ContainersNetworking, "mysqld::port")
+		ip, dataPort, err := sqls[i].getNetworkingAddr(_ContainersNetworking, "mysqld::port")
 		if err != nil {
 			return err
 		}

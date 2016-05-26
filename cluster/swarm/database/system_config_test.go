@@ -5,7 +5,7 @@ import "testing"
 func TestSystemConfig(t *testing.T) {
 	test := Configurations{
 		ConsulConfig: ConsulConfig{
-			ConsulIPs:        "146.240.104.23",
+			ConsulIPs:        "146.240.104.23,146.240.104.24,146.240.104.25",
 			ConsulPort:       8500,
 			ConsulDatacenter: "dc1",
 			ConsulToken:      "",
@@ -31,6 +31,9 @@ func TestSystemConfig(t *testing.T) {
 		Retry:      0,
 	}
 	t.Log(test.DestPath())
+	t.Log(test.ConsulIPs, test.GetConsulAddrs())
+	t.Log(test.GetConsulConfig())
+	t.Log(test.GetConsulClient())
 
 	id, err := test.Insert()
 	if err != nil {

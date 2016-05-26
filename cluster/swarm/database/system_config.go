@@ -100,6 +100,7 @@ func (c Configurations) Insert() (int64, error) {
 
 	return r.LastInsertId()
 }
+
 func (c Configurations) GetConsulClient() ([]*consulapi.Client, error) {
 	port := strconv.Itoa(c.ConsulPort)
 	addrs := strings.Split(c.ConsulIPs, ",")
@@ -107,7 +108,7 @@ func (c Configurations) GetConsulClient() ([]*consulapi.Client, error) {
 
 	for i := range addrs {
 		config := consulapi.Config{
-			Address:    fmt.Sprintf("%s:%d", addrs[i], port),
+			Address:    addrs[i] + ":" + port,
 			Datacenter: c.ConsulDatacenter,
 			WaitTime:   time.Duration(c.ConsulWaitTime) * time.Second,
 			Token:      c.ConsulToken,
@@ -117,6 +118,7 @@ func (c Configurations) GetConsulClient() ([]*consulapi.Client, error) {
 		if err == nil {
 			clients = append(clients, client)
 		}
+		fmt.Println(config)
 	}
 
 	return clients, nil

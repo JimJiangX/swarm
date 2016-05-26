@@ -154,10 +154,9 @@ func (u *unit) getNetworkingAddr(networking, portName string) (addr string, port
 	}
 
 	for i := range u.ports {
-		if u.ports[i].Name == "Port" {
-			port = u.ports[i].Port
+		if u.ports[i].Name == portName {
 
-			return addr, port, nil
+			return addr, u.ports[i].Port, nil
 		}
 	}
 
@@ -517,7 +516,7 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 		MountName: volumes[cnf].Name,
 		Data:      string(content),
 		FDes:      path,
-		Mode:      "0666",
+		Mode:      "0600",
 	}
 
 	logrus.Debugf("default:%s\ndefaultUser:%v\nconfig:%s", u.parent.Content, data, config.Data)
