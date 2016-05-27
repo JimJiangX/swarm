@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"strconv"
 	"strings"
 	"time"
@@ -72,13 +73,40 @@ func (gd *Gardener) RemoveImage(id string) error {
 	return nil
 }
 
+// key is case sensitive,converte to lowcase
+func converteToKeysetParams(params []structs.KeysetParams) map[string]database.KeysetParams {
+	if len(params) == 0 {
+		return nil
+	}
+
+	keyset := make(map[string]database.KeysetParams, len(params))
+	for i := range params {
+		key := strings.ToLower(params[i].Key) // case sensitive
+		keyset[key] = database.KeysetParams{
+			Key:         params[i].Key,
+			CanSet:      params[i].CanSet,
+			MustRestart: params[i].MustRestart,
+			Description: params[i].Description,
+		}
+	}
+
+	return keyset
+}
+
 func LoadImage(req structs.PostLoadImageRequest) (string, error) {
+	content, err := ioutil.ReadFile(req.ConfigFilePath)
+	if err != nil {
+		err = fmt.Errorf("ReadAll From ConfigFile %s error:%s", req.ConfigFilePath, err)
+		logrus.Error(err.Error())
+
+		return "", err
+	}
 	parser, _, err := initialize(req.Name)
 	if err != nil {
 		return "", err
 	}
 
-	_, err = parser.ParseData([]byte(req.Content))
+	_, err = parser.ParseData(content)
 	if err != nil {
 		return "", fmt.Errorf("Parse PostLoadImageRequest.Content Error:%s", err.Error())
 	}
@@ -106,11 +134,11 @@ func LoadImage(req structs.PostLoadImageRequest) (string, error) {
 
 	unitConfig := database.UnitConfig{
 		ID:        utils.Generate64UUID(),
-		Path:      req.ConfigPath,
+		Mount:     req.ConfigMountPath,
 		Version:   0,
 		ParentID:  "",
-		Content:   req.Content,
-		KeySets:   req.KeySet,
+		Content:   string(content),
+		KeySets:   converteToKeysetParams(req.KeySet),
 		CreatedAt: time.Now(),
 	}
 

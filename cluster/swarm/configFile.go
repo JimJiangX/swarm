@@ -17,7 +17,7 @@ func (u unit) Path() string {
 		return "/"
 	}
 
-	return u.parent.Path
+	return u.parent.Mount
 }
 
 func (u unit) CanModify(data map[string]interface{}) ([]string, bool) {
@@ -29,7 +29,8 @@ func (u unit) CanModify(data map[string]interface{}) ([]string, bool) {
 	keys := make([]string, 0, len(u.parent.KeySets))
 
 	for key := range data {
-		if !u.parent.KeySets[key] {
+		// case sensitive
+		if !u.parent.KeySets[strings.ToLower(key)].CanSet {
 			keys = append(keys, key)
 			can = false
 		}
@@ -49,7 +50,8 @@ func (u unit) Verify(data map[string]interface{}) error {
 }
 
 func (u *unit) SetServiceConfig(key string, val interface{}) error {
-	if !u.parent.KeySets[key] {
+	// case sensitive
+	if !u.parent.KeySets[strings.ToLower(key)].CanSet {
 		return fmt.Errorf("Key %s cannot Set new Value", key)
 	}
 
@@ -72,7 +74,7 @@ func (u *unit) SaveConfigToDisk(content []byte) error {
 		ParentID:  u.parent.ID,
 		Content:   string(content),
 		KeySets:   u.parent.KeySets,
-		Path:      u.Path(),
+		Mount:     u.Path(),
 		CreatedAt: time.Now(),
 	}
 

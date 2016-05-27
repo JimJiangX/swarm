@@ -1,7 +1,9 @@
 package database
 
 import (
+	"bytes"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -98,16 +100,23 @@ func DeleteImage(ID string) error {
 }
 
 type UnitConfig struct {
-	ID            string          `db:"id"`
-	ImageID       string          `db:"image_id"`
-	Path          string          `db:"config_file_path"`
-	Version       int             `db:"version"`
-	ParentID      string          `db:"parent_id"`
-	Content       string          `db:"content"`         // map[string]interface{}
-	ConfigKeySets string          `db:"config_key_sets"` // map[string]bool
-	KeySets       map[string]bool `db:"-"`
+	ID            string                  `db:"id"`
+	ImageID       string                  `db:"image_id"`
+	Mount         string                  `db:"config_file_path"`
+	Version       int                     `db:"version"`
+	ParentID      string                  `db:"parent_id"`
+	Content       string                  `db:"content"`         // map[string]interface{}
+	ConfigKeySets string                  `db:"config_key_sets"` // map[string]KeysetParams
+	KeySets       map[string]KeysetParams `db:"-"`
 
 	CreatedAt time.Time `db:"created_at"`
+}
+
+type KeysetParams struct {
+	Key         string
+	CanSet      bool
+	MustRestart bool
+	Description string
 }
 
 func (u UnitConfig) TableName() string {
@@ -115,24 +124,22 @@ func (u UnitConfig) TableName() string {
 }
 
 func (c *UnitConfig) encode() error {
-	if len(c.KeySets) > 0 {
-		data, err := json.Marshal(c.KeySets)
-		if err != nil {
-			return err
-		}
+	buffer := bytes.NewBuffer(nil)
+	err := json.NewEncoder(buffer).Encode(c.KeySets)
 
-		c.ConfigKeySets = string(data)
+	if err == nil {
+		c.ConfigKeySets = buffer.String()
 	}
 
 	return nil
 }
 
 func (c *UnitConfig) decode() error {
-	if len(c.ConfigKeySets) > 0 {
-		err := json.Unmarshal([]byte(c.ConfigKeySets), &c.KeySets)
-		if err != nil {
-			return err
-		}
+	var val map[string]KeysetParams
+	dec := json.NewDecoder(strings.NewReader(c.ConfigKeySets))
+	err := dec.Decode(&val)
+	if err == nil {
+		c.KeySets = val
 	}
 
 	return nil

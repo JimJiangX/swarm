@@ -723,6 +723,7 @@ func (svc *Service) removeContainers(force, rmVolumes bool) error {
 
 			return err
 		}
+		logrus.Debugf("container %s removed", u.Name)
 	}
 
 	return nil
