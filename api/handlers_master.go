@@ -208,6 +208,57 @@ func getNetworkings(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// GET /image/{name:.*}
+func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	image, config, err := database.GetImageAndUnitConfig(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var labels map[string]string
+	err = json.NewDecoder(strings.NewReader(image.Labels)).Decode(&labels)
+	if err != nil {
+		labels = nil
+	}
+
+	var keysets map[string]structs.KeysetParams
+	if len(config.KeySets) > 0 {
+		keysets = make(map[string]structs.KeysetParams, len(config.KeySets))
+		for key, val := range config.KeySets {
+			keysets[key] = structs.KeysetParams{
+				Key:         val.Key,
+				CanSet:      val.CanSet,
+				MustRestart: val.MustRestart,
+				Description: val.Description,
+			}
+		}
+	}
+
+	resp := structs.GetImageResponse{
+		ID:       image.ID,
+		Name:     image.Name,
+		Version:  image.Version,
+		ImageID:  image.ImageID,
+		Labels:   labels,
+		Enabled:  image.Enabled,
+		Size:     image.Size,
+		UploadAt: utils.TimeToString(image.UploadAt),
+		TemplateConfig: structs.ImageConfigResponse{
+			ID:      config.ID,      // string `json:"config_id"`
+			Mount:   config.Mount,   // string `json:"config_mount_path"`
+			Content: config.Content, // string `json:"config_content"`
+			KeySet:  keysets,        // map[string]KeysetParams,
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
 // GET /tasks
 func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 

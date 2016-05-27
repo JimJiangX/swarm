@@ -65,6 +65,26 @@ func QueryImage(name, version string) (Image, error) {
 	return image, err
 }
 
+func GetImageAndUnitConfig(ID string) (Image, UnitConfig, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return Image{}, UnitConfig{}, err
+	}
+
+	image := Image{}
+	err = db.Get(&image, "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?", ID, ID)
+
+	config := UnitConfig{}
+	err = db.Get(&config, "SELECT * FROM tb_unit_config WHERE id=?", image.TemplateConfigID)
+	if err != nil {
+		return Image{}, UnitConfig{}, err
+	}
+
+	err = config.decode()
+
+	return image, config, err
+}
+
 func QueryImageByID(ID string) (Image, error) {
 	db, err := GetDB(true)
 	if err != nil {
@@ -106,7 +126,7 @@ type UnitConfig struct {
 	Version       int                     `db:"version"`
 	ParentID      string                  `db:"parent_id"`
 	Content       string                  `db:"content"`         // map[string]interface{}
-	ConfigKeySets string                  `db:"config_key_sets"` // map[string]KeysetParams
+	configKeySets string                  `db:"config_key_sets"` // map[string]KeysetParams
 	KeySets       map[string]KeysetParams `db:"-"`
 
 	CreatedAt time.Time `db:"created_at"`
@@ -128,7 +148,7 @@ func (c *UnitConfig) encode() error {
 	err := json.NewEncoder(buffer).Encode(c.KeySets)
 
 	if err == nil {
-		c.ConfigKeySets = buffer.String()
+		c.configKeySets = buffer.String()
 	}
 
 	return nil
@@ -136,7 +156,7 @@ func (c *UnitConfig) encode() error {
 
 func (c *UnitConfig) decode() error {
 	var val map[string]KeysetParams
-	dec := json.NewDecoder(strings.NewReader(c.ConfigKeySets))
+	dec := json.NewDecoder(strings.NewReader(c.configKeySets))
 	err := dec.Decode(&val)
 	if err == nil {
 		c.KeySets = val

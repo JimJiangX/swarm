@@ -21,3 +21,22 @@ type KeysetParams struct {
 	MustRestart bool   `json:"must_restart"`
 	Description string `json:",omitempty"`
 }
+
+type GetImageResponse struct {
+	ID             string              `json:"id"`
+	Name           string              `json:"name"`
+	Version        string              `json:"version"`
+	ImageID        string              `json:"docker_image_id"`
+	Labels         map[string]string   `json:"label"`
+	Enabled        bool                `json:"enabled"`
+	Size           int                 `json:"size"`
+	UploadAt       string              `json:"upload_at"`
+	TemplateConfig ImageConfigResponse `json:"template_config"`
+}
+
+type ImageConfigResponse struct {
+	ID      string                  `json:"config_id"`
+	Mount   string                  `json:"config_mount_path"`
+	Content string                  `json:"config_content"`
+	KeySet  map[string]KeysetParams `json:"config_keyset"`
+}
