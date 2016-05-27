@@ -419,16 +419,37 @@ func DeteleServiceRelation(serviceID string) error {
 	defer tx.Rollback()
 
 	err = TxUpdateMultiIPValue(tx, ips)
+	if err != nil {
+		return err
+	}
 	err = TxUpdatePorts(tx, ports)
+	if err != nil {
+		return err
+	}
 
 	for i := range units {
 		err = TxDeleteVolumes(tx, units[i].ID)
+		if err != nil {
+			return err
+		}
 		err = txDeleteUnitConfig(tx, units[i].ConfigID)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = txDeleteBackupStrategy(tx, serviceID)
+	if err != nil {
+		return err
+	}
 	err = txDeleteUsers(tx, serviceID)
+	if err != nil {
+		return err
+	}
 	err = TxDeleteUnit(tx, serviceID)
+	if err != nil {
+		return err
+	}
 
 	err = txDeleteService(tx, serviceID)
 	if err != nil {
