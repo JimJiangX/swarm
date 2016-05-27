@@ -719,7 +719,7 @@ func (svc *Service) removeContainers(force, rmVolumes bool) error {
 	for _, u := range svc.units {
 		err := u.removeContainer(force, rmVolumes)
 		if err != nil {
-			logrus.Errorf("container %s remove,-f=%b -v=%b,error:%s", u.Name, force, rmVolumes, err.Error())
+			logrus.Errorf("container %s remove,-f=%v -v=%v,error:%s", u.Name, force, rmVolumes, err.Error())
 
 			return err
 		}

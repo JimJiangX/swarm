@@ -118,7 +118,7 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 		logrus.Errorf("Cannot Query unit ports By UnitID %s,Error:%s", u.ID, err.Error())
 	}
 
-	u.networkings, err = getIPInfoByUnitID(u.ID)
+	u.networkings, err = u.getNetworkings()
 	if err != nil {
 		logrus.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err.Error())
 	}
@@ -134,9 +134,9 @@ func (u *unit) getNetworkings() ([]IPInfo, error) {
 	if len(u.networkings) > 0 {
 		return u.networkings, nil
 	}
-	networkings, err := getIPInfoByUnitID(u.ID)
+	networkings, err := getIPInfoByUnitID(u.ID, u.engine)
 	if err != nil {
-		return nil, fmt.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err.Error())
+		return nil, fmt.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err)
 	}
 
 	u.networkings = networkings

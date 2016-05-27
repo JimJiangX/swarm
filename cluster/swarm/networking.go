@@ -181,7 +181,7 @@ func (info IPInfo) String() string {
 	return fmt.Sprintf("%s/%d:%s", info.IP.String(), info.Prefix, info.Device)
 }
 
-func getIPInfoByUnitID(id string) ([]IPInfo, error) {
+func getIPInfoByUnitID(id string, engine *cluster.Engine) ([]IPInfo, error) {
 	ips, err := database.ListIPByUnitID(id)
 	if err != nil {
 		return nil, err
@@ -195,7 +195,24 @@ func getIPInfoByUnitID(id string) ([]IPInfo, error) {
 			return nil, err
 		}
 
-		out[i] = NewIPinfo(net, ips[i])
+		ip := NewIPinfo(net, ips[i])
+
+		if net.Type == _ContainersNetworking {
+			device, ok := engine.Labels[_Internal_NIC_Lable]
+			if !ok {
+				device = "bond1"
+			}
+			ip.Device = device
+		} else if net.Type == _ExternalAccessNetworking {
+
+			device, ok := engine.Labels[_External_NIC_Lable]
+			if !ok {
+				device = "bond2"
+			}
+			ip.Device = device
+		}
+
+		out[i] = ip
 	}
 
 	return out, nil
