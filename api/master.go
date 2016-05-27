@@ -91,7 +91,6 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/units/{unit:.*}/switchback": postUnitSwitchback,
 
 		"/ports":                         postImportPort,
-		"/ports/{port:[0-9]+}/disable":   postDisablePort,
 		"/networkings":                   postNetworking,
 		"/networkings/{name:.*}/enable":  postEnableNetworking,
 		"/networkings/{name:.*}/disable": postDisableNetworking,
@@ -116,6 +115,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/clusters/nodes/{node:.*}": deleteNode,
 
 		"/networkings/{name:.*}": deleteNetworking,
+		"/ports/{port:[0-9]+}":   deletePort,
 
 		"/storage/san/{name}":                        deleteStorage,
 		"/storage/san/{name}/raid_group/{rg:[0-9]+}": deleteRaidGroup,

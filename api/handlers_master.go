@@ -787,28 +787,6 @@ func postImportPort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%d}", "num", num)
 }
 
-// POST /ports/{port:[0-9]+}/disable
-func postDisablePort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	port := intValueOrZero(r, "port")
-	if port == 0 {
-		httpError(w, "port must be between 1~65535", http.StatusBadRequest)
-		return
-	}
-
-	err := database.SetPortAllocated(port, true)
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
 // Load Image
 // POST /image/load
 func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1076,6 +1054,28 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	}
 
 	err := gd.RemoveNetworking(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// DELETE /ports/{port:[0-9]+}
+func deletePort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	port := intValueOrZero(r, "port")
+	if port == 0 {
+		httpError(w, "port must in range 1~65535", http.StatusBadRequest)
+		return
+	}
+
+	err := database.DeletePort(port, false)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return

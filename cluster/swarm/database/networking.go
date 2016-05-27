@@ -52,13 +52,14 @@ func NewPort(port int, name, unit, proto string, allocated bool) Port {
 	}
 }
 
-func SetPortAllocated(port int, allocated bool) error {
+// Delete Port only if Port.Allocated==allocated
+func DeletePort(port int, allocated bool) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("UPDATE tb_port SET allocated=? WHERE port=?", allocated, port)
+	_, err = db.Exec("DELETE FROM tb_port WHERE port=? AND allocated=?", port, allocated)
 
 	return err
 }
