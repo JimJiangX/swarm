@@ -195,21 +195,19 @@ func getIPInfoByUnitID(id string, engine *cluster.Engine) ([]IPInfo, error) {
 			return nil, err
 		}
 
-		ip := NewIPinfo(net, ips[i])
+		ip, label := NewIPinfo(net, ips[i]), "bond1"
 
 		if net.Type == _ContainersNetworking {
-			device, ok := engine.Labels[_Internal_NIC_Lable]
-			if !ok {
-				device = "bond1"
-			}
-			ip.Device = device
+			ip.Device = "bond1"
+			label = _Internal_NIC_Lable
 		} else if net.Type == _ExternalAccessNetworking {
-
-			device, ok := engine.Labels[_External_NIC_Lable]
-			if !ok {
-				device = "bond2"
+			ip.Device = "bond2"
+			label = _External_NIC_Lable
+		}
+		if engine != nil && engine.Labels != nil {
+			if dev, ok := engine.Labels[label]; ok {
+				ip.Device = dev
 			}
-			ip.Device = device
 		}
 
 		out[i] = ip
@@ -221,35 +219,27 @@ func getIPInfoByUnitID(id string, engine *cluster.Engine) ([]IPInfo, error) {
 func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit string, req require) ([]IPInfo, error) {
 	networkings := make([]IPInfo, 0, 2)
 	for _, net := range req.networkings {
-		if net.Type == _ContainersNetworking {
-			ipinfo, err := gd.AllocIP("", _ContainersNetworking, unit)
-			if err != nil {
-				return nil, err
-			}
 
-			device, ok := engine.Labels[_Internal_NIC_Lable]
-			if !ok {
-				device = "bond1"
-			}
-			ipinfo.Device = device
-
-			networkings = append(networkings, ipinfo)
-
-		} else if net.Type == _ExternalAccessNetworking {
-
-			ipinfo, err := gd.AllocIP("", _ExternalAccessNetworking, unit)
-			if err != nil {
-				return networkings, err
-			}
-
-			device, ok := engine.Labels[_External_NIC_Lable]
-			if !ok {
-				device = "bond2"
-			}
-			ipinfo.Device = device
-
-			networkings = append(networkings, ipinfo)
+		ipinfo, err := gd.AllocIP("", net.Type, unit)
+		if err != nil {
+			return nil, err
 		}
+
+		label := _Internal_NIC_Lable
+		if net.Type == _ContainersNetworking {
+			label = _Internal_NIC_Lable
+			ipinfo.Device = "bond1"
+		} else if net.Type == _ExternalAccessNetworking {
+			label = _External_NIC_Lable
+			ipinfo.Device = "bond2"
+		}
+		if engine != nil && engine.Labels != nil {
+			if device, ok := engine.Labels[label]; ok {
+				ipinfo.Device = device
+			}
+		}
+
+		networkings = append(networkings, ipinfo)
 	}
 
 	return networkings, nil
