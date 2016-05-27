@@ -1154,20 +1154,20 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// DELETE /ports/{port}
+// DELETE /ports/{port:[0-9]+}
 func deletePort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+	port, err := strconv.Atoi(mux.Vars(r)["rg"])
+	if err != nil {
+		msg := fmt.Sprintf("Parse error:%s,port must in range 1~65535", err)
+		httpError(w, msg, http.StatusBadRequest)
 		return
 	}
-
-	port := intValueOrZero(r, "port")
 	if port <= 0 || port > 65535 {
 		httpError(w, "port must in range 1~65535", http.StatusBadRequest)
 		return
 	}
 
-	err := database.DeletePort(port, false)
+	err = database.DeletePort(port, false)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1197,14 +1197,9 @@ func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 // DELETE /storage/san/{name}/raid_group/{rg:[0-9]+}
 func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	san := mux.Vars(r)["name"]
 
-	rg, err := strconv.Atoi(r.Form.Get("rg"))
+	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
