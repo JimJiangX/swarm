@@ -142,7 +142,7 @@ func ValidService(req structs.PostServiceRequest) []string {
 
 	_, err := database.GetService(req.Name)
 	if err == nil {
-		warnings = append(warnings, "Service Name exist")
+		warnings = append(warnings, fmt.Sprintf("Service Name %s exist", req.Name))
 	}
 
 	arch, _, err := getServiceArch(req.Architecture)
@@ -1019,20 +1019,36 @@ func (svc *Service) Task() *database.Task {
 }
 
 func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int) error {
+	entry := logrus.WithFields(logrus.Fields{
+		"Name":    name,
+		"force":   force,
+		"volumes": volumes,
+	})
+	entry.Info("Removing Service...")
+
 	service, err := database.GetService(name)
 	if err != nil {
+		entry.Errorf("GetService From DB error:%s", err)
+
 		return nil
 	}
+	entry.Infof("Found Service %s:%s", service.Name, service.ID)
+
+	entry.Debug("GetService From Gardener...")
 	svc, err := gd.GetService(service.ID)
 	if err != nil {
 		if err == ErrServiceNotFound {
 			return nil
 		}
+		entry.Errorf("GetService From Gardener error:%s", err)
+
 		return err
 	}
 
+	entry.Debug("Prepare params,GetSystemConfig...")
 	sys, err := database.GetSystemConfig()
 	if err != nil {
+		entry.Errorf("GetSystemConfig error:%s", err)
 		return err
 	}
 	clients, err := sys.GetConsulClient()
@@ -1040,23 +1056,34 @@ func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int)
 		return fmt.Errorf("GetConsulClient error %v %v", err, sys)
 	}
 
+	entry.Debug("Service Delete... stop service & stop containers & rm containers & deregister")
 	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
 	err = svc.Delete(clients[0], horus, force, volumes, timeout)
 	if err != nil {
+		entry.Errorf("Service.Delete error:%s", err)
+
 		return err
 	}
 
 	// delete database records relation svc.ID
+	entry.Debug("DeteleServiceRelation...")
 	err = database.DeteleServiceRelation(svc.ID)
 	if err != nil {
+		entry.Errorf("DeteleServiceRelation error:%s", err)
+
 		return err
 	}
 
-	err = gd.RemoveCronJob(svc.backup.ID)
-	if err != nil {
-		return err
+	if svc.backup != nil {
+		err = gd.RemoveCronJob(svc.backup.ID)
+		if err != nil {
+			entry.Errorf("RemoveCronJob %s error:%s", svc.backup.ID, err)
+
+			return err
+		}
 	}
 
+	entry.Debug("Remove Service From Gardener...")
 	gd.Lock()
 	for i := range gd.services {
 		if gd.services[i].ID == name || gd.services[i].Name == name {
