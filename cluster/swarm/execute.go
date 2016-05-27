@@ -54,32 +54,40 @@ func (gd *Gardener) serviceExecute() (err error) {
 		}
 
 		logrus.Debug("[mg]TxSetServiceStatus")
-		err = database.TxSetServiceStatus(&svc.Service, svc.task,
-			_StatusServiceNoContent, _StatusTaskDone, time.Now(), "")
+		err = database.TxSetServiceStatus(&svc.Service, svc.task, _StatusServiceNoContent, _StatusTaskDone, time.Now(), "")
 		if err != nil {
 			logrus.Errorf("%s TxSetServiceStatus Error:%s", svc.Name, err.Error())
 			goto failure
 		}
 		svc.Unlock()
-		logrus.Debug("[mg]exec done")
+
+		logrus.Debugf("[mg]Service %s Created,running...", svc.Name)
 
 		continue
 
 	failure:
 
 		logrus.Errorf("Exec Error:%v", err)
-
-		for _, u := range svc.units {
-			if err := u.removeContainer(true, true); err != nil {
-				logrus.Errorf("remove container %s ,error:%s", u.Name, err)
-			}
-		}
-
 		err = database.TxSetServiceStatus(&svc.Service, svc.task, svc.Status, _StatusTaskFailed, time.Now(), err.Error())
 		if err != nil {
 			logrus.Errorf("Save Service %s Status Error:%v", svc.Name, err)
 		}
 		svc.Unlock()
+
+		sys, err := database.GetSystemConfig()
+		if err != nil {
+			continue
+		}
+		clients, err := sys.GetConsulClient()
+		if err != nil || len(clients) == 0 {
+			continue
+		}
+
+		horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
+		err = svc.Delete(clients[0], horus, true, true, 0)
+		if err != nil {
+			continue
+		}
 	}
 
 	return err
