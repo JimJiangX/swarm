@@ -827,20 +827,17 @@ func (svc *Service) registerServices(config database.ConsulConfig) (err error) {
 	return nil
 }
 
-func (svc *Service) DeregisterServices(client *consulapi.Client) error {
+func (svc *Service) deregisterServices(client *consulapi.Client) error {
 	if client == nil {
 		return fmt.Errorf("consul client is nil")
 	}
-	svc.Lock()
 
 	for _, u := range svc.units {
 		err := u.DeregisterHealthCheck(client)
 		if err != nil {
-			svc.Unlock()
 			return err
 		}
 	}
-	svc.Unlock()
 
 	return nil
 }
@@ -1120,7 +1117,7 @@ func (svc *Service) Delete(client *consulapi.Client, horus string, force, volume
 		logrus.Error("%s deregister In Horus error:%s", svc.Name, err.Error())
 	}
 
-	err = svc.DeregisterServices(client)
+	err = svc.deregisterServices(client)
 	if err != nil {
 		logrus.Error("%s deregister In consul error:%s", svc.Name, err.Error())
 	}
