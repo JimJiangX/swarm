@@ -96,9 +96,10 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/networkings/{name:.*}/enable":  postEnableNetworking,
 		"/networkings/{name:.*}/disable": postDisableNetworking,
 
-		"/image/load":               postImageLoad,
-		"/image/{image:.*}/enable":  postEnableImage,
-		"/image/{image:.*}/disable": postDisableImage,
+		"/image/load":                postImageLoad,
+		"/image/{image:.*}/enable":   postEnableImage,
+		"/image/{image:.*}/disable":  postDisableImage,
+		"/image/{image:.*}/template": updateImageTemplateConfig,
 
 		"/storage/nas":                                       postNasStorage,
 		"/storage/san":                                       postSanStorage,
@@ -116,7 +117,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/clusters/nodes/{node:.*}": deleteNode,
 
 		"/networkings/{name:.*}": deleteNetworking,
-		"/ports/{port:[0-9]+}":   deletePort,
+		"/ports/{port}":          deletePort,
 
 		"/storage/san/{name}":                        deleteStorage,
 		"/storage/san/{name}/raid_group/{rg:[0-9]+}": deleteRaidGroup,

@@ -199,6 +199,24 @@ func TXInsertUnitConfig(tx *sqlx.Tx, config *UnitConfig) error {
 	return err
 }
 
+func UpdateUnitConfig(config UnitConfig) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	err = config.encode()
+	if err != nil {
+		return err
+	}
+
+	query := "UPDATE tb_unit_config SET image_id=:image,config_file_path=:config_file_path,version=:version,parent_id=:parent_id,content=:content,config_key_sets=:config_key_sets,created_at=:created_at WHERE id=:id"
+
+	_, err = db.NamedExec(query, config)
+
+	return err
+}
+
 func DeleteUnitConfig(id string) error {
 	db, err := GetDB(true)
 	if err != nil {

@@ -190,10 +190,6 @@ func (c *mysqlConfig) Set(key string, val interface{}) error {
 }
 
 func (c *mysqlConfig) ParseData(data []byte) (config.Configer, error) {
-	if len(data) == 0 {
-		return nil, fmt.Errorf("mysqlConfig Parse null Data")
-	}
-
 	configer, err := config.NewConfigData("ini", data)
 	if err != nil {
 		return nil, err
@@ -300,10 +296,6 @@ func (c *proxyConfig) Set(key string, val interface{}) error {
 
 func (proxyConfig) Validate(data map[string]interface{}) error { return nil }
 func (c *proxyConfig) ParseData(data []byte) (config.Configer, error) {
-	if len(data) == 0 {
-		return nil, fmt.Errorf("proxyConfig Parse null Data")
-	}
-
 	configer, err := config.NewConfigData("ini", data)
 	if err != nil {
 		return nil, err
@@ -454,10 +446,6 @@ func (c *switchManagerConfig) Set(key string, val interface{}) error {
 
 func (switchManagerConfig) Validate(data map[string]interface{}) error { return nil }
 func (c *switchManagerConfig) ParseData(data []byte) (config.Configer, error) {
-	if len(data) == 0 {
-		return nil, fmt.Errorf("proxyConfig Parse null Data")
-	}
-
 	configer, err := config.NewConfigData("ini", data)
 	if err != nil {
 		return nil, err

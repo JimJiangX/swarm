@@ -40,3 +40,5 @@ type ImageConfigResponse struct {
 	Content string                  `json:"config_content"`
 	KeySet  map[string]KeysetParams `json:"config_keyset"`
 }
+
+type UpdateUnitConfigRequest ImageConfig

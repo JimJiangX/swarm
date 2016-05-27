@@ -168,6 +168,54 @@ func LoadImage(req structs.PostLoadImageRequest) (string, error) {
 	return image.ID, nil
 }
 
+func UpdateImageTemplateConfig(imageID string, req structs.UpdateUnitConfigRequest) (database.UnitConfig, error) {
+	image, config, err := database.GetImageAndUnitConfig(imageID)
+	if err != nil {
+		return config, err
+	}
+
+	newConfig := config
+
+	if req.ConfigFilePath != "" {
+		content, err := ioutil.ReadFile(req.ConfigFilePath)
+		if err != nil {
+			err = fmt.Errorf("ReadAll From ConfigFile %s error:%s", req.ConfigFilePath, err)
+			logrus.Error(err.Error())
+
+			return config, err
+		}
+		if len(content) == 0 {
+			return config, fmt.Errorf("read 0 byte in ConfigFile %s", req.ConfigFilePath)
+		}
+		parser, _, err := initialize(image.Name)
+		if err != nil {
+			return config, err
+		}
+
+		_, err = parser.ParseData(content)
+		if err != nil {
+			return config, fmt.Errorf("Parse PostLoadImageRequest.Content Error:%s", err.Error())
+		}
+
+		newConfig.Content = string(content)
+	}
+
+	if req.ConfigMountPath != "" {
+		newConfig.Mount = req.ConfigMountPath
+	}
+
+	if len(req.KeySet) > 0 {
+		newConfig.KeySets = converteToKeysetParams(req.KeySet)
+	}
+
+	err = database.UpdateUnitConfig(newConfig)
+	if err != nil {
+		return config, err
+	}
+
+	return newConfig, nil
+}
+
 func parsePushImageOutput(in string) (string, int, error) {
 	index := strings.Index(in, "digest:")
 	if index == -1 {

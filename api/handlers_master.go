@@ -885,6 +885,47 @@ func postDisableImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 }
 
+// POST /image/{image:.*}/template
+func updateImageTemplateConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	image := mux.Vars(r)["image"]
+
+	req := structs.UpdateUnitConfigRequest{}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	config, err := swarm.UpdateImageTemplateConfig(image, req)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var keysets map[string]structs.KeysetParams
+	if len(config.KeySets) > 0 {
+		keysets = make(map[string]structs.KeysetParams, len(config.KeySets))
+		for key, val := range config.KeySets {
+			keysets[key] = structs.KeysetParams{
+				Key:         val.Key,
+				CanSet:      val.CanSet,
+				MustRestart: val.MustRestart,
+				Description: val.Description,
+			}
+		}
+	}
+
+	resp := structs.ImageConfigResponse{
+		ID:      config.ID,      // string `json:"config_id"`
+		Mount:   config.Mount,   // string `json:"config_mount_path"`
+		Content: config.Content, // string `json:"config_content"`
+		KeySet:  keysets,        // map[string]KeysetParams,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
 // POST /storage/san
 func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostSANStoreRequest{}
@@ -1113,7 +1154,7 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// DELETE /ports/{port:[0-9]+}
+// DELETE /ports/{port}
 func deletePort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
@@ -1121,7 +1162,7 @@ func deletePort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	port := intValueOrZero(r, "port")
-	if port == 0 {
+	if port <= 0 || port > 65535 {
 		httpError(w, "port must in range 1~65535", http.StatusBadRequest)
 		return
 	}
