@@ -41,7 +41,6 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 		AttachStderr: true,
 		Tty:          false,
 		Cmd:          cmd,
-		Container:    containerID,
 		Detach:       detach,
 	}
 
@@ -50,7 +49,7 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 		execConfig.AttachStdout = false
 	}
 
-	exec, err := cl.ContainerExecCreate(context.TODO(), execConfig)
+	exec, err := cl.ContainerExecCreate(context.TODO(), containerID, execConfig)
 	if err != nil {
 		return inspect, err
 	}
