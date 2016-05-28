@@ -459,28 +459,16 @@ func (c *Cluster) RemoveImages(name string, force bool) ([]types.ImageDelete, er
 	return out, err
 }
 
-func (c *Cluster) refreshVolumes() {
-	var wg sync.WaitGroup
-	for _, e := range c.engines {
-		wg.Add(1)
-		go func(e *cluster.Engine) {
-			e.RefreshVolumes()
-			wg.Done()
-		}(e)
-	}
-	wg.Wait()
-}
-
 // CreateNetwork creates a network in the cluster
-func (c *Cluster) CreateNetwork(request *types.NetworkCreate) (response *types.NetworkCreateResponse, err error) {
+func (c *Cluster) CreateNetwork(name string, request *types.NetworkCreate) (response *types.NetworkCreateResponse, err error) {
 	var (
-		parts  = strings.SplitN(request.Name, "/", 2)
+		parts  = strings.SplitN(name, "/", 2)
 		config = &cluster.ContainerConfig{}
 	)
 
 	if len(parts) == 2 {
 		// a node was specified, create the container only on this node
-		request.Name = parts[1]
+		name = parts[1]
 		config = cluster.BuildContainerConfig(containertypes.Config{Env: []string{"constraint:node==" + parts[0]}}, containertypes.HostConfig{}, networktypes.NetworkingConfig{})
 	}
 
@@ -489,7 +477,7 @@ func (c *Cluster) CreateNetwork(request *types.NetworkCreate) (response *types.N
 		return nil, err
 	}
 	if nodes != nil {
-		resp, err := c.engines[nodes[0].ID].CreateNetwork(request)
+		resp, err := c.engines[nodes[0].ID].CreateNetwork(name, request)
 		if err == nil {
 			if network := c.engines[nodes[0].ID].Networks().Get(resp.ID); network != nil && network.Scope == "global" {
 				for id, engine := range c.engines {
@@ -898,10 +886,9 @@ func (c *Cluster) Info() [][2]string {
 		sort.Strings(labels)
 		info = append(info, [2]string{"  └ Labels", fmt.Sprintf("%s", strings.Join(labels, ", "))})
 		errMsg := engine.ErrMsg()
-		if len(errMsg) == 0 {
-			errMsg = "(none)"
+		if len(errMsg) != 0 {
+			info = append(info, [2]string{"  └ Error", errMsg})
 		}
-		info = append(info, [2]string{"  └ Error", errMsg})
 		info = append(info, [2]string{"  └ UpdatedAt", engine.UpdatedAt().UTC().Format(time.RFC3339)})
 		info = append(info, [2]string{"  └ ServerVersion", engine.Version})
 	}
@@ -931,7 +918,7 @@ func (c *Cluster) RenameContainer(container *cluster.Container, newName string) 
 }
 
 // BuildImage builds an image
-func (c *Cluster) BuildImage(buildImage *types.ImageBuildOptions, out io.Writer) error {
+func (c *Cluster) BuildImage(buildContext io.Reader, buildImage *types.ImageBuildOptions, out io.Writer) error {
 	c.scheduler.Lock()
 
 	// get an engine
@@ -946,7 +933,7 @@ func (c *Cluster) BuildImage(buildImage *types.ImageBuildOptions, out io.Writer)
 	}
 	n := nodes[0]
 
-	reader, err := c.engines[n.ID].BuildImage(buildImage)
+	reader, err := c.engines[n.ID].BuildImage(buildContext, buildImage)
 	if err != nil {
 		return err
 	}
