@@ -997,14 +997,11 @@ func (e *Engine) Pull(image string, authConfig *types.AuthConfig) error {
 	if err != nil {
 		return err
 	}
-	// FIXME:added by fugr,delete when docker/swarm fix these
-	if authConfig != nil {
-		pullOpts.RegistryAuth, err = encodeAuthToBase64(*authConfig)
-		if err != nil {
-			return err
-		}
+	// FIXME:added by fugr,delete when docker fix these
+	pullOpts.RegistryAuth, err = encodeAuthToBase64(*authConfig)
+	if err != nil {
+		return err
 	}
-
 	pullResponseBody, err := e.apiClient.ImagePull(context.Background(), pullOpts, nil)
 	e.CheckConnectionErr(err)
 	if err != nil {
