@@ -18,20 +18,10 @@ import (
 	goctx "golang.org/x/net/context"
 )
 
-const (
-	StatusUnprocessableEntity = 422
-)
-
 var ErrUnsupportGardener = errors.New("Unsupported Gardener")
 
 // GET /clusters/{name:.*}
 func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	name := mux.Vars(r)["name"]
 
 	cl, err := database.GetCluster(name)
@@ -46,13 +36,29 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	list := make([]structs.NodeInspect, len(nodes))
 	for i, node := range nodes {
+		var (
+			totalCPUs    int
+			usedCPUs     int
+			totalMemory  int
+			usedMemory   int
+			dockerStatus string
+		)
 
-		dockerStatus := ""
 		if node.EngineID != "" {
 			eng, err := gd.GetEngine(node.EngineID)
 			if err == nil && eng != nil {
+				totalCPUs = int(eng.TotalCpus())
+				usedCPUs = int(eng.UsedCpus())
+				totalMemory = int(eng.TotalMemory())
+				usedMemory = int(eng.UsedMemory())
 				dockerStatus = eng.Status()
 			}
 		}
@@ -69,6 +75,12 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 			MaxContainer: node.MaxContainer,
 			Status:       node.Status,
 			RegisterAt:   utils.TimeToString(node.RegisterAt),
+			Resource: structs.Resource{
+				TotalCPUs:   totalCPUs,
+				UsedCPUs:    usedCPUs,
+				TotalMemory: totalMemory,
+				UsedMemory:  usedMemory,
+			},
 		}
 	}
 
@@ -124,18 +136,6 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(lists)
-}
-
-// GET /clusters/nodes/{name:.*}
-func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-	_ = name
-
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
 }
 
 // GET /clusters/resources

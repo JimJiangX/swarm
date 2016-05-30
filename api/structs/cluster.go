@@ -27,17 +27,17 @@ type UpdateNodeSetting struct {
 type ListClusterResource []ClusterResource
 
 type ClusterResource struct {
-	ID    string
-	Name  string
-	Total Resource
-	Nodes []NodeResource
+	ID     string
+	Name   string
+	Entire Resource
+	Nodes  []NodeResource
 }
 
 type Resource struct {
-	TotalCPU    int
-	FreeCPU     int
+	TotalCPUs   int
+	UsedCPUs    int
 	TotalMemory int
-	FreeMemory  int
+	UsedMemory  int
 }
 
 type NodeResource struct {
@@ -111,15 +111,16 @@ type PerClusterInfoResponse struct {
 }
 
 type NodeInspect struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	ClusterID    string `json:"cluster_id"`
-	Addr         string `json:"admin_ip"`
-	EngineID     string `json:"engine_id"`
-	DockerStatus string `json:"docker_status"`
-	Room         string `json:"room"`
-	Seat         string `json:"seat"`
-	MaxContainer int    `json:"max_container"`
-	Status       int    `json:"status"`
-	RegisterAt   string `json:"register_at"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	ClusterID    string   `json:"cluster_id"`
+	Addr         string   `json:"admin_ip"`
+	EngineID     string   `json:"engine_id"`
+	DockerStatus string   `json:"docker_status"`
+	Room         string   `json:"room"`
+	Seat         string   `json:"seat"`
+	MaxContainer int      `json:"max_container"`
+	Status       int      `json:"status"`
+	RegisterAt   string   `json:"register_at"`
+	Resource     Resource `json:"resource"`
 }
