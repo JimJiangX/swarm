@@ -51,10 +51,6 @@ func TestPort(t *testing.T) {
 		t.Fatal("Available Ports should be 2", p1)
 	}
 
-	err = SetPortAllocated(1, false)
-	if err != nil {
-		t.Fatal(err)
-	}
 	p2, err := SelectAvailablePorts(4)
 	if err != nil {
 		t.Fatal(err)

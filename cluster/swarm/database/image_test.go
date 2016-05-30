@@ -15,14 +15,25 @@ func TestTXInsertUnitConfig(t *testing.T) {
 	config := &UnitConfig{
 		ID:       "test1",
 		ImageID:  "image1",
-		Path:     "/root/abc",
+		Mount:    "/root/abc",
 		Version:  0,
 		ParentID: "",
 		Content: `qwertazwk,ol.p;/['sxecrfvtgbyhn 
 		ujmiyuiop[]\][as"""dfghjkl'';'zxcvbnm,./'"'''""`,
-		ConfigKeySets: "",
-		KeySets:       map[string]bool{"abc": false, "def": true},
-		CreatedAt:     time.Now(),
+		configKeySets: "",
+		KeySets: map[string]KeysetParams{
+			"abc": KeysetParams{
+				Key:         "abc",
+				CanSet:      true,
+				MustRestart: false,
+			},
+			"def": KeysetParams{
+				Key:         "def",
+				CanSet:      false,
+				MustRestart: true,
+			},
+		},
+		CreatedAt: time.Now(),
 	}
 
 	err = TXInsertUnitConfig(tx, config)
