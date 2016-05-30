@@ -673,10 +673,35 @@ func (svc *Service) StopService() error {
 	}
 
 	svc.Lock()
-	err = svc.stopService()
-	svc.Unlock()
+	defer svc.Unlock()
 
-	return err
+	addr, port, err := svc.getSwitchManagerAddr()
+	if err != nil {
+		logrus.Warnf("service %s get SwithManager Addr error:%s", svc.Name, err)
+	} else {
+		err = smlib.Lock(addr, port)
+		if err != nil {
+
+		}
+	}
+
+	units := svc.getUnitByType(_UpsqlType)
+	if len(units) == 0 {
+		err = fmt.Errorf("Not Found unit by type %s In Service %s", _UpsqlType, svc.Name)
+		logrus.Error(err)
+
+		return err
+	}
+
+	for _, u := range units {
+		err = u.stopService()
+		if err != nil {
+			logrus.Errorf("service %s unit %s stop service error:%s", svc.Name, u.Name, err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (svc *Service) stopService() error {
@@ -881,7 +906,7 @@ func (svc *Service) getUnitByType(Type string) []*unit {
 		return units
 	}
 
-	logrus.Warnf("Not Found unit %s In Service %s", Type, svc.ID)
+	logrus.Warnf("Not Found unit %s In Service %s", Type, svc.Name)
 
 	return nil
 }
@@ -896,21 +921,30 @@ func (svc *Service) getSwithManagerUnit() *unit {
 	return units[0]
 }
 
-func (svc *Service) GetSwitchManagerAndMaster() (string, int, *unit, error) {
-	svc.RLock()
-	defer svc.RUnlock()
-
+func (svc *Service) getSwitchManagerAddr() (string, int, error) {
 	swm := svc.getSwithManagerUnit()
 	if swm == nil {
-		return "", 0, nil, nil
+		return "", 0, fmt.Errorf("Not Found unit by type %s in service %s", _UnitRole_SwitchManager, svc.Name)
 	}
 
 	addr, port, err := swm.getNetworkingAddr(_ContainersNetworking, "Port")
 	if err != nil {
-		return "", 0, nil, err
+		return "", 0, err
 	}
 	if swm.engine != nil {
 		addr = swm.engine.IP
+	}
+
+	return addr, port, nil
+}
+
+func (svc *Service) GetSwitchManagerAndMaster() (string, int, *unit, error) {
+	svc.RLock()
+	defer svc.RUnlock()
+
+	addr, port, err := svc.getSwitchManagerAddr()
+	if err != nil {
+		return addr, port, nil, err
 	}
 
 	topology, err := smlib.GetTopology(addr, port)
