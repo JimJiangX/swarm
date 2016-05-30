@@ -90,17 +90,14 @@ func DeleteCluster(IDOrName string) error {
 	return err
 }
 
-func GetCluster(IDOrName string) (*Cluster, error) {
+func GetCluster(IDOrName string) (Cluster, error) {
 	db, err := GetDB(true)
 	if err != nil {
-		return nil, err
+		return Cluster{}, err
 	}
 
-	c := &Cluster{}
-	err = db.Get(c, "SELECT * FROM tb_cluster WHERE id=? OR name=?", IDOrName, IDOrName)
-	if err != nil {
-		return nil, err
-	}
+	c := Cluster{}
+	err = db.Get(&c, "SELECT * FROM tb_cluster WHERE id=? OR name=?", IDOrName, IDOrName)
 
 	return c, nil
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster/swarm"
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -55,9 +56,9 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		if node.EngineID != "" {
 			eng, err := gd.GetEngine(node.EngineID)
 			if err == nil && eng != nil {
-				totalCPUs = int(eng.TotalCpus())
+				totalCPUs = int(eng.Cpus)
 				usedCPUs = int(eng.UsedCpus())
-				totalMemory = int(eng.TotalMemory())
+				totalMemory = int(eng.Memory)
 				usedMemory = int(eng.UsedMemory())
 				dockerStatus = eng.Status()
 			}
@@ -139,28 +140,143 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /clusters/resources
-func getNodesResourceByCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-	_ = name
+func getClustersResource(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	clusters, err := database.ListCluster()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	resp := make([]structs.ClusterResource, len(clusters))
+	for i := range clusters {
+		resp[i], err = getClusterResource(gd, clusters[i], false)
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
 }
 
-// GET /clusters/{name}/nodes/{node:.*}
-func getNodeResourceByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	cluster := mux.Vars(r)["name"]
-	node := mux.Vars(r)["node"]
-	_, _ = cluster, node
+// GET /clusters/{name:.*}/resources
+func getNodesResourceByCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	cluster, err := database.GetCluster(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp, err := getClusterResource(gd, cluster, true)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
+func getClusterResource(gd *swarm.Gardener, cluster database.Cluster, detail bool) (structs.ClusterResource, error) {
+	nodes, err := database.ListNodeByCluster(cluster.ID)
+	if err != nil {
+		return structs.ClusterResource{}, err
+	}
+
+	var nodesDetail []structs.NodeResource = nil
+	var totalCPUs, usedCPUs, totalMemory, usedMemory int64
+	if detail {
+		nodesDetail = make([]structs.NodeResource, len(nodes))
+	}
+
+	for i := range nodes {
+		if nodes[i].EngineID != "" {
+			eng, err := gd.GetEngine(nodes[i].EngineID)
+			if err == nil && eng != nil {
+				logrus.Warnf("Engine %s Not Found,%s", nodes[i].EngineID, err)
+				continue
+			}
+			_CPUs := eng.UsedCpus()
+			_Memory := eng.UsedMemory()
+			totalCPUs += eng.Cpus
+			totalMemory += eng.Memory
+			usedCPUs += _CPUs
+			usedMemory += _Memory
+
+			if detail {
+				containers := eng.Containers()
+				crs := make([]structs.ContainerWithResource, len(containers))
+				for _, c := range containers {
+
+					ncpu, err := utils.GetCPUNum(c.Config.HostConfig.CpusetCpus)
+					if err != nil {
+						ncpu = c.Config.HostConfig.CPUShares
+					}
+					crs[i] = structs.ContainerWithResource{
+						ID:          c.ID,
+						Name:        c.Info.Name,
+						Image:       c.Image,
+						Driver:      c.Info.Driver,
+						NetworkMode: c.HostConfig.NetworkMode,
+						Path:        c.Info.Path,
+						Created:     c.Info.Created,
+						Status:      c.Status,
+						Binds:       c.Config.HostConfig.Binds,
+						CpusetCpus:  c.Config.HostConfig.CpusetCpus,
+						CPUs:        ncpu,
+						Memory:      c.Config.HostConfig.Memory,
+						MemorySwap:  c.Config.HostConfig.MemorySwap,
+					}
+				}
+
+				nodesDetail[i] = structs.NodeResource{
+					ID:       nodes[i].ID,
+					Name:     nodes[i].Name,
+					EngineID: eng.ID,
+					Addr:     eng.IP,
+					Status:   eng.Status(),
+					Resource: structs.Resource{
+						TotalCPUs:   int(eng.Cpus),
+						UsedCPUs:    int(_CPUs),
+						TotalMemory: int(eng.Memory),
+						UsedMemory:  int(_Memory),
+					},
+					Containers: crs,
+				}
+
+			}
+		}
+	}
+
+	return structs.ClusterResource{
+		ID:     cluster.ID,
+		Name:   cluster.Name,
+		Enable: cluster.Enabled,
+		Entire: structs.Resource{
+			TotalCPUs:   int(totalCPUs),
+			UsedCPUs:    int(usedCPUs),
+			TotalMemory: int(totalMemory),
+			UsedMemory:  int(usedMemory),
+		},
+		Nodes: nodesDetail,
+	}, nil
 }
 
 // GET /ports

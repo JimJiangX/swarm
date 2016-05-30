@@ -597,7 +597,7 @@ func (gd *Gardener) rebuildDatacenters() error {
 
 func (gd *Gardener) rebuildDatacenter(NameOrID string) (*Datacenter, error) {
 	cl, err := database.GetCluster(NameOrID)
-	if err != nil || cl == nil {
+	if err != nil {
 		return nil, fmt.Errorf("Not Found %s,Error %s", NameOrID, err)
 	}
 
@@ -611,7 +611,7 @@ func (gd *Gardener) rebuildDatacenter(NameOrID string) (*Datacenter, error) {
 
 	dc := &Datacenter{
 		RWMutex: sync.RWMutex{},
-		Cluster: cl,
+		Cluster: &cl,
 		storage: storage,
 		nodes:   make([]*Node, 0, 100),
 	}

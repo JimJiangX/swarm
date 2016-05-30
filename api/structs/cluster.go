@@ -1,7 +1,5 @@
 package structs
 
-import "github.com/docker/engine-api/types"
-
 type PostClusterRequest struct {
 	Name       string `json:"name"`
 	Type       string `json:"type"`
@@ -23,14 +21,15 @@ type UpdateNodeSetting struct {
 	MaxContainer int `json:"max_container"`
 }
 
-// ListClusterResource used for GET: /clusters Response Body structure
+// ListClusterResource used for GET: /clusters/resources Response Body structure
 type ListClusterResource []ClusterResource
 
 type ClusterResource struct {
+	Enable bool
 	ID     string
 	Name   string
 	Entire Resource
-	Nodes  []NodeResource
+	Nodes  []NodeResource `json:",omitempty"` // only used in GET /clusters/{name:.*}/resources
 }
 
 type Resource struct {
@@ -41,24 +40,29 @@ type Resource struct {
 }
 
 type NodeResource struct {
-	ID     string
-	Name   string
-	Addr   string
-	Status string
+	ID       string
+	Name     string
+	EngineID string
+	Addr     string
+	Status   string
 	Resource
+	Containers []ContainerWithResource
 }
 
-// NodeInfo used for GET: /clusters/{name:.*}/nodes/{node:.*} Resonse structure
-type NodeResourceInfo struct {
-	NodeResource
-	Containers []types.ContainerNode
-}
-
-// ClusterInspect used for GET: /clusters/{name:.*} Response structure
-type ClusterResourceInspect struct {
-	ID    string
-	Name  string
-	Nodes []NodeResourceInfo
+type ContainerWithResource struct {
+	ID          string
+	Name        string
+	Image       string
+	Driver      string
+	NetworkMode string
+	Path        string
+	Created     string
+	Status      string
+	Binds       []string
+	CpusetCpus  string // CpusetCpus 0-2, 0,1
+	CPUs        int64  // CPU shares (relative weight vs. other containers)
+	Memory      int64  // Memory limit (in bytes)
+	MemorySwap  int64  // Total memory usage (memory + swap); set `-1` to enable unlimited swap
 }
 
 type Node struct {
