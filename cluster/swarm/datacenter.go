@@ -367,16 +367,9 @@ func (gd *Gardener) DatacenterByEngine(IDOrName string) (*Datacenter, error) {
 }
 
 func (gd *Gardener) SetNodeStatus(name string, state int) error {
-	dc, err := gd.DatacenterByNode(name)
+	node, err := gd.GetNode(name)
 	if err != nil {
 		return err
-	}
-
-	node, err := dc.GetNode(name)
-	if node == nil {
-		if node, err = gd.GetNode(name); err != nil {
-			return err
-		}
 	}
 
 	if node.Status != _StatusNodeDisable &&
@@ -387,6 +380,15 @@ func (gd *Gardener) SetNodeStatus(name string, state int) error {
 	}
 
 	return node.UpdateStatus(state)
+}
+
+func (gd *Gardener) SetNodeParams(name string, max int) error {
+	node, err := gd.GetNode(name)
+	if err != nil {
+		return err
+	}
+
+	return node.UpdateParams(max)
 }
 
 func (dc *Datacenter) RemoveNode(NameOrID string) error {

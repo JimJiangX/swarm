@@ -19,6 +19,10 @@ type UpdateClusterParamsRequest struct {
 	UsageLimit float32 `json:"usage_limit"`
 }
 
+type UpdateNodeSetting struct {
+	MaxContainer int `json:"max_container"`
+}
+
 // ListClusterResource used for GET: /clusters Response Body structure
 type ListClusterResource []ClusterResource
 
@@ -66,7 +70,7 @@ type Node struct {
 	SSD      []string `json:"ssd"`
 
 	Port         int `json:",omitempty"` // ssh port
-	MaxContainer int `json:"max_container,omitempty"`
+	MaxContainer int `json:"max_container"`
 
 	Room string `json:",omitempty"`
 	Seat string `json:",omitempty"`

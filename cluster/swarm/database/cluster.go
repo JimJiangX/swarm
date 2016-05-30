@@ -273,6 +273,23 @@ func (n *Node) UpdateStatus(state int) error {
 	return nil
 }
 
+// UpdateParams returns error when Node UPDATE max_container.
+func (n *Node) UpdateParams(max int) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("UPDATE tb_node SET max_container=? WHERE id=?", max, n.ID)
+	if err != nil {
+		return err
+	}
+
+	n.MaxContainer = max
+
+	return nil
+}
+
 // TxUpdateNodeStatus returns error when Node UPDATE status.
 func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int, msg string) error {
 	tx, err := GetTX()

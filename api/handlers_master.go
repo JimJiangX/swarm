@@ -493,6 +493,31 @@ func postDisableNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusOK)
 }
 
+// POST /clusters/nodes/{node}/update
+func updateNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["node"]
+	req := structs.UpdateNodeSetting{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.SetNodeParams(name, req.MaxContainer)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // POST /services
 func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostServiceRequest{}

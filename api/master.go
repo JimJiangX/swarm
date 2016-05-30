@@ -69,6 +69,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/clusters/{name}/nodes":         postNodes,
 		"/clusters/nodes/{node}/enable":  postEnableNode,
 		"/clusters/nodes/{node}/disable": postDisableNode,
+		"/clusters/nodes/{node}/update":  updateNode,
 
 		"/services":                    postService,
 		"/services/{name:.*}/start":    postServiceStart,
