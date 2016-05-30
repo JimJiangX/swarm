@@ -683,6 +683,17 @@ func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType s
 			continue
 		}
 
+		for _, node := range dc.nodes {
+			if node.engine == nil ||
+				(node.engine != nil &&
+					(!node.engine.IsHealthy() ||
+						len(node.engine.Containers()) >= node.MaxContainer)) {
+
+				out = append(out, node.ID)
+				continue
+			}
+		}
+
 		for _, v := range volumes {
 			// when storage is HITACHI or HUAWEI
 			if v.Type == store.SANStore {
