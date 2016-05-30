@@ -1156,7 +1156,7 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 // DELETE /ports/{port:[0-9]+}
 func deletePort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	port, err := strconv.Atoi(mux.Vars(r)["rg"])
+	port, err := strconv.Atoi(mux.Vars(r)["port"])
 	if err != nil {
 		msg := fmt.Sprintf("Parse error:%s,port must in range 1~65535", err)
 		httpError(w, msg, http.StatusBadRequest)
