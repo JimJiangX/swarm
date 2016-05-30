@@ -736,28 +736,65 @@ func postDisableServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *htt
 	w.WriteHeader(http.StatusOK)
 }
 
-// POST /units/{unit:.*}/start
-func postUnitStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+// POST /units/{name:.*}/start
+func postUnitStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
 
-// POST 	/units/{unit:.*}/stop
-func postUnitStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
 
-// POST /units/{unit:.*}/backup
+	err := gd.StartUnitService(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// POST /units/{name:.*}/stop
+func postUnitStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	name := mux.Vars(r)["name"]
+	timeout := intValueOrZero(r, "timeout")
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.StopUnitService(name, timeout)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// POST /units/{name:.*}/backup
 func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
-// POST /units/{unit:.*}/recover
+// POST /units/{name:.*}/recover
 func postUnitRecover(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
-// POST /units/{unit:.*}/migrate
+// POST /units/{name:.*}/migrate
 func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
-// POST /units/{unit:.*}/rebuild
+// POST /units/{name:.*}/rebuild
 func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
-// POST /units/{unit:.*}/isolate
+// POST /units/{name:.*}/isolate
 func postUnitIsolate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
-// POST /units/{unit:.*}/switchback
+// POST /units/{name:.*}/switchback
 func postUnitSwitchback(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
 // POST /tasks/backup/callback

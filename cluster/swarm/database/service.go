@@ -81,6 +81,19 @@ func (u Unit) TableName() string {
 	return "tb_unit"
 }
 
+func GetUnit(NameOrID string) (Unit, error) {
+	u := Unit{}
+
+	db, err := GetDB(true)
+	if err != nil {
+		return u, err
+	}
+
+	err = db.Get(&u, "SELECT * FROM tb_unit WHERE id=? OR name=? OR container_id=?", NameOrID, NameOrID, NameOrID)
+
+	return u, err
+}
+
 func TxInsertUnit(tx *sqlx.Tx, unit Unit) error {
 	query := "INSERT INTO tb_unit (id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,check_interval,created_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:node_id,:container_id,:unit_config_id,:network_mode,:status,:check_interval,:created_at)"
 	_, err := tx.NamedExec(query, &unit)

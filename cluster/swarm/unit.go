@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -16,6 +17,11 @@ import (
 	"github.com/docker/swarm/cluster/swarm/store"
 	consulapi "github.com/hashicorp/consul/api"
 	"golang.org/x/net/context"
+)
+
+var (
+	errEngineIsNil    = errors.New("Engine is nil")
+	errEngineAPIisNil = errors.New("Engine API is nil")
 )
 
 type ContainerCmd interface {
@@ -78,13 +84,49 @@ func (u *unit) factory() error {
 	return nil
 }
 
+func (gd *Gardener) GetUnit(table database.Unit) (*unit, error) {
+	var (
+		svc *Service
+		u   *unit
+	)
+	gd.RLock()
+	for i := range gd.services {
+		if gd.services[i].ID == table.ServiceID {
+			svc = gd.services[i]
+			break
+		}
+	}
+	gd.RUnlock()
+
+	if svc != nil {
+		svc.RLock()
+		u, _ = svc.getUnit(table.ID)
+		svc.RUnlock()
+	}
+
+	if u == nil || u.engine == nil {
+		value, err := gd.rebuildUnit(table)
+		if err != nil {
+			return nil, err
+		}
+
+		u = &value
+	}
+
+	return u, nil
+}
+
 func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
+	var c *cluster.Container
 	u := unit{
 		Unit: table,
 	}
-	c := gd.Container(table.ContainerID)
-	if c == nil {
-		c = gd.Container(table.Name)
+
+	if table.ContainerID != "" {
+		c = gd.Container(table.ContainerID)
+		if c == nil {
+			c = gd.Container(table.Name)
+		}
 	}
 	if c != nil {
 		u.container = c
@@ -164,7 +206,6 @@ func (u *unit) getNetworkingAddr(networking, portName string) (addr string, port
 }
 
 func (u *unit) prepareCreateContainer() error {
-
 	err := u.createNetworking()
 	if err != nil {
 		return err
@@ -283,7 +324,14 @@ func (u *unit) createContainer(authConfig *types.AuthConfig) (*cluster.Container
 }
 
 func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
+	if u.engine == nil {
+		return errEngineIsNil
+	}
+
 	client := u.engine.EngineAPIClient()
+	if client == nil {
+		return errEngineAPIisNil
+	}
 
 	return client.ContainerUpdate(context.TODO(), u.container.ID, updateConfig)
 }
@@ -320,13 +368,23 @@ func (u *unit) removeContainer(force, rmVolumes bool) error {
 }
 
 func (u *unit) startContainer() error {
+	if u.engine == nil {
+		return errEngineIsNil
+	}
 	return u.engine.StartContainer(u.Unit.Name, nil)
 }
 
 func (u *unit) stopContainer(timeout int) error {
 	u.stopService()
 
+	if u.engine == nil {
+		return errEngineIsNil
+	}
+
 	client := u.engine.EngineAPIClient()
+	if client == nil {
+		return errEngineAPIisNil
+	}
 
 	return client.ContainerStop(context.TODO(), u.Unit.ContainerID, timeout)
 }
@@ -337,13 +395,27 @@ func (u *unit) restartContainer(timeout int) error {
 		return err
 	}
 
+	if u.engine == nil {
+		return errEngineIsNil
+	}
+
 	client := u.engine.EngineAPIClient()
+	if client == nil {
+		return errEngineAPIisNil
+	}
 
 	return client.ContainerRestart(context.TODO(), u.Unit.ContainerID, timeout)
 }
 
 func (u *unit) renameContainer(name string) error {
+	if u.engine == nil {
+		return errEngineIsNil
+	}
+
 	client := u.engine.EngineAPIClient()
+	if client == nil {
+		return errEngineAPIisNil
+	}
 
 	return client.ContainerRename(context.TODO(), u.container.ID, u.Unit.ID)
 }
@@ -584,7 +656,44 @@ func (u *unit) initService() error {
 	return nil
 }
 
+func (gd *Gardener) StartUnitService(NameOrID string) error {
+	unit, err := database.GetUnit(NameOrID)
+	if err != nil {
+		err = fmt.Errorf("Not Found unit %s,%s", NameOrID, err)
+		return err
+	}
+
+	u, err := gd.GetUnit(unit)
+	if err != nil {
+		return err
+	}
+
+	if err = u.startContainer(); err != nil {
+		return err
+	}
+
+	return u.startService()
+}
+
+func (gd *Gardener) StopUnitService(NameOrID string, timeout int) error {
+	unit, err := database.GetUnit(NameOrID)
+	if err != nil {
+		err = fmt.Errorf("Not Found unit %s,%s", NameOrID, err)
+		return err
+	}
+
+	u, err := gd.GetUnit(unit)
+	if err != nil {
+		return err
+	}
+
+	return u.stopContainer(timeout)
+}
+
 func (u *unit) startService() error {
+	if u.engine == nil {
+		return errEngineIsNil
+	}
 	if u.ContainerCmd == nil {
 		return nil
 	}
