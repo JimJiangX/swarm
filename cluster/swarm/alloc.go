@@ -197,7 +197,7 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 		}
 		gd.Unlock()
 		for _, lun := range pendings[i].sanStore {
-			dc, err := gd.DatacenterByNode(pendings[i].unit.Unit.NodeID)
+			dc, err := gd.DatacenterByNode(pendings[i].unit.Unit.EngineID)
 			if err != nil || dc == nil || dc.storage == nil {
 				continue
 			}

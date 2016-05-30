@@ -265,7 +265,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type str
 				ServiceID:     svc.ID,
 				ImageID:       image.ID,
 				ImageName:     image.Name + "_" + image.Version,
-				NodeID:        engine.ID,
+				EngineID:      engine.ID,
 				ConfigID:      parentConfig.ID,
 				Status:        0,
 				CheckInterval: 0,

@@ -92,10 +92,10 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 		u.config = c.Config
 	}
 
-	if u.engine == nil && u.NodeID != "" {
-		node, err := gd.GetNode(u.NodeID)
+	if u.engine == nil && u.EngineID != "" {
+		node, err := gd.GetNode(u.EngineID)
 		if err != nil {
-			logrus.Errorf("Not Found Node %s,Error:%s", u.NodeID, err.Error())
+			logrus.Errorf("Not Found Node %s,Error:%s", u.EngineID, err.Error())
 		} else if node != nil && node.engine != nil {
 			u.engine = node.engine
 		}
@@ -416,9 +416,9 @@ func (u *unit) RegisterHealthCheck(config database.ConsulConfig, context *Servic
 	if u.engine != nil {
 		address = fmt.Sprintf("%s:%d", u.engine.IP, config.ConsulPort)
 	} else {
-		node, err := database.GetNode(u.NodeID)
+		node, err := database.GetNode(u.EngineID)
 		if err != nil {
-			logrus.Errorf("Not Found Node %s,Error:%s", u.NodeID, err.Error())
+			logrus.Errorf("Not Found Node %s,Error:%s", u.EngineID, err.Error())
 			return err
 		}
 		address = fmt.Sprintf("%s:%d", node.Addr, config.ConsulPort)
@@ -666,7 +666,7 @@ func (u *unit) saveToDisk() error {
 func (u *unit) deregisterInHorus() error { return nil }
 
 func (u *unit) registerHorus(user, password string, agentPort int) (registerService, error) {
-	node, err := database.GetNode(u.NodeID)
+	node, err := database.GetNode(u.EngineID)
 	if err != nil {
 		return registerService{}, err
 	}

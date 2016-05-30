@@ -67,7 +67,7 @@ type Unit struct {
 	ImageID     string `db:"image_id"`
 	ImageName   string `db:"image_name"` //<image_name>_<image_version>
 	ServiceID   string `db:"service_id"`
-	NodeID      string `db:"node_id"` // engine.ID
+	EngineID    string `db:"node_id"` // engine.ID
 	ContainerID string `db:"container_id"`
 	ConfigID    string `db:"unit_config_id"`
 	NetworkMode string `db:"network_mode"`
