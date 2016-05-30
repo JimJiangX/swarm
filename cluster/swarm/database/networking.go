@@ -59,6 +59,15 @@ func DeletePort(port int, allocated bool) error {
 		return err
 	}
 
+	using := false
+	err = db.Get(&using, "SELECT allocated FROM tb_port WHERE port=?", port)
+	if err != nil {
+		return err
+	}
+	if using != allocated {
+		return fmt.Errorf("port %d is busy,cannot be removed", port)
+	}
+
 	_, err = db.Exec("DELETE FROM tb_port WHERE port=? AND allocated=?", port, allocated)
 
 	return err
