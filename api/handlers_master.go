@@ -214,41 +214,15 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 				logrus.Warnf("Engine %s Not Found,%v", nodes[i].EngineID, err)
 				continue
 			}
-			_CPUs := eng.UsedCpus()
-			_Memory := eng.UsedMemory()
+
 			totalCPUs += eng.Cpus
 			totalMemory += eng.Memory
+			_CPUs := eng.UsedCpus()
+			_Memory := eng.UsedMemory()
 			usedCPUs += _CPUs
 			usedMemory += _Memory
 
 			if detail {
-				containers := eng.Containers()
-				crs := make([]structs.ContainerWithResource, len(containers))
-				for index, c := range containers {
-					ncpu, err := utils.GetCPUNum(c.Info.HostConfig.CpusetCpus)
-					if err != nil {
-						ncpu = c.Info.HostConfig.CPUShares
-					}
-
-					crs[index] = structs.ContainerWithResource{
-						ID:             c.ID,
-						Name:           c.Info.Name,
-						Image:          c.Image,
-						Driver:         c.Info.Driver,
-						NetworkMode:    c.HostConfig.NetworkMode,
-						Created:        c.Info.Created,
-						State:          cluster.StateString(c.Info.State),
-						Labels:         c.Labels,
-						Env:            c.Info.Config.Env,
-						Mounts:         c.Mounts,
-						CpusetCpus:     c.Info.HostConfig.CpusetCpus,
-						CPUs:           ncpu,
-						Memory:         c.Info.HostConfig.Memory,
-						MemorySwap:     c.Info.HostConfig.MemorySwap,
-						OomKillDisable: *c.Info.HostConfig.OomKillDisable,
-					}
-				}
-
 				nodesDetail[i] = structs.NodeResource{
 					ID:       nodes[i].ID,
 					Name:     nodes[i].Name,
@@ -261,7 +235,7 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 						TotalMemory: int(eng.Memory),
 						UsedMemory:  int(_Memory),
 					},
-					Containers: crs,
+					Containers: containerWithResource(eng.Containers()),
 				}
 			}
 		}
@@ -279,6 +253,40 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 		},
 		Nodes: nodesDetail,
 	}, nil
+}
+
+func containerWithResource(containers cluster.Containers) []structs.ContainerWithResource {
+	if len(containers) == 0 {
+		return nil
+	}
+
+	out := make([]structs.ContainerWithResource, len(containers))
+	for i, c := range containers {
+		ncpu, err := utils.GetCPUNum(c.Info.HostConfig.CpusetCpus)
+		if err != nil {
+			ncpu = c.Info.HostConfig.CPUShares
+		}
+
+		out[i] = structs.ContainerWithResource{
+			ID:             c.ID,
+			Name:           c.Info.Name,
+			Image:          c.Image,
+			Driver:         c.Info.Driver,
+			NetworkMode:    c.HostConfig.NetworkMode,
+			Created:        c.Info.Created,
+			State:          cluster.StateString(c.Info.State),
+			Labels:         c.Labels,
+			Env:            c.Info.Config.Env,
+			Mounts:         c.Mounts,
+			CpusetCpus:     c.Info.HostConfig.CpusetCpus,
+			CPUs:           ncpu,
+			Memory:         c.Info.HostConfig.Memory,
+			MemorySwap:     c.Info.HostConfig.MemorySwap,
+			OomKillDisable: *c.Info.HostConfig.OomKillDisable,
+		}
+	}
+
+	return out
 }
 
 // GET /ports
