@@ -208,6 +208,16 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 	}
 
 	for i := range nodes {
+		if i < len(nodesDetail) {
+			nodesDetail[i] = structs.NodeResource{
+				ID:       nodes[i].ID,
+				Name:     nodes[i].Name,
+				EngineID: nodes[i].EngineID,
+				Addr:     nodes[i].Addr,
+				Status:   swarm.ParseNodeStatus(nodes[i].Status),
+			}
+		}
+
 		if nodes[i].EngineID != "" {
 			eng, err := gd.GetEngine(nodes[i].EngineID)
 			if err != nil || eng == nil {
@@ -222,7 +232,7 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 			usedCPUs += _CPUs
 			usedMemory += _Memory
 
-			if detail {
+			if i < len(nodesDetail) {
 				nodesDetail[i] = structs.NodeResource{
 					ID:       nodes[i].ID,
 					Name:     nodes[i].Name,
