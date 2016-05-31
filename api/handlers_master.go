@@ -11,6 +11,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api/structs"
+	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
@@ -194,8 +195,8 @@ func getNodesResourceByCluster(ctx goctx.Context, w http.ResponseWriter, r *http
 	json.NewEncoder(w).Encode(resp)
 }
 
-func getClusterResource(gd *swarm.Gardener, cluster database.Cluster, detail bool) (structs.ClusterResource, error) {
-	nodes, err := database.ListNodeByCluster(cluster.ID)
+func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (structs.ClusterResource, error) {
+	nodes, err := database.ListNodeByCluster(cl.ID)
 	if err != nil {
 		return structs.ClusterResource{}, err
 	}
@@ -224,25 +225,27 @@ func getClusterResource(gd *swarm.Gardener, cluster database.Cluster, detail boo
 				containers := eng.Containers()
 				crs := make([]structs.ContainerWithResource, len(containers))
 				for index, c := range containers {
-
-					ncpu, err := utils.GetCPUNum(c.Config.HostConfig.CpusetCpus)
+					ncpu, err := utils.GetCPUNum(c.Info.HostConfig.CpusetCpus)
 					if err != nil {
-						ncpu = c.Config.HostConfig.CPUShares
+						ncpu = c.Info.HostConfig.CPUShares
 					}
+
 					crs[index] = structs.ContainerWithResource{
-						ID:          c.ID,
-						Name:        c.Info.Name,
-						Image:       c.Image,
-						Driver:      c.Info.Driver,
-						NetworkMode: c.HostConfig.NetworkMode,
-						Path:        c.Info.Path,
-						Created:     c.Info.Created,
-						Status:      c.Status,
-						Binds:       c.Config.HostConfig.Binds,
-						CpusetCpus:  c.Config.HostConfig.CpusetCpus,
-						CPUs:        ncpu,
-						Memory:      c.Config.HostConfig.Memory,
-						MemorySwap:  c.Config.HostConfig.MemorySwap,
+						ID:             c.ID,
+						Name:           c.Info.Name,
+						Image:          c.Image,
+						Driver:         c.Info.Driver,
+						NetworkMode:    c.HostConfig.NetworkMode,
+						Created:        c.Info.Created,
+						State:          cluster.StateString(c.Info.State),
+						Labels:         c.Labels,
+						Env:            c.Info.Config.Env,
+						Mounts:         c.Mounts,
+						CpusetCpus:     c.Info.HostConfig.CpusetCpus,
+						CPUs:           ncpu,
+						Memory:         c.Info.HostConfig.Memory,
+						MemorySwap:     c.Info.HostConfig.MemorySwap,
+						OomKillDisable: *c.Info.HostConfig.OomKillDisable,
 					}
 				}
 
@@ -265,9 +268,9 @@ func getClusterResource(gd *swarm.Gardener, cluster database.Cluster, detail boo
 	}
 
 	return structs.ClusterResource{
-		ID:     cluster.ID,
-		Name:   cluster.Name,
-		Enable: cluster.Enabled,
+		ID:     cl.ID,
+		Name:   cl.Name,
+		Enable: cl.Enabled,
 		Entire: structs.Resource{
 			TotalCPUs:   int(totalCPUs),
 			UsedCPUs:    int(usedCPUs),

@@ -1,5 +1,7 @@
 package structs
 
+import "github.com/docker/engine-api/types"
+
 type PostClusterRequest struct {
 	Name       string `json:"name"`
 	Type       string `json:"type"`
@@ -50,19 +52,21 @@ type NodeResource struct {
 }
 
 type ContainerWithResource struct {
-	ID          string
-	Name        string
-	Image       string
-	Driver      string
-	NetworkMode string
-	Path        string
-	Created     string
-	Status      string
-	Binds       []string
-	CpusetCpus  string // CpusetCpus 0-2, 0,1
-	CPUs        int64  // CPU shares (relative weight vs. other containers)
-	Memory      int64  // Memory limit (in bytes)
-	MemorySwap  int64  // Total memory usage (memory + swap); set `-1` to enable unlimited swap
+	ID             string
+	Name           string
+	Image          string
+	Driver         string
+	NetworkMode    string
+	Created        string
+	State          string
+	Labels         map[string]string
+	Env            []string
+	Mounts         []types.MountPoint
+	CpusetCpus     string // CpusetCpus 0-2, 0,1
+	CPUs           int64  // CPU shares (relative weight vs. other containers)
+	Memory         int64  // Memory limit (in bytes)
+	MemorySwap     int64  // Total memory usage (memory + swap); set `-1` to enable unlimited swap
+	OomKillDisable bool   // Whether to disable OOM Killer or not
 }
 
 type Node struct {
