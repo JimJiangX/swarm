@@ -20,7 +20,7 @@ func TestTXInsertUnitConfig(t *testing.T) {
 		ParentID: "",
 		Content: `qwertazwk,ol.p;/['sxecrfvtgbyhn 
 		ujmiyuiop[]\][as"""dfghjkl'';'zxcvbnm,./'"'''""`,
-		configKeySets: "",
+		ConfigKeySets: "",
 		KeySets: map[string]KeysetParams{
 			"abc": KeysetParams{
 				Key:         "abc",

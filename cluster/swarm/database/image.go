@@ -126,7 +126,7 @@ type UnitConfig struct {
 	Version       int                     `db:"version"`
 	ParentID      string                  `db:"parent_id"`
 	Content       string                  `db:"content"`         // map[string]interface{}
-	configKeySets string                  `db:"config_key_sets"` // map[string]KeysetParams
+	ConfigKeySets string                  `db:"config_key_sets"` // map[string]KeysetParams
 	KeySets       map[string]KeysetParams `db:"-"`
 
 	CreatedAt time.Time `db:"created_at"`
@@ -148,7 +148,7 @@ func (c *UnitConfig) encode() error {
 	err := json.NewEncoder(buffer).Encode(c.KeySets)
 
 	if err == nil {
-		c.configKeySets = buffer.String()
+		c.ConfigKeySets = buffer.String()
 	}
 
 	return nil
@@ -156,7 +156,7 @@ func (c *UnitConfig) encode() error {
 
 func (c *UnitConfig) decode() error {
 	var val map[string]KeysetParams
-	dec := json.NewDecoder(strings.NewReader(c.configKeySets))
+	dec := json.NewDecoder(strings.NewReader(c.ConfigKeySets))
 	err := dec.Decode(&val)
 	if err == nil {
 		c.KeySets = val

@@ -107,7 +107,7 @@ func TestUnit(t *testing.T) {
 		Version:       99,
 		ParentID:      "parentId99",
 		Content:       "content99",
-		configKeySets: "",
+		ConfigKeySets: "",
 		KeySets:       make(map[string]KeysetParams),
 		CreatedAt:     time.Now(),
 	}
