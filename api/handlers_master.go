@@ -311,7 +311,7 @@ func getPorts(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	end := intValueOrZero(r, "end")
 	limit := intValueOrZero(r, "limit")
 
-	ports, err := swarm.ListPorts(start, end, limit)
+	ports, err := swarm.ListPorts(start, end, limit, true)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -321,7 +321,7 @@ func getPorts(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		resp[i] = structs.PortResponse{
 			Port:      ports[i].Port,
 			Name:      ports[i].Name,
-			UnitID:    ports[i].UnitID,
+			Unit:      ports[i].UnitName,
 			Proto:     ports[i].Proto,
 			Allocated: ports[i].Allocated,
 		}
