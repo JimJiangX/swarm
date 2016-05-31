@@ -223,13 +223,13 @@ func getClusterResource(gd *swarm.Gardener, cluster database.Cluster, detail boo
 			if detail {
 				containers := eng.Containers()
 				crs := make([]structs.ContainerWithResource, len(containers))
-				for _, c := range containers {
+				for index, c := range containers {
 
 					ncpu, err := utils.GetCPUNum(c.Config.HostConfig.CpusetCpus)
 					if err != nil {
 						ncpu = c.Config.HostConfig.CPUShares
 					}
-					crs[i] = structs.ContainerWithResource{
+					crs[index] = structs.ContainerWithResource{
 						ID:          c.ID,
 						Name:        c.Info.Name,
 						Image:       c.Image,
