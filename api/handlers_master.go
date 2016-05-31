@@ -21,7 +21,7 @@ import (
 
 var ErrUnsupportGardener = errors.New("Unsupported Gardener")
 
-// GET /clusters/{name:.*}
+// GET /clusters/{name}
 func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -167,7 +167,7 @@ func getClustersResource(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(resp)
 }
 
-// GET /clusters/{name:.*}/resources
+// GET /clusters/{name}/resources
 func getNodesResourceByCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 

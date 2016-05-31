@@ -99,7 +99,7 @@ func GetCluster(IDOrName string) (Cluster, error) {
 	c := Cluster{}
 	err = db.Get(&c, "SELECT * FROM tb_cluster WHERE id=? OR name=?", IDOrName, IDOrName)
 
-	return c, nil
+	return c, err
 }
 
 func ListCluster() ([]Cluster, error) {
