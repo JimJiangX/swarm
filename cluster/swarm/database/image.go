@@ -215,7 +215,7 @@ func TxUpdateImageTemplateConfig(image string, config UnitConfig) error {
 		return err
 	}
 
-	_, err = tx.Exec("UPDATE tb_image SET template_config_id=? WHERE id=?", image, config.ID)
+	_, err = tx.Exec("UPDATE tb_image SET template_config_id=? WHERE id=?", config.ID, image)
 	if err != nil {
 		return err
 	}
