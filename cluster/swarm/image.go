@@ -202,7 +202,7 @@ func UpdateImageTemplateConfig(imageID string, req structs.UpdateUnitConfigReque
 
 	err = database.TxUpdateImageTemplateConfig(image.ID, newConfig)
 	if err != nil {
-		return config, err
+		return newConfig, err
 	}
 
 	return newConfig, nil

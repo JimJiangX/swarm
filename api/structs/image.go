@@ -43,6 +43,6 @@ type ImageConfigResponse struct {
 
 type UpdateUnitConfigRequest struct {
 	ConfigMountPath string         `json:"config_mount_path"`
-	ConfigContent   string         `json:"config_file_content"`
+	ConfigContent   string         `json:"config_content"`
 	KeySet          []KeysetParams `json:"config_keyset"`
 }
