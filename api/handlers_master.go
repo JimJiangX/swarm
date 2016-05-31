@@ -21,7 +21,7 @@ import (
 
 var ErrUnsupportGardener = errors.New("Unsupported Gardener")
 
-// GET /clusters/{name}
+// GET /clusters/{name:.*}
 func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -139,7 +139,7 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(lists)
 }
 
-// GET /clusters/resources
+// GET /resources
 func getClustersResource(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	clusters, err := database.ListCluster()
 	if err != nil {
@@ -167,9 +167,9 @@ func getClustersResource(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(resp)
 }
 
-// GET /clusters/{name}/resources
+// GET /resources/{cluster:.*}
 func getNodesResourceByCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
+	name := mux.Vars(r)["cluster"]
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
@@ -209,8 +209,8 @@ func getClusterResource(gd *swarm.Gardener, cluster database.Cluster, detail boo
 	for i := range nodes {
 		if nodes[i].EngineID != "" {
 			eng, err := gd.GetEngine(nodes[i].EngineID)
-			if err == nil && eng != nil {
-				logrus.Warnf("Engine %s Not Found,%s", nodes[i].EngineID, err)
+			if err != nil || eng == nil {
+				logrus.Warnf("Engine %s Not Found,%v", nodes[i].EngineID, err)
 				continue
 			}
 			_CPUs := eng.UsedCpus()
@@ -260,7 +260,6 @@ func getClusterResource(gd *swarm.Gardener, cluster database.Cluster, detail boo
 					},
 					Containers: crs,
 				}
-
 			}
 		}
 	}
