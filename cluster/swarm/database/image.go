@@ -66,18 +66,22 @@ func QueryImage(name, version string) (Image, error) {
 }
 
 func GetImageAndUnitConfig(ID string) (Image, UnitConfig, error) {
+	image := Image{}
+	config := UnitConfig{}
+
 	db, err := GetDB(true)
 	if err != nil {
-		return Image{}, UnitConfig{}, err
+		return image, config, err
 	}
 
-	image := Image{}
-	err = db.Get(&image, "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?", ID, ID)
+	err = db.Get(&image, "SELECT * FROM tb_image WHERE id=?", ID)
+	if err != nil {
+		return image, config, err
+	}
 
-	config := UnitConfig{}
 	err = db.Get(&config, "SELECT * FROM tb_unit_config WHERE id=?", image.TemplateConfigID)
 	if err != nil {
-		return Image{}, UnitConfig{}, err
+		return image, config, err
 	}
 
 	err = config.decode()

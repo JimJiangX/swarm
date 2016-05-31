@@ -186,7 +186,7 @@ func UpdateImageTemplateConfig(imageID string, req structs.UpdateUnitConfigReque
 
 		_, err = parser.ParseData([]byte(req.ConfigContent))
 		if err != nil {
-			return config, fmt.Errorf("Parse PostLoadImageRequest.Content Error:%s", err.Error())
+			return config, fmt.Errorf("Parse Config Content Error:%s", err)
 		}
 
 		newConfig.Content = req.ConfigContent
