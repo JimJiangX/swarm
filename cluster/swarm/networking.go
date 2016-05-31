@@ -307,12 +307,12 @@ func (gd *Gardener) RemoveNetworking(ID string) error {
 	return nil
 }
 
-func ListPorts(start, end, limit int) ([]database.Port, error) {
+func ListPorts(start, end, limit int, name bool) ([]database.Port, error) {
 	if limit == 0 || limit > 1000 {
 		limit = 1000
 	}
 
-	return database.ListPorts(start, end, limit)
+	return database.ListPorts(start, end, limit, name)
 }
 
 func ListNetworkings() ([]structs.ListNetworkingsResponse, error) {

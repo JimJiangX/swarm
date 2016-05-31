@@ -34,6 +34,7 @@ type Port struct {
 	Port      int    `db:"port"`
 	Name      string `db:"name"`
 	UnitID    string `db:"unit_id" json:"-"`
+	UnitName  string `db:"-"`
 	Proto     string `db:"proto"` // tcp/udp
 	Allocated bool   `db:"allocated" json:"-"`
 }
@@ -204,7 +205,7 @@ func GetPortsByUnit(id string) ([]Port, error) {
 	return ports, nil
 }
 
-func ListPorts(start, end, limit int) ([]Port, error) {
+func ListPorts(start, end, limit int, name bool) ([]Port, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
@@ -234,6 +235,19 @@ func ListPorts(start, end, limit int) ([]Port, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	if name {
+		stmt, err := db.Preparex("SELECT name FROM tb_unit WHERE id=?")
+		if err != nil {
+			return ports, err
+		}
+		for i := range ports {
+			err := stmt.QueryRowx(ports[i].UnitID).Scan(&ports[i].UnitName)
+			if err != nil {
+				return ports, nil
+			}
+		}
 	}
 
 	return ports, nil
