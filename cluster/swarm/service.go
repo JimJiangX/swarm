@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/types"
+	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -18,6 +21,7 @@ import (
 	consulapi "github.com/hashicorp/consul/api"
 	swm_structs "github.com/yiduoyunQ/sm/sm-svr/structs"
 	"github.com/yiduoyunQ/smlib"
+	"golang.org/x/net/context"
 )
 
 var (
@@ -215,6 +219,42 @@ func ValidService(req structs.PostServiceRequest) []string {
 	logrus.Warnf("Service Valid warning:", warnings)
 
 	return warnings
+}
+
+func ValidateServiceScaleUp(svc *Service, list []structs.ScaleUpModule) error {
+	warns := make([]string, 0, 10)
+
+	for i := range list {
+		_, _, err := initialize(list[i].Type)
+		if err != nil {
+			warns = append(warns, err.Error())
+		}
+
+		err = validateContainerUpdateConfig(list[i].Config)
+		if err != nil {
+			warns = append(warns, err.Error())
+		}
+	}
+
+	svc.RLock()
+	for i := range list {
+		units := svc.getUnitByType(list[i].Type)
+		if len(units) == 0 {
+			warns = append(warns, fmt.Sprintf("Not Found unit '%s' In Service %s", list[i].Type, svc.Name))
+		}
+		for _, u := range units {
+			if u.engine == nil || (u.config == nil && u.container == nil) {
+				warns = append(warns, fmt.Sprintf("unit odd,%+v", u))
+			}
+		}
+	}
+	svc.RUnlock()
+
+	if len(warns) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("Warnings:%s", warns)
 }
 
 func (svc *Service) BackupStrategy() *database.BackupStrategy {
@@ -1048,6 +1088,142 @@ func (svc *Service) TryBackupTask(host, unitID, strategyID, strategyType string,
 func (svc *Service) Task() *database.Task {
 
 	return svc.task
+}
+
+func (gd *Gardener) ServiceScaleUp(name string, list []structs.ScaleUpModule) error {
+	svc, err := gd.GetService(name)
+	if err != nil {
+		return err
+	}
+
+	err = ValidateServiceScaleUp(svc, list)
+	if err != nil {
+		return err
+	}
+	svc.Lock()
+	gd.scheduler.Lock()
+	defer func() {
+		svc.Unlock()
+		gd.scheduler.Unlock()
+	}()
+
+	type pending struct {
+		containerID string
+		cpusetCPus  string
+		engine      *cluster.Engine
+		config      container.UpdateConfig
+	}
+
+	pendings := make([]pending, 0, len(svc.units))
+
+	for i := range list {
+		units := svc.getUnitByType(list[i].Type)
+		if len(units) == 0 {
+			return fmt.Errorf("Not Found unit '%s' In Service %s", list[i].Type, svc.Name)
+		}
+
+		for _, u := range units {
+			if u.engine.Memory-u.engine.UsedMemory()-int64(list[i].Config.Memory)+u.container.Config.HostConfig.Memory < 0 {
+				return fmt.Errorf("Engine %s:%s have not enough Memory for Container %s Update", u.engine.ID, u.engine.IP, u.Name)
+			}
+		}
+
+		used, err := utils.GetCPUNum(units[0].container.Info.HostConfig.CpusetCpus)
+		if err != nil {
+			return err
+		}
+
+		need, err := strconv.ParseInt(list[i].Config.CpusetCpus, 10, 64)
+		if err != nil {
+			return err
+		}
+
+		if need < used {
+			for _, u := range units {
+				cpus, err := utils.ParseUintList(u.container.Info.HostConfig.CpusetCpus)
+				if err != nil {
+					return err
+				}
+
+				cpuSlice := make([]int, 0, len(cpus))
+				for k, ok := range cpus {
+					if ok {
+						cpuSlice = append(cpuSlice, k)
+					}
+				}
+				sort.Ints(cpuSlice)
+				cpuString := make([]string, need)
+				for n := 0; n < int(need); n++ {
+					cpuString[n] = strconv.Itoa(cpuSlice[n])
+				}
+
+				pendings = append(pendings, pending{
+					containerID: u.container.ID,
+					cpusetCPus:  strings.Join(cpuString, ","),
+					engine:      u.engine,
+					config:      list[i].Config,
+				})
+			}
+		} else {
+			for _, u := range units {
+				reserve := make([]string, 0, len(svc.units))
+				for n := range pendings {
+					if u.engine.ID == pendings[n].engine.ID {
+						reserve = append(reserve, pendings[n].cpusetCPus)
+					}
+				}
+				cpusetCpus, err := gd.allocCPUs(u.engine, int(need-used), reserve...)
+				if err != nil {
+					return err
+				}
+				cpusetCpus = u.container.Info.HostConfig.CpusetCpus + "," + cpusetCpus
+				pendings = append(pendings, pending{
+					containerID: u.container.ID,
+					cpusetCPus:  cpusetCpus,
+					engine:      u.engine,
+					config:      list[i].Config,
+				})
+			}
+		}
+	}
+
+	for i := range pendings {
+		client := pendings[i].engine.EngineAPIClient()
+		if client == nil {
+			return nil
+		}
+
+		pendings[i].config.CpusetCpus = pendings[i].cpusetCPus
+		err := client.ContainerUpdate(context.Background(), pendings[i].containerID, pendings[i].config)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func reduceCPU() {
+	// Reserve origin CPU CpusetCpus
+	/*
+		cpus, err := utils.ParseUintList(u.container.Info.HostConfig.CpusetCpus)
+		if err != nil {
+			return err
+		}
+
+		cpuSlice := make([]int, 0, len(cpus))
+		for k, ok := range cpus {
+			if ok {
+				cpuSlice = append(cpuSlice, k)
+			}
+		}
+		sort.Ints(cpuSlice)
+		cpuString := make([]string, need)
+		for n := 0; n < int(need); n++ {
+			cpuString[n] = strconv.Itoa(cpuSlice[n])
+		}
+		cpusetCpus := strings.Join(cpuString, ",")
+	*/
 }
 
 func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int) error {

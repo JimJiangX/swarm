@@ -18,8 +18,8 @@ type PostServiceRequest struct {
 
 	Modules         []Module
 	Users           []User          `json:",omitempty"`
-	BackupRetention time.Duration   // s
-	BackupMaxSize   int             // byte
+	BackupRetention time.Duration   `json:"backup_retention"` // s
+	BackupMaxSize   int             `json:"backup_max_size"`  // byte
 	BackupStrategy  *BackupStrategy `json:"backup_strategy,omitempty"`
 }
 
@@ -63,4 +63,9 @@ type PostServiceResponse struct {
 	ID               string
 	TaskID           string
 	BackupStrategyID string `json:"backup_strategy_id"`
+}
+
+type ScaleUpModule struct {
+	Type   string
+	Config container.UpdateConfig
 }

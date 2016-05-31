@@ -211,12 +211,26 @@ func ListPorts(start, end, limit int) ([]Port, error) {
 	}
 
 	ports := make([]Port, 0, limit)
-	if end != 0 {
+
+	switch {
+	case start == 0 && end == 0:
+		query := fmt.Sprintf("SELECT * FROM tb_port limit %d", limit)
+		err = db.Select(&ports, query)
+
+	case start > 0 && end > 0:
 		query := fmt.Sprintf("SELECT * FROM tb_port WHERE port>=? AND port<=? limit %d", limit)
 		err = db.Select(&ports, query, start, end)
-	} else {
+
+	case end == 0:
 		query := fmt.Sprintf("SELECT * FROM tb_port WHERE port>=? limit %d", limit)
 		err = db.Select(&ports, query, start)
+
+	case start == 0:
+		query := fmt.Sprintf("SELECT * FROM tb_port WHERE port<=? limit %d", limit)
+		err = db.Select(&ports, query, end)
+
+	default:
+		return nil, fmt.Errorf("illegal input,start=%d end=%d limit=%d", start, end, limit)
 	}
 	if err != nil {
 		return nil, err

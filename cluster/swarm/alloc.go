@@ -10,6 +10,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
+	"github.com/docker/swarm/utils"
 )
 
 func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.Engine, config *cluster.ContainerConfig) error {
@@ -73,7 +74,7 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 	}
 
 	// Alloc CPU
-	cpuset, err := allocCPUs(engine, ncpu)
+	cpuset, err := gd.allocCPUs(engine, ncpu)
 	if err != nil {
 		logrus.Errorf("Alloc CPU %d Error:%s", ncpu, err)
 
@@ -85,26 +86,68 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 	return nil
 }
 
-func allocCPUs(engine *cluster.Engine, ncpu int) (string, error) {
-	total := int(engine.TotalCpus())
+func (gd *Gardener) allocCPUs(engine *cluster.Engine, ncpu int, reserve ...string) (string, error) {
+	total := int(engine.Cpus)
 	used := int(engine.UsedCpus())
-	if ncpu > total-used {
+
+	if total-used < ncpu {
 		return "", fmt.Errorf("Engine Alloc CPU Error,%s CPU is Short(%d-%d<%d),", engine.Name, total, used, ncpu)
 	}
 
-	return setCPUSets(used, ncpu), nil
-}
+	usedCPUs := make(map[int]bool, total)
 
-func setCPUSets(used, ncpu int) string {
-	n := int(used)
-	cpus := make([]string, ncpu)
-
-	for i := 0; i < ncpu; i++ {
-		cpus[i] = strconv.Itoa(n)
-		n++
+	for i := range reserve {
+		cpus, err := utils.ParseUintList(reserve[i])
+		if err != nil {
+			return "", err
+		}
+		for k, v := range cpus {
+			if v {
+				usedCPUs[k] = v
+			}
+		}
 	}
 
-	return strings.Join(cpus, ",")
+	containers := engine.Containers()
+	for _, c := range containers {
+		cpus, err := utils.ParseUintList(c.Info.HostConfig.CpusetCpus)
+		if err != nil {
+			return "", err
+		}
+		for k, v := range cpus {
+			if v {
+				usedCPUs[k] = v
+			}
+		}
+	}
+
+	for _, pending := range gd.pendingContainers {
+		if pending.Engine.ID == engine.ID {
+			cpus, err := utils.ParseUintList(pending.Config.HostConfig.CpusetCpus)
+			if err != nil {
+				return "", err
+			}
+			for k, v := range cpus {
+				if v {
+					usedCPUs[k] = v
+				}
+			}
+		}
+	}
+
+	if total-len(usedCPUs) < ncpu {
+		return "", fmt.Errorf("Engine Alloc CPU Error,%s CPU is Short(%d-%d<%d),", engine.Name, total, used, ncpu)
+	}
+
+	free := make([]string, ncpu)
+	for i := 0; i < total && ncpu > 0; i++ {
+		if !usedCPUs[i] {
+			ncpu--
+			free[ncpu] = strconv.Itoa(i)
+		}
+	}
+
+	return strings.Join(free, ","), nil
 }
 
 type preAllocResource struct {

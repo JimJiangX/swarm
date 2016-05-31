@@ -151,6 +151,30 @@ func validateContainerConfig(config *cluster.ContainerConfig) error {
 	return fmt.Errorf("Errors:%s", msg)
 }
 
+func validateContainerUpdateConfig(config container.UpdateConfig) error {
+	msg := make([]string, 0, 5)
+	if config.Resources.CPUShares != 0 {
+		msg = append(msg, "CPUShares > 0,CPUShares should be 0")
+	}
+
+	if config.Resources.CpusetCpus == "" {
+		msg = append(msg, "CpusetCpus is null,CpusetCpus should not be null")
+	}
+
+	n, err := strconv.Atoi(config.Resources.CpusetCpus)
+	if err != nil {
+		msg = append(msg, err.Error())
+	} else if n == 0 {
+		msg = append(msg, fmt.Sprintf("CpusetCpus is '%s',should >0", config.Resources.CpusetCpus))
+	}
+
+	if len(msg) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("Errors:%s", msg)
+}
+
 // parse NCPU from config.HostConfig.CpusetCpus
 func parseCpuset(config *cluster.ContainerConfig) (int, error) {
 	ncpu, err := strconv.Atoi(config.HostConfig.CpusetCpus)

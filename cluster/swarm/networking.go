@@ -311,9 +311,6 @@ func ListPorts(start, end, limit int) ([]database.Port, error) {
 	if limit == 0 || limit > 1000 {
 		limit = 1000
 	}
-	if start == 0 && end == 0 {
-		return nil, fmt.Errorf("'start' 'end' cannot both be '0'")
-	}
 
 	return database.ListPorts(start, end, limit)
 }
