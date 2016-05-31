@@ -175,29 +175,21 @@ func UpdateImageTemplateConfig(imageID string, req structs.UpdateUnitConfigReque
 	}
 
 	newConfig := config
+	newConfig.ID = utils.Generate64UUID()
+	newConfig.Version = 0
 
-	if req.ConfigFilePath != "" {
-		content, err := ioutil.ReadFile(req.ConfigFilePath)
-		if err != nil {
-			err = fmt.Errorf("ReadAll From ConfigFile %s error:%s", req.ConfigFilePath, err)
-			logrus.Error(err.Error())
-
-			return config, err
-		}
-		if len(content) == 0 {
-			return config, fmt.Errorf("read 0 byte in ConfigFile %s", req.ConfigFilePath)
-		}
+	if req.ConfigContent != "" {
 		parser, _, err := initialize(image.Name)
 		if err != nil {
 			return config, err
 		}
 
-		_, err = parser.ParseData(content)
+		_, err = parser.ParseData([]byte(req.ConfigContent))
 		if err != nil {
 			return config, fmt.Errorf("Parse PostLoadImageRequest.Content Error:%s", err.Error())
 		}
 
-		newConfig.Content = string(content)
+		newConfig.Content = req.ConfigContent
 	}
 
 	if req.ConfigMountPath != "" {
@@ -208,7 +200,7 @@ func UpdateImageTemplateConfig(imageID string, req structs.UpdateUnitConfigReque
 		newConfig.KeySets = converteToKeysetParams(req.KeySet)
 	}
 
-	err = database.UpdateUnitConfig(newConfig)
+	err = database.TxUpdateImageTemplateConfig(image.ID, newConfig)
 	if err != nil {
 		return config, err
 	}

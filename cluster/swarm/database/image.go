@@ -199,6 +199,26 @@ func TXInsertUnitConfig(tx *sqlx.Tx, config *UnitConfig) error {
 	return err
 }
 
+func TxUpdateImageTemplateConfig(image string, config UnitConfig) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = TXInsertUnitConfig(tx, &config)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec("UPDATE tb_image SET template_config_id=? WHERE id=?", image, config.ID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func UpdateUnitConfig(config UnitConfig) error {
 	db, err := GetDB(true)
 	if err != nil {

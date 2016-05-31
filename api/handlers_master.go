@@ -239,6 +239,7 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 					EngineID: eng.ID,
 					Addr:     eng.IP,
 					Status:   eng.Status(),
+					Labels:   eng.Labels,
 					Resource: structs.Resource{
 						TotalCPUs:   int(eng.Cpus),
 						UsedCPUs:    int(_CPUs),
@@ -1099,29 +1100,34 @@ func updateImageTemplateConfig(ctx goctx.Context, w http.ResponseWriter, r *http
 		return
 	}
 
-	var keysets map[string]structs.KeysetParams
-	if len(config.KeySets) > 0 {
-		keysets = make(map[string]structs.KeysetParams, len(config.KeySets))
-		for key, val := range config.KeySets {
-			keysets[key] = structs.KeysetParams{
-				Key:         val.Key,
-				CanSet:      val.CanSet,
-				MustRestart: val.MustRestart,
-				Description: val.Description,
-			}
-		}
-	}
-
 	resp := structs.ImageConfigResponse{
-		ID:      config.ID,      // string `json:"config_id"`
-		Mount:   config.Mount,   // string `json:"config_mount_path"`
-		Content: config.Content, // string `json:"config_content"`
-		KeySet:  keysets,        // map[string]KeysetParams,
+		ID:      config.ID,                              // string `json:"config_id"`
+		Mount:   config.Mount,                           // string `json:"config_mount_path"`
+		Content: config.Content,                         // string `json:"config_content"`
+		KeySet:  converteToKeysetParams(config.KeySets), // map[string]KeysetParams,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
+}
+
+func converteToKeysetParams(from map[string]database.KeysetParams) map[string]structs.KeysetParams {
+	if len(from) == 0 {
+		return nil
+	}
+
+	keysets := make(map[string]structs.KeysetParams, len(from))
+	for key, val := range from {
+		keysets[key] = structs.KeysetParams{
+			Key:         val.Key,
+			CanSet:      val.CanSet,
+			MustRestart: val.MustRestart,
+			Description: val.Description,
+		}
+	}
+
+	return keysets
 }
 
 // POST /storage/san

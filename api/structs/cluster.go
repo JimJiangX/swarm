@@ -48,6 +48,7 @@ type NodeResource struct {
 	Addr     string
 	Status   string
 	Resource
+	Labels     map[string]string
 	Containers []ContainerWithResource
 }
 
