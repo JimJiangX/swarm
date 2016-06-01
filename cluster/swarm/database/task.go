@@ -53,8 +53,7 @@ func txInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
 
 func NewTask(relate, linkto, des string, labels []string, timeout int) Task {
 	return Task{
-		ID: utils.Generate64UUID(),
-		//	Name:        name,
+		ID:          utils.Generate64UUID(),
 		Related:     relate,
 		Linkto:      linkto,
 		Description: des,

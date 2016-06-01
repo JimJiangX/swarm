@@ -800,12 +800,15 @@ func postServiceScaleUp(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err := gd.ServiceScaleUp(name, req)
+	taskID, err := gd.ServiceScaleUpTask(name, req)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
 }
 
 // POST /services/{name:.*}/backup_strategy

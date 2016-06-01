@@ -1098,28 +1098,50 @@ type pendingContainerUpdate struct {
 	config      container.UpdateConfig
 }
 
-func (gd *Gardener) ServiceScaleUp(name string, list []structs.ScaleUpModule) error {
+func (gd *Gardener) ServiceScaleUpTask(name string, list []structs.ScaleUpModule) (string, error) {
 	svc, err := gd.GetService(name)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	err = ValidateServiceScaleUp(svc, list)
 	if err != nil {
-		return err
+		return "", err
 	}
 
+	task := database.NewTask("service update containers config",
+		svc.ID, "", nil, 300)
+	err = database.InsertTask(task)
+	if err != nil {
+		return "", err
+	}
+	go gd.serviceScaleUP(svc, list, task)
+
+	return task.ID, nil
+}
+
+func (gd *Gardener) serviceScaleUP(svc *Service, list []structs.ScaleUpModule, task database.Task) (err error) {
 	svc.Lock()
 	gd.scheduler.Lock()
 	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
 		svc.Unlock()
 		gd.scheduler.Unlock()
+		if err == nil {
+			task.Status = _StatusTaskDone
+		} else {
+			task.Status = _StatusTaskFailed
+			task.Errors = err.Error()
+		}
+		database.UpdateTaskStatus(&task, task.Status, time.Now(), task.Errors)
 	}()
 
 	pendings := make([]pendingContainerUpdate, 0, len(svc.units))
 
 	for i := range list {
-		err := handlePerScaleUpModule(gd, svc, list[i], &pendings)
+		err = handlePerScaleUpModule(gd, svc, list[i], &pendings)
 		if err != nil {
 			return err
 		}
@@ -1129,7 +1151,7 @@ func (gd *Gardener) ServiceScaleUp(name string, list []structs.ScaleUpModule) er
 		if pendings[i].svc == nil {
 			pendings[i].svc = svc
 		}
-		err := pendings[i].containerUpdate()
+		err = pendings[i].containerUpdate()
 		if err != nil {
 			logrus.Error("container %s update error:%s", pendings[i].containerID, err)
 			return err
