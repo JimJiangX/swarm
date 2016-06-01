@@ -21,7 +21,6 @@ import (
 	consulapi "github.com/hashicorp/consul/api"
 	swm_structs "github.com/yiduoyunQ/sm/sm-svr/structs"
 	"github.com/yiduoyunQ/smlib"
-	"golang.org/x/net/context"
 )
 
 var (
@@ -1093,6 +1092,8 @@ func (svc *Service) Task() *database.Task {
 type pendingContainerUpdate struct {
 	containerID string
 	cpusetCPus  string
+	unit        *unit
+	svc         *Service
 	engine      *cluster.Engine
 	config      container.UpdateConfig
 }
@@ -1125,6 +1126,9 @@ func (gd *Gardener) ServiceScaleUp(name string, list []structs.ScaleUpModule) er
 	}
 
 	for i := range pendings {
+		if pendings[i].svc == nil {
+			pendings[i].svc = svc
+		}
 		err := pendings[i].containerUpdate()
 		if err != nil {
 			logrus.Error("container %s update error:%s", pendings[i].containerID, err)
@@ -1166,6 +1170,7 @@ func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpMo
 			*pendings = append(*pendings, pendingContainerUpdate{
 				containerID: u.container.ID,
 				cpusetCPus:  cpusetCpus,
+				unit:        u,
 				engine:      u.engine,
 				config:      module.Config,
 			})
@@ -1186,6 +1191,7 @@ func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpMo
 			*pendings = append(*pendings, pendingContainerUpdate{
 				containerID: u.container.ID,
 				cpusetCPus:  cpusetCpus,
+				unit:        u,
 				engine:      u.engine,
 				config:      module.Config,
 			})
@@ -1196,18 +1202,30 @@ func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpMo
 }
 
 func (p *pendingContainerUpdate) containerUpdate() error {
-	if p.engine == nil {
-		return errEngineIsNil
-	}
-	client := p.engine.EngineAPIClient()
-	if client == nil {
-		return errEngineAPIisNil
-	}
-
 	if p.cpusetCPus != "" {
 		p.config.CpusetCpus = p.cpusetCPus
 	}
-	err := client.ContainerUpdate(context.Background(), p.containerID, p.config)
+
+	err := p.unit.stopService()
+	if err != nil {
+		logrus.Warn("container %s stop service error:%s", p.unit.Name, err)
+	}
+
+	err = p.unit.updateContainer(p.config)
+	if err != nil {
+		return err
+	}
+
+	defConfig, err := p.unit.defaultUserConfig(p.svc, p.unit)
+	if err != nil {
+		return err
+	}
+	err = p.unit.CopyConfig(defConfig)
+	if err != nil {
+		return err
+	}
+
+	err = p.unit.startService()
 	if err != nil {
 		return err
 	}

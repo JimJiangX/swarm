@@ -311,11 +311,12 @@ func getPorts(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	end := intValueOrZero(r, "end")
 	limit := intValueOrZero(r, "limit")
 
-	ports, err := swarm.ListPorts(start, end, limit, true)
+	ports, err := swarm.ListPorts(start, end, limit)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	resp := make([]structs.PortResponse, len(ports))
 	for i := range ports {
 		resp[i] = structs.PortResponse{
@@ -327,6 +328,8 @@ func getPorts(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			Allocated: ports[i].Allocated,
 		}
 	}
+
+	logrus.Debugf("limit=%d len=%d", limit, len(ports))
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

@@ -35,6 +35,7 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.En
 			ports[i].Name = req.ports[i].name
 			ports[i].Proto = req.ports[i].proto
 			ports[i].UnitID = preAlloc.unit.Unit.ID
+			ports[i].UnitName = preAlloc.unit.Unit.Name
 			ports[i].Allocated = true
 		}
 
@@ -227,9 +228,11 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 		if pendings[i].unit != nil {
 			ports := pendings[i].unit.ports
 			for p := range ports {
-				ports[p] = database.Port{
-					Allocated: false,
-				}
+				ports[p].Allocated = false
+				ports[p].Name = ""
+				ports[p].UnitID = ""
+				ports[p].UnitName = ""
+				ports[p].Proto = ""
 			}
 			database.TxUpdatePorts(tx, ports)
 			database.TxDeleteUnit(tx, pendings[i].unit.Unit.ServiceID)

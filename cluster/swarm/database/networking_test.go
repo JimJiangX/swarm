@@ -10,10 +10,10 @@ import (
 
 func TestPort(t *testing.T) {
 	ports := []Port{
-		NewPort(1, "port1", "unit1", "tcp", true),
-		NewPort(2, "port2", "unit2", "tcp", false),
-		NewPort(3, "port3", "unit3", "udp", true),
-		NewPort(4, "port4", "unit4", "udp", false),
+		NewPort(1, "port1", "unit1", "unitName1", "tcp", true),
+		NewPort(2, "port2", "unit2", "unitName2", "tcp", false),
+		NewPort(3, "port3", "unit3", "unitName3", "udp", true),
+		NewPort(4, "port4", "unit4", "unitName4", "udp", false),
 	}
 
 	defer func() {
@@ -60,7 +60,7 @@ func TestPort(t *testing.T) {
 	}
 
 	var p3 []Port
-	_p3 := NewPort(3, "port3b", "unit3b", "udp", false)
+	_p3 := NewPort(3, "port3b", "unit3b", "unitName3b", "udp", false)
 	p3 = append(p3, _p3)
 	tx, err = GetTX()
 	err = TxUpdatePorts(tx, p3)
@@ -89,10 +89,10 @@ func TestPort(t *testing.T) {
 		err = DelMultiPorts(
 			tx,
 			[]Port{
-				NewPort(5, "", "", "", true),
-				NewPort(6, "", "", "", true),
-				NewPort(9, "", "", "", true),
-				NewPort(10, "", "", "", true),
+				NewPort(5, "", "", "", "", true),
+				NewPort(6, "", "", "", "", true),
+				NewPort(9, "", "", "", "", true),
+				NewPort(10, "", "", "", "", true),
 			})
 		if err != nil {
 			t.Fatal(err)

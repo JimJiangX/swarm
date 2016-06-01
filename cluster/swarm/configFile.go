@@ -39,6 +39,17 @@ func (u unit) CanModify(data map[string]interface{}) ([]string, bool) {
 	return keys, can
 }
 
+func (u unit) MustRestart(data map[string]interface{}) bool {
+	for key := range data {
+		// case sensitive
+		if u.parent.KeySets[strings.ToLower(key)].MustRestart {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (u unit) Verify(data map[string]interface{}) error {
 	if len(data) > 0 {
 		if err := u.Validate(data); err != nil {
@@ -49,13 +60,19 @@ func (u unit) Verify(data map[string]interface{}) error {
 	return nil
 }
 
-func (u *unit) SetServiceConfig(key string, val interface{}) error {
+func (u *unit) SetServiceConfig(key string, val interface{}) (bool, error) {
 	// case sensitive
-	if !u.parent.KeySets[strings.ToLower(key)].CanSet {
-		return fmt.Errorf("Key %s cannot Set new Value", key)
+	restart := false
+	key = strings.ToLower(key)
+	if !u.parent.KeySets[key].CanSet {
+		return restart, fmt.Errorf("Key %s cannot Set new Value", key)
 	}
 
-	return u.setServiceConfig(key, val)
+	if u.parent.KeySets[key].MustRestart {
+		restart = true
+	}
+
+	return restart, u.setServiceConfig(key, val)
 }
 
 func (u *unit) setServiceConfig(key string, val interface{}) error {

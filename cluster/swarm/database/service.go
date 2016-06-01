@@ -422,6 +422,7 @@ func DeteleServiceRelation(serviceID string) error {
 		ports[i].Allocated = false
 		ports[i].Name = ""
 		ports[i].UnitID = ""
+		ports[i].UnitName = ""
 		ports[i].Proto = ""
 	}
 

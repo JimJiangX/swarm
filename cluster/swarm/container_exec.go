@@ -30,9 +30,9 @@ func checkTtyInput(attachStdin, ttyMode bool) error {
 // containerExec exec cmd in containeID,It returns ContainerExecInspect.
 func containerExec(engine *cluster.Engine, containerID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
 	inspect := types.ContainerExecInspect{}
-	cl := engine.EngineAPIClient()
-	if cl == nil {
-		return inspect, errEngineIsNil
+	client := engine.EngineAPIClient()
+	if client == nil {
+		return inspect, errEngineAPIisNil
 	}
 
 	execConfig := types.ExecConfig{
@@ -49,7 +49,7 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 		execConfig.AttachStdout = false
 	}
 
-	exec, err := cl.ContainerExecCreate(context.TODO(), containerID, execConfig)
+	exec, err := client.ContainerExecCreate(context.TODO(), containerID, execConfig)
 	if err != nil {
 		return inspect, err
 	}
@@ -62,7 +62,7 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 	}).Info("Start Exec")
 
 	if execConfig.Detach {
-		err := cl.ContainerExecStart(context.Background(), exec.ID, types.ExecStartCheck{Detach: detach})
+		err := client.ContainerExecStart(context.Background(), exec.ID, types.ExecStartCheck{Detach: detach})
 		if err != nil {
 			return inspect, err
 		}
@@ -71,13 +71,13 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 			logrus.Warn(err)
 		}
 
-		err = containerExecAttch(cl, exec.ID, execConfig)
+		err = containerExecAttch(client, exec.ID, execConfig)
 		if err != nil {
 			return inspect, err
 		}
 
 		status := 0
-		inspect, status, err = getExecExitCode(cl, exec.ID)
+		inspect, status, err = getExecExitCode(client, exec.ID)
 		if err != nil {
 			return inspect, err
 		}
@@ -89,13 +89,13 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 	return inspect, err
 }
 
-func containerExecAttch(cl client.APIClient, execID string, execConfig types.ExecConfig) error {
+func containerExecAttch(client client.APIClient, execID string, execConfig types.ExecConfig) error {
 	var (
 		out, stderr io.Writer     = os.Stdout, os.Stderr
 		in          io.ReadCloser = os.Stdin
 		errCh       chan error
 	)
-	resp, err := cl.ContainerExecAttach(context.Background(), execID, execConfig)
+	resp, err := client.ContainerExecAttach(context.Background(), execID, execConfig)
 	if err != nil {
 		return err
 	}
@@ -113,8 +113,8 @@ func containerExecAttch(cl client.APIClient, execID string, execConfig types.Exe
 }
 
 // getExecExitCode perform an inspect on the exec command. It returns ContainerExecInspect.
-func getExecExitCode(cl client.APIClient, execID string) (types.ContainerExecInspect, int, error) {
-	resp, err := cl.ContainerExecInspect(context.Background(), execID)
+func getExecExitCode(cli client.APIClient, execID string) (types.ContainerExecInspect, int, error) {
+	resp, err := cli.ContainerExecInspect(context.Background(), execID)
 	if err != nil {
 		// If we can't connect, then the daemon probably died.
 		if err != client.ErrConnectionFailed {

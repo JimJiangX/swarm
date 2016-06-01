@@ -9,6 +9,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/astaxie/beego/config"
+	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/cluster"
@@ -82,6 +83,37 @@ func (u *unit) factory() error {
 	u.ContainerCmd = cmder
 
 	return nil
+}
+
+func (u *unit) getEngine() (*cluster.Engine, error) {
+	if u.engine != nil {
+		return u.engine, nil
+	}
+
+	if u.container != nil && u.container.Engine != nil {
+		u.engine = u.container.Engine
+		return u.engine, nil
+	}
+
+	return nil, errEngineIsNil
+}
+
+func (u *unit) getEngineAPIClient() (client.APIClient, error) {
+	eng, err := u.getEngine()
+	if err != nil {
+		return nil, err
+	}
+
+	if eng == nil {
+		return nil, errEngineIsNil
+	}
+
+	client := eng.EngineAPIClient()
+	if client == nil {
+		return nil, errEngineAPIisNil
+	}
+
+	return client, nil
 }
 
 func (gd *Gardener) GetUnit(table database.Unit) (*unit, error) {
@@ -324,13 +356,9 @@ func (u *unit) createContainer(authConfig *types.AuthConfig) (*cluster.Container
 }
 
 func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
-	if u.engine == nil {
-		return errEngineIsNil
-	}
-
-	client := u.engine.EngineAPIClient()
-	if client == nil {
-		return errEngineAPIisNil
+	client, err := u.getEngineAPIClient()
+	if err != nil {
+		return err
 	}
 
 	return client.ContainerUpdate(context.TODO(), u.container.ID, updateConfig)
@@ -377,13 +405,9 @@ func (u *unit) startContainer() error {
 func (u *unit) stopContainer(timeout int) error {
 	u.stopService()
 
-	if u.engine == nil {
-		return errEngineIsNil
-	}
-
-	client := u.engine.EngineAPIClient()
-	if client == nil {
-		return errEngineAPIisNil
+	client, err := u.getEngineAPIClient()
+	if err != nil {
+		return err
 	}
 
 	return client.ContainerStop(context.TODO(), u.Unit.ContainerID, timeout)
@@ -408,13 +432,9 @@ func (u *unit) restartContainer(timeout int) error {
 }
 
 func (u *unit) renameContainer(name string) error {
-	if u.engine == nil {
-		return errEngineIsNil
-	}
-
-	client := u.engine.EngineAPIClient()
-	if client == nil {
-		return errEngineAPIisNil
+	client, err := u.getEngineAPIClient()
+	if err != nil {
+		return err
 	}
 
 	return client.ContainerRename(context.TODO(), u.container.ID, u.Unit.ID)

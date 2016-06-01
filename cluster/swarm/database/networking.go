@@ -34,7 +34,7 @@ type Port struct {
 	Port      int    `db:"port"`
 	Name      string `db:"name"`
 	UnitID    string `db:"unit_id" json:"-"`
-	UnitName  string `db:"-"`
+	UnitName  string `db:"unit_name"`
 	Proto     string `db:"proto"` // tcp/udp
 	Allocated bool   `db:"allocated" json:"-"`
 }
@@ -43,11 +43,12 @@ func (port Port) TableName() string {
 	return "tb_port"
 }
 
-func NewPort(port int, name, unit, proto string, allocated bool) Port {
+func NewPort(port int, name, unitID, unitName, proto string, allocated bool) Port {
 	return Port{
 		Port:      port,
 		Name:      name,
-		UnitID:    unit,
+		UnitID:    unitID,
+		UnitName:  unitName,
 		Proto:     proto,
 		Allocated: allocated,
 	}
@@ -95,7 +96,7 @@ func SelectAvailablePorts(num int) ([]Port, error) {
 }
 
 func TxUpdatePorts(tx *sqlx.Tx, ports []Port) error {
-	query := "UPDATE tb_port SET name=:name,unit_id=:unit_id,proto=:proto,allocated=:allocated WHERE port=:port"
+	query := "UPDATE tb_port SET name=:name,unit_id=:unit_id,unit_name=:unit_name,proto=:proto,allocated=:allocated WHERE port=:port"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
@@ -155,7 +156,7 @@ loop:
 }
 
 func TxInsertPorts(tx *sqlx.Tx, ports []Port) error {
-	query := "INSERT INTO tb_port (port,name,unit_id,proto,allocated) VALUES (:port,:name,:unit_id,:proto,:allocated)"
+	query := "INSERT INTO tb_port (port,name,unit_id,unit_name,proto,allocated) VALUES (:port,:name,:unit_id,:unit_name,:proto,:allocated)"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
@@ -190,14 +191,14 @@ func DelMultiPorts(tx *sqlx.Tx, ports []Port) error {
 	return nil
 }
 
-func GetPortsByUnit(id string) ([]Port, error) {
+func GetPortsByUnit(NameOrID string) ([]Port, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
 	ports := make([]Port, 0, 2)
-	err = db.Select(&ports, "SELECT * FROM tb_port WHERE unit_id=?", id)
+	err = db.Select(&ports, "SELECT * FROM tb_port WHERE unit_id=? OR unit_name=?", NameOrID, NameOrID)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +206,7 @@ func GetPortsByUnit(id string) ([]Port, error) {
 	return ports, nil
 }
 
-func ListPorts(start, end, limit int, name bool) ([]Port, error) {
+func ListPorts(start, end, limit int) ([]Port, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
@@ -215,19 +216,19 @@ func ListPorts(start, end, limit int, name bool) ([]Port, error) {
 
 	switch {
 	case start == 0 && end == 0:
-		query := fmt.Sprintf("SELECT * FROM tb_port limit %d", limit)
+		query := fmt.Sprintf("SELECT * FROM tb_port LIMIT %d", limit)
 		err = db.Select(&ports, query)
 
 	case start > 0 && end > 0:
-		query := fmt.Sprintf("SELECT * FROM tb_port WHERE port>=? AND port<=? limit %d", limit)
+		query := fmt.Sprintf("SELECT * FROM tb_port WHERE port>=? AND port<=? LIMIT %d", limit)
 		err = db.Select(&ports, query, start, end)
 
 	case end == 0:
-		query := fmt.Sprintf("SELECT * FROM tb_port WHERE port>=? limit %d", limit)
+		query := fmt.Sprintf("SELECT * FROM tb_port WHERE port>=? LIMIT %d", limit)
 		err = db.Select(&ports, query, start)
 
 	case start == 0:
-		query := fmt.Sprintf("SELECT * FROM tb_port WHERE port<=? limit %d", limit)
+		query := fmt.Sprintf("SELECT * FROM tb_port WHERE port<=? LIMIT %d", limit)
 		err = db.Select(&ports, query, end)
 
 	default:
@@ -235,19 +236,6 @@ func ListPorts(start, end, limit int, name bool) ([]Port, error) {
 	}
 	if err != nil {
 		return nil, err
-	}
-
-	if name {
-		stmt, err := db.Preparex("SELECT name FROM tb_unit WHERE id=?")
-		if err != nil {
-			return ports, err
-		}
-		for i := range ports {
-			err := stmt.QueryRowx(ports[i].UnitID).Scan(&ports[i].UnitName)
-			if err != nil {
-				return ports, nil
-			}
-		}
 	}
 
 	return ports, nil
