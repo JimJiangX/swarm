@@ -1354,12 +1354,12 @@ func (svc *Service) Delete(client *consulapi.Client, horus string, force, volume
 
 	err = svc.deregisterInHorus(horus)
 	if err != nil {
-		logrus.Error("%s deregister In Horus error:%s", svc.Name, err.Error())
+		logrus.Errorf("%s deregister In Horus error:%s", svc.Name, err.Error())
 	}
 
 	err = svc.deregisterServices(client)
 	if err != nil {
-		logrus.Error("%s deregister In consul error:%s", svc.Name, err.Error())
+		logrus.Errorf("%s deregister In consul error:%s", svc.Name, err.Error())
 	}
 
 	return nil

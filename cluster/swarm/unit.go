@@ -504,16 +504,13 @@ func (u *unit) extendVG() error {
 }
 
 func (u *unit) RegisterHealthCheck(config database.ConsulConfig, context *Service) error {
+	_, err := u.getEngine()
+	if err != nil {
+		return err
+	}
 	address := ""
 	if u.engine != nil {
 		address = fmt.Sprintf("%s:%d", u.engine.IP, config.ConsulPort)
-	} else {
-		node, err := database.GetNode(u.EngineID)
-		if err != nil {
-			logrus.Errorf("Not Found Node %s,Error:%s", u.EngineID, err.Error())
-			return err
-		}
-		address = fmt.Sprintf("%s:%d", node.Addr, config.ConsulPort)
 	}
 	c := consulapi.Config{
 		Address:    address,
@@ -791,8 +788,6 @@ func (u *unit) saveToDisk() error {
 
 	return database.UpdateUnitInfo(u.Unit)
 }
-
-func (u *unit) deregisterInHorus() error { return nil }
 
 func (u *unit) registerHorus(user, password string, agentPort int) (registerService, error) {
 	node, err := database.GetNode(u.EngineID)

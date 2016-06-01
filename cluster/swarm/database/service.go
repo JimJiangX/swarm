@@ -389,6 +389,7 @@ func txDeleteUsers(tx *sqlx.Tx, id string) error {
 
 	return err
 }
+
 func DeteleServiceRelation(serviceID string) error {
 	units, err := ListUnitByServiceID(serviceID)
 	if err != nil {
