@@ -1142,12 +1142,28 @@ func (gd *Gardener) ServiceScaleUp(name string, list []structs.ScaleUpModule) er
 func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpModule, pendings *[]pendingContainerUpdate) error {
 	need, err := strconv.ParseInt(module.Config.CpusetCpus, 10, 64)
 	if err != nil {
-		return err
+		if module.Config.CpusetCpus == "" {
+			need = 0
+		} else {
+			return err
+		}
 	}
 
 	units := svc.getUnitByType(module.Type)
 	if len(units) == 0 {
 		return fmt.Errorf("Not Found unit '%s' In Service %s", module.Type, svc.Name)
+	}
+
+	var used int64
+	if need > 0 {
+		used, err = utils.GetCPUNum(units[0].container.Info.HostConfig.CpusetCpus)
+		if err != nil {
+			return err
+		}
+	}
+	if (need == 0 || used == need) && (module.Config.Memory == 0 ||
+		module.Config.Memory == units[0].container.Info.HostConfig.Memory) {
+		return nil
 	}
 
 	for _, u := range units {
@@ -1156,12 +1172,16 @@ func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpMo
 		}
 	}
 
-	used, err := utils.GetCPUNum(units[0].container.Info.HostConfig.CpusetCpus)
-	if err != nil {
-		return err
-	}
-
-	if need < used {
+	if need == used || need == 0 {
+		for _, u := range units {
+			*pendings = append(*pendings, pendingContainerUpdate{
+				containerID: u.container.ID,
+				unit:        u,
+				engine:      u.engine,
+				config:      module.Config,
+			})
+		}
+	} else if need < used {
 		for _, u := range units {
 			cpusetCpus, err := reduceCPUset(u.container.Info.HostConfig.CpusetCpus, int(need))
 			if err != nil {
@@ -1202,7 +1222,7 @@ func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpMo
 }
 
 func (p *pendingContainerUpdate) containerUpdate() error {
-	if p.cpusetCPus != "" {
+	if p.cpusetCPus != "" && p.config.CpusetCpus != "" {
 		p.config.CpusetCpus = p.cpusetCPus
 	}
 
