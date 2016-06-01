@@ -32,7 +32,7 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 	inspect := types.ContainerExecInspect{}
 	cl := engine.EngineAPIClient()
 	if cl == nil {
-		return inspect, errors.New("Engine APIClient is nil")
+		return inspect, errEngineIsNil
 	}
 
 	execConfig := types.ExecConfig{

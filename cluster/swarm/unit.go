@@ -21,7 +21,7 @@ import (
 
 var (
 	errEngineIsNil    = errors.New("Engine is nil")
-	errEngineAPIisNil = errors.New("Engine API is nil")
+	errEngineAPIisNil = errors.New("Engine API client is nil")
 )
 
 type ContainerCmd interface {

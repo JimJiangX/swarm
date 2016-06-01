@@ -1090,6 +1090,13 @@ func (svc *Service) Task() *database.Task {
 	return svc.task
 }
 
+type pendingContainerUpdate struct {
+	containerID string
+	cpusetCPus  string
+	engine      *cluster.Engine
+	config      container.UpdateConfig
+}
+
 func (gd *Gardener) ServiceScaleUp(name string, list []structs.ScaleUpModule) error {
 	svc, err := gd.GetService(name)
 	if err != nil {
@@ -1100,6 +1107,7 @@ func (gd *Gardener) ServiceScaleUp(name string, list []structs.ScaleUpModule) er
 	if err != nil {
 		return err
 	}
+
 	svc.Lock()
 	gd.scheduler.Lock()
 	defer func() {
@@ -1107,95 +1115,19 @@ func (gd *Gardener) ServiceScaleUp(name string, list []structs.ScaleUpModule) er
 		gd.scheduler.Unlock()
 	}()
 
-	type pending struct {
-		containerID string
-		cpusetCPus  string
-		engine      *cluster.Engine
-		config      container.UpdateConfig
-	}
-
-	pendings := make([]pending, 0, len(svc.units))
+	pendings := make([]pendingContainerUpdate, 0, len(svc.units))
 
 	for i := range list {
-		units := svc.getUnitByType(list[i].Type)
-		if len(units) == 0 {
-			return fmt.Errorf("Not Found unit '%s' In Service %s", list[i].Type, svc.Name)
-		}
-
-		for _, u := range units {
-			if u.engine.Memory-u.engine.UsedMemory()-int64(list[i].Config.Memory)+u.container.Config.HostConfig.Memory < 0 {
-				return fmt.Errorf("Engine %s:%s have not enough Memory for Container %s Update", u.engine.ID, u.engine.IP, u.Name)
-			}
-		}
-
-		used, err := utils.GetCPUNum(units[0].container.Info.HostConfig.CpusetCpus)
+		err := handlePerScaleUpModule(gd, svc, list[i], &pendings)
 		if err != nil {
 			return err
-		}
-
-		need, err := strconv.ParseInt(list[i].Config.CpusetCpus, 10, 64)
-		if err != nil {
-			return err
-		}
-
-		if need < used {
-			for _, u := range units {
-				cpus, err := utils.ParseUintList(u.container.Info.HostConfig.CpusetCpus)
-				if err != nil {
-					return err
-				}
-
-				cpuSlice := make([]int, 0, len(cpus))
-				for k, ok := range cpus {
-					if ok {
-						cpuSlice = append(cpuSlice, k)
-					}
-				}
-				sort.Ints(cpuSlice)
-				cpuString := make([]string, need)
-				for n := 0; n < int(need); n++ {
-					cpuString[n] = strconv.Itoa(cpuSlice[n])
-				}
-
-				pendings = append(pendings, pending{
-					containerID: u.container.ID,
-					cpusetCPus:  strings.Join(cpuString, ","),
-					engine:      u.engine,
-					config:      list[i].Config,
-				})
-			}
-		} else {
-			for _, u := range units {
-				reserve := make([]string, 0, len(svc.units))
-				for n := range pendings {
-					if u.engine.ID == pendings[n].engine.ID {
-						reserve = append(reserve, pendings[n].cpusetCPus)
-					}
-				}
-				cpusetCpus, err := gd.allocCPUs(u.engine, int(need-used), reserve...)
-				if err != nil {
-					return err
-				}
-				cpusetCpus = u.container.Info.HostConfig.CpusetCpus + "," + cpusetCpus
-				pendings = append(pendings, pending{
-					containerID: u.container.ID,
-					cpusetCPus:  cpusetCpus,
-					engine:      u.engine,
-					config:      list[i].Config,
-				})
-			}
 		}
 	}
 
 	for i := range pendings {
-		client := pendings[i].engine.EngineAPIClient()
-		if client == nil {
-			return nil
-		}
-
-		pendings[i].config.CpusetCpus = pendings[i].cpusetCPus
-		err := client.ContainerUpdate(context.Background(), pendings[i].containerID, pendings[i].config)
+		err := pendings[i].containerUpdate()
 		if err != nil {
+			logrus.Error("container %s update error:%s", pendings[i].containerID, err)
 			return err
 		}
 	}
@@ -1203,27 +1135,106 @@ func (gd *Gardener) ServiceScaleUp(name string, list []structs.ScaleUpModule) er
 	return nil
 }
 
-func reduceCPU() {
-	// Reserve origin CPU CpusetCpus
-	/*
-		cpus, err := utils.ParseUintList(u.container.Info.HostConfig.CpusetCpus)
-		if err != nil {
-			return err
-		}
+func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpModule, pendings *[]pendingContainerUpdate) error {
+	need, err := strconv.ParseInt(module.Config.CpusetCpus, 10, 64)
+	if err != nil {
+		return err
+	}
 
-		cpuSlice := make([]int, 0, len(cpus))
-		for k, ok := range cpus {
-			if ok {
-				cpuSlice = append(cpuSlice, k)
+	units := svc.getUnitByType(module.Type)
+	if len(units) == 0 {
+		return fmt.Errorf("Not Found unit '%s' In Service %s", module.Type, svc.Name)
+	}
+
+	for _, u := range units {
+		if u.engine.Memory-u.engine.UsedMemory()-int64(module.Config.Memory)+u.container.Config.HostConfig.Memory < 0 {
+			return fmt.Errorf("Engine %s:%s have not enough Memory for Container %s Update", u.engine.ID, u.engine.IP, u.Name)
+		}
+	}
+
+	used, err := utils.GetCPUNum(units[0].container.Info.HostConfig.CpusetCpus)
+	if err != nil {
+		return err
+	}
+
+	if need < used {
+		for _, u := range units {
+			cpusetCpus, err := reduceCPUset(u.container.Info.HostConfig.CpusetCpus, int(need))
+			if err != nil {
+				return err
 			}
+			*pendings = append(*pendings, pendingContainerUpdate{
+				containerID: u.container.ID,
+				cpusetCPus:  cpusetCpus,
+				engine:      u.engine,
+				config:      module.Config,
+			})
 		}
-		sort.Ints(cpuSlice)
-		cpuString := make([]string, need)
-		for n := 0; n < int(need); n++ {
-			cpuString[n] = strconv.Itoa(cpuSlice[n])
+	} else {
+		for _, u := range units {
+			reserve := make([]string, 0, len(svc.units))
+			for _, pending := range *pendings {
+				if u.engine.ID == pending.engine.ID {
+					reserve = append(reserve, pending.cpusetCPus)
+				}
+			}
+			cpusetCpus, err := gd.allocCPUs(u.engine, int(need-used), reserve...)
+			if err != nil {
+				return err
+			}
+			cpusetCpus = u.container.Info.HostConfig.CpusetCpus + "," + cpusetCpus
+			*pendings = append(*pendings, pendingContainerUpdate{
+				containerID: u.container.ID,
+				cpusetCPus:  cpusetCpus,
+				engine:      u.engine,
+				config:      module.Config,
+			})
 		}
-		cpusetCpus := strings.Join(cpuString, ",")
-	*/
+	}
+
+	return nil
+}
+
+func (p *pendingContainerUpdate) containerUpdate() error {
+	if p.engine == nil {
+		return errEngineIsNil
+	}
+	client := p.engine.EngineAPIClient()
+	if client == nil {
+		return errEngineAPIisNil
+	}
+
+	if p.cpusetCPus != "" {
+		p.config.CpusetCpus = p.cpusetCPus
+	}
+	err := client.ContainerUpdate(context.Background(), p.containerID, p.config)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func reduceCPUset(cpusetCpus string, need int) (string, error) {
+	cpus, err := utils.ParseUintList(cpusetCpus)
+	if err != nil {
+		return "", err
+	}
+
+	cpuSlice := make([]int, 0, len(cpus))
+	for k, ok := range cpus {
+		if ok {
+			cpuSlice = append(cpuSlice, k)
+		}
+	}
+	sort.Ints(cpuSlice)
+
+	cpuString := make([]string, need)
+	for n := 0; n < need; n++ {
+		cpuString[n] = strconv.Itoa(cpuSlice[n])
+	}
+
+	return strings.Join(cpuString, ","), nil
 }
 
 func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int) error {

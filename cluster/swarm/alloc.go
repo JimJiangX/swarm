@@ -94,45 +94,23 @@ func (gd *Gardener) allocCPUs(engine *cluster.Engine, ncpu int, reserve ...strin
 		return "", fmt.Errorf("Engine Alloc CPU Error,%s CPU is Short(%d-%d<%d),", engine.Name, total, used, ncpu)
 	}
 
-	usedCPUs := make(map[int]bool, total)
-
-	for i := range reserve {
-		cpus, err := utils.ParseUintList(reserve[i])
-		if err != nil {
-			return "", err
-		}
-		for k, v := range cpus {
-			if v {
-				usedCPUs[k] = v
-			}
-		}
-	}
-
 	containers := engine.Containers()
+	list := make([]string, len(reserve), len(reserve)+len(containers)+len(gd.pendingContainers))
+	copy(list, reserve)
+
 	for _, c := range containers {
-		cpus, err := utils.ParseUintList(c.Info.HostConfig.CpusetCpus)
-		if err != nil {
-			return "", err
-		}
-		for k, v := range cpus {
-			if v {
-				usedCPUs[k] = v
-			}
-		}
+		list = append(list, c.Info.HostConfig.CpusetCpus)
 	}
 
 	for _, pending := range gd.pendingContainers {
 		if pending.Engine.ID == engine.ID {
-			cpus, err := utils.ParseUintList(pending.Config.HostConfig.CpusetCpus)
-			if err != nil {
-				return "", err
-			}
-			for k, v := range cpus {
-				if v {
-					usedCPUs[k] = v
-				}
-			}
+			list = append(list, pending.Config.HostConfig.CpusetCpus)
 		}
+	}
+
+	usedCPUs, err := parseUintList(list)
+	if err != nil {
+		return "", err
 	}
 
 	if total-len(usedCPUs) < ncpu {
@@ -140,14 +118,37 @@ func (gd *Gardener) allocCPUs(engine *cluster.Engine, ncpu int, reserve ...strin
 	}
 
 	free := make([]string, ncpu)
-	for i := 0; i < total && ncpu > 0; i++ {
+	for i, n := 0, 0; i < total && n < ncpu; i++ {
 		if !usedCPUs[i] {
-			ncpu--
-			free[ncpu] = strconv.Itoa(i)
+			free[n] = strconv.Itoa(i)
+			n++
 		}
 	}
 
 	return strings.Join(free, ","), nil
+}
+
+func parseUintList(list []string) (map[int]bool, error) {
+	if len(list) == 0 {
+		return map[int]bool{}, nil
+	}
+
+	ints := make(map[int]bool, len(list)*3)
+
+	for i := range list {
+		cpus, err := utils.ParseUintList(list[i])
+		if err != nil {
+			logrus.Errorf("parseUintList '%s' error:%s", list[i], err)
+			continue
+		}
+		for k, v := range cpus {
+			if v {
+				ints[k] = v
+			}
+		}
+	}
+
+	return ints, nil
 }
 
 type preAllocResource struct {
