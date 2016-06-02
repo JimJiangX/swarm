@@ -459,6 +459,18 @@ func (gd *Gardener) RemoveNode(NameOrID string) error {
 		return err
 	}
 
+	sys, err := database.GetSystemConfig()
+	if err != nil {
+		logrus.Errorf("GetSystemConfig error:%s", err)
+		return err
+	}
+	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
+	endpoint := deregisterService{Endpoint: node.ID}
+	err = deregisterToHorus(horus, []deregisterService{endpoint})
+	if err != nil {
+		logrus.Errorf("Node %s:%s deregisterToHorus error:%s", node.Name, node.Addr, err)
+	}
+
 	return dc.RemoveNode(NameOrID)
 }
 
