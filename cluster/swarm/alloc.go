@@ -13,8 +13,9 @@ import (
 	"github.com/docker/swarm/utils"
 )
 
-func (gd *Gardener) allocResource(preAlloc *preAllocResource, engine *cluster.Engine, config *cluster.ContainerConfig) error {
-	// TODO:clone config pointer params values
+func (gd *Gardener) allocResource(preAlloc *preAllocResource,
+	engine *cluster.Engine, config *cluster.ContainerConfig) error {
+
 	constraint := fmt.Sprintf("constraint:node==%s", engine.ID)
 	config.Env = append(config.Env, constraint)
 	// conflicting options:hostname and the network mode
@@ -296,23 +297,10 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 		name := fmt.Sprintf("%s_%s_LV", penging.unit.Unit.Name, need[i].Name)
 
 		if strings.Contains(need[i].Type, store.LocalDiskStore) {
-			if node.localStore == nil {
-				return fmt.Errorf("Not Found LoaclStorage of Node %s", engine.ID)
-			}
-			part := strings.SplitN(need[i].Type, ":", 2)
-			if len(part) == 1 {
-				part = append(part, "HDD")
-			}
-			vgName := engine.Labels[part[1]+"_VG"]
-			if vgName == "" {
-				return fmt.Errorf("Not Found VG_Name of %s", need[i].Type)
-			}
-
-			lvID, _, err := node.localStore.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
+			lvID, err := node.localStorageAlloc(name, penging.unit.Unit.ID, need[i].Type, need[i].Size)
 			if err != nil {
 				return err
 			}
-
 			penging.localStore = append(penging.localStore, lvID)
 			name = fmt.Sprintf("%s:/DBAAS%s", name, need[i].Name)
 			config.HostConfig.Binds = append(config.HostConfig.Binds, name)
@@ -345,4 +333,28 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 	}
 
 	return nil
+}
+
+func (node *Node) localStorageAlloc(name, storageType, unitID string, size int) (string, error) {
+	if !strings.Contains(storageType, store.LocalDiskStore) {
+		return "", fmt.Errorf("'%s' storage type isnot '%s'", storageType, store.LocalDiskStore)
+	}
+	if node.localStore == nil {
+		return "", fmt.Errorf("Not Found LoaclStorage of Node %s", node.Addr)
+	}
+	part := strings.SplitN(storageType, ":", 2)
+	if len(part) == 1 {
+		part = append(part, "HDD")
+	}
+	vgName := node.engine.Labels[part[1]+"_VG"]
+	if vgName == "" {
+		return "", fmt.Errorf("Not Found VG_Name of %s", storageType)
+	}
+
+	lvID, _, err := node.localStore.Alloc(name, unitID, vgName, size)
+	if err != nil {
+		return "", err
+	}
+
+	return lvID, nil
 }
