@@ -53,7 +53,7 @@ if [ "$qrysize" != "err" ] && [ $qrysize -ge $QUOTA ] ;then
 fi
 
 #upsql.table_size
-datadir=/${INSTANCE}_DAT
+datadir=/${INSTANCE}_DAT_LV
 function gettables()
 {	
     local tables
