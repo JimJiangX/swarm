@@ -335,7 +335,7 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 	return nil
 }
 
-func (node *Node) localStorageAlloc(name, storageType, unitID string, size int) (string, error) {
+func (node *Node) localStorageAlloc(name, unitID, storageType string, size int) (string, error) {
 	if !strings.Contains(storageType, store.LocalDiskStore) {
 		return "", fmt.Errorf("'%s' storage type isnot '%s'", storageType, store.LocalDiskStore)
 	}
