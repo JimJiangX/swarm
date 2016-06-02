@@ -78,13 +78,13 @@ func (gd *Gardener) serviceExecute() (err error) {
 		if err != nil {
 			continue
 		}
-		clients, err := sys.GetConsulClient()
-		if err != nil || len(clients) == 0 {
+		configs := sys.GetConsulConfigs()
+		if len(configs) == 0 {
 			continue
 		}
 
 		horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-		err = svc.Delete(clients[0], horus, true, true, 0)
+		err = svc.Delete(configs[0], horus, true, true, 0)
 		if err != nil {
 			continue
 		}

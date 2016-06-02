@@ -122,6 +122,26 @@ func (c Configurations) GetConsulClient() ([]*consulapi.Client, error) {
 	return clients, nil
 }
 
+func (c Configurations) GetConsulConfigs() []consulapi.Config {
+	port := strconv.Itoa(c.ConsulPort)
+	addrs := strings.Split(c.ConsulIPs, ",")
+	if len(addrs) == 0 {
+		return nil
+	}
+	configs := make([]consulapi.Config, len(addrs))
+
+	for i := range addrs {
+		configs[i] = consulapi.Config{
+			Address:    addrs[i] + ":" + port,
+			Datacenter: c.ConsulDatacenter,
+			WaitTime:   time.Duration(c.ConsulWaitTime) * time.Second,
+			Token:      c.ConsulToken,
+		}
+	}
+
+	return configs
+}
+
 func (c Configurations) GetConsulConfig() ([]string, string, string, int) {
 	port := strconv.Itoa(c.ConsulPort)
 	addrs := strings.Split(c.ConsulIPs, ",")

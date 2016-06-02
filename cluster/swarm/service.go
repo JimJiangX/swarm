@@ -773,13 +773,9 @@ func (svc *Service) registerServices(config database.ConsulConfig) (err error) {
 	return nil
 }
 
-func (svc *Service) deregisterServices(client *consulapi.Client) error {
-	if client == nil {
-		return fmt.Errorf("consul client is nil")
-	}
-
+func (svc *Service) deregisterServices(config consulapi.Config) error {
 	for _, u := range svc.units {
-		err := u.DeregisterHealthCheck(client)
+		err := u.DeregisterHealthCheck(config)
 		if err != nil {
 			return err
 		}
@@ -1302,14 +1298,14 @@ func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int)
 		entry.Errorf("GetSystemConfig error:%s", err)
 		return err
 	}
-	clients, err := sys.GetConsulClient()
-	if err != nil || len(clients) == 0 {
-		return fmt.Errorf("GetConsulClient error %v %v", err, sys)
+	configs := sys.GetConsulConfigs()
+	if len(configs) == 0 {
+		return fmt.Errorf("GetConsulConfigs error %v %v", err, sys)
 	}
 
 	entry.Debug("Service Delete... stop service & stop containers & rm containers & deregister")
 	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-	err = svc.Delete(clients[0], horus, force, volumes, timeout)
+	err = svc.Delete(configs[0], horus, force, volumes, timeout)
 	if err != nil {
 		entry.Errorf("Service.Delete error:%s", err)
 
@@ -1347,7 +1343,7 @@ func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int)
 	return nil
 }
 
-func (svc *Service) Delete(client *consulapi.Client, horus string, force, volumes bool, timeout int) error {
+func (svc *Service) Delete(config consulapi.Config, horus string, force, volumes bool, timeout int) error {
 	svc.Lock()
 	defer svc.Unlock()
 
@@ -1371,7 +1367,7 @@ func (svc *Service) Delete(client *consulapi.Client, horus string, force, volume
 		logrus.Errorf("%s deregister In Horus error:%s", svc.Name, err.Error())
 	}
 
-	err = svc.deregisterServices(client)
+	err = svc.deregisterServices(config)
 	if err != nil {
 		logrus.Errorf("%s deregister In consul error:%s", svc.Name, err.Error())
 	}
