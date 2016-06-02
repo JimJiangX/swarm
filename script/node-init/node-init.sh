@@ -540,7 +540,7 @@ install_horus_agent() {
 ## ServiceRestart : horus-agent
 
 #
-HORUS_AGENT_OPTS="-consulip ${adm_ip}:${consul_port} -datacenter ${cs_datacenter} -hsrv ${horus_server_ip}:${horus_server_port} -ip ${adm_ip} -name ${node_id} -nets ${nets_dev} -port ${horus_agent_port} "
+HORUS_AGENT_OPTS="-loglevel debug -consulip ${adm_ip}:${consul_port} -datacenter ${cs_datacenter} -hsrv ${horus_server_ip}:${horus_server_port} -ip ${adm_ip} -name ${node_id} -nets ${nets_dev} -port ${horus_agent_port} "
 
 EOF
 
