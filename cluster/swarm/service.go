@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1131,11 +1132,21 @@ func (gd *Gardener) serviceScaleUP(svc *Service, list []structs.ScaleUpModule, t
 		gd.scheduler.Unlock()
 		if err == nil {
 			task.Status = _StatusTaskDone
-		} else {
+			err = svc.updateDescription(list)
+			if err != nil {
+				logrus.Errorf("service %s update Description error:%s", svc.Name, err)
+			}
+		}
+
+		if err != nil {
 			task.Status = _StatusTaskFailed
 			task.Errors = err.Error()
 		}
-		database.UpdateTaskStatus(&task, task.Status, time.Now(), task.Errors)
+
+		err = database.UpdateTaskStatus(&task, task.Status, time.Now(), task.Errors)
+		if err != nil {
+			logrus.Errorf("task %s update error:%s", task.ID, err)
+		}
 	}()
 
 	pendings := make([]pendingContainerUpdate, 0, len(svc.units))
@@ -1295,6 +1306,61 @@ func reduceCPUset(cpusetCpus string, need int) (string, error) {
 	}
 
 	return strings.Join(cpuString, ","), nil
+}
+
+func (svc *Service) getServiceDescription() (*structs.PostServiceRequest, error) {
+	if svc.base != nil {
+		return svc.base, nil
+	}
+	if svc.base == nil {
+		if svc.Description == "" {
+			table, err := database.GetService(svc.ID)
+			if err != nil {
+				return nil, err
+			}
+			svc.Service = table
+		}
+		if svc.Description != "" {
+			err := json.NewDecoder(strings.NewReader(svc.Description)).Decode(svc.base)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	if svc.base == nil {
+		return nil, fmt.Errorf("Service %s with null Description", svc.Name)
+	}
+
+	return svc.base, nil
+}
+
+func (svc *Service) updateDescription(list []structs.ScaleUpModule) error {
+	dsp, err := svc.getServiceDescription()
+	if err != nil {
+		return err
+	}
+
+	des := *dsp
+	for i := range list {
+		des.Update(list[i].Type, list[i].Config)
+	}
+
+	buffer := bytes.NewBuffer(nil)
+	err = json.NewEncoder(buffer).Encode(&des)
+	if err != nil {
+		return err
+	}
+
+	description := buffer.String()
+	err = database.UpdateServcieDescription(svc.ID, description)
+	if err != nil {
+		return err
+	}
+
+	svc.Description = description
+	svc.base = &des
+
+	return nil
 }
 
 func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int) error {

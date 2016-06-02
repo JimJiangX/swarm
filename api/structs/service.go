@@ -69,3 +69,25 @@ type ScaleUpModule struct {
 	Type   string
 	Config container.UpdateConfig
 }
+
+func (req *PostServiceRequest) Update(typ string, config container.UpdateConfig) {
+	for i := range req.Modules {
+		if req.Modules[i].Type != typ {
+			continue
+		}
+
+		if config.Memory != 0 {
+			req.Modules[i].HostConfig.Memory = config.Memory
+		}
+
+		if config.CpusetCpus != "" {
+			req.Modules[i].HostConfig.CpusetCpus = config.CpusetCpus
+		}
+
+		if config.RestartPolicy != (container.RestartPolicy{}) {
+			req.Modules[i].HostConfig.RestartPolicy = config.RestartPolicy
+		}
+
+		break
+	}
+}

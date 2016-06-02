@@ -231,6 +231,17 @@ func GetService(NameOrID string) (Service, error) {
 	return s, err
 }
 
+func UpdateServcieDescription(ID, des string) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("UPDATE tb_service SET description=? WHERE id=?", des, ID)
+
+	return err
+}
+
 func TxSaveService(svc Service, strategy *BackupStrategy, task *Task, users []User) error {
 	tx, err := GetTX()
 	if err != nil {
