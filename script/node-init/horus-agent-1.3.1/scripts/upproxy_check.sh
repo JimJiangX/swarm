@@ -6,14 +6,11 @@ if [ $? -ne 0 ]; then
 	status=critical
 fi
 
-docker exec $container_name /root/check_proxy
+docker exec $container_name /root/check_proxy --default-file /DBAASCNF/upsql-proxy.conf > /dev/null 2>&1
 
 if [  $? -eq 0 ];then
 	status=passing
 else
 	status=critical
-fi 
-
+fi
 echo $status
-
-
