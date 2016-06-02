@@ -22,8 +22,8 @@ fi
 
 INSTANCE=$1
 
-datafs=/${INSTANCE}_DAT
-logfs=/${INSTANCE}_LOG
+datafs=/${INSTANCE}_CNF_LV
+logfs=/${INSTANCE}_LOG_LV
 
 data=`getfsdata $datafs`
 log=`getfsdata $logfs`
