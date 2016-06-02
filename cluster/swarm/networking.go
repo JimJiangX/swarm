@@ -320,11 +320,23 @@ func ListNetworkings() ([]structs.ListNetworkingsResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	resp := make([]structs.ListNetworkingsResponse, len(list))
 	for i := range list {
 		out, err := database.ListIPByNetworking(list[i].ID)
 		if err != nil {
 			return nil, err
+		}
+		if len(out) == 0 {
+			resp[i] = structs.ListNetworkingsResponse{
+				ID:      list[i].ID,
+				Type:    list[i].Type,
+				Gateway: list[i].Gateway,
+				Enabled: list[i].Enabled,
+				Total:   0,
+				Used:    0,
+			}
+			continue
 		}
 		min, max, total, used := statistic(out)
 
@@ -344,6 +356,9 @@ func ListNetworkings() ([]structs.ListNetworkingsResponse, error) {
 }
 
 func statistic(list []database.IP) (database.IP, database.IP, int, int) {
+	if len(list) == 0 {
+		return database.IP{}, database.IP{}, 0, 0
+	}
 	min, max, total, used := 0, 0, len(list), 0
 	for i := range list {
 		if list[i].IPAddr < list[min].IPAddr {
