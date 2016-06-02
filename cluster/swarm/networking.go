@@ -333,6 +333,7 @@ func ListNetworkings() ([]structs.ListNetworkingsResponse, error) {
 				Type:    list[i].Type,
 				Gateway: list[i].Gateway,
 				Enabled: list[i].Enabled,
+				Mask:    0,
 				Total:   0,
 				Used:    0,
 			}
@@ -345,6 +346,7 @@ func ListNetworkings() ([]structs.ListNetworkingsResponse, error) {
 			Type:    list[i].Type,
 			Gateway: list[i].Gateway,
 			Enabled: list[i].Enabled,
+			Mask:    min.Prefix,
 			Total:   total,
 			Used:    used,
 			Start:   utils.Uint32ToIP(min.IPAddr).String(),

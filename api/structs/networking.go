@@ -19,6 +19,7 @@ type ListNetworkingsResponse struct {
 	Type    string `json:"type"`
 	Gateway string `json:"gateway"`
 	Enabled bool   `json:"enabled"`
+	Mask    int    `json:"mask"`
 	Total   int    `json:"total"`
 	Used    int    `json:"used"`
 	Start   string `json:"start"`
