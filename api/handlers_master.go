@@ -811,6 +811,33 @@ func postServiceScaleUp(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
 }
 
+// POST /services/{name:.*}/volume-extension
+func postServiceVolumeExtension(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	var req []structs.StorageExtension
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	taskID, err := gd.VolumesExtension(name, req)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
+}
+
 // POST /services/{name:.*}/backup_strategy
 func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]

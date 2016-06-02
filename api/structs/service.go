@@ -91,3 +91,8 @@ func (req *PostServiceRequest) Update(typ string, config container.UpdateConfig)
 		break
 	}
 }
+
+type StorageExtension struct {
+	Type       string
+	Extensions []DiskStorage
+}

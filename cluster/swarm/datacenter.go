@@ -32,31 +32,6 @@ type Datacenter struct {
 	nodes []*Node
 }
 
-func ValidDatacenter(req structs.PostClusterRequest) string {
-	warnings := make([]string, 0, 5)
-	if req.Name == "" {
-		warnings = append(warnings, "'name' is null")
-	}
-
-	if !isStringExist(req.StorageType, supportedStoreTypes) {
-		warnings = append(warnings, fmt.Sprintf("Unsupported '%s' Yet", req.StorageType))
-	}
-
-	if req.StorageType != store.LocalDiskStore && req.StorageID == "" {
-		warnings = append(warnings, "missing 'StorageID' when 'StorageType' isnot 'local'")
-	}
-
-	if req.Datacenter == "" {
-		warnings = append(warnings, "'dc' is null")
-	}
-
-	if len(warnings) == 0 {
-		return ""
-	}
-
-	return strings.Join(warnings, ",")
-}
-
 func AddNewCluster(req structs.PostClusterRequest) (database.Cluster, error) {
 	if req.StorageType == store.LocalDiskStore {
 		req.StorageID = ""

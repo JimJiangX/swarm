@@ -138,125 +138,6 @@ func newBackupStrategy(service string, strategy *structs.BackupStrategy) (*datab
 	}, nil
 }
 
-func ValidService(req structs.PostServiceRequest) []string {
-	warnings := make([]string, 0, 10)
-	if req.Name == "" {
-		warnings = append(warnings, "Service Name should not be null")
-	}
-
-	_, err := database.GetService(req.Name)
-	if err == nil {
-		warnings = append(warnings, fmt.Sprintf("Service Name %s exist", req.Name))
-	}
-
-	arch, _, err := getServiceArch(req.Architecture)
-	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("Parse 'Architecture' Failed,%s", err.Error()))
-	}
-
-	for _, module := range req.Modules {
-		if _, _, err := initialize(module.Type); err != nil {
-			warnings = append(warnings, err.Error())
-		}
-
-		//if !isStringExist(module.Type, supportedServiceTypes) {
-		//	warnings = append(warnings, fmt.Sprintf("Unsupported '%s' Yet", module.Type))
-		//}
-		if module.Config.Image == "" {
-			image, err := database.QueryImage(module.Name, module.Version)
-			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("Not Found Image:%s:%s,Error%s", module.Name, module.Version, err.Error()))
-			}
-			if !image.Enabled {
-				warnings = append(warnings, fmt.Sprintf("Image: %s:%s is Disabled", module.Name, module.Version))
-			}
-		} else {
-			image, err := database.QueryImageByID(module.Config.Image)
-			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("Not Found Image:%s,Error%s", module.Config.Image, err.Error()))
-			}
-			if !image.Enabled {
-				warnings = append(warnings, fmt.Sprintf("Image:%s is Disabled", module.Config.Image))
-			}
-		}
-		_, num, err := getServiceArch(module.Arch)
-		if err != nil {
-			warnings = append(warnings, fmt.Sprintf("%s,%s", module.Arch, err))
-		}
-
-		if arch[module.Type] != num {
-			warnings = append(warnings, fmt.Sprintf("%s nodeNum  unequal Architecture,(%s)", module.Type, module.Arch))
-		}
-
-		config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
-		err = validateContainerConfig(config)
-		if err != nil {
-			warnings = append(warnings, err.Error())
-		}
-
-		lvNames := make([]string, 0, len(module.Stores))
-		for _, ds := range module.Stores {
-			if isStringExist(ds.Name, lvNames) {
-				warnings = append(warnings, fmt.Sprintf("Storage Name '%s' Duplicate in one Module:%s", ds.Name, module.Name))
-			} else {
-				lvNames = append(lvNames, ds.Name)
-			}
-
-			if !isStringExist(ds.Name, supportedStoreNames) {
-				warnings = append(warnings, fmt.Sprintf("Unsupported Storage Name '%s' Yet,should be one of %s", ds.Name, supportedStoreNames))
-			}
-
-			if !isStringExist(ds.Type, supportedStoreTypes) {
-				warnings = append(warnings, fmt.Sprintf("Unsupported Storage Type '%s' Yet,should be one of %s", ds.Type, supportedStoreTypes))
-			}
-		}
-	}
-
-	if len(warnings) == 0 {
-		return nil
-	}
-
-	logrus.Warnf("Service Valid warning:", warnings)
-
-	return warnings
-}
-
-func ValidateServiceScaleUp(svc *Service, list []structs.ScaleUpModule) error {
-	warns := make([]string, 0, 10)
-
-	for i := range list {
-		_, _, err := initialize(list[i].Type)
-		if err != nil {
-			warns = append(warns, err.Error())
-		}
-
-		err = validateContainerUpdateConfig(list[i].Config)
-		if err != nil {
-			warns = append(warns, err.Error())
-		}
-	}
-
-	svc.RLock()
-	for i := range list {
-		units := svc.getUnitByType(list[i].Type)
-		if len(units) == 0 {
-			warns = append(warns, fmt.Sprintf("Not Found unit '%s' In Service %s", list[i].Type, svc.Name))
-		}
-		for _, u := range units {
-			if u.engine == nil || (u.config == nil && u.container == nil) {
-				warns = append(warns, fmt.Sprintf("unit odd,%+v", u))
-			}
-		}
-	}
-	svc.RUnlock()
-
-	if len(warns) == 0 {
-		return nil
-	}
-
-	return fmt.Errorf("Warnings:%s", warns)
-}
-
 func (svc *Service) BackupStrategy() *database.BackupStrategy {
 	svc.RLock()
 	backup := svc.backup
@@ -294,7 +175,6 @@ func (svc *Service) UpdateBackupStrategy(backup database.BackupStrategy) error {
 	svc.Unlock()
 
 	return nil
-
 }
 
 func DeleteServiceBackupStrategy(strategy string) error {
@@ -393,6 +273,7 @@ func converteToUsers(service string, users []structs.User) []database.User {
 
 	return list
 }
+
 func (svc *Service) getUnit(IDOrName string) (*unit, error) {
 	for _, u := range svc.units {
 		if u.ID == IDOrName || u.Name == IDOrName {
@@ -452,7 +333,6 @@ func (gd *Gardener) rebuildService(NameOrID string) (*Service, error) {
 	}
 
 	base := &structs.PostServiceRequest{}
-
 	if len(service.Description) > 0 {
 		err := json.Unmarshal([]byte(service.Description), base)
 		if err != nil {
@@ -1361,6 +1241,32 @@ func (svc *Service) updateDescription(list []structs.ScaleUpModule) error {
 	svc.base = &des
 
 	return nil
+}
+
+func (gd *Gardener) VolumesExtension(name string, exts []structs.StorageExtension) (string, error) {
+	svc, err := gd.GetService(name)
+	if err != nil {
+		return "", err
+	}
+
+	err = ValidServiceStorageExtension(svc, exts)
+	if err != nil {
+		return "", err
+	}
+
+	task := database.NewTask("service update containers config",
+		svc.ID, "", nil, 300)
+	err = database.InsertTask(task)
+	if err != nil {
+		return "", err
+	}
+	go gd.volumesExtension(svc, exts, task)
+
+	return task.ID, nil
+}
+
+func (gd *Gardener) volumesExtension(svc *Service, exts []structs.StorageExtension, task database.Task) {
+
 }
 
 func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int) error {
