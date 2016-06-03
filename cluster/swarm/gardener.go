@@ -85,51 +85,11 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	// query consul config from DB
 	sysConfig, err := database.GetSystemConfig()
 	if err != nil {
-		logrus.Fatalf("DB Error,%s", err)
-	}
-	if sysConfig.Retry > 0 && cluster.createRetry == 0 {
-		cluster.createRetry = sysConfig.Retry
-	}
-
-	if sysConfig.PluginPort > 0 {
-		pluginPort = sysConfig.PluginPort
-	}
-
-	gd.registryAuthConfig = &types.AuthConfig{
-		Username:      sysConfig.Registry.Username,
-		Password:      sysConfig.Registry.Password,
-		Email:         sysConfig.Registry.Email,
-		RegistryToken: sysConfig.Registry.Token,
-	}
-
-	endpoints, dc, token, wait := sysConfig.GetConsulConfig()
-
-	if len(endpoints) == 0 {
-		return nil, fmt.Errorf("Consul Config Settings Error")
-	}
-
-	config := consulapi.Config{
-		Address:    endpoints[0],
-		Datacenter: dc,
-		WaitTime:   time.Duration(wait) * time.Second,
-		Token:      token,
-	}
-
-	consulClient, err := consulapi.NewClient(&config)
-	if err != nil {
-		return nil, err
-	}
-	gd.setConsulClient(consulClient)
-
-	options := &kvstore.Config{
-		TLS:               gd.TLSConfig(),
-		ConnectionTimeout: config.WaitTime,
-	}
-
-	if gd.kvClient == nil {
-		gd.kvClient, err = consul.New(endpoints, options)
+		logrus.Error("DB Error,%s", err)
+	} else {
+		err = gd.SetParams(*sysConfig)
 		if err != nil {
-			logrus.Fatalf("Initializing kvStore,consul Config Error,%s", err)
+			logrus.Error(err)
 		}
 	}
 
@@ -182,7 +142,7 @@ func (gd *Gardener) RegistryAuthConfig() (*types.AuthConfig, error) {
 	}, nil
 }
 
-func (gd *Gardener) KVPath() string {
+func (gd *Gardener) KvPath() string {
 	gd.RLock()
 	path := gd.kvPath
 	gd.RUnlock()
@@ -227,4 +187,58 @@ func (gd *Gardener) consulAPIClient(full bool) (*consulapi.Client, error) {
 	}
 
 	return nil, fmt.Errorf("Not Found Alive Consul Server %s:%d", config.ConsulIPs, config.ConsulPort)
+}
+
+func (gd *Gardener) SetParams(sys database.Configurations) error {
+	gd.Lock()
+	defer gd.Unlock()
+
+	if sys.Retry > 0 && gd.Cluster.createRetry == 0 {
+		gd.Cluster.createRetry = sys.Retry
+	}
+
+	if sys.PluginPort > 0 {
+		pluginPort = sys.PluginPort
+	}
+
+	gd.registryAuthConfig = &types.AuthConfig{
+		Username:      sys.Registry.Username,
+		Password:      sys.Registry.Password,
+		Email:         sys.Registry.Email,
+		RegistryToken: sys.Registry.Token,
+	}
+
+	endpoints, dc, token, wait := sys.GetConsulConfig()
+
+	if len(endpoints) == 0 {
+		return fmt.Errorf("Consul Config Settings Error")
+	}
+
+	config := consulapi.Config{
+		Address:    endpoints[0],
+		Datacenter: dc,
+		WaitTime:   time.Duration(wait) * time.Second,
+		Token:      token,
+	}
+
+	consulClient, err := consulapi.NewClient(&config)
+	if err != nil {
+		return err
+	}
+	gd.consulClient = consulClient
+
+	options := &kvstore.Config{
+		TLS:               gd.TLSConfig(),
+		ConnectionTimeout: config.WaitTime,
+	}
+
+	if gd.kvClient == nil {
+		gd.kvClient, err = consul.New(endpoints, options)
+		if err != nil {
+			logrus.Error("Initializing kvStore,consul Config Error,%s", err)
+			return err
+		}
+	}
+
+	return nil
 }
