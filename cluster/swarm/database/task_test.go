@@ -121,7 +121,7 @@ func TestUpdateTaskStatusZero(t *testing.T) {
 
 func TestQueryTask(t *testing.T) {
 	id := "a9cef18feb6b2a66539b2abf08be673490468d93fe3df04fe4d4300a5a97ff0c"
-	task, err := QueryTask(id)
+	task, err := GetTask(id)
 	if err != nil {
 		t.Fatal(err)
 	}

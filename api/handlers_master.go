@@ -399,10 +399,88 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /tasks
-func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var tasks []database.Task
+	if v, ok := r.Form["status"]; ok {
+		if len(v) == 0 {
+			httpError(w, r.URL.String(), http.StatusBadRequest)
+			return
+		}
+		status, err := strconv.Atoi(v[0])
+		if err != nil {
+			msg := fmt.Sprintf("parse status:'%s' error:%s", v, err)
+			httpError(w, msg, http.StatusInternalServerError)
+			return
+		}
+		tasks, err = database.ListTaskByStatus(status)
+	}
+
+	if key, ok := r.Form["key"]; ok {
+		if len(key) == 0 {
+			httpError(w, r.URL.String(), http.StatusBadRequest)
+			return
+		}
+		tasks, err = database.ListTaskByRelated(key[0])
+	}
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := make([]structs.TaskResponse, len(tasks))
+	for i := range tasks {
+		resp[i] = structs.TaskResponse{
+			ID:          tasks[i].ID,
+			Related:     tasks[i].Related,
+			Linkto:      tasks[i].Linkto,
+			Description: tasks[i].Description,
+			Labels:      tasks[i].Labels,
+			Errors:      tasks[i].Errors,
+			Timeout:     tasks[i].Timeout,
+			Status:      int(tasks[i].Status),
+			CreatedAt:   utils.TimeToString(tasks[i].CreatedAt),
+			FinishedAt:  utils.TimeToString(tasks[i].FinishedAt),
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
 
 // GET /tasks/{name:.*}
-func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	task, err := database.GetTask(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := structs.TaskResponse{
+		ID:          task.ID,
+		Related:     task.Related,
+		Linkto:      task.Linkto,
+		Description: task.Description,
+		Labels:      task.Labels,
+		Errors:      task.Errors,
+		Timeout:     task.Timeout,
+		Status:      int(task.Status),
+		CreatedAt:   utils.TimeToString(task.CreatedAt),
+		FinishedAt:  utils.TimeToString(task.FinishedAt),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
 
 // POST /clusters
 func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {

@@ -1,8 +1,6 @@
 package structs
 
-import (
-	"fmt"
-)
+import "fmt"
 
 const (
 	TaskCreate = iota
@@ -13,6 +11,20 @@ const (
 	TaskTimeout
 	TaskFailed
 )
+
+type TaskResponse struct {
+	ID string `json:"id"`
+	// Name     string `json:"name"`
+	Related     string `json:"related"`
+	Linkto      string `json:"link_to"`
+	Description string `json:"description"`
+	Labels      string `json:"labels"`
+	Errors      string `json:"errors"`
+	Timeout     int    `json:"timeout"` // s
+	Status      int    `json:"status"`
+	CreatedAt   string `json:"created_at"`
+	FinishedAt  string `json:"finished_at"`
+}
 
 type BackupTaskCallback struct {
 	TaskID     string `json:"task_id"`

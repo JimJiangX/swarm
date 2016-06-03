@@ -263,7 +263,7 @@ func TestService(t *testing.T) {
 		service.HighAvailable != service3.HighAvailable {
 		t.Fatal("TxSetServiceStatus not equal", string(b), string(b3))
 	}
-	task1, err := QueryTask(task.ID)
+	task1, err := GetTask(task.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func TestService(t *testing.T) {
 		service.HighAvailable != service4.HighAvailable {
 		t.Fatal("TxSetServiceStatus not equal", string(b), string(b5))
 	}
-	task2, err := QueryTask(task.ID)
+	task2, err := GetTask(task.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

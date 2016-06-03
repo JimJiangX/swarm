@@ -185,7 +185,7 @@ func UpdateTaskStatus(task *Task, state int32, finishAt time.Time, msg string) e
 	return nil
 }
 
-func QueryTask(id string) (*Task, error) {
+func GetTask(id string) (*Task, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
@@ -195,6 +195,30 @@ func QueryTask(id string) (*Task, error) {
 	err = db.Get(t, "SELECT * FROM tb_task WHERE id=?", id)
 
 	return t, err
+}
+
+func ListTaskByStatus(status int) ([]Task, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	list := make([]Task, 0, 50)
+	err = db.Select(&list, "SELECT * FROM tb_task WHERE status=?", status)
+
+	return list, err
+}
+
+func ListTaskByRelated(related string) ([]Task, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	list := make([]Task, 0, 50)
+	err = db.Select(&list, "SELECT * FROM tb_task WHERE related=?", related)
+
+	return list, err
 }
 
 func DeleteTask(id string) error {
