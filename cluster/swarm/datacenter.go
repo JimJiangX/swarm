@@ -240,9 +240,7 @@ func (dc *Datacenter) GetNode(IDOrName string) (*Node, error) {
 	}
 
 	dc.RLock()
-
 	node := dc.getNode(IDOrName)
-
 	dc.RUnlock()
 
 	if node != nil {
@@ -294,24 +292,26 @@ func (dc *Datacenter) listNodeID() []string {
 	return out
 }
 
-func (gd *Gardener) GetNode(NameOrID string) (*Node, error) {
+func (gd *Gardener) GetNode(NameOrID string) (*Datacenter, *Node, error) {
 	dc, err := gd.DatacenterByNode(NameOrID)
 	if dc != nil && err == nil {
 
 		node, err := dc.GetNode(NameOrID)
 		if node != nil && err == nil {
-			return node, nil
+			return dc, node, nil
 		}
+	} else {
+		return nil, nil, err
 	}
 
 	n, err := database.GetNode(NameOrID)
 	if err != nil {
-		return nil, err
+		return dc, nil, err
 	}
 
 	node, err := gd.rebuildNode(n)
 	if err != nil {
-		return nil, err
+		return dc, nil, err
 	}
 
 	if dc != nil {
@@ -320,7 +320,7 @@ func (gd *Gardener) GetNode(NameOrID string) (*Node, error) {
 		dc.Unlock()
 	}
 
-	return node, nil
+	return dc, node, nil
 }
 
 func (gd *Gardener) DatacenterByNode(IDOrName string) (*Datacenter, error) {
@@ -342,7 +342,7 @@ func (gd *Gardener) DatacenterByEngine(IDOrName string) (*Datacenter, error) {
 }
 
 func (gd *Gardener) SetNodeStatus(name string, state int) error {
-	node, err := gd.GetNode(name)
+	_, node, err := gd.GetNode(name)
 	if err != nil {
 		return err
 	}
@@ -358,7 +358,7 @@ func (gd *Gardener) SetNodeStatus(name string, state int) error {
 }
 
 func (gd *Gardener) SetNodeParams(name string, max int) error {
-	node, err := gd.GetNode(name)
+	_, node, err := gd.GetNode(name)
 	if err != nil {
 		return err
 	}

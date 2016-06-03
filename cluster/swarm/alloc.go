@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -275,22 +276,12 @@ func (pre *preAllocResource) recycleNetworking() []database.IP {
 }
 
 func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engine, config *cluster.ContainerConfig, need []structs.DiskStorage) error {
-	dc, err := gd.DatacenterByEngine(engine.ID)
-	if err != nil || dc == nil {
-		return fmt.Errorf("Not Found Datacenter By Engine,%v", err)
-	}
+	dc, node, err := gd.GetNode(engine.ID)
+	if err != nil {
+		err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
+		logrus.Error(err)
 
-	node, err := dc.GetNode(engine.ID)
-	if node == nil || err != nil {
-		logrus.Warnf("Not Found Node By Engine ID %s Error:%v", engine.ID, err)
-
-		node, err = gd.GetNode(engine.ID)
-		if err != nil {
-			err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
-			logrus.Error(err)
-
-			return err
-		}
+		return err
 	}
 
 	for i := range need {
@@ -357,4 +348,163 @@ func (node *Node) localStorageAlloc(name, unitID, storageType string, size int) 
 	}
 
 	return lvID, nil
+}
+
+func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtension, task database.Task) error {
+	svc.Lock()
+	defer svc.Unlock()
+
+	pendings := make([]*preAllocResource, 0, len(need)*len(svc.units))
+
+	for e := range need {
+		units := svc.getUnitByType(need[e].Type)
+		for _, u := range units {
+			for d := range need[e].Extensions {
+				pending := newPreAllocResource()
+				pendings = append(pendings, pending)
+
+				dc, node, err := gd.GetNode(u.engine.ID)
+				if err != nil {
+					err := fmt.Errorf("Not Found Node %s,Error:%s", u.engine.Name, err)
+					logrus.Error(err)
+					return err
+				}
+
+				name := fmt.Sprintf("%s_%s_LV", u.Name, need[e].Extensions[d].Name)
+
+				if strings.Contains(need[e].Extensions[d].Type, store.LocalDiskStore) {
+					lvID, err := node.localStorageAlloc(name, u.ID, need[e].Extensions[d].Type, need[e].Extensions[d].Size)
+					if err != nil {
+						return err
+					}
+					pending.localStore = append(pending.localStore, lvID)
+					name = fmt.Sprintf("%s:/DBAAS%s", name, need[e].Extensions[d].Name)
+					continue
+				}
+
+				if dc.storage == nil {
+					return fmt.Errorf("Not Found Datacenter Storage")
+				}
+				vgName := u.Name + "_SAN_VG"
+
+				lunID, _, err := dc.storage.Alloc(name, u.ID, vgName, need[e].Extensions[d].Size)
+				if err != nil {
+					return err
+				}
+				pending.sanStore = append(pending.sanStore, lunID)
+
+				err = dc.storage.Mapping(node.ID, vgName, lunID)
+				if err != nil {
+					return err
+				}
+				name = fmt.Sprintf("%s:/DBAAS%s", name, need[e].Extensions[d].Name)
+			}
+		}
+	}
+
+	return nil
+}
+
+func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpModule, pendings *[]pendingContainerUpdate) error {
+	need, err := strconv.ParseInt(module.Config.CpusetCpus, 10, 64)
+	if err != nil {
+		if module.Config.CpusetCpus == "" {
+			need = 0
+		} else {
+			return err
+		}
+	}
+
+	units := svc.getUnitByType(module.Type)
+	if len(units) == 0 {
+		return fmt.Errorf("Not Found unit '%s' In Service %s", module.Type, svc.Name)
+	}
+
+	var used int64
+	if need > 0 {
+		used, err = utils.GetCPUNum(units[0].container.Info.HostConfig.CpusetCpus)
+		if err != nil {
+			return err
+		}
+	}
+	if (need == 0 || used == need) && (module.Config.Memory == 0 ||
+		module.Config.Memory == units[0].container.Info.HostConfig.Memory) {
+		return nil
+	}
+
+	for _, u := range units {
+		if u.engine.Memory-u.engine.UsedMemory()-int64(module.Config.Memory)+u.container.Config.HostConfig.Memory < 0 {
+			return fmt.Errorf("Engine %s:%s have not enough Memory for Container %s Update", u.engine.ID, u.engine.IP, u.Name)
+		}
+	}
+
+	if need == used || need == 0 {
+		for _, u := range units {
+			*pendings = append(*pendings, pendingContainerUpdate{
+				containerID: u.container.ID,
+				unit:        u,
+				engine:      u.engine,
+				config:      module.Config,
+			})
+		}
+	} else if need < used {
+		for _, u := range units {
+			cpusetCpus, err := reduceCPUset(u.container.Info.HostConfig.CpusetCpus, int(need))
+			if err != nil {
+				return err
+			}
+			*pendings = append(*pendings, pendingContainerUpdate{
+				containerID: u.container.ID,
+				cpusetCPus:  cpusetCpus,
+				unit:        u,
+				engine:      u.engine,
+				config:      module.Config,
+			})
+		}
+	} else {
+		for _, u := range units {
+			reserve := make([]string, 0, len(svc.units))
+			for _, pending := range *pendings {
+				if u.engine.ID == pending.engine.ID {
+					reserve = append(reserve, pending.cpusetCPus)
+				}
+			}
+			cpusetCpus, err := gd.allocCPUs(u.engine, int(need-used), reserve...)
+			if err != nil {
+				return err
+			}
+			cpusetCpus = u.container.Info.HostConfig.CpusetCpus + "," + cpusetCpus
+			*pendings = append(*pendings, pendingContainerUpdate{
+				containerID: u.container.ID,
+				cpusetCPus:  cpusetCpus,
+				unit:        u,
+				engine:      u.engine,
+				config:      module.Config,
+			})
+		}
+	}
+
+	return nil
+}
+
+func reduceCPUset(cpusetCpus string, need int) (string, error) {
+	cpus, err := utils.ParseUintList(cpusetCpus)
+	if err != nil {
+		return "", err
+	}
+
+	cpuSlice := make([]int, 0, len(cpus))
+	for k, ok := range cpus {
+		if ok {
+			cpuSlice = append(cpuSlice, k)
+		}
+	}
+	sort.Ints(cpuSlice)
+
+	cpuString := make([]string, need)
+	for n := 0; n < need; n++ {
+		cpuString[n] = strconv.Itoa(cpuSlice[n])
+	}
+
+	return strings.Join(cpuString, ","), nil
 }

@@ -167,7 +167,7 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 	}
 
 	if u.engine == nil && u.EngineID != "" {
-		node, err := gd.GetNode(u.EngineID)
+		_, node, err := gd.GetNode(u.EngineID)
 		if err != nil {
 			logrus.Errorf("Not Found Node %s,Error:%s", u.EngineID, err.Error())
 		} else if node != nil && node.engine != nil {

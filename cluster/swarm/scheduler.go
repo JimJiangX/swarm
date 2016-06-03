@@ -297,7 +297,9 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type str
 	return allocs, nil
 }
 
-func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit, stores []structs.DiskStorage, config *cluster.ContainerConfig) (*preAllocResource, error) {
+func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit,
+	stores []structs.DiskStorage, config *cluster.ContainerConfig) (*preAllocResource, error) {
+
 	preAlloc := newPreAllocResource()
 	preAlloc.unit = unit
 
