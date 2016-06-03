@@ -417,7 +417,7 @@ func (gd *Gardener) GetEngine(NameOrID string) (*cluster.Engine, error) {
 	return nil, fmt.Errorf("Not Found Engine %s", NameOrID)
 }
 
-func (gd *Gardener) RemoveNode(NameOrID string) error {
+func (gd *Gardener) RemoveNode(NameOrID, user, password string) error {
 	node, err := database.GetNode(NameOrID)
 	if err != nil {
 		return err
@@ -447,6 +447,13 @@ func (gd *Gardener) RemoveNode(NameOrID string) error {
 	count, err := database.CountUnitByNode(node.ID)
 	if err != nil || count != 0 {
 		return fmt.Errorf("Count Unit ByNode,%v,count:%d", err, count)
+	}
+
+	buffer := bytes.NewBuffer(nil)
+	shell := ""
+	err = SSHCommand(node.Addr, user, password, shell, buffer)
+	if err != nil {
+		return fmt.Errorf("shell:%s,error:%s,Output:%s", shell, err, buffer.String())
 	}
 
 	dc, err := gd.DatacenterByNode(NameOrID)

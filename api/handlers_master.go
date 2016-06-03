@@ -1457,6 +1457,12 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // DELETE /clusters/nodes/{node:.*}
 func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	node := mux.Vars(r)["node"]
+	config := structs.SSHConfig{}
+
+	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
@@ -1464,7 +1470,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := gd.RemoveNode(node)
+	err := gd.RemoveNode(node, config.Username, config.Password)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return

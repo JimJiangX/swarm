@@ -71,18 +71,24 @@ type ContainerWithResource struct {
 }
 
 type Node struct {
-	Name     string
-	Address  string
-	Username string
-	Password string
-	HDD      []string `json:"hdd"`
-	SSD      []string `json:"ssd"`
+	Name    string
+	Address string
 
-	Port         int `json:",omitempty"` // ssh port
+	SSHConfig
+
+	HDD []string `json:"hdd"`
+	SSD []string `json:"ssd"`
+
 	MaxContainer int `json:"max_container"`
 
 	Room string `json:",omitempty"`
 	Seat string `json:",omitempty"`
+}
+
+type SSHConfig struct {
+	Username string
+	Password string
+	Port     int `json:",omitempty"` // ssh port
 }
 
 type PostNodesRequest []Node
