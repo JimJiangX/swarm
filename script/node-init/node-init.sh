@@ -317,9 +317,10 @@ install_docker() {
 
 	# stop docker
 	pkill -9 docker >/dev/null 2>&1
+	pkill -9 docker-contarinerd >/dev/null 2>&1
 
 	# copy the binary & set the permissions
-	cp ${cur_dir}/docker-1.10.3-release/bin/docker /usr/bin/docker; chmod +x /usr/bin/docker
+	cp ${cur_dir}/docker-1.11.2-release/bin/docker* /usr/bin/; chmod +x /usr/bin/docker*
 	
 
 	# create the systemd files
@@ -331,7 +332,7 @@ install_docker() {
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label SSD_VG=${ssd_vgname} --label ADM_NIC=${adm_nic} --label INT_NIC=${int_nic} --label EXT_NIC=${ext_nic}
+DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --lable NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label SSD_VG=${ssd_vgname} --label ADM_NIC=${adm_nic} --label INT_NIC=${int_nic} --label EXT_NIC=${ext_nic}
 
 EOF
 
@@ -343,6 +344,9 @@ After=network.target docker.socket
 Requires=docker.socket
 
 [Service]
+# the default is not to use systemd for cgroups because the delegate issues still
+# exists and systemd currently does not support the cgroup feature set required
+# for containers run by docker
 Type=notify
 EnvironmentFile=/etc/sysconfig/docker
 ExecStart=/usr/bin/docker daemon -H fd:// \$DOCKER_OPTS
@@ -350,6 +354,8 @@ LimitNOFILE=1048576
 LimitNPROC=1048576
 LimitCORE=infinity
 TimeoutStartSec=0
+# set delegate yes so that systemd does not reset the cgroups of docker containers
+Delegate=yes
 
 [Install]
 WantedBy=multi-user.target
@@ -420,10 +426,10 @@ install_docker_plugin() {
 	pkill -9 local-volume-plugin > /dev/null 2>&1
 
 	# copy binary file
-	cp ${cur_dir}/dbaas_volume_plugin-1.6.1/bin/local_volume_plugin /usr/bin/local_volume_plugin; chmod 755 /usr/bin/local_volume_plugin
+	cp ${cur_dir}/dbaas_volume_plugin-1.6.4/bin/local_volume_plugin /usr/bin/local_volume_plugin; chmod 755 /usr/bin/local_volume_plugin
 
 	# copy script
-	cp ${cur_dir}/dbaas_volume_plugin-1.6.1/scripts/*.sh ${script_dir}
+	cp ${cur_dir}/dbaas_volume_plugin-1.6.4/scripts/*.sh ${script_dir}
 	chmod +x ${script_dir}/*.sh
 
 	cat << EOF > /usr/lib/systemd/system/local-volume-plugin.service
