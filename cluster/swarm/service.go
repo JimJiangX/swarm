@@ -809,10 +809,10 @@ func (svc *Service) deregisterInHorus(addr string) error {
 	return deregisterToHorus(addr, endpoints)
 }
 
-func (svc *Service) getUnitByType(Type string) []*unit {
+func (svc *Service) getUnitByType(_type string) []*unit {
 	units := make([]*unit, 0, len(svc.units))
 	for _, u := range svc.units {
-		if u.Type == Type {
+		if u.Type == _type {
 			units = append(units, u)
 		}
 	}
@@ -820,7 +820,7 @@ func (svc *Service) getUnitByType(Type string) []*unit {
 		return units
 	}
 
-	logrus.Warnf("Not Found unit %s In Service %s", Type, svc.Name)
+	logrus.Warnf("Not Found unit %s In Service %s", _type, svc.Name)
 
 	return nil
 }

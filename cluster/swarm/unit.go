@@ -807,16 +807,16 @@ func (u *unit) registerHorus(user, password string, agentPort int) (registerServ
 		return registerService{}, err
 	}
 
-	typ := u.Type
+	_type := u.Type
 	switch u.Type {
 	case _SwitchManagerType, "switch manager", "switchmanager":
-		typ = "swm"
+		_type = "swm"
 	case _ProxyType, "upproxy":
-		typ = "upproxy"
+		_type = "upproxy"
 	case _UpsqlType:
-		typ = "upsql"
+		_type = "upsql"
 	default:
-		return registerService{}, fmt.Errorf("Unsupported 'Type':'%s'", u.Type)
+		return registerService{}, fmt.Errorf("Unsupported Type:'%s'", u.Type)
 	}
 
 	return registerService{
@@ -824,7 +824,7 @@ func (u *unit) registerHorus(user, password string, agentPort int) (registerServ
 		CollectorName: u.Name,
 		User:          user,
 		Password:      password,
-		Type:          typ,
+		Type:          _type,
 		CollectorIP:   u.engine.IP,
 		CollectorPort: agentPort,
 		MetricTags:    node.ID,

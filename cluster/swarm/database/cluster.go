@@ -23,11 +23,11 @@ func (c Cluster) TableName() string {
 	return "tb_cluster"
 }
 
-func NewCluster(name, typ, storageType, storageID, dc string, enable bool, num int, limit float32) Cluster {
+func NewCluster(name, _type, storageType, storageID, dc string, enable bool, num int, limit float32) Cluster {
 	return Cluster{
 		ID:          utils.Generate64UUID(),
 		Name:        name,
-		Type:        typ,
+		Type:        _type,
 		StorageType: storageType,
 		StorageID:   storageID,
 		Datacenter:  dc,
@@ -382,7 +382,7 @@ func CountNodeByCluster(cluster string) (int, error) {
 	return num, nil
 }
 
-func ListNodeByClusterType(Type string, enabled bool) ([]Node, error) {
+func ListNodeByClusterType(_type string, enabled bool) ([]Node, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
@@ -390,7 +390,7 @@ func ListNodeByClusterType(Type string, enabled bool) ([]Node, error) {
 
 	clist := make([]string, 0, 5)
 
-	err = db.Select(&clist, "SELECT id FROM tb_cluster WHERE type=? AND enabled=?", Type, enabled)
+	err = db.Select(&clist, "SELECT id FROM tb_cluster WHERE type=? AND enabled=?", _type, enabled)
 	if err != nil {
 		return nil, err
 	}

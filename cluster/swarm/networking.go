@@ -79,12 +79,12 @@ func (gd *Gardener) GetNetworking(id string) (*Networking, error) {
 	return networking, nil
 }
 
-func (gd *Gardener) GetNetworkingByType(typ string) (*Networking, error) {
+func (gd *Gardener) GetNetworkingByType(_type string) (*Networking, error) {
 	gd.RLock()
 
 	for i := range gd.networkings {
 		if gd.networkings[i].Enable &&
-			gd.networkings[i].Type == typ {
+			gd.networkings[i].Type == _type {
 			gd.RUnlock()
 			return gd.networkings[i], nil
 		}
@@ -92,7 +92,7 @@ func (gd *Gardener) GetNetworkingByType(typ string) (*Networking, error) {
 
 	gd.RUnlock()
 
-	out, err := database.ListNetworkingByType(typ)
+	out, err := database.ListNetworkingByType(_type)
 	if err != nil {
 		return nil, err
 	}
@@ -135,8 +135,8 @@ func (gd *Gardener) SetNetworkingStatus(ID string, enable bool) error {
 	return err
 }
 
-func (gd *Gardener) AddNetworking(start, end, typ, gateway string, prefix int) (*Networking, error) {
-	net, ips, err := database.TxInsertNetworking(start, end, gateway, typ, prefix)
+func (gd *Gardener) AddNetworking(start, end, _type, gateway string, prefix int) (*Networking, error) {
+	net, ips, err := database.TxInsertNetworking(start, end, gateway, _type, prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +245,7 @@ func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit string, re
 	return networkings, nil
 }
 
-func (gd *Gardener) AllocIP(id, typ, unit string) (_ IPInfo, err error) {
+func (gd *Gardener) AllocIP(id, _type, unit string) (_ IPInfo, err error) {
 	var networkings []database.Networking
 
 	if len(id) > 0 {
@@ -255,8 +255,8 @@ func (gd *Gardener) AllocIP(id, typ, unit string) (_ IPInfo, err error) {
 		}
 	}
 
-	if len(networkings) == 0 && len(typ) > 0 {
-		networkings, err = database.ListNetworkingByType(typ)
+	if len(networkings) == 0 && len(_type) > 0 {
+		networkings, err = database.ListNetworkingByType(_type)
 		if err != nil {
 			return IPInfo{}, err
 		}

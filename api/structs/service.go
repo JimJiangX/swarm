@@ -70,9 +70,9 @@ type ScaleUpModule struct {
 	Config container.UpdateConfig
 }
 
-func (req *PostServiceRequest) Update(typ string, config container.UpdateConfig) {
+func (req *PostServiceRequest) Update(_type string, config container.UpdateConfig) {
 	for i := range req.Modules {
-		if req.Modules[i].Type != typ {
+		if req.Modules[i].Type != _type {
 			continue
 		}
 

@@ -278,7 +278,7 @@ func ListIPByUnitID(unit string) ([]IP, error) {
 	return out, nil
 }
 
-func ListNetworkingByType(typ string) ([]Networking, error) {
+func ListNetworkingByType(_type string) ([]Networking, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
@@ -286,7 +286,7 @@ func ListNetworkingByType(typ string) ([]Networking, error) {
 
 	list := make([]Networking, 0, 5)
 
-	err = db.Select(&list, "SELECT * FROM tb_networking WHERE type=?", typ)
+	err = db.Select(&list, "SELECT * FROM tb_networking WHERE type=?", _type)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +325,7 @@ func ListIPByNetworking(id string) ([]IP, error) {
 	return list, nil
 }
 
-func TxInsertNetworking(start, end, gateway, typ string, prefix int) (Networking, []IP, error) {
+func TxInsertNetworking(start, end, gateway, _type string, prefix int) (Networking, []IP, error) {
 	startU32 := utils.IPToUint32(start)
 	endU32 := utils.IPToUint32(end)
 	if move := uint(32 - prefix); (startU32 >> move) != (endU32 >> move) {
@@ -336,7 +336,7 @@ func TxInsertNetworking(start, end, gateway, typ string, prefix int) (Networking
 	}
 	net := Networking{
 		ID:      utils.Generate64UUID(),
-		Type:    typ,
+		Type:    _type,
 		Gateway: gateway,
 		Enabled: true,
 	}
