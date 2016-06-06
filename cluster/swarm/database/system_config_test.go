@@ -19,11 +19,12 @@ func TestSystemConfig(t *testing.T) {
 		},
 		Registry: Registry{},
 		SSHDeliver: SSHDeliver{
-			SourceDir:   "./script/node-init",
-			PkgName:     "",
-			ScriptName:  "node-init.sh",
-			CA_CRT_Name: "registery-ca.crt",
-			Destination: "/tmp",
+			SourceDir:       "./script/node-init",
+			PkgName:         "",
+			InitScriptName:  "node-init.sh",
+			CleanScriptName: "node-clean.sh",
+			CA_CRT_Name:     "registery-ca.crt",
+			Destination:     "/tmp",
 		},
 
 		DockerPort: 2375,

@@ -165,7 +165,7 @@ func (gd *Gardener) BuildPendingContainers(list []*node.Node, svc *Service, Type
 
 	entry := logrus.WithFields(logrus.Fields{"Name": svc.Name, "Module": Type})
 
-	highAvaliable := false
+	highAvaliable := svc.HighAvailable
 	for i := range stores {
 		if !store.IsStoreLocal(stores[i].Type) {
 			highAvaliable = true

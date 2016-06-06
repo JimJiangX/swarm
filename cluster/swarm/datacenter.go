@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -449,11 +450,10 @@ func (gd *Gardener) RemoveNode(NameOrID, user, password string) error {
 		return fmt.Errorf("Count Unit ByNode,%v,count:%d", err, count)
 	}
 
-	buffer := bytes.NewBuffer(nil)
-	shell := ""
-	err = SSHCommand(node.Addr, user, password, shell, buffer)
+	// ssh exec clean script
+	err = nodeClean(node.ID, eng.IP, user, password)
 	if err != nil {
-		return fmt.Errorf("shell:%s,error:%s,Output:%s", shell, err, buffer.String())
+		logrus.Error("clean script exec error:%s", err)
 	}
 
 	dc, err := gd.DatacenterByNode(NameOrID)
@@ -796,7 +796,7 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, string,
 		return nil, "", err
 	}
 
-	_, path, caFile := config.DestPath()
+	_, path, caFile, _ := config.DestPath()
 
 	buf, err := json.Marshal(config.GetConsulAddrs())
 	if err != nil {
@@ -886,7 +886,6 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	config, script, err := node.modifyProfile(kvpath)
 	if err != nil {
 		logrus.Error(err)
-
 		return err
 	}
 
@@ -905,7 +904,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	}
 	err = c.Connect(nil)
 	if err != nil {
-		logrus.Errorf("communicator connection error: %s", err)
+		entry.Errorf("communicator connection error: %s", err)
 
 		return err
 	}
@@ -924,7 +923,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	logrus.Info("Registry.CA_CRT", len(config.Registry.CA_CRT), config.Registry.CA_CRT)
 
 	caBuf := bytes.NewBufferString(config.Registry.CA_CRT)
-	_, _, filename := config.DestPath()
+	_, _, filename, _ := config.DestPath()
 
 	if err := c.Upload(filename, caBuf); err != nil {
 		entry.Errorf("SSH UploadFile %s Error,%s", filename, err)
@@ -946,7 +945,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	err = c.Start(&cmd)
 	cmd.Wait()
 	if err != nil || cmd.ExitStatus != 0 {
-		logrus.Errorf("Executing Remote Command: %s,Exited:%d,%v,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
+		entry.Errorf("Executing Remote Command: %s,Exited:%d,%v,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
 
 		cp := remote.Cmd{
 			Command: script,
@@ -957,7 +956,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 		cp.Wait()
 		if err != nil || cp.ExitStatus != 0 {
 			err = fmt.Errorf("Twice Executing Remote Command: %s,Exited:%d,%v,Output:%s", cp.Command, cp.ExitStatus, err, buffer.String())
-			logrus.Error(err)
+			entry.Error(err)
 
 			return err
 		}
@@ -1152,6 +1151,109 @@ func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
 			}).Errorf("Add Host To Storage Error:%s", err.Error())
 		}
 	}
+
+	return nil
+}
+
+func nodeClean(node, addr, user, password string) error {
+	config, err := database.GetSystemConfig()
+	if err != nil {
+		return err
+	}
+	_, _, _, destName := config.DestPath()
+
+	srcFile, err := utils.GetAbsolutePath(false, config.CleanScriptName)
+	if err != nil {
+		logrus.Error("%s %s", srcFile, err)
+		return err
+	}
+
+	file, err := os.Open(srcFile)
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
+
+	r := &terraform.InstanceState{
+		Ephemeral: terraform.EphemeralState{
+			ConnInfo: map[string]string{
+				"type":     "ssh",
+				"user":     user,
+				"password": password,
+				"host":     addr,
+			},
+		},
+	}
+	entry := logrus.WithFields(logrus.Fields{
+		"host":        addr,
+		"user":        user,
+		"source":      srcFile,
+		"destination": destName,
+	})
+	c, err := ssh.New(r)
+	if err != nil {
+		entry.Errorf("error creating communicator: %s", err)
+
+		return err
+	}
+	err = c.Connect(nil)
+	if err != nil {
+		entry.Errorf("communicator connection error: %s", err)
+
+		return err
+	}
+	defer c.Disconnect()
+
+	if err := c.Upload(destName, file); err != nil {
+		entry.Errorf("SSH UploadFile %s Error,%s", destName, err)
+
+		if err := c.Upload(destName, file); err != nil {
+			entry.Errorf("SSH UploadFile %s Error Twice,%s", destName, err)
+
+			return err
+		}
+	}
+
+	/*
+		adm_ip=$1
+		consul_port=${2}
+		node_id=${3}
+		horus_server_ip=${4}
+		horus_server_port=${5}
+	*/
+
+	script := fmt.Sprintf("chmod 755 %s && %s %s %d %s %s %d",
+		destName, destName, config.ConsulPort, node,
+		config.HorusServerIP, config.HorusServerPort)
+
+	buffer := new(bytes.Buffer)
+	cmd := remote.Cmd{
+		Command: script,
+		Stdout:  buffer,
+		Stderr:  buffer,
+	}
+
+	err = c.Start(&cmd)
+	cmd.Wait()
+	if err != nil || cmd.ExitStatus != 0 {
+		entry.Errorf("Executing Remote Command: %s,Exited:%d,%v,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
+
+		cp := remote.Cmd{
+			Command: script,
+			Stdout:  buffer,
+			Stderr:  buffer,
+		}
+		err = c.Start(&cp)
+		cp.Wait()
+		if err != nil || cp.ExitStatus != 0 {
+			err = fmt.Errorf("Twice Executing Remote Command: %s,Exited:%d,%v,Output:%s", cp.Command, cp.ExitStatus, err, buffer.String())
+			entry.Error(err)
+
+			return err
+		}
+	}
+
+	entry.Info("SSH Remote Exec Successed! Output:\n", buffer.String())
 
 	return nil
 }
