@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api/structs"
@@ -426,9 +427,32 @@ func (node *Node) localStorageExtend(name, storageType string, size int) (databa
 	return lv, err
 }
 
-func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtension, task database.Task) error {
+func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtension, task database.Task) (err error) {
 	svc.Lock()
-	defer svc.Unlock()
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+		svc.Unlock()
+
+		if err == nil {
+			task.Status = _StatusTaskDone
+			err = svc.updateDescription(nil)
+			if err != nil {
+				logrus.Errorf("service %s update Description error:%s", svc.Name, err)
+			}
+		}
+
+		if err != nil {
+			task.Status = _StatusTaskFailed
+			task.Errors = err.Error()
+		}
+
+		err = database.UpdateTaskStatus(&task, task.Status, time.Now(), task.Errors)
+		if err != nil {
+			logrus.Errorf("task %s update error:%s", task.ID, err)
+		}
+	}()
 
 	pendings, err := gd.volumesPendingExpension(svc, need)
 	if err != nil {
@@ -447,12 +471,14 @@ func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtensi
 
 	for _, pending := range pendings {
 		for _, lv := range pending.localStore {
-			err := localVolumeExtend(pending.unit, lv)
+			err = localVolumeExtend(pending.unit, lv)
 			if err != nil {
 				return err
 			}
 		}
 	}
+
+	//TODO: update san store Volumes
 
 	return nil
 }
