@@ -33,7 +33,7 @@ type Datacenter struct {
 }
 
 func AddNewCluster(req structs.PostClusterRequest) (database.Cluster, error) {
-	if store.IsStoreLocal(req.StorageType) {
+	if store.IsStoreLocal(req.StorageType) && req.StorageID != "" {
 		req.StorageID = ""
 	}
 
@@ -596,7 +596,7 @@ func (gd *Gardener) rebuildDatacenter(NameOrID string) (*Datacenter, error) {
 	}
 
 	var storage store.Store
-	if !store.IsStoreLocal(store.LocalStorePrefix) && cl.StorageID != "" {
+	if !store.IsStoreLocal(cl.StorageType) && cl.StorageID != "" {
 		storage, err = gd.GetStore(cl.StorageID)
 		if err != nil {
 			return nil, err
