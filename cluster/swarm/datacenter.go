@@ -33,7 +33,7 @@ type Datacenter struct {
 }
 
 func AddNewCluster(req structs.PostClusterRequest) (database.Cluster, error) {
-	if req.StorageType == store.LocalDiskStore {
+	if store.IsStoreLocal(req.StorageType) {
 		req.StorageID = ""
 	}
 
@@ -61,7 +61,7 @@ type Node struct {
 	*database.Node
 	task       *database.Task
 	engine     *cluster.Engine
-	localStore store.Store
+	localStore *store.LocalStore
 	hdd        []string
 	ssd        []string
 	user       string // os user
@@ -596,7 +596,7 @@ func (gd *Gardener) rebuildDatacenter(NameOrID string) (*Datacenter, error) {
 	}
 
 	var storage store.Store
-	if cl.StorageType != store.LocalDiskStore && cl.StorageID != "" {
+	if !store.IsStoreLocal(store.LocalStorePrefix) && cl.StorageID != "" {
 		storage, err = gd.GetStore(cl.StorageID)
 		if err != nil {
 			return nil, err
@@ -696,7 +696,7 @@ func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType s
 				}
 			}
 
-			if !strings.Contains(v.Type, store.LocalDiskStore) {
+			if !store.IsStoreLocal(v.Type) {
 				continue
 			}
 			for _, node := range dc.nodes {

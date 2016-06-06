@@ -39,12 +39,12 @@ func TestHitachiAlloc(t *testing.T) {
 	loop := 10
 	for i := 0; i < loop; i++ {
 		go func(i int) {
-			lunID, lunStorageLunID, err := hitachiStore.Alloc("LunName"+string(i), "Unit0001", "unit0001_VG", 1<<30)
+			lunID, err := hitachiStore.Alloc("LunName"+string(i), "Unit0001", "unit0001_VG", 1<<30)
 			if err != nil {
 				t.Fatal(err)
 			}
 			// clear
-			err = hitachiStore.Recycle(lunID, lunStorageLunID)
+			err = hitachiStore.Recycle(lunID, 0)
 			if err != nil {
 				t.Fatal(err)
 			}

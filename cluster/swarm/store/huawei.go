@@ -72,40 +72,40 @@ func (h *huaweiStore) Insert() error {
 	return err
 }
 
-func (h *huaweiStore) Alloc(name, unit, vg string, size int) (string, int, error) {
+func (h *huaweiStore) Alloc(name, unit, vg string, size int) (string, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
 	out, err := h.idleSize()
 	if err != nil {
-		return "", 0, err
+		return "", err
 	}
 
 	rg := maxIdleSizeRG(out)
 	if out[rg].free < size {
-		return "", 0, fmt.Errorf("Not Enough Space For Alloction,Max:%d < Need:%d", out[rg], size)
+		return "", fmt.Errorf("Not Enough Space For Alloction,Max:%d < Need:%d", out[rg], size)
 	}
 
 	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "create_lun.sh")
 	if err != nil {
-		return "", 0, err
+		return "", err
 	}
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password,
 		strconv.Itoa(rg.StorageRGID), name, strconv.Itoa(int(size))}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
-		return "", 0, err
+		return "", err
 	}
 
 	output, err := cmd.Output()
 	if err != nil {
-		return "", 0, fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return "", fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
 	}
 
 	storageLunID, err := strconv.Atoi(string(output))
 	if err != nil {
-		return "", 0, err
+		return "", err
 	}
 
 	lun := database.LUN{
@@ -131,10 +131,10 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (string, int, error
 
 	err = database.TxInsertLUNAndVolume(lun, lv)
 	if err != nil {
-		return "", 0, err
+		return "", err
 	}
 
-	return lun.ID, lun.StorageLunID, nil
+	return lun.ID, nil
 }
 
 func (h *huaweiStore) Recycle(id string, lun int) error {

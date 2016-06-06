@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"runtime/debug"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -168,7 +167,7 @@ func (gd *Gardener) BuildPendingContainers(list []*node.Node, svc *Service, Type
 
 	highAvaliable := false
 	for i := range stores {
-		if !strings.Contains(stores[i].Type, store.LocalDiskStore) {
+		if !store.IsStoreLocal(stores[i].Type) {
 			highAvaliable = true
 		}
 	}

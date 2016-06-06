@@ -12,8 +12,8 @@ const (
 	HITACHI    = "HITACHI"
 	HUAWEI     = "HUAWEI"
 
-	LocalDiskStore = "local"
-	SANStore       = "san"
+	LocalStorePrefix = "local"
+	SANStore         = "san"
 
 	SAN_StoreDriver  = "lvm"
 	LocalStoreDriver = "lvm"
@@ -35,8 +35,8 @@ type Store interface {
 	AddHost(name string, wwwn ...string) error
 	DelHost(name string, wwwn ...string) error
 
-	Alloc(name, unitID, vgName string, size int) (string, int, error) // create LUN
-	Recycle(id string, lun int) error                                 // delete LUN
+	Alloc(name, unitID, vgName string, size int) (string, error) // create LUN
+	Recycle(id string, lun int) error                            // delete LUN
 
 	Mapping(host, vgName, lun string) error
 	DelMapping(lun string) error
@@ -53,8 +53,6 @@ func RegisterStore(id, vendor, addr, user, password, admin string,
 		store = NewHuaweiStore(id, HUAWEI, addr, user, password, hstart, hend)
 	} else if HITACHI == v {
 		store = NewHitachiStore(id, HITACHI, admin, lstart, lend, hstart, hend)
-	} else if vendor == LocalDiskStore {
-		return nil, nil
 	}
 
 	if err := store.Ping(); err != nil {

@@ -287,12 +287,12 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 	for i := range need {
 		name := fmt.Sprintf("%s_%s_LV", penging.unit.Unit.Name, need[i].Name)
 
-		if strings.Contains(need[i].Type, store.LocalDiskStore) {
-			lvID, err := node.localStorageAlloc(name, penging.unit.Unit.ID, need[i].Type, need[i].Size)
+		if store.IsStoreLocal(need[i].Type) {
+			lv, err := node.localStorageAlloc(name, penging.unit.Unit.ID, need[i].Type, need[i].Size)
 			if err != nil {
 				return err
 			}
-			penging.localStore = append(penging.localStore, lvID)
+			penging.localStore = append(penging.localStore, lv.ID)
 			name = fmt.Sprintf("%s:/DBAAS%s", name, need[i].Name)
 			config.HostConfig.Binds = append(config.HostConfig.Binds, name)
 			config.HostConfig.VolumeDriver = node.localStore.Driver()
@@ -305,7 +305,7 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 		}
 		vgName := penging.unit.Unit.Name + "_SAN_VG"
 
-		lunID, _, err := dc.storage.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
+		lunID, err := dc.storage.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
 		if err != nil {
 			return err
 		}
@@ -326,12 +326,13 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 	return nil
 }
 
-func (node *Node) localStorageAlloc(name, unitID, storageType string, size int) (string, error) {
-	if !strings.Contains(storageType, store.LocalDiskStore) {
-		return "", fmt.Errorf("'%s' storage type isnot '%s'", storageType, store.LocalDiskStore)
+func (node *Node) localStorageAlloc(name, unitID, storageType string, size int) (database.LocalVolume, error) {
+	lv := database.LocalVolume{}
+	if !store.IsStoreLocal(storageType) {
+		return lv, fmt.Errorf("'%s' storage type isnot '%s'", storageType, store.LocalStorePrefix)
 	}
 	if node.localStore == nil {
-		return "", fmt.Errorf("Not Found LoaclStorage of Node %s", node.Addr)
+		return lv, fmt.Errorf("Not Found LoaclStorage of Node %s", node.Addr)
 	}
 	part := strings.SplitN(storageType, ":", 2)
 	if len(part) == 1 {
@@ -339,15 +340,16 @@ func (node *Node) localStorageAlloc(name, unitID, storageType string, size int) 
 	}
 	vgName := node.engine.Labels[part[1]+"_VG"]
 	if vgName == "" {
-		return "", fmt.Errorf("Not Found VG_Name of %s", storageType)
+		return lv, fmt.Errorf("Not Found VG_Name of %s", storageType)
 	}
 
-	lvID, _, err := node.localStore.Alloc(name, unitID, vgName, size)
+	var err error
+	lv, err = node.localStore.Alloc(name, unitID, vgName, size)
 	if err != nil {
-		return "", err
+		return lv, err
 	}
 
-	return lvID, nil
+	return lv, nil
 }
 
 func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtension, task database.Task) error {
@@ -372,12 +374,12 @@ func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtensi
 
 				name := fmt.Sprintf("%s_%s_LV", u.Name, need[e].Extensions[d].Name)
 
-				if strings.Contains(need[e].Extensions[d].Type, store.LocalDiskStore) {
-					lvID, err := node.localStorageAlloc(name, u.ID, need[e].Extensions[d].Type, need[e].Extensions[d].Size)
+				if store.IsStoreLocal(need[e].Extensions[d].Type) {
+					lv, err := node.localStorageAlloc(name, u.ID, need[e].Extensions[d].Type, need[e].Extensions[d].Size)
 					if err != nil {
 						return err
 					}
-					pending.localStore = append(pending.localStore, lvID)
+					pending.localStore = append(pending.localStore, lv.ID)
 					name = fmt.Sprintf("%s:/DBAAS%s", name, need[e].Extensions[d].Name)
 					continue
 				}
@@ -387,7 +389,7 @@ func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtensi
 				}
 				vgName := u.Name + "_SAN_VG"
 
-				lunID, _, err := dc.storage.Alloc(name, u.ID, vgName, need[e].Extensions[d].Size)
+				lunID, err := dc.storage.Alloc(name, u.ID, vgName, need[e].Extensions[d].Size)
 				if err != nil {
 					return err
 				}
