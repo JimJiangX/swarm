@@ -70,7 +70,7 @@ type ScaleUpModule struct {
 	Config container.UpdateConfig
 }
 
-func (req *PostServiceRequest) Update(_type string, config container.UpdateConfig) {
+func (req *PostServiceRequest) UpdateModuleConfig(_type string, config container.UpdateConfig) {
 	for i := range req.Modules {
 		if req.Modules[i].Type != _type {
 			continue
@@ -90,6 +90,31 @@ func (req *PostServiceRequest) Update(_type string, config container.UpdateConfi
 
 		break
 	}
+}
+
+func (req *PostServiceRequest) UpdateModuleStore(list []StorageExtension) {
+	for l := range list {
+		for m := range req.Modules {
+			if req.Modules[m].Type != list[l].Type {
+				continue
+			}
+
+			for e := range list[l].Extensions {
+				for i := range req.Modules[m].Stores {
+					if list[l].Extensions[e].Name != req.Modules[m].Stores[i].Name {
+						continue
+					}
+
+					req.Modules[m].Stores[i].Size += list[l].Extensions[e].Size
+					break
+				}
+
+			}
+
+			break
+		}
+	}
+
 }
 
 type StorageExtension struct {

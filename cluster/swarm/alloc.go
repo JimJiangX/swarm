@@ -428,6 +428,7 @@ func (node *Node) localStorageExtend(name, storageType string, size int) (databa
 }
 
 func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtension, task database.Task) (err error) {
+	var pendings []*pendingStoreExtend
 	svc.Lock()
 	defer func() {
 		if r := recover(); r != nil {
@@ -437,7 +438,7 @@ func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtensi
 
 		if err == nil {
 			task.Status = _StatusTaskDone
-			err = svc.updateDescription(nil)
+			err = svc.updateDescAfterExtension(need)
 			if err != nil {
 				logrus.Errorf("service %s update Description error:%s", svc.Name, err)
 			}
@@ -446,6 +447,11 @@ func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtensi
 		if err != nil {
 			task.Status = _StatusTaskFailed
 			task.Errors = err.Error()
+			err1 := gd.cancelStoreExtend(pendings)
+			if err1 != nil {
+				err = fmt.Errorf("%s,%s", err, err1)
+			}
+			logrus.Error(err)
 		}
 
 		err = database.UpdateTaskStatus(&task, task.Status, time.Now(), task.Errors)
@@ -454,12 +460,8 @@ func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtensi
 		}
 	}()
 
-	pendings, err := gd.volumesPendingExpension(svc, need)
+	pendings, err = gd.volumesPendingExpension(svc, need)
 	if err != nil {
-		err1 := gd.cancelStoreExtend(pendings)
-		if err1 != nil {
-			err = fmt.Errorf("%s,%s", err, err1)
-		}
 		logrus.Error(err)
 
 		return err

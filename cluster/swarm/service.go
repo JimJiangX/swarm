@@ -1006,7 +1006,7 @@ func (gd *Gardener) serviceScaleUP(svc *Service, list []structs.ScaleUpModule, t
 		gd.scheduler.Unlock()
 		if err == nil {
 			task.Status = _StatusTaskDone
-			err = svc.updateDescription(list)
+			err = svc.updateDescAfterScaleUp(list)
 			if err != nil {
 				logrus.Errorf("service %s update Description error:%s", svc.Name, err)
 			}
@@ -1104,7 +1104,7 @@ func (svc *Service) getServiceDescription() (*structs.PostServiceRequest, error)
 	return svc.base, nil
 }
 
-func (svc *Service) updateDescription(list []structs.ScaleUpModule) error {
+func (svc *Service) updateDescAfterScaleUp(list []structs.ScaleUpModule) error {
 	dsp, err := svc.getServiceDescription()
 	if err != nil {
 		return err
@@ -1112,8 +1112,35 @@ func (svc *Service) updateDescription(list []structs.ScaleUpModule) error {
 
 	des := *dsp
 	for i := range list {
-		des.Update(list[i].Type, list[i].Config)
+		des.UpdateModuleConfig(list[i].Type, list[i].Config)
 	}
+
+	buffer := bytes.NewBuffer(nil)
+	err = json.NewEncoder(buffer).Encode(&des)
+	if err != nil {
+		return err
+	}
+
+	description := buffer.String()
+	err = database.UpdateServcieDescription(svc.ID, description)
+	if err != nil {
+		return err
+	}
+
+	svc.Description = description
+	svc.base = &des
+
+	return nil
+}
+
+func (svc *Service) updateDescAfterExtension(list []structs.StorageExtension) error {
+	dsp, err := svc.getServiceDescription()
+	if err != nil {
+		return err
+	}
+
+	des := *dsp
+	des.UpdateModuleStore(list)
 
 	buffer := bytes.NewBuffer(nil)
 	err = json.NewEncoder(buffer).Encode(&des)

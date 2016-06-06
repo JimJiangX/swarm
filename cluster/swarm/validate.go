@@ -256,6 +256,7 @@ func ValidServiceStorageExtension(svc *Service, list []structs.StorageExtension)
 				if list[i].Extensions[ext].Name == des.Modules[m].Stores[ds].Name {
 					// Completion Store Type
 					list[i].Extensions[ext].Type = des.Modules[m].Stores[ds].Type
+					des.Modules[m].Stores[ds].Size += list[i].Extensions[ext].Size
 					found = true
 					break
 				}
