@@ -1,10 +1,10 @@
 #!/bin/bash
 
-adm_ip=$2
-consul_port=${15}
-node_id=${16}
-horus_server_ip=${17}
-horus_server_port=${18}
+adm_ip=$1
+consul_port=$2
+node_id=$3
+horus_server_ip=$4
+horus_server_port=$5
 
 dereg_to_horus_server() {
 	local component_type=$1
