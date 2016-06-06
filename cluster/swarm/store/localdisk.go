@@ -63,7 +63,7 @@ func (l LocalStore) IdleSize() (map[string]int, error) {
 
 		out[list[i].VgName] = free
 	}
-	fmt.Println("get out list: %v", out)
+	fmt.Printf("get out list: %v\n", out)
 	return out, nil
 }
 

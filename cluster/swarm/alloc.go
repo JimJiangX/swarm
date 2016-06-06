@@ -473,8 +473,10 @@ func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtensi
 		for _, lv := range pending.localStore {
 			err = localVolumeExtend(pending.unit, lv)
 			if err != nil {
+				logrus.Error("unit %s update volume error %s", pending.unit.Name, err)
 				return err
 			}
+			logrus.Debug("unit %s update volume done, %v", pending.unit.Name, lv)
 		}
 	}
 
