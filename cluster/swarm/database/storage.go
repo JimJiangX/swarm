@@ -346,6 +346,23 @@ func InsertLocalVolume(lv LocalVolume) error {
 	return err
 }
 
+func UpdateLocalVolume(NameOrID string, size int) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("UPDATE tb_volumes SET size=? WHERE id=? OR name=?", size, NameOrID, NameOrID)
+
+	return err
+}
+
+func TxUpdateLocalVolume(tx *sqlx.Tx, NameOrID string, size int) error {
+	_, err := tx.Exec("UPDATE tb_volumes SET size=? WHERE id=? OR name=?", size, NameOrID, NameOrID)
+
+	return err
+}
+
 func DeleteLocalVoume(IDOrName string) error {
 	db, err := GetDB(true)
 	if err != nil {
@@ -362,7 +379,8 @@ func TxDeleteVolumes(tx *sqlx.Tx, NameOrID string) error {
 
 	return err
 }
-func GetLocalVoume(NameOrID string) (LocalVolume, error) {
+
+func GetLocalVolume(NameOrID string) (LocalVolume, error) {
 	lv := LocalVolume{}
 
 	db, err := GetDB(true)

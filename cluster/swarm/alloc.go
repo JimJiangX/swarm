@@ -159,14 +159,14 @@ type preAllocResource struct {
 	pendingContainer *pendingContainer
 	swarmID          string
 	networkings      []IPInfo
-	localStore       []string
+	localStore       []database.LocalVolume
 	sanStore         []string
 }
 
 func newPreAllocResource() *preAllocResource {
 	return &preAllocResource{
 		networkings: make([]IPInfo, 0, 2),
-		localStore:  make([]string, 0, 2),
+		localStore:  make([]database.LocalVolume, 0, 2),
 		sanStore:    make([]string, 0, 2),
 	}
 }
@@ -241,9 +241,10 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 			database.TxDeleteVolumes(tx, pendings[i].unit.Unit.ID)
 		}
 
-		for _, local := range pendings[i].localStore {
-			database.TxDeleteVolumes(tx, local)
+		for _, lv := range pendings[i].localStore {
+			database.TxDeleteVolumes(tx, lv.ID)
 		}
+
 		gd.Unlock()
 		for _, lun := range pendings[i].sanStore {
 			dc, err := gd.DatacenterByNode(pendings[i].unit.Unit.EngineID)
@@ -292,7 +293,7 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 			if err != nil {
 				return err
 			}
-			penging.localStore = append(penging.localStore, lv.ID)
+			penging.localStore = append(penging.localStore, lv)
 			name = fmt.Sprintf("%s:/DBAAS%s", name, need[i].Name)
 			config.HostConfig.Binds = append(config.HostConfig.Binds, name)
 			config.HostConfig.VolumeDriver = node.localStore.Driver()
@@ -352,59 +353,156 @@ func (node *Node) localStorageAlloc(name, unitID, storageType string, size int) 
 	return lv, nil
 }
 
+type lvExpension struct {
+	lv   database.LocalVolume
+	size int
+}
+
+type pendingStoreExtend struct {
+	unit       *unit
+	localStore []lvExpension
+	sanStore   []string
+}
+
+func (gd *Gardener) cancelStoreExtend(pendings []*pendingStoreExtend) error {
+	tx, err := database.GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, pending := range pendings {
+		for _, lv := range pending.localStore {
+			lv.lv.Size -= lv.size
+			err := database.TxUpdateLocalVolume(tx, lv.lv.ID, lv.lv.Size)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+
+	gd.Lock()
+	for _, pending := range pendings {
+		for _, lun := range pending.sanStore {
+			dc, err := gd.DatacenterByNode(pending.unit.Unit.ID)
+			if err != nil || dc == nil || dc.storage == nil {
+				continue
+			}
+			dc.storage.Recycle(lun, 0)
+		}
+	}
+	gd.Unlock()
+
+	return nil
+}
+
+func (node *Node) localStorageExtend(name, storageType string, size int) (database.LocalVolume, error) {
+	lv := database.LocalVolume{}
+	if !store.IsStoreLocal(storageType) {
+		return lv, fmt.Errorf("'%s' storage type isnot '%s'", storageType, store.LocalStorePrefix)
+	}
+	if node.localStore == nil {
+		return lv, fmt.Errorf("Not Found LoaclStorage of Node %s", node.Addr)
+	}
+	part := strings.SplitN(storageType, ":", 2)
+	if len(part) == 1 {
+		part = append(part, "HDD")
+	}
+	vgName := node.engine.Labels[part[1]+"_VG"]
+	if vgName == "" {
+		return lv, fmt.Errorf("Not Found VG_Name of %s", storageType)
+	}
+
+	lv, err := node.localStore.Extend(vgName, name, size)
+
+	return lv, err
+}
+
 func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtension, task database.Task) error {
 	svc.Lock()
 	defer svc.Unlock()
 
-	pendings := make([]*preAllocResource, 0, len(need)*len(svc.units))
+	pendings, err := gd.volumesPendingExpension(svc, need)
+	if err != nil {
+		err1 := gd.cancelStoreExtend(pendings)
+		if err1 != nil {
+			err = fmt.Errorf("%s,%s", err, err1)
+		}
+		logrus.Error(err)
+
+		return err
+	}
+	if len(pendings) == 0 {
+		logrus.Info("no need doing volume extension")
+		return nil
+	}
+
+	return nil
+}
+
+func (gd *Gardener) volumesPendingExpension(svc *Service, need []structs.StorageExtension) ([]*pendingStoreExtend, error) {
+	pendings := make([]*pendingStoreExtend, 0, len(need)*len(svc.units))
 
 	for e := range need {
 		units := svc.getUnitByType(need[e].Type)
-		for _, u := range units {
-			for d := range need[e].Extensions {
-				pending := newPreAllocResource()
-				pendings = append(pendings, pending)
 
+		for _, u := range units {
+			pending := &pendingStoreExtend{
+				unit:       u,
+				localStore: make([]lvExpension, 0, 3),
+				sanStore:   make([]string, 0, 3),
+			}
+			pendings = append(pendings, pending)
+
+			for d := range need[e].Extensions {
 				dc, node, err := gd.GetNode(u.engine.ID)
 				if err != nil {
 					err := fmt.Errorf("Not Found Node %s,Error:%s", u.engine.Name, err)
 					logrus.Error(err)
-					return err
+					return pendings, err
 				}
 
 				name := fmt.Sprintf("%s_%s_LV", u.Name, need[e].Extensions[d].Name)
 
 				if store.IsStoreLocal(need[e].Extensions[d].Type) {
-					lv, err := node.localStorageAlloc(name, u.ID, need[e].Extensions[d].Type, need[e].Extensions[d].Size)
+					lv, err := node.localStorageExtend(name, need[e].Extensions[d].Type, need[e].Extensions[d].Size)
 					if err != nil {
-						return err
+						return pendings, err
 					}
-					pending.localStore = append(pending.localStore, lv.ID)
+					pending.localStore = append(pending.localStore, lvExpension{
+						lv:   lv,
+						size: need[e].Extensions[d].Size,
+					})
 					name = fmt.Sprintf("%s:/DBAAS%s", name, need[e].Extensions[d].Name)
 					continue
 				}
 
+				// TODO:fix later
 				if dc.storage == nil {
-					return fmt.Errorf("Not Found Datacenter Storage")
+					return pendings, fmt.Errorf("Not Found Datacenter Storage")
 				}
 				vgName := u.Name + "_SAN_VG"
 
 				lunID, err := dc.storage.Alloc(name, u.ID, vgName, need[e].Extensions[d].Size)
 				if err != nil {
-					return err
+					return pendings, err
 				}
 				pending.sanStore = append(pending.sanStore, lunID)
 
 				err = dc.storage.Mapping(node.ID, vgName, lunID)
 				if err != nil {
-					return err
+					return pendings, err
 				}
 				name = fmt.Sprintf("%s:/DBAAS%s", name, need[e].Extensions[d].Name)
 			}
 		}
 	}
 
-	return nil
+	return pendings, nil
 }
 
 func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpModule, pendings *[]pendingContainerUpdate) error {

@@ -248,7 +248,7 @@ func (u *unit) prepareCreateContainer() error {
 
 	for _, name := range binds {
 		parts := strings.SplitN(name, ":", 2)
-		lv, err := database.GetLocalVoume(parts[0])
+		lv, err := database.GetLocalVolume(parts[0])
 		if err != nil {
 			return err
 		}
@@ -298,7 +298,7 @@ func (u *unit) pullImage(authConfig *types.AuthConfig) error {
 }
 
 func (u *unit) createLocalDiskVolume(name string) (*cluster.Volume, error) {
-	lv, err := database.GetLocalVoume(name)
+	lv, err := database.GetLocalVolume(name)
 	if err != nil {
 		return nil, err
 	}

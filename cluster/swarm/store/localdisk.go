@@ -101,6 +101,32 @@ func (l LocalStore) Alloc(name, unit, vg string, size int) (database.LocalVolume
 	return lv, nil
 }
 
+func (l *LocalStore) Extend(vg, name string, size int) (database.LocalVolume, error) {
+	lv, err := database.GetLocalVolume(name)
+	if err != nil {
+		return lv, err
+	}
+
+	idles, err := l.IdleSize()
+	if err != nil || len(idles) == 0 {
+		return lv, err
+	}
+
+	vgsize, ok := idles[vg]
+	if !ok {
+		return lv, fmt.Errorf("doesn't get VG %s", vg)
+	}
+
+	if vgsize < size {
+		return lv, fmt.Errorf("VG %s is shortage,%d<%d", vg, vgsize, size)
+	}
+	lv.Size += size
+
+	err = database.UpdateLocalVolume(lv.ID, lv.Size)
+
+	return lv, err
+}
+
 func (LocalStore) Recycle(id string) error {
 
 	return database.DeleteLocalVoume(id)
