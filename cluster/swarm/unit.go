@@ -484,12 +484,17 @@ func (u *unit) updateVolume(lv database.LocalVolume, size int) error {
 		VgName: lv.VGName,
 		LvName: lv.Name,
 		FsType: lv.Filesystem,
-		Size:   size,
+		Size:   lv.Size,
 	}
 
 	addr := u.getPluginAddr(pluginPort)
 
-	return sdk.VolumeUpdate(addr, option)
+	err := sdk.VolumeUpdate(addr, option)
+	if err != nil {
+		logrus.Errorf("unit %s: %s volume update %s", u.Name, addr, err)
+	}
+
+	return err
 }
 
 func (u *unit) removeVolume() error {
