@@ -364,6 +364,10 @@ type pendingStoreExtend struct {
 	sanStore   []string
 }
 
+func localVolumeExtend(u *unit, lv lvExpension) error {
+	return u.updateVolume(lv.lv, lv.size)
+}
+
 func (gd *Gardener) cancelStoreExtend(pendings []*pendingStoreExtend) error {
 	tx, err := database.GetTX()
 	if err != nil {
@@ -439,6 +443,15 @@ func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtensi
 	if len(pendings) == 0 {
 		logrus.Info("no need doing volume extension")
 		return nil
+	}
+
+	for _, pending := range pendings {
+		for _, lv := range pending.localStore {
+			err := localVolumeExtend(pending.unit, lv)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil

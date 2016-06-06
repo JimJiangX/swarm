@@ -479,8 +479,17 @@ func (u *unit) createVolume() (*cluster.Volume, error) {
 	return nil, nil
 }
 
-func (u *unit) updateVolume() error {
-	return nil
+func (u *unit) updateVolume(lv database.LocalVolume, size int) error {
+	option := sdk.VolumeUpdateOption{
+		VgName: lv.VGName,
+		LvName: lv.Name,
+		FsType: lv.Filesystem,
+		Size:   size,
+	}
+
+	addr := u.getPluginAddr(pluginPort)
+
+	return sdk.VolumeUpdate(addr, option)
 }
 
 func (u *unit) removeVolume() error {

@@ -305,7 +305,7 @@ func TestLocalVolume(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lv4, err := GetLocalVoume(lv1.ID)
+	lv4, err := GetLocalVolume(lv1.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -313,7 +313,7 @@ func TestLocalVolume(t *testing.T) {
 		t.Fatal("GetLocalVoume id should be 1", lv4)
 	}
 
-	lv5, err := GetLocalVoume(lv2.Name)
+	lv5, err := GetLocalVolume(lv2.Name)
 	if err != nil {
 		t.Fatal(err)
 	}

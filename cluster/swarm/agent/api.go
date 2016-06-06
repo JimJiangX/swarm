@@ -20,7 +20,7 @@ type VolumeUpdateOption struct {
 	VgName string `json:"VgName"`
 	LvName string `json:"LvName"`
 	FsType string `json:"FsType"`
-	Size   string `json:"Size"`
+	Size   int    `json:"Size"`
 }
 
 //san.go
