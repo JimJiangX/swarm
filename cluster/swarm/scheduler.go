@@ -58,9 +58,9 @@ func (gd *Gardener) serviceScheduler() (err error) {
 		resourceAlloc := make([]*pendingAllocResource, 0, len(svc.base.Modules))
 
 		for i := range svc.base.Modules {
-			preAlloc, err := gd.BuildPendingContainersPerModule(svc, svc.base.Modules[i])
-			if len(preAlloc) > 0 {
-				resourceAlloc = append(resourceAlloc, preAlloc...)
+			pendings, err := gd.BuildPendingContainersPerModule(svc, svc.base.Modules[i])
+			if len(pendings) > 0 {
+				resourceAlloc = append(resourceAlloc, pendings...)
 			}
 			if err != nil {
 				entry.WithField("Module", svc.base.Modules[i].Name).Errorf("Alloction Failed %s", err)
@@ -84,27 +84,32 @@ func (gd *Gardener) serviceScheduler() (err error) {
 
 	failure:
 		logrus.Debugf("[MG]serviceScheduler Failed: %v", resourceAlloc)
-		err = gd.Recycle(resourceAlloc)
-		if err != nil {
-			entry.Error("Recycle Failed", err)
-		}
+		dealWithSchedulerFailure(gd, svc, resourceAlloc)
 
-		// scheduler failed
-		gd.scheduler.Lock()
-		for i := range resourceAlloc {
-			delete(gd.pendingContainers, resourceAlloc[i].swarmID)
-		}
-		gd.scheduler.Unlock()
-
-		svc.pendingContainers = make(map[string]*pendingContainer)
-		svc.units = make([]*unit, 0, 10)
-
-		svc.Service.SetServiceStatus(_StatusServiceAlloctionFailed, time.Now())
-
-		svc.Unlock()
 	}
 
 	return err
+}
+
+func dealWithSchedulerFailure(gd *Gardener, svc *Service, pendings []*pendingAllocResource) {
+	err := gd.Recycle(pendings)
+	if err != nil {
+		logrus.Error("Recycle Failed", err)
+	}
+
+	// scheduler failed
+	gd.scheduler.Lock()
+	for i := range pendings {
+		delete(gd.pendingContainers, pendings[i].swarmID)
+	}
+	gd.scheduler.Unlock()
+
+	svc.pendingContainers = make(map[string]*pendingContainer)
+	svc.units = make([]*unit, 0, 10)
+
+	svc.Service.SetServiceStatus(_StatusServiceAlloctionFailed, time.Now())
+
+	svc.Unlock()
 }
 
 func templateConfig(gd *Gardener, module structs.Module) (*cluster.ContainerConfig, error) {

@@ -173,8 +173,8 @@ func newPendingAllocResource() *pendingAllocResource {
 	}
 }
 
-func (pre *pendingAllocResource) consistency() (err error) {
-	if pre.unit == nil {
+func (pending *pendingAllocResource) consistency() (err error) {
+	if pending.unit == nil {
 		return nil
 	}
 	tx, err := database.GetTX()
@@ -183,12 +183,12 @@ func (pre *pendingAllocResource) consistency() (err error) {
 	}
 	defer tx.Rollback()
 
-	err = database.TxInsertUnit(tx, pre.unit.Unit)
+	err = database.TxInsertUnit(tx, pending.unit.Unit)
 	if err != nil {
 		return err
 	}
 
-	err = database.TxUpdatePorts(tx, pre.unit.ports)
+	err = database.TxUpdatePorts(tx, pending.unit.ports)
 	if err != nil {
 		return err
 	}
