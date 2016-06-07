@@ -15,8 +15,9 @@ import (
 	"github.com/docker/swarm/utils"
 )
 
-func (gd *Gardener) allocResource(preAlloc *preAllocResource,
-	engine *cluster.Engine, config *cluster.ContainerConfig) error {
+func (gd *Gardener) allocResource(u *unit, engine *cluster.Engine, config *cluster.ContainerConfig) (*pendingAllocResource, error) {
+	pending := newPendingAllocResource()
+	pending.unit = u
 
 	constraint := fmt.Sprintf("constraint:node==%s", engine.ID)
 	config.Env = append(config.Env, constraint)
@@ -24,39 +25,39 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource,
 	// config.Hostname = engine.ID
 	// config.Domainname = engine.Name
 
-	req := preAlloc.unit.Requirement()
+	req := u.Requirement()
 
 	if length := len(req.ports); length > 0 {
 		ports, err := database.SelectAvailablePorts(length)
 		if err != nil || len(ports) < length {
 			logrus.Errorf("Alloc Ports Error:%v", err)
 
-			return err
+			return pending, err
 		}
 
 		for i := range req.ports {
 			ports[i].Name = req.ports[i].name
 			ports[i].Proto = req.ports[i].proto
-			ports[i].UnitID = preAlloc.unit.Unit.ID
-			ports[i].UnitName = preAlloc.unit.Unit.Name
+			ports[i].UnitID = u.Unit.ID
+			ports[i].UnitName = u.Unit.Name
 			ports[i].Allocated = true
 		}
 
-		preAlloc.unit.ports = ports[0:length]
+		u.ports = ports[0:length]
 	}
 
-	portSlice := make([]string, len(preAlloc.unit.ports))
-	for i := range preAlloc.unit.ports {
-		portSlice[i] = strconv.Itoa(preAlloc.unit.ports[i].Port)
+	portSlice := make([]string, len(u.ports))
+	for i := range u.ports {
+		portSlice[i] = strconv.Itoa(u.ports[i].Port)
 	}
 	config.Env = append(config.Env, fmt.Sprintf("PORT=%s", strings.Join(portSlice, ",")))
 
-	networkings, err := gd.getNetworkingSetting(engine, preAlloc.unit.ID, req)
-	preAlloc.networkings = append(preAlloc.networkings, networkings...)
+	networkings, err := gd.getNetworkingSetting(engine, u.ID, req)
+	pending.networkings = append(pending.networkings, networkings...)
 	if err != nil {
 		logrus.Errorf("Alloc Networking Error:%s", err)
 
-		return err
+		return pending, err
 	}
 
 	for i := range networkings {
@@ -74,7 +75,7 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource,
 	if err != nil {
 		logrus.Error(err)
 
-		return err
+		return pending, err
 	}
 
 	// Alloc CPU
@@ -82,12 +83,12 @@ func (gd *Gardener) allocResource(preAlloc *preAllocResource,
 	if err != nil {
 		logrus.Errorf("Alloc CPU %d Error:%s", ncpu, err)
 
-		return err
+		return pending, err
 	}
 
 	config.HostConfig.CpusetCpus = cpuset
 
-	return nil
+	return pending, nil
 }
 
 func (gd *Gardener) allocCPUs(engine *cluster.Engine, ncpu int, reserve ...string) (string, error) {
@@ -155,7 +156,7 @@ func parseUintList(list []string) (map[int]bool, error) {
 	return ints, nil
 }
 
-type preAllocResource struct {
+type pendingAllocResource struct {
 	unit             *unit
 	pendingContainer *pendingContainer
 	swarmID          string
@@ -164,15 +165,15 @@ type preAllocResource struct {
 	sanStore         []string
 }
 
-func newPreAllocResource() *preAllocResource {
-	return &preAllocResource{
+func newPendingAllocResource() *pendingAllocResource {
+	return &pendingAllocResource{
 		networkings: make([]IPInfo, 0, 2),
 		localStore:  make([]database.LocalVolume, 0, 2),
 		sanStore:    make([]string, 0, 2),
 	}
 }
 
-func (pre *preAllocResource) consistency() (err error) {
+func (pre *pendingAllocResource) consistency() (err error) {
 	if pre.unit == nil {
 		return nil
 	}
@@ -195,7 +196,7 @@ func (pre *preAllocResource) consistency() (err error) {
 	return tx.Commit()
 }
 
-func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
+func (gd *Gardener) Recycle(pendings []*pendingAllocResource) (err error) {
 	gd.scheduler.Lock()
 	for i := range pendings {
 		if pendings[i] == nil ||
@@ -260,15 +261,15 @@ func (gd *Gardener) Recycle(pendings []*preAllocResource) (err error) {
 	return tx.Commit()
 }
 
-func (pre *preAllocResource) recycleNetworking() []database.IP {
+func (pending *pendingAllocResource) recycleNetworking() []database.IP {
 	// networking recycle
-	ips := make([]database.IP, 0, len(pre.networkings)*2)
+	ips := make([]database.IP, 0, len(pending.networkings)*2)
 
-	for i := range pre.networkings {
+	for i := range pending.networkings {
 		ips = append(ips, database.IP{
-			IPAddr:       pre.networkings[i].ipuint32,
-			Prefix:       pre.networkings[i].Prefix,
-			NetworkingID: pre.networkings[i].Networking,
+			IPAddr:       pending.networkings[i].ipuint32,
+			Prefix:       pending.networkings[i].Prefix,
+			NetworkingID: pending.networkings[i].Networking,
 			UnitID:       "",
 			Allocated:    false,
 		})
@@ -277,7 +278,7 @@ func (pre *preAllocResource) recycleNetworking() []database.IP {
 	return ips
 }
 
-func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engine, config *cluster.ContainerConfig, need []structs.DiskStorage) error {
+func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.Engine, config *cluster.ContainerConfig, need []structs.DiskStorage) error {
 	dc, node, err := gd.GetNode(engine.ID)
 	if err != nil {
 		err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
@@ -289,7 +290,7 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 	for i := range need {
 		name := fmt.Sprintf("%s_%s_LV", penging.unit.Unit.Name, need[i].Name)
 
-		if store.IsStoreLocal(need[i].Type) {
+		if store.IsLocalStore(need[i].Type) {
 			lv, err := node.localStorageAlloc(name, penging.unit.Unit.ID, need[i].Type, need[i].Size)
 			if err != nil {
 				return err
@@ -330,7 +331,7 @@ func (gd *Gardener) allocStorage(penging *preAllocResource, engine *cluster.Engi
 
 func (node *Node) localStorageAlloc(name, unitID, storageType string, size int) (database.LocalVolume, error) {
 	lv := database.LocalVolume{}
-	if !store.IsStoreLocal(storageType) {
+	if !store.IsLocalStore(storageType) {
 		return lv, fmt.Errorf("'%s' storage type isnot '%s'", storageType, store.LocalStorePrefix)
 	}
 	if node.localStore == nil {
@@ -407,7 +408,7 @@ func (gd *Gardener) cancelStoreExtend(pendings []*pendingStoreExtend) error {
 
 func (node *Node) localStorageExtend(name, storageType string, size int) (database.LocalVolume, error) {
 	lv := database.LocalVolume{}
-	if !store.IsStoreLocal(storageType) {
+	if !store.IsLocalStore(storageType) {
 		return lv, fmt.Errorf("'%s' storage type isnot '%s'", storageType, store.LocalStorePrefix)
 	}
 	if node.localStore == nil {
@@ -511,7 +512,7 @@ func (gd *Gardener) volumesPendingExpension(svc *Service, need []structs.Storage
 
 				name := fmt.Sprintf("%s_%s_LV", u.Name, need[e].Extensions[d].Name)
 
-				if store.IsStoreLocal(need[e].Extensions[d].Type) {
+				if store.IsLocalStore(need[e].Extensions[d].Type) {
 					lv, err := node.localStorageExtend(name, need[e].Extensions[d].Type, need[e].Extensions[d].Size)
 					if err != nil {
 						return pendings, err

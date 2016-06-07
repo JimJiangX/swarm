@@ -20,7 +20,7 @@ type VG struct {
 	Name   string
 }
 
-func IsStoreLocal(_type string) bool {
+func IsLocalStore(_type string) bool {
 	return strings.Contains(_type, LocalStorePrefix)
 }
 

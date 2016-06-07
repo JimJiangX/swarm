@@ -34,7 +34,7 @@ type Datacenter struct {
 }
 
 func AddNewCluster(req structs.PostClusterRequest) (database.Cluster, error) {
-	if store.IsStoreLocal(req.StorageType) && req.StorageID != "" {
+	if store.IsLocalStore(req.StorageType) && req.StorageID != "" {
 		req.StorageID = ""
 	}
 
@@ -534,7 +534,7 @@ func (dc *Datacenter) isIdleStoreEnough(IDOrType string, num, size int) bool {
 		enough += idles[i] / size
 	}
 
-	return enough >= num
+	return enough > num
 }
 
 func (dc *Datacenter) getStore(IDOrType string) store.Store {
@@ -597,7 +597,7 @@ func (gd *Gardener) rebuildDatacenter(NameOrID string) (*Datacenter, error) {
 	}
 
 	var storage store.Store
-	if !store.IsStoreLocal(cl.StorageType) && cl.StorageID != "" {
+	if !store.IsLocalStore(cl.StorageType) && cl.StorageID != "" {
 		storage, err = gd.GetStore(cl.StorageID)
 		if err != nil {
 			return nil, err
@@ -684,7 +684,7 @@ func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType s
 					(!node.engine.IsHealthy() ||
 						len(node.engine.Containers()) >= node.MaxContainer)) {
 
-				out = append(out, node.ID)
+				out = append(out, node.ID, node.EngineID)
 				continue
 			}
 		}
@@ -697,23 +697,23 @@ func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType s
 				}
 			}
 
-			if !store.IsStoreLocal(v.Type) {
+			if !store.IsLocalStore(v.Type) {
 				continue
 			}
 			for _, node := range dc.nodes {
 				if node.localStore == nil {
-					out = append(out, node.ID)
+					out = append(out, node.ID, node.EngineID)
 					continue
 				}
 
 				idle, err := node.localStore.IdleSize()
 				if err != nil {
-					out = append(out, node.ID)
+					out = append(out, node.ID, node.EngineID)
 					continue
 				}
 
 				if idle[v.Type] < v.Size {
-					out = append(out, node.ID)
+					out = append(out, node.ID, node.EngineID)
 					continue
 				}
 			}

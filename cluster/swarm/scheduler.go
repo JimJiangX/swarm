@@ -55,10 +55,10 @@ func (gd *Gardener) serviceScheduler() (err error) {
 
 		svc.Lock()
 
-		resourceAlloc := make([]*preAllocResource, 0, len(svc.base.Modules))
+		resourceAlloc := make([]*pendingAllocResource, 0, len(svc.base.Modules))
 
 		for i := range svc.base.Modules {
-			preAlloc, err := gd.BuildPendingContainersPerModule(svc, &svc.base.Modules[i])
+			preAlloc, err := gd.BuildPendingContainersPerModule(svc, svc.base.Modules[i])
 			if len(preAlloc) > 0 {
 				resourceAlloc = append(resourceAlloc, preAlloc...)
 			}
@@ -107,28 +107,17 @@ func (gd *Gardener) serviceScheduler() (err error) {
 	return err
 }
 
-func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module *structs.Module) ([]*preAllocResource, error) {
-	entry := logrus.WithFields(logrus.Fields{
-		"svcName": svc.Name,
-		"Module":  module.Type,
-	})
+func templateConfig(gd *Gardener, module structs.Module) (*cluster.ContainerConfig, error) {
 
 	config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
 	config = buildContainerConfig(config)
 
 	if err := validateContainerConfig(config); err != nil {
-		entry.Warnf("Container Config Validate:%s", err)
+		logrus.Warnf("Container Config Validate:%s", err)
 
 		return nil, err
 	}
-	entry.Infof("Build Container Config,Validate OK:%+v", config)
-
-	_, num, err := getServiceArch(module.Arch)
-	if err != nil {
-		entry.Errorf("Parse Module.Arch:%s,Error:%v", module.Arch, err)
-
-		return nil, err
-	}
+	logrus.Infof("Build Container Config,Validate OK:%+v", config)
 
 	image, imageID_Label, err := gd.GetImageName(module.Config.Image, module.Name, module.Version)
 	if err != nil {
@@ -137,93 +126,74 @@ func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module *struct
 	config.Config.Image = image
 	config.Config.Labels[_ImageIDInRegistryLabelKey] = imageID_Label
 
-	// TODO:maybe remove
-	tag := module.Type
-	if module.Type == _SwitchManagerType {
-		tag = _ProxyType
-	}
-	filters := gd.listShortIdleStore(module.Stores, tag, num)
-	logrus.Debugf("[MG] %s,%s,%s:first filters of storage:%s", module.Stores, module.Type, num, filters)
+	return config, nil
+}
 
-	list := gd.listCandidateNodes(module.Nodes, tag, filters...)
-	logrus.Debugf("[MG] now listCandidateNodes result:%v ", list)
+func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module structs.Module) ([]*pendingAllocResource, error) {
+	entry := logrus.WithFields(logrus.Fields{
+		"svcName": svc.Name,
+		"Module":  module.Type,
+	})
 
-	entry.Debugf("filters num:%d,candidate nodes num:%d", len(filters), len(list))
-
-	if len(list) < num {
-		err := fmt.Errorf("Not Enough Candidate Nodes For Allocation,%d<%d", len(list), num)
-		entry.Warn(err)
+	_, num, err := getServiceArch(module.Arch)
+	if err != nil {
+		entry.Errorf("Parse Module.Arch:%s,Error:%v", module.Arch, err)
 
 		return nil, err
 	}
 
-	return gd.BuildPendingContainers(list, svc, module.Type, num, module.Stores, config, false)
-}
+	// TODO:maybe remove
+	_type := module.Type
+	if _type == _SwitchManagerType {
+		_type = _ProxyType
+	}
 
-func (gd *Gardener) BuildPendingContainers(list []*node.Node, svc *Service, Type string, num int, stores []structs.DiskStorage,
-	config *cluster.ContainerConfig, withImageAffinity bool) ([]*preAllocResource, error) {
+	filters := gd.listShortIdleStore(module.Stores, _type, num)
+	logrus.Debugf("[MG] %s,%s,%s:first filters of storage:%s", module.Stores, module.Type, num, filters)
 
-	entry := logrus.WithFields(logrus.Fields{"Name": svc.Name, "Module": Type})
+	config, err := templateConfig(gd, module)
+	if err != nil {
+		return nil, err
+	}
 
 	highAvaliable := svc.HighAvailable
-	for i := range stores {
-		if !store.IsStoreLocal(stores[i].Type) {
+	for i := range module.Stores {
+		if !store.IsLocalStore(module.Stores[i].Type) {
 			highAvaliable = true
 		}
 	}
+
 	gd.scheduler.Lock()
 	defer gd.scheduler.Unlock()
 
-	candidates, err := gd.Scheduler(list, config, num, withImageAffinity, highAvaliable)
+	candidates, err := gd.Scheduler(config, _type, num, module.Candidates, filters, false, highAvaliable)
 	if err != nil {
-		entry.Warnf("Failed to scheduler: %s", err)
-
-		var retries int64
-		//  fails with image not found, then try to reschedule with image affinity
-		bImageNotFoundError, _ := regexp.MatchString(`image \S* not found`, err.Error())
-		if bImageNotFoundError && !config.HaveNodeConstraint() {
-			// Check if the image exists in the cluster
-			// If exists, retry with a image affinity
-			if gd.Image(config.Image) != nil {
-				candidates, err = gd.Scheduler(list, config, num, true, highAvaliable)
-				retries++
-			}
-		}
-
-		for ; retries < gd.createRetry && err != nil; retries++ {
-			entry.Warnf("Failed to scheduler: %s, retrying", err)
-			candidates, err = gd.Scheduler(list, config, num, true, highAvaliable)
-		}
-	}
-
-	if err != nil {
-		entry.Warnf("Failed to scheduler: %s", err)
-
 		return nil, err
 	}
 
-	if len(candidates) < num {
-		err := fmt.Errorf("Not Enough Match Condition Nodes After Retries,%d<%d", len(candidates), num)
-		entry.Error(err)
+	return gd.BuildPendingContainers(svc, module.Type, candidates, module.Stores, config)
+}
 
-		return nil, err
-	}
+func (gd *Gardener) BuildPendingContainers(svc *Service, _type string, candidates []*node.Node,
+	stores []structs.DiskStorage, config *cluster.ContainerConfig) ([]*pendingAllocResource, error) {
 
-	preAllocs, err := gd.pendingAlloc(candidates[0:num], svc, Type, stores, config)
+	entry := logrus.WithFields(logrus.Fields{"Name": svc.Name, "Module": _type})
+
+	pendings, err := gd.pendingAlloc(candidates, svc.ID, svc.Name, _type, stores, config)
 	if err != nil {
-		entry.Errorf("gd.pendingAlloc: preAllocs Allocation Failed %s", err)
-		return preAllocs, err
+		entry.Errorf("gd.pendingAlloc: pendings Allocation Failed %s", err)
+		return pendings, err
 	}
 
 	entry.Info("gd.pendingAlloc: Allocation Succeed!")
 
-	return preAllocs, nil
+	return pendings, nil
 }
 
-func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type string, stores []structs.DiskStorage,
-	templConfig *cluster.ContainerConfig) ([]*preAllocResource, error) {
+func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type string,
+	stores []structs.DiskStorage, templConfig *cluster.ContainerConfig) ([]*pendingAllocResource, error) {
 
-	entry := logrus.WithFields(logrus.Fields{"Name": svc.Name, "Module": Type})
+	entry := logrus.WithFields(logrus.Fields{"Name": svcName, "Module": _type})
 
 	imageID, ok := templConfig.Labels[_ImageIDInRegistryLabelKey]
 	if !ok || imageID == "" {
@@ -242,7 +212,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type str
 		return nil, err
 	}
 
-	allocs := make([]*preAllocResource, 0, 5)
+	allocs := make([]*pendingAllocResource, 0, 5)
 
 	for i := range candidates {
 		config := cloneContainerConfig(templConfig)
@@ -259,9 +229,9 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type str
 		unit := &unit{
 			Unit: database.Unit{
 				ID:            id,
-				Name:          string(id[:8]) + "_" + svc.Name,
-				Type:          Type,
-				ServiceID:     svc.ID,
+				Name:          string(id[:8]) + "_" + svcName,
+				Type:          _type,
+				ServiceID:     svcID,
 				ImageID:       image.ID,
 				ImageName:     image.Name + "_" + image.Version,
 				EngineID:      engine.ID,
@@ -297,64 +267,110 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svc *Service, Type str
 }
 
 func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit,
-	stores []structs.DiskStorage, config *cluster.ContainerConfig) (*preAllocResource, error) {
-
-	preAlloc := newPreAllocResource()
-	preAlloc.unit = unit
+	stores []structs.DiskStorage, config *cluster.ContainerConfig) (*pendingAllocResource, error) {
 
 	entry := logrus.WithFields(logrus.Fields{
 		"Engine": engine.Name,
 		"Unit":   unit.Name,
 	})
 
-	err := gd.allocResource(preAlloc, engine, config)
+	pending, err := gd.allocResource(unit, engine, config)
 	if err != nil {
 		err = fmt.Errorf("Alloc Resource Error:%s", err)
 		entry.Error(err)
 
-		return preAlloc, err
+		return pending, err
+	}
+
+	err = gd.allocStorage(pending, engine, config, stores)
+	if err != nil {
+		entry.Errorf("Alloc Storage Error:%s", err)
+
+		return pending, err
 	}
 
 	config.Env = append(config.Env, fmt.Sprintf("C_NAME=%s", unit.Name))
 	config.Labels["unit_id"] = unit.ID
-
-	preAlloc.unit.config = config
-
-	err = gd.allocStorage(preAlloc, engine, config, stores)
-	if err != nil {
-		entry.Errorf("Alloc Storage Error:%s", err)
-
-		return preAlloc, err
-	}
-
 	swarmID := config.SwarmID()
 	if swarmID == "" {
 		// Associate a Swarm ID to the container we are creating.
 		swarmID = gd.generateUniqueID()
 		config.SetSwarmID(swarmID)
 	} else {
-		logrus.Warnf("ContainerConfig.SwarmID() Should be null bug got %s", swarmID)
+		logrus.Errorf("ContainerConfig.SwarmID() Should be null but got %s", swarmID)
 	}
 
-	preAlloc.swarmID = swarmID
-	preAlloc.pendingContainer = &pendingContainer{
+	pending.unit.config = config
+	pending.swarmID = swarmID
+	pending.pendingContainer = &pendingContainer{
 		Name:   unit.Name,
 		Config: config,
 		Engine: engine,
 	}
-	preAlloc.unit.networkings = preAlloc.networkings
+	pending.unit.networkings = pending.networkings
 
-	gd.pendingContainers[swarmID] = preAlloc.pendingContainer
+	gd.pendingContainers[swarmID] = pending.pendingContainer
 
-	err = preAlloc.consistency()
+	err = pending.consistency()
 	if err != nil {
 		entry.Errorf("Pending Allocation Resouces,Consistency Error:%s", err)
 	}
 
-	return preAlloc, err
+	return pending, err
 }
 
-func (gd *Gardener) Scheduler(list []*node.Node, config *cluster.ContainerConfig, num int, withImageAffinity, highAvaliable bool) ([]*node.Node, error) {
+func (gd *Gardener) Scheduler(config *cluster.ContainerConfig,
+	_type string, num int, nodes, filters []string,
+	withImageAffinity, highAvaliable bool) ([]*node.Node, error) {
+
+	list := gd.listCandidateNodes(nodes, _type, filters...)
+	logrus.Debugf("filters num:%d,candidate nodes num:%d", len(filters), len(list))
+
+	if len(list) < num {
+		err := fmt.Errorf("Not Enough Candidate Nodes For Allocation,%d<%d", len(list), num)
+		logrus.Warn(err)
+
+		return nil, err
+	}
+
+	candidates, err := gd.runScheduler(list, config, num, withImageAffinity, highAvaliable)
+	if err != nil {
+		logrus.Warnf("Failed to scheduler: %s", err)
+
+		var retries int64
+		//  fails with image not found, then try to reschedule with image affinity
+		bImageNotFoundError, _ := regexp.MatchString(`image \S* not found`, err.Error())
+		if bImageNotFoundError && !config.HaveNodeConstraint() {
+			// Check if the image exists in the cluster
+			// If exists, retry with a image affinity
+			if gd.Image(config.Image) != nil {
+				candidates, err = gd.runScheduler(list, config, num, true, highAvaliable)
+				retries++
+			}
+		}
+
+		for ; retries < gd.createRetry && err != nil; retries++ {
+			logrus.Warnf("Failed to scheduler: %s, retrying", err)
+			candidates, err = gd.runScheduler(list, config, num, true, highAvaliable)
+		}
+	}
+	if err != nil {
+		logrus.Warnf("Failed to scheduler: %s", err)
+
+		return nil, err
+	}
+
+	if len(candidates) < num {
+		err := fmt.Errorf("Not Enough Match Condition Nodes After Retries,%d<%d", len(candidates), num)
+		logrus.Error(err)
+
+		return nil, err
+	}
+
+	return candidates, nil
+}
+
+func (gd *Gardener) runScheduler(list []*node.Node, config *cluster.ContainerConfig, num int, withImageAffinity, highAvaliable bool) ([]*node.Node, error) {
 	if network := gd.Networks().Get(string(config.HostConfig.NetworkMode)); network != nil && network.Scope == "local" {
 		if !config.HaveNodeConstraint() {
 			config.AddConstraint("node==~" + network.Engine.Name)
@@ -382,15 +398,15 @@ func (gd *Gardener) Scheduler(list []*node.Node, config *cluster.ContainerConfig
 }
 
 // listCandidateNodes returns all validated engines in the cluster, excluding pendingEngines.
-func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...string) []*node.Node {
+func (gd *Gardener) listCandidateNodes(candidates []string, _type string, filters ...string) []*node.Node {
 	gd.RLock()
 	defer gd.RUnlock()
 
 	out := make([]*node.Node, 0, len(gd.engines))
 
-	if len(names) == 0 {
+	if len(candidates) == 0 {
 
-		list, err := database.ListNodeByClusterType(dcTag, true)
+		list, err := database.ListNodeByClusterType(_type, true)
 		if err != nil {
 			logrus.Errorf("Search in Database Error: %s", err)
 
@@ -413,11 +429,11 @@ func (gd *Gardener) listCandidateNodes(names []string, dcTag string, filters ...
 
 	} else {
 
-		logrus.Debugf("Candidates From Assigned %s", names)
+		logrus.Debugf("Candidates From Assigned %s", candidates)
 
-		for _, name := range names {
+		for i := range candidates {
 
-			node := gd.checkNode(name, filters)
+			node := gd.checkNode(candidates[i], filters)
 			if node != nil {
 				out = append(out, node)
 			}

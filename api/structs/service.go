@@ -36,7 +36,7 @@ type Module struct {
 	Version    string
 	Type       string                 // upsql\upproxy\sm
 	Arch       string                 `json:"arch"`
-	Nodes      []string               `json:",omitempty"`
+	Candidates []string               `json:",omitempty"`
 	Stores     []DiskStorage          `json:",omitempty"`
 	Configures map[string]interface{} `json:",omitempty"`
 
@@ -120,4 +120,8 @@ func (req *PostServiceRequest) UpdateModuleStore(list []StorageExtension) {
 type StorageExtension struct {
 	Type       string
 	Extensions []DiskStorage
+}
+
+type Candidates struct {
+	Candidates []string
 }

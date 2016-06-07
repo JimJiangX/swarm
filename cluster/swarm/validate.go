@@ -79,7 +79,7 @@ func ValidDatacenter(req structs.PostClusterRequest) string {
 		warnings = append(warnings, fmt.Sprintf("Unsupported '%s' Yet", req.StorageType))
 	}
 
-	if !store.IsStoreLocal(req.StorageType) && req.StorageID == "" {
+	if !store.IsLocalStore(req.StorageType) && req.StorageID == "" {
 		warnings = append(warnings, "missing 'StorageID' while 'StorageType' isnot 'local'")
 	}
 

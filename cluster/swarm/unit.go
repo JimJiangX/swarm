@@ -361,7 +361,7 @@ func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
 		return err
 	}
 
-	return client.ContainerUpdate(context.TODO(), u.container.ID, updateConfig)
+	return client.ContainerUpdate(context.Background(), u.container.ID, updateConfig)
 }
 
 func (u *unit) removeContainer(force, rmVolumes bool) error {
@@ -410,7 +410,7 @@ func (u *unit) stopContainer(timeout int) error {
 		return err
 	}
 
-	return client.ContainerStop(context.TODO(), u.Unit.ContainerID, timeout)
+	return client.ContainerStop(context.Background(), u.Unit.ContainerID, timeout)
 }
 
 func (u *unit) restartContainer(timeout int) error {
@@ -428,7 +428,7 @@ func (u *unit) restartContainer(timeout int) error {
 		return errEngineAPIisNil
 	}
 
-	return client.ContainerRestart(context.TODO(), u.Unit.ContainerID, timeout)
+	return client.ContainerRestart(context.Background(), u.Unit.ContainerID, timeout)
 }
 
 func (u *unit) renameContainer(name string) error {
@@ -437,7 +437,7 @@ func (u *unit) renameContainer(name string) error {
 		return err
 	}
 
-	return client.ContainerRename(context.TODO(), u.container.ID, u.Unit.ID)
+	return client.ContainerRename(context.Background(), u.container.ID, u.Unit.ID)
 }
 
 func (u *unit) createNetworking() error {

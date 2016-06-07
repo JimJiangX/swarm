@@ -1060,7 +1060,28 @@ func postUnitRecover(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
 // POST /units/{name:.*}/rebuild
-func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	req := structs.Candidates{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.UnitRebuild(name, req.Candidates)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
 
 // POST /units/{name:.*}/isolate
 func postUnitIsolate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}

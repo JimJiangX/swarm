@@ -49,7 +49,7 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 		execConfig.AttachStdout = false
 	}
 
-	exec, err := client.ContainerExecCreate(context.TODO(), containerID, execConfig)
+	exec, err := client.ContainerExecCreate(context.Background(), containerID, execConfig)
 	if err != nil {
 		return inspect, err
 	}
