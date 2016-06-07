@@ -197,6 +197,18 @@ func GetTask(id string) (*Task, error) {
 	return t, err
 }
 
+func ListTask() ([]Task, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	list := make([]Task, 0, 50)
+	err = db.Select(&list, "SELECT * FROM tb_task")
+
+	return list, err
+}
+
 func ListTaskByStatus(status int) ([]Task, error) {
 	db, err := GetDB(true)
 	if err != nil {

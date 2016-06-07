@@ -407,6 +407,7 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	var tasks []database.Task
+	withCondition := false
 	if v, ok := r.Form["status"]; ok {
 		if len(v) == 0 {
 			httpError(w, r.URL.String(), http.StatusBadRequest)
@@ -419,6 +420,7 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		tasks, err = database.ListTaskByStatus(status)
+		withCondition = true
 	}
 
 	if key, ok := r.Form["key"]; ok {
@@ -427,6 +429,10 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		tasks, err = database.ListTaskByRelated(key[0])
+		withCondition = true
+	}
+	if err == nil && !withCondition {
+		tasks, err = database.ListTask()
 	}
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
