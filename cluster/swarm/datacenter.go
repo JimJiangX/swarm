@@ -450,10 +450,16 @@ func (gd *Gardener) RemoveNode(NameOrID, user, password string) error {
 		return fmt.Errorf("Count Unit ByNode,%v,count:%d", err, count)
 	}
 
-	// ssh exec clean script
-	err = nodeClean(node.ID, node.Addr, user, password)
+	sys, err := database.GetSystemConfig()
 	if err != nil {
-		logrus.Error("clean script exec error:%s", err)
+		logrus.Errorf("GetSystemConfig error:%s", err)
+		return err
+	}
+	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
+	endpoint := deregisterService{Endpoint: node.ID}
+	err = deregisterToHorus(horus, []deregisterService{endpoint})
+	if err != nil {
+		logrus.Errorf("Node %s:%s deregisterToHorus error:%s", node.Name, node.Addr, err)
 		return err
 	}
 
@@ -467,19 +473,19 @@ func (gd *Gardener) RemoveNode(NameOrID, user, password string) error {
 		return err
 	}
 
-	sys, err := database.GetSystemConfig()
+	err = dc.RemoveNode(NameOrID)
 	if err != nil {
-		logrus.Errorf("GetSystemConfig error:%s", err)
 		return err
 	}
-	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-	endpoint := deregisterService{Endpoint: node.ID}
-	err = deregisterToHorus(horus, []deregisterService{endpoint})
+
+	// ssh exec clean script
+	err = nodeClean(node.ID, node.Addr, user, password)
 	if err != nil {
-		logrus.Errorf("Node %s:%s deregisterToHorus error:%s", node.Name, node.Addr, err)
+		logrus.Error("clean script exec error:%s", err)
+		return err
 	}
 
-	return dc.RemoveNode(NameOrID)
+	return nil
 }
 
 func (gd *Gardener) RemoveDatacenter(NameOrID string) error {

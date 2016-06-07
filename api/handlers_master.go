@@ -1116,6 +1116,12 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err := swarm.ValidateIPAddress(req.Prefix, req.Start, req.End, req.Gateway)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)

@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
@@ -274,4 +275,25 @@ func ValidServiceStorageExtension(svc *Service, list []structs.StorageExtension)
 	}
 
 	return fmt.Errorf("Warnings:%s", warns)
+}
+
+func ValidateIPAddress(prefix int, addrs ...string) error {
+	warns := make([]string, 0, len(addrs))
+
+	if prefix < 1 || prefix > 31 {
+		warns = append(warns, fmt.Sprintf("'%d' is out of range 1~32"))
+	}
+
+	for i := range addrs {
+		ip := net.ParseIP(addrs[i])
+		if ip == nil {
+			warns = append(warns, fmt.Sprintf("'%s' isnot an IP", addrs[i]))
+		}
+	}
+
+	if len(warns) > 0 {
+		return fmt.Errorf("errors:%s", warns)
+	}
+
+	return nil
 }
