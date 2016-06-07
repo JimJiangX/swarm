@@ -312,7 +312,6 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit,
 		Config: config,
 		Engine: engine,
 	}
-	pending.unit.networkings = pending.networkings
 
 	gd.pendingContainers[swarmID] = pending.pendingContainer
 

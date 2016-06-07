@@ -40,6 +40,7 @@ func (gd *Gardener) allocResource(u *unit, engine *cluster.Engine, config *clust
 		logrus.Errorf("alloc networkings error:%s", err)
 		return pending, err
 	}
+	u.networkings = networkings
 
 	ncpu, err := parseCpuset(config.HostConfig.CpusetCpus)
 	if err != nil {
@@ -47,15 +48,12 @@ func (gd *Gardener) allocResource(u *unit, engine *cluster.Engine, config *clust
 
 		return pending, err
 	}
-
 	// Alloc CPU
 	cpuset, err := gd.allocCPUs(engine, ncpu)
 	if err != nil {
 		logrus.Errorf("Alloc CPU %d Error:%s", ncpu, err)
-
 		return pending, err
 	}
-
 	config.HostConfig.CpusetCpus = cpuset
 
 	return pending, nil
@@ -379,22 +377,22 @@ func (node *Node) localStorageAlloc(name, unitID, storageType string, size int) 
 	return lv, nil
 }
 
-type lvExpension struct {
+type localVolume struct {
 	lv   database.LocalVolume
 	size int
 }
 
-type pendingStoreExtend struct {
+type pendingAllocStore struct {
 	unit       *unit
-	localStore []lvExpension
+	localStore []localVolume
 	sanStore   []string
 }
 
-func localVolumeExtend(u *unit, lv lvExpension) error {
+func localVolumeExtend(u *unit, lv localVolume) error {
 	return u.updateVolume(lv.lv, lv.size)
 }
 
-func (gd *Gardener) cancelStoreExtend(pendings []*pendingStoreExtend) error {
+func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
 	tx, err := database.GetTX()
 	if err != nil {
 		return err
@@ -453,7 +451,7 @@ func (node *Node) localStorageExtend(name, storageType string, size int) (databa
 }
 
 func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtension, task database.Task) (err error) {
-	var pendings []*pendingStoreExtend
+	var pendings []*pendingAllocStore
 	svc.Lock()
 	defer func() {
 		if r := recover(); r != nil {
@@ -512,16 +510,16 @@ func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtensi
 	return nil
 }
 
-func (gd *Gardener) volumesPendingExpension(svc *Service, need []structs.StorageExtension) ([]*pendingStoreExtend, error) {
-	pendings := make([]*pendingStoreExtend, 0, len(need)*len(svc.units))
+func (gd *Gardener) volumesPendingExpension(svc *Service, need []structs.StorageExtension) ([]*pendingAllocStore, error) {
+	pendings := make([]*pendingAllocStore, 0, len(need)*len(svc.units))
 
 	for e := range need {
 		units := svc.getUnitByType(need[e].Type)
 
 		for _, u := range units {
-			pending := &pendingStoreExtend{
+			pending := &pendingAllocStore{
 				unit:       u,
-				localStore: make([]lvExpension, 0, 3),
+				localStore: make([]localVolume, 0, 3),
 				sanStore:   make([]string, 0, 3),
 			}
 			pendings = append(pendings, pending)
@@ -541,7 +539,7 @@ func (gd *Gardener) volumesPendingExpension(svc *Service, need []structs.Storage
 					if err != nil {
 						return pendings, err
 					}
-					pending.localStore = append(pending.localStore, lvExpension{
+					pending.localStore = append(pending.localStore, localVolume{
 						lv:   lv,
 						size: need[e].Extensions[d].Size,
 					})

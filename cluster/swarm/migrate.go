@@ -8,7 +8,7 @@ import (
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/docker/swarm/scheduler/node"
+	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/utils"
 )
 
@@ -55,15 +55,62 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string) error {
 		return err
 	}
 
-	node, err := selectNode(gd, config, module, candidates, filters)
-	if err != nil || node == nil {
+	engine, err := gd.selectEngine(config, module, candidates, filters)
+	if err != nil {
 		return err
+	}
+
+	ncpu, err := parseCpuset(config.HostConfig.CpusetCpus)
+	if err != nil {
+		return err
+	}
+	cpuset, err := gd.allocCPUs(engine, ncpu)
+	if err != nil {
+		logrus.Errorf("Alloc CPU %d Error:%s", ncpu, err)
+		return err
+	}
+	config.HostConfig.CpusetCpus = cpuset
+
+	_, node, err := gd.GetNode(engine.ID)
+	if err != nil {
+		err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
+		logrus.Error(err)
+
+		return err
+	}
+
+	pending := pendingAllocStore{
+		localStore: make([]localVolume, 0, len(module.Stores)),
+		sanStore:   make([]string, 0, 3),
+	}
+	for i := range module.Stores {
+		name := fmt.Sprintf("%s_%s_LV", u.Unit.Name, module.Stores[i].Name)
+
+		if !store.IsLocalStore(module.Stores[i].Type) {
+			continue
+		}
+		lv, err := node.localStorageAlloc(name, u.Unit.ID, module.Stores[i].Type, module.Stores[i].Size)
+		if err != nil {
+			return err
+		}
+		pending.localStore = append(pending.localStore, localVolume{
+			lv:   lv,
+			size: module.Stores[i].Size,
+		})
+	}
+
+	swarmID := gd.generateUniqueID()
+	config.SetSwarmID(swarmID)
+	gd.pendingContainers[swarmID] = &pendingContainer{
+		Name:   swarmID,
+		Config: config,
+		Engine: engine,
 	}
 
 	return nil
 }
 
-func selectNode(gd *Gardener, config *cluster.ContainerConfig, module structs.Module, list, exclude []string) (*node.Node, error) {
+func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs.Module, list, exclude []string) (*cluster.Engine, error) {
 	entry := logrus.WithFields(logrus.Fields{"Module": module.Type})
 
 	num, _type := 1, module.Type
@@ -80,7 +127,14 @@ func selectNode(gd *Gardener, config *cluster.ContainerConfig, module structs.Mo
 		return nil, err
 	}
 
-	return candidates[0], nil
+	engine, ok := gd.engines[candidates[0].ID]
+	if !ok {
+		err = fmt.Errorf("Not Found Engine %s", candidates[0].ID)
+		logrus.Error(err)
+		return nil, err
+	}
+
+	return engine, nil
 }
 
 func resetContainerConfig(config *cluster.ContainerConfig) (*cluster.ContainerConfig, error) {
