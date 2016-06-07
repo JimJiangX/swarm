@@ -28,7 +28,6 @@ dereg_to_consul() {
 	stat_code=`curl -o /dev/null -s -w %{http_code} -X POST -H "Content-Type: application/json" http://${adm_ip}:${consul_port}/v1/agent/service/deregister/${node_id}':'${component_type}`
 	if [ ${stat_code} != "200" ]; then
 		echo "${component_type} deregister to consul failed"
-		exit 2
 	fi
 }
 
