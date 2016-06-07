@@ -19,59 +19,29 @@ func (gd *Gardener) allocResource(u *unit, engine *cluster.Engine, config *clust
 	pending := newPendingAllocResource()
 	pending.unit = u
 
-	constraint := fmt.Sprintf("constraint:node==%s", engine.ID)
-	config.Env = append(config.Env, constraint)
+	// constraint := fmt.Sprintf("constraint:node==%s", engine.ID)
+	// config.Env = append(config.Env, constraint)
 	// conflicting options:hostname and the network mode
 	// config.Hostname = engine.ID
 	// config.Domainname = engine.Name
 
 	req := u.Requirement()
 
-	if length := len(req.ports); length > 0 {
-		ports, err := database.SelectAvailablePorts(length)
-		if err != nil || len(ports) < length {
-			logrus.Errorf("Alloc Ports Error:%v", err)
-
-			return pending, err
-		}
-
-		for i := range req.ports {
-			ports[i].Name = req.ports[i].name
-			ports[i].Proto = req.ports[i].proto
-			ports[i].UnitID = u.Unit.ID
-			ports[i].UnitName = u.Unit.Name
-			ports[i].Allocated = true
-		}
-
-		u.ports = ports[0:length]
-	}
-
-	portSlice := make([]string, len(u.ports))
-	for i := range u.ports {
-		portSlice[i] = strconv.Itoa(u.ports[i].Port)
-	}
-	config.Env = append(config.Env, fmt.Sprintf("PORT=%s", strings.Join(portSlice, ",")))
-
-	networkings, err := gd.getNetworkingSetting(engine, u.ID, req)
-	pending.networkings = append(pending.networkings, networkings...)
+	err := allocPorts(req.ports, u, config)
+	pending.ports = u.ports
 	if err != nil {
-		logrus.Errorf("Alloc Networking Error:%s", err)
-
+		logrus.Errorf("alloc ports error:%s,%v", err, req.ports)
 		return pending, err
 	}
 
-	for i := range networkings {
-		if networkings[i].Type == _ContainersNetworking {
-			ip := networkings[i].IP.String()
-			config.Env = append(config.Env, fmt.Sprintf("IPADDR=%s", ip))
-			config.Labels["container_ip"] = ip
-			config.Labels[_NetworkingLabelKey] = networkings[i].String()
-		} else if networkings[i].Type == _ExternalAccessNetworking {
-			config.Labels[_ProxyNetworkingLabelKey] = networkings[i].String()
-		}
+	networkings, err := gd.allocNetworkings(u.ID, engine, req.networkings, config)
+	pending.networkings = append(pending.networkings, networkings...)
+	if err != nil {
+		logrus.Errorf("alloc networkings error:%s", err)
+		return pending, err
 	}
 
-	ncpu, err := parseCpuset(config)
+	ncpu, err := parseCpuset(config.HostConfig.CpusetCpus)
 	if err != nil {
 		logrus.Error(err)
 
@@ -89,6 +59,61 @@ func (gd *Gardener) allocResource(u *unit, engine *cluster.Engine, config *clust
 	config.HostConfig.CpusetCpus = cpuset
 
 	return pending, nil
+}
+
+// unit == unit.ID
+func (gd *Gardener) allocNetworkings(unit string, engine *cluster.Engine,
+	req []netRequire, config *cluster.ContainerConfig) ([]IPInfo, error) {
+
+	networkings, err := gd.getNetworkingSetting(engine, unit, req)
+	if err != nil {
+		logrus.Errorf("Alloc Networking Error:%s", err)
+
+		return networkings, err
+	}
+
+	for i := range networkings {
+		if networkings[i].Type == _ContainersNetworking {
+			ip := networkings[i].IP.String()
+			config.Env = append(config.Env, fmt.Sprintf("IPADDR=%s", ip))
+			config.Labels["container_ip"] = ip
+			config.Labels[_NetworkingLabelKey] = networkings[i].String()
+		} else if networkings[i].Type == _ExternalAccessNetworking {
+			config.Labels[_ProxyNetworkingLabelKey] = networkings[i].String()
+		}
+	}
+
+	return networkings, nil
+}
+
+func allocPorts(need []port, u *unit, config *cluster.ContainerConfig) error {
+	if length := len(need); length > 0 {
+		ports, err := database.SelectAvailablePorts(length)
+		if err != nil || len(ports) < length {
+			logrus.Errorf("Alloc Ports Error:%v", err)
+
+			return err
+		}
+
+		for i := range need {
+			ports[i].Name = need[i].name
+			ports[i].Proto = need[i].proto
+			ports[i].UnitID = u.Unit.ID
+			ports[i].UnitName = u.Unit.Name
+			ports[i].Allocated = true
+		}
+
+		u.ports = ports[0:length]
+	}
+
+	portSlice := make([]string, len(u.ports))
+	for i := range u.ports {
+		portSlice[i] = strconv.Itoa(u.ports[i].Port)
+	}
+
+	config.Env = append(config.Env, fmt.Sprintf("PORT=%s", strings.Join(portSlice, ",")))
+
+	return nil
 }
 
 func (gd *Gardener) allocCPUs(engine *cluster.Engine, ncpu int, reserve ...string) (string, error) {
@@ -160,6 +185,7 @@ type pendingAllocResource struct {
 	unit             *unit
 	pendingContainer *pendingContainer
 	swarmID          string
+	ports            []database.Port
 	networkings      []IPInfo
 	localStore       []database.LocalVolume
 	sanStore         []string
@@ -174,21 +200,19 @@ func newPendingAllocResource() *pendingAllocResource {
 }
 
 func (pending *pendingAllocResource) consistency() (err error) {
-	if pending.unit == nil {
-		return nil
-	}
 	tx, err := database.GetTX()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	err = database.TxInsertUnit(tx, pending.unit.Unit)
-	if err != nil {
-		return err
+	if pending.unit != nil {
+		err = database.TxInsertUnit(tx, pending.unit.Unit)
+		if err != nil {
+			return err
+		}
 	}
-
-	err = database.TxUpdatePorts(tx, pending.unit.ports)
+	err = database.TxUpdatePorts(tx, pending.ports)
 	if err != nil {
 		return err
 	}
@@ -230,7 +254,7 @@ func (gd *Gardener) Recycle(pendings []*pendingAllocResource) (err error) {
 		}
 
 		if pendings[i].unit != nil {
-			ports := pendings[i].unit.ports
+			ports := pendings[i].ports
 			for p := range ports {
 				ports[p].Allocated = false
 				ports[p].Name = ""
@@ -550,14 +574,11 @@ func (gd *Gardener) volumesPendingExpension(svc *Service, need []structs.Storage
 }
 
 func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpModule, pendings *[]pendingContainerUpdate) error {
-	need, err := strconv.ParseInt(module.Config.CpusetCpus, 10, 64)
+	ncpu, err := parseCpuset(module.Config.CpusetCpus)
 	if err != nil {
-		if module.Config.CpusetCpus == "" {
-			need = 0
-		} else {
-			return err
-		}
+		return err
 	}
+	need := int64(ncpu)
 
 	units := svc.getUnitByType(module.Type)
 	if len(units) == 0 {

@@ -120,13 +120,16 @@ func ParseCPUSets(val string) (map[int]bool, error) {
 }
 
 // parse NCPU from config.HostConfig.CpusetCpus
-func parseCpuset(config *cluster.ContainerConfig) (int, error) {
-	ncpu, err := strconv.Atoi(config.HostConfig.CpusetCpus)
+func parseCpuset(cpuset string) (int, error) {
+	if cpuset == "" {
+		return 0, nil
+	}
+
+	ncpu, err := strconv.Atoi(cpuset)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
-			"container ID": config.SwarmID(),
-			"CpusetCpus":   config.HostConfig.CpusetCpus,
-		}).Errorf("Parse CpusetCpus %s Error:%s", config.HostConfig.CpusetCpus, err)
+			"CpusetCpus": cpuset,
+		}).Errorf("Parse Error:%s", err)
 
 		return 0, err
 	}
