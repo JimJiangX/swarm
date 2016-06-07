@@ -216,9 +216,9 @@ func getIPInfoByUnitID(id string, engine *cluster.Engine) ([]IPInfo, error) {
 	return out, nil
 }
 
-func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit string, req require) ([]IPInfo, error) {
+func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit string, req []netRequire) ([]IPInfo, error) {
 	networkings := make([]IPInfo, 0, 2)
-	for _, net := range req.networkings {
+	for _, net := range req {
 
 		ipinfo, err := gd.AllocIP("", net.Type, unit)
 		if err != nil {

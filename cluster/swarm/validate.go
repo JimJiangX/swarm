@@ -30,7 +30,7 @@ func validateContainerConfig(config *cluster.ContainerConfig) error {
 		msg = append(msg, "CpusetCpus is null,CpusetCpus should not be null")
 	}
 
-	_, err := parseCpuset(config)
+	_, err := parseCpuset(config.HostConfig.CpusetCpus)
 	if err != nil {
 		msg = append(msg, err.Error())
 	}

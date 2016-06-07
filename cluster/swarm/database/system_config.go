@@ -51,7 +51,7 @@ func (d SSHDeliver) DestPath() (string, string, string, string) {
 	return filepath.Join(d.Destination, d.PkgName),
 		filepath.Join(d.Destination, base, d.InitScriptName),
 		filepath.Join(d.Destination, base, d.CA_CRT_Name),
-		filepath.Join(d.Destination, base, d.CleanScriptName)
+		filepath.Join(d.Destination, d.CleanScriptName)
 }
 
 type ConsulConfig struct {
