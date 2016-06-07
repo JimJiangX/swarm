@@ -84,19 +84,20 @@ remove_horus_agent() {
 
 
 
-remove_check_script
-remove_consul
-remove_docker_plugin
 dereg_to_consul DockerPlugin
 dereg_to_horus_server DockerPlugin 
-remove_docker
 dereg_to_consul Docker
 dereg_to_horus_server Docker
-remove_swarm_agent
 dereg_to_consul SwarmAgent
 dereg_to_horus_server SwarmAgent
-remove_horus_agent
 dereg_to_consul HorusAgent 
 dereg_to_horus_server HorusAgent
+
+remove_docker_plugin
+remove_docker
+remove_swarm_agent
+remove_check_script
+remove_horus_agent
+remove_consul
 
 exit 0
