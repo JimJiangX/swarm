@@ -9,7 +9,7 @@ horus_server_port=$5
 dereg_to_horus_server() {
 	local component_type=$1
 
-	curl -X POST -H "Content-Type: application/json" -d '{"name": "'${node_id}':'${component_type}'"}' http://${horus_server_ip}:${horus_server_port}/v1/component/register
+	curl -X POST -H "Content-Type: application/json" -d '{"name": "'${node_id}':'${component_type}'"}' http://${horus_server_ip}:${horus_server_port}/v1/component/deregister
 	if [ $? != 0 ]; then
 		echo "${component_type} deregister to horus server failed"
 		exit 2

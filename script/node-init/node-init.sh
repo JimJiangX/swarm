@@ -350,12 +350,15 @@ Requires=docker.socket
 Type=notify
 EnvironmentFile=/etc/sysconfig/docker
 ExecStart=/usr/bin/docker daemon -H fd:// \$DOCKER_OPTS
+ExecReload=/bin/kill -s HUP $MAINPID
 LimitNOFILE=1048576
 LimitNPROC=1048576
 LimitCORE=infinity
 TimeoutStartSec=0
+## man systemd.resource-control check support
+## systemd-210 unsupport
 # set delegate yes so that systemd does not reset the cgroups of docker containers
-Delegate=yes
+#Delegate=yes
 
 [Install]
 WantedBy=multi-user.target
