@@ -1224,7 +1224,7 @@ func nodeClean(node, addr, user, password string) error {
 	*/
 
 	script := fmt.Sprintf("chmod 755 %s && %s %s %d %s %s %d",
-		destName, destName, config.ConsulPort, node,
+		destName, destName, addr, config.ConsulPort, node,
 		config.HorusServerIP, config.HorusServerPort)
 
 	buffer := new(bytes.Buffer)
