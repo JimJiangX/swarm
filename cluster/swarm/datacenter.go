@@ -454,6 +454,7 @@ func (gd *Gardener) RemoveNode(NameOrID, user, password string) error {
 	err = nodeClean(node.ID, eng.IP, user, password)
 	if err != nil {
 		logrus.Error("clean script exec error:%s", err)
+		return err
 	}
 
 	dc, err := gd.DatacenterByNode(NameOrID)
