@@ -1162,9 +1162,9 @@ func nodeClean(node, addr, user, password string) error {
 	}
 	_, _, _, destName := config.DestPath()
 
-	srcFile, err := utils.GetAbsolutePath(false, config.CleanScriptName)
+	srcFile, err := utils.GetAbsolutePath(false, config.SourceDir, config.CleanScriptName)
 	if err != nil {
-		logrus.Error("%s %s", srcFile, err)
+		logrus.Errorf("%s %s", srcFile, err)
 		return err
 	}
 
