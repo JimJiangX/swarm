@@ -33,8 +33,8 @@ ext_nic=bond2
 reg_to_horus_server() {
 	local component_type=$1
 
-	curl -X POST -H "Content-Type: application/json" -d '{ "endpoint": "'${node_id}'","name": "'${node_id}':'${component_type}'","type": "'${component_type}'","checktype": "health" }' http://${horus_server_ip}:${horus_server_port}/v1/component/register
-	if [ $? != 0 ]; then
+	stat_code=`curl -o /dev/null -s -w %{http_code} -X POST -H "Content-Type: application/json" -d '{ "endpoint": "'${node_id}'","name": "'${node_id}':'${component_type}'","type": "'${component_type}'","checktype": "health" }' http://${horus_server_ip}:${horus_server_port}/v1/component/register`
+	if [ ${stat_code} != '200' ]; then
 		echo "${component_type} register to horus server failed"
 		exit 2
 	fi
@@ -107,8 +107,11 @@ if [ \$? -ne 0 ]; then
 
  rm -f \$output
 
- curl -X POST http://\${ip_addr}:\${port}/ping > /dev/null  2>&1
- exit \$?	
+ stat_code=\`curl -o /dev/null -s -w %{http_code} -X POST http://\${ip_addr}:\${port}/ping\`
+ if [ \${stat_code} == '200' ]; then
+	 exit 0
+ else
+	 exit 2
 EOF
 
 	chmod +x ${dir}/check_switchmanager.sh
@@ -118,9 +121,9 @@ EOF
 reg_to_consul_for_swarm() {
 	local component_type=SwarmAgent
 
-	curl -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Check": {"Script": "/opt/DBaaS/script/check_swarmagent.sh ", "Interval": "10s" }}' http://${adm_ip}:${consul_port}/v1/agent/service/register
+	stat_code=`curl -o /dev/null -s -w %{http_code} -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Check": {"Script": "/opt/DBaaS/script/check_swarmagent.sh ", "Interval": "10s" }}' http://${adm_ip}:${consul_port}/v1/agent/service/register`
 
-	if [ $? != 0 ]; then
+	if [ ${stat_code} != '200' ]; then
 		echo "${component_type} register to consul failed"
 		exit 2
 	fi
@@ -134,8 +137,8 @@ reg_to_consul() {
 	local component_type=$1
 	local component_port=$2
 
-	curl -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Port": '${component_port}', "Check": { "tcp": "'${adm_ip}':'${component_port}'", "Interval": "10s", "timeout": "3s" }}' http://${adm_ip}:${consul_port}/v1/agent/service/register
-	if [ $? != 0 ]; then
+	stat_code=`curl -o /dev/null -s -w %{http_code} -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Port": '${component_port}', "Check": { "tcp": "'${adm_ip}':'${component_port}'", "Interval": "10s", "timeout": "3s" }}' http://${adm_ip}:${consul_port}/v1/agent/service/register`
+	if [ ${stat_code} != "200" ]; then
 		echo "${component_type} register to consul failed"
 		exit 2
 	fi
