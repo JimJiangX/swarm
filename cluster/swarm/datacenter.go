@@ -451,7 +451,7 @@ func (gd *Gardener) RemoveNode(NameOrID, user, password string) error {
 	}
 
 	// ssh exec clean script
-	err = nodeClean(node.ID, eng.IP, user, password)
+	err = nodeClean(node.ID, node.Addr, user, password)
 	if err != nil {
 		logrus.Error("clean script exec error:%s", err)
 		return err
