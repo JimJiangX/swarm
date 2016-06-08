@@ -53,7 +53,6 @@ remove_docker() {
 	rm -rf /usr/lib/systemd/system/docker.service
 	rm -rf /usr/lib/systemd/system/docker.socket
 	rm -rf /etc/docker/
-	rm -rf /var/lib/docker
 }
 
 remove_docker_plugin() {
