@@ -122,6 +122,7 @@ type StorageExtension struct {
 	Extensions []DiskStorage
 }
 
-type Candidates struct {
+type PostRebuildUnit struct {
 	Candidates []string
+	HostConfig *container.HostConfig
 }

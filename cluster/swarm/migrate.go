@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/Sirupsen/logrus"
+	ctypes "github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -12,7 +13,7 @@ import (
 	"github.com/docker/swarm/utils"
 )
 
-func (gd *Gardener) UnitRebuild(name string, candidates []string) error {
+func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ctypes.HostConfig) error {
 	table, err := database.GetUnit(name)
 	if err != nil {
 		return fmt.Errorf("Not Found Unit %s,error:%s", name, err)
@@ -154,7 +155,8 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string) error {
 	}
 
 	logrus.Debug("init & Start Service")
-	if err := u.initService(); err != nil {
+	err = initService(container.ID, engine, u.InitServiceCmd())
+	if err != nil {
 		return err
 	}
 
@@ -177,7 +179,9 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string) error {
 	u.container = container
 	u.ContainerID = container.ID
 
-	// update database
+	// update database :tb_unit
+	// remove old LocalVolume
+	// dealwith errors
 
 	return nil
 }

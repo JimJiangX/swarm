@@ -701,6 +701,20 @@ func (u *unit) initService() error {
 	return nil
 }
 
+func initService(id string, eng *cluster.Engine, cmd []string) error {
+	if len(cmd) == 0 {
+		logrus.Warnf("%s InitServiceCmd is nil", id)
+		return nil
+	}
+
+	inspect, err := containerExec(eng, id, cmd, false)
+	if inspect.ExitCode != 0 {
+		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", id, cmd, inspect.ExitCode, inspect, err)
+	}
+
+	return err
+}
+
 func (gd *Gardener) StartUnitService(NameOrID string) error {
 	unit, err := database.GetUnit(NameOrID)
 	if err != nil {

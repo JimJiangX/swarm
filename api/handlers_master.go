@@ -1069,7 +1069,7 @@ func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 // POST /units/{name:.*}/rebuild
 func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
-	req := structs.Candidates{}
+	req := structs.PostRebuildUnit{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, err.Error(), http.StatusBadRequest)
@@ -1081,7 +1081,7 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	err := gd.UnitRebuild(name, req.Candidates)
+	err := gd.UnitRebuild(name, req.Candidates, req.HostConfig)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusBadRequest)
 		return
