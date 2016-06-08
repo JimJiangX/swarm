@@ -30,6 +30,7 @@ type ClusterResource struct {
 	Enable bool
 	ID     string
 	Name   string
+	Type   string
 	Entire Resource
 	Nodes  []NodeResource `json:",omitempty"` // only used in GET /clusters/{name:.*}/resources
 }

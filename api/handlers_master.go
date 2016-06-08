@@ -255,6 +255,7 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 	return structs.ClusterResource{
 		ID:     cl.ID,
 		Name:   cl.Name,
+		Type:   cl.Type,
 		Enable: cl.Enabled,
 		Entire: structs.Resource{
 			TotalCPUs:   int(totalCPUs),

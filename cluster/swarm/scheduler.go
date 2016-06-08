@@ -47,7 +47,7 @@ func (gd *Gardener) serviceScheduler() (err error) {
 			"Action": "Alloc",
 		})
 
-		logrus.Debugf("[mg] start serviceScheduler:%s", svc.Name)
+		logrus.Debugf("[MG] start serviceScheduler:%s", svc.Name)
 		if !atomic.CompareAndSwapInt64(&svc.Status, _StatusServcieBuilding, _StatusServiceAlloction) {
 			entry.Error("Status Conflict")
 			continue
@@ -393,11 +393,11 @@ func (gd *Gardener) runScheduler(list []*node.Node, config *cluster.ContainerCon
 	}
 
 	if err != nil {
-		logrus.Debugf("[**MG**] gd.scheduler.SelectNodesForContainer fail(swarm level) :", err)
+		logrus.Debugf("[MG] gd.scheduler.SelectNodesForContainer fail(swarm level) :", err)
 		return nil, err
 	}
 
-	logrus.Debugf("[**MG**] gd.scheduler.SelectNodesForContainer ok(swarm level) ndoes:%v", nodes)
+	logrus.Debugf("[MG] gd.scheduler.SelectNodesForContainer ok(swarm level) ndoes:%v", nodes)
 	return gd.SelectNodeByCluster(nodes, num, highAvaliable)
 }
 
@@ -514,21 +514,21 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		if len(all) == 0 {
 			dc, err = gd.DatacenterByNode(nodes[i].ID)
 			if err != nil {
-				logrus.Warnf("[**MG**]SelectNodeByCluster::DatacenterByNode fail", err)
+				logrus.Warnf("[MG]SelectNodeByCluster::DatacenterByNode fail", err)
 			}
-			logrus.Debugf("[**MG**]len(all) == 0 the dc :%v", dc)
+			logrus.Debugf("[**MG]len(all) == 0 the dc :%v", dc)
 		} else {
 			for index := range all {
 				logrus.Debugf("the nodes[i].ID == all[index].ID :%s:%s  ", nodes[i].ID, all[index].EngineID)
 				if nodes[i].ID == all[index].EngineID {
 					dc, err = gd.Datacenter(all[index].ClusterID)
 					if err != nil {
-						logrus.Warnf("[**MG**] SelectNodeByCluster::database.Datacenter fail", err)
+						logrus.Warnf("[MG] SelectNodeByCluster::database.Datacenter fail", err)
 					}
 					break
 				}
 			}
-			logrus.Debugf("[**MG**]len(all) != 0 the dc :%v", dc)
+			logrus.Debugf("[MG]len(all) != 0 the dc :%v", dc)
 		}
 		if err != nil || dc == nil {
 			continue
@@ -541,7 +541,7 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		}
 	}
 
-	logrus.Warnf("[**MG**]highAvailable:%v, num :%d ,m length:%d", highAvailable, num, len(m))
+	logrus.Debugf("[MG]highAvailable:%v, num :%d ,m length:%d", highAvailable, num, len(m))
 
 	//	if highAvailable && len(m) < 2 {
 	//		return nil, errors.New("Not Match")

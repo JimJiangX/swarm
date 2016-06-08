@@ -39,7 +39,7 @@ func (gd *Gardener) serviceExecute() (err error) {
 			continue
 		}
 
-		logrus.Debugf("[mg]Execute Service:%v", svc)
+		logrus.Debugf("[MG]Execute Service:%v", svc)
 
 		err = gd.createServiceContainers(svc)
 		if err != nil {
@@ -53,7 +53,7 @@ func (gd *Gardener) serviceExecute() (err error) {
 			goto failure
 		}
 
-		logrus.Debug("[mg]TxSetServiceStatus")
+		logrus.Debug("[MG]TxSetServiceStatus")
 		err = database.TxSetServiceStatus(&svc.Service, svc.task, _StatusServiceNoContent, _StatusTaskDone, time.Now(), "")
 		if err != nil {
 			logrus.Errorf("%s TxSetServiceStatus Error:%s", svc.Name, err.Error())
@@ -61,7 +61,7 @@ func (gd *Gardener) serviceExecute() (err error) {
 		}
 		svc.Unlock()
 
-		logrus.Debugf("[mg]Service %s Created,running...", svc.Name)
+		logrus.Debugf("[MG]Service %s Created,running...", svc.Name)
 
 		continue
 
@@ -180,15 +180,15 @@ func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) error {
 	if pending == nil || pending.Config == nil || pending.Engine == nil {
 		return fmt.Errorf("pendingContainer or ContainerConfig or Engine is nil")
 	}
-	logrus.Debugf("[mg]svc.getUnit :%v", pending)
+	logrus.Debugf("[MG]svc.getUnit :%v", pending)
 
 	u, err := svc.getUnit(pending.Name)
 	if err != nil || u == nil {
 		return fmt.Errorf("%s:getunit err:%v", pending.Name, err)
 	}
-	logrus.Debugf("[mg]the unit:%v", u)
+	logrus.Debugf("[MG]the unit:%v", u)
 
-	logrus.Debugf("[mg]start pull image %s", u.config.Image)
+	logrus.Debugf("[MG]start pull image %s", u.config.Image)
 	authConfig, err := gd.RegistryAuthConfig()
 	if err != nil {
 		return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
@@ -198,13 +198,13 @@ func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) error {
 		return fmt.Errorf("pullImage Error:%s", err)
 	}
 
-	logrus.Debug("[mg]prepare for Creating Container")
+	logrus.Debug("[MG]prepare for Creating Container")
 	err = u.prepareCreateContainer()
 	if err != nil {
 		return fmt.Errorf("%s:Prepare Networking or Volume Failed,%s", pending.Name, err)
 	}
 
-	logrus.Debug("[mg]create container")
+	logrus.Debug("[MG]create container")
 	container, err := gd.createContainerInPending(swarmID, svc.authConfig)
 	if err != nil {
 		return fmt.Errorf("Container Create Failed %s,%s", pending.Name, err)
@@ -275,32 +275,32 @@ func (gd *Gardener) initAndStartService(svc *Service) error {
 			atomic.StoreInt64(&svc.Status, _StatusServiceNoContent)
 		}
 	}()
-	logrus.Debug("[mg]starting Containers")
+	logrus.Debug("[MG]starting Containers")
 	if err := svc.startContainers(); err != nil {
 		return err
 	}
 
-	logrus.Debug("[mg]copy Service Config")
+	logrus.Debug("[MG]copy Service Config")
 	if err := svc.copyServiceConfig(); err != nil {
 		return err
 	}
 
-	logrus.Debug("[mg]init & Start Service")
+	logrus.Debug("[MG]init & Start Service")
 	if err := svc.initService(); err != nil {
 		return err
 	}
 
-	logrus.Debug("[mg]initTopology")
+	logrus.Debug("[MG]initTopology")
 	if err := svc.initTopology(); err != nil {
 		return err
 	}
 
-	logrus.Debug("[mg]registerServices")
+	logrus.Debug("[MG]registerServices")
 	if err := svc.registerServices(sys.ConsulConfig); err != nil {
 		return err
 	}
 
-	logrus.Debug("[mg]registerToHorus")
+	logrus.Debug("[MG]registerToHorus")
 
 	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
 	err = svc.registerToHorus(horus, sys.MonitorUsername, sys.MonitorPassword, sys.HorusAgentPort)
