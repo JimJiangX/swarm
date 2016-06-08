@@ -384,8 +384,8 @@ type pendingAllocStore struct {
 	sanStore   []string
 }
 
-func localVolumeExtend(u *unit, lv localVolume) error {
-	return u.updateVolume(lv.lv, lv.size)
+func localVolumeExtend(host string, lv localVolume) error {
+	return updateVolume(host, lv.lv, lv.size)
 }
 
 func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
@@ -492,7 +492,7 @@ func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtensi
 
 	for _, pending := range pendings {
 		for _, lv := range pending.localStore {
-			err = localVolumeExtend(pending.unit, lv)
+			err = localVolumeExtend(pending.unit.engine.IP, lv)
 			if err != nil {
 				logrus.Errorf("unit %s update volume error %s", pending.unit.Name, err)
 				return err

@@ -19,7 +19,7 @@ func (e *Engine) UsedCpus() int64 {
 			log.WithFields(log.Fields{
 				"ID":         c.ID,
 				"CpusetCpus": cpuset,
-			}).Error("Parse CpusetCpus Error")
+			}).Error("Parse CpusetCpus Error", err)
 		}
 
 		r += ncpu

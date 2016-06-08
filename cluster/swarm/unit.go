@@ -238,7 +238,7 @@ func (u *unit) getNetworkingAddr(networking, portName string) (addr string, port
 }
 
 func (u *unit) prepareCreateContainer() error {
-	err := u.createNetworking()
+	err := createNetworking(u.engine.IP, u.networkings)
 	if err != nil {
 		return err
 	}
@@ -255,19 +255,13 @@ func (u *unit) prepareCreateContainer() error {
 
 		// if volume create on san storage,should created VG before create Volume
 		if strings.Contains(lv.VGName, "_SAN_VG") {
-			err := u.createSanStoreageVG(parts[0])
+			err := createSanStoreageVG(u.engine.IP, parts[0])
 			if err != nil {
 				return err
 			}
 		}
 
-		req := &types.VolumeCreateRequest{
-			Name:       lv.Name,
-			Driver:     lv.Driver,
-			DriverOpts: map[string]string{"size": strconv.Itoa(lv.Size), "fstype": lv.Filesystem, "vgname": lv.VGName},
-			Labels:     nil,
-		}
-		_, err = u.engine.CreateVolume(req)
+		_, err = createVolume(u.engine, lv)
 		if err != nil {
 			return err
 		}
@@ -297,19 +291,14 @@ func (u *unit) pullImage(authConfig *types.AuthConfig) error {
 	return nil
 }
 
-func (u *unit) createLocalDiskVolume(name string) (*cluster.Volume, error) {
-	lv, err := database.GetLocalVolume(name)
-	if err != nil {
-		return nil, err
-	}
-
+func createVolume(eng *cluster.Engine, lv database.LocalVolume) (*cluster.Volume, error) {
 	req := &types.VolumeCreateRequest{
 		Name:       lv.Name,
 		Driver:     lv.Driver,
 		DriverOpts: map[string]string{"size": strconv.Itoa(lv.Size), "fstype": lv.Filesystem, "vgname": lv.VGName},
 		Labels:     nil,
 	}
-	v, err := u.engine.CreateVolume(req)
+	v, err := eng.CreateVolume(req)
 	if err != nil {
 		return nil, err
 	}
@@ -317,8 +306,8 @@ func (u *unit) createLocalDiskVolume(name string) (*cluster.Volume, error) {
 	return v, nil
 }
 
-func (u *unit) createSanStoreageVG(name string) error {
-	list, err := database.ListLUNByName(name)
+func createSanStoreageVG(host, lun string) error {
+	list, err := database.ListLUNByName(lun)
 	if err != nil || len(list) == 0 {
 		return fmt.Errorf("LUN:%d,Error:%v", len(list), err)
 	}
@@ -340,7 +329,7 @@ func (u *unit) createSanStoreageVG(name string) error {
 		Type:      storage.Vendor(),
 	}
 
-	addr := u.getPluginAddr(pluginPort)
+	addr := getPluginAddr(host, pluginPort)
 
 	return sdk.SanVgCreate(addr, config)
 }
@@ -390,7 +379,7 @@ func (u *unit) removeContainer(force, rmVolumes bool) error {
 		return err
 	}
 
-	err = u.removeNetworking()
+	err = removeNetworking(engine.IP, u.networkings)
 
 	return err
 }
@@ -440,10 +429,10 @@ func (u *unit) renameContainer(name string) error {
 	return client.ContainerRename(context.Background(), u.container.ID, u.Unit.ID)
 }
 
-func (u *unit) createNetworking() error {
-	addr := u.getPluginAddr(pluginPort)
+func createNetworking(host string, networkings []IPInfo) error {
+	addr := getPluginAddr(host, pluginPort)
 
-	for _, net := range u.networkings {
+	for _, net := range networkings {
 		config := sdk.IPDevConfig{
 			Device: net.Device,
 			IPCIDR: fmt.Sprintf("%s/%d", net.IP.String(), net.Prefix),
@@ -458,10 +447,10 @@ func (u *unit) createNetworking() error {
 	return nil
 }
 
-func (u *unit) removeNetworking() error {
-	addr := u.getPluginAddr(pluginPort)
+func removeNetworking(host string, networkings []IPInfo) error {
+	addr := getPluginAddr(host, pluginPort)
 
-	for _, net := range u.networkings {
+	for _, net := range networkings {
 		config := sdk.IPDevConfig{
 			Device: net.Device,
 			IPCIDR: fmt.Sprintf("%s/%d", net.IP.String(), net.Prefix),
@@ -479,7 +468,7 @@ func (u *unit) createVolume() (*cluster.Volume, error) {
 	return nil, nil
 }
 
-func (u *unit) updateVolume(lv database.LocalVolume, size int) error {
+func updateVolume(host string, lv database.LocalVolume, size int) error {
 	option := sdk.VolumeUpdateOption{
 		VgName: lv.VGName,
 		LvName: lv.Name,
@@ -487,11 +476,10 @@ func (u *unit) updateVolume(lv database.LocalVolume, size int) error {
 		Size:   lv.Size,
 	}
 
-	addr := u.getPluginAddr(pluginPort)
-
+	addr := getPluginAddr(host, pluginPort)
 	err := sdk.VolumeUpdate(addr, option)
 	if err != nil {
-		logrus.Errorf("unit %s: %s volume update %s", u.Name, addr, err)
+		logrus.Errorf("host:%s volume update error:%s", addr, err)
 	}
 
 	return err
@@ -637,18 +625,32 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 		return err
 	}
 
+	context := string(content)
+
+	logrus.Debugf("default:%s\ndefaultUser:%v\nconfig:%s", u.parent.Content, data, context)
+
 	volumes, err := database.SelectVolumesByUnitID(u.ID)
 	if err != nil {
 		return err
 	}
 
+	err = copyConfigIntoCNFVolume(u, volumes, context)
+	if err != nil {
+		logrus.Errorf("copyConfigIntoCNFVolume error:%s", err)
+		return err
+	}
+
+	return nil
+}
+
+func copyConfigIntoCNFVolume(u *unit, lvs []database.LocalVolume, content string) error {
 	cnf := 0
-	for i := range volumes {
-		if strings.Contains(volumes[i].Name, "_CNF_LV") {
+	for i := range lvs {
+		if strings.Contains(lvs[i].Name, "_CNF_LV") {
 			cnf = i
 			break
 		}
-		if strings.Contains(volumes[i].Name, "_DAT_LV") {
+		if strings.Contains(lvs[i].Name, "_DAT_LV") {
 			cnf = i
 		}
 	}
@@ -662,18 +664,18 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 	}
 
 	config := sdk.VolumeFileConfig{
-		VgName:    volumes[cnf].VGName,
-		LvsName:   volumes[cnf].Name,
-		MountName: volumes[cnf].Name,
-		Data:      string(content),
+		VgName:    lvs[cnf].VGName,
+		LvsName:   lvs[cnf].Name,
+		MountName: lvs[cnf].Name,
+		Data:      content,
 		FDes:      path,
 		Mode:      "0600",
 	}
 
-	logrus.Debugf("default:%s\ndefaultUser:%v\nconfig:%s", u.parent.Content, data, config.Data)
+	addr := getPluginAddr(u.engine.IP, pluginPort)
+	err := sdk.FileCopyToVolome(addr, config)
 
-	logrus.Debugf("VolumeFileConfig:%+v", config)
-	err = sdk.FileCopyToVolome(u.getPluginAddr(pluginPort), config)
+	logrus.Debugf("FileCopyToVolome to %s:%s config:%v", addr, lvs[cnf].Name, config)
 
 	return err
 }
@@ -805,9 +807,12 @@ func (u *unit) backup(args ...string) error {
 
 var pluginPort = 3333
 
-func (u unit) getPluginAddr(port int) string {
+func getPluginAddr(IP string, port int) string {
+	if port == 0 {
+		port = pluginPort
+	}
 
-	return fmt.Sprintf("%s:%d", u.engine.IP, port)
+	return fmt.Sprintf("%s:%d", IP, port)
 }
 
 func (u *unit) saveToDisk() error {

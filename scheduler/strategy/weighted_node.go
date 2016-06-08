@@ -1,6 +1,8 @@
 package strategy
 
 import (
+	"strconv"
+
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
 )
@@ -39,12 +41,22 @@ func (n weightedNodeList) Less(i, j int) bool {
 func weighNodes(config *cluster.ContainerConfig, nodes []*node.Node, healthinessFactor int64) (weightedNodeList, error) {
 	weightedNodes := weightedNodeList{}
 
+	ncpu, err := strconv.ParseInt(config.HostConfig.CpusetCpus, 10, 64)
+	if err != nil {
+		return weightedNodes, err
+	}
+
 	for _, node := range nodes {
 		nodeMemory := node.TotalMemory
 		nodeCpus := node.TotalCpus
 
 		// Skip nodes that are smaller than the requested resources.
 		if nodeMemory < int64(config.HostConfig.Memory) || nodeCpus < config.HostConfig.CPUShares {
+			continue
+		}
+
+		if node.TotalMemory-node.UsedMemory < config.HostConfig.Memory ||
+			node.TotalCpus-node.UsedCpus < ncpu {
 			continue
 		}
 
@@ -58,6 +70,9 @@ func weighNodes(config *cluster.ContainerConfig, nodes []*node.Node, healthiness
 		}
 		if config.HostConfig.Memory > 0 {
 			memoryScore = (node.UsedMemory + config.HostConfig.Memory) * 100 / nodeMemory
+		}
+		if ncpu > 0 {
+			cpuScore = (node.UsedCpus + ncpu) * 100 / nodeCpus
 		}
 
 		if cpuScore <= 100 && memoryScore <= 100 {

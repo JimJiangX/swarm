@@ -49,7 +49,7 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string) error {
 	if err != nil {
 		return err
 	}
-	err = u.removeNetworking()
+	err = removeNetworking(u.engine.IP, u.networkings)
 	if err != nil {
 		return err
 	}
@@ -63,6 +63,8 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string) error {
 	if err != nil {
 		return err
 	}
+	u.engine = engine
+	u.EngineID = engine.ID
 
 	ncpu, err := parseCpuset(config.HostConfig.CpusetCpus)
 	if err != nil {
@@ -110,6 +112,72 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string) error {
 		Config: config,
 		Engine: engine,
 	}
+
+	logrus.Debugf("[MG]start pull image %s", u.config.Image)
+	authConfig, err := gd.RegistryAuthConfig()
+	if err != nil {
+		return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
+	}
+	if err := u.pullImage(authConfig); err != nil {
+		return fmt.Errorf("pullImage Error:%s", err)
+	}
+
+	err = createNetworking(engine.IP, u.networkings)
+	if err != nil {
+		return err
+	}
+
+	lvs := make([]database.LocalVolume, len(pending.localStore))
+	for i := range pending.localStore {
+		lvs[i] = pending.localStore[i].lv
+		_, err := createVolume(engine, lvs[i])
+		if err != nil {
+			return err
+		}
+	}
+
+	container, err := engine.Create(config, swarmID, false, authConfig)
+	if err != nil {
+		return err
+	}
+
+	delete(gd.pendingContainers, swarmID)
+
+	logrus.Debug("starting Containers")
+	if err := engine.StartContainer(container.ID, nil); err != nil {
+		return err
+	}
+
+	logrus.Debug("copy Service Config")
+	if err := copyConfigIntoCNFVolume(u, lvs, u.parent.Content); err != nil {
+		return err
+	}
+
+	logrus.Debug("init & Start Service")
+	if err := u.initService(); err != nil {
+		return err
+	}
+
+	// remove old container
+	err = u.container.Engine.RemoveContainer(u.container, true, true)
+	if err != nil {
+		return err
+	}
+
+	err = engine.RenameContainer(container, u.Name)
+	if err != nil {
+		return err
+	}
+
+	container, err = container.Refresh()
+	if err != nil {
+		return err
+	}
+
+	u.container = container
+	u.ContainerID = container.ID
+
+	// update database
 
 	return nil
 }
