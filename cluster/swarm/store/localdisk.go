@@ -41,7 +41,7 @@ func (l LocalStore) IdleSize() (map[string]int, error) {
 		return nil, err
 	}
 
-	fmt.Println("get vg list: %v", list)
+	fmt.Printf("get vg list: %v\n", list)
 
 	out := make(map[string]int, len(list))
 
@@ -55,14 +55,13 @@ func (l LocalStore) IdleSize() (map[string]int, error) {
 			return nil, err
 		}
 
-		fmt.Println("get lvs list: %v", lvs)
-
 		for i := range lvs {
 			free -= lvs[i].Size
 		}
 
 		out[list[i].VgName] = free
 	}
+
 	fmt.Printf("get out list: %v\n", out)
 	return out, nil
 }

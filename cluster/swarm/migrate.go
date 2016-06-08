@@ -49,6 +49,10 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string) error {
 	if err != nil {
 		return err
 	}
+	err = u.removeNetworking()
+	if err != nil {
+		return err
+	}
 
 	config, err := resetContainerConfig(u.container.Config)
 	if err != nil {

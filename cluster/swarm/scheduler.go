@@ -154,7 +154,7 @@ func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module structs
 	}
 
 	filters := gd.listShortIdleStore(module.Stores, _type, num)
-	logrus.Debugf("[MG] %s,%s,%s:first filters of storage:%s", module.Stores, module.Type, num, filters)
+	logrus.Debugf("[MG] %v,%s,%d:first filters of storage:%s", module.Stores, module.Type, num, filters)
 
 	config, err := templateConfig(gd, module)
 	if err != nil {
