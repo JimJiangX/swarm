@@ -126,3 +126,38 @@ type PostRebuildUnit struct {
 	Candidates []string
 	HostConfig *container.HostConfig
 }
+
+type ServiceResponse struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Architecture string `json:"architecture"`
+	// Description	string	`json:"description"`
+	// AutoHealing	bool	`json:"auto_healing"`
+	// AutoScaling	bool	`json:"auto_scaling"`
+	HighAvailable        bool   `json:"high_available"`
+	Status               int64  `json:"status"`
+	BackupMaxSizeByte    int    `json:"backup_max_size"`
+	BackupFilesRetention int    `json:"backup_files_retention"`
+	CreatedAt            string `json:"created_at"`
+	FinishedAt           string `json:"finished_at"`
+
+	Containers []UnitInfo `json:"containers"`
+}
+
+type UnitInfo struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`    // <unit_id_8bit>_<service_name>
+	Type     string `json:"type"`    // switch_manager/upproxy/upsql
+	EngineID string `json:"node_id"` // engine.ID
+	// ImageID		string `json:"image_id"`
+	// ImageName	string `json:"image_name"` //<image_name>_<image_version>
+	// ServiceID	string `json:"service_id"`
+	// ContainerID	string `json:"container_id"`
+	// ConfigID		string `json:"unit_config_id"`
+	// NetworkMode	string `json:"network_mode"`
+
+	Status        uint32 `json:"status"`
+	CheckInterval int    `json:"check_interval"`
+	CreatedAt     string `json:"created_at"`
+	Info          string `json:"info"`
+}

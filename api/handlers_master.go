@@ -1,9 +1,11 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -397,6 +399,109 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
+}
+
+// GET /services
+func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	service, err := database.GetService(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	units, err := database.ListUnitByServiceID(service.ID)
+	if err != nil {
+		logrus.Error("ListUnitByServiceID", err)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	containers := gd.Containers()
+	list := make([]structs.UnitInfo, len(units))
+	for i := range units {
+		container := containers.Get(units[i].ContainerID)
+		data, err := getContainerJSON2(units[i].Name, container)
+		if err != nil {
+			//httpError(w, err.Error(), http.StatusInternalServerError)
+			logrus.Warn(err)
+		}
+
+		list[i] = structs.UnitInfo{
+			ID:            units[i].ID,
+			Name:          units[i].Name,
+			Type:          units[i].Type,
+			EngineID:      units[i].EngineID,
+			Status:        units[i].Status,
+			CheckInterval: units[i].CheckInterval,
+			CreatedAt:     utils.TimeToString(units[i].CreatedAt),
+			Info:          string(data),
+		}
+	}
+
+	resp := structs.ServiceResponse{
+		ID:                   service.ID,
+		Name:                 service.Name,
+		Architecture:         service.Architecture,
+		HighAvailable:        service.HighAvailable,
+		Status:               service.Status,
+		BackupMaxSizeByte:    service.BackupMaxSizeByte,
+		BackupFilesRetention: service.BackupFilesRetention,
+		CreatedAt:            utils.TimeToString(service.CreatedAt),
+		FinishedAt:           utils.TimeToString(service.FinishedAt),
+		Containers:           list,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
+func getContainerJSON2(name string, container *cluster.Container) ([]byte, error) {
+	if container == nil {
+		return nil, fmt.Errorf("No such container %s", name)
+	}
+
+	if !container.Engine.IsHealthy() {
+		return nil, fmt.Errorf("Container %s running on unhealthy node %s", name, container.Engine.Name)
+	}
+
+	client, scheme, err := container.Engine.HTTPClientAndScheme()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.Get(scheme + "://" + container.Engine.Addr + "/containers/" + container.ID + "/json")
+	container.Engine.CheckConnectionErr(err)
+	if err != nil {
+		return nil, err
+	}
+
+	// cleanup
+	defer resp.Body.Close()
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	n, err := json.Marshal(container.Engine)
+	if err != nil {
+		return nil, err
+	}
+
+	// insert Node field
+	data = bytes.Replace(data, []byte("\"Name\":\"/"), []byte(fmt.Sprintf("\"Node\":%s,\"Name\":\"/", n)), -1)
+
+	// insert node IP
+	data = bytes.Replace(data, []byte("\"HostIp\":\"0.0.0.0\""), []byte(fmt.Sprintf("\"HostIp\":%q", container.Engine.IP)), -1)
+
+	return data, nil
 }
 
 // GET /tasks
