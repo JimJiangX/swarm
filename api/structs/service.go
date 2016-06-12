@@ -131,10 +131,10 @@ type ServiceResponse struct {
 	ID           string `json:"id"`
 	Name         string `json:"name"`
 	Architecture string `json:"architecture"`
-	// Description	string	`json:"description"`
+	Description  string `json:"description"`
 	// AutoHealing	bool	`json:"auto_healing"`
 	// AutoScaling	bool	`json:"auto_scaling"`
-	HighAvailable        bool   `json:"high_available"`
+	// HighAvailable        bool   `json:"high_available"`
 	Status               int64  `json:"status"`
 	BackupMaxSizeByte    int    `json:"backup_max_size"`
 	BackupFilesRetention int    `json:"backup_files_retention"`

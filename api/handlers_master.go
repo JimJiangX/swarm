@@ -446,10 +446,11 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	}
 
 	resp := structs.ServiceResponse{
-		ID:                   service.ID,
-		Name:                 service.Name,
-		Architecture:         service.Architecture,
-		HighAvailable:        service.HighAvailable,
+		ID:           service.ID,
+		Name:         service.Name,
+		Architecture: service.Architecture,
+		Description:  service.Description,
+		// HighAvailable:        service.HighAvailable,
 		Status:               service.Status,
 		BackupMaxSizeByte:    service.BackupMaxSizeByte,
 		BackupFilesRetention: service.BackupFilesRetention,
