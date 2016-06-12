@@ -219,7 +219,7 @@ func (svc Service) TableName() string {
 	return "tb_service"
 }
 
-func listService() ([]Service, error) {
+func ListServices() ([]Service, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err

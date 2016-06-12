@@ -410,9 +410,8 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 	lists := make([]structs.ServiceResponse, len(services))
 
-	for service, snum := range services {
-
-		units, err := database.ListUnitByServiceID(service.ID)
+	for n := range services {
+		units, err := database.ListUnitByServiceID(services[n].ID)
 		if err != nil {
 			logrus.Error("ListUnitByServiceID", err)
 			return
@@ -446,22 +445,19 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		srvresp := structs.ServiceResponse{
-			ID:           service.ID,
-			Name:         service.Name,
-			Architecture: service.Architecture,
-			Description:  service.Description,
-			// HighAvailable:        service.HighAvailable,
-			Status:               service.Status,
-			BackupMaxSizeByte:    service.BackupMaxSizeByte,
-			BackupFilesRetention: service.BackupFilesRetention,
-			CreatedAt:            utils.TimeToString(service.CreatedAt),
-			FinishedAt:           utils.TimeToString(service.FinishedAt),
+		lists[n] = structs.ServiceResponse{
+			ID:           services[n].ID,
+			Name:         services[n].Name,
+			Architecture: services[n].Architecture,
+			Description:  services[n].Description,
+			// HighAvailable:        services[n].HighAvailable,
+			Status:               services[n].Status,
+			BackupMaxSizeByte:    services[n].BackupMaxSizeByte,
+			BackupFilesRetention: services[n].BackupFilesRetention,
+			CreatedAt:            utils.TimeToString(services[n].CreatedAt),
+			FinishedAt:           utils.TimeToString(services[n].FinishedAt),
 			Containers:           list,
 		}
-
-		lists[snum] = srvresp
-
 	}
 
 	w.Header().Set("Content-Type", "application/json")
