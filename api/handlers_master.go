@@ -401,8 +401,8 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// GET /services
-func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+// GET /services/{name:.*}
+func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
 	service, err := database.GetService(name)
