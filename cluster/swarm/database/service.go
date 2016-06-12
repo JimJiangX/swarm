@@ -219,6 +219,21 @@ func (svc Service) TableName() string {
 	return "tb_service"
 }
 
+func listService() ([]Service, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	services := make([]Service, 0, 10)
+	err = db.Select(&services, "SELECT * FROM tb_service")
+	if err != nil {
+		return nil, err
+	}
+
+	return services, nil
+}
+
 func GetService(NameOrID string) (Service, error) {
 	db, err := GetDB(true)
 	if err != nil {

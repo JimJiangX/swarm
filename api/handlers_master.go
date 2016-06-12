@@ -401,6 +401,74 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// GET /services
+func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	services, err := database.ListServices()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	lists := make([]structs.ServiceResponse, len(services))
+
+	for service, snum := range services {
+
+		units, err := database.ListUnitByServiceID(service.ID)
+		if err != nil {
+			logrus.Error("ListUnitByServiceID", err)
+			return
+		}
+
+		ok, _, gd := fromContext(ctx, _Gardener)
+		if !ok && gd == nil {
+			httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		containers := gd.Containers()
+		list := make([]structs.UnitInfo, len(units))
+		for i := range units {
+			container := containers.Get(units[i].ContainerID)
+			data, err := getContainerJSON2(units[i].Name, container)
+			if err != nil {
+				//httpError(w, err.Error(), http.StatusInternalServerError)
+				logrus.Warn(err)
+			}
+
+			list[i] = structs.UnitInfo{
+				ID:            units[i].ID,
+				Name:          units[i].Name,
+				Type:          units[i].Type,
+				EngineID:      units[i].EngineID,
+				Status:        units[i].Status,
+				CheckInterval: units[i].CheckInterval,
+				CreatedAt:     utils.TimeToString(units[i].CreatedAt),
+				Info:          string(data),
+			}
+		}
+
+		srvresp := structs.ServiceResponse{
+			ID:           service.ID,
+			Name:         service.Name,
+			Architecture: service.Architecture,
+			Description:  service.Description,
+			// HighAvailable:        service.HighAvailable,
+			Status:               service.Status,
+			BackupMaxSizeByte:    service.BackupMaxSizeByte,
+			BackupFilesRetention: service.BackupFilesRetention,
+			CreatedAt:            utils.TimeToString(service.CreatedAt),
+			FinishedAt:           utils.TimeToString(service.FinishedAt),
+			Containers:           list,
+		}
+
+		lists[snum] = srvresp
+
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(lists)
+}
+
 // GET /services/{name:.*}
 func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
