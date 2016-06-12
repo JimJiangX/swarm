@@ -59,6 +59,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/ports":                  getPorts,
 		"/networkings":            getNetworkings,
 		"/image/{name:.*}":        getImage,
+		"/services":               getServices,
 		"/services/{name:.*}":     getServicesByNameOrID,
 	},
 	"POST": {
