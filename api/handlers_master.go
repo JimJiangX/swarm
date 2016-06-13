@@ -420,14 +420,14 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	for n := range services {
 		desc := structs.PostServiceRequest{}
-		err := json.NewEncoder(bytes.NewBufferString(services[n].Description)).Encode(&desc)
+		err := json.NewDecoder(bytes.NewBufferString(services[n].Description)).Decode(&desc)
 		if err != nil {
-			logrus.Warn(err)
+			logrus.Error(err, services[n].Description)
 		}
 		units, err := database.ListUnitByServiceID(services[n].ID)
 		if err != nil {
-			logrus.Error("ListUnitByServiceID", err)
-			return
+			logrus.Error("List Unit By ServiceID", err)
+			continue
 		}
 
 		list := make([]structs.UnitInfo, len(units))
@@ -481,9 +481,9 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 	desc := structs.PostServiceRequest{}
-	err = json.NewEncoder(bytes.NewBufferString(service.Description)).Encode(&desc)
+	err = json.NewDecoder(bytes.NewBufferString(service.Description)).Decode(&desc)
 	if err != nil {
-		logrus.Warn(err)
+		logrus.Warn(err, service.Description)
 	}
 
 	units, err := database.ListUnitByServiceID(service.ID)
@@ -1672,13 +1672,14 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 // DELETE /clusters/nodes/{node:.*}
 func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	node := mux.Vars(r)["node"]
-	config := structs.SSHConfig{}
-
-	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	node := mux.Vars(r)["node"]
+	username := r.FormValue("username")
+	password := r.FormValue("password")
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
@@ -1686,7 +1687,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := gd.RemoveNode(node, config.Username, config.Password)
+	err := gd.RemoveNode(node, username, password)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
