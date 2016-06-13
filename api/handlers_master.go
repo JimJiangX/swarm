@@ -419,6 +419,11 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	containers := gd.Containers()
 
 	for n := range services {
+		desc := structs.PostServiceRequest{}
+		err := json.NewEncoder(bytes.NewBufferString(services[n].Description)).Encode(&desc)
+		if err != nil {
+			logrus.Warn(err)
+		}
 		units, err := database.ListUnitByServiceID(services[n].ID)
 		if err != nil {
 			logrus.Error("ListUnitByServiceID", err)
@@ -450,7 +455,7 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			ID:                   services[n].ID,
 			Name:                 services[n].Name,
 			Architecture:         services[n].Architecture,
-			Description:          services[n].Description,
+			Description:          desc,
 			HighAvailable:        services[n].HighAvailable,
 			Status:               services[n].Status,
 			BackupMaxSizeByte:    services[n].BackupMaxSizeByte,
@@ -474,6 +479,11 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	desc := structs.PostServiceRequest{}
+	err = json.NewEncoder(bytes.NewBufferString(service.Description)).Encode(&desc)
+	if err != nil {
+		logrus.Warn(err)
 	}
 
 	units, err := database.ListUnitByServiceID(service.ID)
@@ -514,7 +524,7 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		ID:                   service.ID,
 		Name:                 service.Name,
 		Architecture:         service.Architecture,
-		Description:          service.Description,
+		Description:          desc,
 		HighAvailable:        service.HighAvailable,
 		Status:               service.Status,
 		BackupMaxSizeByte:    service.BackupMaxSizeByte,

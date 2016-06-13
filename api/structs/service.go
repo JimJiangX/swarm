@@ -128,10 +128,10 @@ type PostRebuildUnit struct {
 }
 
 type ServiceResponse struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Architecture string `json:"architecture"`
-	Description  string `json:"description"`
+	ID           string             `json:"id"`
+	Name         string             `json:"name"`
+	Architecture string             `json:"architecture"`
+	Description  PostServiceRequest `json:"description"`
 	// AutoHealing	bool	`json:"auto_healing"`
 	// AutoScaling	bool	`json:"auto_scaling"`
 	HighAvailable        bool   `json:"high_available"`
