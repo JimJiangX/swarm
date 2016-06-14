@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -401,23 +402,44 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// GET /services
+// GET /services?from=DBAAS
 func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	from := r.FormValue("form")
 	services, err := database.ListServices()
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	var response io.Reader
 
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
+	switch strings.ToUpper(from) {
+	case "DBAAS":
+		response = listServiceFromDBAAS(services)
+	default:
+
+		ok, _, gd := fromContext(ctx, _Gardener)
+		if !ok && gd == nil {
+			httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		response = listServicesResponse(gd, services)
 	}
 
-	lists := make([]structs.ServiceResponse, len(services))
-	containers := gd.Containers()
+	io.Copy(w, response)
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+}
+
+func listServicesResponse(gd *swarm.Gardener, services []database.Service) io.Reader {
+	containers := gd.Containers()
+	lists := make([]structs.ServiceResponse, len(services))
 	for n := range services {
 		desc := structs.PostServiceRequest{}
 		err := json.NewDecoder(bytes.NewBufferString(services[n].Description)).Decode(&desc)
@@ -465,9 +487,61 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(lists)
+	rw := bytes.NewBuffer(nil)
+	json.NewEncoder(rw).Encode(lists)
+
+	return rw
+}
+
+func listServiceFromDBAAS(services []database.Service) io.Reader {
+	type Response struct {
+		ID           string //"id": "??",
+		Name         string //"name": "test01",
+		BusinessCode string `json:"business_code"` // "business_code": "??",
+
+		Version string // "upsql_version": "??",
+		Arch    string // "upsql_arch": "??",
+
+		CPusetCpus string // "upsql_cpusetCpus": "??",
+		Memory     int64  // "upsql_memory": "??",
+
+		ManageStatus  int64  `json:"manage_status"`  //"manage_status": "??",
+		RunningStatus string `json:"running_status"` //"running_status": "??",
+		CreatedAt     string `json:"created_at"`     // "created_at": "??"
+	}
+
+	out := make([]Response, len(services))
+	for i := range services {
+		desc := structs.PostServiceRequest{}
+		err := json.NewDecoder(bytes.NewBufferString(services[i].Description)).Decode(&desc)
+		if err != nil {
+			logrus.Error(err, services[i].Description)
+		}
+		sql := structs.Module{}
+		for _, m := range desc.Modules {
+			if m.Type == "upsql" {
+				sql = m
+				break
+			}
+		}
+		out[i] = Response{
+			Name:          services[i].Name,
+			ID:            services[i].ID,
+			BusinessCode:  services[i].BusinessCode,
+			Version:       sql.Version,
+			Arch:          sql.Arch,
+			Memory:        sql.HostConfig.Memory,
+			CPusetCpus:    sql.HostConfig.CpusetCpus,
+			ManageStatus:  services[i].Status,
+			RunningStatus: "running",
+			CreatedAt:     utils.TimeToString(services[i].CreatedAt),
+		}
+	}
+
+	rw := bytes.NewBuffer(nil)
+	json.NewEncoder(rw).Encode(out)
+
+	return rw
 }
 
 // GET /services/{name:.*}

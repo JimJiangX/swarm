@@ -68,6 +68,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		Name:                 req.Name,
 		Description:          string(des),
 		Architecture:         req.Architecture,
+		BusinessCode:         req.BusinessCode,
 		AutoHealing:          req.AutoHealing,
 		AutoScaling:          req.AutoScaling,
 		HighAvailable:        req.HighAvailable,

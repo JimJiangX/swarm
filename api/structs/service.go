@@ -11,6 +11,7 @@ type PostServiceRequest struct {
 	Name         string
 	Description  string `json:",omitempty"`
 	Architecture string `json:"arch"`
+	BusinessCode string `business_code`
 
 	AutoHealing   bool `json:",omitempty"`
 	AutoScaling   bool `json:",omitempty"`
