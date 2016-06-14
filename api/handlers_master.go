@@ -408,18 +408,23 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	from := r.FormValue("form")
+
+	from := r.FormValue("from")
+
 	services, err := database.ListServices()
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	var response io.Reader
 
+	var response io.Reader
 	switch strings.ToUpper(from) {
 	case "DBAAS":
+		logrus.Debug("From %s", from)
+
 		response = listServiceFromDBAAS(services)
 	default:
+		logrus.Debug("From %s", "default")
 
 		ok, _, gd := fromContext(ctx, _Gardener)
 		if !ok && gd == nil {
