@@ -499,7 +499,7 @@ func listServicesResponse(gd *swarm.Gardener, services []database.Service) io.Re
 }
 
 func listServiceFromDBAAS(services []database.Service) io.Reader {
-	type Response struct {
+	type response struct {
 		ID           string //"id": "??",
 		Name         string //"name": "test01",
 		BusinessCode string `json:"business_code"` // "business_code": "??",
@@ -507,7 +507,7 @@ func listServiceFromDBAAS(services []database.Service) io.Reader {
 		Version string // "upsql_version": "??",
 		Arch    string // "upsql_arch": "??",
 
-		CPusetCpus string // "upsql_cpusetCpus": "??",
+		CpusetCpus string // "upsql_cpusetCpus": "??",
 		Memory     int64  // "upsql_memory": "??",
 
 		ManageStatus  int64  `json:"manage_status"`  //"manage_status": "??",
@@ -515,7 +515,7 @@ func listServiceFromDBAAS(services []database.Service) io.Reader {
 		CreatedAt     string `json:"created_at"`     // "created_at": "??"
 	}
 
-	out := make([]Response, len(services))
+	out := make([]response, len(services))
 	for i := range services {
 		desc := structs.PostServiceRequest{}
 		err := json.NewDecoder(bytes.NewBufferString(services[i].Description)).Decode(&desc)
@@ -529,14 +529,14 @@ func listServiceFromDBAAS(services []database.Service) io.Reader {
 				break
 			}
 		}
-		out[i] = Response{
+		out[i] = response{
 			Name:          services[i].Name,
 			ID:            services[i].ID,
 			BusinessCode:  services[i].BusinessCode,
 			Version:       sql.Version,
 			Arch:          sql.Arch,
 			Memory:        sql.HostConfig.Memory,
-			CPusetCpus:    sql.HostConfig.CpusetCpus,
+			CpusetCpus:    sql.HostConfig.CpusetCpus,
 			ManageStatus:  services[i].Status,
 			RunningStatus: "running",
 			CreatedAt:     utils.TimeToString(services[i].CreatedAt),
