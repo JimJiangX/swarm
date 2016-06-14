@@ -357,7 +357,7 @@ func TxInsertNetworking(start, end, gateway, _type string, prefix int) (Networki
 	}
 
 	// insert to database
-	err := insertNetworking(net, ips)
+	err := txInsertNetworking(net, ips)
 	if err != nil {
 		return Networking{}, nil, err
 	}
@@ -375,15 +375,15 @@ func UpdateNetworkingStatus(id string, enable bool) error {
 	return err
 }
 
-func insertNetworking(net Networking, ips []IP) error {
+func txInsertNetworking(net Networking, ips []IP) error {
 	tx, err := GetTX()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	ipQuery := "INSERT INTO tb_ip (ip_addr,prefix,networking_id,unit_id,allocated) VALUES (:ip_addr,:prefix,:networking_id,:unit_id,:allocated)"
-	stmt, err := tx.PrepareNamed(ipQuery)
+	query := "INSERT INTO tb_ip (ip_addr,prefix,networking_id,unit_id,allocated) VALUES (:ip_addr,:prefix,:networking_id,:unit_id,:allocated)"
+	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
 		return err
 	}
@@ -396,7 +396,7 @@ func insertNetworking(net Networking, ips []IP) error {
 		}
 	}
 
-	query := "INSERT INTO tb_networking (id,type,gateway,enabled) VALUES (:id,:type,:gateway,:enabled)"
+	query = "INSERT INTO tb_networking (id,type,gateway,enabled) VALUES (:id,:type,:gateway,:enabled)"
 	_, err = tx.NamedExec(query, &net)
 	if err != nil {
 		return err

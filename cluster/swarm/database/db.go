@@ -3,6 +3,7 @@ package database
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/codegangsta/cli"
 	"github.com/docker/swarm/utils"
@@ -39,6 +40,23 @@ var (
 		Usage: "connection to database port",
 	}
 )
+
+var (
+	noRowsFoundMsg = "no rows in result set"
+	ErrNoRowsFound = errors.New("Not Found Object")
+)
+
+func CheckError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if strings.Contains(err.Error(), noRowsFoundMsg) {
+		return ErrNoRowsFound
+	}
+
+	return err
+}
 
 func SetupDB(c *cli.Context) error {
 	auth := c.String("dbAuth")
