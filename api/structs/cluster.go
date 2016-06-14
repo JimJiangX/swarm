@@ -2,10 +2,17 @@ package structs
 
 import "github.com/docker/engine-api/types"
 
+type RegisterDatacenter struct {
+	ID           int    `json:"dc_id"`
+	Addr         string `json:"nfs_addr"`
+	Version      string `json:"nfs_version"`
+	Dir          string `json:"nfs_dir"`
+	MountOptions string `json:"nfs_mount_opts"`
+}
+
 type PostClusterRequest struct {
-	Name       string `json:"name"`
-	Type       string `json:"type"`
-	Datacenter string `json:"dc"`
+	Name string `json:"name"`
+	Type string `json:"type"`
 
 	MaxNode    int     `json:"max_node"`
 	UsageLimit float32 `json:"usage_limit"`
@@ -106,7 +113,7 @@ type ClusterInfoResponse struct {
 	Type        string  `json:"type"`
 	StorageType string  `json:"storage_type"`
 	StorageID   string  `json:"storage_id"`
-	Datacenter  string  `json:"dc"`
+	Datacenter  int     `json:"dc"`
 	Enabled     bool    `json:"enabled"`
 	MaxNode     int     `json:"max_node"`
 	NodeNum     int     `json:"node_num"`
@@ -119,7 +126,7 @@ type PerClusterInfoResponse struct {
 	Type        string        `json:"type"`
 	StorageType string        `json:"storage_type"`
 	StorageID   string        `json:"storage_id"`
-	Datacenter  string        `json:"dc"`
+	Datacenter  int           `json:"dc"`
 	Enabled     bool          `json:"enabled"`
 	MaxNode     int           `json:"max_node"`
 	UsageLimit  float32       `json:"usage_limit"`

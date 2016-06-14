@@ -5,6 +5,10 @@ import (
 	"github.com/yiduoyunQ/sm/sm-svr/consts"
 )
 
+var (
+	DatacenterID = 0
+)
+
 const (
 	_StatusTaskCreate = iota
 	_StatusTaskRunning

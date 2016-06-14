@@ -84,10 +84,6 @@ func ValidDatacenter(req structs.PostClusterRequest) string {
 		warnings = append(warnings, "missing 'StorageID' while 'StorageType' isnot 'local'")
 	}
 
-	if req.Datacenter == "" {
-		warnings = append(warnings, "'dc' is null")
-	}
-
 	if len(warnings) == 0 {
 		return ""
 	}

@@ -85,8 +85,9 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	// query consul config from DB
 	sysConfig, err := database.GetSystemConfig()
 	if err != nil {
-		logrus.Error("DB Error,%s", err)
+		logrus.Error("Get System Config Error,%s", err)
 	} else {
+		DatacenterID = sysConfig.DCID
 		err = gd.SetParams(*sysConfig)
 		if err != nil {
 			logrus.Error(err)

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -10,7 +11,9 @@ import (
 )
 
 type Configurations struct {
-	ID int `db:"id"` // auto_increment
+	ID   int `db:"id"` // auto_increment
+	DCID int `db:"dc_id"`
+	NFSOption
 	ConsulConfig
 	HorusConfig
 	Registry
@@ -22,6 +25,12 @@ type Configurations struct {
 	Retry      int64 `db:"retry"`
 }
 
+type NFSOption struct {
+	Addr         string `db:"nfs_ip"`
+	Dir          string `db:"nfs_dir"`
+	Version      string `db:"nfs_version"` // 3/4
+	MountOptions string `db:"nfs_mount_opts"`
+}
 type Users struct {
 	MonitorUsername     string `db:"mon_username"`
 	MonitorPassword     string `db:"mon_password"`
@@ -88,7 +97,7 @@ func (c Configurations) TableName() string {
 }
 
 func (c Configurations) Insert() (int64, error) {
-	query := "INSERT INTO tb_system_config (consul_IPs,consul_port,consul_dc,consul_token,consul_wait_time,horus_server_ip,horus_server_port,horus_agent_port,horus_event_ip,horus_event_port,registry_domain,registry_address,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,pkg_name,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password) VALUES (:consul_IPs,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_server_ip,:horus_server_port,:horus_agent_port,:horus_event_ip,:horus_event_port,:registry_domain,:registry_address,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:pkg_name,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:registry_os_username,:registry_os_password,:mon_username,:mon_password,:repl_username,:repl_password,:cup_dba_username,:cup_dba_password,:db_username,:db_password,:ap_username,:ap_password)"
+	query := "INSERT INTO tb_system_config (dc_id,consul_IPs,consul_port,consul_dc,consul_token,consul_wait_time,horus_server_ip,horus_server_port,horus_agent_port,horus_event_ip,horus_event_port,registry_domain,registry_address,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,pkg_name,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password,nfs_ip,nfs_dir,nfs_version,nfs_mount_opts) VALUES (:dc_id,:consul_IPs,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_server_ip,:horus_server_port,:horus_agent_port,:horus_event_ip,:horus_event_port,:registry_domain,:registry_address,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:pkg_name,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:registry_os_username,:registry_os_password,:mon_username,:mon_password,:repl_username,:repl_password,:cup_dba_username,:cup_dba_password,:db_username,:db_password,:ap_username,:ap_password,:nfs_ip,:nfs_dir,:nfs_version,:nfs_mount_opts)"
 	db, err := GetDB(true)
 	if err != nil {
 		return 0, err
@@ -182,6 +191,32 @@ func deleteSystemConfig(id int64) error {
 	}
 
 	_, err = db.Exec("DELETE FROM tb_system_config WHERE id=?", id)
+
+	return err
+}
+
+func RegisterDatacenter(id int, addr, version, dir, options string) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	c := &Configurations{}
+	err = db.Get(c, "SELECT * FROM tb_system_config LIMIT 1")
+	if err != nil {
+		return err
+	}
+
+	if c.DCID != 0 || c.NFSOption.Addr != "" ||
+		c.NFSOption.Dir != "" ||
+		c.NFSOption.Version != "" ||
+		c.NFSOption.MountOptions != "" {
+
+		return errors.New("datacenter has registered")
+	}
+
+	_, err = db.Exec("UPDATE tb_system_config SET dc_id=?,nfs_ip=?,nfs_dir=?,nfs_version=?,nfs_mount_opts=?",
+		id, addr, dir, version, options)
 
 	return err
 }

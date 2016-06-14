@@ -13,7 +13,6 @@ type Cluster struct {
 	Type        string  `db:"type"`
 	StorageType string  `db:"storage_type"`
 	StorageID   string  `db:"storage_id"`
-	Datacenter  string  `db:"datacenter"`
 	Enabled     bool    `db:"enabled"`
 	MaxNode     int     `db:"max_node"`
 	UsageLimit  float32 `db:"usage_limit"`
@@ -23,14 +22,13 @@ func (c Cluster) TableName() string {
 	return "tb_cluster"
 }
 
-func NewCluster(name, _type, storageType, storageID, dc string, enable bool, num int, limit float32) Cluster {
+func NewCluster(name, _type, storageType, storageID string, enable bool, num int, limit float32) Cluster {
 	return Cluster{
 		ID:          utils.Generate64UUID(),
 		Name:        name,
 		Type:        _type,
 		StorageType: storageType,
 		StorageID:   storageID,
-		Datacenter:  dc,
 		Enabled:     enable,
 		MaxNode:     num,
 		UsageLimit:  limit,
@@ -44,7 +42,7 @@ func (c Cluster) Insert() error {
 	}
 
 	// insert into database
-	query := "INSERT INTO tb_cluster (id,name,type,storage_id,storage_type,datacenter,enabled,max_node,usage_limit) VALUES (:id,:name,:type,:storage_id,:storage_type,:datacenter,:enabled,:max_node,:usage_limit)"
+	query := "INSERT INTO tb_cluster (id,name,type,storage_id,storage_type,enabled,max_node,usage_limit) VALUES (:id,:name,:type,:storage_id,:storage_type,:enabled,:max_node,:usage_limit)"
 	_, err = db.NamedExec(query, &c)
 
 	return err

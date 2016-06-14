@@ -95,7 +95,7 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		Type:        cl.Type,
 		StorageType: cl.StorageType,
 		StorageID:   cl.StorageID,
-		Datacenter:  cl.Datacenter,
+		Datacenter:  swarm.DatacenterID,
 		Enabled:     cl.Enabled,
 		MaxNode:     cl.MaxNode,
 		UsageLimit:  cl.UsageLimit,
@@ -130,7 +130,7 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			Type:        clusters[i].Type,
 			StorageType: clusters[i].StorageType,
 			StorageID:   clusters[i].StorageID,
-			Datacenter:  clusters[i].Datacenter,
+			Datacenter:  swarm.DatacenterID,
 			Enabled:     clusters[i].Enabled,
 			MaxNode:     clusters[i].MaxNode,
 			NodeNum:     num,
@@ -746,6 +746,24 @@ func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
+}
+
+// POST /datacenter
+func postDatacenter(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	req := structs.RegisterDatacenter{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = database.RegisterDatacenter(req.ID, req.Addr, req.Version, req.Dir, req.MountOptions)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	swarm.DatacenterID = req.ID
 }
 
 // POST /clusters

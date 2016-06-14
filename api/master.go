@@ -63,6 +63,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/services/{name:.*}":     getServicesByNameOrID,
 	},
 	"POST": {
+		"/datacenter":                    postDatacenter,
 		"/clusters":                      postCluster,
 		"/clusters/{name}/update":        postUpdateClusterParams,
 		"/clusters/{name}/enable":        postEnableCluster,

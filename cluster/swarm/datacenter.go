@@ -44,7 +44,6 @@ func AddNewCluster(req structs.PostClusterRequest) (database.Cluster, error) {
 		Type:        req.Type,
 		StorageType: req.StorageType,
 		StorageID:   req.StorageID,
-		Datacenter:  req.Datacenter,
 		Enabled:     true,
 		MaxNode:     req.MaxNode,
 		UsageLimit:  req.UsageLimit,
