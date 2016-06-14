@@ -13,4 +13,5 @@ type PostSANStoreRequest struct {
 }
 
 type PostRaidGroupRequest struct {
+	ID int
 }

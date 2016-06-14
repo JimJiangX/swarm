@@ -352,6 +352,26 @@ func TxInsertBackupStrategy(tx *sqlx.Tx, strategy BackupStrategy) error {
 	return err
 }
 
+func TxInsertBackupStrategyAndTask(strategy BackupStrategy, task Task) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = TxInsertBackupStrategy(tx, strategy)
+	if err != nil {
+		return err
+	}
+
+	err = TxInsertTask(tx, task)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func InsertBackupStrategy(strategy BackupStrategy) error {
 	db, err := GetDB(true)
 	if err != nil {

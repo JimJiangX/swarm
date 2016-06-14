@@ -39,7 +39,14 @@ func (bs *serviceBackup) Run() {
 	}
 	bs.strategy = strategy
 
-	bs.svc.TryBackupTask(bs.server, "", strategy.ID, strategy.Type, strategy.Timeout)
+	task := database.NewTask("backup_strategy", strategy.ID, "", nil, strategy.Timeout)
+	task.Status = _StatusTaskCreate
+	err = database.InsertTask(task)
+	if err != nil {
+		return
+	}
+
+	bs.svc.TryBackupTask(&task, bs.server, "", strategy.ID, strategy.Type, strategy.Timeout)
 }
 
 func (bs *serviceBackup) Next(time.Time) time.Time {

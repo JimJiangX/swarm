@@ -1013,13 +1013,27 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 // POST /services/{name:.*}/backup
 func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
+	req := structs.BackupStrategy{}
 
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
-	_ = name
+
+	taskID, err := gd.TemporaryServiceBackupTask(name, req)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
 }
 
 // POST /services/{name:.*}/recover
@@ -1517,7 +1531,7 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 // POST /storage/san/{name}/raidgroup
 func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	req := struct{ ID int }{}
+	req := structs.PostRaidGroupRequest{}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, err.Error(), http.StatusBadRequest)
 		return

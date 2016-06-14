@@ -116,11 +116,16 @@ func newBackupStrategy(service string, strategy *structs.BackupStrategy) (*datab
 	if strategy == nil {
 		return nil, nil
 	}
-
-	valid, err := utils.ParseStringToTime(strategy.Valid)
-	if err != nil {
-		logrus.Error("Parse Request.BackupStrategy.Valid to time.Time", err)
-		return nil, err
+	var (
+		valid = time.Time{}
+		err   error
+	)
+	if strategy.Valid != "" {
+		valid, err = utils.ParseStringToTime(strategy.Valid)
+		if err != nil {
+			logrus.Error("Parse Request.BackupStrategy.Valid to time.Time", err)
+			return nil, err
+		}
 	}
 
 	return &database.BackupStrategy{
@@ -888,20 +893,34 @@ loop:
 	return addr, port, master, err
 }
 
-func (svc *Service) TryBackupTask(host, unitID, strategyID, strategyType string, timeout int) error {
-	task := database.NewTask("backup_strategy", strategyID, "", nil, timeout)
-	task.Status = _StatusTaskCreate
-
-	err := database.InsertTask(task)
+func (gd *Gardener) TemporaryServiceBackupTask(name string, req structs.BackupStrategy) (string, error) {
+	svc, err := gd.GetService(name)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	backup := &unit{}
+	strategy, err := newBackupStrategy(name, &req)
+	if err != nil || strategy == nil {
+		return "", err
+	}
 
+	task := database.NewTask("backup_strategy", strategy.ID, "", nil, strategy.Timeout)
+	task.Status = _StatusTaskCreate
+	err = database.TxInsertBackupStrategyAndTask(*strategy, task)
+	if err != nil {
+		return "", err
+	}
+
+	go svc.TryBackupTask(&task, gd.host, "", strategy.ID, strategy.Type, strategy.Timeout)
+
+	return task.ID, nil
+}
+
+func (svc *Service) TryBackupTask(task *database.Task, host, unitID, strategyID, strategyType string, timeout int) error {
+	backup := &unit{}
 	for retries := 3; ; retries-- {
 		if retries != 3 {
-			time.Sleep(time.Second * 60)
+			time.Sleep(time.Minute)
 		}
 
 		addr, port, master, err := svc.GetSwitchManagerAndMaster()
@@ -909,16 +928,20 @@ func (svc *Service) TryBackupTask(host, unitID, strategyID, strategyType string,
 			if retries > 0 {
 				continue
 			}
-			err1 := database.UpdateTaskStatus(&task, _StatusTaskCancel, time.Now(), "Cancel,The Task marked as TaskCancel,"+err.Error())
-			return fmt.Errorf("Errors:%v,%v", err, err1)
+			err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "Cancel,The Task marked as TaskCancel,"+err.Error())
+			err = fmt.Errorf("Errors:%v,%v", err, err1)
+			logrus.Error(err)
+			return err
 		}
 
 		if err := smlib.Lock(addr, port); err != nil {
 			if retries > 0 {
 				continue
 			}
-			err1 := database.UpdateTaskStatus(&task, _StatusTaskCancel, time.Now(), "TaskCancel,Switch Manager is busy now,"+err.Error())
-			return fmt.Errorf("Errors:%v,%v", err, err1)
+			err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "TaskCancel,Switch Manager is busy now,"+err.Error())
+			err = fmt.Errorf("Errors:%v,%v", err, err1)
+			logrus.Error(err)
+			return err
 		}
 
 		backup = master
@@ -928,6 +951,7 @@ func (svc *Service) TryBackupTask(host, unitID, strategyID, strategyType string,
 	}
 
 	if unitID != "" {
+		var err error
 		svc.RLock()
 		backup, err = svc.getUnit(unitID)
 		svc.RUnlock()
@@ -946,17 +970,23 @@ func (svc *Service) TryBackupTask(host, unitID, strategyID, strategyType string,
 
 	case <-time.After(time.Duration(timeout)):
 
-		err = database.UpdateTaskStatus(&task, _StatusTaskTimeout, time.Now(), "Timeout,The Task marked as TaskTimeout")
+		err := database.UpdateTaskStatus(task, _StatusTaskTimeout, time.Now(), "Timeout,The Task marked as TaskTimeout")
 
-		return fmt.Errorf("Task Timeout,Service:%s,BackupStrategy:%s,Task:%s,Error:%v", svc.ID, strategyID, task.ID, err)
+		err = fmt.Errorf("Task Timeout,Service:%s,BackupStrategy:%s,Task:%s,Error:%v", svc.ID, strategyID, task.ID, err)
+		logrus.Error(err)
+		return err
 	}
 
 	msg := <-errCh
+	close(errCh)
 	if msg == nil {
 		return nil
 	}
 
-	return fmt.Errorf("Backup %s Task Faild,%v", unitID, msg)
+	err := fmt.Errorf("Backup %s Task Faild,%v", unitID, msg)
+	logrus.Error(err)
+
+	return err
 }
 
 func (svc *Service) Task() *database.Task {
