@@ -893,13 +893,24 @@ loop:
 	return addr, port, master, err
 }
 
-func (gd *Gardener) TemporaryServiceBackupTask(name string, req structs.BackupStrategy) (string, error) {
-	svc, err := gd.GetService(name)
+func (gd *Gardener) TemporaryServiceBackupTask(service, unit string, req structs.BackupStrategy) (string, error) {
+	if unit != "" {
+		u, err := database.GetUnit(unit)
+		if err != nil {
+			return "", err
+		}
+
+		if service == "" {
+			service = u.ServiceID
+		}
+	}
+
+	svc, err := gd.GetService(service)
 	if err != nil {
 		return "", err
 	}
 
-	strategy, err := newBackupStrategy(name, &req)
+	strategy, err := newBackupStrategy(service, &req)
 	if err != nil || strategy == nil {
 		return "", err
 	}
@@ -911,7 +922,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(name string, req structs.BackupSt
 		return "", err
 	}
 
-	go svc.TryBackupTask(&task, gd.host, "", strategy.ID, strategy.Type, strategy.Timeout)
+	go svc.TryBackupTask(&task, gd.host, unit, strategy.ID, strategy.Type, strategy.Timeout)
 
 	return task.ID, nil
 }

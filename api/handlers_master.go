@@ -427,7 +427,6 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		units, err := database.ListUnitByServiceID(services[n].ID)
 		if err != nil {
 			logrus.Error("List Unit By ServiceID", err)
-			continue
 		}
 
 		list := make([]structs.UnitInfo, len(units))
@@ -489,7 +488,6 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	units, err := database.ListUnitByServiceID(service.ID)
 	if err != nil {
 		logrus.Error("ListUnitByServiceID", err)
-		return
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
@@ -1012,7 +1010,7 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 // POST /services/{name:.*}/backup
 func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
+	service := mux.Vars(r)["name"]
 	req := structs.BackupStrategy{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1025,7 +1023,7 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	taskID, err := gd.TemporaryServiceBackupTask(name, req)
+	taskID, err := gd.TemporaryServiceBackupTask(service, "", req)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1254,7 +1252,30 @@ func postUnitStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /units/{name:.*}/backup
-func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	unit := mux.Vars(r)["name"]
+	req := structs.BackupStrategy{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	taskID, err := gd.TemporaryServiceBackupTask("", unit, req)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
+}
 
 // POST /units/{name:.*}/recover
 func postUnitRecover(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
