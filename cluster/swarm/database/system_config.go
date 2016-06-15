@@ -109,7 +109,7 @@ func (c Configurations) Insert() (int64, error) {
 func (c Configurations) GetConsulClient() ([]*consulapi.Client, error) {
 	port := strconv.Itoa(c.ConsulPort)
 	addrs := strings.Split(c.ConsulIPs, ",")
-	clients := make([]*consulapi.Client, 0, len(addrs))
+	clients := make([]*consulapi.Client, 0, len(addrs)+1)
 
 	for i := range addrs {
 		config := consulapi.Config{

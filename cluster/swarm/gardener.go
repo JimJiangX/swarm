@@ -21,7 +21,10 @@ import (
 	crontab "gopkg.in/robfig/cron.v2"
 )
 
-var leaderElectionPath = "docker/swarm/leader"
+var (
+	leaderElectionPath = "docker/swarm/leader"
+	HostAddress        = "127.0.0.1"
+)
 
 func init() {
 	logrus.SetFormatter(&logrus.TextFormatter{
@@ -84,6 +87,18 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 		logrus.Warning("kvDiscovery is only supported with consul, etcd and zookeeper discovery.")
 	}
 
+	for _, host := range hosts {
+		protoAddrParts := strings.SplitN(host, "://", 2)
+		if len(protoAddrParts) == 1 {
+			protoAddrParts = append([]string{"tcp"}, protoAddrParts...)
+		}
+		if protoAddrParts[0] == "tcp" {
+			gd.host = protoAddrParts[1]
+			HostAddress = gd.host
+			break
+		}
+	}
+
 	// query consul config from DB
 	sysConfig, err := database.GetSystemConfig()
 	if err != nil {
@@ -93,17 +108,6 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 		err = gd.SetParams(*sysConfig)
 		if err != nil {
 			logrus.Error(err)
-		}
-	}
-
-	for _, host := range hosts {
-		protoAddrParts := strings.SplitN(host, "://", 2)
-		if len(protoAddrParts) == 1 {
-			protoAddrParts = append([]string{"tcp"}, protoAddrParts...)
-		}
-		if protoAddrParts[0] == "tcp" {
-			gd.host = protoAddrParts[1]
-			break
 		}
 	}
 
@@ -171,16 +175,33 @@ func (gd *Gardener) consulAPIClient(full bool) (*consulapi.Client, error) {
 		gd.RUnlock()
 	}
 
-	config, err := database.GetSystemConfig()
+	sys, err := database.GetSystemConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	clients, err := config.GetConsulClient()
+	clients, err := sys.GetConsulClient()
 	if err != nil {
-		return nil, err
+		logrus.Error(err)
 	}
-	for i := range clients {
+	config := consulapi.Config{
+		Address:    fmt.Sprintf("%s:%d", gd.host, sys.ConsulPort),
+		Datacenter: sys.ConsulDatacenter,
+		WaitTime:   time.Duration(sys.ConsulWaitTime) * time.Second,
+		Token:      sys.ConsulToken,
+	}
+
+	consulClient, err := consulapi.NewClient(&config)
+	if err != nil {
+		logrus.Warnf("%s ,%v", err, config)
+	} else {
+		clients = append(clients, consulClient)
+	}
+
+	for i := len(clients) - 1; i >= 0; i-- {
+		if clients[i] == nil {
+			continue
+		}
 		_, err := clients[i].Status().Leader()
 		if err == nil {
 			gd.setConsulClient(clients[i])
@@ -189,14 +210,12 @@ func (gd *Gardener) consulAPIClient(full bool) (*consulapi.Client, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("Not Found Alive Consul Server %s:%d", config.ConsulIPs, config.ConsulPort)
+	return nil, fmt.Errorf("Not Found Alive Consul Server %s:%d", sys.ConsulIPs, sys.ConsulPort)
 }
 
 func (gd *Gardener) SetParams(sys database.Configurations) error {
 	gd.Lock()
 	defer gd.Unlock()
-
-	DatacenterID = sys.ID
 
 	if sys.Retry > 0 && gd.Cluster.createRetry == 0 {
 		gd.Cluster.createRetry = sys.Retry
@@ -215,12 +234,8 @@ func (gd *Gardener) SetParams(sys database.Configurations) error {
 
 	endpoints, dc, token, wait := sys.GetConsulConfig()
 
-	if len(endpoints) == 0 {
-		return fmt.Errorf("Consul Config Settings Error")
-	}
-
 	config := consulapi.Config{
-		Address:    endpoints[0],
+		Address:    fmt.Sprintf("%s:%d", gd.host, sys.ConsulPort),
 		Datacenter: dc,
 		WaitTime:   time.Duration(wait) * time.Second,
 		Token:      token,
@@ -238,10 +253,14 @@ func (gd *Gardener) SetParams(sys database.Configurations) error {
 	}
 
 	if gd.kvClient == nil {
-		gd.kvClient, err = consul.New(endpoints, options)
+		gd.kvClient, err = consul.New([]string{config.Address}, options)
 		if err != nil {
-			logrus.Error("Initializing kvStore,consul Config Error,%s", err)
-			return err
+			logrus.Error("Initializing kvStore,consul Config %s Error,%s", config.Address, err)
+
+			gd.kvClient, err = consul.New(endpoints, options)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
