@@ -11,7 +11,6 @@ import (
 )
 
 type Configurations struct {
-	ID   int `db:"id"` // auto_increment
 	DCID int `db:"dc_id"`
 	NFSOption
 	ConsulConfig
@@ -46,7 +45,6 @@ type Users struct {
 
 type SSHDeliver struct {
 	SourceDir       string `db:"source_dir"`
-	PkgName         string `db:"pkg_name"`
 	CA_CRT_Name     string `db:"ca_crt_name"`
 	Destination     string `db:"destination_dir"` // must be exist
 	InitScriptName  string `db:"init_script_name"`
@@ -54,17 +52,16 @@ type SSHDeliver struct {
 }
 
 // DestPath returns destination abs path,pkg\script\CA
-func (d SSHDeliver) DestPath() (string, string, string, string) {
+func (d SSHDeliver) DestPath() (string, string, string) {
 	base := filepath.Base(d.SourceDir)
 
-	return filepath.Join(d.Destination, d.PkgName),
-		filepath.Join(d.Destination, base, d.InitScriptName),
+	return filepath.Join(d.Destination, base, d.InitScriptName),
 		filepath.Join(d.Destination, base, d.CA_CRT_Name),
 		filepath.Join(d.Destination, d.CleanScriptName)
 }
 
 type ConsulConfig struct {
-	ConsulIPs        string `db:"consul_IPs"`
+	ConsulIPs        string `db:"consul_ip"`
 	ConsulPort       int    `db:"consul_port"`
 	ConsulDatacenter string `db:"consul_dc"`
 	ConsulToken      string `db:"consul_token"`
@@ -83,7 +80,7 @@ type Registry struct {
 	OsUsername string `db:"registry_os_username"`
 	OsPassword string `db:"registry_os_password"`
 	Domain     string `db:"registry_domain"`
-	Address    string `db:"registry_address"`
+	Address    string `db:"registry_ip"`
 	Port       int    `db:"registry_port"`
 	Username   string `db:"registry_username"`
 	Password   string `db:"registry_password"`
@@ -97,7 +94,7 @@ func (c Configurations) TableName() string {
 }
 
 func (c Configurations) Insert() (int64, error) {
-	query := "INSERT INTO tb_system_config (dc_id,consul_IPs,consul_port,consul_dc,consul_token,consul_wait_time,horus_server_ip,horus_server_port,horus_agent_port,horus_event_ip,horus_event_port,registry_domain,registry_address,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,pkg_name,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password,nfs_ip,nfs_dir,nfs_version,nfs_mount_opts) VALUES (:dc_id,:consul_IPs,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_server_ip,:horus_server_port,:horus_agent_port,:horus_event_ip,:horus_event_port,:registry_domain,:registry_address,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:pkg_name,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:registry_os_username,:registry_os_password,:mon_username,:mon_password,:repl_username,:repl_password,:cup_dba_username,:cup_dba_password,:db_username,:db_password,:ap_username,:ap_password,:nfs_ip,:nfs_dir,:nfs_version,:nfs_mount_opts)"
+	query := "INSERT INTO tb_system_config (dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,horus_server_ip,horus_server_port,horus_agent_port,horus_event_ip,horus_event_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password,nfs_ip,nfs_dir,nfs_version,nfs_mount_opts) VALUES (:dc_id,:consul_ip,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_server_ip,:horus_server_port,:horus_agent_port,:horus_event_ip,:horus_event_port,:registry_domain,:registry_ip,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:registry_os_username,:registry_os_password,:mon_username,:mon_password,:repl_username,:repl_password,:cup_dba_username,:cup_dba_password,:db_username,:db_password,:ap_username,:ap_password,:nfs_ip,:nfs_dir,:nfs_version,:nfs_mount_opts)"
 	db, err := GetDB(true)
 	if err != nil {
 		return 0, err
@@ -190,7 +187,7 @@ func deleteSystemConfig(id int64) error {
 		return err
 	}
 
-	_, err = db.Exec("DELETE FROM tb_system_config WHERE id=?", id)
+	_, err = db.Exec("DELETE FROM tb_system_config WHERE dc_id=?", id)
 
 	return err
 }

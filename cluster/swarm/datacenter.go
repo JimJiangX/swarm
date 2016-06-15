@@ -818,7 +818,7 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, string,
 		return nil, "", err
 	}
 
-	_, path, caFile, _ := config.DestPath()
+	path, caFile, _ := config.DestPath()
 
 	buf, err := json.Marshal(config.GetConsulAddrs())
 	if err != nil {
@@ -945,7 +945,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 	logrus.Info("Registry.CA_CRT", len(config.Registry.CA_CRT), config.Registry.CA_CRT)
 
 	caBuf := bytes.NewBufferString(config.Registry.CA_CRT)
-	_, _, filename, _ := config.DestPath()
+	_, filename, _ := config.DestPath()
 
 	if err := c.Upload(filename, caBuf); err != nil {
 		entry.Errorf("SSH UploadFile %s Error,%s", filename, err)
@@ -1182,7 +1182,7 @@ func nodeClean(node, addr, user, password string) error {
 	if err != nil {
 		return err
 	}
-	_, _, _, destName := config.DestPath()
+	_, _, destName := config.DestPath()
 
 	srcFile, err := utils.GetAbsolutePath(false, config.SourceDir, config.CleanScriptName)
 	if err != nil {

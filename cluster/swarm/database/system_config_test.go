@@ -20,7 +20,6 @@ func TestSystemConfig(t *testing.T) {
 		Registry: Registry{},
 		SSHDeliver: SSHDeliver{
 			SourceDir:       "./script/node-init",
-			PkgName:         "",
 			InitScriptName:  "node-init.sh",
 			CleanScriptName: "node-clean.sh",
 			CA_CRT_Name:     "registery-ca.crt",
@@ -46,9 +45,6 @@ func TestSystemConfig(t *testing.T) {
 	config, err := GetSystemConfig()
 	if err != nil {
 		t.Fatal(err)
-	}
-	if config.ID != int(id) {
-		t.Logf("Unexpected:%d != %d", config.ID, id)
 	}
 
 	client, err := config.GetConsulClient()
