@@ -3,6 +3,7 @@ package swarm
 import (
 	"crypto/tls"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -321,5 +322,38 @@ func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 		logrus.Error(err)
 	}
 
+	err = nfsSetting(config.NFSOption)
+
 	return err
+}
+
+func nfsSetting(option database.NFSOption) error {
+	if option.Addr == "" || option.Dir == "" || option.MountDir == "" {
+		logrus.Warnf("NFS Option:%v", option)
+		return nil
+	}
+	_, err := os.Stat(option.MountDir)
+	if os.IsNotExist(err) {
+		err := os.MkdirAll(option.MountDir, os.ModePerm)
+		if err != nil {
+			return err
+		}
+	}
+
+	// mount -t nfs -o nolock 192.168.2.181:/NASBACKUP /NASBACKUP
+	// option addr:dir mount_dir
+	script := fmt.Sprintf("mount -t nfs -o %s %s:%s %s",
+		option.MountOptions, option.Addr, option.Dir, option.MountDir)
+
+	cmd, err := utils.ExecScript(script)
+	if err != nil {
+		return err
+	}
+
+	out, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("%v,%s", err, string(out))
+	}
+
+	return nil
 }
