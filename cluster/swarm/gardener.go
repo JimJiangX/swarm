@@ -261,7 +261,7 @@ func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 		NFSOption: database.NFSOption{
 			Addr:         req.NFS.Addr,
 			Dir:          req.NFS.Dir,
-			Version:      req.NFS.Version,
+			MountDir:     req.NFS.MountDir,
 			MountOptions: req.NFS.MountOptions,
 		},
 		ConsulConfig: database.ConsulConfig{

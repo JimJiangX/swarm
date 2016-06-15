@@ -183,6 +183,7 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 
 // DebugRequestMiddleware dumps the request to logger
 func DebugRequestMiddleware(r *http.Request) error {
+	logrus.Debugf("%v", r)
 	if r.Method != "POST" {
 		return nil
 	}

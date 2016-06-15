@@ -16,7 +16,7 @@ type RegisterDatacenter struct {
 type NFSOption struct {
 	Addr         string `json:"nfs_ip"`
 	Dir          string `json:"nfs_dir"`
-	Version      string `json:"nfs_version"` // 3/4
+	MountDir     string `json:"nfs_mount_dir"`
 	MountOptions string `json:"nfs_mount_opts"`
 }
 type Users struct {
