@@ -111,6 +111,7 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	clusters, err := database.ListCluster()
 	if err != nil {
+		logrus.Error("List Cluster", err)
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -120,6 +121,7 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	for i := range clusters {
 		num, err := database.CountNodeByCluster(clusters[i].ID)
 		if err != nil {
+			logrus.Error("Count Node By Cluster", err)
 			httpError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
