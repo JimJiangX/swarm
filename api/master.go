@@ -199,6 +199,7 @@ func DebugRequestMiddleware(r *http.Request) error {
 	b, err := bufReader.Peek(maxBodySize)
 	if err != io.EOF {
 		// either there was an error reading, or the buffer is full (in which case the request is too large)
+		logrus.Debug(err, "either there was an error reading, or the buffer is full (in which case the request is too large)")
 		return err
 	}
 
@@ -213,6 +214,8 @@ func DebugRequestMiddleware(r *http.Request) error {
 		} else {
 			logrus.Debugf("form data: %q", postForm)
 		}
+	} else {
+		logrus.Debugf("JSON Unmarshal error:%v,%s", err, string(b))
 	}
 
 	return err
