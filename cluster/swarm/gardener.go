@@ -11,6 +11,7 @@ import (
 	"github.com/docker/engine-api/types"
 	kvstore "github.com/docker/libkv/store"
 	"github.com/docker/libkv/store/consul"
+	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
@@ -87,7 +88,7 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	if err != nil {
 		logrus.Error("Get System Config Error,%s", err)
 	} else {
-		DatacenterID = sysConfig.DCID
+		DatacenterID = sysConfig.ID
 		err = gd.SetParams(*sysConfig)
 		if err != nil {
 			logrus.Error(err)
@@ -194,6 +195,8 @@ func (gd *Gardener) SetParams(sys database.Configurations) error {
 	gd.Lock()
 	defer gd.Unlock()
 
+	DatacenterID = sys.ID
+
 	if sys.Retry > 0 && gd.Cluster.createRetry == 0 {
 		gd.Cluster.createRetry = sys.Retry
 	}
@@ -242,4 +245,81 @@ func (gd *Gardener) SetParams(sys database.Configurations) error {
 	}
 
 	return nil
+}
+
+func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
+	sys, err := database.GetSystemConfig()
+	if err == nil {
+		return fmt.Errorf("DC Has Registered,dc=%d", sys.ID)
+	}
+
+	config := database.Configurations{
+		ID:         req.ID,
+		DockerPort: req.DockerPort,
+		PluginPort: req.PluginPort,
+		Retry:      req.Retry,
+		NFSOption: database.NFSOption{
+			Addr:         req.NFS.Addr,
+			Dir:          req.NFS.Dir,
+			Version:      req.NFS.Version,
+			MountOptions: req.NFS.MountOptions,
+		},
+		ConsulConfig: database.ConsulConfig{
+			ConsulIPs:        req.Consul.ConsulIPs,
+			ConsulPort:       req.Consul.ConsulPort,
+			ConsulDatacenter: req.Consul.ConsulDatacenter,
+			ConsulToken:      req.Consul.ConsulToken,
+			ConsulWaitTime:   req.Consul.ConsulWaitTime,
+		},
+		HorusConfig: database.HorusConfig{
+			HorusServerIP:   req.Horus.HorusServerIP,
+			HorusServerPort: req.Horus.HorusServerPort,
+			HorusAgentPort:  req.Horus.HorusAgentPort,
+			HorusEventIP:    req.Horus.HorusEventIP,
+			HorusEventPort:  req.Horus.HorusEventPort,
+		},
+		Registry: database.Registry{
+			OsUsername: req.Registry.OsUsername,
+			OsPassword: req.Registry.OsPassword,
+			Domain:     req.Registry.Domain,
+			Address:    req.Registry.Address,
+			Port:       req.Registry.Port,
+			Username:   req.Registry.Username,
+			Password:   req.Registry.Password,
+			Email:      req.Registry.Email,
+			Token:      req.Registry.Token,
+			CA_CRT:     req.Registry.CA_CRT,
+		},
+		SSHDeliver: database.SSHDeliver{
+			SourceDir:       req.SSHDeliver.SourceDir,
+			CA_CRT_Name:     req.SSHDeliver.CA_CRT_Name,
+			Destination:     req.SSHDeliver.Destination,
+			InitScriptName:  req.SSHDeliver.InitScriptName,
+			CleanScriptName: req.SSHDeliver.CleanScriptName,
+		},
+		Users: database.Users{
+			MonitorUsername:     req.Users.MonitorUsername,
+			MonitorPassword:     req.Users.MonitorPassword,
+			ReplicationUsername: req.Users.ReplicationUsername,
+			ReplicationPassword: req.Users.ReplicationPassword,
+			ApplicationUsername: req.Users.ApplicationUsername,
+			ApplicationPassword: req.Users.ApplicationPassword,
+			DBAUsername:         req.Users.DBAUsername,
+			DBAPassword:         req.Users.DBAPassword,
+			DBUsername:          req.Users.DBUsername,
+			DBPassword:          req.Users.DBPassword,
+		},
+	}
+
+	_, err = config.Insert()
+	if err != nil {
+		return err
+	}
+
+	err = gd.SetParams(config)
+	if err != nil {
+		logrus.Error(err)
+	}
+
+	return err
 }

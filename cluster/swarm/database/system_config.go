@@ -1,7 +1,6 @@
 package database
 
 import (
-	"errors"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -11,17 +10,16 @@ import (
 )
 
 type Configurations struct {
-	DCID int `db:"dc_id"`
+	ID         int   `db:"dc_id"`
+	DockerPort int   `db:"docker_port"`
+	PluginPort int   `db:"plugin_port"`
+	Retry      int64 `db:"retry"`
 	NFSOption
 	ConsulConfig
 	HorusConfig
 	Registry
 	SSHDeliver
 	Users
-
-	DockerPort int   `db:"docker_port"`
-	PluginPort int   `db:"plugin_port"`
-	Retry      int64 `db:"retry"`
 }
 
 type NFSOption struct {
@@ -188,32 +186,6 @@ func deleteSystemConfig(id int64) error {
 	}
 
 	_, err = db.Exec("DELETE FROM tb_system_config WHERE dc_id=?", id)
-
-	return err
-}
-
-func RegisterDatacenter(id int, addr, version, dir, options string) error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
-	}
-
-	c := &Configurations{}
-	err = db.Get(c, "SELECT * FROM tb_system_config LIMIT 1")
-	if err != nil {
-		return err
-	}
-
-	if c.DCID != 0 || c.NFSOption.Addr != "" ||
-		c.NFSOption.Dir != "" ||
-		c.NFSOption.Version != "" ||
-		c.NFSOption.MountOptions != "" {
-
-		return errors.New("datacenter has registered")
-	}
-
-	_, err = db.Exec("UPDATE tb_system_config SET dc_id=?,nfs_ip=?,nfs_dir=?,nfs_version=?,nfs_mount_opts=?",
-		id, addr, dir, version, options)
 
 	return err
 }

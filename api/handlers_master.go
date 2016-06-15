@@ -756,14 +756,19 @@ func postDatacenter(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
 
-	err = database.RegisterDatacenter(req.ID, req.Addr, req.Version, req.Dir, req.MountOptions)
+	err = swarm.RegisterDatacenter(gd, req)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	swarm.DatacenterID = req.ID
+	w.WriteHeader(http.StatusCreated)
 }
 
 // POST /clusters
