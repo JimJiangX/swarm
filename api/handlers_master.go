@@ -1385,7 +1385,28 @@ func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 func postUnitRecover(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
 
 // POST /units/{name:.*}/migrate
-func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	req := structs.PostRebuildUnit{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.UnitMigrate(name, req.Candidates, req.HostConfig)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
 
 // POST /units/{name:.*}/rebuild
 func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {

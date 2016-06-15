@@ -128,6 +128,11 @@ type PostRebuildUnit struct {
 	HostConfig *container.HostConfig
 }
 
+type PostMigrateUnit struct {
+	Candidates []string
+	HostConfig *container.HostConfig
+}
+
 type ServiceResponse struct {
 	ID           string             `json:"id"`
 	Name         string             `json:"name"`
