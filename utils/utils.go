@@ -166,7 +166,7 @@ func ExecScript(script ...string) (*exec.Cmd, error) {
 	copy(slice[1:], script)
 
 	cmd := exec.Command(shell, slice...)
-	fmt.Println("exec:", shell, slice...)
+	fmt.Println("exec:", shell, slice)
 
 	return cmd, nil
 }
