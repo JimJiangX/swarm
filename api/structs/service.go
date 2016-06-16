@@ -57,8 +57,8 @@ type BackupStrategy struct {
 	Valid     string // "2006-01-02 15:04:05"
 	BackupDir string `json:",omitempty"`
 	Timeout   int    `json:",omitempty"` // xx Sec
-	Enable    bool   `json:",omitempty"` // using in response
-	CreatedAt string `json:",omitempty"` // using in response
+	Enable    bool   // using in response
+	CreatedAt string // using in response
 }
 
 type PostServiceResponse struct {
