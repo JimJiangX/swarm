@@ -18,11 +18,11 @@ consul_port=${15}
 node_id=${16}
 horus_server_ip=${17}
 horus_server_port=${18}
-docker_plugin_port=${18}
-nfs_ip=${19}
-nfs_dir=${20}
-nfs_mount_dir=${21}
-nfs_mount_opts=${22}
+docker_plugin_port=${19}
+nfs_ip=${20}
+nfs_dir=${21}
+nfs_mount_dir=${22}
+nfs_mount_opts=${23}
 cur_dir=`dirname $0`
 
 hdd_vgname=${HOSTNAME}_HDD_VG
