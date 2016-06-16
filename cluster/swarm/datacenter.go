@@ -80,8 +80,6 @@ func NewNode(addr, name, cluster, user, password, room, seat string, hdd, ssd []
 
 		MaxContainer: num,
 		Status:       _StatusNodeImport,
-		RegisterAt:   time.Time{},
-		DeregisterAt: time.Time{},
 	}
 
 	task := database.NewTask("node", node.ID, "import node", nil, 0)

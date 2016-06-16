@@ -185,13 +185,13 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 // DebugRequestMiddleware dumps the request to logger
 func DebugRequestMiddleware(r *http.Request) error {
 	if r.Method != "POST" {
-		logrus.Warn("Request Method", r.Method)
+		logrus.Warn("Request Method ", r.Method)
 		return nil
 	}
 
-	maxBodySize := 20 << 1 // 1MB
+	maxBodySize := 4096 // 4KB
 	if r.ContentLength > int64(maxBodySize) {
-		logrus.Warn("ContentLength Too Large", r.ContentLength, maxBodySize)
+		logrus.Warnf("ContentLength Too Large %d>%d", r.ContentLength, maxBodySize)
 		return nil
 	}
 
@@ -202,7 +202,7 @@ func DebugRequestMiddleware(r *http.Request) error {
 	b, err := bufReader.Peek(maxBodySize)
 	if err != io.EOF {
 		// either there was an error reading, or the buffer is full (in which case the request is too large)
-		logrus.Debug(err, "either there was an error reading, or the buffer is full (in which case the request is too large)")
+		logrus.Debug(err, " either there was an error reading, or the buffer is full (in which case the request is too large)")
 		return err
 	}
 

@@ -76,7 +76,6 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		BackupMaxSizeByte:    req.BackupMaxSize,
 		BackupFilesRetention: req.BackupRetention * int(time.Hour) * 12,
 		CreatedAt:            time.Now(),
-		FinishedAt:           time.Time{},
 	}
 
 	strategy, err := newBackupStrategy(svc.ID, req.BackupStrategy)
@@ -107,7 +106,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 	if err := service.SaveToDB(); err != nil {
 		atomic.StoreInt64(&svc.Status, _StatusServiceInit)
 
-		logrus.Error("Service Save To DB", err)
+		logrus.Errorf("Service Save To DB %s", err)
 		return nil, err
 	}
 
