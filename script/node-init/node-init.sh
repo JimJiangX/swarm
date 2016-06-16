@@ -18,8 +18,12 @@ consul_port=${15}
 node_id=${16}
 horus_server_ip=${17}
 horus_server_port=${18}
+docker_plugin_port=${18}
+nfs_ip=${19}
+nfs_dir=${20}
+nfs_mount_dir=${21}
+nfs_mount_opts=${22}
 cur_dir=`dirname $0`
-docker_plugin_port=3333
 
 hdd_vgname=${HOSTNAME}_HDD_VG
 ssd_vgname=${HOSTNAME}_SSD_VG
@@ -28,6 +32,15 @@ adm_nic=bond0
 int_nic=bond1
 ext_nic=bond2
 
+nfs_mount() {
+	umount -f ${nfs_mount_dir}
+	rm -rf ${nfs_mount_dir}
+	mount -t nfs -o ${nfs_mount_opts} ${nfs_ip}:${nfs_dir} ${nfs_mount_dir}
+	if [ $? -ne 0 ]; then
+		echo "nfs mount failed"
+		exit 2
+	fi	
+}
 
 
 reg_to_horus_server() {
@@ -591,6 +604,7 @@ EOF
 
 
 create_check_script
+nfs_mount
 init_hdd_vg
 init_ssd_vg
 install_consul
