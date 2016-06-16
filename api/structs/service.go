@@ -1,8 +1,6 @@
 package structs
 
 import (
-	"time"
-
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/engine-api/types/network"
 )
@@ -19,7 +17,7 @@ type PostServiceRequest struct {
 
 	Modules         []Module
 	Users           []User          `json:",omitempty"`
-	BackupRetention time.Duration   `json:"backup_retention"` // s
+	BackupRetention int             `json:"backup_retention"` // day
 	BackupMaxSize   int             `json:"backup_max_size"`  // byte
 	BackupStrategy  *BackupStrategy `json:"backup_strategy,omitempty"`
 }
@@ -53,11 +51,14 @@ type DiskStorage struct {
 }
 
 type BackupStrategy struct {
-	Type      string        // full/incremental
-	Spec      string        // cron spec
-	Valid     string        // "2006-01-02 15:04:05"
-	BackupDir string        `json:",omitempty"`
-	Timeout   time.Duration // xx Sec
+	Name      string
+	Type      string // full/incremental
+	Spec      string // cron spec
+	Valid     string // "2006-01-02 15:04:05"
+	BackupDir string `json:",omitempty"`
+	Timeout   int    `json:",omitempty"` // xx Sec
+	Enable    bool   `json:",omitempty"` // using in response
+	CreatedAt string `json:",omitempty"` // using in response
 }
 
 type PostServiceResponse struct {

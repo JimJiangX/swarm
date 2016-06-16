@@ -551,7 +551,7 @@ func listServiceFromDBAAS(services []database.Service) io.Reader {
 	return rw
 }
 
-// GET /services/{name:.*}
+// GET /services/{name}
 func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -658,6 +658,40 @@ func getContainerJSON2(name string, container *cluster.Container) ([]byte, error
 	data = bytes.Replace(data, []byte("\"HostIp\":\"0.0.0.0\""), []byte(fmt.Sprintf("\"HostIp\":%q", container.Engine.IP)), -1)
 
 	return data, nil
+}
+
+// GET /services/{name}/backup_strategy
+func getServiceBackupStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	service, err := database.GetService(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	list, err := database.ListBackupStrategyByServiceID(service.ID)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	out := make([]structs.BackupStrategy, len(list))
+
+	for i := range list {
+		out[i] = structs.BackupStrategy{
+			Name:      list[i].Name,
+			Type:      list[i].Type,
+			Spec:      list[i].Spec,
+			Valid:     utils.TimeToString(list[i].Valid),
+			CreatedAt: utils.TimeToString(list[i].CreatedAt),
+			Enable:    list[i].Enabled,
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(out)
 }
 
 // GET /tasks

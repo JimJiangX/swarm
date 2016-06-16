@@ -145,6 +145,26 @@ func DelLUN(id string) error {
 	return err
 }
 
+func TxReleaseLun(name string) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec("DELETE FROM tb_lun WHERE name OR vg_name=?", name, name)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec("DELETE FROM tb_volumes WHERE name OR VGname=?", name, name)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func SelectHostLunIDByMapping(host string) ([]int, error) {
 	db, err := GetDB(true)
 	if err != nil {

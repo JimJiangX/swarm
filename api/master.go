@@ -50,17 +50,18 @@ type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 var masterRoutes = map[string]map[string]ctxHandler{
 	"GET": {
-		"/clusters":               getClusters,
-		"/clusters/{name:.*}":     getClustersByNameOrID,
-		"/resources":              getClustersResource,
-		"/resources/{cluster:.*}": getNodesResourceByCluster,
-		"/tasks":                  getTasks,
-		"/tasks/{name:.*}":        getTask,
-		"/ports":                  getPorts,
-		"/networkings":            getNetworkings,
-		"/image/{name:.*}":        getImage,
-		"/services":               getServices,
-		"/services/{name:.*}":     getServicesByNameOrID,
+		"/clusters":                        getClusters,
+		"/clusters/{name:.*}":              getClustersByNameOrID,
+		"/resources":                       getClustersResource,
+		"/resources/{cluster:.*}":          getNodesResourceByCluster,
+		"/tasks":                           getTasks,
+		"/tasks/{name:.*}":                 getTask,
+		"/ports":                           getPorts,
+		"/networkings":                     getNetworkings,
+		"/image/{name:.*}":                 getImage,
+		"/services":                        getServices,
+		"/services/{name}":                 getServicesByNameOrID,
+		"/services/{name}/backup_strategy": getServiceBackupStrategy,
 	},
 	"POST": {
 		"/datacenter":                    postDatacenter,
@@ -106,7 +107,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/image/{image:.*}/disable":  postDisableImage,
 		"/image/{image:.*}/template": updateImageTemplateConfig,
 
-		"/storage/nas":                                       postNasStorage,
+		// "/storage/nas":                                       postNasStorage,
 		"/storage/san":                                       postSanStorage,
 		"/storage/san/{name}/raid_group":                     postRGToSanStorage,
 		"/storage/san/{name}/raid_group/{rg:[0-9]+}/enable":  postEnableRaidGroup,
@@ -184,11 +185,13 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 // DebugRequestMiddleware dumps the request to logger
 func DebugRequestMiddleware(r *http.Request) error {
 	if r.Method != "POST" {
+		logrus.Warn("Request Method", r.Method)
 		return nil
 	}
 
 	maxBodySize := 20 << 1 // 1MB
 	if r.ContentLength > int64(maxBodySize) {
+		logrus.Warn("ContentLength Too Large", r.ContentLength, maxBodySize)
 		return nil
 	}
 

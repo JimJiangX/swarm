@@ -167,7 +167,7 @@ func (h *hitachiStore) Recycle(id string, lun int) error {
 		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
 	}
 
-	err = database.DelLUN(l.ID)
+	err = database.TxReleaseLun(l.Name)
 
 	return err
 }

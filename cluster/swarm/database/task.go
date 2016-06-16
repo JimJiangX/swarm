@@ -246,6 +246,7 @@ func DeleteTask(id string) error {
 
 type BackupStrategy struct {
 	ID        string    `db:"id"`
+	Name      string    `db:"name"`
 	ServiceID string    `db:"service_id"`
 	Type      string    `db:"type"` // full/part
 	Spec      string    `db:"spec"`
@@ -278,7 +279,7 @@ func GetBackupStrategy(id string) (*BackupStrategy, error) {
 	return strategy, nil
 }
 
-func GetBackupStrategyByServiceID(id string) ([]BackupStrategy, error) {
+func ListBackupStrategyByServiceID(id string) ([]BackupStrategy, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
@@ -346,7 +347,7 @@ func txDeleteBackupStrategy(tx *sqlx.Tx, id string) error {
 
 }
 func TxInsertBackupStrategy(tx *sqlx.Tx, strategy BackupStrategy) error {
-	query := "INSERT INTO tb_backup_strategy (id,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:type,:service_id,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
+	query := "INSERT INTO tb_backup_strategy (id,name,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:name,:type,:service_id,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
 	_, err := tx.NamedExec(query, &strategy)
 
 	return err
@@ -377,7 +378,7 @@ func InsertBackupStrategy(strategy BackupStrategy) error {
 	if err != nil {
 		return err
 	}
-	query := "INSERT INTO tb_backup_strategy (id,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:type,:service_id,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
+	query := "INSERT INTO tb_backup_strategy (id,name,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:name,:type,:service_id,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
 	_, err = db.NamedExec(query, &strategy)
 
 	return err

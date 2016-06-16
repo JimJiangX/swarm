@@ -74,8 +74,9 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		HighAvailable:        req.HighAvailable,
 		Status:               _StatusServiceInit,
 		BackupMaxSizeByte:    req.BackupMaxSize,
-		BackupFilesRetention: int(req.BackupRetention * time.Second),
+		BackupFilesRetention: req.BackupRetention * int(time.Hour) * 12,
 		CreatedAt:            time.Now(),
+		FinishedAt:           time.Time{},
 	}
 
 	strategy, err := newBackupStrategy(svc.ID, req.BackupStrategy)
@@ -137,7 +138,7 @@ func newBackupStrategy(service string, strategy *structs.BackupStrategy) (*datab
 		Valid:     valid,
 		Enabled:   true,
 		BackupDir: strategy.BackupDir,
-		Timeout:   int(strategy.Timeout * time.Second),
+		Timeout:   strategy.Timeout * int(time.Second),
 		CreatedAt: time.Now(),
 	}, nil
 }
@@ -345,7 +346,7 @@ func (gd *Gardener) rebuildService(NameOrID string) (*Service, error) {
 	}
 
 	var backup *database.BackupStrategy
-	strategies, err := database.GetBackupStrategyByServiceID(service.ID)
+	strategies, err := database.ListBackupStrategyByServiceID(service.ID)
 	if err != nil {
 		return nil, err
 	}
