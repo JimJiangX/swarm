@@ -131,6 +131,7 @@ func newBackupStrategy(service string, strategy *structs.BackupStrategy) (*datab
 
 	return &database.BackupStrategy{
 		ID:        utils.Generate64UUID(),
+		Name:      strategy.Name,
 		Type:      strategy.Type,
 		ServiceID: service,
 		Spec:      strategy.Spec,
