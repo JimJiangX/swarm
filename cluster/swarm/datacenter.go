@@ -844,6 +844,11 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, string,
 		node_id=${16}
 		horus_server_ip=${17}
 		horus_server_port=${18}
+		docker_plugin_port=${19}
+		nfs_ip=${20}
+		nfs_dir=${21}
+		nfs_mount_dir=${22}
+		nfs_mount_opts=${23}
 		cur_dir=`dirname $0`
 
 		hdd_vgname=${HOSTNAME}_HDD_VG
@@ -861,12 +866,13 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, string,
 		ssd = strings.Join(node.ssd, ",")
 	}
 
-	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %d %s %s %d",
+	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %d %s %s %d %d %s %s %s %s",
 		path, path, kvpath, node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile,
-		config.DockerPort, hdd, ssd,
-		config.HorusAgentPort, config.ConsulPort, node.ID, config.HorusServerIP, config.HorusServerPort)
+		config.DockerPort, hdd, ssd, config.HorusAgentPort, config.ConsulPort,
+		node.ID, config.HorusServerIP, config.HorusServerPort, config.PluginPort,
+		config.NFSOption.Addr, config.NFSOption.Dir, config.MountDir, config.MountOptions)
 
 	return config, script, nil
 }
