@@ -15,11 +15,11 @@ type huaweiStore struct {
 	hs   database.HuaweiStorage
 }
 
-func NewHuaweiStore(id, vendor, addr, user, password string, start, end int) Store {
+func NewHuaweiStore(vendor, addr, user, password string, start, end int) Store {
 	return &huaweiStore{
 		lock: new(sync.RWMutex),
 		hs: database.HuaweiStorage{
-			ID:       id,
+			ID:       utils.Generate64UUID(),
 			Vendor:   vendor,
 			IPAddr:   addr,
 			Username: user,

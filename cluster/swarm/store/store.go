@@ -46,13 +46,13 @@ type Store interface {
 	DisableSpace(id int) error
 }
 
-func RegisterStore(id, vendor, addr, user, password, admin string,
+func RegisterStore(vendor, addr, user, password, admin string,
 	lstart, lend, hstart, hend int) (store Store, err error) {
 
 	if v := strings.ToUpper(vendor); HUAWEI == v {
-		store = NewHuaweiStore(id, HUAWEI, addr, user, password, hstart, hend)
+		store = NewHuaweiStore(HUAWEI, addr, user, password, hstart, hend)
 	} else if HITACHI == v {
-		store = NewHitachiStore(id, HITACHI, admin, lstart, lend, hstart, hend)
+		store = NewHitachiStore(HITACHI, admin, lstart, lend, hstart, hend)
 	}
 
 	if err := store.Ping(); err != nil {
@@ -63,30 +63,37 @@ func RegisterStore(id, vendor, addr, user, password, admin string,
 		return nil, err
 	}
 
-	stores[id] = store
+	stores[store.ID()] = store
 
 	return nil, nil
 }
 
 func GetStoreByID(ID string) (Store, error) {
+	store, ok := stores[ID]
+	if ok && store != nil {
+		return store, nil
+	}
+
 	hitachi, huawei, err := database.GetStorageByID(ID)
 	if err != nil {
 		return nil, err
 	}
 
 	if hitachi != nil {
-		return &hitachiStore{
+		store = &hitachiStore{
 			lock: new(sync.RWMutex),
 			hs:   *hitachi,
-		}, nil
-	}
-
-	if huawei != nil {
-		return &huaweiStore{
+		}
+	} else if huawei != nil {
+		store = &huaweiStore{
 			lock: new(sync.RWMutex),
 			hs:   *huawei,
-		}, nil
+		}
 	}
 
-	return nil, nil
+	if store != nil {
+		stores[store.ID()] = store
+	}
+
+	return store, nil
 }

@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -216,6 +217,24 @@ func (gd *Gardener) SetParams(sys database.Configurations) error {
 	gd.Lock()
 	defer gd.Unlock()
 
+	endpoints, clients := pingConsul(gd.host, &sys)
+	gd.consulClient = clients[0]
+
+	options := &kvstore.Config{
+		TLS:               gd.TLSConfig(),
+		ConnectionTimeout: time.Duration(sys.ConsulWaitTime) * time.Second,
+	}
+
+	for _, endpoint := range endpoints {
+		client, err := consul.New([]string{endpoint}, options)
+		if err != nil {
+			logrus.Error("Initializing kvStore,consul Config %s Error,%s", endpoint, err)
+		} else {
+			gd.kvClient = client
+			break
+		}
+	}
+
 	DatacenterID = sys.ID
 
 	if sys.Retry > 0 && gd.Cluster.createRetry == 0 {
@@ -231,38 +250,6 @@ func (gd *Gardener) SetParams(sys database.Configurations) error {
 		Password:      sys.Registry.Password,
 		Email:         sys.Registry.Email,
 		RegistryToken: sys.Registry.Token,
-	}
-
-	endpoints, dc, token, wait := sys.GetConsulConfig()
-
-	config := consulapi.Config{
-		Address:    fmt.Sprintf("%s:%d", gd.host, sys.ConsulPort),
-		Datacenter: dc,
-		WaitTime:   time.Duration(wait) * time.Second,
-		Token:      token,
-	}
-
-	consulClient, err := consulapi.NewClient(&config)
-	if err != nil {
-		return err
-	}
-	gd.consulClient = consulClient
-
-	options := &kvstore.Config{
-		TLS:               gd.TLSConfig(),
-		ConnectionTimeout: config.WaitTime,
-	}
-
-	if gd.kvClient == nil {
-		gd.kvClient, err = consul.New([]string{config.Address}, options)
-		if err != nil {
-			logrus.Error("Initializing kvStore,consul Config %s Error,%s", config.Address, err)
-
-			gd.kvClient, err = consul.New(endpoints, options)
-			if err != nil {
-				return err
-			}
-		}
 	}
 
 	return nil
@@ -332,6 +319,11 @@ func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 		},
 	}
 
+	endpoints, clients := pingConsul(gd.host, &config)
+	if len(endpoints) == 0 || len(clients) == 0 {
+		return fmt.Errorf("cannot connect consul")
+	}
+
 	err = nfsSetting(config.NFSOption)
 	if err != nil {
 		logrus.Error(err)
@@ -380,4 +372,80 @@ func nfsSetting(option database.NFSOption) error {
 	}
 
 	return nil
+}
+
+func pingConsul(host string, sys *database.Configurations) ([]string, []*consulapi.Client) {
+	endpoints, dc, token, wait := sys.GetConsulConfig()
+	port := strconv.Itoa(sys.ConsulPort)
+	endpoints = append(endpoints, host+":"+port)
+
+	endpoints[0], endpoints[len(endpoints)-1] = endpoints[len(endpoints)-1], endpoints[0]
+
+	peers := make([]string, 0, len(endpoints))
+	clients := make([]*consulapi.Client, 0, len(endpoints))
+
+	for _, endpoint := range endpoints {
+		config := consulapi.Config{
+			Address:    endpoint,
+			Datacenter: dc,
+			WaitTime:   time.Duration(wait) * time.Second,
+			Token:      token,
+		}
+
+		client, err := consulapi.NewClient(&config)
+		if err != nil {
+			logrus.Warnf("consul config illegal，%v", config)
+			continue
+		}
+
+		servers, err := client.Status().Peers()
+		if err != nil {
+			continue
+		}
+
+		addrs := make([]string, 0, len(servers))
+		for n := range servers {
+			parts := strings.Split(servers[n], ":")
+			if len(parts) == 2 {
+				servers[n] = parts[0] + ":" + port
+				addrs = append(addrs, parts[0])
+			}
+		}
+		sys.ConsulIPs = strings.Join(addrs, ",")
+
+		exist := false
+		for n := range servers {
+			if endpoint == servers[n] {
+				exist = true
+				break
+			}
+		}
+		if !exist {
+			peers = append(peers, endpoint)
+			peers = append(peers, servers...)
+
+			clients = append(clients, client)
+
+		} else {
+			peers = servers
+		}
+
+		for i := range servers {
+			config := consulapi.Config{
+				Address:    servers[i],
+				Datacenter: dc,
+				WaitTime:   time.Duration(wait) * time.Second,
+				Token:      token,
+			}
+
+			client, err := consulapi.NewClient(&config)
+			if err != nil {
+				logrus.Warnf("consul config illegal，%v", config)
+				continue
+			}
+			clients = append(clients, client)
+		}
+	}
+
+	return peers, clients
 }

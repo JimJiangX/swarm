@@ -15,11 +15,11 @@ type hitachiStore struct {
 	hs   database.HitachiStorage
 }
 
-func NewHitachiStore(id, vendor, admin string, lstart, lend, hstart, hend int) Store {
+func NewHitachiStore(vendor, admin string, lstart, lend, hstart, hend int) Store {
 	return &hitachiStore{
 		lock: new(sync.RWMutex),
 		hs: database.HitachiStorage{
-			ID:        id,
+			ID:        utils.Generate64UUID(),
 			Vendor:    vendor,
 			AdminUnit: admin,
 			LunStart:  lstart,

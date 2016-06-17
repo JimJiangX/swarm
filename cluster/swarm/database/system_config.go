@@ -151,10 +151,10 @@ func (c Configurations) GetConsulConfigs() []consulapi.Config {
 func (c Configurations) GetConsulConfig() ([]string, string, string, int) {
 	port := strconv.Itoa(c.ConsulPort)
 	addrs := strings.Split(c.ConsulIPs, ",")
-	endpoints := make([]string, len(addrs))
+	endpoints := make([]string, 0, len(addrs)+1)
 
 	for i := range addrs {
-		endpoints[i] = addrs[i] + ":" + port
+		endpoints = append(endpoints, addrs[i]+":"+port)
 	}
 
 	return endpoints, c.ConsulDatacenter, c.ConsulToken, c.ConsulWaitTime
