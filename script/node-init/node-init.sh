@@ -35,6 +35,7 @@ ext_nic=bond2
 nfs_mount() {
 	umount -f ${nfs_mount_dir}
 	rm -rf ${nfs_mount_dir}
+	mkdir ${nfs_mount_dir}
 	mount -t nfs -o ${nfs_mount_opts} ${nfs_ip}:${nfs_dir} ${nfs_mount_dir}
 	if [ $? -ne 0 ]; then
 		echo "nfs mount failed"
