@@ -104,7 +104,6 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	if err != nil {
 		logrus.Error("Get System Config Error,%s", err)
 	} else {
-		DatacenterID = sysConfig.ID
 		err = gd.SetParams(*sysConfig)
 		if err != nil {
 			logrus.Error(err)
@@ -216,6 +215,8 @@ func (gd *Gardener) consulAPIClient(full bool) (*consulapi.Client, error) {
 func (gd *Gardener) SetParams(sys database.Configurations) error {
 	gd.Lock()
 	defer gd.Unlock()
+
+	DatacenterID = sys.ID
 
 	if sys.Retry > 0 && gd.Cluster.createRetry == 0 {
 		gd.Cluster.createRetry = sys.Retry
