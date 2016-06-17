@@ -74,7 +74,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		HighAvailable:        req.HighAvailable,
 		Status:               _StatusServiceInit,
 		BackupMaxSizeByte:    req.BackupMaxSize,
-		BackupFilesRetention: req.BackupRetention * int(time.Hour) * 12,
+		BackupFilesRetention: req.BackupRetention * 24,
 		CreatedAt:            time.Now(),
 	}
 
