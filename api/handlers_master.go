@@ -680,7 +680,6 @@ func getServiceBackupStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	for i := range list {
 		out[i] = structs.BackupStrategy{
-			ID:        list[i].ID,
 			Name:      list[i].Name,
 			Type:      list[i].Type,
 			Spec:      list[i].Spec,

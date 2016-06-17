@@ -51,7 +51,6 @@ type DiskStorage struct {
 }
 
 type BackupStrategy struct {
-	ID        string
 	Name      string
 	Type      string // full/incremental
 	Spec      string // cron spec
