@@ -331,6 +331,12 @@ func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 		},
 	}
 
+	err = nfsSetting(config.NFSOption)
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
+
 	_, err = config.Insert()
 	if err != nil {
 		return err
@@ -340,8 +346,6 @@ func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 	if err != nil {
 		logrus.Error(err)
 	}
-
-	err = nfsSetting(config.NFSOption)
 
 	return err
 }
