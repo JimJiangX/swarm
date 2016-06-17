@@ -3,6 +3,7 @@ package swarm
 import (
 	"crypto/tls"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -319,6 +320,13 @@ func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 		},
 	}
 
+	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
+	err = pingHorus(horus)
+	if err != nil {
+		logrus.Errorf("Ping Horus %s error,%s", horus, err)
+		return err
+	}
+
 	endpoints, clients := pingConsul(gd.host, &config)
 	if len(endpoints) == 0 || len(clients) == 0 {
 		return fmt.Errorf("cannot connect consul")
@@ -448,4 +456,9 @@ func pingConsul(host string, sys *database.Configurations) ([]string, []*consula
 	}
 
 	return peers, clients
+}
+
+func pingHorus(addr string) error {
+	_, err := http.Post("http://"+addr+"/v1/ping", "", nil)
+	return err
 }
