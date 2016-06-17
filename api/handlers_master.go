@@ -437,11 +437,9 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		response = listServicesResponse(gd, services)
 	}
 
-	io.Copy(w, response)
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-
+	io.Copy(w, response)
 }
 
 func listServicesResponse(gd *swarm.Gardener, services []database.Service) io.Reader {
