@@ -1087,9 +1087,14 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	strategyID := ""
+	if strategy != nil {
+		strategyID = strategy.ID
+	}
+
 	response := structs.PostServiceResponse{
 		ID:               svc.ID,
-		BackupStrategyID: strategy.ID,
+		BackupStrategyID: strategyID,
 		TaskID:           svc.Task().ID,
 	}
 
