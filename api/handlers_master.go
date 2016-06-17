@@ -422,11 +422,11 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	var response io.Reader
 	switch strings.ToUpper(from) {
 	case "DBAAS":
-		logrus.Debug("From %s", from)
+		logrus.Debugf("From %s", from)
 
 		response = listServiceFromDBAAS(services)
 	default:
-		logrus.Debug("From %s", "default")
+		logrus.Debugf("From %s", "default")
 
 		ok, _, gd := fromContext(ctx, _Gardener)
 		if !ok && gd == nil {
@@ -1689,8 +1689,7 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := utils.Generate64UUID()
-	store, err := store.RegisterStore(id, req.Vendor, req.Addr,
+	store, err := store.RegisterStore(req.Vendor, req.Addr,
 		req.Username, req.Password, req.Admin,
 		req.LunStart, req.LunEnd, req.HostLunStart, req.HostLunEnd)
 	if err != nil {
