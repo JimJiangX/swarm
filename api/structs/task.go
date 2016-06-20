@@ -1,6 +1,9 @@
 package structs
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 const (
 	TaskCreate = iota
@@ -44,4 +47,27 @@ func (bt BackupTaskCallback) Error() error {
 
 	return fmt.Errorf("Backup Task Error:%s,unitID:%s ,taskID:%s ,strategyID:%s code:%d",
 		bt.Msg, bt.UnitID, bt.TaskID, bt.StrategyID, bt.Code)
+}
+
+type BackupFile struct {
+	ID         string
+	TaskID     string `json:"task_id"`
+	StrategyID string `json:"strategy_id"`
+	UnitID     string `json:"unit_id"`
+	Type       string // full or incremental
+	Path       string
+	SizeByte   int
+	Retention  string
+	CreatedAt  string    `json:"created_at"`
+	Created    time.Time `json:"-"`
+}
+
+type BackupFiles []BackupFile
+
+func (bfs BackupFiles) Len() int { return len(bfs) }
+func (bfs BackupFiles) Less(i, j int) bool {
+	return bfs[i].Created.After(bfs[j].Created)
+}
+func (bfs BackupFiles) Swap(i, j int) {
+	bfs[i], bfs[j] = bfs[j], bfs[i]
 }

@@ -44,6 +44,35 @@ func (bf BackupFile) TableName() string {
 	return "tb_backup_files"
 }
 
+func ListBackupFilesByService(NameOrID string) ([]BackupFile, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	var service string
+	err = db.Get(&service, "SELECT id FROM tb_service WHERE id=? OR name=?", NameOrID, NameOrID)
+
+	units := make([]string, 0, 5)
+	err = db.Select(&units, "SELECT id FROM tb_unit WHERE service_id=?", service)
+	if err != nil {
+		return nil, err
+	}
+
+	query, args, err := sqlx.In("SELECT * FROM tb_backup_files WHERE unit_id IN (?);", units)
+	if err != nil {
+		return nil, err
+	}
+
+	files := make([]BackupFile, 0, 10)
+	err = db.Select(&files, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return files, nil
+}
+
 func txInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
 	query := "INSERT INTO tb_backup_files (id,task_id,strategy_id,unit_id,type,path,size,retention,created_at) VALUES (:id,:task_id,:strategy_id,:unit_id,:type,:path,:size,:retention,:created_at)"
 	_, err := tx.NamedExec(query, &bf)

@@ -201,16 +201,17 @@ func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {
 }
 
 type Service struct {
-	ID                   string    `db:"id"`
-	Name                 string    `db:"name"`
-	Description          string    `db:"description"`
-	Architecture         string    `db:"architecture"`
-	AutoHealing          bool      `db:"auto_healing"`
-	AutoScaling          bool      `db:"auto_scaling"`
-	HighAvailable        bool      `db:"high_available"`
-	BusinessCode         string    `db:"business_code"`
-	Status               int64     `db:"status"`
-	BackupMaxSizeByte    int       `db:"backup_max_size"`
+	ID                string `db:"id"`
+	Name              string `db:"name"`
+	Description       string `db:"description"`
+	Architecture      string `db:"architecture"`
+	AutoHealing       bool   `db:"auto_healing"`
+	AutoScaling       bool   `db:"auto_scaling"`
+	HighAvailable     bool   `db:"high_available"`
+	BusinessCode      string `db:"business_code"`
+	Status            int64  `db:"status"`
+	BackupMaxSizeByte int    `db:"backup_max_size"`
+	// count by Day,used in swarm.BackupTaskCallback(),calculate BackupFile.Retention
 	BackupFilesRetention int       `db:"backup_files_retention"`
 	CreatedAt            time.Time `db:"created_at"`
 	FinishedAt           time.Time `db:"finished_at"`

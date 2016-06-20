@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -693,6 +694,40 @@ func getServiceBackupStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.
 	json.NewEncoder(w).Encode(out)
 }
 
+// GET /services/{name}/backup_files
+func getServiceBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	files, err := database.ListBackupFilesByService(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	list := make([]structs.BackupFile, len(files))
+	for i := range files {
+		list[i] = structs.BackupFile{
+			ID:         files[i].ID,
+			TaskID:     files[i].TaskID,
+			StrategyID: files[i].StrategyID,
+			UnitID:     files[i].UnitID,
+			Type:       files[i].Type,
+			Path:       files[i].Path,
+			SizeByte:   files[i].SizeByte,
+			Retention:  utils.TimeToString(files[i].Retention),
+			CreatedAt:  utils.TimeToString(files[i].CreatedAt),
+			Created:    files[i].CreatedAt,
+		}
+	}
+
+	sortByTime := structs.BackupFiles(list)
+	sort.Sort(sortByTime)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(sortByTime)
+}
+
 // GET /tasks
 func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
@@ -1176,18 +1211,6 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
 }
 
-// POST /services/{name:.*}/recover
-func postServiceRecover(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
-	_ = name
-}
-
 // POST /services/{name:.*}/recreate
 func postServiceRecreate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
@@ -1419,8 +1442,18 @@ func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
 }
 
-// POST /units/{name:.*}/recover
-func postUnitRecover(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+// POST /units/{name:.*}/restore
+func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	unit := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_ = unit
+}
 
 // POST /units/{name:.*}/migrate
 func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {

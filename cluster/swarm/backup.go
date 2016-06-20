@@ -244,7 +244,7 @@ func BackupTaskCallback(req structs.BackupTaskCallback) error {
 	}
 
 	if rent > 0 {
-		backupFile.Retention = backupFile.CreatedAt.Add(time.Duration(rent))
+		backupFile.Retention = backupFile.CreatedAt.AddDate(0, 0, rent)
 	}
 
 	err = database.TxBackupTaskDone(task, _StatusTaskDone, backupFile)
