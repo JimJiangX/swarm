@@ -146,7 +146,7 @@ func (mysqlCmd) StartServiceCmd() []string {
 func (mysqlCmd) StopServiceCmd() []string {
 	return []string{"/root/upsql.service", "stop"}
 }
-func (mysqlCmd) RecoverCmd(file string) []string { return nil }
+func (mysqlCmd) RestoreCmd(file string) []string { return nil }
 func (mysqlCmd) BackupCmd(args ...string) []string {
 	cmd := make([]string, len(args)+1)
 	cmd[0] = "/root/upsql-backup.sh"
@@ -295,7 +295,7 @@ func (proxyCmd) StartServiceCmd() []string {
 func (proxyCmd) StopServiceCmd() []string {
 	return []string{"/root/upproxy.service", "stop"}
 }
-func (proxyCmd) RecoverCmd(file string) []string            { return nil }
+func (proxyCmd) RestoreCmd(file string) []string            { return nil }
 func (proxyCmd) BackupCmd(args ...string) []string          { return nil }
 func (proxyCmd) CleanBackupFileCmd(args ...string) []string { return nil }
 
@@ -445,7 +445,7 @@ func (switchManagerCmd) StartServiceCmd() []string {
 func (switchManagerCmd) StopServiceCmd() []string {
 	return []string{"/root/swm.service", "stop"}
 }
-func (switchManagerCmd) RecoverCmd(file string) []string            { return nil }
+func (switchManagerCmd) RestoreCmd(file string) []string            { return nil }
 func (switchManagerCmd) BackupCmd(args ...string) []string          { return nil }
 func (switchManagerCmd) CleanBackupFileCmd(args ...string) []string { return nil }
 

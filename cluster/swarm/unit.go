@@ -30,7 +30,7 @@ type ContainerCmd interface {
 	InitServiceCmd() []string
 	StartServiceCmd() []string
 	StopServiceCmd() []string
-	RecoverCmd(file string) []string
+	RestoreCmd(file string) []string
 	BackupCmd(args ...string) []string
 	CleanBackupFileCmd(args ...string) []string
 }

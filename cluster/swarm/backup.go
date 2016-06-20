@@ -149,32 +149,39 @@ func (gd *Gardener) ReplaceServiceBackupStrategy(NameOrID string, req structs.Ba
 
 	return strategy, err
 }
+
 func (gd *Gardener) UpdateServiceBackupStrategy(NameOrID string, req structs.BackupStrategy) error {
-	service, err := gd.GetService(NameOrID)
-	if err != nil {
-		return err
-	}
-
-	backup, err := newBackupStrategy(service.ID, &req)
-	if err != nil || backup == nil {
-		return fmt.Errorf("With non Backup Strategy,Error:%v", err)
-	}
-	if service.backup != nil && service.backup.ID != "" {
-		backup.ID = service.backup.ID
-	}
-	err = service.UpdateBackupStrategy(*backup)
-	if err != nil {
-		return err
-	}
-
-	if service.backup != nil {
-		gd.RemoveCronJob(backup.ID)
-		bs := NewBackupJob(gd.host, service)
-		err = gd.RegisterBackupStrategy(bs)
+	var (
+		valid = time.Time{}
+		err   error
+	)
+	if req.Valid != "" {
+		valid, err = utils.ParseStringToTime(req.Valid)
 		if err != nil {
-			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err)
+			logrus.Error("Parse Request.BackupStrategy.Valid to time.Time", err)
+			return err
 		}
 	}
+	bs, err := database.GetBackupStrategy(NameOrID)
+	if err != nil {
+		return err
+	}
+
+	update := database.BackupStrategy{
+		ID:        bs.ID,
+		ServiceID: bs.ServiceID,
+		Name:      req.Name,
+		Type:      req.Type,
+		Spec:      req.Spec,
+		Valid:     valid,
+		BackupDir: req.BackupDir,
+		Timeout:   req.Timeout * int(time.Second),
+		Next:      bs.Next,
+		Enabled:   bs.Enabled,
+		CreatedAt: bs.CreatedAt,
+	}
+
+	err = database.UpdateBackupStrategy(update)
 
 	return err
 }

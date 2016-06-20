@@ -291,16 +291,16 @@ func (bs BackupStrategy) TableName() string {
 	return "tb_backup_strategy"
 }
 
-func GetBackupStrategy(id string) (*BackupStrategy, error) {
+func GetBackupStrategy(NameOrID string) (*BackupStrategy, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
 	strategy := &BackupStrategy{}
-	query := "SELECT * FROM tb_backup_strategy WHERE id=?"
+	query := "SELECT * FROM tb_backup_strategy WHERE id=? OR name=?"
 
-	err = db.Get(strategy, query, id)
+	err = db.Get(strategy, query, NameOrID, NameOrID)
 	if err != nil {
 		return nil, err
 	}
@@ -332,11 +332,8 @@ func UpdateBackupStrategyStatus(id string, enable bool) error {
 	}
 
 	_, err = db.Exec("UPDATE tb_backup_strategy SET enabled=? WHERE id=?", enable, id)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (bs *BackupStrategy) UpdateNext(next time.Time, enable bool) error {
@@ -375,6 +372,7 @@ func txDeleteBackupStrategy(tx *sqlx.Tx, id string) error {
 	return err
 
 }
+
 func TxInsertBackupStrategy(tx *sqlx.Tx, strategy BackupStrategy) error {
 	query := "INSERT INTO tb_backup_strategy (id,name,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:name,:type,:service_id,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
 	_, err := tx.NamedExec(query, &strategy)
@@ -418,7 +416,7 @@ func UpdateBackupStrategy(strategy BackupStrategy) error {
 	if err != nil {
 		return err
 	}
-	query := "UPDATE tb_backup_strategy SET type=:type,service_id=:service_id,spec=:spec,next=:next,valid=:valid,enabled=:enabled,backup_dir=:backup_dir,timeout=:timeout,created_at=:created_at WHERE id=:id"
+	query := "UPDATE tb_backup_strategy SET name=:name,type=:type,service_id=:service_id,spec=:spec,next=:next,valid=:valid,enabled=:enabled,backup_dir=:backup_dir,timeout=:timeout,created_at=:created_at WHERE id=:id"
 	_, err = db.NamedExec(query, &strategy)
 
 	return err
