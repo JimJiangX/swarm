@@ -215,5 +215,10 @@ func TestParseTime(t *testing.T) {
 		t.Error("Unexpected,location conflict")
 	}
 
-	t.Log(now, timeString, t1)
+	sub := now.Sub(t1)
+	if sub >= time.Second {
+		t.Error("Unexpected", now, t1, sub)
+	}
+
+	t.Log(now, timeString, t1, sub)
 }

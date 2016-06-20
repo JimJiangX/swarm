@@ -149,7 +149,10 @@ func ParseStringToTime(s string) (time.Time, error) {
 		return time.Time{}, err
 	}
 
-	return t.Local(), nil
+	local := t.Local()
+	_, offset := local.Zone()
+
+	return local.Add(-time.Duration(offset) * time.Second), nil
 }
 
 // ExecScript returns a command to execute a script
