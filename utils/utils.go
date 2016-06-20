@@ -142,8 +142,14 @@ func TimeToString(t time.Time) string {
 	return ""
 }
 
+// ParseStringToTime returns local time
 func ParseStringToTime(s string) (time.Time, error) {
-	return time.Parse(defaultTimeLayout, s)
+	t, err := time.Parse(defaultTimeLayout, s)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return t.In(time.Local), nil
 }
 
 // ExecScript returns a command to execute a script

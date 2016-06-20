@@ -177,7 +177,7 @@ func (gd *Gardener) UpdateServiceBackupStrategy(NameOrID string, req structs.Bac
 		BackupDir: req.BackupDir,
 		Timeout:   req.Timeout * int(time.Second),
 		Next:      bs.Next,
-		Enabled:   bs.Enabled,
+		Enabled:   req.Enable,
 		CreatedAt: bs.CreatedAt,
 	}
 
