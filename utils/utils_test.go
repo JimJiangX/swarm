@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestGenerateUUID(t *testing.T) {
@@ -199,4 +200,20 @@ func TestParseUintList(t *testing.T) {
 			t.Fatalf("Expected failure with %s but got %v", v, out)
 		}
 	}
+}
+
+func TestParseTime(t *testing.T) {
+	now := time.Now()
+	timeString := TimeToString(now)
+
+	t1, err := ParseStringToTime(timeString)
+	if err != nil {
+		t.Error(err, timeString)
+	}
+
+	if t1.Location() != time.Local {
+		t.Error("Unexpected,location conflict")
+	}
+
+	t.Log(now, timeString, t1)
 }
