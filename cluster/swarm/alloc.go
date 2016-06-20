@@ -432,16 +432,12 @@ func (node *Node) localStorageExtend(name, storageType string, size int) (databa
 	if node.localStore == nil {
 		return lv, fmt.Errorf("Not Found LoaclStorage of Node %s", node.Addr)
 	}
-	part := strings.SplitN(storageType, ":", 2)
-	if len(part) == 1 {
-		part = append(part, "HDD")
-	}
-	vgName := node.engine.Labels[part[1]+"_VG"]
-	if vgName == "" {
-		return lv, fmt.Errorf("Not Found VG_Name of %s", storageType)
+	vgName, err := node.getVGname(storageType)
+	if err != nil {
+		return lv, err
 	}
 
-	lv, err := node.localStore.Extend(vgName, name, size)
+	lv, err = node.localStore.Extend(vgName, name, size)
 
 	return lv, err
 }

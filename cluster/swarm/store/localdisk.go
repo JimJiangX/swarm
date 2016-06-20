@@ -12,23 +12,16 @@ import (
 type LocalStore struct {
 	node *database.Node
 	addr string
-	VGs  []VG
-}
-
-type VG struct {
-	Vendor string
-	Name   string
 }
 
 func IsLocalStore(_type string) bool {
 	return strings.Contains(_type, LocalStorePrefix)
 }
 
-func NewLocalDisk(addr string, node *database.Node, vgs []VG) *LocalStore {
+func NewLocalDisk(addr string, node *database.Node) *LocalStore {
 	return &LocalStore{
 		node: node,
 		addr: addr,
-		VGs:  vgs,
 	}
 }
 

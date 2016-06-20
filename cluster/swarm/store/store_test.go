@@ -17,10 +17,6 @@ func TestHITACHIStore(t *testing.T) {
 	if err != nil {
 		t.Error(HITACHI, err)
 	}
-	// huawei, err := RegisterStore("hUaWeI", "146.240.104.61", "admin", "Admin@storage", "", 0, 255, 1000, 1200)
-	// if err != nil {
-	//	t.Error(HUAWEI, err)
-	// }
 
 	if store.Vendor() != HITACHI {
 		t.Error("Unexpected,want %s got %s", HITACHI, store.Vendor())
@@ -102,12 +98,11 @@ func TestHITACHIStore(t *testing.T) {
 
 }
 
-
 func TestHUAWEIStore(t *testing.T) {
-	 huawei, err := RegisterStore("hUaWeI", "146.240.104.61", "admin", "Admin@storage", "", 0, 255, 1000, 1200)
-	 if err != nil {
+	store, err := RegisterStore("hUaWeI", "146.240.104.61", "admin", "Admin@storage", "", 0, 255, 1000, 1200)
+	if err != nil {
 		t.Error(HUAWEI, err)
-	 }
+	}
 
 	if store.Vendor() != HUAWEI {
 		t.Error("Unexpected,want %s got %s", HUAWEI, store.Vendor())
@@ -187,4 +182,32 @@ func TestHUAWEIStore(t *testing.T) {
 		t.Error(err)
 	}
 
+}
+
+func TestGetStoreByID(t *testing.T) {
+	if len(stores) == 0 {
+		store, err := RegisterStore("HiTaChI", "", "", "", "AMS2100_83004824", 0, 255, 1000, 1200)
+		if err != nil {
+			t.Error(HITACHI, err)
+		}
+		t.Log(store.ID(), HITACHI, "registered")
+		store, err = RegisterStore("hUaWeI", "146.240.104.61", "admin", "Admin@storage", "", 0, 255, 1000, 1200)
+		if err != nil {
+			t.Error(HUAWEI, err)
+		}
+		t.Log(store.ID(), HUAWEI, "registered")
+	}
+	list := make([]string, 0, len(stores))
+
+	for id := range stores {
+		list = append(list, id)
+		delete(stores, id)
+	}
+
+	for i := range list {
+		store, err := GetStoreByID(list[i])
+		if err != nil || store == nil {
+			t.Error("failed to get store", list[i])
+		}
+	}
 }

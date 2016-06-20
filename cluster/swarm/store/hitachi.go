@@ -184,7 +184,7 @@ func (h hitachiStore) idleSize() (map[*database.RaidGroup]space, error) {
 		rg[i] = val.StorageRGID
 	}
 
-	spaces, err := h.List(rg...)
+	spaces, err := h.list(rg...)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func (h hitachiStore) idleSize() (map[*database.RaidGroup]space, error) {
 	return info, nil
 }
 
-func (h *hitachiStore) List(rg ...int) ([]space, error) {
+func (h *hitachiStore) list(rg ...int) ([]space, error) {
 	list := ""
 	if len(rg) == 0 {
 		return nil, nil
@@ -393,7 +393,7 @@ func (h *hitachiStore) AddSpace(id int) (int, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
-	spaces, err := h.List(id)
+	spaces, err := h.list(id)
 	if err != nil {
 		return 0, err
 	}

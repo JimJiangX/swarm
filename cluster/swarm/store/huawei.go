@@ -339,7 +339,7 @@ func (h *huaweiStore) AddSpace(id int) (int, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
-	spaces, err := h.List()
+	spaces, err := h.list()
 	if err != nil {
 		return 0, err
 	}
@@ -358,7 +358,7 @@ func (h *huaweiStore) AddSpace(id int) (int, error) {
 	return 0, fmt.Errorf("Space %d Not Exist", id)
 }
 
-func (h *huaweiStore) List(rg ...int) ([]space, error) {
+func (h *huaweiStore) list(rg ...int) ([]space, error) {
 	list := ""
 	if len(rg) == 0 {
 		return nil, nil
@@ -425,7 +425,7 @@ func (h huaweiStore) idleSize() (map[*database.RaidGroup]space, error) {
 		rg[i] = val.StorageRGID
 	}
 
-	spaces, err := h.List(rg...)
+	spaces, err := h.list(rg...)
 	if err != nil {
 		return nil, err
 	}

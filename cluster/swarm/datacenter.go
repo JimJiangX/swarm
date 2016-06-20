@@ -610,24 +610,8 @@ func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
 		engine: eng,
 	}
 
-	vgs := make([]store.VG, 0, 2)
-	//SSD
-	if ssd := eng.Labels[_SSD_VG_Label]; ssd != "" {
-		vgs = append(vgs, store.VG{
-			Vendor: _SSD,
-			Name:   ssd,
-		})
-	}
-	// HDD
-	if hdd := eng.Labels[_HDD_VG_Label]; hdd != "" {
-		vgs = append(vgs, store.VG{
-			Vendor: _HDD,
-			Name:   hdd,
-		})
-	}
-
 	pluginAddr := fmt.Sprintf("%s:%d", eng.IP, pluginPort)
-	node.localStore = store.NewLocalDisk(pluginAddr, node.Node, vgs)
+	node.localStore = store.NewLocalDisk(pluginAddr, node.Node)
 
 	return node, nil
 }
@@ -1144,24 +1128,8 @@ func (gd *Gardener) updateNodeEngine(node *Node, dockerPort int) (*cluster.Engin
 }
 
 func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
-	vgs := make([]store.VG, 0, 2)
-	//SSD
-	if ssd := eng.Labels[_SSD_VG_Label]; ssd != "" {
-		vgs = append(vgs, store.VG{
-			Vendor: _SSD,
-			Name:   ssd,
-		})
-	}
-	// HDD
-	if hdd := eng.Labels[_HDD_VG_Label]; hdd != "" {
-		vgs = append(vgs, store.VG{
-			Vendor: _HDD,
-			Name:   hdd,
-		})
-	}
-
 	pluginAddr := fmt.Sprintf("%s:%d", eng.IP, pluginPort)
-	node.localStore = store.NewLocalDisk(pluginAddr, node.Node, vgs)
+	node.localStore = store.NewLocalDisk(pluginAddr, node.Node)
 
 	wwn := eng.Labels[_SAN_HBA_WWN_Lable]
 	if strings.TrimSpace(wwn) != "" {
