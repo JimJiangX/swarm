@@ -15,7 +15,7 @@ type LocalStore struct {
 }
 
 func IsLocalStore(_type string) bool {
-	return strings.Contains(_type, LocalStorePrefix)
+	return strings.HasPrefix(_type, LocalStorePrefix)
 }
 
 func NewLocalDisk(addr string, node *database.Node) *LocalStore {

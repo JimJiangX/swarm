@@ -320,7 +320,7 @@ func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 		},
 	}
 
-	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
+	horus := fmt.Sprintf("%s:%d", config.HorusServerIP, config.HorusServerPort)
 	err = pingHorus(horus)
 	if err != nil {
 		logrus.Errorf("Ping Horus %s error,%s", horus, err)
