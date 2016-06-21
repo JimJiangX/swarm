@@ -164,7 +164,7 @@ func (gd *Gardener) setConsulClient(client *consulapi.Client) {
 	gd.Unlock()
 }
 
-func (gd *Gardener) consulAPIClient(full bool) (*consulapi.Client, error) {
+func (gd *Gardener) ConsulAPIClient(full bool) (*consulapi.Client, error) {
 	if !full {
 		gd.RLock()
 		if gd.consulClient != nil {

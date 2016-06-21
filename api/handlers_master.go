@@ -21,6 +21,7 @@ import (
 	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/utils"
 	"github.com/gorilla/mux"
+	consulapi "github.com/hashicorp/consul/api"
 	goctx "golang.org/x/net/context"
 )
 
@@ -435,68 +436,25 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		response = listServicesResponse(gd, services)
+		containers := gd.Containers()
+		consulClient, err := gd.ConsulAPIClient(false)
+		if err != nil {
+			logrus.Error(err)
+		}
+
+		list := make([]structs.ServiceResponse, len(services))
+		for i := range services {
+			list[i] = getServiceResponse(services[i], containers, consulClient)
+		}
+
+		buffer := bytes.NewBuffer(nil)
+		json.NewEncoder(buffer).Encode(list)
+		response = buffer
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	io.Copy(w, response)
-}
-
-func listServicesResponse(gd *swarm.Gardener, services []database.Service) io.Reader {
-	containers := gd.Containers()
-	lists := make([]structs.ServiceResponse, len(services))
-	for n := range services {
-		desc := structs.PostServiceRequest{}
-		err := json.NewDecoder(bytes.NewBufferString(services[n].Description)).Decode(&desc)
-		if err != nil {
-			logrus.Error(err, services[n].Description)
-		}
-		units, err := database.ListUnitByServiceID(services[n].ID)
-		if err != nil {
-			logrus.Error("List Unit By ServiceID", err)
-		}
-
-		list := make([]structs.UnitInfo, len(units))
-		for i := range units {
-			container := containers.Get(units[i].ContainerID)
-			data, err := getContainerJSON2(units[i].Name, container)
-			if err != nil {
-				//httpError(w, err.Error(), http.StatusInternalServerError)
-				logrus.Warn(err)
-			}
-
-			list[i] = structs.UnitInfo{
-				ID:            units[i].ID,
-				Name:          units[i].Name,
-				Type:          units[i].Type,
-				EngineID:      units[i].EngineID,
-				Status:        units[i].Status,
-				CheckInterval: units[i].CheckInterval,
-				CreatedAt:     utils.TimeToString(units[i].CreatedAt),
-				Info:          string(data),
-			}
-		}
-
-		lists[n] = structs.ServiceResponse{
-			ID:                   services[n].ID,
-			Name:                 services[n].Name,
-			Architecture:         services[n].Architecture,
-			Description:          desc,
-			HighAvailable:        services[n].HighAvailable,
-			Status:               services[n].Status,
-			BackupMaxSizeByte:    services[n].BackupMaxSizeByte,
-			BackupFilesRetention: services[n].BackupFilesRetention,
-			CreatedAt:            utils.TimeToString(services[n].CreatedAt),
-			FinishedAt:           utils.TimeToString(services[n].FinishedAt),
-			Containers:           list,
-		}
-	}
-
-	rw := bytes.NewBuffer(nil)
-	json.NewEncoder(rw).Encode(lists)
-
-	return rw
 }
 
 func listServiceFromDBAAS(services []database.Service) io.Reader {
@@ -559,8 +517,28 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+	consulClient, err := gd.ConsulAPIClient(false)
+	if err != nil {
+		logrus.Error(err)
+	}
+
+	resp := getServiceResponse(service, gd.Containers(), consulClient)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
+func getServiceResponse(service database.Service, containers cluster.Containers,
+	client *consulapi.Client) structs.ServiceResponse {
 	desc := structs.PostServiceRequest{}
-	err = json.NewDecoder(bytes.NewBufferString(service.Description)).Decode(&desc)
+	err := json.NewDecoder(bytes.NewBufferString(service.Description)).Decode(&desc)
 	if err != nil {
 		logrus.Warn(err, service.Description)
 	}
@@ -570,35 +548,59 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		logrus.Error("ListUnitByServiceID", err)
 	}
 
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
+	switchManager := ""
+	for i := range units {
+		if units[i].Type == "switch_manager" {
+			switchManager = units[i].ID
+		}
 	}
 
-	containers := gd.Containers()
+	roles, err := swarm.GetUnitRoleFromConsul(client, service.ID, switchManager)
+	if err != nil {
+		logrus.Error(err)
+		roles = make(map[string]string)
+	}
+
+	checks, err := swarm.HealthChecksFromConsul(client, "any", nil)
+	if err != nil {
+		logrus.Error(err)
+		checks = make(map[string]consulapi.HealthCheck, 0)
+	}
+
 	list := make([]structs.UnitInfo, len(units))
 	for i := range units {
-		container := containers.Get(units[i].ContainerID)
-		data, err := getContainerJSON2(units[i].Name, container)
+
+		node, err := database.GetNode(units[i].EngineID)
 		if err != nil {
-			//httpError(w, err.Error(), http.StatusInternalServerError)
-			logrus.Warn(err)
+			logrus.Error(err, units[i].Name)
 		}
 
 		list[i] = structs.UnitInfo{
-			ID:            units[i].ID,
-			Name:          units[i].Name,
-			Type:          units[i].Type,
-			EngineID:      units[i].EngineID,
-			Status:        units[i].Status,
-			CheckInterval: units[i].CheckInterval,
-			CreatedAt:     utils.TimeToString(units[i].CreatedAt),
-			Info:          string(data),
+			ID:        units[i].ID,
+			Name:      units[i].Name,
+			Type:      units[i].Type,
+			NodeID:    node.ID,
+			NodeAddr:  node.Addr,
+			ClusterID: node.ClusterID,
+			Role:      roles[units[i].Name],
+			Status:    checks[units[i].ID].Status,
+			CreatedAt: utils.TimeToString(units[i].CreatedAt),
 		}
+
+		if list[i].Role == "" {
+			list[i].Role = "unknown"
+		}
+
+		container := containers.Get(units[i].ContainerID)
+		if container != nil {
+			list[i].CpusetCpus = container.Info.HostConfig.CpusetCpus
+			list[i].Memory = container.Info.HostConfig.Memory
+			list[i].State = container.State
+		}
+
 	}
 
-	resp := structs.ServiceResponse{
+	return structs.ServiceResponse{
 		ID:                   service.ID,
 		Name:                 service.Name,
 		Architecture:         service.Architecture,
@@ -611,10 +613,6 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		FinishedAt:           utils.TimeToString(service.FinishedAt),
 		Containers:           list,
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
 }
 
 func getContainerJSON2(name string, container *cluster.Container) ([]byte, error) {

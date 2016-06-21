@@ -56,7 +56,7 @@ type BackupStrategy struct {
 	Type      string // full/incremental
 	Spec      string // cron spec
 	Valid     string // "2006-01-02 15:04:05"
-	BackupDir string `json:",omitempty"`
+	BackupDir string `json:"backup_dir,omitempty"`
 	Timeout   int    `json:",omitempty"` // xx Sec
 	Enable    bool   // using in response
 	CreatedAt string // using in response
@@ -153,19 +153,24 @@ type ServiceResponse struct {
 }
 
 type UnitInfo struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`    // <unit_id_8bit>_<service_name>
-	Type     string `json:"type"`    // switch_manager/upproxy/upsql
-	EngineID string `json:"node_id"` // engine.ID
+	ID        string `json:"id"`
+	Name      string `json:"name"`    // <unit_id_8bit>_<service_name>
+	Type      string `json:"type"`    // switch_manager/upproxy/upsql
+	NodeID    string `json:"node_id"` // Node.ID
+	NodeAddr  string `json:"node_addr"`
+	ClusterID string `json:"cluster_id"`
 	// ImageID		string `json:"image_id"`
 	// ImageName	string `json:"image_name"` //<image_name>_<image_version>
 	// ServiceID	string `json:"service_id"`
 	// ContainerID	string `json:"container_id"`
 	// ConfigID		string `json:"unit_config_id"`
 	// NetworkMode	string `json:"network_mode"`
-
-	Status        uint32 `json:"status"`
-	CheckInterval int    `json:"check_interval"`
-	CreatedAt     string `json:"created_at"`
-	Info          string `json:"info"`
+	Role       string `json:",omitempty"`
+	CpusetCpus string
+	Memory     int64
+	State      string // container state
+	Status     string // service status
+	CreatedAt  string `json:"created_at"`
+	// CheckInterval int    `json:"check_interval"`
+	// Info          string `json:"info"`
 }
