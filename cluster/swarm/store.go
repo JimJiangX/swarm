@@ -30,11 +30,6 @@ func (gd Gardener) GetStore(id string) (store.Store, error) {
 }
 
 func (gd *Gardener) AddStore(store store.Store) error {
-	s, err := gd.GetStore(store.ID())
-	if err == nil && s != nil {
-		return fmt.Errorf("Store is exist,%s", store.ID())
-	}
-
 	gd.Lock()
 	gd.stores = append(gd.stores, store)
 	gd.Unlock()
