@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -49,10 +50,13 @@ type Store interface {
 func RegisterStore(vendor, addr, user, password, admin string,
 	lstart, lend, hstart, hend int) (store Store, err error) {
 
-	if v := strings.ToUpper(vendor); HUAWEI == v {
+	switch strings.ToUpper(vendor) {
+	case HUAWEI:
 		store = NewHuaweiStore(HUAWEI, addr, user, password, hstart, hend)
-	} else if HITACHI == v {
+	case HITACHI:
 		store = NewHitachiStore(HITACHI, admin, lstart, lend, hstart, hend)
+	default:
+		return nil, fmt.Errorf("Unsupported Vendor %s Yet", vendor)
 	}
 
 	if err := store.Ping(); err != nil {

@@ -7,9 +7,32 @@ import (
 )
 
 func init() {
-	dbSource := "root:111111@tcp(127.0.0.1:3306)/DBaaS?parseTime=true&charset=utf8&loc=Asia%%2FShanghai&sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'"
+	dbSource := "root:111111@tcp(127.0.0.1:3306)/DBaaS?parseTime=true&charset=utf8&loc=Asia%2FShanghai&sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'"
 	driverName := "mysql"
-	database.MustConnect(driverName, dbSource)
+	database.Connect(driverName, dbSource)
+}
+
+func TestRegisterStore(t *testing.T) {
+	wrong, err := RegisterStore("HiaChI", "", "", "", "AMS2100_83004824", 0, 255, 1000, 1200)
+	if err == nil {
+		t.Error(wrong.Vendor())
+	}
+	t.Log("Expected", err)
+	hitachi, err := RegisterStore("HiTaChI", "", "", "", "AMS2100_83004824", 0, 255, 1000, 1200)
+	if err != nil {
+		t.Error(HITACHI, err)
+	}
+	t.Log(hitachi.ID(), HITACHI, "registered")
+
+	huawei, err := RegisterStore("hUaWeI", "146.240.104.61", "admin", "Admin@storage", "", 0, 255, 1000, 1200)
+	if err != nil {
+		t.Error(HUAWEI, err)
+	}
+	t.Log(huawei.ID(), HUAWEI, "registered")
+
+	database.DeleteStorageByID(hitachi.ID())
+	database.DeleteStorageByID(huawei.ID())
+
 }
 
 func TestHITACHIStore(t *testing.T) {
@@ -96,6 +119,7 @@ func TestHITACHIStore(t *testing.T) {
 		t.Error(err)
 	}
 
+	database.DeleteStorageByID(store.ID())
 }
 
 func TestHUAWEIStore(t *testing.T) {
@@ -182,6 +206,7 @@ func TestHUAWEIStore(t *testing.T) {
 		t.Error(err)
 	}
 
+	database.DeleteStorageByID(store.ID())
 }
 
 func TestGetStoreByID(t *testing.T) {

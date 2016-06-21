@@ -20,7 +20,7 @@ func TestIsLocalStore(t *testing.T) {
 	for _, test := range tests {
 		got := IsLocalStore(test._type)
 		if got != test.want {
-			t.Error("Unexpected,&s :want %b but got %b", test._type, test.want, got)
+			t.Errorf("Unexpected,%s :want %v but got %v", test._type, test.want, got)
 		}
 	}
 
