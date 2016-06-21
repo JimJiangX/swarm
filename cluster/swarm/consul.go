@@ -4,10 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/Sirupsen/logrus"
-
 	"github.com/hashicorp/consul/api"
 )
 
@@ -35,7 +33,7 @@ func GetUnitRoleFromConsul(client *api.Client, key string) (map[string]string, e
 		return nil, ErrConsulClientIsNil
 	}
 
-	key = strings.ToUpper(key)
+	key = key + "/Topology"
 	val, _, err := client.KV().Get(key, nil)
 	if err != nil {
 		logrus.Error(err, key)
