@@ -3,6 +3,8 @@ package swarm
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 
@@ -28,16 +30,20 @@ func HealthChecksFromConsul(client *api.Client, state string, q *api.QueryOption
 	return m, nil
 }
 
-func GetUnitRoleFromConsul(client *api.Client, service, unit string) (map[string]string, error) {
+func GetUnitRoleFromConsul(client *api.Client, key string) (map[string]string, error) {
 	if client == nil {
 		return nil, ErrConsulClientIsNil
 	}
 
-	key := service + "/" + unit
+	key = strings.ToUpper(key)
 	val, _, err := client.KV().Get(key, nil)
 	if err != nil {
 		logrus.Error(err, key)
 		return nil, err
+	}
+
+	if val == nil {
+		return nil, fmt.Errorf("Wrong KEY:%s", key)
 	}
 
 	return rolesJSONUnmarshal(val.Value)
@@ -52,12 +58,9 @@ func rolesJSONUnmarshal(data []byte) (map[string]string, error) {
 		} `json:"datanode_group"`
 	}{}
 
-	src := string(data)
-	logrus.Debug("src: ", src)
-
 	err := json.Unmarshal(data, &roles)
 	if err != nil {
-		logrus.Error(err, src)
+		logrus.Error(err, string(data))
 		return nil, err
 	}
 

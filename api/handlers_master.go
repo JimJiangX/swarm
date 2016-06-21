@@ -555,7 +555,7 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 		}
 	}
 
-	roles, err := swarm.GetUnitRoleFromConsul(client, service.ID, switchManager)
+	roles, err := swarm.GetUnitRoleFromConsul(client, service.ID+"/"+switchManager)
 	if err != nil {
 		logrus.Error(err)
 		roles = make(map[string]string)
