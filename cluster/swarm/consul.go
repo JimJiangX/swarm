@@ -40,6 +40,10 @@ func GetUnitRoleFromConsul(client *api.Client, service, unit string) (map[string
 		return nil, err
 	}
 
+	return rolesJSONUnmarshal(val.Value)
+}
+
+func rolesJSONUnmarshal(data []byte) (map[string]string, error) {
 	roles := struct {
 		Units struct {
 			Default map[string]struct {
@@ -48,9 +52,12 @@ func GetUnitRoleFromConsul(client *api.Client, service, unit string) (map[string
 		} `json:"datanode_group"`
 	}{}
 
-	err = json.Unmarshal(val.Value, &roles)
+	src := string(data)
+	logrus.Debug("src: ", src)
+
+	err := json.Unmarshal(data, &roles)
 	if err != nil {
-		logrus.Error(err, val)
+		logrus.Error(err, src)
 		return nil, err
 	}
 
