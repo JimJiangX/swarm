@@ -170,12 +170,8 @@ func ExecScript(script ...string) (*exec.Cmd, error) {
 		shell = other
 	}
 
-	slice := make([]string, len(script)+1)
-	slice[0] = flag
-	copy(slice[1:], script)
-
-	cmd := exec.Command(shell, slice...)
-	fmt.Println("exec:", shell, slice)
+	cmd := exec.Command(shell, flag, strings.Join(script, " "))
+	fmt.Println("exec:", cmd.Path, cmd.Args)
 
 	return cmd, nil
 }

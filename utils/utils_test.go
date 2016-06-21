@@ -78,11 +78,14 @@ func TestBase64Generate(t *testing.T) {
 }
 
 func TestExecScript(t *testing.T) {
-	p, err := ExecScript("echo foo bar baz")
+	p, err := ExecScript("echo", "foo", "bar baz")
 	if err != nil {
 		t.Fatal(err)
 	}
 	bs, err := p.Output()
+	if err != nil {
+		t.Error(err, string(bs))
+	}
 	if g, e := string(bs), "foo bar baz\n"; g != e {
 		t.Errorf("echo: want %q, got %q", e, g)
 	}
