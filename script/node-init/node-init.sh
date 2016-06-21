@@ -110,22 +110,22 @@ EOF
 container_name=\$1
 output=\`mktemp /tmp/XXXXX\`
 
-
 docker inspect \$container_name > \$output 2>&1
 if [ \$? -ne 0 ]; then
 	 exit 2
- fi
+fi
 
- ip_addr=\`cat \$output | grep IPADDR | awk -F= '{print \$2}' | sed 's/",//g'\`
- port=\`cat \$output | grep PORT | awk -F= '{print \$2}' | sed 's/",//g'\`
+ip_addr=\`cat \$output | grep IPADDR | awk -F= '{print \$2}' | sed 's/",//g'\`
+port=\`cat \$output | grep PORT | awk -F= '{print \$2}' | sed 's/",//g'\`
 
- rm -f \$output
+rm -f \$output
 
- stat_code=\`curl -o /dev/null -s -w %{http_code} -X POST http://\${ip_addr}:\${port}/ping\`
- if [ \${stat_code} == '200' ]; then
+stat_code=\`curl -o /dev/null -s -w %{http_code} -X POST http://\${ip_addr}:\${port}/ping\`
+if [ \${stat_code} == '200' ]; then
 	 exit 0
  else
 	 exit 2
+fi
 EOF
 
 	chmod +x ${dir}/check_switchmanager.sh
