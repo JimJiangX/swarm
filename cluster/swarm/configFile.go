@@ -146,7 +146,9 @@ func (mysqlCmd) StartServiceCmd() []string {
 func (mysqlCmd) StopServiceCmd() []string {
 	return []string{"/root/upsql.service", "stop"}
 }
-func (mysqlCmd) RestoreCmd(file string) []string { return nil }
+func (mysqlCmd) RestoreCmd(file string) []string {
+	return []string{"/root/upsql-restore.sh", file}
+}
 func (mysqlCmd) BackupCmd(args ...string) []string {
 	cmd := make([]string, len(args)+1)
 	cmd[0] = "/root/upsql-backup.sh"

@@ -88,12 +88,12 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/services/backup_strategy/{name:.*}/enable":  postEnableServiceStrategy,
 		"/services/backup_strategy/{name:.*}/disable": postDisableServiceStrategy,
 
-		"/units/{name:.*}/start":   postUnitStart,
-		"/units/{name:.*}/stop":    postUnitStop,
-		"/units/{name:.*}/backup":  postUnitBackup,
-		"/units/{name:.*}/restore": postUnitRestore,
-		"/units/{name:.*}/migrate": postUnitMigrate,
-		// "/units/{name:.*}/rebuild":    postUnitRebuild,
+		"/units/{name:.*}/start":      postUnitStart,
+		"/units/{name:.*}/stop":       postUnitStop,
+		"/units/{name:.*}/backup":     postUnitBackup,
+		"/units/{name:.*}/restore":    postUnitRestore,
+		"/units/{name:.*}/migrate":    postUnitMigrate,
+		"/units/{name:.*}/rebuild":    postUnitRebuild,
 		"/units/{name:.*}/isolate":    postUnitIsolate,
 		"/units/{name:.*}/switchback": postUnitSwitchback,
 

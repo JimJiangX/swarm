@@ -405,7 +405,7 @@ func (u *unit) stopContainer(timeout int) error {
 func (u *unit) restartContainer(timeout int) error {
 	err := u.stopService()
 	if err != nil {
-		return err
+		// return err
 	}
 
 	if u.engine == nil {
@@ -694,11 +694,8 @@ func (u *unit) initService() error {
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func initService(id string, eng *cluster.Engine, cmd []string) error {
@@ -764,13 +761,10 @@ func (u *unit) startService() error {
 
 	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
-		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
-	}
-	if err != nil {
-		return err
+		err = fmt.Errorf("%s start service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
 
-	return nil
+	return err
 }
 
 func (u *unit) stopService() error {
@@ -785,13 +779,10 @@ func (u *unit) stopService() error {
 
 	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
-		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
-	}
-	if err != nil {
-		return err
+		err = fmt.Errorf("%s stop service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
 
-	return nil
+	return err
 }
 
 func (u *unit) backup(args ...string) error {
@@ -810,13 +801,33 @@ func (u *unit) backup(args ...string) error {
 
 	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
-		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
-	}
-	if err != nil {
-		return err
+		err = fmt.Errorf("%s backup cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
 
-	return nil
+	return err
+}
+
+func (u *unit) restore(file string) error {
+	if u.ContainerCmd == nil {
+		return nil
+	}
+	cmd := u.RestoreCmd(file)
+	if len(cmd) == 0 {
+		logrus.Warnf("%s RestoreCmd is nil", u.Name)
+		return nil
+	}
+	logrus.WithFields(logrus.Fields{
+		"Name": u.Name,
+		"Cmd":  cmd,
+	}).Debugln("restore job")
+
+	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	if inspect.ExitCode != 0 {
+		err = fmt.Errorf("%s restore cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+	}
+
+	return err
+
 }
 
 var pluginPort = 3333
@@ -880,4 +891,32 @@ func (gd *Gardener) unitContainer(u *unit) *cluster.Container {
 	}
 
 	return u.container
+}
+
+func (gd *Gardener) RestoreUnit(NameOrID, source string) error {
+	table, err := database.GetUnit(NameOrID)
+	if err != nil {
+		return err
+	}
+
+	service, err := gd.GetService(table.ServiceID)
+	if err != nil {
+		return err
+	}
+
+	unit, err := service.getUnit(table.ID)
+	if err != nil {
+		return err
+	}
+
+	// manager locked
+	// restart container
+	err = unit.restartContainer(5)
+	if err != nil {
+		return err
+	}
+
+	err = unit.restore(source)
+
+	return err
 }

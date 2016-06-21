@@ -1444,7 +1444,12 @@ func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 // POST /units/{name:.*}/restore
 func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	unit := mux.Vars(r)["name"]
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	name := mux.Vars(r)["name"]
+	source := r.FormValue("from")
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
@@ -1452,7 +1457,13 @@ func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	_ = unit
+	err := gd.RestoreUnit(name, source)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // POST /units/{name:.*}/migrate
