@@ -69,7 +69,7 @@ func RegisterStore(vendor, addr, user, password, admin string,
 
 	stores[store.ID()] = store
 
-	return nil, nil
+	return store, nil
 }
 
 func GetStoreByID(ID string) (Store, error) {
