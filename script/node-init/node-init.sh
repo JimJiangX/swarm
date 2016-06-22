@@ -76,14 +76,15 @@ EOF
 
 container_name=\$1
 
-docker inspect \$container_name > /dev/null 2>&1
+docker inspect \${container_name} > /dev/null 2>&1
 if [ \$? -ne 0 ]; then
 	 exit 2
- fi
+fi
 
- docker exec \$container_name /root/check_db
-
- exit \$?
+docker exec \${container_name} /root/check_db
+if [ \$? -ne 0 ]; then
+	 exit 2
+fi
 EOF
 	chmod +x ${dir}/check_db.sh
 
@@ -96,11 +97,12 @@ container_name=\$1
 docker inspect \$container_name > /dev/null 2>&1
 if [ \$? -ne 0 ]; then
 	 exit 2
- fi
+fi
 
- docker exec \$container_name /root/check_proxy --default-file /DBAASCNF/upsql-proxy.conf
-
- exit \$?
+docker exec \$container_name /root/check_proxy --default-file /DBAASCNF/upsql-proxy.conf
+if [ \$? -ne 0 ]; then
+	 exit 2
+fi
 EOF
 	chmod +x ${dir}/check_proxy.sh
 
