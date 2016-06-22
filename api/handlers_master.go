@@ -641,7 +641,8 @@ func getUnitNetworking(id string) ([]string, []struct {
 	}
 	networkings := make([]string, len(ips))
 	for i := range ips {
-		networkings[i] = fmt.Sprintf("%s/%d", ips[i].IPAddr, ips[i].Prefix)
+		ip := utils.Uint32ToIP(ips[i].IPAddr)
+		networkings[i] = fmt.Sprintf("%s/%d", ip.String(), ips[i].Prefix)
 	}
 
 	out, err := database.ListPortsByUnit(id)
