@@ -679,6 +679,46 @@ func (svc *Service) removeContainers(force, rmVolumes bool) error {
 	return nil
 }
 
+func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}) error {
+	svc.Lock()
+	defer svc.Unlock()
+
+	for key, val := range config {
+		delete(config, key)
+		config[strings.ToLower(key)] = val
+	}
+
+	units := svc.getUnitByType(_type)
+
+	for _, u := range units {
+		keys, ok := u.CanModify(config)
+		if !ok {
+			return fmt.Errorf("Illegal keys:%s,Or keys cannot be modified", keys)
+		}
+
+		err := u.CopyConfig(config)
+		if err != nil {
+			return err
+		}
+
+		if u.MustRestart(config) {
+			err := u.stopService()
+			if err != nil {
+				logrus.Error("%s stop Service error,%s", u.Name, err)
+			}
+
+			err = u.startService()
+			if err != nil {
+				logrus.Error("%s start Service error,%s", u.Name, err)
+				return err
+			}
+
+		}
+	}
+
+	return nil
+}
+
 func (svc *Service) refreshTopology() error {
 	svc.getSwithManagerUnit()
 
@@ -895,6 +935,56 @@ loop:
 	return addr, port, master, err
 }
 
+func (gd *Gardener) UnitIsolate(name string) error {
+	table, err := database.GetUnit(name)
+	if err != nil {
+		return err
+	}
+
+	service, err := gd.GetService(table.ServiceID)
+	if err != nil {
+		return err
+	}
+
+	service.Lock()
+
+	ip, port, err := service.getSwitchManagerAddr()
+	if err != nil {
+		service.Unlock()
+		return err
+	}
+
+	err = smlib.Isolate(ip, port, table.Name)
+	service.Unlock()
+
+	return err
+}
+
+func (gd *Gardener) UnitSwitchBack(name string) error {
+	table, err := database.GetUnit(name)
+	if err != nil {
+		return err
+	}
+
+	service, err := gd.GetService(table.ServiceID)
+	if err != nil {
+		return err
+	}
+
+	service.Lock()
+
+	ip, port, err := service.getSwitchManagerAddr()
+	if err != nil {
+		service.Unlock()
+		return err
+	}
+
+	err = smlib.Recover(ip, port, table.Name)
+	service.Unlock()
+
+	return err
+}
+
 func (gd *Gardener) TemporaryServiceBackupTask(service, unit string, req structs.BackupStrategy) (string, error) {
 	if unit != "" {
 		u, err := database.GetUnit(unit)
@@ -1087,56 +1177,6 @@ func (gd *Gardener) serviceScaleUP(svc *Service, list []structs.ScaleUpModule, t
 	}
 
 	return nil
-}
-
-func (gd *Gardener) UnitIsolate(name string) error {
-	table, err := database.GetUnit(name)
-	if err != nil {
-		return err
-	}
-
-	service, err := gd.GetService(table.ServiceID)
-	if err != nil {
-		return err
-	}
-
-	service.Lock()
-
-	ip, port, err := service.getSwitchManagerAddr()
-	if err != nil {
-		service.Unlock()
-		return err
-	}
-
-	err = smlib.Isolate(ip, port, table.Name)
-	service.Unlock()
-
-	return err
-}
-
-func (gd *Gardener) UnitSwitchBack(name string) error {
-	table, err := database.GetUnit(name)
-	if err != nil {
-		return err
-	}
-
-	service, err := gd.GetService(table.ServiceID)
-	if err != nil {
-		return err
-	}
-
-	service.Lock()
-
-	ip, port, err := service.getSwitchManagerAddr()
-	if err != nil {
-		service.Unlock()
-		return err
-	}
-
-	err = smlib.Recover(ip, port, table.Name)
-	service.Unlock()
-
-	return err
 }
 
 func (p *pendingContainerUpdate) containerUpdate() error {

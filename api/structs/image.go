@@ -46,3 +46,8 @@ type UpdateUnitConfigRequest struct {
 	ConfigContent   string         `json:"config_content"`
 	KeySet          []KeysetParams `json:"config_keyset"`
 }
+
+type UpdateServiceConfigRequest struct {
+	Type  string
+	Pairs map[string]interface{}
+}

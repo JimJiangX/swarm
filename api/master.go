@@ -83,6 +83,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/services/{name:.*}/scale-up":      postServiceScaleUp,
 		"/services/{name:.*}/volume-extend": postServiceVolumeExtension,
 
+		"/services/{name:.*}/service-config/update": postServiceConfig,
+
 		"/services/{name:.*}/backup_strategy":         postStrategyToService,
 		"/services/backup_strategy/{name:.*}/update":  postUpdateServiceStrategy,
 		"/services/backup_strategy/{name:.*}/enable":  postEnableServiceStrategy,
@@ -107,13 +109,12 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/image/{image:.*}/disable":  postDisableImage,
 		"/image/{image:.*}/template": updateImageTemplateConfig,
 
-		// "/storage/nas":                                       postNasStorage,
+		"/tasks/backup/callback": postBackupCallback,
+
 		"/storage/san":                                       postSanStorage,
 		"/storage/san/{name}/raid_group":                     postRGToSanStorage,
 		"/storage/san/{name}/raid_group/{rg:[0-9]+}/enable":  postEnableRaidGroup,
 		"/storage/san/{name}/raid_group/{rg:[0-9]+}/disable": postDisableRaidGroup,
-
-		"/tasks/backup/callback": postBackupCallback,
 	},
 	"DELETE": {
 		"/services/{name}":                    deleteService,

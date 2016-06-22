@@ -1292,6 +1292,37 @@ func postServiceVolumeExtension(ctx goctx.Context, w http.ResponseWriter, r *htt
 	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
 }
 
+// POST /services/{name:.*}/service-config/update
+func postServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	req := structs.UpdateServiceConfigRequest{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	service, err := gd.GetService(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = service.UpdateUnitConfig(req.Type, req.Pairs)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // POST /services/{name:.*}/backup_strategy
 func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
@@ -1885,10 +1916,6 @@ func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 	}
 
 	w.WriteHeader(http.StatusOK)
-}
-
-// POST /storage/nas
-func postNasStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // DELETE /services/{name}
