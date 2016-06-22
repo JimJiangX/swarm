@@ -523,6 +523,7 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	consulClient, err := gd.ConsulAPIClient(false)
 	if err != nil {
 		logrus.Error(err)
@@ -567,12 +568,23 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 		checks = make(map[string]consulapi.HealthCheck, 0)
 	}
 
+	names := make([]string, len(units))
+	for i := range units {
+		names[i] = units[i].EngineID
+	}
+	nodes, err := database.ListNodesByEngines(names)
+	if err != nil {
+		logrus.Error(err, names)
+	}
+
 	list := make([]structs.UnitInfo, len(units))
 	for i := range units {
-
-		node, err := database.GetNode(units[i].EngineID)
-		if err != nil {
-			logrus.Error(err, units[i].Name)
+		node := database.Node{}
+		for n := range nodes {
+			if nodes[n].EngineID == units[i].EngineID {
+				node = nodes[n]
+				break
+			}
 		}
 
 		list[i] = structs.UnitInfo{

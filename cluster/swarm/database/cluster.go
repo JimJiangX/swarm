@@ -408,6 +408,25 @@ func ListNodeByClusterType(_type string, enabled bool) ([]Node, error) {
 	return nodes, nil
 }
 
+func ListNodesByEngines(names []string) ([]Node, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+	query, args, err := sqlx.In("SELECT * FROM tb_node WHERE engine_id IN (?);", names)
+	if err != nil {
+		return nil, err
+	}
+
+	var nodes []Node
+	err = db.Select(&nodes, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
+}
+
 func DeleteNode(IDOrName string) error {
 	db, err := GetDB(true)
 	if err != nil {
