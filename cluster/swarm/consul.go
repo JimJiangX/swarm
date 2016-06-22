@@ -51,7 +51,8 @@ func rolesJSONUnmarshal(data []byte) (map[string]string, error) {
 	roles := struct {
 		Units struct {
 			Default map[string]struct {
-				Type string
+				Type   string
+				Status string
 			}
 		} `json:"datanode_group"`
 	}{}
@@ -64,7 +65,7 @@ func rolesJSONUnmarshal(data []byte) (map[string]string, error) {
 
 	m := make(map[string]string, len(roles.Units.Default))
 	for key, val := range roles.Units.Default {
-		m[key] = val.Type
+		m[key] = fmt.Sprintf("%s(%s)", val.Type, val.Status)
 	}
 
 	return m, nil
