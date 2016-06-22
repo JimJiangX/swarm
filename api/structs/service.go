@@ -35,7 +35,7 @@ type Module struct {
 	Version    string
 	Type       string                 // upsql\upproxy\sm
 	Arch       string                 `json:"arch"`
-	Candidates []string               `json:",omitempty"`
+	Clusters   []string               `json:",omitempty"`
 	Stores     []DiskStorage          `json:",omitempty"`
 	Configures map[string]interface{} `json:",omitempty"`
 

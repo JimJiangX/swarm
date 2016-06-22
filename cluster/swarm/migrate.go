@@ -10,6 +10,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
+	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/utils"
 )
 
@@ -58,6 +59,26 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ct
 	config, err := resetContainerConfig(u.container.Config, hostConfig)
 	if err != nil {
 		return err
+	}
+
+	if len(candidates) == 0 {
+		table, err := database.GetNode(u.EngineID)
+		if err != nil {
+			return err
+		}
+		nodes, err := database.ListNodeByCluster(table.ClusterID)
+		if err != nil {
+			return err
+		}
+		candidates = make([]string, len(nodes))
+		for i := range nodes {
+			candidates[i] = nodes[i].EngineID
+		}
+	} else {
+		candidates, err = database.ListEnginesByNodes(candidates)
+		if err != nil {
+			return err
+		}
 	}
 
 	engine, err := gd.selectEngine(config, module, candidates, filters)
@@ -186,7 +207,7 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ct
 	return nil
 }
 
-func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs.Module, list, exclude []string) (*cluster.Engine, error) {
+func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs.Module, engines, exclude []string) (*cluster.Engine, error) {
 	entry := logrus.WithFields(logrus.Fields{"Module": module.Type})
 
 	num, _type := 1, module.Type
@@ -197,8 +218,20 @@ func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs
 	filters := gd.listShortIdleStore(module.Stores, _type, num)
 	filters = append(filters, exclude...)
 	entry.Debugf("[MG] %s,%s,%s:first filters of storage:%s", module.Stores, module.Type, num, filters)
+	nodes := make([]*node.Node, 0, len(engines))
+	for i := range engines {
+		if isStringExist(engines[i], filters) {
+			continue
+		}
+		node := gd.checkNode(engines[i])
+		if node != nil {
+			nodes = append(nodes, node)
+		}
+	}
 
-	candidates, err := gd.Scheduler(config, _type, num, list, filters, false, false)
+	logrus.Debugf("filters num:%d,candidate nodes num:%d", len(filters), len(nodes))
+
+	candidates, err := gd.Scheduler(config, num, nodes, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -284,6 +317,25 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 		return err
 	}
 
+	if len(candidates) == 0 {
+		table, err := database.GetNode(u.EngineID)
+		if err != nil {
+			return err
+		}
+		nodes, err := database.ListNodeByCluster(table.ClusterID)
+		if err != nil {
+			return err
+		}
+		candidates = make([]string, len(nodes))
+		for i := range nodes {
+			candidates[i] = nodes[i].EngineID
+		}
+	} else {
+		candidates, err = database.ListEnginesByNodes(candidates)
+		if err != nil {
+			return err
+		}
+	}
 	engine, err := gd.selectEngine(config, module, candidates, filters)
 	if err != nil {
 		return err

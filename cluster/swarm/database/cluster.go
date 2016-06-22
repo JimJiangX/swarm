@@ -386,8 +386,7 @@ func ListNodeByClusterType(_type string, enabled bool) ([]Node, error) {
 		return nil, err
 	}
 
-	clist := make([]string, 0, 5)
-
+	var clist []string
 	err = db.Select(&clist, "SELECT id FROM tb_cluster WHERE type=? AND enabled=?", _type, enabled)
 	if err != nil {
 		return nil, err
@@ -398,8 +397,7 @@ func ListNodeByClusterType(_type string, enabled bool) ([]Node, error) {
 		return nil, err
 	}
 
-	nodes := make([]Node, 0, 50)
-
+	var nodes []Node
 	err = db.Select(&nodes, query, args...)
 	if err != nil {
 		return nil, err
@@ -425,6 +423,66 @@ func ListNodesByEngines(names []string) ([]Node, error) {
 	}
 
 	return nodes, nil
+}
+
+func ListEnginesByNodes(names []string) ([]string, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+	query, args, err := sqlx.In("SELECT engine_id FROM tb_node WHERE id IN (?);", names)
+	if err != nil {
+		return nil, err
+	}
+
+	var nodes []string
+	err = db.Select(&nodes, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
+}
+
+func ListNodesByClusters(clusters []string, _type string) ([]Node, error) {
+	if len(clusters) == 0 {
+		return nil, nil
+	}
+
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	var clist []string
+	err = db.Select(&clist, "SELECT id FROM tb_cluster WHERE type=? AND enabled=?", _type, true)
+	if err != nil {
+		return nil, err
+	}
+
+	list := make([]string, 0, len(clusters))
+	for i := range clusters {
+		for j := range clist {
+			if clusters[i] == clist[j] {
+				list = append(list, clusters[i])
+				break
+			}
+		}
+	}
+
+	query, args, err := sqlx.In("SELECT * FROM tb_node WHERE cluster_id IN (?);", list)
+	if err != nil {
+		return nil, err
+	}
+
+	var nodes []Node
+	err = db.Select(&nodes, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
+
 }
 
 func DeleteNode(IDOrName string) error {

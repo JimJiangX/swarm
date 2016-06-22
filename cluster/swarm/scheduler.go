@@ -162,6 +162,11 @@ func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module structs
 	}
 
 	highAvaliable := svc.HighAvailable
+	if num := len(module.Clusters); num > 1 {
+		highAvaliable = true
+	} else if num == 1 {
+		highAvaliable = false
+	}
 	for i := range module.Stores {
 		if !store.IsLocalStore(module.Stores[i].Type) {
 			highAvaliable = true
@@ -171,7 +176,10 @@ func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module structs
 	gd.scheduler.Lock()
 	defer gd.scheduler.Unlock()
 
-	candidates, err := gd.Scheduler(config, _type, num, module.Candidates, filters, false, highAvaliable)
+	list := gd.listCandidateNodes(module.Clusters, _type, filters)
+	logrus.Debugf("filters num:%d,candidate nodes num:%d", len(filters), len(list))
+
+	candidates, err := gd.Scheduler(config, num, list, false, highAvaliable)
 	if err != nil {
 		return nil, err
 	}
@@ -323,12 +331,8 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit,
 	return pending, err
 }
 
-func (gd *Gardener) Scheduler(config *cluster.ContainerConfig,
-	_type string, num int, nodes, filters []string,
-	withImageAffinity, highAvaliable bool) ([]*node.Node, error) {
-
-	list := gd.listCandidateNodes(nodes, _type, filters...)
-	logrus.Debugf("filters num:%d,candidate nodes num:%d", len(filters), len(list))
+func (gd *Gardener) Scheduler(config *cluster.ContainerConfig, num int,
+	list []*node.Node, withImageAffinity, highAvaliable bool) ([]*node.Node, error) {
 
 	if len(list) < num {
 		err := fmt.Errorf("Not Enough Candidate Nodes For Allocation,%d<%d", len(list), num)
@@ -402,45 +406,38 @@ func (gd *Gardener) runScheduler(list []*node.Node, config *cluster.ContainerCon
 }
 
 // listCandidateNodes returns all validated engines in the cluster, excluding pendingEngines.
-func (gd *Gardener) listCandidateNodes(candidates []string, _type string, filters ...string) []*node.Node {
+func (gd *Gardener) listCandidateNodes(clusters []string, _type string, filters []string) []*node.Node {
 	gd.RLock()
 	defer gd.RUnlock()
 
-	out := make([]*node.Node, 0, len(gd.engines))
+	var (
+		list []database.Node
+		err  error
+	)
 
-	if len(candidates) == 0 {
-
-		list, err := database.ListNodeByClusterType(_type, true)
-		if err != nil {
-			logrus.Errorf("Search in Database Error: %s", err)
-
-			return nil
-		}
-
-		for i := range list {
-
-			if list[i].Status != _StatusNodeEnable ||
-				isStringExist(list[i].ClusterID, filters) {
-
-				continue
-			}
-
-			node := gd.checkNode(list[i].EngineID, filters)
-			if node != nil {
-				out = append(out, node)
-			}
-		}
-
+	if len(clusters) == 0 {
+		list, err = database.ListNodeByClusterType(_type, true)
 	} else {
+		list, err = database.ListNodesByClusters(clusters, _type)
+	}
+	if err != nil {
+		logrus.Errorf("Search in Database Error: %s", err)
 
-		logrus.Debugf("Candidates From Assigned %s", candidates)
+		return nil
+	}
 
-		for i := range candidates {
+	out := make([]*node.Node, 0, len(list))
+	for i := range list {
+		if list[i].Status != _StatusNodeEnable ||
+			isStringExist(list[i].ClusterID, filters) ||
+			isStringExist(list[i].EngineID, filters) {
 
-			node := gd.checkNode(candidates[i], filters)
-			if node != nil {
-				out = append(out, node)
-			}
+			continue
+		}
+
+		node := gd.checkNode(list[i].EngineID)
+		if node != nil {
+			out = append(out, node)
 		}
 	}
 
@@ -449,16 +446,11 @@ func (gd *Gardener) listCandidateNodes(candidates []string, _type string, filter
 	return out
 }
 
-func (gd *Gardener) checkNode(id string, filters []string) *node.Node {
+func (gd *Gardener) checkNode(id string) *node.Node {
 	e, ok := gd.engines[id]
 	if !ok {
 		logrus.Debugf("Not Found Engine %s", id)
 
-		return nil
-	}
-
-	if isStringExist(id, filters) {
-		logrus.Debug(id, "IN", filters)
 		return nil
 	}
 
