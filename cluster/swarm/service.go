@@ -1014,12 +1014,12 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, unit string, req structs
 		return "", err
 	}
 
-	go svc.TryBackupTask(&task, gd.host, unit, strategy.ID, strategy.Type, strategy.Timeout)
+	go svc.TryBackupTask(&task, gd.host, unit, *strategy)
 
 	return task.ID, nil
 }
 
-func (svc *Service) TryBackupTask(task *database.Task, host, unitID, strategyID, strategyType string, timeout int) error {
+func (svc *Service) TryBackupTask(task *database.Task, host, unitID string, strategy database.BackupStrategy) error {
 	backup := &unit{}
 	for retries := 3; ; retries-- {
 		if retries != 3 {
@@ -1064,18 +1064,18 @@ func (svc *Service) TryBackupTask(task *database.Task, host, unitID, strategyID,
 		}
 	}
 
-	args := []string{host + "v1.0/task/backup/callback", task.ID, strategyID, backup.ID, strategyType}
+	args := []string{host + "v1.0/task/backup/callback", task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
 
 	errCh := make(chan error, 1)
 
 	select {
 	case errCh <- backup.backup(args...):
 
-	case <-time.After(time.Duration(timeout)):
+	case <-time.After(time.Duration(strategy.Timeout)):
 
 		err := database.UpdateTaskStatus(task, _StatusTaskTimeout, time.Now(), "Timeout,The Task marked as TaskTimeout")
 
-		err = fmt.Errorf("Task Timeout,Service:%s,BackupStrategy:%s,Task:%s,Error:%v", svc.ID, strategyID, task.ID, err)
+		err = fmt.Errorf("Task Timeout,Service:%s,BackupStrategy:%s,Task:%s,Error:%v", svc.ID, strategy.ID, task.ID, err)
 		logrus.Error(err)
 		return err
 	}

@@ -46,7 +46,7 @@ func (bs *serviceBackup) Run() {
 		return
 	}
 
-	bs.svc.TryBackupTask(&task, bs.server, "", strategy.ID, strategy.Type, strategy.Timeout)
+	bs.svc.TryBackupTask(&task, bs.server, "", *strategy)
 }
 
 func (bs *serviceBackup) Next(time.Time) time.Time {

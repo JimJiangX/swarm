@@ -46,6 +46,7 @@ type Gardener struct {
 	host   string
 	kvPath string
 
+	sysConfig          *database.Configurations
 	cron               *crontab.Cron // crontab tasks
 	consulClient       *consulapi.Client
 	kvClient           kvstore.Store
@@ -106,7 +107,7 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	if err != nil {
 		logrus.Error("Get System Config Error,%s", err)
 	} else {
-		err = gd.SetParams(*sysConfig)
+		err = gd.SetParams(sysConfig)
 		if err != nil {
 			logrus.Error(err)
 		}
@@ -214,11 +215,11 @@ func (gd *Gardener) ConsulAPIClient(full bool) (*consulapi.Client, error) {
 	return nil, fmt.Errorf("Not Found Alive Consul Server %s:%d", sys.ConsulIPs, sys.ConsulPort)
 }
 
-func (gd *Gardener) SetParams(sys database.Configurations) error {
+func (gd *Gardener) SetParams(sys *database.Configurations) error {
 	gd.Lock()
 	defer gd.Unlock()
 
-	endpoints, clients := pingConsul(gd.host, &sys)
+	endpoints, clients := pingConsul(gd.host, sys)
 	gd.consulClient = clients[0]
 
 	options := &kvstore.Config{
@@ -252,6 +253,8 @@ func (gd *Gardener) SetParams(sys database.Configurations) error {
 		Email:         sys.Registry.Email,
 		RegistryToken: sys.Registry.Token,
 	}
+
+	gd.sysConfig = sys
 
 	return nil
 }
@@ -343,12 +346,34 @@ func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 		return err
 	}
 
-	err = gd.SetParams(config)
+	err = gd.SetParams(&config)
 	if err != nil {
 		logrus.Error(err)
 	}
 
 	return err
+}
+
+func (gd *Gardener) SystemConfig() (database.Configurations, error) {
+	gd.RLock()
+	config := gd.sysConfig
+	gd.RUnlock()
+
+	if config != nil {
+		return *config, nil
+	}
+
+	sys, err := database.GetSystemConfig()
+	if err != nil || sys == nil {
+		return database.Configurations{}, err
+	}
+
+	err = gd.SetParams(sys)
+	if err != nil {
+		return database.Configurations{}, err
+	}
+
+	return *sys, nil
 }
 
 func nfsSetting(option database.NFSOption) error {

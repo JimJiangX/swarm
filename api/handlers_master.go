@@ -732,6 +732,7 @@ func getServiceBackupStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.
 			Valid:     utils.TimeToString(list[i].Valid),
 			CreatedAt: utils.TimeToString(list[i].CreatedAt),
 			Enable:    list[i].Enabled,
+			BackupDir: list[i].BackupDir,
 		}
 	}
 
@@ -1245,6 +1246,12 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
+	sys, err := gd.SystemConfig()
+	if err != nil {
+		logrus.Error(err)
+	}
+
+	req.BackupDir = sys.BackupDir
 
 	taskID, err := gd.TemporaryServiceBackupTask(service, "", req)
 	if err != nil {
@@ -1374,6 +1381,12 @@ func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
+	sys, err := gd.SystemConfig()
+	if err != nil {
+		logrus.Error(err)
+	}
+
+	req.BackupDir = sys.BackupDir
 
 	strategy, err := gd.ReplaceServiceBackupStrategy(name, req)
 	if err != nil {
@@ -1400,8 +1413,14 @@ func postUpdateServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
+	sys, err := gd.SystemConfig()
+	if err != nil {
+		logrus.Error(err)
+	}
 
-	err := gd.UpdateServiceBackupStrategy(name, req)
+	req.BackupDir = sys.BackupDir
+
+	err = gd.UpdateServiceBackupStrategy(name, req)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1507,6 +1526,12 @@ func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
+	sys, err := gd.SystemConfig()
+	if err != nil {
+		logrus.Error(err)
+	}
+
+	req.BackupDir = sys.BackupDir
 
 	taskID, err := gd.TemporaryServiceBackupTask("", unit, req)
 	if err != nil {
