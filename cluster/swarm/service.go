@@ -1089,6 +1089,56 @@ func (gd *Gardener) serviceScaleUP(svc *Service, list []structs.ScaleUpModule, t
 	return nil
 }
 
+func (gd *Gardener) UnitIsolate(name string) error {
+	table, err := database.GetUnit(name)
+	if err != nil {
+		return err
+	}
+
+	service, err := gd.GetService(table.ServiceID)
+	if err != nil {
+		return err
+	}
+
+	service.Lock()
+
+	ip, port, err := service.getSwitchManagerAddr()
+	if err != nil {
+		service.Unlock()
+		return err
+	}
+
+	err = smlib.Isolate(ip, port, table.Name)
+	service.Unlock()
+
+	return err
+}
+
+func (gd *Gardener) UnitSwitchBack(name string) error {
+	table, err := database.GetUnit(name)
+	if err != nil {
+		return err
+	}
+
+	service, err := gd.GetService(table.ServiceID)
+	if err != nil {
+		return err
+	}
+
+	service.Lock()
+
+	ip, port, err := service.getSwitchManagerAddr()
+	if err != nil {
+		service.Unlock()
+		return err
+	}
+
+	err = smlib.Recover(ip, port, table.Name)
+	service.Unlock()
+
+	return err
+}
+
 func (p *pendingContainerUpdate) containerUpdate() error {
 	if p.cpusetCPus != "" && p.config.CpusetCpus != "" {
 		p.config.CpusetCpus = p.cpusetCPus

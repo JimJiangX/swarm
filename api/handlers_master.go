@@ -1525,10 +1525,40 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 }
 
 // POST /units/{name:.*}/isolate
-func postUnitIsolate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+func postUnitIsolate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.UnitIsolate(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
 
 // POST /units/{name:.*}/switchback
-func postUnitSwitchback(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {}
+func postUnitSwitchback(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.UnitSwitchBack(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
 
 // POST /tasks/backup/callback
 func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
