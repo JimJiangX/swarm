@@ -110,7 +110,7 @@ func TestPort(t *testing.T) {
 		t.Fatal("Available Ports should be 8")
 	}
 
-	p6, err := GetPortsByUnit("unit1")
+	p6, err := ListPortsByUnit("unit1")
 	if err != nil {
 		t.Fatal(err)
 	}

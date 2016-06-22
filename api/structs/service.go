@@ -153,12 +153,17 @@ type ServiceResponse struct {
 }
 
 type UnitInfo struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`    // <unit_id_8bit>_<service_name>
-	Type      string `json:"type"`    // switch_manager/upproxy/upsql
-	NodeID    string `json:"node_id"` // Node.ID
-	NodeAddr  string `json:"node_addr"`
-	ClusterID string `json:"cluster_id"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`    // <unit_id_8bit>_<service_name>
+	Type        string `json:"type"`    // switch_manager/upproxy/upsql
+	NodeID      string `json:"node_id"` // Node.ID
+	NodeAddr    string `json:"node_addr"`
+	ClusterID   string `json:"cluster_id"`
+	Networkings []string
+	Ports       []struct {
+		Name string
+		Port int
+	}
 	// ImageID		string `json:"image_id"`
 	// ImageName	string `json:"image_name"` //<image_name>_<image_version>
 	// ServiceID	string `json:"service_id"`

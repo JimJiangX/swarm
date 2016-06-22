@@ -433,7 +433,7 @@ func DeteleServiceRelation(serviceID string) error {
 		if err == nil {
 			ips = append(ips, ipl...)
 		}
-		pl, err := GetPortsByUnit(units[i].ID)
+		pl, err := ListPortsByUnit(units[i].ID)
 		if err == nil {
 			ports = append(ports, pl...)
 		}

@@ -185,7 +185,7 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 
 	}
 
-	ports, err := database.GetPortsByUnit(u.ID)
+	ports, err := database.ListPortsByUnit(u.ID)
 	if err == nil {
 		u.ports = ports
 	} else {

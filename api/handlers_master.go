@@ -587,16 +587,20 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 			}
 		}
 
+		networkings, ports := getUnitNetworking(units[i].ID)
+
 		list[i] = structs.UnitInfo{
-			ID:        units[i].ID,
-			Name:      units[i].Name,
-			Type:      units[i].Type,
-			NodeID:    node.ID,
-			NodeAddr:  node.Addr,
-			ClusterID: node.ClusterID,
-			Role:      roles[units[i].Name],
-			Status:    checks[units[i].ID].Status,
-			CreatedAt: utils.TimeToString(units[i].CreatedAt),
+			ID:          units[i].ID,
+			Name:        units[i].Name,
+			Type:        units[i].Type,
+			NodeID:      node.ID,
+			NodeAddr:    node.Addr,
+			ClusterID:   node.ClusterID,
+			Networkings: networkings,
+			Ports:       ports,
+			Role:        roles[units[i].Name],
+			Status:      checks[units[i].ID].Status,
+			CreatedAt:   utils.TimeToString(units[i].CreatedAt),
 		}
 
 		if list[i].Role == "" {
@@ -625,6 +629,37 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 		FinishedAt:           utils.TimeToString(service.FinishedAt),
 		Containers:           list,
 	}
+}
+
+func getUnitNetworking(id string) ([]string, []struct {
+	Name string
+	Port int
+}) {
+	ips, err := database.ListIPByUnitID(id)
+	if err != nil {
+		logrus.Error("%s List IP error %s", id, err)
+	}
+	networkings := make([]string, len(ips))
+	for i := range ips {
+		networkings[i] = fmt.Sprintf("%s/%d", ips[i].IPAddr, ips[i].Prefix)
+	}
+
+	out, err := database.ListPortsByUnit(id)
+	if err != nil {
+		logrus.Error("%s List Port error %s", id, err)
+	}
+	ports := make([]struct {
+		Name string
+		Port int
+	}, len(out))
+	for i := range out {
+		ports[i] = struct {
+			Name string
+			Port int
+		}{out[i].Name, out[i].Port}
+	}
+
+	return networkings, ports
 }
 
 func getContainerJSON2(name string, container *cluster.Container) ([]byte, error) {

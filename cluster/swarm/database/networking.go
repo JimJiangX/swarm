@@ -191,7 +191,7 @@ func DelMultiPorts(tx *sqlx.Tx, ports []Port) error {
 	return nil
 }
 
-func GetPortsByUnit(NameOrID string) ([]Port, error) {
+func ListPortsByUnit(NameOrID string) ([]Port, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
