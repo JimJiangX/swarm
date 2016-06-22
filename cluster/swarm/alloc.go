@@ -310,6 +310,17 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 	}
 
 	for i := range need {
+		if need[i].Type == "nfs" || need[i].Type == "NFS" {
+			sys, err := database.GetSystemConfig()
+			if err != nil {
+				logrus.Errorf("GetSystemConfig error:%s", err)
+				return err
+			}
+			name := fmt.Sprintf("%s/%s:/%s", sys.NFSOption.MountDir, penging.unit.Name, need[i].Name)
+			config.HostConfig.Binds = append(config.HostConfig.Binds, name)
+			continue
+		}
+
 		name := fmt.Sprintf("%s_%s_LV", penging.unit.Unit.Name, need[i].Name)
 
 		if store.IsLocalStore(need[i].Type) {
