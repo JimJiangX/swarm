@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -97,7 +96,7 @@ func (gd *Gardener) ConsulAPIClient() (*api.Client, error) {
 		return nil, err
 	}
 
-	_, clients := pingConsul(HostAddress, sys)
+	_, clients := pingConsul(HostAddress, *sys)
 	if len(clients) > 0 {
 		return clients[0], nil
 	}
@@ -105,7 +104,7 @@ func (gd *Gardener) ConsulAPIClient() (*api.Client, error) {
 	return nil, fmt.Errorf("Not Found Alive Consul Server %s:%d", sys.ConsulIPs, sys.ConsulPort)
 }
 
-func pingConsul(host string, sys *database.Configurations) ([]string, []*api.Client) {
+func pingConsul(host string, sys database.Configurations) ([]string, []*api.Client) {
 	endpoints, dc, token, wait := sys.GetConsulConfig()
 	port := strconv.Itoa(sys.ConsulPort)
 	endpoints = append(endpoints, host+":"+port)
@@ -131,7 +130,7 @@ func pingConsul(host string, sys *database.Configurations) ([]string, []*api.Cli
 
 		servers, err := client.Status().Peers()
 		if err != nil {
-			logrus.Warnf("consul connection error%v", config)
+			logrus.Warnf("consul connection error,%s,%v", err, config)
 			continue
 		}
 
@@ -146,7 +145,6 @@ func pingConsul(host string, sys *database.Configurations) ([]string, []*api.Cli
 			servers[n] = ip + ":" + port
 			addrs = append(addrs, servers[n])
 		}
-		sys.ConsulIPs = strings.Join(addrs, ",")
 
 		exist := false
 		for n := range servers {
