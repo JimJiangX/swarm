@@ -1221,7 +1221,7 @@ func nodeClean(node, addr, user, password string) error {
 
 	script := fmt.Sprintf("chmod 755 %s && %s %s %d %s %s %d %s",
 		destName, destName, addr, config.ConsulPort, node,
-		config.HorusServerIP, config.HorusServerPort, config.BackupDir)
+		config.HorusServerIP, config.HorusServerPort, config.NFSOption.MountDir)
 
 	buffer := new(bytes.Buffer)
 	cmd := remote.Cmd{
