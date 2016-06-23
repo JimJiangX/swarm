@@ -421,9 +421,8 @@ func SelectVolumeByVG(name string) ([]LocalVolume, error) {
 		return nil, err
 	}
 
-	lvs := []LocalVolume{}
+	var lvs []LocalVolume
 	query := "SELECT * FROM tb_volumes WHERE VGname=?"
-
 	err = db.Select(&lvs, query, name)
 	if err != nil {
 		return nil, err
@@ -438,9 +437,8 @@ func SelectVolumesByUnitID(id string) ([]LocalVolume, error) {
 		return nil, err
 	}
 
-	lvs := make([]LocalVolume, 0, 5)
+	var lvs []LocalVolume
 	query := "SELECT * FROM tb_volumes WHERE unit_id=?"
-
 	err = db.Select(&lvs, query, id)
 	if err != nil {
 		return nil, err

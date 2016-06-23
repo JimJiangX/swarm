@@ -242,24 +242,21 @@ func (u *unit) prepareCreateContainer() error {
 	}
 
 	// prepare for volumes
-	binds := u.config.HostConfig.Binds
-
-	for _, name := range binds {
-		parts := strings.SplitN(name, ":", 2)
-		lv, err := database.GetLocalVolume(parts[0])
-		if err != nil {
-			return err
-		}
-
+	lvs, err := database.SelectVolumesByUnitID(u.ID)
+	if err != nil {
+		logrus.Error("SelectVolumesByUnitID %s error,%s", u.ID, err)
+		return err
+	}
+	for i := range lvs {
 		// if volume create on san storage,should created VG before create Volume
-		if strings.Contains(lv.VGName, "_SAN_VG") {
-			err := createSanStoreageVG(u.engine.IP, parts[0])
+		if strings.Contains(lvs[i].VGName, "_SAN_VG") {
+			err := createSanStoreageVG(u.engine.IP, lvs[i].Name)
 			if err != nil {
 				return err
 			}
 		}
 
-		_, err = createVolume(u.engine, lv)
+		_, err = createVolume(u.engine, lvs[i])
 		if err != nil {
 			return err
 		}
