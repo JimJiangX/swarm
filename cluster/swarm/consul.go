@@ -131,6 +131,7 @@ func pingConsul(host string, sys *database.Configurations) ([]string, []*api.Cli
 
 		servers, err := client.Status().Peers()
 		if err != nil {
+			logrus.Warnf("consul connection error%v", config)
 			continue
 		}
 
