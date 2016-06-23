@@ -15,3 +15,11 @@ type PostSANStoreRequest struct {
 type PostRaidGroupRequest struct {
 	ID int
 }
+
+type SANStorageResponse struct {
+	ID     string
+	Vendor string
+	Driver string
+	Total  int
+	Used   int
+}

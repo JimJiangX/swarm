@@ -76,13 +76,13 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (string, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	out, err := h.idleSize()
+	out, err := h.Size()
 	if err != nil {
 		return "", err
 	}
 
 	rg := maxIdleSizeRG(out)
-	if out[rg].free < size {
+	if out[rg].Free < size {
 		return "", fmt.Errorf("Not Enough Space For Alloction,Max:%d < Need:%d", out[rg], size)
 	}
 
@@ -179,14 +179,14 @@ func (h huaweiStore) IdleSize() (map[string]int, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
-	rg, err := h.idleSize()
+	rg, err := h.Size()
 	if err != nil {
 		return nil, err
 	}
 
 	out := make(map[string]int, len(rg))
 	for key, val := range rg {
-		out[key.ID] = val.free
+		out[key.ID] = val.Free
 	}
 
 	return out, nil
@@ -345,10 +345,10 @@ func (h *huaweiStore) AddSpace(id int) (int, error) {
 	}
 
 	for i := range spaces {
-		if spaces[i].id == id {
+		if spaces[i].ID == id {
 
 			if err := insert(); err == nil {
-				return spaces[i].free, nil
+				return spaces[i].Free, nil
 			} else {
 				return 0, err
 			}
@@ -413,7 +413,7 @@ func (h *huaweiStore) DisableSpace(id int) error {
 	return err
 }
 
-func (h huaweiStore) idleSize() (map[*database.RaidGroup]space, error) {
+func (h huaweiStore) Size() (map[database.RaidGroup]space, error) {
 	out, err := database.SelectRaidGroupByStorageID(h.ID(), true)
 	if err != nil {
 		return nil, err
@@ -430,15 +430,15 @@ func (h huaweiStore) idleSize() (map[*database.RaidGroup]space, error) {
 		return nil, err
 	}
 
-	var info map[*database.RaidGroup]space
+	var info map[database.RaidGroup]space
 
 	if len(spaces) > 0 {
-		info = make(map[*database.RaidGroup]space)
+		info = make(map[database.RaidGroup]space)
 
 		for i := range out {
 		loop:
 			for s := range spaces {
-				if out[i].StorageRGID == spaces[s].id {
+				if out[i].StorageRGID == spaces[s].ID {
 					info[out[i]] = spaces[s]
 					break loop
 				}
@@ -447,4 +447,29 @@ func (h huaweiStore) idleSize() (map[*database.RaidGroup]space, error) {
 	}
 
 	return info, nil
+}
+
+func (h huaweiStore) Info() (Info, error) {
+	list, err := h.Size()
+	if err != nil {
+		return Info{}, err
+	}
+	info := Info{
+		ID:     h.ID(),
+		Vendor: h.Vendor(),
+		Driver: h.Driver(),
+		List:   make(map[int]space, len(list)),
+	}
+
+	total, free := 0, 0
+	for rg, val := range list {
+		info.List[rg.StorageRGID] = val
+		total += val.Total
+		free += val.Free
+	}
+
+	info.Total = total
+	info.Used = total - free
+
+	return info, err
 }

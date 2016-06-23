@@ -36,9 +36,9 @@ func intSliceToString(input []int, sep string) string {
 	return strings.Join(a, sep)
 }
 
-func maxIdleSizeRG(m map[*database.RaidGroup]space) *database.RaidGroup {
+func maxIdleSizeRG(m map[database.RaidGroup]space) database.RaidGroup {
 	var (
-		key *database.RaidGroup
+		key database.RaidGroup
 		max int
 	)
 
@@ -46,8 +46,8 @@ func maxIdleSizeRG(m map[*database.RaidGroup]space) *database.RaidGroup {
 		if !k.Enabled {
 			continue
 		}
-		if val.free > max {
-			max = val.free
+		if val.Free > max {
+			max = val.Free
 			key = k
 		}
 	}
@@ -56,11 +56,11 @@ func maxIdleSizeRG(m map[*database.RaidGroup]space) *database.RaidGroup {
 }
 
 type space struct {
-	id     int
-	total  int
-	free   int
-	state  string
-	lunNum int
+	ID     int
+	Total  int
+	Free   int
+	State  string
+	LunNum int
 }
 
 func parseSpace(output string) []space {
@@ -78,22 +78,25 @@ func parseSpace(output string) []space {
 				space = space{}
 				err   error
 			)
-			space.id, err = strconv.Atoi(part[0])
+			space.ID, err = strconv.Atoi(part[0])
 			if err != nil {
 				continue
 			}
-			space.total, err = strconv.Atoi(part[1])
+			space.Total, err = strconv.Atoi(part[1])
 			if err != nil {
 				continue
 			}
-			space.free, err = strconv.Atoi(part[2])
-			if err != nil {
-				continue
-			}
+			space.Total = space.Total << 20
 
-			space.state = part[3]
+			space.Free, err = strconv.Atoi(part[2])
+			if err != nil {
+				continue
+			}
+			space.Free = space.Free << 20
 
-			space.lunNum, err = strconv.Atoi(part[4])
+			space.State = part[3]
+
+			space.LunNum, err = strconv.Atoi(part[4])
 			if err != nil {
 				continue
 			}

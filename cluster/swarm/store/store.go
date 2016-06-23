@@ -24,7 +24,17 @@ const (
 
 var stores map[string]Store = make(map[string]Store)
 
+type Info struct {
+	ID     string
+	Vendor string
+	Driver string
+	Total  int
+	Used   int
+	List   map[int]space
+}
+
 type Store interface {
+	Info() (Info, error)
 	ID() string
 	Vendor() string
 	Driver() string

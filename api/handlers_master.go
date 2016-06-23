@@ -791,6 +791,36 @@ func getServiceBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(sortByTime)
 }
 
+// GET /storage/san/{name:.*}
+func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	store, err := store.GetStoreByID(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	info, err := store.Info()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := structs.SANStorageResponse{
+		ID:     info.ID,
+		Vendor: info.Vendor,
+		Driver: info.Driver,
+		Total:  info.Total,
+		Used:   info.Used,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+
+}
+
 // GET /tasks
 func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
