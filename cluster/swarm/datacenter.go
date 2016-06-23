@@ -758,7 +758,7 @@ func (dc *Datacenter) DeregisterNode(IDOrName string) error {
 	return err
 }
 
-func (dc *Datacenter) DistributeNode(node *Node, kvpath string) error {
+func (dc *Datacenter) DistributeNode(node *Node) error {
 	entry := logrus.WithFields(logrus.Fields{
 		"name":    node.Name,
 		"addr":    node.Addr,
@@ -773,7 +773,7 @@ func (dc *Datacenter) DistributeNode(node *Node, kvpath string) error {
 
 	entry.Info("Adding new Node")
 
-	if err := node.Distribute(kvpath); err != nil {
+	if err := node.Distribute(); err != nil {
 		entry.Errorf("SSH UploadDir Error,%s", err)
 
 		return err
@@ -791,7 +791,7 @@ func (dc *Datacenter) DistributeNode(node *Node, kvpath string) error {
 }
 
 // CA,script,error
-func (node Node) modifyProfile(kvpath string) (*database.Configurations, string, error) {
+func (node Node) modifyProfile() (*database.Configurations, string, error) {
 	config, err := database.GetSystemConfig()
 	if err != nil {
 		return nil, "", err
@@ -851,7 +851,7 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, string,
 	}
 
 	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %d %s %s %d %d %s %s %s %s",
-		path, path, kvpath, node.Addr, config.ConsulDatacenter, string(buf),
+		path, path, DockerNodesKVPath, node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile,
 		config.DockerPort, hdd, ssd, config.HorusAgentPort, config.ConsulPort,
@@ -861,7 +861,7 @@ func (node Node) modifyProfile(kvpath string) (*database.Configurations, string,
 	return config, script, nil
 }
 
-func (node *Node) Distribute(kvpath string) (err error) {
+func (node *Node) Distribute() (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Recover From Panic:%v", r)
@@ -895,7 +895,7 @@ func (node *Node) Distribute(kvpath string) (err error) {
 		},
 	}
 
-	config, script, err := node.modifyProfile(kvpath)
+	config, script, err := node.modifyProfile()
 	if err != nil {
 		logrus.Error(err)
 		return err

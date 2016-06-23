@@ -140,7 +140,7 @@ func (gd *Gardener) ReplaceServiceBackupStrategy(NameOrID string, req structs.Ba
 	}
 
 	if service.backup != nil {
-		bs := NewBackupJob(gd.host, service)
+		bs := NewBackupJob(HostAddress, service)
 		err = gd.RegisterBackupStrategy(bs)
 		if err != nil {
 			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
@@ -204,7 +204,7 @@ func (gd *Gardener) EnableServiceBackupStrategy(strategy string) error {
 		svc.backup = backup
 		svc.Unlock()
 
-		bs := NewBackupJob(gd.host, svc)
+		bs := NewBackupJob(HostAddress, svc)
 		err = gd.RegisterBackupStrategy(bs)
 		if err != nil {
 			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err)

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/astaxie/beego/config"
@@ -16,7 +15,6 @@ import (
 	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
-	consulapi "github.com/hashicorp/consul/api"
 	"golang.org/x/net/context"
 )
 
@@ -503,96 +501,6 @@ func (u *unit) deactivateVG() error {
 
 func (u *unit) extendVG() error {
 	return nil
-}
-
-func (u *unit) RegisterHealthCheck(config database.ConsulConfig, context *Service) error {
-	_, err := u.getEngine()
-	if err != nil {
-		return err
-	}
-	address := ""
-	if u.engine != nil {
-		address = fmt.Sprintf("%s:%d", u.engine.IP, config.ConsulPort)
-	}
-	c := consulapi.Config{
-		Address:    address,
-		Datacenter: config.ConsulDatacenter,
-		WaitTime:   time.Duration(config.ConsulWaitTime) * time.Second,
-		Token:      config.ConsulToken,
-	}
-	client, err := consulapi.NewClient(&c)
-	if err != nil {
-		logrus.Errorf("%s Register HealthCheck Error,%s %v", u.Name, err.Error(), c)
-		return err
-	}
-
-	check, err := u.HealthCheck()
-	if err != nil {
-		return err
-	}
-
-	if u.Type == _UpsqlType {
-		swm := context.getSwithManagerUnit()
-		if swm != nil {
-			check.Tags = []string{fmt.Sprintf("swm_key=%s/%s/topology", context.ID, swm.ID)}
-		}
-	}
-
-	containerID := u.ContainerID
-	if u.container != nil && containerID != u.container.ID {
-		containerID = u.container.ID
-		u.ContainerID = u.container.ID
-	}
-
-	addr := ""
-	ips, err := u.getNetworkings()
-	if err != nil {
-		return err
-	}
-	for i := range ips {
-		if ips[i].Type == _ContainersNetworking {
-			addr = ips[i].IP.String()
-		}
-	}
-
-	service := consulapi.AgentServiceRegistration{
-		ID:      u.ID,
-		Name:    u.Name,
-		Tags:    check.Tags,
-		Port:    check.Port,
-		Address: addr,
-		Check: &consulapi.AgentServiceCheck{
-			Script: check.Script + u.Name,
-			// DockerContainerID: containerID,
-			Shell:    check.Shell,
-			Interval: check.Interval,
-			// TTL:      check.TTL,
-		},
-	}
-
-	logrus.Debugf("AgentServiceRegistration:%v %v", service, service.Check)
-
-	return client.Agent().ServiceRegister(&service)
-}
-
-func (u *unit) DeregisterHealthCheck(config consulapi.Config) error {
-	eng, err := u.getEngine()
-	if err != nil {
-		return err
-	}
-	parts := strings.SplitN(config.Address, ":", 2)
-	if len(parts) == 1 {
-		parts[1] = parts[0]
-	}
-
-	config.Address = fmt.Sprintf("%s:%s", eng.IP, parts[1])
-
-	client, err := consulapi.NewClient(&config)
-	if err != nil {
-		return err
-	}
-
-	return client.Agent().ServiceDeregister(u.ID)
 }
 
 func (u *unit) Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (*cluster.Container, error) {

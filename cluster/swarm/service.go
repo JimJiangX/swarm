@@ -432,7 +432,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, *da
 	defer svc.RUnlock()
 
 	if svc.backup != nil {
-		bs := NewBackupJob(gd.host, svc)
+		bs := NewBackupJob(HostAddress, svc)
 		err = gd.RegisterBackupStrategy(bs)
 		if err != nil {
 			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
@@ -808,7 +808,7 @@ func (svc *Service) initTopology() error {
 
 func (svc *Service) registerServices(config database.ConsulConfig) (err error) {
 	for _, u := range svc.units {
-		err = u.RegisterHealthCheck(config, svc)
+		err = registerHealthCheck(u, config, svc)
 		if err != nil {
 
 			return err
@@ -820,7 +820,12 @@ func (svc *Service) registerServices(config database.ConsulConfig) (err error) {
 
 func (svc *Service) deregisterServices(config consulapi.Config) error {
 	for _, u := range svc.units {
-		err := u.DeregisterHealthCheck(config)
+		eng, err := u.getEngine()
+		if err != nil {
+			logrus.Error(err)
+			continue
+		}
+		err = deregisterHealthCheck(eng.IP, u.ID, config)
 		if err != nil {
 			return err
 		}
@@ -1014,7 +1019,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, unit string, req structs
 		return "", err
 	}
 
-	go svc.TryBackupTask(&task, gd.host, unit, *strategy)
+	go svc.TryBackupTask(&task, HostAddress, unit, *strategy)
 
 	return task.ID, nil
 }

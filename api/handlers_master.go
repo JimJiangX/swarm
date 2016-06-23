@@ -1080,7 +1080,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i := range nodes {
-		go dc.DistributeNode(nodes[i], gd.KvPath())
+		go dc.DistributeNode(nodes[i])
 	}
 
 	min := 600

@@ -316,7 +316,7 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 				logrus.Errorf("GetSystemConfig error:%s", err)
 				return err
 			}
-			name := fmt.Sprintf("%s/%s:/%s", sys.NFSOption.MountDir, penging.unit.Name, need[i].Name)
+			name := fmt.Sprintf("%s/%s:%s", sys.NFSOption.MountDir, penging.unit.Name, need[i].Name)
 			config.HostConfig.Binds = append(config.HostConfig.Binds, name)
 			continue
 		}
