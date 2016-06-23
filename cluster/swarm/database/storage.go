@@ -468,6 +468,32 @@ func GetStorageByID(id string) (*HitachiStorage, *HuaweiStorage, error) {
 	return nil, nil, err
 }
 
+func ListStorageID() ([]string, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	var hitachi []string
+	err = db.Select(&hitachi, "SELECT id FROM tb_storage_HITACHI")
+	if err != nil {
+		return nil, err
+	}
+
+	var huawei []string
+	err = db.Get(&huawei, "SELECT id FROM tb_storage_HUAWEI")
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]string, len(hitachi)+len(huawei))
+
+	length := copy(out, hitachi)
+	copy(out[length:], huawei)
+
+	return out, nil
+}
+
 func DeleteStorageByID(id string) error {
 	db, err := GetDB(true)
 	if err != nil {
