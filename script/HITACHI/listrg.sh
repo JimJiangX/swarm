@@ -17,6 +17,9 @@ do
 	free_mb=`cat ${output}  | grep "Free Capacity" | awk '{print $4}'`
 	stat=`cat ${output} | grep "Status" | head -n 1 | awk '{print $3}'`
         lun_num=`cat ${output} | grep "Defined LU Count" | awk '{print $5}'`
+	if [ ${free_mb} == '' ] || [ ${total_mb} == '' ]; then
+		exit 2
+	fi
 	echo "${rg_id}" "${total_mb%.*}" "${free_mb%.*}" "${stat}" "${lun_num}"
 	rm -f ${output}
 done
