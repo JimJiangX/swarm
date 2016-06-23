@@ -32,6 +32,9 @@ do
 	free_mb=`cat $output | grep "Free" | awk '{print $4}' | tr -d '$' | tr -d '\r'`
 	stat=`cat $output | grep "Status" | awk '{print $3}' | tr -d '$' | tr -d '\r'`
         lun_num=`cat $lun_output | awk '$2 == '$rg_id'' | wc -l`
+	if [ ${free_mb} == '' ] || [ ${total_mb} == '' ]; then
+		exit 2
+	fi
 	echo "${rg_id}" "${total_mb}" "${free_mb}" "${stat}" "${lun_num}"
 	rm -rf $output
 done
