@@ -1,6 +1,7 @@
 package structs
 
 import (
+	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/engine-api/types/network"
 )
@@ -159,8 +160,11 @@ type UnitInfo struct {
 	NodeID      string `json:"node_id"` // Node.ID
 	NodeAddr    string `json:"node_addr"`
 	ClusterID   string `json:"cluster_id"`
-	Networkings []string
-	Ports       []struct {
+	Networkings []struct {
+		Type string
+		Addr string
+	}
+	Ports []struct {
 		Name string
 		Port int
 	}
@@ -170,12 +174,12 @@ type UnitInfo struct {
 	// ContainerID	string `json:"container_id"`
 	// ConfigID		string `json:"unit_config_id"`
 	// NetworkMode	string `json:"network_mode"`
-	Role       string `json:",omitempty"`
+	Role       string `json:"role,omitempty"`
 	CpusetCpus string
 	Memory     int64
 	State      string // container state
 	Status     string // service status
 	CreatedAt  string `json:"created_at"`
 	// CheckInterval int    `json:"check_interval"`
-	// Info          string `json:"info"`
+	Info types.ContainerJSON `json:",omitempty"`
 }

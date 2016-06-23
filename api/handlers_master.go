@@ -603,12 +603,13 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 			CreatedAt:   utils.TimeToString(units[i].CreatedAt),
 		}
 
-		if list[i].Role == "" {
+		if list[i].Role == "" && list[i].Type == "upsql" {
 			list[i].Role = "unknown"
 		}
 
 		container := containers.Get(units[i].ContainerID)
 		if container != nil {
+			list[i].Info = container.Info
 			list[i].CpusetCpus = container.Info.HostConfig.CpusetCpus
 			list[i].Memory = container.Info.HostConfig.Memory
 			list[i].State = container.State
@@ -631,7 +632,10 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 	}
 }
 
-func getUnitNetworking(id string) ([]string, []struct {
+func getUnitNetworking(id string) ([]struct {
+	Type string
+	Addr string
+}, []struct {
 	Name string
 	Port int
 }) {
@@ -639,25 +643,37 @@ func getUnitNetworking(id string) ([]string, []struct {
 	if err != nil {
 		logrus.Error("%s List IP error %s", id, err)
 	}
-	networkings := make([]string, len(ips))
+
+	networkings := make([]struct {
+		Type string
+		Addr string
+	}, len(ips))
+
 	for i := range ips {
+		networking, _, err := database.GetNetworkingByID(ips[i].NetworkingID)
+		if err != nil {
+			logrus.Error("Get Networking By ID", err, ips[i].NetworkingID)
+		}
+
 		ip := utils.Uint32ToIP(ips[i].IPAddr)
-		networkings[i] = fmt.Sprintf("%s/%d", ip.String(), ips[i].Prefix)
+
+		networkings[i].Type = networking.Type
+		networkings[i].Addr = fmt.Sprintf("%s/%d", ip.String(), ips[i].Prefix)
 	}
 
 	out, err := database.ListPortsByUnit(id)
 	if err != nil {
 		logrus.Error("%s List Port error %s", id, err)
 	}
+
 	ports := make([]struct {
 		Name string
 		Port int
 	}, len(out))
+
 	for i := range out {
-		ports[i] = struct {
-			Name string
-			Port int
-		}{out[i].Name, out[i].Port}
+		ports[i].Name = out[i].Name
+		ports[i].Port = out[i].Port
 	}
 
 	return networkings, ports
