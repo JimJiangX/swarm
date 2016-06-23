@@ -1426,6 +1426,10 @@ func (svc *Service) Delete(config consulapi.Config, horus string, force, volumes
 			if err1 == errContainerNotFound || err1 == errContainerNotRunning {
 				continue
 			}
+			if force && err.Error() == "EOF" {
+				continue
+			}
+
 			return err
 		}
 
@@ -1436,6 +1440,9 @@ func (svc *Service) Delete(config consulapi.Config, horus string, force, volumes
 
 			err1 := checkContainerError(err)
 			if err1 == errContainerNotFound || err1 == errContainerNotRunning {
+				continue
+			}
+			if force && err.Error() == "EOF" {
 				continue
 			}
 			return err
