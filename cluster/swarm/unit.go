@@ -394,7 +394,12 @@ func (u *unit) stopContainer(timeout int) error {
 		return err
 	}
 
-	return client.ContainerStop(context.Background(), u.Unit.ContainerID, timeout)
+	err = client.ContainerStop(context.Background(), u.Unit.ContainerID, timeout)
+	if err := checkContainerError(err); err == errContainerNotRunning {
+		return nil
+	}
+
+	return err
 }
 
 func (u *unit) restartContainer(timeout int) error {

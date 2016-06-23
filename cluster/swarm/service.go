@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -584,13 +585,14 @@ func (svc *Service) stopContainers(timeout int) error {
 	for _, u := range svc.units {
 		err := u.stopContainer(timeout)
 		if err != nil {
-			logrus.Errorf("container %s stop error:%s", u.Name, err.Error())
+			logrus.Errorf("container %s stop error:%s", u.Name, err)
 			return err
 		}
 	}
 
 	return nil
 }
+
 func (svc *Service) StopService() error {
 	err := svc.checkStatus(_StatusServiceNoContent)
 	if err != nil {
@@ -600,13 +602,16 @@ func (svc *Service) StopService() error {
 	svc.Lock()
 	defer svc.Unlock()
 
+	// TODO:is this necessary?
 	addr, port, err := svc.getSwitchManagerAddr()
 	if err != nil {
 		logrus.Warnf("service %s get SwithManager Addr error:%s", svc.Name, err)
 	} else {
 		err = smlib.Lock(addr, port)
 		if err != nil {
-
+			logrus.Error(err)
+		} else {
+			defer smlib.UnLock(addr, port)
 		}
 	}
 
@@ -634,7 +639,12 @@ func (svc *Service) stopService() error {
 		err := u.stopService()
 		if err != nil {
 			logrus.Errorf("container %s stop service error:%s", u.Name, err.Error())
-			// return err
+
+			err1 := checkContainerError(err)
+			if err1 == errContainerNotRunning || err1 == errContainerNotFound {
+				continue
+			}
+			return err
 		}
 	}
 
@@ -670,6 +680,10 @@ func (svc *Service) removeContainers(force, rmVolumes bool) error {
 		err := u.removeContainer(force, rmVolumes)
 		if err != nil {
 			logrus.Errorf("container %s remove,-f=%v -v=%v,error:%s", u.Name, force, rmVolumes, err.Error())
+
+			if err := checkContainerError(err); err == errContainerNotFound {
+				continue
+			}
 
 			return err
 		}
@@ -1402,17 +1416,33 @@ func (svc *Service) Delete(config consulapi.Config, horus string, force, volumes
 	svc.Lock()
 	defer svc.Unlock()
 
-	if err := svc.stopService(); err != nil {
-		logrus.Error("%s stop Service error:%s", svc.Name, err.Error())
-		// return err
+	for _, u := range svc.units {
+		// stop unit service
+		err := u.stopService()
+		if err != nil {
+			logrus.Errorf("container %s stop service error:%s", u.Name, err.Error())
+
+			err1 := checkContainerError(err)
+			if err1 == errContainerNotFound || err1 == errContainerNotRunning {
+				continue
+			}
+			return err
+		}
+
+		// stop containr
+		err = u.stopContainer(timeout)
+		if err != nil {
+			logrus.Errorf("container %s stop error:%s", u.Name, err.Error())
+
+			err1 := checkContainerError(err)
+			if err1 == errContainerNotFound || err1 == errContainerNotRunning {
+				continue
+			}
+			return err
+		}
 	}
 
-	err := svc.stopContainers(timeout)
-	if err != nil {
-		// return err
-	}
-
-	err = svc.removeContainers(force, volumes)
+	err := svc.removeContainers(force, volumes)
 	if err != nil {
 		return err
 	}
@@ -1428,4 +1458,25 @@ func (svc *Service) Delete(config consulapi.Config, horus string, force, volumes
 	}
 
 	return nil
+}
+
+var (
+	errContainerNotFound   = errors.New("No Such Container")
+	errContainerNotRunning = errors.New("Container Not Running")
+)
+
+func checkContainerError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	if strings.Contains(err.Error(), "Error response from daemon: No such container") {
+		return errContainerNotFound
+	}
+
+	if match, _ := regexp.MatchString(`Container \S* is not running`, err.Error()); match {
+		return errContainerNotRunning
+	}
+
+	return err
 }
