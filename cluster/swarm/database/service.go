@@ -475,10 +475,12 @@ func DeteleServiceRelation(serviceID string) error {
 		if err != nil {
 			return err
 		}
-		err = txDeleteUnitConfig(tx, units[i].ConfigID)
-		if err != nil {
-			return err
-		}
+
+		// TODO:add later when fix unitConfig delete mistake
+		// err = txDeleteUnitConfig(tx, units[i].ConfigID)
+		// if err != nil {
+		//	 return err
+		// }
 	}
 
 	err = txDeleteBackupStrategy(tx, serviceID)
