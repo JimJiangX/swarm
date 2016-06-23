@@ -5,6 +5,14 @@ consul_port=$2
 node_id=$3
 horus_server_ip=$4
 horus_server_port=$5
+backup_dir=$6
+
+
+
+umount_backup_dir() {
+	umount -f $backup_dir
+}
+
 
 dereg_to_horus_server() {
 	local component_type=$1
@@ -80,7 +88,7 @@ remove_horus_agent() {
 }
 
 
-
+umount_backup_dir
 dereg_to_consul DockerPlugin
 dereg_to_horus_server DockerPlugin 
 dereg_to_consul Docker
