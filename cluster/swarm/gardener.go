@@ -32,6 +32,7 @@ func init() {
 	})
 }
 
+// called in mainage.go L143
 func UpdateleaderElectionPath(path string) {
 	leaderElectionPath = path
 }
@@ -40,7 +41,6 @@ type Gardener struct {
 	*Cluster
 
 	// addition by fugr
-
 	sysConfig          *database.Configurations
 	cron               *crontab.Cron // crontab tasks
 	consulClient       *consulapi.Client
@@ -59,6 +59,7 @@ type Gardener struct {
 // NewGardener is exported
 func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, error) {
 	logrus.WithFields(logrus.Fields{"name": "swarm"}).Debug("Initializing Gardener")
+
 	DockerNodesKVPath = parseKVuri(uri)
 
 	cluster, ok := cli.(*Cluster)

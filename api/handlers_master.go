@@ -437,7 +437,7 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 
 		containers := gd.Containers()
-		consulClient, err := gd.ConsulAPIClient(false)
+		consulClient, err := gd.ConsulAPIClient()
 		if err != nil {
 			logrus.Error(err)
 		}
@@ -524,7 +524,7 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	consulClient, err := gd.ConsulAPIClient(false)
+	consulClient, err := gd.ConsulAPIClient()
 	if err != nil {
 		logrus.Error(err)
 	}

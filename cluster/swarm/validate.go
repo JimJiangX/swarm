@@ -169,7 +169,7 @@ func ValidService(req structs.PostServiceRequest) []string {
 		return nil
 	}
 
-	logrus.Warnf("Service Valid warning:", warnings)
+	logrus.Warnf("Service Valid warning:%s", warnings)
 
 	return warnings
 }

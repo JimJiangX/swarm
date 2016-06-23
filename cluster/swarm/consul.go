@@ -82,51 +82,24 @@ func (gd *Gardener) setConsulClient(client *api.Client) {
 	gd.Unlock()
 }
 
-func (gd *Gardener) ConsulAPIClient(full bool) (*api.Client, error) {
-	if !full {
-		gd.RLock()
-		if gd.consulClient != nil {
-			if _, err := gd.consulClient.Status().Leader(); err == nil {
-				gd.RUnlock()
-				return gd.consulClient, nil
-			}
+func (gd *Gardener) ConsulAPIClient() (*api.Client, error) {
+	gd.RLock()
+	if gd.consulClient != nil {
+		if _, err := gd.consulClient.Status().Leader(); err == nil {
+			gd.RUnlock()
+			return gd.consulClient, nil
 		}
-		gd.RUnlock()
 	}
+	gd.RUnlock()
 
 	sys, err := database.GetSystemConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	clients, err := sys.GetConsulClient()
-	if err != nil {
-		logrus.Error(err)
-	}
-	config := api.Config{
-		Address:    fmt.Sprintf("%s:%d", HostAddress, sys.ConsulPort),
-		Datacenter: sys.ConsulDatacenter,
-		WaitTime:   time.Duration(sys.ConsulWaitTime) * time.Second,
-		Token:      sys.ConsulToken,
-	}
-
-	consulClient, err := api.NewClient(&config)
-	if err != nil {
-		logrus.Warnf("%s ,%v", err, config)
-	} else {
-		clients = append(clients, consulClient)
-	}
-
-	for i := len(clients) - 1; i >= 0; i-- {
-		if clients[i] == nil {
-			continue
-		}
-		_, err := clients[i].Status().Leader()
-		if err == nil {
-			gd.setConsulClient(clients[i])
-
-			return clients[i], nil
-		}
+	_, clients := pingConsul(HostAddress, sys)
+	if len(clients) > 0 {
+		return clients[0], nil
 	}
 
 	return nil, fmt.Errorf("Not Found Alive Consul Server %s:%d", sys.ConsulIPs, sys.ConsulPort)
@@ -161,13 +134,16 @@ func pingConsul(host string, sys *database.Configurations) ([]string, []*api.Cli
 			continue
 		}
 
-		addrs := make([]string, 0, len(servers))
+		addrs := make([]string, 0, len(servers)+1)
 		for n := range servers {
-			parts := strings.Split(servers[n], ":")
-			if len(parts) == 2 {
-				servers[n] = parts[0] + ":" + port
-				addrs = append(addrs, parts[0])
+			ip, _, err := net.SplitHostPort(servers[n])
+			if err != nil {
+				logrus.Warn("%s SplitHostPort error %s", servers[n], err)
+				continue
 			}
+
+			servers[n] = ip + ":" + port
+			addrs = append(addrs, servers[n])
 		}
 		sys.ConsulIPs = strings.Join(addrs, ",")
 
@@ -183,7 +159,6 @@ func pingConsul(host string, sys *database.Configurations) ([]string, []*api.Cli
 			peers = append(peers, servers...)
 
 			clients = append(clients, client)
-
 		} else {
 			peers = servers
 		}
@@ -203,6 +178,8 @@ func pingConsul(host string, sys *database.Configurations) ([]string, []*api.Cli
 			}
 			clients = append(clients, client)
 		}
+
+		break
 	}
 
 	return peers, clients

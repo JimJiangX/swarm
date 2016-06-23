@@ -312,7 +312,7 @@ func (gd *Gardener) initAndStartService(svc *Service) error {
 }
 
 func (gd *Gardener) SaveContainerToConsul(container *cluster.Container) error {
-	client, err := gd.ConsulAPIClient(false)
+	client, err := gd.ConsulAPIClient()
 	if err != nil {
 		return err
 	}
