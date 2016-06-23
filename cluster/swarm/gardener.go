@@ -177,6 +177,7 @@ func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 		ID:         req.ID,
 		DockerPort: req.DockerPort,
 		PluginPort: req.PluginPort,
+		BackupDir:  req.BackupDir,
 		Retry:      req.Retry,
 		NFSOption: database.NFSOption{
 			Addr:         req.NFS.Addr,

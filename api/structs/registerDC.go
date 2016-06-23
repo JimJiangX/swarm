@@ -4,6 +4,7 @@ type RegisterDatacenter struct {
 	ID         int          `json:"dc_id"`
 	DockerPort int          `json:"docker_port"`
 	PluginPort int          `json:"plugin_port"`
+	BackupDir  string       `json:"backup_dir"`
 	Retry      int64        `json:"retry"`
 	NFS        NFSOption    `json:"nfs"`
 	Consul     ConsulConfig `json:"consul"`
