@@ -339,7 +339,7 @@ func (h *huaweiStore) AddSpace(id int) (int, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
-	spaces, err := h.list()
+	spaces, err := h.list(id)
 	if err != nil {
 		return 0, err
 	}
