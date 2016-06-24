@@ -80,6 +80,11 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	for key := range out {
+		if !key.Enabled {
+			delete(out, key)
+		}
+	}
 
 	rg := maxIdleSizeRG(out)
 	if out[rg].Free < size {
@@ -318,10 +323,10 @@ func (h *huaweiStore) DelMapping(lun string) error {
 	return nil
 }
 
-func (h *huaweiStore) AddSpace(id int) (int, error) {
+func (h *huaweiStore) AddSpace(id int) (Space, error) {
 	_, err := database.GetRaidGroup(h.ID(), id)
 	if err == nil {
-		return 0, fmt.Errorf("RaidGroup %d is Exist in %s", id, h.ID())
+		return Space{}, fmt.Errorf("RaidGroup %d is Exist in %s", id, h.ID())
 	}
 
 	insert := func() error {
@@ -341,24 +346,24 @@ func (h *huaweiStore) AddSpace(id int) (int, error) {
 
 	spaces, err := h.list(id)
 	if err != nil {
-		return 0, err
+		return Space{}, err
 	}
 
 	for i := range spaces {
 		if spaces[i].ID == id {
 
 			if err := insert(); err == nil {
-				return spaces[i].Free, nil
+				return spaces[i], nil
 			} else {
-				return 0, err
+				return Space{}, err
 			}
 		}
 	}
 
-	return 0, fmt.Errorf("Space %d Not Exist", id)
+	return Space{}, fmt.Errorf("Space %d Not Exist", id)
 }
 
-func (h *huaweiStore) list(rg ...int) ([]space, error) {
+func (h *huaweiStore) list(rg ...int) ([]Space, error) {
 	list := ""
 	if len(rg) == 0 {
 		return nil, nil
@@ -413,8 +418,8 @@ func (h *huaweiStore) DisableSpace(id int) error {
 	return err
 }
 
-func (h huaweiStore) Size() (map[database.RaidGroup]space, error) {
-	out, err := database.SelectRaidGroupByStorageID(h.ID(), true)
+func (h huaweiStore) Size() (map[database.RaidGroup]Space, error) {
+	out, err := database.SelectRaidGroupByStorageID(h.ID())
 	if err != nil {
 		return nil, err
 	}
@@ -430,15 +435,16 @@ func (h huaweiStore) Size() (map[database.RaidGroup]space, error) {
 		return nil, err
 	}
 
-	var info map[database.RaidGroup]space
+	var info map[database.RaidGroup]Space
 
 	if len(spaces) > 0 {
-		info = make(map[database.RaidGroup]space)
+		info = make(map[database.RaidGroup]Space)
 
 		for i := range out {
 		loop:
 			for s := range spaces {
 				if out[i].StorageRGID == spaces[s].ID {
+					spaces[s].Enable = out[i].Enabled
 					info[out[i]] = spaces[s]
 					break loop
 				}
@@ -458,18 +464,14 @@ func (h huaweiStore) Info() (Info, error) {
 		ID:     h.ID(),
 		Vendor: h.Vendor(),
 		Driver: h.Driver(),
-		List:   make(map[int]space, len(list)),
+		List:   make(map[int]Space, len(list)),
 	}
 
-	total, free := 0, 0
 	for rg, val := range list {
 		info.List[rg.StorageRGID] = val
-		total += val.Total
-		free += val.Free
+		info.Total += val.Total
+		info.Free += val.Free
 	}
-
-	info.Total = total
-	info.Used = total - free
 
 	return info, err
 }

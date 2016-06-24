@@ -801,24 +801,10 @@ func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	resp := make([]structs.SANStorageResponse, len(names))
 	for i := range names {
-		store, err := store.GetStoreByID(names[i])
+		resp[i], err = getSanStoreInfo(names[i])
 		if err != nil {
 			httpError(w, err.Error(), http.StatusInternalServerError)
 			return
-		}
-
-		info, err := store.Info()
-		if err != nil {
-			httpError(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		resp[i] = structs.SANStorageResponse{
-			ID:     info.ID,
-			Vendor: info.Vendor,
-			Driver: info.Driver,
-			Total:  info.Total,
-			Used:   info.Used,
 		}
 	}
 
@@ -831,29 +817,51 @@ func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
-	store, err := store.GetStoreByID(name)
+	resp, err := getSanStoreInfo(name)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-
-	info, err := store.Info()
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	resp := structs.SANStorageResponse{
-		ID:     info.ID,
-		Vendor: info.Vendor,
-		Driver: info.Driver,
-		Total:  info.Total,
-		Used:   info.Used,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
+}
+
+func getSanStoreInfo(id string) (structs.SANStorageResponse, error) {
+	store, err := store.GetStoreByID(id)
+	if err != nil {
+		return structs.SANStorageResponse{}, err
+	}
+
+	info, err := store.Info()
+	if err != nil {
+		return structs.SANStorageResponse{}, err
+	}
+
+	i := 0
+	spaces := make([]structs.Space, len(info.List))
+	for _, val := range info.List {
+		spaces[i] = structs.Space{
+			Enable: val.Enable,
+			ID:     val.ID,
+			Total:  val.Total,
+			Free:   val.Free,
+			LunNum: val.LunNum,
+			State:  val.State,
+		}
+		i++
+	}
+
+	return structs.SANStorageResponse{
+		ID:     info.ID,
+		Vendor: info.Vendor,
+		Driver: info.Driver,
+		Total:  info.Total,
+		Free:   info.Free,
+		Used:   info.Total - info.Free,
+		Spaces: spaces,
+	}, nil
 }
 
 // GET /tasks

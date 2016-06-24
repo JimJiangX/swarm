@@ -249,16 +249,16 @@ func UpdateRaidGroupStatusByID(id string, state bool) error {
 	return err
 }
 
-func SelectRaidGroupByStorageID(id string, state bool) ([]RaidGroup, error) {
+func SelectRaidGroupByStorageID(id string) ([]RaidGroup, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
 	var out []RaidGroup
-	query := "SELECT * FROM tb_raid_group WHERE storage_system_id=? AND enabled=?"
+	query := "SELECT * FROM tb_raid_group WHERE storage_system_id=?"
 
-	err = db.Select(&out, query, id, state)
+	err = db.Select(&out, query, id)
 
 	return out, err
 }

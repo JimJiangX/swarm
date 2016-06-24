@@ -21,5 +21,16 @@ type SANStorageResponse struct {
 	Vendor string
 	Driver string
 	Total  int
+	Free   int
 	Used   int
+	Spaces []Space
+}
+
+type Space struct {
+	Enable bool
+	ID     int
+	Total  int
+	Free   int
+	LunNum int
+	State  string
 }

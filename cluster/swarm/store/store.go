@@ -29,8 +29,8 @@ type Info struct {
 	Vendor string
 	Driver string
 	Total  int
-	Used   int
-	List   map[int]space
+	Free   int
+	List   map[int]Space
 }
 
 type Store interface {
@@ -52,7 +52,7 @@ type Store interface {
 	Mapping(host, vgName, lun string) error
 	DelMapping(lun string) error
 
-	AddSpace(id int) (int, error)
+	AddSpace(id int) (Space, error)
 	EnableSpace(id int) error
 	DisableSpace(id int) error
 }
