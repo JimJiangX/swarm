@@ -1365,7 +1365,7 @@ func postServiceRecreate(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 // POST /services/{name:.*}/scale-up"
 func postServiceScaleUp(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
-	var req []structs.ScaleUpModule
+	req := structs.ScaleUpModule{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, err.Error(), http.StatusBadRequest)
@@ -1392,7 +1392,7 @@ func postServiceScaleUp(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 // POST /services/{name:.*}/volume-extension
 func postServiceVolumeExtension(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
-	var req []structs.StorageExtension
+	req := structs.StorageExtension{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, err.Error(), http.StatusBadRequest)
@@ -1414,6 +1414,25 @@ func postServiceVolumeExtension(ctx goctx.Context, w http.ResponseWriter, r *htt
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
+}
+
+// POST /services/{name:.*}/scaled
+func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	req := structs.PostServiceScaledRequest{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_ = name
 }
 
 // POST /services/{name:.*}/service-config/update

@@ -453,7 +453,7 @@ func (node *Node) localStorageExtend(name, storageType string, size int) (databa
 	return lv, err
 }
 
-func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtension, task database.Task) (err error) {
+func (gd *Gardener) volumesExtension(svc *Service, need structs.StorageExtension, task database.Task) (err error) {
 	var pendings []*pendingAllocStore
 	svc.Lock()
 	defer func() {
@@ -513,100 +513,99 @@ func (gd *Gardener) volumesExtension(svc *Service, need []structs.StorageExtensi
 	return nil
 }
 
-func (gd *Gardener) volumesPendingExpension(svc *Service, need []structs.StorageExtension) ([]*pendingAllocStore, error) {
-	pendings := make([]*pendingAllocStore, 0, len(need)*len(svc.units))
+func (gd *Gardener) volumesPendingExpension(svc *Service, need structs.StorageExtension) ([]*pendingAllocStore, error) {
+	units := svc.getUnitByType(need.Type)
+	pendings := make([]*pendingAllocStore, 0, len(units))
 
-	for e := range need {
-		units := svc.getUnitByType(need[e].Type)
+	for _, u := range units {
+		pending := &pendingAllocStore{
+			unit:       u,
+			localStore: make([]localVolume, 0, 3),
+			sanStore:   make([]string, 0, 3),
+		}
+		pendings = append(pendings, pending)
 
-		for _, u := range units {
-			pending := &pendingAllocStore{
-				unit:       u,
-				localStore: make([]localVolume, 0, 3),
-				sanStore:   make([]string, 0, 3),
+		for d := range need.Extensions {
+			dc, node, err := gd.GetNode(u.engine.ID)
+			if err != nil {
+				err := fmt.Errorf("Not Found Node %s,Error:%s", u.engine.Name, err)
+				logrus.Error(err)
+				return pendings, err
 			}
-			pendings = append(pendings, pending)
 
-			for d := range need[e].Extensions {
-				dc, node, err := gd.GetNode(u.engine.ID)
-				if err != nil {
-					err := fmt.Errorf("Not Found Node %s,Error:%s", u.engine.Name, err)
-					logrus.Error(err)
-					return pendings, err
-				}
+			name := fmt.Sprintf("%s_%s_LV", u.Name, need.Extensions[d].Name)
 
-				name := fmt.Sprintf("%s_%s_LV", u.Name, need[e].Extensions[d].Name)
-
-				if store.IsLocalStore(need[e].Extensions[d].Type) {
-					lv, err := node.localStorageExtend(name, need[e].Extensions[d].Type, need[e].Extensions[d].Size)
-					if err != nil {
-						return pendings, err
-					}
-					pending.localStore = append(pending.localStore, localVolume{
-						lv:   lv,
-						size: need[e].Extensions[d].Size,
-					})
-					name = fmt.Sprintf("%s:/DBAAS%s", name, need[e].Extensions[d].Name)
-					continue
-				}
-
-				// TODO:fix later
-				if dc.storage == nil {
-					return pendings, fmt.Errorf("Not Found Datacenter Storage")
-				}
-				vgName := u.Name + "_SAN_VG"
-
-				lunID, err := dc.storage.Alloc(name, u.ID, vgName, need[e].Extensions[d].Size)
+			if store.IsLocalStore(need.Extensions[d].Type) {
+				lv, err := node.localStorageExtend(name, need.Extensions[d].Type, need.Extensions[d].Size)
 				if err != nil {
 					return pendings, err
 				}
-				pending.sanStore = append(pending.sanStore, lunID)
-
-				err = dc.storage.Mapping(node.ID, vgName, lunID)
-				if err != nil {
-					return pendings, err
-				}
-				name = fmt.Sprintf("%s:/DBAAS%s", name, need[e].Extensions[d].Name)
+				pending.localStore = append(pending.localStore, localVolume{
+					lv:   lv,
+					size: need.Extensions[d].Size,
+				})
+				name = fmt.Sprintf("%s:/DBAAS%s", name, need.Extensions[d].Name)
+				continue
 			}
+
+			// TODO:fix later
+			if dc.storage == nil {
+				return pendings, fmt.Errorf("Not Found Datacenter Storage")
+			}
+			vgName := u.Name + "_SAN_VG"
+
+			lunID, err := dc.storage.Alloc(name, u.ID, vgName, need.Extensions[d].Size)
+			if err != nil {
+				return pendings, err
+			}
+			pending.sanStore = append(pending.sanStore, lunID)
+
+			err = dc.storage.Mapping(node.ID, vgName, lunID)
+			if err != nil {
+				return pendings, err
+			}
+			name = fmt.Sprintf("%s:/DBAAS%s", name, need.Extensions[d].Name)
 		}
 	}
 
 	return pendings, nil
 }
 
-func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpModule, pendings *[]pendingContainerUpdate) error {
+func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpModule) ([]pendingContainerUpdate, error) {
 	ncpu, err := parseCpuset(module.Config.CpusetCpus)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	need := int64(ncpu)
 
 	units := svc.getUnitByType(module.Type)
 	if len(units) == 0 {
-		return fmt.Errorf("Not Found unit '%s' In Service %s", module.Type, svc.Name)
+		return nil, fmt.Errorf("Not Found unit '%s' In Service %s", module.Type, svc.Name)
 	}
 
 	var used int64
 	if need > 0 {
 		used, err = utils.GetCPUNum(units[0].container.Info.HostConfig.CpusetCpus)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if (need == 0 || used == need) && (module.Config.Memory == 0 ||
 		module.Config.Memory == units[0].container.Info.HostConfig.Memory) {
-		return nil
+		return nil, nil
 	}
 
 	for _, u := range units {
 		if u.engine.Memory-u.engine.UsedMemory()-int64(module.Config.Memory)+u.container.Config.HostConfig.Memory < 0 {
-			return fmt.Errorf("Engine %s:%s have not enough Memory for Container %s Update", u.engine.ID, u.engine.IP, u.Name)
+			return nil, fmt.Errorf("Engine %s:%s have not enough Memory for Container %s Update", u.engine.ID, u.engine.IP, u.Name)
 		}
 	}
 
+	pendings := make([]pendingContainerUpdate, 0, len(units))
+
 	if need == used || need == 0 {
 		for _, u := range units {
-			*pendings = append(*pendings, pendingContainerUpdate{
+			pendings = append(pendings, pendingContainerUpdate{
 				containerID: u.container.ID,
 				unit:        u,
 				engine:      u.engine,
@@ -617,9 +616,9 @@ func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpMo
 		for _, u := range units {
 			cpusetCpus, err := reduceCPUset(u.container.Info.HostConfig.CpusetCpus, int(need))
 			if err != nil {
-				return err
+				return nil, err
 			}
-			*pendings = append(*pendings, pendingContainerUpdate{
+			pendings = append(pendings, pendingContainerUpdate{
 				containerID: u.container.ID,
 				cpusetCPus:  cpusetCpus,
 				unit:        u,
@@ -630,17 +629,17 @@ func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpMo
 	} else {
 		for _, u := range units {
 			reserve := make([]string, 0, len(svc.units))
-			for _, pending := range *pendings {
+			for _, pending := range pendings {
 				if u.engine.ID == pending.engine.ID {
 					reserve = append(reserve, pending.cpusetCPus)
 				}
 			}
 			cpusetCpus, err := gd.allocCPUs(u.engine, int(need-used), reserve...)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			cpusetCpus = u.container.Info.HostConfig.CpusetCpus + "," + cpusetCpus
-			*pendings = append(*pendings, pendingContainerUpdate{
+			pendings = append(pendings, pendingContainerUpdate{
 				containerID: u.container.ID,
 				cpusetCPus:  cpusetCpus,
 				unit:        u,
@@ -650,7 +649,7 @@ func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpMo
 		}
 	}
 
-	return nil
+	return pendings, nil
 }
 
 func reduceCPUset(cpusetCpus string, need int) (string, error) {
