@@ -1125,13 +1125,13 @@ type pendingContainerUpdate struct {
 	config      container.UpdateConfig
 }
 
-func (gd *Gardener) ServiceScaleUpTask(name string, list []structs.ScaleUpModule) (string, error) {
+func (gd *Gardener) ServiceScaleUpTask(name string, scale structs.ScaleUpModule) (string, error) {
 	svc, err := gd.GetService(name)
 	if err != nil {
 		return "", err
 	}
 
-	err = ValidateServiceScaleUp(svc, list)
+	err = ValidateServiceScaleUp(svc, scale)
 	if err != nil {
 		return "", err
 	}
@@ -1142,12 +1142,12 @@ func (gd *Gardener) ServiceScaleUpTask(name string, list []structs.ScaleUpModule
 	if err != nil {
 		return "", err
 	}
-	go gd.serviceScaleUP(svc, list, task)
+	go gd.serviceScaleUP(svc, scale, task)
 
 	return task.ID, nil
 }
 
-func (gd *Gardener) serviceScaleUP(svc *Service, list []structs.ScaleUpModule, task database.Task) (err error) {
+func (gd *Gardener) serviceScaleUP(svc *Service, scale structs.ScaleUpModule, task database.Task) (err error) {
 	svc.Lock()
 	gd.scheduler.Lock()
 	defer func() {
@@ -1158,7 +1158,7 @@ func (gd *Gardener) serviceScaleUP(svc *Service, list []structs.ScaleUpModule, t
 		gd.scheduler.Unlock()
 		if err == nil {
 			task.Status = _StatusTaskDone
-			err = svc.updateDescAfterScaleUp(list)
+			err = svc.updateDescAfterScaleUp(scale)
 			if err != nil {
 				logrus.Errorf("service %s update Description error:%s", svc.Name, err)
 			}
@@ -1175,13 +1175,9 @@ func (gd *Gardener) serviceScaleUP(svc *Service, list []structs.ScaleUpModule, t
 		}
 	}()
 
-	pendings := make([]pendingContainerUpdate, 0, len(svc.units))
-
-	for i := range list {
-		err = handlePerScaleUpModule(gd, svc, list[i], &pendings)
-		if err != nil {
-			return err
-		}
+	pendings, err := handlePerScaleUpModule(gd, svc, scale)
+	if err != nil {
+		return err
 	}
 
 	for i := range pendings {
@@ -1256,16 +1252,15 @@ func (svc *Service) getServiceDescription() (*structs.PostServiceRequest, error)
 	return svc.base, nil
 }
 
-func (svc *Service) updateDescAfterScaleUp(list []structs.ScaleUpModule) error {
+func (svc *Service) updateDescAfterScaleUp(scale structs.ScaleUpModule) error {
 	dsp, err := svc.getServiceDescription()
 	if err != nil {
 		return err
 	}
 
 	des := *dsp
-	for i := range list {
-		des.UpdateModuleConfig(list[i].Type, list[i].Config)
-	}
+
+	des.UpdateModuleConfig(scale.Type, scale.Config)
 
 	buffer := bytes.NewBuffer(nil)
 	err = json.NewEncoder(buffer).Encode(&des)
@@ -1285,14 +1280,14 @@ func (svc *Service) updateDescAfterScaleUp(list []structs.ScaleUpModule) error {
 	return nil
 }
 
-func (svc *Service) updateDescAfterExtension(list []structs.StorageExtension) error {
+func (svc *Service) updateDescAfterExtension(ext structs.StorageExtension) error {
 	dsp, err := svc.getServiceDescription()
 	if err != nil {
 		return err
 	}
 
 	des := *dsp
-	des.UpdateModuleStore(list)
+	des.UpdateModuleStore(ext)
 
 	buffer := bytes.NewBuffer(nil)
 	err = json.NewEncoder(buffer).Encode(&des)
@@ -1312,7 +1307,7 @@ func (svc *Service) updateDescAfterExtension(list []structs.StorageExtension) er
 	return nil
 }
 
-func (gd *Gardener) VolumesExtension(name string, exts []structs.StorageExtension) (string, error) {
+func (gd *Gardener) VolumesExtension(name string, exts structs.StorageExtension) (string, error) {
 	svc, err := gd.GetService(name)
 	if err != nil {
 		return "", err
