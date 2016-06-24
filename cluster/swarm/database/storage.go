@@ -481,7 +481,7 @@ func ListStorageID() ([]string, error) {
 	}
 
 	var huawei []string
-	err = db.Get(&huawei, "SELECT id FROM tb_storage_HUAWEI")
+	err = db.Select(&huawei, "SELECT id FROM tb_storage_HUAWEI")
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package swarm
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -85,7 +86,13 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 			protoAddrParts = append([]string{"tcp"}, protoAddrParts...)
 		}
 		if protoAddrParts[0] == "tcp" {
-			HostAddress = protoAddrParts[1]
+			ip, _, err := net.SplitHostPort(protoAddrParts[1])
+			if err != nil {
+				logrus.Error("%s SplitHostPort error,%s", protoAddrParts[1], err)
+				return nil, err
+			}
+
+			HostAddress = ip
 			break
 		}
 	}
@@ -143,8 +150,12 @@ func (gd *Gardener) SetParams(sys *database.Configurations) error {
 	gd.Lock()
 	defer gd.Unlock()
 
-	_, clients := pingConsul(HostAddress, sys)
-	gd.consulClient = clients[0]
+	_, clients := pingConsul(HostAddress, *sys)
+	if len(clients) > 0 {
+		gd.consulClient = clients[0]
+	} else {
+		return fmt.Errorf("cannot connect to consul,%v", sys.ConsulConfig)
+	}
 
 	DatacenterID = sys.ID
 
@@ -238,11 +249,6 @@ func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 	if err != nil {
 		logrus.Errorf("Ping Horus %s error,%s", horus, err)
 		return err
-	}
-
-	endpoints, clients := pingConsul(HostAddress, &config)
-	if len(endpoints) == 0 || len(clients) == 0 {
-		return fmt.Errorf("cannot connect consul")
 	}
 
 	err = nfsSetting(config.NFSOption)
