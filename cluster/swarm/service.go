@@ -957,11 +957,13 @@ loop:
 func (gd *Gardener) UnitIsolate(name string) error {
 	table, err := database.GetUnit(name)
 	if err != nil {
+		logrus.Errorf("Get Unit error:%s %s", err, name)
 		return err
 	}
 
 	service, err := gd.GetService(table.ServiceID)
 	if err != nil {
+		logrus.Errorf("Get Service error:%s %s", err, table.ServiceID)
 		return err
 	}
 
@@ -970,11 +972,17 @@ func (gd *Gardener) UnitIsolate(name string) error {
 	ip, port, err := service.getSwitchManagerAddr()
 	if err != nil {
 		service.Unlock()
+
+		logrus.Errorf("get SwitchManager Addr error:%s", err)
 		return err
 	}
 
 	err = smlib.Isolate(ip, port, table.Name)
 	service.Unlock()
+
+	if err != nil {
+		logrus.Errorf("Isolate %s error:%s:%d %s", table.Name, ip, port, err)
+	}
 
 	return err
 }
@@ -982,11 +990,13 @@ func (gd *Gardener) UnitIsolate(name string) error {
 func (gd *Gardener) UnitSwitchBack(name string) error {
 	table, err := database.GetUnit(name)
 	if err != nil {
+		logrus.Errorf("Get Unit error:%s %s", err, name)
 		return err
 	}
 
 	service, err := gd.GetService(table.ServiceID)
 	if err != nil {
+		logrus.Errorf("Get Service error:%s %s", err, table.ServiceID)
 		return err
 	}
 
@@ -995,11 +1005,17 @@ func (gd *Gardener) UnitSwitchBack(name string) error {
 	ip, port, err := service.getSwitchManagerAddr()
 	if err != nil {
 		service.Unlock()
+
+		logrus.Errorf("get SwitchManager Addr error:%s", err)
 		return err
 	}
 
 	err = smlib.Recover(ip, port, table.Name)
 	service.Unlock()
+
+	if err != nil {
+		logrus.Errorf("Recover %s error:%s:%d %s", table.Name, ip, port, err)
+	}
 
 	return err
 }
