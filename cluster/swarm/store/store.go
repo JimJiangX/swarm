@@ -46,8 +46,8 @@ type Store interface {
 	AddHost(name string, wwwn ...string) error
 	DelHost(name string, wwwn ...string) error
 
-	Alloc(name, unitID, vgName string, size int) (string, error) // create LUN
-	Recycle(id string, lun int) error                            // delete LUN
+	Alloc(name, unitID, vgName string, size int) (string, string, error) // create LUN
+	Recycle(id string, lun int) error                                    // delete LUN
 
 	Mapping(host, vgName, lun string) error
 	DelMapping(lun string) error

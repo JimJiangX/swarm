@@ -1134,53 +1134,58 @@ func (svc *Service) Task() *database.Task {
 
 type pendingContainerUpdate struct {
 	containerID string
-	cpusetCPus  string
+	cpusetCpus  string
 	unit        *unit
 	svc         *Service
 	engine      *cluster.Engine
 	config      container.UpdateConfig
 }
 
-func (gd *Gardener) ServiceScaleUpTask(name string, scale structs.ScaleUpModule) (string, error) {
+func (gd *Gardener) ServiceScaleTask(name string, scale structs.PostServiceScaledRequest) (string, error) {
 	svc, err := gd.GetService(name)
 	if err != nil {
 		return "", err
 	}
 
-	err = ValidateServiceScaleUp(svc, scale)
+	err = ValidateServiceScale(svc, scale)
 	if err != nil {
 		return "", err
 	}
 
-	task := database.NewTask("service update containers config",
+	task := database.NewTask("service scaling config",
 		svc.ID, "", nil, 300)
 	err = database.InsertTask(task)
 	if err != nil {
 		return "", err
 	}
-	go gd.serviceScaleUP(svc, scale, task)
+	go gd.serviceScale(svc, scale, task)
 
 	return task.ID, nil
 }
 
-func (gd *Gardener) serviceScaleUP(svc *Service, scale structs.ScaleUpModule, task database.Task) (err error) {
+func (gd *Gardener) serviceScale(svc *Service, scale structs.PostServiceScaledRequest, task database.Task) (err error) {
+	var storePendings []*pendingAllocStore
 	svc.Lock()
 	gd.scheduler.Lock()
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v", r)
 		}
-		svc.Unlock()
-		gd.scheduler.Unlock()
+
 		if err == nil {
 			task.Status = _StatusTaskDone
-			err = svc.updateDescAfterScaleUp(scale)
+			err = svc.updateDescAfterScale(scale)
 			if err != nil {
 				logrus.Errorf("service %s update Description error:%s", svc.Name, err)
 			}
 		}
 
 		if err != nil {
+			err1 := gd.cancelStoreExtend(storePendings)
+			if err1 != nil {
+				err = fmt.Errorf("%s,%s", err, err1)
+			}
+
 			task.Status = _StatusTaskFailed
 			task.Errors = err.Error()
 		}
@@ -1189,10 +1194,20 @@ func (gd *Gardener) serviceScaleUP(svc *Service, scale structs.ScaleUpModule, ta
 		if err != nil {
 			logrus.Errorf("task %s update error:%s", task.ID, err)
 		}
+
+		svc.Unlock()
+		gd.scheduler.Unlock()
 	}()
 
-	pendings, err := handlePerScaleUpModule(gd, svc, scale)
+	pendings, err := svc.handleScaleUp(gd, scale.Type, scale.UpdateConfig)
 	if err != nil {
+		return err
+	}
+
+	storePendings, err = svc.volumesPendingExpension(gd, scale.Type, scale.Extensions)
+	if err != nil {
+		logrus.Error(err)
+
 		return err
 	}
 
@@ -1207,12 +1222,38 @@ func (gd *Gardener) serviceScaleUP(svc *Service, scale structs.ScaleUpModule, ta
 		}
 	}
 
+	for _, pending := range storePendings {
+		for _, lunID := range pending.sanStore {
+			eng, err := pending.unit.getEngine()
+			if err != nil {
+				logrus.Errorf("%s %s", pending.unit.Name, err)
+				return err
+			}
+			err = extendSanStoreageVG(eng.IP, lunID)
+			if err != nil {
+				logrus.Errorf("extend SanStoreageVG error:%s", err)
+				return err
+			}
+		}
+	}
+
+	for _, pending := range storePendings {
+		for _, lv := range pending.localStore {
+			err = localVolumeExtend(pending.unit.engine.IP, lv)
+			if err != nil {
+				logrus.Errorf("unit %s update volume error %s", pending.unit.Name, err)
+				return err
+			}
+			logrus.Debugf("unit %s update volume %v", pending.unit.Name, lv)
+		}
+	}
+
 	return nil
 }
 
 func (p *pendingContainerUpdate) containerUpdate() error {
-	if p.cpusetCPus != "" && p.config.CpusetCpus != "" {
-		p.config.CpusetCpus = p.cpusetCPus
+	if p.cpusetCpus != "" && p.config.CpusetCpus != "" {
+		p.config.CpusetCpus = p.cpusetCpus
 	}
 
 	err := p.unit.stopService()
@@ -1268,7 +1309,7 @@ func (svc *Service) getServiceDescription() (*structs.PostServiceRequest, error)
 	return svc.base, nil
 }
 
-func (svc *Service) updateDescAfterScaleUp(scale structs.ScaleUpModule) error {
+func (svc *Service) updateDescAfterScale(scale structs.PostServiceScaledRequest) error {
 	dsp, err := svc.getServiceDescription()
 	if err != nil {
 		return err
@@ -1276,7 +1317,9 @@ func (svc *Service) updateDescAfterScaleUp(scale structs.ScaleUpModule) error {
 
 	des := *dsp
 
-	des.UpdateModuleConfig(scale.Type, scale.Config)
+	des.UpdateModuleConfig(scale.Type, *scale.UpdateConfig)
+
+	des.UpdateModuleStore(scale.Type, scale.Extensions)
 
 	buffer := bytes.NewBuffer(nil)
 	err = json.NewEncoder(buffer).Encode(&des)
@@ -1294,55 +1337,6 @@ func (svc *Service) updateDescAfterScaleUp(scale structs.ScaleUpModule) error {
 	svc.base = &des
 
 	return nil
-}
-
-func (svc *Service) updateDescAfterExtension(ext structs.StorageExtension) error {
-	dsp, err := svc.getServiceDescription()
-	if err != nil {
-		return err
-	}
-
-	des := *dsp
-	des.UpdateModuleStore(ext)
-
-	buffer := bytes.NewBuffer(nil)
-	err = json.NewEncoder(buffer).Encode(&des)
-	if err != nil {
-		return err
-	}
-
-	description := buffer.String()
-	err = database.UpdateServcieDescription(svc.ID, description)
-	if err != nil {
-		return err
-	}
-
-	svc.Description = description
-	svc.base = &des
-
-	return nil
-}
-
-func (gd *Gardener) VolumesExtension(name string, exts structs.StorageExtension) (string, error) {
-	svc, err := gd.GetService(name)
-	if err != nil {
-		return "", err
-	}
-
-	err = ValidServiceStorageExtension(svc, exts)
-	if err != nil {
-		return "", err
-	}
-
-	task := database.NewTask("service update containers config",
-		svc.ID, "", nil, 300)
-	err = database.InsertTask(task)
-	if err != nil {
-		return "", err
-	}
-	go gd.volumesExtension(svc, exts, task)
-
-	return task.ID, nil
 }
 
 func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int) error {
