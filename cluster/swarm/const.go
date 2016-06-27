@@ -97,6 +97,8 @@ const (
 	_HDD_VG_Label = "HDD_VG"
 	_SSD_VG_Label = "SSD_VG"
 
+	_SAN_VG = "_SAN_VG"
+
 	_SAN_HBA_WWN_Lable = "HBA_WWN"
 
 	_Internal_NIC_Lable = "INT_NIC"

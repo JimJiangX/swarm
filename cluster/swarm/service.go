@@ -1369,7 +1369,7 @@ func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int)
 
 	entry.Debug("Service Delete... stop service & stop containers & rm containers & deregister")
 	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-	err = svc.Delete(gd, configs[0], horus, force, volumes, timeout)
+	err = svc.Delete(gd, configs[0], horus, force, volumes, true, timeout)
 	if err != nil {
 		entry.Errorf("Service.Delete error:%s", err)
 
@@ -1407,7 +1407,7 @@ func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int)
 	return nil
 }
 
-func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, force, volumes bool, timeout int) error {
+func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, force, rmVolumes, recycle bool, timeout int) error {
 	svc.Lock()
 	defer svc.Unlock()
 
@@ -1415,7 +1415,7 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 		// stop unit service
 		err := u.stopService()
 		if err != nil {
-			logrus.Errorf("container %s stop service error:%s", u.Name, err.Error())
+			logrus.Errorf("container %s stop service error:%s", u.Name, err)
 
 			err1 := checkContainerError(err)
 			if err1 == errContainerNotFound || err1 == errContainerNotRunning {
@@ -1444,31 +1444,67 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 		}
 	}
 
-	err := svc.removeContainers(force, volumes)
+	err := svc.removeContainers(force, rmVolumes)
 	if err != nil {
 		return err
 	}
 
-	if volumes {
-		for _, u := range svc.units {
+	volumes := make([]database.LocalVolume, 0, 10)
+
+	for _, u := range svc.units {
+		lvs, err := database.SelectVolumesByUnitID(u.ID)
+		if err != nil {
+			logrus.Warnf("SelectVolumesByUnitID %s error:%s", u.Name, err)
+			continue
+		}
+		volumes = append(volumes, lvs...)
+
+		if recycle {
 			dc, err := gd.DatacenterByEngine(u.EngineID)
 			if err != nil || dc == nil || dc.storage == nil {
 				continue
 			}
+			for i := range lvs {
+				if isSanVG(lvs[i].VGName) {
+					list, err := database.ListLUNByVgName(lvs[i].VGName)
+					if err != nil {
+						logrus.Errorf("ListLUNByVgName %s error:%s", lvs[i].VGName, err)
+						return err
+					}
+					for l := range list {
+						err := dc.storage.DelMapping(list[l].ID)
+						if err != nil {
+							logrus.Errorf("DelMapping error:%s,unit:%s,lun:%s", err, u.Name, list[l].Name)
+						}
+						err = dc.storage.Recycle(list[l].ID, 0)
+						if err != nil {
+							logrus.Errorf("Recycle LUN error:%s,unit:%s,lun:%s", err, u.Name, list[l].Name)
+						}
+					}
+				}
+			}
+		}
+	}
 
-			//dc.storage.DelMapping(lun)
-			//dc.storage.Recycle(lun, 0)
+	// remove volumes
+	for i := range volumes {
+		found, err := gd.RemoveVolumes(volumes[i].Name)
+		if !found {
+			continue
+		}
+		if err != nil {
+			logrus.Errorf("Remove Volumes %s error:%s", volumes[i].Name, err)
 		}
 	}
 
 	err = svc.deregisterInHorus(horus)
 	if err != nil {
-		logrus.Errorf("%s deregister In Horus error:%s", svc.Name, err.Error())
+		logrus.Errorf("%s deregister In Horus error:%s", svc.Name, err)
 	}
 
 	err = svc.deregisterServices(config)
 	if err != nil {
-		logrus.Errorf("%s deregister In consul error:%s", svc.Name, err.Error())
+		logrus.Errorf("%s deregister In consul error:%s", svc.Name, err)
 	}
 
 	return nil

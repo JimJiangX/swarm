@@ -84,7 +84,7 @@ func (gd *Gardener) serviceExecute() (err error) {
 		}
 
 		horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-		err = svc.Delete(gd, configs[0], horus, true, true, 0)
+		err = svc.Delete(gd, configs[0], horus, true, true, false, 0)
 		if err != nil {
 			continue
 		}
