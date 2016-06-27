@@ -33,7 +33,6 @@ int_nic=bond1
 ext_nic=bond2
 
 nfs_mount() {
-	useradd -u 2000 -U DBaaS_nfs > /dev/null 2>&1
 	umount -f ${nfs_mount_dir} > /dev/null 2>&1
 	sed -i "/${nfs_ip}:${nfs_dir}/d" /etc/fstab > /dev/null 2>&1
 	rm -rf ${nfs_mount_dir}
