@@ -1984,11 +1984,6 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 // POST /storage/san/{name}/raid_group/{rg:[0-9]+}/enable
 func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	san := mux.Vars(r)["name"]
 	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
 	if err != nil {
@@ -2013,13 +2008,7 @@ func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 
 // POST /storage/san/{name}/raid_group/{rg:[0-9]+}/disable
 func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	san := mux.Vars(r)["name"]
-
 	rg, err := strconv.Atoi(r.Form.Get("rg"))
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
