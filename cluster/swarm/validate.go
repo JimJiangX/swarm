@@ -52,7 +52,7 @@ func validateContainerUpdateConfig(config container.UpdateConfig) error {
 		msg = append(msg, "CPUShares > 0,CPUShares should be 0")
 	}
 
-	if config.Resources.CpusetCpus == "" {
+	if config.Resources.CpusetCpus != "" {
 		n, err := strconv.Atoi(config.Resources.CpusetCpus)
 		if err != nil {
 			msg = append(msg, err.Error())
@@ -172,7 +172,7 @@ func ValidService(req structs.PostServiceRequest) []string {
 	return warnings
 }
 
-func ValidateServiceScaleUp(svc *Service, scale structs.ScaleUpModule) error {
+func ValidateServiceScale(svc *Service, scale structs.PostServiceScaledRequest) error {
 	warns := make([]string, 0, 10)
 
 	_, _, err := initialize(scale.Type)
@@ -180,9 +180,11 @@ func ValidateServiceScaleUp(svc *Service, scale structs.ScaleUpModule) error {
 		warns = append(warns, err.Error())
 	}
 
-	err = validateContainerUpdateConfig(scale.Config)
-	if err != nil {
-		warns = append(warns, err.Error())
+	if scale.UpdateConfig != nil {
+		err := validateContainerUpdateConfig(*scale.UpdateConfig)
+		if err != nil {
+			warns = append(warns, err.Error())
+		}
 	}
 
 	svc.RLock()
@@ -197,32 +199,10 @@ func ValidateServiceScaleUp(svc *Service, scale structs.ScaleUpModule) error {
 		}
 	}
 
-	svc.RUnlock()
-
-	if len(warns) == 0 {
-		return nil
-	}
-
-	return fmt.Errorf("Warnings:%s", warns)
-}
-
-func ValidServiceStorageExtension(svc *Service, exts structs.StorageExtension) error {
-	warns := make([]string, 0, 10)
-
-	svc.RLock()
-
-	units := svc.getUnitByType(exts.Type)
-	if len(units) == 0 {
-		warns = append(warns, fmt.Sprintf("Not Found unit '%s' In Service %s", exts.Type, svc.Name))
-	}
-	for _, u := range units {
-		if u.engine == nil || (u.config == nil && u.container == nil) {
-			warns = append(warns, fmt.Sprintf("unit odd,%+v", u))
-		}
-	}
-
 	des, err := svc.getServiceDescription()
+
 	svc.RUnlock()
+
 	if err != nil {
 		warns = append(warns, err.Error())
 	}
@@ -232,34 +212,37 @@ func ValidServiceStorageExtension(svc *Service, exts structs.StorageExtension) e
 
 	m, found := 0, false
 	for index := range des.Modules {
-		if exts.Type == des.Modules[index].Type {
+		if scale.Type == des.Modules[index].Type {
 			m, found = index, true
 			break
 		}
 	}
 	if !found {
-		warns = append(warns, fmt.Sprintf("Not Found '%s' service", exts.Type))
+		warns = append(warns, fmt.Sprintf("Not Found '%s' service", scale.Type))
 		return fmt.Errorf("Warnings:%s", warns)
 	}
 
-	for ext := range exts.Extensions {
+	for ext := range scale.Extensions {
+		if scale.Extensions[ext].Type == "nfs" || scale.Extensions[ext].Type == "NFS" {
+			warns = append(warns, "Found Type 'NFS',Unsupported 'NFS' Expension")
+			continue
+		}
 		found = false
 		for ds := range des.Modules[m].Stores {
-			if exts.Extensions[ext].Name == des.Modules[m].Stores[ds].Name {
+			if scale.Extensions[ext].Name == des.Modules[m].Stores[ds].Name {
 				// Completion Store Type
-				exts.Extensions[ext].Type = des.Modules[m].Stores[ds].Type
-				des.Modules[m].Stores[ds].Size += exts.Extensions[ext].Size
+				scale.Extensions[ext].Type = des.Modules[m].Stores[ds].Type
+				des.Modules[m].Stores[ds].Size += scale.Extensions[ext].Size
 				found = true
 				break
 			}
 		}
 		if !found {
 			warns = append(warns, fmt.Sprintf("Not Found '%s':'%s' storage",
-				exts.Extensions[ext].Name, exts.Extensions[ext].Type))
+				scale.Extensions[ext].Name, scale.Extensions[ext].Type))
 			continue
 		}
 	}
-
 	if len(warns) == 0 {
 		return nil
 	}

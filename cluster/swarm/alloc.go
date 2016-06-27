@@ -5,9 +5,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -341,7 +341,7 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 		}
 		vgName := penging.unit.Unit.Name + "_SAN_VG"
 
-		lunID, err := dc.storage.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
+		lunID, _, err := dc.storage.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
 		if err != nil {
 			return err
 		}
@@ -400,6 +400,9 @@ func localVolumeExtend(host string, lv localVolume) error {
 }
 
 func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
+	if len(pendings) == 0 {
+		return nil
+	}
 	tx, err := database.GetTX()
 	if err != nil {
 		return err
@@ -453,68 +456,11 @@ func (node *Node) localStorageExtend(name, storageType string, size int) (databa
 	return lv, err
 }
 
-func (gd *Gardener) volumesExtension(svc *Service, need structs.StorageExtension, task database.Task) (err error) {
-	var pendings []*pendingAllocStore
-	svc.Lock()
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
-		}
-		svc.Unlock()
-
-		if err == nil {
-			task.Status = _StatusTaskDone
-			err = svc.updateDescAfterExtension(need)
-			if err != nil {
-				logrus.Errorf("service %s update Description error:%s", svc.Name, err)
-			}
-		}
-
-		if err != nil {
-			task.Status = _StatusTaskFailed
-			task.Errors = err.Error()
-			err1 := gd.cancelStoreExtend(pendings)
-			if err1 != nil {
-				err = fmt.Errorf("%s,%s", err, err1)
-			}
-			logrus.Error(err)
-		}
-
-		err = database.UpdateTaskStatus(&task, task.Status, time.Now(), task.Errors)
-		if err != nil {
-			logrus.Errorf("task %s update error:%s", task.ID, err)
-		}
-	}()
-
-	pendings, err = gd.volumesPendingExpension(svc, need)
-	if err != nil {
-		logrus.Error(err)
-
-		return err
+func (svc *Service) volumesPendingExpension(gd *Gardener, _type string, extensions []structs.DiskStorage) ([]*pendingAllocStore, error) {
+	if len(extensions) == 0 {
+		return nil, nil
 	}
-	if len(pendings) == 0 {
-		logrus.Info("no need doing volume extension")
-		return nil
-	}
-
-	for _, pending := range pendings {
-		for _, lv := range pending.localStore {
-			err = localVolumeExtend(pending.unit.engine.IP, lv)
-			if err != nil {
-				logrus.Errorf("unit %s update volume error %s", pending.unit.Name, err)
-				return err
-			}
-			logrus.Debugf("unit %s update volume done, %v", pending.unit.Name, lv)
-		}
-	}
-
-	//TODO: update san store Volumes
-
-	return nil
-}
-
-func (gd *Gardener) volumesPendingExpension(svc *Service, need structs.StorageExtension) ([]*pendingAllocStore, error) {
-	units := svc.getUnitByType(need.Type)
+	units := svc.getUnitByType(_type)
 	pendings := make([]*pendingAllocStore, 0, len(units))
 
 	for _, u := range units {
@@ -525,7 +471,7 @@ func (gd *Gardener) volumesPendingExpension(svc *Service, need structs.StorageEx
 		}
 		pendings = append(pendings, pending)
 
-		for d := range need.Extensions {
+		for d := range extensions {
 			dc, node, err := gd.GetNode(u.engine.ID)
 			if err != nil {
 				err := fmt.Errorf("Not Found Node %s,Error:%s", u.engine.Name, err)
@@ -533,54 +479,72 @@ func (gd *Gardener) volumesPendingExpension(svc *Service, need structs.StorageEx
 				return pendings, err
 			}
 
-			name := fmt.Sprintf("%s_%s_LV", u.Name, need.Extensions[d].Name)
+			name := fmt.Sprintf("%s_%s_LV", u.Name, extensions[d].Name)
 
-			if store.IsLocalStore(need.Extensions[d].Type) {
-				lv, err := node.localStorageExtend(name, need.Extensions[d].Type, need.Extensions[d].Size)
+			if store.IsLocalStore(extensions[d].Type) {
+				lv, err := node.localStorageExtend(name, extensions[d].Type, extensions[d].Size)
 				if err != nil {
 					return pendings, err
 				}
 				pending.localStore = append(pending.localStore, localVolume{
 					lv:   lv,
-					size: need.Extensions[d].Size,
+					size: extensions[d].Size,
 				})
-				name = fmt.Sprintf("%s:/DBAAS%s", name, need.Extensions[d].Name)
+
+				name = fmt.Sprintf("%s:/DBAAS%s", name, extensions[d].Name)
 				continue
 			}
 
-			// TODO:fix later
 			if dc.storage == nil {
 				return pendings, fmt.Errorf("Not Found Datacenter Storage")
 			}
 			vgName := u.Name + "_SAN_VG"
 
-			lunID, err := dc.storage.Alloc(name, u.ID, vgName, need.Extensions[d].Size)
+			lunID, lvID, err := dc.storage.Alloc(name, u.ID, vgName, extensions[d].Size)
 			if err != nil {
+				logrus.Errorf("SAN Store Alloc error:%s,%s", err, name)
+
 				return pendings, err
 			}
 			pending.sanStore = append(pending.sanStore, lunID)
+
+			lv, err := database.GetLocalVolume(lvID)
+			if err != nil {
+				logrus.Errorf("Get LocalVolume %s Error:%s", lvID, err)
+
+				return pendings, err
+			}
+
+			pending.localStore = append(pending.localStore, localVolume{
+				lv:   lv,
+				size: extensions[d].Size,
+			})
 
 			err = dc.storage.Mapping(node.ID, vgName, lunID)
 			if err != nil {
 				return pendings, err
 			}
-			name = fmt.Sprintf("%s:/DBAAS%s", name, need.Extensions[d].Name)
+
+			name = fmt.Sprintf("%s:/DBAAS%s", name, extensions[d].Name)
 		}
 	}
 
 	return pendings, nil
 }
 
-func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpModule) ([]pendingContainerUpdate, error) {
-	ncpu, err := parseCpuset(module.Config.CpusetCpus)
+func (svc *Service) handleScaleUp(gd *Gardener, _type string, updateConfig *container.UpdateConfig) ([]pendingContainerUpdate, error) {
+	if updateConfig == nil {
+		return nil, nil
+	}
+	ncpu, err := parseCpuset(updateConfig.CpusetCpus)
 	if err != nil {
 		return nil, err
 	}
 	need := int64(ncpu)
 
-	units := svc.getUnitByType(module.Type)
+	units := svc.getUnitByType(_type)
 	if len(units) == 0 {
-		return nil, fmt.Errorf("Not Found unit '%s' In Service %s", module.Type, svc.Name)
+		return nil, fmt.Errorf("Not Found unit '%s' In Service %s", _type, svc.Name)
 	}
 
 	var used int64
@@ -590,13 +554,13 @@ func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpMo
 			return nil, err
 		}
 	}
-	if (need == 0 || used == need) && (module.Config.Memory == 0 ||
-		module.Config.Memory == units[0].container.Info.HostConfig.Memory) {
+	if (need == 0 || used == need) && (updateConfig.Memory == 0 ||
+		updateConfig.Memory == units[0].container.Info.HostConfig.Memory) {
 		return nil, nil
 	}
 
 	for _, u := range units {
-		if u.engine.Memory-u.engine.UsedMemory()-int64(module.Config.Memory)+u.container.Config.HostConfig.Memory < 0 {
+		if u.engine.Memory-u.engine.UsedMemory()-int64(updateConfig.Memory)+u.container.Config.HostConfig.Memory < 0 {
 			return nil, fmt.Errorf("Engine %s:%s have not enough Memory for Container %s Update", u.engine.ID, u.engine.IP, u.Name)
 		}
 	}
@@ -609,7 +573,7 @@ func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpMo
 				containerID: u.container.ID,
 				unit:        u,
 				engine:      u.engine,
-				config:      module.Config,
+				config:      *updateConfig,
 			})
 		}
 	} else if need < used {
@@ -620,10 +584,10 @@ func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpMo
 			}
 			pendings = append(pendings, pendingContainerUpdate{
 				containerID: u.container.ID,
-				cpusetCPus:  cpusetCpus,
+				cpusetCpus:  cpusetCpus,
 				unit:        u,
 				engine:      u.engine,
-				config:      module.Config,
+				config:      *updateConfig,
 			})
 		}
 	} else {
@@ -631,7 +595,7 @@ func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpMo
 			reserve := make([]string, 0, len(svc.units))
 			for _, pending := range pendings {
 				if u.engine.ID == pending.engine.ID {
-					reserve = append(reserve, pending.cpusetCPus)
+					reserve = append(reserve, pending.cpusetCpus)
 				}
 			}
 			cpusetCpus, err := gd.allocCPUs(u.engine, int(need-used), reserve...)
@@ -641,10 +605,10 @@ func handlePerScaleUpModule(gd *Gardener, svc *Service, module structs.ScaleUpMo
 			cpusetCpus = u.container.Info.HostConfig.CpusetCpus + "," + cpusetCpus
 			pendings = append(pendings, pendingContainerUpdate{
 				containerID: u.container.ID,
-				cpusetCPus:  cpusetCpus,
+				cpusetCpus:  cpusetCpus,
 				unit:        u,
 				engine:      u.engine,
-				config:      module.Config,
+				config:      *updateConfig,
 			})
 		}
 	}

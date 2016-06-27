@@ -1370,61 +1370,7 @@ func postServiceRecreate(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 }
 
-// POST /services/{name:.*}/scale-up"
-func postServiceScaleUp(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-	req := structs.ScaleUpModule{}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	taskID, err := gd.ServiceScaleUpTask(name, req)
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
-}
-
-// POST /services/{name:.*}/volume-extension
-func postServiceVolumeExtension(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-	req := structs.StorageExtension{}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	taskID, err := gd.VolumesExtension(name, req)
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
-}
-
-// POST /services/{name:.*}/scaled
+// POST /services/{name:.*}/scale
 func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 	req := structs.PostServiceScaledRequest{}
@@ -1440,7 +1386,15 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	_ = name
+	taskID, err := gd.ServiceScaleTask(name, req)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
 }
 
 // POST /services/{name:.*}/service-config/update

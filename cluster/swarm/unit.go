@@ -298,8 +298,11 @@ func createVolume(eng *cluster.Engine, lv database.LocalVolume) (*cluster.Volume
 
 func createSanStoreageVG(host, lun string) error {
 	list, err := database.ListLUNByName(lun)
-	if err != nil || len(list) == 0 {
-		return fmt.Errorf("LUN:%d,Error:%v", len(list), err)
+	if err != nil {
+		return fmt.Errorf("LUN:%s,ListLUNByName Error:%s", lun, err)
+	}
+	if len(list) == 0 {
+		return nil
 	}
 
 	storage, err := store.GetStoreByID(list[0].StorageSystemID)
@@ -308,6 +311,7 @@ func createSanStoreageVG(host, lun string) error {
 	}
 
 	l, size := make([]int, len(list)), 0
+
 	for i := range list {
 		l[i] = list[i].StorageLunID
 		size += list[i].SizeByte
@@ -322,6 +326,28 @@ func createSanStoreageVG(host, lun string) error {
 	addr := getPluginAddr(host, pluginPort)
 
 	return sdk.SanVgCreate(addr, config)
+}
+
+func extendSanStoreageVG(host, lunID string) error {
+	lun, err := database.GetLUNByID(lunID)
+	if err != nil {
+		return fmt.Errorf("LUN:%s,ListLUNByName Error:%s", lunID, err)
+	}
+
+	storage, err := store.GetStoreByID(lun.StorageSystemID)
+	if err != nil {
+		return err
+	}
+
+	config := sdk.VgConfig{
+		HostLunId: []int{lun.HostLunID},
+		VgName:    lun.VGName,
+		Type:      storage.Vendor(),
+	}
+
+	addr := getPluginAddr(host, pluginPort)
+
+	return sdk.SanVgExtend(addr, config)
 }
 
 func (u *unit) createContainer(authConfig *types.AuthConfig) (*cluster.Container, error) {
