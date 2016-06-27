@@ -34,9 +34,10 @@ ext_nic=bond2
 
 nfs_mount() {
 	umount -f ${nfs_mount_dir}
+	sed -i "/${nfs_ip}:${nfs_dir}/d" /etc/fstab
 	rm -rf ${nfs_mount_dir}
 	mkdir ${nfs_mount_dir}
-	mount -t nfs -o ${nfs_mount_opts} ${nfs_ip}:${nfs_dir} ${nfs_mount_dir}
+	mount -t nfs -o ${nfs_mount_opts} ${nfs_ip}:${nfs_dir} ${nfs_mount_dir} && echo "${nfs_ip}:${nfs_dir}	${nfs_mount_dir}	nfs	defaults	0 0" >> /etc/fstab
 	if [ $? -ne 0 ]; then
 		echo "nfs mount failed"
 		exit 2
