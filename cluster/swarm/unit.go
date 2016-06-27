@@ -167,7 +167,7 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 	if u.engine == nil && u.EngineID != "" {
 		_, node, err := gd.GetNode(u.EngineID)
 		if err != nil {
-			logrus.Errorf("Not Found Node %s,Error:%s", u.EngineID, err.Error())
+			logrus.Errorf("Not Found Node %s,Error:%s", u.EngineID, err)
 		} else if node != nil && node.engine != nil {
 			u.engine = node.engine
 		}
@@ -178,7 +178,7 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 		if err == nil {
 			u.parent = config
 		} else {
-			logrus.Errorf("Cannot Query unit Parent Config By ConfigID %s,Error:%s", u.ConfigID, err.Error())
+			logrus.Errorf("Cannot Query unit Parent Config By ConfigID %s,Error:%s", u.ConfigID, err)
 		}
 
 	}
@@ -187,12 +187,12 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 	if err == nil {
 		u.ports = ports
 	} else {
-		logrus.Errorf("Cannot Query unit ports By UnitID %s,Error:%s", u.ID, err.Error())
+		logrus.Errorf("Cannot Query unit ports By UnitID %s,Error:%s", u.ID, err)
 	}
 
 	u.networkings, err = u.getNetworkings()
 	if err != nil {
-		logrus.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err.Error())
+		logrus.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err)
 	}
 
 	if err := u.factory(); err != nil {
@@ -236,11 +236,6 @@ func (u *unit) getNetworkingAddr(networking, portName string) (addr string, port
 }
 
 func (u *unit) prepareCreateContainer() error {
-	err := createNetworking(u.engine.IP, u.networkings)
-	if err != nil {
-		return err
-	}
-
 	// prepare for volumes
 	lvs, err := database.SelectVolumesByUnitID(u.ID)
 	if err != nil {
@@ -383,6 +378,20 @@ func (u *unit) startContainer() error {
 	if u.engine == nil {
 		return errEngineIsNil
 	}
+
+	networkings, err := u.getNetworkings()
+	if err != nil {
+		logrus.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err)
+
+		return err
+	}
+
+	err = createNetworking(u.engine.IP, networkings)
+	if err != nil {
+		logrus.Errorf("%s create Networking error:%s,networkings:%v", u.Name, err, networkings)
+		return err
+	}
+
 	return u.engine.StartContainer(u.Unit.Name, nil)
 }
 
