@@ -340,7 +340,7 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 		if dc.storage == nil {
 			return fmt.Errorf("Not Found Datacenter Storage")
 		}
-		vgName := penging.unit.Unit.Name + "_SAN_VG"
+		vgName := penging.unit.Unit.Name + _SAN_VG
 
 		lunID, _, err := dc.storage.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
 		if err != nil {
@@ -500,7 +500,7 @@ func (svc *Service) volumesPendingExpension(gd *Gardener, _type string, extensio
 			if dc.storage == nil {
 				return pendings, fmt.Errorf("Not Found Datacenter Storage")
 			}
-			vgName := u.Name + "_SAN_VG"
+			vgName := u.Name + _SAN_VG
 
 			lunID, lvID, err := dc.storage.Alloc(name, u.ID, vgName, extensions[d].Size)
 			if err != nil {
@@ -638,4 +638,8 @@ func reduceCPUset(cpusetCpus string, need int) (string, error) {
 	}
 
 	return strings.Join(cpuString, ","), nil
+}
+
+func isSanVG(name string) bool {
+	return strings.Contains(name, _SAN_VG)
 }

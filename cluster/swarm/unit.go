@@ -244,7 +244,7 @@ func (u *unit) createVolumes() error {
 	}
 	for i := range lvs {
 		// if volume create on san storage,should created VG before create Volume
-		if strings.Contains(lvs[i].VGName, "_SAN_VG") {
+		if isSanVG(lvs[i].VGName) {
 			err := createSanStoreageVG(u.engine.IP, lvs[i].Name)
 			if err != nil {
 				return err
@@ -520,23 +520,11 @@ func updateVolume(host string, lv database.LocalVolume, size int) error {
 	return err
 }
 
-func (u *unit) removeVolume() error {
-	return nil
-}
-
-func (u *unit) createVG() error {
-	return nil
-}
-
 func (u *unit) activateVG() error {
 	return nil
 }
 
 func (u *unit) deactivateVG() error {
-	return nil
-}
-
-func (u *unit) extendVG() error {
 	return nil
 }
 
