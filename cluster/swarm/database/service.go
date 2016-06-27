@@ -418,7 +418,7 @@ func txDeleteUsers(tx *sqlx.Tx, id string) error {
 	return err
 }
 
-func DeteleServiceRelation(serviceID string) error {
+func DeteleServiceRelation(serviceID string, rmVolumes bool) error {
 	units, err := ListUnitByServiceID(serviceID)
 	if err != nil {
 		return err
@@ -471,9 +471,11 @@ func DeteleServiceRelation(serviceID string) error {
 	}
 
 	for i := range units {
-		err = TxDeleteVolumes(tx, units[i].ID)
-		if err != nil {
-			return err
+		if rmVolumes {
+			err = TxDeleteVolumes(tx, units[i].ID)
+			if err != nil {
+				return err
+			}
 		}
 
 		// TODO:add later when fix unitConfig delete mistake

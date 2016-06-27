@@ -271,10 +271,11 @@ func (gd *Gardener) Recycle(pendings []*pendingAllocResource) (err error) {
 
 		gd.Unlock()
 		for _, lun := range pendings[i].sanStore {
-			dc, err := gd.DatacenterByNode(pendings[i].unit.Unit.EngineID)
+			dc, err := gd.DatacenterByEngine(pendings[i].unit.Unit.EngineID)
 			if err != nil || dc == nil || dc.storage == nil {
 				continue
 			}
+			dc.storage.DelMapping(lun)
 			dc.storage.Recycle(lun, 0)
 		}
 		gd.Lock()
@@ -316,7 +317,7 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 				logrus.Errorf("GetSystemConfig error:%s", err)
 				return err
 			}
-			name := fmt.Sprintf("%s/%s:%s", sys.NFSOption.MountDir, penging.unit.Name, need[i].Name)
+			name := fmt.Sprintf("%s/%s:%s", sys.NFSOption.MountDir, penging.unit.Name, sys.BackupDir)
 			config.HostConfig.Binds = append(config.HostConfig.Binds, name)
 			continue
 		}
@@ -426,10 +427,11 @@ func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
 	gd.Lock()
 	for _, pending := range pendings {
 		for _, lun := range pending.sanStore {
-			dc, err := gd.DatacenterByNode(pending.unit.Unit.ID)
+			dc, err := gd.DatacenterByEngine(pending.unit.Unit.EngineID)
 			if err != nil || dc == nil || dc.storage == nil {
 				continue
 			}
+			dc.storage.DelMapping(lun)
 			dc.storage.Recycle(lun, 0)
 		}
 	}

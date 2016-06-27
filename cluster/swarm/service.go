@@ -1369,7 +1369,7 @@ func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int)
 
 	entry.Debug("Service Delete... stop service & stop containers & rm containers & deregister")
 	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-	err = svc.Delete(configs[0], horus, force, volumes, timeout)
+	err = svc.Delete(gd, configs[0], horus, force, volumes, timeout)
 	if err != nil {
 		entry.Errorf("Service.Delete error:%s", err)
 
@@ -1378,7 +1378,7 @@ func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int)
 
 	// delete database records relation svc.ID
 	entry.Debug("DeteleServiceRelation...")
-	err = database.DeteleServiceRelation(svc.ID)
+	err = database.DeteleServiceRelation(svc.ID, volumes)
 	if err != nil {
 		entry.Errorf("DeteleServiceRelation error:%s", err)
 
@@ -1407,7 +1407,7 @@ func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int)
 	return nil
 }
 
-func (svc *Service) Delete(config consulapi.Config, horus string, force, volumes bool, timeout int) error {
+func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, force, volumes bool, timeout int) error {
 	svc.Lock()
 	defer svc.Unlock()
 
@@ -1447,6 +1447,18 @@ func (svc *Service) Delete(config consulapi.Config, horus string, force, volumes
 	err := svc.removeContainers(force, volumes)
 	if err != nil {
 		return err
+	}
+
+	if volumes {
+		for _, u := range svc.units {
+			dc, err := gd.DatacenterByEngine(u.EngineID)
+			if err != nil || dc == nil || dc.storage == nil {
+				continue
+			}
+
+			//dc.storage.DelMapping(lun)
+			//dc.storage.Recycle(lun, 0)
+		}
 	}
 
 	err = svc.deregisterInHorus(horus)
