@@ -198,10 +198,10 @@ func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) error {
 		return fmt.Errorf("pullImage Error:%s", err)
 	}
 
-	logrus.Debug("[MG]prepare for Creating Container")
-	err = u.prepareCreateContainer()
+	logrus.Debug("[MG]create volumes")
+	err = u.createVolumes()
 	if err != nil {
-		return fmt.Errorf("%s:Prepare Networking or Volume Failed,%s", pending.Name, err)
+		return fmt.Errorf("%s:createVolumes Failed,%s", pending.Name, err)
 	}
 
 	logrus.Debug("[MG]create container")

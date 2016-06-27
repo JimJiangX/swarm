@@ -1256,7 +1256,7 @@ func (p *pendingContainerUpdate) containerUpdate() error {
 		p.config.CpusetCpus = p.cpusetCpus
 	}
 
-	err = p.unit.updateContainer(p.config)
+	err := p.unit.updateContainer(p.config)
 	if err != nil {
 		return err
 	}

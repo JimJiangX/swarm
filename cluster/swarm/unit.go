@@ -235,7 +235,7 @@ func (u *unit) getNetworkingAddr(networking, portName string) (addr string, port
 	return "", 0, fmt.Errorf("Not Found Required networking:%s Port:%s", networking, portName)
 }
 
-func (u *unit) prepareCreateContainer() error {
+func (u *unit) createVolumes() error {
 	// prepare for volumes
 	lvs, err := database.SelectVolumesByUnitID(u.ID)
 	if err != nil {
