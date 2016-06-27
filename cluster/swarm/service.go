@@ -1256,11 +1256,6 @@ func (p *pendingContainerUpdate) containerUpdate() error {
 		p.config.CpusetCpus = p.cpusetCpus
 	}
 
-	err := p.unit.stopService()
-	if err != nil {
-		logrus.Warn("container %s stop service error:%s", p.unit.Name, err)
-	}
-
 	err = p.unit.updateContainer(p.config)
 	if err != nil {
 		return err
@@ -1271,11 +1266,6 @@ func (p *pendingContainerUpdate) containerUpdate() error {
 		return err
 	}
 	err = p.unit.CopyConfig(defConfig)
-	if err != nil {
-		return err
-	}
-
-	err = p.unit.startService()
 	if err != nil {
 		return err
 	}
