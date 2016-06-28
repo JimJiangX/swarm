@@ -3,6 +3,7 @@ package swarm
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	ctypes "github.com/docker/engine-api/types/container"
@@ -97,6 +98,7 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 		}
 	}
 	u := svc.units[index]
+	oldContainer := u.container
 
 	for i := range svc.base.Modules {
 		if u.Type == svc.base.Modules[i].Type {
@@ -108,38 +110,13 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 	if err != nil {
 		return err
 	}
-
-	err = svc.isolate(u.Name)
-	if err != nil {
-		// return err
-	}
-
-	err = u.stopContainer(0)
-	if err != nil {
-		return err
-	}
-	err = removeNetworking(u.engine.IP, u.networkings)
-	if err != nil {
-		return err
-	}
-
-	// local volumes
-	// san volumes
-	err = u.deactivateVG(sdk.DeactivateConfig{})
-	if err != nil {
-		return err
-	}
-
-	// delMapping
-	// dc.store.DelMapping()
-
 	config, err := resetContainerConfig(u.container.Config, hostConfig)
 	if err != nil {
 		return err
 	}
 
 	dc, err := gd.DatacenterByEngine(u.EngineID)
-	if err != nil {
+	if err != nil || dc == nil {
 		return err
 	}
 	nodes, err := database.ListNodeByCluster(dc.ID)
@@ -172,9 +149,66 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 	gd.scheduler.Lock()
 	defer gd.scheduler.Unlock()
 
-	engine, err := gd.selectEngine(config, module, candidates, filters)
+	engine, err := gd.selectEngine(config, module, out, filters)
 	if err != nil {
 		return err
+	}
+
+	err = svc.isolate(u.Name)
+	if err != nil {
+		// return err
+	}
+
+	err = u.stopContainer(0)
+	if err != nil {
+		return err
+	}
+	err = removeNetworking(u.engine.IP, u.networkings)
+	if err != nil {
+		return err
+	}
+
+	// local volumes
+	oldLVs, err := database.SelectVolumesByUnitID(u.ID)
+	if err != nil {
+		return err
+	}
+
+	lunList := make([]database.LUN, 0, len(oldLVs))
+	for i := range oldLVs {
+		if isSanVG(oldLVs[i].VGName) {
+			list, err := database.ListLUNByVgName(oldLVs[i].VGName)
+			if err != nil {
+				return err
+			}
+			lunList = append(lunList, list...)
+		}
+	}
+
+	if len(lunList) > 0 {
+		if dc.storage == nil {
+			return fmt.Errorf("%s storage error", dc.Name)
+		}
+		for i := range lunList {
+			config := sdk.DeactivateConfig{
+				VgName:    lunList[i].VGName,
+				Lvname:    []string{lunList[i].Name},
+				HostLunId: []int{lunList[i].HostLunID},
+				Vendor:    dc.storage.Vendor(),
+			}
+			// san volumes
+			err = u.deactivateVG(config)
+			if err != nil {
+				return err
+			}
+		}
+
+		for i := range lunList {
+			err := dc.storage.DelMapping(lunList[i].ID)
+			if err != nil {
+				logrus.Errorf("%s DelMapping %s", dc.storage.Vendor(), lunList[i].Name)
+			}
+		}
 	}
 
 	ncpu, err := parseCpuset(config.HostConfig.CpusetCpus)
@@ -240,9 +274,31 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 
 	// migrate san volumes
 	// Mapping LVs
+	for i := range lunList {
+		err = dc.storage.Mapping(node.ID, lunList[i].VGName, lunList[i].ID)
+		if err != nil {
+			return err
+		}
+	}
 	// SanVgCreate
-	// SanActivate
+	for i := range lunList {
+		err := createSanStoreageVG(engine.IP, lunList[i].Name)
+		if err != nil {
+			return err
+		}
+	}
 
+	// SanActivate
+	for i := range lunList {
+		activeConfig := sdk.ActiveConfig{
+			VgName: lunList[i].VGName,
+			Lvname: []string{lunList[i].Name},
+		}
+		err := sdk.SanActivate(getPluginAddr(engine.IP, pluginPort), activeConfig)
+		if err != nil {
+			return err
+		}
+	}
 	lvs := make([]database.LocalVolume, len(pending.localStore))
 	for i := range pending.localStore {
 		lvs[i] = pending.localStore[i].lv
@@ -276,17 +332,16 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 	}
 
 	// remove old LocalVolume
-	/*
-		for i := range oldVolumes {
-			err := u.container.Engine.RemoveVolume(oldVolumes[i].Name)
-			if err != nil {
-				logrus.Errorf("%s remove old volume %s", u.Name, oldVolumes[i].Name)
-				return err
-			}
+	for i := range oldLVs {
+		err := oldContainer.Engine.RemoveVolume(oldLVs[i].Name)
+		if err != nil {
+			logrus.Errorf("%s remove old volume %s", u.Name, oldLVs[i].Name)
+			return err
 		}
-	*/
+	}
+
 	// remove old container
-	err = u.container.Engine.RemoveContainer(u.container, true, true)
+	err = oldContainer.Engine.RemoveContainer(oldContainer, true, true)
 	if err != nil {
 		return err
 	}
@@ -305,11 +360,33 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 	u.ContainerID = container.ID
 	u.engine = engine
 	u.EngineID = engine.ID
+	u.CreatedAt = time.Now()
 
 	// update database :tb_unit
-	// update localVolumes VGName
-	// switchback unit
+	// delete old localVolumes
+	tx, err := database.GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 
+	for i := range oldLVs {
+		if isSanVG(oldLVs[i].VGName) {
+			continue
+		}
+
+		err := database.TxDeleteVolume(tx, oldLVs[i].ID)
+		if err != nil {
+			return err
+		}
+
+		err = database.TxUpdateUnit(tx, u.Unit)
+		if err != nil {
+			return err
+		}
+	}
+
+	// switchback unit
 	err = svc.switchBack(u.Name)
 	if err != nil {
 	}

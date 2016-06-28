@@ -394,7 +394,7 @@ func DeleteLocalVoume(IDOrName string) error {
 	return err
 }
 
-func TxDeleteVolumes(tx *sqlx.Tx, NameOrID string) error {
+func TxDeleteVolume(tx *sqlx.Tx, NameOrID string) error {
 	_, err := tx.Exec("DELETE FROM tb_volumes WHERE id=? OR name=? OR unit_id=?", NameOrID, NameOrID, NameOrID)
 
 	return err

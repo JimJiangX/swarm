@@ -262,11 +262,11 @@ func (gd *Gardener) Recycle(pendings []*pendingAllocResource) (err error) {
 			}
 			database.TxUpdatePorts(tx, ports)
 			database.TxDeleteUnit(tx, pendings[i].unit.Unit.ServiceID)
-			database.TxDeleteVolumes(tx, pendings[i].unit.Unit.ID)
+			database.TxDeleteVolume(tx, pendings[i].unit.Unit.ID)
 		}
 
 		for _, lv := range pendings[i].localStore {
-			database.TxDeleteVolumes(tx, lv.ID)
+			database.TxDeleteVolume(tx, lv.ID)
 		}
 
 		gd.Unlock()

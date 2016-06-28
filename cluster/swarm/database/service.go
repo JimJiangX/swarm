@@ -138,6 +138,15 @@ func UpdateUnitInfo(unit Unit) error {
 	return err
 }
 
+func TxUpdateUnit(tx *sqlx.Tx, unit Unit) error {
+	//	query := "UPDATE tb_unit SET name=:name,type=:type,image_id=:image_id,image_name=:image_name,service_id=:service_id,node_id=:node_id,container_id=:container_id,unit_config_id=:unit_config_id,network_mode=:network_mode,status=:status,check_interval=:check_interval,created_at=:created_at WHERE id=:id"
+	query := "UPDATE tb_unit SET node_id=:node_id,container_id=:container_id,status=:status,created_at=:created_at WHERE id=:id"
+
+	_, err := tx.NamedExec(query, unit)
+
+	return err
+}
+
 func TxDeleteUnit(tx *sqlx.Tx, NameOrID string) error {
 	_, err := tx.Exec("DELETE FROM tb_unit WHERE id=? OR name=? OR service_id=?", NameOrID, NameOrID, NameOrID)
 
@@ -491,7 +500,7 @@ func DeteleServiceRelation(serviceID string, rmVolumes bool) error {
 
 	for i := range units {
 		if rmVolumes {
-			err = TxDeleteVolumes(tx, units[i].ID)
+			err = TxDeleteVolume(tx, units[i].ID)
 			if err != nil {
 				return err
 			}
