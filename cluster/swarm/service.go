@@ -970,6 +970,10 @@ func (gd *Gardener) UnitIsolate(name string) error {
 		return err
 	}
 
+	return service.isolate(table.Name)
+}
+
+func (service *Service) isolate(name string) error {
 	service.Lock()
 
 	ip, port, err := service.getSwitchManagerAddr()
@@ -980,11 +984,11 @@ func (gd *Gardener) UnitIsolate(name string) error {
 		return err
 	}
 
-	err = smlib.Isolate(ip, port, table.Name)
+	err = smlib.Isolate(ip, port, name)
 	service.Unlock()
 
 	if err != nil {
-		logrus.Errorf("Isolate %s error:%s:%d %s", table.Name, ip, port, err)
+		logrus.Errorf("Isolate %s error:%s:%d %s", name, ip, port, err)
 	}
 
 	return err
@@ -1003,6 +1007,10 @@ func (gd *Gardener) UnitSwitchBack(name string) error {
 		return err
 	}
 
+	return service.switchBack(table.Name)
+}
+
+func (service *Service) switchBack(name string) error {
 	service.Lock()
 
 	ip, port, err := service.getSwitchManagerAddr()
@@ -1013,14 +1021,15 @@ func (gd *Gardener) UnitSwitchBack(name string) error {
 		return err
 	}
 
-	err = smlib.Recover(ip, port, table.Name)
+	err = smlib.Recover(ip, port, name)
 	service.Unlock()
 
 	if err != nil {
-		logrus.Errorf("Recover %s error:%s:%d %s", table.Name, ip, port, err)
+		logrus.Errorf("Recover %s error:%s:%d %s", name, ip, port, err)
 	}
 
 	return err
+
 }
 
 func (gd *Gardener) TemporaryServiceBackupTask(service, unit string, req structs.BackupStrategy) (string, error) {

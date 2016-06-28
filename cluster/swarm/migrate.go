@@ -8,204 +8,12 @@ import (
 	ctypes "github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/utils"
 )
-
-func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ctypes.HostConfig) error {
-	table, err := database.GetUnit(name)
-	if err != nil {
-		return fmt.Errorf("Not Found Unit %s,error:%s", name, err)
-	}
-
-	svc, err := gd.GetService(table.ServiceID)
-	if err != nil {
-		return err
-	}
-
-	svc.RLock()
-	index, module := 0, structs.Module{}
-	filters := make([]string, len(svc.units))
-	for i, u := range svc.units {
-		filters[i] = u.EngineID
-		if u.Name == name {
-			index = i
-		}
-	}
-	u := svc.units[index]
-
-	for i := range svc.base.Modules {
-		if u.Type == svc.base.Modules[i].Type {
-			module = svc.base.Modules[i]
-			break
-		}
-	}
-	svc.RUnlock()
-	if err != nil {
-		return err
-	}
-
-	err = u.stopContainer(0)
-	if err != nil {
-		return err
-	}
-	err = removeNetworking(u.engine.IP, u.networkings)
-	if err != nil {
-		return err
-	}
-
-	config, err := resetContainerConfig(u.container.Config, hostConfig)
-	if err != nil {
-		return err
-	}
-
-	if len(candidates) == 0 {
-		table, err := database.GetNode(u.EngineID)
-		if err != nil {
-			return err
-		}
-		nodes, err := database.ListNodeByCluster(table.ClusterID)
-		if err != nil {
-			return err
-		}
-		candidates = make([]string, len(nodes))
-		for i := range nodes {
-			candidates[i] = nodes[i].EngineID
-		}
-	} else {
-		candidates, err = database.ListEnginesByNodes(candidates)
-		if err != nil {
-			return err
-		}
-	}
-
-	engine, err := gd.selectEngine(config, module, candidates, filters)
-	if err != nil {
-		return err
-	}
-	u.engine = engine
-	u.EngineID = engine.ID
-
-	ncpu, err := parseCpuset(config.HostConfig.CpusetCpus)
-	if err != nil {
-		return err
-	}
-	cpuset, err := gd.allocCPUs(engine, ncpu)
-	if err != nil {
-		logrus.Errorf("Alloc CPU %d Error:%s", ncpu, err)
-		return err
-	}
-	config.HostConfig.CpusetCpus = cpuset
-
-	_, node, err := gd.GetNode(engine.ID)
-	if err != nil {
-		err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
-		logrus.Error(err)
-
-		return err
-	}
-
-	pending := pendingAllocStore{
-		localStore: make([]localVolume, 0, len(module.Stores)),
-		sanStore:   make([]string, 0, 3),
-	}
-	for i := range module.Stores {
-		name := fmt.Sprintf("%s_%s_LV", u.Unit.Name, module.Stores[i].Name)
-
-		if !store.IsLocalStore(module.Stores[i].Type) {
-			continue
-		}
-		lv, err := node.localStorageAlloc(name, u.Unit.ID, module.Stores[i].Type, module.Stores[i].Size)
-		if err != nil {
-			return err
-		}
-		pending.localStore = append(pending.localStore, localVolume{
-			lv:   lv,
-			size: module.Stores[i].Size,
-		})
-	}
-
-	swarmID := gd.generateUniqueID()
-	config.SetSwarmID(swarmID)
-	gd.pendingContainers[swarmID] = &pendingContainer{
-		Name:   swarmID,
-		Config: config,
-		Engine: engine,
-	}
-
-	logrus.Debugf("[MG]start pull image %s", u.config.Image)
-	authConfig, err := gd.RegistryAuthConfig()
-	if err != nil {
-		return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
-	}
-	if err := u.pullImage(authConfig); err != nil {
-		return fmt.Errorf("pullImage Error:%s", err)
-	}
-
-	err = createNetworking(engine.IP, u.networkings)
-	if err != nil {
-		return err
-	}
-
-	lvs := make([]database.LocalVolume, len(pending.localStore))
-	for i := range pending.localStore {
-		lvs[i] = pending.localStore[i].lv
-		_, err := createVolume(engine, lvs[i])
-		if err != nil {
-			return err
-		}
-	}
-
-	container, err := engine.Create(config, swarmID, false, authConfig)
-	if err != nil {
-		return err
-	}
-
-	delete(gd.pendingContainers, swarmID)
-
-	logrus.Debug("starting Containers")
-	if err := engine.StartContainer(container.ID, nil); err != nil {
-		return err
-	}
-
-	logrus.Debug("copy Service Config")
-	if err := copyConfigIntoCNFVolume(u, lvs, u.parent.Content); err != nil {
-		return err
-	}
-
-	logrus.Debug("init & Start Service")
-	err = initService(container.ID, engine, u.InitServiceCmd())
-	if err != nil {
-		return err
-	}
-
-	// remove old container
-	err = u.container.Engine.RemoveContainer(u.container, true, true)
-	if err != nil {
-		return err
-	}
-
-	err = engine.RenameContainer(container, u.Name)
-	if err != nil {
-		return err
-	}
-
-	container, err = container.Refresh()
-	if err != nil {
-		return err
-	}
-
-	u.container = container
-	u.ContainerID = container.ID
-
-	// update database :tb_unit
-	// remove old LocalVolume
-	// dealwith errors
-
-	return nil
-}
 
 func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs.Module, engines, exclude []string) (*cluster.Engine, error) {
 	entry := logrus.WithFields(logrus.Fields{"Module": module.Type})
@@ -301,6 +109,11 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 		return err
 	}
 
+	err = svc.isolate(u.Name)
+	if err != nil {
+		// return err
+	}
+
 	err = u.stopContainer(0)
 	if err != nil {
 		return err
@@ -309,32 +122,49 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 	if err != nil {
 		return err
 	}
-	// sdk.SanDeActivate
+
+	// local volumes
+	// san volumes
+	err = u.deactivateVG(sdk.DeactivateConfig{})
+	if err != nil {
+		return err
+	}
+
 	// delMapping
+	// dc.store.DelMapping()
 
 	config, err := resetContainerConfig(u.container.Config, hostConfig)
 	if err != nil {
 		return err
 	}
 
-	if len(candidates) > 0 {
-		candidates, err = database.ListEnginesByNodes(candidates)
-		if err != nil {
-			return err
+	dc, err := gd.DatacenterByEngine(u.EngineID)
+	if err != nil {
+		return err
+	}
+	nodes, err := database.ListNodeByCluster(dc.ID)
+	if err != nil {
+		return err
+	}
+	out := make([]string, 0, len(nodes))
+	for i := range candidates {
+		if node := dc.getNode(candidates[i]); node != nil {
+			out = append(out, node.EngineID)
+			continue
 		}
-	} else {
-		table, err := database.GetNode(u.EngineID)
-		if err != nil {
-			return err
+		for n := range nodes {
+			if nodes[n].ID == candidates[i] ||
+				nodes[n].Name == candidates[i] ||
+				nodes[n].EngineID == candidates[i] {
+				out = append(out, nodes[n].EngineID)
+				break
+			}
 		}
-		nodes, err := database.ListNodeByCluster(table.ClusterID)
-		if err != nil {
-			return err
-		}
-		candidates = make([]string, len(nodes))
+	}
+	if len(out) == 0 {
 		for i := range nodes {
 			if nodes[i].EngineID != u.EngineID {
-				candidates[i] = nodes[i].EngineID
+				out = append(out, nodes[i].EngineID)
 			}
 		}
 	}
@@ -346,8 +176,6 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 	if err != nil {
 		return err
 	}
-	u.engine = engine
-	u.EngineID = engine.ID
 
 	ncpu, err := parseCpuset(config.HostConfig.CpusetCpus)
 	if err != nil {
@@ -447,6 +275,16 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 		return err
 	}
 
+	// remove old LocalVolume
+	/*
+		for i := range oldVolumes {
+			err := u.container.Engine.RemoveVolume(oldVolumes[i].Name)
+			if err != nil {
+				logrus.Errorf("%s remove old volume %s", u.Name, oldVolumes[i].Name)
+				return err
+			}
+		}
+	*/
 	// remove old container
 	err = u.container.Engine.RemoveContainer(u.container, true, true)
 	if err != nil {
@@ -465,10 +303,18 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 
 	u.container = container
 	u.ContainerID = container.ID
+	u.engine = engine
+	u.EngineID = engine.ID
 
 	// update database :tb_unit
-	// remove old LocalVolume
+	// update localVolumes VGName
+	// switchback unit
+
+	err = svc.switchBack(u.Name)
+	if err != nil {
+	}
+
 	// dealwith errors
 
-	return nil
+	return err
 }

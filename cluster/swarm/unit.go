@@ -520,12 +520,33 @@ func updateVolume(host string, lv database.LocalVolume, size int) error {
 	return err
 }
 
-func (u *unit) activateVG() error {
+func (u *unit) activateVG(config sdk.ActiveConfig) error {
+	engine, err := u.getEngine()
+	if err != nil {
+		return err
+	}
+
+	addr := getPluginAddr(engine.IP, pluginPort)
+	err = sdk.SanActivate(addr, config)
+	if err != nil {
+		logrus.Error("%s SanDeActivate error:%s", u.Name, err)
+	}
 	return nil
 }
 
-func (u *unit) deactivateVG() error {
-	return nil
+func (u *unit) deactivateVG(config sdk.DeactivateConfig) error {
+	engine, err := u.getEngine()
+	if err != nil {
+		return err
+	}
+
+	addr := getPluginAddr(engine.IP, pluginPort)
+	err = sdk.SanDeActivate(addr, config)
+	if err != nil {
+		logrus.Error("%s SanDeActivate error:%s", u.Name, err)
+	}
+
+	return err
 }
 
 func (u *unit) Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (*cluster.Container, error) {
