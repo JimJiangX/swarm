@@ -2009,7 +2009,7 @@ func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 // POST /storage/san/{name}/raid_group/{rg:[0-9]+}/disable
 func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	san := mux.Vars(r)["name"]
-	rg, err := strconv.Atoi(r.Form.Get("rg"))
+	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
