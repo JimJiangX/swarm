@@ -50,7 +50,7 @@ func (gd *Gardener) serviceExecute() (err error) {
 		err = gd.initAndStartService(svc)
 		if err != nil {
 			logrus.Errorf("%s init And Start Service Error:%s", svc.Name, err.Error())
-			goto failure
+			// goto failure
 		}
 
 		logrus.Debug("[MG]TxSetServiceStatus")
