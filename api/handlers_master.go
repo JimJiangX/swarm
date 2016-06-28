@@ -721,6 +721,35 @@ func getContainerJSON2(name string, container *cluster.Container) ([]byte, error
 	return data, nil
 }
 
+// GET /services/{name}/users
+func getServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_type := "proxy"
+	if key, ok := r.Form["filter"]; ok {
+		if len(key) == 0 {
+			httpError(w, r.URL.String(), http.StatusBadRequest)
+			return
+		}
+		_type = key[0]
+	}
+
+	users, err := database.ListUsersByService(name, _type)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(users)
+}
+
 // GET /services/{name}/backup_strategy
 func getServiceBackupStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]

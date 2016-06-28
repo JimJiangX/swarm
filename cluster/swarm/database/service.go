@@ -390,6 +390,25 @@ func (u User) TableName() string {
 	return "tb_users"
 }
 
+func ListUsersByService(service, _type string) ([]User, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	var users []User
+	if _type == "" {
+		err = db.Select(&users, "SELECT * FROM tb_users WHERE service_id=?", service)
+	} else {
+		err = db.Select(&users, "SELECT * FROM tb_users WHERE service_id=? AND type=?", service, _type)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
 func TxInsertUsers(tx *sqlx.Tx, users []User) error {
 	query := "INSERT INTO tb_users (id,service_id,type,username,password,role,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:created_at)"
 
