@@ -641,5 +641,5 @@ func reduceCPUset(cpusetCpus string, need int) (string, error) {
 }
 
 func isSanVG(name string) bool {
-	return strings.Contains(name, _SAN_VG)
+	return strings.HasSuffix(name, _SAN_VG)
 }
