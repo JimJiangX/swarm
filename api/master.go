@@ -186,8 +186,9 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 
 // DebugRequestMiddleware dumps the request to logger
 func DebugRequestMiddleware(r *http.Request) error {
-	if r.Method != "POST" {
-		logrus.Warn("Request Method ", r.Method)
+	if (r.Method != "POST" && r.Method != "PUT") ||
+		r.ContentLength == 0 || r.Body == nil {
+		logrus.Warnf("Request Method %s,ContentLength %d", r.Method, r.ContentLength)
 		return nil
 	}
 
@@ -220,7 +221,7 @@ func DebugRequestMiddleware(r *http.Request) error {
 			logrus.Debugf("form data: %q", postForm)
 		}
 	} else {
-		logrus.Debugf("JSON Unmarshal error:%v,%s", err, string(b))
+		logrus.Debugf("JSON Unmarshal error:%v,'%s'", err, string(b))
 	}
 
 	return err
