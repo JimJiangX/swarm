@@ -257,7 +257,7 @@ func (gd *Gardener) createContainerInPending(swarmID string, authConfig *types.A
 	return container, err
 }
 
-func (gd *Gardener) initAndStartService(svc *Service) error {
+func (gd *Gardener) initAndStartService(svc *Service) (err error) {
 	sys, err := database.GetSystemConfig()
 	if err != nil {
 		logrus.Errorf("Query Database Error:%s", err.Error())

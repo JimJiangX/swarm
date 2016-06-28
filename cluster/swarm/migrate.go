@@ -317,7 +317,12 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 		return err
 	}
 
-	if len(candidates) == 0 {
+	if len(candidates) > 0 {
+		candidates, err = database.ListEnginesByNodes(candidates)
+		if err != nil {
+			return err
+		}
+	} else {
 		table, err := database.GetNode(u.EngineID)
 		if err != nil {
 			return err
@@ -328,14 +333,15 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 		}
 		candidates = make([]string, len(nodes))
 		for i := range nodes {
-			candidates[i] = nodes[i].EngineID
-		}
-	} else {
-		candidates, err = database.ListEnginesByNodes(candidates)
-		if err != nil {
-			return err
+			if nodes[i].EngineID != u.EngineID {
+				candidates[i] = nodes[i].EngineID
+			}
 		}
 	}
+
+	gd.scheduler.Lock()
+	defer gd.scheduler.Unlock()
+
 	engine, err := gd.selectEngine(config, module, candidates, filters)
 	if err != nil {
 		return err

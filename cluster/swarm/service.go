@@ -394,7 +394,7 @@ func (gd *Gardener) rebuildService(NameOrID string) (*Service, error) {
 
 }
 
-func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, *database.BackupStrategy, error) {
+func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _ *database.BackupStrategy, err error) {
 	authConfig, err := gd.RegistryAuthConfig()
 	if err != nil {
 		logrus.Error("get Registry Auth Config", err)
@@ -450,8 +450,8 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, *da
 	return svc, svc.backup, nil
 }
 
-func (svc *Service) StartService() error {
-	err := svc.statusCAS(_StatusServiceNoContent, _StatusServiceStarting)
+func (svc *Service) StartService() (err error) {
+	err = svc.statusCAS(_StatusServiceNoContent, _StatusServiceStarting)
 	if err != nil {
 		return err
 	}
