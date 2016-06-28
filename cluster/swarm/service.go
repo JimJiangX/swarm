@@ -487,6 +487,7 @@ func (svc *Service) startContainers() error {
 	for _, u := range svc.units {
 		err := u.startContainer()
 		if err != nil {
+			logrus.Errorf("%s start container error:%s", u.Name, err)
 			return err
 		}
 	}
@@ -676,7 +677,9 @@ func (svc *Service) RemoveContainers(force, rmVolumes bool) error {
 }
 
 func (svc *Service) removeContainers(force, rmVolumes bool) error {
+	logrus.Debug(svc.Name, " remove Containers")
 	for _, u := range svc.units {
+		logrus.Debug(u.Name, " remove Container")
 		err := u.removeContainer(force, rmVolumes)
 		if err != nil {
 			logrus.Errorf("container %s remove,-f=%v -v=%v,error:%s", u.Name, force, rmVolumes, err.Error())
@@ -1412,7 +1415,7 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 	defer svc.Unlock()
 
 	for _, u := range svc.units {
-		// stop unit service
+		logrus.Debug(u.Name, " stop unit service")
 		err := u.stopService()
 		if err != nil {
 			logrus.Errorf("container %s stop service error:%s", u.Name, err)
@@ -1428,7 +1431,7 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 			return err
 		}
 
-		// stop containr
+		logrus.Debug(u.Name, " stop container")
 		err = u.stopContainer(timeout)
 		if err != nil {
 			logrus.Errorf("container %s stop error:%s", u.Name, err.Error())
@@ -1452,6 +1455,7 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 	volumes := make([]database.LocalVolume, 0, 10)
 
 	for _, u := range svc.units {
+		logrus.Debug(u.Name, " SelectVolumesByUnitID")
 		lvs, err := database.SelectVolumesByUnitID(u.ID)
 		if err != nil {
 			logrus.Warnf("SelectVolumesByUnitID %s error:%s", u.Name, err)
@@ -1459,27 +1463,33 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 		}
 		volumes = append(volumes, lvs...)
 
+		logrus.Debugf("recycle=%v", recycle)
 		if recycle {
+			logrus.Debug("DatacenterByEngine ", u.EngineID)
 			dc, err := gd.DatacenterByEngine(u.EngineID)
 			if err != nil || dc == nil || dc.storage == nil {
 				continue
 			}
 			for i := range lvs {
-				if isSanVG(lvs[i].VGName) {
-					list, err := database.ListLUNByVgName(lvs[i].VGName)
+				if !isSanVG(lvs[i].VGName) {
+					logrus.Debug(i, lvs[i].VGName)
+					continue
+				}
+				logrus.Debug("ListLUNByVgName ", lvs[i].VGName)
+				list, err := database.ListLUNByVgName(lvs[i].VGName)
+				if err != nil {
+					logrus.Errorf("ListLUNByVgName %s error:%s", lvs[i].VGName, err)
+					return err
+				}
+				for l := range list {
+					logrus.Debug(i, "DelMapping & Recycle ", list[l].ID)
+					err := dc.storage.DelMapping(list[l].ID)
 					if err != nil {
-						logrus.Errorf("ListLUNByVgName %s error:%s", lvs[i].VGName, err)
-						return err
+						logrus.Errorf("DelMapping error:%s,unit:%s,lun:%s", err, u.Name, list[l].Name)
 					}
-					for l := range list {
-						err := dc.storage.DelMapping(list[l].ID)
-						if err != nil {
-							logrus.Errorf("DelMapping error:%s,unit:%s,lun:%s", err, u.Name, list[l].Name)
-						}
-						err = dc.storage.Recycle(list[l].ID, 0)
-						if err != nil {
-							logrus.Errorf("Recycle LUN error:%s,unit:%s,lun:%s", err, u.Name, list[l].Name)
-						}
+					err = dc.storage.Recycle(list[l].ID, 0)
+					if err != nil {
+						logrus.Errorf("Recycle LUN error:%s,unit:%s,lun:%s", err, u.Name, list[l].Name)
 					}
 				}
 			}
@@ -1488,6 +1498,7 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 
 	// remove volumes
 	for i := range volumes {
+		logrus.Debug(i, len(volumes), "RemoveVolumes ", volumes[i].Name)
 		found, err := gd.RemoveVolumes(volumes[i].Name)
 		if !found {
 			continue
@@ -1497,11 +1508,13 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 		}
 	}
 
+	logrus.Debug("deregisterInHorus")
 	err = svc.deregisterInHorus(horus)
 	if err != nil {
 		logrus.Errorf("%s deregister In Horus error:%s", svc.Name, err)
 	}
 
+	logrus.Debug("deregisterServices")
 	err = svc.deregisterServices(config)
 	if err != nil {
 		logrus.Errorf("%s deregister In consul error:%s", svc.Name, err)
