@@ -70,11 +70,11 @@ func RegisterStore(vendor, addr, user, password, admin string,
 	}
 
 	if err := store.Ping(); err != nil {
-		return nil, err
+		return store, err
 	}
 
 	if err := store.Insert(); err != nil {
-		return nil, err
+		return store, err
 	}
 
 	stores[store.ID()] = store

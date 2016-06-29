@@ -20,22 +20,27 @@ func TestRegisterStore(t *testing.T) {
 	if err == nil {
 		t.Error(wrong.Vendor())
 	}
-	t.Log("Expected", err)
+	t.Log("Expected,", err)
 	hitachi, err := RegisterStore("HiTaChI", "", "", "", "AMS2100_83004824", 0, 255, 1000, 1200)
 	if err != nil {
 		t.Error(HITACHI, err)
+	} else {
+		t.Log(hitachi.ID(), HITACHI, "registered")
 	}
-	t.Log(hitachi.ID(), HITACHI, "registered")
 
 	huawei, err := RegisterStore("hUaWeI", "146.240.104.61", "admin", "Admin@storage", "", 0, 255, 1000, 1200)
 	if err != nil {
 		t.Error(HUAWEI, err)
+	} else {
+		t.Log(huawei.ID(), HUAWEI, "registered")
 	}
-	t.Log(huawei.ID(), HUAWEI, "registered")
 
-	database.DeleteStorageByID(hitachi.ID())
-	database.DeleteStorageByID(huawei.ID())
-
+	if hitachi != nil {
+		database.DeleteStorageByID(hitachi.ID())
+	}
+	if huawei != nil {
+		database.DeleteStorageByID(huawei.ID())
+	}
 }
 
 func TestHITACHIStore(t *testing.T) {
@@ -79,10 +84,11 @@ func TestHITACHIStore(t *testing.T) {
 		t.Error(err)
 	}
 
-	id, err := store.Alloc("test001", "unit001", "vgName001", 1<<20)
+	id, lv, err := store.Alloc("test001", "unit001", "vgName001", 1<<20)
 	if err != nil {
 		t.Error(err)
 	}
+	t.Log(id, lv)
 
 	spaces, err = store.IdleSize()
 	if err != nil {
@@ -166,10 +172,11 @@ func TestHUAWEIStore(t *testing.T) {
 		t.Error(err)
 	}
 
-	id, err := store.Alloc("test001", "unit001", "vgName001", 1<<20)
+	id, lv, err := store.Alloc("test001", "unit001", "vgName001", 1<<20)
 	if err != nil {
 		t.Error(err)
 	}
+	t.Log(id, lv)
 
 	spaces, err = store.IdleSize()
 	if err != nil {

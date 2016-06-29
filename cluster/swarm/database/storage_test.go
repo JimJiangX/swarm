@@ -208,7 +208,7 @@ func TestRaidGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rg5, err := SelectRaidGroupByStorageID(rg.StorageID, rg.Enabled)
+	rg5, err := SelectRaidGroupByStorageID(rg.StorageID)
 	if err != nil {
 		t.Fatal(err)
 	}
