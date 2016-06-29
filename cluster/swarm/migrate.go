@@ -107,13 +107,6 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 		}
 	}
 	svc.RUnlock()
-	if err != nil {
-		return err
-	}
-	config, err := resetContainerConfig(u.container.Config, hostConfig)
-	if err != nil {
-		return err
-	}
 
 	dc, err := gd.DatacenterByEngine(u.EngineID)
 	if err != nil || dc == nil {
@@ -146,6 +139,10 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 		}
 	}
 
+	config, err := resetContainerConfig(u.container.Config, hostConfig)
+	if err != nil {
+		return err
+	}
 	gd.scheduler.Lock()
 	defer gd.scheduler.Unlock()
 
@@ -174,26 +171,41 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 		return err
 	}
 
-	lunList := make([]database.LUN, 0, len(oldLVs))
+	lunMap := make(map[string][]database.LUN, len(oldLVs))
+	lunSlice := make([]database.LUN, 0, len(oldLVs))
 	for i := range oldLVs {
-		if isSanVG(oldLVs[i].VGName) {
-			list, err := database.ListLUNByVgName(oldLVs[i].VGName)
+		vg := oldLVs[i].VGName
+		if val, ok := lunMap[vg]; ok && len(val) > 0 {
+			continue
+		}
+		if isSanVG(vg) {
+			list, err := database.ListLUNByVgName(vg)
 			if err != nil {
 				return err
 			}
-			lunList = append(lunList, list...)
+			if len(list) > 0 {
+				lunMap[vg] = list
+				lunSlice = append(lunSlice, list...)
+			}
 		}
 	}
 
-	if len(lunList) > 0 {
+	if len(lunMap) > 0 {
 		if dc.storage == nil {
 			return fmt.Errorf("%s storage error", dc.Name)
 		}
-		for i := range lunList {
+
+		for vg, list := range lunMap {
+			names := make([]string, len(list))
+			hostLuns := make([]int, len(list))
+			for i := range list {
+				names[i] = list[i].Name
+				hostLuns[i] = list[i].HostLunID
+			}
 			config := sdk.DeactivateConfig{
-				VgName:    lunList[i].VGName,
-				Lvname:    []string{lunList[i].Name},
-				HostLunId: []int{lunList[i].HostLunID},
+				VgName:    vg,
+				Lvname:    names,
+				HostLunId: hostLuns,
 				Vendor:    dc.storage.Vendor(),
 			}
 			// san volumes
@@ -203,10 +215,10 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 			}
 		}
 
-		for i := range lunList {
-			err := dc.storage.DelMapping(lunList[i].ID)
+		for i := range lunSlice {
+			err := dc.storage.DelMapping(lunSlice[i].ID)
 			if err != nil {
-				logrus.Errorf("%s DelMapping %s", dc.storage.Vendor(), lunList[i].Name)
+				logrus.Errorf("%s DelMapping %s", dc.storage.Vendor(), lunSlice[i].ID)
 			}
 		}
 	}
@@ -274,25 +286,43 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 
 	// migrate san volumes
 	// Mapping LVs
-	for i := range lunList {
-		err = dc.storage.Mapping(node.ID, lunList[i].VGName, lunList[i].ID)
+	for i := range lunSlice {
+		err = dc.storage.Mapping(node.ID, lunSlice[i].VGName, lunSlice[i].ID)
 		if err != nil {
 			return err
 		}
 	}
 	// SanVgCreate
-	for i := range lunList {
-		err := createSanStoreageVG(engine.IP, lunList[i].Name)
+	for vg, list := range lunMap {
+		l, size := make([]int, len(list)), 0
+
+		for i := range list {
+			l[i] = list[i].StorageLunID
+			size += list[i].SizeByte
+		}
+
+		config := sdk.VgConfig{
+			HostLunId: l,
+			VgName:    vg,
+			Type:      dc.storage.Vendor(),
+		}
+
+		addr := getPluginAddr(engine.IP, pluginPort)
+		err := sdk.SanVgCreate(addr, config)
 		if err != nil {
 			return err
 		}
 	}
 
 	// SanActivate
-	for i := range lunList {
+	for vg, list := range lunMap {
+		names := make([]string, len(list))
+		for i := range list {
+			names[i] = list[i].Name
+		}
 		activeConfig := sdk.ActiveConfig{
-			VgName: lunList[i].VGName,
-			Lvname: []string{lunList[i].Name},
+			VgName: vg,
+			Lvname: names,
 		}
 		err := sdk.SanActivate(getPluginAddr(engine.IP, pluginPort), activeConfig)
 		if err != nil {
@@ -374,16 +404,14 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 		if isSanVG(oldLVs[i].VGName) {
 			continue
 		}
-
 		err := database.TxDeleteVolume(tx, oldLVs[i].ID)
 		if err != nil {
 			return err
 		}
-
-		err = database.TxUpdateUnit(tx, u.Unit)
-		if err != nil {
-			return err
-		}
+	}
+	err = database.TxUpdateUnit(tx, u.Unit)
+	if err != nil {
+		return err
 	}
 
 	// switchback unit
