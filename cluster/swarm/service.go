@@ -89,6 +89,12 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 		logrus.Error("Parse Service.Architecture", err)
 		return nil, err
 	}
+	sys, err := database.GetSystemConfig()
+	if err != nil {
+		return nil, err
+	}
+	users := defaultServiceUsers(svc.ID, *sys)
+	users = append(users, converteToUsers(svc.ID, req.Users)...)
 
 	service := NewService(svc, nodeNum)
 
@@ -101,7 +107,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 	service.backup = strategy
 	service.base = &req
 	service.authConfig = authConfig
-	service.users = converteToUsers(service.ID, req.Users)
+	service.users = users
 	atomic.StoreInt64(&svc.Status, _StatusServcieBuilding)
 
 	if err := service.SaveToDB(); err != nil {
@@ -198,34 +204,20 @@ func DeleteServiceBackupStrategy(strategy string) error {
 	return err
 }
 
-func converteToUsers(service string, users []structs.User) []database.User {
-	list := make([]database.User, 0, len(users)+5)
-	now := time.Now()
-	for i := range users {
-		if users[i].Type != _User_Type_Proxy &&
-			users[i].Role != _User_DB &&
-			users[i].Role != _User_Application {
-			continue
-		}
-
-		list = append(list, database.User{
-			ID:         utils.Generate32UUID(),
-			ServiceID:  service,
-			Type:       users[i].Type,
-			Username:   users[i].Username,
-			Password:   users[i].Password,
-			Role:       users[i].Role,
-			Permission: "",
-			CreatedAt:  now,
-		})
-	}
-
-	sys, err := database.GetSystemConfig()
+func (svc *Service) AddServiceUsers(req []structs.User) error {
+	users := converteToUsers(svc.ID, req)
+	err := database.TxInsertUsers(users)
 	if err != nil {
-		logrus.Error(err)
+		return err
 	}
+	svc.users = append(svc.users, users...)
 
-	list = append(list,
+	return nil
+}
+
+func defaultServiceUsers(service string, sys database.Configurations) []database.User {
+	now := time.Now()
+	return []database.User{
 		database.User{
 			ID:         utils.Generate32UUID(),
 			ServiceID:  service,
@@ -275,7 +267,31 @@ func converteToUsers(service string, users []structs.User) []database.User {
 			Role:       _User_Replication,
 			Permission: "",
 			CreatedAt:  now,
-		})
+		},
+	}
+}
+
+func converteToUsers(service string, users []structs.User) []database.User {
+	list := make([]database.User, len(users))
+	now := time.Now()
+	for i := range users {
+		if users[i].Type != _User_Type_Proxy &&
+			users[i].Role != _User_DB &&
+			users[i].Role != _User_Application {
+			continue
+		}
+
+		list[i] = database.User{
+			ID:         utils.Generate32UUID(),
+			ServiceID:  service,
+			Type:       users[i].Type,
+			Username:   users[i].Username,
+			Password:   users[i].Password,
+			Role:       users[i].Role,
+			Permission: "",
+			CreatedAt:  now,
+		}
+	}
 
 	return list
 }

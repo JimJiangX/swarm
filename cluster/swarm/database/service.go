@@ -295,7 +295,7 @@ func TxSaveService(svc Service, strategy *BackupStrategy, task *Task, users []Us
 	}
 
 	if len(users) > 0 {
-		err = TxInsertUsers(tx, users)
+		err = txInsertUsers(tx, users)
 		if err != nil {
 			return err
 		}
@@ -418,7 +418,22 @@ func ListUsersByService(service, _type string) ([]User, error) {
 	return users, nil
 }
 
-func TxInsertUsers(tx *sqlx.Tx, users []User) error {
+func TxInsertUsers(users []User) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = txInsertUsers(tx, users)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func txInsertUsers(tx *sqlx.Tx, users []User) error {
 	query := "INSERT INTO tb_users (id,service_id,type,username,password,role,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:created_at)"
 
 	stmt, err := tx.PrepareNamed(query)
