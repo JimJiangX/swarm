@@ -205,12 +205,107 @@ func DeleteServiceBackupStrategy(strategy string) error {
 }
 
 func (svc *Service) AddServiceUsers(req []structs.User) error {
-	users := converteToUsers(svc.ID, req)
-	err := database.TxInsertUsers(users)
+	svc.Lock()
+	defer svc.Unlock()
+
+	if len(svc.users) == 0 {
+		out, err := database.ListUsersByService(svc.ID, "")
+		if err != nil {
+			return err
+		}
+
+		svc.users = out
+	}
+
+	exist := make([]string, 0, len(req))
+	for i := range req {
+		for u := range svc.users {
+			if svc.users[u].Username == req[i].Username {
+				exist = append(exist, req[i].Username)
+				break
+			}
+		}
+	}
+	if len(exist) > 0 {
+		return fmt.Errorf("Users '%s' Exist in Service '%s'", exist, svc.ID)
+	}
+
+	addr, port, err := svc.getSwitchManagerAddr()
 	if err != nil {
 		return err
 	}
+
+	users := converteToUsers(svc.ID, req)
+	for i := range users {
+		user := swm_structs.User{
+			Id:       users[i].ID,
+			Type:     users[i].Type,
+			UserName: users[i].Username,
+			Password: users[i].Password,
+			Role:     users[i].Role,
+		}
+		err := smlib.UptUser(addr, port, user)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = database.TxInsertUsers(users)
+	if err != nil {
+		return err
+	}
+
 	svc.users = append(svc.users, users...)
+
+	return nil
+}
+
+func (svc *Service) DeleteServiceUsers(usernames []string) error {
+	svc.Lock()
+	defer svc.Unlock()
+
+	if len(svc.users) == 0 {
+		out, err := database.ListUsersByService(svc.ID, "")
+		if err != nil {
+			return err
+		}
+		if len(out) == 0 {
+			return fmt.Errorf("'%s' are not Service '%s' Usernames", usernames, svc.Name)
+		}
+		svc.users = out
+	}
+
+	nor := make([]string, 0, len(usernames))
+	for i := range usernames {
+		exist := false
+		for u := range svc.users {
+			if svc.users[u].Username == usernames[i] {
+				exist = true
+				break
+			}
+		}
+		if !exist {
+			nor = append(nor, usernames[i])
+		}
+	}
+
+	if len(nor) > 0 {
+		return fmt.Errorf("'%s' are not Service '%s' Usernames", nor, svc.Name)
+	}
+
+	// TODO:call smlib delete users
+
+	err := database.TxDeleteUsers(svc.ID, usernames)
+	if err != nil {
+		return err
+	}
+
+	out, err := database.ListUsersByService(svc.ID, "")
+	if err != nil {
+		return err
+	}
+
+	svc.users = out
 
 	return nil
 }

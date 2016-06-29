@@ -726,7 +726,7 @@ func getServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	name := mux.Vars(r)["name"]
 
 	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -897,7 +897,7 @@ func getSanStoreInfo(id string) (structs.SANStorageResponse, error) {
 func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -1319,7 +1319,7 @@ func postServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		httpError(w, fmt.Sprintf("Not Found Service %s,Error:%s", name, err.Error()), http.StatusInternalServerError)
+		httpError(w, fmt.Sprintf("Not Found Service %s,Error:%s", name, err), http.StatusInternalServerError)
 		return
 	}
 
@@ -1613,7 +1613,7 @@ func postUnitStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // POST /units/{name:.*}/stop
 func postUnitStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	name := mux.Vars(r)["name"]
@@ -1669,7 +1669,7 @@ func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // POST /units/{name:.*}/restore
 func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	name := mux.Vars(r)["name"]
@@ -2070,7 +2070,7 @@ func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 // TODO:Not Done Yet
 func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -2092,6 +2092,36 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// DELETE /services/{name}/users/{usernames:.*}
+func deleteServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	usernames := mux.Vars(r)["usernames"]
+	users := strings.Split(usernames, "&")
+	if len(users) == 0 {
+		httpError(w, fmt.Sprintf("URL without {usernames}:'%s'", usernames), http.StatusBadRequest)
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	svc, err := gd.GetService(name)
+	if err != nil {
+		httpError(w, fmt.Sprintf("Not Found Service '%s' Error:%s", name, err), http.StatusInternalServerError)
+		return
+	}
+
+	err = svc.DeleteServiceUsers(users)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 // DELETE /services/backup_strategy/{name:.*}
@@ -2129,7 +2159,7 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // DELETE /clusters/nodes/{node:.*}
 func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 

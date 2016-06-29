@@ -461,6 +461,31 @@ func txDeleteUsers(tx *sqlx.Tx, id string) error {
 	return err
 }
 
+func TxDeleteUsers(service string, usernames []string) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Preparex("DELETE FROM tb_users WHERE username=? OR service_id=?")
+	if err != nil {
+		return err
+	}
+
+	for i := range usernames {
+		_, err = stmt.Exec(usernames[i], service)
+		if err != nil {
+			stmt.Close()
+			return err
+		}
+	}
+
+	stmt.Close()
+
+	return tx.Commit()
+}
+
 func DeteleServiceRelation(serviceID string, rmVolumes bool) error {
 	units, err := ListUnitByServiceID(serviceID)
 	if err != nil {
