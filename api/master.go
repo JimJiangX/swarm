@@ -119,9 +119,9 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/storage/san/{name}/raid_group/{rg:[0-9]+}/disable": postDisableRaidGroup,
 	},
 	"DELETE": {
-		"/services/{name}":                      deleteService,
-		"/services/{name}/users/{usernames:.*}": deleteServiceUsers,
-		"/services/backup_strategy/{name:.*}":   deleteBackupStrategy,
+		"/services/{name}":                    deleteService,
+		"/services/{name}/users":              deleteServiceUsers,
+		"/services/backup_strategy/{name:.*}": deleteBackupStrategy,
 
 		"/clusters/{name}":          deleteCluster,
 		"/clusters/nodes/{node:.*}": deleteNode,

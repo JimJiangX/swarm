@@ -461,20 +461,20 @@ func txDeleteUsers(tx *sqlx.Tx, id string) error {
 	return err
 }
 
-func TxDeleteUsers(service string, usernames []string) error {
+func TxDeleteUsers(users []User) error {
 	tx, err := GetTX()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.Preparex("DELETE FROM tb_users WHERE username=? OR service_id=?")
+	stmt, err := tx.Preparex("DELETE FROM tb_users WHERE id=?")
 	if err != nil {
 		return err
 	}
 
-	for i := range usernames {
-		_, err = stmt.Exec(usernames[i], service)
+	for i := range users {
+		_, err = stmt.Exec(users[i].ID)
 		if err != nil {
 			stmt.Close()
 			return err

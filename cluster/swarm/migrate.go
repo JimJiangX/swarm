@@ -158,7 +158,11 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 
 	err = u.stopContainer(0)
 	if err != nil {
-		return err
+		err1 := checkContainerError(err)
+		if err1 != errContainerNotRunning && err1 != errContainerNotFound {
+			logrus.Errorf("%s stop container error:%s", u.Name, err)
+			return err
+		}
 	}
 	err = removeNetworking(u.engine.IP, u.networkings)
 	if err != nil {
@@ -234,7 +238,7 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 	}
 	config.HostConfig.CpusetCpus = cpuset
 
-	_, node, err := gd.GetNode(engine.ID)
+	dc, node, err := gd.GetNode(engine.ID)
 	if err != nil {
 		err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
 		logrus.Error(err)

@@ -244,7 +244,7 @@ func (svc *Service) AddServiceUsers(req []structs.User) error {
 			Password: users[i].Password,
 			Role:     users[i].Role,
 		}
-		err := smlib.UptUser(addr, port, user)
+		err := smlib.AddUser(addr, port, user)
 		if err != nil {
 			return err
 		}
@@ -260,7 +260,7 @@ func (svc *Service) AddServiceUsers(req []structs.User) error {
 	return nil
 }
 
-func (svc *Service) DeleteServiceUsers(usernames []string) error {
+func (svc *Service) DeleteServiceUsers(usernames []string, all bool) error {
 	svc.Lock()
 	defer svc.Unlock()
 
@@ -275,27 +275,48 @@ func (svc *Service) DeleteServiceUsers(usernames []string) error {
 		svc.users = out
 	}
 
-	nor := make([]string, 0, len(usernames))
-	for i := range usernames {
-		exist := false
-		for u := range svc.users {
-			if svc.users[u].Username == usernames[i] {
-				exist = true
-				break
+	list := make([]database.User, 0, len(usernames))
+	if all {
+		list = svc.users
+	} else {
+		none := make([]string, 0, len(usernames))
+		for i := range usernames {
+			exist := false
+			for u := range svc.users {
+				if svc.users[u].Username == usernames[i] {
+					list = append(list, svc.users[u])
+					exist = true
+					break
+				}
+			}
+			if !exist {
+				none = append(none, usernames[i])
 			}
 		}
-		if !exist {
-			nor = append(nor, usernames[i])
+
+		if len(none) > 0 {
+			return fmt.Errorf("'%s' are not Service '%s' Usernames", none, svc.Name)
 		}
 	}
 
-	if len(nor) > 0 {
-		return fmt.Errorf("'%s' are not Service '%s' Usernames", nor, svc.Name)
+	addr, port, err := svc.getSwitchManagerAddr()
+	if err != nil {
+		return err
 	}
-
-	// TODO:call smlib delete users
-
-	err := database.TxDeleteUsers(svc.ID, usernames)
+	for i := range list {
+		user := swm_structs.User{
+			Id:       list[i].ID,
+			Type:     list[i].Type,
+			UserName: list[i].Username,
+			Password: list[i].Password,
+			Role:     list[i].Role,
+		}
+		err := smlib.DelUser(addr, port, user)
+		if err != nil {
+			return err
+		}
+	}
+	err = database.TxDeleteUsers(list)
 	if err != nil {
 		return err
 	}

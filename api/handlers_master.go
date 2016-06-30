@@ -2094,12 +2094,21 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// DELETE /services/{name}/users/{usernames:.*}
+// DELETE /services/{name}/users
 func deleteServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	name := mux.Vars(r)["name"]
-	usernames := mux.Vars(r)["usernames"]
+	all := boolValue(r, "all")
+	usernames := r.FormValue("usernames")
 	users := strings.Split(usernames, "&")
-	if len(users) == 0 {
+
+	logrus.Debug(usernames, all)
+
+	if len(users) == 0 && all == false {
 		httpError(w, fmt.Sprintf("URL without {usernames}:'%s'", usernames), http.StatusBadRequest)
 	}
 
@@ -2115,7 +2124,7 @@ func deleteServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = svc.DeleteServiceUsers(users)
+	err = svc.DeleteServiceUsers(users, all)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
