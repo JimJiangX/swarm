@@ -212,9 +212,11 @@ func TxInsertMultiNodeAndTask(nodes []*Node, tasks []*Task) error {
 	for i := range nodes {
 		_, err = stmt.Exec(nodes[i])
 		if err != nil {
+			stmt.Close()
 			return err
 		}
 	}
+	stmt.Close()
 
 	err = TxInsertMultiTask(tx, tasks)
 	if err != nil {

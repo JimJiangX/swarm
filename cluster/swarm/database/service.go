@@ -108,21 +108,21 @@ func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
 
 	for i := range units {
-
 		if units[i] == nil {
 			continue
 		}
 
 		_, err = stmt.Exec(units[i])
 		if err != nil {
+			stmt.Close()
+
 			return err
 		}
 	}
 
-	return nil
+	return stmt.Close()
 }
 
 func UpdateUnitInfo(unit Unit) error {
@@ -418,6 +418,44 @@ func ListUsersByService(service, _type string) ([]User, error) {
 	return users, nil
 }
 
+func TxUpdateUsers(addition, update []User) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if len(addition) > 0 {
+		err = txInsertUsers(tx, addition)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(update) == 0 {
+		return tx.Commit()
+	}
+
+	query := "UPDATE tb_users SET type=:type,password=:password,role=:role,permission=:permission WHERE id=:id OR username=:username"
+	stmt, err := tx.PrepareNamed(query)
+	if err != nil {
+		return err
+	}
+
+	for i := range update {
+		_, err = stmt.Exec(update[i])
+		if err != nil {
+			stmt.Close()
+
+			return err
+		}
+	}
+
+	stmt.Close()
+
+	return tx.Commit()
+}
+
 func TxInsertUsers(users []User) error {
 	tx, err := GetTX()
 	if err != nil {
@@ -448,11 +486,13 @@ func txInsertUsers(tx *sqlx.Tx, users []User) error {
 
 		_, err = stmt.Exec(&users[i])
 		if err != nil {
+			stmt.Close()
+
 			return err
 		}
 	}
 
-	return nil
+	return stmt.Close()
 }
 
 func txDeleteUsers(tx *sqlx.Tx, id string) error {

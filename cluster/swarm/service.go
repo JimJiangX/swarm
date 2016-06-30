@@ -217,17 +217,27 @@ func (svc *Service) AddServiceUsers(req []structs.User) error {
 		svc.users = out
 	}
 
-	exist := make([]string, 0, len(req))
+	update := make([]database.User, 0, len(req))
+	addition := make([]structs.User, 0, len(req))
 	for i := range req {
+		exist := false
 		for u := range svc.users {
 			if svc.users[u].Username == req[i].Username {
-				exist = append(exist, req[i].Username)
+				update = append(update, database.User{
+					ID:        svc.users[u].ID,
+					ServiceID: svc.users[u].ServiceID,
+					Type:      req[i].Type,
+					Username:  req[i].Username,
+					Password:  req[i].Password,
+					Role:      req[i].Role,
+				})
+				exist = true
 				break
 			}
 		}
-	}
-	if len(exist) > 0 {
-		return fmt.Errorf("Users '%s' Exist in Service '%s'", exist, svc.ID)
+		if !exist {
+			addition = append(addition, req[i])
+		}
 	}
 
 	addr, port, err := svc.getSwitchManagerAddr()
@@ -235,7 +245,7 @@ func (svc *Service) AddServiceUsers(req []structs.User) error {
 		return err
 	}
 
-	users := converteToUsers(svc.ID, req)
+	users := converteToUsers(svc.ID, addition)
 	for i := range users {
 		user := swm_structs.User{
 			Id:       users[i].ID,
@@ -250,12 +260,31 @@ func (svc *Service) AddServiceUsers(req []structs.User) error {
 		}
 	}
 
-	err = database.TxInsertUsers(users)
+	for i := range update {
+		user := swm_structs.User{
+			Id:       update[i].ID,
+			Type:     update[i].Type,
+			UserName: update[i].Username,
+			Password: update[i].Password,
+			Role:     update[i].Role,
+		}
+		err := smlib.UptUser(addr, port, user)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = database.TxUpdateUsers(users, update)
 	if err != nil {
 		return err
 	}
 
-	svc.users = append(svc.users, users...)
+	out, err := database.ListUsersByService(svc.ID, "")
+	if err != nil {
+		return err
+	}
+
+	svc.users = out
 
 	return nil
 }

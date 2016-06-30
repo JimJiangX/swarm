@@ -128,11 +128,13 @@ func TxInsertMultiTask(tx *sqlx.Tx, tasks []*Task) error {
 
 		_, err = stmt.Exec(tasks[i])
 		if err != nil {
+			stmt.Close()
+
 			return err
 		}
 	}
 
-	return nil
+	return stmt.Close()
 }
 
 func TxUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int, finish time.Time, msg string) error {

@@ -106,11 +106,13 @@ func TxUpdatePorts(tx *sqlx.Tx, ports []Port) error {
 	for i := range ports {
 		_, err = stmt.Exec(&ports[i])
 		if err != nil {
+			stmt.Close()
+
 			return err
 		}
 	}
 
-	return nil
+	return stmt.Close()
 }
 
 // TxImportPort import Port from start to end(includ end)
@@ -166,11 +168,13 @@ func TxInsertPorts(tx *sqlx.Tx, ports []Port) error {
 	for i := range ports {
 		_, err = stmt.Exec(&ports[i])
 		if err != nil {
+			stmt.Close()
+
 			return err
 		}
 	}
 
-	return nil
+	return stmt.Close()
 }
 
 func DelMultiPorts(tx *sqlx.Tx, ports []Port) error {
@@ -387,14 +391,17 @@ func txInsertNetworking(net Networking, ips []IP) error {
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
 
 	for i := range ips {
 		_, err = stmt.Exec(&ips[i])
 		if err != nil {
+			stmt.Close()
+
 			return err
 		}
 	}
+
+	stmt.Close()
 
 	query = "INSERT INTO tb_networking (id,type,gateway,enabled) VALUES (:id,:type,:gateway,:enabled)"
 	_, err = tx.NamedExec(query, &net)
@@ -492,14 +499,15 @@ func TxUpdateMultiIPValue(tx *sqlx.Tx, val []IP) error {
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
 
 	for i := range val {
 		_, err = stmt.Exec(&val[i])
 		if err != nil {
+			stmt.Close()
+
 			return err
 		}
 	}
 
-	return nil
+	return stmt.Close()
 }
