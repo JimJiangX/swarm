@@ -89,29 +89,30 @@ func MustConnect(driver, source string) *sqlx.DB {
 	return defaultDB
 }
 
-// Connect to a database and verify with a ping.
+// Connect to a database and verify with ping.
 func Connect(driver, source string) (*sqlx.DB, error) {
 	var err error
-
 	defaultDB, err = sqlx.Connect(driver, source)
-
 	if err == nil {
 		driverName = driverName
 		dbSource = source
 	}
 
+	if err = defaultDB.Ping(); err == nil {
+		return defaultDB, nil
+	}
+
 	return defaultDB, err
 }
 
-func GetDB(ping bool) (*sqlx.DB, error) {
-	var err error
-
+func GetDB(ping bool) (_ *sqlx.DB, err error) {
 	if defaultDB == nil {
-		if driverName != "" && dbSource != "" {
-			return Connect(driverName, dbSource)
+		db, err := Connect(driverName, dbSource)
+		if err != nil {
+			return nil, err
 		}
 
-		return nil, errors.New("DB isnot open.")
+		return db, nil
 	}
 
 	if ping {
