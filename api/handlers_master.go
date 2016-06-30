@@ -2104,9 +2104,9 @@ func deleteServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	name := mux.Vars(r)["name"]
 	all := boolValue(r, "all")
 	usernames := r.FormValue("usernames")
-	users := strings.Split(usernames, "&")
+	users := strings.Split(usernames, ",")
 
-	logrus.Debug(usernames, all)
+	logrus.Debugf("%s %s %v", usernames, users, all)
 
 	if len(users) == 0 && all == false {
 		httpError(w, fmt.Sprintf("URL without {usernames}:'%s'", usernames), http.StatusBadRequest)
