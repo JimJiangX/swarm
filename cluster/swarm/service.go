@@ -256,7 +256,7 @@ func (svc *Service) AddServiceUsers(req []structs.User) error {
 		}
 		err := smlib.AddUser(addr, port, user)
 		if err != nil {
-			logrus.Errorf("%s add user error:%s", addr, user)
+			logrus.Errorf("%s add user error:%s", addr, err)
 			return err
 		}
 	}
@@ -271,7 +271,7 @@ func (svc *Service) AddServiceUsers(req []structs.User) error {
 		}
 		err := smlib.UptUser(addr, port, user)
 		if err != nil {
-			logrus.Errorf("%s update user error:%s", addr, user)
+			logrus.Errorf("%s update user error:%s", addr, err)
 			return err
 		}
 	}
