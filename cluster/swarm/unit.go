@@ -260,22 +260,25 @@ func (u *unit) createVolumes() error {
 	return nil
 }
 
-func (u *unit) pullImage(authConfig *types.AuthConfig) error {
-	if u.config.Image == "" || u.engine == nil {
-		return fmt.Errorf("params error,image:%s,Engine:%+v", u.config.Image, u.engine)
+func pullImage(engine *cluster.Engine, image string, authConfig *types.AuthConfig) error {
+	if engine == nil {
+		return errEngineIsNil
+	}
+	if image == "" {
+		return fmt.Errorf("params error,image:%s", image)
 	}
 
-	err := u.engine.Pull(u.config.Image, authConfig)
+	err := engine.Pull(image, authConfig)
 	if err != nil {
 		// try again
-		err := u.engine.Pull(u.config.Image, authConfig)
+		err := engine.Pull(image, authConfig)
 		if err != nil {
 			return err
 		}
 	}
 
-	if image := u.engine.Image(u.config.Image); image == nil {
-		return fmt.Errorf("Not Found Image %s On Engine %s:%s", u.config.Image, u.engine.ID, u.engine.Addr)
+	if image1 := engine.Image(image); image1 == nil {
+		return fmt.Errorf("Not Found Image %s On Engine %s", image, engine.Addr)
 	}
 
 	return nil
@@ -395,7 +398,7 @@ func (u *unit) removeContainer(force, rmVolumes bool) error {
 		return err
 	}
 
-	err = removeNetworking(engine.IP, u.networkings)
+	err = removeNetworkings(engine.IP, u.networkings)
 
 	return err
 }
@@ -482,7 +485,7 @@ func createNetworking(host string, networkings []IPInfo) error {
 	return nil
 }
 
-func removeNetworking(host string, networkings []IPInfo) error {
+func removeNetworkings(host string, networkings []IPInfo) error {
 	addr := getPluginAddr(host, pluginPort)
 
 	for _, net := range networkings {
@@ -652,7 +655,7 @@ func (u *unit) initService() error {
 	return err
 }
 
-func initService(id string, eng *cluster.Engine, cmd []string) error {
+func initUnitService(id string, eng *cluster.Engine, cmd []string) error {
 	if len(cmd) == 0 {
 		logrus.Warnf("%s InitServiceCmd is nil", id)
 		return nil

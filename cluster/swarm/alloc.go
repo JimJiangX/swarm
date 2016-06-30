@@ -42,16 +42,10 @@ func (gd *Gardener) allocResource(u *unit, engine *cluster.Engine, config *clust
 	}
 	u.networkings = networkings
 
-	ncpu, err := parseCpuset(config.HostConfig.CpusetCpus)
-	if err != nil {
-		logrus.Error(err)
-
-		return pending, err
-	}
 	// Alloc CPU
-	cpuset, err := gd.allocCPUs(engine, ncpu)
+	cpuset, err := gd.allocCPUs(engine, config.HostConfig.CpusetCpus)
 	if err != nil {
-		logrus.Errorf("Alloc CPU %d Error:%s", ncpu, err)
+		logrus.Errorf("Alloc CPU '%s' Error:%s", config.HostConfig.CpusetCpus, err)
 		return pending, err
 	}
 	config.HostConfig.CpusetCpus = cpuset
@@ -114,7 +108,12 @@ func allocPorts(need []port, u *unit, config *cluster.ContainerConfig) error {
 	return nil
 }
 
-func (gd *Gardener) allocCPUs(engine *cluster.Engine, ncpu int, reserve ...string) (string, error) {
+func (gd *Gardener) allocCPUs(engine *cluster.Engine, cpusetCpus string, reserve ...string) (string, error) {
+	ncpu, err := parseCpuset(cpusetCpus)
+	if err != nil {
+		return "", err
+	}
+
 	total := int(engine.Cpus)
 	used := int(engine.UsedCpus())
 
@@ -466,72 +465,95 @@ func (svc *Service) volumesPendingExpension(gd *Gardener, _type string, extensio
 	pendings := make([]*pendingAllocStore, 0, len(units))
 
 	for _, u := range units {
-		pending := &pendingAllocStore{
-			unit:       u,
-			localStore: make([]localVolume, 0, 3),
-			sanStore:   make([]string, 0, 3),
+		pending, _, err := pendingAllocUnitStore(gd, u, u.EngineID, extensions, false)
+		if pending != nil {
+			pendings = append(pendings, pending)
 		}
-		pendings = append(pendings, pending)
-
-		for d := range extensions {
-			dc, node, err := gd.GetNode(u.engine.ID)
-			if err != nil {
-				err := fmt.Errorf("Not Found Node %s,Error:%s", u.engine.Name, err)
-				logrus.Error(err)
-				return pendings, err
-			}
-
-			name := fmt.Sprintf("%s_%s_LV", u.Name, extensions[d].Name)
-
-			if store.IsLocalStore(extensions[d].Type) {
-				lv, err := node.localStorageExtend(name, extensions[d].Type, extensions[d].Size)
-				if err != nil {
-					return pendings, err
-				}
-				pending.localStore = append(pending.localStore, localVolume{
-					lv:   lv,
-					size: extensions[d].Size,
-				})
-
-				name = fmt.Sprintf("%s:/DBAAS%s", name, extensions[d].Name)
-				continue
-			}
-
-			if dc.storage == nil {
-				return pendings, fmt.Errorf("Not Found Datacenter Storage")
-			}
-			vgName := u.Name + _SAN_VG
-
-			lunID, lvID, err := dc.storage.Alloc(name, u.ID, vgName, extensions[d].Size)
-			if err != nil {
-				logrus.Errorf("SAN Store Alloc error:%s,%s", err, name)
-
-				return pendings, err
-			}
-			pending.sanStore = append(pending.sanStore, lunID)
-
-			lv, err := database.GetLocalVolume(lvID)
-			if err != nil {
-				logrus.Errorf("Get LocalVolume %s Error:%s", lvID, err)
-
-				return pendings, err
-			}
-
-			pending.localStore = append(pending.localStore, localVolume{
-				lv:   lv,
-				size: extensions[d].Size,
-			})
-
-			err = dc.storage.Mapping(node.ID, vgName, lunID)
-			if err != nil {
-				return pendings, err
-			}
-
-			name = fmt.Sprintf("%s:/DBAAS%s", name, extensions[d].Name)
+		if err != nil {
+			return pendings, nil
 		}
 	}
 
 	return pendings, nil
+}
+
+func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []structs.DiskStorage, skipSAN bool) (*pendingAllocStore, []string, error) {
+	dc, node, err := gd.GetNode(engineID)
+	if err != nil {
+		err := fmt.Errorf("Not Found Node %s,Error:%s", engineID, err)
+		logrus.Error(err)
+
+		return nil, nil, err
+	}
+
+	pending := &pendingAllocStore{
+		unit:       u,
+		localStore: make([]localVolume, 0, 3),
+		sanStore:   make([]string, 0, 3),
+	}
+	binds := make([]string, 0, len(need))
+
+	for d := range need {
+		if need[d].Type == "NFS" || need[d].Type == "nfs" {
+			continue
+		}
+		name := fmt.Sprintf("%s_%s_LV", u.Name, need[d].Name)
+
+		if store.IsLocalStore(need[d].Type) {
+			lv, err := node.localStorageExtend(name, need[d].Type, need[d].Size)
+			if err != nil {
+				return pending, binds, err
+			}
+			pending.localStore = append(pending.localStore, localVolume{
+				lv:   lv,
+				size: need[d].Size,
+			})
+
+			name = fmt.Sprintf("%s:/DBAAS%s", name, need[d].Name)
+			binds = append(binds, name)
+
+			continue
+		}
+
+		if skipSAN {
+			continue
+		}
+
+		if dc.storage == nil {
+			return pending, binds, fmt.Errorf("Not Found Datacenter Storage")
+		}
+		vgName := u.Name + _SAN_VG
+
+		lunID, lvID, err := dc.storage.Alloc(name, u.ID, vgName, need[d].Size)
+		if err != nil {
+			logrus.Errorf("SAN Store Alloc error:%s,%s", err, name)
+
+			return pending, binds, err
+		}
+		pending.sanStore = append(pending.sanStore, lunID)
+
+		lv, err := database.GetLocalVolume(lvID)
+		if err != nil {
+			logrus.Errorf("Get LocalVolume %s Error:%s", lvID, err)
+
+			return pending, binds, err
+		}
+
+		pending.localStore = append(pending.localStore, localVolume{
+			lv:   lv,
+			size: need[d].Size,
+		})
+
+		err = dc.storage.Mapping(node.ID, vgName, lunID)
+		if err != nil {
+			return pending, binds, err
+		}
+
+		name = fmt.Sprintf("%s:/DBAAS%s", name, need[d].Name)
+		binds = append(binds, name)
+	}
+
+	return pending, binds, err
 }
 
 func (svc *Service) handleScaleUp(gd *Gardener, _type string, updateConfig *container.UpdateConfig) ([]pendingContainerUpdate, error) {
@@ -600,7 +622,7 @@ func (svc *Service) handleScaleUp(gd *Gardener, _type string, updateConfig *cont
 					reserve = append(reserve, pending.cpusetCpus)
 				}
 			}
-			cpusetCpus, err := gd.allocCPUs(u.engine, int(need-used), reserve...)
+			cpusetCpus, err := gd.allocCPUs(u.engine, fmt.Sprintf("%d", need-used), reserve...)
 			if err != nil {
 				return nil, err
 			}

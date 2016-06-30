@@ -194,7 +194,7 @@ func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) error {
 		return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
 	}
 
-	if err := u.pullImage(authConfig); err != nil {
+	if err := pullImage(u.engine, u.config.Image, authConfig); err != nil {
 		return fmt.Errorf("pullImage Error:%s", err)
 	}
 
