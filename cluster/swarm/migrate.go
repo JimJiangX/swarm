@@ -259,6 +259,8 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 		logrus.Errorf("updateUnit in database error:%s", err)
 	}
 
+	//  TODO:register to horus、consul
+
 	// switchback unit
 	err = svc.switchBack(u.Name)
 	if err != nil {
@@ -280,6 +282,13 @@ func createAndStartUnit(engine *cluster.Engine, config *cluster.ContainerConfig,
 	err = engine.StartContainer(container.ID, nil)
 	if err != nil {
 		return container, err
+	}
+
+	if len(lvs) == 0 {
+		lvs, err = database.SelectVolumesByUnitID(u.ID)
+		if err != nil {
+			return container, err
+		}
 	}
 
 	logrus.Debug("copy Service Config")
@@ -476,6 +485,8 @@ func cleanOldContainer(old *cluster.Container, lvs []database.LocalVolume) error
 		logrus.Errorf("engine %s remove container %s error:%s", engine.Addr, old.Info.Name, err)
 	}
 
+	// TODO:deregister from horus、consul
+
 	return err
 }
 
@@ -503,4 +514,179 @@ func updateUnit(unit database.Unit, lvs []database.LocalVolume, reserveSAN bool)
 	}
 
 	return tx.Commit()
+}
+
+func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ctypes.HostConfig) error {
+	table, err := database.GetUnit(name)
+	if err != nil {
+		return fmt.Errorf("Not Found Unit %s,error:%s", name, err)
+	}
+
+	svc, err := gd.GetService(table.ServiceID)
+	if err != nil {
+		return err
+	}
+
+	svc.RLock()
+	index, module := 0, structs.Module{}
+	filters := make([]string, len(svc.units))
+	for i, u := range svc.units {
+		filters[i] = u.EngineID
+		if u.Name == name {
+			index = i
+		}
+	}
+	u := svc.units[index]
+	oldContainer := u.container
+
+	for i := range svc.base.Modules {
+		if u.Type == svc.base.Modules[i].Type {
+			module = svc.base.Modules[i]
+			break
+		}
+	}
+	svc.RUnlock()
+
+	dc, err := gd.DatacenterByEngine(u.EngineID)
+	if err != nil || dc == nil {
+		return err
+	}
+
+	out, err := listCandidates(dc, candidates, u.EngineID)
+	if err != nil {
+		return err
+	}
+
+	config, err := resetContainerConfig(u.container.Config, hostConfig)
+	if err != nil {
+		return err
+	}
+	gd.scheduler.Lock()
+	defer gd.scheduler.Unlock()
+
+	engine, err := gd.selectEngine(config, module, out, filters)
+	if err != nil {
+		return err
+	}
+
+	cpuset, err := gd.allocCPUs(engine, config.HostConfig.CpusetCpus)
+	if err != nil {
+		logrus.Errorf("Alloc CPU '%s' Error:%s", config.HostConfig.CpusetCpus, err)
+		return err
+	}
+	config.HostConfig.CpusetCpus = cpuset
+
+	err = stopOldContainer(svc, u)
+	if err != nil {
+		return err
+	}
+
+	oldLVs, _, _, err := listOldVolumes(u.ID)
+	if err != nil {
+		return err
+	}
+	// deactivate
+	// del mapping
+	// recycle lun
+	/*
+			if len(lunMap) > 0 {
+				err = sanDeactivateAndDelMapping(dc.storage, u, lunMap, lunSlice)
+				if err != nil {
+					return err
+				}
+			}
+
+
+		dc, node, err := gd.GetNode(engine.ID)
+		if err != nil {
+			err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
+			logrus.Error(err)
+
+			return err
+		}
+	*/
+	pending := newPendingAllocResource()
+	pending.unit = u
+	config.HostConfig.Binds = make([]string, 0, 5)
+	err = gd.allocStorage(pending, engine, config, module.Stores)
+	if err != nil {
+		return err
+	}
+	/*
+		pending, _, err := pendingAllocUnitStore(gd, u, engine.ID, module.Stores, true)
+		if err != nil {
+			return err
+		}
+	*/
+
+	swarmID := gd.generateUniqueID()
+	config.SetSwarmID(swarmID)
+	gd.pendingContainers[swarmID] = &pendingContainer{
+		Name:   swarmID,
+		Config: config,
+		Engine: engine,
+	}
+
+	logrus.Debugf("[MG]start pull image %s", config.Image)
+	authConfig, err := gd.RegistryAuthConfig()
+	if err != nil {
+		return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
+	}
+
+	err = pullImage(engine, config.Image, authConfig)
+	if err != nil {
+		return fmt.Errorf("pullImage Error:%s", err)
+	}
+
+	err = createNetworking(engine.IP, u.networkings)
+	if err != nil {
+		return err
+	}
+
+	err = createVolumes(engine, u.ID)
+	if err != nil {
+		return err
+	}
+	// lvs, err := migrateVolumes(dc.storage, node.ID, engine, *pending, lunMap, lunSlice)
+	// if err != nil {
+	// 	return err
+	// }
+
+	container, err := createAndStartUnit(engine, config, nil, u, swarmID, authConfig)
+	if err != nil {
+		return err
+	}
+	delete(gd.pendingContainers, swarmID)
+
+	err = cleanOldContainer(oldContainer, oldLVs)
+	if err != nil {
+		return err
+	}
+
+	err = engine.RenameContainer(container, u.Name)
+	if err != nil {
+		return err
+	}
+
+	container, err = container.Refresh()
+	if err != nil {
+		logrus.Warnf("containe Refresh Erorr:%s", err)
+	}
+
+	u.container = container
+	u.ContainerID = container.ID
+	u.engine = engine
+	u.EngineID = engine.ID
+	u.CreatedAt = time.Now()
+
+	err = updateUnit(u.Unit, oldLVs, true)
+	if err != nil {
+		logrus.Errorf("updateUnit in database error:%s", err)
+	}
+	// TODO:deregister from horus、consul
+	//      register to horus、consul
+
+	// dealwith errors
+
+	return err
 }
