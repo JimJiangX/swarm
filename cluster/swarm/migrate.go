@@ -237,7 +237,11 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 	}
 	delete(gd.pendingContainers, swarmID)
 
-	err = cleanOldContainer(oldContainer, oldLVs)
+	sys, err := database.GetSystemConfig()
+	if err != nil {
+		return err
+	}
+	err = cleanOldContainer(u.ID, oldContainer, oldLVs, *sys)
 	if err != nil {
 		return err
 	}
@@ -269,7 +273,26 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 		logrus.Errorf("updateUnit in database error:%s", err)
 	}
 
-	//  TODO:register to horus、consul
+	logrus.Debug("[MG]registerServices")
+	if err := registerHealthCheck(u, sys.ConsulConfig, svc); err != nil {
+		return err
+	}
+
+	logrus.Debug("[MG]registerToHorus")
+	obj, err := u.registerHorus(sys.MonitorUsername, sys.MonitorPassword, sys.HorusAgentPort)
+	if err != nil {
+		err = fmt.Errorf("container %s register Horus Error:%s", u.Name, err)
+		logrus.Error(err)
+
+		return err
+	}
+
+	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
+
+	err = registerToHorus(horus, []registerService{obj})
+	if err != nil {
+		logrus.Errorf("")
+	}
 
 	// switchback unit
 	err = svc.switchBack(u.Name)
@@ -469,7 +492,7 @@ func migrateVolumes(storage store.Store, nodeID string,
 	return lvs, nil
 }
 
-func cleanOldContainer(old *cluster.Container, lvs []database.LocalVolume) error {
+func cleanOldContainer(unitID string, old *cluster.Container, lvs []database.LocalVolume, sys database.Configurations) error {
 	engine := old.Engine
 	if engine == nil {
 		return errEngineIsNil
@@ -491,6 +514,21 @@ func cleanOldContainer(old *cluster.Container, lvs []database.LocalVolume) error
 	}
 
 	// TODO:deregister from horus、consul
+	configs := sys.GetConsulConfigs()
+	if len(configs) == 0 {
+		return fmt.Errorf("GetConsulConfigs error %v %v", err, configs[0])
+	}
+	err = deregisterHealthCheck(engine.IP, unitID, configs[0])
+	if err != nil {
+		return err
+	}
+
+	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
+
+	err = deregisterToHorus(horus, []deregisterService{{unitID}})
+	if err != nil {
+		logrus.Errorf("deregisterToHorus error:%s,endpointer:%s", err, unitID)
+	}
 
 	return err
 }
@@ -667,7 +705,11 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ct
 		return err
 	}
 
-	err = cleanOldContainer(oldContainer, oldLVs)
+	sys, err := database.GetSystemConfig()
+	if err != nil {
+		return err
+	}
+	err = cleanOldContainer(u.ID, oldContainer, oldLVs, *sys)
 	if err != nil {
 		return err
 	}
@@ -698,10 +740,28 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ct
 	if err != nil {
 		logrus.Errorf("updateUnit in database error:%s", err)
 	}
-	// TODO:deregister from horus、consul
-	//      register to horus、consul
 
-	// dealwith errors
+	logrus.Debug("[MG]registerServices")
+	if err := registerHealthCheck(u, sys.ConsulConfig, svc); err != nil {
+		return err
+	}
+
+	logrus.Debug("[MG]registerToHorus")
+
+	obj, err := u.registerHorus(sys.MonitorUsername, sys.MonitorPassword, sys.HorusAgentPort)
+	if err != nil {
+		err = fmt.Errorf("container %s register Horus Error:%s", u.Name, err)
+		logrus.Error(err)
+
+		return err
+	}
+
+	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
+
+	err = registerToHorus(horus, []registerService{obj})
+	if err != nil {
+		logrus.Errorf("")
+	}
 
 	return err
 }
