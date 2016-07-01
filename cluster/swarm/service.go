@@ -60,7 +60,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 
 	des, err := json.Marshal(req)
 	if err != nil {
-		logrus.Errorf("JSON Marshal Error:%s", err.Error())
+		logrus.Errorf("JSON Marshal Error:%s", err)
 		return nil, err
 	}
 
@@ -166,7 +166,7 @@ func (svc *Service) ReplaceBackupStrategy(req structs.BackupStrategy) (*database
 
 	err = database.InsertBackupStrategy(*backup)
 	if err != nil {
-		return nil, fmt.Errorf("Insert Backup Strategy Error:%s", err.Error())
+		return nil, fmt.Errorf("Insert Backup Strategy Error:%s", err)
 	}
 
 	svc.Lock()
@@ -179,7 +179,7 @@ func (svc *Service) ReplaceBackupStrategy(req structs.BackupStrategy) (*database
 func (svc *Service) UpdateBackupStrategy(backup database.BackupStrategy) error {
 	err := database.UpdateBackupStrategy(backup)
 	if err != nil {
-		return fmt.Errorf("Insert Backup Strategy Error:%s", err.Error())
+		return fmt.Errorf("Insert Backup Strategy Error:%s", err)
 	}
 
 	svc.Lock()
@@ -505,7 +505,7 @@ func (gd *Gardener) rebuildService(NameOrID string) (*Service, error) {
 	if len(service.Description) > 0 {
 		err := json.Unmarshal([]byte(service.Description), base)
 		if err != nil {
-			logrus.Warnf("JSON Unmarshal Service.Description Error:%s,Description:%s", err.Error(), service.Description)
+			logrus.Warnf("JSON Unmarshal Service.Description Error:%s,Description:%s", err, service.Description)
 		}
 	}
 
@@ -528,7 +528,7 @@ func (gd *Gardener) rebuildService(NameOrID string) (*Service, error) {
 	}
 	authConfig, err := gd.RegistryAuthConfig()
 	if err != nil {
-		logrus.Errorf("Registry Auth Config Error:%s", err.Error())
+		logrus.Errorf("Registry Auth Config Error:%s", err)
 		return nil, err
 	}
 
@@ -587,7 +587,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 
 	err = gd.AddService(svc)
 	if err != nil {
-		logrus.WithField("Service Name", svc.Name).Errorf("Service Add to Gardener Error:%s", err.Error())
+		logrus.WithField("Service Name", svc.Name).Errorf("Service Add to Gardener Error:%s", err)
 
 		return svc, nil, err
 	}
@@ -599,7 +599,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 		bs := NewBackupJob(HostAddress, svc)
 		err = gd.RegisterBackupStrategy(bs)
 		if err != nil {
-			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
+			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err)
 		}
 	}
 
@@ -802,7 +802,7 @@ func (svc *Service) stopService() error {
 	for _, u := range svc.units {
 		err := u.stopService()
 		if err != nil {
-			logrus.Errorf("container %s stop service error:%s", u.Name, err.Error())
+			logrus.Errorf("container %s stop service error:%s", u.Name, err)
 
 			err1 := checkContainerError(err)
 			if err1 == errContainerNotRunning || err1 == errContainerNotFound {
@@ -845,7 +845,7 @@ func (svc *Service) removeContainers(force, rmVolumes bool) error {
 		logrus.Debug(u.Name, " remove Container")
 		err := u.removeContainer(force, rmVolumes)
 		if err != nil {
-			logrus.Errorf("container %s remove,-f=%v -v=%v,error:%s", u.Name, force, rmVolumes, err.Error())
+			logrus.Errorf("container %s remove,-f=%v -v=%v,error:%s", u.Name, force, rmVolumes, err)
 
 			if err := checkContainerError(err); err == errContainerNotFound {
 				continue
@@ -1020,7 +1020,7 @@ func (svc *Service) registerToHorus(addr, user, password string, agentPort int) 
 	for i, u := range svc.units {
 		obj, err := u.registerHorus(user, password, agentPort)
 		if err != nil {
-			err = fmt.Errorf("container %s register Horus Error:%s", u.Name, err.Error())
+			err = fmt.Errorf("container %s register Horus Error:%s", u.Name, err)
 			logrus.Error(err)
 
 			return err
@@ -1606,7 +1606,7 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 		logrus.Debug(u.Name, " stop container")
 		err = u.stopContainer(timeout)
 		if err != nil {
-			logrus.Errorf("container %s stop error:%s", u.Name, err.Error())
+			logrus.Errorf("container %s stop error:%s", u.Name, err)
 
 			err1 := checkContainerError(err)
 			if err1 == errContainerNotFound || err1 == errContainerNotRunning {

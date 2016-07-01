@@ -143,7 +143,7 @@ func (gd *Gardener) ReplaceServiceBackupStrategy(NameOrID string, req structs.Ba
 		bs := NewBackupJob(HostAddress, service)
 		err = gd.RegisterBackupStrategy(bs)
 		if err != nil {
-			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err.Error())
+			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err)
 		}
 	}
 

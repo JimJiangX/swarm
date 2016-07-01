@@ -1044,7 +1044,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 	}
 	config, err := database.GetSystemConfig()
 	if err != nil {
-		logrus.Error(err.Error())
+		logrus.Error(err)
 		return err
 	}
 
@@ -1144,7 +1144,7 @@ func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
 				"Host":    node.Name,
 				"Storage": dc.storage.ID(),
 				"Vendor":  dc.storage.Vendor(),
-			}).Errorf("Add Host To Storage Error:%s", err.Error())
+			}).Errorf("Add Host To Storage Error:%s", err)
 		}
 	}
 

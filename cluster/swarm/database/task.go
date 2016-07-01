@@ -357,7 +357,7 @@ func (bs *BackupStrategy) UpdateNext(next time.Time, enable bool) error {
 func DeleteBackupStrategy(id string) error {
 	db, err := GetDB(true)
 	if err != nil {
-		return fmt.Errorf("DB Error:%s", err.Error())
+		return fmt.Errorf("DB Error:%s", err)
 	}
 
 	_, err = db.Exec("DELETE FROM tb_backup_strategy WHERE id=?", id)

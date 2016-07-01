@@ -102,7 +102,7 @@ func ValidService(req structs.PostServiceRequest) []string {
 
 	arch, _, err := getServiceArch(req.Architecture)
 	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("Parse 'Architecture' Failed,%s", err.Error()))
+		warnings = append(warnings, fmt.Sprintf("Parse 'Architecture' Failed,%s", err))
 	}
 
 	for _, module := range req.Modules {
@@ -116,7 +116,7 @@ func ValidService(req structs.PostServiceRequest) []string {
 		if module.Config.Image == "" {
 			image, err := database.QueryImage(module.Name, module.Version)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("Not Found Image:%s:%s,Error%s", module.Name, module.Version, err.Error()))
+				warnings = append(warnings, fmt.Sprintf("Not Found Image:%s:%s,Error%s", module.Name, module.Version, err))
 			}
 			if !image.Enabled {
 				warnings = append(warnings, fmt.Sprintf("Image: %s:%s is Disabled", module.Name, module.Version))
@@ -124,7 +124,7 @@ func ValidService(req structs.PostServiceRequest) []string {
 		} else {
 			image, err := database.QueryImageByID(module.Config.Image)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("Not Found Image:%s,Error%s", module.Config.Image, err.Error()))
+				warnings = append(warnings, fmt.Sprintf("Not Found Image:%s,Error%s", module.Config.Image, err))
 			}
 			if !image.Enabled {
 				warnings = append(warnings, fmt.Sprintf("Image:%s is Disabled", module.Config.Image))

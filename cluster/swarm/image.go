@@ -97,7 +97,7 @@ func LoadImage(req structs.PostLoadImageRequest) (string, error) {
 	content, err := ioutil.ReadFile(req.ConfigFilePath)
 	if err != nil {
 		err = fmt.Errorf("ReadAll From ConfigFile %s error:%s", req.ConfigFilePath, err)
-		logrus.Error(err.Error())
+		logrus.Error(err)
 
 		return "", err
 	}
@@ -108,7 +108,7 @@ func LoadImage(req structs.PostLoadImageRequest) (string, error) {
 
 	_, err = parser.ParseData(content)
 	if err != nil {
-		return "", fmt.Errorf("Parse PostLoadImageRequest.Content Error:%s", err.Error())
+		return "", fmt.Errorf("Parse PostLoadImageRequest.Content Error:%s", err)
 	}
 
 	config, err := database.GetSystemConfig()
@@ -247,7 +247,7 @@ func (gd *Gardener) GetImageName(id, name, version string) (string, string, erro
 	}
 
 	if err != nil {
-		logrus.Errorf("Not Found Image %s:%s,Error:%s", name, version, err.Error())
+		logrus.Errorf("Not Found Image %s:%s,Error:%s", name, version, err)
 
 		return "", "", err
 	}

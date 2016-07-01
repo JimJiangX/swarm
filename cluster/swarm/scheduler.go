@@ -462,7 +462,7 @@ func (gd *Gardener) checkNode(id string) *node.Node {
 
 			err := node.AddContainer(pc.ToContainer())
 			if err != nil {
-				logrus.Error(e.ID, err.Error())
+				logrus.Error(e.ID, err)
 
 				return nil
 			}

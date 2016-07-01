@@ -43,20 +43,20 @@ func (gd *Gardener) serviceExecute() (err error) {
 
 		err = gd.createServiceContainers(svc)
 		if err != nil {
-			logrus.Errorf("%s create Service Containers Error:%s", svc.Name, err.Error())
+			logrus.Errorf("%s create Service Containers Error:%s", svc.Name, err)
 			goto failure
 		}
 
 		err = gd.initAndStartService(svc)
 		if err != nil {
-			logrus.Errorf("%s init And Start Service Error:%s", svc.Name, err.Error())
+			logrus.Errorf("%s init And Start Service Error:%s", svc.Name, err)
 			// goto failure
 		}
 
 		logrus.Debug("[MG]TxSetServiceStatus")
 		err = database.TxSetServiceStatus(&svc.Service, svc.task, _StatusServiceNoContent, _StatusTaskDone, time.Now(), "")
 		if err != nil {
-			logrus.Errorf("%s TxSetServiceStatus Error:%s", svc.Name, err.Error())
+			logrus.Errorf("%s TxSetServiceStatus Error:%s", svc.Name, err)
 			goto failure
 		}
 		svc.Unlock()
@@ -221,7 +221,7 @@ func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) error {
 
 	err = gd.SaveContainerToConsul(container)
 	if err != nil {
-		logrus.Errorf("Save Container To Consul error:%s", err.Error())
+		logrus.Errorf("Save Container To Consul error:%s", err)
 		// return err
 	}
 
@@ -260,7 +260,7 @@ func (gd *Gardener) createContainerInPending(swarmID string, authConfig *types.A
 func (gd *Gardener) initAndStartService(svc *Service) (err error) {
 	sys, err := database.GetSystemConfig()
 	if err != nil {
-		logrus.Errorf("Query Database Error:%s", err.Error())
+		logrus.Errorf("Query Database Error:%s", err)
 		return nil
 	}
 	err = svc.statusCAS(_StatusServiceCreating, _StatusServiceStarting)
@@ -305,7 +305,7 @@ func (gd *Gardener) initAndStartService(svc *Service) (err error) {
 	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
 	err = svc.registerToHorus(horus, sys.MonitorUsername, sys.MonitorPassword, sys.HorusAgentPort)
 	if err != nil {
-		logrus.Warnf("register To Horus Error:%s", err.Error())
+		logrus.Warnf("register To Horus Error:%s", err)
 	}
 
 	return nil

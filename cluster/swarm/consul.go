@@ -200,7 +200,7 @@ func registerHealthCheck(u *unit, config database.ConsulConfig, context *Service
 	}
 	client, err := api.NewClient(&c)
 	if err != nil {
-		logrus.Errorf("%s Register HealthCheck Error,%s %v", u.Name, err.Error(), c)
+		logrus.Errorf("%s Register HealthCheck Error,%s %v", u.Name, err, c)
 		return err
 	}
 

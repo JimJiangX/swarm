@@ -137,7 +137,7 @@ func TestMysqlConfig(t *testing.T) {
 
 	data, err := config.defaultUserConfig(nil, nil)
 	if err != nil {
-		t.Logf("Expected Error:%s", err.Error())
+		t.Logf("Expected Error:%s", err)
 
 		data = make(map[string]interface{}, 10)
 		data["mysqld::character_set_server"] = "gbk"
@@ -221,7 +221,7 @@ func TestSwitchManagerConfig(t *testing.T) {
 
 	data, err := config.defaultUserConfig(nil, nil)
 	if err != nil {
-		t.Logf("Expected Error:%s", err.Error())
+		t.Logf("Expected Error:%s", err)
 
 		data = make(map[string]interface{}, 10)
 		data["domain"] = "service_00001"
