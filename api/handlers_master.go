@@ -92,16 +92,20 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	}
 
 	resp := structs.PerClusterInfoResponse{
-		ID:          cl.ID,
-		Name:        cl.Name,
-		Type:        cl.Type,
-		StorageType: cl.StorageType,
-		StorageID:   cl.StorageID,
-		Datacenter:  swarm.DatacenterID,
-		Enabled:     cl.Enabled,
-		MaxNode:     cl.MaxNode,
-		UsageLimit:  cl.UsageLimit,
-		Nodes:       list,
+		ClusterInfoResponse: structs.ClusterInfoResponse{
+			ID:           cl.ID,
+			Name:         cl.Name,
+			Type:         cl.Type,
+			StorageType:  cl.StorageType,
+			StorageID:    cl.StorageID,
+			NetworkingID: cl.NetworkingID,
+			Datacenter:   swarm.DatacenterID,
+			Enabled:      cl.Enabled,
+			MaxNode:      cl.MaxNode,
+			UsageLimit:   cl.UsageLimit,
+			NodeNum:      len(nodes),
+		},
+		Nodes: list,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -129,16 +133,17 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 
 		lists[i] = structs.ClusterInfoResponse{
-			ID:          clusters[i].ID,
-			Name:        clusters[i].Name,
-			Type:        clusters[i].Type,
-			StorageType: clusters[i].StorageType,
-			StorageID:   clusters[i].StorageID,
-			Datacenter:  swarm.DatacenterID,
-			Enabled:     clusters[i].Enabled,
-			MaxNode:     clusters[i].MaxNode,
-			NodeNum:     num,
-			UsageLimit:  clusters[i].UsageLimit,
+			ID:           clusters[i].ID,
+			Name:         clusters[i].Name,
+			Type:         clusters[i].Type,
+			StorageType:  clusters[i].StorageType,
+			StorageID:    clusters[i].StorageID,
+			NetworkingID: clusters[i].NetworkingID,
+			Datacenter:   swarm.DatacenterID,
+			Enabled:      clusters[i].Enabled,
+			MaxNode:      clusters[i].MaxNode,
+			NodeNum:      num,
+			UsageLimit:   clusters[i].UsageLimit,
 		}
 	}
 
