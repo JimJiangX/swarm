@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/engine-api/types"
 	ctypes "github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
@@ -227,7 +226,12 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 		return err
 	}
 
-	container, err := createAndStartUnit(engine, config, lvs, u, swarmID, authConfig)
+	container, err := engine.Create(config, swarmID, false, authConfig)
+	if err != nil {
+		return err
+	}
+
+	err = startUnit(engine, container.ID, u, lvs)
 	if err != nil {
 		return err
 	}
@@ -246,6 +250,12 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 	container, err = container.Refresh()
 	if err != nil {
 		logrus.Warnf("containe Refresh Erorr:%s", err)
+	}
+
+	err = gd.SaveContainerToConsul(container)
+	if err != nil {
+		logrus.Errorf("Save Container To Consul error:%s", err)
+		// return err
 	}
 
 	u.container = container
@@ -271,38 +281,33 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 	return err
 }
 
-func createAndStartUnit(engine *cluster.Engine, config *cluster.ContainerConfig, lvs []database.LocalVolume,
-	u *unit, swarmID string, authConfig *types.AuthConfig) (*cluster.Container, error) {
-	container, err := engine.Create(config, swarmID, false, authConfig)
-	if err != nil {
-		return nil, err
-	}
-
+func startUnit(engine *cluster.Engine, containerID string,
+	u *unit, lvs []database.LocalVolume) error {
 	logrus.Debug("starting Containers")
-	err = engine.StartContainer(container.ID, nil)
+	err := engine.StartContainer(containerID, nil)
 	if err != nil {
-		return container, err
+		return err
 	}
 
 	if len(lvs) == 0 {
 		lvs, err = database.SelectVolumesByUnitID(u.ID)
 		if err != nil {
-			return container, err
+			return err
 		}
 	}
 
 	logrus.Debug("copy Service Config")
 	err = copyConfigIntoCNFVolume(u, lvs, u.parent.Content)
 	if err != nil {
-		return container, err
+		return err
 	}
 
 	logrus.Debug("init & Start Service")
-	err = initUnitService(container.ID, engine, u.InitServiceCmd())
+	err = initUnitService(containerID, engine, u.InitServiceCmd())
 	if err != nil {
 		logrus.Errorf("")
 	}
-	return container, err
+	return err
 }
 
 func stopOldContainer(svc *Service, u *unit) error {
@@ -651,12 +656,16 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ct
 	// if err != nil {
 	// 	return err
 	// }
-
-	container, err := createAndStartUnit(engine, config, nil, u, swarmID, authConfig)
+	container, err := engine.Create(config, swarmID, false, authConfig)
 	if err != nil {
 		return err
 	}
 	delete(gd.pendingContainers, swarmID)
+
+	err = startUnit(engine, container.ID, u, nil)
+	if err != nil {
+		return err
+	}
 
 	err = cleanOldContainer(oldContainer, oldLVs)
 	if err != nil {
@@ -671,6 +680,12 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ct
 	container, err = container.Refresh()
 	if err != nil {
 		logrus.Warnf("containe Refresh Erorr:%s", err)
+	}
+
+	err = gd.SaveContainerToConsul(container)
+	if err != nil {
+		logrus.Errorf("Save Container To Consul error:%s", err)
+		// return err
 	}
 
 	u.container = container
