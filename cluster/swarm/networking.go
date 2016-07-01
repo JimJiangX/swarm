@@ -224,7 +224,7 @@ func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit string, re
 		if net.Type == _ExternalAccessNetworking {
 			dc, err := gd.DatacenterByEngine(engine.ID)
 			if err == nil {
-				networkingID = dc.Cluster.NetworkingID
+				networkingID = strings.TrimSpace(dc.Cluster.NetworkingID)
 			}
 		}
 
@@ -259,9 +259,10 @@ func (gd *Gardener) AllocIP(id, _type, unit string) (_ IPInfo, err error) {
 
 	if len(id) > 0 {
 		networking, _, err := database.GetNetworkingByID(id)
-		if err == nil {
-			networkings = []database.Networking{networking}
+		if err != nil {
+			return IPInfo{}, err
 		}
+		networkings = []database.Networking{networking}
 	}
 
 	if len(networkings) == 0 && len(_type) > 0 {
@@ -272,6 +273,9 @@ func (gd *Gardener) AllocIP(id, _type, unit string) (_ IPInfo, err error) {
 	}
 
 	for i := range networkings {
+		if !networkings[i].Enabled {
+			continue
+		}
 		ip, err := database.TXAllocIPByNetworking(networkings[i].ID, unit)
 		if err == nil {
 			return NewIPinfo(networkings[i], ip), nil
