@@ -119,6 +119,7 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 	}
 
 	svc.RLock()
+
 	index, module := 0, structs.Module{}
 	filters := make([]string, len(svc.units))
 	for i, u := range svc.units {
@@ -136,6 +137,7 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 			break
 		}
 	}
+
 	svc.RUnlock()
 
 	dc, err := gd.DatacenterByEngine(u.EngineID)
@@ -166,6 +168,9 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 		return err
 	}
 	config.HostConfig.CpusetCpus = cpuset
+
+	svc.Lock()
+	defer svc.Unlock()
 
 	err = stopOldContainer(svc, u)
 	if err != nil {
@@ -271,35 +276,18 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 	err = updateUnit(u.Unit, oldLVs, false)
 	if err != nil {
 		logrus.Errorf("updateUnit in database error:%s", err)
-	}
-
-	logrus.Debug("[MG]registerServices")
-	if err := registerHealthCheck(u, sys.ConsulConfig, svc); err != nil {
-		return err
-	}
-
-	logrus.Debug("[MG]registerToHorus")
-	obj, err := u.registerHorus(sys.MonitorUsername, sys.MonitorPassword, sys.HorusAgentPort)
-	if err != nil {
-		err = fmt.Errorf("container %s register Horus Error:%s", u.Name, err)
-		logrus.Error(err)
 
 		return err
 	}
 
-	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-
-	err = registerToHorus(horus, []registerService{obj})
+	err = registerToServers(u, svc, *sys)
 	if err != nil {
-		logrus.Errorf("")
+		logrus.Errorf("registerToServers error:%s", err)
 	}
-
 	// switchback unit
 	err = svc.switchBack(u.Name)
 	if err != nil {
 	}
-
-	// dealwith errors
 
 	return err
 }
@@ -571,6 +559,7 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ct
 	}
 
 	svc.RLock()
+
 	index, module := 0, structs.Module{}
 	filters := make([]string, len(svc.units))
 	for i, u := range svc.units {
@@ -588,6 +577,7 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ct
 			break
 		}
 	}
+
 	svc.RUnlock()
 
 	dc, err := gd.DatacenterByEngine(u.EngineID)
@@ -619,35 +609,43 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ct
 	}
 	config.HostConfig.CpusetCpus = cpuset
 
+	svc.Lock()
+	defer svc.Unlock()
+
 	err = stopOldContainer(svc, u)
 	if err != nil {
 		return err
 	}
 
-	oldLVs, _, _, err := listOldVolumes(u.ID)
+	oldLVs, lunMap, lunSlice, err := listOldVolumes(u.ID)
 	if err != nil {
 		return err
 	}
 	// deactivate
 	// del mapping
-	// recycle lun
-	/*
-			if len(lunMap) > 0 {
-				err = sanDeactivateAndDelMapping(dc.storage, u, lunMap, lunSlice)
-				if err != nil {
-					return err
-				}
-			}
-
-
-		dc, node, err := gd.GetNode(engine.ID)
+	if len(lunMap) > 0 {
+		err = sanDeactivateAndDelMapping(dc.storage, u, lunMap, lunSlice)
 		if err != nil {
-			err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
-			logrus.Error(err)
-
 			return err
 		}
+	}
+	// recycle lun
+	for i := range lunSlice {
+		err := dc.storage.Recycle(lunSlice[i].ID, 0)
+		if err != nil {
+			logrus.Error(err)
+		}
+	}
+	/*
+		// clean local volumes
+		for i := range oldLVs {
+			err := node.localStore.Recycle(oldLVs[i].ID)
+			if err != nil {
+				logrus.Error(err)
+			}
+		}
 	*/
+
 	pending := newPendingAllocResource()
 	pending.unit = u
 	config.HostConfig.Binds = make([]string, 0, 5)
@@ -655,12 +653,6 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ct
 	if err != nil {
 		return err
 	}
-	/*
-		pending, _, err := pendingAllocUnitStore(gd, u, engine.ID, module.Stores, true)
-		if err != nil {
-			return err
-		}
-	*/
 
 	swarmID := gd.generateUniqueID()
 	config.SetSwarmID(swarmID)
@@ -690,10 +682,7 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ct
 	if err != nil {
 		return err
 	}
-	// lvs, err := migrateVolumes(dc.storage, node.ID, engine, *pending, lunMap, lunSlice)
-	// if err != nil {
-	// 	return err
-	// }
+
 	container, err := engine.Create(config, swarmID, false, authConfig)
 	if err != nil {
 		return err
@@ -739,15 +728,24 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ct
 	err = updateUnit(u.Unit, oldLVs, true)
 	if err != nil {
 		logrus.Errorf("updateUnit in database error:%s", err)
+		return err
 	}
 
+	err = registerToServers(u, svc, *sys)
+	if err != nil {
+		logrus.Errorf("registerToServers error:%s", err)
+	}
+
+	return err
+}
+
+func registerToServers(u *unit, svc *Service, sys database.Configurations) error {
 	logrus.Debug("[MG]registerServices")
 	if err := registerHealthCheck(u, sys.ConsulConfig, svc); err != nil {
 		return err
 	}
 
 	logrus.Debug("[MG]registerToHorus")
-
 	obj, err := u.registerHorus(sys.MonitorUsername, sys.MonitorPassword, sys.HorusAgentPort)
 	if err != nil {
 		err = fmt.Errorf("container %s register Horus Error:%s", u.Name, err)
@@ -757,11 +755,9 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ct
 	}
 
 	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-
 	err = registerToHorus(horus, []registerService{obj})
 	if err != nil {
-		logrus.Errorf("")
+		logrus.Errorf("registerToHorus error:%s", err)
 	}
-
 	return err
 }

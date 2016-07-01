@@ -1133,22 +1133,21 @@ func (gd *Gardener) UnitIsolate(name string) error {
 		return err
 	}
 
-	return service.isolate(table.Name)
+	service.Lock()
+	err = service.isolate(table.Name)
+	service.Unlock()
+
+	return err
 }
 
 func (service *Service) isolate(name string) error {
-	service.Lock()
-
 	ip, port, err := service.getSwitchManagerAddr()
 	if err != nil {
-		service.Unlock()
-
 		logrus.Errorf("get SwitchManager Addr error:%s", err)
 		return err
 	}
 
 	err = smlib.Isolate(ip, port, name)
-	service.Unlock()
 
 	if err != nil {
 		logrus.Errorf("Isolate %s error:%s:%d %s", name, ip, port, err)
@@ -1170,23 +1169,21 @@ func (gd *Gardener) UnitSwitchBack(name string) error {
 		return err
 	}
 
-	return service.switchBack(table.Name)
+	service.Lock()
+	err = service.switchBack(table.Name)
+	service.Unlock()
+
+	return err
 }
 
 func (service *Service) switchBack(name string) error {
-	service.Lock()
-
 	ip, port, err := service.getSwitchManagerAddr()
 	if err != nil {
-		service.Unlock()
-
 		logrus.Errorf("get SwitchManager Addr error:%s", err)
 		return err
 	}
 
 	err = smlib.Recover(ip, port, name)
-	service.Unlock()
-
 	if err != nil {
 		logrus.Errorf("Recover %s error:%s:%d %s", name, ip, port, err)
 	}
