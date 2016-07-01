@@ -9,8 +9,9 @@ type PostClusterRequest struct {
 	MaxNode    int     `json:"max_node"`
 	UsageLimit float32 `json:"usage_limit"`
 
-	StorageType string `json:"storage_type"`
-	StorageID   string `json:"storage_id,omitempty"`
+	StorageType  string `json:"storage_type"`
+	StorageID    string `json:"storage_id,omitempty"`
+	NetworkingID string `json:"networking_id,omitempty"`
 }
 
 type UpdateClusterParamsRequest struct {

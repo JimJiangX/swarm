@@ -37,16 +37,20 @@ func AddNewCluster(req structs.PostClusterRequest) (database.Cluster, error) {
 	if store.IsLocalStore(req.StorageType) && req.StorageID != "" {
 		req.StorageID = ""
 	}
+	if req.Type != _ProxyType && req.NetworkingID != "" {
+		req.NetworkingID = ""
+	}
 
 	cluster := database.Cluster{
-		ID:          utils.Generate64UUID(),
-		Name:        req.Name,
-		Type:        req.Type,
-		StorageType: req.StorageType,
-		StorageID:   req.StorageID,
-		Enabled:     true,
-		MaxNode:     req.MaxNode,
-		UsageLimit:  req.UsageLimit,
+		ID:           utils.Generate64UUID(),
+		Name:         req.Name,
+		Type:         req.Type,
+		StorageType:  req.StorageType,
+		StorageID:    req.StorageID,
+		NetworkingID: req.NetworkingID,
+		Enabled:      true,
+		MaxNode:      req.MaxNode,
+		UsageLimit:   req.UsageLimit,
 	}
 
 	err := cluster.Insert()

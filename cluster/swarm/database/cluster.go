@@ -8,30 +8,33 @@ import (
 )
 
 type Cluster struct {
-	ID          string  `db:"id"`
-	Name        string  `db:"name"`
-	Type        string  `db:"type"`
-	StorageType string  `db:"storage_type"`
-	StorageID   string  `db:"storage_id"`
-	Enabled     bool    `db:"enabled"`
-	MaxNode     int     `db:"max_node"`
-	UsageLimit  float32 `db:"usage_limit"`
+	ID           string  `db:"id"`
+	Name         string  `db:"name"`
+	Type         string  `db:"type"`
+	StorageType  string  `db:"storage_type"`
+	StorageID    string  `db:"storage_id"`
+	NetworkingID string  `db:"networking_id"`
+	Enabled      bool    `db:"enabled"`
+	MaxNode      int     `db:"max_node"`
+	UsageLimit   float32 `db:"usage_limit"`
 }
 
 func (c Cluster) TableName() string {
 	return "tb_cluster"
 }
 
-func NewCluster(name, _type, storageType, storageID string, enable bool, num int, limit float32) Cluster {
+func NewCluster(name, _type, storageType, storageID, networking string,
+	enable bool, num int, limit float32) Cluster {
 	return Cluster{
-		ID:          utils.Generate64UUID(),
-		Name:        name,
-		Type:        _type,
-		StorageType: storageType,
-		StorageID:   storageID,
-		Enabled:     enable,
-		MaxNode:     num,
-		UsageLimit:  limit,
+		ID:           utils.Generate64UUID(),
+		Name:         name,
+		Type:         _type,
+		StorageType:  storageType,
+		StorageID:    storageID,
+		NetworkingID: networking,
+		Enabled:      enable,
+		MaxNode:      num,
+		UsageLimit:   limit,
 	}
 }
 
@@ -42,7 +45,7 @@ func (c Cluster) Insert() error {
 	}
 
 	// insert into database
-	query := "INSERT INTO tb_cluster (id,name,type,storage_id,storage_type,enabled,max_node,usage_limit) VALUES (:id,:name,:type,:storage_id,:storage_type,:enabled,:max_node,:usage_limit)"
+	query := "INSERT INTO tb_cluster (id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit) VALUES (:id,:name,:type,:storage_id,:storage_type,:networking_id,:enabled,:max_node,:usage_limit)"
 	_, err = db.NamedExec(query, &c)
 
 	return err
@@ -484,7 +487,6 @@ func ListNodesByClusters(clusters []string, _type string) ([]Node, error) {
 	}
 
 	return nodes, nil
-
 }
 
 func DeleteNode(IDOrName string) error {

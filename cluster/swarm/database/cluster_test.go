@@ -7,15 +7,15 @@ import (
 
 func TestCluster(t *testing.T) {
 	clusters := []Cluster{
-		NewCluster("cluster1", "upsql", "local", "", true, 256, 0.8),
-		NewCluster("cluster2", "upsql", "ssd", "", true, 100000000, 1.44),
-		NewCluster("cluster3", "proxy", "local", "", true, 100000000, 1.44),
-		NewCluster("cluster4", "proxy", "local", "", false, 100000000, 1.44),
+		NewCluster("cluster1", "upsql", "local", "", "", true, 256, 0.8),
+		NewCluster("cluster2", "upsql", "ssd", "", "", true, 100000000, 1.44),
+		NewCluster("cluster3", "proxy", "local", "", "", true, 100000000, 1.44),
+		NewCluster("cluster4", "proxy", "local", "", "", false, 100000000, 1.44),
 	}
 	wrong := []Cluster{
-		NewCluster("cluster2", "nomal", "ssd", "", false, 1000000000000, 1.44),
-		NewCluster("cluster3", "proxy", "local", "", false, 100000000, 1.44),
-		NewCluster("cluster4", "proxy", "local", "", false, 100000000, 1.44),
+		NewCluster("cluster2", "nomal", "ssd", "", "", false, 1000000000000, 1.44),
+		NewCluster("cluster3", "proxy", "local", "", "", false, 100000000, 1.44),
+		NewCluster("cluster4", "proxy", "local", "", "", false, 100000000, 1.44),
 	}
 
 	for i := range clusters {

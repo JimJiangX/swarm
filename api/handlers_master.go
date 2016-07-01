@@ -1038,6 +1038,14 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if req.Type == "proxy" && req.NetworkingID != "" {
+		_, _, err := database.GetNetworkingByID(req.NetworkingID)
+		if err != nil {
+			httpError(w, fmt.Sprintf("Not Found Networking By ID:%s,error:%s", req.NetworkingID, err), http.StatusInternalServerError)
+			return
+		}
+	}
+
 	cluster, err := swarm.AddNewCluster(req)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)

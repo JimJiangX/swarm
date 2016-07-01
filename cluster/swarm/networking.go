@@ -219,8 +219,16 @@ func getIPInfoByUnitID(id string, engine *cluster.Engine) ([]IPInfo, error) {
 func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit string, req []netRequire) ([]IPInfo, error) {
 	networkings := make([]IPInfo, 0, 2)
 	for _, net := range req {
+		networkingID := ""
 
-		ipinfo, err := gd.AllocIP("", net.Type, unit)
+		if net.Type == _ExternalAccessNetworking {
+			dc, err := gd.DatacenterByEngine(engine.ID)
+			if err == nil {
+				networkingID = dc.Cluster.NetworkingID
+			}
+		}
+
+		ipinfo, err := gd.AllocIP(networkingID, net.Type, unit)
 		if err != nil {
 			return nil, err
 		}
@@ -233,6 +241,7 @@ func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit string, re
 			label = _External_NIC_Lable
 			ipinfo.Device = "bond2"
 		}
+
 		if engine != nil && engine.Labels != nil {
 			if device, ok := engine.Labels[label]; ok {
 				ipinfo.Device = device
