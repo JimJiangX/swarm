@@ -1686,7 +1686,7 @@ func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	name := mux.Vars(r)["name"]
-	source := r.FormValue("from")
+	from := r.FormValue("from")
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
@@ -1694,7 +1694,13 @@ func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	err := gd.RestoreUnit(name, source)
+	file, err := database.GetBackupFile(from)
+	if err != nil {
+		httpError(w, fmt.Sprintf("Not Found Backup File by ID:%s,Error:%s", from, err), http.StatusInternalServerError)
+		return
+	}
+
+	err = gd.RestoreUnit(name, file.Path)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
