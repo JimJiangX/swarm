@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -92,8 +93,10 @@ func (s *Server) ListenAndServe() error {
 				l      net.Listener
 				err    error
 				server = &http.Server{
-					Addr:    protoAddrParts[1],
-					Handler: s.dispatcher,
+					Addr:        protoAddrParts[1],
+					Handler:     s.dispatcher,
+					ReadTimeout: 10 * time.Second,
+					//	WriteTimeout: 30 * time.Second,
 				}
 			)
 
