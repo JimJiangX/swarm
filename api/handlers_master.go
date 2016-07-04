@@ -1719,7 +1719,7 @@ func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		Name:      unit + "_backup_manually" + now.String(),
 		Type:      "full",     // full/incremental
 		Spec:      "manually", // cron spec
-		Valid:     now.String(),
+		Valid:     utils.TimeToString(now),
 		BackupDir: sys.BackupDir,
 		Timeout:   24 * 60 * 60,
 	}
