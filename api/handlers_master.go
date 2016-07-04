@@ -27,6 +27,64 @@ import (
 
 var ErrUnsupportGardener = errors.New("Unsupported Gardener")
 
+// GET /clusters/nodes/{name:.*}
+func getClusterNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	node, err := database.GetNode(name)
+	if err != nil {
+		httpError(w, fmt.Sprintf("Not Found Node by NameOrID:%s,Error:%s", name, err), http.StatusInternalServerError)
+		return
+	}
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+	var (
+		totalCPUs    int
+		usedCPUs     int
+		totalMemory  int
+		usedMemory   int
+		dockerStatus = "Disconnected"
+	)
+
+	if node.EngineID != "" {
+		eng, err := gd.GetEngine(node.EngineID)
+		if err == nil && eng != nil {
+			totalCPUs = int(eng.Cpus)
+			usedCPUs = int(eng.UsedCpus())
+			totalMemory = int(eng.Memory)
+			usedMemory = int(eng.UsedMemory())
+			dockerStatus = eng.Status()
+		}
+	}
+
+	resp := structs.NodeInspect{
+		ID:           node.ID,
+		Name:         node.Name,
+		ClusterID:    node.ClusterID,
+		Addr:         node.Addr,
+		EngineID:     node.EngineID,
+		DockerStatus: dockerStatus,
+		Room:         node.Room,
+		Seat:         node.Seat,
+		MaxContainer: node.MaxContainer,
+		Status:       node.Status,
+		RegisterAt:   utils.TimeToString(node.RegisterAt),
+		Resource: structs.Resource{
+			TotalCPUs:   totalCPUs,
+			UsedCPUs:    usedCPUs,
+			TotalMemory: totalMemory,
+			UsedMemory:  usedMemory,
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
 // GET /clusters/{name:.*}
 func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
@@ -56,7 +114,7 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 			usedCPUs     int
 			totalMemory  int
 			usedMemory   int
-			dockerStatus string
+			dockerStatus = "Disconnected"
 		)
 
 		if node.EngineID != "" {

@@ -51,7 +51,8 @@ type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 var masterRoutes = map[string]map[string]ctxHandler{
 	"GET": {
 		"/clusters":                        getClusters,
-		"/clusters/{name:.*}":              getClustersByNameOrID,
+		"/clusters/{name}":                 getClustersByNameOrID,
+		"/clusters/nodes/{name:.*}":        getClusterNode,
 		"/resources":                       getClustersResource,
 		"/resources/{cluster:.*}":          getNodesResourceByCluster,
 		"/tasks":                           getTasks,
