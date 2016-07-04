@@ -146,7 +146,7 @@ func newBackupStrategy(service string, strategy *structs.BackupStrategy) (*datab
 		Valid:     valid,
 		Enabled:   true,
 		BackupDir: strategy.BackupDir,
-		Timeout:   strategy.Timeout * int(time.Second),
+		Timeout:   strategy.Timeout,
 		CreatedAt: time.Now(),
 	}, nil
 }
@@ -1274,7 +1274,7 @@ func (svc *Service) TryBackupTask(task *database.Task, host, unitID string, stra
 
 	args := []string{host + "v1.0/task/backup/callback", task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(strategy.Timeout))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(strategy.Timeout)*time.Second)
 	defer cancel()
 
 	err := backup.backup(ctx, args...)
