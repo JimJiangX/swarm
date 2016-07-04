@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -863,6 +864,7 @@ func getServiceBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	for i := range files {
 		list[i] = structs.BackupFile{
 			ID:         files[i].ID,
+			Name:       path.Base(files[i].Path),
 			TaskID:     files[i].TaskID,
 			StrategyID: files[i].StrategyID,
 			UnitID:     files[i].UnitID,

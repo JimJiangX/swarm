@@ -51,6 +51,7 @@ func (bt BackupTaskCallback) Error() error {
 
 type BackupFile struct {
 	ID         string
+	Name       string
 	TaskID     string `json:"task_id"`
 	StrategyID string `json:"strategy_id"`
 	UnitID     string `json:"unit_id"`
