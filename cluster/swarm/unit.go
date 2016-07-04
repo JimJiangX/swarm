@@ -647,7 +647,7 @@ func (u *unit) initService() error {
 		return nil
 	}
 
-	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(context.Background(), u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
@@ -661,7 +661,7 @@ func initUnitService(id string, eng *cluster.Engine, cmd []string) error {
 		return nil
 	}
 
-	inspect, err := containerExec(eng, id, cmd, false)
+	inspect, err := containerExec(context.Background(), eng, id, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", id, cmd, inspect.ExitCode, inspect, err)
 	}
@@ -716,7 +716,7 @@ func (u *unit) startService() error {
 		return nil
 	}
 
-	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(context.Background(), u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s start service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
@@ -734,7 +734,7 @@ func (u *unit) stopService() error {
 		return nil
 	}
 
-	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(context.Background(), u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s stop service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
@@ -742,7 +742,7 @@ func (u *unit) stopService() error {
 	return err
 }
 
-func (u *unit) backup(args ...string) error {
+func (u *unit) backup(ctx context.Context, args ...string) error {
 	if u.ContainerCmd == nil {
 		return nil
 	}
@@ -756,7 +756,7 @@ func (u *unit) backup(args ...string) error {
 		"Cmd":  cmd,
 	}).Debugln("start Backup job")
 
-	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(ctx, u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s backup cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
@@ -778,7 +778,7 @@ func (u *unit) restore(file string) error {
 		"Cmd":  cmd,
 	}).Debugln("restore job")
 
-	inspect, err := containerExec(u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(context.Background(), u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s restore cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}

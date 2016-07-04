@@ -21,6 +21,7 @@ import (
 	consulapi "github.com/hashicorp/consul/api"
 	swm_structs "github.com/yiduoyunQ/sm/sm-svr/structs"
 	"github.com/yiduoyunQ/smlib"
+	"golang.org/x/net/context"
 )
 
 var (
@@ -1273,28 +1274,34 @@ func (svc *Service) TryBackupTask(task *database.Task, host, unitID string, stra
 
 	args := []string{host + "v1.0/task/backup/callback", task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
 
-	errCh := make(chan error, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(strategy.Timeout))
+	defer cancel()
 
-	select {
-	case errCh <- backup.backup(args...):
-
-	case <-time.After(time.Duration(strategy.Timeout)):
-
-		err := database.UpdateTaskStatus(task, _StatusTaskTimeout, time.Now(), "Timeout,The Task marked as TaskTimeout")
-
-		err = fmt.Errorf("Task Timeout,Service:%s,BackupStrategy:%s,Task:%s,Error:%v", svc.ID, strategy.ID, task.ID, err)
-		logrus.Error(err)
-		return err
-	}
-
-	msg := <-errCh
-	close(errCh)
-	if msg == nil {
+	err := backup.backup(ctx, args...)
+	if err == nil {
+		logrus.Info("Backup %s Task %s End", unitID, task.ID)
 		return nil
+	} else {
+		err = fmt.Errorf("Backup %s Task Faild,%v", unitID, err)
+		logrus.Error(err)
 	}
 
-	err := fmt.Errorf("Backup %s Task Faild,%v", unitID, msg)
-	logrus.Error(err)
+	<-ctx.Done()
+	msg := ""
+	status := int32(0)
+	ctxErr := ctx.Err()
+	if ctxErr != nil {
+		if ctxErr == context.DeadlineExceeded {
+			msg = "Timeout"
+			status = _StatusTaskTimeout
+		} else if ctxErr == context.Canceled {
+			msg = "Canceled"
+			status = _StatusTaskCancel
+		}
+		err1 := database.UpdateTaskStatus(task, status, time.Now(), msg)
+		err1 = fmt.Errorf("Task %s,Service:%s,BackupStrategy:%s,Task:%s,Error:%v", msg, svc.ID, strategy.ID, task.ID, err)
+		logrus.Error(err1)
+	}
 
 	return err
 }

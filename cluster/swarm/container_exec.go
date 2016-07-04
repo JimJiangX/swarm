@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/docker/pkg/promise"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
@@ -28,7 +27,7 @@ func checkTtyInput(attachStdin, ttyMode bool) error {
 }
 
 // containerExec exec cmd in containeID,It returns ContainerExecInspect.
-func containerExec(engine *cluster.Engine, containerID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
+func containerExec(ctx context.Context, engine *cluster.Engine, containerID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
 	inspect := types.ContainerExecInspect{}
 	client := engine.EngineAPIClient()
 	if client == nil {
@@ -49,7 +48,7 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 		execConfig.AttachStdout = false
 	}
 
-	exec, err := client.ContainerExecCreate(context.Background(), containerID, execConfig)
+	exec, err := client.ContainerExecCreate(ctx, containerID, execConfig)
 	if err != nil {
 		return inspect, err
 	}
@@ -62,7 +61,7 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 	}).Info("Start Exec")
 
 	if execConfig.Detach {
-		err := client.ContainerExecStart(context.Background(), exec.ID, types.ExecStartCheck{Detach: detach})
+		err := client.ContainerExecStart(ctx, exec.ID, types.ExecStartCheck{Detach: detach})
 		if err != nil {
 			return inspect, err
 		}
@@ -71,13 +70,13 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 			logrus.Warn(err)
 		}
 
-		err = containerExecAttch(client, exec.ID, execConfig)
+		err = containerExecAttch(ctx, client, exec.ID, execConfig)
 		if err != nil {
 			return inspect, err
 		}
 
 		status := 0
-		inspect, status, err = getExecExitCode(client, exec.ID)
+		inspect, status, err = getExecExitCode(ctx, client, exec.ID)
 		if err != nil {
 			return inspect, err
 		}
@@ -89,22 +88,19 @@ func containerExec(engine *cluster.Engine, containerID string, cmd []string, det
 	return inspect, err
 }
 
-func containerExecAttch(client client.APIClient, execID string, execConfig types.ExecConfig) error {
+func containerExecAttch(ctx context.Context, client client.APIClient, execID string, execConfig types.ExecConfig) error {
 	var (
 		out, stderr io.Writer     = os.Stdout, os.Stderr
 		in          io.ReadCloser = os.Stdin
-		errCh       chan error
 	)
-	resp, err := client.ContainerExecAttach(context.Background(), execID, execConfig)
+	resp, err := client.ContainerExecAttach(ctx, execID, execConfig)
 	if err != nil {
 		return err
 	}
 	defer resp.Close()
-	errCh = promise.Go(func() error {
-		return holdHijackedConnection(context.Background(), execConfig.Tty, in, out, stderr, resp)
-	})
 
-	if err := <-errCh; err != nil {
+	err = holdHijackedConnection(ctx, execConfig.Tty, in, out, stderr, resp)
+	if err != nil {
 		logrus.Debugf("Error hijack: %s", err)
 		return err
 	}
@@ -113,8 +109,8 @@ func containerExecAttch(client client.APIClient, execID string, execConfig types
 }
 
 // getExecExitCode perform an inspect on the exec command. It returns ContainerExecInspect.
-func getExecExitCode(cli client.APIClient, execID string) (types.ContainerExecInspect, int, error) {
-	resp, err := cli.ContainerExecInspect(context.Background(), execID)
+func getExecExitCode(ctx context.Context, cli client.APIClient, execID string) (types.ContainerExecInspect, int, error) {
+	resp, err := cli.ContainerExecInspect(ctx, execID)
 	if err != nil {
 		// If we can't connect, then the daemon probably died.
 		if err != client.ErrConnectionFailed {
