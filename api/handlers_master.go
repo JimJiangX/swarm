@@ -69,8 +69,8 @@ func getNodeInspect(gd *swarm.Gardener, node database.Node) structs.NodeInspect 
 	}
 }
 
-// GET /clusters/nodes/{name:.*}
-func getClusterNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+// GET /nodes/{name:.*}
+func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
 	node, err := database.GetNode(name)
@@ -91,7 +91,7 @@ func getClusterNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// GET /clusters/nodes
+// GET /nodes
 func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	nodes, err := database.GetAllNodes()
 	if err != nil {
