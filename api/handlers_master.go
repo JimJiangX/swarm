@@ -28,20 +28,7 @@ import (
 
 var ErrUnsupportGardener = errors.New("Unsupported Gardener")
 
-// GET /clusters/nodes/{name:.*}
-func getClusterNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-
-	node, err := database.GetNode(name)
-	if err != nil {
-		httpError(w, fmt.Sprintf("Not Found Node by NameOrID:%s,Error:%s", name, err), http.StatusInternalServerError)
-		return
-	}
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
+func getNodeInspect(gd *swarm.Gardener, node database.Node) structs.NodeInspect {
 	var (
 		totalCPUs    int
 		usedCPUs     int
@@ -61,7 +48,7 @@ func getClusterNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	resp := structs.NodeInspect{
+	return structs.NodeInspect{
 		ID:           node.ID,
 		Name:         node.Name,
 		ClusterID:    node.ClusterID,
@@ -79,6 +66,48 @@ func getClusterNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			TotalMemory: totalMemory,
 			UsedMemory:  usedMemory,
 		},
+	}
+}
+
+// GET /clusters/nodes/{name:.*}
+func getClusterNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	node, err := database.GetNode(name)
+	if err != nil {
+		httpError(w, fmt.Sprintf("Not Found Node by NameOrID:%s,Error:%s", name, err), http.StatusInternalServerError)
+		return
+	}
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := getNodeInspect(gd, node)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
+// GET /clusters/nodes
+func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	nodes, err := database.GetAllNodes()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := make([]structs.NodeInspect, len(nodes))
+	for i := range nodes {
+		resp[i] = getNodeInspect(gd, nodes[i])
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -109,45 +138,8 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	}
 
 	list := make([]structs.NodeInspect, len(nodes))
-	for i, node := range nodes {
-		var (
-			totalCPUs    int
-			usedCPUs     int
-			totalMemory  int
-			usedMemory   int
-			dockerStatus = "Disconnected"
-		)
-
-		if node.EngineID != "" {
-			eng, err := gd.GetEngine(node.EngineID)
-			if err == nil && eng != nil {
-				totalCPUs = int(eng.Cpus)
-				usedCPUs = int(eng.UsedCpus())
-				totalMemory = int(eng.Memory)
-				usedMemory = int(eng.UsedMemory())
-				dockerStatus = eng.Status()
-			}
-		}
-
-		list[i] = structs.NodeInspect{
-			ID:           node.ID,
-			Name:         node.Name,
-			ClusterID:    node.ClusterID,
-			Addr:         node.Addr,
-			EngineID:     node.EngineID,
-			DockerStatus: dockerStatus,
-			Room:         node.Room,
-			Seat:         node.Seat,
-			MaxContainer: node.MaxContainer,
-			Status:       node.Status,
-			RegisterAt:   utils.TimeToString(node.RegisterAt),
-			Resource: structs.Resource{
-				TotalCPUs:   totalCPUs,
-				UsedCPUs:    usedCPUs,
-				TotalMemory: totalMemory,
-				UsedMemory:  usedMemory,
-			},
-		}
+	for i := range nodes {
+		list[i] = getNodeInspect(gd, *nodes[i])
 	}
 
 	resp := structs.PerClusterInfoResponse{
