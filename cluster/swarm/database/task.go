@@ -38,6 +38,7 @@ type BackupFile struct {
 	SizeByte   int       `db:"size"`
 	Retention  time.Time `db:"retention"`
 	CreatedAt  time.Time `db:"created_at"`
+	FinishedAt time.Time `db:"finished_at"`
 }
 
 func (bf BackupFile) TableName() string {
@@ -86,7 +87,7 @@ func GetBackupFile(id string) (BackupFile, error) {
 }
 
 func txInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
-	query := "INSERT INTO tb_backup_files (id,task_id,strategy_id,unit_id,type,path,size,retention,created_at) VALUES (:id,:task_id,:strategy_id,:unit_id,:type,:path,:size,:retention,:created_at)"
+	query := "INSERT INTO tb_backup_files (id,task_id,strategy_id,unit_id,type,path,size,retention,created_at,finished_at) VALUES (:id,:task_id,:strategy_id,:unit_id,:type,:path,:size,:retention,:created_at,:finished_at)"
 	_, err := tx.NamedExec(query, &bf)
 
 	return err
@@ -436,22 +437,22 @@ func UpdateBackupStrategy(strategy BackupStrategy) error {
 	return err
 }
 
-func BackupTaskValidate(taskID, strategyID, unitID string) (int, error) {
+func BackupTaskValidate(taskID, strategyID, unitID string) (Task, int, error) {
 	db, err := GetDB(true)
 	if err != nil {
-		return 0, err
+		return Task{}, 0, err
 	}
 
-	state := 0
-	err = db.Get(&state, "SELECT status FROM tb_task WHERE id=?", taskID)
+	task := Task{}
+	err = db.Get(&task, "SELECT * FROM tb_task WHERE id=?", taskID)
 	if err != nil {
-		return 0, err
+		return task, 0, err
 	}
 
 	service := ""
 	err = db.Get(&service, "SELECT service_id FROM tb_backup_strategy WHERE id=?", strategyID)
 	if err != nil {
-		return 0, err
+		return task, 0, err
 	}
 
 	unit := Unit{}
@@ -460,5 +461,5 @@ func BackupTaskValidate(taskID, strategyID, unitID string) (int, error) {
 	rent := 0
 	err = db.Get(&rent, "SELECT backup_files_retention FROM tb_service WHERE id=?", service)
 
-	return rent, err
+	return task, rent, err
 }

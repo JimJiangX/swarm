@@ -222,10 +222,10 @@ func (gd *Gardener) DisableBackupStrategy(id string) error {
 }
 
 func BackupTaskCallback(req structs.BackupTaskCallback) error {
-	task := &database.Task{ID: req.TaskID}
+	task := database.Task{ID: req.TaskID}
 
 	if req.Error() != nil {
-		err := database.UpdateTaskStatus(task, structs.TaskFailed, time.Now(), req.Error().Error())
+		err := database.UpdateTaskStatus(&task, structs.TaskFailed, time.Now(), req.Error().Error())
 		if err != nil {
 			return err
 		}
@@ -233,7 +233,7 @@ func BackupTaskCallback(req structs.BackupTaskCallback) error {
 		return req.Error()
 	}
 
-	rent, err := database.BackupTaskValidate(req.TaskID, req.StrategyID, req.UnitID)
+	task, rent, err := database.BackupTaskValidate(req.TaskID, req.StrategyID, req.UnitID)
 	if err != nil {
 
 		return err
@@ -241,20 +241,21 @@ func BackupTaskCallback(req structs.BackupTaskCallback) error {
 
 	backupFile := database.BackupFile{
 		ID:         utils.Generate64UUID(),
-		TaskID:     req.TaskID,
+		TaskID:     task.ID,
 		StrategyID: req.StrategyID,
 		UnitID:     req.UnitID,
 		Type:       req.Type,
 		Path:       req.Path,
 		SizeByte:   req.Size,
-		CreatedAt:  time.Now(),
+		CreatedAt:  task.CreatedAt, // task.CreatedAt
+		FinishedAt: time.Now(),
 	}
 
 	if rent > 0 {
 		backupFile.Retention = backupFile.CreatedAt.AddDate(0, 0, rent)
 	}
 
-	err = database.TxBackupTaskDone(task, _StatusTaskDone, backupFile)
+	err = database.TxBackupTaskDone(&task, _StatusTaskDone, backupFile)
 
 	return err
 }

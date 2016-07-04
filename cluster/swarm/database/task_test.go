@@ -239,12 +239,12 @@ func TestBackupTaskValidate(t *testing.T) {
 	taskID := "1aa46006cb43690997af5e02231ec4b3081dcc611849d7051d4e62aac0930ba6"
 	strategyID := "BackupStrategyID001"
 	unitID := ""
-	retention, err := BackupTaskValidate(taskID, strategyID, unitID)
+	task, retention, err := BackupTaskValidate(taskID, strategyID, unitID)
 	if err == nil {
 		t.Fatal("Error Expected")
 	}
 
-	t.Log(err)
+	t.Log(err, task)
 
 	if retention == 0 {
 		t.Fatal("BackupTaskValidate retention should not be 0", retention)

@@ -865,6 +865,7 @@ func getServiceBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 			SizeByte:   files[i].SizeByte,
 			Retention:  utils.TimeToString(files[i].Retention),
 			CreatedAt:  utils.TimeToString(files[i].CreatedAt),
+			FinishedAt: utils.TimeToString(files[i].FinishedAt),
 			Created:    files[i].CreatedAt,
 		}
 	}

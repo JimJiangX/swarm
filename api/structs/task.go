@@ -60,6 +60,7 @@ type BackupFile struct {
 	SizeByte   int
 	Retention  string
 	CreatedAt  string    `json:"created_at"`
+	FinishedAt string    `json:"finished_at"`
 	Created    time.Time `json:"-"`
 }
 
