@@ -806,6 +806,71 @@ func getServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(users)
 }
 
+// GET /services/{name}/service_config
+func getServiceServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	service, err := database.GetService(name)
+	if err != nil {
+		httpError(w, fmt.Sprintf("Not Found Service '%s',Error:%s", name, err), http.StatusInternalServerError)
+		return
+	}
+
+	configs, err := database.ListUnitConfigByService(service.ID)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := make([]structs.UnitConfigResponse, len(configs))
+	for i := range configs {
+		resp[i] = structs.UnitConfigResponse{
+			ID:        configs[i].Unit.ID,
+			Name:      configs[i].Unit.Name,
+			Type:      configs[i].Unit.Type,
+			CreatedAt: utils.TimeToString(configs[i].Config.CreatedAt),
+		}
+
+		parser, _, err := swarm.Factory(resp[i].Type)
+		if err != nil {
+
+		}
+		configer, err := parser.ParseData([]byte(configs[i].Config.Content))
+		if err != nil {
+
+		}
+
+		m := make(map[string]map[string]string, 10)
+		for key, val := range configs[i].Config.KeySets {
+			if val.CanSet {
+				section := ""
+				value := configer.String(key)
+				parts := strings.SplitN(key, "::", 2)
+				if len(parts) == 1 {
+					section = "default"
+					key = parts[0]
+				} else if len(parts) == 2 {
+					section = parts[0]
+					key = parts[1]
+				} else {
+					// error
+				}
+				pairs, ok := m[section]
+				if !ok {
+					pairs = make(map[string]string)
+				}
+				pairs[key] = value
+				m[section] = pairs
+			}
+		}
+
+		resp[i].Content = m
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
 // GET /services/{name}/backup_strategy
 func getServiceBackupStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]

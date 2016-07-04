@@ -103,12 +103,16 @@ func (u *unit) SaveConfigToDisk(content []byte) error {
 	return err
 }
 
-func initialize(name string) (configParser, ContainerCmd, error) {
+func Factory(_type string) (configParser, ContainerCmd, error) {
+	return initialize(_type)
+}
+
+func initialize(_type string) (configParser, ContainerCmd, error) {
 	var (
 		parser configParser
 		cmder  ContainerCmd
 	)
-	switch name {
+	switch _type {
 	case _UpsqlType:
 		parser = &mysqlConfig{}
 
@@ -126,7 +130,7 @@ func initialize(name string) (configParser, ContainerCmd, error) {
 
 	default:
 
-		return nil, nil, fmt.Errorf("Unsupported Type:%s", name)
+		return nil, nil, fmt.Errorf("Unsupported Type:'%s'", _type)
 	}
 
 	return parser, cmder, nil

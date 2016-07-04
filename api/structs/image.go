@@ -51,3 +51,11 @@ type UpdateServiceConfigRequest struct {
 	Type  string
 	Pairs map[string]interface{}
 }
+
+type UnitConfigResponse struct {
+	ID        string
+	Name      string
+	Type      string
+	CreatedAt string
+	Content   map[string]map[string]string
+}

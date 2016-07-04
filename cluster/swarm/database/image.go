@@ -3,6 +3,7 @@ package database
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -188,6 +189,76 @@ func GetUnitConfigByID(id string) (*UnitConfig, error) {
 	}
 
 	return config, err
+}
+
+func ListUnitConfigByService(service string) ([]struct {
+	Unit   Unit
+	Config UnitConfig
+}, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	var units []Unit
+	err = db.Select(&units, "SELECT * FROM tb_unit WHERE service_id=?", service)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(units) == 0 {
+		return nil, fmt.Errorf("Not Found Units of Service,Is '%s' Exist?", service)
+	}
+
+	ids := make([]string, len(units))
+	for i := range units {
+		ids[i] = units[i].ConfigID
+	}
+
+	query, args, err := sqlx.In("SELECT * FROM tb_unit_config WHERE id IN (?);", ids)
+	if err != nil {
+		return nil, err
+	}
+
+	var configs []*UnitConfig
+	err = db.Select(&configs, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range configs {
+		err = configs[i].decode()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	out := make([]struct {
+		Unit   Unit
+		Config UnitConfig
+	}, 0, len(units))
+
+	for i := range units {
+		for _, c := range configs {
+			if c == nil {
+				break
+			}
+
+			if units[i].ConfigID != c.ID {
+				continue
+			}
+			out = append(out, struct {
+				Unit   Unit
+				Config UnitConfig
+			}{
+				Unit:   units[i],
+				Config: *c,
+			})
+			break
+		}
+	}
+
+	return out, nil
 }
 
 func TXInsertUnitConfig(tx *sqlx.Tx, config *UnitConfig) error {
