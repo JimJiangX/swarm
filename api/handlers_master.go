@@ -1703,12 +1703,6 @@ func postUnitStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // POST /units/{name:.*}/backup
 func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	unit := mux.Vars(r)["name"]
-	req := structs.BackupStrategy{}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
@@ -1719,9 +1713,18 @@ func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		logrus.Error(err)
 	}
 
-	req.BackupDir = sys.BackupDir
+	now := time.Now()
+	strategy := structs.BackupStrategy{
+		ID:        utils.Generate32UUID(),
+		Name:      unit + "_backup_manually" + now.String(),
+		Type:      "full",     // full/incremental
+		Spec:      "manually", // cron spec
+		Valid:     now.String(),
+		BackupDir: sys.BackupDir,
+		Timeout:   24 * 60 * 60,
+	}
 
-	taskID, err := gd.TemporaryServiceBackupTask("", unit, req)
+	taskID, err := gd.TemporaryServiceBackupTask("", unit, strategy)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
