@@ -44,10 +44,13 @@ errsize=`docker exec $INSTANCE du -m $errfile 2>/dev/null | awk '{print $1}'`
 
 #upsql.slow_query_file_size
 qrysize=`docker exec  $INSTANCE du -m $queryfile 2>/dev/null | awk '{print $1}' `
-#if [ "$qrysize" = "" ];then
-#	qrysize=""
-#fi
+if [ "$qrysize" = "" ];then
+	qrysize=0
+fi
 
+if [ "$QUOTA" = "" ];then 
+     QUOTA=0
+fi
 if [ "$qrysize" != "err" ] && [ $qrysize -ge $QUOTA ] ;then
 	qrysize=`docker exec  $INSTANCE  >$queryfile;du -m $queryfile 2>/dev/null | awk '{print $1}' `
 fi
