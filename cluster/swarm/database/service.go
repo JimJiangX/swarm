@@ -472,7 +472,7 @@ func TxInsertUsers(users []User) error {
 }
 
 func txInsertUsers(tx *sqlx.Tx, users []User) error {
-	query := "INSERT INTO tb_users (id,service_id,type,username,password,role,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:created_at)"
+	query := "INSERT INTO tb_users (id,service_id,type,username,password,role,permission,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:permission,:created_at)"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {

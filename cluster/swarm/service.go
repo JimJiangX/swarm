@@ -21,7 +21,6 @@ import (
 	consulapi "github.com/hashicorp/consul/api"
 	swm_structs "github.com/yiduoyunQ/sm/sm-svr/structs"
 	"github.com/yiduoyunQ/smlib"
-	"golang.org/x/net/context"
 )
 
 var (
@@ -1228,96 +1227,6 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, unit string, req structs
 	go svc.TryBackupTask(&task, HostAddress+":"+httpPort, unit, *strategy)
 
 	return task.ID, nil
-}
-
-func (svc *Service) TryBackupTask(task *database.Task, host, unitID string, strategy database.BackupStrategy) error {
-	backup := &unit{}
-	for retries := 3; ; retries-- {
-		if retries != 3 {
-			time.Sleep(time.Minute)
-		}
-
-		addr, port, master, err := svc.GetSwitchManagerAndMaster()
-		if err != nil || master == nil {
-			if retries > 0 {
-				continue
-			}
-			err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "Cancel,The Task marked as TaskCancel,"+err.Error())
-			err = fmt.Errorf("Errors:%v,%v", err, err1)
-			logrus.Error(err)
-			return err
-		}
-
-		if err := smlib.Lock(addr, port); err != nil {
-			if retries > 0 {
-				continue
-			}
-			err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "TaskCancel,Switch Manager is busy now,"+err.Error())
-			err = fmt.Errorf("Errors:%v,%v", err, err1)
-			logrus.Error(err)
-			return err
-		}
-
-		backup = master
-		defer smlib.UnLock(addr, port)
-
-		break
-	}
-
-	if unitID != "" {
-		var err error
-		svc.RLock()
-		backup, err = svc.getUnit(unitID)
-		svc.RUnlock()
-
-		if err != nil {
-			return err
-		}
-	}
-
-	if !atomic.CompareAndSwapUint32(&backup.Status, _StatusUnitNoContent, _StatusUnitBackuping) {
-		err := fmt.Errorf("contianer %s is busy", backup.Name)
-		database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "TaskCancel,"+err.Error())
-		return err
-	}
-
-	if host == "" {
-		host = HostAddress + ":" + httpPort
-	}
-
-	args := []string{host + "/v1.0/tasks/backup/callback", task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(strategy.Timeout)*time.Second)
-	defer cancel()
-
-	msg, status := "", int32(0)
-
-	err := backup.backup(ctx, args...)
-	if err == nil {
-		logrus.Info("Backup %s Task %s End", unitID, task.ID)
-		return nil
-	} else {
-		status = _StatusTaskFailed
-		err = fmt.Errorf("Backup %s Task Faild,%v", unitID, err)
-		msg = err.Error()
-		logrus.Error(err)
-	}
-
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		if ctxErr == context.DeadlineExceeded {
-			msg = "Timeout"
-			status = _StatusTaskTimeout
-		} else if ctxErr == context.Canceled {
-			msg = "Canceled"
-			status = _StatusTaskCancel
-		}
-	}
-
-	err1 := database.UpdateTaskStatus(task, status, time.Now(), msg)
-	err1 = fmt.Errorf("Task %s,Service:%s,BackupStrategy:%s,Task:%s,Error:%v", msg, svc.ID, strategy.ID, task.ID, err1)
-	logrus.Error(err1)
-
-	return err
 }
 
 func (svc *Service) Task() *database.Task {
