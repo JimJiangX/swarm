@@ -89,7 +89,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/services/{name:.*}/scale":    postServiceScaled,
 
 		"/services/{name:.*}/users":                 postServiceUsers,
-		"/services/{name:.*}/service-config/update": postServiceConfig,
+		"/services/{name:.*}/service_config/update": postServiceConfig,
 
 		"/services/{name:.*}/backup_strategy":         postStrategyToService,
 		"/services/backup_strategy/{name:.*}/update":  postUpdateServiceStrategy,
