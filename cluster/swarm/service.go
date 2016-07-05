@@ -663,9 +663,17 @@ func (svc *Service) startContainers() error {
 
 func (svc *Service) copyServiceConfig() error {
 	for _, u := range svc.units {
+		forbid, can := u.CanModify(u.configures)
+		if !can {
+			return fmt.Errorf("Forbid modifying service configs,%s", forbid)
+		}
 		defConfig, err := u.defaultUserConfig(svc, u)
 		if err != nil {
 			return err
+		}
+
+		for key, val := range u.configures {
+			defConfig[key] = val
 		}
 
 		err = u.CopyConfig(defConfig)

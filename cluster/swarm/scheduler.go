@@ -184,15 +184,15 @@ func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module structs
 		return nil, err
 	}
 
-	return gd.BuildPendingContainers(svc, module.Type, candidates, module.Stores, config)
+	return gd.BuildPendingContainers(svc, module.Type, candidates, module.Stores, config, module.Configures)
 }
 
 func (gd *Gardener) BuildPendingContainers(svc *Service, _type string, candidates []*node.Node,
-	stores []structs.DiskStorage, config *cluster.ContainerConfig) ([]*pendingAllocResource, error) {
+	stores []structs.DiskStorage, config *cluster.ContainerConfig, configures map[string]interface{}) ([]*pendingAllocResource, error) {
 
 	entry := logrus.WithFields(logrus.Fields{"Name": svc.Name, "Module": _type})
 
-	pendings, err := gd.pendingAlloc(candidates, svc.ID, svc.Name, _type, stores, config)
+	pendings, err := gd.pendingAlloc(candidates, svc.ID, svc.Name, _type, stores, config, configures)
 	if err != nil {
 		entry.Errorf("gd.pendingAlloc: pendings Allocation Failed %s", err)
 		return pendings, err
@@ -203,8 +203,8 @@ func (gd *Gardener) BuildPendingContainers(svc *Service, _type string, candidate
 	return pendings, nil
 }
 
-func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type string,
-	stores []structs.DiskStorage, templConfig *cluster.ContainerConfig) ([]*pendingAllocResource, error) {
+func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type string, stores []structs.DiskStorage,
+	templConfig *cluster.ContainerConfig, configures map[string]interface{}) ([]*pendingAllocResource, error) {
 
 	entry := logrus.WithFields(logrus.Fields{"Name": svcName, "Module": _type})
 
@@ -254,9 +254,15 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 				NetworkMode:   config.HostConfig.NetworkMode.NetworkName(),
 				CreatedAt:     time.Now(),
 			},
-			engine: engine,
-			ports:  nil,
-			parent: parentConfig,
+			engine:     engine,
+			ports:      nil,
+			parent:     parentConfig,
+			configures: configures,
+		}
+
+		forbid, can := unit.CanModify(configures)
+		if !can {
+			return allocs, fmt.Errorf("Forbid modifying service config,%s", forbid)
 		}
 
 		if err := unit.factory(); err != nil {

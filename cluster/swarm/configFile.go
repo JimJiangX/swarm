@@ -196,7 +196,6 @@ func (c mysqlConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interf
 		return nil, fmt.Errorf("Unexpected port allocation")
 	}
 
-	m["mysqld::character_set_server"] = "gbk"
 	m["mysqld::log-bin"] = fmt.Sprintf("/DBAASLOG/BIN/%s-binlog", u.Name)
 	m["mysqld::innodb_buffer_pool_size"] = int(float64(u.config.HostConfig.Memory) * 0.75)
 	m["mysqld::relay_log"] = fmt.Sprintf("/DBAASLOG/REL/%s-relay", u.Name)

@@ -66,6 +66,7 @@ type unit struct {
 	parent      *database.UnitConfig
 	ports       []database.Port
 	networkings []IPInfo
+	configures  map[string]interface{}
 
 	configParser
 	ContainerCmd
