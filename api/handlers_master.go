@@ -427,19 +427,6 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		labels = nil
 	}
 
-	var keysets map[string]structs.KeysetParams
-	if len(config.KeySets) > 0 {
-		keysets = make(map[string]structs.KeysetParams, len(config.KeySets))
-		for key, val := range config.KeySets {
-			keysets[key] = structs.KeysetParams{
-				Key:         val.Key,
-				CanSet:      val.CanSet,
-				MustRestart: val.MustRestart,
-				Description: val.Description,
-			}
-		}
-	}
-
 	resp := structs.GetImageResponse{
 		ID:       image.ID,
 		Name:     image.Name,
@@ -450,10 +437,10 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		Size:     image.Size,
 		UploadAt: utils.TimeToString(image.UploadAt),
 		TemplateConfig: structs.ImageConfigResponse{
-			ID:      config.ID,      // string `json:"config_id"`
-			Mount:   config.Mount,   // string `json:"config_mount_path"`
-			Content: config.Content, // string `json:"config_content"`
-			KeySet:  keysets,        // map[string]KeysetParams,
+			ID:      config.ID,                              // string `json:"config_id"`
+			Mount:   config.Mount,                           // string `json:"config_mount_path"`
+			Content: config.Content,                         // string `json:"config_content"`
+			KeySet:  converteToKeysetParams(config.KeySets), // map[string]KeysetParams,
 		},
 	}
 

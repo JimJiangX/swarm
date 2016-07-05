@@ -101,15 +101,14 @@ func TestUnit(t *testing.T) {
 	}
 
 	unitConfig := UnitConfig{
-		ID:            "unitConfig99",
-		ImageID:       "imageId99",
-		Mount:         "/tmp",
-		Version:       99,
-		ParentID:      "parentId99",
-		Content:       "content99",
-		ConfigKeySets: "",
-		KeySets:       make(map[string]KeysetParams),
-		CreatedAt:     time.Now(),
+		ID:        "unitConfig99",
+		ImageID:   "imageId99",
+		Mount:     "/tmp",
+		Version:   99,
+		ParentID:  "parentId99",
+		Content:   "content99",
+		KeySets:   make(map[string]KeysetParams),
+		CreatedAt: time.Now(),
 	}
 
 	err = SaveUnitConfigToDisk(unit1, unitConfig)

@@ -20,7 +20,7 @@ type Image struct {
 	Size    int    `db:"size"`
 
 	TemplateConfigID string `db:"template_config_id"`
-	configKeySets    string `db:"config_keysets"` // map[string]KeysetParams
+	ConfigKeySets    string `db:"config_keysets"` // map[string]KeysetParams
 
 	UploadAt time.Time `db:"upload_at"`
 }
@@ -36,7 +36,7 @@ func TxInsertImage(image Image, config UnitConfig, task Task) error {
 	}
 	defer tx.Rollback()
 
-	image.configKeySets, err = unitConfigEncode(config.KeySets)
+	image.ConfigKeySets, err = unitConfigEncode(config.KeySets)
 
 	query := "INSERT INTO tb_image (enabled,id,name,version,docker_image_id,label,size,template_config_id,config_keysets,upload_at) VALUES (:enabled,:id,:name,:version,:docker_image_id,:label,:size,:template_config_id,:config_keysets,:upload_at)"
 
@@ -89,7 +89,7 @@ func GetImageAndUnitConfig(ID string) (Image, UnitConfig, error) {
 		return image, config, err
 	}
 
-	config.KeySets, err = unitConfigDecode(image.configKeySets)
+	config.KeySets, err = unitConfigDecode(image.ConfigKeySets)
 
 	return image, config, err
 }
@@ -234,18 +234,21 @@ func ListUnitConfigByService(service string) ([]struct {
 		return nil, nil
 	}
 
-	var images []Image
-	err = db.Select(&images, "SELECT * FROM tb_image")
+	var result []struct {
+		ID      string `db:"id"`
+		KeySets string `db:"config_keysets"`
+	}
+	err = db.Select(&result, "SELECT id,config_keysets FROM tb_image")
 	if err != nil {
 		return nil, err
 	}
 
 	for i := range configs {
-		for index := range images {
-			if configs[i].ImageID != images[index].ID {
+		for r := range result {
+			if configs[i].ImageID != result[r].ID {
 				continue
 			}
-			configs[i].KeySets, err = unitConfigDecode(images[index].configKeySets)
+			configs[i].KeySets, err = unitConfigDecode(result[r].KeySets)
 			if err == nil {
 				break
 			}
