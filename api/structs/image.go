@@ -52,10 +52,15 @@ type UpdateServiceConfigRequest struct {
 	Pairs map[string]interface{}
 }
 
+type ValueAndKeyset struct {
+	Value string
+	KeysetParams
+}
+
 type UnitConfigResponse struct {
 	ID        string
 	Name      string
 	Type      string
 	CreatedAt string
-	Content   map[string]map[string]string
+	Config    []ValueAndKeyset
 }

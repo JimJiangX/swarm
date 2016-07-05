@@ -19,8 +19,10 @@ type Image struct {
 	Labels  string `db:"label"`
 	Size    int    `db:"size"`
 
-	TemplateConfigID string    `db:"template_config_id"`
-	UploadAt         time.Time `db:"upload_at"`
+	TemplateConfigID string `db:"template_config_id"`
+	configKeySets    string `db:"config_keysets"` // map[string]KeysetParams
+
+	UploadAt time.Time `db:"upload_at"`
 }
 
 func (Image) TableName() string {
@@ -34,7 +36,9 @@ func TxInsertImage(image Image, config UnitConfig, task Task) error {
 	}
 	defer tx.Rollback()
 
-	query := "INSERT INTO tb_image (enabled,id,name,version,docker_image_id,label,size,template_config_id,upload_at) VALUES (:enabled,:id,:name,:version,:docker_image_id,:label,:size,:template_config_id,:upload_at)"
+	image.configKeySets, err = unitConfigEncode(config.KeySets)
+
+	query := "INSERT INTO tb_image (enabled,id,name,version,docker_image_id,label,size,template_config_id,config_keysets,upload_at) VALUES (:enabled,:id,:name,:version,:docker_image_id,:label,:size,:template_config_id,:config_keysets,:upload_at)"
 
 	_, err = tx.NamedExec(query, &image)
 	if err != nil {
@@ -85,7 +89,7 @@ func GetImageAndUnitConfig(ID string) (Image, UnitConfig, error) {
 		return image, config, err
 	}
 
-	err = config.decode()
+	config.KeySets, err = unitConfigDecode(image.configKeySets)
 
 	return image, config, err
 }
@@ -125,16 +129,14 @@ func DeleteImage(ID string) error {
 }
 
 type UnitConfig struct {
-	ID            string                  `db:"id"`
-	ImageID       string                  `db:"image_id"`
-	Mount         string                  `db:"config_file_path"`
-	Version       int                     `db:"version"`
-	ParentID      string                  `db:"parent_id"`
-	Content       string                  `db:"content"`         // map[string]interface{}
-	ConfigKeySets string                  `db:"config_key_sets"` // map[string]KeysetParams
-	KeySets       map[string]KeysetParams `db:"-"`
-
-	CreatedAt time.Time `db:"created_at"`
+	ID        string                  `db:"id"`
+	ImageID   string                  `db:"image_id"`
+	Mount     string                  `db:"config_file_path"`
+	Version   int                     `db:"version"`
+	ParentID  string                  `db:"parent_id"`
+	Content   string                  `db:"content"`
+	KeySets   map[string]KeysetParams `db:"-"`
+	CreatedAt time.Time               `db:"created_at"`
 }
 
 type KeysetParams struct {
@@ -148,26 +150,25 @@ func (u UnitConfig) TableName() string {
 	return "tb_unit_config"
 }
 
-func (c *UnitConfig) encode() error {
-	buffer := bytes.NewBuffer(nil)
-	err := json.NewEncoder(buffer).Encode(c.KeySets)
-
-	if err == nil {
-		c.ConfigKeySets = buffer.String()
+func unitConfigEncode(keysets map[string]KeysetParams) (string, error) {
+	if len(keysets) == 0 {
+		return "", nil
 	}
+	buffer := bytes.NewBuffer(nil)
+	err := json.NewEncoder(buffer).Encode(keysets)
 
-	return nil
+	return buffer.String(), err
 }
 
-func (c *UnitConfig) decode() error {
-	var val map[string]KeysetParams
-	dec := json.NewDecoder(strings.NewReader(c.ConfigKeySets))
-	err := dec.Decode(&val)
-	if err == nil {
-		c.KeySets = val
+func unitConfigDecode(src string) (map[string]KeysetParams, error) {
+	if len(src) == 0 {
+		return map[string]KeysetParams{}, nil
 	}
+	var val map[string]KeysetParams
+	dec := json.NewDecoder(strings.NewReader(src))
+	err := dec.Decode(&val)
 
-	return nil
+	return val, err
 }
 
 func GetUnitConfigByID(id string) (*UnitConfig, error) {
@@ -177,16 +178,19 @@ func GetUnitConfigByID(id string) (*UnitConfig, error) {
 	}
 
 	config := &UnitConfig{}
-	query := "SELECT * FROM tb_unit_config WHERE id=? OR image_id=?"
-	err = db.Get(config, query, id, id)
+	query := "SELECT * FROM tb_unit_config WHERE id=?"
+	err = db.Get(config, query, id)
 	if err != nil {
 		return nil, err
 	}
 
-	err = config.decode()
+	var keysets string
+	err = db.Get(&keysets, "SELECT config_keysets FROM tb_image WHERE id=?", config.ImageID)
 	if err != nil {
 		return nil, err
 	}
+
+	config.KeySets, err = unitConfigDecode(keysets)
 
 	return config, err
 }
@@ -226,10 +230,25 @@ func ListUnitConfigByService(service string) ([]struct {
 		return nil, err
 	}
 
+	if len(configs) == 0 {
+		return nil, nil
+	}
+
+	var images []Image
+	err = db.Select(&images, "SELECT * FROM tb_image")
+	if err != nil {
+		return nil, err
+	}
+
 	for i := range configs {
-		err = configs[i].decode()
-		if err != nil {
-			return nil, err
+		for index := range images {
+			if configs[i].ImageID != images[index].ID {
+				continue
+			}
+			configs[i].KeySets, err = unitConfigDecode(images[index].configKeySets)
+			if err == nil {
+				break
+			}
 		}
 	}
 
@@ -262,14 +281,8 @@ func ListUnitConfigByService(service string) ([]struct {
 }
 
 func TXInsertUnitConfig(tx *sqlx.Tx, config *UnitConfig) error {
-	err := config.encode()
-	if err != nil {
-		return err
-	}
-
-	query := "INSERT INTO tb_unit_config (id,image_id,config_file_path,version,parent_id,content,config_key_sets,created_at) VALUES (:id,:image_id,:config_file_path,:version,:parent_id,:content,:config_key_sets,:created_at)"
-
-	_, err = tx.NamedExec(query, config)
+	query := "INSERT INTO tb_unit_config (id,image_id,config_file_path,version,parent_id,content,created_at) VALUES (:id,:image_id,:config_file_path,:version,:parent_id,:content,:created_at)"
+	_, err := tx.NamedExec(query, config)
 
 	return err
 }
@@ -286,30 +299,22 @@ func TxUpdateImageTemplateConfig(image string, config UnitConfig) error {
 		return err
 	}
 
-	_, err = tx.Exec("UPDATE tb_image SET template_config_id=? WHERE id=?", config.ID, image)
+	if keysets := ""; len(config.KeySets) == 0 {
+		_, err = tx.Exec("UPDATE tb_image SET template_config_id=? WHERE id=?", config.ID, image)
+	} else {
+		keysets, err = unitConfigEncode(config.KeySets)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Exec("UPDATE tb_image SET template_config_id=?,config_keysets=? WHERE id=?", config.ID, keysets, image)
+	}
+
 	if err != nil {
 		return err
 	}
 
 	return tx.Commit()
-}
-
-func UpdateUnitConfig(config UnitConfig) error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
-	}
-
-	err = config.encode()
-	if err != nil {
-		return err
-	}
-
-	query := "UPDATE tb_unit_config SET image_id=:image,config_file_path=:config_file_path,version=:version,parent_id=:parent_id,content=:content,config_key_sets=:config_key_sets,created_at=:created_at WHERE id=:id"
-
-	_, err = db.NamedExec(query, config)
-
-	return err
 }
 
 func DeleteUnitConfig(id string) error {

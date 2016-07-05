@@ -821,14 +821,15 @@ func getServiceServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.R
 		return
 	}
 
-	const defaultSection = "default"
-
 	resp := make([]structs.UnitConfigResponse, len(configs))
 	for i := range configs {
+		keysetsMap := converteToKeysetParams(configs[i].Config.KeySets)
+
 		resp[i] = structs.UnitConfigResponse{
 			ID:        configs[i].Unit.ID,
 			Name:      configs[i].Unit.Name,
 			Type:      configs[i].Unit.Type,
+			Config:    make([]structs.ValueAndKeyset, 0, len(keysetsMap)),
 			CreatedAt: utils.TimeToString(configs[i].Config.CreatedAt),
 		}
 
@@ -841,28 +842,13 @@ func getServiceServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.R
 
 		}
 
-		m := make(map[string]map[string]string, 10)
-		for key, val := range configs[i].Config.KeySets {
-			if val.CanSet {
-				section := ""
-				value := configer.String(key)
-				sectionKey := strings.Split(key, "::")
-				if len(sectionKey) >= 2 {
-					section = sectionKey[0]
-					key = sectionKey[1]
-				} else {
-					section = defaultSection
-					key = sectionKey[0]
-				}
-
-				if m[section] == nil {
-					m[section] = make(map[string]string)
-				}
-				m[section][key] = value
-			}
+		for key, val := range keysetsMap {
+			value := configer.String(key)
+			resp[i].Config = append(resp[i].Config, structs.ValueAndKeyset{
+				Value:        value,
+				KeysetParams: val,
+			})
 		}
-
-		resp[i].Content = m
 	}
 
 	w.Header().Set("Content-Type", "application/json")
