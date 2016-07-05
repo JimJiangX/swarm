@@ -597,7 +597,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 	defer svc.RUnlock()
 
 	if svc.backup != nil {
-		bs := NewBackupJob(HostAddress, svc)
+		bs := NewBackupJob(svc)
 		err = gd.RegisterBackupStrategy(bs)
 		if err != nil {
 			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err)
@@ -1222,7 +1222,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, unit string, req structs
 		return "", err
 	}
 
-	go svc.TryBackupTask(&task, HostAddress, unit, *strategy)
+	go svc.TryBackupTask(&task, HostAddress+":"+httpPort, unit, *strategy)
 
 	return task.ID, nil
 }
@@ -1272,7 +1272,11 @@ func (svc *Service) TryBackupTask(task *database.Task, host, unitID string, stra
 		}
 	}
 
-	args := []string{host + "v1.0/task/backup/callback", task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
+	if host == "" {
+		host = HostAddress + ":" + httpPort
+	}
+
+	args := []string{host + "/v1.0/task/backup/callback", task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(strategy.Timeout)*time.Second)
 	defer cancel()

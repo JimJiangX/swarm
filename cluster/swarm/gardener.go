@@ -22,6 +22,7 @@ import (
 var (
 	leaderElectionPath = "docker/swarm/leader"
 	HostAddress        = "127.0.0.1"
+	httpPort           = "4000"
 	DockerNodesKVPath  = "docker/swarm/nodes"
 	DatacenterID       = 0
 )
@@ -86,13 +87,14 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 			protoAddrParts = append([]string{"tcp"}, protoAddrParts...)
 		}
 		if protoAddrParts[0] == "tcp" {
-			ip, _, err := net.SplitHostPort(protoAddrParts[1])
+			ip, port, err := net.SplitHostPort(protoAddrParts[1])
 			if err != nil {
 				logrus.Error("%s SplitHostPort error,%s", protoAddrParts[1], err)
 				return nil, err
 			}
 
 			HostAddress = ip
+			httpPort = port
 			break
 		}
 	}

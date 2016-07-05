@@ -13,17 +13,15 @@ import (
 
 type serviceBackup struct {
 	id       crontab.EntryID
-	server   string
 	strategy *database.BackupStrategy
 	schedule crontab.Schedule
 
 	svc *Service
 }
 
-func NewBackupJob(addr string, svc *Service) *serviceBackup {
+func NewBackupJob(svc *Service) *serviceBackup {
 	return &serviceBackup{
 		svc:      svc,
-		server:   addr,
 		strategy: svc.backup,
 	}
 }
@@ -34,9 +32,10 @@ func (bs *serviceBackup) Run() {
 		return
 	}
 
-	if !strategy.Enabled || bs.server == "" || bs.svc == nil {
+	if !strategy.Enabled || bs.svc == nil {
 		return
 	}
+
 	bs.strategy = strategy
 
 	task := database.NewTask("backup_strategy", strategy.ID, "", nil, strategy.Timeout)
@@ -46,7 +45,7 @@ func (bs *serviceBackup) Run() {
 		return
 	}
 
-	bs.svc.TryBackupTask(&task, bs.server, "", *strategy)
+	bs.svc.TryBackupTask(&task, HostAddress+":"+httpPort, "", *strategy)
 }
 
 func (bs *serviceBackup) Next(time.Time) time.Time {
@@ -140,7 +139,7 @@ func (gd *Gardener) ReplaceServiceBackupStrategy(NameOrID string, req structs.Ba
 	}
 
 	if service.backup != nil {
-		bs := NewBackupJob(HostAddress, service)
+		bs := NewBackupJob(service)
 		err = gd.RegisterBackupStrategy(bs)
 		if err != nil {
 			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err)
@@ -204,7 +203,7 @@ func (gd *Gardener) EnableServiceBackupStrategy(strategy string) error {
 		svc.backup = backup
 		svc.Unlock()
 
-		bs := NewBackupJob(HostAddress, svc)
+		bs := NewBackupJob(svc)
 		err = gd.RegisterBackupStrategy(bs)
 		if err != nil {
 			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err)
