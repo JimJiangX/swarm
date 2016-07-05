@@ -1453,13 +1453,13 @@ func postServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err = svc.AddServiceUsers(users)
+	code, err := svc.AddServiceUsers(users)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(code)
 }
 
 // POST /services/{name:.*}/start
@@ -2293,7 +2293,7 @@ func deleteServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // DELETE /services/backup_strategy/{name:.*}

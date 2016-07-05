@@ -205,14 +205,16 @@ func DeleteServiceBackupStrategy(strategy string) error {
 	return err
 }
 
-func (svc *Service) AddServiceUsers(req []structs.User) error {
+func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 	svc.Lock()
 	defer svc.Unlock()
+
+	code := 200
 
 	if len(svc.users) == 0 {
 		out, err := database.ListUsersByService(svc.ID, "")
 		if err != nil {
-			return err
+			return 0, err
 		}
 
 		svc.users = out
@@ -243,11 +245,12 @@ func (svc *Service) AddServiceUsers(req []structs.User) error {
 
 	addr, port, err := svc.getSwitchManagerAddr()
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	users := converteToUsers(svc.ID, addition)
 	for i := range users {
+		code = 201
 		user := swm_structs.User{
 			Id:       users[i].ID,
 			Type:     users[i].Type,
@@ -258,7 +261,7 @@ func (svc *Service) AddServiceUsers(req []structs.User) error {
 		err := smlib.AddUser(addr, port, user)
 		if err != nil {
 			logrus.Errorf("%s add user error:%s", addr, err)
-			return err
+			return 0, err
 		}
 	}
 
@@ -273,23 +276,23 @@ func (svc *Service) AddServiceUsers(req []structs.User) error {
 		err := smlib.UptUser(addr, port, user)
 		if err != nil {
 			logrus.Errorf("%s update user error:%s", addr, err)
-			return err
+			return 0, err
 		}
 	}
 
 	err = database.TxUpdateUsers(users, update)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	out, err := database.ListUsersByService(svc.ID, "")
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	svc.users = out
 
-	return nil
+	return code, nil
 }
 
 func (svc *Service) DeleteServiceUsers(usernames []string, all bool) error {
@@ -1272,29 +1275,35 @@ func (svc *Service) TryBackupTask(task *database.Task, host, unitID string, stra
 		}
 	}
 
+	if !atomic.CompareAndSwapUint32(&backup.Status, _StatusUnitNoContent, _StatusUnitBackuping) {
+		err := fmt.Errorf("contianer %s is busy", backup.Name)
+		database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "TaskCancel,"+err.Error())
+		return err
+	}
+
 	if host == "" {
 		host = HostAddress + ":" + httpPort
 	}
 
-	args := []string{host + "/v1.0/task/backup/callback", task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
+	args := []string{host + "/v1.0/tasks/backup/callback", task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(strategy.Timeout)*time.Second)
 	defer cancel()
+
+	msg, status := "", int32(0)
 
 	err := backup.backup(ctx, args...)
 	if err == nil {
 		logrus.Info("Backup %s Task %s End", unitID, task.ID)
 		return nil
 	} else {
+		status = _StatusTaskFailed
 		err = fmt.Errorf("Backup %s Task Faild,%v", unitID, err)
+		msg = err.Error()
 		logrus.Error(err)
 	}
 
-	<-ctx.Done()
-	msg := ""
-	status := int32(0)
-	ctxErr := ctx.Err()
-	if ctxErr != nil {
+	if ctxErr := ctx.Err(); ctxErr != nil {
 		if ctxErr == context.DeadlineExceeded {
 			msg = "Timeout"
 			status = _StatusTaskTimeout
@@ -1302,10 +1311,11 @@ func (svc *Service) TryBackupTask(task *database.Task, host, unitID string, stra
 			msg = "Canceled"
 			status = _StatusTaskCancel
 		}
-		err1 := database.UpdateTaskStatus(task, status, time.Now(), msg)
-		err1 = fmt.Errorf("Task %s,Service:%s,BackupStrategy:%s,Task:%s,Error:%v", msg, svc.ID, strategy.ID, task.ID, err)
-		logrus.Error(err1)
 	}
+
+	err1 := database.UpdateTaskStatus(task, status, time.Now(), msg)
+	err1 = fmt.Errorf("Task %s,Service:%s,BackupStrategy:%s,Task:%s,Error:%v", msg, svc.ID, strategy.ID, task.ID, err1)
+	logrus.Error(err1)
 
 	return err
 }
