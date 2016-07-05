@@ -1,6 +1,7 @@
 package database
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/docker/swarm/utils"
@@ -395,6 +396,10 @@ func ListNodeByClusterType(_type string, enabled bool) ([]Node, error) {
 	err = db.Select(&clist, "SELECT id FROM tb_cluster WHERE type=? AND enabled=?", _type, enabled)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(clist) <= 0 {
+		return nil, fmt.Errorf("No Available Cluster,Type='%s' & ebabled=%t", _type, enabled)
 	}
 
 	query, args, err := sqlx.In("SELECT * FROM tb_node WHERE cluster_id IN (?);", clist)

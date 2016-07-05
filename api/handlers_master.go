@@ -821,6 +821,8 @@ func getServiceServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.R
 		return
 	}
 
+	const defaultSection = "default"
+
 	resp := make([]structs.UnitConfigResponse, len(configs))
 	for i := range configs {
 		resp[i] = structs.UnitConfigResponse{
@@ -844,22 +846,19 @@ func getServiceServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.R
 			if val.CanSet {
 				section := ""
 				value := configer.String(key)
-				parts := strings.SplitN(key, "::", 2)
-				if len(parts) == 1 {
-					section = "default"
-					key = parts[0]
-				} else if len(parts) == 2 {
-					section = parts[0]
-					key = parts[1]
+				sectionKey := strings.Split(key, "::")
+				if len(sectionKey) >= 2 {
+					section = sectionKey[0]
+					key = sectionKey[1]
 				} else {
-					// error
+					section = defaultSection
+					key = sectionKey[0]
 				}
-				pairs, ok := m[section]
-				if !ok {
-					pairs = make(map[string]string)
+
+				if m[section] == nil {
+					m[section] = make(map[string]string)
 				}
-				pairs[key] = value
-				m[section] = pairs
+				m[section][key] = value
 			}
 		}
 
