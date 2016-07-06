@@ -752,8 +752,8 @@ func (u *unit) stopService() error {
 
 func (u *unit) backup(ctx context.Context, args ...string) error {
 	if !atomic.CompareAndSwapUint32(&u.Status, _StatusUnitNoContent, _StatusUnitBackuping) ||
-		u.container.Status != "running" {
-		err := fmt.Errorf("unit %s is busy,container Status=%s", u.Name, u.container.Status)
+		u.container.State != "running" {
+		err := fmt.Errorf("unit %s is busy,container Status=%s", u.Name, u.container.State)
 		logrus.Error(err)
 
 		return err
