@@ -1207,6 +1207,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, unit string, req structs
 	if unit != "" {
 		u, err := database.GetUnit(unit)
 		if err != nil {
+			logrus.Errorf("Not Found Unit '%s',Error:%s", unit, err)
 			return "", err
 		}
 
@@ -1217,11 +1218,14 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, unit string, req structs
 
 	svc, err := gd.GetService(service)
 	if err != nil {
+		logrus.Errorf("Not Found Service '%s',Error:%s", service, err)
+
 		return "", err
 	}
 
 	strategy, err := newBackupStrategy(service, &req)
 	if err != nil || strategy == nil {
+		logrus.Errorf("Illegal Strategy,%v", err)
 		return "", err
 	}
 
@@ -1229,10 +1233,11 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, unit string, req structs
 	task.Status = _StatusTaskCreate
 	err = database.TxInsertBackupStrategyAndTask(*strategy, task)
 	if err != nil {
+		logrus.Errorf("TxInsert BackupStrategy And Task Erorr:%s", err)
 		return "", err
 	}
 
-	go svc.TryBackupTask(&task, HostAddress+":"+httpPort, unit, *strategy)
+	go svc.TryBackupTask(HostAddress+":"+httpPort, unit, *strategy, &task)
 
 	return task.ID, nil
 }

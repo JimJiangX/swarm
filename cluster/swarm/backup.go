@@ -49,7 +49,7 @@ func (bs *serviceBackup) Run() {
 		return
 	}
 
-	bs.svc.TryBackupTask(&task, HostAddress+":"+httpPort, "", *strategy)
+	bs.svc.TryBackupTask(HostAddress+":"+httpPort, "", *strategy, &task)
 }
 
 func (bs *serviceBackup) Next(time.Time) time.Time {
@@ -90,7 +90,7 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 	return next
 }
 
-func (svc *Service) TryBackupTask(task *database.Task, host, unitID string, strategy database.BackupStrategy) error {
+func (svc *Service) TryBackupTask(host, unitID string, strategy database.BackupStrategy, task *database.Task) error {
 	backup := &unit{}
 	for retries := 3; ; retries-- {
 		if retries != 3 {
@@ -100,16 +100,18 @@ func (svc *Service) TryBackupTask(task *database.Task, host, unitID string, stra
 		addr, port, master, err := svc.GetSwitchManagerAndMaster()
 		if err != nil || master == nil {
 			if retries > 0 {
+				logrus.Errorf("Get SwitchManager And Master,retries=%d,Error:%v", retries, err)
 				continue
 			}
 			err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "Cancel,The Task marked as TaskCancel,"+err.Error())
-			err = fmt.Errorf("Errors:%v,%v", err, err1)
+			err = fmt.Errorf("Update Task Status Errors:%v,%v", err, err1)
 			logrus.Error(err)
 			return err
 		}
 
 		if err := smlib.Lock(addr, port); err != nil {
 			if retries > 0 {
+				logrus.Errorf("Lock SwitchManager %s:%d,Error:%s", addr, port, err)
 				continue
 			}
 			err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "TaskCancel,Switch Manager is busy now,"+err.Error())
@@ -131,13 +133,16 @@ func (svc *Service) TryBackupTask(task *database.Task, host, unitID string, stra
 		svc.RUnlock()
 
 		if err != nil {
+			logrus.Errorf("Not Found Unit %s", unitID)
 			return err
 		}
 	}
 
 	if !atomic.CompareAndSwapUint32(&backup.Status, _StatusUnitNoContent, _StatusUnitBackuping) {
 		err := fmt.Errorf("contianer %s is busy", backup.Name)
-		database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "TaskCancel,"+err.Error())
+		err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "TaskCancel,"+err.Error())
+		logrus.Errorf("CompareAndSwapUint32,%s,%v", err, err1)
+
 		return err
 	}
 
