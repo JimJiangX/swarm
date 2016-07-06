@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/astaxie/beego/config"
@@ -426,6 +427,9 @@ func (u *unit) startContainer() error {
 }
 
 func (u *unit) stopContainer(timeout int) error {
+	if val := atomic.LoadUint32(&u.Status); val == _StatusUnitBackuping {
+		return fmt.Errorf("Unit %s is Backuping,Cannot stop", u.Name)
+	}
 	u.stopService()
 
 	client, err := u.getEngineAPIClient()
@@ -726,6 +730,9 @@ func (u *unit) startService() error {
 }
 
 func (u *unit) stopService() error {
+	if val := atomic.LoadUint32(&u.Status); val == _StatusUnitBackuping {
+		return fmt.Errorf("Unit %s is Backuping,Cannot stop", u.Name)
+	}
 	if u.ContainerCmd == nil {
 		return nil
 	}
@@ -744,6 +751,15 @@ func (u *unit) stopService() error {
 }
 
 func (u *unit) backup(ctx context.Context, args ...string) error {
+	if !atomic.CompareAndSwapUint32(&u.Status, _StatusUnitNoContent, _StatusUnitBackuping) ||
+		u.container.Status != "running" {
+		err := fmt.Errorf("unit %s is busy,container Status=%s", u.Name, u.container.Status)
+		logrus.Error(err)
+
+		return err
+	}
+	defer atomic.CompareAndSwapUint32(&u.Status, _StatusUnitBackuping, _StatusUnitNoContent)
+
 	if u.ContainerCmd == nil {
 		return nil
 	}

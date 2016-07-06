@@ -52,7 +52,8 @@ func ParseNodeStatus(status int) string {
 }
 
 const (
-	_StatusUnitAllocted = iota
+	_StatusUnitNoContent = iota
+	_StatusUnitAllocted
 	_StatusUnitCreating
 	_StatusUnitStarting // start contaier and start service
 	_statusUnitStoping
@@ -61,7 +62,6 @@ const (
 	_StatusUnitDeleting
 	_StatusUnitBackuping
 	_StatusUnitRestoring
-	_StatusUnitNoContent
 )
 
 const (

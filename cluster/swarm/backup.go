@@ -2,7 +2,6 @@ package swarm
 
 import (
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/context"
@@ -136,14 +135,6 @@ func (svc *Service) TryBackupTask(host, unitID string, strategy database.BackupS
 			logrus.Errorf("Not Found Unit %s", unitID)
 			return err
 		}
-	}
-
-	if !atomic.CompareAndSwapUint32(&backup.Status, _StatusUnitNoContent, _StatusUnitBackuping) {
-		err := fmt.Errorf("contianer %s is busy", backup.Name)
-		err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "TaskCancel,"+err.Error())
-		logrus.Errorf("CompareAndSwapUint32,%s,%v", err, err1)
-
-		return err
 	}
 
 	if host == "" {
