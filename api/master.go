@@ -227,7 +227,7 @@ func DebugRequestMiddleware(r *http.Request) error {
 			logrus.Debugf("form data: %q", postForm)
 		}
 	} else {
-		logrus.Debugf("JSON Unmarshal error:%v,'%s'", err, string(b))
+		logrus.Debugf("'%s'", string(b))
 	}
 
 	return err

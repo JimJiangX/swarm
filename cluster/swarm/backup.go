@@ -150,7 +150,7 @@ func (svc *Service) TryBackupTask(host, unitID string, strategy database.BackupS
 
 	err := backup.backup(ctx, args...)
 	if err == nil {
-		logrus.Info("Backup %s Task %s End", unitID, task.ID)
+		logrus.Infof("Backup %s Task %s End", unitID, task.ID)
 		return nil
 	} else {
 		status = _StatusTaskFailed

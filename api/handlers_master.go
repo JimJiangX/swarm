@@ -1487,25 +1487,28 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 // POST /services/{name:.*}/backup
 func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	service := mux.Vars(r)["name"]
-	req := structs.BackupStrategy{}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	sys, err := gd.SystemConfig()
 	if err != nil {
 		logrus.Error(err)
+
+		config, err := database.GetSystemConfig()
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		sys = *config
 	}
+	strategy := defaultBackupStrategy(service, sys.BackupDir)
 
-	req.BackupDir = sys.BackupDir
-
-	taskID, err := gd.TemporaryServiceBackupTask(service, "", req)
+	taskID, err := gd.TemporaryServiceBackupTask(service, "", strategy)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1737,6 +1740,20 @@ func postUnitStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func defaultBackupStrategy(prefix, backupDir string) structs.BackupStrategy {
+
+	now := time.Now()
+	return structs.BackupStrategy{
+		ID:        utils.Generate32UUID(),
+		Name:      prefix + "_backup_manually" + now.String(),
+		Type:      "full",     // full/incremental
+		Spec:      "manually", // cron spec
+		Valid:     utils.TimeToString(now),
+		BackupDir: backupDir,
+		Timeout:   24 * 60 * 60,
+	}
+}
+
 // POST /units/{name:.*}/backup
 func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	unit := mux.Vars(r)["name"]
@@ -1745,21 +1762,20 @@ func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	sys, err := gd.SystemConfig()
 	if err != nil {
 		logrus.Error(err)
-	}
 
-	now := time.Now()
-	strategy := structs.BackupStrategy{
-		ID:        utils.Generate32UUID(),
-		Name:      unit + "_backup_manually" + now.String(),
-		Type:      "full",     // full/incremental
-		Spec:      "manually", // cron spec
-		Valid:     utils.TimeToString(now),
-		BackupDir: sys.BackupDir,
-		Timeout:   24 * 60 * 60,
+		config, err := database.GetSystemConfig()
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		sys = *config
 	}
+	strategy := defaultBackupStrategy(unit, sys.BackupDir)
 
 	taskID, err := gd.TemporaryServiceBackupTask("", unit, strategy)
 	if err != nil {
