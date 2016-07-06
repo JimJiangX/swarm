@@ -83,7 +83,7 @@ func GetBackupFile(id string) (BackupFile, error) {
 	row := BackupFile{}
 	err = db.Get(&row, "SELECT * FROM tb_backup_files WHERE id=?", id)
 
-	return BackupFile{}, err
+	return row, err
 }
 
 func txInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
