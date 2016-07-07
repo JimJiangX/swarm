@@ -488,6 +488,12 @@ func cleanOldContainer(unitID string, old *cluster.Container, lvs []database.Loc
 		return errEngineIsNil
 	}
 
+	// remove old container
+	err := engine.RemoveContainer(old, true, true)
+	if err != nil {
+		logrus.Errorf("engine %s remove container %s error:%s", engine.Addr, old.Info.Name, err)
+	}
+
 	// remove old LocalVolume
 	for i := range lvs {
 		err := engine.RemoveVolume(lvs[i].Name)
@@ -497,13 +503,6 @@ func cleanOldContainer(unitID string, old *cluster.Container, lvs []database.Loc
 		}
 	}
 
-	// remove old container
-	err := engine.RemoveContainer(old, true, true)
-	if err != nil {
-		logrus.Errorf("engine %s remove container %s error:%s", engine.Addr, old.Info.Name, err)
-	}
-
-	// TODO:deregister from horus、consul
 	configs := sys.GetConsulConfigs()
 	if len(configs) == 0 {
 		return fmt.Errorf("GetConsulConfigs error %v %v", err, configs[0])
