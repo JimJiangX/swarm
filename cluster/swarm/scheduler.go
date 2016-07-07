@@ -213,15 +213,10 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 		return nil, fmt.Errorf("Missing Value of ContainerConfig.Labels[_ImageIDInRegistryLabelKey]")
 	}
 
-	image, err := database.QueryImageByID(imageID)
+	image, parentConfig, err := database.GetImageAndUnitConfig(imageID)
 	if err != nil {
-		return nil, err
-	}
-
-	parentConfig, err := database.GetUnitConfigByID(image.ID)
-	if err != nil {
-		entry.Errorf("Not Found Template Config File,Error:%s", err)
-
+		err = fmt.Errorf("Get Image And UnitConfig Error:%s", err)
+		entry.Error(err)
 		return nil, err
 	}
 
@@ -256,7 +251,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 			},
 			engine:     engine,
 			ports:      nil,
-			parent:     parentConfig,
+			parent:     &parentConfig,
 			configures: configures,
 		}
 
