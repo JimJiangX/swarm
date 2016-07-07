@@ -1196,7 +1196,7 @@ func (service *Service) switchBack(name string) error {
 
 	err = smlib.Recover(ip, port, name)
 	if err != nil {
-		logrus.Errorf("Recover %s error:%s:%d %s", name, ip, port, err)
+		logrus.Errorf("switchBack %s error:%s:%d %s", name, ip, port, err)
 	}
 
 	return err

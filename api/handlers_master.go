@@ -507,12 +507,15 @@ const (
 	serviceCritical = "critical"
 )
 
-func getServiceRunningStatus(serviceID string,
+func getServiceRunningStatus(serviceID string, units []database.Unit,
 	containers cluster.Containers, checks map[string]consulapi.HealthCheck) string {
-	units, err := database.ListUnitByServiceID(serviceID)
-	if err != nil {
-		logrus.Errorf("List Unit By ServiceID Error:%s,serviceID=%s", err, serviceID)
-		return serviceUnknown
+	if len(units) == 0 && serviceID != "" {
+		var err error
+		units, err = database.ListUnitByServiceID(serviceID)
+		if err != nil {
+			logrus.Errorf("List Unit By ServiceID Error:%s,serviceID=%s", err, serviceID)
+			return serviceUnknown
+		}
 	}
 
 	if len(units) == 0 {
@@ -634,7 +637,7 @@ func listServiceFromDBAAS(services []database.Service,
 			Memory:        sql.HostConfig.Memory,
 			CpusetCpus:    sql.HostConfig.CpusetCpus,
 			ManageStatus:  services[i].Status,
-			RunningStatus: getServiceRunningStatus(services[i].ID, containers, checks),
+			RunningStatus: getServiceRunningStatus(services[i].ID, nil, containers, checks),
 			CreatedAt:     utils.TimeToString(services[i].CreatedAt),
 		}
 	}
@@ -764,6 +767,7 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 		Status:               service.Status,
 		BackupMaxSizeByte:    service.BackupMaxSizeByte,
 		BackupFilesRetention: service.BackupFilesRetention,
+		RunningStatus:        getServiceRunningStatus(service.ID, units, containers, checks),
 		CreatedAt:            utils.TimeToString(service.CreatedAt),
 		FinishedAt:           utils.TimeToString(service.FinishedAt),
 		Containers:           list,
