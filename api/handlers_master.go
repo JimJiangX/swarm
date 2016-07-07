@@ -750,8 +750,9 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 			list[i].CpusetCpus = container.Info.HostConfig.CpusetCpus
 			list[i].Memory = container.Info.HostConfig.Memory
 			list[i].State = container.State
+		} else {
+			list[i].Status = serviceCritical
 		}
-
 	}
 
 	return structs.ServiceResponse{
