@@ -237,13 +237,15 @@ func (u *unit) getNetworkingAddr(networking, portName string) (addr string, port
 	return "", 0, fmt.Errorf("Not Found Required networking:%s Port:%s", networking, portName)
 }
 
-func createVolumes(engine *cluster.Engine, unitID string) error {
-	// prepare for volumes
-	lvs, err := database.SelectVolumesByUnitID(unitID)
-	if err != nil {
-		logrus.Error("SelectVolumesByUnitID %s error,%s", unitID, err)
-		return err
+func createVolumes(engine *cluster.Engine, unitID string, lvs []database.LocalVolume) (err error) {
+	if len(lvs) == 0 {
+		lvs, err = database.SelectVolumesByUnitID(unitID)
+		if err != nil {
+			logrus.Error("SelectVolumesByUnitID %s error,%s", unitID, err)
+			return err
+		}
 	}
+
 	for i := range lvs {
 		// if volume create on san storage,should created VG before create Volume
 		if isSanVG(lvs[i].VGName) {
@@ -295,6 +297,7 @@ func createVolume(eng *cluster.Engine, lv database.LocalVolume) (*cluster.Volume
 	}
 	v, err := eng.CreateVolume(req)
 	if err != nil {
+		logrus.Errorf("Engine %s Create Volume %v", eng.Addr, req)
 		return nil, err
 	}
 

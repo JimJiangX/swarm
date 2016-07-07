@@ -651,6 +651,7 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 
 	pending := newPendingAllocResource()
 	pending.unit = u
+
 	config.HostConfig.Binds = make([]string, 0, 5)
 	err = gd.allocStorage(pending, engine, config, module.Stores)
 	if err != nil {
@@ -681,7 +682,11 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 		return err
 	}
 
-	err = createVolumes(engine, u.ID)
+	newLvs, err := filterLocalVolumes(u.ID, oldLVs)
+	if err != nil {
+		return err
+	}
+	err = createVolumes(engine, u.ID, newLvs)
 	if err != nil {
 		return err
 	}
@@ -740,6 +745,30 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 	}
 
 	return err
+}
+
+func filterLocalVolumes(unitID string, old []database.LocalVolume) ([]database.LocalVolume, error) {
+	lvs, err := database.SelectVolumesByUnitID(unitID)
+	if err != nil {
+		logrus.Error("SelectVolumesByUnitID %s error,%s", unitID, err)
+		return nil, err
+	}
+
+	out := make([]database.LocalVolume, 0, len(lvs))
+	for i := range lvs {
+		exist := false
+		for j := range old {
+			if lvs[i].ID == old[j].ID {
+				exist = true
+				break
+			}
+		}
+		if !exist {
+			out = append(out, lvs[i])
+		}
+	}
+
+	return out, err
 }
 
 func registerToServers(u *unit, svc *Service, sys database.Configurations) error {

@@ -199,7 +199,7 @@ func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) error {
 	}
 
 	logrus.Debug("[MG]create volumes")
-	err = createVolumes(u.engine, u.ID)
+	err = createVolumes(u.engine, u.ID, nil)
 	if err != nil {
 		return fmt.Errorf("%s:createVolumes Failed,%s", pending.Name, err)
 	}
