@@ -857,7 +857,9 @@ func (svc *Service) removeContainers(force, rmVolumes bool) error {
 		err := u.removeContainer(force, rmVolumes)
 		if err != nil {
 			logrus.Errorf("container %s remove,-f=%v -v=%v,error:%s", u.Name, force, rmVolumes, err)
-
+			if err == errEngineIsNil {
+				continue
+			}
 			if err := checkContainerError(err); err == errContainerNotFound {
 				continue
 			}
