@@ -1494,21 +1494,7 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	sys, err := gd.SystemConfig()
-	if err != nil {
-		logrus.Error(err)
-
-		config, err := database.GetSystemConfig()
-		if err != nil {
-			httpError(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		sys = *config
-	}
-	strategy := defaultBackupStrategy(service, sys.BackupDir)
-
-	taskID, err := gd.TemporaryServiceBackupTask(service, "", strategy)
+	taskID, err := gd.TemporaryServiceBackupTask(service, "")
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1740,20 +1726,6 @@ func postUnitStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func defaultBackupStrategy(prefix, backupDir string) structs.BackupStrategy {
-
-	now := time.Now()
-	return structs.BackupStrategy{
-		ID:        utils.Generate32UUID(),
-		Name:      prefix + "_backup_manually" + now.String(),
-		Type:      "full",     // full/incremental
-		Spec:      "manually", // cron spec
-		Valid:     utils.TimeToString(now),
-		BackupDir: backupDir,
-		Timeout:   24 * 60 * 60,
-	}
-}
-
 // POST /units/{name:.*}/backup
 func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	unit := mux.Vars(r)["name"]
@@ -1763,21 +1735,7 @@ func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sys, err := gd.SystemConfig()
-	if err != nil {
-		logrus.Error(err)
-
-		config, err := database.GetSystemConfig()
-		if err != nil {
-			httpError(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		sys = *config
-	}
-	strategy := defaultBackupStrategy(unit, sys.BackupDir)
-
-	taskID, err := gd.TemporaryServiceBackupTask("", unit, strategy)
+	taskID, err := gd.TemporaryServiceBackupTask("", unit)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
