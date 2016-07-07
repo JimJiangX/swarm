@@ -548,28 +548,15 @@ func (gd *Gardener) rebuildDatacenters() error {
 	if err != nil {
 		return err
 	}
+	gd.Lock()
+	gd.datacenters = make([]*Datacenter, 0, len(list))
+	gd.Unlock()
 
 	for i := range list {
 		dc, err := gd.rebuildDatacenter(list[i].ID)
 		if err != nil {
 			continue
 		}
-		nodes, err := database.ListNodeByCluster(list[i].ID)
-		if err != nil {
-			continue
-		}
-		out := make([]*Node, 0, len(nodes))
-		for n := range nodes {
-			node, err := gd.rebuildNode(*nodes[n])
-			if err != nil {
-				continue
-			}
-			out = append(out, node)
-		}
-
-		dc.Lock()
-		dc.nodes = append(dc.nodes, out...)
-		dc.Unlock()
 
 		gd.Lock()
 		gd.datacenters = append(gd.datacenters, dc)
@@ -599,6 +586,25 @@ func (gd *Gardener) rebuildDatacenter(NameOrID string) (*Datacenter, error) {
 		storage: storage,
 		nodes:   make([]*Node, 0, 100),
 	}
+
+	nodes, err := database.ListNodeByCluster(cl.ID)
+	if err != nil {
+		return dc, fmt.Errorf("List Node By Cluster error:%s", err)
+	}
+
+	out := make([]*Node, 0, len(nodes))
+	for n := range nodes {
+		node, err := gd.rebuildNode(*nodes[n])
+		if err != nil {
+			logrus.Errorf("rebuildNode %s error:%s", nodes[n].Name, err)
+			continue
+		}
+		out = append(out, node)
+	}
+
+	dc.Lock()
+	dc.nodes = append(dc.nodes, out...)
+	dc.Unlock()
 
 	return dc, nil
 }
