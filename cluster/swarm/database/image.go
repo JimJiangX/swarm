@@ -79,7 +79,7 @@ func GetImageAndUnitConfig(ID string) (Image, UnitConfig, error) {
 		return image, config, err
 	}
 
-	err = db.Get(&image, "SELECT * FROM tb_image WHERE id=?", ID)
+	err = db.Get(&image, "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?", ID, ID)
 	if err != nil {
 		return image, config, err
 	}
