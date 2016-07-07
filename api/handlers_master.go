@@ -464,26 +464,26 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	containers := gd.Containers()
+	consulClient, err := gd.ConsulAPIClient()
+	if err != nil {
+		logrus.Error(err)
+	}
+
 	var response io.Reader
 	switch strings.ToUpper(from) {
 	case "DBAAS":
 		logrus.Debugf("From %s", from)
 
-		response = listServiceFromDBAAS(services)
+		response = listServiceFromDBAAS(services, containers, consulClient)
 	default:
 		logrus.Debugf("From %s", "default")
-
-		ok, _, gd := fromContext(ctx, _Gardener)
-		if !ok && gd == nil {
-			httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		containers := gd.Containers()
-		consulClient, err := gd.ConsulAPIClient()
-		if err != nil {
-			logrus.Error(err)
-		}
 
 		list := make([]structs.ServiceResponse, len(services))
 		for i := range services {
@@ -500,7 +500,95 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, response)
 }
 
-func listServiceFromDBAAS(services []database.Service) io.Reader {
+const (
+	servicePassing  = "passing"
+	serviceUnknown  = "unknown"
+	serviceWarning  = "warning"
+	serviceCritical = "critical"
+)
+
+func getServiceRunningStatus(serviceID string,
+	containers cluster.Containers, checks map[string]consulapi.HealthCheck) string {
+	units, err := database.ListUnitByServiceID(serviceID)
+	if err != nil {
+		logrus.Errorf("List Unit By ServiceID Error:%s,serviceID=%s", err, serviceID)
+		return serviceUnknown
+	}
+
+	if len(units) == 0 {
+		return serviceCritical
+	}
+
+	total := len(units)
+	m := make(map[string][]int, total)
+	for i := range units {
+		list, ok := m[units[i].Type]
+		if !ok {
+			list = make([]int, 0, total)
+		}
+
+		list = append(list, i)
+		m[units[i].Type] = list
+	}
+
+	state := servicePassing
+
+	for _type, list := range m {
+		count := 0
+		for _, index := range list {
+			u := units[index]
+			c := containers.Get(u.ContainerID)
+
+			if c == nil {
+				count++
+
+				logrus.Warnf(" Unit '%s',Not Found Container By '%s'", u.Name, u.ContainerID)
+				continue
+			}
+			if c.Engine == nil {
+				count++
+
+				logrus.Warnf("Unit '%s',Engine is nil", u.Name)
+				continue
+			}
+			if c.State != "running" {
+				count++
+
+				logrus.Warnf("Unit '%s',Container State=%s Status=%s", u.Name, c.State, c.Status)
+				continue
+			}
+			if status := c.Engine.Status(); status != "Healthy" {
+				count++
+
+				logrus.Warnf("Unit '%s',Engine Status=%s", u.Name, status)
+				continue
+			}
+			if val, ok := checks[u.ID]; !ok || val.Status != servicePassing {
+				count++
+
+				if !ok {
+					logrus.Warnf("Unit '%s',Not Found Status In Consul", u.Name)
+				} else {
+					logrus.Warnf("Unit '%s',Status In Consul:'%s'", u.Name, val.Status)
+				}
+				continue
+			}
+		}
+
+		if count > 0 {
+			state = serviceWarning
+		}
+
+		if len(list)-count == 0 && _type != "switch_manager" {
+			state = serviceCritical
+		}
+	}
+
+	return state
+}
+
+func listServiceFromDBAAS(services []database.Service,
+	containers cluster.Containers, client *consulapi.Client) io.Reader {
 	type response struct {
 		ID           string //"id": "??",
 		Name         string //"name": "test01",
@@ -515,6 +603,12 @@ func listServiceFromDBAAS(services []database.Service) io.Reader {
 		ManageStatus  int64  `json:"manage_status"`  //"manage_status": "??",
 		RunningStatus string `json:"running_status"` //"running_status": "??",
 		CreatedAt     string `json:"created_at"`     // "created_at": "??"
+	}
+
+	checks, err := swarm.HealthChecksFromConsul(client, "any", nil)
+	if err != nil {
+		logrus.Error(err)
+		checks = make(map[string]consulapi.HealthCheck, 0)
 	}
 
 	out := make([]response, len(services))
@@ -540,7 +634,7 @@ func listServiceFromDBAAS(services []database.Service) io.Reader {
 			Memory:        sql.HostConfig.Memory,
 			CpusetCpus:    sql.HostConfig.CpusetCpus,
 			ManageStatus:  services[i].Status,
-			RunningStatus: "running",
+			RunningStatus: getServiceRunningStatus(services[i].ID, containers, checks),
 			CreatedAt:     utils.TimeToString(services[i].CreatedAt),
 		}
 	}
