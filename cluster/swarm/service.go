@@ -1203,11 +1203,11 @@ func (service *Service) switchBack(name string) error {
 
 }
 
-func (gd *Gardener) TemporaryServiceBackupTask(service, unit string, req structs.BackupStrategy) (string, error) {
-	if unit != "" {
-		u, err := database.GetUnit(unit)
+func (gd *Gardener) TemporaryServiceBackupTask(service, NameOrID string) (string, error) {
+	if NameOrID != "" {
+		u, err := database.GetUnit(NameOrID)
 		if err != nil {
-			logrus.Errorf("Not Found Unit '%s',Error:%s", unit, err)
+			logrus.Errorf("Not Found Unit '%s',Error:%s", NameOrID, err)
 			return "", err
 		}
 
@@ -1223,21 +1223,60 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, unit string, req structs
 		return "", err
 	}
 
-	strategy, err := newBackupStrategy(service, &req)
-	if err != nil || strategy == nil {
-		logrus.Errorf("Illegal Strategy,%v", err)
+	var backup *unit = nil
+	if NameOrID != "" {
+		backup, err = svc.getUnit(NameOrID)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	addr, port, master, err := lockSwitchManager(svc, 3)
+	if err != nil {
+		logrus.Error(err)
+
 		return "", err
+	}
+	if backup == nil {
+		backup = master
+	}
+
+	sys, err := gd.SystemConfig()
+	if err != nil {
+		logrus.Errorf("Get SystemConfig Error:%s", err)
+		return "", err
+	}
+
+	now := time.Now()
+	strategy := database.BackupStrategy{
+		ID:        utils.Generate64UUID(),
+		Name:      backup.Name + "_backup_manually" + utils.TimeToString(now),
+		Type:      "full",
+		ServiceID: svc.ID,
+		Spec:      "manually",
+		Valid:     now,
+		Enabled:   false,
+		BackupDir: sys.BackupDir,
+		Timeout:   24 * 60 * 60,
+		CreatedAt: now,
 	}
 
 	task := database.NewTask("backup_strategy", strategy.ID, "", nil, strategy.Timeout)
 	task.Status = _StatusTaskCreate
-	err = database.TxInsertBackupStrategyAndTask(*strategy, task)
+	err = database.TxInsertBackupStrategyAndTask(strategy, task)
 	if err != nil {
 		logrus.Errorf("TxInsert BackupStrategy And Task Erorr:%s", err)
 		return "", err
 	}
 
-	go svc.TryBackupTask(HostAddress+":"+httpPort, unit, *strategy, &task)
+	go backupTask(master, &task, strategy, func() error {
+		err := smlib.UnLock(addr, port)
+		if err != nil {
+			logrus.Errorf("switch_manager %s:%d Unlock Error:%s", addr, port, err)
+		}
+
+		return err
+	})
 
 	return task.ID, nil
 }

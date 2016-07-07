@@ -48,7 +48,7 @@ func (bs *serviceBackup) Run() {
 		return
 	}
 
-	bs.svc.TryBackupTask(HostAddress+":"+httpPort, "", *strategy, &task)
+	bs.svc.TryBackupTask(*strategy, &task)
 }
 
 func (bs *serviceBackup) Next(time.Time) time.Time {
@@ -89,59 +89,70 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 	return next
 }
 
-func (svc *Service) TryBackupTask(host, unitID string, strategy database.BackupStrategy, task *database.Task) error {
-	backup := &unit{}
-	for retries := 3; ; retries-- {
-		if retries != 3 {
-			time.Sleep(time.Minute)
+func (svc *Service) TryBackupTask(strategy database.BackupStrategy, task *database.Task) error {
+	addr, port, master, err := lockSwitchManager(svc, 3)
+	if err != nil {
+		err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "Cancel,"+err.Error())
+		err = fmt.Errorf("Update Task Status Errors:%v,%v", err, err1)
+		logrus.Error(err)
+
+		return err
+	}
+
+	err = backupTask(master, task, strategy, func() error {
+		err := smlib.UnLock(addr, port)
+		if err != nil {
+			logrus.Errorf("switch_manager %s:%d Unlock Error:%s", addr, port, err)
 		}
 
-		addr, port, master, err := svc.GetSwitchManagerAndMaster()
+		return err
+	})
+	if err != nil {
+		logrus.Errorf("%s backupTask error:%s", svc.Name, err)
+	}
+
+	return err
+}
+
+func lockSwitchManager(svc *Service, retries int) (string, int, *unit, error) {
+	var (
+		addr   string
+		port   int
+		master *unit
+		err    error
+	)
+
+	for count := 0; count < retries; count++ {
+		addr, port, master, err = svc.GetSwitchManagerAndMaster()
 		if err != nil || master == nil {
-			if retries > 0 {
-				logrus.Errorf("Get SwitchManager And Master,retries=%d,Error:%v", retries, err)
-				continue
-			}
-			err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "Cancel,The Task marked as TaskCancel,"+err.Error())
-			err = fmt.Errorf("Update Task Status Errors:%v,%v", err, err1)
-			logrus.Error(err)
-			return err
+			logrus.Errorf("Get SwitchManager And Master,retries=%d,Error:%v", retries, err)
+			continue
 		}
 
-		if err := smlib.Lock(addr, port); err != nil {
-			if retries > 0 {
-				logrus.Errorf("Lock SwitchManager %s:%d,Error:%s", addr, port, err)
-				continue
-			}
-			err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "TaskCancel,Switch Manager is busy now,"+err.Error())
-			err = fmt.Errorf("Errors:%v,%v", err, err1)
-			logrus.Error(err)
-			return err
+		err = smlib.Lock(addr, port)
+		if err != nil {
+			logrus.Errorf("Lock SwitchManager %s:%d,Error:%s", addr, port, err)
+			continue
 		}
-
-		backup = master
-		defer smlib.UnLock(addr, port)
 
 		break
 	}
 
-	if unitID != "" {
-		var err error
-		svc.RLock()
-		backup, err = svc.getUnit(unitID)
-		svc.RUnlock()
+	return addr, port, master, nil
+}
 
-		if err != nil {
-			logrus.Errorf("Not Found Unit %s", unitID)
-			return err
-		}
+func backupTask(backup *unit, task *database.Task, strategy database.BackupStrategy, after func() error) error {
+	if after != nil {
+		defer after()
 	}
 
-	if host == "" {
-		host = HostAddress + ":" + httpPort
-	}
+	entry := logrus.WithFields(logrus.Fields{
+		"Unit":     backup.Name,
+		"Strategy": strategy.ID,
+		"Task":     task.ID,
+	})
 
-	args := []string{host + "/v1.0/tasks/backup/callback", task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
+	args := []string{HostAddress + ":" + httpPort + "/v1.0/tasks/backup/callback", task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(strategy.Timeout)*time.Second)
 	defer cancel()
@@ -150,28 +161,28 @@ func (svc *Service) TryBackupTask(host, unitID string, strategy database.BackupS
 
 	err := backup.backup(ctx, args...)
 	if err == nil {
-		logrus.Infof("Backup %s Task %s End", unitID, task.ID)
+		entry.Info("Backup Done")
 		return nil
 	} else {
 		status = _StatusTaskFailed
-		err = fmt.Errorf("Backup %s Task Faild,%v", unitID, err)
-		msg = err.Error()
-		logrus.Error(err)
+		msg = fmt.Sprintf("Backup Task Faild,%s", err)
+		entry.Error(msg)
 	}
 
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		if ctxErr == context.DeadlineExceeded {
-			msg = "Timeout"
+			msg = "Timeout," + msg
 			status = _StatusTaskTimeout
 		} else if ctxErr == context.Canceled {
-			msg = "Canceled"
+			msg = "Canceled," + msg
 			status = _StatusTaskCancel
 		}
 	}
 
 	err1 := database.UpdateTaskStatus(task, status, time.Now(), msg)
-	err1 = fmt.Errorf("Task %s,Service:%s,BackupStrategy:%s,Task:%s,Error:%v", msg, svc.ID, strategy.ID, task.ID, err1)
-	logrus.Error(err1)
+	if err1 != nil {
+		entry.Errorf("Update TaskStatus Error:%s,message=%s", err, msg)
+	}
 
 	return err
 }
