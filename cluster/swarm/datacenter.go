@@ -304,8 +304,6 @@ func (gd *Gardener) GetNode(NameOrID string) (*Datacenter, *Node, error) {
 		if node != nil && err == nil {
 			return dc, node, nil
 		}
-	} else {
-		return nil, nil, err
 	}
 
 	n, err := database.GetNode(NameOrID)
@@ -315,7 +313,7 @@ func (gd *Gardener) GetNode(NameOrID string) (*Datacenter, *Node, error) {
 
 	node, err := gd.rebuildNode(n)
 	if err != nil {
-		return dc, nil, err
+		return dc, node, err
 	}
 
 	if dc != nil {
@@ -348,7 +346,10 @@ func (gd *Gardener) DatacenterByEngine(IDOrName string) (*Datacenter, error) {
 func (gd *Gardener) SetNodeStatus(name string, state int) error {
 	_, node, err := gd.GetNode(name)
 	if err != nil {
-		return err
+		logrus.Error(err)
+	}
+	if node == nil {
+		return fmt.Errorf("Not Found Node %s", name)
 	}
 
 	if node.Status != _StatusNodeDisable &&
@@ -611,13 +612,13 @@ func (gd *Gardener) rebuildDatacenter(NameOrID string) (*Datacenter, error) {
 
 func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
 	eng, err := gd.GetEngine(n.EngineID)
-	if err != nil {
-		return nil, err
-	}
 
 	node := &Node{
 		Node:   &n,
 		engine: eng,
+	}
+	if err != nil {
+		return node, err
 	}
 
 	pluginAddr := fmt.Sprintf("%s:%d", eng.IP, pluginPort)
