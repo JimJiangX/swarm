@@ -697,7 +697,7 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 	}
 	delete(gd.pendingContainers, swarmID)
 
-	err = startUnit(engine, container.ID, u, nil)
+	err = startUnit(engine, container.ID, u, newLvs)
 	if err != nil {
 		return err
 	}
