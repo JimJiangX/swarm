@@ -661,13 +661,13 @@ func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType s
 
 		if !dc.Enabled {
 			out = append(out, dc.ID)
-			logrus.Debug("DC Disabled", dc.Name)
+			logrus.Debug("DC Disabled ", dc.Name)
 			continue
 		}
 
 		if IDOrType != "" && !(dc.Type == IDOrType || dc.ID == IDOrType) {
 			out = append(out, dc.ID)
-			logrus.Debug("DC.Type Unmatch", dc.Name, dc.Type, dc.ID)
+			logrus.Debugf("DC %s:%s,Type Unmatch %s", dc.Name, dc.Type, IDOrType)
 			continue
 		}
 
@@ -678,7 +678,7 @@ func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType s
 						len(node.engine.Containers()) >= node.MaxContainer)) {
 
 				out = append(out, node.ID, node.EngineID)
-				logrus.Debug("Engine Unmatch", node.Name, node.ID, node.EngineID)
+				logrus.Debugf("%s Engine Unmatch,%s %s", node.Name, node.ID, node.EngineID)
 			}
 		}
 
@@ -687,7 +687,7 @@ func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType s
 			if v.Type == store.SANStore {
 				if !dc.isIdleStoreEnough(num/2, v.Size) {
 					out = append(out, dc.ID)
-					logrus.Debug("san store shortage", dc.Name, v.Size)
+					logrus.Debugf("%s san store shortage:%d", dc.Name, v.Size)
 				}
 			}
 		}
@@ -700,7 +700,7 @@ func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType s
 				}
 				if node.localStore == nil {
 					out = append(out, node.ID, node.EngineID)
-					logrus.Debug("Local Store is nil", node.Name)
+					logrus.Debugf("%s Local Store is nil", node.Name)
 					break
 				}
 
@@ -708,7 +708,7 @@ func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType s
 				if err != nil {
 					out = append(out, node.ID, node.EngineID)
 
-					logrus.Debug("Local Store error", node.Name, err)
+					logrus.Debugf("%s Local Store error:%s", node.Name, err)
 					break
 				}
 
@@ -716,13 +716,13 @@ func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType s
 				if err != nil {
 					out = append(out, node.ID, node.EngineID)
 
-					logrus.Debug("get VG_Name error", node.Name, err)
+					logrus.Debugf("%s get VG_Name error:%s", node.Name, err)
 					break
 				}
 
 				if idle[vgName] < v.Size {
 					out = append(out, node.ID, node.EngineID)
-					logrus.Debug("VG shortage", node.Name, vgName, idle[vgName], v.Size)
+					logrus.Debugf("%s VG %s shortage:%v %d", node.Name, vgName, idle[vgName], v.Size)
 					break
 				}
 			}

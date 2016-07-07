@@ -26,7 +26,7 @@ func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs
 	}
 	filters := gd.listShortIdleStore(module.Stores, _type, num)
 	filters = append(filters, exclude...)
-	entry.Debugf("[MG] %s,%s,%s:first filters of storage:%s", module.Stores, module.Type, num, filters)
+	entry.Debugf("[MG] %v,%s,%s:first filters of storage:%s", module.Stores, module.Type, num, filters)
 	nodes := make([]*node.Node, 0, len(engines))
 	for i := range engines {
 		if isStringExist(engines[i], filters) {
