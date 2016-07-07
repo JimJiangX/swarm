@@ -329,7 +329,7 @@ func stopOldContainer(svc *Service, u *unit) error {
 		}
 	}
 
-	if err := u.stopContainer(0); err != nil {
+	if err := u.forceStopContainer(0); err != nil {
 		err1 := checkContainerError(err)
 		if err1 != errContainerNotRunning && err1 != errContainerNotFound {
 			logrus.Errorf("%s stop container error:%s", u.Name, err)

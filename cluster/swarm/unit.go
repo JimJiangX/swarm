@@ -426,11 +426,11 @@ func (u *unit) startContainer() error {
 	return u.engine.StartContainer(u.Unit.Name, nil)
 }
 
-func (u *unit) stopContainer(timeout int) error {
-	if val := atomic.LoadUint32(&u.Status); val == _StatusUnitBackuping {
-		return fmt.Errorf("Unit %s is Backuping,Cannot stop", u.Name)
+func (u *unit) forceStopContainer(timeout int) error {
+	err := u.forceStopService()
+	if err != nil {
+		logrus.Errorf("%s force Stop Service Error:%s", u.Name, err)
 	}
-	u.stopService()
 
 	client, err := u.getEngineAPIClient()
 	if err != nil {
@@ -441,8 +441,15 @@ func (u *unit) stopContainer(timeout int) error {
 	if err := checkContainerError(err); err == errContainerNotRunning {
 		return nil
 	}
-
 	return err
+}
+
+func (u *unit) stopContainer(timeout int) error {
+	if val := atomic.LoadUint32(&u.Status); val == _StatusUnitBackuping {
+		return fmt.Errorf("Unit %s is Backuping,Cannot stop", u.Name)
+	}
+
+	return u.forceStopContainer(timeout)
 }
 
 func (u *unit) restartContainer(timeout int) error {
@@ -729,10 +736,7 @@ func (u *unit) startService() error {
 	return err
 }
 
-func (u *unit) stopService() error {
-	if val := atomic.LoadUint32(&u.Status); val == _StatusUnitBackuping {
-		return fmt.Errorf("Unit %s is Backuping,Cannot stop", u.Name)
-	}
+func (u *unit) forceStopService() error {
 	if u.ContainerCmd == nil {
 		return nil
 	}
@@ -748,6 +752,14 @@ func (u *unit) stopService() error {
 	}
 
 	return err
+}
+
+func (u *unit) stopService() error {
+	if val := atomic.LoadUint32(&u.Status); val == _StatusUnitBackuping {
+		return fmt.Errorf("Unit %s is Backuping,Cannot stop", u.Name)
+	}
+
+	return u.forceStopService()
 }
 
 func (u *unit) backup(ctx context.Context, args ...string) error {
