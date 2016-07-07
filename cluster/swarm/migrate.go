@@ -125,7 +125,7 @@ func (gd *Gardener) UnitMigrate(NameOrID string, candidates []string, hostConfig
 	filters := make([]string, len(svc.units))
 	for i, u := range svc.units {
 		filters[i] = u.EngineID
-		if u.ID == NameOrID || u.Name == NameOrID {
+		if u.ID == table.ID {
 			index = i
 		}
 	}
@@ -566,7 +566,7 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 	filters := make([]string, len(svc.units))
 	for i, u := range svc.units {
 		filters[i] = u.EngineID
-		if u.ID == NameOrID || u.Name == NameOrID {
+		if u.ID == table.ID {
 			index = i
 		}
 	}

@@ -1566,8 +1566,13 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 	defer svc.Unlock()
 
 	for _, u := range svc.units {
+		if _, err := u.getEngine(); err == errEngineIsNil {
+			logrus.Warnf("Remove Unit %s,error:%s", u.Name, err)
+			continue
+		}
+
 		logrus.Debug(u.Name, " stop unit service")
-		err := u.stopService()
+		err := u.forceStopService()
 		if err != nil {
 			logrus.Errorf("container %s stop service error:%s", u.Name, err)
 

@@ -29,6 +29,10 @@ func checkTtyInput(attachStdin, ttyMode bool) error {
 // containerExec exec cmd in containeID,It returns ContainerExecInspect.
 func containerExec(ctx context.Context, engine *cluster.Engine, containerID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
 	inspect := types.ContainerExecInspect{}
+
+	if engine == nil {
+		return inspect, errEngineIsNil
+	}
 	client := engine.EngineAPIClient()
 	if client == nil {
 		return inspect, errEngineAPIisNil
