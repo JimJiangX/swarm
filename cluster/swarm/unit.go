@@ -602,7 +602,12 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 		return err
 	}
 
-	err = copyConfigIntoCNFVolume(u, volumes, context)
+	engine, err := u.getEngine()
+	if err != nil {
+		return err
+	}
+
+	err = copyConfigIntoCNFVolume(engine, volumes, u.Path(), context)
 	if err != nil {
 		logrus.Errorf("copyConfigIntoCNFVolume error:%s", err)
 		return err
@@ -611,7 +616,7 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 	return nil
 }
 
-func copyConfigIntoCNFVolume(u *unit, lvs []database.LocalVolume, content string) error {
+func copyConfigIntoCNFVolume(engine *cluster.Engine, lvs []database.LocalVolume, path, content string) error {
 	cnf := 0
 	for i := range lvs {
 		if strings.Contains(lvs[i].Name, "_CNF_LV") {
@@ -623,7 +628,6 @@ func copyConfigIntoCNFVolume(u *unit, lvs []database.LocalVolume, content string
 		}
 	}
 
-	path := u.Path()
 	if strings.HasPrefix(path, "/DBAAS") {
 		parts := strings.SplitN(path, "/", 3)
 		if len(parts) == 3 {
@@ -640,10 +644,10 @@ func copyConfigIntoCNFVolume(u *unit, lvs []database.LocalVolume, content string
 		Mode:      "0600",
 	}
 
-	addr := getPluginAddr(u.engine.IP, pluginPort)
+	addr := getPluginAddr(engine.IP, pluginPort)
 	err := sdk.FileCopyToVolome(addr, config)
 
-	logrus.Debugf("FileCopyToVolome to %s:%s config:%v", addr, lvs[cnf].Name, config)
+	logrus.Debugf("FileCopyToVolome to %s:%s config:%+v,error:%v", addr, lvs[cnf].Name, config, err)
 
 	return err
 }

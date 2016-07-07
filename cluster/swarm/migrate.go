@@ -310,7 +310,7 @@ func startUnit(engine *cluster.Engine, containerID string,
 	}
 
 	logrus.Debug("copy Service Config")
-	err = copyConfigIntoCNFVolume(u, lvs, u.parent.Content)
+	err = copyConfigIntoCNFVolume(engine, lvs, u.Path(), u.parent.Content)
 	if err != nil {
 		return err
 	}
