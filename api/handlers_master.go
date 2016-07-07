@@ -1891,7 +1891,7 @@ func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	err := gd.UnitMigrate(name, req.Candidates, req.HostConfig)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -1914,7 +1914,7 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	err := gd.UnitRebuild(name, req.Candidates, req.HostConfig)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -1932,7 +1932,7 @@ func postUnitIsolate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	err := gd.UnitIsolate(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -1950,7 +1950,7 @@ func postUnitSwitchback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	err := gd.UnitSwitchBack(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -1968,7 +1968,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	err := swarm.BackupTaskCallback(req)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

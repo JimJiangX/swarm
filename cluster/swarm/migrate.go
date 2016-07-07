@@ -108,10 +108,10 @@ func resetContainerConfig(config *cluster.ContainerConfig, hostConfig *ctypes.Ho
 	return clone, nil
 }
 
-func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ctypes.HostConfig) error {
-	table, err := database.GetUnit(name)
+func (gd *Gardener) UnitMigrate(NameOrID string, candidates []string, hostConfig *ctypes.HostConfig) error {
+	table, err := database.GetUnit(NameOrID)
 	if err != nil {
-		return fmt.Errorf("Not Found Unit %s,error:%s", name, err)
+		return fmt.Errorf("Not Found Unit %s,error:%s", NameOrID, err)
 	}
 
 	svc, err := gd.GetService(table.ServiceID)
@@ -125,7 +125,7 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 	filters := make([]string, len(svc.units))
 	for i, u := range svc.units {
 		filters[i] = u.EngineID
-		if u.Name == name {
+		if u.ID == NameOrID || u.Name == NameOrID {
 			index = i
 		}
 	}
@@ -150,6 +150,7 @@ func (gd *Gardener) UnitMigrate(name string, candidates []string, hostConfig *ct
 	if err != nil {
 		return err
 	}
+	logrus.Debugf("listCandidates:%d", out)
 
 	config, err := resetContainerConfig(u.container.Config, hostConfig)
 	if err != nil {
@@ -548,10 +549,10 @@ func updateUnit(unit database.Unit, lvs []database.LocalVolume, reserveSAN bool)
 	return tx.Commit()
 }
 
-func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ctypes.HostConfig) error {
-	table, err := database.GetUnit(name)
+func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig *ctypes.HostConfig) error {
+	table, err := database.GetUnit(NameOrID)
 	if err != nil {
-		return fmt.Errorf("Not Found Unit %s,error:%s", name, err)
+		return fmt.Errorf("Not Found Unit %s,error:%s", NameOrID, err)
 	}
 
 	svc, err := gd.GetService(table.ServiceID)
@@ -565,7 +566,7 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ct
 	filters := make([]string, len(svc.units))
 	for i, u := range svc.units {
 		filters[i] = u.EngineID
-		if u.Name == name {
+		if u.ID == NameOrID || u.Name == NameOrID {
 			index = i
 		}
 	}
@@ -590,6 +591,7 @@ func (gd *Gardener) UnitRebuild(name string, candidates []string, hostConfig *ct
 	if err != nil {
 		return err
 	}
+	logrus.Debugf("listCandidates:%d", out)
 
 	config, err := resetContainerConfig(u.container.Config, hostConfig)
 	if err != nil {
