@@ -768,15 +768,18 @@ func (u *unit) backup(ctx context.Context, args ...string) error {
 		logrus.Warnf("%s BackupCmd is nil", u.Name)
 		return nil
 	}
-	logrus.WithFields(logrus.Fields{
+	entry := logrus.WithFields(logrus.Fields{
 		"Name": u.Name,
 		"Cmd":  cmd,
-	}).Debugln("start Backup job")
+	})
+	entry.Info("start Backup job")
 
 	inspect, err := containerExec(ctx, u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s backup cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
+
+	entry.Infof("Backup job done,%v", err)
 
 	return err
 }
