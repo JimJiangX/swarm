@@ -693,7 +693,7 @@ func (svc *Service) initService() error {
 		Go(u.initService, ch)
 	}
 
-	mulErr := NewMultipleError(length)
+	mulErr := NewMultipleError()
 
 	for i := 0; i < length; i++ {
 		err := <-ch
@@ -731,7 +731,7 @@ func (svc *Service) startService() error {
 		Go(u.startService, ch)
 	}
 
-	mulErr := NewMultipleError(length)
+	mulErr := NewMultipleError()
 
 	for i := 0; i < length; i++ {
 		err := <-ch
@@ -793,7 +793,7 @@ func (svc *Service) StopService() error {
 		Go(u.stopService, ch)
 	}
 
-	mulErr := NewMultipleError(length)
+	mulErr := NewMultipleError()
 
 	for i := 0; i < length; i++ {
 		err := <-ch
@@ -822,7 +822,7 @@ func (svc *Service) stopService() error {
 		Go(u.stopService, ch)
 	}
 
-	mulErr := NewMultipleError(length)
+	mulErr := NewMultipleError()
 
 	for i := 0; i < length; i++ {
 		err := <-ch
@@ -1622,7 +1622,7 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 		}, ch)
 	}
 
-	mulErr := NewMultipleError(length)
+	mulErr := NewMultipleError()
 
 	for i := 0; i < length; i++ {
 		err := <-ch

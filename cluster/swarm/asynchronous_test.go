@@ -50,7 +50,7 @@ func ExampleGo() {
 		Go(function, ch)
 	}
 
-	mulErr := NewMultipleError(length)
+	mulErr := NewMultipleError()
 	for i := 0; i < length; i++ {
 		err := <-ch
 		if err != nil {
@@ -71,5 +71,27 @@ func ExampleGo() {
 }
 
 func TestMultipleError(t *testing.T) {
+	merr := NewMultipleError()
 
+	if merr.Err() != nil {
+		t.Errorf("Unexpected,got '%s'", merr.Error())
+	}
+
+	for i := 0; i < 10; i++ {
+		merr.Append(nil)
+	}
+
+	if merr.Err() != nil {
+		t.Errorf("Unexpected,got '%s',len=%d", merr.Error())
+	}
+
+	for i := 0; i < 10; i++ {
+		merr.Append(fmt.Errorf("Error %d", i))
+	}
+
+	if merr.Err() == nil {
+		t.Errorf("Unexpected,want no-nil error but got nil '%s',len=%d", merr.Error())
+	}
+
+	t.Log(merr.Error())
 }

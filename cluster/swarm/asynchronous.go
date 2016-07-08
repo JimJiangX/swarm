@@ -1,10 +1,6 @@
 package swarm
 
-import (
-	"bytes"
-
-	"github.com/Sirupsen/logrus"
-)
+import "bytes"
 
 // Go is a basic promise implementation: it wraps calls a function in a goroutine,
 // and returns a channel which will later return the function's return value.
@@ -14,50 +10,37 @@ func Go(f func() error, ch chan error) {
 	}()
 }
 
-type multipleError []error
+type multipleError struct {
+	buffer *bytes.Buffer
+	val    string
+}
 
-func NewMultipleError(cap int) multipleError {
-	return make([]error, 0, cap)
+func NewMultipleError() multipleError {
+	return multipleError{
+		buffer: bytes.NewBuffer(nil),
+	}
 }
 
 func (m *multipleError) Append(err error) {
-	*m = append(*m, err)
+	if err == nil {
+		return
+	}
+	m.buffer.WriteString(err.Error())
+	m.buffer.WriteString("\n")
+
+	m.val = m.buffer.String()
 }
 
 func (m multipleError) Error() string {
-	if len(m) == 0 {
-		return ""
-	}
-	buffer := bytes.NewBuffer(nil)
 
-	for i := range m {
-		if m[i] != nil {
-			_, err := buffer.WriteString(m[i].Error())
-			if err != nil {
-				logrus.Errorf("WriteString '%s' error:%s", m[i], err)
-			}
-			buffer.WriteString("\n")
-		}
-	}
-
-	return buffer.String()
+	return m.val
 }
 
 func (m multipleError) Err() error {
-	if len(m) == 0 {
+	if m.buffer == nil {
 		return nil
 	}
-
-	all := true
-
-	for i := range m {
-		if m[i] != nil {
-			all = false
-			break
-		}
-	}
-
-	if all {
+	if m.buffer.Len() == 0 {
 		return nil
 	}
 
