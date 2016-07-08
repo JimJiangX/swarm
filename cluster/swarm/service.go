@@ -1602,11 +1602,9 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 				if err1 == errContainerNotFound || err1 == errContainerNotRunning {
 					return nil
 				}
-				if force && err.Error() == "EOF" {
-					return nil
+				if err.Error() != "EOF" {
+					return err
 				}
-
-				return err
 			}
 
 			logrus.Debug(u.Name, " stop container")
@@ -1615,15 +1613,12 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 				logrus.Errorf("container %s stop error:%s", u.Name, err)
 
 				err1 := checkContainerError(err)
-				if err1 == errContainerNotFound || err1 == errContainerNotRunning {
+				if err.Error() == "EOF" || err1 == errContainerNotFound || err1 == errContainerNotRunning {
 					return nil
 				}
-				if force && err.Error() == "EOF" {
-					return nil
-				}
-				return err
 			}
-			return nil
+
+			return err
 		}, ch)
 	}
 
