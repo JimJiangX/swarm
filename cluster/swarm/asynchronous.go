@@ -31,6 +31,9 @@ func (m *multipleError) Append(err error) {
 	if err == nil {
 		return
 	}
+	if m.buffer == nil {
+		m.buffer = bytes.NewBuffer(nil)
+	}
 	m.buffer.WriteString(err.Error())
 	m.buffer.WriteString("\n")
 
@@ -38,7 +41,6 @@ func (m *multipleError) Append(err error) {
 }
 
 func (m multipleError) Error() string {
-
 	return m.val
 }
 
@@ -58,16 +60,18 @@ type taskRecorder interface {
 	Update(code int, msg string) error
 }
 
-type AsyncTask struct {
+type asyncTask struct {
 	recorder   taskRecorder
 	timeout    time.Duration
-	background func(context.Context) error
+	background taskFunc
 	parent     context.Context
 	cancel     func()
 }
 
-func NewAsyncTask(ctx context.Context, f func(context.Context) error, recorder taskRecorder, timeout time.Duration) *AsyncTask {
-	return &AsyncTask{
+type taskFunc func(context.Context) error
+
+func NewAsyncTask(ctx context.Context, f taskFunc, recorder taskRecorder, timeout time.Duration) *asyncTask {
+	return &asyncTask{
 		recorder:   recorder,
 		timeout:    timeout,
 		background: f,
@@ -75,7 +79,7 @@ func NewAsyncTask(ctx context.Context, f func(context.Context) error, recorder t
 	}
 }
 
-func (t *AsyncTask) Run() error {
+func (t *asyncTask) Run() error {
 	err := t.recorder.Insert()
 	if err != nil {
 		return err
@@ -87,19 +91,23 @@ func (t *AsyncTask) Run() error {
 
 	ctx, cancel := context.WithTimeout(t.parent, t.timeout)
 	t.cancel = cancel
-	defer cancel()
 
-	go func(ctx context.Context, t *AsyncTask) {
+	go func(ctx context.Context, t *asyncTask) {
+		defer t.cancel()
+
 		msg, code := "", 0
 
 		logrus.Debug("Running background...")
+
 		err := t.background(ctx)
-		if err != nil {
+		if err == nil {
+			code = _StatusTaskDone
+		} else {
 			code = _StatusTaskFailed
 			msg = err.Error()
-
-			logrus.Error("Run background done,", msg)
 		}
+
+		logrus.Info("Run background end,", msg)
 
 		select {
 		case <-ctx.Done():

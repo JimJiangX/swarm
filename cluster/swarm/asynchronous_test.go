@@ -3,6 +3,9 @@ package swarm
 import (
 	"fmt"
 	"testing"
+	"time"
+
+	"golang.org/x/net/context"
 )
 
 func TestGo(t *testing.T) {
@@ -94,4 +97,107 @@ func TestMultipleError(t *testing.T) {
 	}
 
 	t.Log(merr.Error())
+}
+
+type recorder struct{}
+
+func (recorder) Insert() error {
+	fmt.Println("call recorder.Insert")
+
+	return nil
+}
+
+func (*recorder) Update(code int, msg string) error {
+	fmt.Println("call recorder.Update")
+
+	return nil
+}
+
+type recorder1 struct{}
+
+func (recorder1) Insert() error {
+	fmt.Println("call recorder1.Insert")
+
+	return nil
+}
+
+func (*recorder1) Update(code int, msg string) error {
+
+	return fmt.Errorf("call recorder1.Update error")
+}
+
+type recorder2 struct{}
+
+func (recorder2) Insert() error {
+
+	return fmt.Errorf("call recorder2.Insert")
+}
+
+func (*recorder2) Update(code int, msg string) error {
+
+	return fmt.Errorf("call recorder2.Update error")
+}
+
+func ExampleAsyncTask() {
+	recorders := []taskRecorder{
+		&recorder{},
+		&recorder1{},
+		&recorder2{},
+	}
+
+	tasks := []taskFunc{
+		func(ctx context.Context) (err error) {
+			select {
+			case <-ctx.Done():
+				err = ctx.Err()
+			default:
+			}
+			return err
+		},
+		func(ctx context.Context) (err error) {
+			time.Sleep(time.Second * 2)
+			select {
+			case <-ctx.Done():
+				err = ctx.Err()
+			default:
+			}
+			return err
+		},
+		func(ctx context.Context) (err error) {
+			time.Sleep(time.Second * 10)
+			select {
+			case <-ctx.Done():
+				err = ctx.Err()
+			default:
+			}
+			deadline, ok := ctx.Deadline()
+			return fmt.Errorf("It's a timeout error %v,deadline=%s,%t", err, deadline, ok)
+		},
+	}
+
+	for i := range tasks {
+		for j := range recorders {
+			ctx := context.Background()
+
+			t := NewAsyncTask(ctx, tasks[i], recorders[j], time.Second*5)
+			t.Run()
+
+			if i == 1 && t.cancel != nil {
+				t.cancel()
+			}
+		}
+	}
+
+	time.Sleep(time.Second * 20)
+
+	// output:
+	// call recorder.Insert
+	// call recorder1.Insert
+	// call recorder.Insert
+	// call recorder1.Insert
+	// call recorder.Insert
+	// call recorder1.Insert
+	// call recorder.Update
+	// call recorder.Update
+	// call recorder.Update
 }
