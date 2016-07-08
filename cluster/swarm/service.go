@@ -686,33 +686,24 @@ func (svc *Service) copyServiceConfig() error {
 }
 
 func (svc *Service) initService() error {
-	wg := new(sync.WaitGroup)
-	errCh := make(chan error, len(svc.units))
-	wg.Add(len(svc.units))
-	for _, u := range svc.units {
-
-		go func(u *unit, wg *sync.WaitGroup, ch chan error) {
-			defer wg.Done()
-
-			err := u.initService()
-			if err != nil {
-				logrus.Errorf("container %s init service error:%s", u.Name, err)
-				ch <- err
-			}
-		}(u, wg, errCh)
+	length := len(svc.units)
+	ch := make(chan error, length)
+	for i := range svc.units {
+		u := svc.units[i]
+		Go(u.initService, ch)
 	}
 
-	wg.Wait()
-	close(errCh)
+	mulErr := NewMultipleError(length)
 
-	var err error = nil
-	for err1 := range errCh {
-		if err1 != nil {
-			err = err1
+	for i := 0; i < length; i++ {
+		err := <-ch
+		if err != nil {
+			mulErr.Append(err)
 		}
 	}
+	close(ch)
 
-	return err
+	return mulErr.Err()
 }
 
 func (svc *Service) checkStatus(expected int64) error {
@@ -733,14 +724,16 @@ func (svc *Service) statusCAS(expected, value int64) error {
 }
 
 func (svc *Service) startService() error {
-	ch := make(chan error, len(svc.units))
-	for _, u := range svc.units {
+	length := len(svc.units)
+	ch := make(chan error, length)
+	for i := range svc.units {
+		u := svc.units[i]
 		Go(u.startService, ch)
 	}
 
-	mulErr := NewMultipleError(len(svc.units))
+	mulErr := NewMultipleError(length)
 
-	for i := 0; i < len(svc.units); i++ {
+	for i := 0; i < length; i++ {
 		err := <-ch
 		if err != nil {
 			mulErr.Append(err)
@@ -806,14 +799,16 @@ func (svc *Service) StopService() error {
 		return err
 	}
 
-	ch := make(chan error, len(units))
-	for _, u := range units {
+	length := len(units)
+	ch := make(chan error, length)
+	for i := range units {
+		u := units[i]
 		Go(u.stopService, ch)
 	}
 
-	mulErr := NewMultipleError(len(units))
+	mulErr := NewMultipleError(length)
 
-	for i := 0; i < len(units); i++ {
+	for i := 0; i < length; i++ {
 		err := <-ch
 		if err != nil {
 			logrus.Errorf("Service %s stop service error:%s", svc.Name, err)
@@ -833,14 +828,16 @@ func (svc *Service) StopService() error {
 }
 
 func (svc *Service) stopService() error {
-	ch := make(chan error, len(svc.units))
-	for _, u := range svc.units {
+	length := len(svc.units)
+	ch := make(chan error, length)
+	for i := range svc.units {
+		u := svc.units[i]
 		Go(u.stopService, ch)
 	}
 
-	mulErr := NewMultipleError(len(svc.units))
+	mulErr := NewMultipleError(length)
 
-	for i := 0; i < len(svc.units); i++ {
+	for i := 0; i < length; i++ {
 		err := <-ch
 		if err != nil {
 			logrus.Errorf("Service %s stop service error:%s", svc.Name, err)
