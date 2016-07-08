@@ -20,8 +20,8 @@ func NewMultipleError(cap int) multipleError {
 	return make([]error, 0, cap)
 }
 
-func (m multipleError) Append(err error) {
-	m = append(m, err)
+func (m *multipleError) Append(err error) {
+	*m = append(*m, err)
 }
 
 func (m multipleError) Error() string {
