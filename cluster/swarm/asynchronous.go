@@ -1,6 +1,12 @@
 package swarm
 
-import "bytes"
+import (
+	"bytes"
+	"time"
+
+	"github.com/Sirupsen/logrus"
+	"golang.org/x/net/context"
+)
 
 // Go is a basic promise implementation: it wraps calls a function in a goroutine,
 // and returns a channel which will later return the function's return value.
@@ -45,4 +51,77 @@ func (m multipleError) Err() error {
 	}
 
 	return m
+}
+
+type taskRecorder interface {
+	Insert() error
+	Update(code int, msg string) error
+}
+
+type AsyncTask struct {
+	recorder   taskRecorder
+	timeout    time.Duration
+	background func(context.Context) error
+	parent     context.Context
+	cancel     func()
+}
+
+func NewAsyncTask(ctx context.Context, f func(context.Context) error, recorder taskRecorder, timeout time.Duration) *AsyncTask {
+	return &AsyncTask{
+		recorder:   recorder,
+		timeout:    timeout,
+		background: f,
+		parent:     ctx,
+	}
+}
+
+func (t *AsyncTask) Run() error {
+	err := t.recorder.Insert()
+	if err != nil {
+		return err
+	}
+
+	if t.parent == nil {
+		t.parent = context.Background()
+	}
+
+	ctx, cancel := context.WithTimeout(t.parent, t.timeout)
+	t.cancel = cancel
+	defer cancel()
+
+	go func(ctx context.Context, t *AsyncTask) {
+		msg, code := "", 0
+
+		logrus.Debug("Running background...")
+		err := t.background(ctx)
+		if err != nil {
+			code = _StatusTaskFailed
+			msg = err.Error()
+
+			logrus.Error("Run background done,", msg)
+		}
+
+		select {
+		case <-ctx.Done():
+			if err := ctx.Err(); err != nil {
+				if err == context.DeadlineExceeded {
+					msg = "Timeout " + msg
+					code = _StatusTaskTimeout
+				} else if err == context.Canceled {
+					msg = "Canceled " + msg
+					code = _StatusTaskCancel
+				}
+			}
+		default:
+		}
+
+		if code != 0 {
+			err = t.recorder.Update(code, msg)
+			if err != nil {
+				logrus.Errorf("taskRecorder Update Error:%s,Code=%d,message=%s", err, code, msg)
+			}
+		}
+	}(ctx, t)
+
+	return nil
 }

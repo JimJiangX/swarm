@@ -169,14 +169,18 @@ func backupTask(backup *unit, task *database.Task, strategy database.BackupStrat
 		entry.Error(msg)
 	}
 
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		if ctxErr == context.DeadlineExceeded {
-			msg = "Timeout," + msg
-			status = _StatusTaskTimeout
-		} else if ctxErr == context.Canceled {
-			msg = "Canceled," + msg
-			status = _StatusTaskCancel
+	select {
+	case <-ctx.Done():
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			if ctxErr == context.DeadlineExceeded {
+				msg = "Timeout," + msg
+				status = _StatusTaskTimeout
+			} else if ctxErr == context.Canceled {
+				msg = "Canceled," + msg
+				status = _StatusTaskCancel
+			}
 		}
+	default:
 	}
 
 	err1 := database.UpdateTaskStatus(task, status, time.Now(), msg)

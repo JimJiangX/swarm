@@ -74,7 +74,7 @@ func TestMultipleError(t *testing.T) {
 	merr := NewMultipleError()
 
 	if merr.Err() != nil {
-		t.Errorf("Unexpected,got '%s'", merr.Error())
+		t.Errorf("Unexpected,want nil error,got '%s'", merr.Error())
 	}
 
 	for i := 0; i < 10; i++ {
@@ -82,7 +82,7 @@ func TestMultipleError(t *testing.T) {
 	}
 
 	if merr.Err() != nil {
-		t.Errorf("Unexpected,got '%s',len=%d", merr.Error())
+		t.Errorf("Unexpected,want nil error,got '%s'", merr.Error())
 	}
 
 	for i := 0; i < 10; i++ {
@@ -90,7 +90,7 @@ func TestMultipleError(t *testing.T) {
 	}
 
 	if merr.Err() == nil {
-		t.Errorf("Unexpected,want no-nil error but got nil '%s',len=%d", merr.Error())
+		t.Errorf("Unexpected,want no-nil error but got nil '%s'", merr.Error())
 	}
 
 	t.Log(merr.Error())
