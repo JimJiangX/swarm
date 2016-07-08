@@ -687,9 +687,9 @@ func (svc *Service) copyServiceConfig() error {
 
 func (svc *Service) initService() error {
 	wg := new(sync.WaitGroup)
-	errCh := make(chan error, 5)
+	errCh := make(chan error, len(svc.units))
+	wg.Add(len(svc.units))
 	for _, u := range svc.units {
-		wg.Add(1)
 
 		go func(u *unit, wg *sync.WaitGroup, ch chan error) {
 			defer wg.Done()
@@ -733,14 +733,22 @@ func (svc *Service) statusCAS(expected, value int64) error {
 }
 
 func (svc *Service) startService() error {
+	ch := make(chan error, len(svc.units))
 	for _, u := range svc.units {
-		err := u.startService()
-		if err != nil {
-			return err
-		}
+		Go(u.startService, ch)
 	}
 
-	return nil
+	mulErr := NewMultipleError(len(svc.units))
+
+	for i := 0; i < len(svc.units); i++ {
+		err := <-ch
+		if err != nil {
+			mulErr.Append(err)
+		}
+	}
+	close(ch)
+
+	return mulErr.Err()
 }
 
 func (svc *Service) StopContainers(timeout int) error {
@@ -798,32 +806,55 @@ func (svc *Service) StopService() error {
 		return err
 	}
 
+	ch := make(chan error, len(units))
 	for _, u := range units {
-		err = u.stopService()
-		if err != nil {
-			logrus.Errorf("service %s unit %s stop service error:%s", svc.Name, u.Name, err)
-			return err
-		}
+		Go(u.stopService, ch)
 	}
 
-	return nil
-}
+	mulErr := NewMultipleError(len(units))
 
-func (svc *Service) stopService() error {
-	for _, u := range svc.units {
-		err := u.stopService()
+	for i := 0; i < len(units); i++ {
+		err := <-ch
 		if err != nil {
-			logrus.Errorf("container %s stop service error:%s", u.Name, err)
+			logrus.Errorf("Service %s stop service error:%s", svc.Name, err)
 
 			err1 := checkContainerError(err)
 			if err1 == errContainerNotRunning || err1 == errContainerNotFound {
 				continue
 			}
-			return err
+
+			mulErr.Append(err)
 		}
 	}
 
-	return nil
+	close(ch)
+
+	return mulErr.Err()
+}
+
+func (svc *Service) stopService() error {
+	ch := make(chan error, len(svc.units))
+	for _, u := range svc.units {
+		Go(u.stopService, ch)
+	}
+
+	mulErr := NewMultipleError(len(svc.units))
+
+	for i := 0; i < len(svc.units); i++ {
+		err := <-ch
+		if err != nil {
+			logrus.Errorf("Service %s stop service error:%s", svc.Name, err)
+
+			err1 := checkContainerError(err)
+			if err1 == errContainerNotRunning || err1 == errContainerNotFound {
+				continue
+			}
+			mulErr.Append(err)
+		}
+	}
+	close(ch)
+
+	return mulErr.Err()
 }
 
 func (svc *Service) RemoveContainers(force, rmVolumes bool) error {
