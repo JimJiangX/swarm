@@ -426,11 +426,6 @@ func (u *unit) startContainer() error {
 }
 
 func (u *unit) forceStopContainer(timeout int) error {
-	err := u.forceStopService()
-	if err != nil {
-		logrus.Errorf("%s force Stop Service Error:%s", u.Name, err)
-	}
-
 	client, err := u.getEngineAPIClient()
 	if err != nil {
 		return err
@@ -667,6 +662,10 @@ func (u *unit) initService() error {
 		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
 
+	if err != nil {
+		logrus.Error(err)
+	}
+
 	return err
 }
 
@@ -736,6 +735,9 @@ func (u *unit) startService() error {
 		err = fmt.Errorf("%s start service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
 
+	if err != nil {
+		logrus.Error(err)
+	}
 	return err
 }
 
@@ -762,7 +764,12 @@ func (u *unit) stopService() error {
 		return fmt.Errorf("Unit %s is Backuping,Cannot stop", u.Name)
 	}
 
-	return u.forceStopService()
+	err := u.forceStopService()
+	if err != nil {
+		logrus.Error(err)
+	}
+
+	return err
 }
 
 func (u *unit) backup(ctx context.Context, args ...string) error {

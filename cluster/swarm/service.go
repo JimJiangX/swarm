@@ -744,19 +744,6 @@ func (svc *Service) startService() error {
 	return mulErr.Err()
 }
 
-func (svc *Service) StopContainers(timeout int) error {
-	err := svc.checkStatus(_StatusServiceNoContent)
-	if err != nil {
-		return err
-	}
-
-	svc.Lock()
-	err = svc.stopContainers(timeout)
-	svc.Unlock()
-
-	return err
-}
-
 func (svc *Service) stopContainers(timeout int) error {
 	for _, u := range svc.units {
 		err := u.stopContainer(timeout)
@@ -1595,42 +1582,64 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 	svc.Lock()
 	defer svc.Unlock()
 
-	for _, u := range svc.units {
-		if _, err := u.getEngine(); err == errEngineIsNil {
-			logrus.Warnf("Remove Unit %s,error:%s", u.Name, err)
-			continue
-		}
+	length := len(svc.units)
+	ch := make(chan error, length)
 
-		logrus.Debug(u.Name, " stop unit service")
-		err := u.forceStopService()
+	for i := range svc.units {
+		u := svc.units[i]
+		Go(func() error {
+			if _, err := u.getEngine(); err == errEngineIsNil {
+				logrus.Warnf("Remove Unit %s,error:%s", u.Name, err)
+				return nil
+			}
+
+			logrus.Debug(u.Name, " stop unit service")
+			err := u.forceStopService()
+			if err != nil {
+				logrus.Errorf("container %s stop service error:%s", u.Name, err)
+
+				err1 := checkContainerError(err)
+				if err1 == errContainerNotFound || err1 == errContainerNotRunning {
+					return nil
+				}
+				if force && err.Error() == "EOF" {
+					return nil
+				}
+
+				return err
+			}
+
+			logrus.Debug(u.Name, " stop container")
+			err = u.forceStopContainer(timeout)
+			if err != nil {
+				logrus.Errorf("container %s stop error:%s", u.Name, err)
+
+				err1 := checkContainerError(err)
+				if err1 == errContainerNotFound || err1 == errContainerNotRunning {
+					return nil
+				}
+				if force && err.Error() == "EOF" {
+					return nil
+				}
+				return err
+			}
+			return nil
+		}, ch)
+	}
+
+	mulErr := NewMultipleError(length)
+
+	for i := 0; i < length; i++ {
+		err := <-ch
 		if err != nil {
-			logrus.Errorf("container %s stop service error:%s", u.Name, err)
-
-			err1 := checkContainerError(err)
-			if err1 == errContainerNotFound || err1 == errContainerNotRunning {
-				continue
-			}
-			if force && err.Error() == "EOF" {
-				continue
-			}
-
-			return err
+			mulErr.Append(err)
 		}
+	}
+	close(ch)
 
-		logrus.Debug(u.Name, " stop container")
-		err = u.forceStopContainer(timeout)
-		if err != nil {
-			logrus.Errorf("container %s stop error:%s", u.Name, err)
-
-			err1 := checkContainerError(err)
-			if err1 == errContainerNotFound || err1 == errContainerNotRunning {
-				continue
-			}
-			if force && err.Error() == "EOF" {
-				continue
-			}
-			return err
-		}
+	if err := mulErr.Err(); err != nil {
+		logrus.Error(err)
+		return err
 	}
 
 	err := svc.removeContainers(force, rmVolumes)

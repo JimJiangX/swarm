@@ -330,16 +330,25 @@ func stopOldContainer(svc *Service, u *unit) error {
 			logrus.Errorf("isolate container %s error:%s", u.Name, err)
 		}
 	}
+	err := u.forceStopService()
+	if err != nil {
+		logrus.Errorf("container %s stop service error:%s", u.Name, err)
 
-	if err := u.forceStopContainer(0); err != nil {
 		err1 := checkContainerError(err)
-		if err1 != errContainerNotRunning && err1 != errContainerNotFound {
-			logrus.Errorf("%s stop container error:%s", u.Name, err)
+		if err.Error() != "EOF" && err1 != errContainerNotFound || err1 != errContainerNotRunning {
 			return err
 		}
 	}
 
-	err := removeNetworkings(u.engine.IP, u.networkings)
+	if err = u.forceStopContainer(0); err != nil {
+		logrus.Errorf("%s stop container error:%s", u.Name, err)
+		err1 := checkContainerError(err)
+		if err1 != errContainerNotRunning && err1 != errContainerNotFound {
+			return err
+		}
+	}
+
+	err = removeNetworkings(u.engine.IP, u.networkings)
 	if err != nil {
 		logrus.Errorf("container %s remove Networkings error:%s", u.Name, err)
 	}
