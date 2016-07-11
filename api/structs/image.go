@@ -19,7 +19,7 @@ type KeysetParams struct {
 	CanSet      bool `json:"can_set"`
 	MustRestart bool `json:"must_restart"`
 	Key         string
-	Description string `json:",omitempty"`
+	Description string
 }
 
 type LoadImageResponse struct {
