@@ -780,13 +780,19 @@ func (svc *Service) StopService() error {
 	err = GoConcurrency(funcs)
 	if err != nil {
 		logrus.Errorf("Service %s stop service error:%s", svc.Name, err)
+
 		if _err, ok := err.(_errors); ok {
 			errs := _err.Split()
+			pass := true
 			for i := range errs {
 				err := checkContainerError(errs[i])
 				if err != errContainerNotRunning && err != errContainerNotFound {
+					pass = false
 					break
 				}
+			}
+			if pass {
+				return nil
 			}
 		}
 	}
@@ -805,11 +811,16 @@ func (svc *Service) stopService() error {
 		logrus.Errorf("Service %s stop service error:%s", svc.Name, err)
 		if _err, ok := err.(_errors); ok {
 			errs := _err.Split()
+			pass := true
 			for i := range errs {
 				err := checkContainerError(errs[i])
 				if err != errContainerNotRunning && err != errContainerNotFound {
+					pass = false
 					break
 				}
+			}
+			if pass {
+				return nil
 			}
 		}
 	}
@@ -1586,14 +1597,21 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 	err := GoConcurrency(funcs)
 	if err != nil {
 		logrus.Errorf("Service %s stop error:%s", svc.Name, err)
-		if _err, ok := err.(_errors); ok {
+
+		pass := true
+		_err, ok := err.(_errors)
+		if ok {
 			errs := _err.Split()
 			for i := range errs {
 				err := checkContainerError(errs[i])
 				if err != errContainerNotRunning && err != errContainerNotFound {
+					pass = false
 					break
 				}
 			}
+		}
+		if !pass || !ok {
+			return err
 		}
 	}
 

@@ -10,10 +10,13 @@ import (
 )
 
 func GoConcurrency(funcs []func() error) error {
+	errs := NewErrors()
 	if len(funcs) == 0 {
 		return nil
 	} else if len(funcs) == 1 {
-		return funcs[0]()
+		errs.Append(funcs[0]())
+
+		return errs.Err()
 	}
 
 	length := len(funcs)
@@ -25,7 +28,6 @@ func GoConcurrency(funcs []func() error) error {
 		}(funcs[i])
 	}
 
-	errs := NewErrors()
 	for i := 0; i < length; i++ {
 		errs.Append(<-ch)
 	}
