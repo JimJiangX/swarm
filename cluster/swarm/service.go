@@ -3,7 +3,6 @@ package swarm
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -19,6 +18,7 @@ import (
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
 	consulapi "github.com/hashicorp/consul/api"
+	"github.com/pkg/errors"
 	swm_structs "github.com/yiduoyunQ/sm/sm-svr/structs"
 	"github.com/yiduoyunQ/smlib"
 )
@@ -686,24 +686,17 @@ func (svc *Service) copyServiceConfig() error {
 }
 
 func (svc *Service) initService() error {
-	length := len(svc.units)
-	ch := make(chan error, length)
+	funcs := make([]func() error, len(svc.units))
 	for i := range svc.units {
-		u := svc.units[i]
-		Go(u.initService, ch)
+		funcs[i] = svc.units[i].initService
 	}
 
-	mulErr := NewMultipleError()
-
-	for i := 0; i < length; i++ {
-		err := <-ch
-		if err != nil {
-			mulErr.Append(err)
-		}
+	err := GoConcurrency(funcs)
+	if err != nil {
+		logrus.Errorf("Service %s init service error:%s", svc.Name, err)
 	}
-	close(ch)
 
-	return mulErr.Err()
+	return err
 }
 
 func (svc *Service) checkStatus(expected int64) error {
@@ -724,24 +717,17 @@ func (svc *Service) statusCAS(expected, value int64) error {
 }
 
 func (svc *Service) startService() error {
-	length := len(svc.units)
-	ch := make(chan error, length)
+	funcs := make([]func() error, len(svc.units))
 	for i := range svc.units {
-		u := svc.units[i]
-		Go(u.startService, ch)
+		funcs[i] = svc.units[i].startService
 	}
 
-	mulErr := NewMultipleError()
-
-	for i := 0; i < length; i++ {
-		err := <-ch
-		if err != nil {
-			mulErr.Append(err)
-		}
+	err := GoConcurrency(funcs)
+	if err != nil {
+		logrus.Errorf("Service %s start service error:%s", svc.Name, err)
 	}
-	close(ch)
 
-	return mulErr.Err()
+	return err
 }
 
 func (svc *Service) stopContainers(timeout int) error {
@@ -786,59 +772,49 @@ func (svc *Service) StopService() error {
 		return err
 	}
 
-	length := len(units)
-	ch := make(chan error, length)
+	funcs := make([]func() error, len(units))
 	for i := range units {
-		u := units[i]
-		Go(u.stopService, ch)
+		funcs[i] = units[i].stopService
 	}
 
-	mulErr := NewMultipleError()
-
-	for i := 0; i < length; i++ {
-		err := <-ch
-		if err != nil {
-			logrus.Errorf("Service %s stop service error:%s", svc.Name, err)
-
-			err1 := checkContainerError(err)
-			if err1 == errContainerNotRunning || err1 == errContainerNotFound {
-				continue
+	err = GoConcurrency(funcs)
+	if err != nil {
+		logrus.Errorf("Service %s stop service error:%s", svc.Name, err)
+		if _err, ok := err.(_errors); ok {
+			errs := _err.Split()
+			for i := range errs {
+				err := checkContainerError(errs[i])
+				if err != errContainerNotRunning && err != errContainerNotFound {
+					break
+				}
 			}
-
-			mulErr.Append(err)
 		}
 	}
 
-	close(ch)
-
-	return mulErr.Err()
+	return err
 }
 
 func (svc *Service) stopService() error {
-	length := len(svc.units)
-	ch := make(chan error, length)
+	funcs := make([]func() error, len(svc.units))
 	for i := range svc.units {
-		u := svc.units[i]
-		Go(u.stopService, ch)
+		funcs[i] = svc.units[i].stopService
 	}
 
-	mulErr := NewMultipleError()
-
-	for i := 0; i < length; i++ {
-		err := <-ch
-		if err != nil {
-			logrus.Errorf("Service %s stop service error:%s", svc.Name, err)
-
-			err1 := checkContainerError(err)
-			if err1 == errContainerNotRunning || err1 == errContainerNotFound {
-				continue
+	err := GoConcurrency(funcs)
+	if err != nil {
+		logrus.Errorf("Service %s stop service error:%s", svc.Name, err)
+		if _err, ok := err.(_errors); ok {
+			errs := _err.Split()
+			for i := range errs {
+				err := checkContainerError(errs[i])
+				if err != errContainerNotRunning && err != errContainerNotFound {
+					break
+				}
 			}
-			mulErr.Append(err)
 		}
 	}
-	close(ch)
 
-	return mulErr.Err()
+	return err
 }
 
 func (svc *Service) RemoveContainers(force, rmVolumes bool) error {
@@ -1582,12 +1558,10 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 	svc.Lock()
 	defer svc.Unlock()
 
-	length := len(svc.units)
-	ch := make(chan error, length)
-
+	funcs := make([]func() error, len(svc.units))
 	for i := range svc.units {
 		u := svc.units[i]
-		Go(func() error {
+		funcs[i] = func() error {
 			if _, err := u.getEngine(); err == errEngineIsNil {
 				logrus.Warnf("Remove Unit %s,error:%s", u.Name, err)
 				return nil
@@ -1595,49 +1569,35 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 
 			logrus.Debug(u.Name, " stop unit service")
 			err := u.forceStopService()
-			if err != nil {
-				logrus.Errorf("container %s stop service error:%s", u.Name, err)
-
-				err1 := checkContainerError(err)
-				if err1 == errContainerNotFound || err1 == errContainerNotRunning {
-					return nil
-				}
-				if err.Error() != "EOF" {
-					return err
-				}
+			if err != nil && err.Error() != "EOF" {
+				return errors.Wrapf(err, "%s forceStopService error", u.Name)
 			}
 
 			logrus.Debug(u.Name, " stop container")
 			err = u.forceStopContainer(timeout)
-			if err != nil {
-				logrus.Errorf("container %s stop error:%s", u.Name, err)
-
-				err1 := checkContainerError(err)
-				if err.Error() == "EOF" || err1 == errContainerNotFound || err1 == errContainerNotRunning {
-					return nil
-				}
+			if err != nil && err.Error() != "EOF" {
+				err = errors.Wrapf(err, "%s forceStopContainer error", u.Name)
 			}
 
 			return err
-		}, ch)
-	}
-
-	mulErr := NewMultipleError()
-
-	for i := 0; i < length; i++ {
-		err := <-ch
-		if err != nil {
-			mulErr.Append(err)
 		}
 	}
-	close(ch)
 
-	if err := mulErr.Err(); err != nil {
-		logrus.Error(err)
-		return err
+	err := GoConcurrency(funcs)
+	if err != nil {
+		logrus.Errorf("Service %s stop error:%s", svc.Name, err)
+		if _err, ok := err.(_errors); ok {
+			errs := _err.Split()
+			for i := range errs {
+				err := checkContainerError(errs[i])
+				if err != errContainerNotRunning && err != errContainerNotFound {
+					break
+				}
+			}
+		}
 	}
 
-	err := svc.removeContainers(force, rmVolumes)
+	err = svc.removeContainers(force, rmVolumes)
 	if err != nil {
 		return err
 	}
