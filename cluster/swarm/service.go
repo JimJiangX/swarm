@@ -1254,7 +1254,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, NameOrID string) (string
 	now := time.Now()
 	strategy := database.BackupStrategy{
 		ID:        utils.Generate64UUID(),
-		Name:      backup.Name + "_backup_manually" + utils.TimeToString(now),
+		Name:      backup.Name + "_backup_manually_" + utils.TimeToString(now),
 		Type:      "full",
 		ServiceID: svc.ID,
 		Spec:      "manually",

@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -446,22 +446,28 @@ func (u *unit) stopContainer(timeout int) error {
 	return u.forceStopContainer(timeout)
 }
 
-func (u *unit) restartContainer(timeout int) error {
-	err := u.stopService()
+func (u *unit) restartContainer(ctx context.Context) error {
+	if u.ContainerCmd == nil {
+		return nil
+	}
+	engine, err := u.getEngine()
 	if err != nil {
-		// return err
+		return err
+	}
+	client := engine.EngineAPIClient()
+
+	cmd := u.StopServiceCmd()
+	if len(cmd) == 0 {
+		logrus.Warnf("%s StopServiceCmd is nil", u.Name)
+		return nil
 	}
 
-	if u.engine == nil {
-		return errEngineIsNil
+	inspect, err := containerExec(ctx, engine, u.ContainerID, cmd, false)
+	if inspect.ExitCode != 0 {
+		err = fmt.Errorf("%s stop service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
 
-	client := u.engine.EngineAPIClient()
-	if client == nil {
-		return errEngineAPIisNil
-	}
-
-	return client.ContainerRestart(context.Background(), u.Unit.ContainerID, timeout)
+	return client.ContainerRestart(ctx, u.Unit.ContainerID, 5)
 }
 
 func (u *unit) renameContainer(name string) error {
@@ -806,7 +812,7 @@ func (u *unit) backup(ctx context.Context, args ...string) error {
 	return err
 }
 
-func (u *unit) restore(file string) error {
+func (u *unit) restore(ctx context.Context, file string) error {
 	if u.ContainerCmd == nil {
 		return nil
 	}
@@ -820,13 +826,12 @@ func (u *unit) restore(file string) error {
 		"Cmd":  cmd,
 	}).Debugln("restore job")
 
-	inspect, err := containerExec(context.Background(), u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(ctx, u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s restore cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
 
 	return err
-
 }
 
 var pluginPort = 3333
@@ -892,30 +897,40 @@ func (gd *Gardener) unitContainer(u *unit) *cluster.Container {
 	return u.container
 }
 
-func (gd *Gardener) RestoreUnit(NameOrID, source string) error {
+func (gd *Gardener) RestoreUnit(NameOrID, source string) (string, error) {
 	table, err := database.GetUnit(NameOrID)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	service, err := gd.GetService(table.ServiceID)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	unit, err := service.getUnit(table.ID)
 	if err != nil {
+		return "", err
+	}
+
+	background := func(ctx context.Context) error {
+		// manager locked
+		// restart container
+		err = unit.restartContainer(ctx)
+		if err != nil {
+			return err
+		}
+
+		err = unit.restore(ctx, source)
+		if err != nil {
+			errors.Wrapf(err, "Unit %s restore", unit.Name)
+		}
+
 		return err
 	}
 
-	// manager locked
-	// restart container
-	err = unit.restartContainer(5)
-	if err != nil {
-		return err
-	}
+	task := database.NewTask("Unit restore", unit.ID, "", nil, 0)
+	t := NewAsyncTask(context.Background(), background, task.Insert, task.UpdateStatus, 0)
 
-	err = unit.restore(source)
-
-	return err
+	return task.ID, t.Run()
 }

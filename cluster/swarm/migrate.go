@@ -303,7 +303,6 @@ func (gd *Gardener) UnitMigrate(NameOrID string, candidates []string, hostConfig
 	t := NewAsyncTask(context.Background(), background, task.Insert, task.UpdateStatus, 0)
 
 	return task.ID, t.Run()
-
 }
 
 func startUnit(engine *cluster.Engine, containerID string,
