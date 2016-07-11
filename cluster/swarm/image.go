@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/net/context"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
+	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 type Image struct {
@@ -188,26 +188,41 @@ func UpdateImageTemplateConfig(imageID string, req structs.UpdateUnitConfigReque
 	newConfig.ID = utils.Generate64UUID()
 	newConfig.Version = 0
 
-	if req.ConfigContent != "" {
+	if len(req.ConfigKVs) > 0 {
 		parser, _, err := initialize(image.Name)
 		if err != nil {
 			return config, err
 		}
 
-		_, err = parser.ParseData([]byte(req.ConfigContent))
+		configer, err := parser.ParseData(nil)
 		if err != nil {
-			return config, fmt.Errorf("Parse Config Content Error:%s", err)
+			return config, errors.Wrap(err, "ParseDate")
 		}
 
-		newConfig.Content = req.ConfigContent
+		keysets := make(map[string]database.KeysetParams, len(config.KeySets))
+		for _, kv := range req.ConfigKVs {
+			err := configer.Set(kv.Key, kv.Value)
+			if err != nil {
+				return config, errors.Wrap(err, "Configer Set")
+			}
+			keysets[kv.Key] = database.KeysetParams{
+				Key:         kv.Key,
+				CanSet:      kv.CanSet,
+				MustRestart: kv.MustRestart,
+				Description: kv.Description,
+			}
+		}
+		newConfig.KeySets = keysets
+
+		content, err := parser.Marshal()
+		if err != nil {
+			return config, errors.Wrap(err, "Marshal")
+		}
+		newConfig.Content = string(content)
 	}
 
 	if req.ConfigMountPath != "" {
 		newConfig.Mount = req.ConfigMountPath
-	}
-
-	if len(req.KeySet) > 0 {
-		newConfig.KeySets = converteToKeysetParams(req.KeySet)
 	}
 
 	err = database.TxUpdateImageTemplateConfig(image.ID, newConfig)

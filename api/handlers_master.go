@@ -2145,8 +2145,14 @@ func updateImageTemplateConfig(ctx goctx.Context, w http.ResponseWriter, r *http
 		return
 	}
 
-	kvs, err := iniParse(config.Content, config.KeySets)
-
+	kvs := req.ConfigKVs
+	if len(req.ConfigKVs) == 0 {
+		kvs, err = iniParse(config.Content, config.KeySets)
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
 	resp := structs.ImageConfigResponse{
 		ID:    config.ID,    // string `json:"config_id"`
 		Mount: config.Mount, // string `json:"config_mount_path"`

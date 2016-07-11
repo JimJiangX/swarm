@@ -1261,7 +1261,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, NameOrID string) (string
 		Valid:     now,
 		Enabled:   false,
 		BackupDir: sys.BackupDir,
-		Timeout:   24 * 60 * 60,
+		Timeout:   2 * 60 * 60,
 		CreatedAt: now,
 	}
 
