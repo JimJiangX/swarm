@@ -427,6 +427,12 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		labels = nil
 	}
 
+	kvs, err := iniParse(config.Content, config.KeySets)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	resp := structs.GetImageResponse{
 		ID:       image.ID,
 		Name:     image.Name,
@@ -437,10 +443,9 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		Size:     image.Size,
 		UploadAt: utils.TimeToString(image.UploadAt),
 		TemplateConfig: structs.ImageConfigResponse{
-			ID:      config.ID,                              // string `json:"config_id"`
-			Mount:   config.Mount,                           // string `json:"config_mount_path"`
-			Content: config.Content,                         // string `json:"config_content"`
-			KeySet:  converteToKeysetParams(config.KeySets), // map[string]KeysetParams,
+			ID:    config.ID,    // string `json:"config_id"`
+			Mount: config.Mount, // string `json:"config_mount_path"`
+			KVs:   kvs,
 		},
 	}
 
@@ -2140,11 +2145,12 @@ func updateImageTemplateConfig(ctx goctx.Context, w http.ResponseWriter, r *http
 		return
 	}
 
+	kvs, err := iniParse(config.Content, config.KeySets)
+
 	resp := structs.ImageConfigResponse{
-		ID:      config.ID,                              // string `json:"config_id"`
-		Mount:   config.Mount,                           // string `json:"config_mount_path"`
-		Content: config.Content,                         // string `json:"config_content"`
-		KeySet:  converteToKeysetParams(config.KeySets), // map[string]KeysetParams,
+		ID:    config.ID,    // string `json:"config_id"`
+		Mount: config.Mount, // string `json:"config_mount_path"`
+		KVs:   kvs,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -2168,6 +2174,66 @@ func converteToKeysetParams(from map[string]database.KeysetParams) map[string]st
 	}
 
 	return keysets
+}
+
+func iniParse(content string, keysetsMap map[string]database.KeysetParams) ([]structs.ValueAndKeyset, error) {
+	var (
+		delimiter = "::"
+		prefix    = "default"
+		kvs       = make([]structs.ValueAndKeyset, 0, 100)
+	)
+
+	lenContent := len(content)
+	lenKV := 0
+	buf := bytes.NewBufferString(content)
+	for {
+		if lenKV == lenContent {
+			break
+		}
+		s, err := buf.ReadString('\n')
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+		lenKV += len(s)
+		s = strings.TrimSpace(s)
+		if strings.Index(s, "[") == 0 {
+			prefix = s[1 : len(s)-1]
+			continue
+		}
+		if strings.Index(s, "#") == 0 {
+			continue
+		}
+		index := strings.Index(s, "=")
+		if index < 0 {
+			continue
+		}
+		key := strings.TrimSpace(s[:index])
+		if len(key) == 0 {
+			continue
+		}
+		val := strings.TrimSpace(s[index+1:])
+		if len(val) == 0 {
+			continue
+		}
+		index = strings.Index(val, "#")
+		if index > 0 {
+			val = strings.TrimSpace(val[:index])
+		}
+
+		key = prefix + delimiter + key
+		v := keysetsMap[key]
+		kvs = append(kvs, structs.ValueAndKeyset{
+			Value: val,
+			KeysetParams: structs.KeysetParams{
+				Key:         key,
+				CanSet:      v.CanSet,
+				MustRestart: v.MustRestart,
+				Description: v.Description,
+			},
+		})
+	}
+
+	return kvs, nil
 }
 
 // POST /storage/san

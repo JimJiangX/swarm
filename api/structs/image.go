@@ -16,9 +16,9 @@ type ImageConfig struct {
 }
 
 type KeysetParams struct {
+	CanSet      bool `json:"can_set"`
+	MustRestart bool `json:"must_restart"`
 	Key         string
-	CanSet      bool   `json:"can_set"`
-	MustRestart bool   `json:"must_restart"`
 	Description string `json:",omitempty"`
 }
 
@@ -40,10 +40,9 @@ type GetImageResponse struct {
 }
 
 type ImageConfigResponse struct {
-	ID      string                  `json:"config_id"`
-	Mount   string                  `json:"config_mount_path"`
-	Content string                  `json:"config_content"`
-	KeySet  map[string]KeysetParams `json:"config_keyset"`
+	ID    string `json:"config_id"`
+	Mount string `json:"config_mount_path"`
+	KVs   []ValueAndKeyset
 }
 
 type UpdateUnitConfigRequest struct {
@@ -58,8 +57,8 @@ type UpdateServiceConfigRequest struct {
 }
 
 type ValueAndKeyset struct {
-	Value string
 	KeysetParams
+	Value string
 }
 
 type UnitConfigResponse struct {
