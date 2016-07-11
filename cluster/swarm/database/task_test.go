@@ -8,7 +8,7 @@ import (
 
 func TestInsertTask(t *testing.T) {
 	task1 := NewTask("TaskRelated001", "TaskLinkto001", "TaskDescription001", []string{"TaskLabels011", "TaskLabels011"}, 1011)
-	err := InsertTask(task1)
+	err := task1.Insert()
 	if err != nil {
 		t.Fatal(err)
 	}

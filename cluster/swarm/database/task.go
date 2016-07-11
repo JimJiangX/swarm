@@ -106,7 +106,7 @@ func NewTask(relate, linkto, des string, labels []string, timeout int) Task {
 	}
 }
 
-func InsertTask(task Task) error {
+func (task Task) Insert() error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
@@ -225,6 +225,26 @@ func UpdateTaskStatus(task *Task, state int32, finishAt time.Time, msg string) e
 
 	atomic.StoreInt32(&task.Status, int32(state))
 	task.FinishedAt = finishAt
+
+	return nil
+}
+
+func (task *Task) UpdateStatus(status int, msg string) error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	query := "UPDATE tb_task SET status=?,finished_at=?,errors=? WHERE id=?"
+
+	_, err = db.Exec(query, status, now, msg, task.ID)
+	if err != nil {
+		return err
+	}
+
+	atomic.StoreInt32(&task.Status, int32(status))
+	task.FinishedAt = now
 
 	return nil
 }

@@ -1301,7 +1301,7 @@ func (gd *Gardener) ServiceScaleTask(name string, scale structs.PostServiceScale
 
 	task := database.NewTask("service scaling config",
 		svc.ID, "", nil, 300)
-	err = database.InsertTask(task)
+	err = task.Insert()
 	if err != nil {
 		return "", err
 	}
