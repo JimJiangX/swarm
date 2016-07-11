@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -55,41 +56,130 @@ func (m multipleError) Err() error {
 	return m
 }
 
-type taskRecorder interface {
-	Insert() error
-	Update(code int, msg string) error
+func GoConcurrency(funcs ...func() error) error {
+	length := len(funcs)
+	ch := make(chan error, length)
+
+	for i := range funcs {
+		go func(f func() error) {
+			ch <- f()
+		}(funcs[i])
+	}
+
+	errs := NewErrors()
+	for i := 0; i < length; i++ {
+		errs.Append(<-ch)
+	}
+
+	return errs
+}
+
+type _errors struct {
+	buffer *bytes.Buffer
+	val    string
+	errors []error
+}
+
+func NewErrors() _errors {
+	return _errors{
+		buffer: bytes.NewBuffer(nil),
+		errors: make([]error, 0, 10),
+	}
+}
+
+func (es *_errors) Append(err error) {
+	if err == nil {
+		return
+	}
+	if es.buffer == nil {
+		es.buffer = bytes.NewBuffer(nil)
+	}
+	es.buffer.WriteString(err.Error())
+	es.buffer.WriteString("\n")
+
+	es.val = es.buffer.String()
+
+	if es.errors == nil {
+		es.errors = make([]error, 0, 10)
+	}
+	es.errors = append(es.errors, err)
+}
+
+func (es _errors) Error() string {
+	return es.val
+}
+
+func (es _errors) Err() error {
+	if len(es.errors) == 0 ||
+		es.buffer == nil ||
+		es.buffer.Len() == 0 {
+		return nil
+	}
+
+	return es
+}
+
+func (es _errors) Split() []error {
+	if len(es.errors) == 0 {
+		return nil
+	}
+
+	return es.errors
 }
 
 type asyncTask struct {
-	recorder   taskRecorder
 	timeout    time.Duration
-	background taskFunc
 	parent     context.Context
 	cancel     func()
+	create     func() error
+	background func(context.Context) error
+	update     func(code int, msg string) error
 }
 
-type taskFunc func(context.Context) error
+func NewAsyncTask(ctx context.Context,
+	background func(context.Context) error,
+	create func() error,
+	update func(code int, msg string) error,
+	timeout time.Duration) *asyncTask {
 
-func NewAsyncTask(ctx context.Context, f taskFunc, recorder taskRecorder, timeout time.Duration) *asyncTask {
 	return &asyncTask{
-		recorder:   recorder,
 		timeout:    timeout,
-		background: f,
 		parent:     ctx,
+		create:     create,
+		background: background,
+		update:     update,
 	}
 }
 
 func (t *asyncTask) Run() error {
-	err := t.recorder.Insert()
-	if err != nil {
-		return err
+	if t.background == nil {
+		return errors.New("background function is nil")
 	}
-
 	if t.parent == nil {
 		t.parent = context.Background()
 	}
 
-	ctx, cancel := context.WithTimeout(t.parent, t.timeout)
+	select {
+	case <-t.parent.Done():
+		return errors.Wrap(t.parent.Err(), "parent Context has done")
+	default:
+	}
+
+	if t.create != nil {
+		if err := t.create(); err != nil {
+			return errors.Wrap(err, "create error")
+		}
+	}
+
+	var (
+		ctx    context.Context
+		cancel context.CancelFunc
+	)
+	if t.timeout == 0 {
+		ctx, cancel = context.WithCancel(t.parent)
+	} else {
+		ctx, cancel = context.WithTimeout(t.parent, t.timeout)
+	}
 	t.cancel = cancel
 
 	go func(ctx context.Context, t *asyncTask) {
@@ -123,8 +213,8 @@ func (t *asyncTask) Run() error {
 		default:
 		}
 
-		if code != 0 {
-			err = t.recorder.Update(code, msg)
+		if code != 0 && t.update != nil {
+			err = t.update(code, msg)
 			if err != nil {
 				logrus.Errorf("taskRecorder Update Error:%s,Code=%d,message=%s", err, code, msg)
 			}

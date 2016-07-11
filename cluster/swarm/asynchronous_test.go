@@ -8,6 +8,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+// TODO:update tests
+
 func TestGo(t *testing.T) {
 	ch := make(chan error, 1)
 
