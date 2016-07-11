@@ -9,54 +9,13 @@ import (
 	"golang.org/x/net/context"
 )
 
-// Go is a basic promise implementation: it wraps calls a function in a goroutine,
-// and returns a channel which will later return the function's return value.
-func Go(f func() error, ch chan error) {
-	go func() {
-		ch <- f()
-	}()
-}
-
-type multipleError struct {
-	buffer *bytes.Buffer
-	val    string
-}
-
-func NewMultipleError() multipleError {
-	return multipleError{
-		buffer: bytes.NewBuffer(nil),
-	}
-}
-
-func (m *multipleError) Append(err error) {
-	if err == nil {
-		return
-	}
-	if m.buffer == nil {
-		m.buffer = bytes.NewBuffer(nil)
-	}
-	m.buffer.WriteString(err.Error())
-	m.buffer.WriteString("\n")
-
-	m.val = m.buffer.String()
-}
-
-func (m multipleError) Error() string {
-	return m.val
-}
-
-func (m multipleError) Err() error {
-	if m.buffer == nil {
+func GoConcurrency(funcs []func() error) error {
+	if len(funcs) == 0 {
 		return nil
-	}
-	if m.buffer.Len() == 0 {
-		return nil
+	} else if len(funcs) == 1 {
+		return funcs[0]()
 	}
 
-	return m
-}
-
-func GoConcurrency(funcs ...func() error) error {
 	length := len(funcs)
 	ch := make(chan error, length)
 
@@ -71,7 +30,7 @@ func GoConcurrency(funcs ...func() error) error {
 		errs.Append(<-ch)
 	}
 
-	return errs
+	return errs.Err()
 }
 
 type _errors struct {
