@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
@@ -93,79 +95,87 @@ func converteToKeysetParams(params []structs.KeysetParams) map[string]database.K
 	return keyset
 }
 
-func LoadImage(req structs.PostLoadImageRequest) (string, error) {
+func LoadImage(req structs.PostLoadImageRequest) (string, string, error) {
 	content, err := ioutil.ReadFile(req.ConfigFilePath)
 	if err != nil {
 		err = fmt.Errorf("ReadAll From ConfigFile %s error:%s", req.ConfigFilePath, err)
 		logrus.Error(err)
 
-		return "", err
+		return "", "", err
 	}
 	parser, _, err := initialize(req.Name)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	_, err = parser.ParseData(content)
 	if err != nil {
-		return "", fmt.Errorf("Parse PostLoadImageRequest.Content Error:%s", err)
+		return "", "", fmt.Errorf("Parse PostLoadImageRequest.Content Error:%s", err)
 	}
 
 	config, err := database.GetSystemConfig()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	buffer := bytes.NewBuffer(nil)
-	oldName := fmt.Sprintf("%s:%s", req.Name, req.Version)
-	newName := fmt.Sprintf("%s:%d/%s", config.Registry.Domain, config.Registry.Port, oldName)
-	script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
+	_imageID := utils.Generate64UUID()
 
-	err = SSHCommand(config.Registry.Address,
-		config.Registry.OsUsername, config.Registry.OsPassword, script, buffer)
-	if err != nil {
-		return buffer.String(), err
+	background := func(ctx context.Context) error {
+		buffer := bytes.NewBuffer(nil)
+		oldName := fmt.Sprintf("%s:%s", req.Name, req.Version)
+		newName := fmt.Sprintf("%s:%d/%s", config.Registry.Domain, config.Registry.Port, oldName)
+		script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
+
+		err = SSHCommand(config.Registry.Address,
+			config.Registry.OsUsername, config.Registry.OsPassword, script, buffer)
+		if err != nil {
+			logrus.Error(err, buffer.String())
+			return err
+		}
+
+		imageID, size, err := parsePushImageOutput(buffer.String())
+		if err != nil {
+			return err
+		}
+
+		unitConfig := database.UnitConfig{
+			ID:        utils.Generate64UUID(),
+			Mount:     req.ConfigMountPath,
+			Version:   0,
+			ParentID:  "",
+			Content:   string(content),
+			KeySets:   converteToKeysetParams(req.KeySet),
+			CreatedAt: time.Now(),
+		}
+
+		buf := bytes.NewBuffer(nil)
+		json.NewEncoder(buf).Encode(req.Labels)
+
+		image := database.Image{
+			Enabled:          true,
+			ID:               _imageID,
+			Name:             req.Name,
+			Version:          req.Version,
+			ImageID:          imageID,
+			Labels:           buf.String(),
+			Size:             size,
+			TemplateConfigID: unitConfig.ID,
+			UploadAt:         time.Now(),
+		}
+		unitConfig.ImageID = image.ID
+
+		err = database.TxInsertImage(image, unitConfig)
+		if err != nil {
+			logrus.Error(err)
+		}
+
+		return err
 	}
 
-	imageID, size, err := parsePushImageOutput(buffer.String())
-	if err != nil {
-		return "", err
-	}
+	task := database.NewTask("load image", _imageID, "", nil, 0)
+	t := NewAsyncTask(context.Background(), background, task.Insert, task.UpdateStatus, 0)
 
-	unitConfig := database.UnitConfig{
-		ID:        utils.Generate64UUID(),
-		Mount:     req.ConfigMountPath,
-		Version:   0,
-		ParentID:  "",
-		Content:   string(content),
-		KeySets:   converteToKeysetParams(req.KeySet),
-		CreatedAt: time.Now(),
-	}
-
-	buf := bytes.NewBuffer(nil)
-	json.NewEncoder(buf).Encode(req.Labels)
-
-	image := database.Image{
-		Enabled:          true,
-		ID:               utils.Generate64UUID(),
-		Name:             req.Name,
-		Version:          req.Version,
-		ImageID:          imageID,
-		Labels:           buf.String(),
-		Size:             size,
-		TemplateConfigID: unitConfig.ID,
-		UploadAt:         time.Now(),
-	}
-	unitConfig.ImageID = image.ID
-
-	task := database.NewTask("load image", image.ID, "", nil, 0)
-
-	err = database.TxInsertImage(image, unitConfig, task)
-	if err != nil {
-		return "", err
-	}
-
-	return image.ID, nil
+	return _imageID, task.ID, t.Run()
 }
 
 func UpdateImageTemplateConfig(imageID string, req structs.UpdateUnitConfigRequest) (database.UnitConfig, error) {

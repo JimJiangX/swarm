@@ -2082,15 +2082,20 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := swarm.LoadImage(req)
+	imageID, taskID, err := swarm.LoadImage(req)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	resp := structs.LoadImageResponse{
+		ImageID: imageID,
+		TaskID:  taskID,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "ID", id)
+	json.NewEncoder(w).Encode(resp)
 }
 
 // POST /image/{image:.*}/enable

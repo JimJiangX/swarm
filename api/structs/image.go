@@ -22,6 +22,11 @@ type KeysetParams struct {
 	Description string `json:",omitempty"`
 }
 
+type LoadImageResponse struct {
+	ImageID string `json:"image_id"`
+	TaskID  string `json:"task_id"`
+}
+
 type GetImageResponse struct {
 	ID             string              `json:"id"`
 	Name           string              `json:"name"`
