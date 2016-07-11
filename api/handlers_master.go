@@ -1889,13 +1889,15 @@ func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	err := gd.UnitMigrate(name, req.Candidates, req.HostConfig)
+	taskID, err := gd.UnitMigrate(name, req.Candidates, req.HostConfig)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
 }
 
 // POST /units/{name:.*}/rebuild

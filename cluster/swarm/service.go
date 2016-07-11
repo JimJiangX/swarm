@@ -1586,7 +1586,10 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 
 			logrus.Debug(u.Name, " stop container")
 			err = u.forceStopContainer(timeout)
-			if err != nil && err.Error() != "EOF" {
+			if err != nil {
+				if err.Error() == "EOF" {
+					return nil
+				}
 				err = errors.Wrapf(err, "%s forceStopContainer error", u.Name)
 			}
 
