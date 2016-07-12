@@ -8,8 +8,6 @@ import (
 	"golang.org/x/net/context"
 )
 
-// TODO:update tests
-
 func TestGoConcurrency(t *testing.T) {
 	errFunc := func() error {
 		return fmt.Errorf("It's a error")

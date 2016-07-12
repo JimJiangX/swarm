@@ -422,7 +422,8 @@ func (u *unit) startContainer() error {
 		return err
 	}
 
-	return u.engine.StartContainer(u.Unit.Name, nil)
+	logrus.Debug(u.Name, " start container ", u.ContainerID)
+	return u.engine.StartContainer(u.ContainerID, nil)
 }
 
 func (u *unit) forceStopContainer(timeout int) error {
@@ -681,6 +682,7 @@ func initUnitService(id string, eng *cluster.Engine, cmd []string) error {
 		return nil
 	}
 
+	logrus.Debug(id, " init service ...")
 	inspect, err := containerExec(context.Background(), eng, id, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", id, cmd, inspect.ExitCode, inspect, err)
@@ -720,6 +722,11 @@ func (gd *Gardener) StopUnitService(NameOrID string, timeout int) error {
 		return err
 	}
 
+	err = u.stopService()
+	if err != nil {
+		return err
+	}
+
 	return u.stopContainer(timeout)
 }
 
@@ -736,6 +743,7 @@ func (u *unit) startService() error {
 		return nil
 	}
 
+	logrus.Debug(u.Name, " start service ...")
 	inspect, err := containerExec(context.Background(), u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s start service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
@@ -757,6 +765,7 @@ func (u *unit) forceStopService() error {
 		return nil
 	}
 
+	logrus.Debug(u.Name, " stop service ...")
 	inspect, err := containerExec(context.Background(), u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s stop service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
