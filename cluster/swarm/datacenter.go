@@ -103,15 +103,6 @@ func (node *Node) Task() *database.Task {
 	return node.task
 }
 
-func (node *Node) Insert() error {
-	err := database.TxInsertNodeAndTask(*node.Node, *node.task)
-	if err != nil {
-		logrus.Errorf("Node:%s Insert INTO DB Error,%s", node.Name, err)
-	}
-
-	return err
-}
-
 func SaveMultiNodesToDB(nodes []*Node) error {
 	list := make([]*database.Node, len(nodes))
 	tasks := make([]*database.Task, len(nodes))
@@ -177,29 +168,32 @@ func (gd *Gardener) AddDatacenter(cl database.Cluster, storage store.Store) erro
 func (gd *Gardener) UpdateDatacenterParams(NameOrID string, max int, limit float32) error {
 	dc, err := gd.Datacenter(NameOrID)
 	if err != nil {
+		logrus.Error(err)
 		return err
 	}
+
 	modify := false
 	dc.Lock()
-	old := *dc.Cluster
+	lately := *dc.Cluster
 
-	if max > 0 && old.MaxNode != max {
-		old.MaxNode = max
+	if max > 0 && lately.MaxNode != max {
+		lately.MaxNode = max
 		modify = true
 	}
-	if limit > 0 && old.UsageLimit != limit {
-		old.UsageLimit = limit
+	if limit > 0 && lately.UsageLimit != limit {
+		lately.UsageLimit = limit
 		modify = true
 	}
 
 	if modify {
-		err := old.UpdateParams()
+		err := lately.UpdateParams()
 		if err != nil {
 			dc.Unlock()
+
+			logrus.Errorf("DC %s,%s", dc.Name, err)
 			return err
 		}
-
-		dc.Cluster = &old
+		dc.Cluster = &lately
 	}
 	dc.Unlock()
 
@@ -545,7 +539,7 @@ func (dc *Datacenter) isIdleStoreEnough(num, size int) bool {
 }
 
 func (gd *Gardener) rebuildDatacenters() error {
-	list, err := database.ListCluster()
+	list, err := database.ListClusters()
 	if err != nil {
 		return err
 	}

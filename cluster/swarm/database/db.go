@@ -1,7 +1,6 @@
 package database
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/docker/swarm/utils"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -42,17 +42,24 @@ var (
 )
 
 var (
-	noRowsFoundMsg = "no rows in result set"
-	ErrNoRowsFound = errors.New("Not Found Object")
+	noRowsFoundMsg     = "no rows in result set"
+	connectioneRefused = "connection refused"
+	ErrNoRowsFound     = errors.New("Not Found Object")
+	ErrDisconnected    = errors.New("Disconnected")
 )
 
 func CheckError(err error) error {
 	if err == nil {
 		return nil
 	}
+	msg := err.Error()
 
-	if strings.Contains(err.Error(), noRowsFoundMsg) {
+	if strings.Contains(msg, noRowsFoundMsg) {
 		return ErrNoRowsFound
+	}
+
+	if strings.Contains(msg, connectioneRefused) {
+		return ErrDisconnected
 	}
 
 	return err
@@ -89,40 +96,35 @@ func MustConnect(driver, source string) *sqlx.DB {
 	return defaultDB
 }
 
-// Connect to a database and verify with ping.
+// Connect to a database and verify with Ping.
 func Connect(driver, source string) (*sqlx.DB, error) {
-	var err error
-	defaultDB, err = sqlx.Connect(driver, source)
-	if err == nil {
-		driverName = driverName
-		dbSource = source
+	db, err := sqlx.Connect(driver, source)
+	if err != nil {
+		return nil, errors.Wrap(err, "DB Connection")
+	}
+	if db == nil {
+		return nil, errors.New("Connect returns nil *DB")
 	}
 
-	if err = defaultDB.Ping(); err == nil {
-		return defaultDB, nil
-	}
+	driverName = driverName
+	dbSource = source
+	defaultDB = db
 
-	return defaultDB, err
+	return db, nil
 }
 
-func GetDB(ping bool) (_ *sqlx.DB, err error) {
-	if defaultDB == nil {
-		db, err := Connect(driverName, dbSource)
-		if err != nil {
-			return nil, err
+func GetDB(ping bool) (*sqlx.DB, error) {
+	if defaultDB != nil {
+		if !ping {
+			return defaultDB, nil
 		}
 
-		return db, nil
-	}
-
-	if ping {
-		err = defaultDB.Ping()
-		if err != nil {
-			return Connect(driverName, dbSource)
+		if err := defaultDB.Ping(); err == nil {
+			return defaultDB, nil
 		}
 	}
 
-	return defaultDB, err
+	return Connect(driverName, dbSource)
 }
 
 func GetTX() (*sqlx.Tx, error) {
@@ -131,5 +133,18 @@ func GetTX() (*sqlx.Tx, error) {
 		return nil, err
 	}
 
-	return db.Beginx()
+	tx, err := db.Beginx()
+	if err != nil {
+		db, err = Connect(driverName, dbSource)
+		if err != nil {
+			return nil, err
+		}
+
+		tx, err = db.Beginx()
+		if err != nil {
+			return nil, errors.Wrap(err, "Beginx")
+		}
+	}
+
+	return tx, nil
 }

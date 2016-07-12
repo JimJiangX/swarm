@@ -166,7 +166,7 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 // GET /clusters
 func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	clusters, err := database.ListCluster()
+	clusters, err := database.ListClusters()
 	if err != nil {
 		logrus.Error("List Cluster", err)
 		httpError(w, err.Error(), http.StatusInternalServerError)
@@ -205,7 +205,7 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 // GET /resources
 func getClustersResource(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	clusters, err := database.ListCluster()
+	clusters, err := database.ListClusters()
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return

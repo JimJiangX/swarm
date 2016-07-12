@@ -3,7 +3,24 @@ package database
 import (
 	"testing"
 	"time"
+
+	"github.com/docker/swarm/utils"
 )
+
+func NewCluster(name, _type, storageType, storageID, networking string,
+	enable bool, num int, limit float32) Cluster {
+	return Cluster{
+		ID:           utils.Generate64UUID(),
+		Name:         name,
+		Type:         _type,
+		StorageType:  storageType,
+		StorageID:    storageID,
+		NetworkingID: networking,
+		Enabled:      enable,
+		MaxNode:      num,
+		UsageLimit:   limit,
+	}
+}
 
 func TestCluster(t *testing.T) {
 	clusters := []Cluster{
@@ -73,6 +90,48 @@ func TestCluster(t *testing.T) {
 			t.Error(wrong[i].Name, err)
 		}
 	}
+}
+
+func NewNode(name, clusterID, addr, eng string, num, status int, t1, t2 time.Time) Node {
+	return Node{
+		ID:           utils.Generate64UUID(),
+		Name:         name,
+		ClusterID:    clusterID,
+		Addr:         addr,
+		EngineID:     eng,
+		MaxContainer: num,
+		Status:       status,
+		RegisterAt:   t1,
+		DeregisterAt: t2,
+	}
+}
+
+func (n Node) Insert() error {
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	// insert into database
+	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
+	_, err = db.NamedExec(query, &n)
+
+	return err
+}
+
+func ListNode(status int) ([]Node, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	nodes := make([]Node, 0, 50)
+	err = db.Select(&nodes, "SELECT * FROM tb_node WHERE status=?", status)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
 }
 
 func TestNode(t *testing.T) {
@@ -190,17 +249,12 @@ func TestNode(t *testing.T) {
 		}
 	}()
 
-	err = TxInsertNodeAndTask(list[0], *tasks[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	list1 := make([]*Node, len(list))
 	for i := range list {
 		list1[i] = &list[i]
 	}
 
-	err = TxInsertMultiNodeAndTask(list1[1:4], tasks[1:])
+	err = TxInsertMultiNodeAndTask(list1[0:4], tasks[0:])
 	if err != nil {
 		t.Fatal(err)
 	}

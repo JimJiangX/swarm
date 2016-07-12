@@ -1,11 +1,10 @@
 package database
 
 import (
-	"fmt"
 	"time"
 
-	"github.com/docker/swarm/utils"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 )
 
 type Cluster struct {
@@ -24,23 +23,8 @@ func (c Cluster) TableName() string {
 	return "tb_cluster"
 }
 
-func NewCluster(name, _type, storageType, storageID, networking string,
-	enable bool, num int, limit float32) Cluster {
-	return Cluster{
-		ID:           utils.Generate64UUID(),
-		Name:         name,
-		Type:         _type,
-		StorageType:  storageType,
-		StorageID:    storageID,
-		NetworkingID: networking,
-		Enabled:      enable,
-		MaxNode:      num,
-		UsageLimit:   limit,
-	}
-}
-
 func (c Cluster) Insert() error {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return err
 	}
@@ -48,19 +32,45 @@ func (c Cluster) Insert() error {
 	// insert into database
 	query := "INSERT INTO tb_cluster (id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit) VALUES (:id,:name,:type,:storage_id,:storage_type,:networking_id,:enabled,:max_node,:usage_limit)"
 	_, err = db.NamedExec(query, &c)
+	if err == nil {
+		return nil
+	}
 
-	return err
-}
-
-func (c *Cluster) UpdateStatus(state bool) error {
-	db, err := GetDB(true)
+	db, err = GetDB(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("UPDATE tb_cluster SET enabled=? WHERE id=?", state, c.ID)
+	_, err = db.NamedExec(query, &c)
+	if err == nil {
+		return nil
+	}
+
+	return errors.Wrap(err, "Insert Cluster")
+}
+
+func (c *Cluster) UpdateStatus(state bool) error {
+	db, err := GetDB(false)
 	if err != nil {
 		return err
+	}
+
+	query := "UPDATE tb_cluster SET enabled=? WHERE id=?"
+	_, err = db.Exec(query, state, c.ID)
+	if err == nil {
+		c.Enabled = state
+
+		return nil
+	}
+
+	db, err = GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(query, state, c.ID)
+	if err != nil {
+		return errors.Wrap(err, "Update Cluster.Enabled By ID:"+c.ID)
 	}
 
 	c.Enabled = state
@@ -70,65 +80,139 @@ func (c *Cluster) UpdateStatus(state bool) error {
 
 // UpdateParams Updates MaxNode\UsageLimit
 func (c Cluster) UpdateParams() error {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return err
 	}
 
 	query := "UPDATE tb_cluster SET max_node=:max_node,usage_limit=:usage_limit WHERE id=:id OR name=:name"
 	_, err = db.NamedExec(query, &c)
+	if err == nil {
+		return nil
+	}
 
-	return err
-}
-
-func DeleteCluster(IDOrName string) error {
-	db, err := GetDB(true)
+	db, err = GetDB(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("DELETE FROM tb_cluster WHERE id=? OR name=?", IDOrName, IDOrName)
-
-	return err
-}
-
-func GetCluster(IDOrName string) (Cluster, error) {
-	db, err := GetDB(true)
-	if err != nil {
-		return Cluster{}, err
+	_, err = db.NamedExec(query, &c)
+	if err == nil {
+		return nil
 	}
 
+	return errors.Wrap(err, "Update Cluster Params")
+}
+
+func DeleteCluster(IDOrName string) error {
+	db, err := GetDB(false)
+	if err != nil {
+		return err
+	}
+
+	query := "DELETE FROM tb_cluster WHERE id=? OR name=?"
+	_, err = db.Exec(query, IDOrName, IDOrName)
+	if err == nil {
+		return nil
+	}
+
+	db, err = GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(query, IDOrName, IDOrName)
+	if err == nil {
+		return nil
+	}
+
+	return errors.Wrap(err, "Delete Cluster:"+IDOrName)
+}
+
+func GetCluster(nameOrID string) (Cluster, error) {
 	c := Cluster{}
-	err = db.Get(&c, "SELECT * FROM tb_cluster WHERE id=? OR name=?", IDOrName, IDOrName)
 
-	return c, err
+	db, err := GetDB(false)
+	if err != nil {
+		return c, err
+	}
+
+	query := "SELECT * FROM tb_cluster WHERE id=? OR name=?"
+	err = db.Get(&c, query, nameOrID, nameOrID)
+	if err == nil {
+		return c, nil
+	}
+	if _err := CheckError(err); _err == ErrNoRowsFound {
+		return c, errors.Wrap(err, "Not Found Cluster:"+nameOrID)
+	}
+
+	db, err = GetDB(true)
+	if err != nil {
+		return c, err
+	}
+
+	err = db.Get(&c, query, nameOrID, nameOrID)
+	if err == nil {
+		return c, nil
+	}
+
+	return c, errors.Wrap(err, "Not Found Cluster:"+nameOrID)
+
 }
 
-func ListCluster() ([]Cluster, error) {
-	db, err := GetDB(true)
+func ListClusters() ([]Cluster, error) {
+	db, err := GetDB(false)
 	if err != nil {
 		return nil, err
 	}
 
-	clusters := make([]Cluster, 0, 10)
-	err = db.Select(&clusters, "SELECT * FROM tb_cluster")
+	var clusters []Cluster
+	query := "SELECT * FROM tb_cluster"
+
+	err = db.Select(&clusters, query)
+	if err == nil {
+		return clusters, nil
+	}
+
+	db, err = GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return clusters, nil
+	err = db.Select(&clusters, query)
+	if err == nil {
+		return clusters, nil
+	}
+
+	return nil, errors.Wrap(err, "List Clusters")
+
 }
 
-func CountClusterByStorage(storage string) (int, error) {
-	db, err := GetDB(true)
+func CountClusterByStorage(storageID string) (int, error) {
+	db, err := GetDB(false)
 	if err != nil {
 		return 0, err
 	}
 
 	count := 0
-	err = db.Get(&count, "SELECT COUNT(*) from tb_cluster WHERE storage_id=?", storage)
+	query := "SELECT COUNT(*) from tb_cluster WHERE storage_id=?"
 
-	return count, err
+	err = db.Get(&count, query, storageID)
+	if err == nil {
+		return count, nil
+	}
+
+	db, err = GetDB(true)
+	if err != nil {
+		return 0, err
+	}
+
+	err = db.Get(&count, query, storageID)
+	if err == nil {
+		return count, err
+	}
+
+	return 0, errors.Wrap(err, "Count Cluster By storage_id:"+storageID)
 }
 
 type Node struct {
@@ -148,55 +232,6 @@ type Node struct {
 
 func (n Node) TableName() string {
 	return "tb_node"
-}
-
-func NewNode(name, clusterID, addr, eng string, num, status int, t1, t2 time.Time) Node {
-	return Node{
-		ID:           utils.Generate64UUID(),
-		Name:         name,
-		ClusterID:    clusterID,
-		Addr:         addr,
-		EngineID:     eng,
-		MaxContainer: num,
-		Status:       status,
-		RegisterAt:   t1,
-		DeregisterAt: t2,
-	}
-}
-
-func (n Node) Insert() error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
-	}
-
-	// insert into database
-	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
-	_, err = db.NamedExec(query, &n)
-
-	return err
-}
-
-func TxInsertNodeAndTask(node Node, task Task) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	// insert into database
-	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
-	_, err = tx.NamedExec(query, &node)
-	if err != nil {
-		return err
-	}
-
-	err = TxInsertTask(tx, task)
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit()
 }
 
 func TxInsertMultiNodeAndTask(nodes []*Node, tasks []*Task) error {
@@ -230,65 +265,64 @@ func TxInsertMultiNodeAndTask(nodes []*Node, tasks []*Task) error {
 	return tx.Commit()
 }
 
-func GetNode(IDOrName string) (Node, error) {
-	db, err := GetDB(true)
-	if err != nil {
-		return Node{}, err
-	}
-
-	node := Node{}
-	err = db.Get(&node, "SELECT * FROM tb_node WHERE id=? OR name=? OR engine_id=?", IDOrName, IDOrName, IDOrName)
-
-	return node, err
-}
-
-func GetAllNodes() ([]Node, error) {
-	db, err := GetDB(true)
-	if err != nil {
-		return nil, err
-	}
-
-	nodes := make([]Node, 0, 50)
-	err = db.Select(&nodes, "SELECT * FROM tb_node")
-	if err != nil {
-		return nil, err
-	}
-
-	return nodes, nil
-}
-
 // UpdateStatus returns error when Node UPDATE status.
 func (n *Node) UpdateStatus(state int) error {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("UPDATE tb_node SET status=? WHERE id=?", state, n.ID)
+	query := "UPDATE tb_node SET status=? WHERE id=?"
+	_, err = db.Exec(query, state, n.ID)
+	if err == nil {
+		n.Status = state
+
+		return nil
+	}
+
+	db, err = GetDB(true)
 	if err != nil {
 		return err
 	}
 
-	n.Status = state
+	_, err = db.Exec(query, state, n.ID)
+	if err == nil {
+		n.Status = state
 
-	return nil
+		return nil
+	}
+
+	return errors.Wrap(err, "Update Node Status")
 }
 
 // UpdateParams returns error when Node UPDATE max_container.
 func (n *Node) UpdateParams(max int) error {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("UPDATE tb_node SET max_container=? WHERE id=?", max, n.ID)
+	query := "UPDATE tb_node SET max_container=? WHERE id=?"
+	_, err = db.Exec(query, max, n.ID)
+	if err == nil {
+		n.MaxContainer = max
+
+		return nil
+	}
+
+	db, err = GetDB(true)
 	if err != nil {
 		return err
 	}
 
-	n.MaxContainer = max
+	_, err = db.Exec(query, max, n.ID)
+	if err == nil {
+		n.MaxContainer = max
 
-	return nil
+		return nil
+	}
+
+	return errors.Wrap(err, "Update Node Param By ID:"+n.ID)
 }
 
 // TxUpdateNodeStatus returns error when Node UPDATE status.
@@ -304,14 +338,19 @@ func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int, msg string) err
 		return err
 	}
 
-	n.Status = nstate
-
 	err = TxUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
 	if err != nil {
 		return err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		return errors.Wrap(err, "TX Update Node Status "+n.ID)
+	}
+
+	n.Status = nstate
+
+	return nil
 }
 
 // TxUpdateNodeRegister returns error when Node UPDATE infomation.
@@ -331,59 +370,130 @@ func TxUpdateNodeRegister(n *Node, task *Task, nstate, tstate int, eng, msg stri
 		return err
 	}
 
-	n.Status = nstate
-
 	err = TxUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
 	if err != nil {
 		return err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		return errors.Wrap(err, "TX Update Node Status "+n.ID)
+	}
+
+	n.Status = nstate
+
+	return nil
 }
 
-func ListNode(status int) ([]Node, error) {
-	db, err := GetDB(true)
+func GetNode(nameOrID string) (Node, error) {
+	db, err := GetDB(false)
+	if err != nil {
+		return Node{}, err
+	}
+
+	node := Node{}
+	query := "SELECT * FROM tb_node WHERE id=? OR name=? OR engine_id=?"
+
+	err = db.Get(&node, query, nameOrID, nameOrID, nameOrID)
+	if err == nil {
+		return node, nil
+	}
+	if _err := CheckError(err); _err == ErrNoRowsFound {
+		return node, errors.Wrap(err, "Not Found Node By:"+nameOrID)
+	}
+
+	db, err = GetDB(true)
+	if err != nil {
+		return Node{}, err
+	}
+
+	err = db.Get(&node, query, nameOrID, nameOrID, nameOrID)
+	if err == nil {
+		return node, nil
+	}
+
+	return node, errors.Wrap(err, "Get Node By:"+nameOrID)
+}
+
+func GetAllNodes() ([]Node, error) {
+	db, err := GetDB(false)
 	if err != nil {
 		return nil, err
 	}
 
-	nodes := make([]Node, 0, 50)
-	err = db.Select(&nodes, "SELECT * FROM tb_node WHERE status=?", status)
+	var nodes []Node
+	query := "SELECT * FROM tb_node"
+
+	err = db.Select(&nodes, query)
+	if err == nil {
+		return nodes, nil
+	}
+
+	db, err = GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return nodes, nil
+	err = db.Select(&nodes, query)
+	if err == nil {
+		return nodes, nil
+	}
+
+	return nil, errors.Wrap(err, "Get All Nodes")
 }
 
 func ListNodeByCluster(cluster string) ([]*Node, error) {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return nil, err
 	}
 
-	nodes := make([]*Node, 0, 50)
-	err = db.Select(&nodes, "SELECT * FROM tb_node WHERE cluster_id=?", cluster)
+	var nodes []*Node
+	query := "SELECT * FROM tb_node WHERE cluster_id=?"
+
+	err = db.Select(&nodes, query, cluster)
+	if err == nil {
+		return nodes, nil
+	}
+
+	db, err = GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return nodes, nil
+	err = db.Select(&nodes, query, cluster)
+	if err == nil {
+		return nodes, nil
+	}
+
+	return nil, errors.Wrap(err, "List Node By Cluster:"+cluster)
 }
 
 func CountNodeByCluster(cluster string) (int, error) {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return 0, err
 	}
 
 	num := 0
-	err = db.Get(&num, "SELECT COUNT(*) FROM tb_node WHERE cluster_id=?", cluster)
+	query := "SELECT COUNT(*) FROM tb_node WHERE cluster_id=?"
+
+	err = db.Get(&num, query, cluster)
+	if err == nil {
+		return num, nil
+	}
+
+	db, err = GetDB(true)
 	if err != nil {
 		return 0, err
 	}
 
-	return num, nil
+	err = db.Get(&num, query, cluster)
+	if err == nil {
+		return num, nil
+	}
+
+	return 0, errors.Wrap(err, "Count Node By Cluster:"+cluster)
 }
 
 func ListNodeByClusterType(_type string, enabled bool) ([]Node, error) {
@@ -395,28 +505,32 @@ func ListNodeByClusterType(_type string, enabled bool) ([]Node, error) {
 	var clist []string
 	err = db.Select(&clist, "SELECT id FROM tb_cluster WHERE type=? AND enabled=?", _type, enabled)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "List Clusters By Type:'%s'", _type)
 	}
 
 	if len(clist) <= 0 {
-		return nil, fmt.Errorf("No Available Cluster,Type='%s' & ebabled=%t", _type, enabled)
+		return nil, errors.Errorf("No Available Cluster,Type='%s' & ebabled=%t", _type, enabled)
 	}
 
 	query, args, err := sqlx.In("SELECT * FROM tb_node WHERE cluster_id IN (?);", clist)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "List Node By ClusterType:'%s'", _type)
 	}
 
 	var nodes []Node
 	err = db.Select(&nodes, query, args...)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		return nodes, nil
 	}
 
-	return nodes, nil
+	return nil, errors.Wrapf(err, "List Node By ClusterType:'%s'", _type)
 }
 
 func ListNodesByEngines(names []string) ([]Node, error) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
@@ -428,30 +542,11 @@ func ListNodesByEngines(names []string) ([]Node, error) {
 
 	var nodes []Node
 	err = db.Select(&nodes, query, args...)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		return nodes, nil
 	}
 
-	return nodes, nil
-}
-
-func ListEnginesByNodes(names []string) ([]string, error) {
-	db, err := GetDB(true)
-	if err != nil {
-		return nil, err
-	}
-	query, args, err := sqlx.In("SELECT engine_id FROM tb_node WHERE id IN (?);", names)
-	if err != nil {
-		return nil, err
-	}
-
-	var nodes []string
-	err = db.Select(&nodes, query, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	return nodes, nil
+	return nil, errors.Wrapf(err, "List Nodes By Engines:%s", names)
 }
 
 func ListNodesByClusters(clusters []string, _type string) ([]Node, error) {
@@ -467,7 +562,7 @@ func ListNodesByClusters(clusters []string, _type string) ([]Node, error) {
 	var clist []string
 	err = db.Select(&clist, "SELECT id FROM tb_cluster WHERE type=? AND enabled=?", _type, true)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "List Cluster by Type='%s',enabled=%t", _type, true)
 	}
 
 	list := make([]string, 0, len(clusters))
@@ -480,6 +575,10 @@ func ListNodesByClusters(clusters []string, _type string) ([]Node, error) {
 		}
 	}
 
+	if len(list) == 0 {
+		return nil, errors.New("Cluster List is nil")
+	}
+
 	query, args, err := sqlx.In("SELECT * FROM tb_node WHERE cluster_id IN (?);", list)
 	if err != nil {
 		return nil, err
@@ -487,20 +586,34 @@ func ListNodesByClusters(clusters []string, _type string) ([]Node, error) {
 
 	var nodes []Node
 	err = db.Select(&nodes, query, args...)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		return nodes, nil
 	}
 
-	return nodes, nil
+	return nil, errors.Wrap(err, "List Nodes By Clusters")
 }
 
-func DeleteNode(IDOrName string) error {
-	db, err := GetDB(true)
+func DeleteNode(nameOrID string) error {
+	db, err := GetDB(false)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("DELETE FROM tb_node WHERE id=? OR name=?", IDOrName, IDOrName)
+	query := "DELETE FROM tb_node WHERE id=? OR name=?"
+	_, err = db.Exec(query, nameOrID, nameOrID)
+	if err == nil {
+		return nil
+	}
 
-	return err
+	db, err = GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(query, nameOrID, nameOrID)
+	if err == nil {
+		return nil
+	}
+
+	return errors.Wrap(err, "Delete Node By "+nameOrID)
 }

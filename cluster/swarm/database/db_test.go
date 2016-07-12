@@ -33,7 +33,8 @@ func TestMustConnect(t *testing.T) {
 		t.FailNow()
 	}
 
-	if dbSource == "" || driverName != "mysql" || defaultDB != db {
+	if dbSource == "" || driverName != "mysql" ||
+		defaultDB == nil || defaultDB != db {
 		t.Fatal("Unexpected")
 	}
 }
@@ -41,7 +42,7 @@ func TestMustConnect(t *testing.T) {
 func TestGetDB(t *testing.T) {
 	db, err := GetDB(false)
 	if err != nil || db == nil {
-		t.Fatal(err, db)
+		t.Error("Unexpected", err)
 	}
 
 	db, err = GetDB(true)
