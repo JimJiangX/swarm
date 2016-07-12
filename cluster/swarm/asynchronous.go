@@ -177,7 +177,7 @@ func (t *asyncTask) Run() error {
 		if code != 0 && t.update != nil {
 			err = t.update(code, msg)
 			if err != nil {
-				logrus.Errorf("taskRecorder Update Error:%s,Code=%d,message=%s", err, code, msg)
+				logrus.Errorf("Update Error:%s,Code=%d,message=%s", err, code, msg)
 			}
 		}
 	}(ctx, t)

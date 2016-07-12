@@ -10,32 +10,22 @@ import (
 
 // TODO:update tests
 
-func TestGo(t *testing.T) {
-	ch := make(chan error, 1)
-
-	Go(func() error {
-		return fmt.Errorf("It's a error")
-	}, ch)
-
-	if err := <-ch; err == nil {
-		t.Errorf("Unexpect,want error but got nil")
-	}
-
-	Go(func() error {
-		return nil
-	}, ch)
-
-	if err := <-ch; err != nil {
-		t.Errorf("Unexpect,want nil but got error:'%s'", err)
-	}
-}
-
-func ExampleGo() {
+func TestGoConcurrency(t *testing.T) {
 	errFunc := func() error {
 		return fmt.Errorf("It's a error")
 	}
 	nopFunc := func() error {
 		return nil
+	}
+
+	err := GoConcurrency([]func() error{errFunc})
+	if err == nil {
+		t.Errorf("Unexpect,want error but got nil")
+	}
+
+	err = GoConcurrency([]func() error{nopFunc})
+	if err != nil {
+		t.Errorf("Unexpect,want nil but got error:'%s'", err)
 	}
 
 	funcs := make([]func() error, 10)
@@ -47,58 +37,51 @@ func ExampleGo() {
 		}
 	}
 
-	length := len(funcs)
-	ch := make(chan error, length)
-
-	for i := range funcs {
-		function := funcs[i]
-		Go(function, ch)
+	err = GoConcurrency(funcs)
+	if err == nil {
+		t.Errorf("Unexpect,want error but got nil")
 	}
 
-	mulErr := NewMultipleError()
-	for i := 0; i < length; i++ {
-		err := <-ch
-		if err != nil {
-			mulErr.Append(err)
-		}
+	if _errs, ok := err.(_errors); !ok {
+		t.Error("Unexpected,%s", err)
+	} else if errs := _errs.Split(); len(errs) != 5 {
+		t.Error("Unexpected,%s", errs)
 	}
 
-	if err := mulErr.Err(); err != nil {
-		fmt.Println(err)
-	}
-
-	// Output:
-	// It's a error
-	// It's a error
-	// It's a error
-	// It's a error
-	// It's a error
+	t.Logf("%s", err)
 }
 
-func TestMultipleError(t *testing.T) {
-	merr := NewMultipleError()
+func TestErrors(t *testing.T) {
+	errs := NewErrors()
 
-	if merr.Err() != nil {
-		t.Errorf("Unexpected,want nil error,got '%s'", merr.Error())
+	if errs.Err() != nil {
+		t.Errorf("Unexpected,want nil error,got '%s'", errs.Error())
 	}
 
 	for i := 0; i < 10; i++ {
-		merr.Append(nil)
+		errs.Append(nil)
 	}
 
-	if merr.Err() != nil {
-		t.Errorf("Unexpected,want nil error,got '%s'", merr.Error())
+	if errs.Err() != nil {
+		t.Errorf("Unexpected,want nil error,got '%s'", errs.Error())
 	}
 
-	for i := 0; i < 10; i++ {
-		merr.Append(fmt.Errorf("Error %d", i))
+	for i := 0; i < 25; i++ {
+		errs.Append(fmt.Errorf("Error %d", i))
 	}
 
-	if merr.Err() == nil {
-		t.Errorf("Unexpected,want no-nil error but got nil '%s'", merr.Error())
+	if errs.Err() == nil {
+		t.Errorf("Unexpected,want no-nil error but got nil '%s'", errs.Error())
 	}
 
-	t.Log(merr.Error())
+	_errs := errs.Split()
+	if len(_errs) != 25 {
+		t.Errorf("Unexpected,want 25 but got %d", len(_errs))
+	}
+
+	for i := range _errs {
+		t.Log(i, _errs[i])
+	}
 }
 
 type recorder struct{}
@@ -141,13 +124,25 @@ func (*recorder2) Update(code int, msg string) error {
 }
 
 func ExampleAsyncTask() {
-	recorders := []taskRecorder{
-		&recorder{},
-		&recorder1{},
-		&recorder2{},
+	var (
+		r0 = &recorder{}
+		r1 = &recorder1{}
+		r2 = &recorder2{}
+	)
+
+	creates := []func() error{
+		r0.Insert,
+		r1.Insert,
+		r2.Insert,
 	}
 
-	tasks := []taskFunc{
+	updates := []func(code int, msg string) error{
+		r0.Update,
+		r1.Update,
+		r2.Update,
+	}
+
+	tasks := []func(context.Context) error{
 		func(ctx context.Context) (err error) {
 			select {
 			case <-ctx.Done():
@@ -178,14 +173,19 @@ func ExampleAsyncTask() {
 	}
 
 	for i := range tasks {
-		for j := range recorders {
-			ctx := context.Background()
+		for c := range creates {
+			for u := range updates {
+				ctx := context.Background()
 
-			t := NewAsyncTask(ctx, tasks[i], recorders[j], time.Second*5)
-			t.Run()
+				t := NewAsyncTask(ctx, tasks[i], creates[c], updates[u], time.Second*5)
+				err := t.Run()
+				if err != nil {
+					fmt.Println(err)
+				}
 
-			if i == 1 && t.cancel != nil {
-				t.cancel()
+				if i == 1 && t.cancel != nil {
+					t.cancel()
+				}
 			}
 		}
 	}
@@ -194,11 +194,35 @@ func ExampleAsyncTask() {
 
 	// output:
 	// call recorder.Insert
-	// call recorder1.Insert
+	// call recorder.Insert
 	// call recorder.Insert
 	// call recorder1.Insert
+	// call recorder1.Insert
+	// call recorder1.Insert
+	// create error: call recorder2.Insert
+	// create error: call recorder2.Insert
+	// create error: call recorder2.Insert
+	// call recorder.Insert
+	// call recorder.Insert
 	// call recorder.Insert
 	// call recorder1.Insert
+	// call recorder1.Insert
+	// call recorder1.Insert
+	// create error: call recorder2.Insert
+	// create error: call recorder2.Insert
+	// create error: call recorder2.Insert
+	// call recorder.Insert
+	// call recorder.Insert
+	// call recorder.Insert
+	// call recorder1.Insert
+	// call recorder1.Insert
+	// call recorder1.Insert
+	// create error: call recorder2.Insert
+	// create error: call recorder2.Insert
+	// create error: call recorder2.Insert
+	// call recorder.Update
+	// call recorder.Update
+	// call recorder.Update
 	// call recorder.Update
 	// call recorder.Update
 	// call recorder.Update
