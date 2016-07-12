@@ -57,12 +57,14 @@ func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs
 	return engine, nil
 }
 
-func listCandidates(dc *Datacenter, candidates []string, oldHost string) ([]string, error) {
+func listCandidates(dc *Datacenter, candidates []string) ([]string, error) {
 	nodes, err := database.ListNodeByCluster(dc.ID)
 	if err != nil {
 		return nil, err
 	}
+
 	out := make([]string, 0, len(nodes))
+
 	for i := range candidates {
 		if node := dc.getNode(candidates[i]); node != nil {
 			out = append(out, node.EngineID)
@@ -79,9 +81,7 @@ func listCandidates(dc *Datacenter, candidates []string, oldHost string) ([]stri
 	}
 	if len(out) == 0 {
 		for i := range nodes {
-			if nodes[i].EngineID != oldHost {
-				out = append(out, nodes[i].EngineID)
-			}
+			out = append(out, nodes[i].EngineID)
 		}
 	}
 
@@ -148,7 +148,7 @@ func (gd *Gardener) UnitMigrate(NameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 
-	out, err := listCandidates(dc, candidates, u.EngineID)
+	out, err := listCandidates(dc, candidates)
 	if err != nil {
 		return "", err
 	}
@@ -606,11 +606,11 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 
-	out, err := listCandidates(dc, candidates, u.EngineID)
+	out, err := listCandidates(dc, candidates)
 	if err != nil {
 		return "", err
 	}
-	logrus.Debugf("listCandidates:%d", out)
+	logrus.Debugf("listCandidates:%d", len(out))
 
 	config, err := resetContainerConfig(u.container.Config, hostConfig)
 	if err != nil {

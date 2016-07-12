@@ -1299,29 +1299,26 @@ type pendingContainerUpdate struct {
 	config      container.UpdateConfig
 }
 
-func (gd *Gardener) ServiceScaleTask(name string, scale structs.PostServiceScaledRequest) (string, error) {
+func (gd *Gardener) ServiceScaleTask(name string, scale structs.PostServiceScaledRequest) error {
 	svc, err := gd.GetService(name)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	err = ValidateServiceScale(svc, scale)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	task := database.NewTask("service scaling config",
-		svc.ID, "", nil, 300)
-	err = task.Insert()
+	err = gd.serviceScale(svc, scale)
 	if err != nil {
-		return "", err
+		logrus.Errorf("Service  %s:%s Scale Error:%s", svc.Name, scale.Type, err)
 	}
-	go gd.serviceScale(svc, scale, task)
 
-	return task.ID, nil
+	return err
 }
 
-func (gd *Gardener) serviceScale(svc *Service, scale structs.PostServiceScaledRequest, task database.Task) (err error) {
+func (gd *Gardener) serviceScale(svc *Service, scale structs.PostServiceScaledRequest) (err error) {
 	var storePendings []*pendingAllocStore
 	svc.Lock()
 	gd.scheduler.Lock()
@@ -1331,7 +1328,6 @@ func (gd *Gardener) serviceScale(svc *Service, scale structs.PostServiceScaledRe
 		}
 
 		if err == nil {
-			task.Status = _StatusTaskDone
 			err = svc.updateDescAfterScale(scale)
 			if err != nil {
 				logrus.Errorf("service %s update Description error:%s", svc.Name, err)
@@ -1343,14 +1339,6 @@ func (gd *Gardener) serviceScale(svc *Service, scale structs.PostServiceScaledRe
 			if err1 != nil {
 				err = fmt.Errorf("%s,%s", err, err1)
 			}
-
-			task.Status = _StatusTaskFailed
-			task.Errors = err.Error()
-		}
-
-		err = database.UpdateTaskStatus(&task, task.Status, time.Now(), task.Errors)
-		if err != nil {
-			logrus.Errorf("task %s update error:%s", task.ID, err)
 		}
 
 		svc.Unlock()

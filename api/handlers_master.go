@@ -1642,15 +1642,13 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	taskID, err := gd.ServiceScaleTask(name, req)
+	err := gd.ServiceScaleTask(name, req)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
 }
 
 // POST /services/{name:.*}/service-config/update
