@@ -701,12 +701,8 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 		if err != nil {
 			return err
 		}
-
-		newLvs, err := filterLocalVolumes(u.ID, oldLVs)
-		if err != nil {
-			return err
-		}
-		err = createVolumes(engine, u.ID, newLvs)
+		// TODO:create San Volume
+		err = createVolumes(engine, u.ID, pending.localStore)
 		if err != nil {
 			return err
 		}
@@ -717,7 +713,7 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 		}
 		delete(gd.pendingContainers, swarmID)
 
-		err = startUnit(engine, container.ID, u, newLvs)
+		err = startUnit(engine, container.ID, u, pending.localStore)
 		if err != nil {
 			return err
 		}
