@@ -160,15 +160,20 @@ func (gd *Gardener) UnitMigrate(NameOrID string, candidates []string, hostConfig
 	if err != nil {
 		return "", err
 	}
+
 	gd.scheduler.Lock()
-	defer gd.scheduler.Unlock()
 
 	engine, err := gd.selectEngine(config, module, out, filters)
 	if err != nil {
+		gd.scheduler.Unlock()
 		return "", err
 	}
+	gd.scheduler.Unlock()
 
 	background := func(ctx context.Context) error {
+		gd.scheduler.Lock()
+		defer gd.scheduler.Unlock()
+
 		cpuset, err := gd.allocCPUs(engine, config.HostConfig.CpusetCpus)
 		if err != nil {
 			logrus.Errorf("Alloc CPU '%s' Error:%s", config.HostConfig.CpusetCpus, err)
@@ -618,15 +623,21 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 	if err != nil {
 		return "", err
 	}
+
 	gd.scheduler.Lock()
-	defer gd.scheduler.Unlock()
 
 	engine, err := gd.selectEngine(config, module, out, filters)
 	if err != nil {
+		gd.scheduler.Unlock()
+
 		return "", err
 	}
+	gd.scheduler.Unlock()
 
 	background := func(ctx context.Context) error {
+		gd.scheduler.Lock()
+		defer gd.scheduler.Unlock()
+
 		cpuset, err := gd.allocCPUs(engine, config.HostConfig.CpusetCpus)
 		if err != nil {
 			logrus.Errorf("Alloc CPU '%s' Error:%s", config.HostConfig.CpusetCpus, err)
