@@ -40,6 +40,12 @@ func (p *Replica) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// all GET Request handle by self
+	if strings.ToUpper(r.Method) == "GET" {
+		p.handler.ServeHTTP(w, r)
+		return
+	}
+
 	// Otherwise, forward.
 	if p.primary == "" {
 		httpError(w, "No elected primary cluster manager", http.StatusInternalServerError)
