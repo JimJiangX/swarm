@@ -496,36 +496,6 @@ func CountNodeByCluster(cluster string) (int, error) {
 	return 0, errors.Wrap(err, "Count Node By Cluster:"+cluster)
 }
 
-func ListNodeByClusterType(_type string, enabled bool) ([]Node, error) {
-	db, err := GetDB(true)
-	if err != nil {
-		return nil, err
-	}
-
-	var clist []string
-	err = db.Select(&clist, "SELECT id FROM tb_cluster WHERE type=? AND enabled=?", _type, enabled)
-	if err != nil {
-		return nil, errors.Wrapf(err, "List Clusters By Type:'%s'", _type)
-	}
-
-	if len(clist) <= 0 {
-		return nil, errors.Errorf("No Available Cluster,Type='%s' & ebabled=%t", _type, enabled)
-	}
-
-	query, args, err := sqlx.In("SELECT * FROM tb_node WHERE cluster_id IN (?);", clist)
-	if err != nil {
-		return nil, errors.Wrapf(err, "List Node By ClusterType:'%s'", _type)
-	}
-
-	var nodes []Node
-	err = db.Select(&nodes, query, args...)
-	if err == nil {
-		return nodes, nil
-	}
-
-	return nil, errors.Wrapf(err, "List Node By ClusterType:'%s'", _type)
-}
-
 func ListNodesByEngines(names []string) ([]Node, error) {
 	if len(names) == 0 {
 		return nil, nil
@@ -549,20 +519,16 @@ func ListNodesByEngines(names []string) ([]Node, error) {
 	return nil, errors.Wrapf(err, "List Nodes By Engines:%s", names)
 }
 
-func ListNodesByClusters(clusters []string, _type string) ([]Node, error) {
-	if len(clusters) == 0 {
-		return nil, nil
-	}
-
+func ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
 	var clist []string
-	err = db.Select(&clist, "SELECT id FROM tb_cluster WHERE type=? AND enabled=?", _type, true)
+	err = db.Select(&clist, "SELECT id FROM tb_cluster WHERE type=? AND enabled=?", _type, enable)
 	if err != nil {
-		return nil, errors.Wrapf(err, "List Cluster by Type='%s',enabled=%t", _type, true)
+		return nil, errors.Wrapf(err, "List Cluster by Type='%s',enabled=%t", _type, enable)
 	}
 
 	list := make([]string, 0, len(clusters))
@@ -575,6 +541,9 @@ func ListNodesByClusters(clusters []string, _type string) ([]Node, error) {
 		}
 	}
 
+	if len(list) == 0 && len(clist) > 0 {
+		list = clist
+	}
 	if len(list) == 0 {
 		return nil, errors.New("Cluster List is nil")
 	}

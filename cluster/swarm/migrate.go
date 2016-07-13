@@ -18,7 +18,7 @@ import (
 	"github.com/docker/swarm/utils"
 )
 
-func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs.Module, engines, exclude []string) (*cluster.Engine, error) {
+func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs.Module, list []database.Node, exclude []string) (*cluster.Engine, error) {
 	entry := logrus.WithFields(logrus.Fields{"Module": module.Type})
 
 	num, _type := 1, module.Type
@@ -26,21 +26,23 @@ func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs
 	if module.Type == _SwitchManagerType {
 		_type = _ProxyType
 	}
-	filters := gd.listShortIdleStore(module.Stores, _type, num)
-	filters = append(filters, exclude...)
-	entry.Debugf("[MG] %v,%s,%d:first filters of storage:%s", module.Stores, module.Type, num, filters)
-	nodes := make([]*node.Node, 0, len(engines))
-	for i := range engines {
-		if isStringExist(engines[i], filters) {
+
+	list = gd.shortIdleStoreFilter(list, module.Stores, _type, num)
+
+	entry.Debugf("[MG] %v,%s,%d:after filters of storage:%d", module.Stores, module.Type, num, len(list))
+
+	nodes := make([]*node.Node, 0, len(list))
+	for i := range list {
+		if isStringExist(list[i].EngineID, exclude) {
 			continue
 		}
-		node := gd.checkNode(engines[i])
+		node := gd.checkNode(list[i].EngineID)
 		if node != nil {
 			nodes = append(nodes, node)
 		}
 	}
 
-	logrus.Debugf("filters num:%d,candidate nodes num:%d", len(filters), len(nodes))
+	logrus.Debugf("filters num:%d,candidate nodes num:%d", len(exclude), len(nodes))
 
 	candidates, err := gd.Scheduler(config, num, nodes, false, false)
 	if err != nil {
@@ -57,31 +59,31 @@ func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs
 	return engine, nil
 }
 
-func listCandidates(dc *Datacenter, candidates []string) ([]string, error) {
+func (dc *Datacenter) listCandidates(candidates []string) ([]database.Node, error) {
 	nodes, err := database.ListNodeByCluster(dc.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]string, 0, len(nodes))
+	out := make([]database.Node, 0, len(nodes))
 
 	for i := range candidates {
 		if node := dc.getNode(candidates[i]); node != nil {
-			out = append(out, node.EngineID)
+			out = append(out, *node.Node)
 			continue
 		}
 		for n := range nodes {
 			if nodes[n].ID == candidates[i] ||
 				nodes[n].Name == candidates[i] ||
 				nodes[n].EngineID == candidates[i] {
-				out = append(out, nodes[n].EngineID)
+				out = append(out, *nodes[n])
 				break
 			}
 		}
 	}
 	if len(out) == 0 {
 		for i := range nodes {
-			out = append(out, nodes[i].EngineID)
+			out = append(out, *nodes[i])
 		}
 	}
 
@@ -148,7 +150,7 @@ func (gd *Gardener) UnitMigrate(NameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 
-	out, err := listCandidates(dc, candidates)
+	out, err := dc.listCandidates(candidates)
 	if err != nil {
 		return "", err
 	}
@@ -606,7 +608,7 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 
-	out, err := listCandidates(dc, candidates)
+	out, err := dc.listCandidates(candidates)
 	if err != nil {
 		return "", err
 	}

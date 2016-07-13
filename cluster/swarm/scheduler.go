@@ -147,18 +147,14 @@ func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module structs
 		return nil, err
 	}
 
+	config, err := templateConfig(gd, module)
+	if err != nil {
+		return nil, err
+	}
 	// TODO:maybe remove
 	_type := module.Type
 	if _type == _SwitchManagerType {
 		_type = _ProxyType
-	}
-
-	filters := gd.listShortIdleStore(module.Stores, _type, num)
-	logrus.Debugf("[MG] %v,%s,%d:first filters of storage:%s", module.Stores, module.Type, num, filters)
-
-	config, err := templateConfig(gd, module)
-	if err != nil {
-		return nil, err
 	}
 
 	highAvaliable := svc.HighAvailable
@@ -176,10 +172,17 @@ func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module structs
 	gd.scheduler.Lock()
 	defer gd.scheduler.Unlock()
 
-	list := gd.listCandidateNodes(module.Clusters, _type, filters)
-	logrus.Debugf("filters num:%d,candidate nodes num:%d", len(filters), len(list))
+	list, err := listCandidates(module.Clusters, _type)
+	if err != nil {
+		return nil, err
+	}
+	logrus.Debugf("all candidate nodes num:%d,filter by Type:'%s'", len(list), _type)
 
-	candidates, err := gd.Scheduler(config, num, list, false, highAvaliable)
+	list = gd.shortIdleStoreFilter(list, module.Stores, _type, num)
+
+	candidates := gd.listCandidateNodes(list)
+
+	candidates, err = gd.Scheduler(config, num, candidates, false, highAvaliable)
 	if err != nil {
 		return nil, err
 	}
@@ -406,36 +409,33 @@ func (gd *Gardener) runScheduler(list []*node.Node, config *cluster.ContainerCon
 	return gd.SelectNodeByCluster(nodes, num, highAvaliable)
 }
 
-// listCandidateNodes returns all validated engines in the cluster, excluding pendingEngines.
-func (gd *Gardener) listCandidateNodes(clusters []string, _type string, filters []string) []*node.Node {
-	gd.RLock()
-	defer gd.RUnlock()
-
-	var (
-		list []database.Node
-		err  error
-	)
-
-	if len(clusters) == 0 {
-		list, err = database.ListNodeByClusterType(_type, true)
-	} else {
-		list, err = database.ListNodesByClusters(clusters, _type)
-	}
+func listCandidates(clusters []string, _type string) ([]database.Node, error) {
+	list, err := database.ListNodesByClusters(clusters, _type, true)
 	if err != nil {
 		logrus.Errorf("Search in Database Error: %s", err)
 
-		return nil
+		return nil, err
 	}
 
-	out := make([]*node.Node, 0, len(list))
+	out := make([]database.Node, 0, len(list))
 	for i := range list {
-		if list[i].Status != _StatusNodeEnable ||
-			isStringExist(list[i].ClusterID, filters) ||
-			isStringExist(list[i].EngineID, filters) {
-
+		if list[i].Status != _StatusNodeEnable {
 			continue
 		}
+		out = append(out, list[i])
+	}
 
+	return out, nil
+}
+
+// listCandidateNodes returns all validated engines in the cluster, excluding pendingEngines.
+func (gd *Gardener) listCandidateNodes(list []database.Node) []*node.Node {
+	gd.RLock()
+	defer gd.RUnlock()
+
+	out := make([]*node.Node, 0, len(list))
+
+	for i := range list {
 		node := gd.checkNode(list[i].EngineID)
 		if node != nil {
 			out = append(out, node)

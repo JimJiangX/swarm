@@ -234,7 +234,7 @@ func (dc *Datacenter) isNodeExist(IDOrName string) bool {
 
 func (dc *Datacenter) GetNode(IDOrName string) (*Node, error) {
 	if len(IDOrName) == 0 {
-		return nil, errors.New("Not Found Node")
+		return nil, errors.New("Node Name Or ID is null")
 	}
 
 	dc.RLock()
@@ -639,7 +639,7 @@ func (node *Node) getVGname(_type string) (string, error) {
 	return vgName, nil
 }
 
-func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType string, num int) []string {
+func (gd *Gardener) shortIdleStoreFilter(list []database.Node, volumes []structs.DiskStorage, _type string, num int) []database.Node {
 	gd.RLock()
 	length := len(gd.datacenters)
 	gd.RUnlock()
@@ -651,86 +651,95 @@ func (gd *Gardener) listShortIdleStore(volumes []structs.DiskStorage, IDOrType s
 		}
 	}
 
-	gd.RLock()
-	defer gd.RUnlock()
-	out := make([]string, 0, 100)
-	for _, dc := range gd.datacenters {
-		// check dc
-		if dc == nil {
-			continue
+	out := make([]database.Node, 0, 100)
+
+loop:
+	for i := range list {
+		dc, node, err := gd.GetNode(list[i].ID)
+		if err != nil || dc == nil || node == nil {
+			logrus.Warningf("Not Found Node By ID:%s", list[i].ID)
+
+			continue loop
 		}
+
+		dc.Lock()
 
 		if !dc.Enabled {
-			out = append(out, dc.ID)
 			logrus.Debug("DC Disabled ", dc.Name)
-			continue
+
+			dc.Unlock()
+
+			continue loop
 		}
 
-		if IDOrType != "" && !(dc.Type == IDOrType || dc.ID == IDOrType) {
-			out = append(out, dc.ID)
-			logrus.Debugf("DC %s:%s,Type Unmatch %s", dc.Name, dc.Type, IDOrType)
-			continue
+		if node.engine == nil ||
+			(node.engine != nil && (!node.engine.IsHealthy() ||
+				len(node.engine.Containers()) >= node.MaxContainer)) {
+			logrus.Debugf("%s Engine Unmatch,%s %s", node.Name, node.ID, node.EngineID)
+
+			dc.Unlock()
+
+			continue loop
 		}
 
-		for _, node := range dc.nodes {
-			if node.engine == nil ||
-				(node.engine != nil &&
-					(!node.engine.IsHealthy() ||
-						len(node.engine.Containers()) >= node.MaxContainer)) {
-
-				out = append(out, node.ID, node.EngineID)
-				logrus.Debugf("%s Engine Unmatch,%s %s", node.Name, node.ID, node.EngineID)
-			}
-		}
+		dc.Unlock()
 
 		for _, v := range volumes {
-			// when storage is HITACHI or HUAWEI
-			if v.Type == store.SANStore {
+			if store.IsLocalStore(v.Type) {
+				if !node.isIdleStoreEnough(v.Type, v.Size) {
+					logrus.Debugf("%s local store shortage:%d", node.Name, v.Size)
+
+					continue loop
+				}
+			} else if v.Type == store.SANStore {
+				// when storage is HITACHI or HUAWEI
 				if !dc.isIdleStoreEnough(num/2, v.Size) {
-					out = append(out, dc.ID)
 					logrus.Debugf("%s san store shortage:%d", dc.Name, v.Size)
+
+					continue loop
 				}
 			}
 		}
 
-		// local store
-		for _, node := range dc.nodes {
-			for _, v := range volumes {
-				if !store.IsLocalStore(v.Type) {
-					continue
-				}
-				if node.localStore == nil {
-					out = append(out, node.ID, node.EngineID)
-					logrus.Debugf("%s Local Store is nil", node.Name)
-					break
-				}
-
-				idle, err := node.localStore.IdleSize()
-				if err != nil {
-					out = append(out, node.ID, node.EngineID)
-
-					logrus.Debugf("%s Local Store error:%s", node.Name, err)
-					break
-				}
-
-				vgName, err := node.getVGname(v.Type)
-				if err != nil {
-					out = append(out, node.ID, node.EngineID)
-
-					logrus.Debugf("%s get VG_Name error:%s", node.Name, err)
-					break
-				}
-
-				if idle[vgName] < v.Size {
-					out = append(out, node.ID, node.EngineID)
-					logrus.Debugf("%s VG %s shortage:%v %d", node.Name, vgName, idle[vgName], v.Size)
-					break
-				}
-			}
-		}
+		out = append(out, list[i])
 	}
 
 	return out
+}
+
+func (node *Node) isIdleStoreEnough(_type string, size int) bool {
+	if !store.IsLocalStore(_type) {
+
+		return false
+	}
+
+	if node.localStore == nil {
+		logrus.Debugf("%s Local Store is nil", node.Name)
+
+		return false
+	}
+
+	idle, err := node.localStore.IdleSize()
+	if err != nil {
+		logrus.Debugf("%s Local Store error:%s", node.Name, err)
+
+		return false
+	}
+
+	vgName, err := node.getVGname(_type)
+	if err != nil {
+		logrus.Debugf("%s get VG_Name error:%s", node.Name, err)
+
+		return false
+	}
+
+	if idle[vgName] < size {
+		logrus.Debugf("%s VG %s shortage:%v %d", node.Name, vgName, idle[vgName], size)
+
+		return false
+	}
+
+	return true
 }
 
 func (dc *Datacenter) DeregisterNode(IDOrName string) error {
