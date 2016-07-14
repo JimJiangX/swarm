@@ -583,7 +583,7 @@ func getServiceRunningStatus(serviceID string, units []database.Unit,
 			}
 		}
 
-		if count > 0 {
+		if count > 0 && state == servicePassing {
 			state = serviceWarning
 		}
 
