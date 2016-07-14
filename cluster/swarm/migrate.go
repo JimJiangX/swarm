@@ -3,9 +3,8 @@ package swarm
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/Sirupsen/logrus"
 	ctypes "github.com/docker/engine-api/types/container"
@@ -16,6 +15,8 @@ import (
 	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/utils"
+	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs.Module, list []database.Node, exclude []string) (*cluster.Engine, error) {
@@ -136,14 +137,24 @@ func (gd *Gardener) UnitMigrate(NameOrID string, candidates []string, hostConfig
 	u := svc.units[index]
 	oldContainer := u.container
 
+	san := false
 	for i := range svc.base.Modules {
 		if u.Type == svc.base.Modules[i].Type {
 			module = svc.base.Modules[i]
+			for s := range module.Stores {
+				if strings.ToUpper(module.Stores[s].Type) == "SAN" {
+					san = true
+				}
+			}
 			break
 		}
 	}
 
 	svc.RUnlock()
+
+	if !san {
+		return "", errors.Errorf("Unit %s storage hasn't SAN Storage,Cannot Exec Migrate", NameOrID)
+	}
 
 	dc, err := gd.DatacenterByEngine(u.EngineID)
 	if err != nil || dc == nil {
