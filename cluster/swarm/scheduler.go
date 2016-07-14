@@ -44,10 +44,10 @@ func (gd *Gardener) serviceScheduler() (err error) {
 
 		entry := logrus.WithFields(logrus.Fields{
 			"Name":   svc.Name,
-			"Action": "Alloc",
+			"Action": "Schedule&Alloc",
 		})
 
-		logrus.Debugf("[MG] start serviceScheduler:%s", svc.Name)
+		logrus.Debugf("[MG] start service Scheduler:%s", svc.Name)
 		if !atomic.CompareAndSwapInt64(&svc.Status, _StatusServcieBuilding, _StatusServiceAlloction) {
 			entry.Error("Status Conflict")
 			continue
@@ -81,6 +81,12 @@ func (gd *Gardener) serviceScheduler() (err error) {
 			svc.pendingContainers[resourceAlloc[i].swarmID] = resourceAlloc[i].pendingContainer
 		}
 
+		err = createServiceResources(gd, resourceAlloc)
+		if err != nil {
+			entry.Errorf("create Service Volumes Error:%s", err)
+			goto failure
+		}
+
 		// scheduler success
 		svc.Unlock()
 
@@ -97,6 +103,54 @@ func (gd *Gardener) serviceScheduler() (err error) {
 	}
 
 	return err
+}
+
+func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err error) {
+	volumes := make([]*cluster.Volume, 0, 10)
+
+	defer func() {
+		if err != nil {
+			logrus.Error("create Service volumes&IP,defer ", err)
+
+			for _, v := range volumes {
+				if v == nil {
+					continue
+				}
+				ok, _err := gd.RemoveVolumes(v.Name)
+				logrus.Debugf("Remove Volumes %s:%t,%v", v.Name, ok, _err)
+			}
+		}
+
+		for _, pending := range allocs {
+			if pending == nil || pending.engine == nil {
+				continue
+			}
+
+			_err := removeNetworkings(pending.engine.IP, pending.networkings)
+			if err != nil {
+				logrus.Error(_err)
+			}
+		}
+	}()
+
+	for _, pending := range allocs {
+		if pending == nil || pending.engine == nil {
+			continue
+		}
+		out, err := createVolumes(pending.engine, pending.localStore, pending.sanStore)
+		volumes = append(volumes, out...)
+
+		if err != nil {
+			return err
+		}
+
+		err = createNetworking(pending.engine.IP, pending.networkings)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func dealWithSchedulerFailure(gd *Gardener, svc *Service, pendings []*pendingAllocResource) {
@@ -219,6 +273,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 	allocs := make([]*pendingAllocResource, 0, 5)
 
 	for i := range candidates {
+
 		config := cloneContainerConfig(templConfig)
 		id := gd.generateUniqueID()
 

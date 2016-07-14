@@ -715,10 +715,10 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 			return err
 		}
 		// TODO:create San Volume
-		err = createVolumes(engine, u.ID, pending.localStore)
-		if err != nil {
-			return err
-		}
+		// err = createVolumes(engine, u.ID, pending.localStore)
+		// if err != nil {
+		// 	return err
+		// }
 
 		container, err := engine.Create(config, swarmID, false, authConfig)
 		if err != nil {

@@ -13,6 +13,7 @@ import (
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/utils"
+	"github.com/pkg/errors"
 )
 
 func (gd *Gardener) allocResource(u *unit, engine *cluster.Engine, config *cluster.ContainerConfig) (*pendingAllocResource, error) {
@@ -73,7 +74,7 @@ func (gd *Gardener) allocNetworkings(unit string, engine *cluster.Engine,
 		if networkings[i].Type == _ContainersNetworking {
 			ip := networkings[i].IP.String()
 			config.Env = append(config.Env, fmt.Sprintf("IPADDR=%s", ip))
-			config.Labels["container_ip"] = ip
+			config.Labels[_ContainerIPLabelKey] = ip
 			config.Labels[_NetworkingLabelKey] = networkings[i].String()
 		} else if networkings[i].Type == _ExternalAccessNetworking {
 			config.Labels[_ProxyNetworkingLabelKey] = networkings[i].String()
@@ -205,6 +206,29 @@ func newPendingAllocResource() *pendingAllocResource {
 	}
 }
 
+func createVolumes(engine *cluster.Engine, lvs []database.LocalVolume, lun []database.LUN) ([]*cluster.Volume, error) {
+	volumes := make([]*cluster.Volume, 0, len(lvs))
+
+	for i := range lvs {
+		// if volume create on san storage,should created VG before create Volume
+		if isSanVG(lvs[i].VGName) {
+			err := createSanStoreageVG(engine.IP, lvs[i].Name, lun)
+			if err != nil {
+				return volumes, errors.Wrapf(err, "create SAN VG:%s ON Engine %s", lvs[i].VGName, engine.IP)
+			}
+		}
+
+		volume, err := createVolume(engine, lvs[i])
+		if err != nil {
+			return volumes, err
+		}
+
+		volumes = append(volumes, volume)
+	}
+
+	return volumes, nil
+}
+
 func (pending *pendingAllocResource) consistency() (err error) {
 	tx, err := database.GetTX()
 	if err != nil {
@@ -312,19 +336,24 @@ func (pending *pendingAllocResource) recycleNetworking() []database.IP {
 func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.Engine, config *cluster.ContainerConfig, need []structs.DiskStorage) error {
 	dc, node, err := gd.GetNode(engine.ID)
 	if err != nil {
-		err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
+		err := errors.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
 		logrus.Error(err)
 
 		return err
 	}
 
+	sys, err := gd.SystemConfig()
+	if err != nil {
+		temp, err := database.GetSystemConfig()
+		if err != nil {
+			logrus.Error(err)
+			return err
+		}
+		sys = *temp
+	}
+
 	for i := range need {
 		if need[i].Type == "nfs" || need[i].Type == "NFS" {
-			sys, err := database.GetSystemConfig()
-			if err != nil {
-				logrus.Errorf("GetSystemConfig error:%s", err)
-				return err
-			}
 			name := fmt.Sprintf("%s:%s", sys.NFSOption.MountDir, sys.BackupDir)
 			config.HostConfig.Binds = append(config.HostConfig.Binds, name)
 			continue
@@ -346,20 +375,22 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 		}
 
 		if dc.storage == nil {
-			return fmt.Errorf("Not Found Datacenter Storage")
+			return errors.Errorf("Not Found Datacenter %s SAN Storage", dc.Name)
 		}
+
 		vgName := penging.unit.Unit.Name + _SAN_VG
 
 		lun, lv, err := dc.storage.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "Datacenter %s SAN Alloc Failed", dc.Name)
 		}
+
 		penging.sanStore = append(penging.sanStore, lun)
 		penging.localStore = append(penging.localStore, lv)
 
 		err = dc.storage.Mapping(node.ID, vgName, lun.ID)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "Datacenter %s SAN Mapping Failed", dc.Name)
 		}
 
 		name = fmt.Sprintf("%s:/DBAAS%s", name, need[i].Name)
@@ -375,10 +406,11 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 func (node *Node) localStorageAlloc(name, unitID, storageType string, size int) (database.LocalVolume, error) {
 	lv := database.LocalVolume{}
 	if !store.IsLocalStore(storageType) {
-		return lv, fmt.Errorf("'%s' storage type isnot '%s'", storageType, store.LocalStorePrefix)
+		return lv, errors.Errorf("'%s' storage type isnot '%s'", storageType, store.LocalStorePrefix)
 	}
+
 	if node.localStore == nil {
-		return lv, fmt.Errorf("Not Found LoaclStorage of Node %s", node.Addr)
+		return lv, errors.Errorf("Not Found LoaclStorage of Node %s", node.Addr)
 	}
 
 	vgName, err := node.getVGname(storageType)

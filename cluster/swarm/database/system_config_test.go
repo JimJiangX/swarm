@@ -2,6 +2,17 @@ package database
 
 import "testing"
 
+func deleteSystemConfig(id int64) error {
+	db, err := GetDB(false)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("DELETE FROM tb_system_config WHERE dc_id=?", id)
+
+	return err
+}
+
 func TestSystemConfig(t *testing.T) {
 	test := Configurations{
 		ConsulConfig: ConsulConfig{

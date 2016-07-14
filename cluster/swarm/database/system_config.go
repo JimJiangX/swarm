@@ -7,6 +7,7 @@ import (
 	"time"
 
 	consulapi "github.com/hashicorp/consul/api"
+	"github.com/pkg/errors"
 )
 
 type Configurations struct {
@@ -166,27 +167,28 @@ func (c Configurations) GetConsulAddrs() []string {
 }
 
 func GetSystemConfig() (*Configurations, error) {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return nil, err
 	}
 
 	c := &Configurations{}
-	err = db.Get(c, "SELECT * FROM tb_system_config LIMIT 1")
+	query := "SELECT * FROM tb_system_config LIMIT 1"
+
+	err = db.Get(c, query)
+	if err == nil {
+		return c, nil
+	}
+
+	db, err = GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return c, nil
-}
-
-func deleteSystemConfig(id int64) error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
+	err = db.Get(c, query)
+	if err == nil {
+		return c, nil
 	}
 
-	_, err = db.Exec("DELETE FROM tb_system_config WHERE dc_id=?", id)
-
-	return err
+	return nil, errors.Wrap(err, "Get SystemConfig")
 }

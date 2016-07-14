@@ -110,6 +110,7 @@ const (
 	_ExternalAccessNetworking = "external_access_networking"
 
 	_NetworkingLabelKey      = "upm.ip"
+	_ContainerIPLabelKey     = "container_ip"
 	_ProxyNetworkingLabelKey = "upm.proxyip"
 
 	_ImageIDInRegistryLabelKey = "registry.imageID"
