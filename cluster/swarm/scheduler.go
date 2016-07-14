@@ -541,17 +541,25 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 	logrus.Debugf("[MG]highAvailable:%t, num :%d ,dcMap len=%d", highAvailable, num, len(dcMap))
 
 	if highAvailable && num > 1 && len(dcMap) < 2 {
-		return nil, errors.New("Not Enough Node For Match")
+		return nil, errors.New("Not Enough Cluster For Match")
 	}
 
 	candidates := make([]*node.Node, num)
 
-	for index := 0; index < num; index++ {
+	for index := 0; index < num; {
+		if len(dcMap) == 0 {
+			return nil, errors.New("Not Enough Cluster For Match")
+		}
 		for key, list := range dcMap {
 			if len(list) == 0 {
+				delete(dcMap, key)
 				continue
 			}
-			candidates[index] = list[0]
+
+			if list[0] != nil {
+				candidates[index] = list[0]
+				index++
+			}
 
 			if len(list[1:]) > 0 {
 				dcMap[key] = list[1:]
