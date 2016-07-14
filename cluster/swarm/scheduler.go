@@ -224,7 +224,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 
 		engine, ok := gd.engines[candidates[i].ID]
 		if !ok || engine == nil {
-			err := fmt.Errorf("Engine %s Not Found", candidates[i].ID)
+			err := fmt.Errorf("Not Found Engine '%s':'%s'", candidates[i].ID, candidates[i].Addr)
 			entry.Error(err)
 
 			return allocs, err

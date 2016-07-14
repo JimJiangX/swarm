@@ -18,6 +18,7 @@ import (
 func (gd *Gardener) allocResource(u *unit, engine *cluster.Engine, config *cluster.ContainerConfig) (*pendingAllocResource, error) {
 	pending := newPendingAllocResource()
 	pending.unit = u
+	pending.engine = engine
 
 	// constraint := fmt.Sprintf("constraint:node==%s", engine.ID)
 	// config.Env = append(config.Env, constraint)
@@ -27,12 +28,16 @@ func (gd *Gardener) allocResource(u *unit, engine *cluster.Engine, config *clust
 
 	req := u.Requirement()
 
-	err := allocPorts(req.ports, u, config)
-	pending.ports = u.ports
+	ports, portENV, err := allocPorts(req.ports, u.ID, u.Name)
+	pending.ports = ports
 	if err != nil {
 		logrus.Errorf("alloc ports error:%s,%v", err, req.ports)
 		return pending, err
 	}
+	if len(ports) > 0 && portENV != "" {
+		config.Env = append(config.Env, portENV)
+	}
+	u.ports = ports
 
 	networkings, err := gd.allocNetworkings(u.ID, engine, req.networkings, config)
 	pending.networkings = append(pending.networkings, networkings...)
@@ -78,34 +83,37 @@ func (gd *Gardener) allocNetworkings(unit string, engine *cluster.Engine,
 	return networkings, nil
 }
 
-func allocPorts(need []port, u *unit, config *cluster.ContainerConfig) error {
-	if length := len(need); length > 0 {
-		ports, err := database.SelectAvailablePorts(length)
-		if err != nil || len(ports) < length {
-			logrus.Errorf("Alloc Ports Error:%v", err)
+func allocPorts(need []port, unitID, unitName string) ([]database.Port, string, error) {
+	length := len(need)
 
-			return err
-		}
-
-		for i := range need {
-			ports[i].Name = need[i].name
-			ports[i].Proto = need[i].proto
-			ports[i].UnitID = u.Unit.ID
-			ports[i].UnitName = u.Unit.Name
-			ports[i].Allocated = true
-		}
-
-		u.ports = ports[0:length]
+	if length == 0 {
+		logrus.Warning("no need ports")
+		return nil, "", nil
 	}
 
-	portSlice := make([]string, len(u.ports))
-	for i := range u.ports {
-		portSlice[i] = strconv.Itoa(u.ports[i].Port)
+	ports, err := database.SelectAvailablePorts(length)
+	if err != nil || len(ports) < length {
+		logrus.Errorf("Alloc Ports Error:%v", err)
+
+		return nil, "", err
 	}
 
-	config.Env = append(config.Env, fmt.Sprintf("PORT=%s", strings.Join(portSlice, ",")))
+	for i := range need {
+		ports[i].Name = need[i].name
+		ports[i].Proto = need[i].proto
+		ports[i].UnitID = unitID
+		ports[i].UnitName = unitName
+		ports[i].Allocated = true
+	}
 
-	return nil
+	portSlice := make([]string, len(ports))
+	for i := range ports {
+		portSlice[i] = strconv.Itoa(ports[i].Port)
+	}
+
+	env := fmt.Sprintf("PORT=%s", strings.Join(portSlice, ","))
+
+	return ports, env, nil
 }
 
 func (gd *Gardener) allocCPUs(engine *cluster.Engine, cpusetCpus string, reserve ...string) (string, error) {
@@ -180,6 +188,7 @@ func parseUintList(list []string) (map[int]bool, error) {
 
 type pendingAllocResource struct {
 	unit             *unit
+	engine           *cluster.Engine
 	pendingContainer *pendingContainer
 	swarmID          string
 	ports            []database.Port
