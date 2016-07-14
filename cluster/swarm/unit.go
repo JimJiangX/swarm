@@ -380,8 +380,9 @@ func (u *unit) removeContainer(force, rmVolumes bool) error {
 }
 
 func (u *unit) startContainer() error {
-	if u.engine == nil {
-		return errEngineIsNil
+	engine, err := u.getEngine()
+	if err != nil {
+		return err
 	}
 
 	networkings, err := u.getNetworkings()
@@ -391,14 +392,25 @@ func (u *unit) startContainer() error {
 		return err
 	}
 
-	err = createNetworking(u.engine.IP, networkings)
+	return startContainer(u.ContainerID, engine, networkings)
+}
+
+func startContainer(containerID string, engine *cluster.Engine, networkings []IPInfo) error {
+	if engine == nil {
+		return errEngineIsNil
+	}
+
+	err := createNetworking(engine.IP, networkings)
 	if err != nil {
-		logrus.Errorf("%s create Networking error:%s,networkings:%v", u.Name, err, networkings)
+		err = errors.Errorf("%s create Networking error:%s,networkings:%v", engine.Addr, err, networkings)
+		logrus.Error(err)
+
 		return err
 	}
 
-	logrus.Debug(u.Name, " start container ", u.ContainerID)
-	return u.engine.StartContainer(u.ContainerID, nil)
+	logrus.Debug("Engine %s start container ", engine.Addr, containerID)
+
+	return engine.StartContainer(containerID, nil)
 }
 
 func (u *unit) forceStopContainer(timeout int) error {
