@@ -486,10 +486,10 @@ func isStringExist(s string, list []string) bool {
 
 func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailable bool) ([]*node.Node, error) {
 	if len(nodes) < num {
-		return nil, errors.New("Not Enough Nodes")
+		return nil, errors.New("Not Enough Nodes For Match")
 	}
 
-	if !highAvailable {
+	if !highAvailable || num == 1 {
 		return nodes[0:num:num], nil
 	}
 
@@ -523,14 +523,16 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 			logrus.Debugf("[MG]len(all) = %d, the DC:%s", len(all), dcID)
 		}
 		if err != nil || dcID == "" {
-			logrus.Warningf("%d:Node %s fail,%v", i, nodes[i].ID, err)
+			logrus.Warningf("%d Node %s fail,%v", i, nodes[i].ID, err)
 			continue
 		}
 
-		if s, ok := dcMap[dcID]; ok {
-			dcMap[dcID] = append(s, nodes[i])
+		if list, ok := dcMap[dcID]; ok {
+			dcMap[dcID] = append(list, nodes[i])
 		} else {
-			dcMap[dcID] = []*node.Node{nodes[i]}
+			list := make([]*node.Node, 1, len(nodes)/2)
+			list[0] = nodes[i]
+			dcMap[dcID] = list
 		}
 
 		logrus.Debugf("DC %s Append Node:%s,len=%d", dcID, nodes[i].Name, len(dcMap[dcID]))
@@ -550,7 +552,12 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 				continue
 			}
 			candidates[index] = list[0]
-			dcMap[key] = list[1:]
+
+			if len(list[1:]) > 0 {
+				dcMap[key] = list[1:]
+			} else {
+				delete(dcMap, key)
+			}
 		}
 	}
 
