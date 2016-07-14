@@ -93,11 +93,11 @@ func (gd *Gardener) serviceExecute() (err error) {
 	return err
 }
 
-func (gd *Gardener) RecreateAndStartService(NameOrID string) error {
+func (gd *Gardener) RecreateAndStartService(nameOrID string) error {
 	var svc *Service
 	gd.Lock()
 	for i := range gd.services {
-		if gd.services[i].ID == NameOrID || gd.services[i].Name == NameOrID {
+		if gd.services[i].ID == nameOrID || gd.services[i].Name == nameOrID {
 			svc = gd.services[i]
 			break
 		}
@@ -105,7 +105,7 @@ func (gd *Gardener) RecreateAndStartService(NameOrID string) error {
 	gd.Unlock()
 
 	if svc == nil {
-		return fmt.Errorf("Not Found Service %s", NameOrID)
+		return fmt.Errorf("Not Found Service %s", nameOrID)
 	}
 
 	val := atomic.LoadInt64(&svc.Status)

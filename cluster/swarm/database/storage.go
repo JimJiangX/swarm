@@ -366,41 +366,41 @@ func InsertLocalVolume(lv LocalVolume) error {
 	return err
 }
 
-func UpdateLocalVolume(NameOrID string, size int) error {
+func UpdateLocalVolume(nameOrID string, size int) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("UPDATE tb_volumes SET size=? WHERE id=? OR name=?", size, NameOrID, NameOrID)
+	_, err = db.Exec("UPDATE tb_volumes SET size=? WHERE id=? OR name=?", size, nameOrID, nameOrID)
 
 	return err
 }
 
-func TxUpdateLocalVolume(tx *sqlx.Tx, NameOrID string, size int) error {
-	_, err := tx.Exec("UPDATE tb_volumes SET size=? WHERE id=? OR name=?", size, NameOrID, NameOrID)
+func TxUpdateLocalVolume(tx *sqlx.Tx, nameOrID string, size int) error {
+	_, err := tx.Exec("UPDATE tb_volumes SET size=? WHERE id=? OR name=?", size, nameOrID, nameOrID)
 
 	return err
 }
 
-func DeleteLocalVoume(IDOrName string) error {
+func DeleteLocalVoume(nameOrID string) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("DELETE FROM tb_volumes WHERE id=? OR name=?", IDOrName, IDOrName)
+	_, err = db.Exec("DELETE FROM tb_volumes WHERE id=? OR name=?", nameOrID, nameOrID)
 
 	return err
 }
 
-func TxDeleteVolume(tx *sqlx.Tx, NameOrID string) error {
-	_, err := tx.Exec("DELETE FROM tb_volumes WHERE id=? OR name=? OR unit_id=?", NameOrID, NameOrID, NameOrID)
+func TxDeleteVolume(tx *sqlx.Tx, nameOrID string) error {
+	_, err := tx.Exec("DELETE FROM tb_volumes WHERE id=? OR name=? OR unit_id=?", nameOrID, nameOrID, nameOrID)
 
 	return err
 }
 
-func GetLocalVolume(NameOrID string) (LocalVolume, error) {
+func GetLocalVolume(nameOrID string) (LocalVolume, error) {
 	lv := LocalVolume{}
 
 	db, err := GetDB(true)
@@ -410,7 +410,7 @@ func GetLocalVolume(NameOrID string) (LocalVolume, error) {
 
 	query := "SELECT * FROM tb_volumes WHERE id=? OR name=?"
 
-	err = db.Get(&lv, query, NameOrID, NameOrID)
+	err = db.Get(&lv, query, nameOrID, nameOrID)
 
 	return lv, err
 }

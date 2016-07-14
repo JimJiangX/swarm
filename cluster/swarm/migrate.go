@@ -3,9 +3,8 @@ package swarm
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/Sirupsen/logrus"
 	ctypes "github.com/docker/engine-api/types/container"
@@ -16,6 +15,8 @@ import (
 	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/utils"
+	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs.Module, list []database.Node, exclude []string) (*cluster.Engine, error) {
@@ -112,10 +113,10 @@ func resetContainerConfig(config *cluster.ContainerConfig, hostConfig *ctypes.Ho
 	return clone, nil
 }
 
-func (gd *Gardener) UnitMigrate(NameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
-	table, err := database.GetUnit(NameOrID)
+func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
+	table, err := database.GetUnit(nameOrID)
 	if err != nil {
-		return "", fmt.Errorf("Not Found Unit %s,error:%s", NameOrID, err)
+		return "", fmt.Errorf("Not Found Unit %s,error:%s", nameOrID, err)
 	}
 
 	svc, err := gd.GetService(table.ServiceID)
@@ -136,14 +137,24 @@ func (gd *Gardener) UnitMigrate(NameOrID string, candidates []string, hostConfig
 	u := svc.units[index]
 	oldContainer := u.container
 
+	san := false
 	for i := range svc.base.Modules {
 		if u.Type == svc.base.Modules[i].Type {
 			module = svc.base.Modules[i]
+			for s := range module.Stores {
+				if strings.ToUpper(module.Stores[s].Type) == "SAN" {
+					san = true
+				}
+			}
 			break
 		}
 	}
 
 	svc.RUnlock()
+
+	if !san {
+		return "", errors.Errorf("Unit %s storage hasn't SAN Storage,Cannot Exec Migrate", nameOrID)
+	}
 
 	dc, err := gd.DatacenterByEngine(u.EngineID)
 	if err != nil || dc == nil {
@@ -587,10 +598,10 @@ func updateUnit(unit database.Unit, lvs []database.LocalVolume, reserveSAN bool)
 	return tx.Commit()
 }
 
-func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
-	table, err := database.GetUnit(NameOrID)
+func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
+	table, err := database.GetUnit(nameOrID)
 	if err != nil {
-		return "", fmt.Errorf("Not Found Unit %s,error:%s", NameOrID, err)
+		return "", fmt.Errorf("Not Found Unit %s,error:%s", nameOrID, err)
 	}
 
 	svc, err := gd.GetService(table.ServiceID)

@@ -198,14 +198,14 @@ func DelMultiPorts(tx *sqlx.Tx, ports []Port) error {
 	return nil
 }
 
-func ListPortsByUnit(NameOrID string) ([]Port, error) {
+func ListPortsByUnit(nameOrID string) ([]Port, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
 	ports := make([]Port, 0, 2)
-	err = db.Select(&ports, "SELECT * FROM tb_port WHERE unit_id=? OR unit_name=?", NameOrID, NameOrID)
+	err = db.Select(&ports, "SELECT * FROM tb_port WHERE unit_id=? OR unit_name=?", nameOrID, nameOrID)
 	if err != nil {
 		return nil, err
 	}

@@ -115,10 +115,10 @@ func SaveMultiNodesToDB(nodes []*Node) error {
 	return database.TxInsertMultiNodeAndTask(list, tasks)
 }
 
-func (gd *Gardener) Datacenter(IDOrName string) (*Datacenter, error) {
+func (gd *Gardener) Datacenter(nameOrID string) (*Datacenter, error) {
 	gd.RLock()
 	for i := range gd.datacenters {
-		if gd.datacenters[i].ID == IDOrName || gd.datacenters[i].Name == IDOrName {
+		if gd.datacenters[i].ID == nameOrID || gd.datacenters[i].Name == nameOrID {
 			gd.RUnlock()
 
 			return gd.datacenters[i], nil
@@ -128,7 +128,7 @@ func (gd *Gardener) Datacenter(IDOrName string) (*Datacenter, error) {
 	gd.RUnlock()
 
 	//If Not Found
-	dc, err := gd.rebuildDatacenter(IDOrName)
+	dc, err := gd.rebuildDatacenter(nameOrID)
 	if err != nil {
 		return nil, err
 	}
@@ -165,8 +165,8 @@ func (gd *Gardener) AddDatacenter(cl database.Cluster, storage store.Store) erro
 	return nil
 }
 
-func (gd *Gardener) UpdateDatacenterParams(NameOrID string, max int, limit float32) error {
-	dc, err := gd.Datacenter(NameOrID)
+func (gd *Gardener) UpdateDatacenterParams(nameOrID string, max int, limit float32) error {
+	dc, err := gd.Datacenter(nameOrID)
 	if err != nil {
 		logrus.Error(err)
 		return err
@@ -216,12 +216,12 @@ func (dc *Datacenter) ListNode() []*Node {
 	return nodes
 }
 
-func (dc *Datacenter) isNodeExist(IDOrName string) bool {
+func (dc *Datacenter) isNodeExist(nameOrID string) bool {
 	dc.RLock()
 
 	for i := range dc.nodes {
 
-		if dc.nodes[i].ID == IDOrName || dc.nodes[i].Name == IDOrName {
+		if dc.nodes[i].ID == nameOrID || dc.nodes[i].Name == nameOrID {
 			dc.Unlock()
 			return true
 		}
@@ -232,13 +232,13 @@ func (dc *Datacenter) isNodeExist(IDOrName string) bool {
 	return false
 }
 
-func (dc *Datacenter) GetNode(IDOrName string) (*Node, error) {
-	if len(IDOrName) == 0 {
+func (dc *Datacenter) GetNode(nameOrID string) (*Node, error) {
+	if len(nameOrID) == 0 {
 		return nil, errors.New("Node Name Or ID is null")
 	}
 
 	dc.RLock()
-	node := dc.getNode(IDOrName)
+	node := dc.getNode(nameOrID)
 	dc.RUnlock()
 
 	if node != nil {
@@ -249,11 +249,11 @@ func (dc *Datacenter) GetNode(IDOrName string) (*Node, error) {
 	return nil, errors.New("Not Found Node")
 }
 
-func (dc *Datacenter) getNode(NameOrID string) *Node {
+func (dc *Datacenter) getNode(nameOrID string) *Node {
 	for i := range dc.nodes {
-		if dc.nodes[i].ID == NameOrID ||
-			dc.nodes[i].Name == NameOrID ||
-			dc.nodes[i].EngineID == NameOrID {
+		if dc.nodes[i].ID == nameOrID ||
+			dc.nodes[i].Name == nameOrID ||
+			dc.nodes[i].EngineID == nameOrID {
 
 			return dc.nodes[i]
 		}
@@ -290,17 +290,17 @@ func (dc *Datacenter) listNodeID() []string {
 	return out
 }
 
-func (gd *Gardener) GetNode(NameOrID string) (*Datacenter, *Node, error) {
-	dc, err := gd.DatacenterByNode(NameOrID)
+func (gd *Gardener) GetNode(nameOrID string) (*Datacenter, *Node, error) {
+	dc, err := gd.DatacenterByNode(nameOrID)
 	if dc != nil && err == nil {
 
-		node, err := dc.GetNode(NameOrID)
+		node, err := dc.GetNode(nameOrID)
 		if node != nil && err == nil {
 			return dc, node, nil
 		}
 	}
 
-	n, err := database.GetNode(NameOrID)
+	n, err := database.GetNode(nameOrID)
 	if err != nil {
 		return dc, nil, err
 	}
@@ -319,8 +319,8 @@ func (gd *Gardener) GetNode(NameOrID string) (*Datacenter, *Node, error) {
 	return dc, node, nil
 }
 
-func (gd *Gardener) DatacenterByNode(IDOrName string) (*Datacenter, error) {
-	node, err := database.GetNode(IDOrName)
+func (gd *Gardener) DatacenterByNode(nameOrID string) (*Datacenter, error) {
+	node, err := database.GetNode(nameOrID)
 	if err != nil {
 		return nil, err
 	}
@@ -328,8 +328,8 @@ func (gd *Gardener) DatacenterByNode(IDOrName string) (*Datacenter, error) {
 	return gd.Datacenter(node.ClusterID)
 }
 
-func (gd *Gardener) DatacenterByEngine(IDOrName string) (*Datacenter, error) {
-	node, err := database.GetNode(IDOrName)
+func (gd *Gardener) DatacenterByEngine(nameOrID string) (*Datacenter, error) {
+	node, err := database.GetNode(nameOrID)
 	if err != nil {
 		return nil, err
 	}
@@ -365,12 +365,12 @@ func (gd *Gardener) SetNodeParams(name string, max int) error {
 	return node.UpdateParams(max)
 }
 
-func (dc *Datacenter) RemoveNode(NameOrID string) error {
+func (dc *Datacenter) RemoveNode(nameOrID string) error {
 	dc.Lock()
 	for i := range dc.nodes {
-		if dc.nodes[i].ID == NameOrID ||
-			dc.nodes[i].Name == NameOrID ||
-			dc.nodes[i].EngineID == NameOrID {
+		if dc.nodes[i].ID == nameOrID ||
+			dc.nodes[i].Name == nameOrID ||
+			dc.nodes[i].EngineID == nameOrID {
 
 			dc.nodes = append(dc.nodes[:i], dc.nodes[i+1:]...)
 			break
@@ -382,14 +382,14 @@ func (dc *Datacenter) RemoveNode(NameOrID string) error {
 	return nil
 }
 
-func (gd *Gardener) GetEngine(NameOrID string) (*cluster.Engine, error) {
+func (gd *Gardener) GetEngine(nameOrID string) (*cluster.Engine, error) {
 	gd.RLock()
-	eng, ok := gd.engines[NameOrID]
+	eng, ok := gd.engines[nameOrID]
 
 	if !ok {
 		for _, engine := range gd.engines {
-			if engine.ID == NameOrID ||
-				engine.Name == NameOrID {
+			if engine.ID == nameOrID ||
+				engine.Name == nameOrID {
 				eng = engine
 				ok = true
 				break
@@ -399,8 +399,8 @@ func (gd *Gardener) GetEngine(NameOrID string) (*cluster.Engine, error) {
 
 	if !ok {
 		for _, engine := range gd.pendingEngines {
-			if engine.ID == NameOrID ||
-				engine.Name == NameOrID {
+			if engine.ID == nameOrID ||
+				engine.Name == nameOrID {
 				eng = engine
 				ok = true
 				break
@@ -413,11 +413,11 @@ func (gd *Gardener) GetEngine(NameOrID string) (*cluster.Engine, error) {
 		return eng, nil
 	}
 
-	return nil, fmt.Errorf("Not Found Engine %s", NameOrID)
+	return nil, fmt.Errorf("Not Found Engine %s", nameOrID)
 }
 
-func (gd *Gardener) RemoveNode(NameOrID, user, password string) error {
-	node, err := database.GetNode(NameOrID)
+func (gd *Gardener) RemoveNode(nameOrID, user, password string) error {
+	node, err := database.GetNode(nameOrID)
 	if err != nil {
 		return err
 	}
@@ -429,7 +429,7 @@ func (gd *Gardener) RemoveNode(NameOrID, user, password string) error {
 	if eng != nil {
 		eng.RefreshContainers(false)
 		if num := len(eng.Containers()); num != 0 {
-			return fmt.Errorf("%d Containers Has Created On Node %s", num, NameOrID)
+			return fmt.Errorf("%d Containers Has Created On Node %s", num, nameOrID)
 		}
 
 		gd.scheduler.Lock()
@@ -437,7 +437,7 @@ func (gd *Gardener) RemoveNode(NameOrID, user, password string) error {
 			if pending.Engine.ID == node.EngineID {
 				gd.scheduler.Unlock()
 
-				return fmt.Errorf("Containers Has Created On Node %s", NameOrID)
+				return fmt.Errorf("Containers Has Created On Node %s", nameOrID)
 			}
 		}
 		gd.scheduler.Unlock()
@@ -448,7 +448,7 @@ func (gd *Gardener) RemoveNode(NameOrID, user, password string) error {
 		return fmt.Errorf("Count Unit ByNode,%v,count:%d", err, count)
 	}
 
-	dc, err := gd.DatacenterByNode(NameOrID)
+	dc, err := gd.DatacenterByNode(nameOrID)
 	if err != nil {
 		return err
 	}
@@ -466,12 +466,12 @@ func (gd *Gardener) RemoveNode(NameOrID, user, password string) error {
 		return err
 	}
 
-	err = database.DeleteNode(NameOrID)
+	err = database.DeleteNode(nameOrID)
 	if err != nil {
 		return err
 	}
 
-	err = dc.RemoveNode(NameOrID)
+	err = dc.RemoveNode(nameOrID)
 	if err != nil {
 		return err
 	}
@@ -486,8 +486,8 @@ func (gd *Gardener) RemoveNode(NameOrID, user, password string) error {
 	return nil
 }
 
-func (gd *Gardener) RemoveDatacenter(NameOrID string) error {
-	cl, err := database.GetCluster(NameOrID)
+func (gd *Gardener) RemoveDatacenter(nameOrID string) error {
+	cl, err := database.GetCluster(nameOrID)
 	if err != nil {
 		return err
 	}
@@ -496,10 +496,10 @@ func (gd *Gardener) RemoveDatacenter(NameOrID string) error {
 		return err
 	}
 	if count > 0 {
-		return fmt.Errorf("%d Nodes In Cluster %s", count, NameOrID)
+		return fmt.Errorf("%d Nodes In Cluster %s", count, nameOrID)
 	}
 
-	err = database.DeleteCluster(NameOrID)
+	err = database.DeleteCluster(nameOrID)
 	if err != nil {
 		return err
 	}
@@ -561,10 +561,10 @@ func (gd *Gardener) rebuildDatacenters() error {
 	return nil
 }
 
-func (gd *Gardener) rebuildDatacenter(NameOrID string) (*Datacenter, error) {
-	cl, err := database.GetCluster(NameOrID)
+func (gd *Gardener) rebuildDatacenter(nameOrID string) (*Datacenter, error) {
+	cl, err := database.GetCluster(nameOrID)
 	if err != nil {
-		return nil, fmt.Errorf("Not Found %s,Error %s", NameOrID, err)
+		return nil, fmt.Errorf("Not Found %s,Error %s", nameOrID, err)
 	}
 
 	var storage store.Store
@@ -742,17 +742,17 @@ func (node *Node) isIdleStoreEnough(_type string, size int) bool {
 	return true
 }
 
-func (dc *Datacenter) DeregisterNode(IDOrName string) error {
+func (dc *Datacenter) DeregisterNode(nameOrID string) error {
 	dc.RLock()
 
-	node := dc.getNode(IDOrName)
+	node := dc.getNode(nameOrID)
 
 	dc.RUnlock()
 
 	if node == nil {
 		node = &Node{
 			Node: &database.Node{
-				ID: IDOrName,
+				ID: nameOrID,
 			},
 		}
 	}
@@ -767,7 +767,7 @@ func (dc *Datacenter) DeregisterNode(IDOrName string) error {
 
 	dc.Unlock()
 
-	logrus.Infof("Deregister Node:%s of Cluster:%s", IDOrName, dc.Name)
+	logrus.Infof("Deregister Node:%s of Cluster:%s", nameOrID, dc.Name)
 
 	return err
 }
