@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/ioutils"
@@ -150,16 +151,22 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 			localFct := fct
 
 			wrap := func(w http.ResponseWriter, r *http.Request) {
-				logrus.WithFields(logrus.Fields{"method": r.Method, "uri": r.RequestURI}).Debug("HTTP request received")
+				start := time.Now()
+
 				if enableCors {
 					writeCorsHeaders(w, r)
 				}
 				if logrus.GetLevel() == logrus.DebugLevel {
 					DebugRequestMiddleware(r)
 				}
+
 				context.apiVersion = mux.Vars(r)["version"]
 				ctx := goctx.WithValue(goctx.Background(), _Gardener, context)
 				localFct(ctx, w, r)
+
+				logrus.WithFields(logrus.Fields{"method": r.Method,
+					"uri":   r.RequestURI,
+					"since": time.Since(start).String()}).Debug("HTTP request received")
 			}
 			localMethod := method
 
