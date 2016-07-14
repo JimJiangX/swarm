@@ -76,6 +76,9 @@ func DeletePort(port int, allocated bool) error {
 }
 
 func SelectAvailablePorts(num int) ([]Port, error) {
+	if num == 0 {
+		return nil, nil
+	}
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err

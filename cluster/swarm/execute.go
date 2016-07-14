@@ -198,12 +198,6 @@ func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) error {
 		return fmt.Errorf("pullImage Error:%s", err)
 	}
 
-	logrus.Debug("[MG]create volumes")
-	err = createVolumes(u.engine, u.ID, nil)
-	if err != nil {
-		return fmt.Errorf("%s:createVolumes Failed,%s", pending.Name, err)
-	}
-
 	logrus.Debug("[MG]create container")
 	container, err := gd.createContainerInPending(swarmID, svc.authConfig)
 	if err != nil {

@@ -3,7 +3,6 @@ package swarm
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -21,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform/communicator/remote"
 	"github.com/hashicorp/terraform/communicator/ssh"
 	"github.com/hashicorp/terraform/terraform"
+	"github.com/pkg/errors"
 )
 
 type Datacenter struct {
@@ -633,7 +633,7 @@ func (node *Node) getVGname(_type string) (string, error) {
 
 	vgName, ok := node.engine.Labels[parts[1]+"_VG"]
 	if !ok {
-		return "", fmt.Errorf("Not Found VG_Name of %s", _type)
+		return "", errors.Errorf("Not Found VG_Name '%s' of Node:'%s'", _type, node.Name)
 	}
 
 	return vgName, nil

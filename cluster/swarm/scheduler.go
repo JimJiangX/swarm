@@ -44,10 +44,10 @@ func (gd *Gardener) serviceScheduler() (err error) {
 
 		entry := logrus.WithFields(logrus.Fields{
 			"Name":   svc.Name,
-			"Action": "Alloc",
+			"Action": "Schedule&Alloc",
 		})
 
-		logrus.Debugf("[MG] start serviceScheduler:%s", svc.Name)
+		logrus.Debugf("[MG] start service Scheduler:%s", svc.Name)
 		if !atomic.CompareAndSwapInt64(&svc.Status, _StatusServcieBuilding, _StatusServiceAlloction) {
 			entry.Error("Status Conflict")
 			continue
@@ -57,20 +57,34 @@ func (gd *Gardener) serviceScheduler() (err error) {
 
 		resourceAlloc := make([]*pendingAllocResource, 0, len(svc.base.Modules))
 
-		for i := range svc.base.Modules {
-			pendings, err := gd.BuildPendingContainersPerModule(svc, svc.base.Modules[i])
+		for _, module := range svc.base.Modules {
+
+			candidates, config, err := gd.schedulerPerModule(svc, module)
+			if err != nil {
+				entry.WithField("Module", module.Name).Errorf("Alloction Failed %s", err)
+				goto failure
+			}
+
+			pendings, err := gd.pendingAlloc(candidates, svc.ID, svc.Name, module.Type, module.Stores, config, module.Configures)
 			if len(pendings) > 0 {
 				resourceAlloc = append(resourceAlloc, pendings...)
 			}
 			if err != nil {
-				entry.WithField("Module", svc.base.Modules[i].Name).Errorf("Alloction Failed %s", err)
+				entry.Errorf("gd.pendingAlloc: pendings Allocation Failed %s", err)
 				goto failure
 			}
+			entry.Info("gd.pendingAlloc: Allocation Succeed!")
 		}
 
 		for i := range resourceAlloc {
 			svc.units = append(svc.units, resourceAlloc[i].unit)
 			svc.pendingContainers[resourceAlloc[i].swarmID] = resourceAlloc[i].pendingContainer
+		}
+
+		err = createServiceResources(gd, resourceAlloc)
+		if err != nil {
+			entry.Errorf("create Service Volumes Error:%s", err)
+			goto failure
 		}
 
 		// scheduler success
@@ -89,6 +103,54 @@ func (gd *Gardener) serviceScheduler() (err error) {
 	}
 
 	return err
+}
+
+func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err error) {
+	volumes := make([]*cluster.Volume, 0, 10)
+
+	defer func() {
+		if err != nil {
+			logrus.Error("create Service volumes&IP,defer ", err)
+
+			for _, v := range volumes {
+				if v == nil {
+					continue
+				}
+				ok, _err := gd.RemoveVolumes(v.Name)
+				logrus.Debugf("Remove Volumes %s:%t,%v", v.Name, ok, _err)
+			}
+		}
+
+		for _, pending := range allocs {
+			if pending == nil || pending.engine == nil {
+				continue
+			}
+
+			_err := removeNetworkings(pending.engine.IP, pending.networkings)
+			if err != nil {
+				logrus.Error(_err)
+			}
+		}
+	}()
+
+	for _, pending := range allocs {
+		if pending == nil || pending.engine == nil {
+			continue
+		}
+		out, err := createVolumes(pending.engine, pending.localStore, pending.sanStore)
+		volumes = append(volumes, out...)
+
+		if err != nil {
+			return err
+		}
+
+		err = createNetworking(pending.engine.IP, pending.networkings)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func dealWithSchedulerFailure(gd *Gardener, svc *Service, pendings []*pendingAllocResource) {
@@ -113,7 +175,6 @@ func dealWithSchedulerFailure(gd *Gardener, svc *Service, pendings []*pendingAll
 }
 
 func templateConfig(gd *Gardener, module structs.Module) (*cluster.ContainerConfig, error) {
-
 	config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
 	config = buildContainerConfig(config)
 
@@ -134,7 +195,7 @@ func templateConfig(gd *Gardener, module structs.Module) (*cluster.ContainerConf
 	return config, nil
 }
 
-func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module structs.Module) ([]*pendingAllocResource, error) {
+func (gd *Gardener) schedulerPerModule(svc *Service, module structs.Module) ([]*node.Node, *cluster.ContainerConfig, error) {
 	entry := logrus.WithFields(logrus.Fields{
 		"svcName": svc.Name,
 		"Module":  module.Type,
@@ -144,12 +205,12 @@ func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module structs
 	if err != nil {
 		entry.Errorf("Parse Module.Arch:%s,Error:%v", module.Arch, err)
 
-		return nil, err
+		return nil, nil, err
 	}
 
 	config, err := templateConfig(gd, module)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// TODO:maybe remove
 	_type := module.Type
@@ -174,7 +235,7 @@ func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module structs
 
 	list, err := listCandidates(module.Clusters, _type)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	logrus.Debugf("all candidate nodes num:%d,filter by Type:'%s'", len(list), _type)
 
@@ -184,31 +245,14 @@ func (gd *Gardener) BuildPendingContainersPerModule(svc *Service, module structs
 
 	candidates, err = gd.Scheduler(config, num, candidates, false, highAvaliable)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return gd.BuildPendingContainers(svc, module.Type, candidates, module.Stores, config, module.Configures)
-}
-
-func (gd *Gardener) BuildPendingContainers(svc *Service, _type string, candidates []*node.Node,
-	stores []structs.DiskStorage, config *cluster.ContainerConfig, configures map[string]interface{}) ([]*pendingAllocResource, error) {
-
-	entry := logrus.WithFields(logrus.Fields{"Name": svc.Name, "Module": _type})
-
-	pendings, err := gd.pendingAlloc(candidates, svc.ID, svc.Name, _type, stores, config, configures)
-	if err != nil {
-		entry.Errorf("gd.pendingAlloc: pendings Allocation Failed %s", err)
-		return pendings, err
-	}
-
-	entry.Info("gd.pendingAlloc: Allocation Succeed!")
-
-	return pendings, nil
+	return candidates, config, nil
 }
 
 func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type string, stores []structs.DiskStorage,
 	templConfig *cluster.ContainerConfig, configures map[string]interface{}) ([]*pendingAllocResource, error) {
-
 	entry := logrus.WithFields(logrus.Fields{"Name": svcName, "Module": _type})
 
 	imageID, ok := templConfig.Labels[_ImageIDInRegistryLabelKey]
@@ -223,15 +267,19 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 		return nil, err
 	}
 
+	gd.scheduler.Lock()
+	defer gd.scheduler.Unlock()
+
 	allocs := make([]*pendingAllocResource, 0, 5)
 
 	for i := range candidates {
+
 		config := cloneContainerConfig(templConfig)
 		id := gd.generateUniqueID()
 
 		engine, ok := gd.engines[candidates[i].ID]
 		if !ok || engine == nil {
-			err := fmt.Errorf("Engine %s Not Found", candidates[i].ID)
+			err := fmt.Errorf("Not Found Engine '%s':'%s'", candidates[i].ID, candidates[i].Addr)
 			entry.Error(err)
 
 			return allocs, err

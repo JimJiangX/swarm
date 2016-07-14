@@ -237,33 +237,6 @@ func (u *unit) getNetworkingAddr(networking, portName string) (addr string, port
 	return "", 0, fmt.Errorf("Not Found Required networking:%s Port:%s", networking, portName)
 }
 
-func createVolumes(engine *cluster.Engine, unitID string, lvs []database.LocalVolume) (err error) {
-	if len(lvs) == 0 {
-		lvs, err = database.SelectVolumesByUnitID(unitID)
-		if err != nil {
-			logrus.Error("SelectVolumesByUnitID %s error,%s", unitID, err)
-			return err
-		}
-	}
-
-	for i := range lvs {
-		// if volume create on san storage,should created VG before create Volume
-		if isSanVG(lvs[i].VGName) {
-			err := createSanStoreageVG(engine.IP, lvs[i].Name)
-			if err != nil {
-				return err
-			}
-		}
-
-		_, err = createVolume(engine, lvs[i])
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func pullImage(engine *cluster.Engine, image string, authConfig *types.AuthConfig) error {
 	if engine == nil {
 		return errEngineIsNil
@@ -297,18 +270,20 @@ func createVolume(eng *cluster.Engine, lv database.LocalVolume) (*cluster.Volume
 	}
 	v, err := eng.CreateVolume(req)
 	if err != nil {
-		logrus.Errorf("Engine %s Create Volume %v", eng.Addr, req)
-		return nil, err
+		return nil, errors.Wrapf(err, "Engine %s Create Volume %v", eng.Addr, req)
 	}
 
 	return v, nil
 }
 
-func createSanStoreageVG(host, lun string) error {
-	list, err := database.ListLUNByName(lun)
-	if err != nil {
-		return fmt.Errorf("LUN:%s,ListLUNByName Error:%s", lun, err)
+func createSanStoreageVG(host, name string, lun []database.LUN) error {
+	list := make([]database.LUN, 0, len(lun))
+	for i := range lun {
+		if lun[i].Name == name {
+			list = append(list, lun[i])
+		}
 	}
+
 	if len(list) == 0 {
 		return nil
 	}
@@ -333,15 +308,15 @@ func createSanStoreageVG(host, lun string) error {
 
 	addr := getPluginAddr(host, pluginPort)
 
-	return sdk.SanVgCreate(addr, config)
-}
-
-func extendSanStoreageVG(host, lunID string) error {
-	lun, err := database.GetLUNByID(lunID)
+	err = sdk.SanVgCreate(addr, config)
 	if err != nil {
-		return fmt.Errorf("LUN:%s,ListLUNByName Error:%s", lunID, err)
+		return errors.Wrapf(err, "Create SAN VG ON %s", addr)
 	}
 
+	return nil
+}
+
+func extendSanStoreageVG(host string, lun database.LUN) error {
 	storage, err := store.GetStoreByID(lun.StorageSystemID)
 	if err != nil {
 		return err
@@ -405,8 +380,9 @@ func (u *unit) removeContainer(force, rmVolumes bool) error {
 }
 
 func (u *unit) startContainer() error {
-	if u.engine == nil {
-		return errEngineIsNil
+	engine, err := u.getEngine()
+	if err != nil {
+		return err
 	}
 
 	networkings, err := u.getNetworkings()
@@ -416,14 +392,25 @@ func (u *unit) startContainer() error {
 		return err
 	}
 
-	err = createNetworking(u.engine.IP, networkings)
+	return startContainer(u.ContainerID, engine, networkings)
+}
+
+func startContainer(containerID string, engine *cluster.Engine, networkings []IPInfo) error {
+	if engine == nil {
+		return errEngineIsNil
+	}
+
+	err := createNetworking(engine.IP, networkings)
 	if err != nil {
-		logrus.Errorf("%s create Networking error:%s,networkings:%v", u.Name, err, networkings)
+		err = errors.Errorf("%s create Networking error:%s,networkings:%v", engine.Addr, err, networkings)
+		logrus.Error(err)
+
 		return err
 	}
 
-	logrus.Debug(u.Name, " start container ", u.ContainerID)
-	return u.engine.StartContainer(u.ContainerID, nil)
+	logrus.Debug("Engine %s start container ", engine.Addr, containerID)
+
+	return engine.StartContainer(containerID, nil)
 }
 
 func (u *unit) forceStopContainer(timeout int) error {
@@ -491,7 +478,7 @@ func createNetworking(host string, networkings []IPInfo) error {
 
 		err := sdk.CreateIP(addr, config)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "Create IP ON %s,%+v", addr, config)
 		}
 	}
 
@@ -508,7 +495,7 @@ func removeNetworkings(host string, networkings []IPInfo) error {
 		}
 
 		if err := sdk.RemoveIP(addr, config); err != nil {
-			return err
+			return errors.Wrapf(err, "%s Remove IP,%+v", addr, config)
 		}
 	}
 

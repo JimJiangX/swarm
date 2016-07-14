@@ -315,16 +315,10 @@ func (gd *Gardener) UnitMigrate(NameOrID string, candidates []string, hostConfig
 func startUnit(engine *cluster.Engine, containerID string,
 	u *unit, lvs []database.LocalVolume) error {
 	logrus.Debug("starting Containers")
-	err := engine.StartContainer(containerID, nil)
+
+	err := startContainer(containerID, engine, u.networkings)
 	if err != nil {
 		return err
-	}
-
-	if len(lvs) == 0 {
-		lvs, err = database.SelectVolumesByUnitID(u.ID)
-		if err != nil {
-			return err
-		}
 	}
 
 	logrus.Debug("copy Service Config")
@@ -564,7 +558,7 @@ func updateUnit(unit database.Unit, lvs []database.LocalVolume, reserveSAN bool)
 		}
 		err := database.TxDeleteVolume(tx, lvs[i].ID)
 		if err != nil {
-			return err
+			logrus.Error(err)
 		}
 	}
 	err = database.TxUpdateUnit(tx, unit)
@@ -608,7 +602,7 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 
 	svc.RUnlock()
 
-	dc, err := gd.DatacenterByEngine(u.EngineID)
+	dc, original, err := gd.GetNode(u.EngineID)
 	if err != nil || dc == nil {
 		return "", err
 	}
@@ -634,9 +628,21 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 	}
 	gd.scheduler.Unlock()
 
-	background := func(ctx context.Context) error {
+	background := func(ctx context.Context) (err error) {
+		svc.Lock()
 		gd.scheduler.Lock()
-		defer gd.scheduler.Unlock()
+
+		pending := newPendingAllocResource()
+
+		defer func() {
+			if err != nil {
+				// error handle
+			}
+
+			svc.Unlock()
+			gd.scheduler.Unlock()
+
+		}()
 
 		cpuset, err := gd.allocCPUs(engine, config.HostConfig.CpusetCpus)
 		if err != nil {
@@ -644,9 +650,6 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 			return err
 		}
 		config.HostConfig.CpusetCpus = cpuset
-
-		svc.Lock()
-		defer svc.Unlock()
 
 		err = stopOldContainer(svc, u)
 		if err != nil {
@@ -672,18 +675,17 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 				logrus.Error(err)
 			}
 		}
-		/*
-			// clean local volumes
-			for i := range oldLVs {
-				err := node.localStore.Recycle(oldLVs[i].ID)
-				if err != nil {
-					logrus.Error(err)
-				}
-			}
-		*/
 
-		pending := newPendingAllocResource()
+		// clean local volumes
+		for i := range oldLVs {
+			err := original.localStore.Recycle(oldLVs[i].ID)
+			if err != nil {
+				logrus.Error(err)
+			}
+		}
+
 		pending.unit = u
+		pending.engine = engine
 
 		config.HostConfig.Binds = make([]string, 0, 5)
 		err = gd.allocStorage(pending, engine, config, module.Stores)
@@ -710,12 +712,7 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 			return fmt.Errorf("pullImage Error:%s", err)
 		}
 
-		err = createNetworking(engine.IP, u.networkings)
-		if err != nil {
-			return err
-		}
-		// TODO:create San Volume
-		err = createVolumes(engine, u.ID, pending.localStore)
+		err = createServiceResources(gd, []*pendingAllocResource{pending})
 		if err != nil {
 			return err
 		}
