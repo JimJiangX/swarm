@@ -347,7 +347,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit,
 		return pending, err
 	}
 
-	err = gd.allocStorage(pending, engine, config, stores)
+	err = gd.allocStorage(pending, engine, config, stores, false)
 	if err != nil {
 		entry.Errorf("Alloc Storage Error:%s", err)
 

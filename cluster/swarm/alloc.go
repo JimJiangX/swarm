@@ -333,7 +333,8 @@ func (pending *pendingAllocResource) recycleNetworking() []database.IP {
 	return ips
 }
 
-func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.Engine, config *cluster.ContainerConfig, need []structs.DiskStorage) error {
+func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.Engine,
+	config *cluster.ContainerConfig, need []structs.DiskStorage, skipSAN bool) error {
 	dc, node, err := gd.GetNode(engine.ID)
 	if err != nil {
 		err := errors.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
@@ -374,25 +375,26 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 			continue
 		}
 
-		if dc.storage == nil {
-			return errors.Errorf("Not Found Datacenter %s SAN Storage", dc.Name)
+		if !skipSAN {
+			if dc.storage == nil {
+				return errors.Errorf("Not Found Datacenter %s SAN Storage", dc.Name)
+			}
+
+			vgName := penging.unit.Unit.Name + _SAN_VG
+
+			lun, lv, err := dc.storage.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
+			if err != nil {
+				return errors.Wrapf(err, "Datacenter %s SAN Alloc Failed", dc.Name)
+			}
+
+			penging.sanStore = append(penging.sanStore, lun)
+			penging.localStore = append(penging.localStore, lv)
+
+			err = dc.storage.Mapping(node.ID, vgName, lun.ID)
+			if err != nil {
+				return errors.Wrapf(err, "Datacenter %s SAN Mapping Failed", dc.Name)
+			}
 		}
-
-		vgName := penging.unit.Unit.Name + _SAN_VG
-
-		lun, lv, err := dc.storage.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
-		if err != nil {
-			return errors.Wrapf(err, "Datacenter %s SAN Alloc Failed", dc.Name)
-		}
-
-		penging.sanStore = append(penging.sanStore, lun)
-		penging.localStore = append(penging.localStore, lv)
-
-		err = dc.storage.Mapping(node.ID, vgName, lun.ID)
-		if err != nil {
-			return errors.Wrapf(err, "Datacenter %s SAN Mapping Failed", dc.Name)
-		}
-
 		name = fmt.Sprintf("%s:/DBAAS%s", name, need[i].Name)
 		config.HostConfig.Binds = append(config.HostConfig.Binds, name)
 		config.HostConfig.VolumeDriver = dc.storage.Driver()
