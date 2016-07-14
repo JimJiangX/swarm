@@ -546,10 +546,8 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 
 	candidates := make([]*node.Node, num)
 
-	for index := 0; index < num; {
-		if len(dcMap) == 0 {
-			return nil, errors.New("Not Enough Cluster For Match")
-		}
+	for index := 0; index < num && len(dcMap) > 0; {
+
 		for key, list := range dcMap {
 			if len(list) == 0 {
 				delete(dcMap, key)
@@ -559,6 +557,12 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 			if list[0] != nil {
 				candidates[index] = list[0]
 				index++
+
+				if index == num {
+					dcMap = nil
+
+					return candidates, nil
+				}
 			}
 
 			if len(list[1:]) > 0 {
@@ -566,8 +570,9 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 			} else {
 				delete(dcMap, key)
 			}
+
 		}
 	}
 
-	return candidates, nil
+	return nil, errors.New("Not Enough Cluster&Node For Match")
 }
