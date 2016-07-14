@@ -81,7 +81,7 @@ func (u Unit) TableName() string {
 	return "tb_unit"
 }
 
-func GetUnit(NameOrID string) (Unit, error) {
+func GetUnit(nameOrID string) (Unit, error) {
 	u := Unit{}
 
 	db, err := GetDB(true)
@@ -89,7 +89,7 @@ func GetUnit(NameOrID string) (Unit, error) {
 		return u, err
 	}
 
-	err = db.Get(&u, "SELECT * FROM tb_unit WHERE id=? OR name=? OR container_id=?", NameOrID, NameOrID, NameOrID)
+	err = db.Get(&u, "SELECT * FROM tb_unit WHERE id=? OR name=? OR container_id=?", nameOrID, nameOrID, nameOrID)
 
 	return u, err
 }
@@ -147,8 +147,8 @@ func TxUpdateUnit(tx *sqlx.Tx, unit Unit) error {
 	return err
 }
 
-func TxDeleteUnit(tx *sqlx.Tx, NameOrID string) error {
-	_, err := tx.Exec("DELETE FROM tb_unit WHERE id=? OR name=? OR service_id=?", NameOrID, NameOrID, NameOrID)
+func TxDeleteUnit(tx *sqlx.Tx, nameOrID string) error {
+	_, err := tx.Exec("DELETE FROM tb_unit WHERE id=? OR name=? OR service_id=?", nameOrID, nameOrID, nameOrID)
 
 	return err
 }
@@ -245,14 +245,14 @@ func ListServices() ([]Service, error) {
 	return services, nil
 }
 
-func GetService(NameOrID string) (Service, error) {
+func GetService(nameOrID string) (Service, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return Service{}, err
 	}
 
 	s := Service{}
-	err = db.Get(&s, "SELECT * FROM tb_service WHERE id=? OR name=?", NameOrID, NameOrID)
+	err = db.Get(&s, "SELECT * FROM tb_service WHERE id=? OR name=?", nameOrID, nameOrID)
 
 	return s, err
 }
@@ -378,8 +378,8 @@ func TxSetServiceStatus(svc *Service, task *Task, state, tstate int64, finish ti
 	return nil
 }
 
-func txDeleteService(tx *sqlx.Tx, NameOrID string) error {
-	_, err := tx.Exec("DELETE FROM tb_service WHERE id=? OR name=?", NameOrID, NameOrID)
+func txDeleteService(tx *sqlx.Tx, nameOrID string) error {
+	_, err := tx.Exec("DELETE FROM tb_service WHERE id=? OR name=?", nameOrID, nameOrID)
 
 	return err
 }

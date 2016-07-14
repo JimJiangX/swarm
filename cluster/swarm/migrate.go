@@ -113,10 +113,10 @@ func resetContainerConfig(config *cluster.ContainerConfig, hostConfig *ctypes.Ho
 	return clone, nil
 }
 
-func (gd *Gardener) UnitMigrate(NameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
-	table, err := database.GetUnit(NameOrID)
+func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
+	table, err := database.GetUnit(nameOrID)
 	if err != nil {
-		return "", fmt.Errorf("Not Found Unit %s,error:%s", NameOrID, err)
+		return "", fmt.Errorf("Not Found Unit %s,error:%s", nameOrID, err)
 	}
 
 	svc, err := gd.GetService(table.ServiceID)
@@ -153,7 +153,7 @@ func (gd *Gardener) UnitMigrate(NameOrID string, candidates []string, hostConfig
 	svc.RUnlock()
 
 	if !san {
-		return "", errors.Errorf("Unit %s storage hasn't SAN Storage,Cannot Exec Migrate", NameOrID)
+		return "", errors.Errorf("Unit %s storage hasn't SAN Storage,Cannot Exec Migrate", nameOrID)
 	}
 
 	dc, err := gd.DatacenterByEngine(u.EngineID)
@@ -598,10 +598,10 @@ func updateUnit(unit database.Unit, lvs []database.LocalVolume, reserveSAN bool)
 	return tx.Commit()
 }
 
-func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
-	table, err := database.GetUnit(NameOrID)
+func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
+	table, err := database.GetUnit(nameOrID)
 	if err != nil {
-		return "", fmt.Errorf("Not Found Unit %s,error:%s", NameOrID, err)
+		return "", fmt.Errorf("Not Found Unit %s,error:%s", nameOrID, err)
 	}
 
 	svc, err := gd.GetService(table.ServiceID)

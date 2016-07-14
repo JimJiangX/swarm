@@ -232,8 +232,8 @@ func (gd *Gardener) RemoveCronJob(strategyID string) error {
 	return nil
 }
 
-func (gd *Gardener) ReplaceServiceBackupStrategy(NameOrID string, req structs.BackupStrategy) (*database.BackupStrategy, error) {
-	service, err := gd.GetService(NameOrID)
+func (gd *Gardener) ReplaceServiceBackupStrategy(nameOrID string, req structs.BackupStrategy) (*database.BackupStrategy, error) {
+	service, err := gd.GetService(nameOrID)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +254,7 @@ func (gd *Gardener) ReplaceServiceBackupStrategy(NameOrID string, req structs.Ba
 	return strategy, err
 }
 
-func (gd *Gardener) UpdateServiceBackupStrategy(NameOrID string, req structs.BackupStrategy) error {
+func (gd *Gardener) UpdateServiceBackupStrategy(nameOrID string, req structs.BackupStrategy) error {
 	var (
 		valid = time.Time{}
 		err   error
@@ -266,7 +266,7 @@ func (gd *Gardener) UpdateServiceBackupStrategy(NameOrID string, req structs.Bac
 			return err
 		}
 	}
-	bs, err := database.GetBackupStrategy(NameOrID)
+	bs, err := database.GetBackupStrategy(nameOrID)
 	if err != nil {
 		return err
 	}

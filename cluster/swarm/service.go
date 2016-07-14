@@ -446,14 +446,14 @@ func converteToUsers(service string, users []structs.User) []database.User {
 	return list
 }
 
-func (svc *Service) getUnit(IDOrName string) (*unit, error) {
+func (svc *Service) getUnit(nameOrID string) (*unit, error) {
 	for _, u := range svc.units {
-		if u.ID == IDOrName || u.Name == IDOrName {
+		if u.ID == nameOrID || u.Name == nameOrID {
 			return u, nil
 		}
 	}
 
-	return nil, fmt.Errorf("Unit Not Found,%s", IDOrName)
+	return nil, fmt.Errorf("Unit Not Found,%s", nameOrID)
 }
 
 func (gd *Gardener) AddService(svc *Service) error {
@@ -482,11 +482,11 @@ func (svc *Service) SaveToDB() error {
 	return database.TxSaveService(svc.Service, svc.backup, svc.task, svc.users)
 }
 
-func (gd *Gardener) GetService(NameOrID string) (*Service, error) {
+func (gd *Gardener) GetService(nameOrID string) (*Service, error) {
 	gd.RLock()
 
 	for i := range gd.services {
-		if gd.services[i].ID == NameOrID || gd.services[i].Name == NameOrID {
+		if gd.services[i].ID == nameOrID || gd.services[i].Name == nameOrID {
 			gd.RUnlock()
 
 			return gd.services[i], nil
@@ -495,11 +495,11 @@ func (gd *Gardener) GetService(NameOrID string) (*Service, error) {
 
 	gd.RUnlock()
 
-	return gd.rebuildService(NameOrID)
+	return gd.rebuildService(nameOrID)
 }
 
-func (gd *Gardener) rebuildService(NameOrID string) (*Service, error) {
-	service, err := database.GetService(NameOrID)
+func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
+	service, err := database.GetService(nameOrID)
 	if err != nil {
 		return nil, err
 	}
@@ -1207,11 +1207,11 @@ func (service *Service) switchBack(name string) error {
 
 }
 
-func (gd *Gardener) TemporaryServiceBackupTask(service, NameOrID string) (string, error) {
-	if NameOrID != "" {
-		u, err := database.GetUnit(NameOrID)
+func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string, error) {
+	if nameOrID != "" {
+		u, err := database.GetUnit(nameOrID)
 		if err != nil {
-			logrus.Errorf("Not Found Unit '%s',Error:%s", NameOrID, err)
+			logrus.Errorf("Not Found Unit '%s',Error:%s", nameOrID, err)
 			return "", err
 		}
 
@@ -1228,8 +1228,8 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, NameOrID string) (string
 	}
 
 	var backup *unit = nil
-	if NameOrID != "" {
-		backup, err = svc.getUnit(NameOrID)
+	if nameOrID != "" {
+		backup, err = svc.getUnit(nameOrID)
 		if err != nil {
 			return "", err
 		}

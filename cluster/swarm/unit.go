@@ -678,10 +678,10 @@ func initUnitService(id string, eng *cluster.Engine, cmd []string) error {
 	return err
 }
 
-func (gd *Gardener) StartUnitService(NameOrID string) error {
-	unit, err := database.GetUnit(NameOrID)
+func (gd *Gardener) StartUnitService(nameOrID string) error {
+	unit, err := database.GetUnit(nameOrID)
 	if err != nil {
-		err = fmt.Errorf("Not Found unit %s,%s", NameOrID, err)
+		err = fmt.Errorf("Not Found unit %s,%s", nameOrID, err)
 		return err
 	}
 
@@ -697,10 +697,10 @@ func (gd *Gardener) StartUnitService(NameOrID string) error {
 	return u.startService()
 }
 
-func (gd *Gardener) StopUnitService(NameOrID string, timeout int) error {
-	unit, err := database.GetUnit(NameOrID)
+func (gd *Gardener) StopUnitService(nameOrID string, timeout int) error {
+	unit, err := database.GetUnit(nameOrID)
 	if err != nil {
-		err = fmt.Errorf("Not Found unit %s,%s", NameOrID, err)
+		err = fmt.Errorf("Not Found unit %s,%s", nameOrID, err)
 		return err
 	}
 
@@ -893,8 +893,8 @@ func (gd *Gardener) unitContainer(u *unit) *cluster.Container {
 	return u.container
 }
 
-func (gd *Gardener) RestoreUnit(NameOrID, source string) (string, error) {
-	table, err := database.GetUnit(NameOrID)
+func (gd *Gardener) RestoreUnit(nameOrID, source string) (string, error) {
+	table, err := database.GetUnit(nameOrID)
 	if err != nil {
 		return "", err
 	}

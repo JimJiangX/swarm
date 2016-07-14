@@ -45,14 +45,14 @@ func (bf BackupFile) TableName() string {
 	return "tb_backup_files"
 }
 
-func ListBackupFilesByService(NameOrID string) ([]BackupFile, error) {
+func ListBackupFilesByService(nameOrID string) ([]BackupFile, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
 	var service string
-	err = db.Get(&service, "SELECT id FROM tb_service WHERE id=? OR name=?", NameOrID, NameOrID)
+	err = db.Get(&service, "SELECT id FROM tb_service WHERE id=? OR name=?", nameOrID, nameOrID)
 
 	units := make([]string, 0, 5)
 	err = db.Select(&units, "SELECT id FROM tb_unit WHERE service_id=?", service)
@@ -326,7 +326,7 @@ func (bs BackupStrategy) TableName() string {
 	return "tb_backup_strategy"
 }
 
-func GetBackupStrategy(NameOrID string) (*BackupStrategy, error) {
+func GetBackupStrategy(nameOrID string) (*BackupStrategy, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
@@ -335,7 +335,7 @@ func GetBackupStrategy(NameOrID string) (*BackupStrategy, error) {
 	strategy := &BackupStrategy{}
 	query := "SELECT * FROM tb_backup_strategy WHERE id=? OR name=?"
 
-	err = db.Get(strategy, query, NameOrID, NameOrID)
+	err = db.Get(strategy, query, nameOrID, nameOrID)
 	if err != nil {
 		return nil, err
 	}
