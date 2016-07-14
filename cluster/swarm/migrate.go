@@ -170,9 +170,18 @@ func (gd *Gardener) UnitMigrate(NameOrID string, candidates []string, hostConfig
 	}
 	gd.scheduler.Unlock()
 
-	background := func(ctx context.Context) error {
+	background := func(ctx context.Context) (err error) {
+		pending := newPendingAllocResource()
+
 		gd.scheduler.Lock()
-		defer gd.scheduler.Unlock()
+		defer func() {
+			gd.scheduler.Unlock()
+
+			if err != nil {
+				// error handle
+				logrus.Error(err)
+			}
+		}()
 
 		cpuset, err := gd.allocCPUs(engine, config.HostConfig.CpusetCpus)
 		if err != nil {
@@ -201,15 +210,11 @@ func (gd *Gardener) UnitMigrate(NameOrID string, candidates []string, hostConfig
 			}
 		}
 
-		dc, node, err := gd.GetNode(engine.ID)
-		if err != nil {
-			err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
-			logrus.Error(err)
+		pending.unit = u
+		pending.engine = engine
+		config.HostConfig.Binds = make([]string, 0, 5)
 
-			return err
-		}
-
-		pending, _, err := pendingAllocUnitStore(gd, u, engine.ID, module.Stores, true)
+		err = gd.allocStorage(pending, engine, config, module.Stores, true)
 		if err != nil {
 			return err
 		}
@@ -233,12 +238,15 @@ func (gd *Gardener) UnitMigrate(NameOrID string, candidates []string, hostConfig
 			return fmt.Errorf("pullImage Error:%s", err)
 		}
 
-		err = createNetworking(engine.IP, u.networkings)
+		dc, node, err := gd.GetNode(engine.ID)
 		if err != nil {
+			err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
+			logrus.Error(err)
+
 			return err
 		}
 
-		lvs, err := migrateVolumes(dc.storage, node.ID, engine, *pending, lunMap, lunSlice)
+		lvs, err := migrateVolumes(dc.storage, node.ID, engine, pending.localStore, oldLVs, lunMap, lunSlice)
 		if err != nil {
 			return err
 		}
@@ -436,7 +444,7 @@ func listOldVolumes(unit string) ([]database.LocalVolume, map[string][]database.
 // create local volumes
 func migrateVolumes(storage store.Store, nodeID string,
 	engine *cluster.Engine,
-	pending pendingAllocStore,
+	localStore, oldLVs []database.LocalVolume,
 	lunMap map[string][]database.LUN,
 	lunSlice []database.LUN) ([]database.LocalVolume, error) {
 
@@ -445,14 +453,14 @@ func migrateVolumes(storage store.Store, nodeID string,
 		return nil, fmt.Errorf("Store is nil")
 	}
 
-	addr := getPluginAddr(engine.IP, pluginPort)
-
 	for i := range lunSlice {
 		err := storage.Mapping(nodeID, lunSlice[i].VGName, lunSlice[i].ID)
 		if err != nil {
 			return nil, err
 		}
 	}
+
+	addr := getPluginAddr(engine.IP, pluginPort)
 
 	// SanVgCreate
 	for vg, list := range lunMap {
@@ -491,12 +499,22 @@ func migrateVolumes(storage store.Store, nodeID string,
 		}
 	}
 
-	lvs := make([]database.LocalVolume, len(pending.localStore))
-	for i := range pending.localStore {
-		lvs[i] = pending.localStore[i].lv
-		_, err := createVolume(engine, lvs[i])
+	lvs := make([]database.LocalVolume, len(localStore), len(oldLVs))
+	copy(lvs, localStore)
+	for i := range localStore {
+		_, err := createVolume(engine, localStore[i])
 		if err != nil {
-			return nil, err
+			return lvs, err
+		}
+	}
+
+	for i := range oldLVs {
+		if isSanVG(oldLVs[i].VGName) {
+			lvs = append(lvs, oldLVs[i])
+			_, err := createVolume(engine, oldLVs[i])
+			if err != nil {
+				return lvs, err
+			}
 		}
 	}
 
@@ -629,18 +647,23 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 	gd.scheduler.Unlock()
 
 	background := func(ctx context.Context) (err error) {
+		pending := newPendingAllocResource()
+
 		svc.Lock()
 		gd.scheduler.Lock()
 
-		pending := newPendingAllocResource()
-
 		defer func() {
+			gd.scheduler.Unlock()
 			if err != nil {
+				logrus.Error(err)
 				// error handle
+				_err := gd.Recycle([]*pendingAllocResource{pending})
+				if _err != nil {
+					logrus.Error("Recycle ", _err)
+				}
 			}
 
 			svc.Unlock()
-			gd.scheduler.Unlock()
 
 		}()
 
@@ -688,7 +711,7 @@ func (gd *Gardener) UnitRebuild(NameOrID string, candidates []string, hostConfig
 		pending.engine = engine
 
 		config.HostConfig.Binds = make([]string, 0, 5)
-		err = gd.allocStorage(pending, engine, config, module.Stores)
+		err = gd.allocStorage(pending, engine, config, module.Stores, false)
 		if err != nil {
 			return err
 		}
