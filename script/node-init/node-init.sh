@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o nounset
 
 swarm_key=$1
 adm_ip=$2

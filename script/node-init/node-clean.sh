@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o nounset
 
 adm_ip=$1
 consul_port=$2
