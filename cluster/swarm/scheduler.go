@@ -499,94 +499,60 @@ func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		all = nil
 	}
 
-	m := make(map[string][]*node.Node)
+	dcMap := make(map[string][]*node.Node)
 
 	for i := range nodes {
-		var dc *Datacenter = nil
+		dcID := ""
 
 		if len(all) == 0 {
-			dc, err = gd.DatacenterByNode(nodes[i].ID)
+			node, err := database.GetNode(nodes[i].ID)
 			if err != nil {
 				logrus.Warnf("[MG]SelectNodeByCluster::DatacenterByNode fail", err)
+				continue
 			}
-			logrus.Debugf("[**MG]len(all) == 0 the dc :%v", dc)
+			dcID = node.ClusterID
+
+			logrus.Debugf("[**MG]len(all) == 0 the dc :%s", dcID)
 		} else {
 			for index := range all {
-				logrus.Debugf("the nodes[i].ID == all[index].ID :%s:%s  ", nodes[i].ID, all[index].EngineID)
 				if nodes[i].ID == all[index].EngineID {
-					dc, err = gd.Datacenter(all[index].ClusterID)
-					if err != nil {
-						logrus.Warnf("[MG] SelectNodeByCluster::database.Datacenter fail", err)
-					}
+					dcID = all[index].ClusterID
 					break
 				}
 			}
-			logrus.Debugf("[MG]len(all) != 0 the dc :%v", dc)
+			logrus.Debugf("[MG]len(all) = %d, the DC:%s", len(all), dcID)
 		}
-		if err != nil || dc == nil {
+		if err != nil || dcID == "" {
+			logrus.Warningf("%d:Node %s fail,%v", i, nodes[i].ID, err)
 			continue
 		}
 
-		if s, ok := m[dc.ID]; ok {
-			m[dc.ID] = append(s, nodes[i])
+		if s, ok := dcMap[dcID]; ok {
+			dcMap[dcID] = append(s, nodes[i])
 		} else {
-			m[dc.ID] = []*node.Node{nodes[i]}
+			dcMap[dcID] = []*node.Node{nodes[i]}
 		}
+
+		logrus.Debugf("DC %s Append Node:%s,len=%d", dcID, nodes[i].Name, len(dcMap[dcID]))
 	}
 
-	logrus.Debugf("[MG]highAvailable:%v, num :%d ,m length:%d", highAvailable, num, len(m))
+	logrus.Debugf("[MG]highAvailable:%t, num :%d ,dcMap len=%d", highAvailable, num, len(dcMap))
 
-	//	if highAvailable && len(m) < 2 {
-	//		return nil, errors.New("Not Match")
-	//	}
+	if highAvailable && num > 1 && len(dcMap) < 2 {
+		return nil, errors.New("Not Enough Node For Match")
+	}
 
 	candidates := make([]*node.Node, num)
-	seq := 0
 
-	if len(m) >= num {
-		for _, v := range m {
-			candidates[seq] = v[0]
-
-			seq++
-			if seq >= num {
-				return candidates, nil
-			}
-		}
-
-	} else {
-
-		count := make(map[string]int)
-
-		for i := range nodes {
-			var dc *Datacenter = nil
-
-			if len(all) == 0 {
-				dc, err = gd.DatacenterByNode(nodes[i].ID)
-			} else {
-				for index := range all {
-					if nodes[i].ID == all[index].ID {
-						dc, err = gd.Datacenter(all[index].ClusterID)
-						break
-					}
-				}
-			}
-			if err != nil || dc == nil {
+	for index := 0; index < num; index++ {
+		for key, list := range dcMap {
+			if len(list) == 0 {
 				continue
 			}
-
-			if count[dc.ID] < num/2 {
-
-				candidates[seq] = nodes[i]
-
-				count[dc.ID]++
-				seq++
-				if seq >= num {
-					return candidates, nil
-				}
-			}
+			candidates[index] = list[0]
+			dcMap[key] = list[1:]
 		}
 	}
 
-	logrus.Debugf("[**MG**]SelectNodeByCluster end with Not Match ")
-	return nil, errors.New("Not Match")
+	return candidates, nil
 }
