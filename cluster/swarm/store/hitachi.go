@@ -66,13 +66,16 @@ func (h *hitachiStore) Insert() error {
 	return h.hs.Insert()
 }
 
-func (h *hitachiStore) Alloc(name, unit, vg string, size int) (string, string, error) {
+func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, database.LocalVolume, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
+	lun := database.LUN{}
+	lv := database.LocalVolume{}
+
 	out, err := h.Size()
 	if err != nil {
-		return "", "", err
+		return lun, lv, err
 	}
 
 	for key := range out {
@@ -83,36 +86,36 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (string, string, e
 
 	rg := maxIdleSizeRG(out)
 	if out[rg].Free < size {
-		return "", "", fmt.Errorf("Not Enough Space For Alloction,Max:%d < Need:%d", out[rg], size)
+		return lun, lv, fmt.Errorf("Not Enough Space For Alloction,Max:%d < Need:%d", out[rg], size)
 	}
 
 	used, err := database.SelectLunIDBySystemID(h.ID())
 	if err != nil {
-		return "", "", err
+		return lun, lv, err
 	}
 
 	ok, id := findIdleNum(h.hs.LunStart, h.hs.LunEnd, used)
 	if !ok {
-		return "", "", fmt.Errorf("No available LUN ID")
+		return lun, lv, fmt.Errorf("No available LUN ID")
 	}
 
 	path, err := utils.GetAbsolutePath(false, scriptPath, HITACHI, "create_lun.sh")
 	if err != nil {
-		return "", "", err
+		return lun, lv, err
 	}
 	param := []string{path, h.hs.AdminUnit,
 		strconv.Itoa(rg.StorageRGID), strconv.Itoa(id), strconv.Itoa(int(size))}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
-		return "", "", err
+		return lun, lv, err
 	}
 	output, err := cmd.Output()
 	if err != nil {
-		return "", "", fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return lun, lv, fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
 	}
 
-	lun := database.LUN{
+	lun = database.LUN{
 		ID:              utils.Generate64UUID(),
 		Name:            name,
 		VGName:          vg,
@@ -123,7 +126,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (string, string, e
 		CreatedAt:       time.Now(),
 	}
 
-	lv := database.LocalVolume{
+	lv = database.LocalVolume{
 		ID:         utils.Generate64UUID(),
 		Name:       name,
 		Size:       size,
@@ -135,10 +138,10 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (string, string, e
 
 	err = database.TxInsertLUNAndVolume(lun, lv)
 	if err != nil {
-		return "", "", err
+		return lun, lv, err
 	}
 
-	return lun.ID, lv.ID, nil
+	return lun, lv, nil
 }
 
 func (h *hitachiStore) Recycle(id string, lun int) error {

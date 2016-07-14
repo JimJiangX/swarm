@@ -185,14 +185,14 @@ type pendingAllocResource struct {
 	ports            []database.Port
 	networkings      []IPInfo
 	localStore       []database.LocalVolume
-	sanStore         []string
+	sanStore         []database.LUN
 }
 
 func newPendingAllocResource() *pendingAllocResource {
 	return &pendingAllocResource{
 		networkings: make([]IPInfo, 0, 2),
-		localStore:  make([]database.LocalVolume, 0, 2),
-		sanStore:    make([]string, 0, 2),
+		localStore:  make([]database.LocalVolume, 0, 5),
+		sanStore:    make([]database.LUN, 0, 2),
 	}
 }
 
@@ -274,8 +274,8 @@ func (gd *Gardener) Recycle(pendings []*pendingAllocResource) (err error) {
 			if err != nil || dc == nil || dc.storage == nil {
 				continue
 			}
-			dc.storage.DelMapping(lun)
-			dc.storage.Recycle(lun, 0)
+			dc.storage.DelMapping(lun.ID)
+			dc.storage.Recycle(lun.ID, 0)
 		}
 		gd.Lock()
 	}
@@ -341,13 +341,14 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 		}
 		vgName := penging.unit.Unit.Name + _SAN_VG
 
-		lunID, _, err := dc.storage.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
+		lun, lv, err := dc.storage.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
 		if err != nil {
 			return err
 		}
-		penging.sanStore = append(penging.sanStore, lunID)
+		penging.sanStore = append(penging.sanStore, lun)
+		penging.localStore = append(penging.localStore, lv)
 
-		err = dc.storage.Mapping(node.ID, vgName, lunID)
+		err = dc.storage.Mapping(node.ID, vgName, lun.ID)
 		if err != nil {
 			return err
 		}
@@ -392,7 +393,7 @@ type localVolume struct {
 type pendingAllocStore struct {
 	unit       *unit
 	localStore []localVolume
-	sanStore   []string
+	sanStore   []database.LUN
 }
 
 func localVolumeExtend(host string, lv localVolume) error {
@@ -430,8 +431,8 @@ func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
 			if err != nil || dc == nil || dc.storage == nil {
 				continue
 			}
-			dc.storage.DelMapping(lun)
-			dc.storage.Recycle(lun, 0)
+			dc.storage.DelMapping(lun.ID)
+			dc.storage.Recycle(lun.ID, 0)
 		}
 	}
 	gd.Unlock()
@@ -489,7 +490,7 @@ func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []struct
 	pending := &pendingAllocStore{
 		unit:       u,
 		localStore: make([]localVolume, 0, 3),
-		sanStore:   make([]string, 0, 3),
+		sanStore:   make([]database.LUN, 0, 3),
 	}
 	binds := make([]string, 0, len(need))
 
@@ -524,27 +525,19 @@ func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []struct
 		}
 		vgName := u.Name + _SAN_VG
 
-		lunID, lvID, err := dc.storage.Alloc(name, u.ID, vgName, need[d].Size)
+		lun, lv, err := dc.storage.Alloc(name, u.ID, vgName, need[d].Size)
 		if err != nil {
 			logrus.Errorf("SAN Store Alloc error:%s,%s", err, name)
 
 			return pending, binds, err
 		}
-		pending.sanStore = append(pending.sanStore, lunID)
-
-		lv, err := database.GetLocalVolume(lvID)
-		if err != nil {
-			logrus.Errorf("Get LocalVolume %s Error:%s", lvID, err)
-
-			return pending, binds, err
-		}
-
+		pending.sanStore = append(pending.sanStore, lun)
 		pending.localStore = append(pending.localStore, localVolume{
 			lv:   lv,
 			size: need[d].Size,
 		})
 
-		err = dc.storage.Mapping(node.ID, vgName, lunID)
+		err = dc.storage.Mapping(node.ID, vgName, lun.ID)
 		if err != nil {
 			return pending, binds, err
 		}

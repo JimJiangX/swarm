@@ -72,13 +72,16 @@ func (h *huaweiStore) Insert() error {
 	return err
 }
 
-func (h *huaweiStore) Alloc(name, unit, vg string, size int) (string, string, error) {
+func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, database.LocalVolume, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
+	lun := database.LUN{}
+	lv := database.LocalVolume{}
+
 	out, err := h.Size()
 	if err != nil {
-		return "", "", err
+		return lun, lv, err
 	}
 	for key := range out {
 		if !key.Enabled {
@@ -88,32 +91,32 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (string, string, er
 
 	rg := maxIdleSizeRG(out)
 	if out[rg].Free < size {
-		return "", "", fmt.Errorf("Not Enough Space For Alloction,Max:%d < Need:%d", out[rg], size)
+		return lun, lv, fmt.Errorf("Not Enough Space For Alloction,Max:%d < Need:%d", out[rg], size)
 	}
 
 	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "create_lun.sh")
 	if err != nil {
-		return "", "", err
+		return lun, lv, err
 	}
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password,
 		strconv.Itoa(rg.StorageRGID), name, strconv.Itoa(int(size))}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
-		return "", "", err
+		return lun, lv, err
 	}
 
 	output, err := cmd.Output()
 	if err != nil {
-		return "", "", fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return lun, lv, fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
 	}
 
 	storageLunID, err := strconv.Atoi(string(output))
 	if err != nil {
-		return "", "", err
+		return lun, lv, err
 	}
 
-	lun := database.LUN{
+	lun = database.LUN{
 		ID:              utils.Generate64UUID(),
 		Name:            name,
 		VGName:          vg,
@@ -124,7 +127,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (string, string, er
 		CreatedAt:       time.Now(),
 	}
 
-	lv := database.LocalVolume{
+	lv = database.LocalVolume{
 		ID:         utils.Generate64UUID(),
 		Name:       name,
 		Size:       size,
@@ -136,10 +139,10 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (string, string, er
 
 	err = database.TxInsertLUNAndVolume(lun, lv)
 	if err != nil {
-		return "", "", err
+		return lun, lv, err
 	}
 
-	return lun.ID, lv.ID, nil
+	return lun, lv, nil
 }
 
 func (h *huaweiStore) Recycle(id string, lun int) error {

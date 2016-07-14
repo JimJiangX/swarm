@@ -336,12 +336,7 @@ func createSanStoreageVG(host, lun string) error {
 	return sdk.SanVgCreate(addr, config)
 }
 
-func extendSanStoreageVG(host, lunID string) error {
-	lun, err := database.GetLUNByID(lunID)
-	if err != nil {
-		return fmt.Errorf("LUN:%s,ListLUNByName Error:%s", lunID, err)
-	}
-
+func extendSanStoreageVG(host string, lun database.LUN) error {
 	storage, err := store.GetStoreByID(lun.StorageSystemID)
 	if err != nil {
 		return err

@@ -1369,13 +1369,13 @@ func (gd *Gardener) serviceScale(svc *Service, scale structs.PostServiceScaledRe
 	}
 
 	for _, pending := range storePendings {
-		for _, lunID := range pending.sanStore {
+		for i := range pending.sanStore {
 			eng, err := pending.unit.getEngine()
 			if err != nil {
 				logrus.Errorf("%s %s", pending.unit.Name, err)
 				return err
 			}
-			err = extendSanStoreageVG(eng.IP, lunID)
+			err = extendSanStoreageVG(eng.IP, pending.sanStore[i])
 			if err != nil {
 				logrus.Errorf("extend SanStoreageVG error:%s", err)
 				return err
