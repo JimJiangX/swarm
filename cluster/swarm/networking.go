@@ -35,7 +35,7 @@ func NewNetworking(net database.Networking, ips []database.IP) (*Networking, err
 	networking := &Networking{
 		RWMutex:    new(sync.RWMutex),
 		Enable:     true,
-		Prefix:     int(ips[0].Prefix),
+		Prefix:     ips[0].Prefix,
 		Networking: net,
 	}
 
@@ -300,7 +300,7 @@ func (gd *Gardener) RemoveNetworking(ID string) error {
 		return err
 	}
 	if count > 0 {
-		return fmt.Errorf("networking %d is using")
+		return fmt.Errorf("networking %s is using", ID)
 	}
 
 	err = database.TxDeleteNetworking(ID)

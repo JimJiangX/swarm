@@ -213,7 +213,7 @@ func UpdateTaskStatus(task *Task, state int32, finishAt time.Time, msg string) e
 			return err
 		}
 
-		atomic.StoreInt32(&task.Status, int32(state))
+		atomic.StoreInt32(&task.Status, state)
 
 		return nil
 	}
@@ -223,7 +223,7 @@ func UpdateTaskStatus(task *Task, state int32, finishAt time.Time, msg string) e
 		return err
 	}
 
-	atomic.StoreInt32(&task.Status, int32(state))
+	atomic.StoreInt32(&task.Status, state)
 	task.FinishedAt = finishAt
 
 	return nil

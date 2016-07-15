@@ -29,14 +29,14 @@ func (gd *Gardener) ServiceToScheduler(svc *Service) error {
 	return nil
 }
 
-func (gd *Gardener) serviceScheduler() (err error) {
+func (gd *Gardener) serviceScheduler() {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("Recover From Panic:%v,Error:%v", r, err)
+			logrus.Errorf("Recover From Panic:%v", r)
 		}
 
 		debug.PrintStack()
-		logrus.Fatal("Service Scheduler Exit,%s", err)
+		logrus.Fatal("Service Scheduler Exit")
 	}()
 
 	for {
@@ -81,8 +81,7 @@ func (gd *Gardener) serviceScheduler() (err error) {
 			svc.pendingContainers[resourceAlloc[i].swarmID] = resourceAlloc[i].pendingContainer
 		}
 
-		err = createServiceResources(gd, resourceAlloc)
-		if err != nil {
+		if err := createServiceResources(gd, resourceAlloc); err != nil {
 			entry.Errorf("create Service Volumes Error:%s", err)
 			goto failure
 		}
@@ -101,8 +100,6 @@ func (gd *Gardener) serviceScheduler() (err error) {
 		dealWithSchedulerFailure(gd, svc, resourceAlloc)
 
 	}
-
-	return err
 }
 
 func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err error) {
@@ -288,7 +285,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 		unit := &unit{
 			Unit: database.Unit{
 				ID:            id,
-				Name:          string(id[:8]) + "_" + svcName,
+				Name:          id[:8] + "_" + svcName,
 				Type:          _type,
 				ServiceID:     svcID,
 				ImageID:       image.ID,

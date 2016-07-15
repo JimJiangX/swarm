@@ -84,11 +84,11 @@ func TestHITACHIStore(t *testing.T) {
 		t.Error(err)
 	}
 
-	id, lv, err := store.Alloc("test001", "unit001", "vgName001", 1<<20)
+	lun, lv, err := store.Alloc("test001", "unit001", "vgName001", 1<<20)
 	if err != nil {
 		t.Error(err)
 	}
-	t.Log(id, lv)
+	t.Log(lun, lv)
 
 	spaces, err = store.IdleSize()
 	if err != nil {
@@ -99,17 +99,17 @@ func TestHITACHIStore(t *testing.T) {
 		t.Log(key, val)
 	}
 
-	err = store.Mapping("node001", "vgName001", id)
+	err = store.Mapping("node001", "vgName001", lun.ID)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = store.DelMapping(id)
+	err = store.DelMapping(lun.ID)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = store.Recycle(id, 0)
+	err = store.Recycle(lun.ID, 0)
 	if err != nil {
 		t.Error(err)
 	}
@@ -172,11 +172,11 @@ func TestHUAWEIStore(t *testing.T) {
 		t.Error(err)
 	}
 
-	id, lv, err := store.Alloc("test001", "unit001", "vgName001", 1<<20)
+	lun, lv, err := store.Alloc("test001", "unit001", "vgName001", 1<<20)
 	if err != nil {
 		t.Error(err)
 	}
-	t.Log(id, lv)
+	t.Log(lun, lv)
 
 	spaces, err = store.IdleSize()
 	if err != nil {
@@ -187,17 +187,17 @@ func TestHUAWEIStore(t *testing.T) {
 		t.Log(key, val)
 	}
 
-	err = store.Mapping("node001", "vgName001", id)
+	err = store.Mapping("node001", "vgName001", lun.ID)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = store.DelMapping(id)
+	err = store.DelMapping(lun.ID)
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = store.Recycle(id, 0)
+	err = store.Recycle(lun.ID, 0)
 	if err != nil {
 		t.Error(err)
 	}

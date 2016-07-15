@@ -41,7 +41,7 @@ type Module struct {
 	Configures map[string]interface{} `json:",omitempty"`
 
 	Config           container.Config         `json:",omitempty"`
-	HostConfig       container.HostConfig     `json:"host_config",omitempty"`
+	HostConfig       container.HostConfig     `json:"host_config,omitempty"`
 	NetworkingConfig network.NetworkingConfig `json:"-"`
 }
 

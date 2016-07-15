@@ -620,7 +620,7 @@ func (svc *Service) handleScaleUp(gd *Gardener, _type string, updateConfig *cont
 	}
 
 	for _, u := range units {
-		if u.engine.Memory-u.engine.UsedMemory()-int64(updateConfig.Memory)+u.container.Config.HostConfig.Memory < 0 {
+		if u.engine.Memory-u.engine.UsedMemory()-updateConfig.Memory+u.container.Config.HostConfig.Memory < 0 {
 			return nil, fmt.Errorf("Engine %s:%s have not enough Memory for Container %s Update", u.engine.ID, u.engine.IP, u.Name)
 		}
 	}

@@ -239,7 +239,7 @@ func parsePushImageOutput(in string) (string, int, error) {
 		return "", 0, fmt.Errorf("Not Found ImageID,%s", in)
 	}
 
-	output := string(in[index:])
+	output := in[index:]
 
 	parts := strings.Split(output, " ")
 

@@ -961,7 +961,7 @@ func (svc *Service) initTopology() error {
 	case num > 2:
 		arch = _DB_Type_M_SB_SL
 	default:
-		return fmt.Errorf("get %d units by type:%d", num, _UpsqlType)
+		return fmt.Errorf("get %d units by type:'%s'", num, _UpsqlType)
 	}
 
 	dataNodes := make(map[string]swm_structs.DatabaseInfo, len(sqls))

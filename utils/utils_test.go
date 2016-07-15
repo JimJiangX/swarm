@@ -53,9 +53,9 @@ func TestIPToUint32(t *testing.T) {
 func TestUint32ToIP(t *testing.T) {
 	for i := range test {
 		got := Uint32ToIP(test[i].code)
-		if got.String() != test[i].ip {
-			t.Fatalf("%d [got:%v] != [want:%d]",
-				test[i].code, got, test[i].ip)
+		if str := got.String(); str != test[i].ip {
+			t.Fatalf("%d [got:%v] != [want:%s]",
+				test[i].code, str, test[i].ip)
 		}
 	}
 }

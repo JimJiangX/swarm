@@ -86,7 +86,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 
 	rg := maxIdleSizeRG(out)
 	if out[rg].Free < size {
-		return lun, lv, fmt.Errorf("Not Enough Space For Alloction,Max:%d < Need:%d", out[rg], size)
+		return lun, lv, fmt.Errorf("Not Enough Space For Alloction,Max:%d < Need:%d", out[rg].Free, size)
 	}
 
 	used, err := database.SelectLunIDBySystemID(h.ID())
@@ -104,7 +104,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 		return lun, lv, err
 	}
 	param := []string{path, h.hs.AdminUnit,
-		strconv.Itoa(rg.StorageRGID), strconv.Itoa(id), strconv.Itoa(int(size))}
+		strconv.Itoa(rg.StorageRGID), strconv.Itoa(id), strconv.Itoa(size)}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {

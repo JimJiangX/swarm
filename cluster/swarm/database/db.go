@@ -90,7 +90,7 @@ func SetupDB(c *cli.Context) error {
 func MustConnect(driver, source string) *sqlx.DB {
 	defaultDB = sqlx.MustConnect(driver, source)
 
-	driverName = driverName
+	driverName = driver
 	dbSource = source
 
 	return defaultDB
@@ -106,7 +106,7 @@ func Connect(driver, source string) (*sqlx.DB, error) {
 		return nil, errors.New("Connect returns nil *DB")
 	}
 
-	driverName = driverName
+	driverName = driver
 	dbSource = source
 	defaultDB = db
 

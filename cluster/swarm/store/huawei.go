@@ -91,7 +91,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 
 	rg := maxIdleSizeRG(out)
 	if out[rg].Free < size {
-		return lun, lv, fmt.Errorf("Not Enough Space For Alloction,Max:%d < Need:%d", out[rg], size)
+		return lun, lv, fmt.Errorf("Not Enough Space For Alloction,Max:%d < Need:%d", out[rg].Free, size)
 	}
 
 	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "create_lun.sh")
@@ -99,7 +99,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 		return lun, lv, err
 	}
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password,
-		strconv.Itoa(rg.StorageRGID), name, strconv.Itoa(int(size))}
+		strconv.Itoa(rg.StorageRGID), name, strconv.Itoa(size)}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {

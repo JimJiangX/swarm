@@ -22,7 +22,7 @@ func (ip IP) TableName() string {
 type Networking struct {
 	ID      string `db:"id"`
 	Type    string `db:"type"`
-	Gateway string `db"gateway"`
+	Gateway string `db:"gateway"`
 	Enabled bool   `db:"enabled"`
 }
 

@@ -20,20 +20,20 @@ func (gd *Gardener) ServiceToExecute(svc *Service) {
 	gd.serviceExecuteCh <- svc
 }
 
-func (gd *Gardener) serviceExecute() (err error) {
+func (gd *Gardener) serviceExecute() error {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("Recover From Panic:%v", r)
+			logrus.Errorf("Recover From Panic:%v", r)
 		}
 		debug.PrintStack()
 
-		logrus.Fatalf("Service Execute Exit,%s", err)
+		logrus.Fatal("Service Execute Exit")
 	}()
 
 	for {
 		svc := <-gd.serviceExecuteCh
 		svc.Lock()
-		err = svc.statusCAS(_StatusServiceAlloction, _StatusServiceCreating)
+		err := svc.statusCAS(_StatusServiceAlloction, _StatusServiceCreating)
 		if err != nil {
 			logrus.Error(err)
 			continue
@@ -90,7 +90,6 @@ func (gd *Gardener) serviceExecute() (err error) {
 		}
 	}
 
-	return err
 }
 
 func (gd *Gardener) RecreateAndStartService(nameOrID string) error {

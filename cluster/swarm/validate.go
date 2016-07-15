@@ -254,7 +254,7 @@ func ValidateIPAddress(prefix int, addrs ...string) error {
 	warns := make([]string, 0, len(addrs))
 
 	if prefix < 1 || prefix > 31 {
-		warns = append(warns, fmt.Sprintf("'%d' is out of range 1~32"))
+		warns = append(warns, fmt.Sprintf("'%d' is out of range 1~32", prefix))
 	}
 
 	for i := range addrs {
