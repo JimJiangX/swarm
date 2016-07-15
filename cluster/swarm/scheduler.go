@@ -216,9 +216,9 @@ func (gd *Gardener) schedulerPerModule(svc *Service, module structs.Module) ([]*
 	}
 
 	highAvaliable := svc.HighAvailable
-	if num := len(module.Clusters); num > 1 {
+	if length := len(module.Clusters); length > 1 {
 		highAvaliable = true
-	} else if num == 1 {
+	} else if length == 1 {
 		highAvaliable = false
 	}
 	for i := range module.Stores {

@@ -39,7 +39,7 @@ func (h hitachiStore) Vendor() string {
 }
 
 func (h hitachiStore) Driver() string {
-	return SAN_StoreDriver
+	return SANStoreDriver
 }
 
 func (h hitachiStore) Ping() error {
@@ -420,12 +420,10 @@ func (h *hitachiStore) AddSpace(id int) (Space, error) {
 
 	for i := range spaces {
 		if spaces[i].ID == id {
-
-			if err := insert(); err == nil {
+			if err = insert(); err == nil {
 				return spaces[i], nil
-			} else {
-				return Space{}, err
 			}
+			return Space{}, err
 		}
 	}
 

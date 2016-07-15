@@ -337,7 +337,7 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 	config *cluster.ContainerConfig, need []structs.DiskStorage, skipSAN bool) error {
 	dc, node, err := gd.GetNode(engine.ID)
 	if err != nil {
-		err := errors.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
+		err = errors.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
 		logrus.Error(err)
 
 		return err

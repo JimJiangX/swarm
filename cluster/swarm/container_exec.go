@@ -126,7 +126,7 @@ func getExecExitCode(ctx context.Context, cli client.APIClient, execID string) (
 	return resp, resp.ExitCode, nil
 }
 
-func holdHijackedConnection(ctx context.Context, tty bool, inputStream io.ReadCloser, outputStream, errorStream io.Writer, resp types.HijackedResponse) error {
+func holdHijackedConnection(ctx context.Context, tty bool, inputStream io.Reader, outputStream, errorStream io.Writer, resp types.HijackedResponse) error {
 	receiveStdout := make(chan error, 1)
 	if outputStream != nil || errorStream != nil {
 		go func() {

@@ -1148,7 +1148,7 @@ func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
 	wwn := eng.Labels[_SAN_HBA_WWN_Lable]
 	if strings.TrimSpace(wwn) != "" {
 		list := strings.Split(wwn, ",")
-		if dc.storage == nil || dc.storage.Driver() != store.SAN_StoreDriver {
+		if dc.storage == nil || dc.storage.Driver() != store.SANStoreDriver {
 			return nil
 		}
 

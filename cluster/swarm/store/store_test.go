@@ -52,8 +52,8 @@ func TestHITACHIStore(t *testing.T) {
 	if store.Vendor() != HITACHI {
 		t.Error("Unexpected,want %s got %s", HITACHI, store.Vendor())
 	}
-	if store.Driver() != SAN_StoreDriver {
-		t.Error("Unexpected,want %s got %s", SAN_StoreDriver, store.Driver())
+	if store.Driver() != SANStoreDriver {
+		t.Error("Unexpected,want %s got %s", SANStoreDriver, store.Driver())
 	}
 
 	size, err := store.AddSpace(0)
@@ -140,8 +140,8 @@ func TestHUAWEIStore(t *testing.T) {
 	if store.Vendor() != HUAWEI {
 		t.Error("Unexpected,want %s got %s", HUAWEI, store.Vendor())
 	}
-	if store.Driver() != SAN_StoreDriver {
-		t.Error("Unexpected,want %s got %s", SAN_StoreDriver, store.Driver())
+	if store.Driver() != SANStoreDriver {
+		t.Error("Unexpected,want %s got %s", SANStoreDriver, store.Driver())
 	}
 
 	size, err := store.AddSpace(0)
