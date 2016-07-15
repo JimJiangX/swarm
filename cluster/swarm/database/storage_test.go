@@ -13,9 +13,7 @@ func insertLUN(t *testing.T, lun LUN) error {
 		t.Fatal(err)
 	}
 
-	query := "INSERT INTO tb_lun (id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at) VALUES (:id,:name,:vg_name,:raid_group_id,:storage_system_id,:mapping_hostname,:size,:host_lun_id,:storage_lun_id,:created_at)"
-
-	_, err = db.NamedExec(query, &lun)
+	_, err = db.NamedExec(insertLUNQuery, &lun)
 	if err != nil {
 		t.Fatal(err)
 	}

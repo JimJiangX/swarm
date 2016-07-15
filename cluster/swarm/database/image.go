@@ -10,6 +10,8 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+const insertImageQuery = "INSERT INTO tb_image (enabled,id,name,version,docker_image_id,label,size,template_config_id,config_keysets,upload_at) VALUES (:enabled,:id,:name,:version,:docker_image_id,:label,:size,:template_config_id,:config_keysets,:upload_at)"
+
 type Image struct {
 	Enabled bool   `db:"enabled"`
 	ID      string `db:"id"`
@@ -38,9 +40,7 @@ func TxInsertImage(image Image, config UnitConfig) error {
 
 	image.ConfigKeySets, err = unitConfigEncode(config.KeySets)
 
-	query := "INSERT INTO tb_image (enabled,id,name,version,docker_image_id,label,size,template_config_id,config_keysets,upload_at) VALUES (:enabled,:id,:name,:version,:docker_image_id,:label,:size,:template_config_id,:config_keysets,:upload_at)"
-
-	_, err = tx.NamedExec(query, &image)
+	_, err = tx.NamedExec(insertImageQuery, &image)
 	if err != nil {
 		return err
 	}
@@ -122,6 +122,8 @@ func DeleteImage(ID string) error {
 
 	return err
 }
+
+const insertUnitConfigQuery = "INSERT INTO tb_unit_config (id,image_id,config_file_path,version,parent_id,content,created_at) VALUES (:id,:image_id,:config_file_path,:version,:parent_id,:content,:created_at)"
 
 type UnitConfig struct {
 	ID        string                  `db:"id"`
@@ -279,8 +281,7 @@ func ListUnitConfigByService(service string) ([]struct {
 }
 
 func TXInsertUnitConfig(tx *sqlx.Tx, config *UnitConfig) error {
-	query := "INSERT INTO tb_unit_config (id,image_id,config_file_path,version,parent_id,content,created_at) VALUES (:id,:image_id,:config_file_path,:version,:parent_id,:content,:created_at)"
-	_, err := tx.NamedExec(query, config)
+	_, err := tx.NamedExec(insertUnitConfigQuery, config)
 
 	return err
 }

@@ -60,6 +60,8 @@ func TxInsertMultiContainer(tx *sqlx.Tx, clist []*Container) error {
 }
 */
 
+const insertUnitQuery = "INSERT INTO tb_unit (id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,check_interval,created_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:node_id,:container_id,:unit_config_id,:network_mode,:status,:check_interval,:created_at)"
+
 type Unit struct {
 	ID          string `db:"id"`
 	Name        string `db:"name"` // <unit_id_8bit>_<service_name>
@@ -95,16 +97,13 @@ func GetUnit(nameOrID string) (Unit, error) {
 }
 
 func TxInsertUnit(tx *sqlx.Tx, unit Unit) error {
-	query := "INSERT INTO tb_unit (id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,check_interval,created_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:node_id,:container_id,:unit_config_id,:network_mode,:status,:check_interval,:created_at)"
-	_, err := tx.NamedExec(query, &unit)
+	_, err := tx.NamedExec(insertUnitQuery, &unit)
 
 	return err
 }
 
 func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
-	query := "INSERT INTO tb_unit (id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,check_interval,created_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:node_id,:container_id,:unit_config_id,:network_mode,:status,:check_interval,:created_at)"
-
-	stmt, err := tx.PrepareNamed(query)
+	stmt, err := tx.PrepareNamed(insertUnitQuery)
 	if err != nil {
 		return err
 	}
@@ -209,6 +208,8 @@ func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {
 	return nil
 }
 
+const insertServiceQuery = "INSERT INTO tb_service (id,name,description,architecture,business_code,auto_healing,auto_scaling,high_available,status,backup_max_size,backup_files_retention,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:business_code,:auto_healing,:auto_scaling,:high_available,:status,:backup_max_size,:backup_files_retention,:created_at,:finished_at)"
+
 type Service struct {
 	ID                string `db:"id"`
 	Name              string `db:"name"`
@@ -306,8 +307,7 @@ func TxSaveService(svc Service, strategy *BackupStrategy, task *Task, users []Us
 
 func txInsertSerivce(tx *sqlx.Tx, svc Service) error {
 	// insert into database
-	query := "INSERT INTO tb_service (id,name,description,architecture,business_code,auto_healing,auto_scaling,high_available,status,backup_max_size,backup_files_retention,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:business_code,:auto_healing,:auto_scaling,:high_available,:status,:backup_max_size,:backup_files_retention,:created_at,:finished_at)"
-	_, err := tx.NamedExec(query, &svc)
+	_, err := tx.NamedExec(insertServiceQuery, &svc)
 
 	return err
 }
@@ -383,6 +383,8 @@ func txDeleteService(tx *sqlx.Tx, nameOrID string) error {
 
 	return err
 }
+
+const insertUserQuery = "INSERT INTO tb_users (id,service_id,type,username,password,role,permission,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:permission,:created_at)"
 
 type User struct {
 	ID         string    `db:"id"`
@@ -472,9 +474,7 @@ func TxInsertUsers(users []User) error {
 }
 
 func txInsertUsers(tx *sqlx.Tx, users []User) error {
-	query := "INSERT INTO tb_users (id,service_id,type,username,password,role,permission,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:permission,:created_at)"
-
-	stmt, err := tx.PrepareNamed(query)
+	stmt, err := tx.PrepareNamed(insertUserQuery)
 	if err != nil {
 		return err
 	}

@@ -10,6 +10,8 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+const insertTaskQuery = "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,created_at,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:finished_at)"
+
 type Task struct {
 	ID string `db:"id"`
 	//	Name        string        `db:"name"`
@@ -27,6 +29,8 @@ type Task struct {
 func (t Task) TableName() string {
 	return "tb_task"
 }
+
+const insertBackupFileQuery = "INSERT INTO tb_backup_files (id,task_id,strategy_id,unit_id,type,path,size,retention,created_at,finished_at) VALUES (:id,:task_id,:strategy_id,:unit_id,:type,:path,:size,:retention,:created_at,:finished_at)"
 
 type BackupFile struct {
 	ID         string    `db:"id"`
@@ -87,8 +91,7 @@ func GetBackupFile(id string) (BackupFile, error) {
 }
 
 func txInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
-	query := "INSERT INTO tb_backup_files (id,task_id,strategy_id,unit_id,type,path,size,retention,created_at,finished_at) VALUES (:id,:task_id,:strategy_id,:unit_id,:type,:path,:size,:retention,:created_at,:finished_at)"
-	_, err := tx.NamedExec(query, &bf)
+	_, err := tx.NamedExec(insertBackupFileQuery, &bf)
 
 	return err
 }
@@ -111,25 +114,20 @@ func (task Task) Insert() error {
 	if err != nil {
 		return err
 	}
-	query := "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,created_at,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:finished_at)"
 
-	_, err = db.NamedExec(query, &task)
+	_, err = db.NamedExec(insertTaskQuery, &task)
 
 	return err
 }
 
 func TxInsertTask(tx *sqlx.Tx, t Task) error {
-	query := "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,created_at,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:finished_at)"
-
-	_, err := tx.NamedExec(query, &t)
+	_, err := tx.NamedExec(insertTaskQuery, &t)
 
 	return err
 }
 
 func TxInsertMultiTask(tx *sqlx.Tx, tasks []*Task) error {
-	query := "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,created_at,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:finished_at)"
-
-	stmt, err := tx.PrepareNamed(query)
+	stmt, err := tx.PrepareNamed(insertTaskQuery)
 	if err != nil {
 		return err
 	}
@@ -308,6 +306,8 @@ func DeleteTask(id string) error {
 	return err
 }
 
+const insertBackupStrategyQuery = "INSERT INTO tb_backup_strategy (id,name,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:name,:type,:service_id,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
+
 type BackupStrategy struct {
 	ID        string    `db:"id"`
 	Name      string    `db:"name"`
@@ -409,8 +409,7 @@ func txDeleteBackupStrategy(tx *sqlx.Tx, id string) error {
 }
 
 func TxInsertBackupStrategy(tx *sqlx.Tx, strategy BackupStrategy) error {
-	query := "INSERT INTO tb_backup_strategy (id,name,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:name,:type,:service_id,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
-	_, err := tx.NamedExec(query, &strategy)
+	_, err := tx.NamedExec(insertBackupStrategyQuery, &strategy)
 
 	return err
 }
@@ -440,8 +439,7 @@ func InsertBackupStrategy(strategy BackupStrategy) error {
 	if err != nil {
 		return err
 	}
-	query := "INSERT INTO tb_backup_strategy (id,name,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:name,:type,:service_id,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
-	_, err = db.NamedExec(query, &strategy)
+	_, err = db.NamedExec(insertBackupStrategyQuery, &strategy)
 
 	return err
 }

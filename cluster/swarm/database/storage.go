@@ -6,6 +6,8 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+const insertLUNQuery = "INSERT INTO tb_lun (id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at) VALUES (:id,:name,:vg_name,:raid_group_id,:storage_system_id,:mapping_hostname,:size,:host_lun_id,:storage_lun_id,:created_at)"
+
 type LUN struct {
 	ID              string    `db:"id"`
 	Name            string    `db:"name"`
@@ -30,15 +32,12 @@ func TxInsertLUNAndVolume(lun LUN, lv LocalVolume) error {
 	}
 	defer tx.Rollback()
 
-	query := "INSERT INTO tb_lun (id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at) VALUES (:id,:name,:vg_name,:raid_group_id,:storage_system_id,:mapping_hostname,:size,:host_lun_id,:storage_lun_id,:created_at)"
-
-	_, err = tx.NamedExec(query, &lun)
+	_, err = tx.NamedExec(insertLUNQuery, &lun)
 	if err != nil {
 		return err
 	}
 
-	lvquery := "INSERT INTO tb_volumes (id,name,unit_id,size,VGname,driver,fstype) VALUES (:id,:name,:unit_id,:size,:VGname,:driver,:fstype)"
-	_, err = tx.NamedExec(lvquery, &lv)
+	_, err = tx.NamedExec(insertLocalVolumeQuery, &lv)
 	if err != nil {
 		return err
 	}
@@ -199,6 +198,8 @@ func SelectLunIDBySystemID(id string) ([]int, error) {
 	return out, err
 }
 
+const insertRaidGroupQuery = "INSERT INTO tb_raid_group (id,storage_system_id,storage_rg_id,enabled) VALUES (:id,:storage_system_id,:storage_rg_id,:enabled)"
+
 type RaidGroup struct {
 	ID          string `db:"id"`
 	StorageID   string `db:"storage_system_id"`
@@ -216,9 +217,7 @@ func (rg RaidGroup) Insert() error {
 		return err
 	}
 
-	query := "INSERT INTO tb_raid_group (id,storage_system_id,storage_rg_id,enabled) VALUES (:id,:storage_system_id,:storage_rg_id,:enabled)"
-
-	_, err = db.NamedExec(query, &rg)
+	_, err = db.NamedExec(insertRaidGroupQuery, &rg)
 
 	return err
 }
@@ -288,6 +287,8 @@ func DeleteRaidGroup(id string, rg int) error {
 	return err
 }
 
+const insertHitachiStorageQuery = "INSERT INTO tb_storage_HITACHI (id,vendor,admin_unit,lun_start,lun_end,hlu_start,hlu_end) VALUES (:id,:vendor,:admin_unit,:lun_start,:lun_end,:hlu_start,:hlu_end)"
+
 type HitachiStorage struct {
 	ID        string `db:"id"`
 	Vendor    string `db:"vendor"`
@@ -308,11 +309,12 @@ func (hs HitachiStorage) Insert() error {
 		return err
 	}
 
-	query := "INSERT INTO tb_storage_HITACHI (id,vendor,admin_unit,lun_start,lun_end,hlu_start,hlu_end) VALUES (:id,:vendor,:admin_unit,:lun_start,:lun_end,:hlu_start,:hlu_end)"
-	_, err = db.NamedExec(query, &hs)
+	_, err = db.NamedExec(insertHitachiStorageQuery, &hs)
 
 	return err
 }
+
+const insertHuaweiStorageQuery = "INSERT INTO tb_storage_HUAWEI (id,vendor,ip_addr,username,password,hlu_start,hlu_end) VALUES (:id,:vendor,:ip_addr,:username,:password,:hlu_start,:hlu_end)"
 
 type HuaweiStorage struct {
 	ID       string `db:"id"`
@@ -334,11 +336,12 @@ func (hs HuaweiStorage) Insert() error {
 		return err
 	}
 
-	query := "INSERT INTO tb_storage_HUAWEI (id,vendor,ip_addr,username,password,hlu_start,hlu_end) VALUES (:id,:vendor,:ip_addr,:username,:password,:hlu_start,:hlu_end)"
-	_, err = db.NamedExec(query, &hs)
+	_, err = db.NamedExec(insertHuaweiStorageQuery, &hs)
 
 	return err
 }
+
+const insertLocalVolumeQuery = "INSERT INTO tb_volumes (id,name,unit_id,size,VGname,driver,fstype) VALUES (:id,:name,:unit_id,:size,:VGname,:driver,:fstype)"
 
 type LocalVolume struct {
 	Size       int    `db:"size"`
@@ -360,8 +363,7 @@ func InsertLocalVolume(lv LocalVolume) error {
 		return err
 	}
 
-	query := "INSERT INTO tb_volumes (id,name,unit_id,size,VGname,driver,fstype) VALUES (:id,:name,:unit_id,:size,:VGname,:driver,:fstype)"
-	_, err = db.NamedExec(query, &lv)
+	_, err = db.NamedExec(insertLocalVolumeQuery, &lv)
 
 	return err
 }

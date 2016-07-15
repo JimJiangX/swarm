@@ -7,6 +7,8 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+const insertIPQuery = "INSERT INTO tb_ip (ip_addr,prefix,networking_id,unit_id,allocated) VALUES (:ip_addr,:prefix,:networking_id,:unit_id,:allocated)"
+
 type IP struct {
 	IPAddr       uint32 `db:"ip_addr"`
 	Prefix       int    `db:"prefix"`
@@ -19,6 +21,8 @@ func (ip IP) TableName() string {
 	return "tb_ip"
 }
 
+const insertNetworkingQuery = "INSERT INTO tb_networking (id,type,gateway,enabled) VALUES (:id,:type,:gateway,:enabled)"
+
 type Networking struct {
 	ID      string `db:"id"`
 	Type    string `db:"type"`
@@ -29,6 +33,8 @@ type Networking struct {
 func (net Networking) TableName() string {
 	return "tb_networking"
 }
+
+const insertPortQuery = "INSERT INTO tb_port (port,name,unit_id,unit_name,proto,allocated) VALUES (:port,:name,:unit_id,:unit_name,:proto,:allocated)"
 
 type Port struct {
 	Port      int    `db:"port"`
@@ -161,9 +167,7 @@ loop:
 }
 
 func TxInsertPorts(tx *sqlx.Tx, ports []Port) error {
-	query := "INSERT INTO tb_port (port,name,unit_id,unit_name,proto,allocated) VALUES (:port,:name,:unit_id,:unit_name,:proto,:allocated)"
-
-	stmt, err := tx.PrepareNamed(query)
+	stmt, err := tx.PrepareNamed(insertPortQuery)
 	if err != nil {
 		return err
 	}
@@ -389,8 +393,7 @@ func txInsertNetworking(net Networking, ips []IP) error {
 	}
 	defer tx.Rollback()
 
-	query := "INSERT INTO tb_ip (ip_addr,prefix,networking_id,unit_id,allocated) VALUES (:ip_addr,:prefix,:networking_id,:unit_id,:allocated)"
-	stmt, err := tx.PrepareNamed(query)
+	stmt, err := tx.PrepareNamed(insertIPQuery)
 	if err != nil {
 		return err
 	}
@@ -406,8 +409,7 @@ func txInsertNetworking(net Networking, ips []IP) error {
 
 	stmt.Close()
 
-	query = "INSERT INTO tb_networking (id,type,gateway,enabled) VALUES (:id,:type,:gateway,:enabled)"
-	_, err = tx.NamedExec(query, &net)
+	_, err = tx.NamedExec(insertNetworkingQuery, &net)
 	if err != nil {
 		return err
 	}

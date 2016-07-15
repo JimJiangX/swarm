@@ -113,8 +113,7 @@ func (n Node) Insert() error {
 	}
 
 	// insert into database
-	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
-	_, err = db.NamedExec(query, &n)
+	_, err = db.NamedExec(insertNodeQuery, &n)
 
 	return err
 }

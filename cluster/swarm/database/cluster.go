@@ -7,6 +7,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const insertClusterQuery = "INSERT INTO tb_cluster (id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit) VALUES (:id,:name,:type,:storage_id,:storage_type,:networking_id,:enabled,:max_node,:usage_limit)"
+
 type Cluster struct {
 	ID           string  `db:"id"`
 	Name         string  `db:"name"`
@@ -30,8 +32,7 @@ func (c Cluster) Insert() error {
 	}
 
 	// insert into database
-	query := "INSERT INTO tb_cluster (id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit) VALUES (:id,:name,:type,:storage_id,:storage_type,:networking_id,:enabled,:max_node,:usage_limit)"
-	_, err = db.NamedExec(query, &c)
+	_, err = db.NamedExec(insertClusterQuery, &c)
 	if err == nil {
 		return nil
 	}
@@ -41,7 +42,7 @@ func (c Cluster) Insert() error {
 		return err
 	}
 
-	_, err = db.NamedExec(query, &c)
+	_, err = db.NamedExec(insertClusterQuery, &c)
 	if err == nil {
 		return nil
 	}
@@ -215,6 +216,8 @@ func CountClusterByStorage(storageID string) (int, error) {
 	return 0, errors.Wrap(err, "Count Cluster By storage_id:"+storageID)
 }
 
+const insertNodeQuery = "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
+
 type Node struct {
 	ID           string `db:"id"`
 	Name         string `db:"name"`
@@ -242,9 +245,7 @@ func TxInsertMultiNodeAndTask(nodes []*Node, tasks []*Task) error {
 	defer tx.Rollback()
 
 	// insert into database
-	query := "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
-
-	stmt, err := tx.PrepareNamed(query)
+	stmt, err := tx.PrepareNamed(insertNodeQuery)
 	if err != nil {
 		return err
 	}
