@@ -813,30 +813,6 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 	return task.ID, t.Run()
 }
 
-func filterLocalVolumes(unitID string, old []database.LocalVolume) ([]database.LocalVolume, error) {
-	lvs, err := database.SelectVolumesByUnitID(unitID)
-	if err != nil {
-		logrus.Error("SelectVolumesByUnitID %s error,%s", unitID, err)
-		return nil, err
-	}
-
-	out := make([]database.LocalVolume, 0, len(lvs))
-	for i := range lvs {
-		exist := false
-		for j := range old {
-			if lvs[i].ID == old[j].ID {
-				exist = true
-				break
-			}
-		}
-		if !exist {
-			out = append(out, lvs[i])
-		}
-	}
-
-	return out, err
-}
-
 func registerToServers(u *unit, svc *Service, sys database.Configurations) error {
 	logrus.Debug("[MG]registerServices")
 	if err := registerHealthCheck(u, sys.ConsulConfig, svc); err != nil {

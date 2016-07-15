@@ -72,7 +72,7 @@ func (gd *Gardener) RemoveImage(id string) error {
 
 	_, err = gd.RemoveImages(id, false)
 
-	return nil
+	return err
 }
 
 // key is case sensitive,converte to lowcase

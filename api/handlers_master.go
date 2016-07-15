@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"path"
 	"sort"
@@ -826,48 +825,6 @@ func getUnitNetworking(id string) ([]struct {
 	return networkings, ports
 }
 
-func getContainerJSON2(name string, container *cluster.Container) ([]byte, error) {
-	if container == nil {
-		return nil, fmt.Errorf("No such container %s", name)
-	}
-
-	if !container.Engine.IsHealthy() {
-		return nil, fmt.Errorf("Container %s running on unhealthy node %s", name, container.Engine.Name)
-	}
-
-	client, scheme, err := container.Engine.HTTPClientAndScheme()
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := client.Get(scheme + "://" + container.Engine.Addr + "/containers/" + container.ID + "/json")
-	container.Engine.CheckConnectionErr(err)
-	if err != nil {
-		return nil, err
-	}
-
-	// cleanup
-	defer resp.Body.Close()
-
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	n, err := json.Marshal(container.Engine)
-	if err != nil {
-		return nil, err
-	}
-
-	// insert Node field
-	data = bytes.Replace(data, []byte("\"Name\":\"/"), []byte(fmt.Sprintf("\"Node\":%s,\"Name\":\"/", n)), -1)
-
-	// insert node IP
-	data = bytes.Replace(data, []byte("\"HostIp\":\"0.0.0.0\""), []byte(fmt.Sprintf("\"HostIp\":%q", container.Engine.IP)), -1)
-
-	return data, nil
-}
-
 // GET /services/{name}/users
 func getServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
@@ -1260,14 +1217,6 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(w, "{%q:%q}", "ID", cluster.ID)
-}
-
-func floatValueOrZero(r *http.Request, k string) float64 {
-	val, err := strconv.ParseFloat(r.FormValue(k), 64)
-	if err != nil {
-		return 0
-	}
-	return val
 }
 
 // POST /clusters/{name}/update

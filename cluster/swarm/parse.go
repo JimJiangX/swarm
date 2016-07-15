@@ -7,32 +7,10 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/types/container"
-	"github.com/docker/engine-api/types/network"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/utils"
 )
-
-func defaultContainerConfig() *cluster.ContainerConfig {
-	return &cluster.ContainerConfig{
-
-		Config: container.Config{
-			AttachStdout: true,
-			AttachStderr: true,
-			ExposedPorts: make(map[nat.Port]struct{}),
-			Env:          make([]string, 0, 5),
-			Cmd:          make([]string, 0, 5),
-			Volumes:      make(map[string]struct{}),
-			Labels:       make(map[string]string),
-		},
-		HostConfig: container.HostConfig{
-			Binds:         make([]string, 0, 5),
-			NetworkMode:   "default",
-			RestartPolicy: container.RestartPolicy{Name: "no"},
-		},
-		NetworkingConfig: network.NetworkingConfig{},
-	}
-}
 
 func buildContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerConfig {
 	// TODO: make sure later
