@@ -25,6 +25,7 @@ type TaskResponse struct {
 	Errors      string `json:"errors"`
 	Timeout     int    `json:"timeout"` // s
 	Status      int    `json:"status"`
+	Timestamp   int64  `json:"timestamp"`
 	CreatedAt   string `json:"created_at"`
 	FinishedAt  string `json:"finished_at"`
 }

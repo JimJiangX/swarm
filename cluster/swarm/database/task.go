@@ -8,9 +8,10 @@ import (
 
 	"github.com/docker/swarm/utils"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 )
 
-const insertTaskQuery = "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,created_at,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:finished_at)"
+const insertTaskQuery = "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
 
 type Task struct {
 	ID string `db:"id"`
@@ -20,8 +21,9 @@ type Task struct {
 	Description string    `db:"description"`
 	Labels      string    `db:"labels"`
 	Errors      string    `db:"errors"`
-	Timeout     int       `db:"timeout"` // s
 	Status      int32     `db:"status"`
+	Timeout     int       `db:"timeout"`   // s
+	Timestamp   int64     `db:"timestamp"` // time.Time.Unix()
 	CreatedAt   time.Time `db:"created_at"`
 	FinishedAt  time.Time `db:"finished_at"`
 }
@@ -115,12 +117,16 @@ func (task Task) Insert() error {
 		return err
 	}
 
+	task.Timestamp = task.CreatedAt.Unix()
+
 	_, err = db.NamedExec(insertTaskQuery, &task)
 
 	return err
 }
 
 func TxInsertTask(tx *sqlx.Tx, t Task) error {
+
+	t.Timestamp = t.CreatedAt.Unix()
 	_, err := tx.NamedExec(insertTaskQuery, &t)
 
 	return err
@@ -136,6 +142,8 @@ func TxInsertMultiTask(tx *sqlx.Tx, tasks []*Task) error {
 		if tasks[i] == nil {
 			continue
 		}
+
+		tasks[i].Timestamp = tasks[i].CreatedAt.Unix()
 
 		_, err = stmt.Exec(tasks[i])
 		if err != nil {
@@ -291,6 +299,42 @@ func ListTaskByRelated(related string) ([]Task, error) {
 
 	list := make([]Task, 0, 50)
 	err = db.Select(&list, "SELECT * FROM tb_task WHERE related=?", related)
+
+	return list, err
+}
+
+func ListTaskByTimestamp(begin, end time.Time) ([]Task, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	var list []Task
+	query := "SELECT * FROM tb_task"
+	min, max := begin.Unix(), end.Unix()
+
+	if begin.IsZero() && !end.IsZero() {
+
+		query = "SELECT * FROM tb_task WHERE timestamp<?" //max
+		err = db.Select(&list, query, max)
+
+	} else if !begin.IsZero() && end.IsZero() {
+
+		query = "SELECT * FROM tb_task WHERE timestamp>=?" //min
+		err = db.Select(&list, query, min)
+
+	} else if !begin.IsZero() && !end.IsZero() {
+
+		query = "SELECT * FROM tb_task WHERE timestamp>=? AND timestamp<?" //max
+		err = db.Select(&list, query, min, max)
+
+	} else {
+		err = db.Select(&list, query)
+	}
+
+	if err != nil {
+		err = errors.Wrapf(err, "Select Task By Timestamp,begin=%s,end=%s", begin, end)
+	}
 
 	return list, err
 }

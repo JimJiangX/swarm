@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 )
 
 const insertLUNQuery = "INSERT INTO tb_lun (id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at) VALUES (:id,:name,:vg_name,:raid_group_id,:storage_system_id,:mapping_hostname,:size,:host_lun_id,:storage_lun_id,:created_at)"
@@ -400,6 +401,31 @@ func TxDeleteVolume(tx *sqlx.Tx, nameOrID string) error {
 	_, err := tx.Exec("DELETE FROM tb_volumes WHERE id=? OR name=? OR unit_id=?", nameOrID, nameOrID, nameOrID)
 
 	return err
+}
+
+func TxDeleteVolumes(volumes []LocalVolume) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	stmt, err := tx.Preparex("DELETE FROM tb_volumes WHERE id=?")
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+
+	for i := range volumes {
+		_, err = stmt.Exec(volumes[i].ID)
+		if err != nil {
+			return errors.Wrap(err, "delete volumes:"+volumes[i].ID)
+		}
+	}
+
+	return nil
 }
 
 func GetLocalVolume(nameOrID string) (LocalVolume, error) {

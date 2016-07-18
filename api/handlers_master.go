@@ -1062,6 +1062,7 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	var tasks []database.Task
 	withCondition := false
+
 	if v, ok := r.Form["status"]; ok {
 		if len(v) == 0 {
 			httpError(w, r.URL.String(), http.StatusBadRequest)
@@ -1085,12 +1086,43 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		tasks, err = database.ListTaskByRelated(key[0])
 		withCondition = true
 	}
-	if err == nil && !withCondition {
-		tasks, err = database.ListTask()
+
+	var begin, end time.Time
+	if key, ok := r.Form["begin"]; ok {
+		if len(key) == 0 {
+			httpError(w, r.URL.String(), http.StatusBadRequest)
+			return
+		}
+		begin, err = time.Parse(time.RFC3339, key[0])
+		if err != nil {
+			httpError(w, r.URL.String(), http.StatusBadRequest)
+			return
+		}
 	}
+
+	if key, ok := r.Form["end"]; ok {
+		if len(key) == 0 {
+			httpError(w, r.URL.String(), http.StatusBadRequest)
+			return
+		}
+		end, err = time.Parse(time.RFC3339, key[0])
+		if err != nil {
+			httpError(w, r.URL.String(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	if !begin.IsZero() || !end.IsZero() {
+		withCondition = true
+		tasks, err = database.ListTaskByTimestamp(begin, end)
+	}
+
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if !withCondition {
+		tasks, err = database.ListTask()
 	}
 
 	resp := make([]structs.TaskResponse, len(tasks))
@@ -1104,6 +1136,7 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			Errors:      tasks[i].Errors,
 			Timeout:     tasks[i].Timeout,
 			Status:      int(tasks[i].Status),
+			Timestamp:   tasks[i].Timestamp,
 			CreatedAt:   utils.TimeToString(tasks[i].CreatedAt),
 			FinishedAt:  utils.TimeToString(tasks[i].FinishedAt),
 		}
