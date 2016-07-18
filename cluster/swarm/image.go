@@ -172,7 +172,7 @@ func LoadImage(req structs.PostLoadImageRequest) (string, string, error) {
 		return err
 	}
 
-	task := database.NewTask("load image", _imageID, "", nil, 0)
+	task := database.NewTask(_Image_Load_Task, _imageID, "", nil, 0)
 	t := NewAsyncTask(context.Background(), background, task.Insert, task.UpdateStatus, 0)
 
 	return _imageID, task.ID, t.Run()

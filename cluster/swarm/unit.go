@@ -925,7 +925,7 @@ func (gd *Gardener) RestoreUnit(nameOrID, source string) (string, error) {
 		return err
 	}
 
-	task := database.NewTask("Unit restore", unit.ID, "", nil, 0)
+	task := database.NewTask(_Unit_Restore_Task, unit.ID, "", nil, 0)
 	t := NewAsyncTask(context.Background(), background, task.Insert, task.UpdateStatus, 0)
 
 	return task.ID, t.Run()

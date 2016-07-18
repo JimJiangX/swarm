@@ -110,6 +110,8 @@ func resetContainerConfig(config *cluster.ContainerConfig, hostConfig *ctypes.Ho
 		clone.HostConfig.CpusetCpus = strconv.FormatInt(ncpu, 10)
 	}
 
+	clone.HostConfig.Binds = make([]string, 0, 5)
+
 	return clone, nil
 }
 
@@ -223,7 +225,6 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		pending.unit = u
 		pending.engine = engine
-		config.HostConfig.Binds = make([]string, 0, 5)
 
 		err = gd.allocStorage(pending, engine, config, module.Stores, true)
 		if err != nil {
@@ -233,7 +234,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		swarmID := gd.generateUniqueID()
 		config.SetSwarmID(swarmID)
 		gd.pendingContainers[swarmID] = &pendingContainer{
-			Name:   swarmID,
+			Name:   u.Name,
 			Config: config,
 			Engine: engine,
 		}
@@ -262,7 +263,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		container, err := engine.Create(config, swarmID, false, authConfig)
+		container, err := engine.Create(config, u.Name, false, authConfig)
 		if err != nil {
 			return err
 		}
@@ -278,11 +279,6 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 		err = cleanOldContainer(u.ID, oldContainer, oldLVs, *sys)
-		if err != nil {
-			return err
-		}
-
-		err = engine.RenameContainer(container, u.Name)
 		if err != nil {
 			return err
 		}
@@ -324,7 +320,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		return nil
 	}
 
-	task := database.NewTask("Unit migrate", u.ID, "", nil, 0)
+	task := database.NewTask(_Unit_Migrate_Task, u.ID, "", nil, 0)
 
 	t := NewAsyncTask(context.Background(), background, task.Insert, task.UpdateStatus, 0)
 
@@ -678,6 +674,11 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 		}()
 
+		sys, err := database.GetSystemConfig()
+		if err != nil {
+			return err
+		}
+
 		cpuset, err := gd.allocCPUs(engine, config.HostConfig.CpusetCpus)
 		if err != nil {
 			logrus.Errorf("Alloc CPU '%s' Error:%s", config.HostConfig.CpusetCpus, err)
@@ -685,43 +686,55 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		}
 		config.HostConfig.CpusetCpus = cpuset
 
-		err = stopOldContainer(svc, u)
-		if err != nil {
-			return err
-		}
-
 		oldLVs, lunMap, lunSlice, err := listOldVolumes(u.ID)
 		if err != nil {
 			return err
 		}
-		// deactivate
-		// del mapping
-		if len(lunMap) > 0 {
-			err = sanDeactivateAndDelMapping(dc.storage, u, lunMap, lunSlice)
-			if err != nil {
-				return err
-			}
-		}
-		// recycle lun
-		for i := range lunSlice {
-			err := dc.storage.Recycle(lunSlice[i].ID, 0)
-			if err != nil {
-				logrus.Error(err)
-			}
-		}
 
-		// clean local volumes
-		for i := range oldLVs {
-			err := original.localStore.Recycle(oldLVs[i].ID)
+		defer func() {
+			if err != nil {
+				return
+			}
+			err = stopOldContainer(svc, u)
 			if err != nil {
 				logrus.Error(err)
 			}
-		}
+
+			// deactivate
+			// del mapping
+			if len(lunMap) > 0 {
+				err = sanDeactivateAndDelMapping(dc.storage, u, lunMap, lunSlice)
+				if err != nil {
+					logrus.Error(err)
+				}
+			}
+			// recycle lun
+			for i := range lunSlice {
+				err := dc.storage.Recycle(lunSlice[i].ID, 0)
+				if err != nil {
+					logrus.Error(err)
+				}
+			}
+
+			// clean local volumes
+			for i := range oldLVs {
+				err := original.localStore.Recycle(oldLVs[i].ID)
+				if err != nil {
+					logrus.Error(err)
+				}
+			}
+
+			err = cleanOldContainer(u.ID, oldContainer, oldLVs, *sys)
+			if err != nil {
+				logrus.Error(err)
+			}
+
+			// clean database
+		}()
 
 		pending.unit = u
 		pending.engine = engine
 
-		config.HostConfig.Binds = make([]string, 0, 5)
 		err = gd.allocStorage(pending, engine, config, module.Stores, false)
 		if err != nil {
 			return err
@@ -730,7 +743,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		swarmID := gd.generateUniqueID()
 		config.SetSwarmID(swarmID)
 		gd.pendingContainers[swarmID] = &pendingContainer{
-			Name:   swarmID,
+			Name:   u.Name,
 			Config: config,
 			Engine: engine,
 		}
@@ -751,27 +764,13 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		container, err := engine.Create(config, swarmID, false, authConfig)
+		container, err := engine.Create(config, u.Name, false, authConfig)
 		if err != nil {
 			return err
 		}
 		delete(gd.pendingContainers, swarmID)
 
 		err = startUnit(engine, container.ID, u, pending.localStore)
-		if err != nil {
-			return err
-		}
-
-		sys, err := database.GetSystemConfig()
-		if err != nil {
-			return err
-		}
-		err = cleanOldContainer(u.ID, oldContainer, oldLVs, *sys)
-		if err != nil {
-			return err
-		}
-
-		err = engine.RenameContainer(container, u.Name)
 		if err != nil {
 			return err
 		}
@@ -806,7 +805,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		return err
 	}
 
-	task := database.NewTask("Unit rebuild", u.ID, "", nil, 0)
+	task := database.NewTask(_Unit_Rebuild_Task, u.ID, "", nil, 0)
 
 	t := NewAsyncTask(context.Background(), background, task.Insert, task.UpdateStatus, 0)
 

@@ -101,7 +101,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 	service.Lock()
 	defer service.Unlock()
 
-	task := database.NewTask("service", svc.ID, "create service", nil, 0)
+	task := database.NewTask(_Service_Create_Task, svc.ID, "create service", nil, 0)
 	service.task = &task
 
 	service.backup = strategy
@@ -1265,7 +1265,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 		CreatedAt: now,
 	}
 
-	task := database.NewTask("backup_strategy", strategy.ID, "", nil, strategy.Timeout)
+	task := database.NewTask(_Backup_Manual_Task, strategy.ID, "", nil, strategy.Timeout)
 	task.Status = _StatusTaskCreate
 	err = database.TxInsertBackupStrategyAndTask(strategy, task)
 	if err != nil {
