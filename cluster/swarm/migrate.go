@@ -233,11 +233,13 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		swarmID := gd.generateUniqueID()
 		config.SetSwarmID(swarmID)
-		gd.pendingContainers[swarmID] = &pendingContainer{
+		pending.pendingContainer = &pendingContainer{
 			Name:   u.Name,
 			Config: config,
 			Engine: engine,
 		}
+
+		gd.pendingContainers[swarmID] = pending.pendingContainer
 
 		logrus.Debugf("[MG]start pull image %s", config.Image)
 		authConfig, err := gd.RegistryAuthConfig()
@@ -311,6 +313,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		if err != nil {
 			logrus.Errorf("registerToServers error:%s", err)
 		}
+
 		// switchback unit
 		err = svc.switchBack(u.Name)
 		if err != nil {
@@ -695,41 +698,41 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			if err != nil {
 				return
 			}
-			err = stopOldContainer(svc, u)
-			if err != nil {
-				logrus.Error(err)
-			}
 
 			// deactivate
 			// del mapping
 			if len(lunMap) > 0 {
-				err = sanDeactivateAndDelMapping(dc.storage, u, lunMap, lunSlice)
-				if err != nil {
-					logrus.Error(err)
+				_err := sanDeactivateAndDelMapping(dc.storage, u, lunMap, lunSlice)
+				if _err != nil {
+					logrus.Error(_err)
 				}
 			}
 			// recycle lun
 			for i := range lunSlice {
-				err := dc.storage.Recycle(lunSlice[i].ID, 0)
-				if err != nil {
-					logrus.Error(err)
+				_err := dc.storage.Recycle(lunSlice[i].ID, 0)
+				if _err != nil {
+					logrus.Error(_err)
 				}
 			}
 
 			// clean local volumes
 			for i := range oldLVs {
-				err := original.localStore.Recycle(oldLVs[i].ID)
+				_err := original.localStore.Recycle(oldLVs[i].ID)
 				if err != nil {
-					logrus.Error(err)
+					logrus.Error(_err)
 				}
 			}
 
-			err = cleanOldContainer(u.ID, oldContainer, oldLVs, *sys)
-			if err != nil {
-				logrus.Error(err)
+			_err := cleanOldContainer(u.ID, oldContainer, oldLVs, *sys)
+			if _err != nil {
+				logrus.Error(_err)
 			}
 
 			// clean database
+			_err = database.TxDeleteVolumes(oldLVs)
+			if _err != nil {
+				logrus.Error(_err)
+			}
 		}()
 
 		pending.unit = u
@@ -742,11 +745,13 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 		swarmID := gd.generateUniqueID()
 		config.SetSwarmID(swarmID)
-		gd.pendingContainers[swarmID] = &pendingContainer{
+		pending.pendingContainer = &pendingContainer{
 			Name:   u.Name,
 			Config: config,
 			Engine: engine,
 		}
+
+		gd.pendingContainers[swarmID] = pending.pendingContainer
 
 		logrus.Debugf("[MG]start pull image %s", config.Image)
 		authConfig, err := gd.RegistryAuthConfig()
@@ -786,6 +791,11 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			// return err
 		}
 
+		// stop original container
+		if err = stopOldContainer(svc, u); err != nil {
+			logrus.Error(err)
+		}
+
 		u.container = container
 		u.ContainerID = container.ID
 		u.engine = engine
@@ -802,7 +812,8 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		if err != nil {
 			logrus.Errorf("registerToServers error:%s", err)
 		}
-		return err
+
+		return nil
 	}
 
 	task := database.NewTask(_Unit_Rebuild_Task, u.ID, "", nil, 0)

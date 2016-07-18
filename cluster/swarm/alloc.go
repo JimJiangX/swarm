@@ -283,7 +283,7 @@ func (gd *Gardener) Recycle(pendings []*pendingAllocResource) (err error) {
 			database.TxUpdateMultiIPValue(tx, ips)
 		}
 
-		if pendings[i].unit != nil {
+		if pendings[i].unit != nil && len(pendings[i].ports) > 0 {
 			ports := pendings[i].ports
 			for p := range ports {
 				ports[p].Allocated = false
