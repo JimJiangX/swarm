@@ -45,6 +45,17 @@ func TestGetDB(t *testing.T) {
 		t.Error("Unexpected", err)
 	}
 
+	db.Close()
+
+	db, err = GetDB(false)
+	if err != nil || db == nil {
+		t.Error("Unexpected", err)
+	}
+
+	if err = db.Ping(); err != nil {
+		t.Log("Expected", err)
+	}
+
 	db, err = GetDB(true)
 	if err != nil || db == nil {
 		t.Fatal("With Ping", err, db)
