@@ -883,11 +883,14 @@ func getServiceServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.R
 
 		parser, _, err := swarm.Factory(resp[i].Type)
 		if err != nil {
+			logrus.Error(err)
 
+			continue
 		}
 		configer, err := parser.ParseData([]byte(configs[i].Config.Content))
 		if err != nil {
-
+			logrus.Error("ParseData error", err, configs[i].Config.Content)
+			continue
 		}
 
 		for key, val := range keysetsMap {

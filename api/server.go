@@ -93,10 +93,10 @@ func (s *Server) ListenAndServe() error {
 				l      net.Listener
 				err    error
 				server = &http.Server{
-					Addr:        protoAddrParts[1],
-					Handler:     s.dispatcher,
-					ReadTimeout: 10 * time.Second,
-					//	WriteTimeout: 30 * time.Second,
+					Addr:         protoAddrParts[1],
+					Handler:      s.dispatcher,
+					ReadTimeout:  time.Minute,
+					WriteTimeout: 5 * time.Minute,
 				}
 			)
 
