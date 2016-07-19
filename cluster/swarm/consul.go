@@ -206,7 +206,18 @@ func registerHealthCheck(u *unit, config database.ConsulConfig, context *Service
 
 	check, err := u.HealthCheck()
 	if err != nil {
-		return err
+		logrus.Warnf("Unit %s HealthCheck error:%s", u.Name, err)
+		if err = u.factory(); err != nil {
+			logrus.Error("Unit %s factory error:%s", u.Name, err)
+			return err
+		}
+
+		check, err = u.HealthCheck()
+		if err != nil {
+			logrus.Errorf("Unit %s HealthCheck error:%s", u.Name, err)
+
+			return err
+		}
 	}
 
 	if u.Type == _UpsqlType {

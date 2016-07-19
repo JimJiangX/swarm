@@ -103,11 +103,13 @@ func (gd *Gardener) serviceScheduler() {
 }
 
 func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err error) {
+	logrus.Debug("create Service Resources...")
+
 	volumes := make([]*cluster.Volume, 0, 10)
 
 	defer func() {
 		if err != nil {
-			logrus.Error("create Service volumes&IP,defer ", err)
+			logrus.Error("Rollback create Service volumes&IP,defer ", err)
 
 			for _, v := range volumes {
 				if v == nil {

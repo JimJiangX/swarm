@@ -539,6 +539,8 @@ func (dc *Datacenter) isIdleStoreEnough(num, size int) bool {
 }
 
 func (gd *Gardener) rebuildDatacenters() error {
+	logrus.Debug("rebuild Datacenters")
+
 	list, err := database.ListClusters()
 	if err != nil {
 		return err
@@ -562,6 +564,8 @@ func (gd *Gardener) rebuildDatacenters() error {
 }
 
 func (gd *Gardener) rebuildDatacenter(nameOrID string) (*Datacenter, error) {
+	logrus.Debugf("rebuild Datacenter:%s", nameOrID)
+
 	cl, err := database.GetCluster(nameOrID)
 	if err != nil {
 		return nil, fmt.Errorf("Not Found %s,Error %s", nameOrID, err)
@@ -605,6 +609,8 @@ func (gd *Gardener) rebuildDatacenter(nameOrID string) (*Datacenter, error) {
 }
 
 func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
+	logrus.Debugf("rebuild Node,name=%s,addr=%s", n.Name, n.Addr)
+
 	eng, err := gd.GetEngine(n.EngineID)
 
 	node := &Node{
@@ -640,6 +646,8 @@ func (node *Node) getVGname(_type string) (string, error) {
 }
 
 func (gd *Gardener) shortIdleStoreFilter(list []database.Node, volumes []structs.DiskStorage, _type string, num int) []database.Node {
+	logrus.Debug("shortIdleStoreFilter:nodes=%d,Type='%s',num=%d", len(list), _type, num)
+
 	gd.RLock()
 	length := len(gd.datacenters)
 	gd.RUnlock()

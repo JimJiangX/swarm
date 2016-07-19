@@ -280,7 +280,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		if err != nil {
 			return err
 		}
-		err = cleanOldContainer(u.ID, oldContainer, oldLVs, *sys)
+		err = cleanOldContainer(oldContainer, oldLVs)
 		if err != nil {
 			return err
 		}
@@ -348,18 +348,13 @@ func startUnit(engine *cluster.Engine, containerID string,
 	logrus.Debug("init & Start Service")
 	err = initUnitService(containerID, engine, u.InitServiceCmd())
 	if err != nil {
-		logrus.Errorf("")
+		logrus.Error(err)
 	}
+
 	return err
 }
 
 func stopOldContainer(svc *Service, u *unit) error {
-	if u.Type != _SwitchManagerType {
-		err := svc.isolate(u.Name)
-		if err != nil {
-			logrus.Errorf("isolate container %s error:%s", u.Name, err)
-		}
-	}
 	err := u.forceStopService()
 	if err != nil {
 		logrus.Errorf("container %s stop service error:%s", u.Name, err)
@@ -531,7 +526,7 @@ func migrateVolumes(storage store.Store, nodeID string,
 	return lvs, nil
 }
 
-func cleanOldContainer(unitID string, old *cluster.Container, lvs []database.LocalVolume, sys database.Configurations) error {
+func cleanOldContainer(old *cluster.Container, lvs []database.LocalVolume) error {
 	engine := old.Engine
 	if engine == nil {
 		return errEngineIsNil
@@ -552,13 +547,18 @@ func cleanOldContainer(unitID string, old *cluster.Container, lvs []database.Loc
 		}
 	}
 
+	return nil
+}
+
+func deregisterToServices(addr, unitID string, sys database.Configurations) error {
 	configs := sys.GetConsulConfigs()
 	if len(configs) == 0 {
-		return fmt.Errorf("GetConsulConfigs error %v %v", err, configs[0])
+		return fmt.Errorf("GetConsulConfigs error %v %v", configs[0])
 	}
-	err = deregisterHealthCheck(engine.IP, unitID, configs[0])
+
+	err := deregisterHealthCheck(addr, unitID, configs[0])
 	if err != nil {
-		return err
+		logrus.Error(err)
 	}
 
 	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
@@ -569,6 +569,7 @@ func cleanOldContainer(unitID string, old *cluster.Container, lvs []database.Loc
 	}
 
 	return err
+
 }
 
 func updateUnit(unit database.Unit, lvs []database.LocalVolume, reserveSAN bool) error {
@@ -674,10 +675,9 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			}
 
 			svc.Unlock()
-
 		}()
 
-		sys, err := database.GetSystemConfig()
+		sys, err := gd.SystemConfig()
 		if err != nil {
 			return err
 		}
@@ -694,18 +694,20 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
+		// deactivate
+		// del mapping
+		if len(lunMap) > 0 {
+			_err := sanDeactivateAndDelMapping(dc.storage, u, lunMap, lunSlice)
+			if _err != nil {
+				logrus.Error(_err)
+			}
+		}
+
 		defer func() {
 			if err != nil {
+				// map
+				// active
 				return
-			}
-
-			// deactivate
-			// del mapping
-			if len(lunMap) > 0 {
-				_err := sanDeactivateAndDelMapping(dc.storage, u, lunMap, lunSlice)
-				if _err != nil {
-					logrus.Error(_err)
-				}
 			}
 			// recycle lun
 			for i := range lunSlice {
@@ -723,13 +725,8 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 				}
 			}
 
-			_err := cleanOldContainer(u.ID, oldContainer, oldLVs, *sys)
-			if _err != nil {
-				logrus.Error(_err)
-			}
-
 			// clean database
-			_err = database.TxDeleteVolumes(oldLVs)
+			_err := database.TxDeleteVolumes(oldLVs)
 			if _err != nil {
 				logrus.Error(_err)
 			}
@@ -769,6 +766,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
+		logrus.Debugf("Engine %s create container %s", engine.Addr, u.Name)
 		container, err := engine.Create(config, u.Name, false, authConfig)
 		if err != nil {
 			return err
@@ -785,15 +783,9 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			logrus.Warnf("containe Refresh Erorr:%s", err)
 		}
 
-		err = gd.SaveContainerToConsul(container)
-		if err != nil {
-			logrus.Errorf("Save Container To Consul error:%s", err)
-			// return err
-		}
-
 		// stop original container
 		if err = stopOldContainer(svc, u); err != nil {
-			logrus.Error(err)
+			logrus.Error("stopOldContainer", err)
 		}
 
 		u.container = container
@@ -802,13 +794,49 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		u.EngineID = engine.ID
 		u.CreatedAt = time.Now()
 
+		defer func(c *cluster.Container, lvs []database.LocalVolume) {
+			if err == nil {
+				return
+			}
+			logrus.Debugf("clean new container %s", c.ID)
+
+			_err := cleanOldContainer(c, lvs)
+			if _err != nil {
+				logrus.Error(_err)
+			}
+
+		}(container, pending.localStore)
+
+		// TODO:fresh topoology
+		err = svc.initTopology()
+		if err != nil {
+			logrus.Errorf("%s initTopology error:%s", svc.Name, err)
+			return err
+		}
+
 		err = updateUnit(u.Unit, oldLVs, true)
 		if err != nil {
 			logrus.Errorf("updateUnit in database error:%s", err)
 			return err
 		}
 
-		err = registerToServers(u, svc, *sys)
+		err = gd.SaveContainerToConsul(container)
+		if err != nil {
+			logrus.Errorf("Save Container To Consul error:%s", err)
+			// return err
+		}
+
+		err = cleanOldContainer(oldContainer, oldLVs)
+		if err != nil {
+			logrus.Error(err)
+		}
+
+		err = deregisterToServices(u.ID, oldContainer.Engine.IP, sys)
+		if err != nil {
+			logrus.Error(err)
+		}
+
+		err = registerToServers(u, svc, sys)
 		if err != nil {
 			logrus.Errorf("registerToServers error:%s", err)
 		}
@@ -824,12 +852,12 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 }
 
 func registerToServers(u *unit, svc *Service, sys database.Configurations) error {
-	logrus.Debug("[MG]registerServices")
+	logrus.Debug("[MG]register Services")
 	if err := registerHealthCheck(u, sys.ConsulConfig, svc); err != nil {
 		logrus.Error(err)
 	}
 
-	logrus.Debug("[MG]registerToHorus")
+	logrus.Debug("[MG]register To Horus")
 	obj, err := u.registerHorus(sys.MonitorUsername, sys.MonitorPassword, sys.HorusAgentPort)
 	if err != nil {
 		err = fmt.Errorf("container %s register Horus Error:%s", u.Name, err)

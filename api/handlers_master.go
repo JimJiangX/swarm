@@ -756,7 +756,7 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 			list[i].Info = container.Info
 			list[i].CpusetCpus = container.Info.HostConfig.CpusetCpus
 			list[i].Memory = container.Info.HostConfig.Memory
-			list[i].State = container.State
+			list[i].State = container.Status
 		} else {
 			list[i].Status = serviceCritical
 		}

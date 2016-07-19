@@ -207,6 +207,7 @@ func newPendingAllocResource() *pendingAllocResource {
 }
 
 func createVolumes(engine *cluster.Engine, lvs []database.LocalVolume, lun []database.LUN) ([]*cluster.Volume, error) {
+	logrus.Debugf("Engine %s create Volumes %d", engine.Addr, len(lvs))
 	volumes := make([]*cluster.Volume, 0, len(lvs))
 
 	for i := range lvs {

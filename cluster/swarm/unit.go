@@ -79,6 +79,13 @@ func (u *unit) factory() error {
 		return fmt.Errorf("Unexpected Error,%s:%v", u.Type, err)
 	}
 
+	if u.parent != nil {
+		_, err := parser.ParseData([]byte(u.parent.Content))
+		if err != nil {
+			logrus.Errorf("Unit %s ParseData error:%s", u.Name, err)
+		}
+	}
+
 	u.configParser = parser
 	u.ContainerCmd = cmder
 
@@ -262,6 +269,8 @@ func pullImage(engine *cluster.Engine, image string, authConfig *types.AuthConfi
 }
 
 func createVolume(eng *cluster.Engine, lv database.LocalVolume) (*cluster.Volume, error) {
+	logrus.Debugf("Engine %s create Volume %s", eng.Addr, lv.Name)
+
 	req := &types.VolumeCreateRequest{
 		Name:       lv.Name,
 		Driver:     lv.Driver,
@@ -277,6 +286,7 @@ func createVolume(eng *cluster.Engine, lv database.LocalVolume) (*cluster.Volume
 }
 
 func createSanStoreageVG(host, name string, lun []database.LUN) error {
+	logrus.Debugf("Engine %s create San Storeage VG,name=%s", host, name)
 	list := make([]database.LUN, 0, len(lun))
 	for i := range lun {
 		if lun[i].Name == name {
@@ -408,7 +418,7 @@ func startContainer(containerID string, engine *cluster.Engine, networkings []IP
 		return err
 	}
 
-	logrus.Debug("Engine %s start container ", engine.Addr, containerID)
+	logrus.Debugf("Engine %s start container ", engine.Addr, containerID)
 
 	return engine.StartContainer(containerID, nil)
 }
@@ -468,6 +478,8 @@ func (u *unit) renameContainer(name string) error {
 }
 
 func createNetworking(host string, networkings []IPInfo) error {
+	logrus.Debugf("Engine %s create Networking %s", host, networkings)
+
 	addr := getPluginAddr(host, pluginPort)
 
 	for _, net := range networkings {
@@ -486,6 +498,8 @@ func createNetworking(host string, networkings []IPInfo) error {
 }
 
 func removeNetworkings(host string, networkings []IPInfo) error {
+	logrus.Debugf("Engine %s remove Networkings %s", host, networkings)
+
 	addr := getPluginAddr(host, pluginPort)
 
 	for _, net := range networkings {

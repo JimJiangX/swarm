@@ -120,16 +120,31 @@ func (t *asyncTask) Run() error {
 		t.parent = context.Background()
 	}
 
-	select {
-	case <-t.parent.Done():
-		return errors.Wrap(t.parent.Err(), "parent Context has done")
-	default:
-	}
-
 	if t.create != nil {
 		if err := t.create(); err != nil {
 			return errors.Wrap(err, "create error")
 		}
+	}
+
+	select {
+	case <-t.parent.Done():
+
+		if t.update != nil {
+			code, msg := _StatusTaskCancel, "Task Cancel by Parent Context"
+			if t.parent.Err() != nil {
+				msg = t.parent.Err().Error()
+			}
+
+			err := t.update(code, msg)
+			if err != nil {
+				err = errors.Errorf("asyncTask.update,code=%d,msg=%s,%s", code, msg, err)
+			}
+
+			return errors.Wrap(err, "parent Context has done")
+		}
+
+		return errors.Wrap(t.parent.Err(), "parent Context has done")
+	default:
 	}
 
 	var (
@@ -146,7 +161,12 @@ func (t *asyncTask) Run() error {
 	go func(ctx context.Context, t *asyncTask) {
 		defer t.cancel()
 
-		msg, code := "", 0
+		msg, code := "", _StatusTaskRunning
+		if t.update != nil {
+			if err := t.update(code, msg); err != nil {
+				logrus.Errorf("asyncTask.update error:%s", err)
+			}
+		}
 
 		logrus.Debug("Running background...")
 
