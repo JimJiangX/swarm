@@ -1093,6 +1093,10 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			httpError(w, r.URL.String(), http.StatusBadRequest)
 			return
 		}
+		// make sure time with location
+		if !strings.HasSuffix(key[0], "+08:00") {
+			key[0] += "+08:00"
+		}
 		begin, err = time.Parse(time.RFC3339, key[0])
 		if err != nil {
 			httpError(w, r.URL.String(), http.StatusBadRequest)
@@ -1104,6 +1108,10 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		if len(key) == 0 {
 			httpError(w, r.URL.String(), http.StatusBadRequest)
 			return
+		}
+		// make sure time with location
+		if !strings.HasSuffix(key[0], "+08:00") {
+			key[0] += "+08:00"
 		}
 		end, err = time.Parse(time.RFC3339, key[0])
 		if err != nil {
