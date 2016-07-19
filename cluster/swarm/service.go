@@ -940,6 +940,8 @@ func (svc *Service) initTopology() error {
 		proxyNames[i] = proxys[i].ID
 	}
 
+	var dba, replicater database.User
+
 	users := make([]swm_structs.User, len(svc.users))
 	for i := range svc.users {
 		users[i] = swm_structs.User{
@@ -949,6 +951,12 @@ func (svc *Service) initTopology() error {
 			Password: svc.users[i].Password,
 			Role:     svc.users[i].Role,
 			ReadOnly: false,
+		}
+
+		if svc.users[i].Role == _User_DBA {
+			dba = svc.users[i]
+		} else if svc.users[i].Role == _User_Replication {
+			replicater = svc.users[i]
 		}
 	}
 
@@ -976,21 +984,16 @@ func (svc *Service) initTopology() error {
 		}
 	}
 
-	sys, err := database.GetSystemConfig()
-	if err != nil {
-		return err
-	}
-
 	topolony := swm_structs.MgmPost{
-		DbaasType:           arch,                    //  string   `json:"dbaas-type"`
-		DbRootUser:          sys.DBAUsername,         //  string   `json:"db-root-user"`
-		DbRootPassword:      sys.DBAPassword,         //  string   `json:"db-root-password"`
-		DbReplicateUser:     sys.ReplicationUsername, //  string   `json:"db-replicate-user"`
-		DbReplicatePassword: sys.ReplicationPassword, //  string   `json:"db-replicate-password"`
-		SwarmApiVersion:     "1.22",                  //  string   `json:"swarm-api-version,omitempty"`
-		ProxyNames:          proxyNames,              //  []string `json:"proxy-names"`
-		Users:               users,                   //  []User   `json:"users"`
-		DataNode:            dataNodes,               //  map[string]DatabaseInfo `json:"data-node"`
+		DbaasType:           arch,                //  string   `json:"dbaas-type"`
+		DbRootUser:          dba.Username,        //  string   `json:"db-root-user"`
+		DbRootPassword:      dba.Password,        //  string   `json:"db-root-password"`
+		DbReplicateUser:     replicater.Username, //  string   `json:"db-replicate-user"`
+		DbReplicatePassword: replicater.Password, //  string   `json:"db-replicate-password"`
+		SwarmApiVersion:     "1.22",              //  string   `json:"swarm-api-version,omitempty"`
+		ProxyNames:          proxyNames,          //  []string `json:"proxy-names"`
+		Users:               users,               //  []User   `json:"users"`
+		DataNode:            dataNodes,           //  map[string]DatabaseInfo `json:"data-node"`
 	}
 
 	err = smlib.InitSm(addr, port, topolony)
