@@ -1060,9 +1060,11 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var tasks []database.Task
-	withCondition := false
-
+	var (
+		withCondition = false
+		tasks         []database.Task
+		begin, end    time.Time
+	)
 	if v, ok := r.Form["status"]; ok {
 		if len(v) == 0 {
 			httpError(w, r.URL.String(), http.StatusBadRequest)
@@ -1076,6 +1078,7 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 		tasks, err = database.ListTaskByStatus(status)
 		withCondition = true
+		logrus.Debugf("List Task By Status:%d", status)
 	}
 
 	if key, ok := r.Form["key"]; ok {
@@ -1085,9 +1088,9 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 		tasks, err = database.ListTaskByRelated(key[0])
 		withCondition = true
+		logrus.Debugf("List Task By Related:%s", key[0])
 	}
 
-	var begin, end time.Time
 	if key, ok := r.Form["begin"]; ok {
 		if len(key) == 0 {
 			httpError(w, r.URL.String(), http.StatusBadRequest)
@@ -1123,16 +1126,19 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !begin.IsZero() || !end.IsZero() {
-		withCondition = true
 		tasks, err = database.ListTaskByTimestamp(begin, end)
+		withCondition = true
+		logrus.Debugf("List Task By Timestamp,begin=%s,end=%s", begin, end)
+	}
+
+	if !withCondition {
+		tasks, err = database.ListTask()
+		logrus.Debugf("List Tasks")
 	}
 
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-	if !withCondition {
-		tasks, err = database.ListTask()
 	}
 
 	resp := make([]structs.TaskResponse, len(tasks))

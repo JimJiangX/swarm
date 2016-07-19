@@ -304,6 +304,10 @@ func ListTaskByRelated(related string) ([]Task, error) {
 }
 
 func ListTaskByTimestamp(begin, end time.Time) ([]Task, error) {
+	if begin.After(end) {
+		begin, end = end, begin
+	}
+
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
