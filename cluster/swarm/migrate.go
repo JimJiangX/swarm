@@ -826,7 +826,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 func registerToServers(u *unit, svc *Service, sys database.Configurations) error {
 	logrus.Debug("[MG]registerServices")
 	if err := registerHealthCheck(u, sys.ConsulConfig, svc); err != nil {
-		return err
+		logrus.Error(err)
 	}
 
 	logrus.Debug("[MG]registerToHorus")
@@ -843,5 +843,6 @@ func registerToServers(u *unit, svc *Service, sys database.Configurations) error
 	if err != nil {
 		logrus.Errorf("registerToHorus error:%s", err)
 	}
+
 	return err
 }

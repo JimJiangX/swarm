@@ -1093,13 +1093,14 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			httpError(w, r.URL.String(), http.StatusBadRequest)
 			return
 		}
+		// "2016-07-19T10:41:05+08:00"
 		// make sure time with location
 		if !strings.HasSuffix(key[0], "+08:00") {
 			key[0] += "+08:00"
 		}
 		begin, err = time.Parse(time.RFC3339, key[0])
 		if err != nil {
-			httpError(w, r.URL.String(), http.StatusBadRequest)
+			httpError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
@@ -1109,13 +1110,14 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			httpError(w, r.URL.String(), http.StatusBadRequest)
 			return
 		}
+		// "2016-07-19T10:41:05+08:00"
 		// make sure time with location
 		if !strings.HasSuffix(key[0], "+08:00") {
 			key[0] += "+08:00"
 		}
 		end, err = time.Parse(time.RFC3339, key[0])
 		if err != nil {
-			httpError(w, r.URL.String(), http.StatusBadRequest)
+			httpError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
