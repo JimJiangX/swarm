@@ -1268,7 +1268,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 		CreatedAt: now,
 	}
 
-	task := database.NewTask(_Backup_Manual_Task, strategy.ID, "", nil, strategy.Timeout)
+	task := database.NewTask(_Backup_Manual_Task, backup.ID, "", nil, strategy.Timeout)
 	task.Status = _StatusTaskCreate
 	err = database.TxInsertBackupStrategyAndTask(strategy, task)
 	if err != nil {
