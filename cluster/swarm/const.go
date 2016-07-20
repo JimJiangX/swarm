@@ -16,14 +16,14 @@ const (
 )
 
 const (
+	_Node_Install_Task   = "node_install"
+	_Image_Load_Task     = "image_load"
+	_Unit_Migrate_Task   = "unit_migrate"
+	_Unit_Rebuild_Task   = "unit_rebuild"
+	_Unit_Restore_Task   = "unit_restore"
+	_Service_Create_Task = "service_create"
 	_Backup_Auto_Task    = "backup_auto"
 	_Backup_Manual_Task  = "backup_manual"
-	_Node_Install_Task   = "node install"
-	_Image_Load_Task     = "image load"
-	_Unit_Migrate_Task   = "unit migrate"
-	_Unit_Rebuild_Task   = "unit rebuild"
-	_Unit_Restore_Task   = "unit restore"
-	_Service_Create_Task = "service create"
 )
 
 const (

@@ -355,6 +355,12 @@ func startUnit(engine *cluster.Engine, containerID string,
 }
 
 func stopOldContainer(svc *Service, u *unit) error {
+	if u.Type != _SwitchManagerType {
+		err := svc.isolate(u.Name)
+		if err != nil {
+			logrus.Errorf("isolate container %s error:%s", u.Name, err)
+		}
+	}
 	err := u.forceStopService()
 	if err != nil {
 		logrus.Errorf("container %s stop service error:%s", u.Name, err)
@@ -807,17 +813,16 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 		}(container, pending.localStore)
 
-		// TODO:fresh topoology
-		err = svc.initTopology()
-		if err != nil {
-			logrus.Errorf("%s initTopology error:%s", svc.Name, err)
-			return err
-		}
-
 		err = updateUnit(u.Unit, oldLVs, true)
 		if err != nil {
 			logrus.Errorf("updateUnit in database error:%s", err)
 			return err
+		}
+
+		// switchback unit
+		err = svc.switchBack(u.Name)
+		if err != nil {
+			logrus.Errorf("switchBack error:%s", err)
 		}
 
 		err = gd.SaveContainerToConsul(container)
