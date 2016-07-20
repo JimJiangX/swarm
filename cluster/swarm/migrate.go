@@ -355,12 +355,6 @@ func startUnit(engine *cluster.Engine, containerID string,
 }
 
 func stopOldContainer(svc *Service, u *unit) error {
-	if u.Type != _SwitchManagerType {
-		err := svc.isolate(u.Name)
-		if err != nil {
-			logrus.Errorf("isolate container %s error:%s", u.Name, err)
-		}
-	}
 	err := u.forceStopService()
 	if err != nil {
 		logrus.Errorf("container %s stop service error:%s", u.Name, err)
@@ -575,7 +569,6 @@ func deregisterToServices(addr, unitID string, sys database.Configurations) erro
 	}
 
 	return err
-
 }
 
 func updateUnit(unit database.Unit, lvs []database.LocalVolume, reserveSAN bool) error {
@@ -749,7 +742,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		swarmID := gd.generateUniqueID()
 		config.SetSwarmID(swarmID)
 		pending.pendingContainer = &pendingContainer{
-			Name:   u.Name,
+			Name:   swarmID,
 			Config: config,
 			Engine: engine,
 		}
@@ -769,11 +762,12 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 		err = createServiceResources(gd, []*pendingAllocResource{pending})
 		if err != nil {
+			logrus.Errorf("create Service Resources error:%s", err)
 			return err
 		}
 
-		logrus.Debugf("Engine %s create container %s", engine.Addr, u.Name)
-		container, err := engine.Create(config, u.Name, false, authConfig)
+		logrus.Debugf("Engine %s create container %s", engine.Addr, swarmID)
+		container, err := engine.Create(config, swarmID, false, authConfig)
 		if err != nil {
 			return err
 		}
@@ -784,14 +778,21 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
+		if u.Type != _SwitchManagerType {
+			err := svc.isolate(u.Name)
+			if err != nil {
+				logrus.Errorf("isolate container %s error:%s", u.Name, err)
+			}
+		}
+
+		err = engine.RenameContainer(container, u.Name)
+		if err != nil {
+
+		}
+
 		container, err = container.Refresh()
 		if err != nil {
 			logrus.Warnf("containe Refresh Erorr:%s", err)
-		}
-
-		// stop original container
-		if err = stopOldContainer(svc, u); err != nil {
-			logrus.Error("stopOldContainer", err)
 		}
 
 		u.container = container
@@ -810,19 +811,12 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			if _err != nil {
 				logrus.Error(_err)
 			}
-
 		}(container, pending.localStore)
 
 		err = updateUnit(u.Unit, oldLVs, true)
 		if err != nil {
 			logrus.Errorf("updateUnit in database error:%s", err)
 			return err
-		}
-
-		// switchback unit
-		err = svc.switchBack(u.Name)
-		if err != nil {
-			logrus.Errorf("switchBack error:%s", err)
 		}
 
 		err = gd.SaveContainerToConsul(container)
@@ -836,7 +830,13 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			logrus.Error(err)
 		}
 
-		err = deregisterToServices(u.ID, oldContainer.Engine.IP, sys)
+		// switchback unit
+		err = svc.switchBack(u.Name)
+		if err != nil {
+			logrus.Errorf("switchBack error:%s", err)
+		}
+
+		err = deregisterToServices(oldContainer.Engine.IP, u.ID, sys)
 		if err != nil {
 			logrus.Error(err)
 		}

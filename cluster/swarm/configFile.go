@@ -393,7 +393,7 @@ func (c proxyConfig) HealthCheck() (healthCheck, error) {
 func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error) {
 	m := make(map[string]interface{}, 10)
 	m["upsql-proxy::proxy-domain"] = svc.ID
-	m["upsql-proxy::proxy-name"] = u.ID
+	m["upsql-proxy::proxy-name"] = u.Name
 	if len(u.networkings) == 2 && len(u.ports) >= 2 {
 		adminAddr, dataAddr := "", ""
 		adminPort, dataPort := 0, 0
@@ -543,7 +543,7 @@ func (c switchManagerConfig) defaultUserConfig(svc *Service, u *unit) (map[strin
 
 	m := make(map[string]interface{}, 10)
 	m["domain"] = svc.ID
-	m["name"] = u.ID
+	m["name"] = u.Name
 	port, proxyPort := 0, 0
 	for i := range u.ports {
 		if u.ports[i].Name == "Port" {
