@@ -20,6 +20,12 @@ type TaskResponse struct {
 	// Name     string `json:"name"`
 	Related     string `json:"related"`
 	Linkto      string `json:"link_to"`
+	UnitID      string `json:"unit_id"`
+	UnitName    string `json:"unit_name"`
+	ServiceID   string `json:"service_id"`
+	ServiceName string `json:"service_name"`
+	NodeID      string `json:"node_id"`
+	NodeName    string `json:"node_name"`
 	Description string `json:"description"`
 	Labels      string `json:"labels"`
 	Errors      string `json:"errors"`

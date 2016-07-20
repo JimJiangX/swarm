@@ -1141,26 +1141,98 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	resp := make([]structs.TaskResponse, len(tasks))
 	for i := range tasks {
-		resp[i] = structs.TaskResponse{
-			ID:          tasks[i].ID,
-			Related:     tasks[i].Related,
-			Linkto:      tasks[i].Linkto,
-			Description: tasks[i].Description,
-			Labels:      tasks[i].Labels,
-			Errors:      tasks[i].Errors,
-			Timeout:     tasks[i].Timeout,
-			Status:      int(tasks[i].Status),
-			Timestamp:   tasks[i].Timestamp,
-			CreatedAt:   utils.TimeToString(tasks[i].CreatedAt),
-			FinishedAt:  utils.TimeToString(tasks[i].FinishedAt),
-		}
+		resp[i] = getTaskResponse(tasks[i])
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
+}
+
+func getTaskResponse(task database.Task) structs.TaskResponse {
+	var (
+		err     error
+		unit    database.Unit
+		node    database.Node
+		service database.Service
+	)
+	/*
+		_Node_Install_Task   = "node_install"
+		_Image_Load_Task     = "image_load"
+		_Unit_Migrate_Task   = "unit_migrate"
+		_Unit_Rebuild_Task   = "unit_rebuild"
+		_Unit_Restore_Task   = "unit_restore"
+		_Service_Create_Task = "service_create"
+		_Backup_Auto_Task    = "backup_auto"
+		_Backup_Manual_Task  = "backup_manual"
+	*/
+	switch task.Related {
+	case "backup_auto":
+		strategy, err := database.GetBackupStrategy(task.Linkto)
+		if err == nil {
+			service, err = database.GetService(strategy.ServiceID)
+			if err != nil {
+				logrus.Warning(err)
+			}
+		}
+
+	case "node_install":
+		node, err = database.GetNode(task.Linkto)
+		if err != nil {
+			logrus.Warning(err)
+		}
+
+	case "service_create":
+		service, err = database.GetService(task.Linkto)
+		if err != nil {
+			logrus.Warning(err)
+		}
+
+	case "unit_migrate", "unit_rebuild", "unit_restore", "backup_manual":
+		unit, err = database.GetUnit(task.Linkto)
+		if err == nil {
+			node, err = database.GetNode(unit.EngineID)
+			if err != nil {
+				logrus.Error(err)
+			}
+
+			service, err = database.GetService(unit.ServiceID)
+			if err != nil {
+				logrus.Error(err)
+			}
+		}
+
+	default:
+		logrus.Debugf("%v", task)
+	}
+
+	return structs.TaskResponse{
+		ID:          task.ID,
+		Related:     task.Related,
+		Linkto:      task.Linkto,
+		ServiceID:   service.ID,
+		ServiceName: service.Name,
+		NodeID:      node.ID,
+		NodeName:    node.Name,
+		UnitID:      unit.ID,
+		UnitName:    unit.Name,
+		Description: task.Description,
+		Labels:      task.Labels,
+		Errors:      task.Errors,
+		Timeout:     task.Timeout,
+		Status:      int(task.Status),
+		Timestamp:   task.Timestamp,
+		CreatedAt:   utils.TimeToString(task.CreatedAt),
+		FinishedAt:  utils.TimeToString(task.FinishedAt),
+	}
 }
 
 // GET /tasks/{name:.*}
@@ -1173,18 +1245,7 @@ func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := structs.TaskResponse{
-		ID:          task.ID,
-		Related:     task.Related,
-		Linkto:      task.Linkto,
-		Description: task.Description,
-		Labels:      task.Labels,
-		Errors:      task.Errors,
-		Timeout:     task.Timeout,
-		Status:      int(task.Status),
-		CreatedAt:   utils.TimeToString(task.CreatedAt),
-		FinishedAt:  utils.TimeToString(task.FinishedAt),
-	}
+	resp := getTaskResponse(*task)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
