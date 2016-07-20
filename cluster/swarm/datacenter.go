@@ -646,7 +646,7 @@ func (node *Node) getVGname(_type string) (string, error) {
 }
 
 func (gd *Gardener) shortIdleStoreFilter(list []database.Node, volumes []structs.DiskStorage, _type string, num int) []database.Node {
-	logrus.Debug("shortIdleStoreFilter:nodes=%d,Type='%s',num=%d", len(list), _type, num)
+	logrus.Debugf("shortIdleStoreFilter:nodes=%d,Type='%s',num=%d", len(list), _type, num)
 
 	gd.RLock()
 	length := len(gd.datacenters)

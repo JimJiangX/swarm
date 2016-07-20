@@ -252,6 +252,8 @@ func pullImage(engine *cluster.Engine, image string, authConfig *types.AuthConfi
 		return fmt.Errorf("params error,image:%s", image)
 	}
 
+	logrus.Debugf("Engine %s Pull image:%s", engine.Addr, image)
+
 	err := engine.Pull(image, authConfig)
 	if err != nil {
 		// try again

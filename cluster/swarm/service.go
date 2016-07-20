@@ -1165,6 +1165,8 @@ func (service *Service) isolate(unitName string) error {
 		return err
 	}
 
+	logrus.Debugf("Service %s Isolate Unit %s,%s:%d", service.Name, unitName, ip, port)
+
 	err = smlib.Isolate(ip, port, unitName)
 
 	if err != nil {
@@ -1200,6 +1202,8 @@ func (service *Service) switchBack(unitName string) error {
 		logrus.Errorf("get SwitchManager Addr error:%s", err)
 		return err
 	}
+
+	logrus.Debugf("Service %s Switchback Unit %s,%s:%d", service.Name, unitName, ip, port)
 
 	err = smlib.Recover(ip, port, unitName)
 	if err != nil {

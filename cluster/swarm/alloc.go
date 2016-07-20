@@ -336,6 +336,9 @@ func (pending *pendingAllocResource) recycleNetworking() []database.IP {
 
 func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.Engine,
 	config *cluster.ContainerConfig, need []structs.DiskStorage, skipSAN bool) error {
+
+	logrus.Debugf("Engine %s alloc storage %v", engine.Addr, need)
+
 	dc, node, err := gd.GetNode(engine.ID)
 	if err != nil {
 		err = errors.Errorf("Not Found Node %s,Error:%s", engine.Name, err)

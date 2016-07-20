@@ -332,7 +332,6 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 func startUnit(engine *cluster.Engine, containerID string,
 	u *unit, lvs []database.LocalVolume) error {
-	logrus.Debug("starting Containers")
 
 	err := startContainer(containerID, engine, u.networkings)
 	if err != nil {
@@ -532,11 +531,15 @@ func cleanOldContainer(old *cluster.Container, lvs []database.LocalVolume) error
 		return errEngineIsNil
 	}
 
+	logrus.Debugf("Engine %s remove container %s", engine.Addr, old.ID)
+
 	// remove old container
 	err := engine.RemoveContainer(old, true, true)
 	if err != nil {
 		logrus.Errorf("engine %s remove container %s error:%s", engine.Addr, old.Info.Name, err)
 	}
+
+	logrus.Debug("Remove Volumes")
 
 	// remove old LocalVolume
 	for i := range lvs {
@@ -556,10 +559,14 @@ func deregisterToServices(addr, unitID string, sys database.Configurations) erro
 		return fmt.Errorf("GetConsulConfigs error %v %v", configs[0])
 	}
 
+	logrus.Debug("deregister HealthCheck %s", unitID)
+
 	err := deregisterHealthCheck(addr, unitID, configs[0])
 	if err != nil {
 		logrus.Error(err)
 	}
+
+	logrus.Debug("deregister Horus %s", unitID)
 
 	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
 
@@ -708,6 +715,8 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 				// active
 				return
 			}
+
+			logrus.Debug("recycle old container volumes resource")
 			// recycle lun
 			for i := range lunSlice {
 				_err := dc.storage.Recycle(lunSlice[i].ID, 0)
@@ -773,6 +782,18 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		}
 		delete(gd.pendingContainers, swarmID)
 
+		defer func(c *cluster.Container, lvs []database.LocalVolume) {
+			if err == nil {
+				return
+			}
+			logrus.Debugf("clean new container %s", c.ID)
+
+			_err := cleanOldContainer(c, lvs)
+			if _err != nil {
+				logrus.Error(_err)
+			}
+		}(container, pending.localStore)
+
 		err = startUnit(engine, container.ID, u, pending.localStore)
 		if err != nil {
 			return err
@@ -787,7 +808,9 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 		err = engine.RenameContainer(container, u.Name)
 		if err != nil {
+			logrus.Error(err)
 
+			return err
 		}
 
 		container, err = container.Refresh()
@@ -800,18 +823,6 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		u.engine = engine
 		u.EngineID = engine.ID
 		u.CreatedAt = time.Now()
-
-		defer func(c *cluster.Container, lvs []database.LocalVolume) {
-			if err == nil {
-				return
-			}
-			logrus.Debugf("clean new container %s", c.ID)
-
-			_err := cleanOldContainer(c, lvs)
-			if _err != nil {
-				logrus.Error(_err)
-			}
-		}(container, pending.localStore)
 
 		err = updateUnit(u.Unit, oldLVs, true)
 		if err != nil {
