@@ -1747,7 +1747,7 @@ func (svc *Service) Slowlog(enable, notUsingIndexxes bool, longQueryTime int) er
 	}
 
 	commands := ""
-	cmd := fmt.Sprintf(`mysql -S /DBAASDAT/upsql.sock mysql -u%s -p%s  -e"%s"`, monitor.Username, monitor.Password)
+	cmd := fmt.Sprintf(`mysql -S /DBAASDAT/upsql.sock mysql -u%s -p%s`, monitor.Username, monitor.Password)
 
 	if !enable {
 		commands = "set global slow_query_log=0;"
@@ -1761,7 +1761,7 @@ func (svc *Service) Slowlog(enable, notUsingIndexxes bool, longQueryTime int) er
 		}
 	}
 
-	cmd = fmt.Sprintf(cmd, commands)
+	cmd = fmt.Sprintf(`%s -e"%s"`, cmd, commands)
 
 	for i := range sqls {
 		eng, err := sqls[i].Engine()
