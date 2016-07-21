@@ -121,7 +121,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		return "", fmt.Errorf("Not Found Unit %s,error:%s", nameOrID, err)
 	}
 
-	svc, err := gd.GetService(table.ServiceID)
+	svc, err := gd.rebuildService(table.ServiceID)
 	if err != nil {
 		return "", err
 	}
@@ -581,7 +581,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		return "", fmt.Errorf("Not Found Unit %s,error:%s", nameOrID, err)
 	}
 
-	svc, err := gd.GetService(table.ServiceID)
+	svc, err := gd.rebuildService(table.ServiceID)
 	if err != nil {
 		return "", err
 	}

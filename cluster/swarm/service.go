@@ -553,7 +553,17 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	svc.authConfig = authConfig
 
 	gd.Lock()
-	gd.services = append(gd.services, svc)
+
+	exist := false
+	for i := range gd.services {
+		if gd.services[i].ID == svc.ID {
+			gd.services[i] = svc
+			exist = true
+		}
+	}
+	if !exist {
+		gd.services = append(gd.services, svc)
+	}
 	gd.Unlock()
 
 	return svc, nil
