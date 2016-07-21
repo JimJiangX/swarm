@@ -79,7 +79,6 @@ func (gd *Gardener) serviceScheduler() {
 
 		for i := range resourceAlloc {
 			svc.units = append(svc.units, resourceAlloc[i].unit)
-			svc.pendingContainers[resourceAlloc[i].swarmID] = resourceAlloc[i].pendingContainer
 		}
 
 		if err := createServiceResources(gd, resourceAlloc); err != nil {
@@ -99,7 +98,6 @@ func (gd *Gardener) serviceScheduler() {
 	failure:
 		logrus.Debugf("[MG]serviceScheduler Failed: %v", resourceAlloc)
 		dealWithSchedulerFailure(gd, svc, resourceAlloc)
-
 	}
 }
 
@@ -166,9 +164,6 @@ func dealWithSchedulerFailure(gd *Gardener, svc *Service, pendings []*pendingAll
 		delete(gd.pendingContainers, pendings[i].swarmID)
 	}
 	gd.scheduler.Unlock()
-
-	svc.pendingContainers = make(map[string]*pendingContainer)
-	svc.units = make([]*unit, 0, 10)
 
 	svc.Service.SetServiceStatus(_StatusServiceAlloctionFailed, time.Now())
 
@@ -360,7 +355,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit,
 	swarmID := config.SwarmID()
 	if swarmID == "" {
 		// Associate a Swarm ID to the container we are creating.
-		swarmID = gd.generateUniqueID()
+		swarmID = unit.ID
 		config.SetSwarmID(swarmID)
 	} else {
 		logrus.Errorf("ContainerConfig.SwarmID() Should be null but got %s", swarmID)

@@ -319,7 +319,7 @@ func ListTaskByTimestamp(begin, end time.Time) ([]Task, error) {
 
 	if begin.IsZero() && !end.IsZero() {
 
-		query = "SELECT * FROM tb_task WHERE timestamp<?" //max
+		query = "SELECT * FROM tb_task WHERE timestamp<=?" //max
 		err = db.Select(&list, query, max)
 
 	} else if !begin.IsZero() && end.IsZero() {
@@ -329,7 +329,7 @@ func ListTaskByTimestamp(begin, end time.Time) ([]Task, error) {
 
 	} else if !begin.IsZero() && !end.IsZero() {
 
-		query = "SELECT * FROM tb_task WHERE timestamp>=? AND timestamp<?" //max
+		query = "SELECT * FROM tb_task WHERE timestamp>=? AND timestamp<=?" //max
 		err = db.Select(&list, query, min, max)
 
 	} else {

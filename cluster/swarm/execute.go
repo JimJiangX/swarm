@@ -66,6 +66,15 @@ func (gd *Gardener) serviceExecute() error {
 
 	failure:
 
+		gd.scheduler.Lock()
+		for _, u := range svc.units {
+			if u == nil {
+				continue
+			}
+			delete(gd.pendingContainers, u.ID)
+		}
+		gd.scheduler.Unlock()
+
 		logrus.Errorf("Exec Error:%v", err)
 		err = database.TxSetServiceStatus(&svc.Service, svc.task, svc.Status, _StatusTaskFailed, time.Now(), err.Error())
 		if err != nil {
@@ -90,35 +99,6 @@ func (gd *Gardener) serviceExecute() error {
 	}
 }
 
-func (gd *Gardener) RecreateAndStartService(nameOrID string) error {
-	var svc *Service
-	gd.Lock()
-	for i := range gd.services {
-		if gd.services[i].ID == nameOrID || gd.services[i].Name == nameOrID {
-			svc = gd.services[i]
-			break
-		}
-	}
-	gd.Unlock()
-
-	if svc == nil {
-		return fmt.Errorf("Not Found Service %s", nameOrID)
-	}
-
-	val := atomic.LoadInt64(&svc.Status)
-	if val == _StatusServiceAlloction ||
-		val == _StatusServiceCreateFailed ||
-		val == _StatusServiceStartFailed {
-
-		return fmt.Errorf("Status Conflict:expected %d/%d/%d but got %d",
-			_StatusServiceAlloction, _StatusServiceCreateFailed, _StatusServiceStartFailed, val)
-	}
-
-	gd.ServiceToExecute(svc)
-
-	return nil
-}
-
 func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 	defer func() {
 		if err != nil {
@@ -128,12 +108,16 @@ func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 		}
 	}()
 
-	index, funcs := 0, make([]func() error, len(svc.pendingContainers))
+	funcs := make([]func() error, len(svc.units))
+	for i := range svc.units {
+		if svc.units[i] == nil {
+			logrus.Warning("%s:nil pointer in service units", svc.Name)
+			continue
+		}
 
-	for id := range svc.pendingContainers {
-		swarmID := id
+		swarmID := svc.units[i].ID
 
-		funcs[index] = func() error {
+		funcs[i] = func() error {
 			err := svc.createPendingContainer(gd, swarmID)
 			if err != nil {
 				logrus.Errorf("swarmID %s,Error:%s", swarmID, err)
@@ -141,40 +125,20 @@ func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 
 			return err
 		}
-		index++
 	}
 
 	err = GoConcurrency(funcs)
-	if err == nil {
-		svc.pendingContainers = nil
-	} else {
-		gd.scheduler.Lock()
-		for id, value := range svc.pendingContainers {
-			if _, ok := gd.pendingContainers[id]; !ok {
-				gd.pendingContainers[id] = value
-			}
-		}
-		gd.scheduler.Unlock()
+	if err != nil {
+		logrus.Errorf("Create Service %s Containers Error:%s", svc.Name, err)
 	}
 
 	return err
 }
 
-func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) error {
+func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) (err error) {
 	if swarmID == "" {
 		return fmt.Errorf("The swarmID is Null")
 	}
-	pending := svc.pendingContainers[swarmID]
-	if pending == nil || pending.Config == nil || pending.Engine == nil {
-		return fmt.Errorf("pendingContainer or ContainerConfig or Engine is nil")
-	}
-	logrus.Debugf("[MG]svc.getUnit :%v", pending)
-
-	u, err := svc.getUnit(pending.Name)
-	if err != nil || u == nil {
-		return fmt.Errorf("%s:getunit err:%v", pending.Name, err)
-	}
-	logrus.Debugf("[MG]the unit:%v", u)
 
 	if svc.authConfig == nil {
 		svc.authConfig, err = gd.RegistryAuthConfig()
@@ -186,9 +150,15 @@ func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) error {
 	logrus.Debug("[MG]create container")
 	container, err := gd.createContainerInPending(swarmID, svc.authConfig)
 	if err != nil {
-		return fmt.Errorf("Container Create Failed %s,%s", pending.Name, err)
+		return fmt.Errorf("Container Create Failed %s,%s", swarmID, err)
 	}
-	logrus.Debug("container created:", container)
+
+	logrus.Debug("container created:", container.ID)
+
+	u, err := svc.getUnit(swarmID)
+	if err != nil || u == nil {
+		return fmt.Errorf("%s:get unit err:%v", svc.Name, err)
+	}
 
 	u.container = container
 	u.config = container.Config
@@ -201,7 +171,6 @@ func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) error {
 	err = gd.SaveContainerToConsul(container)
 	if err != nil {
 		logrus.Errorf("Save Container To Consul error:%s", err)
-		// return err
 	}
 
 	return nil

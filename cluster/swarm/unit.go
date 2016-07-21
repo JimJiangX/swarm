@@ -856,6 +856,7 @@ func getPluginAddr(IP string, port int) string {
 }
 
 func (u *unit) saveToDisk() error {
+	logrus.Debugf("%s:save unit To Disk", u.Name)
 
 	return database.UpdateUnitInfo(u.Unit)
 }

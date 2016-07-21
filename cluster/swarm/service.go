@@ -35,8 +35,6 @@ type Service struct {
 	database.Service
 	base *structs.PostServiceRequest
 
-	pendingContainers map[string]*pendingContainer
-
 	units  []*unit
 	users  []database.User
 	backup *database.BackupStrategy
@@ -47,9 +45,8 @@ type Service struct {
 
 func NewService(svc database.Service, unitNum int) *Service {
 	return &Service{
-		Service:           svc,
-		units:             make([]*unit, 0, unitNum),
-		pendingContainers: make(map[string]*pendingContainer, unitNum),
+		Service: svc,
+		units:   make([]*unit, 0, unitNum),
 	}
 }
 

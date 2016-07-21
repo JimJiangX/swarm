@@ -1132,17 +1132,13 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	if !withCondition {
 		tasks, err = database.ListTask()
-		logrus.Debugf("List Tasks")
+		logrus.Debug("List Tasks")
 	}
 
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+		logrus.Errorf("getTasks error:%+v", err)
 
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -1668,23 +1664,6 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
-}
-
-// POST /services/{name:.*}/recreate
-func postServiceRecreate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
-	err := gd.RecreateAndStartService(name)
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
 }
 
 // POST /services/{name:.*}/scale
