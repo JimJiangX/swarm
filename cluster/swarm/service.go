@@ -21,6 +21,7 @@ import (
 	"github.com/pkg/errors"
 	swm_structs "github.com/yiduoyunQ/sm/sm-svr/structs"
 	"github.com/yiduoyunQ/smlib"
+	"golang.org/x/net/context"
 )
 
 var (
@@ -1715,4 +1716,58 @@ func checkContainerError(err error) error {
 	}
 
 	return err
+}
+
+func (svc *Service) Slowlog(enable, notUsingIndexxes bool, longQueryTime int) error {
+	sqls := svc.getUnitByType(_UpsqlType)
+	if len(sqls) == 0 {
+		return errors.Errorf("Service %s Has no '%s' Type Unit", svc.Name, _UpsqlType)
+	}
+
+	var monitor, db *database.User
+	for i := range svc.users {
+		if svc.users[i].Type == _User_Monitor {
+			monitor = &svc.users[i]
+			break
+		} else if svc.users[i].Type == _User_DB {
+			db = &svc.users[i]
+		}
+	}
+	if monitor == nil && db != nil {
+		monitor = db
+	}
+
+	commands := ""
+	cmd := fmt.Sprintf(`mysql -S /DBAASDAT/upsql.sock mysql -u%s -p%s  -e"%s"`, monitor.Username, monitor.Password)
+
+	if !enable {
+		commands = "set global slow_query_log=0;"
+	} else {
+		commands = "set global slow_query_log=1;"
+		if longQueryTime > 0 {
+			commands += fmt.Sprintf("set global long_query_time = %d;", longQueryTime)
+		}
+		if notUsingIndexxes {
+			commands += "set global log_queries_not_using_indexes=1;"
+		}
+	}
+
+	cmd = fmt.Sprintf(cmd, commands)
+
+	for i := range sqls {
+		eng, err := sqls[i].Engine()
+		if err != nil {
+			return err
+		}
+
+		inspect, err := containerExec(context.Background(), eng, sqls[i].ContainerID, []string{cmd}, false)
+		if err != nil {
+			logrus.Errorf("%s exec %s,error:%s", sqls[i].Name, cmd, err)
+
+			return err
+		}
+		logrus.Debugf("%s exec %s:%+v", sqls[i].Name, cmd, inspect)
+	}
+
+	return nil
 }

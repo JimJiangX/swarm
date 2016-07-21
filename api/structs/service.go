@@ -186,3 +186,9 @@ type UnitInfo struct {
 	// CheckInterval int    `json:"check_interval"`
 	Info types.ContainerJSON `json:",omitempty"`
 }
+
+type PostSlowlogRequest struct {
+	Enable          bool
+	NotUsingIndexes bool `json:"not_using_indexes,omitempty"`
+	LongQueryTime   int  `json:"long_query_time,omitempty"`
+}
