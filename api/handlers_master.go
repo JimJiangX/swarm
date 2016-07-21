@@ -693,17 +693,16 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 		logrus.Error("ListUnitByServiceID", err)
 	}
 
-	switchManager := ""
+	roles := make(map[string]string)
 	for i := range units {
 		if units[i].Type == "switch_manager" {
-			switchManager = units[i].ID
+			roles, err = swarm.GetUnitRoleFromConsul(client, service.ID+"/"+units[i].Name)
+			if err == nil {
+				break
+			} else {
+				logrus.Error(err)
+			}
 		}
-	}
-
-	roles, err := swarm.GetUnitRoleFromConsul(client, service.ID+"/"+switchManager)
-	if err != nil {
-		logrus.Error(err)
-		roles = make(map[string]string)
 	}
 
 	checks, err := swarm.HealthChecksFromConsul(client, "any", nil)
