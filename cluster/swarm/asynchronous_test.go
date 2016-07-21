@@ -224,4 +224,10 @@ func ExampleAsyncTask() {
 	// call recorder.Update
 	// call recorder.Update
 	// call recorder.Update
+	// call recorder.Update
+	// call recorder.Update
+	// call recorder.Update
+	// call recorder.Update
+	// call recorder.Update
+	// call recorder.Update
 }
