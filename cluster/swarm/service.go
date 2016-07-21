@@ -532,6 +532,10 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 		logrus.Errorf("Registry Auth Config Error:%s", err)
 		return nil, err
 	}
+	users, err := database.ListUsersByService(service.ID, "")
+	if err != nil {
+		logrus.Errorf("List Users By Service %s,error:%s", service.ID, err)
+	}
 
 	svc := NewService(service, len(units))
 	svc.Lock()
@@ -548,6 +552,7 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	}
 	svc.backup = backup
 	svc.base = base
+	svc.users = users
 	svc.authConfig = authConfig
 
 	gd.Lock()
@@ -557,6 +562,7 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 		if gd.services[i].ID == svc.ID {
 			gd.services[i] = svc
 			exist = true
+			break
 		}
 	}
 	if !exist {
