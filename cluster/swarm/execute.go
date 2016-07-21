@@ -49,7 +49,7 @@ func (gd *Gardener) serviceExecute() error {
 		err = gd.initAndStartService(svc)
 		if err != nil {
 			logrus.Errorf("%s init And Start Service Error:%s", svc.Name, err)
-			// goto failure
+			goto failure
 		}
 
 		logrus.Debug("[MG]TxSetServiceStatus")
@@ -73,7 +73,7 @@ func (gd *Gardener) serviceExecute() error {
 		}
 		svc.Unlock()
 
-		sys, err := database.GetSystemConfig()
+		sys, err := gd.SystemConfig()
 		if err != nil {
 			continue
 		}
@@ -88,7 +88,6 @@ func (gd *Gardener) serviceExecute() error {
 			continue
 		}
 	}
-
 }
 
 func (gd *Gardener) RecreateAndStartService(nameOrID string) error {
