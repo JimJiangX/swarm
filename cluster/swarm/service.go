@@ -1726,15 +1726,18 @@ func (svc *Service) Slowlog(enable, notUsingIndexxes bool, longQueryTime int) er
 
 	var monitor, db *database.User
 	for i := range svc.users {
-		if svc.users[i].Type == _User_Monitor {
+		if svc.users[i].Role == _User_Monitor {
 			monitor = &svc.users[i]
 			break
-		} else if svc.users[i].Type == _User_DB {
+		} else if svc.users[i].Role == _User_DB {
 			db = &svc.users[i]
 		}
 	}
 	if monitor == nil && db != nil {
 		monitor = db
+	}
+	if monitor == nil {
+		return errors.Errorf("Not Found Service %s User:'%s'", svc.Name, _User_Monitor)
 	}
 
 	commands := ""
