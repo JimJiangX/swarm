@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/astaxie/beego/config"
@@ -92,7 +93,7 @@ func (u *unit) factory() error {
 	return nil
 }
 
-func (u *unit) getEngine() (*cluster.Engine, error) {
+func (u *unit) Engine() (*cluster.Engine, error) {
 	if u.engine != nil {
 		return u.engine, nil
 	}
@@ -105,8 +106,8 @@ func (u *unit) getEngine() (*cluster.Engine, error) {
 	return nil, errEngineIsNil
 }
 
-func (u *unit) getEngineAPIClient() (client.APIClient, error) {
-	eng, err := u.getEngine()
+func (u *unit) ContainerAPIClient() (client.ContainerAPIClient, error) {
+	eng, err := u.Engine()
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +116,7 @@ func (u *unit) getEngineAPIClient() (client.APIClient, error) {
 		return nil, errEngineIsNil
 	}
 
-	client := eng.EngineAPIClient()
+	client := eng.ContainerAPIClient()
 	if client == nil {
 		return nil, errEngineAPIisNil
 	}
@@ -270,7 +271,7 @@ func pullImage(engine *cluster.Engine, image string, authConfig *types.AuthConfi
 	return nil
 }
 
-func createVolume(eng *cluster.Engine, lv database.LocalVolume) (*cluster.Volume, error) {
+func createVolume(eng *cluster.Engine, lv database.LocalVolume) (*types.Volume, error) {
 	logrus.Debugf("Engine %s create Volume %s", eng.Addr, lv.Name)
 
 	req := &types.VolumeCreateRequest{
@@ -345,18 +346,8 @@ func extendSanStoreageVG(host string, lun database.LUN) error {
 	return sdk.SanVgExtend(addr, config)
 }
 
-func (u *unit) createContainer(authConfig *types.AuthConfig) (*cluster.Container, error) {
-	container, err := u.engine.Create(u.config, u.Unit.ID, true, authConfig)
-	if err == nil && container != nil {
-		u.container = container
-		u.Unit.ContainerID = container.ID
-	}
-
-	return container, err
-}
-
 func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
-	client, err := u.getEngineAPIClient()
+	client, err := u.ContainerAPIClient()
 	if err != nil {
 		return err
 	}
@@ -365,7 +356,7 @@ func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
 }
 
 func (u *unit) removeContainer(force, rmVolumes bool) error {
-	engine, err := u.getEngine()
+	engine, err := u.Engine()
 	if err != nil {
 		return err
 	}
@@ -392,7 +383,7 @@ func (u *unit) removeContainer(force, rmVolumes bool) error {
 }
 
 func (u *unit) startContainer() error {
-	engine, err := u.getEngine()
+	engine, err := u.Engine()
 	if err != nil {
 		return err
 	}
@@ -426,12 +417,18 @@ func startContainer(containerID string, engine *cluster.Engine, networkings []IP
 }
 
 func (u *unit) forceStopContainer(timeout int) error {
-	client, err := u.getEngineAPIClient()
+	client, err := u.ContainerAPIClient()
 	if err != nil {
 		return err
 	}
 
-	err = client.ContainerStop(context.Background(), u.Unit.ContainerID, timeout)
+	var timeoutptr *time.Duration = nil
+	if timeout > 0 {
+		temp := time.Duration(timeout) * time.Second
+		timeoutptr = &temp
+	}
+
+	err = client.ContainerStop(context.Background(), u.Unit.ContainerID, timeoutptr)
 	if err := checkContainerError(err); err == errContainerNotRunning {
 		return nil
 	}
@@ -450,11 +447,11 @@ func (u *unit) restartContainer(ctx context.Context) error {
 	if u.ContainerCmd == nil {
 		return nil
 	}
-	engine, err := u.getEngine()
+	engine, err := u.Engine()
 	if err != nil {
 		return err
 	}
-	client := engine.EngineAPIClient()
+	client := engine.ContainerAPIClient()
 
 	cmd := u.StopServiceCmd()
 	if len(cmd) == 0 {
@@ -467,16 +464,18 @@ func (u *unit) restartContainer(ctx context.Context) error {
 		err = fmt.Errorf("%s stop service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
 
-	return client.ContainerRestart(ctx, u.Unit.ContainerID, 5)
+	timeout := 5 * time.Second
+
+	return client.ContainerRestart(ctx, u.Unit.ContainerID, &timeout)
 }
 
 func (u *unit) renameContainer(name string) error {
-	client, err := u.getEngineAPIClient()
+	client, err := u.ContainerAPIClient()
 	if err != nil {
 		return err
 	}
 
-	return client.ContainerRename(context.Background(), u.container.ID, u.Unit.ID)
+	return client.ContainerRename(context.Background(), u.container.ID, name)
 }
 
 func createNetworking(host string, networkings []IPInfo) error {
@@ -540,7 +539,7 @@ func updateVolume(host string, lv database.LocalVolume, size int) error {
 }
 
 func (u *unit) activateVG(config sdk.ActiveConfig) error {
-	engine, err := u.getEngine()
+	engine, err := u.Engine()
 	if err != nil {
 		return err
 	}
@@ -554,7 +553,7 @@ func (u *unit) activateVG(config sdk.ActiveConfig) error {
 }
 
 func (u *unit) deactivateVG(config sdk.DeactivateConfig) error {
-	engine, err := u.getEngine()
+	engine, err := u.Engine()
 	if err != nil {
 		return err
 	}
@@ -607,7 +606,7 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 		return err
 	}
 
-	engine, err := u.getEngine()
+	engine, err := u.Engine()
 	if err != nil {
 		return err
 	}

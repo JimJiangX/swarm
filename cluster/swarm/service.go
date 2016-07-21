@@ -1018,7 +1018,7 @@ func (svc *Service) registerServices(config database.ConsulConfig) (err error) {
 
 func (svc *Service) deregisterServices(config consulapi.Config) error {
 	for _, u := range svc.units {
-		eng, err := u.getEngine()
+		eng, err := u.Engine()
 		if err != nil {
 			logrus.Error(err)
 			continue
@@ -1377,7 +1377,7 @@ func (gd *Gardener) serviceScale(svc *Service, scale structs.PostServiceScaledRe
 
 	for _, pending := range storePendings {
 		for i := range pending.sanStore {
-			eng, err := pending.unit.getEngine()
+			eng, err := pending.unit.Engine()
 			if err != nil {
 				logrus.Errorf("%s %s", pending.unit.Name, err)
 				return err
@@ -1568,7 +1568,7 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 	for i := range svc.units {
 		u := svc.units[i]
 		funcs[i] = func() error {
-			if _, err := u.getEngine(); err == errEngineIsNil {
+			if _, err := u.Engine(); err == errEngineIsNil {
 				logrus.Warnf("Remove Unit %s,error:%s", u.Name, err)
 				return nil
 			}

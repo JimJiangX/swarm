@@ -29,7 +29,7 @@ func (e *Engine) UsedCpus() int64 {
 	return r
 }
 
-func (e *Engine) EngineAPIClient() client.APIClient {
+func (e *Engine) ContainerAPIClient() client.ContainerAPIClient {
 
 	return e.apiClient
 }

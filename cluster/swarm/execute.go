@@ -187,15 +187,16 @@ func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) error {
 	}
 	logrus.Debugf("[MG]the unit:%v", u)
 
-	logrus.Debugf("[MG]start pull image %s", u.config.Image)
-	authConfig, err := gd.RegistryAuthConfig()
-	if err != nil {
-		return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
+	if svc.authConfig == nil {
+		svc.authConfig, err = gd.RegistryAuthConfig()
+		if err != nil {
+			return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
+		}
 	}
 
-	if err := pullImage(u.engine, u.config.Image, authConfig); err != nil {
-		return fmt.Errorf("pullImage Error:%s", err)
-	}
+	// if err := pullImage(u.engine, u.config.Image, authConfig); err != nil {
+	//   return fmt.Errorf("pullImage Error:%s", err)
+	// }
 
 	logrus.Debug("[MG]create container")
 	container, err := gd.createContainerInPending(swarmID, svc.authConfig)
@@ -232,13 +233,9 @@ func (gd *Gardener) createContainerInPending(swarmID string, authConfig *types.A
 	}
 
 	engine := pending.Engine
-	container, err := engine.Create(pending.Config, pending.Name, true, authConfig)
-
+	container, err := engine.CreateContainer(pending.Config, pending.Name, true, authConfig)
 	if err != nil {
-		for retries := int64(0); retries < gd.createRetry && err != nil; retries++ {
-			logrus.WithFields(logrus.Fields{"Name": "Swarm"}).Warnf("Failed to create container: %s, retrying", err)
-			container, err = engine.Create(pending.Config, pending.Name, true, authConfig)
-		}
+		logrus.WithFields(logrus.Fields{"Name": "Swarm"}).Warnf("Failed to create container: %s", err)
 	}
 
 	if err == nil && container != nil {

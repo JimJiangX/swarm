@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
@@ -105,7 +106,7 @@ func (gd *Gardener) serviceScheduler() {
 func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err error) {
 	logrus.Debug("create Service Resources...")
 
-	volumes := make([]*cluster.Volume, 0, 10)
+	volumes := make([]*types.Volume, 0, 10)
 
 	defer func() {
 		if err != nil {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
@@ -206,9 +207,9 @@ func newPendingAllocResource() *pendingAllocResource {
 	}
 }
 
-func createVolumes(engine *cluster.Engine, lvs []database.LocalVolume, lun []database.LUN) ([]*cluster.Volume, error) {
+func createVolumes(engine *cluster.Engine, lvs []database.LocalVolume, lun []database.LUN) ([]*types.Volume, error) {
 	logrus.Debugf("Engine %s create Volumes %d", engine.Addr, len(lvs))
-	volumes := make([]*cluster.Volume, 0, len(lvs))
+	volumes := make([]*types.Volume, 0, len(lvs))
 
 	for i := range lvs {
 		// if volume create on san storage,should created VG before create Volume

@@ -33,7 +33,7 @@ func containerExec(ctx context.Context, engine *cluster.Engine, containerID stri
 	if engine == nil {
 		return inspect, errEngineIsNil
 	}
-	client := engine.EngineAPIClient()
+	client := engine.ContainerAPIClient()
 	if client == nil {
 		return inspect, errEngineAPIisNil
 	}
@@ -92,7 +92,7 @@ func containerExec(ctx context.Context, engine *cluster.Engine, containerID stri
 	return inspect, err
 }
 
-func containerExecAttch(ctx context.Context, client client.APIClient, execID string, execConfig types.ExecConfig) error {
+func containerExecAttch(ctx context.Context, client client.ContainerAPIClient, execID string, execConfig types.ExecConfig) error {
 	var (
 		out, stderr io.Writer     = os.Stdout, os.Stderr
 		in          io.ReadCloser = os.Stdin
@@ -113,7 +113,7 @@ func containerExecAttch(ctx context.Context, client client.APIClient, execID str
 }
 
 // getExecExitCode perform an inspect on the exec command. It returns ContainerExecInspect.
-func getExecExitCode(ctx context.Context, cli client.APIClient, execID string) (types.ContainerExecInspect, int, error) {
+func getExecExitCode(ctx context.Context, cli client.ContainerAPIClient, execID string) (types.ContainerExecInspect, int, error) {
 	resp, err := cli.ContainerExecInspect(ctx, execID)
 	if err != nil {
 		// If we can't connect, then the daemon probably died.

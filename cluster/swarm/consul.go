@@ -185,7 +185,7 @@ func pingConsul(host string, sys database.Configurations) ([]string, []*api.Clie
 }
 
 func registerHealthCheck(u *unit, config database.ConsulConfig, context *Service) error {
-	eng, err := u.getEngine()
+	eng, err := u.Engine()
 	if err != nil {
 		return err
 	}

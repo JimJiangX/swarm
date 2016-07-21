@@ -242,15 +242,11 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		gd.pendingContainers[swarmID] = pending.pendingContainer
 
 		logrus.Debugf("[MG]start pull image %s", config.Image)
-		authConfig, err := gd.RegistryAuthConfig()
-		if err != nil {
-			return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
-		}
 
-		err = pullImage(engine, config.Image, authConfig)
-		if err != nil {
-			return fmt.Errorf("pullImage Error:%s", err)
-		}
+		//  err = pullImage(engine, config.Image, authConfig)
+		//  if err != nil {
+		//  	return fmt.Errorf("pullImage Error:%s", err)
+		//  }
 
 		dc, node, err := gd.GetNode(engine.ID)
 		if err != nil {
@@ -265,7 +261,13 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		container, err := engine.Create(config, u.Name, false, authConfig)
+		if svc.authConfig == nil {
+			svc.authConfig, err = gd.RegistryAuthConfig()
+			if err != nil {
+				return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
+			}
+		}
+		container, err := engine.CreateContainer(config, u.Name, true, svc.authConfig)
 		if err != nil {
 			return err
 		}
@@ -758,16 +760,10 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 		gd.pendingContainers[swarmID] = pending.pendingContainer
 
-		logrus.Debugf("[MG]start pull image %s", config.Image)
-		authConfig, err := gd.RegistryAuthConfig()
-		if err != nil {
-			return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
-		}
-
-		err = pullImage(engine, config.Image, authConfig)
-		if err != nil {
-			return fmt.Errorf("pullImage Error:%s", err)
-		}
+		// err = pullImage(engine, config.Image, authConfig)
+		// if err != nil {
+		//  	return fmt.Errorf("pullImage Error:%s", err)
+		// }
 
 		err = createServiceResources(gd, []*pendingAllocResource{pending})
 		if err != nil {
@@ -775,8 +771,15 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
+		if svc.authConfig == nil {
+			svc.authConfig, err = gd.RegistryAuthConfig()
+			if err != nil {
+				return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
+			}
+		}
+
 		logrus.Debugf("Engine %s create container %s", engine.Addr, swarmID)
-		container, err := engine.Create(config, swarmID, false, authConfig)
+		container, err := engine.CreateContainer(config, swarmID, true, svc.authConfig)
 		if err != nil {
 			return err
 		}
