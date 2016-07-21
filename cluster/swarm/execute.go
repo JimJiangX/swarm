@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime/debug"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -130,32 +129,24 @@ func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 		}
 	}()
 
-	errCh := make(chan error, 5)
-	wg := new(sync.WaitGroup)
+	index, funcs := 0, make([]func() error, len(svc.pendingContainers))
 
-	for swarmID := range svc.pendingContainers {
-		wg.Add(1)
-		go func(gd *Gardener, svc *Service, swarmID string, wg *sync.WaitGroup, ch chan error) {
-			defer wg.Done()
+	for id := range svc.pendingContainers {
+		swarmID := id
 
+		funcs[index] = func() error {
 			err := svc.createPendingContainer(gd, swarmID)
 			if err != nil {
 				logrus.Errorf("swarmID %s,Error:%s", swarmID, err)
-				ch <- err
 			}
 
-		}(gd, svc, swarmID, wg, errCh)
-	}
-
-	wg.Wait()
-	close(errCh)
-
-	for err1 := range errCh {
-		if err1 != nil {
-			err = err1
+			return err
 		}
+
+		index++
 	}
 
+	err = GoConcurrency(funcs)
 	if err == nil {
 		svc.pendingContainers = nil
 	} else {
