@@ -122,7 +122,7 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 		}
 
 		for _, pending := range allocs {
-			if pending == nil || pending.engine == nil {
+			if pending == nil || pending.engine == nil || len(pending.networkings) == 0 {
 				continue
 			}
 
@@ -139,14 +139,15 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 		}
 		out, err := createVolumes(pending.engine, pending.localStore, pending.sanStore)
 		volumes = append(volumes, out...)
-
 		if err != nil {
 			return err
 		}
 
-		err = createNetworking(pending.engine.IP, pending.networkings)
-		if err != nil {
-			return err
+		if len(pending.networkings) > 0 {
+			err = createNetworking(pending.engine.IP, pending.networkings)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

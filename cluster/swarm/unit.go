@@ -411,7 +411,7 @@ func startContainer(containerID string, engine *cluster.Engine, networkings []IP
 		return err
 	}
 
-	logrus.Debugf("Engine %s start container ", engine.Addr, containerID)
+	logrus.Debugf("Engine %s start container %s", engine.Addr, containerID)
 
 	return engine.StartContainer(containerID, nil)
 }

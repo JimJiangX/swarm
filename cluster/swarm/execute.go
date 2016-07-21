@@ -142,7 +142,6 @@ func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 
 			return err
 		}
-
 		index++
 	}
 
@@ -184,10 +183,6 @@ func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) error {
 			return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
 		}
 	}
-
-	// if err := pullImage(u.engine, u.config.Image, authConfig); err != nil {
-	//   return fmt.Errorf("pullImage Error:%s", err)
-	// }
 
 	logrus.Debug("[MG]create container")
 	container, err := gd.createContainerInPending(swarmID, svc.authConfig)

@@ -243,11 +243,6 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		logrus.Debugf("[MG]start pull image %s", config.Image)
 
-		//  err = pullImage(engine, config.Image, authConfig)
-		//  if err != nil {
-		//  	return fmt.Errorf("pullImage Error:%s", err)
-		//  }
-
 		dc, node, err := gd.GetNode(engine.ID)
 		if err != nil {
 			err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
@@ -541,8 +536,6 @@ func cleanOldContainer(old *cluster.Container, lvs []database.LocalVolume) error
 		logrus.Errorf("engine %s remove container %s error:%s", engine.Addr, old.Info.Name, err)
 	}
 
-	logrus.Debug("Remove Volumes")
-
 	// remove old LocalVolume
 	for i := range lvs {
 		err := engine.RemoveVolume(lvs[i].Name)
@@ -550,34 +543,10 @@ func cleanOldContainer(old *cluster.Container, lvs []database.LocalVolume) error
 			logrus.Errorf("%s remove old volume %s", old.Info.Name, lvs[i].Name)
 			return err
 		}
+		logrus.Debugf("Engine %s remove volume %s", engine.Addr, lvs[i].Name)
 	}
 
 	return nil
-}
-
-func deregisterToServices(addr, unitID string, sys database.Configurations) error {
-	configs := sys.GetConsulConfigs()
-	if len(configs) == 0 {
-		return fmt.Errorf("GetConsulConfigs error %v %v", configs[0])
-	}
-
-	logrus.Debug("deregister HealthCheck %s", unitID)
-
-	err := deregisterHealthCheck(addr, unitID, configs[0])
-	if err != nil {
-		logrus.Error(err)
-	}
-
-	logrus.Debug("deregister Horus %s", unitID)
-
-	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-
-	err = deregisterToHorus(horus, []deregisterService{{unitID}})
-	if err != nil {
-		logrus.Errorf("deregisterToHorus error:%s,endpointer:%s", err, unitID)
-	}
-
-	return err
 }
 
 func updateUnit(unit database.Unit, lvs []database.LocalVolume, reserveSAN bool) error {
@@ -760,11 +729,6 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 		gd.pendingContainers[swarmID] = pending.pendingContainer
 
-		// err = pullImage(engine, config.Image, authConfig)
-		// if err != nil {
-		//  	return fmt.Errorf("pullImage Error:%s", err)
-		// }
-
 		err = createServiceResources(gd, []*pendingAllocResource{pending})
 		if err != nil {
 			logrus.Errorf("create Service Resources error:%s", err)
@@ -889,6 +853,31 @@ func registerToServers(u *unit, svc *Service, sys database.Configurations) error
 	err = registerToHorus(horus, []registerService{obj})
 	if err != nil {
 		logrus.Errorf("registerToHorus error:%s", err)
+	}
+
+	return err
+}
+
+func deregisterToServices(addr, unitID string, sys database.Configurations) error {
+	configs := sys.GetConsulConfigs()
+	if len(configs) == 0 {
+		return fmt.Errorf("GetConsulConfigs error %v %v", configs[0])
+	}
+
+	logrus.Debugf("deregister HealthCheck %s", unitID)
+
+	err := deregisterHealthCheck(addr, unitID, configs[0])
+	if err != nil {
+		logrus.Error(err)
+	}
+
+	logrus.Debugf("deregister Horus %s", unitID)
+
+	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
+
+	err = deregisterToHorus(horus, []deregisterService{{unitID}})
+	if err != nil {
+		logrus.Errorf("deregisterToHorus error:%s,endpointer:%s", err, unitID)
 	}
 
 	return err
