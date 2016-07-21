@@ -291,7 +291,7 @@ func getNetwork(c *context, w http.ResponseWriter, r *http.Request) {
 		// see https://github.com/docker/swarm/issues/1969
 		cleanNetwork := network.RemoveDuplicateEndpoints()
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(cleanNetwork)
+		json.NewEncoder(w).Encode(cleanNetwork.NetworkResource)
 		return
 	}
 	httpError(w, fmt.Sprintf("No such network: %s", id), http.StatusNotFound)
@@ -302,7 +302,7 @@ func getVolume(c *context, w http.ResponseWriter, r *http.Request) {
 	var name = mux.Vars(r)["volumename"]
 	if volume := c.cluster.Volumes().Get(name); volume != nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(volume)
+		json.NewEncoder(w).Encode(volume.Volume)
 		return
 	}
 	httpError(w, fmt.Sprintf("No such volume: %s", name), http.StatusNotFound)
@@ -310,18 +310,18 @@ func getVolume(c *context, w http.ResponseWriter, r *http.Request) {
 
 // GET /volumes
 func getVolumes(c *context, w http.ResponseWriter, r *http.Request) {
-	volumes := struct{ Volumes []*apitypes.Volume }{}
+	volumesListResponse := apitypes.VolumesListResponse{}
 
 	for _, volume := range c.cluster.Volumes() {
 		tmp := (*volume).Volume
 		if tmp.Driver == "local" {
 			tmp.Name = volume.Engine.Name + "/" + volume.Name
 		}
-		volumes.Volumes = append(volumes.Volumes, &tmp)
+		volumesListResponse.Volumes = append(volumesListResponse.Volumes, &tmp)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(volumes)
+	json.NewEncoder(w).Encode(volumesListResponse)
 }
 
 // GET /containers/ps
@@ -537,7 +537,10 @@ func getContainerJSON(c *context, w http.ResponseWriter, r *http.Request) {
 
 // POST /containers/create
 func postContainersCreate(c *context, w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	var (
 		defaultMemorySwappiness = int64(-1)
 		name                    = r.Form.Get("name")
@@ -678,14 +681,8 @@ func postImagesCreate(c *context, w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			json.Unmarshal(buf, &authConfig)
 		}
-
-		if tag := r.Form.Get("tag"); tag != "" {
-			if tagHasDigest(tag) {
-				image += "@" + tag
-			} else {
-				image += ":" + tag
-			}
-		}
+		tag := r.Form.Get("tag")
+		image := getImageRef(image, tag)
 
 		var errorMessage string
 		errorFound := false
@@ -724,7 +721,8 @@ func postImagesCreate(c *context, w http.ResponseWriter, r *http.Request) {
 			}
 			sendJSONMessage(wf, what, status)
 		}
-		c.cluster.Import(source, repo, tag, r.Body, callback)
+		ref := getImageRef(repo, tag)
+		c.cluster.Import(source, ref, tag, r.Body, callback)
 		if errorFound {
 			sendErrorJSONMessage(wf, 1, errorMessage)
 		}
@@ -1178,8 +1176,9 @@ func postTagImage(c *context, w http.ResponseWriter, r *http.Request) {
 	tag := r.Form.Get("tag")
 	force := boolValue(r, "force")
 
+	ref := getImageRef(repo, tag)
 	// call cluster tag image
-	if err := c.cluster.TagImage(name, repo, tag, force); err != nil {
+	if err := c.cluster.TagImage(name, ref, force); err != nil {
 		if strings.HasPrefix(err.Error(), "No such image") {
 			httpError(w, err.Error(), http.StatusNotFound)
 			return

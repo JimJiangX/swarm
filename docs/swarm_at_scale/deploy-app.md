@@ -39,7 +39,7 @@ on the Swarm `manager` instance.
     $ eval $(docker-machine env manager)
     ```
 
-    You can create the network on an cluster node at the network is visible on
+    You can create the network on a cluster node at the network is visible on
     them all.
 
 2. Create the `voteapp` container network.
@@ -87,7 +87,7 @@ images and which do not:
 - Results containers: custom built image
 
 You can launch these containers from any host in the cluster using the commands
-in this section. Each command includs a `-H `flag so that they execute against
+in this section. Each command includes a `-H `flag so that they execute against
 the Swarm manager.
 
 The commands also all use the `-e` flag which is a Swarm constraint. The
@@ -256,7 +256,7 @@ Now, you can test your application.
 ## Extra Credit: Deployment with Docker Compose
 
 Up to this point, you've deployed each application container individually. This
-can be cumbersome espeically because their are several different containers and
+can be cumbersome especially because their are several different containers and
 starting them is order dependent. For example, that database should be running
 before the worker.
 
@@ -270,15 +270,15 @@ the containers at once. This extra credit
 
         $ DOCKER_HOST=$(docker-machine ip manager):3376
 
-    b. List all the application continers on the Swarm.
+    b. List all the application containers on the Swarm.
 
     c. Stop and remove each container.
 
 2. Try to create Compose file on your own by reviewing the tasks in this tutorial.
 
-    <a href="http://192.168.99.100:8000/compose/compose-file/#entrypoint" target="_blank">The
-    version 2 Compose file format</a> is the best to use. Translate each `docker
-    run` command into a service in the `docker-compose.yml` file. For example,
+    [The version 2 Compose file format](/compose/compose-file.md)
+    is the best to use. Translate each `docker run` command into a service
+    in the `docker-compose.yml` file. For example,
     this command:
 
     ```bash
@@ -394,7 +394,7 @@ result file</a>
 8. Check your work again by visiting the `http://vote.myenterprise.com` and
 `http://results.myenterprise.com` again.
 
-9. You can view the logs on an indvidual container.
+9. You can view the logs on an individual container.
 
   ```bash
   $ docker logs scale_voting-app_1

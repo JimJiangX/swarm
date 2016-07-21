@@ -45,7 +45,7 @@ var (
 	}
 
 	mockVersion = types.Version{
-		Version: "1.6.2",
+		Version: "1.8.2",
 	}
 
 	engOpts = &EngineOpts{
@@ -118,7 +118,7 @@ func TestEngineFailureCount(t *testing.T) {
 	assert.True(t, engine.failureCount == 0)
 }
 
-func TestHealthINdicator(t *testing.T) {
+func TestHealthIndicator(t *testing.T) {
 	engine := NewEngine("test", 0, engOpts)
 	assert.True(t, engine.state == statePending)
 	assert.True(t, engine.HealthIndicator() == 0)
@@ -222,13 +222,20 @@ func TestEngineSpecs(t *testing.T) {
 	assert.True(t, engine.isConnected())
 	assert.True(t, engine.IsHealthy())
 
-	assert.Equal(t, engine.Cpus, int64(mockInfo.NCPU))
-	assert.Equal(t, engine.Memory, mockInfo.MemTotal)
-	assert.Equal(t, engine.Labels["storagedriver"], mockInfo.Driver)
-	assert.Equal(t, engine.Labels["executiondriver"], mockInfo.ExecutionDriver)
-	assert.Equal(t, engine.Labels["kernelversion"], mockInfo.KernelVersion)
-	assert.Equal(t, engine.Labels["operatingsystem"], mockInfo.OperatingSystem)
+	mockInfo2 := mockInfo
+	mockInfo2.Labels = []string{"foo=bar", "executiondriver=newdriver", "node=node1"}
+
+	assert.Equal(t, engine.Cpus, int64(mockInfo2.NCPU))
+	assert.Equal(t, engine.Memory, mockInfo2.MemTotal)
+	assert.Equal(t, engine.Labels["storagedriver"], mockInfo2.Driver)
+
+	assert.Equal(t, engine.Labels["executiondriver"], mockInfo2.ExecutionDriver)
+
+	assert.Equal(t, engine.Labels["kernelversion"], mockInfo2.KernelVersion)
+	assert.Equal(t, engine.Labels["operatingsystem"], mockInfo2.OperatingSystem)
 	assert.Equal(t, engine.Labels["foo"], "bar")
+
+	assert.NotEqual(t, engine.Labels["node"], "node1")
 
 	client.Mock.AssertExpectations(t)
 	apiClient.Mock.AssertExpectations(t)
@@ -253,12 +260,80 @@ func TestEngineState(t *testing.T) {
 
 	// The client will return one container at first, then a second one will appear.
 	apiClient.On("ImageList", mock.Anything, mock.AnythingOfType("ImageListOptions")).Return([]types.Image{}, nil).Once()
-	apiClient.On("ContainerList", mock.Anything, types.ContainerListOptions{All: true, Size: false}).Return([]types.Container{{ID: "one"}}, nil).Once()
-	apiClient.On("ContainerInspect", mock.Anything, "one").Return(types.ContainerJSON{ContainerJSONBase: &types.ContainerJSONBase{HostConfig: &containertypes.HostConfig{Resources: containertypes.Resources{CPUShares: 100}}}, Config: &containertypes.Config{}, NetworkSettings: &types.NetworkSettings{Networks: nil}}, nil).Once()
+
+	apiClient.On(
+		"ContainerList",
+		mock.Anything,
+		types.ContainerListOptions{
+			All:  true,
+			Size: false,
+		},
+	).Return(
+		[]types.Container{
+			{
+				ID: "one",
+			},
+		},
+		nil,
+	).Once()
+
+	apiClient.On("ContainerInspect", mock.Anything, "one").Return(
+		types.ContainerJSON{
+			ContainerJSONBase: &types.ContainerJSONBase{
+				HostConfig: &containertypes.HostConfig{
+					Resources: containertypes.Resources{
+						CPUShares: 100,
+					},
+				},
+				State: &types.ContainerState{
+					StartedAt:  "2016-06-06T01:41:38.090313266Z",
+					FinishedAt: "0001-01-01T00:00:00Z",
+				},
+			},
+			Config: &containertypes.Config{},
+			NetworkSettings: &types.NetworkSettings{
+				Networks: nil,
+			},
+		},
+		nil,
+	).Once()
+
 	filterArgs := filters.NewArgs()
 	filterArgs.Add("id", "two")
-	apiClient.On("ContainerList", mock.Anything, types.ContainerListOptions{All: true, Size: false, Filter: filterArgs}).Return([]types.Container{{ID: "two"}}, nil).Once()
-	apiClient.On("ContainerInspect", mock.Anything, "two").Return(types.ContainerJSON{ContainerJSONBase: &types.ContainerJSONBase{HostConfig: &containertypes.HostConfig{Resources: containertypes.Resources{CPUShares: 100}}}, Config: &containertypes.Config{}, NetworkSettings: &types.NetworkSettings{Networks: nil}}, nil).Once()
+
+	apiClient.On(
+		"ContainerList",
+		mock.Anything,
+		types.ContainerListOptions{
+			All:    true,
+			Size:   false,
+			Filter: filterArgs,
+		},
+	).Return(
+		[]types.Container{{ID: "two"}},
+		nil,
+	).Once()
+
+	apiClient.On("ContainerInspect", mock.Anything, "two").Return(
+		types.ContainerJSON{
+			ContainerJSONBase: &types.ContainerJSONBase{
+				HostConfig: &containertypes.HostConfig{
+					Resources: containertypes.Resources{
+						CPUShares: 100,
+					},
+				},
+				State: &types.ContainerState{
+					StartedAt:  "2016-06-06T01:41:38.090313266Z",
+					FinishedAt: "0001-01-01T00:00:00Z",
+				},
+			},
+			Config: &containertypes.Config{},
+			NetworkSettings: &types.NetworkSettings{
+				Networks: nil,
+			},
+		},
+		nil,
+	).Once()
 
 	assert.NoError(t, engine.ConnectWithClient(client, apiClient))
 	assert.True(t, engine.isConnected())
@@ -296,6 +371,10 @@ func TestCreateContainer(t *testing.T) {
 				CPUShares: 1,
 			},
 		}, networktypes.NetworkingConfig{}}
+		state = types.ContainerState{
+			StartedAt:  "2016-06-06T01:41:38.090313266Z",
+			FinishedAt: "0001-01-01T00:00:00Z",
+		}
 		engine     = NewEngine("test", 0, engOpts)
 		client     = mockclient.NewMockClient()
 		apiClient  = engineapimock.NewMockClient()
@@ -329,12 +408,54 @@ func TestCreateContainer(t *testing.T) {
 	id := "id1"
 	apiClient.On("ImageList", mock.Anything, mock.AnythingOfType("ImageListOptions")).Return([]types.Image{}, nil).Once()
 	var auth *types.AuthConfig
-	apiClient.On("ContainerCreate", mock.Anything, &mockConfig.Config, &mockConfig.HostConfig, &mockConfig.NetworkingConfig, name).Return(types.ContainerCreateResponse{ID: id}, nil).Once()
+
+	apiClient.On(
+		"ContainerCreate",
+		mock.Anything,
+		&mockConfig.Config,
+		&mockConfig.HostConfig,
+		&mockConfig.NetworkingConfig,
+		name,
+	).Return(
+		types.ContainerCreateResponse{ID: id},
+		nil,
+	).Once()
+
 	filterArgs := filters.NewArgs()
 	filterArgs.Add("id", id)
-	apiClient.On("ContainerList", mock.Anything, types.ContainerListOptions{All: true, Size: false, Filter: filterArgs}).Return([]types.Container{{ID: id}}, nil).Once()
-	apiClient.On("ContainerInspect", mock.Anything, id).Return(types.ContainerJSON{Config: &config.Config, ContainerJSONBase: &types.ContainerJSONBase{HostConfig: &config.HostConfig}, NetworkSettings: &types.NetworkSettings{Networks: nil}}, nil).Once()
-	container, err := engine.Create(config, name, false, auth)
+
+	apiClient.On(
+		"ContainerList",
+		mock.Anything,
+		types.ContainerListOptions{
+			All:    true,
+			Size:   false,
+			Filter: filterArgs,
+		},
+	).Return(
+		[]types.Container{{ID: id}},
+		nil,
+	).Once()
+
+	apiClient.On(
+		"ContainerInspect",
+		mock.Anything,
+		id,
+	).Return(
+		types.ContainerJSON{
+			Config: &config.Config,
+			ContainerJSONBase: &types.ContainerJSONBase{
+				HostConfig: &config.HostConfig,
+				State:      &state,
+			},
+			NetworkSettings: &types.NetworkSettings{
+				Networks: nil,
+			},
+		},
+		nil,
+	).Once()
+
+	container, err := engine.CreateContainer(config, name, false, auth)
 	assert.Nil(t, err)
 	assert.Equal(t, container.ID, id)
 	assert.Len(t, engine.Containers(), 1)
@@ -343,8 +464,19 @@ func TestCreateContainer(t *testing.T) {
 	name = "test2"
 	mockConfig.HostConfig.CPUShares = int64(math.Ceil(float64(config.HostConfig.CPUShares*1024) / float64(mockInfo.NCPU)))
 	// FIXMEENGINEAPI : below should return an engine-api error, or something custom
-	apiClient.On("ContainerCreate", mock.Anything, &mockConfig.Config, &mockConfig.HostConfig, &mockConfig.NetworkingConfig, name).Return(types.ContainerCreateResponse{}, dockerclient.ErrImageNotFound).Once()
-	container, err = engine.Create(config, name, false, auth)
+	apiClient.On(
+		"ContainerCreate",
+		mock.Anything,
+		&mockConfig.Config,
+		&mockConfig.HostConfig,
+		&mockConfig.NetworkingConfig,
+		name,
+	).Return(
+		types.ContainerCreateResponse{},
+		dockerclient.ErrImageNotFound,
+	).Once()
+
+	container, err = engine.CreateContainer(config, name, false, auth)
 	assert.Equal(t, err, dockerclient.ErrImageNotFound)
 	assert.Nil(t, container)
 
@@ -355,14 +487,61 @@ func TestCreateContainer(t *testing.T) {
 	mockConfig.HostConfig.CPUShares = int64(math.Ceil(float64(config.HostConfig.CPUShares*1024) / float64(mockInfo.NCPU)))
 	apiClient.On("ImagePull", mock.Anything, config.Image, mock.AnythingOfType("types.ImagePullOptions")).Return(readCloser, nil).Once()
 	// TODO(nishanttotla): below should return an engine-api error, or something custom, so that we can get rid of dockerclient
-	apiClient.On("ContainerCreate", mock.Anything, &mockConfig.Config, &mockConfig.HostConfig, &mockConfig.NetworkingConfig, name).Return(types.ContainerCreateResponse{}, dockerclient.ErrImageNotFound).Once()
+	apiClient.On(
+		"ContainerCreate",
+		mock.Anything,
+		&mockConfig.Config,
+		&mockConfig.HostConfig,
+		&mockConfig.NetworkingConfig,
+		name,
+	).Return(
+		types.ContainerCreateResponse{},
+		dockerclient.ErrImageNotFound,
+	).Once()
+
 	// FIXMEENGINEAPI : below should return an engine-api error, or something custom
-	apiClient.On("ContainerCreate", mock.Anything, &mockConfig.Config, &mockConfig.HostConfig, &mockConfig.NetworkingConfig, name).Return(types.ContainerCreateResponse{ID: id}, nil).Once()
+	apiClient.On(
+		"ContainerCreate",
+		mock.Anything,
+		&mockConfig.Config,
+		&mockConfig.HostConfig,
+		&mockConfig.NetworkingConfig,
+		name,
+	).Return(
+		types.ContainerCreateResponse{ID: id},
+		nil,
+	).Once()
+
 	filterArgs = filters.NewArgs()
 	filterArgs.Add("id", id)
-	apiClient.On("ContainerList", mock.Anything, types.ContainerListOptions{All: true, Size: false, Filter: filterArgs}).Return([]types.Container{{ID: id}}, nil).Once()
-	apiClient.On("ContainerInspect", mock.Anything, id).Return(types.ContainerJSON{Config: &config.Config, ContainerJSONBase: &types.ContainerJSONBase{HostConfig: &config.HostConfig}, NetworkSettings: &types.NetworkSettings{Networks: nil}}, nil).Once()
-	container, err = engine.Create(config, name, true, auth)
+	apiClient.On(
+		"ContainerList",
+		mock.Anything,
+		types.ContainerListOptions{
+			All:    true,
+			Size:   false,
+			Filter: filterArgs,
+		},
+	).Return(
+		[]types.Container{{ID: id}},
+		nil,
+	).Once()
+
+	apiClient.On("ContainerInspect", mock.Anything, id).Return(
+		types.ContainerJSON{
+			Config: &config.Config,
+			ContainerJSONBase: &types.ContainerJSONBase{
+				HostConfig: &config.HostConfig,
+				State:      &state,
+			},
+			NetworkSettings: &types.NetworkSettings{
+				Networks: nil,
+			},
+		},
+		nil,
+	).Once()
+
+	container, err = engine.CreateContainer(config, name, true, auth)
 	assert.Nil(t, err)
 	assert.Equal(t, container.ID, id)
 	assert.Len(t, engine.Containers(), 2)
@@ -428,11 +607,41 @@ func TestUsedCpus(t *testing.T) {
 				).Return(types.VolumesListResponse{}, nil)
 				apiClient.On("Events", mock.Anything, mock.AnythingOfType("EventsOptions")).Return(&nopCloser{infiniteRead{}}, nil)
 				apiClient.On("ImageList", mock.Anything, mock.AnythingOfType("ImageListOptions")).Return([]types.Image{}, nil).Once()
-				apiClient.On("ContainerList", mock.Anything, types.ContainerListOptions{All: true, Size: false}).Return([]types.Container{{ID: "test"}}, nil).Once()
-				apiClient.On("ContainerInspect", mock.Anything, "test").Return(types.ContainerJSON{ContainerJSONBase: &types.ContainerJSONBase{HostConfig: &containertypes.HostConfig{Resources: containertypes.Resources{CPUShares: cpuShares}}}, Config: &containertypes.Config{}, NetworkSettings: &types.NetworkSettings{Networks: nil}}, nil).Once()
+
+				apiClient.On(
+					"ContainerList",
+					mock.Anything,
+					types.ContainerListOptions{
+						All:  true,
+						Size: false,
+					},
+				).Return(
+					[]types.Container{{ID: "test"}},
+					nil,
+				).Once()
+
+				apiClient.On("ContainerInspect", mock.Anything, "test").Return(
+					types.ContainerJSON{
+						ContainerJSONBase: &types.ContainerJSONBase{
+							HostConfig: &containertypes.HostConfig{
+								Resources: containertypes.Resources{
+									CPUShares: cpuShares,
+								},
+							},
+							State: &types.ContainerState{
+								StartedAt:  "2016-06-06T01:41:38.090313266Z",
+								FinishedAt: "0001-01-01T00:00:00Z",
+							},
+						},
+						Config: &containertypes.Config{},
+						NetworkSettings: &types.NetworkSettings{
+							Networks: nil,
+						},
+					},
+					nil,
+				).Once()
 
 				engine.ConnectWithClient(client, apiClient)
-
 				assert.Equal(t, engine.Cpus, int64(mockInfo.NCPU))
 				assert.Equal(t, engine.UsedCpus(), cn)
 			}
@@ -445,7 +654,23 @@ func TestContainerRemovedDuringRefresh(t *testing.T) {
 		container1 = types.Container{ID: "c1"}
 		container2 = types.Container{ID: "c2"}
 		info1      types.ContainerJSON
-		info2      = types.ContainerJSON{ContainerJSONBase: &types.ContainerJSONBase{HostConfig: &containertypes.HostConfig{Resources: containertypes.Resources{CPUShares: 100}}}, Config: &containertypes.Config{}, NetworkSettings: &types.NetworkSettings{Networks: nil}}
+		info2      = types.ContainerJSON{
+			ContainerJSONBase: &types.ContainerJSONBase{
+				HostConfig: &containertypes.HostConfig{
+					Resources: containertypes.Resources{
+						CPUShares: 100,
+					},
+				},
+				State: &types.ContainerState{
+					StartedAt:  "2016-06-06T01:41:38.090313266Z",
+					FinishedAt: "0001-01-01T00:00:00Z",
+				},
+			},
+			Config: &containertypes.Config{},
+			NetworkSettings: &types.NetworkSettings{
+				Networks: nil,
+			},
+		}
 	)
 
 	engine := NewEngine("test", 0, engOpts)
@@ -466,7 +691,19 @@ func TestContainerRemovedDuringRefresh(t *testing.T) {
 	).Return(types.VolumesListResponse{}, nil)
 	apiClient.On("ImageList", mock.Anything, mock.AnythingOfType("ImageListOptions")).Return([]types.Image{}, nil)
 	apiClient.On("Events", mock.Anything, mock.AnythingOfType("EventsOptions")).Return(&nopCloser{infiniteRead{}}, nil)
-	apiClient.On("ContainerList", mock.Anything, types.ContainerListOptions{All: true, Size: false}).Return([]types.Container{container1, container2}, nil)
+
+	apiClient.On(
+		"ContainerList",
+		mock.Anything,
+		types.ContainerListOptions{
+			All:  true,
+			Size: false,
+		},
+	).Return(
+		[]types.Container{container1, container2},
+		nil,
+	)
+
 	apiClient.On("ContainerInspect", mock.Anything, "c1").Return(info1, errors.New("Not found"))
 	apiClient.On("ContainerInspect", mock.Anything, "c2").Return(info2, nil)
 
@@ -500,12 +737,76 @@ func TestDisconnect(t *testing.T) {
 
 	// The client will return one container at first, then a second one will appear.
 	apiClient.On("ImageList", mock.Anything, mock.AnythingOfType("ImageListOptions")).Return([]types.Image{}, nil)
-	apiClient.On("ContainerList", mock.Anything, types.ContainerListOptions{All: true, Size: false}).Return([]types.Container{{ID: "one"}}, nil).Once()
-	apiClient.On("ContainerInspect", mock.Anything, "one").Return(types.ContainerJSON{ContainerJSONBase: &types.ContainerJSONBase{HostConfig: &containertypes.HostConfig{Resources: containertypes.Resources{CPUShares: 100}}}, Config: &containertypes.Config{}, NetworkSettings: &types.NetworkSettings{Networks: nil}}, nil).Once()
+
+	apiClient.On(
+		"ContainerList",
+		mock.Anything,
+		types.ContainerListOptions{
+			All:  true,
+			Size: false,
+		},
+	).Return([]types.Container{{ID: "one"}}, nil).Once()
+
+	apiClient.On(
+		"ContainerInspect",
+		mock.Anything,
+		"one",
+	).Return(
+		types.ContainerJSON{
+			ContainerJSONBase: &types.ContainerJSONBase{
+				HostConfig: &containertypes.HostConfig{
+					Resources: containertypes.Resources{
+						CPUShares: 100,
+					},
+				},
+				State: &types.ContainerState{
+					StartedAt:  "2016-06-06T01:41:38.090313266Z",
+					FinishedAt: "0001-01-01T00:00:00Z",
+				},
+			},
+			Config: &containertypes.Config{},
+			NetworkSettings: &types.NetworkSettings{
+				Networks: nil,
+			},
+		},
+		nil,
+	).Once()
+
 	filterArgs := filters.NewArgs()
 	filterArgs.Add("id", "two")
-	apiClient.On("ContainerList", mock.Anything, types.ContainerListOptions{All: true, Size: false, Filter: filterArgs}).Return([]types.Container{{ID: "two"}}, nil).Once()
-	apiClient.On("ContainerInspect", mock.Anything, "two").Return(types.ContainerJSON{ContainerJSONBase: &types.ContainerJSONBase{HostConfig: &containertypes.HostConfig{Resources: containertypes.Resources{CPUShares: 100}}}, Config: &containertypes.Config{}, NetworkSettings: &types.NetworkSettings{Networks: nil}}, nil).Once()
+	apiClient.On(
+		"ContainerList",
+		mock.Anything,
+		types.ContainerListOptions{
+			All:    true,
+			Size:   false,
+			Filter: filterArgs,
+		},
+	).Return(
+		[]types.Container{{ID: "two"}},
+		nil,
+	).Once()
+
+	apiClient.On("ContainerInspect", mock.Anything, "two").Return(
+		types.ContainerJSON{
+			ContainerJSONBase: &types.ContainerJSONBase{
+				HostConfig: &containertypes.HostConfig{
+					Resources: containertypes.Resources{
+						CPUShares: 100,
+					},
+				},
+				State: &types.ContainerState{
+					StartedAt:  "2016-06-06T01:41:38.090313266Z",
+					FinishedAt: "0001-01-01T00:00:00Z",
+				},
+			},
+			Config: &containertypes.Config{},
+			NetworkSettings: &types.NetworkSettings{
+				Networks: nil,
+			},
+		},
+		nil,
+	).Once()
 
 	assert.NoError(t, engine.ConnectWithClient(client, apiClient))
 	assert.True(t, engine.isConnected())

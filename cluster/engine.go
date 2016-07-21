@@ -23,6 +23,7 @@ import (
 	"github.com/docker/engine-api/types/filters"
 	networktypes "github.com/docker/engine-api/types/network"
 	engineapinop "github.com/docker/swarm/api/nopclient"
+	"github.com/docker/swarm/swarmclient"
 	"github.com/samalba/dockerclient"
 	"github.com/samalba/dockerclient/nopclient"
 	"golang.org/x/net/context"
@@ -32,8 +33,11 @@ const (
 	// Timeout for requests sent out to the engine.
 	requestTimeout = 10 * time.Second
 
+	// Threshold of delta duaration between swarm manager and engine's systime
+	thresholdTime = 2 * time.Second
+
 	// Minimum docker engine version supported by swarm.
-	minSupportedVersion = version.Version("1.6.0")
+	minSupportedVersion = version.Version("1.8.0")
 )
 
 type engineState int
@@ -119,7 +123,7 @@ type Engine struct {
 	networks        map[string]*Network
 	volumes         map[string]*Volume
 	client          dockerclient.Client
-	apiClient       engineapi.APIClient
+	apiClient       swarmclient.SwarmAPIClient
 	eventHandler    EventHandler
 	state           engineState
 	lastError       string
@@ -128,6 +132,7 @@ type Engine struct {
 	overcommitRatio int64
 	opts            *EngineOpts
 	eventsMonitor   *EventsMonitor
+	DeltaDuration   time.Duration // swarm's systime - engine's systime
 }
 
 // NewEngine is exported
@@ -204,7 +209,7 @@ func (e *Engine) StartMonitorEvents() {
 }
 
 // ConnectWithClient is exported
-func (e *Engine) ConnectWithClient(client dockerclient.Client, apiClient engineapi.APIClient) error {
+func (e *Engine) ConnectWithClient(client dockerclient.Client, apiClient swarmclient.SwarmAPIClient) error {
 	e.client = client
 	e.apiClient = apiClient
 	e.eventsMonitor = NewEventsMonitor(e.apiClient, e.handler)
@@ -427,13 +432,9 @@ func (e *Engine) CheckConnectionErr(err error) {
 
 // Update API Version in apiClient
 func (e *Engine) updateClientVersionFromServer(serverVersion string) {
-	// v will be >= 1.6, since this is checked earlier
+	// v will be >= 1.8, since this is checked earlier
 	v := version.Version(serverVersion)
 	switch {
-	case v.LessThan(version.Version("1.7")):
-		e.apiClient.UpdateClientVersion("1.18")
-	case v.LessThan(version.Version("1.8")):
-		e.apiClient.UpdateClientVersion("1.19")
 	case v.LessThan(version.Version("1.9")):
 		e.apiClient.UpdateClientVersion("1.20")
 	case v.LessThan(version.Version("1.10")):
@@ -469,7 +470,6 @@ func (e *Engine) updateSpecs() error {
 	// by Swarm.  Catch the error ASAP and refuse to connect.
 	if engineVersion.LessThan(minSupportedVersion) {
 		err = fmt.Errorf("engine %s is running an unsupported version of Docker Engine. Please upgrade to at least %s", e.Addr, minSupportedVersion)
-		e.CheckConnectionErr(err)
 		return err
 	}
 	// update server version
@@ -490,14 +490,48 @@ func (e *Engine) updateSpecs() error {
 		e.lastError = message
 		return fmt.Errorf(message)
 	}
+
+	// delta is an estimation of time difference between manager and engine
+	// with adjustment of delays (Engine response delay + network delay + manager process delay).
+	var delta time.Duration
+	if info.SystemTime != "" {
+		engineTime, _ := time.Parse(time.RFC3339Nano, info.SystemTime)
+		delta = time.Now().UTC().Sub(engineTime)
+	} else {
+		// if no SystemTime in info response, we treat delta as 0.
+		delta = time.Duration(0)
+	}
+
+	// If the servers are sync up on time, this delta might be the source of error
+	// we set a threshhold that to ignore this case.
+	absDelta := delta
+	if delta.Seconds() < 0 {
+		absDelta = time.Duration(-1*delta.Seconds()) * time.Second
+	}
+
+	if absDelta < thresholdTime {
+		e.DeltaDuration = 0
+	} else {
+		log.Warnf("Engine (ID: %s, Addr: %s) has unsynchronized systime with swarm, please synchronize it.", e.ID, e.Addr)
+		e.DeltaDuration = delta
+	}
+
 	e.Name = info.Name
 	e.Cpus = int64(info.NCPU)
 	e.Memory = info.MemTotal
-	e.Labels = map[string]string{
-		"storagedriver":   info.Driver,
-		"executiondriver": info.ExecutionDriver,
-		"kernelversion":   info.KernelVersion,
-		"operatingsystem": info.OperatingSystem,
+
+	e.Labels = map[string]string{}
+	if info.Driver != "" {
+		e.Labels["storagedriver"] = info.Driver
+	}
+	if info.ExecutionDriver != "" {
+		e.Labels["executiondriver"] = info.ExecutionDriver
+	}
+	if info.KernelVersion != "" {
+		e.Labels["kernelversion"] = info.KernelVersion
+	}
+	if info.OperatingSystem != "" {
+		e.Labels["operatingsystem"] = info.OperatingSystem
 	}
 	for _, label := range info.Labels {
 		kv := strings.SplitN(label, "=", 2)
@@ -512,10 +546,15 @@ func (e *Engine) updateSpecs() error {
 		// since "node" in constraint will match node.Name instead of label.
 		// Log warn message in this case.
 		if kv[0] == "node" {
-			log.Warnf("Engine (ID: %s, Addr: %s) containers a label (%s) with key of \"node\" which cannot be used in Swarm.", e.ID, e.Addr, label)
+			log.Warnf("Engine (ID: %s, Addr: %s) contains a label (%s) with key of \"node\" which cannot be used in Swarm.", e.ID, e.Addr, label)
+			continue
 		}
 
-		e.Labels[kv[0]] = kv[1]
+		if value, exist := e.Labels[kv[0]]; exist {
+			log.Warnf("Node (ID: %s, Addr: %s) already contains a label (%s) with key (%s), and Engine's label (%s) cannot override it.", e.ID, e.Addr, value, kv[0], kv[1])
+		} else {
+			e.Labels[kv[0]] = kv[1]
+		}
 	}
 	return nil
 }
@@ -525,6 +564,9 @@ func (e *Engine) RemoveImage(name string, force bool) ([]types.ImageDelete, erro
 	rmOpts := types.ImageRemoveOptions{force, true}
 	dels, err := e.apiClient.ImageRemove(context.Background(), name, rmOpts)
 	e.CheckConnectionErr(err)
+
+	// ImageRemove is not atomic. Engine may have deleted some layers and still failed.
+	// Swarm should still refresh images before returning an error
 	e.RefreshImages()
 	return dels, err
 }
@@ -594,6 +636,27 @@ func (e *Engine) RefreshImages() error {
 	return nil
 }
 
+// refreshNetwork refreshes single network on the engine.
+func (e *Engine) refreshNetwork(ID string) error {
+	network, err := e.apiClient.NetworkInspect(context.Background(), ID)
+	e.CheckConnectionErr(err)
+	if err != nil {
+		if strings.Contains(err.Error(), "No such network") {
+			e.Lock()
+			delete(e.networks, ID)
+			e.Unlock()
+			return nil
+		}
+		return err
+	}
+
+	e.Lock()
+	e.networks[ID] = &Network{NetworkResource: network, Engine: e}
+	e.Unlock()
+
+	return nil
+}
+
 // RefreshNetworks refreshes the list of networks on the engine.
 func (e *Engine) RefreshNetworks() error {
 	netLsOpts := types.NetworkListOptions{filters.NewArgs()}
@@ -624,6 +687,28 @@ func (e *Engine) RefreshVolumes() error {
 		e.volumes[volume.Name] = &Volume{Volume: *volume, Engine: e}
 	}
 	e.Unlock()
+	return nil
+}
+
+// refreshVolume refreshes single volume on the engine.
+func (e *Engine) refreshVolume(IDOrName string) error {
+	volume, err := e.apiClient.VolumeInspect(context.Background(), IDOrName)
+	e.CheckConnectionErr(err)
+	if err != nil {
+		if strings.Contains(err.Error(), "No such volume") {
+			e.Lock()
+			delete(e.volumes, IDOrName)
+			e.Unlock()
+			return nil
+		} else {
+			return err
+		}
+	}
+
+	e.Lock()
+	e.volumes[volume.Name] = &Volume{Volume: volume, Engine: e}
+	e.Unlock()
+
 	return nil
 }
 
@@ -721,6 +806,8 @@ func (e *Engine) updateContainer(c types.Container, containers map[string]*Conta
 	// container (containers[container.Id]) will get replaced.
 	e.RUnlock()
 
+	c.Created = time.Unix(c.Created, 0).Add(e.DeltaDuration).Unix()
+
 	// Update ContainerInfo.
 	if full {
 		info, err := e.apiClient.ContainerInspect(context.Background(), c.ID)
@@ -738,6 +825,13 @@ func (e *Engine) updateContainer(c types.Container, containers map[string]*Conta
 		container.Config = BuildContainerConfig(*info.Config, *info.HostConfig, networkingConfig)
 		// FIXME remove "duplicate" line and move this to cluster/config.go
 		container.Config.HostConfig.CPUShares = container.Config.HostConfig.CPUShares * e.Cpus / 1024.0
+
+		// consider the delta duration between swarm and docker engine
+		startedAt, _ := time.Parse(time.RFC3339Nano, info.State.StartedAt)
+		finishedAt, _ := time.Parse(time.RFC3339Nano, info.State.FinishedAt)
+
+		info.State.StartedAt = startedAt.Add(e.DeltaDuration).Format(time.RFC3339Nano)
+		info.State.FinishedAt = finishedAt.Add(e.DeltaDuration).Format(time.RFC3339Nano)
 
 		// Save the entire inspect back into the container.
 		container.Info = info
@@ -860,8 +954,8 @@ func (e *Engine) TotalCpus() int64 {
 	return e.Cpus + (e.Cpus * e.overcommitRatio / 100)
 }
 
-// Create a new container
-func (e *Engine) Create(config *ContainerConfig, name string, pullImage bool, authConfig *types.AuthConfig) (*Container, error) {
+// CreateContainer creates a new container
+func (e *Engine) CreateContainer(config *ContainerConfig, name string, pullImage bool, authConfig *types.AuthConfig) (*Container, error) {
 	var (
 		err        error
 		createResp types.ContainerCreateResponse
@@ -899,8 +993,6 @@ func (e *Engine) Create(config *ContainerConfig, name string, pullImage bool, au
 	// Register the container immediately while waiting for a state refresh.
 	// Force a state refresh to pick up the newly created container.
 	e.refreshContainer(createResp.ID, true)
-	e.RefreshVolumes()
-	e.RefreshNetworks()
 
 	e.Lock()
 	container := e.containers[createResp.ID]
@@ -937,24 +1029,26 @@ func (e *Engine) RemoveContainer(container *Container, force, volumes bool) erro
 func (e *Engine) CreateNetwork(name string, request *types.NetworkCreate) (*types.NetworkCreateResponse, error) {
 	response, err := e.apiClient.NetworkCreate(context.Background(), name, *request)
 	e.CheckConnectionErr(err)
+	if err != nil {
+		return nil, err
+	}
 
-	e.RefreshNetworks()
+	e.refreshNetwork(response.ID)
 
 	return &response, err
 }
 
 // CreateVolume creates a volume in the engine
-func (e *Engine) CreateVolume(request *types.VolumeCreateRequest) (*Volume, error) {
+func (e *Engine) CreateVolume(request *types.VolumeCreateRequest) (*types.Volume, error) {
 	volume, err := e.apiClient.VolumeCreate(context.Background(), *request)
-
-	e.RefreshVolumes()
 	e.CheckConnectionErr(err)
-
 	if err != nil {
 		return nil, err
 	}
-	return &Volume{Volume: volume, Engine: e}, nil
 
+	e.refreshVolume(volume.Name)
+
+	return &volume, err
 }
 
 // encodeAuthToBase64 serializes the auth configuration as JSON base64 payload
@@ -1044,7 +1138,7 @@ func (e *Engine) Load(reader io.Reader) error {
 }
 
 // Import image
-func (e *Engine) Import(source string, repository string, tag string, imageReader io.Reader) error {
+func (e *Engine) Import(source string, ref string, tag string, imageReader io.Reader) error {
 	importSrc := types.ImageImportSource{
 		Source:     imageReader,
 		SourceName: source,
@@ -1052,17 +1146,7 @@ func (e *Engine) Import(source string, repository string, tag string, imageReade
 	opts := types.ImageImportOptions{
 		Tag: tag,
 	}
-	// TODO(nishanttotla): There might be a better way to pass a ref string than construct it here
 
-	// generate ref string
-	ref := repository
-	if tag != "" {
-		if strings.Contains(tag, ":") {
-			ref += "@" + tag
-		} else {
-			ref += ":" + tag
-		}
-	}
 	_, err := e.apiClient.ImageImport(context.Background(), importSrc, ref, opts)
 	e.CheckConnectionErr(err)
 	if err != nil {
@@ -1150,9 +1234,9 @@ func (e *Engine) handler(msg events.Message) error {
 
 	switch msg.Type {
 	case "network":
-		e.RefreshNetworks()
+		e.refreshNetwork(msg.Actor.ID)
 	case "volume":
-		e.RefreshVolumes()
+		e.refreshVolume(msg.Actor.ID)
 	case "image":
 		e.RefreshImages()
 	case "container":
@@ -1161,6 +1245,13 @@ func (e *Engine) handler(msg events.Message) error {
 			e.refreshContainer(msg.ID, true)
 		default:
 			e.refreshContainer(msg.ID, false)
+		}
+	case "daemon":
+		// docker 1.12 started to support daemon events
+		// https://github.com/docker/docker/pull/22590
+		switch msg.Action {
+		case "reload":
+			e.updateSpecs()
 		}
 	case "":
 		// docker < 1.10
@@ -1242,8 +1333,8 @@ func (e *Engine) StartContainer(id string, hostConfig *dockerclient.HostConfig) 
 	if hostConfig != nil {
 		err = e.client.StartContainer(id, hostConfig)
 	} else {
-		// TODO(nishanttotla): Figure out what the checkpoint id (second string argument) should be
-		err = e.apiClient.ContainerStart(context.Background(), id, "")
+		// TODO(nishanttotla): Should ContainerStartOptions be provided?
+		err = e.apiClient.ContainerStart(context.Background(), id, types.ContainerStartOptions{})
 	}
 	e.CheckConnectionErr(err)
 	if err != nil {
@@ -1280,23 +1371,9 @@ func (e *Engine) BuildImage(buildContext io.Reader, buildImage *types.ImageBuild
 }
 
 // TagImage tags an image
-func (e *Engine) TagImage(IDOrName string, repo string, tag string, force bool) error {
+func (e *Engine) TagImage(IDOrName string, ref string, force bool) error {
 	// send tag request to docker engine
-	opts := types.ImageTagOptions{
-		Force: force,
-	}
-	// TODO(nishanttotla): There might be a better way to pass a ref string than construct it here
-
-	// generate ref string
-	ref := repo
-	if tag != "" {
-		if strings.Contains(tag, ":") {
-			ref += "@" + tag
-		} else {
-			ref += ":" + tag
-		}
-	}
-	err := e.apiClient.ImageTag(context.Background(), IDOrName, ref, opts)
+	err := e.apiClient.ImageTag(context.Background(), IDOrName, ref)
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err

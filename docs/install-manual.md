@@ -16,7 +16,7 @@ This page teaches you to deploy a high-availability Docker Swarm cluster.
 Although the example installation uses the Amazon Web Services (AWS) platform,
 you can deploy an equivalent Docker Swarm cluster on many other platforms. In this example, you do the following:
 
-- [Verify you have the prequisites](#prerequisites)
+- [Verify you have the prerequisites](#prerequisites)
 - [Establish basic network security](#step-1-add-network-security-rules)
 - [Create your nodes](#step-2-create-your-instances)
 - [Install Engine on each node](#step-3-install-engine-on-each-node)
@@ -26,7 +26,7 @@ you can deploy an equivalent Docker Swarm cluster on many other platforms. In th
 - [Test the high-availability Swarm managers](#step-7-test-swarm-failover)
 - [Additional Resources](#additional-resources)
 
-For a gentler introduction to Swarm, try the [Evaluate Swarm in a sandbox](install-w-machine) page.
+For a gentler introduction to Swarm, try the [Evaluate Swarm in a sandbox](install-w-machine.md) page.
 
 ## Prerequisites
 
@@ -97,7 +97,7 @@ group. When complete, the example deployment contains three types of nodes:
 
 To create the instances do the following:
 
-1. Open the EC2 Dashboard and launch four EC2 instances, one at a time.
+1. Open the EC2 Dashboard and launch five EC2 instances, one at a time.
 
     - During **Step 1: Choose an Amazon Machine Image (AMI)**, pick the *Amazon Linux AMI*.
 

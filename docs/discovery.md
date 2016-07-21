@@ -107,7 +107,7 @@ store.
 
 You can use a static file or list of nodes for your discovery backend. The file must be stored on a host that is accessible from the Swarm manager. You can also pass a node list as an option when you start Swarm.
 
-Both the static file and the `nodes` option support a IP address ranges. To specify a range supply a pattern, for example, `10.0.0.[10:200]` refers to nodes starting from `10.0.0.10` to `10.0.0.200`.  For example for the `file` discovery method.
+Both the static file and the `nodes` option support an IP address ranges. To specify a range supply a pattern, for example, `10.0.0.[10:200]` refers to nodes starting from `10.0.0.10` to `10.0.0.200`.  For example for the `file` discovery method.
 
         $ echo "10.0.0.[11:100]:2375"   >> /tmp/my_cluster
         $ echo "10.0.1.[15:20]:2375"    >> /tmp/my_cluster
@@ -186,7 +186,7 @@ swarm is connected to the public internet. To create your cluster:
 
 2. Create each node and join them to the cluster.
 
-    On each of your nodes, start the swarm agent. The <node_ip> doesn't have to be public (eg. 192.168.0.X) but the the Swarm manager must be able to access it.
+    On each of your nodes, start the swarm agent. The node IP address doesn't have to be public (eg. 192.168.0.X) but the the Swarm manager must be able to access it.
 
         $ swarm join --advertise=<node_ip:2375> token://<cluster_id>
 

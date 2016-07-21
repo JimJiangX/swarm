@@ -220,7 +220,8 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 	c.scheduler.Unlock()
 
-	container, err := engine.Create(config, name, true, authConfig)
+	log.WithFields(log.Fields{"NodeName": n.Name, "NodeID": n.ID}).Debugf("Scheduling container %s to ", name)
+	container, err := engine.CreateContainer(config, name, true, authConfig)
 
 	c.scheduler.Lock()
 	delete(c.pendingContainers, swarmID)
@@ -493,10 +494,10 @@ func (c *Cluster) CreateNetwork(name string, request *types.NetworkCreate) (resp
 }
 
 // CreateVolume creates a volume in the cluster
-func (c *Cluster) CreateVolume(request *types.VolumeCreateRequest) (*cluster.Volume, error) {
+func (c *Cluster) CreateVolume(request *types.VolumeCreateRequest) (*types.Volume, error) {
 	var (
 		wg     sync.WaitGroup
-		volume *cluster.Volume
+		volume *types.Volume
 		err    error
 		parts  = strings.SplitN(request.Name, "/", 2)
 		node   = ""
@@ -671,7 +672,7 @@ func (c *Cluster) Load(imageReader io.Reader, callback func(where, status string
 }
 
 // Import image
-func (c *Cluster) Import(source string, repository string, tag string, imageReader io.Reader, callback func(what, status string, err error)) {
+func (c *Cluster) Import(source string, ref string, tag string, imageReader io.Reader, callback func(what, status string, err error)) {
 	var wg sync.WaitGroup
 	ch := make(chan struct{}, 10)
 
@@ -694,7 +695,7 @@ func (c *Cluster) Import(source string, repository string, tag string, imageRead
 			ch <- struct{}{}
 
 			// call engine import
-			err := engine.Import(source, repository, tag, reader)
+			err := engine.Import(source, ref, tag, reader)
 			if callback != nil {
 				if err != nil {
 					callback(engine.Name, "", err)
@@ -848,7 +849,7 @@ func (c *Cluster) TotalMemory() int64 {
 	return totalMemory
 }
 
-// TotalCpus returns the total memory of the cluster
+// TotalCpus returns the total CPUs of the cluster
 func (c *Cluster) TotalCpus() int64 {
 	var totalCpus int64
 	for _, engine := range c.engines {
@@ -876,7 +877,24 @@ func (c *Cluster) Info() [][2]string {
 		info = append(info, [2]string{" " + engineName, engine.Addr})
 		info = append(info, [2]string{"  └ ID", engine.ID})
 		info = append(info, [2]string{"  └ Status", engine.Status()})
-		info = append(info, [2]string{"  └ Containers", fmt.Sprintf("%d", len(engine.Containers()))})
+
+		// if engine's status is healthy, show container details of the node
+		if engine.IsHealthy() {
+			var paused, running, stopped int = 0, 0, 0
+			for _, c := range engine.Containers() {
+				if c.Info.State.Paused {
+					paused++
+				} else if c.Info.State.Running {
+					running++
+				} else {
+					stopped++
+				}
+			}
+			info = append(info, [2]string{"  └ Containers", fmt.Sprintf("%d (%d Running, %d Paused, %d Stopped)", len(engine.Containers()), running, paused, stopped)})
+		} else {
+			info = append(info, [2]string{"  └ Containers", fmt.Sprintf("%d", len(engine.Containers()))})
+		}
+
 		info = append(info, [2]string{"  └ Reserved CPUs", fmt.Sprintf("%d / %d", engine.UsedCpus(), engine.TotalCpus())})
 		info = append(info, [2]string{"  └ Reserved Memory", fmt.Sprintf("%s / %s", units.BytesSize(float64(engine.UsedMemory())), units.BytesSize(float64(engine.TotalMemory())))})
 		labels := make([]string, 0, len(engine.Labels))
@@ -947,7 +965,7 @@ func (c *Cluster) BuildImage(buildContext io.Reader, buildImage *types.ImageBuil
 }
 
 // TagImage tags an image
-func (c *Cluster) TagImage(IDOrName string, repo string, tag string, force bool) error {
+func (c *Cluster) TagImage(IDOrName string, ref string, force bool) error {
 	c.RLock()
 	defer c.RUnlock()
 
@@ -958,7 +976,7 @@ func (c *Cluster) TagImage(IDOrName string, repo string, tag string, force bool)
 		for _, image := range e.Images() {
 			if image.Match(IDOrName, true) {
 				found = true
-				err := image.Engine.TagImage(IDOrName, repo, tag, force)
+				err := image.Engine.TagImage(IDOrName, ref, force)
 				if err != nil {
 					errs = append(errs, fmt.Sprintf("%s: %s", image.Engine.Name, err.Error()))
 					continue

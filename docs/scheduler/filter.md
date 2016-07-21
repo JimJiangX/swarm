@@ -67,8 +67,7 @@ host. Currently, the default tags include:
 Custom node labels you apply when you start the `docker daemon`, for example:
 
 ```bash
-$ docker daemon --label com.example.environment="production" --label
-com.example.storage="ssd"
+$ docker daemon --label com.example.environment="production" --label com.example.storage="ssd"
 ```
 
 Then, when you start a container on the cluster, you can set constraints using
@@ -196,7 +195,7 @@ there will be no limit on container number.
 When creating a container, you can use three types of container filters:
 
 * [`affinity`](#use-an-affinity-filter)
-* [`dependency`](#use-a-depedency-filter)
+* [`dependency`](#use-a-dependency-filter)
 * [`port`](#use-a-port-filter)
 
 ### Use an affinity filter

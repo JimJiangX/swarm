@@ -301,7 +301,7 @@ func (c *Cluster) refreshNetworks() {
 }
 
 // CreateVolume creates a volume in the cluster
-func (c *Cluster) CreateVolume(request *types.VolumeCreateRequest) (*cluster.Volume, error) {
+func (c *Cluster) CreateVolume(request *types.VolumeCreateRequest) (*types.Volume, error) {
 	return nil, errNotSupported
 }
 
@@ -353,9 +353,6 @@ func (c *Cluster) Container(IDOrName string) *cluster.Container {
 		return nil
 	}
 
-	c.RLock()
-	defer c.RUnlock()
-
 	return formatContainer(cluster.Containers(c.Containers()).Get(IDOrName))
 }
 
@@ -375,7 +372,7 @@ func (c *Cluster) Load(imageReader io.Reader, callback func(where, status string
 }
 
 // Import image
-func (c *Cluster) Import(source string, repository string, tag string, imageReader io.Reader, callback func(what, status string, err error)) {
+func (c *Cluster) Import(source string, ref string, tag string, imageReader io.Reader, callback func(what, status string, err error)) {
 
 }
 
@@ -675,6 +672,6 @@ func (c *Cluster) BuildImage(buildContext io.Reader, buildImage *types.ImageBuil
 }
 
 // TagImage tags an image
-func (c *Cluster) TagImage(IDOrName string, repo string, tag string, force bool) error {
+func (c *Cluster) TagImage(IDOrName string, ref string, force bool) error {
 	return errNotSupported
 }
