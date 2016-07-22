@@ -310,7 +310,9 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		defer func(c *cluster.Container, lvs []database.LocalVolume) {
+		defer func(c *cluster.Container, addr string,
+			networkings []IPInfo, lvs []database.LocalVolume) {
+
 			if err == nil {
 				return
 			}
@@ -320,7 +322,11 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			if _err != nil {
 				logrus.Error(_err)
 			}
-		}(container, lvs)
+			err = removeNetworkings(addr, networkings)
+			if err != nil {
+				logrus.Errorf("container %s remove Networkings error:%s", u.Name, err)
+			}
+		}(container, engine.IP, networkings, pending.localStore)
 
 		err = startUnit(engine, container.ID, u, networkings, lvs)
 		delete(gd.pendingContainers, swarmID)
@@ -829,7 +835,9 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		defer func(c *cluster.Container, lvs []database.LocalVolume) {
+		defer func(c *cluster.Container, addr string,
+			networkings []IPInfo, lvs []database.LocalVolume) {
+
 			if err == nil {
 				return
 			}
@@ -839,7 +847,12 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			if _err != nil {
 				logrus.Error(_err)
 			}
-		}(container, pending.localStore)
+			err = removeNetworkings(addr, networkings)
+			if err != nil {
+				logrus.Errorf("container %s remove Networkings error:%s", u.Name, err)
+			}
+
+		}(container, engine.IP, networkings, pending.localStore)
 
 		err = startUnit(engine, container.ID, u, networkings, pending.localStore)
 		if err != nil {
