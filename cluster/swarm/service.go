@@ -1187,6 +1187,16 @@ func (gd *Gardener) UnitIsolate(nameOrID string) error {
 }
 
 func (service *Service) isolate(unitName string) error {
+	u, err := service.getUnit(unitName)
+	if err != nil {
+
+		logrus.Warning(err)
+
+	} else if u.Type == _SwitchManagerType {
+
+		return fmt.Errorf("Cann't Isolate Unit '%s:%s'", u.Type, unitName)
+	}
+
 	ip, port, err := service.getSwitchManagerAddr()
 	if err != nil {
 		logrus.Errorf("get SwitchManager Addr error:%s", err)
@@ -1225,6 +1235,16 @@ func (gd *Gardener) UnitSwitchBack(nameOrID string) error {
 }
 
 func (service *Service) switchBack(unitName string) error {
+	u, err := service.getUnit(unitName)
+	if err != nil {
+
+		logrus.Warning(err)
+
+	} else if u.Type == _SwitchManagerType {
+
+		return fmt.Errorf("Cann't SwitchBack Unit '%s:%s'", u.Type, unitName)
+	}
+
 	ip, port, err := service.getSwitchManagerAddr()
 	if err != nil {
 		logrus.Errorf("get SwitchManager Addr error:%s", err)
