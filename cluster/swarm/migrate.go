@@ -368,10 +368,12 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			logrus.Error(err)
 		}
 
-		// switchback unit
-		err = svc.switchBack(u.Name)
-		if err != nil {
-			logrus.Errorf("switchBack error:%s", err)
+		if u.Type != _SwitchManagerType {
+			// switchback unit
+			err = svc.switchBack(u.Name)
+			if err != nil {
+				logrus.Errorf("switchBack error:%s", err)
+			}
 		}
 
 		err = deregisterToServices(oldContainer.Engine.IP, u.ID, sys)
@@ -898,10 +900,12 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			logrus.Error(err)
 		}
 
-		// switchback unit
-		err = svc.switchBack(u.Name)
-		if err != nil {
-			logrus.Errorf("switchBack error:%s", err)
+		if u.Type != _SwitchManagerType {
+			// switchback unit
+			err = svc.switchBack(u.Name)
+			if err != nil {
+				logrus.Errorf("switchBack error:%s", err)
+			}
 		}
 
 		err = deregisterToServices(oldContainer.Engine.IP, u.ID, sys)
