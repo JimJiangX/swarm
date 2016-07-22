@@ -1118,8 +1118,11 @@ func (svc *Service) getSwitchManagerAddr() (string, int, error) {
 
 func (svc *Service) GetSwitchManagerAddr() (string, error) {
 	svc.RLock()
+
 	host, port, err := svc.getSwitchManagerAddr()
+
 	svc.RUnlock()
+
 	if err != nil {
 		return "", err
 	}
@@ -1736,6 +1739,9 @@ func checkContainerError(err error) error {
 }
 
 func (svc *Service) Slowlog(enable, notUsingIndexxes bool, longQueryTime int) error {
+	svc.RLock()
+	defer svc.RUnlock()
+
 	sqls := svc.getUnitByType(_UpsqlType)
 	if len(sqls) == 0 {
 		return errors.Errorf("Service %s Has no '%s' Type Unit", svc.Name, _UpsqlType)
@@ -1750,6 +1756,7 @@ func (svc *Service) Slowlog(enable, notUsingIndexxes bool, longQueryTime int) er
 			db = &svc.users[i]
 		}
 	}
+
 	if monitor == nil && db != nil {
 		monitor = db
 	}
@@ -1757,22 +1764,22 @@ func (svc *Service) Slowlog(enable, notUsingIndexxes bool, longQueryTime int) er
 		return errors.Errorf("Not Found Service %s User:'%s'", svc.Name, _User_Monitor)
 	}
 
-	commands := ""
+	command := bytes.NewBuffer(nil)
 	cmd := fmt.Sprintf(`mysql -S /DBAASDAT/upsql.sock mysql -u%s -p%s`, monitor.Username, monitor.Password)
 
 	if !enable {
-		commands = "set global slow_query_log=0;"
+		command.WriteString("set global slow_query_log=0;")
 	} else {
-		commands = "set global slow_query_log=1;"
+		command.WriteString("set global slow_query_log=1;")
 		if longQueryTime > 0 {
-			commands += fmt.Sprintf("set global long_query_time = %d;", longQueryTime)
+			command.WriteString(fmt.Sprintf("set global long_query_time = %d;", longQueryTime))
 		}
 		if notUsingIndexxes {
-			commands += "set global log_queries_not_using_indexes=1;"
+			command.WriteString("set global log_queries_not_using_indexes=1;")
 		}
 	}
 
-	cmd = fmt.Sprintf(`%s -e"%s"`, cmd, commands)
+	cmd = fmt.Sprintf(`%s -e"%s"`, cmd, command.String())
 
 	for i := range sqls {
 		eng, err := sqls[i].Engine()

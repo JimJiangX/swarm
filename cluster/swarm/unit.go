@@ -309,7 +309,7 @@ func createSanStoreageVG(host, name string, lun []database.LUN) error {
 	l, size := make([]int, len(list)), 0
 
 	for i := range list {
-		l[i] = list[i].StorageLunID
+		l[i] = list[i].HostLunID
 		size += list[i].SizeByte
 	}
 
