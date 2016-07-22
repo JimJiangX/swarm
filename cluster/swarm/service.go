@@ -1116,6 +1116,17 @@ func (svc *Service) getSwitchManagerAddr() (string, int, error) {
 	return addr, port, nil
 }
 
+func (svc *Service) GetSwitchManagerAddr() (string, error) {
+	svc.RLock()
+	host, port, err := svc.getSwitchManagerAddr()
+	svc.RUnlock()
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s:%d", host, port), nil
+}
+
 func (svc *Service) GetSwitchManagerAndMaster() (string, int, *unit, error) {
 	svc.RLock()
 	defer svc.RUnlock()

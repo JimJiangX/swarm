@@ -853,6 +853,39 @@ func getServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(users)
 }
 
+// GET /services/{name}/topology
+func hijackTopology(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	service, err := gd.GetService(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	addr, err := service.GetSwitchManagerAddr()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	r.URL.Path = "/topology"
+
+	logrus.Debugf("hijack to %s,URL:%s", addr, r.URL.String())
+
+	err = hijack(nil, addr, w, r)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 // GET /services/{name}/service_config
 func getServiceServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
