@@ -171,7 +171,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 	if err != nil {
 		return "", err
 	}
-	logrus.Debugf("listCandidates:%d", out)
+	logrus.Debugf("listCandidates:%d", len(out))
 
 	config, err := resetContainerConfig(u.container.Config, hostConfig)
 	if err != nil {
@@ -237,7 +237,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}
 
 		if len(lunMap) > 0 {
-			err = sanDeactivateAndDelMapping(dc.storage, u, lunMap, lunSlice)
+			err = sanDeactivateAndDelMapping(dc.storage, original.engine.IP, lunMap, lunSlice)
 			if err != nil {
 				return err
 			}
@@ -250,6 +250,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 					logrus.Error(err)
 					//	return err
 				}
+				return
 			}
 
 			logrus.Debug("recycle old container volumes resource")
@@ -446,7 +447,7 @@ func stopOldContainer(svc *Service, u *unit) error {
 	return err
 }
 
-func sanDeactivateAndDelMapping(storage store.Store, u *unit,
+func sanDeactivateAndDelMapping(storage store.Store, host string,
 	lunMap map[string][]database.LUN, lunSlice []database.LUN) error {
 	if storage == nil {
 		return fmt.Errorf("Store is nil")
@@ -466,9 +467,10 @@ func sanDeactivateAndDelMapping(storage store.Store, u *unit,
 			Vendor:    storage.Vendor(),
 		}
 		// san volumes
-		err := u.deactivateVG(config)
+		addr := getPluginAddr(host, pluginPort)
+		err := sdk.SanDeActivate(addr, config)
 		if err != nil {
-			return err
+			logrus.Error("%s SanDeActivate error:%s", host, err)
 		}
 	}
 
@@ -766,7 +768,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			// del mapping
 			if len(lunMap) > 0 {
 				// TODO:fix host
-				_err := sanDeactivateAndDelMapping(dc.storage, u, lunMap, lunSlice)
+				_err := sanDeactivateAndDelMapping(dc.storage, original.engine.IP, lunMap, lunSlice)
 				if _err != nil {
 					logrus.Error(_err)
 				}
