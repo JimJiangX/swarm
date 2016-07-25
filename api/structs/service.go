@@ -28,7 +28,8 @@ type User struct {
 	Username  string
 	Password  string
 	Role      string
-	Whitelist []string `json:",omitempty"`
+	Whitelist string // []string
+	Blacklist string // []string
 }
 
 type Module struct {

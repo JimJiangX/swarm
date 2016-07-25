@@ -223,13 +223,18 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 		exist := false
 		for u := range svc.users {
 			if svc.users[u].Username == req[i].Username {
+
 				update = append(update, database.User{
-					ID:        svc.users[u].ID,
-					ServiceID: svc.users[u].ServiceID,
-					Type:      req[i].Type,
-					Username:  req[i].Username,
-					Password:  req[i].Password,
-					Role:      req[i].Role,
+					ID:         svc.users[u].ID,
+					ServiceID:  svc.users[u].ServiceID,
+					Permission: svc.users[u].Permission,
+					CreatedAt:  svc.users[u].CreatedAt,
+					Type:       req[i].Type,
+					Username:   req[i].Username,
+					Password:   req[i].Password,
+					Role:       req[i].Role,
+					Blacklist:  req[i].Blacklist,
+					Whitelist:  req[i].Whitelist,
 				})
 				exist = true
 				break
@@ -240,44 +245,34 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 		}
 	}
 
+	additionList := converteToUsers(svc.ID, addition)
+
 	addr, port, err := svc.getSwitchManagerAddr()
 	if err != nil {
 		return 0, err
 	}
 
-	users := converteToUsers(svc.ID, addition)
-	for i := range users {
+	swmUsers := converteToSWM_Users(additionList)
+	for i := range swmUsers {
+
 		code = 201
-		user := swm_structs.User{
-			Id:       users[i].ID,
-			Type:     users[i].Type,
-			UserName: users[i].Username,
-			Password: users[i].Password,
-			Role:     users[i].Role,
-		}
-		err := smlib.AddUser(addr, port, user)
+		err := smlib.AddUser(addr, port, swmUsers[i])
 		if err != nil {
 			logrus.Errorf("%s add user error:%s", addr, err)
 			return 0, err
 		}
 	}
 
-	for i := range update {
-		user := swm_structs.User{
-			Id:       update[i].ID,
-			Type:     update[i].Type,
-			UserName: update[i].Username,
-			Password: update[i].Password,
-			Role:     update[i].Role,
-		}
-		err := smlib.UptUser(addr, port, user)
+	swmUsers = converteToSWM_Users(update)
+	for i := range swmUsers {
+		err := smlib.UptUser(addr, port, swmUsers[i])
 		if err != nil {
 			logrus.Errorf("%s update user error:%s", addr, err)
 			return 0, err
 		}
 	}
 
-	err = database.TxUpdateUsers(users, update)
+	err = database.TxUpdateUsers(additionList, update)
 	if err != nil {
 		return 0, err
 	}
@@ -335,15 +330,10 @@ func (svc *Service) DeleteServiceUsers(usernames []string, all bool) error {
 	if err != nil {
 		return err
 	}
-	for i := range list {
-		user := swm_structs.User{
-			Id:       list[i].ID,
-			Type:     list[i].Type,
-			UserName: list[i].Username,
-			Password: list[i].Password,
-			Role:     list[i].Role,
-		}
-		err := smlib.DelUser(addr, port, user)
+
+	users := converteToSWM_Users(list)
+	for i := range users {
+		err := smlib.DelUser(addr, port, users[i])
 		if err != nil {
 			return err
 		}
@@ -420,7 +410,7 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 }
 
 func converteToUsers(service string, users []structs.User) []database.User {
-	list := make([]database.User, len(users))
+	out := make([]database.User, 0, len(users))
 	now := time.Now()
 	for i := range users {
 		if users[i].Type != _User_Type_Proxy &&
@@ -429,7 +419,7 @@ func converteToUsers(service string, users []structs.User) []database.User {
 			continue
 		}
 
-		list[i] = database.User{
+		out = append(out, database.User{
 			ID:         utils.Generate32UUID(),
 			ServiceID:  service,
 			Type:       users[i].Type,
@@ -437,11 +427,53 @@ func converteToUsers(service string, users []structs.User) []database.User {
 			Password:   users[i].Password,
 			Role:       users[i].Role,
 			Permission: "",
+			Blacklist:  users[i].Blacklist,
+			Whitelist:  users[i].Whitelist,
 			CreatedAt:  now,
-		}
+		})
 	}
 
-	return list
+	return out
+}
+
+func converteToSWM_Users(users []database.User) []swm_structs.User {
+	out := make([]swm_structs.User, 0, len(users))
+
+	for i := range users {
+		if users[i].Type != _User_Type_Proxy &&
+			users[i].Role != _User_DB &&
+			users[i].Role != _User_Application {
+			continue
+		}
+
+		var black, white []string
+		if len(users[i].Blacklist) > 0 {
+			err := json.Unmarshal([]byte(users[i].Blacklist), &black)
+			if err != nil {
+				logrus.Error(err)
+				continue
+			}
+		}
+		if len(users[i].Whitelist) > 0 {
+			err := json.Unmarshal([]byte(users[i].Whitelist), &white)
+			if err != nil {
+				logrus.Error(err)
+				continue
+			}
+		}
+
+		out = append(out, swm_structs.User{
+			Id:        users[i].ID,
+			Type:      users[i].Type,
+			UserName:  users[i].Username,
+			Password:  users[i].Password,
+			Role:      users[i].Role,
+			BlackList: black,
+			WhiteList: white,
+		})
+	}
+
+	return out
 }
 
 func (svc *Service) getUnit(nameOrID string) (*unit, error) {
@@ -954,19 +986,11 @@ func (svc *Service) initTopology() error {
 		proxyNames[i] = proxys[i].Name
 	}
 
-	var dba, replicater database.User
-
-	users := make([]swm_structs.User, len(svc.users))
+	var (
+		dba, replicater database.User
+		users           = converteToSWM_Users(svc.users)
+	)
 	for i := range svc.users {
-		users[i] = swm_structs.User{
-			Id:       svc.users[i].ID,
-			Type:     svc.users[i].Type,
-			UserName: svc.users[i].Username,
-			Password: svc.users[i].Password,
-			Role:     svc.users[i].Role,
-			ReadOnly: false,
-		}
-
 		if svc.users[i].Role == _User_DBA {
 			dba = svc.users[i]
 		} else if svc.users[i].Role == _User_Replication {
