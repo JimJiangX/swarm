@@ -245,10 +245,11 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		defer func() {
 			if err != nil {
-				// SAN Mapping && Active
-
-				// start old unit
-				return
+				_, err := migrateVolumes(dc.storage, original.ID, original.engine, oldLVs, oldLVs, lunMap, lunSlice)
+				if err != nil {
+					logrus.Error(err)
+					//	return err
+				}
 			}
 
 			logrus.Debug("recycle old container volumes resource")
@@ -362,9 +363,20 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			// return err
 		}
 
+		oldEngineIP := oldContainer.Engine.IP
 		err = cleanOldContainer(oldContainer, oldLVs)
 		if err != nil {
 			logrus.Error(err)
+		}
+
+		err = deregisterToServices(oldEngineIP, u.ID, sys)
+		if err != nil {
+			logrus.Error(err)
+		}
+
+		err = registerToServers(u, svc, sys)
+		if err != nil {
+			logrus.Errorf("registerToServers error:%s", err)
 		}
 
 		if u.Type != _SwitchManagerType {
@@ -373,16 +385,6 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			if err != nil {
 				logrus.Errorf("switchBack error:%s", err)
 			}
-		}
-
-		err = deregisterToServices(oldContainer.Engine.IP, u.ID, sys)
-		if err != nil {
-			logrus.Error(err)
-		}
-
-		err = registerToServers(u, svc, sys)
-		if err != nil {
-			logrus.Errorf("registerToServers error:%s", err)
 		}
 
 		return nil
@@ -543,6 +545,21 @@ func migrateVolumes(storage store.Store, nodeID string,
 	}
 
 	addr := getPluginAddr(engine.IP, pluginPort)
+	// SanActivate
+	for vg, list := range vgMap {
+		names := make([]string, len(list))
+		for i := range list {
+			names[i] = list[i].Name
+		}
+		activeConfig := sdk.ActiveConfig{
+			VgName: vg,
+			Lvname: names,
+		}
+		err := sdk.SanActivate(addr, activeConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// SanVgCreate
 	for vg, list := range vgMap {
@@ -560,22 +577,6 @@ func migrateVolumes(storage store.Store, nodeID string,
 		}
 
 		err := sdk.SanVgCreate(addr, config)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// SanActivate
-	for vg, list := range vgMap {
-		names := make([]string, len(list))
-		for i := range list {
-			names[i] = list[i].Name
-		}
-		activeConfig := sdk.ActiveConfig{
-			VgName: vg,
-			Lvname: names,
-		}
-		err := sdk.SanActivate(addr, activeConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -764,6 +765,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			// deactivate
 			// del mapping
 			if len(lunMap) > 0 {
+				// TODO:fix host
 				_err := sanDeactivateAndDelMapping(dc.storage, u, lunMap, lunSlice)
 				if _err != nil {
 					logrus.Error(_err)
@@ -867,6 +869,12 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			}
 		}
 
+		err = stopOldContainer(svc, u)
+		if err != nil {
+			logrus.Error(err)
+			// return err
+		}
+
 		err = engine.RenameContainer(container, u.Name)
 		if err != nil {
 			logrus.Error(err)
@@ -894,9 +902,20 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			// return err
 		}
 
+		oldEngineIP := oldContainer.Engine.IP
 		err = cleanOldContainer(oldContainer, oldLVs)
 		if err != nil {
 			logrus.Error(err)
+		}
+
+		err = deregisterToServices(oldEngineIP, u.ID, sys)
+		if err != nil {
+			logrus.Error(err)
+		}
+
+		err = registerToServers(u, svc, sys)
+		if err != nil {
+			logrus.Errorf("registerToServers error:%s", err)
 		}
 
 		if u.Type != _SwitchManagerType {
@@ -905,16 +924,6 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			if err != nil {
 				logrus.Errorf("switchBack error:%s", err)
 			}
-		}
-
-		err = deregisterToServices(oldContainer.Engine.IP, u.ID, sys)
-		if err != nil {
-			logrus.Error(err)
-		}
-
-		err = registerToServers(u, svc, sys)
-		if err != nil {
-			logrus.Errorf("registerToServers error:%s", err)
 		}
 
 		return nil
