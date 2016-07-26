@@ -688,6 +688,16 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 		logrus.Warn(err, service.Description)
 	}
 
+	_, files, err := database.ListBackupFilesByService(service.ID)
+	if err != nil {
+		logrus.Error(err)
+	}
+
+	usedSpaceByte := 0
+	for i := range files {
+		usedSpaceByte += files[i].SizeByte
+	}
+
 	units, err := database.ListUnitByServiceID(service.ID)
 	if err != nil {
 		logrus.Error("ListUnitByServiceID", err)
@@ -769,6 +779,7 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 		HighAvailable:        service.HighAvailable,
 		Status:               service.Status,
 		BackupMaxSizeByte:    service.BackupMaxSizeByte,
+		BackupUsedSizeByte:   usedSpaceByte,
 		BackupFilesRetention: service.BackupFilesRetention,
 		RunningStatus:        getServiceRunningStatus(service.ID, units, containers, checks),
 		CreatedAt:            utils.TimeToString(service.CreatedAt),

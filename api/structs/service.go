@@ -149,6 +149,7 @@ type ServiceResponse struct {
 	HighAvailable        bool   `json:"high_available"`
 	Status               int64  `json:"status"`
 	BackupMaxSizeByte    int    `json:"backup_max_size"`
+	BackupUsedSizeByte   int    `json:"backup_used_size"`
 	BackupFilesRetention int    `json:"backup_files_retention"` // Day
 	RunningStatus        string `json:"running_status"`
 	CreatedAt            string `json:"created_at"`
