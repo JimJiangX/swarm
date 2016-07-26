@@ -1012,7 +1012,7 @@ func getServiceBackupStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.
 func getServiceBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
-	files, err := database.ListBackupFilesByService(name)
+	_, files, err := database.ListBackupFilesByService(name)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -1306,6 +1306,15 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 		return "", err
 	}
 
+	ok, err := checkBackupFiles(svc.ID)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", errors.Errorf("Service %s,No More Space For Backup Task", svc.Name)
+
+	}
+
 	var backup *unit = nil
 	if nameOrID != "" {
 		backup, err = svc.getUnit(nameOrID)
@@ -1791,25 +1800,20 @@ func (svc *Service) Slowlog(enable, notUsingIndexxes bool, longQueryTime int) er
 		return errors.Errorf("Service %s Has no '%s' Type Unit", svc.Name, _UpsqlType)
 	}
 
-	var monitor, db *database.User
+	var dba *database.User
 	for i := range svc.users {
-		if svc.users[i].Role == _User_Monitor {
-			monitor = &svc.users[i]
+		if svc.users[i].Role == _User_DBA {
+			dba = &svc.users[i]
 			break
-		} else if svc.users[i].Role == _User_DB {
-			db = &svc.users[i]
 		}
 	}
 
-	if monitor == nil && db != nil {
-		monitor = db
-	}
-	if monitor == nil {
-		return errors.Errorf("Not Found Service %s User:'%s'", svc.Name, _User_Monitor)
+	if dba == nil {
+		return errors.Errorf("Not Found Service %s User:'%s'", svc.Name, _User_DBA)
 	}
 
 	command := bytes.NewBuffer(nil)
-	cmd := fmt.Sprintf(`mysql -S /DBAASDAT/upsql.sock mysql -u%s -p%s`, monitor.Username, monitor.Password)
+	cmd := fmt.Sprintf(`mysql -S /DBAASDAT/upsql.sock mysql -u%s -p%s`, dba.Username, dba.Password)
 
 	if !enable {
 		command.WriteString("set global slow_query_log=0;")
