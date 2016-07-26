@@ -19,7 +19,7 @@ func DeleteUnitConfig(id string) error {
 		return nil
 	}
 
-	db, err := GetDB(true)
+	db, err = GetDB(true)
 	if err != nil {
 		return err
 	}
