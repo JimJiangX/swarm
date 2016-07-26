@@ -221,6 +221,7 @@ init_ssd_vg() {
 
 # install consul agent
 install_consul() {
+	local version=0.6.4
 	
 	# stop consul
 	pkill -9 consul >/dev/null 2>&1
@@ -252,7 +253,7 @@ install_consul() {
 EOF
 
 	# copy binary file
-	cp ${cur_dir}/consul-agent-0.6.4-release/bin/consul /usr/bin/consul; chmod 755 /usr/bin/consul
+	cp ${cur_dir}/consul-agent-${version}-release/bin/consul /usr/bin/consul; chmod 755 /usr/bin/consul
 
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/consul
@@ -307,6 +308,7 @@ EOF
 
 # install docker
 install_docker() {
+	local version=1.11.2
 	# scan wwn 
 	wwn=""
 	for fc_host in `ls /sys/class/fc_host/`
@@ -341,7 +343,7 @@ install_docker() {
 	pkill -9 docker-contarinerd >/dev/null 2>&1
 
 	# copy the binary & set the permissions
-	cp ${cur_dir}/docker-1.11.2-release/bin/docker* /usr/bin/; chmod +x /usr/bin/docker*
+	cp ${cur_dir}/docker-${version}-release/bin/docker* /usr/bin/; chmod +x /usr/bin/docker*
 	
 
 	# create the systemd files
@@ -444,16 +446,17 @@ init_docker() {
 
 # install docker plugin
 install_docker_plugin() {
+	local version=1.6.5
 	local script_dir=/usr/local/local_volume_plugin/scripts
 	mkdir -p ${script_dir}
 
 	pkill -9 local-volume-plugin > /dev/null 2>&1
 
 	# copy binary file
-	cp ${cur_dir}/dbaas_volume_plugin-1.6.4/bin/local_volume_plugin /usr/bin/local_volume_plugin; chmod 755 /usr/bin/local_volume_plugin
+	cp ${cur_dir}/dbaas_volume_plugin-${version}/bin/local_volume_plugin /usr/bin/local_volume_plugin; chmod 755 /usr/bin/local_volume_plugin
 
 	# copy script
-	cp ${cur_dir}/dbaas_volume_plugin-1.6.4/scripts/*.sh ${script_dir}
+	cp ${cur_dir}/dbaas_volume_plugin-${version}/scripts/*.sh ${script_dir}
 	chmod +x ${script_dir}/*.sh
 
 	cat << EOF > /usr/lib/systemd/system/local-volume-plugin.service
@@ -491,11 +494,12 @@ EOF
 
 # install swarm agent
 install_swarm_agent() {
+	local version=1.2.0
 	# stop swarm-agent
 	pkill -9 swarm >/dev/null 2>&1
 
 	# copy binary file
-	cp ${cur_dir}/swarm-agent-1.2.0-release/bin/swarm /usr/bin/swarm; chmod 755 /usr/bin/swarm
+	cp ${cur_dir}/swarm-agent-${version}-release/bin/swarm /usr/bin/swarm; chmod 755 /usr/bin/swarm
 
 	#nohup swarm join --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/DBaaS  >> /var/log/swarm.log &
 	# create systemd config file
@@ -546,6 +550,7 @@ EOF
 
 # install horus agent
 install_horus_agent() {
+	local version=1.3.5
 	# stop swarm-agent
 	pkill -9 horus-agent >/dev/null 2>&1
 
@@ -553,8 +558,8 @@ install_horus_agent() {
 
 	# copy binary file
 	mkdir -p /usr/local/horus-agent
-	cp ${cur_dir}/horus-agent-1.3.1/bin/horus-agent /usr/bin/horus-agent; chmod 755 /usr/bin/horus-agent
-	cp -r ${cur_dir}/horus-agent-1.3.1/scripts /usr/local/horus-agent/scripts; chmod -R +x /usr/local/horus-agent/scripts/*.sh
+	cp ${cur_dir}/horus-agent-${version}/bin/horus-agent /usr/bin/horus-agent; chmod 755 /usr/bin/horus-agent
+	cp -r ${cur_dir}/horus-agent-${version}/scripts /usr/local/horus-agent/scripts; chmod -R +x /usr/local/horus-agent/scripts/*.sh
 
 	local nets_dev="${adm_nic}#${int_nic}"
 	if [ ! -z "${ext_nic}" ]; then
