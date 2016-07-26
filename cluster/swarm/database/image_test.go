@@ -3,7 +3,34 @@ package database
 import (
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
 )
+
+func DeleteUnitConfig(id string) error {
+	db, err := GetDB(false)
+	if err != nil {
+		return err
+	}
+
+	query := "DELETE FROM tb_unit_config WHERE id=?"
+	_, err = db.Exec(query, id)
+	if err == nil {
+		return nil
+	}
+
+	db, err := GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(query, id)
+	if err == nil {
+		return nil
+	}
+
+	return errors.Wrap(err, "Delete UnitConfig")
+}
 
 func TestTXInsertUnitConfig(t *testing.T) {
 	tx, err := GetTX()

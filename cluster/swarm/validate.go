@@ -114,7 +114,7 @@ func ValidService(req structs.PostServiceRequest) []string {
 		//	warnings = append(warnings, fmt.Sprintf("Unsupported '%s' Yet", module.Type))
 		//}
 		if module.Config.Image == "" {
-			image, err := database.QueryImage(module.Name, module.Version)
+			image, err := database.GetImage(module.Name, module.Version)
 			if err != nil {
 				warnings = append(warnings, fmt.Sprintf("Not Found Image:%s:%s,Error%s", module.Name, module.Version, err))
 			}
@@ -122,7 +122,7 @@ func ValidService(req structs.PostServiceRequest) []string {
 				warnings = append(warnings, fmt.Sprintf("Image: %s:%s is Disabled", module.Name, module.Version))
 			}
 		} else {
-			image, err := database.QueryImageByID(module.Config.Image)
+			image, err := database.GetImageByID(module.Config.Image)
 			if err != nil {
 				warnings = append(warnings, fmt.Sprintf("Not Found Image:%s,Error%s", module.Config.Image, err))
 			}

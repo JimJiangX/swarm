@@ -24,7 +24,7 @@ type Image struct {
 }
 
 func (gd *Gardener) GetImage(name, version string) (Image, error) {
-	im, err := database.QueryImage(name, version)
+	im, err := database.GetImage(name, version)
 	if err != nil {
 		return Image{}, err
 	}
@@ -42,7 +42,7 @@ func (gd *Gardener) GetImage(name, version string) (Image, error) {
 }
 
 func (gd *Gardener) GetImageByID(id string) (Image, error) {
-	im, err := database.QueryImageByID(id)
+	im, err := database.GetImageByID(id)
 	if err != nil {
 		return Image{}, err
 	}
