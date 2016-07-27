@@ -53,9 +53,6 @@ type Gardener struct {
 	networkings []*Networking
 	services    []*Service
 	stores      []store.Store
-
-	// serviceSchedulerCh chan *Service // scheduler service units
-	// serviceExecuteCh   chan *Service // run service containers
 }
 
 // NewGardener is exported
@@ -77,8 +74,6 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 		networkings: make([]*Networking, 0, 50),
 		services:    make([]*Service, 0, 100),
 		stores:      make([]store.Store, 0, 50),
-		//		serviceSchedulerCh: make(chan *Service, 100),
-		//		serviceExecuteCh:   make(chan *Service, 100),
 	}
 
 	for _, host := range hosts {
@@ -111,8 +106,6 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	}
 
 	gd.cron.Start()
-	//go gd.serviceScheduler()
-	//go gd.serviceExecute()
 
 	return gd, nil
 }

@@ -39,7 +39,6 @@ type Service struct {
 	units  []*unit
 	users  []database.User
 	backup *database.BackupStrategy
-	task   *database.Task
 
 	authConfig *types.AuthConfig
 }
@@ -466,8 +465,8 @@ func (gd *Gardener) AddService(svc *Service) error {
 	return nil
 }
 
-func (svc *Service) SaveToDB() error {
-	return database.TxSaveService(svc.Service, svc.backup, svc.task, svc.users)
+func (svc *Service) SaveToDB(task *database.Task) error {
+	return database.TxSaveService(svc.Service, svc.backup, task, svc.users)
 }
 
 func (gd *Gardener) GetService(nameOrID string) (*Service, error) {
@@ -587,7 +586,6 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 	logrus.WithFields(logrus.Fields{
 		"Servcie Name": svc.Name,
 		"Service ID":   svc.ID,
-		"Task ID":      svc.task.ID,
 	}).Info("Service Saved Into Database")
 
 	svc.failureRetry = gd.createRetry
@@ -629,13 +627,15 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 	}
 
 	task := database.NewTask(_Service_Create_Task, svc.ID, "create service", nil, 0)
-	svc.task = &task
 
+	creater := func() error {
+		return database.TxSaveService(svc.Service, svc.backup, &task, svc.users)
+	}
 	updater := func(code int, msg string) error {
 		return database.TxSetServiceStatus(&svc.Service, &task, svc.Status, int64(code), time.Now(), msg)
 	}
 
-	worker := NewAsyncTask(context.Background(), background, svc.SaveToDB, updater, 0)
+	worker := NewAsyncTask(context.Background(), background, creater, updater, 10*time.Minute)
 	if err = worker.Run(); err != nil {
 		return svc, "", "", err
 	}
@@ -1351,11 +1351,6 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 	})
 
 	return task.ID, nil
-}
-
-func (svc *Service) Task() *database.Task {
-
-	return svc.task
 }
 
 type pendingContainerUpdate struct {
