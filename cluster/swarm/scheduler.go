@@ -420,11 +420,12 @@ func (gd *Gardener) runScheduler(list []*node.Node, config *cluster.ContainerCon
 	}
 
 	if err != nil {
-		logrus.Debugf("[MG] gd.scheduler.SelectNodesForContainer fail(swarm level) :", err)
+		logrus.Errorf("[MG] gd.scheduler.SelectNodesForContainer fail(swarm level):%s", err)
+
 		return nil, err
 	}
 
-	logrus.Debugf("[MG] gd.scheduler.SelectNodesForContainer ok(swarm level) ndoes:%v", nodes)
+	logrus.Debugf("[MG] gd.scheduler.SelectNodesForContainer ok(swarm level) ndoes:%d", len(nodes))
 	return gd.SelectNodeByCluster(nodes, num, highAvaliable)
 }
 

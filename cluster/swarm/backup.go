@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"time"
 
-	"golang.org/x/net/context"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
 	"github.com/yiduoyunQ/smlib"
+	"golang.org/x/net/context"
 	crontab "gopkg.in/robfig/cron.v2"
 )
 
@@ -36,6 +35,12 @@ func (bs *serviceBackup) Run() {
 	}
 
 	if !strategy.Enabled || bs.svc == nil {
+		return
+	}
+
+	ok, err := checkBackupFiles(strategy.ServiceID)
+	if !ok || err != nil {
+		logrus.Info("Backup Task Canceled")
 		return
 	}
 
@@ -183,12 +188,52 @@ func backupTask(backup *unit, task *database.Task, strategy database.BackupStrat
 	default:
 	}
 
-	err1 := database.UpdateTaskStatus(task, status, time.Now(), msg)
-	if err1 != nil {
-		entry.Errorf("Update TaskStatus Error:%s,message=%s", err, msg)
+	_err := database.UpdateTaskStatus(task, status, time.Now(), msg)
+	if _err != nil {
+		entry.Errorf("Update TaskStatus Error:%s,message=%s", _err, msg)
 	}
 
 	return err
+}
+
+// checkBackupFiles checks files.Retention,remove expired files
+func checkBackupFiles(nameOrID string) (bool, error) {
+	service, files, err := database.ListBackupFilesByService(nameOrID)
+	if err != nil {
+		return false, err
+	}
+
+	now := time.Now()
+	expired := make([]database.BackupFile, 0, len(files))
+	valid := make([]database.BackupFile, 0, len(files))
+
+	for i := range files {
+		if now.After(files[i].Retention) {
+			expired = append(expired, files[i])
+		} else {
+			valid = append(valid, files[i])
+		}
+	}
+
+	logrus.Infof("Backup Files Expired:%v", expired)
+	// TODO:remove expired files and delete backupfile record
+
+	sub := 0
+	for i := range valid {
+		sub += valid[i].SizeByte
+	}
+
+	if sub >= service.BackupMaxSizeByte {
+		logrus.WithFields(logrus.Fields{
+			"Service": service.Name,
+			"Max":     service.BackupMaxSizeByte,
+			"Used":    sub,
+		}).Warning("No More Space For Backup Task")
+
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (gd *Gardener) RegisterBackupStrategy(strategy *serviceBackup) error {

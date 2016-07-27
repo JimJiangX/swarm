@@ -3,9 +3,10 @@ package database
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -42,27 +43,42 @@ func TxInsertImage(image Image, config UnitConfig) error {
 
 	_, err = tx.NamedExec(insertImageQuery, &image)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "TX insert Image")
 	}
 
 	err = TXInsertUnitConfig(tx, &config)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Tx insert UnitConfig")
 	}
 
 	return tx.Commit()
 }
 
-func QueryImage(name, version string) (Image, error) {
-	db, err := GetDB(true)
+func GetImage(name, version string) (Image, error) {
+	db, err := GetDB(false)
 	if err != nil {
 		return Image{}, err
 	}
 
 	image := Image{}
-	err = db.Get(&image, "SELECT * FROM tb_image WHERE name=? AND version=?", name, version)
+	query := "SELECT * FROM tb_image WHERE name=? AND version=?"
 
-	return image, err
+	err = db.Get(&image, query, name, version)
+	if err == nil {
+		return image, nil
+	}
+
+	db, err = GetDB(true)
+	if err != nil {
+		return Image{}, err
+	}
+
+	err = db.Get(&image, query, name, version)
+	if err == nil {
+		return image, nil
+	}
+
+	return image, errors.Wrapf(err, "Get Image,name='%s' version='%s'", name, version)
 }
 
 func GetImageAndUnitConfig(ID string) (Image, UnitConfig, error) {
@@ -76,12 +92,12 @@ func GetImageAndUnitConfig(ID string) (Image, UnitConfig, error) {
 
 	err = db.Get(&image, "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?", ID, ID)
 	if err != nil {
-		return image, config, err
+		return image, config, errors.Wrapf(err, "Get Image by id='%s'", ID)
 	}
 
 	err = db.Get(&config, "SELECT * FROM tb_unit_config WHERE id=?", image.TemplateConfigID)
 	if err != nil {
-		return image, config, err
+		return image, config, errors.Wrapf(err, "Get UnitConfig by id='%s'", image.TemplateConfigID)
 	}
 
 	config.KeySets, err = unitConfigDecode(image.ConfigKeySets)
@@ -89,38 +105,81 @@ func GetImageAndUnitConfig(ID string) (Image, UnitConfig, error) {
 	return image, config, err
 }
 
-func QueryImageByID(ID string) (Image, error) {
-	db, err := GetDB(true)
+func GetImageByID(ID string) (Image, error) {
+	db, err := GetDB(false)
 	if err != nil {
 		return Image{}, err
 	}
 
 	image := Image{}
-	err = db.Get(&image, "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?", ID, ID)
+	query := "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?"
 
-	return image, err
+	err = db.Get(&image, query, ID, ID)
+	if err == nil {
+		return image, nil
+	}
+
+	db, err = GetDB(true)
+	if err != nil {
+		return Image{}, err
+	}
+
+	err = db.Get(&image, query, ID, ID)
+	if err == nil {
+		return image, nil
+	}
+
+	return image, errors.Wrapf(err, "Get Image by id='%s'", ID)
 }
 
 func UpdateImageStatus(ID string, enable bool) error {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("UPDATE tb_image SET enabled=? WHERE id=? OR docker_image_id=?", enable, ID, ID)
+	query := "UPDATE tb_image SET enabled=? WHERE id=? OR docker_image_id=?"
+	_, err = db.Exec(query, enable, ID, ID)
+	if err == nil {
+		return nil
+	}
 
-	return err
+	db, err = GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(query, enable, ID, ID)
+	if err == nil {
+		return nil
+	}
+
+	return errors.Wrapf(err, "Update Image by id='%s' enabled=%t", ID, enable)
 }
 
 func DeleteImage(ID string) error {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("DELETE FROM tb_image WHERE id=? OR docker_image_id=?", ID, ID)
+	query := "DELETE FROM tb_image WHERE id=? OR docker_image_id=?"
+	_, err = db.Exec(query, ID, ID)
+	if err == nil {
+		return nil
+	}
 
-	return err
+	db, err = GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(query, ID, ID)
+	if err == nil {
+		return nil
+	}
+
+	return errors.Wrapf(err, "Delete Image by id='%s'", ID)
 }
 
 const insertUnitConfigQuery = "INSERT INTO tb_unit_config (id,image_id,config_file_path,version,parent_id,content,created_at) VALUES (:id,:image_id,:config_file_path,:version,:parent_id,:content,:created_at)"
@@ -154,7 +213,7 @@ func unitConfigEncode(keysets map[string]KeysetParams) (string, error) {
 	buffer := bytes.NewBuffer(nil)
 	err := json.NewEncoder(buffer).Encode(keysets)
 
-	return buffer.String(), err
+	return buffer.String(), errors.Wrap(err, "UnitConfig Encode")
 }
 
 func unitConfigDecode(src string) (map[string]KeysetParams, error) {
@@ -165,7 +224,7 @@ func unitConfigDecode(src string) (map[string]KeysetParams, error) {
 	dec := json.NewDecoder(strings.NewReader(src))
 	err := dec.Decode(&val)
 
-	return val, err
+	return val, errors.Wrap(err, "UnitConfig Decode")
 }
 
 func GetUnitConfigByID(id string) (*UnitConfig, error) {
@@ -175,16 +234,15 @@ func GetUnitConfigByID(id string) (*UnitConfig, error) {
 	}
 
 	config := &UnitConfig{}
-	query := "SELECT * FROM tb_unit_config WHERE id=?"
-	err = db.Get(config, query, id)
+	err = db.Get(config, "SELECT * FROM tb_unit_config WHERE id=?", id)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Get UnitConfig")
 	}
 
 	var keysets string
 	err = db.Get(&keysets, "SELECT config_keysets FROM tb_image WHERE id=?", config.ImageID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "Get Image.ConfigKeysets by id='%s'", config.ImageID)
 	}
 
 	config.KeySets, err = unitConfigDecode(keysets)
@@ -192,10 +250,12 @@ func GetUnitConfigByID(id string) (*UnitConfig, error) {
 	return config, err
 }
 
-func ListUnitConfigByService(service string) ([]struct {
+type UnitWithConfig struct {
 	Unit   Unit
 	Config UnitConfig
-}, error) {
+}
+
+func ListUnitConfigByService(service string) ([]UnitWithConfig, error) {
 	db, err := GetDB(true)
 	if err != nil {
 		return nil, err
@@ -204,11 +264,11 @@ func ListUnitConfigByService(service string) ([]struct {
 	var units []Unit
 	err = db.Select(&units, "SELECT * FROM tb_unit WHERE service_id=?", service)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "Select []Unit by service_id='%s'", service)
 	}
 
 	if len(units) == 0 {
-		return nil, fmt.Errorf("Not Found Units of Service,Is '%s' Exist?", service)
+		return nil, errors.Errorf("Not Found []Unit by service_id='%s'", service)
 	}
 
 	ids := make([]string, len(units))
@@ -224,7 +284,7 @@ func ListUnitConfigByService(service string) ([]struct {
 	var configs []*UnitConfig
 	err = db.Select(&configs, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "Select []UnitConfig by id=%s", ids)
 	}
 
 	if len(configs) == 0 {
@@ -237,7 +297,7 @@ func ListUnitConfigByService(service string) ([]struct {
 	}
 	err = db.Select(&result, "SELECT id,config_keysets FROM tb_image")
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Select []Image")
 	}
 
 	for i := range configs {
@@ -252,10 +312,7 @@ func ListUnitConfigByService(service string) ([]struct {
 		}
 	}
 
-	out := make([]struct {
-		Unit   Unit
-		Config UnitConfig
-	}, 0, len(units))
+	out := make([]UnitWithConfig, 0, len(units))
 
 	for i := range units {
 		for _, c := range configs {
@@ -266,10 +323,7 @@ func ListUnitConfigByService(service string) ([]struct {
 			if units[i].ConfigID != c.ID {
 				continue
 			}
-			out = append(out, struct {
-				Unit   Unit
-				Config UnitConfig
-			}{
+			out = append(out, UnitWithConfig{
 				Unit:   units[i],
 				Config: *c,
 			})
@@ -282,8 +336,11 @@ func ListUnitConfigByService(service string) ([]struct {
 
 func TXInsertUnitConfig(tx *sqlx.Tx, config *UnitConfig) error {
 	_, err := tx.NamedExec(insertUnitConfigQuery, config)
+	if err == nil {
+		return nil
+	}
 
-	return err
+	return errors.Wrap(err, "Tx insert UnitConfig")
 }
 
 func TxUpdateImageTemplateConfig(image string, config UnitConfig) error {
@@ -310,21 +367,10 @@ func TxUpdateImageTemplateConfig(image string, config UnitConfig) error {
 	}
 
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Update Image")
 	}
 
 	return tx.Commit()
-}
-
-func DeleteUnitConfig(id string) error {
-	db, err := GetDB(true)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec("DELETE FROM tb_unit_config WHERE id=?", id)
-
-	return err
 }
 
 func txDeleteUnitConfig(tx *sqlx.Tx, id string) error {

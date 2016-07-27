@@ -688,6 +688,16 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 		logrus.Warnf("JSON Decode Serivce.Description %s:%s,%s", service.Name, err, service.Description)
 	}
 
+	_, files, err := database.ListBackupFilesByService(service.ID)
+	if err != nil {
+		logrus.Error(err)
+	}
+
+	usedSpaceByte := 0
+	for i := range files {
+		usedSpaceByte += files[i].SizeByte
+	}
+
 	units, err := database.ListUnitByServiceID(service.ID)
 	if err != nil {
 		logrus.Error("ListUnitByServiceID", err)
@@ -769,6 +779,7 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 		HighAvailable:        service.HighAvailable,
 		Status:               service.Status,
 		BackupMaxSizeByte:    service.BackupMaxSizeByte,
+		BackupUsedSizeByte:   usedSpaceByte,
 		BackupFilesRetention: service.BackupFilesRetention,
 		RunningStatus:        getServiceRunningStatus(service.ID, units, containers, checks),
 		CreatedAt:            utils.TimeToString(service.CreatedAt),
@@ -886,6 +897,39 @@ func hijackTopology(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GET /services/{name}/proxys
+func hijackProxys(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	service, err := gd.GetService(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	addr, err := service.GetSwitchManagerAddr()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	r.URL.Path = "/proxys"
+
+	logrus.Debugf("hijack to %s,URL:%s", addr, r.URL.String())
+
+	err = hijack(nil, addr, w, r)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 // GET /services/{name}/service_config
 func getServiceServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
@@ -979,7 +1023,7 @@ func getServiceBackupStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.
 func getServiceBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
-	files, err := database.ListBackupFilesByService(name)
+	_, files, err := database.ListBackupFilesByService(name)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return

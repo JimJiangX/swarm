@@ -384,17 +384,20 @@ func txDeleteService(tx *sqlx.Tx, nameOrID string) error {
 	return err
 }
 
-const insertUserQuery = "INSERT INTO tb_users (id,service_id,type,username,password,role,permission,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:permission,:created_at)"
+const insertUserQuery = "INSERT INTO tb_users (id,service_id,type,username,password,role,permission,blacklist,whitelist,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:permission,:blacklist,:whitelist,:created_at)"
 
 type User struct {
-	ID         string    `db:"id"`
-	ServiceID  string    `db:"service_id"`
-	Type       string    `db:"type"`
-	Username   string    `db:"username"`
-	Password   string    `db:"password"`
-	Role       string    `db:"role"`
-	Permission string    `db:"permission"`
-	CreatedAt  time.Time `db:"created_at"`
+	ID         string `db:"id"`
+	ServiceID  string `db:"service_id"`
+	Type       string `db:"type"`
+	Username   string `db:"username"`
+	Password   string `db:"password"`
+	Role       string `db:"role"`
+	Permission string `db:"permission"`
+	Blacklist  string `db:"blacklist"`
+	Whitelist  string `db:"whitelist"`
+
+	CreatedAt time.Time `db:"created_at"`
 }
 
 func (u User) TableName() string {
@@ -438,7 +441,7 @@ func TxUpdateUsers(addition, update []User) error {
 		return tx.Commit()
 	}
 
-	query := "UPDATE tb_users SET type=:type,password=:password,role=:role,permission=:permission WHERE id=:id OR username=:username"
+	query := "UPDATE tb_users SET type=:type,password=:password,role=:role,permission=:permission,blacklist=:blacklist,whitelist=:whitelist, WHERE id=:id OR username=:username"
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
 		return err

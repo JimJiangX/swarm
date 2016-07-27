@@ -6,7 +6,30 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 )
+
+func delMultiPorts(tx *sqlx.Tx, ports []Port) error {
+	query := "DELETE FROM tb_port WHERE port=?"
+
+	stmt, err := tx.Preparex(query)
+	if err != nil {
+		return errors.Wrap(err, "Prepare Delete Port")
+	}
+
+	for i := range ports {
+		_, err := stmt.Exec(ports[i].Port)
+		if err != nil {
+			// return err
+		}
+	}
+
+	stmt.Close()
+
+	return nil
+}
 
 func TestPort(t *testing.T) {
 	ports := []Port{
@@ -21,7 +44,7 @@ func TestPort(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = DelMultiPorts(tx, ports)
+		err = delMultiPorts(tx, ports)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -35,7 +58,7 @@ func TestPort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = TxInsertPorts(tx, ports)
+	err = txInsertPorts(tx, ports)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +109,7 @@ func TestPort(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = DelMultiPorts(
+		err = delMultiPorts(
 			tx,
 			[]Port{
 				NewPort(5, "", "", "", "", true),

@@ -51,33 +51,40 @@ func (bf BackupFile) TableName() string {
 	return "tb_backup_files"
 }
 
-func ListBackupFilesByService(nameOrID string) ([]BackupFile, error) {
+func ListBackupFilesByService(nameOrID string) (Service, []BackupFile, error) {
 	db, err := GetDB(true)
 	if err != nil {
-		return nil, err
+		return Service{}, nil, err
 	}
 
-	var service string
-	err = db.Get(&service, "SELECT id FROM tb_service WHERE id=? OR name=?", nameOrID, nameOrID)
-
-	units := make([]string, 0, 5)
-	err = db.Select(&units, "SELECT id FROM tb_unit WHERE service_id=?", service)
+	service := Service{}
+	err = db.Get(&service, "SELECT * FROM tb_service WHERE id=? OR name=?", nameOrID, nameOrID)
 	if err != nil {
-		return nil, err
+		return service, nil, errors.Wrapf(err, "Not Found Service By '%s'", nameOrID)
+	}
+
+	var units []string
+	err = db.Select(&units, "SELECT id FROM tb_unit WHERE service_id=?", service.ID)
+	if err != nil {
+		return service, nil, errors.Wrapf(err, "Not Found Units By service_id='%s'", service.ID)
+	}
+
+	if len(units) == 0 {
+		return service, nil, errors.Wrapf(err, "Not Found Units By service_id='%s'", service.ID)
 	}
 
 	query, args, err := sqlx.In("SELECT * FROM tb_backup_files WHERE unit_id IN (?);", units)
 	if err != nil {
-		return nil, err
+		return service, nil, err
 	}
 
-	files := make([]BackupFile, 0, 10)
+	var files []BackupFile
 	err = db.Select(&files, query, args...)
 	if err != nil {
-		return nil, err
+		return service, nil, errors.Wrapf(err, "Not Found BackupFile By unit_id='%s'", units)
 	}
 
-	return files, nil
+	return service, files, nil
 }
 
 func GetBackupFile(id string) (BackupFile, error) {

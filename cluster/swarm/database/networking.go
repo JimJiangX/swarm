@@ -5,6 +5,7 @@ import (
 
 	"github.com/docker/swarm/utils"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 )
 
 const insertIPQuery = "INSERT INTO tb_ip (ip_addr,prefix,networking_id,unit_id,allocated) VALUES (:ip_addr,:prefix,:networking_id,:unit_id,:allocated)"
@@ -70,13 +71,16 @@ func DeletePort(port int, allocated bool) error {
 	using := false
 	err = db.Get(&using, "SELECT allocated FROM tb_port WHERE port=?", port)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Get Port.Allocated")
 	}
 	if using != allocated {
-		return fmt.Errorf("port %d is busy,cannot be removed", port)
+		return errors.Errorf("Port %d (%t!= %t),cannot be removed", port, using, allocated)
 	}
 
 	_, err = db.Exec("DELETE FROM tb_port WHERE port=? AND allocated=?", port, allocated)
+	if err != nil {
+		return errors.Wrap(err, "Delete Port")
+	}
 
 	return err
 }
@@ -85,20 +89,30 @@ func SelectAvailablePorts(num int) ([]Port, error) {
 	if num == 0 {
 		return nil, nil
 	}
-	db, err := GetDB(true)
+
+	db, err := GetDB(false)
 	if err != nil {
 		return nil, err
 	}
 
-	ports := make([]Port, 0, num)
+	var ports []Port
 	query := fmt.Sprintf("SELECT * FROM tb_port WHERE allocated=? LIMIT %d", num)
 
 	err = db.Select(&ports, query, false)
 	if err != nil {
-		return nil, err
+		db, err = GetDB(true)
+		if err != nil {
+			return nil, err
+		}
+
+		err = db.Select(&ports, query, false)
+		if err != nil {
+			return nil, errors.Wrap(err, "Select []Port")
+		}
 	}
+
 	if len(ports) != num {
-		return nil, fmt.Errorf("Cannot get required num=%d available ports", num)
+		return nil, errors.Errorf("Cannot get required num=%d available ports", num)
 	}
 
 	return ports, nil
@@ -109,7 +123,7 @@ func TxUpdatePorts(tx *sqlx.Tx, ports []Port) error {
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Tx Prepare Update []Port")
 	}
 
 	for i := range ports {
@@ -117,11 +131,16 @@ func TxUpdatePorts(tx *sqlx.Tx, ports []Port) error {
 		if err != nil {
 			stmt.Close()
 
-			return err
+			return errors.Wrap(err, "Tx Update Port")
 		}
 	}
 
-	return stmt.Close()
+	err = stmt.Close()
+	if err != nil {
+		return errors.Wrap(err, "Tx Update []Port")
+	}
+
+	return nil
 }
 
 // TxImportPort import Port from start to end(includ end)
@@ -142,34 +161,29 @@ loop:
 		})
 	}
 
-	db, err := GetDB(true)
-	if err != nil {
-		return 0, err
-	}
-
-	tx, err := db.Beginx()
+	tx, err := GetTX()
 	if err != nil {
 		return 0, err
 	}
 	defer tx.Rollback()
 
-	err = TxInsertPorts(tx, ports)
+	err = txInsertPorts(tx, ports)
 	if err != nil {
 		return 0, err
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return 0, err
+		return 0, errors.Wrap(err, "Insert []Port Commit")
 	}
 
 	return len(ports), nil
 }
 
-func TxInsertPorts(tx *sqlx.Tx, ports []Port) error {
+func txInsertPorts(tx *sqlx.Tx, ports []Port) error {
 	stmt, err := tx.PrepareNamed(insertPortQuery)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Tx Prepare Insert Port")
 	}
 
 	for i := range ports {
@@ -177,44 +191,43 @@ func TxInsertPorts(tx *sqlx.Tx, ports []Port) error {
 		if err != nil {
 			stmt.Close()
 
-			return err
+			return errors.Wrap(err, "Tx Insert Port")
 		}
 	}
 
-	return stmt.Close()
-}
-
-func DelMultiPorts(tx *sqlx.Tx, ports []Port) error {
-	query := "DELETE FROM tb_port WHERE port=?"
-
-	stmt, err := tx.Preparex(query)
+	err = stmt.Close()
 	if err != nil {
-		return err
-	}
-
-	for i := range ports {
-		_, err := stmt.Exec(ports[i].Port)
-		if err != nil {
-			// return err
-		}
+		return errors.Wrap(err, "Tx Insert []Port")
 	}
 
 	return nil
 }
 
 func ListPortsByUnit(nameOrID string) ([]Port, error) {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return nil, err
 	}
 
-	ports := make([]Port, 0, 2)
-	err = db.Select(&ports, "SELECT * FROM tb_port WHERE unit_id=? OR unit_name=?", nameOrID, nameOrID)
+	var ports []Port
+	query := "SELECT * FROM tb_port WHERE unit_id=? OR unit_name=?"
+
+	err = db.Select(&ports, query, nameOrID, nameOrID)
+	if err == nil {
+		return ports, nil
+	}
+
+	db, err = GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return ports, nil
+	err = db.Select(&ports, query, nameOrID, nameOrID)
+	if err == nil {
+		return ports, nil
+	}
+
+	return nil, errors.Wrap(err, "Select []Port")
 }
 
 func ListPorts(start, end, limit int) ([]Port, error) {
@@ -243,10 +256,11 @@ func ListPorts(start, end, limit int) ([]Port, error) {
 		err = db.Select(&ports, query, end)
 
 	default:
-		return nil, fmt.Errorf("illegal input,start=%d end=%d limit=%d", start, end, limit)
+		return nil, errors.Errorf("illegal input,start=%d end=%d limit=%d", start, end, limit)
 	}
+
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Select []Port")
 	}
 
 	return ports, nil
@@ -262,85 +276,131 @@ func GetNetworkingByID(id string) (Networking, int, error) {
 
 	err = db.Get(&net, "SELECT * FROM tb_networking WHERE id=?", id)
 	if err != nil {
-		return net, 0, err
+		return net, 0, errors.Wrap(err, "Get Networking")
 	}
 
 	prefix := 0
 	err = db.Get(&prefix, "SELECT prefix FROM tb_ip WHERE networking_id=? LIMIT 1", id)
 	if err != nil {
-		return Networking{}, 0, err
+		return Networking{}, 0, errors.Wrap(err, "Get IP.Prefix")
 	}
 
 	return net, prefix, nil
 }
 
 func ListIPByUnitID(unit string) ([]IP, error) {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]IP, 0, 2)
-	err = db.Select(&out, "SELECT * from tb_ip WHERE unit_id=?", unit)
+	var out []IP
+	query := "SELECT * from tb_ip WHERE unit_id=?"
+
+	err = db.Select(&out, query, unit)
+	if err == nil {
+		return out, nil
+	}
+
+	db, err = GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return out, nil
+	err = db.Select(&out, query, unit)
+	if err == nil {
+		return out, nil
+	}
+
+	return nil, errors.Wrap(err, "Select []IP")
 }
 
 func ListNetworkingByType(_type string) ([]Networking, error) {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return nil, err
 	}
 
-	list := make([]Networking, 0, 5)
+	var list []Networking
+	query := "SELECT * FROM tb_networking WHERE type=?"
 
-	err = db.Select(&list, "SELECT * FROM tb_networking WHERE type=?", _type)
+	err = db.Select(&list, query, _type)
+	if err == nil {
+		return list, nil
+	}
+
+	db, err = GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return list, nil
+	err = db.Select(&list, query, _type)
+	if err == nil {
+		return list, nil
+	}
+
+	return nil, errors.Wrap(err, "Select []Networking")
 }
 
 func ListNetworking() ([]Networking, error) {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return nil, err
 	}
 
-	list := make([]Networking, 0, 5)
+	var list []Networking
+	query := "SELECT * FROM tb_networking"
 
-	err = db.Select(&list, "SELECT * FROM tb_networking")
+	err = db.Select(&list, query)
+	if err == nil {
+		return list, nil
+	}
+
+	db, err = GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return list, nil
+	err = db.Select(&list, query)
+	if err == nil {
+		return list, nil
+	}
+
+	return nil, errors.Wrap(err, "Select []Networking")
 }
 
 func ListIPByNetworking(id string) ([]IP, error) {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return nil, err
 	}
 
-	list := make([]IP, 0, 100)
-	err = db.Select(&list, "SELECT * FROM tb_ip WHERE networking_id=?", id)
+	var list []IP
+	query := "SELECT * FROM tb_ip WHERE networking_id=?"
+
+	err = db.Select(&list, query, id)
+	if err == nil {
+		return list, nil
+	}
+
+	db, err = GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return list, nil
+	err = db.Select(&list, query, id)
+	if err == nil {
+		return list, nil
+	}
+
+	return nil, errors.Wrap(err, "Select []IP")
 }
 
 func TxInsertNetworking(start, end, gateway, _type string, prefix int) (Networking, []IP, error) {
 	startU32 := utils.IPToUint32(start)
 	endU32 := utils.IPToUint32(end)
 	if move := uint(32 - prefix); (startU32 >> move) != (endU32 >> move) {
-		return Networking{}, nil, fmt.Errorf("%s-%s is different network segments", start, end)
+		return Networking{}, nil, errors.Errorf("%s-%s is different network segments", start, end)
 	}
 	if startU32 > endU32 {
 		startU32, endU32 = endU32, startU32
@@ -377,13 +437,28 @@ func TxInsertNetworking(start, end, gateway, _type string, prefix int) (Networki
 }
 
 func UpdateNetworkingStatus(id string, enable bool) error {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return err
 	}
-	_, err = db.Exec("UPDATE tb_networking SET enabled=? WHERE id=?", enable, id)
 
-	return err
+	query := "UPDATE tb_networking SET enabled=? WHERE id=?"
+	_, err = db.Exec(query, enable, id)
+	if err == nil {
+		return nil
+	}
+
+	db, err = GetDB(true)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(query, enable, id)
+	if err == nil {
+		return nil
+	}
+
+	return errors.Wrap(err, "Update Networking")
 }
 
 func txInsertNetworking(net Networking, ips []IP) error {
@@ -395,7 +470,7 @@ func txInsertNetworking(net Networking, ips []IP) error {
 
 	stmt, err := tx.PrepareNamed(insertIPQuery)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Tx Prepare Insert []IP")
 	}
 
 	for i := range ips {
@@ -403,7 +478,7 @@ func txInsertNetworking(net Networking, ips []IP) error {
 		if err != nil {
 			stmt.Close()
 
-			return err
+			return errors.Wrap(err, "Tx Insert IP")
 		}
 	}
 
@@ -411,7 +486,7 @@ func txInsertNetworking(net Networking, ips []IP) error {
 
 	_, err = tx.NamedExec(insertNetworkingQuery, &net)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Tx Insert Networking")
 	}
 
 	return tx.Commit()
@@ -426,43 +501,69 @@ func TxDeleteNetworking(id string) error {
 
 	_, err = tx.Exec("DELETE FROM tb_networking WHERE id=?", id)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Delete Networking")
 	}
+
 	_, err = tx.Exec("DELETE FROM tb_ip WHERE networking_id=?", id)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Delete []IP")
 	}
 
 	return tx.Commit()
 }
 
 func CountIPByNetwrokingAndStatus(networking string, allocation bool) (int, error) {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return 0, err
 	}
 
 	count := 0
-	err = db.Get(&count, "SELECT COUNT(*) from tb_ip WHERE networking_id=? AND allocated=?", networking, allocation)
+	query := "SELECT COUNT(*) from tb_ip WHERE networking_id=? AND allocated=?"
 
-	return count, err
+	err = db.Get(&count, query, networking, allocation)
+	if err == nil {
+		return count, nil
+	}
+
+	db, err = GetDB(true)
+	if err != nil {
+		return 0, err
+	}
+
+	err = db.Get(&count, query, networking, allocation)
+	if err == nil {
+		return count, nil
+	}
+
+	return 0, errors.Wrap(err, "Count Networking.IP")
 }
 
 func GetMultiIPByNetworking(networking string, allocation bool, num int) ([]IP, error) {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]IP, num)
+	var out []IP
 	query := fmt.Sprintf("SELECT * from tb_ip WHERE networking_id=? AND allocated=? LIMIT %d", num)
 
 	err = db.Select(&out, query, networking, allocation)
+	if err == nil {
+		return out, nil
+	}
+
+	db, err = GetDB(true)
 	if err != nil {
 		return nil, err
 	}
 
-	return out, nil
+	err = db.Select(&out, query, networking, allocation)
+	if err == nil {
+		return out, nil
+	}
+
+	return nil, errors.Wrap(err, "Select []IP")
 }
 
 func TXAllocIPByNetworking(id, unit string) (IP, error) {
@@ -477,7 +578,7 @@ func TXAllocIPByNetworking(id, unit string) (IP, error) {
 
 	err = tx.Get(&out, query, id, false)
 	if err != nil {
-		return out, err
+		return out, errors.Wrap(err, "Tx Get IP")
 	}
 
 	out.Allocated = true
@@ -487,11 +588,11 @@ func TXAllocIPByNetworking(id, unit string) (IP, error) {
 
 	_, err = tx.NamedExec(query, out)
 	if err != nil {
-		return out, err
+		return out, errors.Wrap(err, "Update IP")
 	}
 
 	if err = tx.Commit(); err != nil {
-		return out, err
+		return out, errors.Wrap(err, "Update IP Commit")
 	}
 
 	return out, nil
@@ -502,7 +603,7 @@ func TxUpdateMultiIPValue(tx *sqlx.Tx, val []IP) error {
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Tx Prepare Update []IP")
 	}
 
 	for i := range val {
@@ -510,9 +611,14 @@ func TxUpdateMultiIPValue(tx *sqlx.Tx, val []IP) error {
 		if err != nil {
 			stmt.Close()
 
-			return err
+			return errors.Wrap(err, "Tx Update IP")
 		}
 	}
 
-	return stmt.Close()
+	err = stmt.Close()
+	if err != nil {
+		return errors.Wrap(err, "Tx Update []IP")
+	}
+
+	return nil
 }

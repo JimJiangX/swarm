@@ -85,7 +85,7 @@ const (
 	_StatusServiceStarting // start contaier and start service
 	_StatusServiceStartFailed
 	_statusServiceStoping
-	_statusServiceStopFaied
+	_statusServiceStopFailed
 	_StatusServiceDeleting
 	_StatusServiceDeleteFailed
 	_StatusServiceBackuping

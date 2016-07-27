@@ -212,13 +212,18 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 		exist := false
 		for u := range svc.users {
 			if svc.users[u].Username == req[i].Username {
+
 				update = append(update, database.User{
-					ID:        svc.users[u].ID,
-					ServiceID: svc.users[u].ServiceID,
-					Type:      req[i].Type,
-					Username:  req[i].Username,
-					Password:  req[i].Password,
-					Role:      req[i].Role,
+					ID:         svc.users[u].ID,
+					ServiceID:  svc.users[u].ServiceID,
+					Permission: svc.users[u].Permission,
+					CreatedAt:  svc.users[u].CreatedAt,
+					Type:       req[i].Type,
+					Username:   req[i].Username,
+					Password:   req[i].Password,
+					Role:       req[i].Role,
+					Blacklist:  req[i].Blacklist,
+					Whitelist:  req[i].Whitelist,
 				})
 				exist = true
 				break
@@ -229,44 +234,34 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 		}
 	}
 
+	additionList := converteToUsers(svc.ID, addition)
+
 	addr, port, err := svc.getSwitchManagerAddr()
 	if err != nil {
 		return 0, err
 	}
 
-	users := converteToUsers(svc.ID, addition)
-	for i := range users {
+	swmUsers := converteToSWM_Users(additionList)
+	for i := range swmUsers {
+
 		code = 201
-		user := swm_structs.User{
-			Id:       users[i].ID,
-			Type:     users[i].Type,
-			UserName: users[i].Username,
-			Password: users[i].Password,
-			Role:     users[i].Role,
-		}
-		err := smlib.AddUser(addr, port, user)
+		err := smlib.AddUser(addr, port, swmUsers[i])
 		if err != nil {
 			logrus.Errorf("%s add user error:%s", addr, err)
 			return 0, err
 		}
 	}
 
-	for i := range update {
-		user := swm_structs.User{
-			Id:       update[i].ID,
-			Type:     update[i].Type,
-			UserName: update[i].Username,
-			Password: update[i].Password,
-			Role:     update[i].Role,
-		}
-		err := smlib.UptUser(addr, port, user)
+	swmUsers = converteToSWM_Users(update)
+	for i := range swmUsers {
+		err := smlib.UptUser(addr, port, swmUsers[i])
 		if err != nil {
 			logrus.Errorf("%s update user error:%s", addr, err)
 			return 0, err
 		}
 	}
 
-	err = database.TxUpdateUsers(users, update)
+	err = database.TxUpdateUsers(additionList, update)
 	if err != nil {
 		return 0, err
 	}
@@ -324,15 +319,10 @@ func (svc *Service) DeleteServiceUsers(usernames []string, all bool) error {
 	if err != nil {
 		return err
 	}
-	for i := range list {
-		user := swm_structs.User{
-			Id:       list[i].ID,
-			Type:     list[i].Type,
-			UserName: list[i].Username,
-			Password: list[i].Password,
-			Role:     list[i].Role,
-		}
-		err := smlib.DelUser(addr, port, user)
+
+	users := converteToSWM_Users(list)
+	for i := range users {
+		err := smlib.DelUser(addr, port, users[i])
 		if err != nil {
 			return err
 		}
@@ -409,7 +399,7 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 }
 
 func converteToUsers(service string, users []structs.User) []database.User {
-	list := make([]database.User, len(users))
+	out := make([]database.User, 0, len(users))
 	now := time.Now()
 	for i := range users {
 		if users[i].Type != _User_Type_Proxy &&
@@ -418,7 +408,7 @@ func converteToUsers(service string, users []structs.User) []database.User {
 			continue
 		}
 
-		list[i] = database.User{
+		out = append(out, database.User{
 			ID:         utils.Generate32UUID(),
 			ServiceID:  service,
 			Type:       users[i].Type,
@@ -426,11 +416,53 @@ func converteToUsers(service string, users []structs.User) []database.User {
 			Password:   users[i].Password,
 			Role:       users[i].Role,
 			Permission: "",
+			Blacklist:  users[i].Blacklist,
+			Whitelist:  users[i].Whitelist,
 			CreatedAt:  now,
-		}
+		})
 	}
 
-	return list
+	return out
+}
+
+func converteToSWM_Users(users []database.User) []swm_structs.User {
+	out := make([]swm_structs.User, 0, len(users))
+
+	for i := range users {
+		if users[i].Type != _User_Type_Proxy &&
+			users[i].Role != _User_DB &&
+			users[i].Role != _User_Application {
+			continue
+		}
+
+		var black, white []string
+		if len(users[i].Blacklist) > 0 {
+			err := json.Unmarshal([]byte(users[i].Blacklist), &black)
+			if err != nil {
+				logrus.Error(err)
+				continue
+			}
+		}
+		if len(users[i].Whitelist) > 0 {
+			err := json.Unmarshal([]byte(users[i].Whitelist), &white)
+			if err != nil {
+				logrus.Error(err)
+				continue
+			}
+		}
+
+		out = append(out, swm_structs.User{
+			Id:        users[i].ID,
+			Type:      users[i].Type,
+			UserName:  users[i].Username,
+			Password:  users[i].Password,
+			Role:      users[i].Role,
+			BlackList: black,
+			WhiteList: white,
+		})
+	}
+
+	return out
 }
 
 func (svc *Service) getUnit(nameOrID string) (*unit, error) {
@@ -646,7 +678,14 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 func (svc *Service) StartService() (err error) {
 	err = svc.statusCAS(_StatusServiceNoContent, _StatusServiceStarting)
 	if err != nil {
-		return err
+		logrus.Warning(err)
+
+		err = svc.statusCAS(_StatusServiceStartFailed, _StatusServiceStarting)
+		if err != nil {
+			logrus.Error(err)
+
+			return err
+		}
 	}
 
 	svc.Lock()
@@ -654,7 +693,7 @@ func (svc *Service) StartService() (err error) {
 		if err != nil {
 			svc.SetServiceStatus(_StatusServiceStartFailed, time.Now())
 		} else {
-			atomic.StoreInt64(&svc.Status, _StatusServiceNoContent)
+			svc.SetServiceStatus(_StatusServiceNoContent, time.Now())
 		}
 		svc.Unlock()
 	}()
@@ -669,13 +708,9 @@ func (svc *Service) StartService() (err error) {
 		return err
 	}
 
-	err = svc.refreshTopology()
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
+
 func (svc *Service) startContainers() error {
 	for _, u := range svc.units {
 		err := u.startContainer()
@@ -732,7 +767,7 @@ func (svc *Service) checkStatus(expected int64) error {
 		return nil
 	}
 
-	return fmt.Errorf("Status Conflict:expected %d but got %d", expected, val)
+	return fmt.Errorf("Service %s,Status Conflict:expected %d but got %d", svc.Name, expected, val)
 }
 
 func (svc *Service) statusCAS(expected, value int64) error {
@@ -740,7 +775,7 @@ func (svc *Service) statusCAS(expected, value int64) error {
 		return nil
 	}
 
-	return fmt.Errorf("Status Conflict:expected %d but got %d", expected, atomic.LoadInt64(&svc.Status))
+	return fmt.Errorf("Service %s,Status Conflict:expected %d but got %d", svc.Name, expected, atomic.LoadInt64(&svc.Status))
 }
 
 func (svc *Service) startService() error {
@@ -769,27 +804,28 @@ func (svc *Service) stopContainers(timeout int) error {
 	return nil
 }
 
-func (svc *Service) StopService() error {
-	err := svc.checkStatus(_StatusServiceNoContent)
+func (svc *Service) StopService() (err error) {
+	err = svc.statusCAS(_StatusServiceNoContent, _statusServiceStoping)
 	if err != nil {
-		return err
+		logrus.Warning(err)
+
+		err = svc.statusCAS(_statusServiceStopFailed, _statusServiceStoping)
+		if err != nil {
+			logrus.Error(err)
+
+			return err
+		}
 	}
 
 	svc.Lock()
-	defer svc.Unlock()
-
-	// TODO:is this necessary?
-	addr, port, err := svc.getSwitchManagerAddr()
-	if err != nil {
-		logrus.Warnf("service %s get SwithManager Addr error:%s", svc.Name, err)
-	} else {
-		err = smlib.Lock(addr, port)
+	defer func() {
 		if err != nil {
-			logrus.Error(err)
+			svc.SetServiceStatus(_statusServiceStopFailed, time.Now())
 		} else {
-			defer smlib.UnLock(addr, port)
+			svc.SetServiceStatus(_StatusServiceNoContent, time.Now())
 		}
-	}
+		svc.Unlock()
+	}()
 
 	units := svc.getUnitByType(_UpsqlType)
 	if len(units) == 0 {
@@ -941,12 +977,6 @@ func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}
 	return nil
 }
 
-func (svc *Service) refreshTopology() error {
-	svc.getSwithManagerUnit()
-
-	return nil
-}
-
 func (svc *Service) initTopology() error {
 	swm := svc.getSwithManagerUnit()
 	sqls := svc.getUnitByType(_UpsqlType)
@@ -967,19 +997,11 @@ func (svc *Service) initTopology() error {
 		proxyNames[i] = proxys[i].Name
 	}
 
-	var dba, replicater database.User
-
-	users := make([]swm_structs.User, len(svc.users))
+	var (
+		dba, replicater database.User
+		users           = converteToSWM_Users(svc.users)
+	)
 	for i := range svc.users {
-		users[i] = swm_structs.User{
-			Id:       svc.users[i].ID,
-			Type:     svc.users[i].Type,
-			UserName: svc.users[i].Username,
-			Password: svc.users[i].Password,
-			Role:     svc.users[i].Role,
-			ReadOnly: false,
-		}
-
 		if svc.users[i].Role == _User_DBA {
 			dba = svc.users[i]
 		} else if svc.users[i].Role == _User_Replication {
@@ -1293,6 +1315,15 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 		logrus.Errorf("Not Found Service '%s',Error:%s", service, err)
 
 		return "", err
+	}
+
+	ok, err := checkBackupFiles(svc.ID)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", errors.Errorf("Service %s,No More Space For Backup Task", svc.Name)
+
 	}
 
 	var backup *unit = nil
@@ -1775,25 +1806,20 @@ func (svc *Service) Slowlog(enable, notUsingIndexxes bool, longQueryTime int) er
 		return errors.Errorf("Service %s Has no '%s' Type Unit", svc.Name, _UpsqlType)
 	}
 
-	var monitor, db *database.User
+	var dba *database.User
 	for i := range svc.users {
-		if svc.users[i].Role == _User_Monitor {
-			monitor = &svc.users[i]
+		if svc.users[i].Role == _User_DBA {
+			dba = &svc.users[i]
 			break
-		} else if svc.users[i].Role == _User_DB {
-			db = &svc.users[i]
 		}
 	}
 
-	if monitor == nil && db != nil {
-		monitor = db
-	}
-	if monitor == nil {
-		return errors.Errorf("Not Found Service %s User:'%s'", svc.Name, _User_Monitor)
+	if dba == nil {
+		return errors.Errorf("Not Found Service %s User:'%s'", svc.Name, _User_DBA)
 	}
 
 	command := bytes.NewBuffer(nil)
-	cmd := fmt.Sprintf(`mysql -S /DBAASDAT/upsql.sock mysql -u%s -p%s`, monitor.Username, monitor.Password)
+	cmd := fmt.Sprintf(`mysql -S /DBAASDAT/upsql.sock mysql -u%s -p%s`, dba.Username, dba.Password)
 
 	if !enable {
 		command.WriteString("set global slow_query_log=0;")

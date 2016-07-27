@@ -28,7 +28,8 @@ type User struct {
 	Username  string
 	Password  string
 	Role      string
-	Whitelist []string `json:",omitempty"`
+	Whitelist string // []string
+	Blacklist string // []string
 }
 
 type Module struct {
@@ -148,6 +149,7 @@ type ServiceResponse struct {
 	HighAvailable        bool   `json:"high_available"`
 	Status               int64  `json:"status"`
 	BackupMaxSizeByte    int    `json:"backup_max_size"`
+	BackupUsedSizeByte   int    `json:"backup_used_size"`
 	BackupFilesRetention int    `json:"backup_files_retention"` // Day
 	RunningStatus        string `json:"running_status"`
 	CreatedAt            string `json:"created_at"`
