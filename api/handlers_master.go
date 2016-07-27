@@ -623,7 +623,7 @@ func listServiceFromDBAAS(services []database.Service,
 		desc := structs.PostServiceRequest{}
 		err := json.NewDecoder(bytes.NewBufferString(services[i].Description)).Decode(&desc)
 		if err != nil {
-			logrus.Error(err, services[i].Description)
+			logrus.Warningf("JSON Decode Serivce.Description %s:%s,%s", services[i].Name, err, services[i].Description)
 		}
 		sql := structs.Module{}
 		for _, m := range desc.Modules {
@@ -685,7 +685,7 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 	desc := structs.PostServiceRequest{}
 	err := json.NewDecoder(bytes.NewBufferString(service.Description)).Decode(&desc)
 	if err != nil {
-		logrus.Warn(err, service.Description)
+		logrus.Warnf("JSON Decode Serivce.Description %s:%s,%s", service.Name, err, service.Description)
 	}
 
 	units, err := database.ListUnitByServiceID(service.ID)
