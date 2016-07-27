@@ -665,7 +665,14 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 func (svc *Service) StartService() (err error) {
 	err = svc.statusCAS(_StatusServiceNoContent, _StatusServiceStarting)
 	if err != nil {
-		return err
+		logrus.Warning(err)
+
+		err = svc.statusCAS(_StatusServiceStartFailed, _StatusServiceStarting)
+		if err != nil {
+			logrus.Error(err)
+
+			return err
+		}
 	}
 
 	svc.Lock()
@@ -673,7 +680,7 @@ func (svc *Service) StartService() (err error) {
 		if err != nil {
 			svc.SetServiceStatus(_StatusServiceStartFailed, time.Now())
 		} else {
-			atomic.StoreInt64(&svc.Status, _StatusServiceNoContent)
+			svc.SetServiceStatus(_StatusServiceNoContent, time.Now())
 		}
 		svc.Unlock()
 	}()
@@ -688,13 +695,9 @@ func (svc *Service) StartService() (err error) {
 		return err
 	}
 
-	err = svc.refreshTopology()
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
+
 func (svc *Service) startContainers() error {
 	for _, u := range svc.units {
 		err := u.startContainer()
@@ -751,7 +754,7 @@ func (svc *Service) checkStatus(expected int64) error {
 		return nil
 	}
 
-	return fmt.Errorf("Status Conflict:expected %d but got %d", expected, val)
+	return fmt.Errorf("Service %s,Status Conflict:expected %d but got %d", svc.Name, expected, val)
 }
 
 func (svc *Service) statusCAS(expected, value int64) error {
@@ -759,7 +762,7 @@ func (svc *Service) statusCAS(expected, value int64) error {
 		return nil
 	}
 
-	return fmt.Errorf("Status Conflict:expected %d but got %d", expected, atomic.LoadInt64(&svc.Status))
+	return fmt.Errorf("Service %s,Status Conflict:expected %d but got %d", svc.Name, expected, atomic.LoadInt64(&svc.Status))
 }
 
 func (svc *Service) startService() error {
@@ -788,27 +791,28 @@ func (svc *Service) stopContainers(timeout int) error {
 	return nil
 }
 
-func (svc *Service) StopService() error {
-	err := svc.checkStatus(_StatusServiceNoContent)
+func (svc *Service) StopService() (err error) {
+	err = svc.statusCAS(_StatusServiceNoContent, _statusServiceStoping)
 	if err != nil {
-		return err
+		logrus.Warning(err)
+
+		err = svc.statusCAS(_statusServiceStopFailed, _statusServiceStoping)
+		if err != nil {
+			logrus.Error(err)
+
+			return err
+		}
 	}
 
 	svc.Lock()
-	defer svc.Unlock()
-
-	// TODO:is this necessary?
-	addr, port, err := svc.getSwitchManagerAddr()
-	if err != nil {
-		logrus.Warnf("service %s get SwithManager Addr error:%s", svc.Name, err)
-	} else {
-		err = smlib.Lock(addr, port)
+	defer func() {
 		if err != nil {
-			logrus.Error(err)
+			svc.SetServiceStatus(_statusServiceStopFailed, time.Now())
 		} else {
-			defer smlib.UnLock(addr, port)
+			svc.SetServiceStatus(_StatusServiceNoContent, time.Now())
 		}
-	}
+		svc.Unlock()
+	}()
 
 	units := svc.getUnitByType(_UpsqlType)
 	if len(units) == 0 {
@@ -956,12 +960,6 @@ func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}
 
 		}
 	}
-
-	return nil
-}
-
-func (svc *Service) refreshTopology() error {
-	svc.getSwithManagerUnit()
 
 	return nil
 }
