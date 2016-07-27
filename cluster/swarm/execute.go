@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"runtime/debug"
 	"sync/atomic"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/types"
@@ -15,23 +14,22 @@ import (
 	consulapi "github.com/hashicorp/consul/api"
 )
 
-func (gd *Gardener) serviceExecute(svc *Service, task *database.Task) (err error) {
+func (gd *Gardener) serviceExecute(svc *Service) (err error) {
 	svc.Lock()
 
 	defer func() {
 		if r := recover(); r != nil {
 			logrus.Errorf("Recover From Panic:%v", r)
 			debug.PrintStack()
+
+			err = fmt.Errorf("serviceExecute:Recover From Panic,%v", r)
 		}
 
 		if err == nil {
-			logrus.Debug("[MG]TxSetServiceStatus")
-			_err := database.TxSetServiceStatus(&svc.Service, task, _StatusServiceNoContent, _StatusTaskDone, time.Now(), "")
-			if _err != nil {
-				logrus.Errorf("%s TxSetServiceStatus Error:%s", svc.Name, _err)
+			atomic.StoreInt64(&svc.Status, _StatusServiceNoContent)
+			svc.Unlock()
 
-				return
-			}
+			return
 		}
 
 		logrus.Info("Service %s Execute Failed", svc.Name)
@@ -45,11 +43,6 @@ func (gd *Gardener) serviceExecute(svc *Service, task *database.Task) (err error
 		}
 		gd.scheduler.Unlock()
 
-		logrus.Errorf("Exec Error:%v", err)
-		err = database.TxSetServiceStatus(&svc.Service, task, svc.Status, _StatusTaskFailed, time.Now(), err.Error())
-		if err != nil {
-			logrus.Errorf("Save Service %s Status Error:%v", svc.Name, err)
-		}
 		svc.Unlock()
 
 		sys, err := gd.SystemConfig()

@@ -99,21 +99,11 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 	service.Lock()
 	defer service.Unlock()
 
-	task := database.NewTask(_Service_Create_Task, svc.ID, "create service", nil, 0)
-	service.task = &task
-
 	service.backup = strategy
 	service.base = &req
 	service.authConfig = authConfig
 	service.users = users
 	atomic.StoreInt64(&svc.Status, _StatusServcieBuilding)
-
-	if err := service.SaveToDB(); err != nil {
-		atomic.StoreInt64(&svc.Status, _StatusServiceInit)
-
-		logrus.Errorf("Service Save To DB %s", err)
-		return nil, err
-	}
 
 	return service, nil
 }
@@ -574,17 +564,17 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 
 }
 
-func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _ *database.BackupStrategy, err error) {
+func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _ string, _ string, err error) {
 	authConfig, err := gd.RegistryAuthConfig()
 	if err != nil {
 		logrus.Error("get Registry Auth Config", err)
-		return nil, nil, err
+		return nil, "", "", err
 	}
 
 	svc, err := BuildService(req, authConfig)
 	if err != nil {
 		logrus.Error("Build Service", err)
-		return nil, nil, err
+		return nil, "", "", err
 	}
 
 	defer func() {
@@ -606,28 +596,51 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 	if err != nil {
 		logrus.WithField("Service Name", svc.Name).Errorf("Service Add to Gardener Error:%s", err)
 
-		return svc, nil, err
+		return svc, "", "", err
 	}
 
 	svc.RLock()
 	defer svc.RUnlock()
 
-	if svc.backup != nil {
-		bs := NewBackupJob(svc)
-		err = gd.RegisterBackupStrategy(bs)
-		if err != nil {
-			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err)
-		}
-	}
-
-	err = gd.serviceScheduler(svc, svc.task)
+	err = gd.serviceScheduler(svc)
 	if err != nil {
 		logrus.Error("Service Add To Scheduler", err)
-		return svc, svc.backup, err
+		return svc, "", "", err
 	}
 	logrus.Debugf("[mg] ServiceToScheduler ok:%v", svc)
 
-	return svc, svc.backup, nil
+	background := func(context.Context) error {
+		err := gd.serviceExecute(svc)
+		if err != nil {
+			logrus.Errorf("Service %s,execute error:%s", err)
+
+			return err
+		}
+
+		if svc.backup != nil {
+			bs := NewBackupJob(svc)
+			err = gd.RegisterBackupStrategy(bs)
+			if err != nil {
+				logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err)
+			}
+		}
+
+		return nil
+	}
+
+	task := database.NewTask(_Service_Create_Task, svc.ID, "create service", nil, 0)
+	svc.task = &task
+
+	updater := func(code int, msg string) error {
+		return database.TxSetServiceStatus(&svc.Service, &task, svc.Status, int64(code), time.Now(), msg)
+	}
+
+	worker := NewAsyncTask(context.Background(), background, svc.SaveToDB, updater, 0)
+	if err = worker.Run(); err != nil {
+		return svc, "", "", err
+	}
+
+	return svc, svc.backup.ID, task.ID, nil
 }
 
 func (svc *Service) StartService() (err error) {

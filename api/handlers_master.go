@@ -1576,21 +1576,16 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svc, strategy, err := gd.CreateService(req)
+	svc, strategyID, taskID, err := gd.CreateService(req)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	strategyID := ""
-	if strategy != nil {
-		strategyID = strategy.ID
-	}
-
 	response := structs.PostServiceResponse{
 		ID:               svc.ID,
 		BackupStrategyID: strategyID,
-		TaskID:           svc.Task().ID,
+		TaskID:           taskID,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sync/atomic"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -16,24 +17,20 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 )
 
-func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err error) {
-
+func (gd *Gardener) serviceScheduler(svc *Service) (err error) {
 	resourceAlloc := make([]*pendingAllocResource, 0, len(svc.base.Modules))
 
-	svc.Lock()
 	defer func() {
-		if r := recover(); r != nil {
-			logrus.Errorf("Recover From Panic:%v", r)
-		}
-
 		if err != nil && len(resourceAlloc) > 0 {
-
-			dealWithSchedulerFailure(gd, svc, resourceAlloc)
+			_err := dealWithSchedulerFailure(gd, svc, resourceAlloc)
+			if _err != nil {
+				logrus.Errorf("deal With Scheduler Failure,%s", _err)
+			}
+			logrus.Info("[MG]serviceScheduler Failed,%s", err)
 		}
-
-		svc.Unlock()
-		logrus.Info("[MG]serviceScheduler Failed")
 	}()
+
+	atomic.StoreInt64(&svc.Status, _StatusServiceAlloction)
 
 	entry := logrus.WithFields(logrus.Fields{
 		"Name":   svc.Name,
@@ -41,19 +38,6 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 	})
 
 	logrus.Debugf("[MG] start service Scheduler:%s", svc.Name)
-
-	err = svc.statusCAS(_StatusServcieBuilding, _StatusServiceAlloction)
-	if err != nil {
-		entry.Error(err)
-
-		return err
-	}
-
-	err = database.TxSetServiceStatus(&svc.Service, task,
-		_StatusServcieBuilding, _StatusTaskRunning, time.Time{}, "")
-	if err != nil {
-		return err
-	}
 
 	for _, module := range svc.base.Modules {
 
@@ -89,11 +73,7 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 	// scheduler success
 	entry.Info("Alloction Success")
 
-	logrus.Debugf("[MG]Alloction OK and put  to the ServiceToExecute: %v", resourceAlloc)
-
-	err = gd.serviceExecute(svc, svc.task)
-
-	return err
+	return nil
 }
 
 func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err error) {
@@ -147,10 +127,12 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 	return nil
 }
 
-func dealWithSchedulerFailure(gd *Gardener, svc *Service, pendings []*pendingAllocResource) {
+func dealWithSchedulerFailure(gd *Gardener, svc *Service, pendings []*pendingAllocResource) error {
 	err := gd.Recycle(pendings)
 	if err != nil {
-		logrus.Error("Recycle Failed", err)
+		logrus.Errorf("Recycle Failed,%s", err)
+
+		return err
 	}
 
 	// scheduler failed
@@ -160,9 +142,7 @@ func dealWithSchedulerFailure(gd *Gardener, svc *Service, pendings []*pendingAll
 	}
 	gd.scheduler.Unlock()
 
-	svc.Service.SetServiceStatus(_StatusServiceAlloctionFailed, time.Now())
-
-	svc.Unlock()
+	return err
 }
 
 func templateConfig(gd *Gardener, module structs.Module) (*cluster.ContainerConfig, error) {
