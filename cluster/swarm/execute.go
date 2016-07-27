@@ -15,56 +15,26 @@ import (
 	consulapi "github.com/hashicorp/consul/api"
 )
 
-func (gd *Gardener) ServiceToExecute(svc *Service) {
-	gd.serviceExecuteCh <- svc
-}
+func (gd *Gardener) serviceExecute(svc *Service, task *database.Task) (err error) {
+	svc.Lock()
 
-func (gd *Gardener) serviceExecute() error {
 	defer func() {
 		if r := recover(); r != nil {
 			logrus.Errorf("Recover From Panic:%v", r)
-		}
-		debug.PrintStack()
-
-		logrus.Fatal("Service Execute Exit")
-	}()
-
-	for {
-		svc := <-gd.serviceExecuteCh
-		svc.Lock()
-		err := svc.statusCAS(_StatusServiceAlloction, _StatusServiceCreating)
-		if err != nil {
-			logrus.Error(err)
-			continue
+			debug.PrintStack()
 		}
 
-		logrus.Debugf("[MG]Execute Service:%v", svc)
+		if err == nil {
+			logrus.Debug("[MG]TxSetServiceStatus")
+			_err := database.TxSetServiceStatus(&svc.Service, task, _StatusServiceNoContent, _StatusTaskDone, time.Now(), "")
+			if _err != nil {
+				logrus.Errorf("%s TxSetServiceStatus Error:%s", svc.Name, _err)
 
-		err = gd.createServiceContainers(svc)
-		if err != nil {
-			logrus.Errorf("%s create Service Containers Error:%s", svc.Name, err)
-			goto failure
+				return
+			}
 		}
 
-		err = gd.initAndStartService(svc)
-		if err != nil {
-			logrus.Errorf("%s init And Start Service Error:%s", svc.Name, err)
-			goto failure
-		}
-
-		logrus.Debug("[MG]TxSetServiceStatus")
-		err = database.TxSetServiceStatus(&svc.Service, svc.task, _StatusServiceNoContent, _StatusTaskDone, time.Now(), "")
-		if err != nil {
-			logrus.Errorf("%s TxSetServiceStatus Error:%s", svc.Name, err)
-			goto failure
-		}
-		svc.Unlock()
-
-		logrus.Debugf("[MG]Service %s Created,running...", svc.Name)
-
-		continue
-
-	failure:
+		logrus.Info("Service %s Execute Failed", svc.Name)
 
 		gd.scheduler.Lock()
 		for _, u := range svc.units {
@@ -76,7 +46,7 @@ func (gd *Gardener) serviceExecute() error {
 		gd.scheduler.Unlock()
 
 		logrus.Errorf("Exec Error:%v", err)
-		err = database.TxSetServiceStatus(&svc.Service, svc.task, svc.Status, _StatusTaskFailed, time.Now(), err.Error())
+		err = database.TxSetServiceStatus(&svc.Service, task, svc.Status, _StatusTaskFailed, time.Now(), err.Error())
 		if err != nil {
 			logrus.Errorf("Save Service %s Status Error:%v", svc.Name, err)
 		}
@@ -84,19 +54,45 @@ func (gd *Gardener) serviceExecute() error {
 
 		sys, err := gd.SystemConfig()
 		if err != nil {
-			continue
+			return
 		}
 		configs := sys.GetConsulConfigs()
 		if len(configs) == 0 {
-			continue
+			return
 		}
 
 		horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
 		err = svc.Delete(gd, configs[0], horus, true, true, false, 0)
 		if err != nil {
-			continue
+			return
 		}
+	}()
+
+	err = svc.statusCAS(_StatusServiceAlloction, _StatusServiceCreating)
+	if err != nil {
+		logrus.Error(err)
+		return err
 	}
+
+	logrus.Debugf("[MG]Execute Service:%v", svc)
+
+	err = gd.createServiceContainers(svc)
+	if err != nil {
+		logrus.Errorf("%s create Service Containers Error:%s", svc.Name, err)
+
+		return err
+	}
+
+	err = gd.initAndStartService(svc)
+	if err != nil {
+		logrus.Errorf("%s init And Start Service Error:%s", svc.Name, err)
+
+		return err
+	}
+
+	logrus.Debugf("[MG]Service %s Created,running...", svc.Name)
+
+	return nil
 }
 
 func (gd *Gardener) createServiceContainers(svc *Service) (err error) {

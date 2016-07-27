@@ -42,7 +42,7 @@ func UpdateleaderElectionPath(path string) {
 type Gardener struct {
 	*Cluster
 
-	// addition by fugr
+	// added by fugr
 	sysConfig          *database.Configurations
 	cron               *crontab.Cron // crontab tasks
 	consulClient       *consulapi.Client
@@ -54,8 +54,8 @@ type Gardener struct {
 	services    []*Service
 	stores      []store.Store
 
-	serviceSchedulerCh chan *Service // scheduler service units
-	serviceExecuteCh   chan *Service // run service containers
+	// serviceSchedulerCh chan *Service // scheduler service units
+	// serviceExecuteCh   chan *Service // run service containers
 }
 
 // NewGardener is exported
@@ -70,15 +70,15 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	}
 
 	gd := &Gardener{
-		Cluster:            cluster,
-		cron:               crontab.New(),
-		cronJobs:           make(map[crontab.EntryID]*serviceBackup),
-		datacenters:        make([]*Datacenter, 0, 50),
-		networkings:        make([]*Networking, 0, 50),
-		services:           make([]*Service, 0, 100),
-		stores:             make([]store.Store, 0, 50),
-		serviceSchedulerCh: make(chan *Service, 100),
-		serviceExecuteCh:   make(chan *Service, 100),
+		Cluster:     cluster,
+		cron:        crontab.New(),
+		cronJobs:    make(map[crontab.EntryID]*serviceBackup),
+		datacenters: make([]*Datacenter, 0, 50),
+		networkings: make([]*Networking, 0, 50),
+		services:    make([]*Service, 0, 100),
+		stores:      make([]store.Store, 0, 50),
+		//		serviceSchedulerCh: make(chan *Service, 100),
+		//		serviceExecuteCh:   make(chan *Service, 100),
 	}
 
 	for _, host := range hosts {
@@ -111,8 +111,8 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	}
 
 	gd.cron.Start()
-	go gd.serviceScheduler()
-	go gd.serviceExecute()
+	//go gd.serviceScheduler()
+	//go gd.serviceExecute()
 
 	return gd, nil
 }

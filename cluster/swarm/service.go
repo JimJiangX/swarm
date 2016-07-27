@@ -620,7 +620,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 		}
 	}
 
-	err = gd.ServiceToScheduler(svc)
+	err = gd.serviceScheduler(svc, svc.task)
 	if err != nil {
 		logrus.Error("Service Add To Scheduler", err)
 		return svc, svc.backup, err
