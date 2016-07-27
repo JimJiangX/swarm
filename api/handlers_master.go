@@ -623,7 +623,7 @@ func listServiceFromDBAAS(services []database.Service,
 		desc := structs.PostServiceRequest{}
 		err := json.NewDecoder(bytes.NewBufferString(services[i].Description)).Decode(&desc)
 		if err != nil {
-			logrus.Warnf("JSON Decode Serivce.Description %s:%s,%s", services[i].Name, err, services[i].Description)
+			logrus.Warningf("JSON Decode Serivce.Description %s:%s,%s", services[i].Name, err, services[i].Description)
 		}
 		sql := structs.Module{}
 		for _, m := range desc.Modules {
@@ -682,6 +682,11 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 func getServiceResponse(service database.Service, containers cluster.Containers,
 	client *consulapi.Client) structs.ServiceResponse {
+	desc := structs.PostServiceRequest{}
+	err := json.NewDecoder(bytes.NewBufferString(service.Description)).Decode(&desc)
+	if err != nil {
+		logrus.Warnf("JSON Decode Serivce.Description %s:%s,%s", service.Name, err, service.Description)
+	}
 
 	_, files, err := database.ListBackupFilesByService(service.ID)
 	if err != nil {
@@ -770,7 +775,7 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 		ID:                   service.ID,
 		Name:                 service.Name,
 		Architecture:         service.Architecture,
-		Description:          service.Description,
+		Description:          desc,
 		HighAvailable:        service.HighAvailable,
 		Status:               service.Status,
 		BackupMaxSizeByte:    service.BackupMaxSizeByte,
