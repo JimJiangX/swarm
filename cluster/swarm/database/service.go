@@ -500,7 +500,7 @@ func TxUpdateUsers(addition, update []User) error {
 		return tx.Commit()
 	}
 
-	query := "UPDATE tb_users SET type=:type,password=:password,role=:role,permission=:permission,blacklist=:blacklist,whitelist=:whitelist, WHERE id=:id OR username=:username"
+	query := "UPDATE tb_users SET type=:type,password=:password,role=:role,permission=:permission,blacklist=:blacklist,whitelist=:whitelist WHERE id=:id OR username=:username"
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
 		return err
