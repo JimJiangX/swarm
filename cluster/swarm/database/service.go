@@ -398,8 +398,8 @@ type User struct {
 	Permission string   `db:"permission"`
 	Blacklist  []string `db:"-"`
 	Whitelist  []string `db:"-"`
-	White      string   `db:"whitelist"`
-	Black      string   `db:"blacklist"`
+	White      string   `db:"whitelist" json:"-"`
+	Black      string   `db:"blacklist" json:"-"`
 
 	CreatedAt time.Time `db:"created_at"`
 }
@@ -435,6 +435,9 @@ func ListUsersByService(service, _type string) ([]User, error) {
 }
 
 func (u *User) jsonDecode() error {
+	u.Blacklist = []string{}
+	u.Whitelist = []string{}
+
 	buffer := bytes.NewBufferString(u.Black)
 	if len(u.Black) > 0 {
 		err := json.NewDecoder(buffer).Decode(u.Blacklist)
