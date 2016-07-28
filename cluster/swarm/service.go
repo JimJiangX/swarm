@@ -440,30 +440,14 @@ func converteToSWM_Users(users []database.User) []swm_structs.User {
 			continue
 		}
 
-		var black, white []string
-		if len(users[i].Blacklist) > 0 {
-			err := json.Unmarshal([]byte(users[i].Blacklist), &black)
-			if err != nil {
-				logrus.Error(err)
-				continue
-			}
-		}
-		if len(users[i].Whitelist) > 0 {
-			err := json.Unmarshal([]byte(users[i].Whitelist), &white)
-			if err != nil {
-				logrus.Error(err)
-				continue
-			}
-		}
-
 		out = append(out, swm_structs.User{
 			Id:        users[i].ID,
 			Type:      users[i].Type,
 			UserName:  users[i].Username,
 			Password:  users[i].Password,
 			Role:      users[i].Role,
-			BlackList: black,
-			WhiteList: white,
+			BlackList: users[i].Blacklist,
+			WhiteList: users[i].Whitelist,
 		})
 	}
 
