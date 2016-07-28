@@ -50,7 +50,8 @@ func NewService(svc database.Service, unitNum int) *Service {
 	}
 }
 
-func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) (*Service, error) {
+func buildService(req structs.PostServiceRequest,
+	authConfig *types.AuthConfig) (*Service, *database.Task, error) {
 	// if warnings := ValidService(req); len(warnings) > 0 {
 	//	 return nil, errors.New(strings.Join(warnings, ","))
 	// }
@@ -58,7 +59,7 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 	des, err := json.Marshal(req)
 	if err != nil {
 		logrus.Errorf("JSON Marshal Error:%s", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	svc := database.Service{
@@ -78,17 +79,17 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 
 	strategy, err := newBackupStrategy(svc.ID, req.BackupStrategy)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	_, nodeNum, err := getServiceArch(req.Architecture)
 	if err != nil {
 		logrus.Error("Parse Service.Architecture", err)
-		return nil, err
+		return nil, nil, err
 	}
 	sys, err := database.GetSystemConfig()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	users := defaultServiceUsers(svc.ID, *sys)
 	users = append(users, converteToUsers(svc.ID, req.Users)...)
@@ -104,7 +105,11 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 	service.users = users
 	atomic.StoreInt64(&svc.Status, _StatusServcieBuilding)
 
-	return service, nil
+	task := database.NewTask(_Service_Create_Task, service.ID, "create service", nil, 0)
+
+	err = database.TxSaveService(service.Service, service.backup, &task, service.users)
+
+	return service, &task, err
 }
 
 func newBackupStrategy(service string, strategy *structs.BackupStrategy) (*database.BackupStrategy, error) {
@@ -602,18 +607,11 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 		return nil, "", "", err
 	}
 
-	svc, err := BuildService(req, authConfig)
+	svc, task, err := buildService(req, authConfig)
 	if err != nil {
 		logrus.Error("Build Service", err)
 		return nil, "", "", err
 	}
-
-	defer func() {
-		if err != nil {
-			logrus.WithField("Service Name", svc.Name).Errorf("Servcie Cleaned,%v", err)
-			gd.RemoveService(svc.Name, true, true, 0)
-		}
-	}()
 
 	logrus.WithFields(logrus.Fields{
 		"Servcie Name": svc.Name,
@@ -632,9 +630,10 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 	svc.RLock()
 	defer svc.RUnlock()
 
-	err = gd.serviceScheduler(svc)
+	err = gd.serviceScheduler(svc, task)
 	if err != nil {
 		logrus.Error("Service Add To Scheduler", err)
+
 		return svc, "", "", err
 	}
 	logrus.Debugf("[mg] ServiceToScheduler ok:%v", svc)
@@ -658,16 +657,11 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 		return nil
 	}
 
-	task := database.NewTask(_Service_Create_Task, svc.ID, "create service", nil, 0)
-
-	creater := func() error {
-		return database.TxSaveService(svc.Service, svc.backup, &task, svc.users)
-	}
 	updater := func(code int, msg string) error {
-		return database.TxSetServiceStatus(&svc.Service, &task, svc.Status, int64(code), time.Now(), msg)
+		return database.TxSetServiceStatus(&svc.Service, task, svc.Status, int64(code), time.Now(), msg)
 	}
 
-	worker := NewAsyncTask(context.Background(), background, creater, updater, 10*time.Minute)
+	worker := NewAsyncTask(context.Background(), background, nil, updater, 10*time.Minute)
 	if err = worker.Run(); err != nil {
 		return svc, "", "", err
 	}

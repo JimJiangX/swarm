@@ -17,25 +17,33 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 )
 
-func (gd *Gardener) serviceScheduler(svc *Service) (err error) {
+func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err error) {
 	resourceAlloc := make([]*pendingAllocResource, 0, len(svc.base.Modules))
-
+	entry := logrus.WithFields(logrus.Fields{
+		"Name":   svc.Name,
+		"Action": "Schedule&Alloc",
+	})
 	defer func() {
+		if err == nil {
+			return
+		}
+
+		entry.Errorf("Task Failed:%s", err)
+
+		_err := database.TxSetServiceStatus(&svc.Service, task,
+			_StatusServiceAlloctionFailed, _StatusTaskFailed, time.Now(), err.Error())
+		if _err != nil {
+			entry.Error("Tx Set ServiceStatus error:%s", _err)
+		}
 		if err != nil && len(resourceAlloc) > 0 {
 			_err := dealWithSchedulerFailure(gd, svc, resourceAlloc)
 			if _err != nil {
 				logrus.Errorf("deal With Scheduler Failure,%s", _err)
 			}
-			logrus.Info("[MG]serviceScheduler Failed,%s", err)
 		}
 	}()
 
 	atomic.StoreInt64(&svc.Status, _StatusServiceAlloction)
-
-	entry := logrus.WithFields(logrus.Fields{
-		"Name":   svc.Name,
-		"Action": "Schedule&Alloc",
-	})
 
 	logrus.Debugf("[MG] start service Scheduler:%s", svc.Name)
 
@@ -127,7 +135,9 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 	return nil
 }
 
-func dealWithSchedulerFailure(gd *Gardener, svc *Service, pendings []*pendingAllocResource) error {
+func dealWithSchedulerFailure(gd *Gardener, svc *Service,
+	pendings []*pendingAllocResource) error {
+
 	err := gd.Recycle(pendings)
 	if err != nil {
 		logrus.Errorf("Recycle Failed,%s", err)

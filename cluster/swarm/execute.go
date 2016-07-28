@@ -25,15 +25,14 @@ func (gd *Gardener) serviceExecute(svc *Service) (err error) {
 			err = fmt.Errorf("serviceExecute:Recover From Panic,%v", r)
 		}
 
-		svc.Unlock()
-
 		if err == nil {
 			atomic.StoreInt64(&svc.Status, _StatusServiceNoContent)
 
+			svc.Unlock()
 			return
 		}
 
-		logrus.Info("Service %s Execute Failed", svc.Name)
+		logrus.Errorf("Service %s Execute Failed,%s", svc.Name, err)
 
 		gd.scheduler.Lock()
 		for _, u := range svc.units {
@@ -44,17 +43,15 @@ func (gd *Gardener) serviceExecute(svc *Service) (err error) {
 		}
 		gd.scheduler.Unlock()
 
-		err = gd.RemoveService(svc.Name, true, true, 0)
-		logrus.WithField("Service Name", svc.Name).Errorf("Servcie Cleaned,%v", err)
+		svc.Unlock()
 	}()
 
 	err = svc.statusCAS(_StatusServiceAlloction, _StatusServiceCreating)
 	if err != nil {
-		logrus.Error(err)
 		return err
 	}
 
-	logrus.Debugf("[MG]Execute Service:%v", svc)
+	logrus.Debugf("Execute Service %s", svc.Name)
 
 	err = gd.createServiceContainers(svc)
 	if err != nil {
@@ -70,7 +67,7 @@ func (gd *Gardener) serviceExecute(svc *Service) (err error) {
 		return err
 	}
 
-	logrus.Debugf("[MG]Service %s Created,running...", svc.Name)
+	logrus.Debugf("Service %s Created,running...", svc.Name)
 
 	return nil
 }
