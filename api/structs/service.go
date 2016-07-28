@@ -24,6 +24,7 @@ type PostServiceRequest struct {
 }
 
 type User struct {
+	ID        string `json:"-"`
 	Type      string // db/proxy
 	Username  string
 	Password  string

@@ -211,42 +211,33 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 		svc.users = out
 	}
 
+	users := converteToUsers(svc.ID, req)
 	update := make([]database.User, 0, len(req))
-	addition := make([]structs.User, 0, len(req))
-	for i := range req {
+	addition := make([]database.User, 0, len(req))
+	for i := range users {
 		exist := false
 		for u := range svc.users {
-			if svc.users[u].Username == req[i].Username {
+			if svc.users[u].Username == users[i].Username {
+				users[i].ID = svc.users[u].ID
+				users[i].Permission = svc.users[u].Permission
+				users[i].CreatedAt = svc.users[u].CreatedAt
 
-				update = append(update, database.User{
-					ID:         svc.users[u].ID,
-					ServiceID:  svc.users[u].ServiceID,
-					Permission: svc.users[u].Permission,
-					CreatedAt:  svc.users[u].CreatedAt,
-					Type:       req[i].Type,
-					Username:   req[i].Username,
-					Password:   req[i].Password,
-					Role:       req[i].Role,
-					Blacklist:  req[i].Blacklist,
-					Whitelist:  req[i].Whitelist,
-				})
+				update = append(update, users[i])
 				exist = true
 				break
 			}
 		}
 		if !exist {
-			addition = append(addition, req[i])
+			addition = append(addition, users[i])
 		}
 	}
-
-	additionList := converteToUsers(svc.ID, addition)
 
 	addr, port, err := svc.getSwitchManagerAddr()
 	if err != nil {
 		return 0, err
 	}
 
-	swmUsers := converteToSWM_Users(additionList)
+	swmUsers := converteToSWM_Users(addition)
 	for i := range swmUsers {
 
 		code = 201
@@ -266,7 +257,7 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 		}
 	}
 
-	err = database.TxUpdateUsers(additionList, update)
+	err = database.TxUpdateUsers(addition, update)
 	if err != nil {
 		return 0, err
 	}
@@ -406,10 +397,42 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 func converteToUsers(service string, users []structs.User) []database.User {
 	out := make([]database.User, 0, len(users))
 	now := time.Now()
+
 	for i := range users {
-		if users[i].Type != _User_Type_Proxy &&
-			users[i].Role != _User_DB &&
-			users[i].Role != _User_Application {
+
+		switch {
+		case users[i].Type == _User_Type_DB:
+		case users[i].Type == _User_Type_Proxy:
+
+		case strings.ToLower(users[i].Type) == strings.ToLower(_User_Type_DB):
+
+			users[i].Type = _User_Type_DB
+
+		case strings.ToLower(users[i].Type) == strings.ToLower(_User_Type_Proxy):
+
+			users[i].Type = _User_Type_Proxy
+
+		default:
+			continue
+		}
+
+		switch {
+		case users[i].Role == _User_DB:
+		case users[i].Role == _User_Application:
+		case users[i].Role == _User_Check:
+		case users[i].Role == _User_DBA:
+		case users[i].Role == _User_Monitor:
+		case users[i].Role == _User_Replication:
+
+		case strings.ToLower(users[i].Role) == strings.ToLower(_User_DB):
+
+			users[i].Role = _User_DB
+
+		case strings.ToLower(users[i].Role) == strings.ToLower(_User_Application):
+
+			users[i].Role = _User_Application
+
+		default:
 			continue
 		}
 
@@ -434,9 +457,35 @@ func converteToSWM_Users(users []database.User) []swm_structs.User {
 	out := make([]swm_structs.User, 0, len(users))
 
 	for i := range users {
-		if users[i].Type != _User_Type_Proxy &&
-			users[i].Role != _User_DB &&
-			users[i].Role != _User_Application {
+		switch {
+		case users[i].Type == _User_Type_Proxy:
+		case users[i].Type == _User_Type_DB:
+
+		case strings.ToLower(users[i].Type) == strings.ToLower(_User_Type_DB):
+
+			users[i].Type = _User_Type_DB
+
+		case strings.ToLower(users[i].Type) == strings.ToLower(_User_Type_Proxy):
+
+			users[i].Type = _User_Type_Proxy
+
+		default:
+			continue
+		}
+
+		switch {
+		case users[i].Role == _User_DB:
+		case users[i].Role == _User_Application:
+
+		case strings.ToLower(users[i].Role) == strings.ToLower(_User_DB):
+
+			users[i].Role = _User_DB
+
+		case strings.ToLower(users[i].Role) == strings.ToLower(_User_Application):
+
+			users[i].Role = _User_Application
+
+		default:
 			continue
 		}
 
@@ -964,6 +1013,7 @@ func (svc *Service) initTopology() error {
 	swm := svc.getSwithManagerUnit()
 	sqls := svc.getUnitByType(_UpsqlType)
 	proxys := svc.getUnitByType(_ProxyType)
+
 	if len(proxys) == 0 || len(sqls) == 0 || swm == nil {
 		return nil
 	}

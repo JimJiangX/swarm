@@ -143,6 +143,7 @@ const (
 
 	_User_Type_DB    = consts.Type_Db
 	_User_Type_Proxy = consts.Type_Proxy
+
 	_DB_Type_M       = consts.Type_M
 	_DB_Type_M_SB    = consts.Type_M_SB
 	_DB_Type_M_SB_SL = consts.Type_M_SB_SL
