@@ -25,9 +25,10 @@ func (gd *Gardener) serviceExecute(svc *Service) (err error) {
 			err = fmt.Errorf("serviceExecute:Recover From Panic,%v", r)
 		}
 
+		svc.Unlock()
+
 		if err == nil {
 			atomic.StoreInt64(&svc.Status, _StatusServiceNoContent)
-			svc.Unlock()
 
 			return
 		}
@@ -43,22 +44,8 @@ func (gd *Gardener) serviceExecute(svc *Service) (err error) {
 		}
 		gd.scheduler.Unlock()
 
-		svc.Unlock()
-
-		sys, err := gd.SystemConfig()
-		if err != nil {
-			return
-		}
-		configs := sys.GetConsulConfigs()
-		if len(configs) == 0 {
-			return
-		}
-
-		horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-		err = svc.Delete(gd, configs[0], horus, true, true, false, 0)
-		if err != nil {
-			return
-		}
+		err = gd.RemoveService(svc.Name, true, true, 0)
+		logrus.WithField("Service Name", svc.Name).Errorf("Servcie Cleaned,%v", err)
 	}()
 
 	err = svc.statusCAS(_StatusServiceAlloction, _StatusServiceCreating)

@@ -51,9 +51,9 @@ func NewService(svc database.Service, unitNum int) *Service {
 }
 
 func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) (*Service, error) {
-	if warnings := ValidService(req); len(warnings) > 0 {
-		return nil, errors.New(strings.Join(warnings, ","))
-	}
+	// if warnings := ValidService(req); len(warnings) > 0 {
+	//	 return nil, errors.New(strings.Join(warnings, ","))
+	// }
 
 	des, err := json.Marshal(req)
 	if err != nil {
@@ -1574,15 +1574,15 @@ func (svc *Service) updateDescAfterScale(scale structs.PostServiceScaledRequest)
 	return nil
 }
 
-func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int) error {
+func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout int) error {
 	entry := logrus.WithFields(logrus.Fields{
-		"Name":    name,
+		"Name":    nameOrID,
 		"force":   force,
 		"volumes": volumes,
 	})
 	entry.Info("Removing Service...")
 
-	service, err := database.GetService(name)
+	service, err := database.GetService(nameOrID)
 	if err != nil {
 		entry.Errorf("GetService From DB error:%s", err)
 
@@ -1630,6 +1630,16 @@ func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int)
 		return err
 	}
 
+	entry.Debug("Remove Service From Gardener...")
+	gd.Lock()
+	for i := range gd.services {
+		if gd.services[i].ID == nameOrID || gd.services[i].Name == nameOrID {
+			gd.services = append(gd.services[:i], gd.services[i+1:]...)
+			break
+		}
+	}
+	gd.Unlock()
+
 	if svc.backup != nil {
 		err = gd.RemoveCronJob(svc.backup.ID)
 		if err != nil {
@@ -1638,16 +1648,6 @@ func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int)
 			return err
 		}
 	}
-
-	entry.Debug("Remove Service From Gardener...")
-	gd.Lock()
-	for i := range gd.services {
-		if gd.services[i].ID == name || gd.services[i].Name == name {
-			gd.services = append(gd.services[:i], gd.services[i+1:]...)
-			break
-		}
-	}
-	gd.Unlock()
 
 	return nil
 }
