@@ -672,7 +672,12 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 		return svc, "", "", err
 	}
 
-	return svc, svc.backup.ID, task.ID, nil
+	strategyID := ""
+	if svc.backup != nil {
+		strategyID = svc.backup.ID
+	}
+
+	return svc, strategyID, task.ID, nil
 }
 
 func (svc *Service) StartService() (err error) {
