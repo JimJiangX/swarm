@@ -440,7 +440,7 @@ func (u *User) jsonDecode() error {
 
 	buffer := bytes.NewBufferString(u.Black)
 	if len(u.Black) > 0 {
-		err := json.NewDecoder(buffer).Decode(u.Blacklist)
+		err := json.NewDecoder(buffer).Decode(&u.Blacklist)
 		if err != nil {
 			return err
 		}
@@ -450,7 +450,7 @@ func (u *User) jsonDecode() error {
 		buffer.Reset()
 		buffer.WriteString(u.White)
 
-		err := json.NewDecoder(buffer).Decode(u.Whitelist)
+		err := json.NewDecoder(buffer).Decode(&u.Whitelist)
 		if err != nil {
 			return err
 		}
