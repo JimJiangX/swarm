@@ -246,7 +246,7 @@ func (c *Cluster) RemoveNetwork(network *cluster.Network) error {
 			}
 		}
 	} else if engineapi.ErrConnectionFailed == err && network.Scope == "global" {
-		log.Debug("The original engine is unreachable - Attempting to remove global network from the reachable engines...")
+		logrus.Debug("The original engine is unreachable - Attempting to remove global network from the reachable engines...")
 		for _, engine := range c.engines {
 			e1 := engine.RemoveNetwork(network)
 			if e1 == nil {
@@ -259,7 +259,7 @@ func (c *Cluster) RemoveNetwork(network *cluster.Network) error {
 		}
 	}
 	if err != nil && network.Scope == "global" {
-		log.Debugf("Failed to remove global scope network %s from any engine...", network.ID)
+		logrus.Debugf("Failed to remove global scope network %s from any engine...", network.ID)
 	}
 	return err
 }
