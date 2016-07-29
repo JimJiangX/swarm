@@ -1,6 +1,8 @@
 package database
 
 import (
+	"bytes"
+	"encoding/json"
 	"sync/atomic"
 	"time"
 
@@ -387,15 +389,17 @@ func txDeleteService(tx *sqlx.Tx, nameOrID string) error {
 const insertUserQuery = "INSERT INTO tb_users (id,service_id,type,username,password,role,permission,blacklist,whitelist,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:permission,:blacklist,:whitelist,:created_at)"
 
 type User struct {
-	ID         string `db:"id"`
-	ServiceID  string `db:"service_id"`
-	Type       string `db:"type"`
-	Username   string `db:"username"`
-	Password   string `db:"password"`
-	Role       string `db:"role"`
-	Permission string `db:"permission"`
-	Blacklist  string `db:"blacklist"`
-	Whitelist  string `db:"whitelist"`
+	ID         string   `db:"id"`
+	ServiceID  string   `db:"service_id"`
+	Type       string   `db:"type"`
+	Username   string   `db:"username"`
+	Password   string   `db:"password"`
+	Role       string   `db:"role"`
+	Permission string   `db:"permission"`
+	Blacklist  []string `db:"-"`
+	Whitelist  []string `db:"-"`
+	White      string   `db:"whitelist" json:"-"`
+	Black      string   `db:"blacklist" json:"-"`
 
 	CreatedAt time.Time `db:"created_at"`
 }
@@ -420,7 +424,62 @@ func ListUsersByService(service, _type string) ([]User, error) {
 		return nil, err
 	}
 
+	for i := range users {
+		err = users[i].jsonDecode()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return users, nil
+}
+
+func (u *User) jsonDecode() error {
+	u.Blacklist = []string{}
+	u.Whitelist = []string{}
+
+	buffer := bytes.NewBufferString(u.Black)
+	if len(u.Black) > 0 {
+		err := json.NewDecoder(buffer).Decode(&u.Blacklist)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(u.White) > 0 {
+		buffer.Reset()
+		buffer.WriteString(u.White)
+
+		err := json.NewDecoder(buffer).Decode(&u.Whitelist)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (u *User) jsonEncode() error {
+	buffer := bytes.NewBuffer(nil)
+	if len(u.Blacklist) > 0 {
+		err := json.NewEncoder(buffer).Encode(u.Blacklist)
+		if err != nil {
+			return err
+		}
+		u.Black = buffer.String()
+	}
+
+	buffer.Reset()
+
+	if len(u.Whitelist) > 0 {
+		err := json.NewEncoder(buffer).Encode(u.Whitelist)
+		if err != nil {
+			return err
+		}
+		u.White = buffer.String()
+	}
+
+	return nil
 }
 
 func TxUpdateUsers(addition, update []User) error {
@@ -441,13 +500,19 @@ func TxUpdateUsers(addition, update []User) error {
 		return tx.Commit()
 	}
 
-	query := "UPDATE tb_users SET type=:type,password=:password,role=:role,permission=:permission,blacklist=:blacklist,whitelist=:whitelist, WHERE id=:id OR username=:username"
+	query := "UPDATE tb_users SET type=:type,password=:password,role=:role,permission=:permission,blacklist=:blacklist,whitelist=:whitelist WHERE id=:id OR username=:username"
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
 		return err
 	}
 
 	for i := range update {
+		if err = update[i].jsonEncode(); err != nil {
+			stmt.Close()
+
+			return err
+		}
+
 		_, err = stmt.Exec(update[i])
 		if err != nil {
 			stmt.Close()
@@ -483,8 +548,14 @@ func txInsertUsers(tx *sqlx.Tx, users []User) error {
 	}
 
 	for i := range users {
-		if users[i] == (User{}) {
+		if len(users[i].ID) == 0 {
 			continue
+		}
+
+		if err = users[i].jsonEncode(); err != nil {
+			stmt.Close()
+
+			return err
 		}
 
 		_, err = stmt.Exec(&users[i])
@@ -520,6 +591,7 @@ func TxDeleteUsers(users []User) error {
 		_, err = stmt.Exec(users[i].ID)
 		if err != nil {
 			stmt.Close()
+
 			return err
 		}
 	}

@@ -623,7 +623,7 @@ func listServiceFromDBAAS(services []database.Service,
 		desc := structs.PostServiceRequest{}
 		err := json.NewDecoder(bytes.NewBufferString(services[i].Description)).Decode(&desc)
 		if err != nil {
-			logrus.Error(err, services[i].Description)
+			logrus.Warningf("JSON Decode Serivce.Description %s:%s,%s", services[i].Name, err, services[i].Description)
 		}
 		sql := structs.Module{}
 		for _, m := range desc.Modules {
@@ -685,7 +685,7 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 	desc := structs.PostServiceRequest{}
 	err := json.NewDecoder(bytes.NewBufferString(service.Description)).Decode(&desc)
 	if err != nil {
-		logrus.Warn(err, service.Description)
+		logrus.Warnf("JSON Decode Serivce.Description %s:%s,%s", service.Name, err, service.Description)
 	}
 
 	_, files, err := database.ListBackupFilesByService(service.ID)
@@ -1620,21 +1620,16 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svc, strategy, err := gd.CreateService(req)
+	svc, strategyID, taskID, err := gd.CreateService(req)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	strategyID := ""
-	if strategy != nil {
-		strategyID = strategy.ID
-	}
-
 	response := structs.PostServiceResponse{
 		ID:               svc.ID,
 		BackupStrategyID: strategyID,
-		TaskID:           svc.Task().ID,
+		TaskID:           taskID,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

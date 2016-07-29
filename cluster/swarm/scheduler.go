@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"runtime/debug"
 	"sync/atomic"
 	"time"
 
@@ -18,87 +17,71 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 )
 
-func (gd *Gardener) ServiceToScheduler(svc *Service) error {
-	err := database.TxSetServiceStatus(&svc.Service, svc.task,
-		_StatusServcieBuilding, _StatusTaskRunning, time.Time{}, "")
-	if err != nil {
+func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err error) {
+	resourceAlloc := make([]*pendingAllocResource, 0, len(svc.base.Modules))
+	entry := logrus.WithFields(logrus.Fields{
+		"Name":   svc.Name,
+		"Action": "Schedule&Alloc",
+	})
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		entry.Errorf("Task Failed:%s", err)
+
+		_err := database.TxSetServiceStatus(&svc.Service, task,
+			_StatusServiceAlloctionFailed, _StatusTaskFailed, time.Now(), err.Error())
+		if _err != nil {
+			entry.Error("Tx Set ServiceStatus error:%s", _err)
+		}
+		if err != nil && len(resourceAlloc) > 0 {
+			_err := dealWithSchedulerFailure(gd, svc, resourceAlloc)
+			if _err != nil {
+				logrus.Errorf("deal With Scheduler Failure,%s", _err)
+			}
+		}
+	}()
+
+	atomic.StoreInt64(&svc.Status, _StatusServiceAlloction)
+
+	logrus.Debugf("[MG] start service Scheduler:%s", svc.Name)
+
+	for _, module := range svc.base.Modules {
+
+		candidates, config, err := gd.schedulerPerModule(svc, module)
+		if err != nil {
+			entry.WithField("Module", module.Name).Errorf("Alloction Failed %s", err)
+
+			return err
+		}
+
+		pendings, err := gd.pendingAlloc(candidates, svc.ID, svc.Name, module.Type, module.Stores, config, module.Configures)
+		if len(pendings) > 0 {
+			resourceAlloc = append(resourceAlloc, pendings...)
+		}
+		if err != nil {
+			entry.Errorf("gd.pendingAlloc: pendings Allocation Failed %s", err)
+
+			return err
+		}
+		entry.Info("gd.pendingAlloc: Allocation Succeed!")
+	}
+
+	for i := range resourceAlloc {
+		svc.units = append(svc.units, resourceAlloc[i].unit)
+	}
+
+	if err := createServiceResources(gd, resourceAlloc); err != nil {
+		entry.Errorf("create Service Volumes Error:%s", err)
+
 		return err
 	}
 
-	gd.serviceSchedulerCh <- svc
+	// scheduler success
+	entry.Info("Alloction Success")
 
 	return nil
-}
-
-func (gd *Gardener) serviceScheduler() {
-	defer func() {
-		if r := recover(); r != nil {
-			logrus.Errorf("Recover From Panic:%v", r)
-		}
-
-		debug.PrintStack()
-		logrus.Fatal("Service Scheduler Exit")
-	}()
-
-	for {
-		svc := <-gd.serviceSchedulerCh
-
-		entry := logrus.WithFields(logrus.Fields{
-			"Name":   svc.Name,
-			"Action": "Schedule&Alloc",
-		})
-
-		logrus.Debugf("[MG] start service Scheduler:%s", svc.Name)
-		if !atomic.CompareAndSwapInt64(&svc.Status, _StatusServcieBuilding, _StatusServiceAlloction) {
-			entry.Error("Status Conflict")
-			continue
-		}
-
-		svc.Lock()
-
-		resourceAlloc := make([]*pendingAllocResource, 0, len(svc.base.Modules))
-
-		for _, module := range svc.base.Modules {
-
-			candidates, config, err := gd.schedulerPerModule(svc, module)
-			if err != nil {
-				entry.WithField("Module", module.Name).Errorf("Alloction Failed %s", err)
-				goto failure
-			}
-
-			pendings, err := gd.pendingAlloc(candidates, svc.ID, svc.Name, module.Type, module.Stores, config, module.Configures)
-			if len(pendings) > 0 {
-				resourceAlloc = append(resourceAlloc, pendings...)
-			}
-			if err != nil {
-				entry.Errorf("gd.pendingAlloc: pendings Allocation Failed %s", err)
-				goto failure
-			}
-			entry.Info("gd.pendingAlloc: Allocation Succeed!")
-		}
-
-		for i := range resourceAlloc {
-			svc.units = append(svc.units, resourceAlloc[i].unit)
-		}
-
-		if err := createServiceResources(gd, resourceAlloc); err != nil {
-			entry.Errorf("create Service Volumes Error:%s", err)
-			goto failure
-		}
-
-		// scheduler success
-		svc.Unlock()
-
-		entry.Info("Alloction Success")
-		logrus.Debugf("[MG]Alloction OK and put  to the ServiceToExecute: %v", resourceAlloc)
-
-		gd.ServiceToExecute(svc)
-		continue
-
-	failure:
-		logrus.Debugf("[MG]serviceScheduler Failed: %v", resourceAlloc)
-		dealWithSchedulerFailure(gd, svc, resourceAlloc)
-	}
 }
 
 func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err error) {
@@ -152,10 +135,14 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 	return nil
 }
 
-func dealWithSchedulerFailure(gd *Gardener, svc *Service, pendings []*pendingAllocResource) {
+func dealWithSchedulerFailure(gd *Gardener, svc *Service,
+	pendings []*pendingAllocResource) error {
+
 	err := gd.Recycle(pendings)
 	if err != nil {
-		logrus.Error("Recycle Failed", err)
+		logrus.Errorf("Recycle Failed,%s", err)
+
+		return err
 	}
 
 	// scheduler failed
@@ -165,9 +152,7 @@ func dealWithSchedulerFailure(gd *Gardener, svc *Service, pendings []*pendingAll
 	}
 	gd.scheduler.Unlock()
 
-	svc.Service.SetServiceStatus(_StatusServiceAlloctionFailed, time.Now())
-
-	svc.Unlock()
+	return err
 }
 
 func templateConfig(gd *Gardener, module structs.Module) (*cluster.ContainerConfig, error) {

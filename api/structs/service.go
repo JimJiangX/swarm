@@ -28,8 +28,8 @@ type User struct {
 	Username  string
 	Password  string
 	Role      string
-	Whitelist string // []string
-	Blacklist string // []string
+	Whitelist []string // []string
+	Blacklist []string // []string
 }
 
 type Module struct {

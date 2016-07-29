@@ -39,7 +39,6 @@ type Service struct {
 	units  []*unit
 	users  []database.User
 	backup *database.BackupStrategy
-	task   *database.Task
 
 	authConfig *types.AuthConfig
 }
@@ -51,15 +50,16 @@ func NewService(svc database.Service, unitNum int) *Service {
 	}
 }
 
-func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) (*Service, error) {
-	if warnings := ValidService(req); len(warnings) > 0 {
-		return nil, errors.New(strings.Join(warnings, ","))
-	}
+func buildService(req structs.PostServiceRequest,
+	authConfig *types.AuthConfig) (*Service, *database.Task, error) {
+	// if warnings := ValidService(req); len(warnings) > 0 {
+	//	 return nil, errors.New(strings.Join(warnings, ","))
+	// }
 
 	des, err := json.Marshal(req)
 	if err != nil {
 		logrus.Errorf("JSON Marshal Error:%s", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	svc := database.Service{
@@ -79,17 +79,17 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 
 	strategy, err := newBackupStrategy(svc.ID, req.BackupStrategy)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	_, nodeNum, err := getServiceArch(req.Architecture)
 	if err != nil {
 		logrus.Error("Parse Service.Architecture", err)
-		return nil, err
+		return nil, nil, err
 	}
 	sys, err := database.GetSystemConfig()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	users := defaultServiceUsers(svc.ID, *sys)
 	users = append(users, converteToUsers(svc.ID, req.Users)...)
@@ -99,23 +99,17 @@ func BuildService(req structs.PostServiceRequest, authConfig *types.AuthConfig) 
 	service.Lock()
 	defer service.Unlock()
 
-	task := database.NewTask(_Service_Create_Task, svc.ID, "create service", nil, 0)
-	service.task = &task
-
 	service.backup = strategy
 	service.base = &req
 	service.authConfig = authConfig
 	service.users = users
 	atomic.StoreInt64(&svc.Status, _StatusServcieBuilding)
 
-	if err := service.SaveToDB(); err != nil {
-		atomic.StoreInt64(&svc.Status, _StatusServiceInit)
+	task := database.NewTask(_Service_Create_Task, service.ID, "create service", nil, 0)
 
-		logrus.Errorf("Service Save To DB %s", err)
-		return nil, err
-	}
+	err = database.TxSaveService(service.Service, service.backup, &task, service.users)
 
-	return service, nil
+	return service, &task, err
 }
 
 func newBackupStrategy(service string, strategy *structs.BackupStrategy) (*database.BackupStrategy, error) {
@@ -217,42 +211,33 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 		svc.users = out
 	}
 
+	users := converteToUsers(svc.ID, req)
 	update := make([]database.User, 0, len(req))
-	addition := make([]structs.User, 0, len(req))
-	for i := range req {
+	addition := make([]database.User, 0, len(req))
+	for i := range users {
 		exist := false
 		for u := range svc.users {
-			if svc.users[u].Username == req[i].Username {
+			if svc.users[u].Username == users[i].Username {
+				users[i].ID = svc.users[u].ID
+				users[i].Permission = svc.users[u].Permission
+				users[i].CreatedAt = svc.users[u].CreatedAt
 
-				update = append(update, database.User{
-					ID:         svc.users[u].ID,
-					ServiceID:  svc.users[u].ServiceID,
-					Permission: svc.users[u].Permission,
-					CreatedAt:  svc.users[u].CreatedAt,
-					Type:       req[i].Type,
-					Username:   req[i].Username,
-					Password:   req[i].Password,
-					Role:       req[i].Role,
-					Blacklist:  req[i].Blacklist,
-					Whitelist:  req[i].Whitelist,
-				})
+				update = append(update, users[i])
 				exist = true
 				break
 			}
 		}
 		if !exist {
-			addition = append(addition, req[i])
+			addition = append(addition, users[i])
 		}
 	}
-
-	additionList := converteToUsers(svc.ID, addition)
 
 	addr, port, err := svc.getSwitchManagerAddr()
 	if err != nil {
 		return 0, err
 	}
 
-	swmUsers := converteToSWM_Users(additionList)
+	swmUsers := converteToSWM_Users(addition)
 	for i := range swmUsers {
 
 		code = 201
@@ -272,7 +257,7 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 		}
 	}
 
-	err = database.TxUpdateUsers(additionList, update)
+	err = database.TxUpdateUsers(addition, update)
 	if err != nil {
 		return 0, err
 	}
@@ -412,10 +397,42 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 func converteToUsers(service string, users []structs.User) []database.User {
 	out := make([]database.User, 0, len(users))
 	now := time.Now()
+
 	for i := range users {
-		if users[i].Type != _User_Type_Proxy &&
-			users[i].Role != _User_DB &&
-			users[i].Role != _User_Application {
+
+		switch {
+		case users[i].Type == _User_Type_DB:
+		case users[i].Type == _User_Type_Proxy:
+
+		case strings.ToLower(users[i].Type) == strings.ToLower(_User_Type_DB):
+
+			users[i].Type = _User_Type_DB
+
+		case strings.ToLower(users[i].Type) == strings.ToLower(_User_Type_Proxy):
+
+			users[i].Type = _User_Type_Proxy
+
+		default:
+			continue
+		}
+
+		switch {
+		case users[i].Role == _User_DB:
+		case users[i].Role == _User_Application:
+		case users[i].Role == _User_Check:
+		case users[i].Role == _User_DBA:
+		case users[i].Role == _User_Monitor:
+		case users[i].Role == _User_Replication:
+
+		case strings.ToLower(users[i].Role) == strings.ToLower(_User_DB):
+
+			users[i].Role = _User_DB
+
+		case strings.ToLower(users[i].Role) == strings.ToLower(_User_Application):
+
+			users[i].Role = _User_Application
+
+		default:
 			continue
 		}
 
@@ -440,26 +457,36 @@ func converteToSWM_Users(users []database.User) []swm_structs.User {
 	out := make([]swm_structs.User, 0, len(users))
 
 	for i := range users {
-		if users[i].Type != _User_Type_Proxy &&
-			users[i].Role != _User_DB &&
-			users[i].Role != _User_Application {
+		switch {
+		case users[i].Type == _User_Type_Proxy:
+		case users[i].Type == _User_Type_DB:
+
+		case strings.ToLower(users[i].Type) == strings.ToLower(_User_Type_DB):
+
+			users[i].Type = _User_Type_DB
+
+		case strings.ToLower(users[i].Type) == strings.ToLower(_User_Type_Proxy):
+
+			users[i].Type = _User_Type_Proxy
+
+		default:
 			continue
 		}
 
-		var black, white []string
-		if len(users[i].Blacklist) > 0 {
-			err := json.Unmarshal([]byte(users[i].Blacklist), &black)
-			if err != nil {
-				logrus.Error(err)
-				continue
-			}
-		}
-		if len(users[i].Whitelist) > 0 {
-			err := json.Unmarshal([]byte(users[i].Whitelist), &white)
-			if err != nil {
-				logrus.Error(err)
-				continue
-			}
+		switch {
+		case users[i].Role == _User_DB:
+		case users[i].Role == _User_Application:
+
+		case strings.ToLower(users[i].Role) == strings.ToLower(_User_DB):
+
+			users[i].Role = _User_DB
+
+		case strings.ToLower(users[i].Role) == strings.ToLower(_User_Application):
+
+			users[i].Role = _User_Application
+
+		default:
+			continue
 		}
 
 		out = append(out, swm_structs.User{
@@ -468,8 +495,8 @@ func converteToSWM_Users(users []database.User) []swm_structs.User {
 			UserName:  users[i].Username,
 			Password:  users[i].Password,
 			Role:      users[i].Role,
-			BlackList: black,
-			WhiteList: white,
+			BlackList: users[i].Blacklist,
+			WhiteList: users[i].Whitelist,
 		})
 	}
 
@@ -508,8 +535,8 @@ func (gd *Gardener) AddService(svc *Service) error {
 	return nil
 }
 
-func (svc *Service) SaveToDB() error {
-	return database.TxSaveService(svc.Service, svc.backup, svc.task, svc.users)
+func (svc *Service) SaveToDB(task *database.Task) error {
+	return database.TxSaveService(svc.Service, svc.backup, task, svc.users)
 }
 
 func (gd *Gardener) GetService(nameOrID string) (*Service, error) {
@@ -606,30 +633,22 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 
 }
 
-func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _ *database.BackupStrategy, err error) {
+func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _ string, _ string, err error) {
 	authConfig, err := gd.RegistryAuthConfig()
 	if err != nil {
 		logrus.Error("get Registry Auth Config", err)
-		return nil, nil, err
+		return nil, "", "", err
 	}
 
-	svc, err := BuildService(req, authConfig)
+	svc, task, err := buildService(req, authConfig)
 	if err != nil {
 		logrus.Error("Build Service", err)
-		return nil, nil, err
+		return nil, "", "", err
 	}
-
-	defer func() {
-		if err != nil {
-			logrus.WithField("Service Name", svc.Name).Errorf("Servcie Cleaned,%v", err)
-			gd.RemoveService(svc.Name, true, true, 0)
-		}
-	}()
 
 	logrus.WithFields(logrus.Fields{
 		"Servcie Name": svc.Name,
 		"Service ID":   svc.ID,
-		"Task ID":      svc.task.ID,
 	}).Info("Service Saved Into Database")
 
 	svc.failureRetry = gd.createRetry
@@ -638,28 +657,54 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 	if err != nil {
 		logrus.WithField("Service Name", svc.Name).Errorf("Service Add to Gardener Error:%s", err)
 
-		return svc, nil, err
+		return svc, "", "", err
 	}
 
 	svc.RLock()
 	defer svc.RUnlock()
 
-	if svc.backup != nil {
-		bs := NewBackupJob(svc)
-		err = gd.RegisterBackupStrategy(bs)
-		if err != nil {
-			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err)
-		}
-	}
-
-	err = gd.ServiceToScheduler(svc)
+	err = gd.serviceScheduler(svc, task)
 	if err != nil {
 		logrus.Error("Service Add To Scheduler", err)
-		return svc, svc.backup, err
+
+		return svc, "", "", err
 	}
 	logrus.Debugf("[mg] ServiceToScheduler ok:%v", svc)
 
-	return svc, svc.backup, nil
+	background := func(context.Context) error {
+		err := gd.serviceExecute(svc)
+		if err != nil {
+			logrus.Errorf("Service %s,execute error:%s", err)
+
+			return err
+		}
+
+		if svc.backup != nil {
+			bs := NewBackupJob(svc)
+			err = gd.RegisterBackupStrategy(bs)
+			if err != nil {
+				logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err)
+			}
+		}
+
+		return nil
+	}
+
+	updater := func(code int, msg string) error {
+		return database.TxSetServiceStatus(&svc.Service, task, svc.Status, int64(code), time.Now(), msg)
+	}
+
+	worker := NewAsyncTask(context.Background(), background, nil, updater, 10*time.Minute)
+	if err = worker.Run(); err != nil {
+		return svc, "", "", err
+	}
+
+	strategyID := ""
+	if svc.backup != nil {
+		strategyID = svc.backup.ID
+	}
+
+	return svc, strategyID, task.ID, nil
 }
 
 func (svc *Service) StartService() (err error) {
@@ -968,6 +1013,7 @@ func (svc *Service) initTopology() error {
 	swm := svc.getSwithManagerUnit()
 	sqls := svc.getUnitByType(_UpsqlType)
 	proxys := svc.getUnitByType(_ProxyType)
+
 	if len(proxys) == 0 || len(sqls) == 0 || swm == nil {
 		return nil
 	}
@@ -1371,11 +1417,6 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 	return task.ID, nil
 }
 
-func (svc *Service) Task() *database.Task {
-
-	return svc.task
-}
-
 type pendingContainerUpdate struct {
 	containerID string
 	cpusetCpus  string
@@ -1561,15 +1602,15 @@ func (svc *Service) updateDescAfterScale(scale structs.PostServiceScaledRequest)
 	return nil
 }
 
-func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int) error {
+func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout int) error {
 	entry := logrus.WithFields(logrus.Fields{
-		"Name":    name,
+		"Name":    nameOrID,
 		"force":   force,
 		"volumes": volumes,
 	})
 	entry.Info("Removing Service...")
 
-	service, err := database.GetService(name)
+	service, err := database.GetService(nameOrID)
 	if err != nil {
 		entry.Errorf("GetService From DB error:%s", err)
 
@@ -1617,6 +1658,16 @@ func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int)
 		return err
 	}
 
+	entry.Debug("Remove Service From Gardener...")
+	gd.Lock()
+	for i := range gd.services {
+		if gd.services[i].ID == nameOrID || gd.services[i].Name == nameOrID {
+			gd.services = append(gd.services[:i], gd.services[i+1:]...)
+			break
+		}
+	}
+	gd.Unlock()
+
 	if svc.backup != nil {
 		err = gd.RemoveCronJob(svc.backup.ID)
 		if err != nil {
@@ -1625,16 +1676,6 @@ func (gd *Gardener) RemoveService(name string, force, volumes bool, timeout int)
 			return err
 		}
 	}
-
-	entry.Debug("Remove Service From Gardener...")
-	gd.Lock()
-	for i := range gd.services {
-		if gd.services[i].ID == name || gd.services[i].Name == name {
-			gd.services = append(gd.services[:i], gd.services[i+1:]...)
-			break
-		}
-	}
-	gd.Unlock()
 
 	return nil
 }
