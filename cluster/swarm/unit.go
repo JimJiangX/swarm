@@ -612,7 +612,7 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 
 	context := string(content)
 
-	logrus.Debugf("default:%s\ndefaultUser:%v\nconfig:%s", u.parent.Content, data, context)
+	logrus.Debugf("Unit %s:%s\n%s", u.Name, u.ImageName, context)
 
 	volumes, err := database.SelectVolumesByUnitID(u.ID)
 	if err != nil {
@@ -626,7 +626,7 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 
 	err = copyConfigIntoCNFVolume(engine, volumes, u.Path(), context)
 	if err != nil {
-		logrus.Errorf("copyConfigIntoCNFVolume error:%s", err)
+		logrus.Errorf("%s:%s copy Config Into CNF Volume error:%s", u.Name, u.ImageName, err)
 		return err
 	}
 

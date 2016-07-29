@@ -770,8 +770,11 @@ func (svc *Service) copyServiceConfig() error {
 		if !can {
 			return fmt.Errorf("Forbid modifying service configs,%s", forbid)
 		}
+
 		defConfig, err := u.defaultUserConfig(svc, u)
 		if err != nil {
+			logrus.Errorf("Unit %s:%s,defaultUserConfig error,%s", u.Name, u.ImageName, err)
+
 			return err
 		}
 

@@ -183,13 +183,18 @@ func (mysqlConfig) Validate(data map[string]interface{}) error {
 }
 
 func (c mysqlConfig) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
-	errUnexpectedArgs := errors.Errorf("Unexpected args:%v", args)
+	errUnexpectedArgs := errors.Errorf("Unexpected args,len=%d", len(args))
 
-	if len(args) < 1 {
+	if len(args) < 2 {
 		return nil, errUnexpectedArgs
 	}
-	u, ok := args[0].(*unit)
-	if !ok || u == nil {
+	svc, ok := args[0].(*Service)
+	if !ok || svc == nil {
+		return nil, errUnexpectedArgs
+	}
+
+	u, ok := args[1].(*unit)
+	if !ok || svc == nil {
 		return nil, errUnexpectedArgs
 	}
 
@@ -408,7 +413,7 @@ func (c proxyConfig) HealthCheck() (healthCheck, error) {
 }
 
 func (c proxyConfig) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
-	errUnexpectedArgs := errors.Errorf("Unexpected args:%v", args)
+	errUnexpectedArgs := errors.Errorf("Unexpected args,len=%d", len(args))
 
 	if len(args) < 2 {
 		return nil, errUnexpectedArgs
@@ -484,7 +489,7 @@ type proxyConfig_v110 struct {
 }
 
 func (c proxyConfig_v110) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
-	errUnexpectedArgs := errors.Errorf("Unexpected args:%v", args)
+	errUnexpectedArgs := errors.Errorf("Unexpected args,len=%d", len(args))
 
 	if len(args) < 2 {
 		return nil, errUnexpectedArgs
@@ -654,7 +659,7 @@ func (c switchManagerConfig) HealthCheck() (healthCheck, error) {
 }
 
 func (c switchManagerConfig) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
-	errUnexpectedArgs := errors.Errorf("Unexpected args:%v", args)
+	errUnexpectedArgs := errors.Errorf("Unexpected args,len=%d", len(args))
 
 	if len(args) < 2 {
 		return nil, errUnexpectedArgs
@@ -692,6 +697,9 @@ func (c switchManagerConfig) defaultUserConfig(args ...interface{}) (map[string]
 	m["ConsulBindNetworkName"] = u.engine.Labels[_Admin_NIC_Lable]
 	m["SwarmHostKey"] = leaderElectionPath
 	m["ConsulPort"] = sys.ConsulPort
+	m["ConsulUserAgent"] = "1.23"
+
+	// _User_Check Role
 
 	return m, nil
 }
@@ -705,7 +713,7 @@ type switchManagerConfig_v1121 struct {
 }
 
 func (c switchManagerConfig_v1121) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
-	errUnexpectedArgs := errors.Errorf("Unexpected args:%v", args)
+	errUnexpectedArgs := errors.Errorf("Unexpected args,len=%d", len(args))
 
 	if len(args) < 2 {
 		return nil, errUnexpectedArgs
@@ -743,7 +751,9 @@ func (c switchManagerConfig_v1121) defaultUserConfig(args ...interface{}) (map[s
 	m["ConsulBindNetworkName"] = u.engine.Labels[_Admin_NIC_Lable]
 	m["SwarmHostKey"] = leaderElectionPath
 	m["ConsulPort"] = sys.ConsulPort
-	m["ConsulUserAgent"] = "v1.23"
+	m["ConsulUserAgent"] = "1.23"
+
+	// _User_Check Role
 
 	return m, nil
 }
