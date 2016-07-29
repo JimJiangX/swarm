@@ -646,6 +646,15 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 		return nil, "", "", err
 	}
 
+	defer func(ID string) {
+		if err == nil {
+			return
+		}
+
+		_err := gd.RemoveService(ID, true, true, 0)
+		logrus.Info("Remove %s,%v", ID, _err)
+	}(svc.ID)
+
 	logrus.WithFields(logrus.Fields{
 		"Servcie Name": svc.Name,
 		"Service ID":   svc.ID,
@@ -657,7 +666,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 	if err != nil {
 		logrus.WithField("Service Name", svc.Name).Errorf("Service Add to Gardener Error:%s", err)
 
-		return svc, "", task.ID, err
+		return nil, "", "", err
 	}
 
 	svc.RLock()
@@ -667,7 +676,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 	if err != nil {
 		logrus.Error("Service Add To Scheduler", err)
 
-		return svc, "", task.ID, err
+		return nil, "", "", err
 	}
 	logrus.Debugf("[mg] ServiceToScheduler ok:%v", svc)
 
@@ -696,7 +705,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 
 	worker := NewAsyncTask(context.Background(), background, nil, updater, 10*time.Minute)
 	if err = worker.Run(); err != nil {
-		return svc, "", task.ID, err
+		return nil, "", "", err
 	}
 
 	strategyID := ""
@@ -1610,6 +1619,15 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 	})
 	entry.Info("Removing Service...")
 
+	gd.Lock()
+	for i := range gd.services {
+		if gd.services[i].ID == nameOrID || gd.services[i].Name == nameOrID {
+			gd.services = append(gd.services[:i], gd.services[i+1:]...)
+			break
+		}
+	}
+	gd.Unlock()
+
 	service, err := database.GetService(nameOrID)
 	if err != nil {
 		entry.Errorf("GetService From DB error:%s", err)
@@ -1630,7 +1648,7 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 	}
 
 	entry.Debug("Prepare params,GetSystemConfig...")
-	sys, err := database.GetSystemConfig()
+	sys, err := gd.SystemConfig()
 	if err != nil {
 		entry.Errorf("GetSystemConfig error:%s", err)
 		return err
@@ -1654,8 +1672,6 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 	err = database.DeteleServiceRelation(svc.ID, volumes)
 	if err != nil {
 		entry.Errorf("DeteleServiceRelation error:%s", err)
-
-		return err
 	}
 
 	entry.Debug("Remove Service From Gardener...")
