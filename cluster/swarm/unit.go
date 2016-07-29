@@ -75,7 +75,20 @@ type unit struct {
 }
 
 func (u *unit) factory() error {
-	parser, cmder, err := initialize(u.Type)
+	name, version := "", ""
+	parts := strings.SplitN(u.ImageName, ":", 2)
+	if len(parts) == 2 {
+		name, version = parts[0], parts[1]
+	} else {
+		image, err := database.GetImageByID(u.ImageID)
+		if err != nil {
+			return errors.Wrapf(err, "Not Found Unit %s Image:%s %s", u.Name, u.ImageName, u.ImageID)
+		}
+
+		name, version = image.Name, image.Version
+	}
+
+	parser, cmder, err := initialize(name, version)
 	if err != nil || parser == nil || cmder == nil {
 		return fmt.Errorf("Unexpected Error,%s:%v", u.Type, err)
 	}

@@ -47,7 +47,7 @@ func (c Cluster) Insert() error {
 		return nil
 	}
 
-	return errors.Wrap(err, "Insert Cluster")
+	return errors.Wrap(err, insertClusterQuery)
 }
 
 func (c *Cluster) UpdateStatus(state bool) error {

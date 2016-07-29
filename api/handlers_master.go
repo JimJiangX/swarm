@@ -939,6 +939,12 @@ func getServiceServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.R
 		return
 	}
 
+	images, err := database.ListImages()
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	configs, err := database.ListUnitConfigByService(service.ID)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
@@ -957,7 +963,15 @@ func getServiceServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.R
 			CreatedAt: utils.TimeToString(configs[i].Config.CreatedAt),
 		}
 
-		parser, _, err := swarm.Factory(resp[i].Type)
+		name, version := "", ""
+		for j := range images {
+			if configs[i].Unit.ImageID == images[j].ID {
+				name, version = images[j].Name, images[j].Version
+				break
+			}
+		}
+
+		parser, _, err := swarm.Factory(name, version)
 		if err != nil {
 			logrus.Error(err)
 

@@ -54,6 +54,33 @@ func TxInsertImage(image Image, config UnitConfig) error {
 	return tx.Commit()
 }
 
+func ListImages() ([]Image, error) {
+	db, err := GetDB(false)
+	if err != nil {
+		return nil, err
+	}
+
+	var images []Image
+	query := "SELECT * FROM tb_image"
+
+	err = db.Select(&images, query)
+	if err == nil {
+		return images, nil
+	}
+
+	db, err = GetDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.Select(&images, query)
+	if err == nil {
+		return images, nil
+	}
+
+	return nil, errors.Wrap(err, query)
+}
+
 func GetImage(name, version string) (Image, error) {
 	db, err := GetDB(false)
 	if err != nil {

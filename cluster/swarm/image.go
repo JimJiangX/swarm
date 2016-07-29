@@ -103,7 +103,7 @@ func LoadImage(req structs.PostLoadImageRequest) (string, string, error) {
 
 		return "", "", err
 	}
-	parser, _, err := initialize(req.Name)
+	parser, _, err := initialize(req.Name, req.Version)
 	if err != nil {
 		return "", "", err
 	}
@@ -189,7 +189,7 @@ func UpdateImageTemplateConfig(imageID string, req structs.UpdateUnitConfigReque
 	newConfig.Version = 0
 
 	if len(req.ConfigKVs) > 0 {
-		parser, _, err := initialize(image.Name)
+		parser, _, err := initialize(image.Name, image.Version)
 		if err != nil {
 			return config, err
 		}

@@ -103,34 +103,27 @@ func (u *unit) SaveConfigToDisk(content []byte) error {
 	return err
 }
 
-func Factory(_type string) (configParser, ContainerCmd, error) {
-	return initialize(_type)
+func Factory(name, version string) (configParser, ContainerCmd, error) {
+	return initialize(name, version)
 }
 
-func initialize(_type string) (configParser, ContainerCmd, error) {
-	var (
-		parser configParser
-		cmder  ContainerCmd
-	)
-	switch _type {
-	case _UpsqlType:
+func initialize(name, version string) (parser configParser, cmder ContainerCmd, err error) {
+	switch {
+	case _ImageUpsql == name && version == "5.6.19":
 		parser = &mysqlConfig{}
-
 		cmder = &mysqlCmd{}
 
-	case _ProxyType, "upproxy":
+	case _ImageProxy == name && version == "1.0.2":
 		parser = &proxyConfig{}
-
 		cmder = &proxyCmd{}
 
-	case _SwitchManagerType, "swm":
+	case _ImageSwitchManager == name && version == "1.1.19":
 		parser = &switchManagerConfig{}
-
 		cmder = &switchManagerCmd{}
 
 	default:
 
-		return nil, nil, fmt.Errorf("Unsupported Type:'%s'", _type)
+		return nil, nil, fmt.Errorf("Unsupported Image:'%s:%s'", name, version)
 	}
 
 	return parser, cmder, nil

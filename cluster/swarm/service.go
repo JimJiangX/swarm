@@ -657,7 +657,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 	if err != nil {
 		logrus.WithField("Service Name", svc.Name).Errorf("Service Add to Gardener Error:%s", err)
 
-		return svc, "", "", err
+		return svc, "", task.ID, err
 	}
 
 	svc.RLock()
@@ -667,7 +667,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 	if err != nil {
 		logrus.Error("Service Add To Scheduler", err)
 
-		return svc, "", "", err
+		return svc, "", task.ID, err
 	}
 	logrus.Debugf("[mg] ServiceToScheduler ok:%v", svc)
 
@@ -696,7 +696,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 
 	worker := NewAsyncTask(context.Background(), background, nil, updater, 10*time.Minute)
 	if err = worker.Run(); err != nil {
-		return svc, "", "", err
+		return svc, "", task.ID, err
 	}
 
 	strategyID := ""

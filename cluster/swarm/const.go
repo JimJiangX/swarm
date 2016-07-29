@@ -100,6 +100,10 @@ const (
 	_ProxyType         = "proxy"          // cluster_type,networking_type
 	_SwitchManagerType = "switch_manager" // cluster_type,networking_type
 
+	_ImageUpsql         = "upsql"
+	_ImageProxy         = "upproxy"
+	_ImageSwitchManager = "switch_manager"
+
 	_UnitRole_Master        = "master"
 	_UnitRole_SwitchManager = "switch_manager"
 

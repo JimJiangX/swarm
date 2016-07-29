@@ -69,7 +69,7 @@ type Unit struct {
 	Name        string `db:"name"` // <unit_id_8bit>_<service_name>
 	Type        string `db:"type"` // switch_manager/upproxy/upsql
 	ImageID     string `db:"image_id"`
-	ImageName   string `db:"image_name"` //<image_name>_<image_version>
+	ImageName   string `db:"image_name"` //<image_name>:<image_version>
 	ServiceID   string `db:"service_id"`
 	EngineID    string `db:"node_id"` // engine.ID
 	ContainerID string `db:"container_id"`

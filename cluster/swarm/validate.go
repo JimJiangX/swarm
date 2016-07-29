@@ -106,7 +106,7 @@ func ValidService(req structs.PostServiceRequest) []string {
 	}
 
 	for _, module := range req.Modules {
-		if _, _, err := initialize(module.Type); err != nil {
+		if _, _, err := initialize(module.Name, module.Version); err != nil {
 			warnings = append(warnings, err.Error())
 		}
 
@@ -174,11 +174,6 @@ func ValidService(req structs.PostServiceRequest) []string {
 
 func ValidateServiceScale(svc *Service, scale structs.PostServiceScaledRequest) error {
 	warns := make([]string, 0, 10)
-
-	_, _, err := initialize(scale.Type)
-	if err != nil {
-		warns = append(warns, err.Error())
-	}
 
 	if scale.UpdateConfig != nil {
 		err := validateContainerUpdateConfig(*scale.UpdateConfig)
