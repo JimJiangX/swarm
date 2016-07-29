@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/astaxie/beego/config"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
@@ -182,7 +183,7 @@ func (mysqlConfig) Validate(data map[string]interface{}) error {
 }
 
 func (c mysqlConfig) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
-	errUnexpectedArgs := errors.Errorf("Unexpected args:%s", args)
+	errUnexpectedArgs := errors.Errorf("Unexpected args:%v", args)
 
 	if len(args) < 1 {
 		return nil, errUnexpectedArgs
@@ -407,7 +408,7 @@ func (c proxyConfig) HealthCheck() (healthCheck, error) {
 }
 
 func (c proxyConfig) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
-	var errUnexpectedArgs = errors.Errorf("Unexpected args:%s", args)
+	errUnexpectedArgs := errors.Errorf("Unexpected args:%v", args)
 
 	if len(args) < 2 {
 		return nil, errUnexpectedArgs
@@ -449,7 +450,13 @@ func (c proxyConfig) defaultUserConfig(args ...interface{}) (map[string]interfac
 		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", adminAddr, adminPort)
 	}
 
-	m["upsql-proxy::event-threads-count"] = u.config.HostConfig.CpusetCpus
+	ncpu, err := parseCpuset(u.config.HostConfig.CpusetCpus)
+	if err == nil {
+		m["upsql-proxy::event-threads-count"] = ncpu
+	} else {
+		logrus.Warn("upsql-proxy::event-threads-count ", u.Name, err)
+		m["upsql-proxy::event-threads-count"] = u.config.HostConfig.CpusetCpus
+	}
 
 	swm := svc.getSwithManagerUnit()
 	if swm != nil {
@@ -477,7 +484,7 @@ type proxyConfig_v110 struct {
 }
 
 func (c proxyConfig_v110) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
-	var errUnexpectedArgs = errors.Errorf("Unexpected args:%s", args)
+	errUnexpectedArgs := errors.Errorf("Unexpected args:%v", args)
 
 	if len(args) < 2 {
 		return nil, errUnexpectedArgs
@@ -516,10 +523,18 @@ func (c proxyConfig_v110) defaultUserConfig(args ...interface{}) (map[string]int
 			}
 		}
 		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", dataAddr, dataPort)
-		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", adminAddr, adminPort)
+		m["supervise::supervise-address"] = fmt.Sprintf("%s:%d", dataAddr, adminPort)
+		// m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", adminAddr, adminPort)
+		_ = adminAddr
 	}
 
-	m["upsql-proxy::event-threads-count"] = u.config.HostConfig.CpusetCpus
+	ncpu, err := parseCpuset(u.config.HostConfig.CpusetCpus)
+	if err == nil {
+		m["upsql-proxy::event-threads-count"] = ncpu
+	} else {
+		logrus.Warn("upsql-proxy::event-threads-count ", u.Name, err)
+		m["upsql-proxy::event-threads-count"] = u.config.HostConfig.CpusetCpus
+	}
 
 	swm := svc.getSwithManagerUnit()
 	if swm != nil {
@@ -639,7 +654,7 @@ func (c switchManagerConfig) HealthCheck() (healthCheck, error) {
 }
 
 func (c switchManagerConfig) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
-	var errUnexpectedArgs = errors.Errorf("Unexpected args:%s", args)
+	errUnexpectedArgs := errors.Errorf("Unexpected args:%v", args)
 
 	if len(args) < 2 {
 		return nil, errUnexpectedArgs
@@ -690,7 +705,7 @@ type switchManagerConfig_v1121 struct {
 }
 
 func (c switchManagerConfig_v1121) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
-	var errUnexpectedArgs = errors.Errorf("Unexpected args:%s", args)
+	errUnexpectedArgs := errors.Errorf("Unexpected args:%v", args)
 
 	if len(args) < 2 {
 		return nil, errUnexpectedArgs
@@ -728,6 +743,7 @@ func (c switchManagerConfig_v1121) defaultUserConfig(args ...interface{}) (map[s
 	m["ConsulBindNetworkName"] = u.engine.Labels[_Admin_NIC_Lable]
 	m["SwarmHostKey"] = leaderElectionPath
 	m["ConsulPort"] = sys.ConsulPort
+	m["ConsulUserAgent"] = "v1.23"
 
 	return m, nil
 }
