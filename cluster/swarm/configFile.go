@@ -529,8 +529,7 @@ func (c proxyConfig_v110) defaultUserConfig(args ...interface{}) (map[string]int
 		}
 		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", dataAddr, dataPort)
 		m["supervise::supervise-address"] = fmt.Sprintf("%s:%d", dataAddr, adminPort)
-		// m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", adminAddr, adminPort)
-		_ = adminAddr
+		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", adminAddr, adminPort)
 	}
 
 	ncpu, err := parseCpuset(u.config.HostConfig.CpusetCpus)
