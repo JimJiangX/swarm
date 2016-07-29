@@ -53,7 +53,7 @@ type require struct {
 type configParser interface {
 	Validate(data map[string]interface{}) error
 	ParseData(data []byte) (config.Configer, error)
-	defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error)
+	defaultUserConfig(args ...interface{}) (map[string]interface{}, error)
 	Marshal() ([]byte, error)
 	Requirement() require
 	HealthCheck() (healthCheck, error)
@@ -89,11 +89,11 @@ func (u *unit) factory() error {
 	}
 
 	parser, cmder, err := initialize(name, version)
-	if err != nil || parser == nil || cmder == nil {
-		return fmt.Errorf("Unexpected Error,%s:%v", u.Type, err)
+	if err != nil {
+		logrus.WithField("Unit", u.Name).Error(err)
 	}
 
-	if u.parent != nil {
+	if u.parent != nil && parser != nil {
 		_, err := parser.ParseData([]byte(u.parent.Content))
 		if err != nil {
 			logrus.Errorf("Unit %s ParseData error:%s", u.Name, err)

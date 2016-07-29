@@ -10,6 +10,7 @@ import (
 	"github.com/astaxie/beego/config"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
+	"github.com/pkg/errors"
 )
 
 func (u unit) Path() string {
@@ -114,10 +115,26 @@ func initialize(name, version string) (parser configParser, cmder ContainerCmd, 
 		cmder = &mysqlCmd{}
 
 	case _ImageProxy == name && version == "1.0.2":
-		parser = &proxyConfig{}
+		parser = &proxyConfig_v102{}
+		cmder = &proxyCmd{}
+
+	case _ImageProxy == name && version == "1.1.0":
+		parser = &proxyConfig_v110{}
 		cmder = &proxyCmd{}
 
 	case _ImageSwitchManager == name && version == "1.1.19":
+		parser = &switchManagerConfig_v1119{}
+		cmder = &switchManagerCmd{}
+
+	case _ImageSwitchManager == name && version == "1.1.21":
+		parser = &switchManagerConfig_v1121{}
+		cmder = &switchManagerCmd{}
+
+	case _ImageProxy == name:
+		parser = &proxyConfig{}
+		cmder = &proxyCmd{}
+
+	case _ImageSwitchManager == name:
 		parser = &switchManagerConfig{}
 		cmder = &switchManagerCmd{}
 
@@ -164,20 +181,26 @@ func (mysqlConfig) Validate(data map[string]interface{}) error {
 	return nil
 }
 
-func (c mysqlConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error) {
-	found := false
-	m := make(map[string]interface{}, 10)
-	if svc == nil || u == nil {
-		return m, fmt.Errorf("params maybe nil")
+func (c mysqlConfig) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
+	errUnexpectedArgs := errors.Errorf("Unexpected args:%s", args)
+
+	if len(args) < 1 {
+		return nil, errUnexpectedArgs
 	}
+	u, ok := args[0].(*unit)
+	if !ok || u == nil {
+		return nil, errUnexpectedArgs
+	}
+
+	m := make(map[string]interface{}, 10)
 
 	if len(u.networkings) == 1 {
 		m["mysqld::bind-address"] = u.networkings[0].IP.String()
 	} else {
-		return nil, fmt.Errorf("Unexpected IPAddress allocated")
+		return nil, fmt.Errorf("Unexpected IPAddress")
 	}
 
-	found = false
+	found := false
 	for i := range u.ports {
 		if u.ports[i].Name == "mysqld::port" {
 			m["mysqld::port"] = u.ports[i].Port
@@ -383,8 +406,94 @@ func (c proxyConfig) HealthCheck() (healthCheck, error) {
 	}, nil
 }
 
-func (c proxyConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error) {
+func (c proxyConfig) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
+	var errUnexpectedArgs = errors.Errorf("Unexpected args:%s", args)
+
+	if len(args) < 2 {
+		return nil, errUnexpectedArgs
+	}
+	svc, ok := args[0].(*Service)
+	if !ok || svc == nil {
+		return nil, errUnexpectedArgs
+	}
+
+	u, ok := args[1].(*unit)
+	if !ok || svc == nil {
+		return nil, errUnexpectedArgs
+	}
+
 	m := make(map[string]interface{}, 10)
+
+	m["upsql-proxy::proxy-domain"] = svc.ID
+	m["upsql-proxy::proxy-name"] = u.Name
+	if len(u.networkings) == 2 && len(u.ports) >= 2 {
+		adminAddr, dataAddr := "", ""
+		adminPort, dataPort := 0, 0
+		for i := range u.networkings {
+			if u.networkings[i].Type == _ContainersNetworking {
+				adminAddr = u.networkings[i].IP.String()
+			} else if u.networkings[i].Type == _ExternalAccessNetworking {
+				dataAddr = u.networkings[i].IP.String()
+			}
+		}
+
+		for i := range u.ports {
+			if u.ports[i].Name == "proxy_data_port" {
+				dataPort = u.ports[i].Port
+			} else if u.ports[i].Name == "proxy_admin_port" {
+				adminPort = u.ports[i].Port
+				m["adm-cli::proxy_admin_port"] = adminPort
+			}
+		}
+		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", dataAddr, dataPort)
+		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", adminAddr, adminPort)
+	}
+
+	m["upsql-proxy::event-threads-count"] = u.config.HostConfig.CpusetCpus
+
+	swm := svc.getSwithManagerUnit()
+	if swm != nil {
+		swmProxyPort := 0
+		for i := range swm.ports {
+			if swm.ports[i].Name == "ProxyPort" {
+				swmProxyPort = swm.ports[i].Port
+				break
+			}
+		}
+		if len(swm.networkings) == 1 {
+			m["adm-cli::adm-svr-address"] = fmt.Sprintf("%s:%d", swm.networkings[0].IP.String(), swmProxyPort)
+		}
+	}
+
+	return m, nil
+}
+
+type proxyConfig_v102 struct {
+	proxyConfig
+}
+
+type proxyConfig_v110 struct {
+	proxyConfig
+}
+
+func (c proxyConfig_v110) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
+	var errUnexpectedArgs = errors.Errorf("Unexpected args:%s", args)
+
+	if len(args) < 2 {
+		return nil, errUnexpectedArgs
+	}
+	svc, ok := args[0].(*Service)
+	if !ok || svc == nil {
+		return nil, errUnexpectedArgs
+	}
+
+	u, ok := args[1].(*unit)
+	if !ok || svc == nil {
+		return nil, errUnexpectedArgs
+	}
+
+	m := make(map[string]interface{}, 10)
+
 	m["upsql-proxy::proxy-domain"] = svc.ID
 	m["upsql-proxy::proxy-name"] = u.Name
 	if len(u.networkings) == 2 && len(u.ports) >= 2 {
@@ -528,7 +637,74 @@ func (c switchManagerConfig) HealthCheck() (healthCheck, error) {
 		Tags:     nil,
 	}, nil
 }
-func (c switchManagerConfig) defaultUserConfig(svc *Service, u *unit) (map[string]interface{}, error) {
+
+func (c switchManagerConfig) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
+	var errUnexpectedArgs = errors.Errorf("Unexpected args:%s", args)
+
+	if len(args) < 2 {
+		return nil, errUnexpectedArgs
+	}
+	svc, ok := args[0].(*Service)
+	if !ok || svc == nil {
+		return nil, errUnexpectedArgs
+	}
+
+	u, ok := args[1].(*unit)
+	if !ok || svc == nil {
+		return nil, errUnexpectedArgs
+	}
+
+	sys, err := database.GetSystemConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	m := make(map[string]interface{}, 10)
+	m["domain"] = svc.ID
+	m["name"] = u.Name
+	port, proxyPort := 0, 0
+	for i := range u.ports {
+		if u.ports[i].Name == "Port" {
+			port = u.ports[i].Port
+		} else if u.ports[i].Name == "ProxyPort" {
+			proxyPort = u.ports[i].Port
+		}
+	}
+	m["ProxyPort"] = proxyPort
+	m["Port"] = port
+
+	// consul
+	m["ConsulBindNetworkName"] = u.engine.Labels[_Admin_NIC_Lable]
+	m["SwarmHostKey"] = leaderElectionPath
+	m["ConsulPort"] = sys.ConsulPort
+
+	return m, nil
+}
+
+type switchManagerConfig_v1119 struct {
+	switchManagerConfig
+}
+
+type switchManagerConfig_v1121 struct {
+	switchManagerConfig
+}
+
+func (c switchManagerConfig_v1121) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
+	var errUnexpectedArgs = errors.Errorf("Unexpected args:%s", args)
+
+	if len(args) < 2 {
+		return nil, errUnexpectedArgs
+	}
+	svc, ok := args[0].(*Service)
+	if !ok || svc == nil {
+		return nil, errUnexpectedArgs
+	}
+
+	u, ok := args[1].(*unit)
+	if !ok || svc == nil {
+		return nil, errUnexpectedArgs
+	}
+
 	sys, err := database.GetSystemConfig()
 	if err != nil {
 		return nil, err

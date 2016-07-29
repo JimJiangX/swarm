@@ -1643,8 +1643,6 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 			return nil
 		}
 		entry.Errorf("GetService From Gardener error:%s", err)
-
-		return err
 	}
 
 	entry.Debug("Prepare params,GetSystemConfig...")
