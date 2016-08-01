@@ -1,0 +1,73 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "yXrS4e4yxaRBu/MX+39X3cS4kbg=",
+			"path": "github.com/Sirupsen/logrus",
+			"revision": "a283a10442df8dc09befd873fab202bf8a253d6a",
+			"revisionTime": "2016-07-16T02:56:31Z"
+		},
+		{
+			"checksumSHA1": "WkwnYaiPV/H1o+/5ijKMPARM8UI=",
+			"path": "github.com/astaxie/beego/config",
+			"revision": "125030800b8ee4125118705f7eda9ada1d0155a0",
+			"revisionTime": "2016-07-29T13:37:22Z"
+		},
+		{
+			"checksumSHA1": "YDYbS5U2mDwfcOUJ6M09cP6Bubg=",
+			"path": "github.com/docker/docker/pkg/stdcopy",
+			"revision": "b38c25ad4108dadc6d92930b20a989aaea891767",
+			"revisionTime": "2016-07-31T16:03:36Z"
+		},
+		{
+			"checksumSHA1": "BIY45G2IVrTttD4Rlk9tHwiIOCM=",
+			"path": "github.com/go-sql-driver/mysql",
+			"revision": "3654d25ec346ee8ce71a68431025458d52a38ac0",
+			"revisionTime": "2016-06-02T00:10:21Z"
+		},
+		{
+			"checksumSHA1": "5I0G+0o3xHUQ53jlq70Ujrw0d2A=",
+			"path": "github.com/jmoiron/sqlx",
+			"revision": "7396209bbeada6a4fcc28aa9408f89b2e71cac39",
+			"revisionTime": "2016-07-29T03:07:26Z"
+		},
+		{
+			"checksumSHA1": "NJHTyLwheqVk7+syzj9UN7p1dKs=",
+			"path": "github.com/jmoiron/sqlx/reflectx",
+			"revision": "7396209bbeada6a4fcc28aa9408f89b2e71cac39",
+			"revisionTime": "2016-07-29T03:07:26Z"
+		},
+		{
+			"checksumSHA1": "2HSjyUZ4IMkCeA34TjJ0/f+Kk/k=",
+			"path": "github.com/pkg/errors",
+			"revision": "1d2e60385a13aaa66134984235061c2f9302520e",
+			"revisionTime": "2016-07-24T02:43:27Z"
+		},
+		{
+			"checksumSHA1": "G6fmfnhXJdbSBBMnAhF/LqVg2Jg=",
+			"path": "github.com/yiduoyunQ/sm/sm-svr/consts",
+			"revision": "ccace47c24e8e69f7ce9e70347f134717bca8574",
+			"revisionTime": "2016-08-01T02:54:59Z"
+		},
+		{
+			"checksumSHA1": "ooY66lQp0gemEsoIL3tNF2dNPkU=",
+			"path": "github.com/yiduoyunQ/sm/sm-svr/structs",
+			"revision": "ccace47c24e8e69f7ce9e70347f134717bca8574",
+			"revisionTime": "2016-08-01T02:54:59Z"
+		},
+		{
+			"checksumSHA1": "M71d78IvZTzM2oeo2FqaZSjkCgk=",
+			"path": "github.com/yiduoyunQ/smlib",
+			"revision": "70b566d63395e918982ae3545ee15381eadbbe74",
+			"revisionTime": "2016-06-30T11:49:35Z"
+		},
+		{
+			"checksumSHA1": "CzLpoHWYgSP+mT3bcW/jt8epp5I=",
+			"path": "gopkg.in/robfig/cron.v2",
+			"revision": "be2e0b0deed5a68ffee390b4583a13aff8321535",
+			"revisionTime": "2015-01-07T22:02:07Z"
+		}
+	],
+	"rootPath": "github.com/docker/swarm"
+}
