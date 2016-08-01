@@ -125,8 +125,8 @@ func initialize(name, version string) (parser configParser, cmder ContainerCmd, 
 		parser = &switchManagerConfig_v1119{}
 		cmder = &switchManagerCmd{}
 
-	case _ImageSwitchManager == name && version == "1.1.23":
-		parser = &switchManagerConfig_v1123{}
+	case _ImageSwitchManager == name && version == "1.1.21":
+		parser = &switchManagerConfig_v1121{}
 		cmder = &switchManagerCmd{}
 
 	case _ImageProxy == name:
