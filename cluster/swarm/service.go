@@ -1631,16 +1631,8 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 	}
 	gd.Unlock()
 
-	service, err := database.GetService(nameOrID)
-	if err != nil {
-		entry.Errorf("GetService From DB error:%s", err)
-
-		return nil
-	}
-	entry.Infof("Found Service %s:%s", service.Name, service.ID)
-
 	entry.Debug("GetService From Gardener...")
-	svc, err := gd.GetService(service.ID)
+	svc, err := gd.GetService(nameOrID)
 	if err != nil {
 		if err == ErrServiceNotFound {
 			return nil
