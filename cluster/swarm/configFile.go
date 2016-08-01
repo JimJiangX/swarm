@@ -199,7 +199,7 @@ func (c mysqlConfig) defaultUserConfig(args ...interface{}) (map[string]interfac
 	m := make(map[string]interface{}, 10)
 
 	if len(u.networkings) == 1 {
-		m["mysqld::bind-address"] = u.networkings[0].IP.String()
+		m["mysqld::bind_address"] = u.networkings[0].IP.String()
 	} else {
 		return nil, fmt.Errorf("Unexpected IPAddress")
 	}
@@ -208,7 +208,7 @@ func (c mysqlConfig) defaultUserConfig(args ...interface{}) (map[string]interfac
 	for i := range u.ports {
 		if u.ports[i].Name == "mysqld::port" {
 			m["mysqld::port"] = u.ports[i].Port
-			m["mysqld::server-id"] = u.ports[i].Port
+			m["mysqld::server_id"] = u.ports[i].Port
 			found = true
 		}
 	}
@@ -216,7 +216,7 @@ func (c mysqlConfig) defaultUserConfig(args ...interface{}) (map[string]interfac
 		return nil, fmt.Errorf("Unexpected port allocation")
 	}
 
-	m["mysqld::log-bin"] = fmt.Sprintf("/DBAASLOG/BIN/%s-binlog", u.Name)
+	m["mysqld::log_bin"] = fmt.Sprintf("/DBAASLOG/BIN/%s-binlog", u.Name)
 	m["mysqld::innodb_buffer_pool_size"] = int(float64(u.config.HostConfig.Memory) * 0.75)
 	m["mysqld::relay_log"] = fmt.Sprintf("/DBAASLOG/REL/%s-relay", u.Name)
 
