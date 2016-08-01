@@ -23,16 +23,14 @@ func (u unit) Path() string {
 }
 
 func (u unit) CanModify(data map[string]interface{}) ([]string, bool) {
-	if len(u.parent.KeySets) == 0 {
-		return nil, true
-	}
-
 	can := true
-	keys := make([]string, 0, len(u.parent.KeySets))
+	keys := make([]string, 0, len(data))
 
 	for key := range data {
 		// case sensitive
-		if !u.parent.KeySets[strings.ToLower(key)].CanSet {
+		if len(u.parent.KeySets) == 0 ||
+			!u.parent.KeySets[strings.ToLower(key)].CanSet {
+
 			keys = append(keys, key)
 			can = false
 		}

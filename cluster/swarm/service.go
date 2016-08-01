@@ -981,6 +981,171 @@ func (svc *Service) removeContainers(force, rmVolumes bool) error {
 	return nil
 }
 
+func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}) (err error) {
+	if _type == _ProxyType || _type == _SwitchManagerType {
+		return svc.UpdateUnitConfig(_type, config)
+	}
+
+	if _type != _UpsqlType {
+		return errors.Errorf("Unsupported Type:'%s'", _type)
+	}
+
+	svc.Lock()
+	defer svc.Unlock()
+
+	units := svc.getUnitByType(_type)
+	if len(units) == 0 {
+		return errors.Errorf("Service:%s Not Found Unit By Type:'%s'", svc.Name, _type)
+	}
+
+	dba, found := database.User{}, false
+	for i := range svc.users {
+		if svc.users[i].Username == _User_DBA {
+			dba = svc.users[i]
+			found = true
+			break
+		}
+	}
+	if !found {
+		return errors.Errorf("Service %s missing User:%s", svc.Name, _User_DBA)
+	}
+
+	for key, val := range config {
+		delete(config, key)
+
+		if parts := strings.SplitN(key, "::", 2); len(parts) == 1 {
+			key = "default::" + key
+		}
+
+		config[strings.ToLower(key)] = val
+	}
+
+	u := units[0]
+
+	if u.parent == nil || u.configParser == nil {
+		if u.ConfigID == "" {
+			return errors.Errorf("unit %s infomation bug", u.Name)
+		}
+
+		data, err := database.GetUnitConfigByID(u.ConfigID)
+		if err == nil {
+			u.parent = data
+		} else {
+			return err
+		}
+
+		if err = u.factory(); err != nil {
+			return err
+		}
+
+		out, ok := u.CanModify(config)
+		if !ok {
+			return errors.Errorf("Cannot Modify UnitConfig,Key:%s", out)
+		}
+	}
+
+	copyContent := u.parent.Content
+	original := make(map[string]string, len(config))
+	cmdRollback := make([]*unit, 0, len(units))
+	cnfRollback := make([]*unit, 0, len(units))
+	cmds := make([]string, 0, len(config))
+	originalCmds := make([]string, 0, len(config))
+
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		for _, u := range cmdRollback {
+			engine, _err := u.Engine()
+			if _err != nil {
+				continue
+			}
+
+			for i := range originalCmds {
+
+				inspect, _err := containerExec(context.Background(), engine, u.ContainerID, []string{originalCmds[i]}, false)
+				if inspect.ExitCode != 0 {
+					_err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, originalCmds[i], inspect.ExitCode, inspect, err)
+				}
+				if _err != nil {
+					logrus.Error(_err)
+				}
+			}
+
+			for _, u := range cnfRollback {
+				u.parent.Content = copyContent
+
+				_err := u.CopyConfig(nil)
+				if _err != nil {
+					logrus.Error(err)
+				}
+			}
+		}
+	}()
+
+	configer, err := u.ParseData([]byte(copyContent))
+	if err != nil {
+		return err
+	}
+
+	for key := range config {
+		original[key] = configer.String(key)
+	}
+
+	for key, val := range config {
+		original := configer.String(key)
+
+		err = configer.Set(key, fmt.Sprintf("%v", val))
+		if err != nil {
+			return err
+		}
+
+		key = strings.Replace(key, "_", "-", -1)
+		cmd := fmt.Sprintf(`mysql -u%s -p%s -S /DBAASDAT/upsql.sock -e "SET GLOBAL %v = %s ;"`,
+			dba.Username, dba.Password, key, val)
+
+		cmds = append(cmds)
+
+		cmd = fmt.Sprintf(`mysql -u%s -p%s -S /DBAASDAT/upsql.sock -e "SET GLOBAL %v = %s ;"`,
+			dba.Username, dba.Password, key, original)
+
+		originalCmds = append(originalCmds, cmd)
+	}
+
+	for _, u := range units {
+		engine, err := u.Engine()
+		if err != nil {
+			return err
+		}
+
+		cmdRollback = append(cmdRollback, u)
+
+		for i := range cmds {
+
+			inspect, err := containerExec(context.Background(), engine, u.ContainerID, []string{cmds[i]}, false)
+			if inspect.ExitCode != 0 {
+				err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmds[i], inspect.ExitCode, inspect, err)
+			}
+			if err != nil {
+				logrus.Error(err)
+			}
+			return err
+		}
+	}
+
+	for _, u := range units {
+		cnfRollback = append(cnfRollback, u)
+
+		err = u.CopyConfig(config)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}) error {
 	svc.Lock()
 	defer svc.Unlock()
@@ -1837,60 +2002,4 @@ func checkContainerError(err error) error {
 	}
 
 	return err
-}
-
-func (svc *Service) Slowlog(enable, notUsingIndexxes bool, longQueryTime int) error {
-	svc.RLock()
-	defer svc.RUnlock()
-
-	sqls := svc.getUnitByType(_UpsqlType)
-	if len(sqls) == 0 {
-		return errors.Errorf("Service %s Has no '%s' Type Unit", svc.Name, _UpsqlType)
-	}
-
-	var dba *database.User
-	for i := range svc.users {
-		if svc.users[i].Role == _User_DBA {
-			dba = &svc.users[i]
-			break
-		}
-	}
-
-	if dba == nil {
-		return errors.Errorf("Not Found Service %s User:'%s'", svc.Name, _User_DBA)
-	}
-
-	command := bytes.NewBuffer(nil)
-	cmd := fmt.Sprintf(`mysql -S /DBAASDAT/upsql.sock mysql -u%s -p%s`, dba.Username, dba.Password)
-
-	if !enable {
-		command.WriteString("set global slow_query_log=0;")
-	} else {
-		command.WriteString("set global slow_query_log=1;")
-		if longQueryTime > 0 {
-			command.WriteString(fmt.Sprintf("set global long_query_time = %d;", longQueryTime))
-		}
-		if notUsingIndexxes {
-			command.WriteString("set global log_queries_not_using_indexes=1;")
-		}
-	}
-
-	cmd = fmt.Sprintf(`%s -e"%s"`, cmd, command.String())
-
-	for i := range sqls {
-		eng, err := sqls[i].Engine()
-		if err != nil {
-			return err
-		}
-
-		inspect, err := containerExec(context.Background(), eng, sqls[i].ContainerID, []string{cmd}, false)
-		if err != nil {
-			logrus.Errorf("%s exec %s,error:%s", sqls[i].Name, cmd, err)
-
-			return err
-		}
-		logrus.Debugf("%s exec %s:%+v", sqls[i].Name, cmd, inspect)
-	}
-
-	return nil
 }

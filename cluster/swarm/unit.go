@@ -203,7 +203,6 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 		} else {
 			logrus.Errorf("Cannot Query unit Parent Config By ConfigID %s,Error:%s", u.ConfigID, err)
 		}
-
 	}
 
 	ports, err := database.ListPortsByUnit(u.ID)
@@ -578,10 +577,6 @@ func (u *unit) deactivateVG(config sdk.DeactivateConfig) error {
 	}
 
 	return err
-}
-
-func (u *unit) Migrate(e *cluster.Engine, config *cluster.ContainerConfig) (*cluster.Container, error) {
-	return nil, nil
 }
 
 func (u *unit) CopyConfig(data map[string]interface{}) error {

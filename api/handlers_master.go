@@ -1777,37 +1777,6 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 }
 
-// POST /services/{name:.*}/slowlog
-func postServiceSlowlog(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-
-	req := structs.PostSlowlogRequest{}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	svc, err := gd.GetService(name)
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	err = svc.Slowlog(req.Enable, req.NotUsingIndexes, req.LongQueryTime)
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
 // POST /services/{name:.*}/service-config/update
 func postServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
@@ -1831,6 +1800,37 @@ func postServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	}
 
 	err = service.UpdateUnitConfig(req.Type, req.Pairs)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// POST /services/{name:.*}/service_config/modify
+func postServiceConfigModify(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	req := structs.UpdateServiceConfigRequest{}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	service, err := gd.GetService(name)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = service.ModifyUnitConfig(req.Type, req.Pairs)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
