@@ -38,7 +38,7 @@ const (
 	_StatusNodeDeregisted
 )
 
-func ParseNodeStatus(status int) string {
+func ParseNodeStatus(status int64) string {
 	switch status {
 	case _StatusNodeImport:
 		return "importing"

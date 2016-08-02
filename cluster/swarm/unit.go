@@ -455,7 +455,7 @@ func (u *unit) forceStopContainer(timeout int) error {
 }
 
 func (u *unit) stopContainer(timeout int) error {
-	if val := atomic.LoadUint32(&u.Status); val == _StatusUnitBackuping {
+	if val := atomic.LoadInt64(&u.Status); val == _StatusUnitBackuping {
 		return fmt.Errorf("Unit %s is Backuping,Cannot stop", u.Name)
 	}
 
@@ -823,7 +823,7 @@ func (u *unit) forceStopService() error {
 }
 
 func (u *unit) stopService() error {
-	if val := atomic.LoadUint32(&u.Status); val == _StatusUnitBackuping {
+	if val := atomic.LoadInt64(&u.Status); val == _StatusUnitBackuping {
 		return fmt.Errorf("Unit %s is Backuping,Cannot stop", u.Name)
 	}
 
@@ -836,14 +836,14 @@ func (u *unit) stopService() error {
 }
 
 func (u *unit) backup(ctx context.Context, args ...string) error {
-	if !atomic.CompareAndSwapUint32(&u.Status, _StatusUnitNoContent, _StatusUnitBackuping) ||
+	if !atomic.CompareAndSwapInt64(&u.Status, _StatusUnitNoContent, _StatusUnitBackuping) ||
 		u.container.State != "running" {
 		err := fmt.Errorf("unit %s is busy,container Status=%s", u.Name, u.container.State)
 		logrus.Error(err)
 
 		return err
 	}
-	defer atomic.CompareAndSwapUint32(&u.Status, _StatusUnitBackuping, _StatusUnitNoContent)
+	defer atomic.CompareAndSwapInt64(&u.Status, _StatusUnitBackuping, _StatusUnitNoContent)
 
 	eng, err := u.Engine()
 	if err != nil {

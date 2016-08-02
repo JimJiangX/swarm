@@ -238,7 +238,7 @@ func TestService(t *testing.T) {
 	msg := "msg001"
 	service.Status = status
 	service.FinishedAt = finish
-	task.Status = int32(tStatus)
+	task.Status = tStatus
 	task.FinishedAt = finish
 	task.Errors = msg
 	err = TxSetServiceStatus(&service, &task, status, tStatus, finish, msg)

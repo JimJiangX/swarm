@@ -21,7 +21,7 @@ type Task struct {
 	Description string    `db:"description"`
 	Labels      string    `db:"labels"`
 	Errors      string    `db:"errors"`
-	Status      int32     `db:"status"`
+	Status      int64     `db:"status"`
 	Timeout     int       `db:"timeout"`   // s
 	Timestamp   int64     `db:"timestamp"` // time.Time.Unix()
 	CreatedAt   time.Time `db:"created_at"`
@@ -163,7 +163,7 @@ func TxInsertMultiTask(tx *sqlx.Tx, tasks []*Task) error {
 	return stmt.Close()
 }
 
-func TxUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int, finish time.Time, msg string) error {
+func TxUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int64, finish time.Time, msg string) error {
 	query := "UPDATE tb_task SET status=?,finished_at=?,errors=? WHERE id=?"
 
 	if finish.IsZero() {
@@ -174,7 +174,7 @@ func TxUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int, finish time.Time, msg s
 			return err
 		}
 
-		atomic.StoreInt32(&t.Status, int32(state))
+		atomic.StoreInt64(&t.Status, state)
 
 		return nil
 	}
@@ -184,13 +184,13 @@ func TxUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int, finish time.Time, msg s
 		return err
 	}
 
-	atomic.StoreInt32(&t.Status, int32(state))
+	atomic.StoreInt64(&t.Status, state)
 	t.FinishedAt = finish
 
 	return nil
 }
 
-func TxBackupTaskDone(task *Task, state int, backupFile BackupFile) error {
+func TxBackupTaskDone(task *Task, state int64, backupFile BackupFile) error {
 	tx, err := GetTX()
 	if err != nil {
 		return err
@@ -210,7 +210,7 @@ func TxBackupTaskDone(task *Task, state int, backupFile BackupFile) error {
 	return tx.Commit()
 }
 
-func UpdateTaskStatus(task *Task, state int32, finishAt time.Time, msg string) error {
+func UpdateTaskStatus(task *Task, state int64, finishAt time.Time, msg string) error {
 	db, err := GetDB(true)
 	if err != nil {
 		return err
@@ -226,7 +226,7 @@ func UpdateTaskStatus(task *Task, state int32, finishAt time.Time, msg string) e
 			return err
 		}
 
-		atomic.StoreInt32(&task.Status, state)
+		atomic.StoreInt64(&task.Status, state)
 
 		return nil
 	}
@@ -236,7 +236,7 @@ func UpdateTaskStatus(task *Task, state int32, finishAt time.Time, msg string) e
 		return err
 	}
 
-	atomic.StoreInt32(&task.Status, state)
+	atomic.StoreInt64(&task.Status, state)
 	task.FinishedAt = finishAt
 
 	return nil
@@ -256,7 +256,7 @@ func (task *Task) UpdateStatus(status int, msg string) error {
 		return err
 	}
 
-	atomic.StoreInt32(&task.Status, int32(status))
+	atomic.StoreInt64(&task.Status, int64(status))
 	task.FinishedAt = now
 
 	return nil

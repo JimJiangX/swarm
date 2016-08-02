@@ -1,6 +1,7 @@
 package database
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -227,7 +228,7 @@ type Node struct {
 	Room         string `db:"room"`
 	Seat         string `db:"seat"`
 	MaxContainer int    `db:"max_container"`
-	Status       int    `db:"status"`
+	Status       int64  `db:"status"`
 
 	RegisterAt   time.Time `db:"register_at"`
 	DeregisterAt time.Time `db:"deregister_at"`
@@ -267,7 +268,7 @@ func TxInsertMultiNodeAndTask(nodes []*Node, tasks []*Task) error {
 }
 
 // UpdateStatus returns error when Node UPDATE status.
-func (n *Node) UpdateStatus(state int) error {
+func (n *Node) UpdateStatus(state int64) error {
 	db, err := GetDB(false)
 	if err != nil {
 		return err
@@ -276,7 +277,7 @@ func (n *Node) UpdateStatus(state int) error {
 	query := "UPDATE tb_node SET status=? WHERE id=?"
 	_, err = db.Exec(query, state, n.ID)
 	if err == nil {
-		n.Status = state
+		atomic.StoreInt64(&n.Status, state)
 
 		return nil
 	}
@@ -288,7 +289,7 @@ func (n *Node) UpdateStatus(state int) error {
 
 	_, err = db.Exec(query, state, n.ID)
 	if err == nil {
-		n.Status = state
+		atomic.StoreInt64(&n.Status, state)
 
 		return nil
 	}
@@ -327,7 +328,7 @@ func (n *Node) UpdateParams(max int) error {
 }
 
 // TxUpdateNodeStatus returns error when Node UPDATE status.
-func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int, msg string) error {
+func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int64, msg string) error {
 	tx, err := GetTX()
 	if err != nil {
 		return err
@@ -355,7 +356,7 @@ func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int, msg string) err
 }
 
 // TxUpdateNodeRegister returns error when Node UPDATE infomation.
-func TxUpdateNodeRegister(n *Node, task *Task, nstate, tstate int, eng, msg string) error {
+func TxUpdateNodeRegister(n *Node, task *Task, nstate, tstate int64, eng, msg string) error {
 	tx, err := GetTX()
 	if err != nil {
 		return err
@@ -381,7 +382,7 @@ func TxUpdateNodeRegister(n *Node, task *Task, nstate, tstate int, eng, msg stri
 		return errors.Wrap(err, "TX Update Node Status "+n.ID)
 	}
 
-	n.Status = nstate
+	atomic.StoreInt64(&n.Status, nstate)
 
 	return nil
 }

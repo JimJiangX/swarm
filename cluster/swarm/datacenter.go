@@ -337,7 +337,7 @@ func (gd *Gardener) DatacenterByEngine(nameOrID string) (*Datacenter, error) {
 	return gd.Datacenter(node.ClusterID)
 }
 
-func (gd *Gardener) SetNodeStatus(name string, state int) error {
+func (gd *Gardener) SetNodeStatus(name string, state int64) error {
 	_, node, err := gd.GetNode(name)
 	if err != nil {
 		logrus.Error(err)
@@ -887,7 +887,7 @@ func (node *Node) Distribute() (err error) {
 			err = fmt.Errorf("Recover From Panic:%v", r)
 		}
 
-		nodeState, taskState, msg := 0, 0, ""
+		nodeState, taskState, msg := int64(0), int64(0), ""
 		if err == nil {
 			nodeState = _StatusNodeInstalled
 		} else {

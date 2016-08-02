@@ -162,7 +162,7 @@ func backupTask(backup *unit, task *database.Task, strategy database.BackupStrat
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(strategy.Timeout)*time.Second)
 	defer cancel()
 
-	msg, status := "", int32(0)
+	msg, status := "", int64(0)
 
 	err := backup.backup(ctx, args...)
 	if err == nil {

@@ -57,7 +57,7 @@ func getNodeInspect(gd *swarm.Gardener, node database.Node) structs.NodeInspect 
 		Room:         node.Room,
 		Seat:         node.Seat,
 		MaxContainer: node.MaxContainer,
-		Status:       node.Status,
+		Status:       int(node.Status),
 		RegisterAt:   utils.TimeToString(node.RegisterAt),
 		Resource: structs.Resource{
 			TotalCPUs:   totalCPUs,

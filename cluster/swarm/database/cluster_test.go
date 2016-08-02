@@ -100,7 +100,7 @@ func NewNode(name, clusterID, addr, eng string, num, status int, t1, t2 time.Tim
 		Addr:         addr,
 		EngineID:     eng,
 		MaxContainer: num,
-		Status:       status,
+		Status:       int64(status),
 		RegisterAt:   t1,
 		DeregisterAt: t2,
 	}

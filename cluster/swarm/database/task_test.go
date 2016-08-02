@@ -53,7 +53,7 @@ func TestTxUpdateTaskStatusNotZero(t *testing.T) {
 	task := Task{
 		ID: "57b8db7218d32f615e8d48646d6007d3289ac7600fcb9eb0125905e42eacb8c0",
 	}
-	status := 1
+	status := int64(1)
 	finish := time.Now()
 	msg := "msg001"
 
@@ -75,7 +75,7 @@ func TestTxUpdateTaskStatusZero(t *testing.T) {
 	task := Task{
 		ID: "a9cef18feb6b2a66539b2abf08be673490468d93fe3df04fe4d4300a5a97ff0c",
 	}
-	status := 2
+	status := int64(2)
 	finish := time.Time{}
 	msg := "msg002"
 
@@ -97,7 +97,7 @@ func TestUpdateTaskStatusNotZero(t *testing.T) {
 	task := Task{
 		ID: "5d3cb60881556a2d118459a43074775660a3f8a4f7b0999e59759e8af97c1aa8",
 	}
-	status := int32(1)
+	status := int64(1)
 	finish := time.Now()
 	msg := "msg001"
 	err := UpdateTaskStatus(&task, status, finish, msg)
@@ -110,7 +110,7 @@ func TestUpdateTaskStatusZero(t *testing.T) {
 	task := Task{
 		ID: "5d62e9d5f15a71ab59c0db112d4339ee38ff38742790c74e46dbb89ca7c8fb51",
 	}
-	status := int32(2)
+	status := int64(2)
 	finish := time.Time{}
 	msg := "msg002"
 	err := UpdateTaskStatus(&task, status, finish, msg)
@@ -143,7 +143,7 @@ func TestTxBackupTaskDone(t *testing.T) {
 	task := Task{
 		ID: "c3aa342ae7747addbd77789cc187be2cf7027d634a91d2abe57f4e5ccd05cc8d",
 	}
-	status := 1
+	status := int64(1)
 
 	bf := BackupFile{
 		ID:         "BackupFileID001",
