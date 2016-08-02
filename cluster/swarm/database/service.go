@@ -63,7 +63,7 @@ func TxInsertMultiContainer(tx *sqlx.Tx, clist []*Container) error {
 }
 */
 
-const insertUnitQuery = "INSERT INTO tb_unit (id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,last_error,check_interval,created_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:node_id,:container_id,:unit_config_id,:network_mode,:status,:last_error,:check_interval,:created_at)"
+const insertUnitQuery = "INSERT INTO tb_unit (id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:node_id,:container_id,:unit_config_id,:network_mode,:status,:latest_error,:check_interval,:created_at)"
 
 type Unit struct {
 	ID          string `db:"id"`
@@ -76,7 +76,7 @@ type Unit struct {
 	ContainerID string `db:"container_id"`
 	ConfigID    string `db:"unit_config_id"`
 	NetworkMode string `db:"network_mode"`
-	LastError   string `db:"last_error"`
+	LatestError string `db:"latest_error"`
 
 	Status        int64     `db:"status"`
 	CheckInterval int       `db:"check_interval"`
@@ -134,7 +134,7 @@ func UpdateUnitInfo(unit Unit) error {
 		return err
 	}
 
-	query := "UPDATE tb_unit SET name=:name,type=:type,image_id=:image_id,image_name=:image_name,service_id=:service_id,node_id=:node_id,container_id=:container_id,unit_config_id=:unit_config_id,network_mode=:network_mode,status=:status,last_error=:last_error,check_interval=:check_interval,created_at=:created_at WHERE id=:id"
+	query := "UPDATE tb_unit SET name=:name,type=:type,image_id=:image_id,image_name=:image_name,service_id=:service_id,node_id=:node_id,container_id=:container_id,unit_config_id=:unit_config_id,network_mode=:network_mode,status=:status,latest_error=:latest_error,check_interval=:check_interval,created_at=:created_at WHERE id=:id"
 
 	_, err = db.NamedExec(query, &unit)
 
@@ -143,7 +143,7 @@ func UpdateUnitInfo(unit Unit) error {
 
 func TxUpdateUnit(tx *sqlx.Tx, unit Unit) error {
 	//	query := "UPDATE tb_unit SET name=:name,type=:type,image_id=:image_id,image_name=:image_name,service_id=:service_id,node_id=:node_id,container_id=:container_id,unit_config_id=:unit_config_id,network_mode=:network_mode,status=:status,check_interval=:check_interval,created_at=:created_at WHERE id=:id"
-	query := "UPDATE tb_unit SET node_id=:node_id,container_id=:container_id,status=:status,last_error=:last_error,created_at=:created_at WHERE id=:id"
+	query := "UPDATE tb_unit SET node_id=:node_id,container_id=:container_id,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
 
 	_, err := tx.NamedExec(query, unit)
 
@@ -152,13 +152,13 @@ func TxUpdateUnit(tx *sqlx.Tx, unit Unit) error {
 
 func txUpdateUnitStatus(tx *sqlx.Tx, unit *Unit, status int64, msg string) error {
 
-	_, err := tx.Exec("UPDATE tb_unit SET status=?,last_error=? WHERE id=?", status, msg, unit)
+	_, err := tx.Exec("UPDATE tb_unit SET status=?,latest_error=? WHERE id=?", status, msg, unit)
 	if err != nil {
 		return errors.Wrap(err, "tx Update Unit Status")
 	}
 
 	atomic.StoreInt64(&unit.Status, status)
-	unit.LastError = msg
+	unit.LatestError = msg
 
 	return nil
 }
