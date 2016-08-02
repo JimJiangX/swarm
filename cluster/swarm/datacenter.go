@@ -448,14 +448,9 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) error {
 		return fmt.Errorf("Count Unit ByNode,%v,count:%d", err, count)
 	}
 
-	dc, err := gd.DatacenterByNode(nameOrID)
+	sys, err := gd.SystemConfig()
 	if err != nil {
-		return err
-	}
-
-	sys, err := database.GetSystemConfig()
-	if err != nil {
-		logrus.Errorf("GetSystemConfig error:%s", err)
+		logrus.Errorf("SystemConfig error:%s", err)
 		return err
 	}
 	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
@@ -471,19 +466,22 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) error {
 		return err
 	}
 
-	err = dc.RemoveNode(nameOrID)
-	if err != nil {
-		return err
+	gd.Lock()
+	for i := range gd.datacenters {
+		if gd.datacenters[i].ID == node.ClusterID {
+			gd.datacenters[i].RemoveNode(nameOrID)
+			break
+		}
 	}
+	gd.Unlock()
 
 	// ssh exec clean script
 	err = nodeClean(node.ID, node.Addr, user, password)
 	if err != nil {
 		logrus.Error("clean script exec error:%s", err)
-		return err
 	}
 
-	return nil
+	return err
 }
 
 func (gd *Gardener) RemoveDatacenter(nameOrID string) error {
