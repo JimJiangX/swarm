@@ -1062,7 +1062,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 		logrus.Error("%s Not Found,%s", name, err)
 		return err
 	}
-	config, err := database.GetSystemConfig()
+	config, err := gd.SystemConfig()
 	if err != nil {
 		logrus.Error(err)
 		return err
@@ -1084,7 +1084,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 			}
 			eng, err := gd.updateNodeEngine(nodes[i], config.DockerPort)
 			if err != nil || eng == nil {
-				logrus.Error(err)
+				logrus.Warn(err)
 				continue
 			}
 
@@ -1125,15 +1125,14 @@ func (gd *Gardener) updateNodeEngine(node *Node, dockerPort int) (*cluster.Engin
 	addr := fmt.Sprintf("%s:%d", node.Addr, dockerPort)
 	eng := gd.getEngineByAddr(addr)
 
-	if status := ""; eng == nil || !strings.EqualFold(eng.Status(), "Healthy") {
+	if status := ""; eng == nil || !eng.IsHealthy() {
 		if eng != nil {
 			status = eng.Status()
 		} else {
 			status = "engine is nil"
 		}
 
-		err := fmt.Errorf("Engine %s Status:%s", addr, status)
-		return nil, err
+		return nil, errors.Errorf("Engine %s Status:%s", addr, status)
 	}
 
 	err := database.TxUpdateNodeRegister(node.Node, node.task, _StatusNodeTesting, _StatusTaskRunning, eng.ID, "")
