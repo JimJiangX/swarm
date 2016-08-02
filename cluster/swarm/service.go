@@ -1032,12 +1032,16 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 		}
 	}
 
+	template := [...]string{"mysql", "-u%s", "-p%s", "-S", "/DBAASDAT/upsql.sock", "-e", "SET GLOBAL %s = %v;"}
+	template[1] = fmt.Sprintf(template[1], dba.Username)
+	template[2] = fmt.Sprintf(template[1], dba.Password)
+	const length, last = len(template), len(template) - 1
+
 	copyContent := u.parent.Content
-	original := make(map[string]string, len(config))
 	cmdRollback := make([]*unit, 0, len(units))
 	cnfRollback := make([]*unit, 0, len(units))
-	cmds := make([]string, 0, len(config))
-	originalCmds := make([]string, 0, len(config))
+	cmdList := make([][length]string, 0, len(config))
+	originalCmds := make([][length]string, 0, len(config))
 
 	defer func() {
 		if err == nil {
@@ -1052,7 +1056,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 
 			for i := range originalCmds {
 
-				inspect, _err := containerExec(context.Background(), engine, u.ContainerID, []string{originalCmds[i]}, false)
+				inspect, _err := containerExec(context.Background(), engine, u.ContainerID, originalCmds[i][:], false)
 				if inspect.ExitCode != 0 {
 					_err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, originalCmds[i], inspect.ExitCode, inspect, err)
 				}
@@ -1077,12 +1081,10 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 		return err
 	}
 
-	for key := range config {
-		original[key] = configer.String(key)
-	}
-
 	for key, val := range config {
-		original := configer.String(key)
+		oldValue := configer.String(key)
+		cmds := template
+		old := template
 
 		err = configer.Set(key, fmt.Sprintf("%v", val))
 		if err != nil {
@@ -1090,15 +1092,12 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 		}
 
 		key = strings.Replace(key, "_", "-", -1)
-		cmd := fmt.Sprintf(`mysql -u%s -p%s -S /DBAASDAT/upsql.sock -e "SET GLOBAL %v = %s ;"`,
-			dba.Username, dba.Password, key, val)
 
-		cmds = append(cmds)
+		cmds[last] = fmt.Sprintf(cmds[last], key, val)
+		cmdList = append(cmdList, cmds)
 
-		cmd = fmt.Sprintf(`mysql -u%s -p%s -S /DBAASDAT/upsql.sock -e "SET GLOBAL %v = %s ;"`,
-			dba.Username, dba.Password, key, original)
-
-		originalCmds = append(originalCmds, cmd)
+		old[last] = fmt.Sprintf(old[last], key, oldValue)
+		originalCmds = append(originalCmds, old)
 	}
 
 	for _, u := range units {
@@ -1109,11 +1108,11 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 
 		cmdRollback = append(cmdRollback, u)
 
-		for i := range cmds {
+		for i := range cmdList {
 
-			inspect, err := containerExec(context.Background(), engine, u.ContainerID, []string{cmds[i]}, false)
+			inspect, err := containerExec(context.Background(), engine, u.ContainerID, cmdList[i][:], false)
 			if inspect.ExitCode != 0 {
-				err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmds[i], inspect.ExitCode, inspect, err)
+				err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmdList[i], inspect.ExitCode, inspect, err)
 			}
 			if err != nil {
 				logrus.Error(err)

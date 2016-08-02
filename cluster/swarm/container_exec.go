@@ -63,7 +63,7 @@ func containerExec(ctx context.Context, engine *cluster.Engine, containerID stri
 		"Engine":     engine.Addr,
 		"ExecID":     exec.ID,
 		"ExecConfig": execConfig,
-	}).Info("Start Exec")
+	}).Infof("Start Exec:%s", cmd)
 
 	if execConfig.Detach {
 		err := client.ContainerExecStart(ctx, exec.ID, types.ExecStartCheck{Detach: detach})
