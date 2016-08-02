@@ -106,8 +106,72 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	}
 
 	gd.cron.Start()
+	go gd.syncNodeWithEngine()
 
 	return gd, nil
+}
+
+func (gd *Gardener) syncNodeWithEngine() {
+	gd.Lock()
+	if gd.Cluster.pendingEngineCh == nil {
+		gd.Cluster.pendingEngineCh = make(chan *cluster.Engine, 50)
+	}
+	gd.Unlock()
+
+	for {
+		engine := <-gd.Cluster.pendingEngineCh
+		if engine == nil || !engine.IsHealthy() {
+
+			continue
+		}
+
+		nodeTab, err := database.GetNode(engine.ID)
+		if err != nil {
+			gd.RUnlock()
+
+			logrus.Errorf("sync Node With Engine:%s", err)
+			continue
+		}
+
+		var dc *Datacenter
+
+		gd.RLock()
+		for i := range gd.datacenters {
+			if gd.datacenters[i].ID == nodeTab.ClusterID {
+				dc = gd.datacenters[i]
+				break
+			}
+		}
+		gd.RUnlock()
+
+		if dc == nil {
+			dc, err = gd.Datacenter(nodeTab.ClusterID)
+			if err != nil {
+				logrus.WithError(err).Warn("syncNodeWithEngine")
+			}
+			continue
+		}
+
+		node, err := dc.GetNode(nodeTab.ID)
+		if err == nil {
+			if node.engine == nil ||
+				(!node.engine.IsHealthy() && node.engine.Addr == engine.Addr) {
+				node.engine = engine
+			}
+
+		} else {
+			node, err = gd.rebuildNode(nodeTab)
+			if err != nil {
+				logrus.WithError(err).Warnf("rebuildNode %s", nodeTab.Name)
+				continue
+			}
+			if dc != nil {
+				dc.Lock()
+				dc.nodes = append(dc.nodes, node)
+				dc.Unlock()
+			}
+		}
+	}
 }
 
 func (gd *Gardener) generateUUID(length int) string {
