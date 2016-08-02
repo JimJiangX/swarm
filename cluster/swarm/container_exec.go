@@ -53,6 +53,7 @@ func containerExec(ctx context.Context, engine *cluster.Engine, containerID stri
 	}
 
 	exec, err := client.ContainerExecCreate(ctx, containerID, execConfig)
+	engine.CheckConnectionErr(err)
 	if err != nil {
 		return inspect, err
 	}
@@ -66,6 +67,7 @@ func containerExec(ctx context.Context, engine *cluster.Engine, containerID stri
 
 	if execConfig.Detach {
 		err := client.ContainerExecStart(ctx, exec.ID, types.ExecStartCheck{Detach: detach})
+		engine.CheckConnectionErr(err)
 		if err != nil {
 			return inspect, err
 		}
@@ -75,6 +77,7 @@ func containerExec(ctx context.Context, engine *cluster.Engine, containerID stri
 		}
 
 		err = containerExecAttch(ctx, client, exec.ID, execConfig)
+		engine.CheckConnectionErr(err)
 		if err != nil {
 			return inspect, err
 		}

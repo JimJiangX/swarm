@@ -113,28 +113,29 @@ func (u *unit) Engine() (*cluster.Engine, error) {
 
 	if u.container != nil && u.container.Engine != nil {
 		u.engine = u.container.Engine
+
 		return u.engine, nil
 	}
 
 	return nil, errEngineIsNil
 }
 
-func (u *unit) ContainerAPIClient() (client.ContainerAPIClient, error) {
+func (u *unit) ContainerAPIClient() (*cluster.Engine, client.ContainerAPIClient, error) {
 	eng, err := u.Engine()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if eng == nil {
-		return nil, errEngineIsNil
+		return nil, nil, errEngineIsNil
 	}
 
 	client := eng.ContainerAPIClient()
 	if client == nil {
-		return nil, errEngineAPIisNil
+		return eng, nil, errEngineAPIisNil
 	}
 
-	return client, nil
+	return eng, client, nil
 }
 
 func (gd *Gardener) GetUnit(table database.Unit) (*unit, error) {
@@ -359,12 +360,15 @@ func extendSanStoreageVG(host string, lun database.LUN) error {
 }
 
 func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
-	client, err := u.ContainerAPIClient()
+	engine, client, err := u.ContainerAPIClient()
 	if err != nil {
 		return err
 	}
 
-	return client.ContainerUpdate(context.Background(), u.container.ID, updateConfig)
+	err = client.ContainerUpdate(context.Background(), u.container.ID, updateConfig)
+	engine.CheckConnectionErr(err)
+
+	return err
 }
 
 func (u *unit) removeContainer(force, rmVolumes bool) error {
@@ -429,7 +433,7 @@ func startContainer(containerID string, engine *cluster.Engine, networkings []IP
 }
 
 func (u *unit) forceStopContainer(timeout int) error {
-	client, err := u.ContainerAPIClient()
+	engine, client, err := u.ContainerAPIClient()
 	if err != nil {
 		return err
 	}
@@ -441,9 +445,12 @@ func (u *unit) forceStopContainer(timeout int) error {
 	}
 
 	err = client.ContainerStop(context.Background(), u.Unit.ContainerID, timeoutptr)
-	if err := checkContainerError(err); err == errContainerNotRunning {
+	engine.CheckConnectionErr(err)
+
+	if err = checkContainerError(err); err == errContainerNotRunning {
 		return nil
 	}
+
 	return err
 }
 
@@ -478,16 +485,22 @@ func (u *unit) restartContainer(ctx context.Context) error {
 
 	timeout := 5 * time.Second
 
-	return client.ContainerRestart(ctx, u.Unit.ContainerID, &timeout)
+	err = client.ContainerRestart(ctx, u.Unit.ContainerID, &timeout)
+	engine.CheckConnectionErr(err)
+
+	return err
 }
 
 func (u *unit) renameContainer(name string) error {
-	client, err := u.ContainerAPIClient()
+	engine, client, err := u.ContainerAPIClient()
 	if err != nil {
 		return err
 	}
 
-	return client.ContainerRename(context.Background(), u.container.ID, name)
+	err = client.ContainerRename(context.Background(), u.container.ID, name)
+	engine.CheckConnectionErr(err)
+
+	return err
 }
 
 func createNetworking(host string, networkings []IPInfo) error {
@@ -619,7 +632,7 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 		return err
 	}
 
-	err = copyConfigIntoCNFVolume(engine, volumes, u.Path(), context)
+	err = copyConfigIntoCNFVolume(engine.IP, u.Path(), context, volumes)
 	if err != nil {
 		logrus.Errorf("%s:%s copy Config Into CNF Volume error:%s", u.Name, u.ImageName, err)
 		return err
@@ -628,7 +641,7 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 	return nil
 }
 
-func copyConfigIntoCNFVolume(engine *cluster.Engine, lvs []database.LocalVolume, path, content string) error {
+func copyConfigIntoCNFVolume(host, path, content string, lvs []database.LocalVolume) error {
 	cnf := 0
 	for i := range lvs {
 		if strings.Contains(lvs[i].Name, "_CNF_LV") {
@@ -656,7 +669,7 @@ func copyConfigIntoCNFVolume(engine *cluster.Engine, lvs []database.LocalVolume,
 		Mode:      "0600",
 	}
 
-	addr := getPluginAddr(engine.IP, pluginPort)
+	addr := getPluginAddr(host, pluginPort)
 	err := sdk.FileCopyToVolome(addr, config)
 
 	logrus.Debugf("FileCopyToVolome to %s:%s config:%+v,error:%v", addr, lvs[cnf].Name, config, err)
@@ -708,7 +721,15 @@ func (gd *Gardener) StartUnitService(nameOrID string) error {
 		return err
 	}
 
-	u, err := gd.GetUnit(unit)
+	svc, err := gd.GetService(unit.ServiceID)
+	if err != nil {
+		return err
+	}
+
+	svc.Lock()
+	defer svc.Unlock()
+
+	u, err := svc.getUnit(unit.ID)
 	if err != nil {
 		return err
 	}
@@ -727,7 +748,15 @@ func (gd *Gardener) StopUnitService(nameOrID string, timeout int) error {
 		return err
 	}
 
-	u, err := gd.GetUnit(unit)
+	svc, err := gd.GetService(unit.ServiceID)
+	if err != nil {
+		return err
+	}
+
+	svc.Lock()
+	defer svc.Unlock()
+
+	u, err := svc.getUnit(unit.ID)
 	if err != nil {
 		return err
 	}
@@ -741,12 +770,15 @@ func (gd *Gardener) StopUnitService(nameOrID string, timeout int) error {
 }
 
 func (u *unit) startService() error {
-	if u.engine == nil {
-		return errEngineIsNil
+	eng, err := u.Engine()
+	if err != nil {
+		return err
 	}
+
 	if u.ContainerCmd == nil {
 		return nil
 	}
+
 	cmd := u.StartServiceCmd()
 	if len(cmd) == 0 {
 		logrus.Warnf("%s StartServiceCmd is nil", u.Name)
@@ -754,7 +786,7 @@ func (u *unit) startService() error {
 	}
 
 	logrus.Debug(u.Name, " start service ...")
-	inspect, err := containerExec(context.Background(), u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(context.Background(), eng, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s start service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
@@ -762,10 +794,16 @@ func (u *unit) startService() error {
 	if err != nil {
 		logrus.Error(err)
 	}
+
 	return err
 }
 
 func (u *unit) forceStopService() error {
+	eng, err := u.Engine()
+	if err != nil {
+		return err
+	}
+
 	if u.ContainerCmd == nil {
 		return nil
 	}
@@ -776,7 +814,7 @@ func (u *unit) forceStopService() error {
 	}
 
 	logrus.Debug(u.Name, " stop service ...")
-	inspect, err := containerExec(context.Background(), u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(context.Background(), eng, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s stop service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
@@ -807,6 +845,11 @@ func (u *unit) backup(ctx context.Context, args ...string) error {
 	}
 	defer atomic.CompareAndSwapUint32(&u.Status, _StatusUnitBackuping, _StatusUnitNoContent)
 
+	eng, err := u.Engine()
+	if err != nil {
+		return err
+	}
+
 	if u.ContainerCmd == nil {
 		return nil
 	}
@@ -821,7 +864,7 @@ func (u *unit) backup(ctx context.Context, args ...string) error {
 	})
 	entry.Info("start Backup job")
 
-	inspect, err := containerExec(ctx, u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(ctx, eng, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s backup cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
@@ -832,9 +875,15 @@ func (u *unit) backup(ctx context.Context, args ...string) error {
 }
 
 func (u *unit) restore(ctx context.Context, file string) error {
+	eng, err := u.Engine()
+	if err != nil {
+		return err
+	}
+
 	if u.ContainerCmd == nil {
 		return nil
 	}
+
 	cmd := u.RestoreCmd(file)
 	if len(cmd) == 0 {
 		logrus.Warnf("%s RestoreCmd is nil", u.Name)
@@ -845,7 +894,7 @@ func (u *unit) restore(ctx context.Context, file string) error {
 		"Cmd":  cmd,
 	}).Debugln("restore job")
 
-	inspect, err := containerExec(ctx, u.engine, u.ContainerID, cmd, false)
+	inspect, err := containerExec(ctx, eng, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s restore cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
@@ -928,7 +977,10 @@ func (gd *Gardener) RestoreUnit(nameOrID, source string) (string, error) {
 		return "", err
 	}
 
+	service.RLock()
 	unit, err := service.getUnit(table.ID)
+	service.RUnlock()
+
 	if err != nil {
 		return "", err
 	}

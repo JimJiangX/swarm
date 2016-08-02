@@ -407,7 +407,7 @@ func startUnit(engine *cluster.Engine, containerID string,
 	}
 
 	logrus.Debug("copy Service Config")
-	err = copyConfigIntoCNFVolume(engine, lvs, u.Path(), u.parent.Content)
+	err = copyConfigIntoCNFVolume(engine.IP, u.Path(), u.parent.Content, lvs)
 	if err != nil {
 		return err
 	}
@@ -616,6 +616,7 @@ func cleanOldContainer(old *cluster.Container, lvs []database.LocalVolume) error
 
 	// remove old container
 	err := engine.RemoveContainer(old, true, true)
+	engine.CheckConnectionErr(err)
 	if err != nil {
 		logrus.Errorf("engine %s remove container %s error:%s", engine.Addr, old.Info.Name, err)
 	}
