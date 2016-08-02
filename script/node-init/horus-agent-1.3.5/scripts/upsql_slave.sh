@@ -66,8 +66,11 @@ if [ "$slaveIO" = "Yes" ] &&  [ "$slaveSQL" = "Yes" ] ;then
 		runstatus="Yes"   
 fi
 
+host=`docker exec $INSTANCE awk -F= '/bind_address=/{print $2}' /DBAASDAT/my.cnf`
+port=`docker exec $INSTANCE awk -F= '/port=/{print $2}' /DBAASDAT/my.cnf`
+
 # upsql.replication.status
-replication=${mhost}#${mport}#${runstatus}#${rwmode}#${mID}#${slaveIO}#${slaveSQL}#${seconds_behind_master}#${relay_Log_File}#${relay_Log_Pos}#${master_Log_File}#${read_Master_Log_Pos}
+replication=${mhost}#${mport}#${runstatus}#${rwmode}#${mID}#${slaveIO}#${slaveSQL}#${seconds_behind_master}#${relay_Log_File}#${relay_Log_Pos}#${master_Log_File}#${read_Master_Log_Pos}#${host}#${port}
 
 rm $SLAVEFILE
 
