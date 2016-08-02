@@ -123,15 +123,13 @@ func (gd *Gardener) syncNodeWithEngine() {
 	for {
 		engine := <-gd.Cluster.pendingEngineCh
 		if engine == nil || !engine.IsHealthy() {
-
 			continue
 		}
 
 		nodeTab, err := database.GetNode(engine.ID)
 		if err != nil {
-			gd.RUnlock()
-
 			logrus.Errorf("sync Node With Engine:%s", err)
+
 			continue
 		}
 
