@@ -1635,7 +1635,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	svc, strategyID, taskID, err := gd.CreateService(req)
-	if err != nil {
+	if err != nil && svc == nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

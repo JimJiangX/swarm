@@ -59,7 +59,6 @@ func buildService(req structs.PostServiceRequest,
 	des, err := json.Marshal(req)
 	if err != nil {
 		logrus.Errorf("JSON Marshal Error:%s", err)
-		return nil, nil, err
 	}
 
 	svc := database.Service{
@@ -633,7 +632,7 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 
 }
 
-func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _ string, _ string, err error) {
+func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, string, string, error) {
 	authConfig, err := gd.RegistryAuthConfig()
 	if err != nil {
 		logrus.Error("get Registry Auth Config", err)
@@ -642,31 +641,28 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 
 	svc, task, err := buildService(req, authConfig)
 	if err != nil {
-		logrus.Error("Build Service", err)
-		return nil, "", "", err
+		logrus.Error("Build Service Error:", err)
+
+		return svc, "", task.ID, err
 	}
 
-	defer func(ID string) {
-		if err == nil {
-			return
-		}
-
-		_err := gd.RemoveService(ID, true, true, 0)
-		logrus.Info("Remove %s,%v", ID, _err)
-	}(svc.ID)
+	strategyID := ""
+	if svc.backup != nil {
+		strategyID = svc.backup.ID
+	}
 
 	logrus.WithFields(logrus.Fields{
-		"Servcie Name": svc.Name,
-		"Service ID":   svc.ID,
+		"ServcieName": svc.Name,
+		"ServiceID":   svc.ID,
 	}).Info("Service Saved Into Database")
 
 	svc.failureRetry = gd.createRetry
 
 	err = gd.AddService(svc)
 	if err != nil {
-		logrus.WithField("Service Name", svc.Name).Errorf("Service Add to Gardener Error:%s", err)
+		logrus.WithField("ServiceName", svc.Name).Errorf("Service Add to Gardener Error:%s", err)
 
-		return nil, "", "", err
+		return svc, strategyID, task.ID, err
 	}
 
 	svc.RLock()
@@ -676,9 +672,9 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 	if err != nil {
 		logrus.Error("Service Add To Scheduler", err)
 
-		return nil, "", "", err
+		return svc, strategyID, task.ID, err
 	}
-	logrus.Debugf("[mg] ServiceToScheduler ok:%v", svc)
+	logrus.Debugf("Service %s Scheduler OK!", svc.Name)
 
 	background := func(context.Context) error {
 		err := gd.serviceExecute(svc)
@@ -704,16 +700,9 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (_ *Service, _
 	}
 
 	worker := NewAsyncTask(context.Background(), background, nil, updater, 10*time.Minute)
-	if err = worker.Run(); err != nil {
-		return nil, "", "", err
-	}
+	err = worker.Run()
 
-	strategyID := ""
-	if svc.backup != nil {
-		strategyID = svc.backup.ID
-	}
-
-	return svc, strategyID, task.ID, nil
+	return svc, strategyID, task.ID, err
 }
 
 func (svc *Service) StartService() (err error) {
