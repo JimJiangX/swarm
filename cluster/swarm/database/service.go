@@ -661,11 +661,10 @@ func DeteleServiceRelation(serviceID string, rmVolumes bool) error {
 			}
 		}
 
-		// TODO:add later when fix unitConfig delete mistake
-		// err = txDeleteUnitConfig(tx, units[i].ConfigID)
-		// if err != nil {
-		//	 return err
-		// }
+		err = txDeleteUnitConfig(tx, units[i].ConfigID)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = txDeleteBackupStrategy(tx, serviceID)

@@ -275,7 +275,6 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 				ImageID:       image.ID,
 				ImageName:     image.Name + ":" + image.Version,
 				EngineID:      engine.ID,
-				ConfigID:      parentConfig.ID,
 				Status:        0,
 				CheckInterval: 0,
 				NetworkMode:   config.HostConfig.NetworkMode.NetworkName(),
