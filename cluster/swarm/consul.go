@@ -279,3 +279,14 @@ func deregisterHealthCheck(host, serviceID string, config api.Config) error {
 
 	return client.Agent().ServiceDeregister(serviceID)
 }
+
+func deleteConsulKV(config api.Config, key string) error {
+	client, err := api.NewClient(&config)
+	if err != nil {
+		return err
+	}
+
+	_, err = client.KV().Delete(key, nil)
+
+	return err
+}

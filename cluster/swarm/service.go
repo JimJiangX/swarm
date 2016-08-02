@@ -557,7 +557,7 @@ func (gd *Gardener) GetService(nameOrID string) (*Service, error) {
 func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	service, err := database.GetService(nameOrID)
 	if err != nil {
-		return nil, err
+		return nil, ErrServiceNotFound
 	}
 
 	base := &structs.PostServiceRequest{}
@@ -629,7 +629,6 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	gd.Unlock()
 
 	return svc, nil
-
 }
 
 func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, string, string, error) {
@@ -1843,7 +1842,9 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 	return nil
 }
 
-func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, force, rmVolumes, recycle bool, timeout int) error {
+func (svc *Service) Delete(gd *Gardener, config consulapi.Config,
+	horus string, force, rmVolumes, recycle bool, timeout int) error {
+
 	svc.Lock()
 	defer svc.Unlock()
 
@@ -1967,6 +1968,11 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config, horus string, 
 	err = svc.deregisterServices(config)
 	if err != nil {
 		logrus.Errorf("%s deregister In consul error:%s", svc.Name, err)
+	}
+
+	err = deleteConsulKV(config, svc.ID)
+	if err != nil {
+		logrus.Errorf("Delete Consul KV:%s,%s", svc.ID, err)
 	}
 
 	return nil
