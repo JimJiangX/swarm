@@ -15,6 +15,7 @@ import (
 	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/utils"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -158,8 +159,8 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 	svc.RUnlock()
 
-	if !san {
-		//	return "", errors.Errorf("Unit %s storage hasn't SAN Storage,Cannot Exec Migrate", nameOrID)
+	if !san && u.Type == _UpsqlType {
+		return "", errors.Errorf("Unit %s storage hasn't SAN Storage,Cannot Exec Migrate", nameOrID)
 	}
 
 	dc, original, err := gd.GetNode(u.EngineID)
