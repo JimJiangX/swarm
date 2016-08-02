@@ -111,6 +111,8 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	return gd, nil
 }
 
+// syncNodeWithEngine synchronize Node.engine if Node exist
+// engine from new Engine register to Cluster
 func (gd *Gardener) syncNodeWithEngine() {
 	gd.Lock()
 	if gd.Cluster.pendingEngineCh == nil {
