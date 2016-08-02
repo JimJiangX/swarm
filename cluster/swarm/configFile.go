@@ -11,6 +11,7 @@ import (
 	"github.com/astaxie/beego/config"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
+	"github.com/docker/swarm/version"
 	"github.com/pkg/errors"
 )
 
@@ -125,8 +126,8 @@ func initialize(name, version string) (parser configParser, cmder ContainerCmd, 
 		parser = &switchManagerConfig_v1119{}
 		cmder = &switchManagerCmd{}
 
-	case _ImageSwitchManager == name && version == "1.1.21":
-		parser = &switchManagerConfig_v1121{}
+	case _ImageSwitchManager == name && version == "1.1.23":
+		parser = &switchManagerConfig_v1123{}
 		cmder = &switchManagerCmd{}
 
 	case _ImageProxy == name:
@@ -692,9 +693,11 @@ func (c switchManagerConfig) defaultUserConfig(args ...interface{}) (map[string]
 
 	// consul
 	m["ConsulBindNetworkName"] = u.engine.Labels[_Admin_NIC_Lable]
-	m["SwarmHostKey"] = leaderElectionPath
 	m["ConsulPort"] = sys.ConsulPort
-	m["ConsulUserAgent"] = "1.23"
+
+	// swarm
+	m["SwarmUserAgent"] = version.VERSION
+	m["SwarmHostKey"] = leaderElectionPath
 
 	// _User_Check Role
 
@@ -705,11 +708,11 @@ type switchManagerConfig_v1119 struct {
 	switchManagerConfig
 }
 
-type switchManagerConfig_v1121 struct {
+type switchManagerConfig_v1123 struct {
 	switchManagerConfig
 }
 
-func (c switchManagerConfig_v1121) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
+func (c switchManagerConfig_v1123) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
 	errUnexpectedArgs := errors.Errorf("Unexpected args,len=%d", len(args))
 
 	if len(args) < 2 {
@@ -746,9 +749,11 @@ func (c switchManagerConfig_v1121) defaultUserConfig(args ...interface{}) (map[s
 
 	// consul
 	m["ConsulBindNetworkName"] = u.engine.Labels[_Admin_NIC_Lable]
-	m["SwarmHostKey"] = leaderElectionPath
 	m["ConsulPort"] = sys.ConsulPort
-	m["ConsulUserAgent"] = "1.23"
+
+	// swarm
+	m["SwarmUserAgent"] = version.VERSION
+	m["SwarmHostKey"] = leaderElectionPath
 
 	// _User_Check Role
 
