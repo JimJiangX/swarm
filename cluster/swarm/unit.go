@@ -82,7 +82,7 @@ func (u *unit) factory() error {
 	} else {
 		image, err := database.GetImageByID(u.ImageID)
 		if err != nil {
-			return errors.Wrapf(err, "Not Found Unit %s Image:%s %s", u.Name, u.ImageName, u.ImageID)
+			return errors.Wrapf(err, "Not Found Unit %s Image:(%s %s)", u.Name, u.ImageName, u.ImageID)
 		}
 
 		name, version = image.Name, image.Version
@@ -96,7 +96,7 @@ func (u *unit) factory() error {
 	if u.parent != nil && parser != nil {
 		_, err := parser.ParseData([]byte(u.parent.Content))
 		if err != nil {
-			logrus.Errorf("Unit %s ParseData error:%s", u.Name, err)
+			logrus.WithField("Unit", u.Name).Errorf("parser ParseData Error:%s", err)
 		}
 	}
 
@@ -191,7 +191,7 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 	if u.engine == nil && u.EngineID != "" {
 		_, node, err := gd.GetNode(u.EngineID)
 		if err != nil {
-			logrus.Errorf("Not Found Node %s,Error:%s", u.EngineID, err)
+			logrus.WithField("Engine", u.EngineID).Errorf("Not Found Node Error:%s", err)
 		} else if node != nil && node.engine != nil {
 			u.engine = node.engine
 		}
@@ -199,30 +199,35 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 
 	if u.ConfigID != "" {
 		config, err := database.GetUnitConfigByID(u.ConfigID)
-		if err == nil {
-			u.parent = config
-		} else {
-			logrus.Errorf("Cannot Query unit Parent Config By ConfigID %s,Error:%s", u.ConfigID, err)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"Unit":     u.Name,
+				"ConfigID": u.ConfigID,
+			}).Errorf("Get UnitConfig By ConfigID Error:%s", err)
 		}
+		u.parent = config
 	}
 
 	ports, err := database.ListPortsByUnit(u.ID)
 	if err == nil {
 		u.ports = ports
 	} else {
-		logrus.Errorf("Cannot Query unit ports By UnitID %s,Error:%s", u.ID, err)
+		logrus.WithField("Unit", u.ID).Errorf("List Ports By UnitID Error:%s", err)
 	}
 
 	u.networkings, err = u.getNetworkings()
 	if err != nil {
-		logrus.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err)
+		logrus.WithError(err).Error("Get Unit Networkings")
 	}
 
-	if err := u.factory(); err != nil {
-		return u, err
-	}
+	err = u.factory()
 
-	return u, nil
+	logrus.WithFields(logrus.Fields{
+		"Name":      table.Name,
+		"Container": table.ContainerID,
+	}).Debugf("rebuild Unit:%s", err)
+
+	return u, err
 }
 
 func (u *unit) getNetworkings() ([]IPInfo, error) {
@@ -231,7 +236,7 @@ func (u *unit) getNetworkings() ([]IPInfo, error) {
 	}
 	networkings, err := getIPInfoByUnitID(u.ID, u.engine)
 	if err != nil {
-		return nil, fmt.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err)
+		return nil, errors.Errorf("Get Unit Networkings By UnitID:%s Error:%s", u.ID, err)
 	}
 
 	u.networkings = networkings

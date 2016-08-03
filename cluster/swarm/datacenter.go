@@ -413,7 +413,7 @@ func (gd *Gardener) GetEngine(nameOrID string) (*cluster.Engine, error) {
 		return eng, nil
 	}
 
-	return nil, fmt.Errorf("Not Found Engine %s", nameOrID)
+	return nil, errors.Errorf("Not Found Engine %s", nameOrID)
 }
 
 func (gd *Gardener) RemoveNode(nameOrID, user, password string) error {
@@ -562,11 +562,11 @@ func (gd *Gardener) rebuildDatacenters() error {
 }
 
 func (gd *Gardener) rebuildDatacenter(nameOrID string) (*Datacenter, error) {
-	logrus.Debugf("rebuild Datacenter:%s", nameOrID)
+	logrus.WithField("nameOrID", nameOrID).Debug("rebuild Datacenter")
 
 	cl, err := database.GetCluster(nameOrID)
 	if err != nil {
-		return nil, fmt.Errorf("Not Found %s,Error %s", nameOrID, err)
+		return nil, err
 	}
 
 	var storage store.Store
@@ -586,14 +586,14 @@ func (gd *Gardener) rebuildDatacenter(nameOrID string) (*Datacenter, error) {
 
 	nodes, err := database.ListNodeByCluster(cl.ID)
 	if err != nil {
-		return dc, fmt.Errorf("List Node By Cluster error:%s", err)
+		return dc, err
 	}
 
 	out := make([]*Node, 0, len(nodes))
 	for n := range nodes {
 		node, err := gd.rebuildNode(*nodes[n])
 		if err != nil {
-			logrus.Errorf("rebuildNode %s error:%s", nodes[n].Name, err)
+			logrus.WithError(err).Error("rebuild Node:", nodes[n])
 			continue
 		}
 		out = append(out, node)
@@ -607,14 +607,18 @@ func (gd *Gardener) rebuildDatacenter(nameOrID string) (*Datacenter, error) {
 }
 
 func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
-	logrus.Debugf("rebuild Node,name=%s,addr=%s", n.Name, n.Addr)
-
 	eng, err := gd.GetEngine(n.EngineID)
 
 	node := &Node{
 		Node:   &n,
 		engine: eng,
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"Name": n.Name,
+		"Addr": n.Addr,
+	}).Debug("rebuild Node")
+
 	if err != nil {
 		return node, err
 	}

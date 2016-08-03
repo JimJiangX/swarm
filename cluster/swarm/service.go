@@ -570,7 +570,7 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	if len(service.Description) > 0 {
 		err := json.Unmarshal([]byte(service.Description), base)
 		if err != nil {
-			logrus.Warnf("JSON Unmarshal Service.Description Error:%s,Description:%s", err, service.Description)
+			logrus.WithError(err).Warn("JSON Unmarshal Service.Description")
 		}
 	}
 
@@ -593,12 +593,13 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	}
 	authConfig, err := gd.RegistryAuthConfig()
 	if err != nil {
-		logrus.Errorf("Registry Auth Config Error:%s", err)
+		logrus.WithError(err).Error("Registry Auth Config")
 		return nil, err
 	}
 	users, err := database.ListUsersByService(service.ID, "")
 	if err != nil {
 		logrus.Errorf("List Users By Service %s,error:%s", service.ID, err)
+		logrus.WithField("Service", service.ID).Errorf("List Users By Service Error:%s", err)
 	}
 
 	svc := NewService(service, len(units))
@@ -633,6 +634,8 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 		gd.services = append(gd.services, svc)
 	}
 	gd.Unlock()
+
+	logrus.WithField("NameOrID", nameOrID).Debug("rebuild Service")
 
 	return svc, nil
 }
