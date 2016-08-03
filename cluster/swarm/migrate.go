@@ -344,6 +344,12 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
+		logrus.WithFields(logrus.Fields{
+			"Engine":    engine.Addr,
+			"Container": container.Names,
+			"NewName":   u.Name,
+		}).Debug("RenameContainer")
+
 		u.container = container
 		u.ContainerID = container.ID
 		u.config = container.Config

@@ -245,7 +245,7 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 			logrus.Errorf("%s add user error:%s", addr, err)
 			return 0, err
 		}
-		logrus.Debugf("Add User:", swmUsers[i].UserName)
+		logrus.Debug("Add User:", swmUsers[i].UserName)
 	}
 
 	swmUsers = converteToSWM_Users(update)
@@ -255,7 +255,7 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 			logrus.Errorf("%s update user error:%s", addr, err)
 			return 0, err
 		}
-		logrus.Debugf("Update User:", swmUsers[i].UserName)
+		logrus.Debug("Update User:", swmUsers[i].UserName)
 	}
 
 	err = database.TxUpdateUsers(addition, update)
