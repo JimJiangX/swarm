@@ -1032,7 +1032,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 		}
 	}
 
-	template := [...]string{"mysql", "-u%s", "-p%s", "-S", "/DBAASDAT/upsql.sock", "-e", "'SET GLOBAL %s = %v;'"}
+	template := [...]string{"mysql", "-u%s", "-p%s", "-S", "/DBAASDAT/upsql.sock", "-e", "SET GLOBAL %s = %v;"}
 	template[1] = fmt.Sprintf(template[1], dba.Username)
 	template[2] = fmt.Sprintf(template[2], dba.Password)
 	const length, last = len(template), len(template) - 1
@@ -1123,8 +1123,8 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 			}
 			if err != nil {
 				logrus.Error(err)
+				return err
 			}
-			return err
 		}
 	}
 
