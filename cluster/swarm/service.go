@@ -1969,7 +1969,7 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config,
 		logrus.Errorf("%s deregister In consul error:%s", svc.Name, err)
 	}
 
-	err = deleteConsulKV(config, svc.ID)
+	err = deleteConsulKVTree(config, svc.ID)
 	if err != nil {
 		logrus.Errorf("Delete Consul KV:%s,%s", svc.ID, err)
 	}
