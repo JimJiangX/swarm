@@ -133,17 +133,35 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 	svc.RLock()
 
-	index, module := 0, structs.Module{}
+	u, err := svc.getUnit(table.ID)
+	if u == nil || err != nil {
+		svc.RUnlock()
+
+		logrus.Warn(err)
+		svc, err = gd.rebuildService(table.ServiceID)
+		if err != nil {
+			return "", err
+		}
+
+		svc.RLock()
+
+		u, err = svc.getUnit(table.ID)
+		if u == nil || err != nil {
+			logrus.Error(err)
+			svc.RUnlock()
+
+			return "", err
+		}
+	}
+
+	oldContainer := u.container
+
 	filters := make([]string, len(svc.units))
 	for i, u := range svc.units {
 		filters[i] = u.EngineID
-		if u.ID == table.ID {
-			index = i
-		}
 	}
-	u := svc.units[index]
-	oldContainer := u.container
 
+	module := structs.Module{}
 	san := false
 	for i := range svc.base.Modules {
 		if u.Type == svc.base.Modules[i].Type {
@@ -685,17 +703,35 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 	svc.RLock()
 
-	index, module := 0, structs.Module{}
+	u, err := svc.getUnit(table.ID)
+	if u == nil || err != nil {
+		svc.RUnlock()
+
+		logrus.Warn(err)
+		svc, err = gd.rebuildService(table.ServiceID)
+		if err != nil {
+			return "", err
+		}
+
+		svc.RLock()
+
+		u, err = svc.getUnit(table.ID)
+		if u == nil || err != nil {
+			logrus.Error(err)
+			svc.RUnlock()
+
+			return "", err
+		}
+	}
+
+	oldContainer := u.container
+
 	filters := make([]string, len(svc.units))
 	for i, u := range svc.units {
 		filters[i] = u.EngineID
-		if u.ID == table.ID {
-			index = i
-		}
 	}
-	u := svc.units[index]
-	oldContainer := u.container
 
+	module := structs.Module{}
 	for i := range svc.base.Modules {
 		if u.Type == svc.base.Modules[i].Type {
 			module = svc.base.Modules[i]
