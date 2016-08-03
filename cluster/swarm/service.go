@@ -1098,7 +1098,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 			return err
 		}
 
-		key = strings.Replace(key, "_", "-", -1)
+		key = strings.Replace(key, "-", "_", -1)
 
 		cmds[last] = fmt.Sprintf(cmds[last], key, val)
 		cmdList = append(cmdList, cmds)
