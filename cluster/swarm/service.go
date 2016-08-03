@@ -245,6 +245,7 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 			logrus.Errorf("%s add user error:%s", addr, err)
 			return 0, err
 		}
+		logrus.Debugf("Add User:", swmUsers[i].UserName)
 	}
 
 	swmUsers = converteToSWM_Users(update)
@@ -254,6 +255,7 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 			logrus.Errorf("%s update user error:%s", addr, err)
 			return 0, err
 		}
+		logrus.Debugf("Update User:", swmUsers[i].UserName)
 	}
 
 	err = database.TxUpdateUsers(addition, update)
@@ -412,6 +414,7 @@ func converteToUsers(service string, users []structs.User) []database.User {
 			users[i].Type = _User_Type_Proxy
 
 		default:
+			logrus.WithField("Service", service).Warnf("skip:%s Role='%s'", users[i].Username, users[i].Type)
 			continue
 		}
 
@@ -432,6 +435,7 @@ func converteToUsers(service string, users []structs.User) []database.User {
 			users[i].Role = _User_Application
 
 		default:
+			logrus.WithField("Service", service).Warnf("skip:%s Role='%s'", users[i].Username, users[i].Role)
 			continue
 		}
 
@@ -469,6 +473,7 @@ func converteToSWM_Users(users []database.User) []swm_structs.User {
 			users[i].Type = _User_Type_Proxy
 
 		default:
+			logrus.WithField("Service", users[i].ServiceID).Warnf("skip:%s Type='%s'", users[i].Username, users[i].Type)
 			continue
 		}
 
@@ -485,6 +490,7 @@ func converteToSWM_Users(users []database.User) []swm_structs.User {
 			users[i].Role = _User_Application
 
 		default:
+			logrus.WithField("Service", users[i].ServiceID).Warnf("skip:%s Role='%s'", users[i].Username, users[i].Role)
 			continue
 		}
 
