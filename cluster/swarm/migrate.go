@@ -279,7 +279,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		swarmID := gd.generateUniqueID()
 		config.SetSwarmID(swarmID)
 		pending.pendingContainer = &pendingContainer{
-			Name:   u.Name,
+			Name:   swarmID,
 			Config: config,
 			Engine: engine,
 		}
@@ -307,7 +307,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 				return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
 			}
 		}
-		container, err := engine.CreateContainer(config, u.Name, true, svc.authConfig)
+		container, err := engine.CreateContainer(config, swarmID, true, svc.authConfig)
 		if err != nil {
 			return err
 		}
@@ -346,9 +346,9 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		logrus.WithFields(logrus.Fields{
 			"Engine":    engine.Addr,
-			"Container": container.Names,
-			"NewName":   u.Name,
-		}).Debug("RenameContainer")
+			"Container": container.ID,
+			"NewName":   container.Names,
+		}).Debug("Rename Container")
 
 		u.container = container
 		u.ContainerID = container.ID
