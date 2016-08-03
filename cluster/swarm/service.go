@@ -1034,7 +1034,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 
 	template := [...]string{"mysql", "-u%s", "-p%s", "-S", "/DBAASDAT/upsql.sock", "-e", "SET GLOBAL %s = %v;"}
 	template[1] = fmt.Sprintf(template[1], dba.Username)
-	template[2] = fmt.Sprintf(template[1], dba.Password)
+	template[2] = fmt.Sprintf(template[2], dba.Password)
 	const length, last = len(template), len(template) - 1
 
 	copyContent := u.parent.Content
@@ -1051,6 +1051,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 		for _, u := range cmdRollback {
 			engine, _err := u.Engine()
 			if _err != nil {
+				logrus.Error(u.Name, _err)
 				continue
 			}
 
@@ -1061,7 +1062,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 					_err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, originalCmds[i], inspect.ExitCode, inspect, err)
 				}
 				if _err != nil {
-					logrus.Error(_err)
+					logrus.Errorf("Rollback:%s", _err)
 				}
 			}
 
@@ -1070,7 +1071,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 
 				_err := u.CopyConfig(nil)
 				if _err != nil {
-					logrus.Error(err)
+					logrus.Errorf("ConfigFile Rollback:%s", err)
 				}
 			}
 		}
@@ -1085,6 +1086,12 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 		oldValue := configer.String(key)
 		cmds := template
 		old := template
+		parts := strings.SplitAfterN(key, "::", 2)
+		if len(parts) == 2 {
+			key = parts[1]
+		} else if len(parts) == 1 {
+			key = parts[0]
+		}
 
 		err = configer.Set(key, fmt.Sprintf("%v", val))
 		if err != nil {
