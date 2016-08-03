@@ -223,7 +223,7 @@ func registerHealthCheck(u *unit, config database.ConsulConfig, context *Service
 	if u.Type == _UpsqlType {
 		swm := context.getSwithManagerUnit()
 		if swm != nil {
-			check.Tags = []string{fmt.Sprintf("swm_key=%s/%s/topology", context.ID, swm.Name)}
+			check.Tags = []string{fmt.Sprintf("swm_key=%s/%s/Topology", context.ID, swm.Name)}
 		}
 	}
 
