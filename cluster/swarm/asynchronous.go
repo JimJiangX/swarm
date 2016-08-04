@@ -2,6 +2,8 @@ package swarm
 
 import (
 	"bytes"
+	"fmt"
+	"runtime/debug"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -24,6 +26,11 @@ func GoConcurrency(funcs []func() error) error {
 
 	for i := range funcs {
 		go func(f func() error) {
+			defer func() {
+				if r := recover(); r != nil {
+					logrus.Errorf("GoConcurrency Panic:%v\n%s", r, string(debug.Stack()))
+				}
+			}()
 			ch <- f()
 		}(funcs[i])
 	}
@@ -130,7 +137,7 @@ func (t *asyncTask) Run() error {
 	case <-t.parent.Done():
 
 		if t.update != nil {
-			code, msg := _StatusTaskCancel, "Task Cancel by Parent Context"
+			code, msg := statusTaskCancel, "Task Cancel by Parent Context"
 			if t.parent.Err() != nil {
 				msg = t.parent.Err().Error()
 			}
@@ -159,9 +166,22 @@ func (t *asyncTask) Run() error {
 	t.cancel = cancel
 
 	go func(ctx context.Context, t *asyncTask) {
-		defer t.cancel()
+		defer func() {
+			if r := recover(); r != nil {
+				logrus.Errorf("asyncTask panic:%v\n%s", r, string(debug.Stack()))
 
-		msg, code := "", _StatusTaskRunning
+				if t.update != nil {
+					code, msg := statusTaskFailed, fmt.Sprintf("panic:%v", r)
+					err := t.update(code, msg)
+					if err != nil {
+						logrus.Errorf("Update Error:%s,Code=%d,message=%s", err, code, msg)
+					}
+				}
+			}
+			t.cancel()
+		}()
+
+		msg, code := "", statusTaskRunning
 		if t.update != nil {
 			if err := t.update(code, msg); err != nil {
 				logrus.Errorf("asyncTask.update error:%s", err)
@@ -172,9 +192,9 @@ func (t *asyncTask) Run() error {
 
 		err := t.background(ctx)
 		if err == nil {
-			code = _StatusTaskDone
+			code = statusTaskDone
 		} else {
-			code = _StatusTaskFailed
+			code = statusTaskFailed
 			msg = err.Error()
 		}
 
@@ -185,10 +205,10 @@ func (t *asyncTask) Run() error {
 			if err := ctx.Err(); err != nil {
 				if err == context.DeadlineExceeded {
 					msg = "Timeout " + msg
-					code = _StatusTaskTimeout
+					code = statusTaskTimeout
 				} else if err == context.Canceled {
 					msg = "Canceled " + msg
-					code = _StatusTaskCancel
+					code = statusTaskCancel
 				}
 			}
 		default:
