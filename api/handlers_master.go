@@ -1768,7 +1768,7 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err := gd.ServiceScaleTask(name, req)
+	err := gd.ServiceScale(name, req)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return

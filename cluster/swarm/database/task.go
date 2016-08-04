@@ -163,7 +163,7 @@ func TxInsertMultiTask(tx *sqlx.Tx, tasks []*Task) error {
 	return stmt.Close()
 }
 
-func TxUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int64, finish time.Time, msg string) error {
+func txUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int64, finish time.Time, msg string) error {
 	query := "UPDATE tb_task SET status=?,finished_at=?,errors=? WHERE id=?"
 
 	if finish.IsZero() {
@@ -202,7 +202,7 @@ func TxBackupTaskDone(task *Task, state int64, backupFile BackupFile) error {
 		return err
 	}
 
-	err = TxUpdateTaskStatus(tx, task, state, time.Now(), "")
+	err = txUpdateTaskStatus(tx, task, state, time.Now(), "")
 	if err != nil {
 		return err
 	}

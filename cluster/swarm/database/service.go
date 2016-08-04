@@ -190,6 +190,26 @@ func (u *Unit) StatusCAS(operator string, old, value int64) error {
 	return errors.Errorf("Forbid To Set Unit Status")
 }
 
+func TxUpdateUnitAndInsertTask(unit *Unit, task Task) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = txUpdateUnitStatus(tx, unit, unit.Status, unit.LatestError)
+	if err != nil {
+		return err
+	}
+
+	err = TxInsertTask(tx, task)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func TxUpdateUnitStatus(unit *Unit, status int64, msg string) error {
 	tx, err := GetTX()
 	if err != nil {
@@ -198,6 +218,26 @@ func TxUpdateUnitStatus(unit *Unit, status int64, msg string) error {
 	defer tx.Rollback()
 
 	err = txUpdateUnitStatus(tx, unit, status, msg)
+
+	return tx.Commit()
+}
+
+func TxUpdateUnitStatusWithTask(unit *Unit, task *Task, msg string) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = txUpdateUnitStatus(tx, unit, unit.Status, unit.LatestError)
+	if err != nil {
+		return err
+	}
+
+	err = txUpdateTaskStatus(tx, task, task.Status, time.Now(), msg)
+	if err != nil {
+		return err
+	}
 
 	return tx.Commit()
 }
@@ -430,7 +470,7 @@ func TxSetServiceStatus(svc *Service, task *Task, state, tstate int64, finish ti
 		}
 	}
 
-	err = TxUpdateTaskStatus(tx, task, tstate, finish, msg)
+	err = txUpdateTaskStatus(tx, task, tstate, finish, msg)
 	if err != nil {
 		return err
 	}

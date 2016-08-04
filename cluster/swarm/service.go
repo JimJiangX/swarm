@@ -70,7 +70,7 @@ func buildService(req structs.PostServiceRequest,
 		AutoHealing:          req.AutoHealing,
 		AutoScaling:          req.AutoScaling,
 		HighAvailable:        req.HighAvailable,
-		Status:               _StatusServiceInit,
+		Status:               statusServiceInit,
 		BackupMaxSizeByte:    req.BackupMaxSize,
 		BackupFilesRetention: req.BackupRetention,
 		CreatedAt:            time.Now(),
@@ -102,7 +102,7 @@ func buildService(req structs.PostServiceRequest,
 	service.base = &req
 	service.authConfig = authConfig
 	service.users = users
-	atomic.StoreInt64(&svc.Status, _StatusServcieBuilding)
+	atomic.StoreInt64(&svc.Status, statusServcieBuilding)
 
 	task := database.NewTask(_Service_Create_Task, service.ID, "create service", nil, 0)
 
@@ -714,11 +714,11 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 }
 
 func (svc *Service) StartService() (err error) {
-	err = svc.statusCAS(_StatusServiceNoContent, _StatusServiceStarting)
+	err = svc.statusCAS(statusServiceNoContent, statusServiceStarting)
 	if err != nil {
 		logrus.Warning(err)
 
-		err = svc.statusCAS(_StatusServiceStartFailed, _StatusServiceStarting)
+		err = svc.statusCAS(statusServiceStartFailed, statusServiceStarting)
 		if err != nil {
 			logrus.Error(err)
 
@@ -729,9 +729,9 @@ func (svc *Service) StartService() (err error) {
 	svc.Lock()
 	defer func() {
 		if err != nil {
-			svc.SetServiceStatus(_StatusServiceStartFailed, time.Now())
+			svc.SetServiceStatus(statusServiceStartFailed, time.Now())
 		} else {
-			svc.SetServiceStatus(_StatusServiceNoContent, time.Now())
+			svc.SetServiceStatus(statusServiceNoContent, time.Now())
 		}
 		svc.Unlock()
 	}()
@@ -846,11 +846,11 @@ func (svc *Service) stopContainers(timeout int) error {
 }
 
 func (svc *Service) StopService() (err error) {
-	err = svc.statusCAS(_StatusServiceNoContent, _statusServiceStoping)
+	err = svc.statusCAS(statusServiceNoContent, statusServiceStoping)
 	if err != nil {
 		logrus.Warning(err)
 
-		err = svc.statusCAS(_statusServiceStopFailed, _statusServiceStoping)
+		err = svc.statusCAS(statusServiceStopFailed, statusServiceStoping)
 		if err != nil {
 			logrus.Error(err)
 
@@ -861,9 +861,9 @@ func (svc *Service) StopService() (err error) {
 	svc.Lock()
 	defer func() {
 		if err != nil {
-			svc.SetServiceStatus(_statusServiceStopFailed, time.Now())
+			svc.SetServiceStatus(statusServiceStopFailed, time.Now())
 		} else {
-			svc.SetServiceStatus(_StatusServiceNoContent, time.Now())
+			svc.SetServiceStatus(statusServiceNoContent, time.Now())
 		}
 		svc.Unlock()
 	}()
@@ -934,7 +934,7 @@ func (svc *Service) stopService() error {
 
 func (svc *Service) RemoveContainers(force, rmVolumes bool) error {
 	if !force {
-		err := svc.checkStatus(_StatusServiceNoContent)
+		err := svc.checkStatus(statusServiceNoContent)
 		if err != nil {
 			return err
 		}
@@ -959,6 +959,9 @@ func (svc *Service) RemoveContainers(force, rmVolumes bool) error {
 func (svc *Service) removeContainers(force, rmVolumes bool) error {
 	logrus.Debug(svc.Name, " remove Containers")
 	for _, u := range svc.units {
+
+		atomic.StoreInt64(&u.Status, statusUnitDeleting)
+
 		logrus.Debug(u.Name, " remove Container")
 		err := u.removeContainer(force, rmVolumes)
 		if err != nil {
@@ -1578,7 +1581,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 	}
 
 	task := database.NewTask(_Backup_Manual_Task, backup.ID, "", nil, strategy.Timeout)
-	task.Status = _StatusTaskCreate
+	task.Status = statusTaskCreate
 	err = database.TxInsertBackupStrategyAndTask(strategy, task)
 	if err != nil {
 		logrus.Errorf("TxInsert BackupStrategy And Task Erorr:%s", err)
@@ -1586,9 +1589,14 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 	}
 
 	go backupTask(master, &task, strategy, func() error {
-		err := smlib.UnLock(addr, port)
-		if err != nil {
-			logrus.Errorf("switch_manager %s:%d Unlock Error:%s", addr, port, err)
+		var err error
+		if r := recover(); r != nil {
+			err = errors.Errorf("%v", r)
+		}
+		_err := smlib.UnLock(addr, port)
+		if _err != nil {
+			logrus.Errorf("switch_manager %s:%d Unlock Error:%s", addr, port, _err)
+			err = errors.Errorf("%s,%s", err, _err)
 		}
 
 		return err
@@ -1606,7 +1614,7 @@ type pendingContainerUpdate struct {
 	config      container.UpdateConfig
 }
 
-func (gd *Gardener) ServiceScaleTask(name string, scale structs.PostServiceScaledRequest) error {
+func (gd *Gardener) ServiceScale(name string, scale structs.PostServiceScaledRequest) error {
 	svc, err := gd.GetService(name)
 	if err != nil {
 		return err

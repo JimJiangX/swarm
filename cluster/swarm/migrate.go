@@ -133,8 +133,8 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 	svc.RLock()
 
-	u, err := svc.getUnit(table.ID)
-	if u == nil || err != nil {
+	migrate, err := svc.getUnit(table.ID)
+	if migrate == nil || err != nil {
 		svc.RUnlock()
 
 		logrus.Warn(err)
@@ -145,8 +145,8 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		svc.RLock()
 
-		u, err = svc.getUnit(table.ID)
-		if u == nil || err != nil {
+		migrate, err = svc.getUnit(table.ID)
+		if migrate == nil || err != nil {
 			logrus.Error(err)
 			svc.RUnlock()
 
@@ -154,7 +154,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}
 	}
 
-	oldContainer := u.container
+	oldContainer := migrate.container
 
 	filters := make([]string, len(svc.units))
 	for i, u := range svc.units {
@@ -164,7 +164,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 	module := structs.Module{}
 	san := false
 	for i := range svc.base.Modules {
-		if u.Type == svc.base.Modules[i].Type {
+		if migrate.Type == svc.base.Modules[i].Type {
 			module = svc.base.Modules[i]
 			for s := range module.Stores {
 				if strings.ToUpper(module.Stores[s].Type) == "SAN" {
@@ -177,11 +177,11 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 	svc.RUnlock()
 
-	if !san && u.Type == _UpsqlType {
+	if !san && migrate.Type == _UpsqlType {
 		return "", errors.Errorf("Unit %s storage hasn't SAN Storage,Cannot Exec Migrate", nameOrID)
 	}
 
-	dc, original, err := gd.GetNode(u.EngineID)
+	dc, original, err := gd.GetNode(migrate.EngineID)
 	if err != nil || dc == nil {
 		return "", err
 	}
@@ -192,7 +192,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 	}
 	logrus.Debugf("listCandidates:%d", len(out))
 
-	config, err := resetContainerConfig(u.container.Config, hostConfig)
+	config, err := resetContainerConfig(migrate.container.Config, hostConfig)
 	if err != nil {
 		return "", err
 	}
@@ -213,6 +213,12 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		gd.scheduler.Lock()
 
 		defer func() {
+			if err == nil {
+				migrate.Status, migrate.LatestError = statusUnitMigrated, ""
+			} else {
+				migrate.Status, migrate.LatestError = statusUnitMigrateFailed, err.Error()
+			}
+
 			gd.scheduler.Unlock()
 			if err != nil {
 				logrus.Error(err)
@@ -226,7 +232,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			svc.Unlock()
 		}()
 
-		networkings, err := getIPInfoByUnitID(u.ID, engine)
+		networkings, err := getIPInfoByUnitID(migrate.ID, engine)
 		if err != nil {
 			return err
 		}
@@ -238,19 +244,19 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}
 		config.HostConfig.CpusetCpus = cpuset
 
-		if u.Type != _SwitchManagerType {
-			err := svc.isolate(u.Name)
+		if migrate.Type != _SwitchManagerType {
+			err := svc.isolate(migrate.Name)
 			if err != nil {
-				logrus.Errorf("isolate container %s error:%s", u.Name, err)
+				logrus.Errorf("isolate container %s error:%s", migrate.Name, err)
 			}
 		}
 
-		err = stopOldContainer(svc, u)
+		err = stopOldContainer(svc, migrate)
 		if err != nil {
 			return err
 		}
 
-		oldLVs, lunMap, lunSlice, err := listOldVolumes(u.ID)
+		oldLVs, lunMap, lunSlice, err := listOldVolumes(migrate.ID)
 		if err != nil {
 			return err
 		}
@@ -286,7 +292,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			}
 		}()
 
-		pending.unit = u
+		pending.unit = migrate
 		pending.engine = engine
 
 		err = gd.allocStorage(pending, engine, config, module.Stores, true)
@@ -344,18 +350,18 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			}
 			err = removeNetworkings(addr, networkings)
 			if err != nil {
-				logrus.Errorf("container %s remove Networkings error:%s", u.Name, err)
+				logrus.Errorf("container %s remove Networkings error:%s", migrate.Name, err)
 			}
 		}(container, engine.IP, networkings, pending.localStore)
 
-		err = startUnit(engine, container.ID, u, networkings, lvs)
+		err = startUnit(engine, container.ID, migrate, networkings, lvs)
 		delete(gd.pendingContainers, swarmID)
 
 		if err != nil {
 			return err
 		}
 
-		err = engine.RenameContainer(container, u.Name)
+		err = engine.RenameContainer(container, migrate.Name)
 		if err != nil {
 			logrus.Error(err)
 
@@ -368,15 +374,15 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			"NewName":   container.Names,
 		}).Debug("Rename Container")
 
-		u.container = container
-		u.ContainerID = container.ID
-		u.config = container.Config
-		u.engine = engine
-		u.EngineID = engine.ID
-		u.networkings = networkings
-		u.CreatedAt = time.Now()
+		migrate.container = container
+		migrate.ContainerID = container.ID
+		migrate.config = container.Config
+		migrate.engine = engine
+		migrate.EngineID = engine.ID
+		migrate.networkings = networkings
+		migrate.CreatedAt = time.Now()
 
-		err = updateUnit(u.Unit, oldLVs, false)
+		err = updateUnit(migrate.Unit, oldLVs, false)
 		if err != nil {
 			logrus.Errorf("updateUnit in database error:%s", err)
 
@@ -395,19 +401,19 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			logrus.Error(err)
 		}
 
-		err = deregisterToServices(oldEngineIP, u.ID, sys)
+		err = deregisterToServices(oldEngineIP, migrate.ID, sys)
 		if err != nil {
 			logrus.Error(err)
 		}
 
-		err = registerToServers(u, svc, sys)
+		err = registerToServers(migrate, svc, sys)
 		if err != nil {
 			logrus.Errorf("registerToServers error:%s", err)
 		}
 
-		if u.Type != _SwitchManagerType {
+		if migrate.Type != _SwitchManagerType {
 			// switchback unit
-			err = svc.switchBack(u.Name)
+			err = svc.switchBack(migrate.Name)
 			if err != nil {
 				logrus.Errorf("switchBack error:%s", err)
 			}
@@ -416,9 +422,21 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		return nil
 	}
 
-	task := database.NewTask(_Unit_Migrate_Task, u.ID, "", nil, 0)
+	task := database.NewTask(_Unit_Migrate_Task, migrate.ID, "", nil, 0)
 
-	t := NewAsyncTask(context.Background(), background, task.Insert, task.UpdateStatus, 0)
+	create := func() error {
+		migrate.Status, migrate.LatestError = statusUnitMigrating, ""
+
+		return database.TxUpdateUnitAndInsertTask(&migrate.Unit, task)
+	}
+
+	update := func(code int, msg string) error {
+		task.Status = int64(code)
+
+		return database.TxUpdateUnitStatusWithTask(&migrate.Unit, &task, msg)
+	}
+
+	t := NewAsyncTask(context.Background(), background, create, update, 0)
 
 	return task.ID, t.Run()
 }
@@ -703,8 +721,8 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 	svc.RLock()
 
-	u, err := svc.getUnit(table.ID)
-	if u == nil || err != nil {
+	rebuild, err := svc.getUnit(table.ID)
+	if rebuild == nil || err != nil {
 		svc.RUnlock()
 
 		logrus.Warn(err)
@@ -715,8 +733,8 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 		svc.RLock()
 
-		u, err = svc.getUnit(table.ID)
-		if u == nil || err != nil {
+		rebuild, err = svc.getUnit(table.ID)
+		if rebuild == nil || err != nil {
 			logrus.Error(err)
 			svc.RUnlock()
 
@@ -724,7 +742,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		}
 	}
 
-	oldContainer := u.container
+	oldContainer := rebuild.container
 
 	filters := make([]string, len(svc.units))
 	for i, u := range svc.units {
@@ -733,7 +751,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 	module := structs.Module{}
 	for i := range svc.base.Modules {
-		if u.Type == svc.base.Modules[i].Type {
+		if rebuild.Type == svc.base.Modules[i].Type {
 			module = svc.base.Modules[i]
 			break
 		}
@@ -741,7 +759,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 	svc.RUnlock()
 
-	dc, original, err := gd.GetNode(u.EngineID)
+	dc, original, err := gd.GetNode(rebuild.EngineID)
 	if err != nil || dc == nil {
 		return "", err
 	}
@@ -752,7 +770,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 	}
 	logrus.Debugf("listCandidates:%d", len(out))
 
-	config, err := resetContainerConfig(u.container.Config, hostConfig)
+	config, err := resetContainerConfig(rebuild.container.Config, hostConfig)
 	if err != nil {
 		return "", err
 	}
@@ -774,6 +792,12 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		gd.scheduler.Lock()
 
 		defer func() {
+			if err == nil {
+				rebuild.Status, rebuild.LatestError = statusUnitRebuilt, ""
+			} else {
+				rebuild.Status, rebuild.LatestError = statusUnitRebuildFailed, err.Error()
+			}
+
 			gd.scheduler.Unlock()
 			if err != nil {
 				logrus.Error(err)
@@ -787,7 +811,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			svc.Unlock()
 		}()
 
-		networkings, err := getIPInfoByUnitID(u.ID, engine)
+		networkings, err := getIPInfoByUnitID(rebuild.ID, engine)
 		if err != nil {
 			return err
 		}
@@ -799,7 +823,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		}
 		config.HostConfig.CpusetCpus = cpuset
 
-		oldLVs, lunMap, lunSlice, err := listOldVolumes(u.ID)
+		oldLVs, lunMap, lunSlice, err := listOldVolumes(rebuild.ID)
 		if err != nil {
 			return err
 		}
@@ -845,7 +869,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			}
 		}()
 
-		pending.unit = u
+		pending.unit = rebuild
 		pending.engine = engine
 
 		err = gd.allocStorage(pending, engine, config, module.Stores, false)
@@ -898,45 +922,45 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			}
 			err = removeNetworkings(addr, networkings)
 			if err != nil {
-				logrus.Errorf("container %s remove Networkings error:%s", u.Name, err)
+				logrus.Errorf("container %s remove Networkings error:%s", rebuild.Name, err)
 			}
 
 		}(container, engine.IP, networkings, pending.localStore)
 
-		err = startUnit(engine, container.ID, u, networkings, pending.localStore)
+		err = startUnit(engine, container.ID, rebuild, networkings, pending.localStore)
 		if err != nil {
 			return err
 		}
 
-		if u.Type != _SwitchManagerType {
-			err := svc.isolate(u.Name)
+		if rebuild.Type != _SwitchManagerType {
+			err := svc.isolate(rebuild.Name)
 			if err != nil {
-				logrus.Errorf("isolate container %s error:%s", u.Name, err)
+				logrus.Errorf("isolate container %s error:%s", rebuild.Name, err)
 			}
 		}
 
-		err = stopOldContainer(svc, u)
+		err = stopOldContainer(svc, rebuild)
 		if err != nil {
 			logrus.Error(err)
 			// return err
 		}
 
-		err = engine.RenameContainer(container, u.Name)
+		err = engine.RenameContainer(container, rebuild.Name)
 		if err != nil {
 			logrus.Error(err)
 
 			return err
 		}
 
-		u.container = container
-		u.ContainerID = container.ID
-		u.config = container.Config
-		u.engine = engine
-		u.EngineID = engine.ID
-		u.networkings = networkings
-		u.CreatedAt = time.Now()
+		rebuild.container = container
+		rebuild.ContainerID = container.ID
+		rebuild.config = container.Config
+		rebuild.engine = engine
+		rebuild.EngineID = engine.ID
+		rebuild.networkings = networkings
+		rebuild.CreatedAt = time.Now()
 
-		err = updateUnit(u.Unit, oldLVs, true)
+		err = updateUnit(rebuild.Unit, oldLVs, true)
 		if err != nil {
 			logrus.Errorf("updateUnit in database error:%s", err)
 			return err
@@ -954,19 +978,19 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			logrus.Error(err)
 		}
 
-		err = deregisterToServices(oldEngineIP, u.ID, sys)
+		err = deregisterToServices(oldEngineIP, rebuild.ID, sys)
 		if err != nil {
 			logrus.Error(err)
 		}
 
-		err = registerToServers(u, svc, sys)
+		err = registerToServers(rebuild, svc, sys)
 		if err != nil {
 			logrus.Errorf("registerToServers error:%s", err)
 		}
 
-		if u.Type != _SwitchManagerType {
+		if rebuild.Type != _SwitchManagerType {
 			// switchback unit
-			err = svc.switchBack(u.Name)
+			err = svc.switchBack(rebuild.Name)
 			if err != nil {
 				logrus.Errorf("switchBack error:%s", err)
 			}
@@ -975,9 +999,21 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		return nil
 	}
 
-	task := database.NewTask(_Unit_Rebuild_Task, u.ID, "", nil, 0)
+	task := database.NewTask(_Unit_Rebuild_Task, rebuild.ID, "", nil, 0)
 
-	t := NewAsyncTask(context.Background(), background, task.Insert, task.UpdateStatus, 0)
+	create := func() error {
+		rebuild.Status, rebuild.LatestError = statusUnitRebuilding, ""
+
+		return database.TxUpdateUnitAndInsertTask(&rebuild.Unit, task)
+	}
+
+	update := func(code int, msg string) error {
+		task.Status = int64(code)
+
+		return database.TxUpdateUnitStatusWithTask(&rebuild.Unit, &task, msg)
+	}
+
+	t := NewAsyncTask(context.Background(), background, create, update, 0)
 
 	return task.ID, t.Run()
 }

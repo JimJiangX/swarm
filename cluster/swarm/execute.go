@@ -26,7 +26,7 @@ func (gd *Gardener) serviceExecute(svc *Service) (err error) {
 		}
 
 		if err == nil {
-			atomic.StoreInt64(&svc.Status, _StatusServiceNoContent)
+			atomic.StoreInt64(&svc.Status, statusServiceNoContent)
 
 			svc.Unlock()
 			return
@@ -46,7 +46,7 @@ func (gd *Gardener) serviceExecute(svc *Service) (err error) {
 		svc.Unlock()
 	}()
 
-	err = svc.statusCAS(_StatusServiceAlloction, _StatusServiceCreating)
+	err = svc.statusCAS(statusServiceAllocting, statusServiceCreating)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 		if err != nil {
 			logrus.Errorf("%s create Service Containers error:%s", svc.Name, err)
 
-			atomic.StoreInt64(&svc.Status, _StatusServiceCreateFailed)
+			atomic.StoreInt64(&svc.Status, statusServiceCreateFailed)
 		}
 	}()
 
@@ -180,16 +180,16 @@ func (gd *Gardener) initAndStartService(svc *Service) (err error) {
 		logrus.Errorf("Query Database Error:%s", err)
 		return nil
 	}
-	err = svc.statusCAS(_StatusServiceCreating, _StatusServiceStarting)
+	err = svc.statusCAS(statusServiceCreating, statusServiceStarting)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		if err != nil {
 			// mark failed
-			atomic.StoreInt64(&svc.Status, _StatusServiceStartFailed)
+			atomic.StoreInt64(&svc.Status, statusServiceStartFailed)
 		} else {
-			atomic.StoreInt64(&svc.Status, _StatusServiceNoContent)
+			atomic.StoreInt64(&svc.Status, statusServiceNoContent)
 		}
 	}()
 	logrus.Debug("[MG]starting Containers")

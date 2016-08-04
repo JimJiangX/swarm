@@ -61,7 +61,7 @@ func TestTxUpdateTaskStatusNotZero(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = TxUpdateTaskStatus(tx, &task, status, finish, msg)
+	err = txUpdateTaskStatus(tx, &task, status, finish, msg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestTxUpdateTaskStatusZero(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = TxUpdateTaskStatus(tx, &task, status, finish, msg)
+	err = txUpdateTaskStatus(tx, &task, status, finish, msg)
 	if err != nil {
 		t.Fatal(err)
 	}

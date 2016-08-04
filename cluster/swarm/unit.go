@@ -460,7 +460,7 @@ func (u *unit) forceStopContainer(timeout int) error {
 }
 
 func (u *unit) stopContainer(timeout int) error {
-	if val := atomic.LoadInt64(&u.Status); val == _StatusUnitBackuping {
+	if val := atomic.LoadInt64(&u.Status); val == statusUnitBackuping {
 		return fmt.Errorf("Unit %s is Backuping,Cannot stop", u.Name)
 	}
 
@@ -775,6 +775,13 @@ func (gd *Gardener) StopUnitService(nameOrID string, timeout int) error {
 }
 
 func (u *unit) startService() error {
+	err := u.StatusCAS("!=", statusUnitBackuping, statusUnitStarting)
+	if err != nil {
+		logrus.WithError(err).Errorf("Start %s service", u.Name)
+
+		return err
+	}
+
 	eng, err := u.Engine()
 	if err != nil {
 		return err
@@ -796,8 +803,15 @@ func (u *unit) startService() error {
 		err = fmt.Errorf("%s start service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
 
+	code, msg := int64(statusUnitStarted), ""
 	if err != nil {
 		logrus.Error(err)
+		code, msg = statusUnitStartFailed, err.Error()
+	}
+
+	_err := database.TxUpdateUnitStatus(&u.Unit, code, msg)
+	if err != nil {
+		logrus.WithField("Unit", u.Name).Errorf("Update Unit Status,status=%d,LatestError=%s,%s", code, msg, _err)
 	}
 
 	return err
@@ -828,27 +842,51 @@ func (u *unit) forceStopService() error {
 }
 
 func (u *unit) stopService() error {
-	if val := atomic.LoadInt64(&u.Status); val == _StatusUnitBackuping {
-		return fmt.Errorf("Unit %s is Backuping,Cannot stop", u.Name)
+	err := u.StatusCAS("!=", statusUnitBackuping, statusUnitStoping)
+	if err != nil {
+		logrus.WithError(err).Errorf("Start %s service", u.Name)
+
+		return err
 	}
 
-	err := u.forceStopService()
+	code, msg := int64(statusUnitStarted), ""
+	err = u.forceStopService()
+
 	if err != nil {
 		logrus.Error(err)
+		code, msg = statusUnitStopFailed, err.Error()
+	}
+
+	_err := database.TxUpdateUnitStatus(&u.Unit, code, msg)
+	if err != nil {
+		logrus.WithField("Unit", u.Name).Errorf("Update Unit Status,status=%d,LatestError=%s,%s", code, msg, _err)
 	}
 
 	return err
 }
 
-func (u *unit) backup(ctx context.Context, args ...string) error {
-	if !atomic.CompareAndSwapInt64(&u.Status, _StatusUnitNoContent, _StatusUnitBackuping) ||
-		u.container.State != "running" {
-		err := fmt.Errorf("unit %s is busy,container Status=%s", u.Name, u.container.State)
+func (u *unit) backup(ctx context.Context, args ...string) (err error) {
+	if u.container.State != "running" {
+		err = fmt.Errorf("unit %s is busy,container Status=%s", u.Name, u.container.State)
 		logrus.Error(err)
 
 		return err
 	}
-	defer atomic.CompareAndSwapInt64(&u.Status, _StatusUnitBackuping, _StatusUnitNoContent)
+
+	err = u.StatusCAS("!=", statusUnitStoping, statusUnitBackuping)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err == nil {
+			u.Status = statusUnitBackuped
+			u.LatestError = ""
+		} else {
+			u.Status = statusUnitBackupFailed
+			u.LatestError = err.Error()
+		}
+	}()
 
 	eng, err := u.Engine()
 	if err != nil {
@@ -991,23 +1029,45 @@ func (gd *Gardener) RestoreUnit(nameOrID, source string) (string, error) {
 	}
 
 	background := func(ctx context.Context) error {
-		// manager locked
 		// restart container
 		err = unit.restartContainer(ctx)
 		if err != nil {
 			return err
 		}
 
+		unit.Status, unit.LatestError = statusUnitRestored, ""
+
 		err = unit.restore(ctx, source)
 		if err != nil {
-			errors.Wrapf(err, "Unit %s restore", unit.Name)
+			err = errors.Wrapf(err, "Unit %s restore", unit.Name)
+			logrus.Error(err)
+
+			unit.Status, unit.LatestError = statusUnitRestoreFailed, err.Error()
 		}
 
 		return err
 	}
 
 	task := database.NewTask(_Unit_Restore_Task, unit.ID, "", nil, 0)
-	t := NewAsyncTask(context.Background(), background, task.Insert, task.UpdateStatus, 0)
+
+	before := func() error {
+		err := unit.StatusCAS("!=", statusUnitBackuping, statusUnitRestoring)
+		if err != nil {
+			logrus.WithError(err).Errorf("Start %s service", unit.Name)
+
+			return err
+		}
+
+		return task.Insert()
+	}
+
+	update := func(code int, msg string) error {
+		task.Status = int64(code)
+
+		return database.TxUpdateUnitStatusWithTask(&unit.Unit, &task, msg)
+	}
+
+	t := NewAsyncTask(context.Background(), background, before, update, 0)
 
 	return task.ID, t.Run()
 }

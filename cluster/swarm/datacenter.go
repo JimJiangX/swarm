@@ -83,7 +83,7 @@ func NewNode(addr, name, cluster, user, password, room, seat string, hdd, ssd []
 		Seat:      seat,
 
 		MaxContainer: num,
-		Status:       _StatusNodeImport,
+		Status:       statusNodeImport,
 	}
 
 	task := database.NewTask(_Node_Install_Task, node.ID, "import node", nil, 0)
@@ -346,9 +346,9 @@ func (gd *Gardener) SetNodeStatus(name string, state int64) error {
 		return fmt.Errorf("Not Found Node %s", name)
 	}
 
-	if node.Status != _StatusNodeDisable &&
-		node.Status != _StatusNodeEnable &&
-		node.Status != _StatusNodeDeregisted {
+	if node.Status != statusNodeDisable &&
+		node.Status != statusNodeEnable &&
+		node.Status != statusNodeDeregisted {
 
 		return fmt.Errorf("Node %s Status:%d,Forbidding Changing Status to %d", name, node.Status, state)
 	}
@@ -769,7 +769,7 @@ func (dc *Datacenter) DeregisterNode(nameOrID string) error {
 
 	dc.Lock()
 
-	err := node.UpdateStatus(_StatusNodeDeregisted)
+	err := node.UpdateStatus(statusNodeDeregisted)
 
 	if node.engine != nil {
 		node.engine.Disconnect()
@@ -789,7 +789,7 @@ func (dc *Datacenter) DistributeNode(node *Node) error {
 		"cluster": dc.Cluster.ID,
 	})
 	err := database.TxUpdateNodeStatus(node.Node, node.task,
-		_StatusNodeInstalling, _StatusTaskRunning, "")
+		statusNodeInstalling, statusTaskRunning, "")
 	if err != nil {
 		entry.Error(err)
 		return err
@@ -893,10 +893,10 @@ func (node *Node) Distribute() (err error) {
 
 		nodeState, taskState, msg := int64(0), int64(0), ""
 		if err == nil {
-			nodeState = _StatusNodeInstalled
+			nodeState = statusNodeInstalled
 		} else {
-			nodeState = _StatusNodeInstallFailed
-			taskState = _StatusTaskFailed
+			nodeState = statusNodeInstallFailed
+			taskState = statusTaskFailed
 			msg = err.Error()
 		}
 
@@ -1082,8 +1082,8 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 		time.Sleep(30 * time.Second)
 
 		for i := range nodes {
-			if nodes[i].Status != _StatusNodeInstalled {
-				logrus.Warnf("Node Status Not Match,%s:%d!=%d", nodes[i].Addr, nodes[i].Status, _StatusNodeInstalled)
+			if nodes[i].Status != statusNodeInstalled {
+				logrus.Warnf("Node Status Not Match,%s:%d!=%d", nodes[i].Addr, nodes[i].Status, statusNodeInstalled)
 				continue
 			}
 			eng, err := gd.updateNodeEngine(nodes[i], config.DockerPort)
@@ -1098,7 +1098,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 				continue
 			}
 
-			err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, _StatusNodeEnable, _StatusTaskDone, eng.ID, "")
+			err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, statusNodeEnable, statusTaskDone, eng.ID, "")
 			if err != nil {
 				logrus.WithField("Host", nodes[i].Name).Errorf("Node Registed,Error:%s", err)
 
@@ -1111,13 +1111,13 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 func dealWithTimeout(nodes []*Node) error {
 	logrus.Warnf("RegisterNodes Timeout")
 	for i := range nodes {
-		if nodes[i].Status >= _StatusNodeEnable {
+		if nodes[i].Status >= statusNodeEnable {
 			continue
 		}
-		if nodes[i].Status != _StatusNodeInstalled {
-			nodes[i].Status = _StatusNodeInstallFailed
+		if nodes[i].Status != statusNodeInstalled {
+			nodes[i].Status = statusNodeInstallFailed
 		}
-		err := database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, nodes[i].Status, _StatusTaskTimeout, "", "Node Register Timeout")
+		err := database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, nodes[i].Status, statusTaskTimeout, "", "Node Register Timeout")
 		if err != nil {
 			logrus.Error(nodes[i].Name, "TxUpdateNodeRegister", err)
 		}
@@ -1139,7 +1139,7 @@ func (gd *Gardener) updateNodeEngine(node *Node, dockerPort int) (*cluster.Engin
 		return nil, errors.Errorf("Engine %s Status:%s", addr, status)
 	}
 
-	err := database.TxUpdateNodeRegister(node.Node, node.task, _StatusNodeTesting, _StatusTaskRunning, eng.ID, "")
+	err := database.TxUpdateNodeRegister(node.Node, node.task, statusNodeTesting, statusTaskRunning, eng.ID, "")
 	if err != nil {
 		logrus.Error(eng.Addr, "TxUpdateNodeRegister", err)
 		return nil, err
