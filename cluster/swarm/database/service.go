@@ -222,6 +222,8 @@ func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {
 		}
 	}
 
+	config.UnitID = unit.ID
+
 	err = TXInsertUnitConfig(tx, &config)
 	if err != nil {
 		return err
@@ -688,7 +690,7 @@ func DeteleServiceRelation(serviceID string, rmVolumes bool) error {
 			}
 		}
 
-		err = txDeleteUnitConfig(tx, units[i].ConfigID)
+		err = txDeleteUnitConfigByUnit(tx, units[i].ID)
 		if err != nil {
 			return err
 		}

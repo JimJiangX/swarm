@@ -6,9 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 )
 
 const insertImageQuery = "INSERT INTO tb_image (enabled,id,name,version,docker_image_id,label,size,template_config_id,config_keysets,upload_at) VALUES (:enabled,:id,:name,:version,:docker_image_id,:label,:size,:template_config_id,:config_keysets,:upload_at)"
@@ -108,6 +107,15 @@ func GetImage(name, version string) (Image, error) {
 	return image, errors.Wrapf(err, "Get Image,name='%s' version='%s'", name, version)
 }
 
+func txGetImage(tx *sqlx.Tx, ID string) (image Image, err error) {
+	err = tx.Get(&image, "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?", ID, ID)
+	if err != nil {
+		return image, errors.Wrapf(err, "Get Image by id='%s'", ID)
+	}
+
+	return
+}
+
 func GetImageAndUnitConfig(ID string) (Image, UnitConfig, error) {
 	image := Image{}
 	config := UnitConfig{}
@@ -184,36 +192,71 @@ func UpdateImageStatus(ID string, enable bool) error {
 	return errors.Wrapf(err, "Update Image by id='%s' enabled=%t", ID, enable)
 }
 
-func DeleteImage(ID string) error {
-	db, err := GetDB(false)
+func isImageUsed(tx *sqlx.Tx, image string) (bool, error) {
+	var out []string
+	query := "SELECT unit_id FROM tb_unit_config WHERE image_id=?"
+
+	err := tx.Select(&out, query, image)
+	if err != nil {
+		return false, errors.Wrap(err, "SELECT []UnitConfig")
+	}
+
+	exist := false
+	for i := range out {
+		if strings.TrimSpace(out[i]) != "" {
+			exist = true
+			break
+		}
+	}
+
+	return exist, nil
+}
+
+func TxDeleteImage(ID string) error {
+	tx, err := GetTX()
 	if err != nil {
 		return err
+	}
+	defer tx.Rollback()
+
+	image, err := txGetImage(tx, ID)
+	if err != nil {
+		return err
+	}
+
+	ok, err := isImageUsed(tx, image.ID)
+	if err != nil {
+		return err
+	}
+	if ok {
+		return errors.Errorf("Image %s is using", ID)
 	}
 
 	query := "DELETE FROM tb_image WHERE id=? OR docker_image_id=?"
-	_, err = db.Exec(query, ID, ID)
-	if err == nil {
-		return nil
-	}
-
-	db, err = GetDB(true)
+	_, err = tx.Exec(query, ID, ID)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec(query, ID, ID)
+	_, err = tx.Exec("DELETE FROM tb_unit_config WHERE image_id=?", image.ID)
+	if err != nil {
+		return errors.Wrapf(err, "TX Delete UnitConfig By ImageID:%s", image.ID)
+	}
+
+	err = tx.Commit()
 	if err == nil {
-		return nil
+		return err
 	}
 
 	return errors.Wrapf(err, "Delete Image by id='%s'", ID)
 }
 
-const insertUnitConfigQuery = "INSERT INTO tb_unit_config (id,image_id,config_file_path,version,parent_id,content,created_at) VALUES (:id,:image_id,:config_file_path,:version,:parent_id,:content,:created_at)"
+const insertUnitConfigQuery = "INSERT INTO tb_unit_config (id,image_id,unit_id,config_file_path,version,parent_id,content,created_at) VALUES (:id,:image_id,:unit_id,:config_file_path,:version,:parent_id,:content,:created_at)"
 
 type UnitConfig struct {
 	ID        string                  `db:"id"`
 	ImageID   string                  `db:"image_id"`
+	UnitID    string                  `db:"unit_id"`
 	Mount     string                  `db:"config_file_path"`
 	Version   int                     `db:"version"`
 	ParentID  string                  `db:"parent_id"`
@@ -400,8 +443,8 @@ func TxUpdateImageTemplateConfig(image string, config UnitConfig) error {
 	return tx.Commit()
 }
 
-func txDeleteUnitConfig(tx *sqlx.Tx, id string) error {
-	_, err := tx.Exec("DELETE FROM tb_unit_config WHERE id=?", id)
+func txDeleteUnitConfigByUnit(tx *sqlx.Tx, unitID string) error {
+	_, err := tx.Exec("DELETE FROM tb_unit_config WHERE unit_id=?", unitID)
 
 	return err
 }

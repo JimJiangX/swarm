@@ -84,7 +84,7 @@ func (u *unit) setServiceConfig(key string, val interface{}) error {
 	return u.configParser.Set(key, val)
 }
 
-func (u *unit) SaveConfigToDisk(content []byte) error {
+func (u *unit) saveConfigToDisk(content []byte) error {
 	config := database.UnitConfig{
 		ID:        utils.Generate64UUID(),
 		ImageID:   u.ImageID,
@@ -98,6 +98,7 @@ func (u *unit) SaveConfigToDisk(content []byte) error {
 
 	u.Unit.ConfigID = config.ID
 	u.parent = &config
+	config.UnitID = u.ID
 
 	err := database.SaveUnitConfigToDisk(&u.Unit, config)
 

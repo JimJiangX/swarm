@@ -619,7 +619,7 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 		return err
 	}
 
-	if err := u.SaveConfigToDisk(content); err != nil {
+	if err := u.saveConfigToDisk(content); err != nil {
 		return err
 	}
 

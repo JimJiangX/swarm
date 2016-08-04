@@ -65,7 +65,8 @@ func UpdateImageStatus(id string, enable bool) error {
 }
 
 func (gd *Gardener) RemoveImage(id string) error {
-	err := database.DeleteImage(id)
+
+	err := database.TxDeleteImage(id)
 	if err != nil {
 		return err
 	}
