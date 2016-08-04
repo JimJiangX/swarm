@@ -455,12 +455,12 @@ func (c proxyConfig) defaultUserConfig(args ...interface{}) (map[string]interfac
 		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", adminAddr, adminPort)
 	}
 
-	ncpu, err := parseCpuset(u.config.HostConfig.CpusetCpus)
+	ncpu, err := utils.GetCPUNum(u.config.HostConfig.CpusetCpus)
 	if err == nil {
 		m["upsql-proxy::event-threads-count"] = ncpu
 	} else {
-		logrus.Warn("upsql-proxy::event-threads-count ", u.Name, err)
-		m["upsql-proxy::event-threads-count"] = u.config.HostConfig.CpusetCpus
+		logrus.WithError(err).Warnf("%s upsql-proxy::event-threads-count", u.Name)
+		m["upsql-proxy::event-threads-count"] = 1
 	}
 
 	swm := svc.getSwithManagerUnit()
@@ -532,12 +532,12 @@ func (c proxyConfig_v110) defaultUserConfig(args ...interface{}) (map[string]int
 		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", adminAddr, adminPort)
 	}
 
-	ncpu, err := parseCpuset(u.config.HostConfig.CpusetCpus)
+	ncpu, err := utils.GetCPUNum(u.config.HostConfig.CpusetCpus)
 	if err == nil {
 		m["upsql-proxy::event-threads-count"] = ncpu
 	} else {
-		logrus.Warn("upsql-proxy::event-threads-count ", u.Name, err)
-		m["upsql-proxy::event-threads-count"] = u.config.HostConfig.CpusetCpus
+		logrus.WithError(err).Warnf("%s upsql-proxy::event-threads-count", u.Name)
+		m["upsql-proxy::event-threads-count"] = 1
 	}
 
 	swm := svc.getSwithManagerUnit()

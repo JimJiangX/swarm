@@ -128,7 +128,7 @@ func (gd *Gardener) syncNodeWithEngine() {
 
 		nodeTab, err := database.GetNode(engine.ID)
 		if err != nil {
-			logrus.Errorf("sync Node With Engine:%s", err)
+			logrus.Errorf("sync Node With Engine %s:%s", engine.Addr, err)
 
 			continue
 		}
@@ -147,7 +147,7 @@ func (gd *Gardener) syncNodeWithEngine() {
 		if dc == nil {
 			dc, err = gd.Datacenter(nodeTab.ClusterID)
 			if err != nil {
-				logrus.WithError(err).Warn("syncNodeWithEngine")
+				logrus.WithError(err).Warnf("sync Node With Engine:%s", engine.Addr)
 			}
 			continue
 		}
