@@ -1,11 +1,14 @@
 #!/bin/bash
 
-if [ $# -ne 1 ];then
-	echo "must eqaul to 1"
-  	exit 2
+if [ $# -ne 3 ];then
+	echo "must eqaul to 3"
+	exit 2
 fi
 
 INSTANCE=$1
+USER=$2
+PASSWD=$3
+
 LIMIT_COUNT=100
 SLOWLOG_FILE=/DBAASLOG/slow-query.log
 TMPFILE=/tmp/${INSTANCE}_slowlog.data
