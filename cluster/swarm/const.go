@@ -64,15 +64,38 @@ func ParseNodeStatus(status int64) string {
 
 const (
 	_StatusUnitNoContent = iota
+
 	_StatusUnitAllocted
+
 	_StatusUnitCreating
+	_StatusUnitCreated
+	_StatusUnitCreateFailed
+
 	_StatusUnitStarting // start contaier and start service
+	_StatusUnitStarted
+	_StatusUnitStartFailed
+
 	_statusUnitStoping
+	_StatusUnitStoped
+	_StatusUnitStopFailed
+
 	_StatusUnitMigrating
+	_StatusUnitMigrated
+	_StatusUnitMigrateFailed
+
 	_StatusUnitRebuilding
+	_StatusUnitRebuilt
+	_StatusUnitRebuildFailed
+
 	_StatusUnitDeleting
+
 	_StatusUnitBackuping
+	_StatusUnitBackuped
+	_StatusUnitBackupFailed
+
 	_StatusUnitRestoring
+	_StatusUnitRestored
+	_StatusUnitRestoreFailed
 )
 
 const (
