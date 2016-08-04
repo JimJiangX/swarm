@@ -46,7 +46,7 @@ func (bs *serviceBackup) Run() {
 
 	bs.strategy = strategy
 
-	task := database.NewTask(_Backup_Auto_Task, strategy.ID, "", nil, strategy.Timeout)
+	task := database.NewTask(bs.svc.Name, _Backup_Auto_Task, strategy.ID, "", nil, strategy.Timeout)
 	task.Status = statusTaskCreate
 	err = task.Insert()
 	if err != nil {

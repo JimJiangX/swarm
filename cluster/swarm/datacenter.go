@@ -86,7 +86,7 @@ func NewNode(addr, name, cluster, user, password, room, seat string, hdd, ssd []
 		Status:       statusNodeImport,
 	}
 
-	task := database.NewTask(_Node_Install_Task, node.ID, "import node", nil, 0)
+	task := database.NewTask(node.Name, _Node_Install_Task, node.ID, "import node", nil, 0)
 
 	return &Node{
 		Node:     node,

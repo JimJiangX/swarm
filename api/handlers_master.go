@@ -1302,6 +1302,7 @@ func getTaskResponse(task database.Task) structs.TaskResponse {
 
 	return structs.TaskResponse{
 		ID:          task.ID,
+		Name:        task.Name,
 		Related:     task.Related,
 		Linkto:      task.Linkto,
 		ServiceID:   service.ID,

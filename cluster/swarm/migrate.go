@@ -422,7 +422,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		return nil
 	}
 
-	task := database.NewTask(_Unit_Migrate_Task, migrate.ID, "", nil, 0)
+	task := database.NewTask(migrate.Name, _Unit_Migrate_Task, migrate.ID, "", nil, 0)
 
 	create := func() error {
 		migrate.Status, migrate.LatestError = statusUnitMigrating, ""
@@ -999,7 +999,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		return nil
 	}
 
-	task := database.NewTask(_Unit_Rebuild_Task, rebuild.ID, "", nil, 0)
+	task := database.NewTask(rebuild.Name, _Unit_Rebuild_Task, rebuild.ID, "", nil, 0)
 
 	create := func() error {
 		rebuild.Status, rebuild.LatestError = statusUnitRebuilding, ""

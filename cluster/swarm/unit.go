@@ -1048,7 +1048,7 @@ func (gd *Gardener) RestoreUnit(nameOrID, source string) (string, error) {
 		return err
 	}
 
-	task := database.NewTask(_Unit_Restore_Task, unit.ID, "", nil, 0)
+	task := database.NewTask(unit.Name, _Unit_Restore_Task, unit.ID, "", nil, 0)
 
 	before := func() error {
 		err := unit.StatusCAS("!=", statusUnitBackuping, statusUnitRestoring)

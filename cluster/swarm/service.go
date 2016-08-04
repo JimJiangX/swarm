@@ -104,7 +104,7 @@ func buildService(req structs.PostServiceRequest,
 	service.users = users
 	atomic.StoreInt64(&svc.Status, statusServcieBuilding)
 
-	task := database.NewTask(_Service_Create_Task, service.ID, "create service", nil, 0)
+	task := database.NewTask(service.Name, _Service_Create_Task, service.ID, "create service", nil, 0)
 
 	err = database.TxSaveService(service.Service, service.backup, &task, service.users)
 
@@ -1580,7 +1580,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 		CreatedAt: now,
 	}
 
-	task := database.NewTask(_Backup_Manual_Task, backup.ID, "", nil, strategy.Timeout)
+	task := database.NewTask(backup.Name, _Backup_Manual_Task, backup.ID, "", nil, strategy.Timeout)
 	task.Status = statusTaskCreate
 	err = database.TxInsertBackupStrategyAndTask(strategy, task)
 	if err != nil {
