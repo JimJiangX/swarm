@@ -3,6 +3,7 @@ package database
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -150,17 +151,63 @@ func TxUpdateUnit(tx *sqlx.Tx, unit Unit) error {
 	return err
 }
 
-func txUpdateUnitStatus(tx *sqlx.Tx, unit *Unit, status int64, msg string) error {
-
-	_, err := tx.Exec("UPDATE tb_unit SET status=?,latest_error=? WHERE id=?", status, msg, unit)
-	if err != nil {
-		return errors.Wrap(err, "tx Update Unit Status")
+func (u *Unit) StatusCAS(operator string, old, value int64) error {
+	if operator == "!=" {
+		operator = "<>"
 	}
 
-	atomic.StoreInt64(&unit.Status, status)
-	unit.LatestError = msg
+	query := fmt.Sprintf("UPDATE tb_unit SET status=? WHERE id=? AND status%s?", operator)
 
-	return nil
+	db, err := GetDB(false)
+	if err != nil {
+		return err
+	}
+
+	r, err := db.Exec(query, value, u.ID, old)
+	if err != nil {
+		db, err = GetDB(true)
+		if err != nil {
+			return err
+		}
+
+		r, err = db.Exec(query, value, u.ID, old)
+		if err != nil {
+			return errors.Wrap(err, "Update Unit Status")
+		}
+	}
+
+	n, err := r.RowsAffected()
+	if n == 1 {
+		atomic.StoreInt64(&u.Status, value)
+
+		return nil
+
+	} else if err != nil {
+
+		return errors.Wrap(err, "Update Unit Status Affected Error")
+	}
+
+	return errors.Errorf("Forbid To Set Unit Status")
+}
+
+func TxUpdateUnitAndInsertTask(unit *Unit, task Task) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = txUpdateUnitStatus(tx, unit, unit.Status, unit.LatestError)
+	if err != nil {
+		return err
+	}
+
+	err = TxInsertTask(tx, task)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func TxUpdateUnitStatus(unit *Unit, status int64, msg string) error {
@@ -173,6 +220,39 @@ func TxUpdateUnitStatus(unit *Unit, status int64, msg string) error {
 	err = txUpdateUnitStatus(tx, unit, status, msg)
 
 	return tx.Commit()
+}
+
+func TxUpdateUnitStatusWithTask(unit *Unit, task *Task, msg string) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = txUpdateUnitStatus(tx, unit, unit.Status, unit.LatestError)
+	if err != nil {
+		return err
+	}
+
+	err = txUpdateTaskStatus(tx, task, task.Status, time.Now(), msg)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func txUpdateUnitStatus(tx *sqlx.Tx, unit *Unit, status int64, msg string) error {
+
+	_, err := tx.Exec("UPDATE tb_unit SET status=?,latest_error=? WHERE id=?", status, msg, unit.ID)
+	if err != nil {
+		return errors.Wrap(err, "tx Update Unit Status")
+	}
+
+	atomic.StoreInt64(&unit.Status, status)
+	unit.LatestError = msg
+
+	return nil
 }
 
 func TxDeleteUnit(tx *sqlx.Tx, nameOrID string) error {
@@ -390,7 +470,7 @@ func TxSetServiceStatus(svc *Service, task *Task, state, tstate int64, finish ti
 		}
 	}
 
-	err = TxUpdateTaskStatus(tx, task, tstate, finish, msg)
+	err = txUpdateTaskStatus(tx, task, tstate, finish, msg)
 	if err != nil {
 		return err
 	}

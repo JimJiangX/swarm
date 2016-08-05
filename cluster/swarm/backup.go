@@ -46,8 +46,8 @@ func (bs *serviceBackup) Run() {
 
 	bs.strategy = strategy
 
-	task := database.NewTask(_Backup_Auto_Task, strategy.ID, "", nil, strategy.Timeout)
-	task.Status = _StatusTaskCreate
+	task := database.NewTask(bs.svc.Name, _Backup_Auto_Task, strategy.ID, "", nil, strategy.Timeout)
+	task.Status = statusTaskCreate
 	err = task.Insert()
 	if err != nil {
 		return
@@ -97,7 +97,7 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 func (svc *Service) TryBackupTask(strategy database.BackupStrategy, task *database.Task) error {
 	addr, port, master, err := lockSwitchManager(svc, 3)
 	if err != nil {
-		err1 := database.UpdateTaskStatus(task, _StatusTaskCancel, time.Now(), "Cancel,"+err.Error())
+		err1 := database.UpdateTaskStatus(task, statusTaskCancel, time.Now(), "Cancel,"+err.Error())
 		err = fmt.Errorf("Update Task Status Errors:%v,%v", err, err1)
 		logrus.Error(err)
 
@@ -169,7 +169,7 @@ func backupTask(backup *unit, task *database.Task, strategy database.BackupStrat
 		entry.Info("Backup Done")
 		return nil
 	} else {
-		status = _StatusTaskFailed
+		status = statusTaskFailed
 		msg = fmt.Sprintf("Backup Task Faild,%s", err)
 		entry.Error(msg)
 	}
@@ -179,16 +179,17 @@ func backupTask(backup *unit, task *database.Task, strategy database.BackupStrat
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			if ctxErr == context.DeadlineExceeded {
 				msg = "Timeout," + msg
-				status = _StatusTaskTimeout
+				status = statusTaskTimeout
 			} else if ctxErr == context.Canceled {
 				msg = "Canceled," + msg
-				status = _StatusTaskCancel
+				status = statusTaskCancel
 			}
 		}
 	default:
 	}
 
-	_err := database.UpdateTaskStatus(task, status, time.Now(), msg)
+	task.Status = status
+	_err := database.TxUpdateUnitStatusWithTask(&backup.Unit, task, msg)
 	if _err != nil {
 		entry.Errorf("Update TaskStatus Error:%s,message=%s", _err, msg)
 	}
@@ -404,7 +405,7 @@ func BackupTaskCallback(req structs.BackupTaskCallback) error {
 		backupFile.Retention = backupFile.CreatedAt.AddDate(0, 0, rent)
 	}
 
-	err = database.TxBackupTaskDone(&task, _StatusTaskDone, backupFile)
+	err = database.TxBackupTaskDone(&task, statusTaskDone, backupFile)
 
 	return err
 }

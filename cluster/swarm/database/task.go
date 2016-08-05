@@ -11,11 +11,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-const insertTaskQuery = "INSERT INTO tb_task (id,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
+const insertTaskQuery = "INSERT INTO tb_task (id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
 
 type Task struct {
-	ID string `db:"id"`
-	//	Name        string        `db:"name"`
+	ID          string    `db:"id"`
+	Name        string    `db:"name"` //Related-Object
 	Related     string    `db:"related"`
 	Linkto      string    `db:"link_to"`
 	Description string    `db:"description"`
@@ -105,9 +105,10 @@ func txInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
 	return err
 }
 
-func NewTask(relate, linkto, des string, labels []string, timeout int) Task {
+func NewTask(object, relate, linkto, des string, labels []string, timeout int) Task {
 	return Task{
 		ID:          utils.Generate64UUID(),
+		Name:        relate + "-" + object,
 		Related:     relate,
 		Linkto:      linkto,
 		Description: des,
@@ -163,7 +164,7 @@ func TxInsertMultiTask(tx *sqlx.Tx, tasks []*Task) error {
 	return stmt.Close()
 }
 
-func TxUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int64, finish time.Time, msg string) error {
+func txUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int64, finish time.Time, msg string) error {
 	query := "UPDATE tb_task SET status=?,finished_at=?,errors=? WHERE id=?"
 
 	if finish.IsZero() {
@@ -202,7 +203,7 @@ func TxBackupTaskDone(task *Task, state int64, backupFile BackupFile) error {
 		return err
 	}
 
-	err = TxUpdateTaskStatus(tx, task, state, time.Now(), "")
+	err = txUpdateTaskStatus(tx, task, state, time.Now(), "")
 	if err != nil {
 		return err
 	}

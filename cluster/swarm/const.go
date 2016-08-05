@@ -6,13 +6,13 @@ import (
 )
 
 const (
-	_StatusTaskCreate = iota
-	_StatusTaskRunning
-	_StatusTaskStop
-	_StatusTaskCancel
-	_StatusTaskDone
-	_StatusTaskTimeout
-	_StatusTaskFailed
+	statusTaskCreate = iota
+	statusTaskRunning
+	statusTaskStop
+	statusTaskCancel
+	statusTaskDone
+	statusTaskTimeout
+	statusTaskFailed
 )
 
 const (
@@ -27,34 +27,34 @@ const (
 )
 
 const (
-	_StatusNodeImport = iota
-	_StatusNodeInstalling
-	_StatusNodeInstalled
-	_StatusNodeInstallFailed
-	_StatusNodeTesting
-	_StatusNodeFailedTest
-	_StatusNodeEnable
-	_StatusNodeDisable
-	_StatusNodeDeregisted
+	statusNodeImport = iota
+	statusNodeInstalling
+	statusNodeInstalled
+	statusNodeInstallFailed
+	statusNodeTesting
+	statusNodeFailedTest
+	statusNodeEnable
+	statusNodeDisable
+	statusNodeDeregisted
 )
 
 func ParseNodeStatus(status int64) string {
 	switch status {
-	case _StatusNodeImport:
+	case statusNodeImport:
 		return "importing"
-	case _StatusNodeInstalling:
+	case statusNodeInstalling:
 		return "installing"
-	case _StatusNodeInstalled:
+	case statusNodeInstalled:
 		return "install failed"
-	case _StatusNodeTesting:
+	case statusNodeTesting:
 		return "testing"
-	case _StatusNodeFailedTest:
+	case statusNodeFailedTest:
 		return "test failed"
-	case _StatusNodeEnable:
+	case statusNodeEnable:
 		return "enable"
-	case _StatusNodeDisable:
+	case statusNodeDisable:
 		return "disable"
-	case _StatusNodeDeregisted:
+	case statusNodeDeregisted:
 		return "deregister"
 	default:
 	}
@@ -63,35 +63,60 @@ func ParseNodeStatus(status int64) string {
 }
 
 const (
-	_StatusUnitNoContent = iota
-	_StatusUnitAllocted
-	_StatusUnitCreating
-	_StatusUnitStarting // start contaier and start service
-	_statusUnitStoping
-	_StatusUnitMigrating
-	_StatusUnitRebuilding
-	_StatusUnitDeleting
-	_StatusUnitBackuping
-	_StatusUnitRestoring
+	statusUnitNoContent = iota
+
+	statusUnitAllocting
+	statusUnitAllocted
+	statusUnitAlloctionFailed
+
+	statusUnitCreating
+	statusUnitCreated
+	statusUnitCreateFailed
+
+	statusUnitStarting // start contaier and start service
+	statusUnitStarted
+	statusUnitStartFailed
+
+	statusUnitStoping
+	statusUnitStoped
+	statusUnitStopFailed
+
+	statusUnitMigrating
+	statusUnitMigrated
+	statusUnitMigrateFailed
+
+	statusUnitRebuilding
+	statusUnitRebuilt
+	statusUnitRebuildFailed
+
+	statusUnitDeleting
+
+	statusUnitBackuping
+	statusUnitBackuped
+	statusUnitBackupFailed
+
+	statusUnitRestoring
+	statusUnitRestored
+	statusUnitRestoreFailed
 )
 
 const (
-	_StatusServiceInit = iota
-	_StatusServcieBuilding
-	_StatusServiceAlloction
-	_StatusServiceAlloctionFailed
-	_StatusServiceCreating
-	_StatusServiceCreateFailed
-	_StatusServiceStarting // start contaier and start service
-	_StatusServiceStartFailed
-	_statusServiceStoping
-	_statusServiceStopFailed
-	_StatusServiceDeleting
-	_StatusServiceDeleteFailed
-	_StatusServiceBackuping
-	_StatusServiceRestoring
-	_StatusServiceRestoreFailed
-	_StatusServiceNoContent
+	statusServiceInit = iota
+	statusServcieBuilding
+	statusServiceAllocting
+	statusServiceAlloctionFailed
+	statusServiceCreating
+	statusServiceCreateFailed
+	statusServiceStarting // start contaier and start service
+	statusServiceStartFailed
+	statusServiceStoping
+	statusServiceStopFailed
+	statusServiceDeleting
+	statusServiceDeleteFailed
+	statusServiceBackuping
+	statusServiceRestoring
+	statusServiceRestoreFailed
+	statusServiceNoContent
 )
 
 const (

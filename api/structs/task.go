@@ -16,8 +16,8 @@ const (
 )
 
 type TaskResponse struct {
-	ID string `json:"id"`
-	// Name     string `json:"name"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
 	Related     string `json:"related"`
 	Linkto      string `json:"link_to"`
 	UnitID      string `json:"unit_id"`

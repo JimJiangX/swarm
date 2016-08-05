@@ -340,7 +340,7 @@ func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int64, msg string) e
 		return err
 	}
 
-	err = TxUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
+	err = txUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
 	if err != nil {
 		return err
 	}
@@ -372,7 +372,7 @@ func TxUpdateNodeRegister(n *Node, task *Task, nstate, tstate int64, eng, msg st
 		return err
 	}
 
-	err = TxUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
+	err = txUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
 	if err != nil {
 		return err
 	}

@@ -31,19 +31,21 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 		entry.Errorf("Task Failed:%s", err)
 
 		_err := database.TxSetServiceStatus(&svc.Service, task,
-			_StatusServiceAlloctionFailed, _StatusTaskFailed, time.Now(), err.Error())
+			statusServiceAlloctionFailed, statusTaskFailed, time.Now(), err.Error())
 		if _err != nil {
 			entry.Error("Tx Set ServiceStatus error:%s", _err)
 		}
 		if err != nil && len(resourceAlloc) > 0 {
-			_err := dealWithSchedulerFailure(gd, svc, resourceAlloc)
+			_err := dealWithSchedulerFailure(gd, resourceAlloc)
 			if _err != nil {
 				logrus.Errorf("deal With Scheduler Failure,%s", _err)
 			}
 		}
+
+		svc.units = nil
 	}()
 
-	atomic.StoreInt64(&svc.Status, _StatusServiceAlloction)
+	atomic.StoreInt64(&svc.Status, statusServiceAllocting)
 
 	logrus.Debugf("[MG] start service Scheduler:%s", svc.Name)
 
@@ -135,9 +137,7 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 	return nil
 }
 
-func dealWithSchedulerFailure(gd *Gardener, svc *Service,
-	pendings []*pendingAllocResource) error {
-
+func dealWithSchedulerFailure(gd *Gardener, pendings []*pendingAllocResource) error {
 	err := gd.Recycle(pendings)
 	if err != nil {
 		logrus.Errorf("Recycle Failed,%s", err)
@@ -275,7 +275,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 				ImageID:       image.ID,
 				ImageName:     image.Name + ":" + image.Version,
 				EngineID:      engine.ID,
-				Status:        0,
+				Status:        statusUnitAllocting,
 				CheckInterval: 0,
 				NetworkMode:   config.HostConfig.NetworkMode.NetworkName(),
 				CreatedAt:     time.Now(),
@@ -300,10 +300,13 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 		preAlloc, err := gd.pendingAllocOneNode(engine, unit, stores, config)
 		allocs = append(allocs, preAlloc)
 		if err != nil {
+			atomic.StoreInt64(&unit.Status, statusUnitAlloctionFailed)
 			entry.Errorf("pendingAlloc:Alloc Resource %s", err)
 
 			return allocs, err
 		}
+
+		atomic.StoreInt64(&unit.Status, statusUnitAllocted)
 	}
 
 	entry.Info("pendingAlloc: Allocation Succeed!")
@@ -448,7 +451,7 @@ func listCandidates(clusters []string, _type string) ([]database.Node, error) {
 
 	out := make([]database.Node, 0, len(list))
 	for i := range list {
-		if list[i].Status != _StatusNodeEnable {
+		if list[i].Status != statusNodeEnable {
 			continue
 		}
 		out = append(out, list[i])

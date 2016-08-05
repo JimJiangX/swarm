@@ -119,7 +119,8 @@ func GetDB(ping bool) (*sqlx.DB, error) {
 			return defaultDB, nil
 		}
 
-		if err := defaultDB.Ping(); err == nil {
+		err := defaultDB.Ping()
+		if err == nil {
 			return defaultDB, nil
 		}
 	}

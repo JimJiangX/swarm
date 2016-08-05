@@ -1302,6 +1302,7 @@ func getTaskResponse(task database.Task) structs.TaskResponse {
 
 	return structs.TaskResponse{
 		ID:          task.ID,
+		Name:        task.Name,
 		Related:     task.Related,
 		Linkto:      task.Linkto,
 		ServiceID:   service.ID,
@@ -1768,7 +1769,7 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err := gd.ServiceScaleTask(name, req)
+	err := gd.ServiceScale(name, req)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
