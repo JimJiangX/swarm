@@ -753,6 +753,8 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 			Ports:       ports,
 			Role:        roles[units[i].Name],
 			Status:      checks[units[i].ID].Status,
+			TaskStatus:  units[i].Status,
+			LatestMsg:   units[i].LatestError,
 			CreatedAt:   utils.TimeToString(units[i].CreatedAt),
 		}
 
