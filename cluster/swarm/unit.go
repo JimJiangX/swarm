@@ -849,7 +849,7 @@ func (u *unit) stopService() error {
 		return err
 	}
 
-	code, msg := int64(statusUnitStarted), ""
+	code, msg := int64(statusUnitStoped), ""
 	err = u.forceStopService()
 
 	if err != nil {

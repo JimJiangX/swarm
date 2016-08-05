@@ -221,6 +221,10 @@ func TxDeleteImage(ID string) error {
 
 	image, err := txGetImage(tx, ID)
 	if err != nil {
+		if ErrNoRowsFound == CheckError(err) {
+			return nil
+		}
+
 		return err
 	}
 
