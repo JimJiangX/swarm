@@ -183,10 +183,13 @@ type UnitInfo struct {
 	Role       string `json:"role,omitempty"`
 	CpusetCpus string
 	Memory     int64
+	TaskStatus int64  `json:"task_status"`
 	State      string // container state
 	Status     string // service status
+	LatestMsg  string `json:"latest_msg"`
 	CreatedAt  string `json:"created_at"`
 	// CheckInterval int    `json:"check_interval"`
+
 	Info types.ContainerJSON `json:",omitempty"`
 }
 
