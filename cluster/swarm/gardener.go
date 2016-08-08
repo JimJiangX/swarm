@@ -128,9 +128,16 @@ func (gd *Gardener) syncNodeWithEngine() {
 
 		nodeTab, err := database.GetNode(engine.ID)
 		if err != nil {
-			logrus.Errorf("sync Node With Engine %s:%s", engine.Addr, err)
+			logrus.Warnf("sync Node With Engine %s:%s", engine.Addr, err)
 
-			continue
+			nodeTab, err = database.GetNodeByAddr(engine.Addr)
+			if err != nil {
+				logrus.Warn(err)
+				continue
+			}
+			if nodeTab.Status < statusNodeEnable {
+				continue
+			}
 		}
 
 		var dc *Datacenter
@@ -156,6 +163,7 @@ func (gd *Gardener) syncNodeWithEngine() {
 		if err == nil {
 			if node.engine == nil ||
 				(!node.engine.IsHealthy() && node.engine.Addr == engine.Addr) {
+
 				node.engine = engine
 			}
 

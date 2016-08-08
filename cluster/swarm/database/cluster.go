@@ -417,6 +417,36 @@ func GetNode(nameOrID string) (Node, error) {
 	return node, errors.Wrap(err, "Get Node By:"+nameOrID)
 }
 
+func GetNodeByAddr(addr string) (Node, error) {
+	db, err := GetDB(false)
+	if err != nil {
+		return Node{}, err
+	}
+
+	node := Node{}
+	query := "SELECT * FROM tb_node WHERE admin_ip=?"
+
+	err = db.Get(&node, query, addr)
+	if err == nil {
+		return node, nil
+	}
+	if _err := CheckError(err); _err == ErrNoRowsFound {
+		return node, errors.Wrap(err, "Not Found Node By Addr:"+addr)
+	}
+
+	db, err = GetDB(true)
+	if err != nil {
+		return Node{}, err
+	}
+
+	err = db.Get(&node, query, addr)
+	if err == nil {
+		return node, nil
+	}
+
+	return node, errors.Wrap(err, "Not Found Node By Addr:"+addr)
+}
+
 func GetAllNodes() ([]Node, error) {
 	db, err := GetDB(false)
 	if err != nil {
