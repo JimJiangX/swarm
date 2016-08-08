@@ -7,7 +7,7 @@ import (
 )
 
 func TestInsertTask(t *testing.T) {
-	task1 := NewTask("TaskRelated001", "TaskLinkto001", "TaskDescription001", []string{"TaskLabels011", "TaskLabels011"}, 1011)
+	task1 := NewTask("task001", "TaskRelated001", "TaskLinkto001", "TaskDescription001", []string{"TaskLabels011", "TaskLabels011"}, 1011)
 	err := task1.Insert()
 	if err != nil {
 		t.Fatal(err)
@@ -15,7 +15,7 @@ func TestInsertTask(t *testing.T) {
 }
 
 func TestTxInsertTask(t *testing.T) {
-	task2 := NewTask("TaskRelated002", "TaskLinkto002", "TaskDescription002", []string{"TaskLabels021", "TaskLabels022"}, 1021)
+	task2 := NewTask("task002", "TaskRelated002", "TaskLinkto002", "TaskDescription002", []string{"TaskLabels021", "TaskLabels022"}, 1021)
 	tx, err := GetTX()
 	if err != nil {
 		t.Fatal(err)
@@ -31,8 +31,8 @@ func TestTxInsertTask(t *testing.T) {
 }
 
 func TestTxInsertMultiTask(t *testing.T) {
-	t1 := NewTask("TaskRelated003", "TaskLinkto003", "TaskDescription003", []string{"TaskLabels031", "TaskLabels031"}, 1031)
-	t2 := NewTask("TaskRelated004", "TaskLinkto004", "TaskDescription004", []string{"TaskLabels041", "TaskLabels041"}, 1041)
+	t1 := NewTask("task001", "TaskRelated003", "TaskLinkto003", "TaskDescription003", []string{"TaskLabels031", "TaskLabels031"}, 1031)
+	t2 := NewTask("task002", "TaskRelated004", "TaskLinkto004", "TaskDescription004", []string{"TaskLabels041", "TaskLabels041"}, 1041)
 
 	tasks := []*Task{&t1, &t2}
 	tx, err := GetTX()

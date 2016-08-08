@@ -57,7 +57,8 @@ func (c *Cluster) UpdateStatus(state bool) error {
 		return err
 	}
 
-	query := "UPDATE tb_cluster SET enabled=? WHERE id=?"
+	const query = "UPDATE tb_cluster SET enabled=? WHERE id=?"
+
 	_, err = db.Exec(query, state, c.ID)
 	if err == nil {
 		c.Enabled = state
@@ -87,7 +88,8 @@ func (c Cluster) UpdateParams() error {
 		return err
 	}
 
-	query := "UPDATE tb_cluster SET max_node=:max_node,usage_limit=:usage_limit WHERE id=:id OR name=:name"
+	const query = "UPDATE tb_cluster SET max_node=:max_node,usage_limit=:usage_limit WHERE id=:id OR name=:name"
+
 	_, err = db.NamedExec(query, &c)
 	if err == nil {
 		return nil
@@ -112,7 +114,8 @@ func DeleteCluster(IDOrName string) error {
 		return err
 	}
 
-	query := "DELETE FROM tb_cluster WHERE id=? OR name=?"
+	const query = "DELETE FROM tb_cluster WHERE id=? OR name=?"
+
 	_, err = db.Exec(query, IDOrName, IDOrName)
 	if err == nil {
 		return nil
@@ -139,7 +142,8 @@ func GetCluster(nameOrID string) (Cluster, error) {
 		return c, err
 	}
 
-	query := "SELECT * FROM tb_cluster WHERE id=? OR name=?"
+	const query = "SELECT * FROM tb_cluster WHERE id=? OR name=?"
+
 	err = db.Get(&c, query, nameOrID, nameOrID)
 	if err == nil {
 		return c, nil
@@ -169,7 +173,7 @@ func ListClusters() ([]Cluster, error) {
 	}
 
 	var clusters []Cluster
-	query := "SELECT * FROM tb_cluster"
+	const query = "SELECT * FROM tb_cluster"
 
 	err = db.Select(&clusters, query)
 	if err == nil {
@@ -197,7 +201,7 @@ func CountClusterByStorage(storageID string) (int, error) {
 	}
 
 	count := 0
-	query := "SELECT COUNT(*) from tb_cluster WHERE storage_id=?"
+	const query = "SELECT COUNT(*) from tb_cluster WHERE storage_id=?"
 
 	err = db.Get(&count, query, storageID)
 	if err == nil {
@@ -274,7 +278,8 @@ func (n *Node) UpdateStatus(state int64) error {
 		return err
 	}
 
-	query := "UPDATE tb_node SET status=? WHERE id=?"
+	const query = "UPDATE tb_node SET status=? WHERE id=?"
+
 	_, err = db.Exec(query, state, n.ID)
 	if err == nil {
 		atomic.StoreInt64(&n.Status, state)
@@ -304,7 +309,8 @@ func (n *Node) UpdateParams(max int) error {
 		return err
 	}
 
-	query := "UPDATE tb_node SET max_container=? WHERE id=?"
+	const query = "UPDATE tb_node SET max_container=? WHERE id=?"
+
 	_, err = db.Exec(query, max, n.ID)
 	if err == nil {
 		n.MaxContainer = max
@@ -394,7 +400,7 @@ func GetNode(nameOrID string) (Node, error) {
 	}
 
 	node := Node{}
-	query := "SELECT * FROM tb_node WHERE id=? OR name=? OR engine_id=?"
+	const query = "SELECT * FROM tb_node WHERE id=? OR name=? OR engine_id=?"
 
 	err = db.Get(&node, query, nameOrID, nameOrID, nameOrID)
 	if err == nil {
@@ -424,7 +430,7 @@ func GetNodeByAddr(addr string) (Node, error) {
 	}
 
 	node := Node{}
-	query := "SELECT * FROM tb_node WHERE admin_ip=?"
+	const query = "SELECT * FROM tb_node WHERE admin_ip=?"
 
 	err = db.Get(&node, query, addr)
 	if err == nil {
@@ -454,7 +460,7 @@ func GetAllNodes() ([]Node, error) {
 	}
 
 	var nodes []Node
-	query := "SELECT * FROM tb_node"
+	const query = "SELECT * FROM tb_node"
 
 	err = db.Select(&nodes, query)
 	if err == nil {
@@ -481,7 +487,7 @@ func ListNodeByCluster(cluster string) ([]*Node, error) {
 	}
 
 	var nodes []*Node
-	query := "SELECT * FROM tb_node WHERE cluster_id=?"
+	const query = "SELECT * FROM tb_node WHERE cluster_id=?"
 
 	err = db.Select(&nodes, query, cluster)
 	if err == nil {
@@ -508,7 +514,7 @@ func CountNodeByCluster(cluster string) (int, error) {
 	}
 
 	num := 0
-	query := "SELECT COUNT(*) FROM tb_node WHERE cluster_id=?"
+	const query = "SELECT COUNT(*) FROM tb_node WHERE cluster_id=?"
 
 	err = db.Get(&num, query, cluster)
 	if err == nil {
@@ -600,7 +606,8 @@ func DeleteNode(nameOrID string) error {
 		return err
 	}
 
-	query := "DELETE FROM tb_node WHERE id=? OR name=?"
+	const query = "DELETE FROM tb_node WHERE id=? OR name=?"
+
 	_, err = db.Exec(query, nameOrID, nameOrID)
 	if err == nil {
 		return nil

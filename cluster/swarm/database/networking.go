@@ -95,8 +95,10 @@ func SelectAvailablePorts(num int) ([]Port, error) {
 		return nil, err
 	}
 
-	var ports []Port
-	query := fmt.Sprintf("SELECT * FROM tb_port WHERE allocated=? LIMIT %d", num)
+	var (
+		ports []Port
+		query = fmt.Sprintf("SELECT * FROM tb_port WHERE allocated=? LIMIT %d", num)
+	)
 
 	err = db.Select(&ports, query, false)
 	if err != nil {
@@ -119,7 +121,7 @@ func SelectAvailablePorts(num int) ([]Port, error) {
 }
 
 func TxUpdatePorts(tx *sqlx.Tx, ports []Port) error {
-	query := "UPDATE tb_port SET name=:name,unit_id=:unit_id,unit_name=:unit_name,proto=:proto,allocated=:allocated WHERE port=:port"
+	const query = "UPDATE tb_port SET name=:name,unit_id=:unit_id,unit_name=:unit_name,proto=:proto,allocated=:allocated WHERE port=:port"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
@@ -210,7 +212,7 @@ func ListPortsByUnit(nameOrID string) ([]Port, error) {
 	}
 
 	var ports []Port
-	query := "SELECT * FROM tb_port WHERE unit_id=? OR unit_name=?"
+	const query = "SELECT * FROM tb_port WHERE unit_id=? OR unit_name=?"
 
 	err = db.Select(&ports, query, nameOrID, nameOrID)
 	if err == nil {
@@ -295,7 +297,7 @@ func ListIPByUnitID(unit string) ([]IP, error) {
 	}
 
 	var out []IP
-	query := "SELECT * from tb_ip WHERE unit_id=?"
+	const query = "SELECT * from tb_ip WHERE unit_id=?"
 
 	err = db.Select(&out, query, unit)
 	if err == nil {
@@ -322,7 +324,7 @@ func ListNetworkingByType(_type string) ([]Networking, error) {
 	}
 
 	var list []Networking
-	query := "SELECT * FROM tb_networking WHERE type=?"
+	const query = "SELECT * FROM tb_networking WHERE type=?"
 
 	err = db.Select(&list, query, _type)
 	if err == nil {
@@ -349,7 +351,7 @@ func ListNetworking() ([]Networking, error) {
 	}
 
 	var list []Networking
-	query := "SELECT * FROM tb_networking"
+	const query = "SELECT * FROM tb_networking"
 
 	err = db.Select(&list, query)
 	if err == nil {
@@ -376,7 +378,7 @@ func ListIPByNetworking(id string) ([]IP, error) {
 	}
 
 	var list []IP
-	query := "SELECT * FROM tb_ip WHERE networking_id=?"
+	const query = "SELECT * FROM tb_ip WHERE networking_id=?"
 
 	err = db.Select(&list, query, id)
 	if err == nil {
@@ -442,7 +444,8 @@ func UpdateNetworkingStatus(id string, enable bool) error {
 		return err
 	}
 
-	query := "UPDATE tb_networking SET enabled=? WHERE id=?"
+	const query = "UPDATE tb_networking SET enabled=? WHERE id=?"
+
 	_, err = db.Exec(query, enable, id)
 	if err == nil {
 		return nil
@@ -519,7 +522,7 @@ func CountIPByNetwrokingAndStatus(networking string, allocation bool) (int, erro
 	}
 
 	count := 0
-	query := "SELECT COUNT(*) from tb_ip WHERE networking_id=? AND allocated=?"
+	const query = "SELECT COUNT(*) from tb_ip WHERE networking_id=? AND allocated=?"
 
 	err = db.Get(&count, query, networking, allocation)
 	if err == nil {
@@ -599,7 +602,7 @@ func TXAllocIPByNetworking(id, unit string) (IP, error) {
 }
 
 func TxUpdateMultiIPValue(tx *sqlx.Tx, val []IP) error {
-	query := "UPDATE tb_ip SET unit_id=:unit_id,allocated=:allocated WHERE ip_addr=:ip_addr AND prefix=:prefix"
+	const query = "UPDATE tb_ip SET unit_id=:unit_id,allocated=:allocated WHERE ip_addr=:ip_addr AND prefix=:prefix"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {

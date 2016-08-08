@@ -60,7 +60,7 @@ func ListImages() ([]Image, error) {
 	}
 
 	var images []Image
-	query := "SELECT * FROM tb_image"
+	const query = "SELECT * FROM tb_image"
 
 	err = db.Select(&images, query)
 	if err == nil {
@@ -87,7 +87,7 @@ func GetImage(name, version string) (Image, error) {
 	}
 
 	image := Image{}
-	query := "SELECT * FROM tb_image WHERE name=? AND version=?"
+	const query = "SELECT * FROM tb_image WHERE name=? AND version=?"
 
 	err = db.Get(&image, query, name, version)
 	if err == nil {
@@ -147,7 +147,7 @@ func GetImageByID(ID string) (Image, error) {
 	}
 
 	image := Image{}
-	query := "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?"
+	const query = "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?"
 
 	err = db.Get(&image, query, ID, ID)
 	if err == nil {
@@ -173,7 +173,7 @@ func UpdateImageStatus(ID string, enable bool) error {
 		return err
 	}
 
-	query := "UPDATE tb_image SET enabled=? WHERE id=? OR docker_image_id=?"
+	const query = "UPDATE tb_image SET enabled=? WHERE id=? OR docker_image_id=?"
 	_, err = db.Exec(query, enable, ID, ID)
 	if err == nil {
 		return nil
@@ -194,7 +194,7 @@ func UpdateImageStatus(ID string, enable bool) error {
 
 func isImageUsed(tx *sqlx.Tx, image string) (bool, error) {
 	var out []string
-	query := "SELECT unit_id FROM tb_unit_config WHERE image_id=?"
+	const query = "SELECT unit_id FROM tb_unit_config WHERE image_id=?"
 
 	err := tx.Select(&out, query, image)
 	if err != nil {
@@ -236,8 +236,7 @@ func TxDeleteImage(ID string) error {
 		return errors.Errorf("Image %s is using", ID)
 	}
 
-	query := "DELETE FROM tb_image WHERE id=? OR docker_image_id=?"
-	_, err = tx.Exec(query, ID, ID)
+	_, err = tx.Exec("DELETE FROM tb_image WHERE id=? OR docker_image_id=?", ID, ID)
 	if err != nil {
 		return err
 	}
@@ -414,7 +413,7 @@ func TXInsertUnitConfig(tx *sqlx.Tx, config *UnitConfig) error {
 		return nil
 	}
 
-	return errors.Wrap(err, "Tx insert UnitConfig")
+	return errors.Wrap(err, "Tx Insert UnitConfig")
 }
 
 func TxUpdateImageTemplateConfig(image string, config UnitConfig) error {
@@ -449,6 +448,9 @@ func TxUpdateImageTemplateConfig(image string, config UnitConfig) error {
 
 func txDeleteUnitConfigByUnit(tx *sqlx.Tx, unitID string) error {
 	_, err := tx.Exec("DELETE FROM tb_unit_config WHERE unit_id=?", unitID)
+	if err == nil {
+		return nil
+	}
 
-	return err
+	return errors.Wrap(err, "Tx Delete UnitConfig By UnitID:"+unitID)
 }

@@ -174,7 +174,7 @@ func GetSystemConfig() (*Configurations, error) {
 	}
 
 	c := &Configurations{}
-	query := "SELECT * FROM tb_system_config LIMIT 1"
+	const query = "SELECT * FROM tb_system_config LIMIT 1"
 
 	err = db.Get(c, query)
 	if err == nil {
