@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/hashicorp/consul/api"
 )
@@ -278,6 +280,27 @@ func deregisterHealthCheck(host, serviceID string, config api.Config) error {
 	}
 
 	return client.Agent().ServiceDeregister(serviceID)
+}
+
+func (gd *Gardener) SaveContainerToConsul(container *cluster.Container) error {
+	client, err := gd.ConsulAPIClient()
+	if err != nil {
+		return err
+	}
+
+	buf := bytes.NewBuffer(nil)
+	err = json.NewEncoder(buf).Encode(container)
+	if err != nil {
+		return err
+	}
+
+	pair := &api.KVPair{
+		Key:   "DBAAS/Conatainers/" + container.ID,
+		Value: buf.Bytes(),
+	}
+	_, err = client.KV().Put(pair, nil)
+
+	return err
 }
 
 func deleteConsulKVTree(config api.Config, key string) error {

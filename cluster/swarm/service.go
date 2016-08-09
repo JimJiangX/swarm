@@ -751,9 +751,19 @@ func (svc *Service) StartService() (err error) {
 
 func (svc *Service) startContainers() error {
 	for _, u := range svc.units {
+		code, msg := int64(statusUnitStarting), ""
+
 		err := u.startContainer()
 		if err != nil {
+			code, msg = statusUnitStartFailed, err.Error()
+
 			logrus.Errorf("%s start container error:%s", u.Name, err)
+		}
+
+		_err := database.TxUpdateUnitStatus(&u.Unit, code, msg)
+		if err != nil {
+			logrus.WithField("Unit", u.Name).Errorf("Update Unit Status,status=%d,LatestError=%s,%s", code, msg, _err)
+
 			return err
 		}
 	}

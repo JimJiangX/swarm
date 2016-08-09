@@ -1,8 +1,6 @@
 package swarm
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"runtime/debug"
 	"sync/atomic"
@@ -10,8 +8,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/swarm/cluster"
-	"github.com/docker/swarm/cluster/swarm/database"
-	consulapi "github.com/hashicorp/consul/api"
+	"github.com/pkg/errors"
 )
 
 func (gd *Gardener) serviceExecute(svc *Service) (err error) {
@@ -120,25 +117,35 @@ func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) (err er
 		}
 	}
 
-	logrus.Debug("[MG]create container")
-	container, err := gd.createContainerInPending(swarmID, svc.authConfig)
-	if err != nil {
-		return fmt.Errorf("Container Create Failed %s,%s", swarmID, err)
-	}
-
-	logrus.Debug("container created:", container.ID)
-
 	u, err := svc.getUnit(swarmID)
 	if err != nil || u == nil {
 		return fmt.Errorf("%s:get unit err:%v", svc.Name, err)
 	}
 
+	atomic.StoreInt64(&u.Unit.Status, statusUnitCreating)
+
+	logrus.Debug("[MG]create container")
+	container, err := gd.createContainerInPending(swarmID, svc.authConfig)
+	if err != nil {
+		atomic.StoreInt64(&u.Unit.Status, statusUnitCreateFailed)
+		u.LatestError = err.Error()
+
+		u.saveToDisk()
+
+		return fmt.Errorf("Container Create Failed %s,%s", swarmID, err)
+	}
+
+	logrus.Debug("container created:", container.ID)
+
 	u.container = container
 	u.config = container.Config
 	u.Unit.ContainerID = container.ID
 
+	atomic.StoreInt64(&u.Unit.Status, statusUnitCreated)
+	u.Unit.LatestError = ""
+
 	if err := u.saveToDisk(); err != nil {
-		return fmt.Errorf("update unit %s value error:%s,value:%v", u.Name, err, u)
+		return errors.Errorf("Update Unit %s value error:%s,Unit:%+v", u.Name, err, u.Unit)
 	}
 
 	err = gd.SaveContainerToConsul(container)
@@ -175,16 +182,21 @@ func (gd *Gardener) createContainerInPending(swarmID string, authConfig *types.A
 }
 
 func (gd *Gardener) initAndStartService(svc *Service) (err error) {
-	sys, err := database.GetSystemConfig()
+	sys, err := gd.SystemConfig()
 	if err != nil {
 		logrus.Errorf("Query Database Error:%s", err)
 		return nil
 	}
+
 	err = svc.statusCAS(statusServiceCreating, statusServiceStarting)
 	if err != nil {
 		return err
 	}
 	defer func() {
+		for _, u := range svc.units {
+			u.saveToDisk()
+		}
+
 		if err != nil {
 			// mark failed
 			atomic.StoreInt64(&svc.Status, statusServiceStartFailed)
@@ -192,6 +204,7 @@ func (gd *Gardener) initAndStartService(svc *Service) (err error) {
 			atomic.StoreInt64(&svc.Status, statusServiceNoContent)
 		}
 	}()
+
 	logrus.Debug("[MG]starting Containers")
 	if err := svc.startContainers(); err != nil {
 		return err
@@ -226,25 +239,4 @@ func (gd *Gardener) initAndStartService(svc *Service) (err error) {
 	}
 
 	return nil
-}
-
-func (gd *Gardener) SaveContainerToConsul(container *cluster.Container) error {
-	client, err := gd.ConsulAPIClient()
-	if err != nil {
-		return err
-	}
-
-	buf := bytes.NewBuffer(nil)
-	err = json.NewEncoder(buf).Encode(container)
-	if err != nil {
-		return err
-	}
-
-	pair := &consulapi.KVPair{
-		Key:   "DBAAS/Conatainers/" + container.ID,
-		Value: buf.Bytes(),
-	}
-	_, err = client.KV().Put(pair, nil)
-
-	return err
 }

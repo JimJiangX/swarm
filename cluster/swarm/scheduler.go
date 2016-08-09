@@ -276,6 +276,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 				ImageName:     image.Name + ":" + image.Version,
 				EngineID:      engine.ID,
 				Status:        statusUnitAllocting,
+				LatestError:   "",
 				CheckInterval: 0,
 				NetworkMode:   config.HostConfig.NetworkMode.NetworkName(),
 				CreatedAt:     time.Now(),
@@ -301,12 +302,14 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 		allocs = append(allocs, preAlloc)
 		if err != nil {
 			atomic.StoreInt64(&unit.Status, statusUnitAlloctionFailed)
+			unit.LatestError = err.Error()
+
+			unit.saveToDisk()
+
 			entry.Errorf("pendingAlloc:Alloc Resource %s", err)
 
 			return allocs, err
 		}
-
-		atomic.StoreInt64(&unit.Status, statusUnitAllocted)
 	}
 
 	entry.Info("pendingAlloc: Allocation Succeed!")
@@ -357,6 +360,8 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit,
 	}
 
 	gd.pendingContainers[swarmID] = pending.pendingContainer
+
+	atomic.StoreInt64(&pending.unit.Status, statusUnitAllocted)
 
 	err = pending.consistency()
 	if err != nil {
