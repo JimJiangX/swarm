@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/swarm/cluster"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -33,9 +33,22 @@ func containerExec(ctx context.Context, engine *cluster.Engine, containerID stri
 	if engine == nil {
 		return inspect, errEngineIsNil
 	}
+
 	client := engine.ContainerAPIClient()
 	if client == nil {
 		return inspect, errEngineAPIisNil
+	}
+
+	container, err := client.ContainerInspect(ctx, containerID)
+	engine.CheckConnectionErr(err)
+	if err != nil {
+		return inspect, err
+	}
+
+	if !container.State.Running {
+		return inspect, errors.Errorf("Container %s:%s,%s",
+			container.Name, errContainerNotRunning,
+			cluster.FullStateString(container.State))
 	}
 
 	execConfig := types.ExecConfig{
