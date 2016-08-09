@@ -10,7 +10,8 @@ INSTANCE=$1
 USER=$2
 PASSWD=$3
 #QUOTA=$4
-QUOTA=10240
+# 1024 * 1024 * 1024 * 5 =5368709120 = 5G
+QUOTA=5368709120
 VARFILE=/tmp/${INSTANCE}_file_variables.data
 
 docker exec $INSTANCE mysql -S /DBAASDAT/upsql.sock mysql -u$USER -p$PASSWD  -e"show variables where Variable_name in ( 'log_error', 'slow_query_log_file');" >$VARFILE  2>/dev/null
@@ -36,14 +37,14 @@ done <$VARFILE
 
 
  #upsql.error_file_size
-errsize=`docker exec $INSTANCE du -m $errfile 2>/dev/null | awk '{print $1}'`
+errsize=`docker exec $INSTANCE du -b $errfile 2>/dev/null | awk '{print $1}'`
 
 #if [ "$errsize" = "" ];then
 #	errsize="err"
 #fi
 
 #upsql.slow_query_file_size
-qrysize=`docker exec  $INSTANCE du -m $queryfile 2>/dev/null | awk '{print $1}' `
+qrysize=`docker exec  $INSTANCE du -b $queryfile 2>/dev/null | awk '{print $1}' `
 if [ "$qrysize" = "" ];then
 	qrysize=0
 fi
@@ -52,7 +53,7 @@ if [ "$QUOTA" = "" ];then
      QUOTA=0
 fi
 if [ "$qrysize" != "err" ] && [ $qrysize -ge $QUOTA ] ;then
-	qrysize=`docker exec  $INSTANCE  >$queryfile;du -m $queryfile 2>/dev/null | awk '{print $1}' `
+	qrysize=`docker exec  $INSTANCE  >$queryfile;du -b $queryfile 2>/dev/null | awk '{print $1}' `
 fi
 
 #upsql.table_size
@@ -73,7 +74,7 @@ function gettables()
 		#   [  "$file" = "slave_master_info.ibd" ];then
     #      	continue
     # fi
-        tablesize=`du -m $file | awk '{print $1}'`
+        tablesize=`du -b $file | awk '{print $1}'`
         tablename=`echo $file | awk -F . '{print $1}'`       
         tables=$tables#${database},${tablename},${tablesize}
 	done

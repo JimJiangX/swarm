@@ -75,6 +75,7 @@ EOF
 	
 	cat << EOF > ${dir}/check_db.sh
 #!/bin/bash
+set -o nounset
 
 container_name=\$1
 
@@ -83,9 +84,15 @@ if [ \$? -ne 0 ]; then
 	 exit 2
 fi
 
+running_status=\`docker inspect -f "{{.State.Running}}" \${container_name}\`
+if [ \${running_status} == "false" ]; then
+	echo "container \${container_name} is not running !"
+	exit 3
+fi
+
 docker exec \${container_name} /root/check_db
 if [ \$? -ne 0 ]; then
-	 exit 2
+	 exit 4
 fi
 EOF
 	chmod +x ${dir}/check_db.sh
@@ -93,6 +100,7 @@ EOF
 
 	cat << EOF > ${dir}/check_proxy.sh
 #!/bin/bash
+set -o nounset
 
 container_name=\$1
 
@@ -101,9 +109,15 @@ if [ \$? -ne 0 ]; then
 	 exit 2
 fi
 
+running_status=\`docker inspect -f "{{.State.Running}}" \${container_name}\`
+if [ \${running_status} == "false" ]; then
+	echo "container \${container_name} is not running !"
+	exit 3
+fi
+
 docker exec \$container_name /root/check_proxy --default-file /DBAASCNF/upsql-proxy.conf
 if [ \$? -ne 0 ]; then
-	 exit 2
+	 exit 4
 fi
 EOF
 	chmod +x ${dir}/check_proxy.sh
