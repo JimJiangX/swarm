@@ -702,7 +702,12 @@ func (u *unit) initService() error {
 		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
 
+	atomic.StoreInt64(&u.Status, statusUnitStarted)
+
 	if err != nil {
+		atomic.StoreInt64(&u.Status, statusUnitStartFailed)
+		u.LatestError = err.Error()
+
 		logrus.Error(err)
 	}
 
@@ -810,11 +815,13 @@ func (u *unit) startService() error {
 
 	code, msg := int64(statusUnitStarted), ""
 	if err != nil {
-		logrus.Error(err)
 		code, msg = statusUnitStartFailed, err.Error()
+
+		logrus.Error(err)
 	}
 
 	_err := database.TxUpdateUnitStatus(&u.Unit, code, msg)
+
 	if err != nil {
 		logrus.WithField("Unit", u.Name).Errorf("Update Unit Status,status=%d,LatestError=%s,%s", code, msg, _err)
 	}
@@ -854,15 +861,22 @@ func (u *unit) stopService() error {
 		return err
 	}
 
-	code, msg := int64(statusUnitStoped), ""
+	code, msg := int64(statusUnitStoping), ""
+	_err := database.TxUpdateUnitStatus(&u.Unit, code, msg)
+	if err != nil {
+		logrus.WithField("Unit", u.Name).Errorf("Update Unit Status,status=%d,LatestError=%s,%s", code, msg, _err)
+	}
+
 	err = u.forceStopService()
+
+	code = statusUnitStoped
 
 	if err != nil {
 		logrus.Error(err)
 		code, msg = statusUnitStopFailed, err.Error()
 	}
 
-	_err := database.TxUpdateUnitStatus(&u.Unit, code, msg)
+	_err = database.TxUpdateUnitStatus(&u.Unit, code, msg)
 	if err != nil {
 		logrus.WithField("Unit", u.Name).Errorf("Update Unit Status,status=%d,LatestError=%s,%s", code, msg, _err)
 	}
@@ -961,9 +975,12 @@ func getPluginAddr(IP string, port int) string {
 }
 
 func (u *unit) saveToDisk() error {
-	logrus.Debugf("%s:save unit To Disk", u.Name)
+	err := database.UpdateUnitInfo(u.Unit)
+	if err != nil {
+		logrus.WithField("Container", u.Name).Errorf("Update Unit Info:%s,%+v", err, u.Unit)
+	}
 
-	return database.UpdateUnitInfo(u.Unit)
+	return err
 }
 
 func (u *unit) registerHorus(user, password string, agentPort int) (registerService, error) {
