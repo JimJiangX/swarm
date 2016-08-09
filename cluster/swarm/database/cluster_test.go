@@ -234,10 +234,10 @@ func TestNode(t *testing.T) {
 		}
 	}
 
-	t0 := NewTask("qwertyu", "qwertyuiopsdfghjklbn", "tyuighjfdghjkl", nil, 888)
-	t1 := NewTask("qweafjlafjrtyu", "qwertyuiajlfakfaopsdfghjklbn", "tyuifajflaghjfdghjkl", nil, 888)
-	t2 := NewTask("qwertyu", "qwertyuiopsdfghjklbn", "tyuighjfdghjkl", []string{"jlafjlakf", "jaljflajflajf"}, 888)
-	t3 := NewTask("qweafjlahjklkjhfjrtyu", "qwertfajlfjafyuiajlfakfaopsdfghjklbn", "", nil, 888)
+	t0 := NewTask("task1", "qwertyu", "qwertyuiopsdfghjklbn", "tyuighjfdghjkl", nil, 888)
+	t1 := NewTask("task2", "qweafjlafjrtyu", "qwertyuiajlfakfaopsdfghjklbn", "tyuifajflaghjfdghjkl", nil, 888)
+	t2 := NewTask("task3", "qwertyu", "qwertyuiopsdfghjklbn", "tyuighjfdghjkl", []string{"jlafjlakf", "jaljflajflajf"}, 888)
+	t3 := NewTask("task4", "qweafjlahjklkjhfjrtyu", "qwertfajlfjafyuiajlfakfaopsdfghjklbn", "", nil, 888)
 	tasks := []*Task{&t0, &t1, &t2, &t3}
 
 	defer func() {

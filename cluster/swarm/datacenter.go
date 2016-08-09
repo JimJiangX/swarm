@@ -593,7 +593,7 @@ func (gd *Gardener) rebuildDatacenter(nameOrID string) (*Datacenter, error) {
 	for n := range nodes {
 		node, err := gd.rebuildNode(*nodes[n])
 		if err != nil {
-			logrus.WithError(err).Error("rebuild Node:", nodes[n])
+			logrus.WithError(err).Error("rebuild Node:")
 			continue
 		}
 		out = append(out, node)
@@ -614,12 +614,15 @@ func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
 		engine: eng,
 	}
 
-	logrus.WithFields(logrus.Fields{
+	entry := logrus.WithFields(logrus.Fields{
 		"Name": n.Name,
 		"Addr": n.Addr,
-	}).Debug("rebuild Node")
+	})
+	entry.Debug("rebuild Node")
 
 	if err != nil {
+		entry.Error(err)
+
 		return node, err
 	}
 
@@ -1104,6 +1107,9 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 
 				continue
 			}
+
+			nodes[i].engine = eng
+			nodes[i].EngineID = eng.ID
 		}
 	}
 }
@@ -1138,14 +1144,6 @@ func (gd *Gardener) updateNodeEngine(node *Node, dockerPort int) (*cluster.Engin
 
 		return nil, errors.Errorf("Engine %s Status:%s", addr, status)
 	}
-
-	err := database.TxUpdateNodeRegister(node.Node, node.task, statusNodeTesting, statusTaskRunning, eng.ID, "")
-	if err != nil {
-		logrus.Error(eng.Addr, "TxUpdateNodeRegister", err)
-		return nil, err
-	}
-	node.engine = eng
-	node.EngineID = eng.ID
 
 	return eng, nil
 }

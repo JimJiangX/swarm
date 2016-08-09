@@ -161,6 +161,11 @@ func (gd *Gardener) GetUnit(table database.Unit) (*unit, error) {
 	if u == nil || u.engine == nil {
 		value, err := gd.rebuildUnit(table)
 		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"Service": svc.Name,
+				"Unit":    table.Name,
+			}).Errorf("rebuild Unit:%s", err)
+
 			return nil, err
 		}
 
@@ -225,7 +230,7 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 	logrus.WithFields(logrus.Fields{
 		"Name":      table.Name,
 		"Container": table.ContainerID,
-	}).Debugf("rebuild Unit:%s", err)
+	}).Debugf("rebuild Unit:%v", err)
 
 	return u, err
 }
@@ -849,7 +854,7 @@ func (u *unit) stopService() error {
 		return err
 	}
 
-	code, msg := int64(statusUnitStarted), ""
+	code, msg := int64(statusUnitStoped), ""
 	err = u.forceStopService()
 
 	if err != nil {

@@ -1185,7 +1185,6 @@ func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}
 				logrus.Error("%s start Service error,%s", u.Name, err)
 				return err
 			}
-
 		}
 	}
 
