@@ -42,7 +42,7 @@ fi
  done <$STATUSFILE
 
 #upsql.buffer_pool_hit
-hit=`echo "scale=2;($requests - $reads)/$reads" |bc `
+hit=`echo "scale=2;($requests - $reads)/$requests" |bc `
 
 #upsql.buffer_pool.size
 total=`echo "$pool_pages_total*$page_size/1024/1024" |bc `
