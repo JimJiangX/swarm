@@ -17,7 +17,6 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
-	consulapi "github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 	swm_structs "github.com/yiduoyunQ/sm/sm-svr/structs"
 	"github.com/yiduoyunQ/smlib"
@@ -1290,7 +1289,7 @@ func (svc *Service) registerServices(config database.ConsulConfig) (err error) {
 	return nil
 }
 
-func (svc *Service) deregisterServices(config consulapi.Config) error {
+func (svc *Service) deregisterServices(config database.ConsulConfig) error {
 	for _, u := range svc.units {
 		eng, err := u.Engine()
 		if err != nil {
@@ -1843,14 +1842,12 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 		entry.Errorf("GetSystemConfig error:%s", err)
 		return err
 	}
-	configs := getConsulConfigs(sys.ConsulConfig)
-	if len(configs) == 0 {
-		return fmt.Errorf("GetConsulConfigs error %v %v", err, sys)
-	}
 
 	entry.Debug("Service Delete... stop service & stop containers & rm containers & deregister")
+
 	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-	err = svc.Delete(gd, configs[0], horus, force, volumes, true, timeout)
+
+	err = svc.Delete(gd, horus, force, volumes, true, timeout)
 	if err != nil {
 		entry.Errorf("Service.Delete error:%s", err)
 
@@ -1886,8 +1883,8 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 	return nil
 }
 
-func (svc *Service) Delete(gd *Gardener, config consulapi.Config,
-	horus string, force, rmVolumes, recycle bool, timeout int) error {
+func (svc *Service) Delete(gd *Gardener, horus string,
+	force, rmVolumes, recycle bool, timeout int) error {
 
 	svc.Lock()
 	defer svc.Unlock()
@@ -2009,12 +2006,17 @@ func (svc *Service) Delete(gd *Gardener, config consulapi.Config,
 	}
 
 	logrus.Debug("deregisterServices")
-	err = svc.deregisterServices(config)
+	sys, err := gd.SystemConfig()
+	if err != nil {
+		logrus.WithError(err).Error("Get System Config")
+		return nil
+	}
+	err = svc.deregisterServices(sys.ConsulConfig)
 	if err != nil {
 		logrus.Errorf("%s deregister In consul error:%s", svc.Name, err)
 	}
 
-	err = deleteConsulKVTree(config, svc.ID)
+	err = deleteConsulKVTree(sys.ConsulConfig, svc.ID)
 	if err != nil {
 		logrus.Errorf("Delete Consul KV:%s,%s", svc.ID, err)
 	}

@@ -17,3 +17,15 @@ func TestRolesJSONUnmarshal(t *testing.T) {
 	}
 	t.Logf("%v %v", m, err)
 }
+
+func TestParseIPFromHealthCheck(t *testing.T) {
+	output := "TCP connect 192.168.2.123:8000: Success"
+	id := "HS-192.168.2.123"
+
+	addr := parseIPFromHealthCheck(id, output)
+	if addr != "" {
+		t.Log(addr)
+	} else {
+		t.Error("Unexpected")
+	}
+}

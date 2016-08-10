@@ -475,23 +475,19 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	containers := gd.Containers()
-	consulClient, err := gd.ConsulAPIClient()
-	if err != nil {
-		logrus.Error(err)
-	}
 
 	var response io.Reader
 	switch strings.ToUpper(from) {
 	case "DBAAS":
 		logrus.Debugf("From %s", from)
 
-		response = listServiceFromDBAAS(services, containers, consulClient)
+		response = listServiceFromDBAAS(services, containers)
 	default:
 		logrus.Debugf("From %s", "default")
 
 		list := make([]structs.ServiceResponse, len(services))
 		for i := range services {
-			list[i] = getServiceResponse(services[i], containers, consulClient)
+			list[i] = getServiceResponse(services[i], containers)
 		}
 
 		buffer := bytes.NewBuffer(nil)
@@ -594,8 +590,7 @@ func getServiceRunningStatus(serviceID string, units []database.Unit,
 	return state
 }
 
-func listServiceFromDBAAS(services []database.Service,
-	containers cluster.Containers, client *consulapi.Client) io.Reader {
+func listServiceFromDBAAS(services []database.Service, containers cluster.Containers) io.Reader {
 	type response struct {
 		ID           string //"id": "??",
 		Name         string //"name": "test01",
@@ -612,7 +607,7 @@ func listServiceFromDBAAS(services []database.Service,
 		CreatedAt     string `json:"created_at"`     // "created_at": "??"
 	}
 
-	checks, err := swarm.HealthChecksFromConsul(client, "any", nil)
+	checks, err := swarm.HealthChecksFromConsul("any", nil)
 	if err != nil {
 		logrus.Error(err)
 		checks = make(map[string]consulapi.HealthCheck, 0)
@@ -668,20 +663,14 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	consulClient, err := gd.ConsulAPIClient()
-	if err != nil {
-		logrus.Error(err)
-	}
-
-	resp := getServiceResponse(service, gd.Containers(), consulClient)
+	resp := getServiceResponse(service, gd.Containers())
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }
 
-func getServiceResponse(service database.Service, containers cluster.Containers,
-	client *consulapi.Client) structs.ServiceResponse {
+func getServiceResponse(service database.Service, containers cluster.Containers) structs.ServiceResponse {
 	desc := structs.PostServiceRequest{}
 	err := json.NewDecoder(bytes.NewBufferString(service.Description)).Decode(&desc)
 	if err != nil {
@@ -706,7 +695,7 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 	roles := make(map[string]string)
 	for i := range units {
 		if units[i].Type == "switch_manager" {
-			roles, err = swarm.GetUnitRoleFromConsul(client, service.ID+"/"+units[i].Name)
+			roles, err = swarm.GetUnitRoleFromConsul(service.ID + "/" + units[i].Name)
 			if err == nil {
 				break
 			} else {
@@ -715,7 +704,7 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 		}
 	}
 
-	checks, err := swarm.HealthChecksFromConsul(client, "any", nil)
+	checks, err := swarm.HealthChecksFromConsul("any", nil)
 	if err != nil {
 		logrus.Error(err)
 		checks = make(map[string]consulapi.HealthCheck, 0)

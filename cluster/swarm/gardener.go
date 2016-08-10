@@ -15,7 +15,6 @@ import (
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
 	"github.com/docker/swarm/utils"
-	consulapi "github.com/hashicorp/consul/api"
 	crontab "gopkg.in/robfig/cron.v2"
 )
 
@@ -45,7 +44,6 @@ type Gardener struct {
 	// added by fugr
 	sysConfig          *database.Configurations
 	cron               *crontab.Cron // crontab tasks
-	consulClient       *consulapi.Client
 	registryAuthConfig *types.AuthConfig
 	cronJobs           map[crontab.EntryID]*serviceBackup
 
@@ -217,11 +215,9 @@ func (gd *Gardener) SetParams(sys *database.Configurations) error {
 	gd.Lock()
 	defer gd.Unlock()
 
-	_, clients := pingConsul(HostAddress, *sys)
-	if len(clients) > 0 {
-		gd.consulClient = clients[0]
-	} else {
-		return fmt.Errorf("cannot connect to consul,%v", sys.ConsulConfig)
+	err := setConsulClient(&sys.ConsulConfig)
+	if err != nil {
+		return err
 	}
 
 	DatacenterID = sys.ID

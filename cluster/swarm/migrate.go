@@ -389,7 +389,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		err = gd.SaveContainerToConsul(container)
+		err = saveContainerToConsul(container)
 		if err != nil {
 			logrus.Errorf("Save Container To Consul error:%s", err)
 			// return err
@@ -966,7 +966,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		err = gd.SaveContainerToConsul(container)
+		err = saveContainerToConsul(container)
 		if err != nil {
 			logrus.Errorf("Save Container To Consul error:%s", err)
 			// return err
@@ -1043,14 +1043,9 @@ func registerToServers(u *unit, svc *Service, sys database.Configurations) error
 }
 
 func deregisterToServices(addr, unitID string, sys database.Configurations) error {
-	configs := getConsulConfigs(sys.ConsulConfig)
-	if len(configs) == 0 {
-		return fmt.Errorf("GetConsulConfigs error %v %v", configs[0])
-	}
-
 	logrus.Debugf("deregister HealthCheck %s", unitID)
 
-	err := deregisterHealthCheck(addr, unitID, configs[0])
+	err := deregisterHealthCheck(addr, unitID, sys.ConsulConfig)
 	if err != nil {
 		logrus.Error(err)
 	}

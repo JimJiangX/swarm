@@ -3,45 +3,26 @@ package swarm
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/hashicorp/consul/api"
+	"github.com/pkg/errors"
 )
 
-var ErrConsulClientIsNil = errors.New("consul client is nil")
-
-func getConsulConfigs(c database.ConsulConfig) []api.Config {
-	port := strconv.Itoa(c.ConsulPort)
-	addrs := strings.Split(c.ConsulIPs, ",")
-	if len(addrs) == 0 {
-		return nil
-	}
-	configs := make([]api.Config, len(addrs))
-
-	for i := range addrs {
-		configs[i] = api.Config{
-			Address:    addrs[i] + ":" + port,
-			Datacenter: c.ConsulDatacenter,
-			WaitTime:   time.Duration(c.ConsulWaitTime) * time.Second,
-			Token:      c.ConsulToken,
-		}
+func HealthChecksFromConsul(state string, q *api.QueryOptions) (map[string]api.HealthCheck, error) {
+	client, err := getConsulClient(true)
+	if err != nil {
+		return nil, err
 	}
 
-	return configs
-}
-
-func HealthChecksFromConsul(client *api.Client, state string, q *api.QueryOptions) (map[string]api.HealthCheck, error) {
-	if client == nil {
-		return nil, ErrConsulClientIsNil
-	}
 	checks, _, err := client.Health().State(state, q)
 	if err != nil {
 		return nil, err
@@ -55,9 +36,10 @@ func HealthChecksFromConsul(client *api.Client, state string, q *api.QueryOption
 	return m, nil
 }
 
-func GetUnitRoleFromConsul(client *api.Client, key string) (map[string]string, error) {
-	if client == nil {
-		return nil, ErrConsulClientIsNil
+func GetUnitRoleFromConsul(key string) (map[string]string, error) {
+	client, err := getConsulClient(true)
+	if err != nil {
+		return nil, err
 	}
 
 	key = key + "/Topology"
@@ -96,115 +78,6 @@ func rolesJSONUnmarshal(data []byte) (map[string]string, error) {
 	}
 
 	return m, nil
-}
-
-func (gd *Gardener) setConsulClient(client *api.Client) {
-	gd.Lock()
-	gd.consulClient = client
-	gd.Unlock()
-}
-
-func (gd *Gardener) ConsulAPIClient() (*api.Client, error) {
-	gd.RLock()
-	if gd.consulClient != nil {
-		if _, err := gd.consulClient.Status().Leader(); err == nil {
-			gd.RUnlock()
-			return gd.consulClient, nil
-		}
-	}
-	gd.RUnlock()
-
-	sys, err := database.GetSystemConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	_, clients := pingConsul(HostAddress, *sys)
-	if len(clients) > 0 {
-		return clients[0], nil
-	}
-
-	return nil, fmt.Errorf("Not Found Alive Consul Server %s:%d", sys.ConsulIPs, sys.ConsulPort)
-}
-
-func pingConsul(host string, sys database.Configurations) ([]string, []*api.Client) {
-	endpoints, dc, token, wait := sys.GetConsulConfig()
-	port := strconv.Itoa(sys.ConsulPort)
-	endpoints = append(endpoints, host+":"+port)
-
-	endpoints[0], endpoints[len(endpoints)-1] = endpoints[len(endpoints)-1], endpoints[0]
-
-	peers := make([]string, 0, len(endpoints))
-	clients := make([]*api.Client, 0, len(endpoints))
-
-	for _, endpoint := range endpoints {
-		config := api.Config{
-			Address:    endpoint,
-			Datacenter: dc,
-			WaitTime:   time.Duration(wait) * time.Second,
-			Token:      token,
-		}
-
-		client, err := api.NewClient(&config)
-		if err != nil {
-			logrus.Warnf("consul config illegal，%v", config)
-			continue
-		}
-
-		servers, err := client.Status().Peers()
-		if err != nil {
-			logrus.Warnf("consul connection error,%s,%v", err, config)
-			continue
-		}
-
-		addrs := make([]string, 0, len(servers)+1)
-		for n := range servers {
-			ip, _, err := net.SplitHostPort(servers[n])
-			if err != nil {
-				logrus.Warn("%s SplitHostPort error %s", servers[n], err)
-				continue
-			}
-
-			servers[n] = ip + ":" + port
-			addrs = append(addrs, servers[n])
-		}
-
-		exist := false
-		for n := range servers {
-			if endpoint == servers[n] {
-				exist = true
-				break
-			}
-		}
-		if !exist {
-			peers = append(peers, endpoint)
-			peers = append(peers, servers...)
-
-			clients = append(clients, client)
-		} else {
-			peers = servers
-		}
-
-		for i := range servers {
-			config := api.Config{
-				Address:    servers[i],
-				Datacenter: dc,
-				WaitTime:   time.Duration(wait) * time.Second,
-				Token:      token,
-			}
-
-			client, err := api.NewClient(&config)
-			if err != nil {
-				logrus.Warnf("consul config illegal，%v", config)
-				continue
-			}
-			clients = append(clients, client)
-		}
-
-		break
-	}
-
-	return peers, clients
 }
 
 func registerHealthCheck(u *unit, config database.ConsulConfig, context *Service) error {
@@ -287,15 +160,16 @@ func registerHealthCheck(u *unit, config database.ConsulConfig, context *Service
 	return client.Agent().ServiceRegister(&service)
 }
 
-func deregisterHealthCheck(host, serviceID string, config api.Config) error {
-	_, port, err := net.SplitHostPort(config.Address)
-	if err != nil {
-		logrus.Error("SplitHostPort %s error %s", config.Address, err)
-		return err
-	}
+func deregisterHealthCheck(host, serviceID string, config database.ConsulConfig) error {
+	address := fmt.Sprintf("%s:%d", host, config.ConsulPort)
 
-	config.Address = fmt.Sprintf("%s:%s", host, port)
-	client, err := api.NewClient(&config)
+	c := api.Config{
+		Address:    address,
+		Datacenter: config.ConsulDatacenter,
+		WaitTime:   time.Duration(config.ConsulWaitTime) * time.Second,
+		Token:      config.ConsulToken,
+	}
+	client, err := api.NewClient(&c)
 	if err != nil {
 		return err
 	}
@@ -303,8 +177,8 @@ func deregisterHealthCheck(host, serviceID string, config api.Config) error {
 	return client.Agent().ServiceDeregister(serviceID)
 }
 
-func (gd *Gardener) SaveContainerToConsul(container *cluster.Container) error {
-	client, err := gd.ConsulAPIClient()
+func saveContainerToConsul(container *cluster.Container) error {
+	client, err := getConsulClient(true)
 	if err != nil {
 		return err
 	}
@@ -324,8 +198,8 @@ func (gd *Gardener) SaveContainerToConsul(container *cluster.Container) error {
 	return err
 }
 
-func deleteConsulKVTree(config api.Config, key string) error {
-	client, err := api.NewClient(&config)
+func deleteConsulKVTree(config database.ConsulConfig, key string) error {
+	client, err := getConsulClient(true)
 	if err != nil {
 		return err
 	}
@@ -335,7 +209,178 @@ func deleteConsulKVTree(config api.Config, key string) error {
 	return err
 }
 
-func getHorusFromConsul(config api.Config) ([]string, error) {
+func getHorusFromConsul() (string, error) {
+	client, err := getConsulClient(true)
+	if err != nil {
+		return "", err
+	}
 
-	return nil, nil
+	checks, _, err := client.Health().State("passing", nil)
+	if err != nil {
+		return "", err
+	}
+
+	for i := range checks {
+		addr := parseIPFromHealthCheck(checks[i].ServiceID, checks[i].Output)
+		if addr != "" {
+			return addr, nil
+		}
+	}
+
+	return "", errors.New("Non Available Horus Query From Consul Servers")
+}
+
+func parseIPFromHealthCheck(serviceID, output string) string {
+	const key = "HS-"
+
+	if !strings.HasPrefix(serviceID, key) {
+		return ""
+	}
+
+	index := strings.Index(serviceID, key)
+	addr := string(serviceID[index+len(key):])
+
+	if net.ParseIP(addr) == nil {
+		return ""
+	}
+
+	index = strings.Index(output, addr)
+
+	parts := strings.Split(string(output[index:]), ":")
+	if len(parts) > 2 {
+		addr = parts[0] + ":" + parts[1]
+		_, _, err := net.SplitHostPort(addr)
+		if err == nil {
+			return addr
+		}
+	}
+
+	return ""
+}
+
+var errAvailableConsulClient = errors.New("Non Available Consul Client")
+var defaultConsuls = &consulConfigs{}
+
+func getConsulClient(ping bool) (*api.Client, error) {
+	client, err := defaultConsuls.getConsulClient(ping)
+	if err == nil {
+		return client, nil
+	}
+
+	c, err := database.GetSystemConfig()
+	if err == nil {
+		err = setConsulClient(&c.ConsulConfig)
+		if err == nil {
+			return defaultConsuls.getConsulClient(ping)
+		}
+	}
+
+	return nil, err
+}
+
+func setConsulClient(c *database.ConsulConfig) error {
+	if c == nil {
+		c = &defaultConsuls.c
+	}
+
+	return defaultConsuls.set(*c)
+}
+
+type consulConfigs struct {
+	sync.RWMutex
+	clients []*api.Client
+	addrs   []string
+	c       database.ConsulConfig
+}
+
+func (cs *consulConfigs) set(c database.ConsulConfig) error {
+	cs.Lock()
+	defer cs.Unlock()
+
+	addrs := strings.Split(c.ConsulIPs, ",")
+	if len(addrs) == 0 {
+		return errors.New("Non Consul Addr")
+	}
+
+	config := api.Config{
+		Datacenter: c.ConsulDatacenter,
+		WaitTime:   time.Duration(c.ConsulWaitTime) * time.Second,
+		Token:      c.ConsulToken,
+	}
+
+	var (
+		peers []string
+		port  = strconv.Itoa(c.ConsulPort)
+	)
+	for i := range addrs {
+		config.Address = addrs[i] + ":" + port
+
+		client, err := api.NewClient(&config)
+		if err != nil {
+			continue
+		}
+
+		peers, err = client.Status().Peers()
+		if err == nil && len(peers) > 0 {
+			break
+		}
+	}
+
+	if len(peers) == 0 {
+		return errors.Errorf("Unable to connect consul servers,%s", addrs)
+	}
+
+	list := make([]*api.Client, len(peers))
+
+	for i := range peers {
+		host, _, err := net.SplitHostPort(peers[i])
+		if err != nil {
+			continue
+		}
+
+		config.Address = host + ":" + port
+
+		client, err := api.NewClient(&config)
+		if err != nil {
+			continue
+		}
+
+		list[i] = client
+	}
+
+	cs.addrs = addrs
+	cs.c = c
+	cs.clients = list
+
+	return nil
+}
+
+func (cs *consulConfigs) getConsulClient(ping bool) (*api.Client, error) {
+	var client *api.Client
+
+	cs.RLock()
+
+	for _, c := range cs.clients {
+		if c == nil {
+			continue
+		}
+
+		if ping {
+			_, err := c.Status().Peers()
+			if err != nil {
+				continue
+			}
+		}
+
+		client = c
+		break
+	}
+
+	cs.RUnlock()
+
+	if client != nil {
+		return client, nil
+	}
+
+	return nil, errAvailableConsulClient
 }

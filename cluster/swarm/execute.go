@@ -148,7 +148,7 @@ func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) (err er
 		return errors.Errorf("Update Unit %s value error:%s,Unit:%+v", u.Name, err, u.Unit)
 	}
 
-	err = gd.SaveContainerToConsul(container)
+	err = saveContainerToConsul(container)
 	if err != nil {
 		logrus.Errorf("Save Container To Consul error:%s", err)
 	}
