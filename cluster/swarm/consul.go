@@ -247,12 +247,22 @@ func parseIPFromHealthCheck(serviceID, output string) string {
 	index = strings.Index(output, addr)
 
 	parts := strings.Split(string(output[index:]), ":")
-	if len(parts) > 2 {
+	if len(parts) >= 2 {
+
 		addr = parts[0] + ":" + parts[1]
 		_, _, err := net.SplitHostPort(addr)
 		if err == nil {
 			return addr
 		}
+
+	} else {
+
+		sys, err := database.GetSystemConfig()
+		if err != nil {
+			return ""
+		}
+
+		return fmt.Sprintf("%s:%d", addr, sys.HorusServerPort)
 	}
 
 	return ""
