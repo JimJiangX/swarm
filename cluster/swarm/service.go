@@ -1843,7 +1843,7 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 		entry.Errorf("GetSystemConfig error:%s", err)
 		return err
 	}
-	configs := sys.GetConsulConfigs()
+	configs := getConsulConfigs(sys.ConsulConfig)
 	if len(configs) == 0 {
 		return fmt.Errorf("GetConsulConfigs error %v %v", err, sys)
 	}

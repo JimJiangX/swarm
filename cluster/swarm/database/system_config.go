@@ -4,9 +4,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
-	consulapi "github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 )
 
@@ -117,48 +115,6 @@ func (c Configurations) Insert() (int64, error) {
 	}
 
 	return 0, err
-}
-
-func (c Configurations) GetConsulClient() ([]*consulapi.Client, error) {
-	port := strconv.Itoa(c.ConsulPort)
-	addrs := strings.Split(c.ConsulIPs, ",")
-	clients := make([]*consulapi.Client, 0, len(addrs)+1)
-
-	for i := range addrs {
-		config := consulapi.Config{
-			Address:    addrs[i] + ":" + port,
-			Datacenter: c.ConsulDatacenter,
-			WaitTime:   time.Duration(c.ConsulWaitTime) * time.Second,
-			Token:      c.ConsulToken,
-		}
-
-		client, err := consulapi.NewClient(&config)
-		if err == nil {
-			clients = append(clients, client)
-		}
-	}
-
-	return clients, nil
-}
-
-func (c Configurations) GetConsulConfigs() []consulapi.Config {
-	port := strconv.Itoa(c.ConsulPort)
-	addrs := strings.Split(c.ConsulIPs, ",")
-	if len(addrs) == 0 {
-		return nil
-	}
-	configs := make([]consulapi.Config, len(addrs))
-
-	for i := range addrs {
-		configs[i] = consulapi.Config{
-			Address:    addrs[i] + ":" + port,
-			Datacenter: c.ConsulDatacenter,
-			WaitTime:   time.Duration(c.ConsulWaitTime) * time.Second,
-			Token:      c.ConsulToken,
-		}
-	}
-
-	return configs
 }
 
 func (c Configurations) GetConsulConfig() ([]string, string, string, int) {

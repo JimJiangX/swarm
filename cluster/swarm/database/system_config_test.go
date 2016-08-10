@@ -44,7 +44,6 @@ func TestSystemConfig(t *testing.T) {
 	t.Log(test.DestPath())
 	t.Log(test.ConsulIPs, test.GetConsulAddrs())
 	t.Log(test.GetConsulConfig())
-	t.Log(test.GetConsulClient())
 
 	id, err := test.Insert()
 	if err != nil {
@@ -55,11 +54,6 @@ func TestSystemConfig(t *testing.T) {
 
 	config, err := GetSystemConfig()
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	client, err := config.GetConsulClient()
-	if err != nil || client == nil {
 		t.Fatal(err)
 	}
 

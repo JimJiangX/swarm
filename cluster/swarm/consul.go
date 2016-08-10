@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -16,6 +17,26 @@ import (
 )
 
 var ErrConsulClientIsNil = errors.New("consul client is nil")
+
+func getConsulConfigs(c database.ConsulConfig) []api.Config {
+	port := strconv.Itoa(c.ConsulPort)
+	addrs := strings.Split(c.ConsulIPs, ",")
+	if len(addrs) == 0 {
+		return nil
+	}
+	configs := make([]api.Config, len(addrs))
+
+	for i := range addrs {
+		configs[i] = api.Config{
+			Address:    addrs[i] + ":" + port,
+			Datacenter: c.ConsulDatacenter,
+			WaitTime:   time.Duration(c.ConsulWaitTime) * time.Second,
+			Token:      c.ConsulToken,
+		}
+	}
+
+	return configs
+}
 
 func HealthChecksFromConsul(client *api.Client, state string, q *api.QueryOptions) (map[string]api.HealthCheck, error) {
 	if client == nil {

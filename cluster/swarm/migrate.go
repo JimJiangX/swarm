@@ -1043,7 +1043,7 @@ func registerToServers(u *unit, svc *Service, sys database.Configurations) error
 }
 
 func deregisterToServices(addr, unitID string, sys database.Configurations) error {
-	configs := sys.GetConsulConfigs()
+	configs := getConsulConfigs(sys.ConsulConfig)
 	if len(configs) == 0 {
 		return fmt.Errorf("GetConsulConfigs error %v %v", configs[0])
 	}
