@@ -313,3 +313,8 @@ func deleteConsulKVTree(config api.Config, key string) error {
 
 	return err
 }
+
+func getHorusFromConsul(config api.Config) ([]string, error) {
+
+	return nil, nil
+}

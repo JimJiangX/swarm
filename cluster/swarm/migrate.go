@@ -1058,15 +1058,14 @@ func deregisterToServices(addr, unitID string, sys database.Configurations) erro
 	logrus.Debugf("deregister Horus %s", unitID)
 
 	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-	endpoints := []deregisterService{{unitID}}
 
-	err = deregisterToHorus(horus, endpoints, false)
+	err = deregisterToHorus(horus, false, unitID)
 	if err != nil {
-		logrus.WithField("Endpoints", endpoints).Errorf("Deregister To Horus:%s", horus)
+		logrus.WithField("Endpoints", unitID).Errorf("Deregister To Horus:%s", horus)
 
-		err = deregisterToHorus(horus, endpoints, true)
+		err = deregisterToHorus(horus, true, unitID)
 		if err != nil {
-			logrus.WithField("Endpoints", endpoints).Errorf("Deregister To Horus:%s,force=true", horus)
+			logrus.WithField("Endpoints", unitID).Errorf("Deregister To Horus:%s,force=true", horus)
 			return err
 		}
 	}

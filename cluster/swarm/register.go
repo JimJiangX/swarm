@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 )
 
 /*
@@ -63,13 +64,13 @@ type registerService struct {
 }
 
 func registerToHorus(addr string, obj []registerService) error {
-	buffer := bytes.NewBuffer(nil)
-	if err := json.NewEncoder(buffer).Encode(obj); err != nil {
+	body := bytes.NewBuffer(nil)
+	if err := json.NewEncoder(body).Encode(obj); err != nil {
 		return err
 	}
 
 	url := fmt.Sprintf("http://%s/v1/agent/register", addr)
-	resp, err := http.Post(url, "application/json", buffer)
+	resp, err := http.Post(url, "application/json", body)
 	if err != nil {
 		return err
 	}
@@ -93,25 +94,39 @@ func registerToHorus(addr string, obj []registerService) error {
 	return nil
 }
 
-type deregisterService struct {
-	Endpoint string
-}
+func deregisterToHorus(addr string, force bool, endpoints ...string) error {
+	type deregisterService struct {
+		Endpoint string
+	}
 
-func deregisterToHorus(addr string, obj []deregisterService, force bool) error {
+	obj := make([]deregisterService, len(endpoints))
+	for i := range obj {
+		obj[i].Endpoint = endpoints[i]
+	}
+
 	body := bytes.NewBuffer(nil)
 	if err := json.NewEncoder(body).Encode(obj); err != nil {
 		return err
 	}
 
-	url := fmt.Sprintf("http://%s/v1/agent/deregister", addr)
-	if force {
-		url += "?force=true"
-	}
-	resp, err := http.Post(url, "application/json", body)
+	path := fmt.Sprintf("http://%s/v1/agent/deregister", addr)
+
+	req, err := http.NewRequest("POST", path, body)
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Content-Type", "application/json")
 
+	if force {
+		params := make(url.Values)
+		params.Set("force", "true")
+		req.URL.RawQuery = params.Encode()
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
 	if resp.Body != nil {
 		defer resp.Body.Close()
 	}

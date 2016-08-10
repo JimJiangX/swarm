@@ -1324,17 +1324,17 @@ func (svc *Service) registerToHorus(addr, user, password string, agentPort int) 
 }
 
 func (svc *Service) deregisterInHorus(addr string) error {
-	endpoints := make([]deregisterService, len(svc.units))
+	endpoints := make([]string, len(svc.units))
 
 	for i, u := range svc.units {
-		endpoints[i] = deregisterService{Endpoint: u.ID}
+		endpoints[i] = u.ID
 	}
 
-	err := deregisterToHorus(addr, endpoints, false)
+	err := deregisterToHorus(addr, false, endpoints...)
 	if err != nil {
 		logrus.WithField("Endpoints", endpoints).Errorf("Deregister To Horus:%s", addr)
 
-		err = deregisterToHorus(addr, endpoints, true)
+		err = deregisterToHorus(addr, true, endpoints...)
 		if err != nil {
 			logrus.WithField("Endpoints", endpoints).Errorf("Deregister To Horus:%s,force=true", addr)
 

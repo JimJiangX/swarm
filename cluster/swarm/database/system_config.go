@@ -96,17 +96,27 @@ func (c Configurations) TableName() string {
 }
 
 func (c Configurations) Insert() (int64, error) {
-	db, err := GetDB(true)
+	db, err := GetDB(false)
 	if err != nil {
 		return 0, err
 	}
 
 	r, err := db.NamedExec(insertConfigurateionQuery, &c)
+	if err == nil {
+		return r.LastInsertId()
+	}
+
+	db, err = GetDB(true)
 	if err != nil {
 		return 0, err
 	}
 
-	return r.LastInsertId()
+	r, err = db.NamedExec(insertConfigurateionQuery, &c)
+	if err == nil {
+		return r.LastInsertId()
+	}
+
+	return 0, err
 }
 
 func (c Configurations) GetConsulClient() ([]*consulapi.Client, error) {
