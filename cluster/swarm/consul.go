@@ -269,6 +269,7 @@ func parseIPFromHealthCheck(serviceID, output string) string {
 }
 
 var errAvailableConsulClient = errors.New("Non Available Consul Client")
+
 var defaultConsuls = &consulConfigs{}
 
 func getConsulClient(ping bool) (*api.Client, error) {

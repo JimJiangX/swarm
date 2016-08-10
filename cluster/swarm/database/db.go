@@ -129,22 +129,17 @@ func GetDB(ping bool) (*sqlx.DB, error) {
 }
 
 func GetTX() (*sqlx.Tx, error) {
-	db, err := GetDB(true)
+	db, err := sqlx.Connect(driverName, dbSource)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "DB Connection")
+	}
+	if db == nil {
+		return nil, errors.New("Connect returns nil *DB")
 	}
 
 	tx, err := db.Beginx()
 	if err != nil {
-		db, err = Connect(driverName, dbSource)
-		if err != nil {
-			return nil, err
-		}
-
-		tx, err = db.Beginx()
-		if err != nil {
-			return nil, errors.Wrap(err, "Beginx")
-		}
+		return nil, errors.Wrap(err, "Beginx")
 	}
 
 	return tx, nil
