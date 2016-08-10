@@ -1330,7 +1330,19 @@ func (svc *Service) deregisterInHorus(addr string) error {
 		endpoints[i] = deregisterService{Endpoint: u.ID}
 	}
 
-	return deregisterToHorus(addr, endpoints)
+	err := deregisterToHorus(addr, endpoints, false)
+	if err != nil {
+		logrus.WithField("Endpoints", endpoints).Errorf("Deregister To Horus:%s", addr)
+
+		err = deregisterToHorus(addr, endpoints, true)
+		if err != nil {
+			logrus.WithField("Endpoints", endpoints).Errorf("Deregister To Horus:%s,force=true", addr)
+
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (svc *Service) getUnitByType(_type string) []*unit {

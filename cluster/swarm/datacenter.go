@@ -453,12 +453,19 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) error {
 		logrus.Errorf("SystemConfig error:%s", err)
 		return err
 	}
+
 	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-	endpoint := deregisterService{Endpoint: node.ID}
-	err = deregisterToHorus(horus, []deregisterService{endpoint})
+	endpoints := []deregisterService{deregisterService{Endpoint: node.ID}}
+
+	err = deregisterToHorus(horus, endpoints, false)
 	if err != nil {
-		logrus.Errorf("Node %s:%s deregisterToHorus error:%s", node.Name, node.Addr, err)
-		return err
+		logrus.WithField("Endpoints", endpoints).Errorf("Deregister Node To Horus:%s", horus)
+
+		err = deregisterToHorus(horus, endpoints, true)
+		if err != nil {
+			logrus.WithField("Endpoints", endpoints).Errorf("Deregister Node To Horus:%s,force=true", horus)
+			return err
+		}
 	}
 
 	err = database.DeleteNode(nameOrID)

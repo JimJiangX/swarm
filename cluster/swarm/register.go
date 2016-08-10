@@ -97,14 +97,17 @@ type deregisterService struct {
 	Endpoint string
 }
 
-func deregisterToHorus(addr string, obj []deregisterService) error {
-	buffer := bytes.NewBuffer(nil)
-	if err := json.NewEncoder(buffer).Encode(obj); err != nil {
+func deregisterToHorus(addr string, obj []deregisterService, force bool) error {
+	body := bytes.NewBuffer(nil)
+	if err := json.NewEncoder(body).Encode(obj); err != nil {
 		return err
 	}
 
 	url := fmt.Sprintf("http://%s/v1/agent/deregister", addr)
-	resp, err := http.Post(url, "application/json", buffer)
+	if force {
+		url += "?force=true"
+	}
+	resp, err := http.Post(url, "application/json", body)
 	if err != nil {
 		return err
 	}
