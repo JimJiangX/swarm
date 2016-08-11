@@ -126,6 +126,7 @@ func GetDB(ping bool) (*sqlx.DB, error) {
 
 		} else {
 			defaultDB.Close()
+			defaultDB = nil
 		}
 	}
 
