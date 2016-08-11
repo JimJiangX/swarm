@@ -11,6 +11,11 @@ PASSWD=$3
 
 SLAVEFILE=/tmp/${INSTANCE}_file_slave.data
 
+running_status=`docker inspect -f "{{.State.Running}}" ${INSTANCE}`
+if [ ${running_status} == "false" ]; then
+	exit 4
+fi
+
 docker exec $INSTANCE mysql -S /DBAASDAT/upsql.sock mysql -u$USER -p$PASSWD  -e"show slave status \G;" >$SLAVEFILE  2>/dev/null
 if [ $? -ne 0 ];then
 	echo "get variabes err"

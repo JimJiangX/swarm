@@ -11,6 +11,11 @@ PASSWD=$3
 
 STATSFILE=/tmp/${INSTANCE}_pressure_status.data
 
+running_status=`docker inspect -f "{{.State.Running}}" ${INSTANCE}`
+if [ ${running_status} == "false" ]; then
+	exit 4
+fi
+
 docker exec $INSTANCE mysql -S /DBAASDAT/upsql.sock mysql -u$USER -p$PASSWD  -e"show status where Variable_name in ('Com_insert','Com_update','Com_delete','Com_select','open_tables');" >$STATSFILE  2>/dev/null
 if [ $? -ne 0 ];then
 	echo "get data err"

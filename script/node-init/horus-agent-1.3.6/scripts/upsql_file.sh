@@ -14,6 +14,11 @@ PASSWD=$3
 QUOTA=5368709120
 VARFILE=/tmp/${INSTANCE}_file_variables.data
 
+running_status=`docker inspect -f "{{.State.Running}}" ${INSTANCE}`
+if [ ${running_status} == "false" ]; then
+	exit 4
+fi
+
 docker exec $INSTANCE mysql -S /DBAASDAT/upsql.sock mysql -u$USER -p$PASSWD  -e"show variables where Variable_name in ( 'log_error', 'slow_query_log_file');" >$VARFILE  2>/dev/null
 if [ $? -ne 0 ];then
 	echo "get variabes err"
