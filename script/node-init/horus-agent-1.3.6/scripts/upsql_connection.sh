@@ -12,6 +12,11 @@ PASSWD=$3
 STATUSFILE=/tmp/${INSTANCE}_connection_status.data
 VARFILE=/tmp/${INSTANCE}_connection_variables.data
 
+running_status=`docker inspect -f "{{.State.Running}}" ${INSTANCE}`
+if [ ${running_status} == "false" ]; then
+	exit 4
+fi
+
 
 docker exec $INSTANCE mysql -S /DBAASDAT/upsql.sock mysql -u$USER -p$PASSWD  -e"show status where Variable_name in ('threads_running','threads_cached','Threads_connected','Aborted_connects');" >$STATUSFILE  2>/dev/null
 if [ $? -ne 0 ];then
