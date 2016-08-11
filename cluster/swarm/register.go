@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+
+	"github.com/pkg/errors"
 )
 
 /*
@@ -63,7 +65,12 @@ type registerService struct {
 	CheckType     string   `json:"checktype"`
 }
 
-func registerToHorus(addr string, obj []registerService) error {
+func registerToHorus(obj ...registerService) error {
+	addr, err := getHorusFromConsul()
+	if err != nil {
+		return err
+	}
+
 	body := bytes.NewBuffer(nil)
 	if err := json.NewEncoder(body).Encode(obj); err != nil {
 		return err
@@ -94,9 +101,14 @@ func registerToHorus(addr string, obj []registerService) error {
 	return nil
 }
 
-func deregisterToHorus(addr string, force bool, endpoints ...string) error {
+func deregisterToHorus(force bool, endpoints ...string) error {
 	type deregisterService struct {
 		Endpoint string
+	}
+
+	addr, err := getHorusFromConsul()
+	if err != nil {
+		return err
 	}
 
 	obj := make([]deregisterService, len(endpoints))
@@ -140,7 +152,7 @@ func deregisterToHorus(addr string, force bool, endpoints ...string) error {
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("StatusCode:%d,Error:%s", resp.StatusCode, res.Err)
+		return errors.Errorf("StatusCode:%d,Error:%s", resp.StatusCode, res.Err)
 	}
 
 	return nil

@@ -8,7 +8,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-const insertConfigurateionQuery = "INSERT INTO tb_system_config (dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,horus_server_ip,horus_server_port,horus_agent_port,horus_event_ip,horus_event_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts,backup_dir) VALUES (:dc_id,:consul_ip,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_server_ip,:horus_server_port,:horus_agent_port,:horus_event_ip,:horus_event_port,:registry_domain,:registry_ip,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:registry_os_username,:registry_os_password,:mon_username,:mon_password,:repl_username,:repl_password,:cup_dba_username,:cup_dba_password,:db_username,:db_password,:ap_username,:ap_password,:nfs_ip,:nfs_dir,:nfs_mount_dir,:nfs_mount_opts,:backup_dir)"
+// "INSERT INTO tb_system_config (dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,horus_server_ip,horus_server_port,horus_agent_port,horus_event_ip,horus_event_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts,backup_dir) VALUES (:dc_id,:consul_ip,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_server_ip,:horus_server_port,:horus_agent_port,:horus_event_ip,:horus_event_port,:registry_domain,:registry_ip,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:registry_os_username,:registry_os_password,:mon_username,:mon_password,:repl_username,:repl_password,:cup_dba_username,:cup_dba_password,:db_username,:db_password,:ap_username,:ap_password,:nfs_ip,:nfs_dir,:nfs_mount_dir,:nfs_mount_opts,:backup_dir)"
+const insertConfigurateionQuery = "INSERT INTO tb_system_config (dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,horus_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts,backup_dir) VALUES (:dc_id,:consul_ip,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_agent_port,:registry_domain,:registry_ip,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:registry_os_username,:registry_os_password,:mon_username,:mon_password,:repl_username,:repl_password,:cup_dba_username,:cup_dba_password,:db_username,:db_password,:ap_username,:ap_password,:nfs_ip,:nfs_dir,:nfs_mount_dir,:nfs_mount_opts,:backup_dir)"
 
 type Configurations struct {
 	ID         int    `db:"dc_id"`
@@ -69,11 +70,11 @@ type ConsulConfig struct {
 }
 
 type HorusConfig struct {
-	HorusServerIP   string `db:"horus_server_ip"`
-	HorusServerPort int    `db:"horus_server_port"`
-	HorusAgentPort  int    `db:"horus_agent_port"`
-	HorusEventIP    string `db:"horus_event_ip"`
-	HorusEventPort  int    `db:"horus_event_port"`
+	// HorusServerIP   string `db:"horus_server_ip"`
+	// HorusServerPort int    `db:"horus_server_port"`
+	HorusAgentPort int `db:"horus_agent_port"`
+	//	HorusEventIP   string `db:"horus_event_ip"`
+	//	HorusEventPort int    `db:"horus_event_port"`
 }
 
 type Registry struct {

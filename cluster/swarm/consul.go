@@ -80,8 +80,13 @@ func rolesJSONUnmarshal(data []byte) (map[string]string, error) {
 	return m, nil
 }
 
-func registerHealthCheck(u *unit, config database.ConsulConfig, context *Service) error {
+func registerHealthCheck(u *unit, context *Service) error {
 	eng, err := u.Engine()
+	if err != nil {
+		return err
+	}
+
+	config, err := getConsulConfig()
 	if err != nil {
 		return err
 	}
@@ -160,7 +165,12 @@ func registerHealthCheck(u *unit, config database.ConsulConfig, context *Service
 	return client.Agent().ServiceRegister(&service)
 }
 
-func deregisterHealthCheck(host, serviceID string, config database.ConsulConfig) error {
+func deregisterHealthCheck(host, serviceID string) error {
+	config, err := getConsulConfig()
+	if err != nil {
+		return err
+	}
+
 	address := fmt.Sprintf("%s:%d", host, config.ConsulPort)
 
 	c := api.Config{
@@ -198,7 +208,7 @@ func saveContainerToConsul(container *cluster.Container) error {
 	return err
 }
 
-func deleteConsulKVTree(config database.ConsulConfig, key string) error {
+func deleteConsulKVTree(key string) error {
 	client, err := getConsulClient(true)
 	if err != nil {
 		return err
@@ -254,15 +264,6 @@ func parseIPFromHealthCheck(serviceID, output string) string {
 		if err == nil {
 			return addr
 		}
-
-	} else {
-
-		sys, err := database.GetSystemConfig()
-		if err != nil {
-			return ""
-		}
-
-		return fmt.Sprintf("%s:%d", addr, sys.HorusServerPort)
 	}
 
 	return ""
@@ -288,6 +289,11 @@ func getConsulClient(ping bool) (*api.Client, error) {
 	return nil, err
 }
 
+func getConsulConfig() (database.ConsulConfig, error) {
+
+	return defaultConsuls.getConsulConfig()
+}
+
 func setConsulClient(c *database.ConsulConfig) error {
 	if c == nil {
 		c = &defaultConsuls.c
@@ -308,9 +314,7 @@ func (cs *consulConfigs) set(c database.ConsulConfig) error {
 	defer cs.Unlock()
 
 	addrs := strings.Split(c.ConsulIPs, ",")
-	if len(addrs) == 0 {
-		return errors.New("Non Consul Addr")
-	}
+	addrs = append(addrs, "127.0.0.1")
 
 	config := api.Config{
 		Datacenter: c.ConsulDatacenter,
@@ -393,4 +397,17 @@ func (cs *consulConfigs) getConsulClient(ping bool) (*api.Client, error) {
 	}
 
 	return nil, errAvailableConsulClient
+}
+
+func (cs *consulConfigs) getConsulConfig() (database.ConsulConfig, error) {
+	cs.RLock()
+
+	config := cs.c
+	cs.RUnlock()
+
+	if config.ConsulPort == 0 {
+		return config, errors.New("Non ConsulConfig")
+	}
+
+	return config, nil
 }

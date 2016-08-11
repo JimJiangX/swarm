@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -448,21 +449,13 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) error {
 		return fmt.Errorf("Count Unit ByNode,%v,count:%d", err, count)
 	}
 
-	sys, err := gd.SystemConfig()
+	err = deregisterToHorus(false, node.ID)
 	if err != nil {
-		logrus.Errorf("SystemConfig error:%s", err)
-		return err
-	}
+		logrus.WithField("Endpoints", node.ID).Errorf("Deregister Node To Horus:%s", err)
 
-	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-
-	err = deregisterToHorus(horus, false, node.ID)
-	if err != nil {
-		logrus.WithField("Endpoints", node.ID).Errorf("Deregister Node To Horus:%s", horus)
-
-		err = deregisterToHorus(horus, true, node.ID)
+		err = deregisterToHorus(true, node.ID)
 		if err != nil {
-			logrus.WithField("Endpoints", node.ID).Errorf("Deregister Node To Horus:%s,force=true", horus)
+			logrus.WithField("Endpoints", node.ID).Errorf("Deregister Node To Horus,force=true,%s", err)
 			return err
 		}
 	}
@@ -830,6 +823,16 @@ func (node Node) modifyProfile() (*database.Configurations, string, error) {
 		return nil, "", err
 	}
 
+	horus, err := getHorusFromConsul()
+	if err != nil {
+		return nil, "", err
+	}
+
+	horusIP, horusPort, err := net.SplitHostPort(horus)
+	if err != nil {
+		return nil, "", err
+	}
+
 	config.SourceDir, err = utils.GetAbsolutePath(true, config.SourceDir)
 	if err != nil {
 		return nil, "", err
@@ -883,12 +886,12 @@ func (node Node) modifyProfile() (*database.Configurations, string, error) {
 		ssd = strings.Join(node.ssd, ",")
 	}
 
-	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %d %s %s %d %d %s %s %s %s",
+	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %d %s %s %s %d %s %s %s %s",
 		path, path, DockerNodesKVPath, node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile,
 		config.DockerPort, hdd, ssd, config.HorusAgentPort, config.ConsulPort,
-		node.ID, config.HorusServerIP, config.HorusServerPort, config.PluginPort,
+		node.ID, horusIP, horusPort, config.PluginPort,
 		config.NFSOption.Addr, config.NFSOption.Dir, config.MountDir, config.MountOptions)
 
 	return config, script, nil
@@ -1183,6 +1186,16 @@ func nodeClean(node, addr, user, password string) error {
 	if err != nil {
 		return err
 	}
+
+	horus, err := getHorusFromConsul()
+	if err != nil {
+		return err
+	}
+
+	horusIP, horusPort, err := net.SplitHostPort(horus)
+	if err != nil {
+		return err
+	}
 	_, _, destName := config.DestPath()
 
 	srcFile, err := utils.GetAbsolutePath(false, config.SourceDir, config.CleanScriptName)
@@ -1246,9 +1259,9 @@ func nodeClean(node, addr, user, password string) error {
 		backup_dir = ${6}
 	*/
 
-	script := fmt.Sprintf("chmod 755 %s && %s %s %d %s %s %d %s",
+	script := fmt.Sprintf("chmod 755 %s && %s %s %d %s %s %s %s",
 		destName, destName, addr, config.ConsulPort, node,
-		config.HorusServerIP, config.HorusServerPort, config.NFSOption.MountDir)
+		horusIP, horusPort, config.NFSOption.MountDir)
 
 	buffer := new(bytes.Buffer)
 	cmd := remote.Cmd{

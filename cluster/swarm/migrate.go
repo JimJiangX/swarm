@@ -126,11 +126,6 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 
-	sys, err := gd.SystemConfig()
-	if err != nil {
-		return "", err
-	}
-
 	svc.RLock()
 
 	migrate, err := svc.getUnit(table.ID)
@@ -401,7 +396,12 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			logrus.Error(err)
 		}
 
-		err = deregisterToServices(oldEngineIP, migrate.ID, sys)
+		sys, err := gd.SystemConfig()
+		if err != nil {
+			logrus.WithError(err).Error("Get System Config")
+		}
+
+		err = deregisterToServices(oldEngineIP, migrate.ID)
 		if err != nil {
 			logrus.Error(err)
 		}
@@ -714,11 +714,6 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 
-	sys, err := gd.SystemConfig()
-	if err != nil {
-		return "", err
-	}
-
 	svc.RLock()
 
 	rebuild, err := svc.getUnit(table.ID)
@@ -978,7 +973,12 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			logrus.Error(err)
 		}
 
-		err = deregisterToServices(oldEngineIP, rebuild.ID, sys)
+		sys, err := gd.SystemConfig()
+		if err != nil {
+			logrus.WithError(err).Error("Get System Config")
+		}
+
+		err = deregisterToServices(oldEngineIP, rebuild.ID)
 		if err != nil {
 			logrus.Error(err)
 		}
@@ -1020,7 +1020,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 func registerToServers(u *unit, svc *Service, sys database.Configurations) error {
 	logrus.Debug("[MG]register Services")
-	if err := registerHealthCheck(u, sys.ConsulConfig, svc); err != nil {
+	if err := registerHealthCheck(u, svc); err != nil {
 		logrus.Error(err)
 	}
 
@@ -1033,35 +1033,31 @@ func registerToServers(u *unit, svc *Service, sys database.Configurations) error
 		return err
 	}
 
-	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-	err = registerToHorus(horus, []registerService{obj})
+	err = registerToHorus(obj)
 	if err != nil {
-		logrus.Errorf("registerToHorus error:%s", err)
+		logrus.Errorf("register To Horus error:%s", err)
 	}
 
 	return err
 }
 
-func deregisterToServices(addr, unitID string, sys database.Configurations) error {
+func deregisterToServices(addr, unitID string) error {
 	logrus.Debugf("deregister HealthCheck %s", unitID)
 
-	err := deregisterHealthCheck(addr, unitID, sys.ConsulConfig)
+	err := deregisterHealthCheck(addr, unitID)
 	if err != nil {
 		logrus.Error(err)
 	}
 
 	logrus.Debugf("deregister Horus %s", unitID)
 
-	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-
-	err = deregisterToHorus(horus, false, unitID)
+	err = deregisterToHorus(false, unitID)
 	if err != nil {
-		logrus.WithField("Endpoints", unitID).Errorf("Deregister To Horus:%s", horus)
+		logrus.WithField("Endpoints", unitID).Errorf("Deregister To Horus:%s", err)
 
-		err = deregisterToHorus(horus, true, unitID)
+		err = deregisterToHorus(true, unitID)
 		if err != nil {
-			logrus.WithField("Endpoints", unitID).Errorf("Deregister To Horus:%s,force=true", horus)
-			return err
+			logrus.WithField("Endpoints", unitID).Errorf("Deregister To Horus,force=true,%s", err)
 		}
 	}
 

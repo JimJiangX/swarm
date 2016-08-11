@@ -268,11 +268,7 @@ func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 			ConsulWaitTime:   req.Consul.ConsulWaitTime,
 		},
 		HorusConfig: database.HorusConfig{
-			HorusServerIP:   req.Horus.HorusServerIP,
-			HorusServerPort: req.Horus.HorusServerPort,
-			HorusAgentPort:  req.Horus.HorusAgentPort,
-			HorusEventIP:    req.Horus.HorusEventIP,
-			HorusEventPort:  req.Horus.HorusEventPort,
+			HorusAgentPort: req.Horus.HorusAgentPort,
 		},
 		Registry: database.Registry{
 			OsUsername: req.Registry.OsUsername,
@@ -307,11 +303,9 @@ func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 		},
 	}
 
-	horus := fmt.Sprintf("%s:%d", config.HorusServerIP, config.HorusServerPort)
-	err = pingHorus(horus)
+	err = pingHorus()
 	if err != nil {
-		logrus.Errorf("Ping Horus %s error,%s", horus, err)
-		return err
+		logrus.Errorf("Ping Horus error,%s", err)
 	}
 
 	err = nfsSetting(config.NFSOption)
@@ -386,7 +380,13 @@ func nfsSetting(option database.NFSOption) error {
 	return nil
 }
 
-func pingHorus(addr string) error {
-	_, err := http.Post("http://"+addr+"/v1/ping", "", nil)
+func pingHorus() error {
+	addr, err := getHorusFromConsul()
+	if err != nil {
+		return err
+	}
+
+	_, err = http.Post("http://"+addr+"/v1/ping", "", nil)
+
 	return err
 }

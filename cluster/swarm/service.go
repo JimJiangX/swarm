@@ -1277,9 +1277,9 @@ func (svc *Service) initTopology() error {
 	return err
 }
 
-func (svc *Service) registerServices(config database.ConsulConfig) (err error) {
+func (svc *Service) registerServices() (err error) {
 	for _, u := range svc.units {
-		err = registerHealthCheck(u, config, svc)
+		err = registerHealthCheck(u, svc)
 		if err != nil {
 
 			return err
@@ -1289,14 +1289,14 @@ func (svc *Service) registerServices(config database.ConsulConfig) (err error) {
 	return nil
 }
 
-func (svc *Service) deregisterServices(config database.ConsulConfig) error {
+func (svc *Service) deregisterServices() error {
 	for _, u := range svc.units {
 		eng, err := u.Engine()
 		if err != nil {
 			logrus.Error(err)
 			continue
 		}
-		err = deregisterHealthCheck(eng.IP, u.ID, config)
+		err = deregisterHealthCheck(eng.IP, u.ID)
 		if err != nil {
 			return err
 		}
@@ -1305,7 +1305,7 @@ func (svc *Service) deregisterServices(config database.ConsulConfig) error {
 	return nil
 }
 
-func (svc *Service) registerToHorus(addr, user, password string, agentPort int) error {
+func (svc *Service) registerToHorus(user, password string, agentPort int) error {
 	params := make([]registerService, len(svc.units))
 
 	for i, u := range svc.units {
@@ -1319,23 +1319,23 @@ func (svc *Service) registerToHorus(addr, user, password string, agentPort int) 
 		params[i] = obj
 	}
 
-	return registerToHorus(addr, params)
+	return registerToHorus(params...)
 }
 
-func (svc *Service) deregisterInHorus(addr string) error {
+func (svc *Service) deregisterInHorus() error {
 	endpoints := make([]string, len(svc.units))
 
 	for i, u := range svc.units {
 		endpoints[i] = u.ID
 	}
 
-	err := deregisterToHorus(addr, false, endpoints...)
+	err := deregisterToHorus(false, endpoints...)
 	if err != nil {
-		logrus.WithField("Endpoints", endpoints).Errorf("Deregister To Horus:%s", addr)
+		logrus.WithField("Endpoints", endpoints).Errorf("Deregister To Horus")
 
-		err = deregisterToHorus(addr, true, endpoints...)
+		err = deregisterToHorus(true, endpoints...)
 		if err != nil {
-			logrus.WithField("Endpoints", endpoints).Errorf("Deregister To Horus:%s,force=true", addr)
+			logrus.WithField("Endpoints", endpoints).Errorf("Deregister To Horus,force=true")
 
 			return err
 		}
@@ -1994,27 +1994,20 @@ func (svc *Service) Delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 		logrus.Debug(i, len(volumes), "RemoveVolume ", volumes[i].Name)
 	}
 
-	sys, err := gd.SystemConfig()
-	if err != nil {
-		logrus.WithError(err).Error("Get System Config")
-		return nil
-	}
-
 	logrus.Debug("deregisterInHorus")
-	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-	err = svc.deregisterInHorus(horus)
+	err = svc.deregisterInHorus()
 	if err != nil {
 		logrus.Errorf("%s deregister In Horus error:%s", svc.Name, err)
 	}
 
 	logrus.Debug("deregisterServices")
 
-	err = svc.deregisterServices(sys.ConsulConfig)
+	err = svc.deregisterServices()
 	if err != nil {
 		logrus.Errorf("%s deregister In consul error:%s", svc.Name, err)
 	}
 
-	err = deleteConsulKVTree(sys.ConsulConfig, svc.ID)
+	err = deleteConsulKVTree(svc.ID)
 	if err != nil {
 		logrus.Errorf("Delete Consul KV:%s,%s", svc.ID, err)
 	}
