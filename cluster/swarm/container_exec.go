@@ -46,9 +46,8 @@ func containerExec(ctx context.Context, engine *cluster.Engine, containerID stri
 	}
 
 	if !container.State.Running {
-		return inspect, errors.Errorf("Container %s:%s,%s",
-			container.Name, errContainerNotRunning,
-			cluster.FullStateString(container.State))
+		return inspect, errors.Errorf("Container %s is not running,%s",
+			container.Name, cluster.FullStateString(container.State))
 	}
 
 	execConfig := types.ExecConfig{

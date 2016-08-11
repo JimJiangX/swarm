@@ -1836,18 +1836,9 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 		entry.Errorf("GetService From Gardener error:%s", err)
 	}
 
-	entry.Debug("Prepare params,GetSystemConfig...")
-	sys, err := gd.SystemConfig()
-	if err != nil {
-		entry.Errorf("GetSystemConfig error:%s", err)
-		return err
-	}
-
 	entry.Debug("Service Delete... stop service & stop containers & rm containers & deregister")
 
-	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
-
-	err = svc.Delete(gd, horus, force, volumes, true, timeout)
+	err = svc.Delete(gd, force, volumes, true, timeout)
 	if err != nil {
 		entry.Errorf("Service.Delete error:%s", err)
 
@@ -1883,9 +1874,7 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 	return nil
 }
 
-func (svc *Service) Delete(gd *Gardener, horus string,
-	force, rmVolumes, recycle bool, timeout int) error {
-
+func (svc *Service) Delete(gd *Gardener, force, rmVolumes, recycle bool, timeout int) error {
 	svc.Lock()
 	defer svc.Unlock()
 
@@ -1900,13 +1889,20 @@ func (svc *Service) Delete(gd *Gardener, horus string,
 
 			logrus.Debug(u.Name, " stop unit service")
 			err := u.forceStopService()
-			if err != nil && err.Error() != "EOF" {
+			if err != nil &&
+				u.container.Info.State.Running &&
+				err.Error() != "EOF" {
+
 				return errors.Wrapf(err, "%s forceStopService error", u.Name)
 			}
 
 			logrus.Debug(u.Name, " stop container")
 			err = u.forceStopContainer(timeout)
 			if err != nil {
+				if !u.container.Info.State.Running {
+					return nil
+				}
+
 				if err.Error() == "EOF" {
 					return nil
 				}
@@ -1999,18 +1995,21 @@ func (svc *Service) Delete(gd *Gardener, horus string,
 		}
 	}
 
+	sys, err := gd.SystemConfig()
+	if err != nil {
+		logrus.WithError(err).Error("Get System Config")
+		return nil
+	}
+
 	logrus.Debug("deregisterInHorus")
+	horus := fmt.Sprintf("%s:%d", sys.HorusServerIP, sys.HorusServerPort)
 	err = svc.deregisterInHorus(horus)
 	if err != nil {
 		logrus.Errorf("%s deregister In Horus error:%s", svc.Name, err)
 	}
 
 	logrus.Debug("deregisterServices")
-	sys, err := gd.SystemConfig()
-	if err != nil {
-		logrus.WithError(err).Error("Get System Config")
-		return nil
-	}
+
 	err = svc.deregisterServices(sys.ConsulConfig)
 	if err != nil {
 		logrus.Errorf("%s deregister In consul error:%s", svc.Name, err)
