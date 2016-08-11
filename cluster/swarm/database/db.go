@@ -100,10 +100,11 @@ func MustConnect(driver, source string) *sqlx.DB {
 func Connect(driver, source string) (*sqlx.DB, error) {
 	db, err := sqlx.Connect(driver, source)
 	if err != nil {
+		if db != nil {
+			db.Close()
+		}
+
 		return nil, errors.Wrap(err, "DB Connection")
-	}
-	if db == nil {
-		return nil, errors.New("Connect returns nil *DB")
 	}
 
 	driverName = driver
@@ -115,13 +116,16 @@ func Connect(driver, source string) (*sqlx.DB, error) {
 
 func GetDB(ping bool) (*sqlx.DB, error) {
 	if defaultDB != nil {
+
 		if !ping {
 			return defaultDB, nil
 		}
 
-		err := defaultDB.Ping()
-		if err == nil {
+		if err := defaultDB.Ping(); err == nil {
 			return defaultDB, nil
+
+		} else {
+			defaultDB.Close()
 		}
 	}
 
