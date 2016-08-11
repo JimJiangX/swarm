@@ -1985,14 +1985,13 @@ func (svc *Service) Delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 
 	// remove volumes
 	for i := range volumes {
-		logrus.Debug(i, len(volumes), "RemoveVolumes ", volumes[i].Name)
 		found, err := gd.RemoveVolumes(volumes[i].Name)
-		if !found {
+		if err != nil {
+			logrus.Errorf("Remove Volumes %s,Found=%t,%s", volumes[i].Name, found, err)
 			continue
 		}
-		if err != nil {
-			logrus.Errorf("Remove Volumes %s error:%s", volumes[i].Name, err)
-		}
+
+		logrus.Debug(i, len(volumes), "RemoveVolume ", volumes[i].Name)
 	}
 
 	sys, err := gd.SystemConfig()
