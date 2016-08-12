@@ -1184,6 +1184,11 @@ func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}
 		}
 
 		if u.MustRestart(config) {
+
+			// disable restart Service for now
+			logrus.WithField("Container", u.Name).Warn("Should restart service to make new config file works")
+			return nil
+
 			err := u.stopService()
 			if err != nil {
 				logrus.Error("%s stop Service error,%s", u.Name, err)
