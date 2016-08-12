@@ -232,6 +232,8 @@ func getHorusFromConsul() (string, error) {
 
 	for i := range checks {
 		addr := parseIPFromHealthCheck(checks[i].ServiceID, checks[i].Output)
+		logrus.Debugf("%d %s %s :%s", i, checks[i].ServiceID, checks[i].Output, addr)
+
 		if addr != "" {
 			return addr, nil
 		}
