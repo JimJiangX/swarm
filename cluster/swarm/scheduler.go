@@ -156,7 +156,14 @@ func dealWithSchedulerFailure(gd *Gardener, pendings []*pendingAllocResource) er
 }
 
 func templateConfig(gd *Gardener, module structs.Module) (*cluster.ContainerConfig, error) {
-	config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
+	hostConfig := container.HostConfig{
+		Resources: container.Resources{
+			Memory:     module.HostConfig.Memory,
+			CpusetCpus: module.HostConfig.CpusetCpus,
+		},
+	}
+
+	config := cluster.BuildContainerConfig(module.Config, hostConfig, module.NetworkingConfig)
 	config = buildContainerConfig(config)
 
 	if err := validateContainerConfig(config); err != nil {

@@ -43,9 +43,14 @@ type Module struct {
 	Stores     []DiskStorage          `json:",omitempty"`
 	Configures map[string]interface{} `json:",omitempty"`
 
-	Config           container.Config         `json:",omitempty"`
-	HostConfig       container.HostConfig     `json:"host_config,omitempty"`
+	Config           container.Config         `json:"-,omitempty"`
+	HostConfig       ResourceRequired         `json:"host_config,omitempty"`
 	NetworkingConfig network.NetworkingConfig `json:"-"`
+}
+
+type ResourceRequired struct {
+	Memory     int64  // Memory limit (in bytes)
+	CpusetCpus string // CpusetCpus 0-2, 0,1
 }
 
 type DiskStorage struct {
@@ -96,10 +101,6 @@ func (req *PostServiceRequest) UpdateModuleConfig(_type string, config container
 
 		if config.CpusetCpus != "" {
 			req.Modules[i].HostConfig.CpusetCpus = config.CpusetCpus
-		}
-
-		if config.RestartPolicy != (container.RestartPolicy{}) {
-			req.Modules[i].HostConfig.RestartPolicy = config.RestartPolicy
 		}
 
 		break

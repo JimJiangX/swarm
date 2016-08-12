@@ -139,7 +139,14 @@ func ValidService(req structs.PostServiceRequest) []string {
 			warnings = append(warnings, fmt.Sprintf("%s nodeNum  unequal Architecture,(%s)", module.Type, module.Arch))
 		}
 
-		config := cluster.BuildContainerConfig(module.Config, module.HostConfig, module.NetworkingConfig)
+		hostConfig := container.HostConfig{
+			Resources: container.Resources{
+				Memory:     module.HostConfig.Memory,
+				CpusetCpus: module.HostConfig.CpusetCpus,
+			},
+		}
+
+		config := cluster.BuildContainerConfig(module.Config, hostConfig, module.NetworkingConfig)
 		err = validateContainerConfig(config)
 		if err != nil {
 			warnings = append(warnings, err.Error())
