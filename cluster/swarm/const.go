@@ -154,6 +154,8 @@ const (
 	_ProxyNetworkingLabelKey = "upm.proxyip"
 
 	_ImageIDInRegistryLabelKey = "registry.imageID"
+
+	_ContainerKVKeyPrefix = "DBAAS/Conatainers/"
 )
 
 var (

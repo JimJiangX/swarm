@@ -200,7 +200,7 @@ func saveContainerToConsul(container *cluster.Container) error {
 	}
 
 	pair := &api.KVPair{
-		Key:   "DBAAS/Conatainers/" + container.ID,
+		Key:   _ContainerKVKeyPrefix + container.ID,
 		Value: buf.Bytes(),
 	}
 	_, err = client.KV().Put(pair, nil)
