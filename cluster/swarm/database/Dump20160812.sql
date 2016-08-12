@@ -391,7 +391,7 @@ CREATE TABLE `tb_unit` (
   `check_interval` int(11) unsigned DEFAULT NULL COMMENT '服务检查间隔时间,单位为秒',
   `status` int(11) unsigned NOT NULL COMMENT '管理状态\n0	已分配\n1	创建中\n2	启动中\n3	停止中\n4	迁移中\n5	重建中\n6	删除中\n7	备份中\n8	还原中\n99	无任务',
   `created_at` datetime NOT NULL,
-  `latest_error` varchar(256) DEFAULT NULL COMMENT '最新错误信息',
+  `latest_error` varchar(1024) DEFAULT NULL COMMENT '最新错误信息',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -467,4 +467,4 @@ CREATE TABLE `tb_volumes` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-08-12 15:08:24
+-- Dump completed on 2016-08-12 19:06:55
