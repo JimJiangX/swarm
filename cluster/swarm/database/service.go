@@ -243,6 +243,9 @@ func TxUpdateUnitStatus(unit *Unit, status int64, msg string) error {
 	defer tx.Rollback()
 
 	err = txUpdateUnitStatus(tx, unit, status, msg)
+	if err != nil {
+		return err
+	}
 
 	return tx.Commit()
 }
@@ -268,7 +271,6 @@ func TxUpdateUnitStatusWithTask(unit *Unit, task *Task, msg string) error {
 }
 
 func txUpdateUnitStatus(tx *sqlx.Tx, unit *Unit, status int64, msg string) error {
-
 	_, err := tx.Exec("UPDATE tb_unit SET status=?,latest_error=? WHERE id=?", status, msg, unit.ID)
 	if err != nil {
 		return errors.Wrap(err, "tx Update Unit Status")
