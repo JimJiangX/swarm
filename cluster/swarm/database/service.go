@@ -606,22 +606,23 @@ func txDeleteService(tx *sqlx.Tx, nameOrID string) error {
 	return err
 }
 
-const insertUserQuery = "INSERT INTO tb_users (id,service_id,type,username,password,role,permission,blacklist,whitelist,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:permission,:blacklist,:whitelist,:created_at)"
+const insertUserQuery = "INSERT INTO tb_users (id,service_id,type,username,password,role,read_only,blacklist,whitelist,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:read_only,:blacklist,:whitelist,:created_at)"
 
 type User struct {
-	ID         string   `db:"id"`
-	ServiceID  string   `db:"service_id"`
-	Type       string   `db:"type"`
-	Username   string   `db:"username"`
-	Password   string   `db:"password"`
-	Role       string   `db:"role"`
-	Permission string   `db:"permission"`
-	Blacklist  []string `db:"-"`
-	Whitelist  []string `db:"-"`
-	White      string   `db:"whitelist" json:"-"`
-	Black      string   `db:"blacklist" json:"-"`
+	ReadOnly  bool   `db:"read_only" json:"read_only"`
+	ID        string `db:"id"`
+	ServiceID string `db:"service_id" json:""service_id`
+	Type      string `db:"type"`
+	Username  string `db:"username"`
+	Password  string `db:"password"`
+	Role      string `db:"role"`
 
-	CreatedAt time.Time `db:"created_at"`
+	Blacklist []string `db:"-"`
+	Whitelist []string `db:"-"`
+	White     string   `db:"whitelist" json:"-"`
+	Black     string   `db:"blacklist" json:"-"`
+
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
 func (u User) TableName() string {
@@ -725,7 +726,7 @@ func TxUpdateUsers(addition, update []User) error {
 		return tx.Commit()
 	}
 
-	const query = "UPDATE tb_users SET type=:type,password=:password,role=:role,permission=:permission,blacklist=:blacklist,whitelist=:whitelist WHERE id=:id OR username=:username"
+	const query = "UPDATE tb_users SET type=:type,password=:password,role=:role,read_only=:read_only,blacklist=:blacklist,whitelist=:whitelist WHERE id=:id OR username=:username"
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
 		return err

@@ -217,7 +217,6 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 		for u := range svc.users {
 			if svc.users[u].Username == users[i].Username {
 				users[i].ID = svc.users[u].ID
-				users[i].Permission = svc.users[u].Permission
 				users[i].CreatedAt = svc.users[u].CreatedAt
 
 				update = append(update, users[i])
@@ -342,54 +341,54 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 	now := time.Now()
 	return []database.User{
 		database.User{
-			ID:         utils.Generate32UUID(),
-			ServiceID:  service,
-			Type:       _User_Type_DB,
-			Username:   sys.MonitorUsername,
-			Password:   sys.MonitorPassword,
-			Role:       _User_Monitor,
-			Permission: "",
-			CreatedAt:  now,
+			ID:        utils.Generate32UUID(),
+			ServiceID: service,
+			Type:      _User_Type_DB,
+			Username:  sys.MonitorUsername,
+			Password:  sys.MonitorPassword,
+			Role:      _User_Monitor,
+			ReadOnly:  false,
+			CreatedAt: now,
 		},
 		database.User{
-			ID:         utils.Generate32UUID(),
-			ServiceID:  service,
-			Type:       _User_Type_DB,
-			Username:   sys.ApplicationUsername,
-			Password:   sys.ApplicationPassword,
-			Role:       _User_Application,
-			Permission: "",
-			CreatedAt:  now,
+			ID:        utils.Generate32UUID(),
+			ServiceID: service,
+			Type:      _User_Type_DB,
+			Username:  sys.ApplicationUsername,
+			Password:  sys.ApplicationPassword,
+			Role:      _User_Application,
+			ReadOnly:  false,
+			CreatedAt: now,
 		},
 		database.User{
-			ID:         utils.Generate32UUID(),
-			ServiceID:  service,
-			Type:       _User_Type_DB,
-			Username:   sys.DBAUsername,
-			Password:   sys.DBAPassword,
-			Role:       _User_DBA,
-			Permission: "",
-			CreatedAt:  now,
+			ID:        utils.Generate32UUID(),
+			ServiceID: service,
+			Type:      _User_Type_DB,
+			Username:  sys.DBAUsername,
+			Password:  sys.DBAPassword,
+			Role:      _User_DBA,
+			ReadOnly:  false,
+			CreatedAt: now,
 		},
 		database.User{
-			ID:         utils.Generate32UUID(),
-			ServiceID:  service,
-			Type:       _User_Type_DB,
-			Username:   sys.DBUsername,
-			Password:   sys.DBPassword,
-			Role:       _User_DB,
-			Permission: "",
-			CreatedAt:  now,
+			ID:        utils.Generate32UUID(),
+			ServiceID: service,
+			Type:      _User_Type_DB,
+			Username:  sys.DBUsername,
+			Password:  sys.DBPassword,
+			Role:      _User_DB,
+			ReadOnly:  false,
+			CreatedAt: now,
 		},
 		database.User{
-			ID:         utils.Generate32UUID(),
-			ServiceID:  service,
-			Type:       _User_Type_DB,
-			Username:   sys.ReplicationUsername,
-			Password:   sys.ReplicationPassword,
-			Role:       _User_Replication,
-			Permission: "",
-			CreatedAt:  now,
+			ID:        utils.Generate32UUID(),
+			ServiceID: service,
+			Type:      _User_Type_DB,
+			Username:  sys.ReplicationUsername,
+			Password:  sys.ReplicationPassword,
+			Role:      _User_Replication,
+			ReadOnly:  false,
+			CreatedAt: now,
 		},
 	}
 }
@@ -439,16 +438,16 @@ func converteToUsers(service string, users []structs.User) []database.User {
 		}
 
 		out = append(out, database.User{
-			ID:         utils.Generate32UUID(),
-			ServiceID:  service,
-			Type:       users[i].Type,
-			Username:   users[i].Username,
-			Password:   users[i].Password,
-			Role:       users[i].Role,
-			Permission: "",
-			Blacklist:  users[i].Blacklist,
-			Whitelist:  users[i].Whitelist,
-			CreatedAt:  now,
+			ID:        utils.Generate32UUID(),
+			ServiceID: service,
+			Type:      users[i].Type,
+			Username:  users[i].Username,
+			Password:  users[i].Password,
+			Role:      users[i].Role,
+			ReadOnly:  users[i].ReadOnly,
+			Blacklist: users[i].Blacklist,
+			Whitelist: users[i].Whitelist,
+			CreatedAt: now,
 		})
 	}
 
@@ -501,6 +500,7 @@ func converteToSWM_Users(users []database.User) []swm_structs.User {
 			Role:      users[i].Role,
 			BlackList: users[i].Blacklist,
 			WhiteList: users[i].Whitelist,
+			ReadOnly:  users[i].ReadOnly,
 		})
 	}
 

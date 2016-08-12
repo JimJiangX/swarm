@@ -24,10 +24,12 @@ type PostServiceRequest struct {
 }
 
 type User struct {
-	Type      string // db/proxy
-	Username  string
-	Password  string
-	Role      string
+	ReadOnly bool   `json:"read_only"`
+	Type     string // db/proxy
+	Username string
+	Password string
+	Role     string
+
 	Whitelist []string // []string
 	Blacklist []string // []string
 }

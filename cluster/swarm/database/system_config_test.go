@@ -23,10 +23,10 @@ func TestSystemConfig(t *testing.T) {
 			ConsulWaitTime:   15,
 		},
 		HorusConfig: HorusConfig{
-			HorusServerIP:   "10.211.104.23",
-			HorusServerPort: 8383,
-			HorusEventIP:    "10.211.104.23",
-			HorusEventPort:  8484,
+		//	HorusServerIP:   "10.211.104.23",
+		//	HorusServerPort: 8383,
+		//	HorusEventIP:    "10.211.104.23",
+		//	HorusEventPort:  8484,
 		},
 		Registry: Registry{},
 		SSHDeliver: SSHDeliver{
