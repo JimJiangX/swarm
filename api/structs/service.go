@@ -43,7 +43,7 @@ type Module struct {
 	Stores     []DiskStorage          `json:",omitempty"`
 	Configures map[string]interface{} `json:",omitempty"`
 
-	Config           container.Config         `json:"-,omitempty"`
+	Config           container.Config         `json:"-"`
 	HostConfig       ResourceRequired         `json:"host_config,omitempty"`
 	NetworkingConfig network.NetworkingConfig `json:"-"`
 }
