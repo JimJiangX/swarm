@@ -784,8 +784,21 @@ func (gd *Gardener) StopUnitService(nameOrID string, timeout int) error {
 	return u.stopContainer(timeout)
 }
 
-func (u *unit) startService() error {
-	err := u.StatusCAS("!=", statusUnitBackuping, statusUnitStarting)
+func (u *unit) startService() (err error) {
+	defer func() {
+		code, msg := int64(statusUnitStarted), ""
+		if err != nil {
+			code, msg = statusUnitStartFailed, err.Error()
+		}
+
+		_err := database.TxUpdateUnitStatus(&u.Unit, code, msg)
+
+		if err != nil {
+			logrus.WithField("Unit", u.Name).Errorf("Update Unit Status,status=%d,LatestError=%s,%v", code, msg, _err)
+		}
+	}()
+
+	err = u.StatusCAS("!=", statusUnitBackuping, statusUnitStarting)
 	if err != nil {
 		logrus.WithError(err).Errorf("Start %s service", u.Name)
 
@@ -811,19 +824,6 @@ func (u *unit) startService() error {
 	inspect, err := containerExec(context.Background(), eng, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
 		err = fmt.Errorf("%s start service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
-	}
-
-	code, msg := int64(statusUnitStarted), ""
-	if err != nil {
-		code, msg = statusUnitStartFailed, err.Error()
-
-		logrus.Error(err)
-	}
-
-	_err := database.TxUpdateUnitStatus(&u.Unit, code, msg)
-
-	if err != nil {
-		logrus.WithField("Unit", u.Name).Errorf("Update Unit Status,status=%d,LatestError=%s,%v", code, msg, _err)
 	}
 
 	return err
@@ -871,7 +871,6 @@ func (u *unit) stopService() error {
 	code = statusUnitStoped
 
 	if err != nil {
-		logrus.Error(err)
 		code, msg = statusUnitStopFailed, err.Error()
 	}
 
