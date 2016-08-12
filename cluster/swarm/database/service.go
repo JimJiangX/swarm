@@ -197,31 +197,22 @@ func (u *Unit) StatusCAS(operator string, old, value int64) error {
 		return err
 	}
 
-	r, err := db.Exec(query, value, u.ID, old)
+	_, err = db.Exec(query, value, u.ID, old)
 	if err != nil {
 		db, err = GetDB(true)
 		if err != nil {
 			return err
 		}
 
-		r, err = db.Exec(query, value, u.ID, old)
+		_, err = db.Exec(query, value, u.ID, old)
 		if err != nil {
 			return errors.Wrap(err, "Update Unit Status")
 		}
 	}
 
-	n, err := r.RowsAffected()
-	if n == 1 {
-		atomic.StoreInt64(&u.Status, value)
+	atomic.StoreInt64(&u.Status, value)
 
-		return nil
-
-	} else if err != nil {
-
-		return errors.Wrap(err, "Update Unit Status Affected Error")
-	}
-
-	return errors.Errorf("Forbid To Set Unit Status")
+	return nil
 }
 
 func TxUpdateUnitAndInsertTask(unit *Unit, task Task) error {
