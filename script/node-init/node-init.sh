@@ -183,6 +183,7 @@ init_hdd_vg() {
 	if [ ${hdd_dev} == "null" ]; then
 		hdd_dev=''
 		hdd_vgname=''
+		hdd_vg_size=''
 		return
 	fi
 
@@ -203,6 +204,7 @@ init_hdd_vg() {
 		echo "${hdd_dev} vgcreate failed"
 		exit 2
 	fi	
+	hdd_vg_size=`vgdisplay --units B ${hdd_vgname} | awk '/VG\ Size/{print $3}'`
 }
 
 # init VG
@@ -211,6 +213,7 @@ init_ssd_vg() {
 	if [ ${ssd_dev} == "null" ]; then
 		ssd_dev=''
 		ssd_vgname=''
+		ssd_vg_size=''
 		return
 	fi
 
@@ -231,6 +234,7 @@ init_ssd_vg() {
 		echo "${ssd_dev} vgcreate failed"
 		exit 2
 	fi	
+	ssd_vg_size=`vgdisplay --units B ${ssd_vgname} | awk '/VG\ Size/{print $3}'`
 }
 
 # install consul agent
@@ -369,7 +373,7 @@ install_docker() {
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label SSD_VG=${ssd_vgname} --label ADM_NIC=${adm_nic} --label INT_NIC=${int_nic} --label EXT_NIC=${ext_nic}
+DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label ADM_NIC=${adm_nic} --label INT_NIC=${int_nic} --label EXT_NIC=${ext_nic}
 
 EOF
 
