@@ -29,14 +29,10 @@ var ErrUnsupportGardener = errors.New("Unsupported Gardener")
 
 func getNodeInspect(gd *swarm.Gardener, node database.Node) structs.NodeInspect {
 	var (
-		totalCPUs    int
-		usedCPUs     int
-		totalMemory  int
-		usedMemory   int
-		totalHDDSize int
-		usedHDDSize  int
-		totalSSDSize int
-		usedSSDSize  int
+		totalCPUs, usedCPUs       int
+		totalMemory, usedMemory   int
+		totalHDDSize, usedHDDSize int
+		totalSSDSize, usedSSDSize int
 
 		dockerStatus = "Disconnected"
 	)
@@ -291,18 +287,19 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 	)
 
 	if detail {
-		nodesDetail = make([]structs.NodeResource, len(nodes))
+		nodesDetail = make([]structs.NodeResource, 0, len(nodes))
 	}
 
 	for i := range nodes {
 		if nodes[i].EngineID == "" && detail {
-			nodesDetail[i] = structs.NodeResource{
+			nodesDetail = append(nodesDetail, structs.NodeResource{
 				ID:       nodes[i].ID,
 				Name:     nodes[i].Name,
 				EngineID: nodes[i].EngineID,
 				Addr:     nodes[i].Addr,
 				Status:   swarm.ParseNodeStatus(nodes[i].Status),
-			}
+			})
+			continue
 		}
 
 		eng, err := gd.GetEngine(nodes[i].EngineID)
@@ -327,11 +324,11 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 		totalHDDSize += hdd.Total
 		usedHDDSize += hdd.Used
 
-		if detail {
+		if !detail {
 			continue
 		}
 
-		nodesDetail[i] = structs.NodeResource{
+		inspect := structs.NodeResource{
 			ID:       nodes[i].ID,
 			Name:     nodes[i].Name,
 			EngineID: eng.ID,
@@ -350,6 +347,8 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 			},
 			Containers: containerWithResource(eng.Containers()),
 		}
+
+		nodesDetail = append(nodesDetail, inspect)
 	}
 
 	return structs.ClusterResource{
