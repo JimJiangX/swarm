@@ -658,12 +658,12 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 		strategyID = svc.backup.ID
 	}
 
+	svc.failureRetry = gd.createRetry
+
 	logrus.WithFields(logrus.Fields{
 		"ServcieName": svc.Name,
 		"ServiceID":   svc.ID,
 	}).Info("Service Saved Into Database")
-
-	svc.failureRetry = gd.createRetry
 
 	err = gd.AddService(svc)
 	if err != nil {
@@ -672,18 +672,18 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 		return svc, strategyID, task.ID, err
 	}
 
-	svc.RLock()
-	defer svc.RUnlock()
-
-	err = gd.serviceScheduler(svc, task)
-	if err != nil {
-		logrus.Error("Service Add To Scheduler", err)
-
-		return svc, strategyID, task.ID, err
-	}
-	logrus.Debugf("Service %s Scheduler OK!", svc.Name)
-
 	background := func(context.Context) error {
+		svc.RLock()
+		defer svc.RUnlock()
+
+		err = gd.serviceScheduler(svc, task)
+		if err != nil {
+			logrus.Error("Service Add To Scheduler", err)
+
+			return err
+		}
+		logrus.Debugf("Service %s Scheduler OK!", svc.Name)
+
 		err := gd.serviceExecute(svc)
 		if err != nil {
 			logrus.Errorf("Service %s,execute error:%s", err)
@@ -703,7 +703,9 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 	}
 
 	updater := func(code int, msg string) error {
-		return database.TxSetServiceStatus(&svc.Service, task, svc.Status, int64(code), time.Now(), msg)
+		svcStatus := atomic.LoadInt64(&svc.Status)
+
+		return database.TxSetServiceStatus(&svc.Service, task, svcStatus, int64(code), time.Now(), msg)
 	}
 
 	worker := NewAsyncTask(context.Background(), background, nil, updater, 10*time.Minute)

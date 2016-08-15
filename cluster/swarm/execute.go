@@ -12,8 +12,6 @@ import (
 )
 
 func (gd *Gardener) serviceExecute(svc *Service) (err error) {
-	svc.Lock()
-
 	defer func() {
 		if r := recover(); r != nil {
 			logrus.Errorf("Recover From Panic:%v", r)
@@ -24,8 +22,6 @@ func (gd *Gardener) serviceExecute(svc *Service) (err error) {
 
 		if err == nil {
 			atomic.StoreInt64(&svc.Status, statusServiceNoContent)
-
-			svc.Unlock()
 			return
 		}
 
@@ -39,8 +35,6 @@ func (gd *Gardener) serviceExecute(svc *Service) (err error) {
 			delete(gd.pendingContainers, u.ID)
 		}
 		gd.scheduler.Unlock()
-
-		svc.Unlock()
 	}()
 
 	err = svc.statusCAS(statusServiceAllocting, statusServiceCreating)
