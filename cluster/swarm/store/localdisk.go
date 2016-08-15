@@ -123,3 +123,18 @@ func (LocalStore) Recycle(id string) error {
 
 	return database.DeleteLocalVoume(id)
 }
+
+func GetVGUsedSize(vg string) (int, error) {
+	vgs, err := database.SelectVolumeByVG(vg)
+	if err != nil {
+		return 0, err
+	}
+
+	used := 0
+
+	for i := range vgs {
+		used += vgs[i].Size
+	}
+
+	return used, nil
+}

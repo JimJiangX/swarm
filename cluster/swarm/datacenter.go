@@ -631,22 +631,92 @@ func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
 	return node, nil
 }
 
-func (node *Node) getVGname(_type string) (string, error) {
-	if node.engine == nil || node.engine.Labels == nil {
+func getVGname(engine *cluster.Engine, _type string) (string, error) {
+	if engine == nil || engine.Labels == nil {
 		return "", errEngineIsNil
 	}
 
 	parts := strings.SplitN(_type, ":", 2)
 	if len(parts) == 1 {
-		parts = append(parts, "HDD")
+		parts = append(parts, _HDD)
 	}
 
-	vgName, ok := node.engine.Labels[parts[1]+"_VG"]
+	label := ""
+
+	switch {
+	case parts[1] == _HDD:
+		label = _HDD_VG_Label
+	case parts[1] == _SSD:
+		label = _SSD_VG_Label
+	case strings.ToUpper(parts[1]) == _HDD:
+		label = _HDD_VG_Label
+	case strings.ToUpper(parts[1]) == _SSD:
+		label = _SSD_VG_Label
+
+	default:
+		return "", errors.Errorf("Unable Get VG Type '%s' VG_Label In Engine %s", parts[1], engine.Addr)
+	}
+
+	vgName, ok := engine.Labels[label]
 	if !ok {
-		return "", errors.Errorf("Not Found VG_Name '%s' of Node:'%s'", _type, node.Name)
+		return "", errors.Errorf("Not Found VG_Name '%s' of Node:'%s'", _type, engine.Addr)
 	}
 
 	return vgName, nil
+}
+
+type vgUsage struct {
+	Name  string
+	Total int
+	Used  int
+}
+
+func GetLocalVGUsage(engine *cluster.Engine) map[string]vgUsage {
+	if engine == nil || engine.Labels == nil {
+		return map[string]vgUsage{}
+	}
+
+	out := make(map[string]vgUsage, 2)
+
+	// HDD
+	hdd, ok := engine.Labels[_HDD_VG_Size_Label]
+	if ok {
+		total, err := strconv.Atoi(hdd)
+		if err == nil {
+			vgName, ok := engine.Labels[_HDD_VG_Label]
+			if ok {
+				used, err := store.GetVGUsedSize(vgName)
+				if err == nil {
+					out[_HDD] = vgUsage{
+						Name:  vgName,
+						Total: total,
+						Used:  used,
+					}
+				}
+			}
+		}
+	}
+
+	// SSD
+	ssd, ok := engine.Labels[_SSD_VG_Size_Label]
+	if ok {
+		total, err := strconv.Atoi(ssd)
+		if err == nil {
+			vgName, ok := engine.Labels[_SSD_VG_Label]
+			if ok {
+				used, err := store.GetVGUsedSize(vgName)
+				if err == nil {
+					out[_SSD] = vgUsage{
+						Name:  vgName,
+						Total: total,
+						Used:  used,
+					}
+				}
+			}
+		}
+	}
+
+	return out
 }
 
 func (gd *Gardener) shortIdleStoreFilter(list []database.Node, volumes []structs.DiskStorage, _type string, num int) []database.Node {
@@ -738,7 +808,7 @@ func (node *Node) isIdleStoreEnough(_type string, size int) bool {
 		return false
 	}
 
-	vgName, err := node.getVGname(_type)
+	vgName, err := getVGname(node.engine, _type)
 	if err != nil {
 		logrus.Debugf("%s get VG_Name error:%s", node.Name, err)
 

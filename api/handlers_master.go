@@ -33,6 +33,11 @@ func getNodeInspect(gd *swarm.Gardener, node database.Node) structs.NodeInspect 
 		usedCPUs     int
 		totalMemory  int
 		usedMemory   int
+		totalHDDSize int
+		usedHDDSize  int
+		totalSSDSize int
+		usedSSDSize  int
+
 		dockerStatus = "Disconnected"
 	)
 
@@ -44,6 +49,15 @@ func getNodeInspect(gd *swarm.Gardener, node database.Node) structs.NodeInspect 
 			totalMemory = int(eng.Memory)
 			usedMemory = int(eng.UsedMemory())
 			dockerStatus = eng.Status()
+
+			usage := swarm.GetLocalVGUsage(eng)
+			ssd := usage["SSD"]
+			hdd := usage["HDD"]
+
+			totalSSDSize = ssd.Total
+			usedSSDSize = ssd.Used
+			totalHDDSize = hdd.Total
+			usedHDDSize = hdd.Used
 		}
 	}
 
@@ -60,10 +74,14 @@ func getNodeInspect(gd *swarm.Gardener, node database.Node) structs.NodeInspect 
 		Status:       int(node.Status),
 		RegisterAt:   utils.TimeToString(node.RegisterAt),
 		Resource: structs.Resource{
-			TotalCPUs:   totalCPUs,
-			UsedCPUs:    usedCPUs,
-			TotalMemory: totalMemory,
-			UsedMemory:  usedMemory,
+			TotalCPUs:    totalCPUs,
+			UsedCPUs:     usedCPUs,
+			TotalMemory:  totalMemory,
+			UsedMemory:   usedMemory,
+			TotalSSDSize: totalSSDSize,
+			UsedSSDSize:  usedSSDSize,
+			TotalHDDSize: totalHDDSize,
+			UsedHDDSize:  usedHDDSize,
 		},
 	}
 }
@@ -263,14 +281,21 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 		return structs.ClusterResource{}, err
 	}
 
-	var nodesDetail []structs.NodeResource = nil
-	var totalCPUs, usedCPUs, totalMemory, usedMemory int64
+	var (
+		totalCPUs, usedCPUs       int64
+		totalMemory, usedMemory   int64
+		totalSSDSize, usedSSDSize int
+		totalHDDSize, usedHDDSize int
+
+		nodesDetail []structs.NodeResource
+	)
+
 	if detail {
 		nodesDetail = make([]structs.NodeResource, len(nodes))
 	}
 
 	for i := range nodes {
-		if i < len(nodesDetail) {
+		if nodes[i].EngineID == "" && detail {
 			nodesDetail[i] = structs.NodeResource{
 				ID:       nodes[i].ID,
 				Name:     nodes[i].Name,
@@ -280,37 +305,50 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 			}
 		}
 
-		if nodes[i].EngineID != "" {
-			eng, err := gd.GetEngine(nodes[i].EngineID)
-			if err != nil || eng == nil {
-				logrus.Warnf("Engine %s Not Found,%v", nodes[i].EngineID, err)
-				continue
-			}
+		eng, err := gd.GetEngine(nodes[i].EngineID)
+		if err != nil || eng == nil {
+			logrus.Warnf("Engine %s Not Found,%v", nodes[i].EngineID, err)
+			continue
+		}
 
-			totalCPUs += eng.Cpus
-			totalMemory += eng.Memory
-			_CPUs := eng.UsedCpus()
-			_Memory := eng.UsedMemory()
-			usedCPUs += _CPUs
-			usedMemory += _Memory
+		totalCPUs += eng.Cpus
+		totalMemory += eng.Memory
+		_CPUs := eng.UsedCpus()
+		_Memory := eng.UsedMemory()
+		usedCPUs += _CPUs
+		usedMemory += _Memory
 
-			if i < len(nodesDetail) {
-				nodesDetail[i] = structs.NodeResource{
-					ID:       nodes[i].ID,
-					Name:     nodes[i].Name,
-					EngineID: eng.ID,
-					Addr:     eng.IP,
-					Status:   eng.Status(),
-					Labels:   eng.Labels,
-					Resource: structs.Resource{
-						TotalCPUs:   int(eng.Cpus),
-						UsedCPUs:    int(_CPUs),
-						TotalMemory: int(eng.Memory),
-						UsedMemory:  int(_Memory),
-					},
-					Containers: containerWithResource(eng.Containers()),
-				}
-			}
+		usage := swarm.GetLocalVGUsage(eng)
+		ssd := usage["SSD"]
+		hdd := usage["HDD"]
+
+		totalSSDSize += ssd.Total
+		usedSSDSize += ssd.Used
+		totalHDDSize += hdd.Total
+		usedHDDSize += hdd.Used
+
+		if detail {
+			continue
+		}
+
+		nodesDetail[i] = structs.NodeResource{
+			ID:       nodes[i].ID,
+			Name:     nodes[i].Name,
+			EngineID: eng.ID,
+			Addr:     eng.IP,
+			Status:   eng.Status(),
+			Labels:   eng.Labels,
+			Resource: structs.Resource{
+				TotalCPUs:    int(eng.Cpus),
+				UsedCPUs:     int(_CPUs),
+				TotalMemory:  int(eng.Memory),
+				UsedMemory:   int(_Memory),
+				TotalSSDSize: ssd.Total,
+				UsedSSDSize:  ssd.Used,
+				TotalHDDSize: hdd.Total,
+				UsedHDDSize:  hdd.Used,
+			},
+			Containers: containerWithResource(eng.Containers()),
 		}
 	}
 
@@ -320,10 +358,14 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 		Type:   cl.Type,
 		Enable: cl.Enabled,
 		Entire: structs.Resource{
-			TotalCPUs:   int(totalCPUs),
-			UsedCPUs:    int(usedCPUs),
-			TotalMemory: int(totalMemory),
-			UsedMemory:  int(usedMemory),
+			TotalCPUs:    int(totalCPUs),
+			UsedCPUs:     int(usedCPUs),
+			TotalMemory:  int(totalMemory),
+			UsedMemory:   int(usedMemory),
+			TotalSSDSize: totalSSDSize,
+			UsedSSDSize:  usedSSDSize,
+			TotalHDDSize: totalHDDSize,
+			UsedHDDSize:  usedHDDSize,
 		},
 		Nodes: nodesDetail,
 	}, nil

@@ -676,7 +676,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 		svc.RLock()
 		defer svc.RUnlock()
 
-		err = gd.serviceScheduler(svc, task)
+		err := gd.serviceScheduler(svc, task)
 		if err != nil {
 			logrus.Error("Service Add To Scheduler", err)
 
@@ -684,7 +684,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 		}
 		logrus.Debugf("Service %s Scheduler OK!", svc.Name)
 
-		err := gd.serviceExecute(svc)
+		err = gd.serviceExecute(svc)
 		if err != nil {
 			logrus.Errorf("Service %s,execute error:%s", err)
 

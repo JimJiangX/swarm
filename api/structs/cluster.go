@@ -36,10 +36,14 @@ type ClusterResource struct {
 }
 
 type Resource struct {
-	TotalCPUs   int
-	UsedCPUs    int
-	TotalMemory int
-	UsedMemory  int
+	TotalCPUs    int
+	UsedCPUs     int
+	TotalMemory  int
+	UsedMemory   int
+	TotalSSDSize int
+	UsedSSDSize  int
+	TotalHDDSize int
+	UsedHDDSize  int
 }
 
 type NodeResource struct {

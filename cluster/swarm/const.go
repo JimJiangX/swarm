@@ -132,10 +132,12 @@ const (
 	_UnitRole_Master        = "master"
 	_UnitRole_SwitchManager = "switch_manager"
 
-	_SSD          = "SSD"
-	_HDD          = "HDD"
-	_HDD_VG_Label = "HDD_VG"
-	_SSD_VG_Label = "SSD_VG"
+	_SSD               = "SSD"
+	_HDD               = "HDD"
+	_HDD_VG_Label      = "HDD_VG"
+	_SSD_VG_Label      = "SSD_VG"
+	_HDD_VG_Size_Label = "HDD_VG_Size"
+	_SSD_VG_Size_Label = "SSD_VG_Size"
 
 	_SAN_VG = "_SAN_VG"
 

@@ -420,7 +420,7 @@ func (node *Node) localStorageAlloc(name, unitID, storageType string, size int) 
 		return lv, errors.Errorf("Not Found LoaclStorage of Node %s", node.Addr)
 	}
 
-	vgName, err := node.getVGname(storageType)
+	vgName, err := getVGname(node.engine, storageType)
 	if err != nil {
 		return lv, err
 	}
@@ -496,7 +496,7 @@ func (node *Node) localStorageExtend(name, storageType string, size int) (databa
 	if node.localStore == nil {
 		return lv, fmt.Errorf("Not Found LoaclStorage of Node %s", node.Addr)
 	}
-	vgName, err := node.getVGname(storageType)
+	vgName, err := getVGname(node.engine, storageType)
 	if err != nil {
 		return lv, err
 	}
