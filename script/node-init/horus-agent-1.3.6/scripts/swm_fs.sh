@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o nounset
 
 function getfsdata()
 {	
@@ -28,4 +29,4 @@ logfs=/${INSTANCE}_LOG_LV
 data=`getfsdata $datafs`
 log=`getfsdata $logfs`
 
-echo $data:$log
+echo "$data:$log"

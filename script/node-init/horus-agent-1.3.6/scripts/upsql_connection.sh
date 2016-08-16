@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o nounset
 
 if [ $# -ne 3 ];then
 	echo "must eqaul to 3"
@@ -13,7 +14,7 @@ STATUSFILE=/tmp/${INSTANCE}_connection_status.data
 VARFILE=/tmp/${INSTANCE}_connection_variables.data
 
 running_status=`docker inspect -f "{{.State.Running}}" ${INSTANCE}`
-if [ ${running_status} == "false" ]; then
+if [ "${running_status}" != "true" ]; then
 	exit 4
 fi
 
@@ -73,6 +74,6 @@ connection_usage=`echo "scale=2;$attempts/$total*100" |bc `
 #upsql.thread_cache_usage
 cache_usage=`echo "scale=3;$cached/$size*100" |bc `
 
-echo $total:$attempts:$connection_usage:$exec_thread:$cache_usage
+echo "$total:$attempts:$connection_usage:$exec_thread:$cache_usage"
 
 rm  $STATUSFILE  $VARFILE

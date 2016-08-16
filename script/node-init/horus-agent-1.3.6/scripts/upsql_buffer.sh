@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o nounset
 
 if [ $# -ne 3 ];then
 	echo "must eqaul to 3"
@@ -10,7 +11,7 @@ USER=$2
 PASSWD=$3
 
 running_status=`docker inspect -f "{{.State.Running}}" ${INSTANCE}`
-if [ ${running_status} == "false" ]; then
+if [ "${running_status}" != "true" ]; then
 	exit 4
 fi
 
@@ -65,5 +66,5 @@ fi
 #upsql.buffer_pool_usage
 usage=`echo "scale=2;($pool_pages_total-$pool_pages_free)/$pool_pages_total*100" |bc `
 
-echo $hit:$total:$free:$usage:$dirty
+echo "$hit:$total:$free:$usage:$dirty"
 rm $STATUSFILE

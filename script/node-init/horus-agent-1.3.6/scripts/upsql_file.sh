@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o nounset
 
 
 if [ $# -ne 3 ];then
@@ -15,7 +16,7 @@ QUOTA=5368709120
 VARFILE=/tmp/${INSTANCE}_file_variables.data
 
 running_status=`docker inspect -f "{{.State.Running}}" ${INSTANCE}`
-if [ ${running_status} == "false" ]; then
+if [ "${running_status}" != "true" ]; then
 	exit 4
 fi
 

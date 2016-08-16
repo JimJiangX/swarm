@@ -50,7 +50,7 @@ reg_to_horus_server() {
 	local component_type=$1
 
 	stat_code=`curl -o /dev/null -s -w %{http_code} -X POST -H "Content-Type: application/json" -d '{ "endpoint": "'${node_id}'","name": "'${node_id}':'${component_type}'","type": "'${component_type}'","checktype": "health" }' http://${horus_server_ip}:${horus_server_port}/v1/component/register`
-	if [ ${stat_code} != '200' ]; then
+	if [ "${stat_code}" != "200" ]; then
 		echo "${component_type} register to horus server failed"
 		exit 2
 	fi
@@ -85,7 +85,7 @@ if [ \$? -ne 0 ]; then
 fi
 
 running_status=\`docker inspect -f "{{.State.Running}}" \${container_name}\`
-if [ \${running_status} == "false" ]; then
+if [ "\${running_status}" != "true" ]; then
 	echo "container \${container_name} is not running !"
 	exit 3
 fi
@@ -110,7 +110,7 @@ if [ \$? -ne 0 ]; then
 fi
 
 running_status=\`docker inspect -f "{{.State.Running}}" \${container_name}\`
-if [ \${running_status} == "false" ]; then
+if [ "\${running_status}" != "true" ]; then
 	echo "container \${container_name} is not running !"
 	exit 3
 fi
@@ -139,9 +139,7 @@ port=\`cat \$output | grep PORT | awk -F= '{print \$2}' | sed 's/",//g'\`
 rm -f \$output
 
 stat_code=\`curl -o /dev/null -s -w %{http_code} -X POST http://\${ip_addr}:\${port}/ping\`
-if [ \${stat_code} == '200' ]; then
-	 exit 0
- else
+if [ "\${stat_code}" != "200" ]; then
 	 exit 2
 fi
 EOF
@@ -155,7 +153,7 @@ reg_to_consul_for_swarm() {
 
 	stat_code=`curl -o /dev/null -s -w %{http_code} -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Check": {"Script": "/opt/DBaaS/script/check_swarmagent.sh ", "Interval": "10s" }}' http://${adm_ip}:${consul_port}/v1/agent/service/register`
 
-	if [ ${stat_code} != '200' ]; then
+	if [ "${stat_code}" != "200" ]; then
 		echo "${component_type} register to consul failed"
 		exit 2
 	fi
@@ -170,7 +168,7 @@ reg_to_consul() {
 	local component_port=$2
 
 	stat_code=`curl -o /dev/null -s -w %{http_code} -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Port": '${component_port}', "Check": { "tcp": "'${adm_ip}':'${component_port}'", "Interval": "10s", "timeout": "3s" }}' http://${adm_ip}:${consul_port}/v1/agent/service/register`
-	if [ ${stat_code} != "200" ]; then
+	if [ "${stat_code}" != "200" ]; then
 		echo "${component_type} register to consul failed"
 		exit 2
 	fi
@@ -180,7 +178,7 @@ reg_to_consul() {
 # init VG
 init_hdd_vg() {
 	local hdd_dev_list=''
-	if [ ${hdd_dev} == "null" ]; then
+	if [ "${hdd_dev}" == "null" ]; then
 		hdd_dev=''
 		hdd_vgname=''
 		hdd_vg_size=''
@@ -210,7 +208,7 @@ init_hdd_vg() {
 # init VG
 init_ssd_vg() {
 	local hdd_dev_list=''
-	if [ ${ssd_dev} == "null" ]; then
+	if [ "${ssd_dev}" == "null" ]; then
 		ssd_dev=''
 		ssd_vgname=''
 		ssd_vg_size=''

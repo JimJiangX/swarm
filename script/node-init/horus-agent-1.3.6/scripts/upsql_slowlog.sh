@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o nounset
 
 if [ $# -ne 3 ];then
 	echo "must eqaul to 3"
@@ -14,7 +15,7 @@ SLOWLOG_FILE=/DBAASLOG/slow-query.log
 TMPFILE=/tmp/${INSTANCE}_slowlog.data
 
 running_status=`docker inspect -f "{{.State.Running}}" ${INSTANCE}`
-if [ ${running_status} == "false" ]; then
+if [ "${running_status}" != "true" ]; then
 	exit 4
 fi
 

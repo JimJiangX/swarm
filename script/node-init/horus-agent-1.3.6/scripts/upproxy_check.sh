@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o nounset
 
 container_name=$1
 docker inspect $container_name > /dev/null 2>&1
@@ -9,7 +10,7 @@ if [ $? -ne 0 ]; then
 fi
 
 running_status=`docker inspect -f "{{.State.Running}}" ${container_name}`
-if [ ${running_status} == "false" ]; then
+if [ "${running_status}" != "true" ]; then
 	status=critical
 	echo $status
 	exit
