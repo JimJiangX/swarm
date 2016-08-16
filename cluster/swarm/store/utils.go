@@ -1,6 +1,8 @@
 package store
 
 import (
+	"bufio"
+	"io"
 	"sort"
 	"strconv"
 	"strings"
@@ -64,15 +66,17 @@ type Space struct {
 	LunNum int
 }
 
-func parseSpace(output string) []Space {
-	var (
-		spaces []Space
-		lines  = strings.Split(output, "\n") // lines
-	)
+func parseSpace(r io.Reader) []Space {
+	spaces := make([]Space, 0, 10)
+	br := bufio.NewReader(r)
 
-	for i := range lines {
+	for {
+		line, _, err := br.ReadLine()
+		if err != nil {
+			break
+		}
 
-		part := strings.Split(lines[i], " ")
+		part := strings.Split(string(line), " ")
 
 		if len(part) == 5 {
 			var (

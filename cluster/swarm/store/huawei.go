@@ -56,7 +56,7 @@ func (h *huaweiStore) Ping() error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
 	}
 
 	return nil
@@ -108,7 +108,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 
 	output, err := cmd.Output()
 	if err != nil {
-		return lun, lv, fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return lun, lv, fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
 	}
 
 	storageLunID, err := strconv.Atoi(string(output))
@@ -175,7 +175,7 @@ func (h *huaweiStore) Recycle(id string, lun int) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
 	}
 
 	err = database.TxReleaseLun(l.Name)
@@ -220,7 +220,7 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
 	}
 
 	return nil
@@ -247,7 +247,7 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
 	}
 
 	return nil
@@ -290,7 +290,7 @@ func (h *huaweiStore) Mapping(host, vg, lun string) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
 	}
 
 	return nil
@@ -318,7 +318,7 @@ func (h *huaweiStore) DelMapping(lun string) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
 	}
 
 	err = database.DelLunMapping(lun, "", "", 0)
@@ -387,13 +387,23 @@ func (h *huaweiStore) list(rg ...int) ([]Space, error) {
 		return nil, err
 	}
 
-	output, err := cmd.Output()
+	r, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
-
+		return nil, err
 	}
 
-	spaces := parseSpace(string(output))
+	err = cmd.Start()
+	if err != nil {
+		return nil, fmt.Errorf("Exec Start Script Error:%s", err)
+	}
+
+	spaces := parseSpace(r)
+
+	err = cmd.Wait()
+	if err != nil {
+		return nil, err
+	}
+
 	if len(spaces) == 0 {
 		return nil, nil
 	}

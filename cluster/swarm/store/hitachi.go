@@ -55,7 +55,7 @@ func (h hitachiStore) Ping() error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
 	}
 
 	return nil
@@ -112,7 +112,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 	}
 	output, err := cmd.Output()
 	if err != nil {
-		return lun, lv, fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return lun, lv, fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
 	}
 
 	lun = database.LUN{
@@ -173,7 +173,7 @@ func (h *hitachiStore) Recycle(id string, lun int) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
 	}
 
 	err = database.TxReleaseLun(l.Name)
@@ -239,12 +239,23 @@ func (h *hitachiStore) list(rg ...int) ([]Space, error) {
 		return nil, err
 	}
 
-	output, err := cmd.Output()
+	r, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return nil, err
 	}
 
-	spaces := parseSpace(string(output))
+	err = cmd.Start()
+	if err != nil {
+		return nil, fmt.Errorf("Exec Start Script Error:%s", err)
+	}
+
+	spaces := parseSpace(r)
+
+	err = cmd.Wait()
+	if err != nil {
+		return nil, err
+	}
+
 	if len(spaces) == 0 {
 		return nil, nil
 	}
@@ -288,7 +299,7 @@ func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
 	}
 
 	return err
@@ -313,7 +324,7 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
 	}
 
 	return err
@@ -356,7 +367,7 @@ func (h *hitachiStore) Mapping(host, vg, lun string) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
 	}
 
 	return err
@@ -384,7 +395,7 @@ func (h *hitachiStore) DelMapping(lun string) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, string(output))
+		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
 	}
 
 	err = database.DelLunMapping(lun, "", "", 0)
