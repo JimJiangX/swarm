@@ -28,7 +28,7 @@ func GoConcurrency(funcs []func() error) error {
 		go func(f func() error) {
 			defer func() {
 				if r := recover(); r != nil {
-					logrus.Errorf("GoConcurrency Panic:%v\n%s", r, string(debug.Stack()))
+					logrus.Errorf("GoConcurrency Panic:%v\n%s", r, debug.Stack())
 				}
 			}()
 			ch <- f()
@@ -168,7 +168,7 @@ func (t *asyncTask) Run() error {
 	go func(ctx context.Context, t *asyncTask) {
 		defer func() {
 			if r := recover(); r != nil {
-				logrus.Errorf("asyncTask panic:%v\n%s", r, string(debug.Stack()))
+				logrus.Errorf("asyncTask panic:%v\n%s", r, debug.Stack())
 
 				if t.update != nil {
 					code, msg := statusTaskFailed, fmt.Sprintf("panic:%v", r)

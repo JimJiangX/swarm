@@ -374,7 +374,7 @@ func nfsSetting(option database.NFSOption) error {
 
 	out, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("%v,%s", err, string(out))
+		return fmt.Errorf("%v,%s", err, out)
 	}
 
 	return nil

@@ -657,7 +657,10 @@ func getVGname(engine *cluster.Engine, _type string) (string, error) {
 		return "", errors.Errorf("Unable Get VG Type '%s' VG_Label In Engine %s", parts[1], engine.Addr)
 	}
 
+	engine.RLock()
 	vgName, ok := engine.Labels[label]
+	engine.RUnlock()
+
 	if !ok {
 		return "", errors.Errorf("Not Found VG_Name '%s' of Node:'%s'", _type, engine.Addr)
 	}
@@ -679,11 +682,17 @@ func GetLocalVGUsage(engine *cluster.Engine) map[string]vgUsage {
 	out := make(map[string]vgUsage, 2)
 
 	// HDD
+	engine.RLock()
 	hdd, ok := engine.Labels[_HDD_VG_Size_Label]
+	engine.RUnlock()
+
 	if ok {
 		total, err := strconv.Atoi(hdd)
 		if err == nil {
+			engine.RLock()
 			vgName, ok := engine.Labels[_HDD_VG_Label]
+			engine.RUnlock()
+
 			if ok {
 				used, err := store.GetVGUsedSize(vgName)
 				if err == nil {
@@ -698,11 +707,17 @@ func GetLocalVGUsage(engine *cluster.Engine) map[string]vgUsage {
 	}
 
 	// SSD
+	engine.RLock()
 	ssd, ok := engine.Labels[_SSD_VG_Size_Label]
+	engine.RUnlock()
+
 	if ok {
 		total, err := strconv.Atoi(ssd)
 		if err == nil {
+			engine.RLock()
 			vgName, ok := engine.Labels[_SSD_VG_Label]
+			engine.RUnlock()
+
 			if ok {
 				used, err := store.GetVGUsedSize(vgName)
 				if err == nil {

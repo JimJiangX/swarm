@@ -236,7 +236,7 @@ func DebugRequestMiddleware(r *http.Request) error {
 			logrus.Debugf("form data: %q", postForm)
 		}
 	} else {
-		logrus.Debugf("'%s'", string(b))
+		logrus.Debugf("'%s'", b)
 	}
 
 	return err
