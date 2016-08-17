@@ -33,6 +33,16 @@ adm_nic=bond0
 int_nic=bond1
 ext_nic=bond2
 
+rpm_install() {
+	zypper --non-interactive install sysstat ./rpm/percona-toolkit-2.2.19-1.noarch.rpm
+	if [ $? -ne 0 ]; then
+		echo "zypper install faild"
+		exit 2
+	fi	
+	
+
+}
+
 nfs_mount() {
 	umount -f ${nfs_mount_dir} > /dev/null 2>&1
 	sed -i "/${nfs_ip}:${nfs_dir}/d" /etc/fstab > /dev/null 2>&1
@@ -570,7 +580,6 @@ install_horus_agent() {
 	# stop swarm-agent
 	pkill -9 horus-agent >/dev/null 2>&1
 
-	zypper --non-interactive install sysstat
 
 	# copy binary file
 	mkdir -p /usr/local/horus-agent
@@ -627,8 +636,7 @@ EOF
 
 }
 
-
-
+rpm_install
 create_check_script
 nfs_mount
 init_hdd_vg
@@ -647,7 +655,5 @@ reg_to_horus_server SwarmAgent
 install_horus_agent
 reg_to_consul HorusAgent ${horus_agent_port}
 reg_to_horus_server HorusAgent
-
-
 
 exit 0
