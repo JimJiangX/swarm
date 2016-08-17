@@ -566,7 +566,7 @@ EOF
 
 # install horus agent
 install_horus_agent() {
-	local version=1.3.6
+	local version=1.3.7
 	# stop swarm-agent
 	pkill -9 horus-agent >/dev/null 2>&1
 
