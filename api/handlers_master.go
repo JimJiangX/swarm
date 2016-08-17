@@ -277,6 +277,18 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 		return structs.ClusterResource{}, err
 	}
 
+	engines := make([]string, 0, len(nodes))
+	for i := range nodes {
+		if nodes[i].EngineID != "" {
+			engines = append(engines, nodes[i].EngineID)
+		}
+	}
+
+	containersNum, err := database.CountUnitsInNodes(engines)
+	if err != nil {
+		logrus.Error(err)
+	}
+
 	var (
 		totalCPUs, usedCPUs       int64
 		totalMemory, usedMemory   int64
@@ -352,10 +364,12 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 	}
 
 	return structs.ClusterResource{
-		ID:     cl.ID,
-		Name:   cl.Name,
-		Type:   cl.Type,
-		Enable: cl.Enabled,
+		ID:            cl.ID,
+		Name:          cl.Name,
+		Type:          cl.Type,
+		Enable:        cl.Enabled,
+		NodeNum:       len(nodes),
+		ContainersNum: containersNum,
 		Entire: structs.Resource{
 			TotalCPUs:    int(totalCPUs),
 			UsedCPUs:     int(usedCPUs),

@@ -116,6 +116,30 @@ func GetUnit(nameOrID string) (Unit, error) {
 	return u, errors.Wrap(err, "Get Unit By nameOrID:"+nameOrID)
 }
 
+func CountUnitsInNodes(engines []string) (int, error) {
+	db, err := GetDB(true)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(engines) == 0 {
+		return 0, nil
+	}
+
+	query, args, err := sqlx.In("SELECT COUNT(*) FROM tb_unit WHERE node_id IN (?);", engines)
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	err = db.Select(&count, query, args...)
+	if err == nil {
+		return count, nil
+	}
+
+	return 0, errors.Wrap(err, "Cound Units By node_id")
+}
+
 func TxInsertUnit(tx *sqlx.Tx, unit Unit) error {
 	_, err := tx.NamedExec(insertUnitQuery, &unit)
 	if err == nil {

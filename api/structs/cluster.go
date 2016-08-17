@@ -27,12 +27,14 @@ type UpdateNodeSetting struct {
 type ListClusterResource []ClusterResource
 
 type ClusterResource struct {
-	Enable bool
-	ID     string
-	Name   string
-	Type   string
-	Entire Resource
-	Nodes  []NodeResource `json:",omitempty"` // only used in GET /clusters/{name:.*}/resources
+	Enable        bool
+	NodeNum       int `json:"node_num"`
+	ContainersNum int `json:"containers_num"`
+	ID            string
+	Name          string
+	Type          string
+	Entire        Resource
+	Nodes         []NodeResource `json:",omitempty"` // only used in GET /clusters/{name:.*}/resources
 }
 
 type Resource struct {
