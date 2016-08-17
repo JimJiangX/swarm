@@ -513,7 +513,7 @@ func sanDeactivateAndDelMapping(storage store.Store, host string,
 		addr := getPluginAddr(host, pluginPort)
 		err := sdk.SanDeActivate(addr, config)
 		if err != nil {
-			logrus.Error("%s SanDeActivate error:%s", host, err)
+			logrus.Errorf("%s SanDeActivate error:%s", host, err)
 		}
 	}
 

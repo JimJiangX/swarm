@@ -82,7 +82,7 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 		if protoAddrParts[0] == "tcp" {
 			ip, port, err := net.SplitHostPort(protoAddrParts[1])
 			if err != nil {
-				logrus.Error("%s SplitHostPort error,%s", protoAddrParts[1], err)
+				logrus.Errorf("%s SplitHostPort error,%s", protoAddrParts[1], err)
 				return nil, err
 			}
 
@@ -95,7 +95,7 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	// query consul config from DB
 	sysConfig, err := database.GetSystemConfig()
 	if err != nil {
-		logrus.Error("Get System Config Error,%s", err)
+		logrus.Errorf("Get System Config Error,%s", err)
 	} else {
 		err = gd.SetParams(sysConfig)
 		if err != nil {

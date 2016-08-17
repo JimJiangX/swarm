@@ -33,7 +33,7 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 		_err := database.TxSetServiceStatus(&svc.Service, task,
 			statusServiceAlloctionFailed, statusTaskFailed, time.Now(), err.Error())
 		if _err != nil {
-			entry.Error("Tx Set ServiceStatus error:%s", _err)
+			entry.Errorf("Tx Set ServiceStatus error:%s", _err)
 		}
 		if err != nil && len(resourceAlloc) > 0 {
 			_err := dealWithSchedulerFailure(gd, resourceAlloc)

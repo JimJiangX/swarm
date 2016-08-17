@@ -582,7 +582,7 @@ func (u *unit) activateVG(config sdk.ActiveConfig) error {
 	addr := getPluginAddr(engine.IP, pluginPort)
 	err = sdk.SanActivate(addr, config)
 	if err != nil {
-		logrus.Error("%s SanDeActivate error:%s", u.Name, err)
+		logrus.Errorf("%s SanDeActivate error:%s", u.Name, err)
 	}
 	return nil
 }
@@ -596,7 +596,7 @@ func (u *unit) deactivateVG(config sdk.DeactivateConfig) error {
 	addr := getPluginAddr(engine.IP, pluginPort)
 	err = sdk.SanDeActivate(addr, config)
 	if err != nil {
-		logrus.Error("%s SanDeActivate error:%s", u.Name, err)
+		logrus.Errorf("%s SanDeActivate error:%s", u.Name, err)
 	}
 
 	return err

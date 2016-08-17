@@ -41,9 +41,9 @@ func TestGoConcurrency(t *testing.T) {
 	}
 
 	if _errs, ok := err.(_errors); !ok {
-		t.Error("Unexpected,%s", err)
+		t.Errorf("Unexpected,%s", err)
 	} else if errs := _errs.Split(); len(errs) != 5 {
-		t.Error("Unexpected,%s", errs)
+		t.Errorf("Unexpected,%s", errs)
 	}
 
 	t.Logf("%s", err)

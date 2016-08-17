@@ -686,7 +686,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 
 		err = gd.serviceExecute(svc)
 		if err != nil {
-			logrus.Errorf("Service %s,execute error:%s", err)
+			logrus.Errorf("Service %s,execute error:%s", svc.Name, err)
 
 			return err
 		}
@@ -1193,12 +1193,12 @@ func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}
 
 			err := u.stopService()
 			if err != nil {
-				logrus.Error("%s stop Service error,%s", u.Name, err)
+				logrus.Errorf("%s stop Service error,%s", u.Name, err)
 			}
 
 			err = u.startService()
 			if err != nil {
-				logrus.Error("%s start Service error,%s", u.Name, err)
+				logrus.Errorf("%s start Service error,%s", u.Name, err)
 				return err
 			}
 		}
@@ -1705,7 +1705,7 @@ func (gd *Gardener) serviceScale(svc *Service, scale structs.PostServiceScaledRe
 		}
 		err = pendings[i].containerUpdate()
 		if err != nil {
-			logrus.Error("container %s update error:%s", pendings[i].containerID, err)
+			logrus.Errorf("container %s update error:%s", pendings[i].containerID, err)
 			return err
 		}
 	}

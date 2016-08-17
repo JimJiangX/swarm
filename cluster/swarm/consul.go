@@ -109,7 +109,7 @@ func registerHealthCheck(u *unit, context *Service) error {
 	if err != nil {
 		logrus.Warnf("Unit %s HealthCheck error:%s", u.Name, err)
 		if err = u.factory(); err != nil {
-			logrus.Error("Unit %s factory error:%s", u.Name, err)
+			logrus.Errorf("Unit %s factory error:%s", u.Name, err)
 			return err
 		}
 

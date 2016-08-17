@@ -843,7 +843,7 @@ func getUnitNetworking(id string) ([]struct {
 }) {
 	ips, err := database.ListIPByUnitID(id)
 	if err != nil {
-		logrus.Error("%s List IP error %s", id, err)
+		logrus.Errorf("%s List IP error %s", id, err)
 	}
 
 	networkings := make([]struct {
@@ -865,7 +865,7 @@ func getUnitNetworking(id string) ([]struct {
 
 	out, err := database.ListPortsByUnit(id)
 	if err != nil {
-		logrus.Error("%s List Port error %s", id, err)
+		logrus.Errorf("%s List Port error %s", id, err)
 	}
 
 	ports := make([]struct {
@@ -2499,7 +2499,7 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	size, err := store.AddSpace(req.ID)
+	space, err := store.AddSpace(req.ID)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -2507,7 +2507,7 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%d}", "Size", size)
+	fmt.Fprintf(w, "{%q:%d}", "Size", space.Total)
 }
 
 // POST /storage/san/{name}/raid_group/{rg:[0-9]+}/enable

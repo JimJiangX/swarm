@@ -477,7 +477,7 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) error {
 	// ssh exec clean script
 	err = nodeClean(node.ID, node.Addr, user, password)
 	if err != nil {
-		logrus.Error("clean script exec error:%s", err)
+		logrus.Errorf("clean script exec error:%s", err)
 	}
 
 	return err
@@ -1160,7 +1160,7 @@ func SSHCommand(host, user, password, shell string, output io.Writer) error {
 func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Duration) error {
 	dc, err := gd.Datacenter(name)
 	if err != nil || dc == nil {
-		logrus.Error("%s Not Found,%s", name, err)
+		logrus.Errorf("%s Not Found,%s", name, err)
 		return err
 	}
 	config, err := gd.SystemConfig()

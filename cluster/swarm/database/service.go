@@ -628,7 +628,7 @@ const insertUserQuery = "INSERT INTO tb_users (id,service_id,type,username,passw
 type User struct {
 	ReadOnly  bool   `db:"read_only" json:"read_only"`
 	ID        string `db:"id"`
-	ServiceID string `db:"service_id" json:""service_id`
+	ServiceID string `db:"service_id" json:"service_id"`
 	Type      string `db:"type"`
 	Username  string `db:"username"`
 	Password  string `db:"password"`
