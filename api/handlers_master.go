@@ -515,7 +515,11 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logrus.Debug("next step: Gardener.Containers()")
+
 	containers := gd.Containers()
+
+	logrus.Debug("next step: Gardener.Containers() ", len(containers))
 
 	var response io.Reader
 	switch strings.ToUpper(from) {
@@ -704,7 +708,13 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	resp := getServiceResponse(service, gd.Containers())
+	logrus.Debug("Next step:Gardener.Containers")
+
+	containers := gd.Containers()
+
+	logrus.Debug("next step: Gardener.Containers() ", len(containers))
+
+	resp := getServiceResponse(service, containers)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
