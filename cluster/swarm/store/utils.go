@@ -2,6 +2,7 @@ package store
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"sort"
 	"strconv"
@@ -57,6 +58,7 @@ func maxIdleSizeRG(m map[database.RaidGroup]Space) database.RaidGroup {
 	return key
 }
 
+// Space ---> RG
 type Space struct {
 	Enable bool
 	ID     int
@@ -76,32 +78,32 @@ func parseSpace(r io.Reader) []Space {
 			break
 		}
 
-		part := strings.Split(string(line), " ")
+		parts := bytes.Split(line, []byte{' '})
 
-		if len(part) == 5 {
+		if len(parts) == 5 {
 			var (
 				space = Space{}
 				err   error
 			)
-			space.ID, err = strconv.Atoi(part[0])
+			space.ID, err = strconv.Atoi(string(parts[0]))
 			if err != nil {
 				continue
 			}
-			space.Total, err = strconv.Atoi(part[1])
+			space.Total, err = strconv.Atoi(string(parts[1]))
 			if err != nil {
 				continue
 			}
 			space.Total = space.Total << 20
 
-			space.Free, err = strconv.Atoi(part[2])
+			space.Free, err = strconv.Atoi(string(parts[2]))
 			if err != nil {
 				continue
 			}
 			space.Free = space.Free << 20
 
-			space.State = part[3]
+			space.State = string(parts[3])
 
-			space.LunNum, err = strconv.Atoi(part[4])
+			space.LunNum, err = strconv.Atoi(string(parts[4]))
 			if err != nil {
 				continue
 			}
