@@ -17,7 +17,13 @@ if [ "${running_status}" != "true" ]; then
 	exit 4
 fi
 
-docker exec $INSTANCE mysql -S /DBAASDAT/upsql.sock mysql -u$USER -p$PASSWD  -e"show slave status \G;" >$SLAVEFILE  2>/dev/null
+EXEC_BIN=`which mysql 2>/dev/null`
+if [ "${EXEC_BIN}" == '' ]; then
+	echo "not find mysql"
+	exit 4
+fi
+
+${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock mysql -u$USER -p$PASSWD  -e"show slave status \G;" >$SLAVEFILE  2>/dev/null
 if [ $? -ne 0 ];then
 	echo "get variabes err"
 	rm  $STATUSFILE

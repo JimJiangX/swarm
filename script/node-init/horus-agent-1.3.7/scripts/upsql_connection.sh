@@ -18,8 +18,13 @@ if [ "${running_status}" != "true" ]; then
 	exit 4
 fi
 
+EXEC_BIN=`which mysql 2>/dev/null`
+if [ "${EXEC_BIN}" == '' ]; then
+	echo "not find mysql"
+	exit 4
+fi
 
-docker exec $INSTANCE mysql -S /DBAASDAT/upsql.sock mysql -u$USER -p$PASSWD  -e"show status where Variable_name in ('threads_running','threads_cached','Threads_connected','Aborted_connects');" >$STATUSFILE  2>/dev/null
+${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock mysql -u$USER -p$PASSWD  -e"show status where Variable_name in ('threads_running','threads_cached','Threads_connected','Aborted_connects');" >$STATUSFILE  2>/dev/null
 if [ $? -ne 0 ];then
 	echo "get status err"
 	exit 2

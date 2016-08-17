@@ -17,7 +17,13 @@ fi
 
 STATUSFILE=/tmp/${INSTANCE}_buffer_status.data
 
-docker exec $INSTANCE mysql -S /DBAASDAT/upsql.sock  mysql -u$USER -p$PASSWD  -e"show status where Variable_name in ('Innodb_buffer_pool_pages_free','Innodb_page_size','Innodb_buffer_pool_pages_total','innodb_buffer_pool_reads','innodb_buffer_pool_read_requests');" >$STATUSFILE  2>/dev/null
+EXEC_BIN=`which mysql 2>/dev/null`
+if [ "${EXEC_BIN}" == '' ]; then
+	echo "not find mysql"
+	exit 4
+fi
+
+${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock  mysql -u$USER -p$PASSWD  -e"show status where Variable_name in ('Innodb_buffer_pool_pages_free','Innodb_page_size','Innodb_buffer_pool_pages_total','innodb_buffer_pool_reads','innodb_buffer_pool_read_requests');" >$STATUSFILE  2>/dev/null
 
 if [ $? -ne 0 ];then
 	echo "get status err"

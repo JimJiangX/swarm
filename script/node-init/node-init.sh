@@ -34,7 +34,7 @@ int_nic=bond1
 ext_nic=bond2
 
 rpm_install() {
-	zypper --non-interactive install sysstat ./rpm/percona-toolkit-2.2.19-1.noarch.rpm
+	zypper --no-gpg-checks --non-interactive install sysstat mariadb-client ./tools/percona-toolkit-2.2.19-1.noarch.rpm
 	if [ $? -ne 0 ]; then
 		echo "zypper install faild"
 		exit 2
@@ -107,7 +107,7 @@ fi
 EOF
 	chmod +x ${dir}/check_db.sh
 
-
+        cp tools/check_proxy ${dir}/
 	cat << EOF > ${dir}/check_proxy.sh
 #!/bin/bash
 set -o nounset
@@ -125,7 +125,7 @@ if [ "\${running_status}" != "true" ]; then
 	exit 3
 fi
 
-docker exec \$container_name /root/check_proxy --default-file /DBAASCNF/upsql-proxy.conf
+${dir}/check_proxy --default-file /\${container_name}_CNF_LV/upsql-proxy.conf
 if [ \$? -ne 0 ]; then
 	 exit 4
 fi

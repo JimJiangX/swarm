@@ -2,6 +2,7 @@
 set -o nounset
 
 container_name=$1
+dir=/opt/DBaaS/script
 docker inspect $container_name > /dev/null 2>&1
 if [ $? -ne 0 ]; then
 	status=critical
@@ -16,8 +17,7 @@ if [ "${running_status}" != "true" ]; then
 	exit
 fi
 
-docker exec $container_name /root/check_proxy --default-file /DBAASCNF/upsql-proxy.conf > /dev/null 2>&1
-
+${dir}/check_proxy --default-file /${container_name}_CNF_LV/upsql-proxy.conf > /dev/null 2>&1
 if [  $? -eq 0 ];then
 	status=passing
 else
