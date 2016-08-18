@@ -82,7 +82,7 @@ fi
 EOF
 	chmod +x ${dir}/check_swarmagent.sh
 	
-        cp tools/check_db ${dir}/
+        cp ${cur_dir}/tools/check_db ${dir}/
 	cat << EOF > ${dir}/check_db.sh
 #!/bin/bash
 set -o nounset
@@ -108,7 +108,7 @@ fi
 EOF
 	chmod +x ${dir}/check_db.sh
 
-        cp tools/check_proxy ${dir}/
+        cp ${cur_dir}/tools/check_proxy ${dir}/
 	cat << EOF > ${dir}/check_proxy.sh
 #!/bin/bash
 set -o nounset
