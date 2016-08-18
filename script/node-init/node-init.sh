@@ -80,7 +80,6 @@ else
 	exit 0
 fi
 EOF
-	chmod +x ${dir}/check_swarmagent.sh
 	
         cp ${cur_dir}/tools/check_db ${dir}/
 	cat << EOF > ${dir}/check_db.sh
@@ -106,7 +105,6 @@ if [ \$? -ne 0 ]; then
 	 exit 4
 fi
 EOF
-	chmod +x ${dir}/check_db.sh
 
         cp ${cur_dir}/tools/check_proxy ${dir}/
 	cat << EOF > ${dir}/check_proxy.sh
@@ -132,7 +130,6 @@ if [ \$? -ne 0 ]; then
 	 exit 4
 fi
 EOF
-	chmod +x ${dir}/check_proxy.sh
 
 	cat << EOF > ${dir}/check_switchmanager.sh
 #!/bin/bash
@@ -155,7 +152,7 @@ if [ "\${stat_code}" != "200" ]; then
 	 exit 2
 fi
 EOF
-	chmod +x ${dir}/check_switchmanager.sh
+	chmod -R +x ${dir}
 }
 
 
