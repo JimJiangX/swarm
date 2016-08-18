@@ -116,30 +116,6 @@ func GetUnit(nameOrID string) (Unit, error) {
 	return u, errors.Wrap(err, "Get Unit By nameOrID:"+nameOrID)
 }
 
-func CountUnitsInNodes(engines []string) (int, error) {
-	db, err := GetDB(true)
-	if err != nil {
-		return 0, err
-	}
-
-	if len(engines) == 0 {
-		return 0, nil
-	}
-
-	query, args, err := sqlx.In("SELECT COUNT(*) FROM tb_unit WHERE node_id IN (?);", engines)
-	if err != nil {
-		return 0, err
-	}
-
-	count := 0
-	err = db.Select(&count, query, args...)
-	if err == nil {
-		return count, nil
-	}
-
-	return 0, errors.Wrap(err, "Cound Units By node_id")
-}
-
 func TxInsertUnit(tx *sqlx.Tx, unit Unit) error {
 	_, err := tx.NamedExec(insertUnitQuery, &unit)
 	if err == nil {
@@ -349,7 +325,7 @@ func CountUnitByNode(id string) (int, error) {
 	}
 
 	count := 0
-	const query = "SELECT COUNT(*) from tb_unit WHERE node_id=?"
+	const query = "SELECT COUNT(id) from tb_unit WHERE node_id=?"
 
 	err = db.Get(&count, query, id)
 	if err == nil {
@@ -367,6 +343,30 @@ func CountUnitByNode(id string) (int, error) {
 	}
 
 	return 0, errors.Wrap(err, "Count Unit By NodeID:"+id)
+}
+
+func CountUnitsInNodes(engines []string) (int, error) {
+	if len(engines) == 0 {
+		return 0, nil
+	}
+
+	db, err := GetDB(true)
+	if err != nil {
+		return 0, err
+	}
+
+	query, args, err := sqlx.In("SELECT COUNT(container_id) FROM tb_unit WHERE node_id IN (?);", engines)
+	if err != nil {
+		return 0, err
+	}
+
+	count := 0
+	err = db.Get(&count, query, args...)
+	if err == nil {
+		return count, nil
+	}
+
+	return 0, errors.Wrap(err, "Cound Units By node_id")
 }
 
 func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {

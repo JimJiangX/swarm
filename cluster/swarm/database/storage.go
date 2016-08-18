@@ -189,7 +189,7 @@ func CountLUNByRaidGroupID(rg string) (int, error) {
 	}
 
 	count := 0
-	const query = "SELECT COUNT(*) from tb_lun WHERE raid_group_id=?"
+	const query = "SELECT COUNT(id) from tb_lun WHERE raid_group_id=?"
 
 	err = db.Get(&count, query, rg)
 	if err == nil {

@@ -201,7 +201,7 @@ func CountClusterByStorage(storageID string) (int, error) {
 	}
 
 	count := 0
-	const query = "SELECT COUNT(*) from tb_cluster WHERE storage_id=?"
+	const query = "SELECT COUNT(id) from tb_cluster WHERE storage_id=?"
 
 	err = db.Get(&count, query, storageID)
 	if err == nil {
@@ -514,7 +514,7 @@ func CountNodeByCluster(cluster string) (int, error) {
 	}
 
 	num := 0
-	const query = "SELECT COUNT(*) FROM tb_node WHERE cluster_id=?"
+	const query = "SELECT COUNT(id) FROM tb_node WHERE cluster_id=?"
 
 	err = db.Get(&num, query, cluster)
 	if err == nil {
@@ -536,7 +536,7 @@ func CountNodeByCluster(cluster string) (int, error) {
 
 func ListNodesByEngines(names []string) ([]Node, error) {
 	if len(names) == 0 {
-		return nil, nil
+		return []Node{}, nil
 	}
 
 	db, err := GetDB(true)
@@ -583,7 +583,7 @@ func ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, 
 		list = clist
 	}
 	if len(list) == 0 {
-		return nil, errors.New("Cluster List is nil")
+		return []Node{}, nil
 	}
 
 	query, args, err := sqlx.In("SELECT * FROM tb_node WHERE cluster_id IN (?);", list)

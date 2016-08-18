@@ -341,7 +341,7 @@ func ListUnitConfigByService(service string) ([]UnitWithConfig, error) {
 	}
 
 	if len(units) == 0 {
-		return nil, errors.Errorf("Not Found []Unit by service_id='%s'", service)
+		return []UnitWithConfig{}, nil
 	}
 
 	ids := make([]string, len(units))

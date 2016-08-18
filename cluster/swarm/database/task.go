@@ -69,7 +69,7 @@ func ListBackupFilesByService(nameOrID string) (Service, []BackupFile, error) {
 	}
 
 	if len(units) == 0 {
-		return service, nil, errors.Wrapf(err, "Not Found Units By service_id='%s'", service.ID)
+		return service, []BackupFile{}, nil
 	}
 
 	query, args, err := sqlx.In("SELECT * FROM tb_backup_files WHERE unit_id IN (?);", units)
