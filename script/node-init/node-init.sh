@@ -80,14 +80,15 @@ else
 	exit 0
 fi
 EOF
-
 	chmod +x ${dir}/check_swarmagent.sh
 	
+        cp tools/check_db ${dir}/
 	cat << EOF > ${dir}/check_db.sh
 #!/bin/bash
 set -o nounset
 
 container_name=\$1
+dir=${dir}
 
 docker inspect \${container_name} > /dev/null 2>&1
 if [ \$? -ne 0 ]; then
@@ -100,7 +101,7 @@ if [ "\${running_status}" != "true" ]; then
 	exit 3
 fi
 
-docker exec \${container_name} /root/check_db
+\${dir}/check_db --default-file /\${container_name}_DAT_LV/my.cnf
 if [ \$? -ne 0 ]; then
 	 exit 4
 fi
@@ -113,6 +114,7 @@ EOF
 set -o nounset
 
 container_name=\$1
+dir=${dir}
 
 docker inspect \$container_name > /dev/null 2>&1
 if [ \$? -ne 0 ]; then
@@ -125,7 +127,7 @@ if [ "\${running_status}" != "true" ]; then
 	exit 3
 fi
 
-${dir}/check_proxy --default-file /\${container_name}_CNF_LV/upsql-proxy.conf
+\${dir}/check_proxy --default-file /\${container_name}_CNF_LV/upsql-proxy.conf
 if [ \$? -ne 0 ]; then
 	 exit 4
 fi
@@ -153,7 +155,6 @@ if [ "\${stat_code}" != "200" ]; then
 	 exit 2
 fi
 EOF
-
 	chmod +x ${dir}/check_switchmanager.sh
 }
 
