@@ -92,16 +92,18 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 	volumes := make([]*types.Volume, 0, 10)
 
 	defer func() {
-		if err != nil {
-			logrus.Error("Rollback create Service volumes&IP,defer ", err)
+		if err == nil {
+			return
+		}
 
-			for _, v := range volumes {
-				if v == nil {
-					continue
-				}
-				ok, _err := gd.RemoveVolumes(v.Name)
-				logrus.Debugf("Remove Volumes %s:%t,%v", v.Name, ok, _err)
+		logrus.Error("Rollback create Service volumes&IP, ", err)
+
+		for _, v := range volumes {
+			if v == nil {
+				continue
 			}
+			ok, _err := gd.RemoveVolumes(v.Name)
+			logrus.Debugf("Remove Volumes %s:%t,%v", v.Name, ok, _err)
 		}
 
 		for _, pending := range allocs {
