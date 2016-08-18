@@ -34,7 +34,7 @@ int_nic=bond1
 ext_nic=bond2
 
 rpm_install() {
-	zypper --no-gpg-checks --non-interactive install sysstat mariadb-client ./tools/percona-toolkit-2.2.19-1.noarch.rpm
+	zypper --no-gpg-checks --non-interactive install sysstat mariadb-client ${cur_dir}/tools/percona-toolkit-2.2.19-1.noarch.rpm
 	if [ $? -ne 0 ]; then
 		echo "zypper install faild"
 		exit 2
