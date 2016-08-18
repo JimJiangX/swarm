@@ -23,7 +23,7 @@ if [ "${EXEC_BIN}" == '' ]; then
 	exit 4
 fi
 
-${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock  mysql -u${USER} -p${PASSWD}  -e"show status where Variable_name in ('Innodb_buffer_pool_pages_free','Innodb_page_size','Innodb_buffer_pool_pages_total','innodb_buffer_pool_reads','innodb_buffer_pool_read_requests');" >$STATUSFILE  2>/dev/null
+${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e"show status where Variable_name in ('Innodb_buffer_pool_pages_free','Innodb_page_size','Innodb_buffer_pool_pages_total','innodb_buffer_pool_reads','innodb_buffer_pool_read_requests');" >$STATUSFILE  2>/dev/null
 
 if [ $? -ne 0 ];then
 	echo "get status err"
@@ -53,24 +53,24 @@ fi
  done <$STATUSFILE
 
 #upsql.buffer_pool_hit
-hit=`echo "scale=2;($requests - $reads)/$requests" |bc `
+hit=`echo "scale=4;($requests - $reads)/$requests*100" |bc `
 
 #upsql.buffer_pool.size
-total=`echo "$pool_pages_total*$page_size/1024/1024" |bc `
+total=`echo "$pool_pages_total*$page_size" |bc `
 
 #upsql.buffer_pool.free_size
-free=`echo "$pool_pages_free*$page_size/1024/1024" |bc `
+free=`echo "$pool_pages_free*$page_size" |bc `
 
 #upsql.buffer_pool_dirty_page
-dirty_page=`${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock mysql -u${USER} -p${PASSWD}  -e"show engine innodb status \G;" 2>/dev/null | grep '^Total memory allocated' | awk '{print $4}' | tr -d ";"`
+dirty_page=`${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e"show engine innodb status \G;" 2>/dev/null | grep '^Total memory allocated' | awk '{print $4}' | tr -d ";"`
 if [ "$dirty_page" = "" ];then
    dirty="err"
 else
-   dirty=`echo "${dirty_page}/1024/1024" |bc `
+   dirty=`echo "${dirty_page}" |bc `
 fi
 
 #upsql.buffer_pool_usage
-usage=`echo "scale=2;($pool_pages_total-$pool_pages_free)/$pool_pages_total*100" |bc `
+usage=`echo "scale=4;($pool_pages_total-$pool_pages_free)/$pool_pages_total*100" |bc `
 
 echo "$hit:$total:$free:$usage:$dirty"
-rm $STATUSFILE
+rm -f $STATUSFILE

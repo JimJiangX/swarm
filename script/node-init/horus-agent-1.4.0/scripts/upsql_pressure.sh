@@ -23,7 +23,7 @@ if [ "${EXEC_BIN}" == '' ]; then
 	exit 4
 fi
 
-${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock mysql -u$USER -p$PASSWD  -e"show status where Variable_name in ('Com_insert','Com_update','Com_delete','Com_select','open_tables');" >$STATSFILE  2>/dev/null
+${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e"show status where Variable_name in ('Com_insert','Com_update','Com_delete','Com_select','open_tables');" >$STATSFILE  2>/dev/null
 if [ $? -ne 0 ];then
 	echo "get data err"
 	exit 2
@@ -60,6 +60,6 @@ fi
 
  echo $delete:$insert:$com_select:$update:$tables
 
-rm $STATSFILE
+rm -f $STATSFILE
 
 

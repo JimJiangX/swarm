@@ -3,7 +3,7 @@ set -o nounset
 
 function getfsdata()
 {	
-	subdata=`df -m $1 2>/dev/null | tail -n 1|tr -d %| awk '{print $2":"$5}'`
+	subdata=`df -b $1 2>/dev/null | tail -n 1|tr -d %| awk '{print $2":"$5}'`
 	if [ "$subdata" = "" ];then
 		subdata="err:err"
 	fi
