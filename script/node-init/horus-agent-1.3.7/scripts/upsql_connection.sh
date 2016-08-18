@@ -24,13 +24,13 @@ if [ "${EXEC_BIN}" == '' ]; then
 	exit 4
 fi
 
-${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock mysql -u$USER -p$PASSWD  -e"show status where Variable_name in ('threads_running','threads_cached','Threads_connected','Aborted_connects');" >$STATUSFILE  2>/dev/null
+${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e"show status where Variable_name in ('threads_running','threads_cached','Threads_connected','Aborted_connects');" >$STATUSFILE  2>/dev/null
 if [ $? -ne 0 ];then
 	echo "get status err"
 	exit 2
 fi
 
-docker exec $INSTANCE mysql -S /DBAASDAT/upsql.sock mysql -u$USER -p$PASSWD  -e"show variables where Variable_name in ('max_connections', 'thread_cache_size');" >$VARFILE  2>/dev/null
+${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e"show variables where Variable_name in ('max_connections', 'thread_cache_size');" >$VARFILE  2>/dev/null
 if [ $? -ne 0 ];then
 	echo "get variabes err"
 	rm  $STATUSFILE

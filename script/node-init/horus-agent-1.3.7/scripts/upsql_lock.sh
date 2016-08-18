@@ -24,7 +24,7 @@ if [ "${EXEC_BIN}" == '' ]; then
 	exit 4
 fi
 
-${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock mysql -u$USER -p$PASSWD  -e"select r.trx_mysql_thread_id waiting_thread,b.trx_mysql_thread_id blocking_thread from information_schema.innodb_lock_waits w inner join information_schema.innodb_trx b on b.trx_id= w.blocking_trx_id inner join information_schema.innodb_trx r on r.trx_id=w.requesting_trx_id;" >$LockFILE  2>/dev/null
+${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e"select r.trx_mysql_thread_id waiting_thread,b.trx_mysql_thread_id blocking_thread from information_schema.innodb_lock_waits w inner join information_schema.innodb_trx b on b.trx_id= w.blocking_trx_id inner join information_schema.innodb_trx r on r.trx_id=w.requesting_trx_id;" >$LockFILE  2>/dev/null
 if [ $? -ne 0 ];then
 	echo "get lockID err"
 	exit 2
@@ -48,7 +48,7 @@ fi
 
 locks=${locks:1}
 
-docker exec $INSTANCE mysql -S /DBAASDAT/upsql.sock mysql -u$USER -p$PASSWD  -e"select * from information_schema.processlist where ID in (${locks});"  >$dataFile  2>/dev/null
+${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e"select * from information_schema.processlist where ID in (${locks});"  >$dataFile  2>/dev/null
 if [ $? -ne 0 ];then
 	echo "get information_schema.processlist err"
 	rm  $LockFILE 

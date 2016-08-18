@@ -23,14 +23,14 @@ if [ "${EXEC_BIN}" == '' ]; then
 	exit 4
 fi
 
-${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock mysql -u$USER -p$PASSWD  -e"show slave status \G;" >$SLAVEFILE  2>/dev/null
+${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e"show slave status \G;" >$SLAVEFILE  2>/dev/null
 if [ $? -ne 0 ];then
 	echo "get variabes err"
 	rm  $STATUSFILE
 	exit 2
 fi
 
-rwmode=`docker exec $INSTANCE mysql -S /DBAASDAT/upsql.sock mysql -u$USER -p$PASSWD  -e"show variables like 'read_only';" 2>/dev/null |tail -n 1 | awk '{print $2}'`
+rwmode=`${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e"show variables like 'read_only';" 2>/dev/null |tail -n 1 | awk '{print $2}'`
 
 while read LINE 
  do  
@@ -78,8 +78,8 @@ if [ "$slaveIO" = "Yes" ] &&  [ "$slaveSQL" = "Yes" ] ;then
 		runstatus="Yes"   
 fi
 
-host=`docker exec $INSTANCE awk -F= '/bind_address=/{print $2}' /DBAASDAT/my.cnf`
-port=`docker exec $INSTANCE awk -F= '/port=/{print $2}' /DBAASDAT/my.cnf`
+host=`awk -F= '/bind_address=/{print $2}' /${INSTANCE}_DAT_LV/my.cnf`
+port=`awk -F= '/port=/{print $2}' /${INSTANCE}_DAT_LV/my.cnf`
 
 # upsql.replication.status
 replication=${mhost}#${mport}#${runstatus}#${rwmode}#${mID}#${slaveIO}#${slaveSQL}#${seconds_behind_master}#${relay_Log_File}#${relay_Log_Pos}#${master_Log_File}#${read_Master_Log_Pos}#${host}#${port}

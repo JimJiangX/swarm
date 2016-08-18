@@ -23,7 +23,7 @@ if [ "${EXEC_BIN}" == '' ]; then
 	exit 4
 fi
 
-${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock  mysql -u$USER -p$PASSWD  -e"show status where Variable_name in ('Innodb_buffer_pool_pages_free','Innodb_page_size','Innodb_buffer_pool_pages_total','innodb_buffer_pool_reads','innodb_buffer_pool_read_requests');" >$STATUSFILE  2>/dev/null
+${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock  mysql -u${USER} -p${PASSWD}  -e"show status where Variable_name in ('Innodb_buffer_pool_pages_free','Innodb_page_size','Innodb_buffer_pool_pages_total','innodb_buffer_pool_reads','innodb_buffer_pool_read_requests');" >$STATUSFILE  2>/dev/null
 
 if [ $? -ne 0 ];then
 	echo "get status err"
@@ -62,7 +62,7 @@ total=`echo "$pool_pages_total*$page_size/1024/1024" |bc `
 free=`echo "$pool_pages_free*$page_size/1024/1024" |bc `
 
 #upsql.buffer_pool_dirty_page
-dirty_page=`docker exec $INSTANCE mysql -S /DBAASDAT/upsql.sock mysql -u$USER -p$PASSWD  -e"show engine innodb status \G;" 2>/dev/null | grep '^Total memory allocated' | awk '{print $4}' | tr -d ";"`
+dirty_page=`${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock mysql -u${USER} -p${PASSWD}  -e"show engine innodb status \G;" 2>/dev/null | grep '^Total memory allocated' | awk '{print $4}' | tr -d ";"`
 if [ "$dirty_page" = "" ];then
    dirty="err"
 else

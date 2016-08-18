@@ -9,15 +9,10 @@ fi
 
 INSTANCE=$1
 
-running_status=`docker inspect -f "{{.State.Running}}" ${INSTANCE}`
-if [ "${running_status}" != "true" ]; then
-	exit 4
-fi
 
-
-logfile="/DBAASLOG/upproxy.log"
+logfile="/${INSTANCE}_LOG_LV/upproxy.log"
 #upsql.error_file_size
-logfilesize=`docker exec $INSTANCE du -m $logfile 2>/dev/null | awk '{print $1}'`
+logfilesize=`du -b $logfile 2>/dev/null | awk '{print $1}'`
 
 if [ "$logfilesize" == "" ];then
 	logfilesize="err"
