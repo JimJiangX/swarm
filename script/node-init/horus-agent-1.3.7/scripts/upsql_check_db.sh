@@ -2,6 +2,7 @@
 set -o nounset
 
 container_name=$1
+dir=/opt/DBaaS/script
 docker inspect $container_name > /dev/null 2>&1
 if [ $? -ne 0 ]; then
 	status=critical
@@ -16,7 +17,7 @@ if [ "${running_status}" != "true" ]; then
 	exit
 fi
 
-docker exec $container_name /root/check_db  > /dev/null 2>&1
+${dir}/check_db --default-file /${container_name}_DAT_LV/my.cnf > /dev/null 2>&1
 if [  $? -eq 0 ];then
 	status=passing
 else

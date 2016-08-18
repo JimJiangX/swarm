@@ -34,7 +34,7 @@ int_nic=bond1
 ext_nic=bond2
 
 rpm_install() {
-	zypper --no-gpg-checks --non-interactive install sysstat mariadb-client ./tools/percona-toolkit-2.2.19-1.noarch.rpm
+	zypper --no-gpg-checks --non-interactive install sysstat mariadb-client ${cur_dir}/tools/percona-toolkit-2.2.19-1.noarch.rpm
 	if [ $? -ne 0 ]; then
 		echo "zypper install faild"
 		exit 2
@@ -80,14 +80,15 @@ else
 	exit 0
 fi
 EOF
-
 	chmod +x ${dir}/check_swarmagent.sh
 	
+        cp ${cur_dir}/tools/check_db ${dir}/
 	cat << EOF > ${dir}/check_db.sh
 #!/bin/bash
 set -o nounset
 
 container_name=\$1
+dir=${dir}
 
 docker inspect \${container_name} > /dev/null 2>&1
 if [ \$? -ne 0 ]; then
@@ -100,19 +101,20 @@ if [ "\${running_status}" != "true" ]; then
 	exit 3
 fi
 
-docker exec \${container_name} /root/check_db
+\${dir}/check_db --default-file /\${container_name}_DAT_LV/my.cnf
 if [ \$? -ne 0 ]; then
 	 exit 4
 fi
 EOF
 	chmod +x ${dir}/check_db.sh
 
-        cp tools/check_proxy ${dir}/
+        cp ${cur_dir}/tools/check_proxy ${dir}/
 	cat << EOF > ${dir}/check_proxy.sh
 #!/bin/bash
 set -o nounset
 
 container_name=\$1
+dir=${dir}
 
 docker inspect \$container_name > /dev/null 2>&1
 if [ \$? -ne 0 ]; then
@@ -125,7 +127,7 @@ if [ "\${running_status}" != "true" ]; then
 	exit 3
 fi
 
-${dir}/check_proxy --default-file /\${container_name}_CNF_LV/upsql-proxy.conf
+\${dir}/check_proxy --default-file /\${container_name}_CNF_LV/upsql-proxy.conf
 if [ \$? -ne 0 ]; then
 	 exit 4
 fi
@@ -153,7 +155,6 @@ if [ "\${stat_code}" != "200" ]; then
 	 exit 2
 fi
 EOF
-
 	chmod +x ${dir}/check_switchmanager.sh
 }
 
