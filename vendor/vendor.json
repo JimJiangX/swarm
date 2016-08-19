@@ -9,10 +9,10 @@
 			"revisionTime": "2016-07-16T02:56:31Z"
 		},
 		{
-			"checksumSHA1": "WkwnYaiPV/H1o+/5ijKMPARM8UI=",
+			"checksumSHA1": "LwEiQ/Hyb7Ul28TSlwowN9cpWDY=",
 			"path": "github.com/astaxie/beego/config",
-			"revision": "125030800b8ee4125118705f7eda9ada1d0155a0",
-			"revisionTime": "2016-07-29T13:37:22Z"
+			"revision": "3672f96a9d832c044565b5c0a92af8bac7fd237c",
+			"revisionTime": "2016-08-17T14:56:21Z"
 		},
 		{
 			"checksumSHA1": "YDYbS5U2mDwfcOUJ6M09cP6Bubg=",
@@ -21,10 +21,10 @@
 			"revisionTime": "2016-07-31T16:03:36Z"
 		},
 		{
-			"checksumSHA1": "BIY45G2IVrTttD4Rlk9tHwiIOCM=",
+			"checksumSHA1": "jEXpLrWXoQvH/zk1lW5Si0swr6Y=",
 			"path": "github.com/go-sql-driver/mysql",
-			"revision": "3654d25ec346ee8ce71a68431025458d52a38ac0",
-			"revisionTime": "2016-06-02T00:10:21Z"
+			"revision": "0b58b37b664c21f3010e836f1b931e1d0b0b0685",
+			"revisionTime": "2016-08-02T11:38:42Z"
 		},
 		{
 			"checksumSHA1": "5I0G+0o3xHUQ53jlq70Ujrw0d2A=",
