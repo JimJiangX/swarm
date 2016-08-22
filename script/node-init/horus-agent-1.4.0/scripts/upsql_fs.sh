@@ -4,11 +4,11 @@ set -o nounset
 function getfsdata()
 {	
 	# unit K
-	subdata=`df -k $1 2>/dev/null | tail -n 1 | awk '{print $2":"$5}' | sed 's/%//'`
+	subdata=`df --output=used,avail $1 2>/dev/null | tail -n 1 | awk '{print $1":"$2}'`
 	if [ "$subdata" = "" ];then
 		subdata="err:err"
 	fi
-	# $2:total  $5:Use% 
+	# $2:total  $6:Use% 
 	echo $subdata
 }
 
