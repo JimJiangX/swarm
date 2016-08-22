@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/discovery"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/engine-api/client"
@@ -69,12 +69,12 @@ type Cluster struct {
 	createRetry     int64
 	TLSConfig       *tls.Config
 
-	pendingEngineCh chan *cluster.Engine
+	pendingEngineCh chan *cluster.Engine // added by fugr
 }
 
 // NewCluster is exported
 func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery discovery.Backend, options cluster.DriverOpts, engineOptions *cluster.EngineOpts) (cluster.Cluster, error) {
-	logrus.WithFields(logrus.Fields{"name": "swarm"}).Debug("Initializing cluster")
+	log.WithFields(log.Fields{"name": "swarm"}).Debug("Initializing cluster")
 
 	cluster := &Cluster{
 		eventHandlers:     cluster.NewEventHandlers(),
@@ -92,9 +92,9 @@ func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery
 
 	if val, ok := options.Float("swarm.overcommit", ""); ok {
 		if val <= float64(-1) {
-			logrus.Fatalf("swarm.overcommit should be larger than -1, %f is invalid", val)
+			log.Fatalf("swarm.overcommit should be larger than -1, %f is invalid", val)
 		} else if val < float64(0) {
-			logrus.Warn("-1 < swarm.overcommit < 0 will make swarm take less resource than docker engine offers")
+			log.Warn("-1 < swarm.overcommit < 0 will make swarm take less resource than docker engine offers")
 			cluster.overcommitRatio = val
 		} else {
 			cluster.overcommitRatio = val
@@ -103,7 +103,7 @@ func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery
 
 	if val, ok := options.Int("swarm.createretry", ""); ok {
 		if val < 0 {
-			logrus.Fatalf("swarm.createretry can not be negative, %d is invalid", val)
+			log.Fatalf("swarm.createretry can not be negative, %d is invalid", val)
 		}
 		cluster.createRetry = val
 	}
@@ -165,7 +165,7 @@ func (c *Cluster) CreateContainer(config *cluster.ContainerConfig, name string, 
 		}
 
 		for ; retries < c.createRetry && err != nil; retries++ {
-			logrus.WithFields(logrus.Fields{"Name": "Swarm"}).Warnf("Failed to create container: %s, retrying", err)
+			log.WithFields(log.Fields{"Name": "Swarm"}).Warnf("Failed to create container: %s, retrying", err)
 			container, err = c.createContainer(config, name, false, authConfig)
 		}
 	}
@@ -224,8 +224,17 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 	c.scheduler.Unlock()
 
-	logrus.WithFields(logrus.Fields{"NodeName": n.Name, "NodeID": n.ID}).Debugf("Scheduling container %s to ", name)
 	container, err := engine.CreateContainer(config, name, true, authConfig)
+
+	if err != nil {
+		log.WithFields(log.Fields{"NodeName": n.Name, "NodeID": n.ID}).WithError(err).Error("Failed to create container")
+	} else {
+		containerFlag := name
+		if containerFlag == "" {
+			containerFlag = stringid.TruncateID(container.ID)
+		}
+		log.WithFields(log.Fields{"NodeName": n.Name, "NodeID": n.ID}).Debugf("Scheduling container %s to ", containerFlag)
+	}
 
 	c.scheduler.Lock()
 	delete(c.pendingContainers, swarmID)
@@ -249,7 +258,7 @@ func (c *Cluster) RemoveNetwork(network *cluster.Network) error {
 			}
 		}
 	} else if engineapi.ErrConnectionFailed == err && network.Scope == "global" {
-		logrus.Debug("The original engine is unreachable - Attempting to remove global network from the reachable engines...")
+		log.Debug("The original engine is unreachable - Attempting to remove global network from the reachable engines...")
 		for _, engine := range c.engines {
 			e1 := engine.RemoveNetwork(network)
 			if e1 == nil {
@@ -262,7 +271,7 @@ func (c *Cluster) RemoveNetwork(network *cluster.Network) error {
 		}
 	}
 	if err != nil && network.Scope == "global" {
-		logrus.Debugf("Failed to remove global scope network %s from any engine...", network.ID)
+		log.Debugf("Failed to remove global scope network %s from any engine...", network.ID)
 	}
 	return err
 }
@@ -294,7 +303,7 @@ func (c *Cluster) addEngine(addr string) bool {
 
 	engine := cluster.NewEngine(addr, c.overcommitRatio, c.engineOpts)
 	if err := engine.RegisterEventHandler(c); err != nil {
-		logrus.Error(err)
+		log.Error(err)
 	}
 	// Add it to pending engine map, indexed by address. This will prevent
 	// duplicates from entering
@@ -315,7 +324,7 @@ func (c *Cluster) validatePendingEngine(engine *cluster.Engine) bool {
 	// Attempt a connection to the engine. Since this is slow, don't get a hold
 	// of the lock yet.
 	if err := engine.Connect(c.TLSConfig); err != nil {
-		logrus.WithFields(logrus.Fields{"Addr": engine.Addr}).Debugf("Failed to validate pending node: %s", err)
+		log.WithFields(log.Fields{"Addr": engine.Addr}).Debugf("Failed to validate pending node: %s", err)
 		return false
 	}
 
@@ -331,7 +340,7 @@ func (c *Cluster) validatePendingEngine(engine *cluster.Engine) bool {
 	// Make sure the engine ID is unique.
 	if old, exists := c.engines[engine.ID]; exists {
 		if old.Addr != engine.Addr {
-			logrus.Errorf("ID duplicated. %s shared by %s and %s", engine.ID, old.Addr, engine.Addr)
+			log.Errorf("ID duplicated. %s shared by %s and %s", engine.ID, old.Addr, engine.Addr)
 			// Keep this engine in pendingEngines table and show its error.
 			// If it's ID duplication from VM clone, user see this message and can fix it.
 			// If the engine is rebooted and get new IP from DHCP, previous address will be removed
@@ -339,7 +348,7 @@ func (c *Cluster) validatePendingEngine(engine *cluster.Engine) bool {
 			// In both cases, retry may fix the problem.
 			engine.HandleIDConflict(old.Addr)
 		} else {
-			logrus.Debugf("node %q (name: %q) with address %q is already registered", engine.ID, engine.Name, engine.Addr)
+			log.Debugf("node %q (name: %q) with address %q is already registered", engine.ID, engine.Name, engine.Addr)
 			engine.Disconnect()
 			// Remove it from pendingEngines table
 			delete(c.pendingEngines, engine.Addr)
@@ -354,7 +363,7 @@ func (c *Cluster) validatePendingEngine(engine *cluster.Engine) bool {
 	c.engines[engine.ID] = engine
 	c.pendingEngineCh <- engine
 
-	logrus.Infof("Registered Engine %s at %s", engine.Name, engine.Addr)
+	log.Infof("Registered Engine %s at %s", engine.Name, engine.Addr)
 	return true
 }
 
@@ -373,7 +382,7 @@ func (c *Cluster) removeEngine(addr string) bool {
 	} else {
 		delete(c.engines, engine.ID)
 	}
-	logrus.Infof("Removed Engine %s", engine.Name)
+	log.Infof("Removed Engine %s", engine.Name)
 	return true
 }
 
@@ -398,7 +407,7 @@ func (c *Cluster) monitorDiscovery(ch <-chan discovery.Entries, errCh <-chan err
 				c.addEngine(entry.String())
 			}
 		case err := <-errCh:
-			logrus.Errorf("Discovery error: %v", err)
+			log.Errorf("Discovery error: %v", err)
 		}
 	}
 }
@@ -533,17 +542,11 @@ func (c *Cluster) CreateVolume(request *types.VolumeCreateRequest) (*types.Volum
 	}
 	if node == "" {
 		c.RLock()
-		ch := make(chan struct{}, 10)
-
-		logrus.WithField("Volume", request.Name).Warnf("Create Volume on all Engines")
-
 		for _, e := range c.engines {
 			wg.Add(1)
 
 			go func(engine *cluster.Engine) {
 				defer wg.Done()
-
-				ch <- struct{}{}
 
 				v, er := engine.CreateVolume(request)
 				if v != nil {
@@ -553,8 +556,6 @@ func (c *Cluster) CreateVolume(request *types.VolumeCreateRequest) (*types.Volum
 				if er != nil && volume == nil {
 					err = er
 				}
-
-				<-ch
 			}(e)
 		}
 		c.RUnlock()
@@ -607,19 +608,13 @@ func (c *Cluster) RemoveVolumes(name string) (bool, error) {
 // Pull is exported
 func (c *Cluster) Pull(name string, authConfig *types.AuthConfig, callback func(where, status string, err error)) {
 	var wg sync.WaitGroup
-	ch := make(chan struct{}, 10)
 
 	c.RLock()
 	for _, e := range c.engines {
 		wg.Add(1)
 
 		go func(engine *cluster.Engine) {
-			defer func() {
-				wg.Done()
-				<-ch
-			}()
-
-			ch <- struct{}{}
+			defer wg.Done()
 
 			if callback != nil {
 				callback(engine.Name, "", nil)
@@ -642,7 +637,6 @@ func (c *Cluster) Pull(name string, authConfig *types.AuthConfig, callback func(
 // Load image
 func (c *Cluster) Load(imageReader io.Reader, callback func(where, status string, err error)) {
 	var wg sync.WaitGroup
-	ch := make(chan struct{}, 10)
 
 	c.RLock()
 	pipeWriters := []*io.PipeWriter{}
@@ -653,13 +647,8 @@ func (c *Cluster) Load(imageReader io.Reader, callback func(where, status string
 		pipeWriters = append(pipeWriters, pipeWriter)
 
 		go func(reader *io.PipeReader, engine *cluster.Engine) {
-			defer func() {
-				wg.Done()
-				reader.Close()
-				<-ch
-			}()
-
-			ch <- struct{}{}
+			defer wg.Done()
+			defer reader.Close()
 
 			// call engine load image
 			err := engine.Load(reader)
@@ -682,7 +671,7 @@ func (c *Cluster) Load(imageReader io.Reader, callback func(where, status string
 	// copy image-reader to multi-writer
 	_, err := io.Copy(multiWriter, imageReader)
 	if err != nil {
-		logrus.Error(err)
+		log.Error(err)
 	}
 
 	// close pipe writers
@@ -696,8 +685,6 @@ func (c *Cluster) Load(imageReader io.Reader, callback func(where, status string
 // Import image
 func (c *Cluster) Import(source string, ref string, tag string, imageReader io.Reader, callback func(what, status string, err error)) {
 	var wg sync.WaitGroup
-	ch := make(chan struct{}, 10)
-
 	c.RLock()
 	pipeWriters := []*io.PipeWriter{}
 
@@ -708,13 +695,8 @@ func (c *Cluster) Import(source string, ref string, tag string, imageReader io.R
 		pipeWriters = append(pipeWriters, pipeWriter)
 
 		go func(reader *io.PipeReader, engine *cluster.Engine) {
-			defer func() {
-				wg.Done()
-				reader.Close()
-				<-ch
-			}()
-
-			ch <- struct{}{}
+			defer wg.Done()
+			defer reader.Close()
 
 			// call engine import
 			err := engine.Import(source, ref, tag, reader)
@@ -740,7 +722,7 @@ func (c *Cluster) Import(source string, ref string, tag string, imageReader io.R
 	// copy image-reader to muti-writer
 	_, err := io.Copy(multiWriter, imageReader)
 	if err != nil {
-		logrus.Error(err)
+		log.Error(err)
 	}
 
 	// close pipe writers
