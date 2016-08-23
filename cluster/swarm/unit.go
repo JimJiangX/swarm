@@ -680,7 +680,7 @@ func copyConfigIntoCNFVolume(host, path, content string, lvs []database.LocalVol
 	}
 
 	addr := getPluginAddr(host, pluginPort)
-	err := sdk.FileCopyToVolome(addr, config)
+	err := sdk.CopyFileToVolume(addr, config)
 
 	logrus.Debugf("FileCopyToVolome to %s:%s config:%+v,error:%v", addr, lvs[cnf].Name, config, err)
 
