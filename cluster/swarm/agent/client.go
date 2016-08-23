@@ -43,7 +43,7 @@ func HttpPost(uri string, body io.Reader) error {
 		return errors.Wrapf(err, "read request POST:"+uri+" body")
 	}
 
-	var res *CommonRes
+	res := CommonRes{}
 	if err := json.Unmarshal(respBody, &res); err != nil {
 		return errors.Wrapf(err, "JSON unmarshal POST:"+uri+" body:"+string(respBody))
 	}

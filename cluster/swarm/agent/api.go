@@ -93,7 +93,7 @@ func GetVgList(addr string) ([]VgInfo, error) {
 		return nil, errors.Wrapf(err, "read request POST:"+uri+" body")
 	}
 
-	var res *VgListRes
+	res := VgListRes{}
 	if err := json.Unmarshal(respBody, &res); err != nil {
 		return nil, errors.Wrapf(err, "JSON unmarshal GET:"+uri+" body:"+string(respBody))
 	}
