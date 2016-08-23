@@ -10,6 +10,7 @@ import (
 
 const insertClusterQuery = "INSERT INTO tb_cluster (id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit) VALUES (:id,:name,:type,:storage_id,:storage_type,:networking_id,:enabled,:max_node,:usage_limit)"
 
+// tb_cluster structure
 type Cluster struct {
 	ID           string  `db:"id"`
 	Name         string  `db:"name"`
@@ -26,6 +27,7 @@ func (c Cluster) TableName() string {
 	return "tb_cluster"
 }
 
+// Insert insert a new record to tb_cluster.
 func (c Cluster) Insert() error {
 	db, err := GetDB(false)
 	if err != nil {
@@ -48,9 +50,10 @@ func (c Cluster) Insert() error {
 		return nil
 	}
 
-	return errors.Wrap(err, insertClusterQuery)
+	return errors.Wrap(err, "Cluster.Insert")
 }
 
+// UpdateStatus update tb_cluster.enabled by ID
 func (c *Cluster) UpdateStatus(state bool) error {
 	db, err := GetDB(false)
 	if err != nil {
@@ -73,7 +76,7 @@ func (c *Cluster) UpdateStatus(state bool) error {
 
 	_, err = db.Exec(query, state, c.ID)
 	if err != nil {
-		return errors.Wrap(err, "Update Cluster.Enabled By ID:"+c.ID)
+		return errors.Wrap(err, "update Cluster.Enabled by ID:"+c.ID)
 	}
 
 	c.Enabled = state
@@ -81,7 +84,7 @@ func (c *Cluster) UpdateStatus(state bool) error {
 	return nil
 }
 
-// UpdateParams Updates MaxNode\UsageLimit
+// UpdateParams updates MaxNode\UsageLimit
 func (c Cluster) UpdateParams() error {
 	db, err := GetDB(false)
 	if err != nil {
@@ -105,10 +108,11 @@ func (c Cluster) UpdateParams() error {
 		return nil
 	}
 
-	return errors.Wrap(err, "Update Cluster Params")
+	return errors.Wrap(err, "update Cluster MaxNode or UsageLimit")
 }
 
-func DeleteCluster(IDOrName string) error {
+// DeleteCluster delete a record of tb_cluster by nameOrID
+func DeleteCluster(nameOrID string) error {
 	db, err := GetDB(false)
 	if err != nil {
 		return err
@@ -116,7 +120,7 @@ func DeleteCluster(IDOrName string) error {
 
 	const query = "DELETE FROM tb_cluster WHERE id=? OR name=?"
 
-	_, err = db.Exec(query, IDOrName, IDOrName)
+	_, err = db.Exec(query, nameOrID, nameOrID)
 	if err == nil {
 		return nil
 	}
@@ -126,14 +130,15 @@ func DeleteCluster(IDOrName string) error {
 		return err
 	}
 
-	_, err = db.Exec(query, IDOrName, IDOrName)
+	_, err = db.Exec(query, nameOrID, nameOrID)
 	if err == nil {
 		return nil
 	}
 
-	return errors.Wrap(err, "Delete Cluster:"+IDOrName)
+	return errors.Wrap(err, "delete Cluster:"+nameOrID)
 }
 
+// GetCluster get Cluster by nameOrID.
 func GetCluster(nameOrID string) (Cluster, error) {
 	c := Cluster{}
 
@@ -149,7 +154,7 @@ func GetCluster(nameOrID string) (Cluster, error) {
 		return c, nil
 	}
 	if _err := CheckError(err); _err == ErrNoRowsFound {
-		return c, errors.Wrap(err, "Not Found Cluster:"+nameOrID)
+		return c, errors.Wrap(err, "not found Cluster:"+nameOrID)
 	}
 
 	db, err = GetDB(true)
@@ -162,10 +167,11 @@ func GetCluster(nameOrID string) (Cluster, error) {
 		return c, nil
 	}
 
-	return c, errors.Wrap(err, "Not Found Cluster:"+nameOrID)
+	return c, errors.Wrap(err, "get Cluster:"+nameOrID)
 
 }
 
+// ListClusters select tb_cluster
 func ListClusters() ([]Cluster, error) {
 	db, err := GetDB(false)
 	if err != nil {
@@ -190,10 +196,10 @@ func ListClusters() ([]Cluster, error) {
 		return clusters, nil
 	}
 
-	return nil, errors.Wrap(err, "List Clusters")
-
+	return nil, errors.Wrap(err, "list Clusters")
 }
 
+// CountClusterByStorage count Clusters by storageID.
 func CountClusterByStorage(storageID string) (int, error) {
 	db, err := GetDB(false)
 	if err != nil {
@@ -223,6 +229,7 @@ func CountClusterByStorage(storageID string) (int, error) {
 
 const insertNodeQuery = "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
 
+// tb_node structure
 type Node struct {
 	ID           string `db:"id"`
 	Name         string `db:"name"`
@@ -242,6 +249,7 @@ func (n Node) TableName() string {
 	return "tb_node"
 }
 
+// TxInsertMultiNodeAndTask insert nodes and tasks in one Tx
 func TxInsertMultiNodeAndTask(nodes []*Node, tasks []*Task) error {
 	tx, err := GetTX()
 	if err != nil {
@@ -249,7 +257,7 @@ func TxInsertMultiNodeAndTask(nodes []*Node, tasks []*Task) error {
 	}
 	defer tx.Rollback()
 
-	// insert into database
+	// use prepare insert into database
 	stmt, err := tx.PrepareNamed(insertNodeQuery)
 	if err != nil {
 		return err
@@ -271,7 +279,7 @@ func TxInsertMultiNodeAndTask(nodes []*Node, tasks []*Task) error {
 	return tx.Commit()
 }
 
-// UpdateStatus returns error when Node UPDATE status.
+// UpdateStatus returns error when Node UPDATE tb_node.status.
 func (n *Node) UpdateStatus(state int64) error {
 	db, err := GetDB(false)
 	if err != nil {
@@ -299,10 +307,10 @@ func (n *Node) UpdateStatus(state int64) error {
 		return nil
 	}
 
-	return errors.Wrap(err, "Update Node Status")
+	return errors.Wrap(err, "update Node Status")
 }
 
-// UpdateParams returns error when Node UPDATE max_container.
+// UpdateParams returns error when Node update max_container.
 func (n *Node) UpdateParams(max int) error {
 	db, err := GetDB(false)
 	if err != nil {
@@ -330,7 +338,7 @@ func (n *Node) UpdateParams(max int) error {
 		return nil
 	}
 
-	return errors.Wrap(err, "Update Node Param By ID:"+n.ID)
+	return errors.Wrap(err, "update Node MaxContainer by ID:"+n.ID)
 }
 
 // TxUpdateNodeStatus returns error when Node UPDATE status.
@@ -353,7 +361,7 @@ func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int64, msg string) e
 
 	err = tx.Commit()
 	if err != nil {
-		return errors.Wrap(err, "TX Update Node Status "+n.ID)
+		return errors.Wrap(err, "Tx update Node Status by ID:"+n.ID)
 	}
 
 	n.Status = nstate
@@ -385,7 +393,7 @@ func TxUpdateNodeRegister(n *Node, task *Task, nstate, tstate int64, eng, msg st
 
 	err = tx.Commit()
 	if err != nil {
-		return errors.Wrap(err, "TX Update Node Status "+n.ID)
+		return errors.Wrap(err, "Tx update Node Status by ID:"+n.ID)
 	}
 
 	atomic.StoreInt64(&n.Status, nstate)
@@ -393,6 +401,7 @@ func TxUpdateNodeRegister(n *Node, task *Task, nstate, tstate int64, eng, msg st
 	return nil
 }
 
+// GetNode get Node by nameOrID.
 func GetNode(nameOrID string) (Node, error) {
 	db, err := GetDB(false)
 	if err != nil {
@@ -407,7 +416,7 @@ func GetNode(nameOrID string) (Node, error) {
 		return node, nil
 	}
 	if _err := CheckError(err); _err == ErrNoRowsFound {
-		return node, errors.Wrap(err, "Not Found Node By:"+nameOrID)
+		return node, errors.Wrap(err, "not found Node by:"+nameOrID)
 	}
 
 	db, err = GetDB(true)
@@ -420,9 +429,10 @@ func GetNode(nameOrID string) (Node, error) {
 		return node, nil
 	}
 
-	return node, errors.Wrap(err, "Get Node By:"+nameOrID)
+	return node, errors.Wrap(err, "get Node by:"+nameOrID)
 }
 
+// GetNodeByAddr returns Node by addr.
 func GetNodeByAddr(addr string) (Node, error) {
 	db, err := GetDB(false)
 	if err != nil {
@@ -437,7 +447,7 @@ func GetNodeByAddr(addr string) (Node, error) {
 		return node, nil
 	}
 	if _err := CheckError(err); _err == ErrNoRowsFound {
-		return node, errors.Wrap(err, "Not Found Node By Addr:"+addr)
+		return node, errors.Wrap(err, "not found Node by addr:"+addr)
 	}
 
 	db, err = GetDB(true)
@@ -450,9 +460,10 @@ func GetNodeByAddr(addr string) (Node, error) {
 		return node, nil
 	}
 
-	return node, errors.Wrap(err, "Not Found Node By Addr:"+addr)
+	return node, errors.Wrap(err, "get Node by addr:"+addr)
 }
 
+// GetAllNodes returns all nodes.
 func GetAllNodes() ([]Node, error) {
 	db, err := GetDB(false)
 	if err != nil {
@@ -477,9 +488,10 @@ func GetAllNodes() ([]Node, error) {
 		return nodes, nil
 	}
 
-	return nil, errors.Wrap(err, "Get All Nodes")
+	return nil, errors.Wrap(err, "get all Nodes")
 }
 
+// ListNodeByCluster returns nodes,select by cluster
 func ListNodeByCluster(cluster string) ([]*Node, error) {
 	db, err := GetDB(false)
 	if err != nil {
@@ -504,9 +516,10 @@ func ListNodeByCluster(cluster string) ([]*Node, error) {
 		return nodes, nil
 	}
 
-	return nil, errors.Wrap(err, "List Node By Cluster:"+cluster)
+	return nil, errors.Wrap(err, "list Node by cluster:"+cluster)
 }
 
+// CountNodeByCluster returns num of node select by cluster.
 func CountNodeByCluster(cluster string) (int, error) {
 	db, err := GetDB(false)
 	if err != nil {
@@ -531,9 +544,10 @@ func CountNodeByCluster(cluster string) (int, error) {
 		return num, nil
 	}
 
-	return 0, errors.Wrap(err, "Count Node By Cluster:"+cluster)
+	return 0, errors.Wrap(err, "count Node by cluster:"+cluster)
 }
 
+// ListNodesByEngines returns nodes,select by engines ID.
 func ListNodesByEngines(names []string) ([]Node, error) {
 	if len(names) == 0 {
 		return []Node{}, nil
@@ -554,9 +568,10 @@ func ListNodesByEngines(names []string) ([]Node, error) {
 		return nodes, nil
 	}
 
-	return nil, errors.Wrapf(err, "List Nodes By Engines:%s", names)
+	return nil, errors.Wrapf(err, "list Nodes by engines:%s", names)
 }
 
+// ListNodesByClusters returns nodes,select by clusters\type\enabled.
 func ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, error) {
 	db, err := GetDB(true)
 	if err != nil {
@@ -566,7 +581,7 @@ func ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, 
 	var clist []string
 	err = db.Select(&clist, "SELECT id FROM tb_cluster WHERE type=? AND enabled=?", _type, enable)
 	if err != nil {
-		return nil, errors.Wrapf(err, "List Cluster by Type='%s',enabled=%t", _type, enable)
+		return nil, errors.Wrapf(err, "list Cluster by type='%s',enabled=%t", _type, enable)
 	}
 
 	list := make([]string, 0, len(clusters))
@@ -597,9 +612,10 @@ func ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, 
 		return nodes, nil
 	}
 
-	return nil, errors.Wrap(err, "List Nodes By Clusters")
+	return nil, errors.Wrap(err, "list Nodes by clusters")
 }
 
+// DeleteNode delete node by name or ID
 func DeleteNode(nameOrID string) error {
 	db, err := GetDB(false)
 	if err != nil {
@@ -623,5 +639,5 @@ func DeleteNode(nameOrID string) error {
 		return nil
 	}
 
-	return errors.Wrap(err, "Delete Node By "+nameOrID)
+	return errors.Wrap(err, "delete Node by nameOrID:"+nameOrID)
 }

@@ -44,10 +44,11 @@ var (
 var (
 	noRowsFoundMsg     = "no rows in result set"
 	connectioneRefused = "connection refused"
-	ErrNoRowsFound     = errors.New("Not Found Object")
-	ErrDisconnected    = errors.New("Disconnected")
+	ErrNoRowsFound     = errors.New("not found object")
+	ErrDisconnected    = errors.New("DB disconnected")
 )
 
+// CheckError check error if error is ErrNoRowsFound or ErrDisconnected
 func CheckError(err error) error {
 	if err == nil {
 		return nil
@@ -65,6 +66,7 @@ func CheckError(err error) error {
 	return err
 }
 
+// SetupDB opens *sql.DB
 func SetupDB(c *cli.Context) error {
 	auth := c.String("dbAuth")
 	user, password, err := utils.Base64Decode(auth)
@@ -104,7 +106,7 @@ func Connect(driver, source string) (*sqlx.DB, error) {
 			db.Close()
 		}
 
-		return nil, errors.Wrap(err, "DB Connection")
+		return nil, errors.Wrap(err, "DB connection")
 	}
 
 	driverName = driver
@@ -114,6 +116,10 @@ func Connect(driver, source string) (*sqlx.DB, error) {
 	return db, nil
 }
 
+// GetDB returns *sqlx.DB for DB operation.
+// if defaultDB is non-nil,use defaultDB.
+// if ping is true calls DB.Ping.
+// open a new DB if error happened.
 func GetDB(ping bool) (*sqlx.DB, error) {
 	if defaultDB != nil {
 
@@ -132,6 +138,7 @@ func GetDB(ping bool) (*sqlx.DB, error) {
 	return Connect(driverName, dbSource)
 }
 
+// GetTX begin a new Tx.
 func GetTX() (*sqlx.Tx, error) {
 	db, err := GetDB(true)
 	if err != nil {
@@ -147,7 +154,7 @@ func GetTX() (*sqlx.Tx, error) {
 
 		tx, err = db.Beginx()
 		if err != nil {
-			return nil, errors.Wrap(err, "Beginx")
+			return nil, errors.Wrap(err, "TX begin")
 		}
 	}
 
