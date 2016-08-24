@@ -10,14 +10,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-var defaultVaild = time.Minute * 10
+var defaultTTL = time.Minute * 10
 
 // LocalStore host local storage,HDD or SSD
 type LocalStore struct {
 	addr string
 	node *database.Node
 
-	valid   time.Duration
+	ttl     time.Duration
 	expired time.Time
 	list    []sdk.VgInfo
 }
@@ -28,20 +28,20 @@ func IsLocalStore(_type string) bool {
 }
 
 // NewLocalDisk returns the node local storage
-func NewLocalDisk(addr string, node *database.Node, valid time.Duration) (*LocalStore, error) {
-	if valid == 0 {
-		valid = defaultVaild
+func NewLocalDisk(addr string, node *database.Node, ttl time.Duration) (*LocalStore, error) {
+	if ttl == 0 {
+		ttl = defaultTTL
 	}
 	l := &LocalStore{
-		node:  node,
-		addr:  addr,
-		valid: valid,
+		node: node,
+		addr: addr,
+		ttl:  ttl,
 	}
 
 	list, err := sdk.GetVgList(l.addr)
 	if err == nil {
 		l.list = list
-		l.expired = time.Now().Add(l.valid)
+		l.expired = time.Now().Add(l.ttl)
 	} else {
 
 		return l, errors.Wrap(err, "new localdisk store")
@@ -66,7 +66,7 @@ func (l LocalStore) IdleSize() (map[string]int, error) {
 		}
 
 		l.list = list
-		l.expired = time.Now().Add(l.valid)
+		l.expired = time.Now().Add(l.ttl)
 	}
 
 	out := make(map[string]int, len(l.list))
