@@ -11,8 +11,10 @@ import (
 )
 
 var (
+	// Port local_plugin_volume server port
 	Port = "3333"
-	IP   = "127.0.0.1"
+	// IP local_plugin_volume server IP
+	IP = "127.0.0.1"
 )
 
 // SetAddr sets IP and Port for Request address
@@ -21,12 +23,12 @@ func SetAddr(ip, port string) {
 	IP = ip
 }
 
-func getIpAddr() string {
+func getIPAddr() string {
 	return IP + ":" + Port
 }
 
-// HttpPost post a requst,returns response error
-func HttpPost(uri string, body io.Reader) error {
+// postHTTP post a requst,returns response error
+func postHTTP(uri string, body io.Reader) error {
 	resp, err := http.Post(uri, "application/json", body)
 	if err != nil {
 		return errors.Wrap(err, "POST:"+uri)
@@ -43,7 +45,7 @@ func HttpPost(uri string, body io.Reader) error {
 		return errors.Wrapf(err, "read request POST:"+uri+" body")
 	}
 
-	res := CommonRes{}
+	res := commonResonse{}
 	if err := json.Unmarshal(respBody, &res); err != nil {
 		return errors.Wrapf(err, "JSON unmarshal POST:"+uri+" body:"+string(respBody))
 	}

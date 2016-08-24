@@ -8,17 +8,16 @@ import (
 	"github.com/pkg/errors"
 )
 
-// CommonRes common http requet response body msg
-type CommonRes struct {
+// commonResonse common http requet response body msg
+type commonResonse struct {
 	Err string `json:"Err"`
 }
 
-// Error implement of error
-func (res CommonRes) Error() string {
-	return res.Err
+func (resp commonResonse) Error() string {
+	return resp.Err
 }
 
-//update.go
+// VolumeUpdateOption used in VolumeUpdate
 type VolumeUpdateOption struct {
 	VgName string `json:"VgName"`
 	LvName string `json:"LvName"`
@@ -26,44 +25,51 @@ type VolumeUpdateOption struct {
 	Size   int    `json:"Size"`
 }
 
-//san.go
+// VgConfig contains VGName&Type and HostLUNID on SAN storage
+// used in SanVgExtend
 type VgConfig struct {
-	HostLunId []int  `json:"HostLunId"`
+	HostLunID []int  `json:"HostLunId"`
 	VgName    string `json:"VgName"`
 	Type      string `json:"Type"`
 }
 
+// VgInfo contains VG total size and free size,unit:byte
+// used in GetVgList response
 type VgInfo struct {
 	VgName string `json:"VgName"`
 	VgSize int    `json:"VgSize"`
 	VgFree int    `json:"VgFree"`
 }
 
-type VgListRes struct {
+// vgListResonse response of /san/vglist
+type vgListResonse struct {
 	Err string   `json:"Err"`
 	Vgs []VgInfo `json:"Vgs"`
 }
 
-//ip.go
+// IPDevConfig contains device and IP
+// IPCIDR:192.168.2.111/24 for example
 type IPDevConfig struct {
 	Device string `json:"Device"`
 	IPCIDR string `json:"IpCIDR"`
 }
 
-//migration.go
+// ActiveConfig active a VG,used in SanActivate
 type ActiveConfig struct {
 	VgName string   `json:"VgName"`
 	Lvname []string `json:"Lvname"`
 }
 
+// DeactivateConfig used in SanDeActivate
 type DeactivateConfig struct {
 	VgName    string   `json:"VgName"`
 	Lvname    []string `json:"Lvname"`
-	HostLunId []int    `json:"HostLunId"`
+	HostLunID []int    `json:"HostLunId"`
 	Vendor    string   `json:"Vendor"`
 }
 
 // VolumeFileConfig contains file infomation and volume placed
+// used in CopyFileToVolume
 type VolumeFileConfig struct {
 	VgName    string `json:"VgName"`
 	LvsName   string `json:"LvsName"`
@@ -93,7 +99,7 @@ func GetVgList(addr string) ([]VgInfo, error) {
 		return nil, errors.Wrapf(err, "read request POST:"+uri+" body")
 	}
 
-	res := VgListRes{}
+	res := vgListResonse{}
 	if err := json.Unmarshal(respBody, &res); err != nil {
 		return nil, errors.Wrapf(err, "JSON unmarshal GET:"+uri+" body:"+string(respBody))
 	}
@@ -115,7 +121,7 @@ func CreateIP(addr string, opt IPDevConfig) error {
 
 	uri := "http://" + addr + "/ip/create"
 
-	return HttpPost(uri, body)
+	return postHTTP(uri, body)
 }
 
 // RemoveIP remove the IP from remote host
@@ -127,7 +133,7 @@ func RemoveIP(addr string, opt IPDevConfig) error {
 	}
 
 	uri := "http://" + addr + "/ip/remove"
-	return HttpPost(uri, body)
+	return postHTTP(uri, body)
 }
 
 // VolumeUpdate update volume optinal on remote host
@@ -139,7 +145,7 @@ func VolumeUpdate(addr string, opt VolumeUpdateOption) error {
 	}
 
 	uri := "http://" + addr + "/VolumeDriver.Update"
-	return HttpPost(uri, body)
+	return postHTTP(uri, body)
 }
 
 // SanVgCreate create new VG on remote host
@@ -151,7 +157,7 @@ func SanVgCreate(addr string, opt VgConfig) error {
 	}
 
 	uri := "http://" + addr + "/san/vgcreate"
-	return HttpPost(uri, body)
+	return postHTTP(uri, body)
 }
 
 // SanVgExtend extense the specified VG Size on remote host
@@ -163,7 +169,7 @@ func SanVgExtend(addr string, opt VgConfig) error {
 	}
 
 	uri := "http://" + addr + "/san/vgextend"
-	return HttpPost(uri, body)
+	return postHTTP(uri, body)
 }
 
 // SanActivate activates the specified LV remote host
@@ -175,7 +181,7 @@ func SanActivate(addr string, opt ActiveConfig) error {
 	}
 
 	uri := "http://" + addr + "/san/activate"
-	return HttpPost(uri, body)
+	return postHTTP(uri, body)
 }
 
 // SanDeActivate Deactivates the specified LV on remote host
@@ -187,7 +193,7 @@ func SanDeActivate(addr string, opt DeactivateConfig) error {
 	}
 
 	uri := "http://" + addr + "/san/deactivate"
-	return HttpPost(uri, body)
+	return postHTTP(uri, body)
 }
 
 // CopyFileToVolume Post file to the specified LV on remote host
@@ -199,5 +205,5 @@ func CopyFileToVolume(addr string, opt VolumeFileConfig) error {
 	}
 
 	uri := "http://" + addr + "/volume/file/cp"
-	return HttpPost(uri, body)
+	return postHTTP(uri, body)
 }
