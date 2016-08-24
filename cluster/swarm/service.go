@@ -1537,7 +1537,6 @@ func (service *Service) switchBack(unitName string) error {
 	}
 
 	return err
-
 }
 
 func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string, error) {

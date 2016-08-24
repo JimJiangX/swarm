@@ -337,7 +337,7 @@ func createSanStoreageVG(host, name string, lun []database.LUN) error {
 	}
 
 	config := sdk.VgConfig{
-		HostLunId: l,
+		HostLunID: l,
 		VgName:    list[0].VGName,
 		Type:      storage.Vendor(),
 	}
@@ -359,7 +359,7 @@ func extendSanStoreageVG(host string, lun database.LUN) error {
 	}
 
 	config := sdk.VgConfig{
-		HostLunId: []int{lun.HostLunID},
+		HostLunID: []int{lun.HostLunID},
 		VgName:    lun.VGName,
 		Type:      storage.Vendor(),
 	}

@@ -506,7 +506,7 @@ func sanDeactivateAndDelMapping(storage store.Store, host string,
 		config := sdk.DeactivateConfig{
 			VgName:    vg,
 			Lvname:    names,
-			HostLunId: hostLuns,
+			HostLunID: hostLuns,
 			Vendor:    storage.Vendor(),
 		}
 		// san volumes
@@ -616,7 +616,7 @@ func migrateVolumes(storage store.Store, nodeID string,
 		}
 
 		config := sdk.VgConfig{
-			HostLunId: l,
+			HostLunID: l,
 			VgName:    vg,
 			Type:      storage.Vendor(),
 		}

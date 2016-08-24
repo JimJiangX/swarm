@@ -620,13 +620,16 @@ func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
 	entry.Debug("rebuild Node")
 
 	if err != nil {
-		entry.Error(err)
+		entry.WithError(err).Error("rebuild Node")
 
 		return node, err
 	}
 
 	pluginAddr := fmt.Sprintf("%s:%d", eng.IP, pluginPort)
-	node.localStore = store.NewLocalDisk(pluginAddr, node.Node)
+	node.localStore, err = store.NewLocalDisk(pluginAddr, node.Node, 0)
+	if err != nil {
+		entry.WithError(err).Error("rebuild Node")
+	}
 
 	return node, nil
 }
@@ -1244,7 +1247,11 @@ func (gd *Gardener) updateNodeEngine(node *Node, dockerPort int) (*cluster.Engin
 
 func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
 	pluginAddr := fmt.Sprintf("%s:%d", eng.IP, pluginPort)
-	node.localStore = store.NewLocalDisk(pluginAddr, node.Node)
+	localStore, err := store.NewLocalDisk(pluginAddr, node.Node, 0)
+	if err != nil {
+		logrus.WithField("Host", node.Name).WithError(err).Error("init Node local store")
+	}
+	node.localStore = localStore
 
 	wwn := eng.Labels[_SAN_HBA_WWN_Lable]
 	if strings.TrimSpace(wwn) != "" {
