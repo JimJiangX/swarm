@@ -6,24 +6,32 @@ import (
 	"sync"
 
 	"github.com/docker/swarm/cluster/swarm/database"
+	"github.com/pkg/errors"
 )
 
 const (
 	scriptPath = "script"
-	HITACHI    = "HITACHI"
-	HUAWEI     = "HUAWEI"
-
+	// HITACHI store vendor name
+	HITACHI = "HITACHI"
+	// HUAWEI store vendor name
+	HUAWEI = "HUAWEI"
+	// LocalStorePrefix prefix of local store
 	LocalStorePrefix = "local"
-	SANStore         = "san"
+	// SANStore type
+	SANStore = "san"
 
-	SANStoreDriver   = "lvm"
+	// SANStoreDriver SAN store driver
+	SANStoreDriver = "lvm"
+	// LocalStoreDriver local store Driver
 	LocalStoreDriver = "lvm"
 
+	// DefaultFilesystemType default filesystem type
 	DefaultFilesystemType = "xfs"
 )
 
-var stores map[string]Store = make(map[string]Store)
+var stores = make(map[string]Store)
 
+// Info describle remote storage system infomation
 type Info struct {
 	ID     string
 	Vendor string
@@ -33,6 +41,7 @@ type Info struct {
 	List   map[int]Space
 }
 
+// Store is remote storage system
 type Store interface {
 	Info() (Info, error)
 	ID() string
@@ -57,6 +66,7 @@ type Store interface {
 	DisableSpace(id int) error
 }
 
+// RegisterStore register a new remote storage system
 func RegisterStore(vendor, addr, user, password, admin string,
 	lstart, lend, hstart, hend int) (store Store, err error) {
 
@@ -82,6 +92,7 @@ func RegisterStore(vendor, addr, user, password, admin string,
 	return store, nil
 }
 
+// GetStoreByID returns store find by ID
 func GetStoreByID(ID string) (Store, error) {
 	store, ok := stores[ID]
 	if ok && store != nil {
@@ -90,7 +101,7 @@ func GetStoreByID(ID string) (Store, error) {
 
 	hitachi, huawei, err := database.GetStorageByID(ID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "get store by ID")
 	}
 
 	if hitachi != nil {

@@ -1,78 +1,111 @@
 package store
 
 import (
-	"fmt"
 	"strings"
+	"time"
 
 	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
+	"github.com/pkg/errors"
 )
 
+var defaultVaild = time.Minute * 10
+
+// LocalStore host local storage,HDD or SSD
 type LocalStore struct {
-	node *database.Node
 	addr string
+	node *database.Node
+
+	valid   time.Duration
+	expired time.Time
+	list    []sdk.VgInfo
 }
 
+// IsLocalStore returns true is _type is local
 func IsLocalStore(_type string) bool {
 	return strings.HasPrefix(_type, LocalStorePrefix)
 }
 
-func NewLocalDisk(addr string, node *database.Node) *LocalStore {
-	return &LocalStore{
-		node: node,
-		addr: addr,
+// NewLocalDisk returns the node local storage
+func NewLocalDisk(addr string, node *database.Node, valid time.Duration) (*LocalStore, error) {
+	if valid == 0 {
+		valid = defaultVaild
 	}
+	l := &LocalStore{
+		node:  node,
+		addr:  addr,
+		valid: valid,
+	}
+
+	list, err := sdk.GetVgList(l.addr)
+	if err == nil {
+		l.list = list
+		l.expired = time.Now().Add(l.valid)
+	} else {
+
+		return l, errors.Wrap(err, "new localdisk store")
+	}
+
+	return l, nil
 }
 
-func (l LocalStore) ID() string   { return l.node.ID }
+// ID returns node ID
+func (l LocalStore) ID() string { return l.node.ID }
+
+// Driver returns local store driver
 func (LocalStore) Driver() string { return LocalStoreDriver }
+
+// IdleSize returns local store idle size,include HDD,and SSD maybe
 func (l LocalStore) IdleSize() (map[string]int, error) {
-	// api get local disk size
-	list, err := sdk.GetVgList(l.addr)
-	if err != nil {
-		return nil, err
+	if time.Now().After(l.expired) {
+		// api get local disk size
+		list, err := sdk.GetVgList(l.addr)
+		if err != nil {
+			return nil, errors.Wrap(err, l.node.Name+" store idle size")
+		}
+
+		l.list = list
+		l.expired = time.Now().Add(l.valid)
 	}
 
-	fmt.Printf("get vg list: %v\n", list)
+	out := make(map[string]int, len(l.list))
 
-	out := make(map[string]int, len(list))
-
-	for i := range list {
-		free := list[i].VgSize
+	for i := range l.list {
+		free := l.list[i].VgSize
 		// free := list[i].VgSize * 1000 * 1000
 
 		// allocated size
-		lvs, err := database.SelectVolumeByVG(list[i].VgName)
+		lvs, err := database.SelectVolumeByVG(l.list[i].VgName)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, l.node.Name+" store idle size")
 		}
 
 		for i := range lvs {
 			free -= lvs[i].Size
 		}
 
-		out[list[i].VgName] = free
+		out[l.list[i].VgName] = free
 	}
 
-	fmt.Printf("get out list: %v\n", out)
 	return out, nil
 }
 
+// Alloc returns allocated local volume on the host
 func (l LocalStore) Alloc(name, unit, vg string, size int) (database.LocalVolume, error) {
 	lv := database.LocalVolume{}
 	idles, err := l.IdleSize()
 	if err != nil || len(idles) == 0 {
-		return lv, err
+		return lv, errors.Wrap(err, l.node.Name+" store alloc")
 	}
 
 	vgsize, ok := idles[vg]
 	if !ok {
-		return lv, fmt.Errorf("doesn't get VG %s", vg)
+		return lv, errors.Errorf("%s:doesn't get VG %s", l.node.Name, vg)
 	}
 
 	if vgsize < size {
-		return lv, fmt.Errorf("VG %s is shortage,%d<%d", vg, vgsize, size)
+		return lv, errors.Errorf("%s:VG %s is shortage,%d<%d", l.node.Name, vg, vgsize, size)
 	}
 
 	lv = database.LocalVolume{
@@ -87,47 +120,57 @@ func (l LocalStore) Alloc(name, unit, vg string, size int) (database.LocalVolume
 
 	err = database.InsertLocalVolume(lv)
 	if err != nil {
-		return lv, err
+		return lv, errors.Wrap(err, l.node.Name+" store alloc")
 	}
 
 	return lv, nil
 }
 
+// Extend extend a exist VG size
 func (l *LocalStore) Extend(vg, name string, size int) (database.LocalVolume, error) {
 	lv, err := database.GetLocalVolume(name)
 	if err != nil {
-		return lv, err
+		return lv, errors.Wrap(err, l.node.Name+" VG extend")
 	}
 
 	idles, err := l.IdleSize()
 	if err != nil || len(idles) == 0 {
-		return lv, err
+		return lv, errors.Wrap(err, l.node.Name+" VG extend")
 	}
 
 	vgsize, ok := idles[vg]
 	if !ok {
-		return lv, fmt.Errorf("doesn't get VG %s", vg)
+		return lv, errors.Errorf("%s doesn't get VG %s", l.node.Name, vg)
 	}
 
 	if vgsize < size {
-		return lv, fmt.Errorf("VG %s is shortage,%d<%d", vg, vgsize, size)
+		return lv, errors.Errorf("%s:VG %s is shortage,%d<%d", l.node.Name, vg, vgsize, size)
 	}
 	lv.Size += size
 
 	err = database.UpdateLocalVolume(lv.ID, lv.Size)
+	if err != nil {
+		return lv, errors.Wrap(err, l.node.Name+" VG extend")
+	}
 
-	return lv, err
+	return lv, nil
 }
 
-func (LocalStore) Recycle(id string) error {
+// Recycle recycle a volume
+func (l LocalStore) Recycle(id string) error {
+	err := database.DeleteLocalVoume(id)
+	if err != nil {
+		return errors.Wrap(err, l.node.Name+" recycle volume")
+	}
 
-	return database.DeleteLocalVoume(id)
+	return nil
 }
 
+// GetVGUsedSize returns VG used size
 func GetVGUsedSize(vg string) (int, error) {
 	vgs, err := database.SelectVolumeByVG(vg)
 	if err != nil {
-		return 0, err
+		return 0, errors.Wrap(err, "get VG used size")
 	}
 
 	used := 0

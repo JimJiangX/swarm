@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
+	"github.com/pkg/errors"
 )
 
 type huaweiStore struct {
@@ -15,6 +16,7 @@ type huaweiStore struct {
 	hs   database.HuaweiStorage
 }
 
+// NewHuaweiStore returns a new huawei store
 func NewHuaweiStore(vendor, addr, user, password string, start, end int) Store {
 	return &huaweiStore{
 		lock: new(sync.RWMutex),
@@ -46,17 +48,17 @@ func (h huaweiStore) Driver() string {
 func (h *huaweiStore) Ping() error {
 	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "connect_test.sh")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "ping store:"+h.Vendor())
 	}
 
 	cmd, err := utils.ExecScript(path, h.hs.IPAddr, h.hs.Username, h.hs.Password)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "ping store:"+h.Vendor())
 	}
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
+		return fmt.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
 
 	return nil
@@ -64,12 +66,14 @@ func (h *huaweiStore) Ping() error {
 
 func (h *huaweiStore) Insert() error {
 	h.lock.Lock()
-
 	err := h.hs.Insert()
-
 	h.lock.Unlock()
 
-	return err
+	if err != nil {
+		return errors.Wrap(err, "insert huawei store")
+	}
+
+	return nil
 }
 
 func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, database.LocalVolume, error) {
@@ -91,29 +95,29 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 
 	rg := maxIdleSizeRG(out)
 	if out[rg].Free < size {
-		return lun, lv, fmt.Errorf("Not Enough Space For Alloction,Max:%d < Need:%d", out[rg].Free, size)
+		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
 	}
 
 	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "create_lun.sh")
 	if err != nil {
-		return lun, lv, err
+		return lun, lv, errors.Wrap(err, h.Vendor()+" store alloc")
 	}
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password,
 		strconv.Itoa(rg.StorageRGID), name, strconv.Itoa(size)}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
-		return lun, lv, err
+		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
 	}
 
 	output, err := cmd.Output()
 	if err != nil {
-		return lun, lv, fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
+		return lun, lv, errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
 
 	storageLunID, err := strconv.Atoi(string(output))
 	if err != nil {
-		return lun, lv, err
+		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
 	}
 
 	lun = database.LUN{
@@ -139,7 +143,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 
 	err = database.TxInsertLUNAndVolume(lun, lv)
 	if err != nil {
-		return lun, lv, err
+		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
 	}
 
 	return lun, lv, nil
@@ -160,27 +164,30 @@ func (h *huaweiStore) Recycle(id string, lun int) error {
 		l, err = database.GetLUNByLunID(h.ID(), lun)
 	}
 	if err != nil {
-		return err
+		return errors.Wrap(err, h.Vendor()+" recycle")
 	}
 
 	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "del_lun.sh")
 	if err != nil {
-		return err
+		return errors.Wrap(err, h.Vendor()+" recycle")
 	}
 
 	cmd, err := utils.ExecScript(path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID))
 	if err != nil {
-		return err
+		return errors.Wrap(err, h.Vendor()+" recycle")
 	}
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
+		return fmt.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
 
 	err = database.TxReleaseLun(l.Name)
+	if err != nil {
+		return errors.Wrap(err, h.Vendor()+" recycle")
+	}
 
-	return err
+	return nil
 }
 
 func (h huaweiStore) IdleSize() (map[string]int, error) {
@@ -189,7 +196,7 @@ func (h huaweiStore) IdleSize() (map[string]int, error) {
 
 	rg, err := h.Size()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, h.Vendor()+" idle size")
 	}
 
 	out := make(map[string]int, len(rg))
@@ -206,7 +213,7 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 
 	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "add_host.sh")
 	if err != nil {
-		return err
+		return errors.Wrap(err, h.Vendor()+" add host")
 	}
 
 	h.lock.Lock()
@@ -215,12 +222,12 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, name}
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
-		return err
+		return errors.Wrap(err, h.Vendor()+" add host")
 	}
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
+		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
 
 	return nil
@@ -232,7 +239,7 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 
 	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "del_host.sh")
 	if err != nil {
-		return err
+		return errors.Wrap(err, h.Vendor()+" delete host")
 	}
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, name}
@@ -242,12 +249,12 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
-		return err
+		return errors.Wrap(err, h.Vendor()+" delete host")
 	}
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
+		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
 
 	return nil
@@ -259,38 +266,38 @@ func (h *huaweiStore) Mapping(host, vg, lun string) error {
 
 	l, err := database.GetLUNByID(lun)
 	if err != nil {
-		return err
+		return errors.Wrap(err, h.Vendor()+" mapping")
 	}
 
 	out, err := database.SelectHostLunIDByMapping(host)
 	if err != nil {
-		return err
+		return errors.Wrap(err, h.Vendor()+" mapping")
 	}
 
 	find, val := findIdleNum(h.hs.HluStart, h.hs.HluEnd, out)
 	if !find {
-		return fmt.Errorf("No available Host LUN ID")
+		return errors.Errorf("%s:no available Host LUN ID", h.Vendor())
 	}
 
 	err = database.LunMapping(lun, host, vg, val)
 	if err != nil {
-		return err
+		return errors.Wrap(err, h.Vendor()+" lun mapping")
 	}
 
 	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "create_lunmap.sh")
 	if err != nil {
-		return err
+		return errors.Wrap(err, h.Vendor()+" lun mapping")
 	}
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val)}
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
-		return err
+		return errors.Wrap(err, h.Vendor()+" lun mapping")
 	}
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
+		return fmt.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
 
 	return nil
@@ -299,12 +306,12 @@ func (h *huaweiStore) Mapping(host, vg, lun string) error {
 func (h *huaweiStore) DelMapping(lun string) error {
 	l, err := database.GetLUNByID(lun)
 	if err != nil {
-		return err
+		return errors.Wrap(err, h.Vendor()+" delete mapping")
 	}
 
 	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "del_lunmap.sh")
 	if err != nil {
-		return err
+		return errors.Wrap(err, h.Vendor()+" delete mapping")
 	}
 
 	h.lock.Lock()
@@ -313,15 +320,18 @@ func (h *huaweiStore) DelMapping(lun string) error {
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID)}
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
-		return err
+		return errors.Wrap(err, h.Vendor()+" delete mapping")
 	}
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec Script Error:%s,Output:%s", err, output)
+		return fmt.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
 
 	err = database.DelLunMapping(lun, "", "", 0)
+	if err != nil {
+		return errors.Wrap(err, h.Vendor()+" delete mapping")
+	}
 
 	return nil
 }
@@ -329,7 +339,7 @@ func (h *huaweiStore) DelMapping(lun string) error {
 func (h *huaweiStore) AddSpace(id int) (Space, error) {
 	_, err := database.GetRaidGroup(h.ID(), id)
 	if err == nil {
-		return Space{}, fmt.Errorf("RaidGroup %d is Exist in %s", id, h.ID())
+		return Space{}, errors.Errorf("RaidGroup %d is exist in %s", id, h.ID())
 	}
 
 	insert := func() error {
@@ -349,7 +359,7 @@ func (h *huaweiStore) AddSpace(id int) (Space, error) {
 
 	spaces, err := h.list(id)
 	if err != nil {
-		return Space{}, err
+		return Space{}, errors.Wrap(err, h.Vendor()+" add space")
 	}
 
 	for i := range spaces {
@@ -358,12 +368,13 @@ func (h *huaweiStore) AddSpace(id int) (Space, error) {
 			if err = insert(); err == nil {
 				return spaces[i], nil
 			}
-			return Space{}, err
+
+			return Space{}, errors.Wrap(err, h.Vendor()+" add space")
 
 		}
 	}
 
-	return Space{}, fmt.Errorf("Space %d Not Exist", id)
+	return Space{}, errors.Errorf("%s:Space %d is not exist", h.ID(), id)
 }
 
 func (h *huaweiStore) list(rg ...int) ([]Space, error) {
@@ -379,29 +390,29 @@ func (h *huaweiStore) list(rg ...int) ([]Space, error) {
 
 	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "listrg.sh")
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, h.Vendor()+" list")
 	}
 
 	cmd, err := utils.ExecScript(path, h.hs.IPAddr, h.hs.Username, h.hs.Password, list)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, h.Vendor()+" list")
 	}
 
 	r, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, h.Vendor()+" list")
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		return nil, fmt.Errorf("Exec Start Script Error:%s", err)
+		return nil, errors.Errorf("Exec %s:%s", cmd.Args, err)
 	}
 
 	spaces := parseSpace(r)
 
 	err = cmd.Wait()
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("Wait %s:%s", cmd.Args, err)
 	}
 
 	if len(spaces) == 0 {
@@ -413,28 +424,32 @@ func (h *huaweiStore) list(rg ...int) ([]Space, error) {
 
 func (h *huaweiStore) EnableSpace(id int) error {
 	h.lock.Lock()
-
 	err := database.UpdateRaidGroupStatus(h.ID(), id, true)
-
 	h.lock.Unlock()
 
-	return err
+	if err != nil {
+		return errors.Wrap(err, h.Vendor()+" enable space")
+	}
+
+	return nil
 }
 
 func (h *huaweiStore) DisableSpace(id int) error {
 	h.lock.Lock()
-
 	err := database.UpdateRaidGroupStatus(h.ID(), id, false)
-
 	h.lock.Unlock()
 
-	return err
+	if err != nil {
+		return errors.Wrap(err, h.Vendor()+" disable space")
+	}
+
+	return nil
 }
 
 func (h huaweiStore) Size() (map[database.RaidGroup]Space, error) {
 	out, err := database.SelectRaidGroupByStorageID(h.ID())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, h.Vendor()+" size")
 	}
 
 	rg := make([]int, len(out))
@@ -471,7 +486,7 @@ func (h huaweiStore) Size() (map[database.RaidGroup]Space, error) {
 func (h huaweiStore) Info() (Info, error) {
 	list, err := h.Size()
 	if err != nil {
-		return Info{}, err
+		return Info{}, errors.Wrap(err, h.Vendor()+" info")
 	}
 	info := Info{
 		ID:     h.ID(),
@@ -486,5 +501,5 @@ func (h huaweiStore) Info() (Info, error) {
 		info.Free += val.Free
 	}
 
-	return info, err
+	return info, nil
 }
