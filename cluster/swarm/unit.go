@@ -249,7 +249,9 @@ func (u *unit) getNetworkings() ([]IPInfo, error) {
 	return u.networkings, nil
 }
 
-func (u *unit) getNetworkingAddr(networking, portName string) (addr string, port int, err error) {
+func (u *unit) getNetworkingAddr(networking, portName string) (string, int, error) {
+	var addr string
+
 	for i := range u.networkings {
 		if u.networkings[i].Type == networking {
 			addr = u.networkings[i].IP.String()
@@ -265,7 +267,7 @@ func (u *unit) getNetworkingAddr(networking, portName string) (addr string, port
 		}
 	}
 
-	return "", 0, fmt.Errorf("Not Found Required networking:%s Port:%s", networking, portName)
+	return "", 0, errors.Errorf("not found required networking='%s' port='%s'", networking, portName)
 }
 
 func pullImage(engine *cluster.Engine, image string, authConfig *types.AuthConfig) error {

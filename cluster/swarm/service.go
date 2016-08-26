@@ -800,13 +800,13 @@ func (svc *Service) copyServiceConfig() error {
 }
 
 func (svc *Service) initService() error {
-	var swm *unit
+	//	var swm *unit
 	funcs := make([]func() error, len(svc.units))
 	for i := range svc.units {
-		if svc.units[i].Type == _SwitchManagerType {
-			swm = svc.units[i]
-			continue
-		}
+		//		if svc.units[i].Type == _SwitchManagerType {
+		//			swm = svc.units[i]
+		//			continue
+		//		}
 		funcs[i] = svc.units[i].initService
 	}
 
@@ -815,16 +815,16 @@ func (svc *Service) initService() error {
 		logrus.WithField("Service", svc.Name).WithError(err).Error("Init services")
 	}
 
-	if err == nil && swm != nil {
+	//	if err == nil && swm != nil {
 
-		err = swm.initService()
-		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"Service": svc.Name,
-				"Unit":    swm.Name,
-			}).WithError(err).Error("Init service")
-		}
-	}
+	//		err = swm.initService()
+	//		if err != nil {
+	//			logrus.WithFields(logrus.Fields{
+	//				"Service": svc.Name,
+	//				"Unit":    swm.Name,
+	//			}).WithError(err).Error("Init service")
+	//		}
+	//	}
 
 	return err
 }
@@ -1288,6 +1288,7 @@ func (svc *Service) initTopology() error {
 	if len(proxys) == 0 || len(sqls) == 0 || swm == nil {
 		return nil
 	}
+
 	addr, port, err := swm.getNetworkingAddr(_ContainersNetworking, "Port")
 	if err != nil {
 		return err
@@ -1457,6 +1458,7 @@ func (svc *Service) getSwitchManagerAddr() (string, int, error) {
 	if err != nil {
 		return "", 0, err
 	}
+
 	if swm.engine != nil {
 		addr = swm.engine.IP
 	}
