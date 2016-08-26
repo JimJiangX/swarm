@@ -3,11 +3,11 @@
 function getfsdata()
 {	
 	# unit K
-       	subdata=`df --output=used,avail $1 2>/dev/null | tail -n 1 | awk '{print $1":"$2}'`
+	subdata=`df -k $1 2>/dev/null | tail -n 1 | awk '{print $2":"$5}' | sed 's/%//g'`
 	if [ "$subdata" = "" ];then
 		subdata="err:err"
 	fi
-	# $2:total  $6:Use% 
+	# $2:total  $5:Use% 
 	echo $subdata
 }
 
