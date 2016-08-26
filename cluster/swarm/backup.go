@@ -128,7 +128,7 @@ func lockSwitchManager(svc *Service, retries int) (string, int, *unit, error) {
 	)
 
 	for count := 0; count < retries; count++ {
-		addr, port, master, err = svc.GetSwitchManagerAndMaster()
+		addr, port, master, err = svc.getSwitchManagerAndMaster()
 		if err != nil || master == nil {
 			logrus.Errorf("Get SwitchManager And Master,retries=%d,Error:%v", retries, err)
 			continue
@@ -168,11 +168,10 @@ func backupTask(backup *unit, task *database.Task, strategy database.BackupStrat
 	if err == nil {
 		entry.Info("Backup Done")
 		return nil
-	} else {
-		status = statusTaskFailed
-		msg = fmt.Sprintf("Backup Task Faild,%s", err)
-		entry.Error(msg)
 	}
+	status = statusTaskFailed
+	msg = fmt.Sprintf("Backup Task Faild,%s", err)
+	entry.Error(msg)
 
 	select {
 	case <-ctx.Done():

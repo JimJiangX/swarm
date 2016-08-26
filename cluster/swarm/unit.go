@@ -448,7 +448,7 @@ func (u *unit) forceStopContainer(timeout int) error {
 		return err
 	}
 
-	var timeoutptr *time.Duration = nil
+	var timeoutptr *time.Duration
 	if timeout > 0 {
 		temp := time.Duration(timeout) * time.Second
 		timeoutptr = &temp

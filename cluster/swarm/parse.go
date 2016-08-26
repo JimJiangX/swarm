@@ -124,7 +124,7 @@ func parseServiceArch(arch string) (map[string]int, int, error) {
 		parts := strings.Split(s[i], ":")
 		if len(parts) == 1 {
 			out[parts[0]] = 1
-			count += 1
+			count++
 
 		} else if len(parts) == 2 {
 

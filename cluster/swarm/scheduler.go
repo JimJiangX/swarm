@@ -175,12 +175,12 @@ func templateConfig(gd *Gardener, module structs.Module) (*cluster.ContainerConf
 	}
 	logrus.Infof("Build Container Config,Validate OK:%+v", config)
 
-	image, imageID_Label, err := gd.GetImageName(module.Config.Image, module.Name, module.Version)
+	image, imageIDLabel, err := gd.GetImageName(module.Config.Image, module.Name, module.Version)
 	if err != nil {
 		return nil, err
 	}
 	config.Config.Image = image
-	config.Config.Labels[_ImageIDInRegistryLabelKey] = imageID_Label
+	config.Config.Labels[_ImageIDInRegistryLabelKey] = imageIDLabel
 
 	return config, nil
 }

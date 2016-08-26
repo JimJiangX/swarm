@@ -1478,7 +1478,7 @@ func (svc *Service) GetSwitchManagerAddr() (string, error) {
 	return fmt.Sprintf("%s:%d", host, port), nil
 }
 
-func (svc *Service) GetSwitchManagerAndMaster() (string, int, *unit, error) {
+func (svc *Service) getSwitchManagerAndMaster() (string, int, *unit, error) {
 	svc.RLock()
 	defer svc.RUnlock()
 
@@ -1534,8 +1534,8 @@ func (gd *Gardener) UnitIsolate(nameOrID string) error {
 	return err
 }
 
-func (service *Service) isolate(unitName string) error {
-	u, err := service.getUnit(unitName)
+func (svc *Service) isolate(unitName string) error {
+	u, err := svc.getUnit(unitName)
 	if err != nil {
 
 		logrus.Warning(err)
@@ -1545,13 +1545,13 @@ func (service *Service) isolate(unitName string) error {
 		return fmt.Errorf("Cann't Isolate Unit '%s:%s'", u.Type, unitName)
 	}
 
-	ip, port, err := service.getSwitchManagerAddr()
+	ip, port, err := svc.getSwitchManagerAddr()
 	if err != nil {
 		logrus.Errorf("get SwitchManager Addr error:%s", err)
 		return err
 	}
 
-	logrus.Debugf("Service %s Isolate Unit %s,%s:%d", service.Name, unitName, ip, port)
+	logrus.Debugf("Service %s Isolate Unit %s,%s:%d", svc.Name, unitName, ip, port)
 
 	err = smlib.Isolate(ip, port, unitName)
 
@@ -1582,8 +1582,8 @@ func (gd *Gardener) UnitSwitchBack(nameOrID string) error {
 	return err
 }
 
-func (service *Service) switchBack(unitName string) error {
-	u, err := service.getUnit(unitName)
+func (svc *Service) switchBack(unitName string) error {
+	u, err := svc.getUnit(unitName)
 	if err != nil {
 
 		logrus.Warning(err)
@@ -1593,13 +1593,13 @@ func (service *Service) switchBack(unitName string) error {
 		return fmt.Errorf("Cann't SwitchBack Unit '%s:%s'", u.Type, unitName)
 	}
 
-	ip, port, err := service.getSwitchManagerAddr()
+	ip, port, err := svc.getSwitchManagerAddr()
 	if err != nil {
 		logrus.Errorf("get SwitchManager Addr error:%s", err)
 		return err
 	}
 
-	logrus.Debugf("Service %s Switchback Unit %s,%s:%d", service.Name, unitName, ip, port)
+	logrus.Debugf("Service %s Switchback Unit %s,%s:%d", svc.Name, unitName, ip, port)
 
 	err = smlib.Recover(ip, port, unitName)
 	if err != nil {
@@ -1638,7 +1638,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 
 	}
 
-	var backup *unit = nil
+	var backup *unit
 	if nameOrID != "" {
 		backup, err = svc.getUnit(nameOrID)
 		if err != nil {
