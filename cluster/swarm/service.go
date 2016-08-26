@@ -800,31 +800,34 @@ func (svc *Service) copyServiceConfig() error {
 }
 
 func (svc *Service) initService() error {
-	//	var swm *unit
-	funcs := make([]func() error, len(svc.units))
+	var (
+		swm   *unit
+		funcs = make([]func() error, len(svc.units))
+	)
 	for i := range svc.units {
-		//		if svc.units[i].Type == _SwitchManagerType {
-		//			swm = svc.units[i]
-		//			continue
-		//		}
+		if svc.units[i].Type == _SwitchManagerType {
+			swm = svc.units[i]
+			continue
+		}
 		funcs[i] = svc.units[i].initService
+	}
+
+	if swm != nil {
+		err := swm.initService()
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"Service": svc.Name,
+				"Unit":    swm.Name,
+			}).WithError(err).Error("Init service")
+
+			return err
+		}
 	}
 
 	err := GoConcurrency(funcs)
 	if err != nil {
 		logrus.WithField("Service", svc.Name).WithError(err).Error("Init services")
 	}
-
-	//	if err == nil && swm != nil {
-
-	//		err = swm.initService()
-	//		if err != nil {
-	//			logrus.WithFields(logrus.Fields{
-	//				"Service": svc.Name,
-	//				"Unit":    swm.Name,
-	//			}).WithError(err).Error("Init service")
-	//		}
-	//	}
 
 	return err
 }
@@ -1352,10 +1355,13 @@ func (svc *Service) initTopology() error {
 
 	err = smlib.InitSm(addr, port, topolony)
 	if err != nil {
-		logrus.Errorf("%s Init Topology Error %s", svc.Name, err)
+		if strings.Contains(err.Error(), "connection refused") {
+			time.Sleep(time.Second * 3)
+			err = smlib.InitSm(addr, port, topolony)
+		}
 	}
 
-	return err
+	return errors.Wrap(err, "init topology")
 }
 
 func (svc *Service) registerServices() (err error) {
