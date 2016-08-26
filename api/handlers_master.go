@@ -703,13 +703,18 @@ func listServiceFromDBAAS(services []database.Service, containers cluster.Contai
 }
 
 // GET /services/{name}
+// It is able to get Service by Unit ID or name
 func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
 	service, err := database.GetService(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
+		// get service by unit name or ID
+		service, err = database.TxGetServiceByUnit(name)
+		if err != nil {
+			httpError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
