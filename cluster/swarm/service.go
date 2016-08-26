@@ -80,7 +80,7 @@ func buildService(req structs.PostServiceRequest,
 		return nil, nil, err
 	}
 
-	_, nodeNum, err := getServiceArch(req.Architecture)
+	_, nodeNum, err := parseServiceArch(req.Architecture)
 	if err != nil {
 		logrus.Error("Parse Service.Architecture", err)
 		return nil, nil, err

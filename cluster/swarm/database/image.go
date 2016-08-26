@@ -164,7 +164,7 @@ func GetImageByID(ID string) (Image, error) {
 		return image, nil
 	}
 
-	return image, errors.Wrapf(err, "Get Image by id='%s'", ID)
+	return image, errors.Wrapf(err, "get Image by id '%s'", ID)
 }
 
 func UpdateImageStatus(ID string, enable bool) error {

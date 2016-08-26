@@ -1,142 +1,152 @@
 package swarm
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"strconv"
-	"strings"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/store"
+	"github.com/pkg/errors"
 )
 
 func validateContainerConfig(config *cluster.ContainerConfig) error {
 	// validate config
-	msg := make([]string, 0, 5)
+	buf := bytes.NewBuffer(nil)
+
 	swarmID := config.SwarmID()
 	if swarmID != "" {
-		msg = append(msg, "Swarm ID to the container have created")
+		buf.WriteString("SwarmID to the container have created\n")
 	}
 
 	if config.HostConfig.CPUShares != 0 {
-		msg = append(msg, "CPUShares > 0,CPUShares should be 0")
+		buf.WriteString("CPUShares > 0,CPUShares should be 0\n")
 	}
 
 	if config.HostConfig.CpusetCpus == "" {
-		msg = append(msg, "CpusetCpus is null,CpusetCpus should not be null")
+		buf.WriteString("CpusetCpus is null,CpusetCpus should not be null\n")
 	}
 
 	_, err := parseCpuset(config.HostConfig.CpusetCpus)
 	if err != nil {
-		msg = append(msg, err.Error())
+		buf.WriteString(err.Error())
+		buf.WriteByte('\n')
 	}
 
 	if err := config.Validate(); err != nil {
-		msg = append(msg, err.Error())
+		buf.WriteString(err.Error())
+		buf.WriteByte('\n')
 	}
 
-	if len(msg) == 0 {
+	if buf.Len() == 0 {
 		return nil
 	}
 
-	return fmt.Errorf("Errors:%s", msg)
+	return errors.New(buf.String())
 }
 
 func validateContainerUpdateConfig(config container.UpdateConfig) error {
-	msg := make([]string, 0, 5)
+	buf := bytes.NewBuffer(nil)
+
 	if config.Resources.CPUShares != 0 {
-		msg = append(msg, "CPUShares > 0,CPUShares should be 0")
+		buf.WriteString("CPUShares > 0,CPUShares should be 0\n")
 	}
 
 	if config.Resources.CpusetCpus != "" {
 		n, err := strconv.Atoi(config.Resources.CpusetCpus)
 		if err != nil {
-			msg = append(msg, err.Error())
+			buf.WriteString(err.Error())
+			buf.WriteByte('\n')
 		} else if n == 0 {
-			msg = append(msg, fmt.Sprintf("CpusetCpus is '%s',should >0", config.Resources.CpusetCpus))
+			buf.WriteString(fmt.Sprintf("CpusetCpus is '%s',should > 0\n", config.Resources.CpusetCpus))
 		}
 	}
 
-	if len(msg) == 0 {
+	if buf.Len() == 0 {
 		return nil
 	}
 
-	return fmt.Errorf("Errors:%s", msg)
+	return errors.New(buf.String())
 }
 
-func ValidDatacenter(req structs.PostClusterRequest) string {
-	warnings := make([]string, 0, 5)
+func ValidDatacenter(req structs.PostClusterRequest) error {
+	buf := bytes.NewBuffer(nil)
+
 	if req.Name == "" {
-		warnings = append(warnings, "'name' is null")
+		buf.WriteString("'name' is null\n")
 	}
 
 	if !isStringExist(req.StorageType, supportedStoreTypes) {
-		warnings = append(warnings, fmt.Sprintf("Unsupported '%s' Yet", req.StorageType))
+		buf.WriteString("unsupported '" + req.StorageType + "' yet\n")
 	}
 
 	if !store.IsLocalStore(req.StorageType) && req.StorageID == "" {
-		warnings = append(warnings, "missing 'StorageID' while 'StorageType' isnot 'local'")
+		buf.WriteString("missing 'StorageID' while 'StorageType' != 'local'\n")
 	}
 
-	if len(warnings) == 0 {
-		return ""
+	if buf.Len() == 0 {
+		return nil
 	}
 
-	return strings.Join(warnings, ",")
+	return errors.New(buf.String())
 }
 
-func ValidService(req structs.PostServiceRequest) []string {
-	warnings := make([]string, 0, 10)
+func ValidService(req structs.PostServiceRequest) error {
+	buf := bytes.NewBuffer(nil)
+
 	if req.Name == "" {
-		warnings = append(warnings, "Service Name should not be null")
+		buf.WriteString("Service name should not be null\n")
 	}
 
 	_, err := database.GetService(req.Name)
 	if err == nil {
-		warnings = append(warnings, fmt.Sprintf("Service Name %s exist", req.Name))
+		buf.WriteString("Service name '" + req.Name + "' exist\n")
 	}
 
-	arch, _, err := getServiceArch(req.Architecture)
+	arch, _, err := parseServiceArch(req.Architecture)
 	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("Parse 'Architecture' Failed,%s", err))
+		buf.WriteString(err.Error())
+		buf.WriteByte('\n')
 	}
 
 	for _, module := range req.Modules {
 		if _, _, err := initialize(module.Name, module.Version); err != nil {
-			warnings = append(warnings, err.Error())
+			buf.WriteString(err.Error())
+			buf.WriteByte('\n')
 		}
 
 		//if !isStringExist(module.Type, supportedServiceTypes) {
-		//	warnings = append(warnings, fmt.Sprintf("Unsupported '%s' Yet", module.Type))
+		//	buf.WriteString("Unsupported " + module.Type)
 		//}
 		if module.Config.Image == "" {
 			image, err := database.GetImage(module.Name, module.Version)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("Not Found Image:%s:%s,Error%s", module.Name, module.Version, err))
+				buf.WriteString("not found Image:" + err.Error() + "\n")
 			}
 			if !image.Enabled {
-				warnings = append(warnings, fmt.Sprintf("Image: %s:%s is Disabled", module.Name, module.Version))
+				buf.WriteString(fmt.Sprintf("Image '%s:%s' disabled\n", module.Name, module.Version))
 			}
 		} else {
 			image, err := database.GetImageByID(module.Config.Image)
 			if err != nil {
-				warnings = append(warnings, fmt.Sprintf("Not Found Image:%s,Error%s", module.Config.Image, err))
+				buf.WriteString("not found Image:" + err.Error() + "\n")
 			}
 			if !image.Enabled {
-				warnings = append(warnings, fmt.Sprintf("Image:%s is Disabled", module.Config.Image))
+				buf.WriteString("Image:'" + module.Config.Image + "' disabled\n")
 			}
 		}
-		_, num, err := getServiceArch(module.Arch)
+		_, num, err := parseServiceArch(module.Arch)
 		if err != nil {
-			warnings = append(warnings, fmt.Sprintf("%s,%s", module.Arch, err))
+			buf.WriteString(err.Error())
+			buf.WriteByte('\n')
 		}
 
 		if arch[module.Type] != num {
-			warnings = append(warnings, fmt.Sprintf("%s nodeNum  unequal Architecture,(%s)", module.Type, module.Arch))
+			buf.WriteString(fmt.Sprintf("%s nodeNum  unequal Architecture,(%s)\n", module.Type, module.Arch))
 		}
 
 		hostConfig := container.HostConfig{
@@ -149,43 +159,43 @@ func ValidService(req structs.PostServiceRequest) []string {
 		config := cluster.BuildContainerConfig(module.Config, hostConfig, module.NetworkingConfig)
 		err = validateContainerConfig(config)
 		if err != nil {
-			warnings = append(warnings, err.Error())
+			buf.WriteString(err.Error())
+			buf.WriteByte('\n')
 		}
 
 		lvNames := make([]string, 0, len(module.Stores))
 		for _, ds := range module.Stores {
 			if isStringExist(ds.Name, lvNames) {
-				warnings = append(warnings, fmt.Sprintf("Storage Name '%s' Duplicate in one Module:%s", ds.Name, module.Name))
+				buf.WriteString(fmt.Sprintf("Storage Name '%s' duplicate in one module:'%s'\n", ds.Name, module.Name))
 			} else {
 				lvNames = append(lvNames, ds.Name)
 			}
 
 			if !isStringExist(ds.Name, supportedStoreNames) {
-				warnings = append(warnings, fmt.Sprintf("Unsupported Storage Name '%s' Yet,should be one of %s", ds.Name, supportedStoreNames))
+				buf.WriteString(fmt.Sprintf("unsupported Storage Name '%s' yet,should be one of %s\n", ds.Name, supportedStoreNames))
 			}
 
 			if !isStringExist(ds.Type, supportedStoreTypes) {
-				warnings = append(warnings, fmt.Sprintf("Unsupported Storage Type '%s' Yet,should be one of %s", ds.Type, supportedStoreTypes))
+				buf.WriteString(fmt.Sprintf("unsupported Storage Type '%s' yet,should be one of %s\n", ds.Type, supportedStoreTypes))
 			}
 		}
 	}
 
-	if len(warnings) == 0 {
+	if buf.Len() == 0 {
 		return nil
 	}
 
-	logrus.Warnf("Service Valid warning:%s", warnings)
-
-	return warnings
+	return errors.New(buf.String())
 }
 
 func ValidateServiceScale(svc *Service, scale structs.PostServiceScaledRequest) error {
-	warns := make([]string, 0, 10)
+	buf := bytes.NewBuffer(nil)
 
 	if scale.UpdateConfig != nil {
 		err := validateContainerUpdateConfig(*scale.UpdateConfig)
 		if err != nil {
-			warns = append(warns, err.Error())
+			buf.WriteString(err.Error())
+			buf.WriteByte('\n')
 		}
 	}
 
@@ -193,24 +203,22 @@ func ValidateServiceScale(svc *Service, scale structs.PostServiceScaledRequest) 
 
 	units, err := svc.getUnitByType(scale.Type)
 	if err != nil {
-		warns = append(warns, err.Error())
+		buf.WriteString(err.Error())
+		buf.WriteByte('\n')
 	}
 	for _, u := range units {
 		if u.engine == nil || (u.config == nil && u.container == nil) {
-			warns = append(warns, fmt.Sprintf("unit odd,%+v", u))
+			buf.WriteString(fmt.Sprintf("unit odd,%+v\n", u))
 		}
 	}
 
 	des, err := svc.getServiceDescription()
+	if err != nil {
+		buf.WriteString(err.Error())
+		buf.WriteByte('\n')
+	}
 
 	svc.RUnlock()
-
-	if err != nil {
-		warns = append(warns, err.Error())
-	}
-	if err != nil || des == nil {
-		return fmt.Errorf("Warnings:%s", warns)
-	}
 
 	m, found := 0, false
 	for index := range des.Modules {
@@ -220,13 +228,13 @@ func ValidateServiceScale(svc *Service, scale structs.PostServiceScaledRequest) 
 		}
 	}
 	if !found {
-		warns = append(warns, fmt.Sprintf("Not Found '%s' service", scale.Type))
-		return fmt.Errorf("Warnings:%s", warns)
+		buf.WriteString(fmt.Sprintf("not found Service by Type'%s'\n", scale.Type))
+		return errors.New(buf.String())
 	}
 
 	for ext := range scale.Extensions {
 		if scale.Extensions[ext].Type == "nfs" || scale.Extensions[ext].Type == "NFS" {
-			warns = append(warns, "Found Type 'NFS',Unsupported 'NFS' Expension")
+			buf.WriteString("found Type 'NFS',unsupported 'NFS' expension\n")
 			continue
 		}
 		found = false
@@ -240,35 +248,36 @@ func ValidateServiceScale(svc *Service, scale structs.PostServiceScaledRequest) 
 			}
 		}
 		if !found {
-			warns = append(warns, fmt.Sprintf("Not Found '%s':'%s' storage",
+			buf.WriteString(fmt.Sprintf("not found '%s':'%s' storage\n",
 				scale.Extensions[ext].Name, scale.Extensions[ext].Type))
 			continue
 		}
 	}
-	if len(warns) == 0 {
+
+	if buf.Len() == 0 {
 		return nil
 	}
 
-	return fmt.Errorf("Warnings:%s", warns)
+	return errors.New(buf.String())
 }
 
 func ValidateIPAddress(prefix int, addrs ...string) error {
-	warns := make([]string, 0, len(addrs))
+	buf := bytes.NewBuffer(nil)
 
 	if prefix < 1 || prefix > 31 {
-		warns = append(warns, fmt.Sprintf("'%d' is out of range 1~32", prefix))
+		buf.WriteString(fmt.Sprintf("'%d' is out of range 1~32\n", prefix))
 	}
 
 	for i := range addrs {
 		ip := net.ParseIP(addrs[i])
 		if ip == nil {
-			warns = append(warns, fmt.Sprintf("'%s' isnot an IP", addrs[i]))
+			buf.WriteString(addrs[i] + " isnot an IP\n")
 		}
 	}
 
-	if len(warns) > 0 {
-		return fmt.Errorf("errors:%s", warns)
+	if buf.Len() == 0 {
+		return nil
 	}
 
-	return nil
+	return errors.New(buf.String())
 }

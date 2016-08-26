@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/utils"
+	"github.com/pkg/errors"
 )
 
 func buildContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerConfig {
@@ -107,16 +107,16 @@ func parseCpuset(cpuset string) (int, error) {
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"CpusetCpus": cpuset,
-		}).Errorf("Parse Error:%s", err)
+		}).Errorf("parse CpusetCpus error:%s", err)
 
-		return 0, err
+		return 0, errors.Wrap(err, "parse CpusetCpus")
 	}
 
 	return ncpu, nil
 }
 
 // "master:1#standby:1#slave:3"
-func getServiceArch(arch string) (map[string]int, int, error) {
+func parseServiceArch(arch string) (map[string]int, int, error) {
 	s := strings.Split(arch, "#")
 	out, count := make(map[string]int, len(s)), 0
 
@@ -133,10 +133,10 @@ func getServiceArch(arch string) (map[string]int, int, error) {
 				count += n
 
 			} else {
-				return nil, 0, fmt.Errorf("%s,%s", err, s[i])
+				return nil, 0, errors.Errorf("parse Service Arch:'%s',%s", s[i], err)
 			}
 		} else {
-			return nil, 0, fmt.Errorf("Unexpected format in %s", s[i])
+			return nil, 0, errors.Errorf("Unexpected format '%s'", s[i])
 		}
 	}
 
