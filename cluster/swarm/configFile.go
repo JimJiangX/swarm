@@ -100,7 +100,7 @@ func (u *unit) saveConfigToDisk(content []byte) error {
 	u.parent = &config
 	config.UnitID = u.ID
 
-	err := database.SaveUnitConfigToDisk(&u.Unit, config)
+	err := database.SaveUnitConfig(&u.Unit, config)
 
 	return err
 }

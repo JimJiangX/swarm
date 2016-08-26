@@ -671,9 +671,9 @@ func listServiceFromDBAAS(services []database.Service, containers cluster.Contai
 	out := make([]response, len(services))
 	for i := range services {
 		desc := structs.PostServiceRequest{}
-		err := json.NewDecoder(bytes.NewBufferString(services[i].Description)).Decode(&desc)
+		err := json.NewDecoder(bytes.NewBufferString(services[i].Desc)).Decode(&desc)
 		if err != nil {
-			logrus.Warningf("JSON Decode Serivce.Description %s:%s,%s", services[i].Name, err, services[i].Description)
+			logrus.Warningf("JSON Decode Serivce.Desc %s:%s,%s", services[i].Name, err, services[i].Desc)
 		}
 		sql := structs.Module{}
 		for _, m := range desc.Modules {
@@ -732,9 +732,9 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 func getServiceResponse(service database.Service, containers cluster.Containers) structs.ServiceResponse {
 	desc := structs.PostServiceRequest{}
-	err := json.NewDecoder(bytes.NewBufferString(service.Description)).Decode(&desc)
+	err := json.NewDecoder(bytes.NewBufferString(service.Desc)).Decode(&desc)
 	if err != nil {
-		logrus.Warnf("JSON Decode Serivce.Description %s:%s,%s", service.Name, err, service.Description)
+		logrus.Warnf("JSON Decode Serivce.Desc %s:%s,%s", service.Name, err, service.Desc)
 	}
 
 	_, files, err := database.ListBackupFilesByService(service.ID)

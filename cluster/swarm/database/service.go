@@ -145,6 +145,7 @@ func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
 	return stmt.Close()
 }
 
+// UpdateUnitInfo could update params of unit
 func UpdateUnitInfo(unit Unit) error {
 	db, err := GetDB(false)
 	if err != nil {
@@ -164,25 +165,21 @@ func UpdateUnitInfo(unit Unit) error {
 	}
 
 	_, err = db.NamedExec(query, &unit)
-	if err == nil {
-		return nil
-	}
 
-	return errors.Wrap(err, "Update Unit")
+	return errors.Wrap(err, "update Unit params")
 }
 
+// TxUpdateUnit upate unit params in tx
 func TxUpdateUnit(tx *sqlx.Tx, unit Unit) error {
-	//	query := "UPDATE tb_unit SET name=:name,type=:type,image_id=:image_id,image_name=:image_name,service_id=:service_id,node_id=:node_id,container_id=:container_id,unit_config_id=:unit_config_id,network_mode=:network_mode,status=:status,check_interval=:check_interval,created_at=:created_at WHERE id=:id"
 	const query = "UPDATE tb_unit SET node_id=:node_id,container_id=:container_id,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
 
 	_, err := tx.NamedExec(query, unit)
-	if err == nil {
-		return nil
-	}
 
-	return errors.Wrap(err, "Tx Update Unit")
+	return errors.Wrap(err, "Tx update Unit")
 }
 
+// StatusCAS update Unit Status with conditions,
+// Unit status==old or status!=old,update Unit Status to be value if true,else return error
 func (u *Unit) StatusCAS(operator string, old, value int64) error {
 	if operator == "!=" {
 		operator = "<>"
@@ -190,22 +187,18 @@ func (u *Unit) StatusCAS(operator string, old, value int64) error {
 
 	query := fmt.Sprintf("UPDATE tb_unit SET status=? WHERE id=? AND status%s?", operator)
 
-	db, err := GetDB(false)
+	db, err := GetDB(true)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec(query, value, u.ID, old)
+	r, err := db.Exec(query, value, u.ID, old)
 	if err != nil {
-		db, err = GetDB(true)
-		if err != nil {
-			return err
-		}
+		return errors.Wrap(err, "update Unit Status")
+	}
 
-		_, err = db.Exec(query, value, u.ID, old)
-		if err != nil {
-			return errors.Wrap(err, "Update Unit Status")
-		}
+	if n, err := r.RowsAffected(); err != nil || n != 1 {
+		return errors.Errorf("unable to update Unit %s,condition:status%s%d", u.ID, operator, old)
 	}
 
 	atomic.StoreInt64(&u.Status, value)
@@ -213,6 +206,7 @@ func (u *Unit) StatusCAS(operator string, old, value int64) error {
 	return nil
 }
 
+// TxUpdateUnitAndInsertTask update Unit Status & LatestError and insert Task in Tx
 func TxUpdateUnitAndInsertTask(unit *Unit, task Task) error {
 	tx, err := GetTX()
 	if err != nil {
@@ -230,9 +224,12 @@ func TxUpdateUnitAndInsertTask(unit *Unit, task Task) error {
 		return err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Tx update Unit and insert Task")
 }
 
+// TxUpdateUnitStatus update Unit Status & LatestError in Tx
 func TxUpdateUnitStatus(unit *Unit, status int64, msg string) error {
 	tx, err := GetTX()
 	if err != nil {
@@ -245,9 +242,12 @@ func TxUpdateUnitStatus(unit *Unit, status int64, msg string) error {
 		return err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Tx update Unit Status & LatestError")
 }
 
+// TxUpdateUnitStatusWithTask update Unit and Task in Tx
 func TxUpdateUnitStatusWithTask(unit *Unit, task *Task, msg string) error {
 	tx, err := GetTX()
 	if err != nil {
@@ -265,13 +265,15 @@ func TxUpdateUnitStatusWithTask(unit *Unit, task *Task, msg string) error {
 		return err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Tx update Unit & Task")
 }
 
 func txUpdateUnitStatus(tx *sqlx.Tx, unit *Unit, status int64, msg string) error {
 	_, err := tx.Exec("UPDATE tb_unit SET status=?,latest_error=? WHERE id=?", status, msg, unit.ID)
 	if err != nil {
-		return errors.Wrap(err, "tx Update Unit Status")
+		return errors.Wrap(err, "Tx update Unit status")
 	}
 
 	atomic.StoreInt64(&unit.Status, status)
@@ -280,15 +282,14 @@ func txUpdateUnitStatus(tx *sqlx.Tx, unit *Unit, status int64, msg string) error
 	return nil
 }
 
+// TxDeleteUnit delete Unit by name or ID or ServiceID in Tx
 func TxDeleteUnit(tx *sqlx.Tx, nameOrID string) error {
 	_, err := tx.Exec("DELETE FROM tb_unit WHERE id=? OR name=? OR service_id=?", nameOrID, nameOrID, nameOrID)
-	if err == nil {
-		return nil
-	}
 
-	return errors.Wrap(err, "Tx Delete Unit By nameOrID OR ServiceID:"+nameOrID)
+	return errors.Wrap(err, "Tx delete Unit by nameOrID or ServiceID")
 }
 
+// ListUnitByServiceID returns []Unit select by ServiceID
 func ListUnitByServiceID(id string) ([]Unit, error) {
 	db, err := GetDB(false)
 	if err != nil {
@@ -309,13 +310,11 @@ func ListUnitByServiceID(id string) ([]Unit, error) {
 	}
 
 	err = db.Select(&out, query, id)
-	if err == nil {
-		return out, nil
-	}
 
-	return nil, errors.Wrap(err, "Select []Unit By ServiceID:"+id)
+	return out, errors.Wrap(err, "list []Unit by ServiceID")
 }
 
+// CountUnitByNode returns len of []Unit select Unit by EngineID
 func CountUnitByNode(id string) (int, error) {
 	db, err := GetDB(false)
 	if err != nil {
@@ -336,13 +335,11 @@ func CountUnitByNode(id string) (int, error) {
 	}
 
 	err = db.Get(&count, query, id)
-	if err == nil {
-		return count, nil
-	}
 
-	return 0, errors.Wrap(err, "Count Unit By NodeID:"+id)
+	return count, errors.Wrap(err, "count Unit by NodeID")
 }
 
+// CountUnitsInNodes returns len of []Unit select Unit by NodeID IN Engines.
 func CountUnitsInNodes(engines []string) (int, error) {
 	if len(engines) == 0 {
 		return 0, nil
@@ -360,14 +357,12 @@ func CountUnitsInNodes(engines []string) (int, error) {
 
 	count := 0
 	err = db.Get(&count, query, args...)
-	if err == nil {
-		return count, nil
-	}
 
-	return 0, errors.Wrap(err, "Cound Units By node_id")
+	return count, errors.Wrap(err, "cound Units by engines")
 }
 
-func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {
+// SaveUnitConfig insert UnitConfig and update Unit.ConfigID in Tx
+func SaveUnitConfig(unit *Unit, config UnitConfig) error {
 	tx, err := GetTX()
 	if err != nil {
 		return err
@@ -392,7 +387,7 @@ func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {
 
 	err = tx.Commit()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "save Unit Config")
 	}
 
 	unit.ConfigID = config.ID
@@ -402,10 +397,11 @@ func SaveUnitConfigToDisk(unit *Unit, config UnitConfig) error {
 
 const insertServiceQuery = "INSERT INTO tb_service (id,name,description,architecture,business_code,auto_healing,auto_scaling,high_available,status,backup_max_size,backup_files_retention,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:business_code,:auto_healing,:auto_scaling,:high_available,:status,:backup_max_size,:backup_files_retention,:created_at,:finished_at)"
 
+// Service if table tb_service structure
 type Service struct {
 	ID                string `db:"id"`
 	Name              string `db:"name"`
-	Description       string `db:"description"`
+	Desc              string `db:"description"` // short for Description
 	Architecture      string `db:"architecture"`
 	BusinessCode      string `db:"business_code"`
 	AutoHealing       bool   `db:"auto_healing"`
@@ -423,6 +419,7 @@ func (svc Service) tableName() string {
 	return "tb_service"
 }
 
+// ListServices returns all []Service
 func ListServices() ([]Service, error) {
 	db, err := GetDB(false)
 	if err != nil {
@@ -443,13 +440,11 @@ func ListServices() ([]Service, error) {
 	}
 
 	err = db.Select(&out, query)
-	if err == nil {
-		return out, nil
-	}
 
-	return nil, errors.Wrap(err, "Select []Service")
+	return out, errors.Wrap(err, "list []Service")
 }
 
+// GetService returns Service select by ID or Name
 func GetService(nameOrID string) (Service, error) {
 	db, err := GetDB(false)
 	if err != nil {
@@ -470,11 +465,8 @@ func GetService(nameOrID string) (Service, error) {
 	}
 
 	err = db.Get(&s, query, nameOrID, nameOrID)
-	if err == nil {
-		return s, nil
-	}
 
-	return s, errors.Wrap(err, "Get Service By nameOrID:"+nameOrID)
+	return s, errors.Wrap(err, "Get Service By nameOrID")
 }
 
 // TxGetServiceByUnit returns Service select by Unit ID or Name.
@@ -510,7 +502,8 @@ func TxGetServiceByUnit(unit string) (Service, error) {
 	return service, errors.Wrap(err, "Tx get Service by unit")
 }
 
-func UpdateServcieDescription(id, des string) error {
+// UpdateServcieDesc update Service Description
+func UpdateServcieDesc(id, desc string) error {
 	db, err := GetDB(false)
 	if err != nil {
 		return err
@@ -518,7 +511,7 @@ func UpdateServcieDescription(id, des string) error {
 
 	const query = "UPDATE tb_service SET description=? WHERE id=?"
 
-	_, err = db.Exec(query, des, id)
+	_, err = db.Exec(query, desc, id)
 	if err == nil {
 		return nil
 	}
@@ -528,14 +521,12 @@ func UpdateServcieDescription(id, des string) error {
 		return err
 	}
 
-	_, err = db.Exec(query, des, id)
-	if err == nil {
-		return nil
-	}
+	_, err = db.Exec(query, desc, id)
 
-	return errors.Wrap(err, "Update Service.Description")
+	return errors.Wrap(err, "update Service.Desc")
 }
 
+// TxSaveService insert Service & BackupStrategy & Task & []User in Tx.
 func TxSaveService(svc Service, strategy *BackupStrategy, task *Task, users []User) error {
 	tx, err := GetTX()
 	if err != nil {
@@ -569,19 +560,18 @@ func TxSaveService(svc Service, strategy *BackupStrategy, task *Task, users []Us
 		}
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Tx save Service & BackupStrategy & Task & []User")
 }
 
 func txInsertSerivce(tx *sqlx.Tx, svc Service) error {
-	// insert into database
 	_, err := tx.NamedExec(insertServiceQuery, &svc)
-	if err == nil {
-		return nil
-	}
 
-	return errors.Wrap(err, "Tx Insert Service")
+	return errors.Wrap(err, "Tx insert Service")
 }
 
+// SetServiceStatus update Service Status
 func (svc *Service) SetServiceStatus(state int64, finish time.Time) error {
 	db, err := GetDB(true)
 	if err != nil {
@@ -591,7 +581,7 @@ func (svc *Service) SetServiceStatus(state int64, finish time.Time) error {
 	if finish.IsZero() {
 		_, err = db.Exec("UPDATE tb_service SET status=? WHERE id=?", state, svc.ID)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "update Service Status")
 		}
 
 		atomic.StoreInt64(&svc.Status, state)
@@ -601,7 +591,7 @@ func (svc *Service) SetServiceStatus(state int64, finish time.Time) error {
 
 	_, err = db.Exec("UPDATE tb_service SET status=?,finished_at=? WHERE id=?", state, finish, svc.ID)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "update Service Status & FinishedAt")
 	}
 
 	atomic.StoreInt64(&svc.Status, state)
@@ -610,6 +600,7 @@ func (svc *Service) SetServiceStatus(state int64, finish time.Time) error {
 	return nil
 }
 
+// TxSetServiceStatus update Service Status and Task Status in Tx.
 func TxSetServiceStatus(svc *Service, task *Task, state, tstate int64, finish time.Time, msg string) error {
 	tx, err := GetTX()
 	if err != nil {
@@ -620,12 +611,12 @@ func TxSetServiceStatus(svc *Service, task *Task, state, tstate int64, finish ti
 	if finish.IsZero() {
 		_, err := tx.Exec("UPDATE tb_service SET status=? WHERE id=?", state, svc.ID)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "Tx update Service status")
 		}
 	} else {
 		_, err := tx.Exec("UPDATE tb_service SET status=?,finished_at=? WHERE id=?", state, finish, svc.ID)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "Tx update Service status & finishedAt")
 		}
 	}
 
@@ -636,7 +627,7 @@ func TxSetServiceStatus(svc *Service, task *Task, state, tstate int64, finish ti
 
 	err = tx.Commit()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Tx update Service status & Task status")
 	}
 
 	if !finish.IsZero() {
@@ -656,6 +647,7 @@ func txDeleteService(tx *sqlx.Tx, nameOrID string) error {
 
 const insertUserQuery = "INSERT INTO tb_users (id,service_id,type,username,password,role,read_only,blacklist,whitelist,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:read_only,:blacklist,:whitelist,:created_at)"
 
+// User is for DB and Proxy
 type User struct {
 	ReadOnly  bool   `db:"read_only" json:"read_only"`
 	ID        string `db:"id"`
@@ -677,6 +669,7 @@ func (u User) tableName() string {
 	return "tb_users"
 }
 
+// ListUsersByService returns []User select by serviceID and User type if assigned
 func ListUsersByService(service, _type string) ([]User, error) {
 	db, err := GetDB(true)
 	if err != nil {
@@ -690,7 +683,7 @@ func ListUsersByService(service, _type string) ([]User, error) {
 		err = db.Select(&users, "SELECT * FROM tb_users WHERE service_id=? AND type=?", service, _type)
 	}
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "list []User by serviceID")
 	}
 
 	for i := range users {
@@ -711,7 +704,7 @@ func (u *User) jsonDecode() error {
 	if len(u.Black) > 0 {
 		err := json.NewDecoder(buffer).Decode(&u.Blacklist)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "JSON decode blacklist")
 		}
 	}
 
@@ -721,7 +714,7 @@ func (u *User) jsonDecode() error {
 
 		err := json.NewDecoder(buffer).Decode(&u.Whitelist)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "JSON decode whitelist")
 		}
 	}
 
@@ -756,6 +749,8 @@ func (u *User) jsonEncode() error {
 	return nil
 }
 
+// TxUpdateUsers update []User in Tx,
+// If User is exist,exec update,if not exec insert.
 func TxUpdateUsers(addition, update []User) error {
 	tx, err := GetTX()
 	if err != nil {
@@ -771,13 +766,15 @@ func TxUpdateUsers(addition, update []User) error {
 	}
 
 	if len(update) == 0 {
-		return tx.Commit()
+		err = tx.Commit()
+
+		return errors.Wrap(err, "Tx update []User")
 	}
 
 	const query = "UPDATE tb_users SET type=:type,password=:password,role=:role,read_only=:read_only,blacklist=:blacklist,whitelist=:whitelist WHERE id=:id OR username=:username"
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Tx prepare update User")
 	}
 
 	for i := range update {
@@ -797,9 +794,12 @@ func TxUpdateUsers(addition, update []User) error {
 
 	stmt.Close()
 
-	return tx.Commit()
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Tx update []User")
 }
 
+// TxInsertUsers insert []User in Tx
 func TxInsertUsers(users []User) error {
 	tx, err := GetTX()
 	if err != nil {
@@ -812,13 +812,15 @@ func TxInsertUsers(users []User) error {
 		return err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Tx insert []User")
 }
 
 func txInsertUsers(tx *sqlx.Tx, users []User) error {
 	stmt, err := tx.PrepareNamed(insertUserQuery)
 	if err != nil {
-		return errors.Wrap(err, "Tx Prepare Insert []User")
+		return errors.Wrap(err, "Tx prepare insert []User")
 	}
 
 	for i := range users {
@@ -836,22 +838,22 @@ func txInsertUsers(tx *sqlx.Tx, users []User) error {
 		if err != nil {
 			stmt.Close()
 
-			return errors.Wrap(err, "Tx Insert User")
+			return errors.Wrap(err, "Tx insert []User")
 		}
 	}
 
-	return stmt.Close()
+	stmt.Close()
+
+	return errors.Wrap(err, "Tx insert []User")
 }
 
 func txDeleteUsers(tx *sqlx.Tx, id string) error {
 	_, err := tx.Exec("DELETE FROM tb_users WHERE id=? OR service_id=?", id, id)
-	if err == nil {
-		return nil
-	}
 
-	return errors.Wrap(err, "Tx Delete User By ID OR ServiceID:"+id)
+	return errors.Wrap(err, "Tx delete User by ID or ServiceID")
 }
 
+// TxDeleteUsers delete []User in Tx
 func TxDeleteUsers(users []User) error {
 	tx, err := GetTX()
 	if err != nil {
@@ -861,7 +863,7 @@ func TxDeleteUsers(users []User) error {
 
 	stmt, err := tx.Preparex("DELETE FROM tb_users WHERE id=?")
 	if err != nil {
-		return errors.Wrap(err, "Tx Prepare Delete []User")
+		return errors.Wrap(err, "Tx prepare delete []User")
 	}
 
 	for i := range users {
@@ -869,15 +871,20 @@ func TxDeleteUsers(users []User) error {
 		if err != nil {
 			stmt.Close()
 
-			return errors.Wrap(err, "Tx Delete User By ID:"+users[i].ID)
+			return errors.Wrap(err, "Tx delete User by ID:"+users[i].ID)
 		}
 	}
 
 	stmt.Close()
 
-	return tx.Commit()
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Tx delete []User")
 }
 
+// DeteleServiceRelation delelte related record about Service,
+// include Service,Unit,BackupStrategy,IP,Port,LocalVolume,UnitConfig.
+// delete in a Tx
 func DeteleServiceRelation(serviceID string, rmVolumes bool) error {
 	units, err := ListUnitByServiceID(serviceID)
 	if err != nil {
@@ -909,20 +916,16 @@ func DeteleServiceRelation(serviceID string, rmVolumes bool) error {
 	}
 
 	for i := range ips {
-
 		ips[i].Allocated = false
 		ips[i].UnitID = ""
-
 	}
 
 	for i := range ports {
-
 		ports[i].Allocated = false
 		ports[i].Name = ""
 		ports[i].UnitID = ""
 		ports[i].UnitName = ""
 		ports[i].Proto = ""
-
 	}
 
 	tx, err := GetTX()
@@ -942,7 +945,6 @@ func DeteleServiceRelation(serviceID string, rmVolumes bool) error {
 	}
 
 	for i := range units {
-
 		if rmVolumes {
 			err = TxDeleteVolume(tx, units[i].ID)
 			if err != nil {
@@ -976,5 +978,7 @@ func DeteleServiceRelation(serviceID string, rmVolumes bool) error {
 		return err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Detele Service relation")
 }

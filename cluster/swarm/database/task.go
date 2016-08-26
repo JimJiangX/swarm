@@ -160,15 +160,11 @@ func (task Task) Insert() error {
 }
 
 func TxInsertTask(tx *sqlx.Tx, t Task) error {
-
 	t.Timestamp = t.CreatedAt.Unix()
 
 	_, err := tx.NamedExec(insertTaskQuery, &t)
-	if err == nil {
-		return nil
-	}
 
-	return errors.Wrap(err, "Tx Insert Task")
+	return errors.Wrap(err, "Tx insert Task")
 }
 
 func TxInsertMultiTask(tx *sqlx.Tx, tasks []*Task) error {
@@ -215,7 +211,7 @@ func txUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int64, finish time.Time, msg
 
 	_, err := tx.Exec(query, state, finish, msg, t.ID)
 	if err != nil {
-		return errors.Wrap(err, "Tx update Task status")
+		return errors.Wrap(err, "Tx update Task status & errors")
 	}
 
 	atomic.StoreInt64(&t.Status, state)
@@ -651,11 +647,8 @@ func txDeleteBackupStrategy(tx *sqlx.Tx, id string) error {
 
 func TxInsertBackupStrategy(tx *sqlx.Tx, strategy BackupStrategy) error {
 	_, err := tx.NamedExec(insertBackupStrategyQuery, &strategy)
-	if err == nil {
-		return nil
-	}
 
-	return errors.Wrap(err, "Tx Insert BackupStrategy")
+	return errors.Wrap(err, "Tx insert BackupStrategy")
 }
 
 func TxInsertBackupStrategyAndTask(strategy BackupStrategy, task Task) error {

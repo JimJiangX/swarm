@@ -55,7 +55,7 @@ func buildService(req structs.PostServiceRequest,
 	//	 return nil, errors.New(strings.Join(warnings, ","))
 	// }
 
-	des, err := json.Marshal(req)
+	desc, err := json.Marshal(req)
 	if err != nil {
 		logrus.Errorf("JSON Marshal Error:%s", err)
 	}
@@ -63,7 +63,7 @@ func buildService(req structs.PostServiceRequest,
 	svc := database.Service{
 		ID:                   utils.Generate64UUID(),
 		Name:                 req.Name,
-		Description:          string(des),
+		Desc:                 string(desc),
 		Architecture:         req.Architecture,
 		BusinessCode:         req.BusinessCode,
 		AutoHealing:          req.AutoHealing,
@@ -566,8 +566,8 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	}
 
 	base := &structs.PostServiceRequest{}
-	if len(service.Description) > 0 {
-		err := json.Unmarshal([]byte(service.Description), base)
+	if len(service.Desc) > 0 {
+		err := json.Unmarshal([]byte(service.Desc), base)
 		if err != nil {
 			logrus.WithError(err).Warn("JSON Unmarshal Service.Description")
 		}
@@ -1843,15 +1843,15 @@ func (svc *Service) getServiceDescription() (*structs.PostServiceRequest, error)
 		return svc.base, nil
 	}
 	if svc.base == nil {
-		if svc.Description == "" {
+		if svc.Desc == "" {
 			table, err := database.GetService(svc.ID)
 			if err != nil {
 				return nil, err
 			}
 			svc.Service = table
 		}
-		if svc.Description != "" {
-			err := json.NewDecoder(strings.NewReader(svc.Description)).Decode(svc.base)
+		if svc.Desc != "" {
+			err := json.NewDecoder(strings.NewReader(svc.Desc)).Decode(svc.base)
 			if err != nil {
 				return nil, err
 			}
@@ -1882,13 +1882,13 @@ func (svc *Service) updateDescAfterScale(scale structs.PostServiceScaledRequest)
 		return err
 	}
 
-	description := buffer.String()
-	err = database.UpdateServcieDescription(svc.ID, description)
+	desc := buffer.String()
+	err = database.UpdateServcieDesc(svc.ID, desc)
 	if err != nil {
 		return err
 	}
 
-	svc.Description = description
+	svc.Desc = desc
 	svc.base = &des
 
 	return nil

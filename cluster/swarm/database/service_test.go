@@ -111,7 +111,7 @@ func TestUnit(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 
-	err = SaveUnitConfigToDisk(unit1, unitConfig)
+	err = SaveUnitConfig(unit1, unitConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +121,7 @@ func TestService(t *testing.T) {
 	service := Service{
 		ID:                   "serviceId001",
 		Name:                 "serviceName001",
-		Description:          "serviceDescription001",
+		Desc:                 "serviceDescription001",
 		Architecture:         "serviceArchitecture001",
 		AutoHealing:          true,
 		AutoScaling:          true,
@@ -197,7 +197,7 @@ func TestService(t *testing.T) {
 		service.BackupFilesRetention != service1.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service1.BackupMaxSizeByte ||
 		service.CreatedAt.Format("2006-01-02 15:04:05") != service1.CreatedAt.Format("2006-01-02 15:04:05") ||
-		service.Description != service1.Description ||
+		service.Desc != service1.Desc ||
 		service.FinishedAt.Format("2006-01-02 15:04:05") != service1.FinishedAt.Format("2006-01-02 15:04:05") ||
 		service.HighAvailable != service1.HighAvailable {
 		t.Fatal("GetService not equal", string(b), string(b1))
@@ -226,7 +226,7 @@ func TestService(t *testing.T) {
 		service.BackupFilesRetention != service2.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service2.BackupMaxSizeByte ||
 		service.CreatedAt.Format("2006-01-02 15:04:05") != service2.CreatedAt.Format("2006-01-02 15:04:05") ||
-		service.Description != service2.Description ||
+		service.Desc != service2.Desc ||
 		service.FinishedAt.Format("2006-01-02 15:04:05") != service2.FinishedAt.Format("2006-01-02 15:04:05") ||
 		service.HighAvailable != service2.HighAvailable {
 		t.Fatal("SetServiceStatus not equal", string(b), string(b2))
@@ -257,7 +257,7 @@ func TestService(t *testing.T) {
 		service.BackupFilesRetention != service3.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service3.BackupMaxSizeByte ||
 		service.CreatedAt.Format("2006-01-02 15:04:05") != service3.CreatedAt.Format("2006-01-02 15:04:05") ||
-		service.Description != service3.Description ||
+		service.Desc != service3.Desc ||
 		service.FinishedAt.Format("2006-01-02 15:04:05") != service3.FinishedAt.Format("2006-01-02 15:04:05") ||
 		service.HighAvailable != service3.HighAvailable {
 		t.Fatal("TxSetServiceStatus not equal", string(b), string(b3))
@@ -297,7 +297,7 @@ func TestService(t *testing.T) {
 		service.BackupFilesRetention != service4.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service4.BackupMaxSizeByte ||
 		service.CreatedAt.Format("2006-01-02 15:04:05") != service4.CreatedAt.Format("2006-01-02 15:04:05") ||
-		service.Description != service4.Description ||
+		service.Desc != service4.Desc ||
 		service.FinishedAt.Format("2006-01-02 15:04:05") != service4.FinishedAt.Format("2006-01-02 15:04:05") ||
 		service.HighAvailable != service4.HighAvailable {
 		t.Fatal("TxSetServiceStatus not equal", string(b), string(b5))
