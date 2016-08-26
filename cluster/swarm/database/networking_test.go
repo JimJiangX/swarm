@@ -11,6 +11,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+func NewPort(port int, name, unitID, unitName, proto string, allocated bool) Port {
+	return Port{
+		Port:      port,
+		Name:      name,
+		UnitID:    unitID,
+		UnitName:  unitName,
+		Proto:     proto,
+		Allocated: allocated,
+	}
+}
+
 func delMultiPorts(tx *sqlx.Tx, ports []Port) error {
 	query := "DELETE FROM tb_port WHERE port=?"
 
@@ -66,7 +77,7 @@ func TestPort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p1, err := SelectAvailablePorts(4)
+	p1, err := ListAvailablePorts(4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +85,7 @@ func TestPort(t *testing.T) {
 		t.Fatal("Available Ports should be 2", p1)
 	}
 
-	p2, err := SelectAvailablePorts(4)
+	p2, err := ListAvailablePorts(4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +106,7 @@ func TestPort(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p4, err := SelectAvailablePorts(4)
+	p4, err := ListAvailablePorts(4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +136,7 @@ func TestPort(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	p5, err := SelectAvailablePorts(10)
+	p5, err := ListAvailablePorts(10)
 	if err != nil {
 		t.Fatal(err)
 	}

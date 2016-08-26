@@ -93,7 +93,7 @@ func allocPorts(need []port, unitID, unitName string) ([]database.Port, string, 
 		return nil, "", nil
 	}
 
-	ports, err := database.SelectAvailablePorts(length)
+	ports, err := database.ListAvailablePorts(length)
 	if err != nil || len(ports) < length {
 		logrus.Errorf("Alloc Ports Error:%v", err)
 
@@ -282,7 +282,7 @@ func (gd *Gardener) Recycle(pendings []*pendingAllocResource) (err error) {
 
 		if len(pendings[i].networkings) > 0 {
 			ips := pendings[i].recycleNetworking()
-			database.TxUpdateMultiIPValue(tx, ips)
+			database.TxUpdateIPs(tx, ips)
 		}
 
 		if pendings[i].unit != nil && len(pendings[i].ports) > 0 {

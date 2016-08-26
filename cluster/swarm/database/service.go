@@ -66,6 +66,7 @@ func TxInsertMultiContainer(tx *sqlx.Tx, clist []*Container) error {
 
 const insertUnitQuery = "INSERT INTO tb_unit (id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:node_id,:container_id,:unit_config_id,:network_mode,:status,:latest_error,:check_interval,:created_at)"
 
+// Unit is table tb_unit structure
 type Unit struct {
 	ID          string `db:"id"`
 	Name        string `db:"name"` // <unit_id_8bit>_<service_name>
@@ -88,6 +89,7 @@ func (u Unit) tableName() string {
 	return "tb_unit"
 }
 
+// GetUnit return Unit select by Name or ID or ContainerID
 func GetUnit(nameOrID string) (Unit, error) {
 	u := Unit{}
 
@@ -109,26 +111,22 @@ func GetUnit(nameOrID string) (Unit, error) {
 	}
 
 	err = db.Get(&u, query, nameOrID, nameOrID, nameOrID)
-	if err == nil {
-		return u, nil
-	}
 
-	return u, errors.Wrap(err, "Get Unit By nameOrID:"+nameOrID)
+	return u, errors.Wrap(err, "Get Unit By nameOrID")
 }
 
+// TxInsertUnit insert Unit in Tx
 func TxInsertUnit(tx *sqlx.Tx, unit Unit) error {
 	_, err := tx.NamedExec(insertUnitQuery, &unit)
-	if err == nil {
-		return nil
-	}
 
-	return errors.Wrap(err, "Tx Insert Unit")
+	return errors.Wrap(err, "Tx insert Unit")
 }
 
+// TxInsertMultiUnit insert []Unit in Tx
 func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
 	stmt, err := tx.PrepareNamed(insertUnitQuery)
 	if err != nil {
-		return errors.Wrap(err, "Tx Prepare Insert Unit")
+		return errors.Wrap(err, "Tx prepare insert Unit")
 	}
 
 	for i := range units {
@@ -477,6 +475,39 @@ func GetService(nameOrID string) (Service, error) {
 	}
 
 	return s, errors.Wrap(err, "Get Service By nameOrID:"+nameOrID)
+}
+
+// TxGetServiceByUnit returns Service select by Unit ID or Name.
+func TxGetServiceByUnit(unit string) (Service, error) {
+	tx, err := GetTX()
+	if err != nil {
+		return Service{}, err
+	}
+	defer tx.Rollback()
+
+	const (
+		queryUnit    = "SELECT service_id FROM tb_unit WHERE id=? OR name=?"
+		queryService = "SELECT * FROM tb_service WHERE id=?"
+	)
+
+	var (
+		id      string
+		service Service
+	)
+
+	err = tx.Get(&id, queryUnit, unit)
+	if err != nil {
+		return Service{}, errors.Wrap(err, "Tx get Unit")
+	}
+
+	err = tx.Get(&service, queryService, id)
+	if err != nil {
+		return Service{}, errors.Wrap(err, "Tx get Service")
+	}
+
+	err = tx.Commit()
+
+	return service, errors.Wrap(err, "Tx get Service by unit")
 }
 
 func UpdateServcieDescription(id, des string) error {
@@ -900,7 +931,7 @@ func DeteleServiceRelation(serviceID string, rmVolumes bool) error {
 	}
 	defer tx.Rollback()
 
-	err = TxUpdateMultiIPValue(tx, ips)
+	err = TxUpdateIPs(tx, ips)
 	if err != nil {
 		return err
 	}

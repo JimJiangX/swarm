@@ -174,7 +174,7 @@ func TxInsertTask(tx *sqlx.Tx, t Task) error {
 func TxInsertMultiTask(tx *sqlx.Tx, tasks []*Task) error {
 	stmt, err := tx.PrepareNamed(insertTaskQuery)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "tx prepare insert task")
 	}
 
 	for i := range tasks {
@@ -188,11 +188,13 @@ func TxInsertMultiTask(tx *sqlx.Tx, tasks []*Task) error {
 		if err != nil {
 			stmt.Close()
 
-			return errors.Wrap(err, "Tx Insert []Task")
+			return errors.Wrap(err, "Tx insert []Task")
 		}
 	}
 
-	return stmt.Close()
+	err = stmt.Close()
+
+	return errors.Wrap(err, "Tx insert []Task")
 }
 
 func txUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int64, finish time.Time, msg string) error {
@@ -203,7 +205,7 @@ func txUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int64, finish time.Time, msg
 
 		_, err := tx.Exec(query, state, msg, t.ID)
 		if err != nil {
-			return errors.Wrap(err, "Tx Update Task Status")
+			return errors.Wrap(err, "Tx update Task status")
 		}
 
 		atomic.StoreInt64(&t.Status, state)
@@ -213,7 +215,7 @@ func txUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int64, finish time.Time, msg
 
 	_, err := tx.Exec(query, state, finish, msg, t.ID)
 	if err != nil {
-		return errors.Wrap(err, "Tx Update Task Status")
+		return errors.Wrap(err, "Tx update Task status")
 	}
 
 	atomic.StoreInt64(&t.Status, state)

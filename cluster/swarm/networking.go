@@ -99,7 +99,7 @@ func (gd *Gardener) GetNetworkingByType(_type string) (*Networking, error) {
 
 	list := make([]*Networking, 0, len(out))
 	for i := range out {
-		ips, err := database.GetMultiIPByNetworking(out[i].ID, false, 1)
+		ips, err := database.ListIPWithCondition(out[i].ID, false, 1)
 		if err != nil || len(ips) == 0 {
 			continue
 		}
@@ -276,7 +276,7 @@ func (gd *Gardener) AllocIP(id, _type, unit string) (_ IPInfo, err error) {
 		if !networkings[i].Enabled {
 			continue
 		}
-		ip, err := database.TXAllocIPByNetworking(networkings[i].ID, unit)
+		ip, err := database.TxAllocIPByNetworking(networkings[i].ID, unit)
 		if err == nil {
 			return NewIPinfo(networkings[i], ip), nil
 		}
@@ -295,7 +295,7 @@ func isProxyType(name string) bool {
 }
 
 func (gd *Gardener) RemoveNetworking(ID string) error {
-	count, err := database.CountIPByNetwrokingAndStatus(ID, true)
+	count, err := database.CountIPByNetwroking(ID, true)
 	if err != nil {
 		return err
 	}

@@ -46,9 +46,6 @@ func (c Cluster) Insert() error {
 	}
 
 	_, err = db.NamedExec(insertClusterQuery, &c)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "Cluster.Insert")
 }
@@ -104,9 +101,6 @@ func (c Cluster) UpdateParams() error {
 	}
 
 	_, err = db.NamedExec(query, &c)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "update Cluster MaxNode or UsageLimit")
 }
@@ -131,11 +125,8 @@ func DeleteCluster(nameOrID string) error {
 	}
 
 	_, err = db.Exec(query, nameOrID, nameOrID)
-	if err == nil {
-		return nil
-	}
 
-	return errors.Wrap(err, "delete Cluster:"+nameOrID)
+	return errors.Wrap(err, "delete Cluster")
 }
 
 // GetCluster get Cluster by nameOrID.
@@ -163,12 +154,8 @@ func GetCluster(nameOrID string) (Cluster, error) {
 	}
 
 	err = db.Get(&c, query, nameOrID, nameOrID)
-	if err == nil {
-		return c, nil
-	}
 
-	return c, errors.Wrap(err, "get Cluster:"+nameOrID)
-
+	return c, errors.Wrap(err, "get Cluster")
 }
 
 // ListClusters select tb_cluster
@@ -192,11 +179,8 @@ func ListClusters() ([]Cluster, error) {
 	}
 
 	err = db.Select(&clusters, query)
-	if err == nil {
-		return clusters, nil
-	}
 
-	return nil, errors.Wrap(err, "list Clusters")
+	return clusters, errors.Wrap(err, "list Clusters")
 }
 
 // CountClusterByStorage count Clusters by storageID.
@@ -220,11 +204,8 @@ func CountClusterByStorage(storageID string) (int, error) {
 	}
 
 	err = db.Get(&count, query, storageID)
-	if err == nil {
-		return count, err
-	}
 
-	return 0, errors.Wrap(err, "Count Cluster By storage_id:"+storageID)
+	return count, errors.Wrap(err, "count Cluster by storage_id")
 }
 
 const insertNodeQuery = "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
@@ -260,13 +241,14 @@ func TxInsertMultiNodeAndTask(nodes []*Node, tasks []*Task) error {
 	// use prepare insert into database
 	stmt, err := tx.PrepareNamed(insertNodeQuery)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "tx prepare insert Node")
 	}
 	for i := range nodes {
 		_, err = stmt.Exec(nodes[i])
 		if err != nil {
 			stmt.Close()
-			return err
+
+			return errors.Wrap(err, "tx prepare insert []Node")
 		}
 	}
 	stmt.Close()
@@ -276,7 +258,9 @@ func TxInsertMultiNodeAndTask(nodes []*Node, tasks []*Task) error {
 		return err
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Tx insert multiple Node And Task")
 }
 
 // UpdateStatus returns error when Node UPDATE tb_node.status.
@@ -338,7 +322,7 @@ func (n *Node) UpdateParams(max int) error {
 		return nil
 	}
 
-	return errors.Wrap(err, "update Node MaxContainer by ID:"+n.ID)
+	return errors.Wrap(err, "update Node MaxContainer by ID")
 }
 
 // TxUpdateNodeStatus returns error when Node UPDATE status.
@@ -351,7 +335,7 @@ func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int64, msg string) e
 
 	_, err = tx.Exec("UPDATE tb_node SET status=? WHERE id=?", nstate, n.ID)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Tx update Node status")
 	}
 
 	err = txUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
@@ -361,7 +345,7 @@ func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int64, msg string) e
 
 	err = tx.Commit()
 	if err != nil {
-		return errors.Wrap(err, "Tx update Node Status by ID:"+n.ID)
+		return errors.Wrap(err, "Tx update Node status by ID:"+n.ID)
 	}
 
 	n.Status = nstate
@@ -383,7 +367,7 @@ func TxUpdateNodeRegister(n *Node, task *Task, nstate, tstate int64, eng, msg st
 		_, err = tx.Exec("UPDATE tb_node SET status=?,register_at=? WHERE id=?", nstate, time.Now(), n.ID)
 	}
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Tx update Node status")
 	}
 
 	err = txUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
@@ -456,11 +440,8 @@ func GetNodeByAddr(addr string) (Node, error) {
 	}
 
 	err = db.Get(&node, query, addr)
-	if err == nil {
-		return node, nil
-	}
 
-	return node, errors.Wrap(err, "get Node by addr:"+addr)
+	return node, errors.Wrap(err, "get Node by addr")
 }
 
 // GetAllNodes returns all nodes.
@@ -484,11 +465,8 @@ func GetAllNodes() ([]Node, error) {
 	}
 
 	err = db.Select(&nodes, query)
-	if err == nil {
-		return nodes, nil
-	}
 
-	return nil, errors.Wrap(err, "get all Nodes")
+	return nodes, errors.Wrap(err, "get all Nodes")
 }
 
 // ListNodeByCluster returns nodes,select by cluster
@@ -512,11 +490,8 @@ func ListNodeByCluster(cluster string) ([]*Node, error) {
 	}
 
 	err = db.Select(&nodes, query, cluster)
-	if err == nil {
-		return nodes, nil
-	}
 
-	return nil, errors.Wrap(err, "list Node by cluster:"+cluster)
+	return nodes, errors.Wrap(err, "list Node by cluster")
 }
 
 // CountNodeByCluster returns num of node select by cluster.
@@ -540,11 +515,8 @@ func CountNodeByCluster(cluster string) (int, error) {
 	}
 
 	err = db.Get(&num, query, cluster)
-	if err == nil {
-		return num, nil
-	}
 
-	return 0, errors.Wrap(err, "count Node by cluster:"+cluster)
+	return num, errors.Wrap(err, "count Node by cluster")
 }
 
 // ListNodesByEngines returns nodes,select by engines ID.
@@ -559,7 +531,7 @@ func ListNodesByEngines(names []string) ([]Node, error) {
 	}
 	query, args, err := sqlx.In("SELECT * FROM tb_node WHERE engine_id IN (?);", names)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "select []Node IN engines")
 	}
 
 	var nodes []Node
@@ -603,16 +575,13 @@ func ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, 
 
 	query, args, err := sqlx.In("SELECT * FROM tb_node WHERE cluster_id IN (?);", list)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "select []Node IN clusterIDs")
 	}
 
 	var nodes []Node
 	err = db.Select(&nodes, query, args...)
-	if err == nil {
-		return nodes, nil
-	}
 
-	return nil, errors.Wrap(err, "list Nodes by clusters")
+	return nodes, errors.Wrap(err, "list Nodes by clusters")
 }
 
 // DeleteNode delete node by name or ID
@@ -635,9 +604,6 @@ func DeleteNode(nameOrID string) error {
 	}
 
 	_, err = db.Exec(query, nameOrID, nameOrID)
-	if err == nil {
-		return nil
-	}
 
-	return errors.Wrap(err, "delete Node by nameOrID:"+nameOrID)
+	return errors.Wrap(err, "delete Node by nameOrID")
 }
