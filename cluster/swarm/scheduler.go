@@ -191,7 +191,7 @@ func (gd *Gardener) schedulerPerModule(svc *Service, module structs.Module) ([]*
 		"Module":  module.Type,
 	})
 
-	_, num, err := getServiceArch(module.Arch)
+	_, num, err := parseServiceArch(module.Arch)
 	if err != nil {
 		entry.Errorf("Parse Module.Arch:%s,Error:%v", module.Arch, err)
 

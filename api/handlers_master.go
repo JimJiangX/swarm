@@ -1421,8 +1421,8 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if warnings := swarm.ValidDatacenter(req); warnings != "" {
-		httpError(w, warnings, http.StatusBadRequest)
+	if err := swarm.ValidDatacenter(req); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -1670,8 +1670,8 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if warnings := swarm.ValidService(req); len(warnings) > 0 {
-		httpError(w, strings.Join(warnings, ";"), http.StatusConflict)
+	if err := swarm.ValidService(req); err != nil {
+		httpError(w, err.Error(), http.StatusConflict)
 		return
 	}
 
