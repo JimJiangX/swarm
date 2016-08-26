@@ -26,12 +26,18 @@ func GoConcurrency(funcs []func() error) error {
 
 	for i := range funcs {
 		go func(f func() error) {
+			if f == nil {
+				ch <- nil
+			}
+
 			defer func() {
 				if r := recover(); r != nil {
 					logrus.Errorf("GoConcurrency Panic:%v\n%s", r, debug.Stack())
 				}
 			}()
+
 			ch <- f()
+
 		}(funcs[i])
 	}
 

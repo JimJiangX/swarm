@@ -463,8 +463,8 @@ func (c proxyConfig) defaultUserConfig(args ...interface{}) (map[string]interfac
 		m["upsql-proxy::event-threads-count"] = 1
 	}
 
-	swm := svc.getSwithManagerUnit()
-	if swm != nil {
+	swm, err := svc.getSwithManagerUnit()
+	if err == nil && swm != nil {
 		swmProxyPort := 0
 		for i := range swm.ports {
 			if swm.ports[i].Name == "ProxyPort" {
@@ -540,8 +540,8 @@ func (c proxyConfig_v110) defaultUserConfig(args ...interface{}) (map[string]int
 		m["upsql-proxy::event-threads-count"] = 1
 	}
 
-	swm := svc.getSwithManagerUnit()
-	if swm != nil {
+	swm, err := svc.getSwithManagerUnit()
+	if err == nil && swm != nil {
 		swmProxyPort := 0
 		for i := range swm.ports {
 			if swm.ports[i].Name == "ProxyPort" {

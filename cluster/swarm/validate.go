@@ -191,9 +191,9 @@ func ValidateServiceScale(svc *Service, scale structs.PostServiceScaledRequest) 
 
 	svc.RLock()
 
-	units := svc.getUnitByType(scale.Type)
-	if len(units) == 0 {
-		warns = append(warns, fmt.Sprintf("Not Found unit '%s' In Service %s", scale.Type, svc.Name))
+	units, err := svc.getUnitByType(scale.Type)
+	if err != nil {
+		warns = append(warns, err.Error())
 	}
 	for _, u := range units {
 		if u.engine == nil || (u.config == nil && u.container == nil) {

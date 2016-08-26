@@ -122,8 +122,8 @@ func registerHealthCheck(u *unit, context *Service) error {
 	}
 
 	if u.Type == _UpsqlType {
-		swm := context.getSwithManagerUnit()
-		if swm != nil {
+		swm, err := context.getSwithManagerUnit()
+		if err == nil && swm != nil {
 			check.Tags = []string{fmt.Sprintf("swm_key=%s/%s/Topology", context.ID, swm.Name)}
 		}
 	}

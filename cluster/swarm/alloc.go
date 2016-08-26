@@ -510,7 +510,13 @@ func (svc *Service) volumesPendingExpension(gd *Gardener, _type string, extensio
 	if len(extensions) == 0 {
 		return nil, nil
 	}
-	units := svc.getUnitByType(_type)
+
+	units, err := svc.getUnitByType(_type)
+	if err != nil {
+		logrus.WithField("Service", svc.Name).WithError(err).Error("get unit by type")
+		return nil, err
+	}
+
 	pendings := make([]*pendingAllocStore, 0, len(units))
 
 	for _, u := range units {
@@ -607,9 +613,9 @@ func (svc *Service) handleScaleUp(gd *Gardener, _type string, updateConfig *cont
 	}
 	need := int64(ncpu)
 
-	units := svc.getUnitByType(_type)
-	if len(units) == 0 {
-		return nil, fmt.Errorf("Not Found unit '%s' In Service %s", _type, svc.Name)
+	units, err := svc.getUnitByType(_type)
+	if err != nil {
+		return nil, err
 	}
 
 	var used int64
@@ -626,7 +632,7 @@ func (svc *Service) handleScaleUp(gd *Gardener, _type string, updateConfig *cont
 
 	for _, u := range units {
 		if u.engine.Memory-u.engine.UsedMemory()-updateConfig.Memory+u.container.Config.HostConfig.Memory < 0 {
-			return nil, fmt.Errorf("Engine %s:%s have not enough Memory for Container %s Update", u.engine.ID, u.engine.IP, u.Name)
+			return nil, errors.Errorf("Engine %s:%s have not enough memory for Container %s update", u.engine.ID, u.engine.IP, u.Name)
 		}
 	}
 

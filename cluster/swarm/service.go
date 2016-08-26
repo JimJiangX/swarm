@@ -800,14 +800,30 @@ func (svc *Service) copyServiceConfig() error {
 }
 
 func (svc *Service) initService() error {
+	var swm *unit
 	funcs := make([]func() error, len(svc.units))
 	for i := range svc.units {
+		if svc.units[i].Type == _SwitchManagerType {
+			swm = svc.units[i]
+			continue
+		}
 		funcs[i] = svc.units[i].initService
 	}
 
 	err := GoConcurrency(funcs)
 	if err != nil {
-		logrus.Errorf("Service %s init service error:%s", svc.Name, err)
+		logrus.WithField("Service", svc.Name).WithError(err).Error("Init services")
+	}
+
+	if err == nil && swm != nil {
+
+		err = swm.initService()
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"Service": svc.Name,
+				"Unit":    swm.Name,
+			}).WithError(err).Error("Init service")
+		}
 	}
 
 	return err
@@ -831,14 +847,30 @@ func (svc *Service) statusCAS(expected, value int64) error {
 }
 
 func (svc *Service) startService() error {
+	var swm *unit
 	funcs := make([]func() error, len(svc.units))
 	for i := range svc.units {
+		if svc.units[i].Type == _SwitchManagerType {
+			swm = svc.units[i]
+			continue
+		}
 		funcs[i] = svc.units[i].startService
 	}
 
 	err := GoConcurrency(funcs)
 	if err != nil {
-		logrus.Errorf("Service %s start service error:%s", svc.Name, err)
+		logrus.WithField("Service", svc.Name).WithError(err).Error("start services")
+	}
+
+	if err == nil && swm != nil {
+
+		err = swm.startService()
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"Service": svc.Name,
+				"Unit":    swm.Name,
+			}).WithError(err).Error("Service start service")
+		}
 	}
 
 	return err
@@ -879,22 +911,38 @@ func (svc *Service) StopService() (err error) {
 		svc.Unlock()
 	}()
 
-	units := svc.getUnitByType(_UpsqlType)
-	if len(units) == 0 {
-		err = fmt.Errorf("Not Found unit by type %s In Service %s", _UpsqlType, svc.Name)
-		logrus.Error(err)
+	swm, err := svc.getSwithManagerUnit()
+	if err == nil && swm != nil {
+		err = swm.stopService()
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"Service": svc.Name,
+				"Unit":    swm.Name,
+			}).WithError(err).Error("stop service")
+
+			err = checkContainerError(err)
+			if err != errContainerNotRunning && err != errContainerNotFound {
+				return err
+			}
+		}
+	}
+
+	units, err := svc.getUnitByType(_UpsqlType)
+	if err != nil {
+		logrus.WithField("Service", svc.Name).WithError(err).Error("get unit by type")
 
 		return err
 	}
 
 	funcs := make([]func() error, len(units))
 	for i := range units {
+
 		funcs[i] = units[i].stopService
 	}
 
 	err = GoConcurrency(funcs)
 	if err != nil {
-		logrus.Errorf("Service %s stop service error:%s", svc.Name, err)
+		logrus.WithField("Service", svc.Name).WithError(err).Error("stop services")
 
 		if _err, ok := err.(_errors); ok {
 			errs := _err.Split()
@@ -916,9 +964,31 @@ func (svc *Service) StopService() (err error) {
 }
 
 func (svc *Service) stopService() error {
+	var swm *unit
 	funcs := make([]func() error, len(svc.units))
+
 	for i := range svc.units {
+		if svc.units[i].Type == _SwitchManagerType {
+			swm = svc.units[i]
+			continue
+		}
+
 		funcs[i] = svc.units[i].stopService
+	}
+
+	if swm != nil {
+		err := swm.stopService()
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"Service": svc.Name,
+				"Unit":    swm.Name,
+			}).WithError(err).Error("stop service")
+
+			err = checkContainerError(err)
+			if err != errContainerNotRunning && err != errContainerNotFound {
+				return err
+			}
+		}
 	}
 
 	err := GoConcurrency(funcs)
@@ -1004,9 +1074,9 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 	svc.Lock()
 	defer svc.Unlock()
 
-	units := svc.getUnitByType(_type)
-	if len(units) == 0 {
-		return errors.Errorf("Service:%s Not Found Unit By Type:'%s'", svc.Name, _type)
+	units, err := svc.getUnitByType(_type)
+	if err != nil {
+		return err
 	}
 
 	dba, found := database.User{}, false
@@ -1172,12 +1242,15 @@ func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}
 		config[strings.ToLower(key)] = val
 	}
 
-	units := svc.getUnitByType(_type)
+	units, err := svc.getUnitByType(_type)
+	if err != nil {
+		return err
+	}
 
 	for _, u := range units {
 		keys, ok := u.CanModify(config)
 		if !ok {
-			return fmt.Errorf("Illegal keys:%s,Or keys cannot be modified", keys)
+			return errors.Errorf("Illegal keys:%s,Or keys unable to modified", keys)
 		}
 
 		err := u.CopyConfig(config)
@@ -1208,9 +1281,9 @@ func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}
 }
 
 func (svc *Service) initTopology() error {
-	swm := svc.getSwithManagerUnit()
-	sqls := svc.getUnitByType(_UpsqlType)
-	proxys := svc.getUnitByType(_ProxyType)
+	swm, _ := svc.getSwithManagerUnit()
+	sqls, _ := svc.getUnitByType(_UpsqlType)
+	proxys, _ := svc.getUnitByType(_ProxyType)
 
 	if len(proxys) == 0 || len(sqls) == 0 || swm == nil {
 		return nil
@@ -1249,7 +1322,7 @@ func (svc *Service) initTopology() error {
 	case num > 2:
 		arch = _DB_Type_M_SB_SL
 	default:
-		return fmt.Errorf("get %d units by type:'%s'", num, _UpsqlType)
+		return errors.Errorf("get %d units by type:'%s'", num, _UpsqlType)
 	}
 
 	dataNodes := make(map[string]swm_structs.DatabaseInfo, len(sqls))
@@ -1351,7 +1424,7 @@ func (svc *Service) deregisterInHorus() error {
 	return nil
 }
 
-func (svc *Service) getUnitByType(_type string) []*unit {
+func (svc *Service) getUnitByType(_type string) ([]*unit, error) {
 	units := make([]*unit, 0, len(svc.units))
 	for _, u := range svc.units {
 		if u.Type == _type {
@@ -1359,28 +1432,25 @@ func (svc *Service) getUnitByType(_type string) []*unit {
 		}
 	}
 	if len(units) > 0 {
-		return units
+		return units, nil
 	}
 
-	logrus.Warnf("Not Found unit %s In Service %s", _type, svc.Name)
-
-	return nil
+	return nil, errors.Errorf("Service:%s,not found unit by type '%s'", svc.Name, _type)
 }
 
-func (svc *Service) getSwithManagerUnit() *unit {
-	units := svc.getUnitByType(_UnitRole_SwitchManager)
-	if len(units) != 1 {
-		logrus.Warnf("Unexpected num about %s unit,got %d", _UnitRole_SwitchManager, len(units))
-		return nil
+func (svc *Service) getSwithManagerUnit() (*unit, error) {
+	units, err := svc.getUnitByType(_UnitRole_SwitchManager)
+	if err != nil {
+		return nil, err
 	}
 
-	return units[0]
+	return units[0], nil
 }
 
 func (svc *Service) getSwitchManagerAddr() (string, int, error) {
-	swm := svc.getSwithManagerUnit()
-	if swm == nil {
-		return "", 0, fmt.Errorf("Not Found unit by type %s in service %s", _UnitRole_SwitchManager, svc.Name)
+	swm, err := svc.getSwithManagerUnit()
+	if err != nil {
+		return "", 0, err
 	}
 
 	addr, port, err := swm.getNetworkingAddr(_ContainersNetworking, "Port")
@@ -2029,6 +2099,10 @@ var (
 func checkContainerError(err error) error {
 	if err == nil {
 		return nil
+	}
+
+	if err == errContainerNotRunning || err == errContainerNotFound {
+		return err
 	}
 
 	if strings.Contains(err.Error(), "Error response from daemon: No such container") {
