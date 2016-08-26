@@ -22,7 +22,7 @@ type LUN struct {
 	CreatedAt       time.Time `db:"created_at"`
 }
 
-func (l LUN) TableName() string {
+func (l LUN) tableName() string {
 	return "tb_lun"
 }
 
@@ -318,7 +318,7 @@ type RaidGroup struct {
 	Enabled     bool   `db:"enabled"`
 }
 
-func (r RaidGroup) TableName() string {
+func (r RaidGroup) tableName() string {
 	return "tb_raid_group"
 }
 
@@ -485,7 +485,7 @@ type HitachiStorage struct {
 	HluEnd    int    `db:"hlu_end"`
 }
 
-func (hds HitachiStorage) TableName() string {
+func (hds HitachiStorage) tableName() string {
 	return "tb_storage_HITACHI"
 }
 
@@ -525,7 +525,7 @@ type HuaweiStorage struct {
 	HluEnd   int    `db:"hlu_end"`
 }
 
-func (h HuaweiStorage) TableName() string {
+func (h HuaweiStorage) tableName() string {
 	return "tb_storage_HUAWEI"
 }
 
@@ -565,7 +565,7 @@ type LocalVolume struct {
 	Filesystem string `db:"fstype"`
 }
 
-func (LocalVolume) TableName() string {
+func (LocalVolume) tableName() string {
 	return "tb_volumes"
 }
 

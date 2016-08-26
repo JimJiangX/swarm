@@ -90,7 +90,7 @@ type Registry struct {
 	CA_CRT     string `db:"registry_ca_crt"`
 }
 
-func (c Configurations) TableName() string {
+func (c Configurations) tableName() string {
 	return "tb_system_config"
 }
 

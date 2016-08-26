@@ -18,7 +18,7 @@ type IP struct {
 	Allocated    bool   `db:"allocated"`
 }
 
-func (ip IP) TableName() string {
+func (ip IP) tableName() string {
 	return "tb_ip"
 }
 
@@ -31,7 +31,7 @@ type Networking struct {
 	Enabled bool   `db:"enabled"`
 }
 
-func (net Networking) TableName() string {
+func (net Networking) tableName() string {
 	return "tb_networking"
 }
 
@@ -46,7 +46,7 @@ type Port struct {
 	Allocated bool   `db:"allocated" json:"-"`
 }
 
-func (port Port) TableName() string {
+func (port Port) tableName() string {
 	return "tb_port"
 }
 

@@ -35,7 +35,7 @@ type Container struct {
 	CreatedAt      time.Time `db:"create_at"`
 }
 
-func (c Container) TableName() string {
+func (c Container) tableName() string {
 	return "tb_container"
 }
 
@@ -84,7 +84,7 @@ type Unit struct {
 	CreatedAt     time.Time `db:"created_at"`
 }
 
-func (u Unit) TableName() string {
+func (u Unit) tableName() string {
 	return "tb_unit"
 }
 
@@ -421,7 +421,7 @@ type Service struct {
 	FinishedAt           time.Time `db:"finished_at"`
 }
 
-func (svc Service) TableName() string {
+func (svc Service) tableName() string {
 	return "tb_service"
 }
 
@@ -642,7 +642,7 @@ type User struct {
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
-func (u User) TableName() string {
+func (u User) tableName() string {
 	return "tb_users"
 }
 

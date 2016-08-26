@@ -27,7 +27,7 @@ type Task struct {
 	FinishedAt  time.Time `db:"finished_at"`
 }
 
-func (t Task) TableName() string {
+func (t Task) tableName() string {
 	return "tb_task"
 }
 
@@ -46,7 +46,7 @@ type BackupFile struct {
 	FinishedAt time.Time `db:"finished_at"`
 }
 
-func (bf BackupFile) TableName() string {
+func (bf BackupFile) tableName() string {
 	return "tb_backup_files"
 }
 
@@ -500,7 +500,7 @@ type BackupStrategy struct {
 	CreatedAt time.Time `db:"created_at"`
 }
 
-func (bs BackupStrategy) TableName() string {
+func (bs BackupStrategy) tableName() string {
 	return "tb_backup_strategy"
 }
 

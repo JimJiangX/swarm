@@ -23,7 +23,7 @@ type Cluster struct {
 	UsageLimit   float32 `db:"usage_limit"`
 }
 
-func (c Cluster) TableName() string {
+func (c Cluster) tableName() string {
 	return "tb_cluster"
 }
 
@@ -245,7 +245,7 @@ type Node struct {
 	DeregisterAt time.Time `db:"deregister_at"`
 }
 
-func (n Node) TableName() string {
+func (n Node) tableName() string {
 	return "tb_node"
 }
 

@@ -27,7 +27,7 @@ type Image struct {
 	UploadAt time.Time `db:"upload_at"`
 }
 
-func (Image) TableName() string {
+func (Image) tableName() string {
 	return "tb_image"
 }
 
@@ -275,7 +275,7 @@ type KeysetParams struct {
 	Description string
 }
 
-func (u UnitConfig) TableName() string {
+func (u UnitConfig) tableName() string {
 	return "tb_unit_config"
 }
 
