@@ -2038,7 +2038,7 @@ func (svc *Service) Delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 		if recycle {
 			logrus.Debug("DatacenterByEngine ", u.EngineID)
 			dc, err := gd.DatacenterByEngine(u.EngineID)
-			if err != nil || dc == nil || dc.storage == nil {
+			if err != nil || dc == nil || dc.store == nil {
 				continue
 			}
 			for i := range lvs {
@@ -2054,11 +2054,11 @@ func (svc *Service) Delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 				}
 				for l := range list {
 					logrus.Debug(i, "DelMapping & Recycle ", list[l].ID)
-					err := dc.storage.DelMapping(list[l].ID)
+					err := dc.store.DelMapping(list[l].ID)
 					if err != nil {
 						logrus.Errorf("DelMapping error:%s,unit:%s,lun:%s", err, u.Name, list[l].Name)
 					}
-					err = dc.storage.Recycle(list[l].ID, 0)
+					err = dc.store.Recycle(list[l].ID, 0)
 					if err != nil {
 						logrus.Errorf("Recycle LUN error:%s,unit:%s,lun:%s", err, u.Name, list[l].Name)
 					}

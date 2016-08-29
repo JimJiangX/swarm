@@ -18,7 +18,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm"
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/docker/swarm/cluster/swarm/store"
+	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/docker/swarm/utils"
 	"github.com/gorilla/mux"
 	consulapi "github.com/hashicorp/consul/api"
@@ -1158,7 +1158,7 @@ func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 }
 
 func getSanStoreInfo(id string) (structs.SANStorageResponse, error) {
-	store, err := store.GetStoreByID(id)
+	store, err := storage.GetStoreByID(id)
 	if err != nil {
 		return structs.SANStorageResponse{}, err
 	}
@@ -1417,7 +1417,7 @@ func postDatacenter(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	var (
 		req   = structs.PostClusterRequest{}
-		store store.Store
+		store storage.Store
 	)
 
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -2464,7 +2464,7 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	store, err := store.RegisterStore(req.Vendor, req.Addr,
+	store, err := storage.RegisterStore(req.Vendor, req.Addr,
 		req.Username, req.Password, req.Admin,
 		req.LunStart, req.LunEnd, req.HostLunStart, req.HostLunEnd)
 	if err != nil {

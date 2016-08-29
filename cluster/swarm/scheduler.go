@@ -13,7 +13,7 @@ import (
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/docker/swarm/cluster/swarm/store"
+	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/docker/swarm/scheduler/node"
 )
 
@@ -214,7 +214,7 @@ func (gd *Gardener) schedulerPerModule(svc *Service, module structs.Module) ([]*
 	}
 
 	for i := range module.Stores {
-		if !store.IsLocalStore(module.Stores[i].Type) {
+		if !storage.IsLocalStore(module.Stores[i].Type) {
 			highAvaliable = true
 		}
 	}

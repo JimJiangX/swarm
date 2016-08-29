@@ -16,7 +16,7 @@ import (
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/docker/swarm/cluster/swarm/store"
+	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/docker/swarm/utils"
 	"github.com/hashicorp/terraform/communicator/remote"
 	"github.com/hashicorp/terraform/communicator/ssh"
@@ -29,13 +29,13 @@ type Datacenter struct {
 
 	*database.Cluster
 
-	storage store.Store
+	store storage.Store
 
 	nodes []*Node
 }
 
 func AddNewCluster(req structs.PostClusterRequest) (database.Cluster, error) {
-	if store.IsLocalStore(req.StorageType) && req.StorageID != "" {
+	if storage.IsLocalStore(req.StorageType) && req.StorageID != "" {
 		req.StorageID = ""
 	}
 	if req.Type != _ProxyType && req.NetworkingID != "" {
@@ -66,7 +66,7 @@ type Node struct {
 	*database.Node
 	task       *database.Task
 	engine     *cluster.Engine
-	localStore *store.LocalStore
+	localStore *storage.LocalStore
 	hdd        []string
 	ssd        []string
 	user       string // os user
@@ -141,7 +141,7 @@ func (gd *Gardener) Datacenter(nameOrID string) (*Datacenter, error) {
 	return dc, nil
 }
 
-func (gd *Gardener) AddDatacenter(cl database.Cluster, storage store.Store) error {
+func (gd *Gardener) AddDatacenter(cl database.Cluster, store storage.Store) error {
 	if cl.ID == "" {
 		cl.ID = gd.generateUniqueID()
 	}
@@ -153,7 +153,7 @@ func (gd *Gardener) AddDatacenter(cl database.Cluster, storage store.Store) erro
 	dc := &Datacenter{
 		RWMutex: sync.RWMutex{},
 		Cluster: &cl,
-		storage: storage,
+		store:   store,
 		nodes:   make([]*Node, 0, 100),
 	}
 
@@ -515,7 +515,7 @@ func (gd *Gardener) RemoveDatacenter(nameOrID string) error {
 
 func (dc *Datacenter) isIdleStoreEnough(num, size int) bool {
 	dc.RLock()
-	store := dc.storage
+	store := dc.store
 	if store == nil {
 		dc.RUnlock()
 		return false
@@ -568,9 +568,9 @@ func (gd *Gardener) rebuildDatacenter(nameOrID string) (*Datacenter, error) {
 		return nil, err
 	}
 
-	var storage store.Store
-	if !store.IsLocalStore(cl.StorageType) && cl.StorageID != "" {
-		storage, err = gd.GetStore(cl.StorageID)
+	var store storage.Store
+	if !storage.IsLocalStore(cl.StorageType) && cl.StorageID != "" {
+		store, err = gd.GetStore(cl.StorageID)
 		if err != nil {
 			return nil, err
 		}
@@ -579,7 +579,7 @@ func (gd *Gardener) rebuildDatacenter(nameOrID string) (*Datacenter, error) {
 	dc := &Datacenter{
 		RWMutex: sync.RWMutex{},
 		Cluster: &cl,
-		storage: storage,
+		store:   store,
 		nodes:   make([]*Node, 0, 100),
 	}
 
@@ -626,7 +626,7 @@ func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
 	}
 
 	pluginAddr := fmt.Sprintf("%s:%d", eng.IP, pluginPort)
-	node.localStore, err = store.NewLocalDisk(pluginAddr, node.Node, 0)
+	node.localStore, err = storage.NewLocalDisk(pluginAddr, node.Node, 0)
 	if err != nil {
 		entry.WithError(err).Error("rebuild Node")
 	}
@@ -697,7 +697,7 @@ func GetLocalVGUsage(engine *cluster.Engine) map[string]vgUsage {
 			engine.RUnlock()
 
 			if ok {
-				used, err := store.GetVGUsedSize(vgName)
+				used, err := storage.GetVGUsedSize(vgName)
 				if err == nil {
 					out[_HDD] = vgUsage{
 						Name:  vgName,
@@ -722,7 +722,7 @@ func GetLocalVGUsage(engine *cluster.Engine) map[string]vgUsage {
 			engine.RUnlock()
 
 			if ok {
-				used, err := store.GetVGUsedSize(vgName)
+				used, err := storage.GetVGUsedSize(vgName)
 				if err == nil {
 					out[_SSD] = vgUsage{
 						Name:  vgName,
@@ -785,13 +785,13 @@ loop:
 		dc.Unlock()
 
 		for _, v := range volumes {
-			if store.IsLocalStore(v.Type) {
+			if storage.IsLocalStore(v.Type) {
 				if !node.isIdleStoreEnough(v.Type, v.Size) {
 					logrus.Debugf("%s local store shortage:%d", node.Name, v.Size)
 
 					continue loop
 				}
-			} else if v.Type == store.SANStore {
+			} else if v.Type == storage.SANStore {
 				// when storage is HITACHI or HUAWEI
 				if !dc.isIdleStoreEnough(num/2, v.Size) {
 					logrus.Debugf("%s san store shortage:%d", dc.Name, v.Size)
@@ -808,7 +808,7 @@ loop:
 }
 
 func (node *Node) isIdleStoreEnough(_type string, size int) bool {
-	if !store.IsLocalStore(_type) {
+	if !storage.IsLocalStore(_type) {
 
 		return false
 	}
@@ -1247,7 +1247,7 @@ func (gd *Gardener) updateNodeEngine(node *Node, dockerPort int) (*cluster.Engin
 
 func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
 	pluginAddr := fmt.Sprintf("%s:%d", eng.IP, pluginPort)
-	localStore, err := store.NewLocalDisk(pluginAddr, node.Node, 0)
+	localStore, err := storage.NewLocalDisk(pluginAddr, node.Node, 0)
 	if err != nil {
 		logrus.WithField("Host", node.Name).WithError(err).Error("init Node local store")
 	}
@@ -1256,16 +1256,16 @@ func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
 	wwn := eng.Labels[_SAN_HBA_WWN_Lable]
 	if strings.TrimSpace(wwn) != "" {
 		list := strings.Split(wwn, ",")
-		if dc.storage == nil || dc.storage.Driver() != store.SANStoreDriver {
+		if dc.store == nil || dc.store.Driver() != storage.SANStoreDriver {
 			return nil
 		}
 
-		err := dc.storage.AddHost(node.ID, list...)
+		err := dc.store.AddHost(node.ID, list...)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				"Host":    node.Name,
-				"Storage": dc.storage.ID(),
-				"Vendor":  dc.storage.Vendor(),
+				"Storage": dc.store.ID(),
+				"Vendor":  dc.store.Vendor(),
 			}).Errorf("Add Host To Storage Error:%s", err)
 		}
 	}

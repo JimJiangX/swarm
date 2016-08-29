@@ -13,7 +13,7 @@ import (
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/docker/swarm/cluster/swarm/store"
+	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/docker/swarm/utils"
 	crontab "gopkg.in/robfig/cron.v2"
 )
@@ -50,7 +50,7 @@ type Gardener struct {
 	datacenters []*Datacenter
 	networkings []*Networking
 	services    []*Service
-	stores      []store.Store
+	stores      []storage.Store
 }
 
 // NewGardener is exported
@@ -71,7 +71,7 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 		datacenters: make([]*Datacenter, 0, 50),
 		networkings: make([]*Networking, 0, 50),
 		services:    make([]*Service, 0, 100),
-		stores:      make([]store.Store, 0, 50),
+		stores:      make([]storage.Store, 0, 50),
 	}
 
 	for _, host := range hosts {

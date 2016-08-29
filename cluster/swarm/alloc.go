@@ -12,7 +12,7 @@ import (
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/docker/swarm/cluster/swarm/store"
+	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/docker/swarm/utils"
 	"github.com/pkg/errors"
 )
@@ -306,11 +306,11 @@ func (gd *Gardener) Recycle(pendings []*pendingAllocResource) (err error) {
 		gd.Unlock()
 		for _, lun := range pendings[i].sanStore {
 			dc, err := gd.DatacenterByEngine(pendings[i].unit.Unit.EngineID)
-			if err != nil || dc == nil || dc.storage == nil {
+			if err != nil || dc == nil || dc.store == nil {
 				continue
 			}
-			dc.storage.DelMapping(lun.ID)
-			dc.storage.Recycle(lun.ID, 0)
+			dc.store.DelMapping(lun.ID)
+			dc.store.Recycle(lun.ID, 0)
 		}
 		gd.Lock()
 	}
@@ -367,7 +367,7 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 
 		name := fmt.Sprintf("%s_%s_LV", penging.unit.Unit.Name, need[i].Name)
 
-		if store.IsLocalStore(need[i].Type) {
+		if storage.IsLocalStore(need[i].Type) {
 			lv, err := node.localStorageAlloc(name, penging.unit.Unit.ID, need[i].Type, need[i].Size)
 			if err != nil {
 				return err
@@ -381,13 +381,13 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 		}
 
 		if !skipSAN {
-			if dc.storage == nil {
+			if dc.store == nil {
 				return errors.Errorf("Not Found Datacenter %s SAN Storage", dc.Name)
 			}
 
 			vgName := penging.unit.Unit.Name + _SAN_VG
 
-			lun, lv, err := dc.storage.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
+			lun, lv, err := dc.store.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
 			if err != nil {
 				return errors.Wrapf(err, "Datacenter %s SAN Alloc Failed", dc.Name)
 			}
@@ -395,14 +395,14 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 			penging.sanStore = append(penging.sanStore, lun)
 			penging.localStore = append(penging.localStore, lv)
 
-			err = dc.storage.Mapping(node.ID, vgName, lun.ID)
+			err = dc.store.Mapping(node.ID, vgName, lun.ID)
 			if err != nil {
 				return errors.Wrapf(err, "Datacenter %s SAN Mapping Failed", dc.Name)
 			}
 		}
 		name = fmt.Sprintf("%s:/DBAAS%s", name, need[i].Name)
 		config.HostConfig.Binds = append(config.HostConfig.Binds, name)
-		config.HostConfig.VolumeDriver = dc.storage.Driver()
+		config.HostConfig.VolumeDriver = dc.store.Driver()
 
 		continue
 	}
@@ -412,8 +412,8 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 
 func (node *Node) localStorageAlloc(name, unitID, storageType string, size int) (database.LocalVolume, error) {
 	lv := database.LocalVolume{}
-	if !store.IsLocalStore(storageType) {
-		return lv, errors.Errorf("'%s' storage type isnot '%s'", storageType, store.LocalStorePrefix)
+	if !storage.IsLocalStore(storageType) {
+		return lv, errors.Errorf("'%s' storage type isnot '%s'", storageType, storage.LocalStorePrefix)
 	}
 
 	if node.localStore == nil {
@@ -476,11 +476,11 @@ func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
 	for _, pending := range pendings {
 		for _, lun := range pending.sanStore {
 			dc, err := gd.DatacenterByEngine(pending.unit.Unit.EngineID)
-			if err != nil || dc == nil || dc.storage == nil {
+			if err != nil || dc == nil || dc.store == nil {
 				continue
 			}
-			dc.storage.DelMapping(lun.ID)
-			dc.storage.Recycle(lun.ID, 0)
+			dc.store.DelMapping(lun.ID)
+			dc.store.Recycle(lun.ID, 0)
 		}
 	}
 	gd.Unlock()
@@ -490,8 +490,8 @@ func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
 
 func (node *Node) localStorageExtend(name, storageType string, size int) (database.LocalVolume, error) {
 	lv := database.LocalVolume{}
-	if !store.IsLocalStore(storageType) {
-		return lv, fmt.Errorf("'%s' storage type isnot '%s'", storageType, store.LocalStorePrefix)
+	if !storage.IsLocalStore(storageType) {
+		return lv, fmt.Errorf("'%s' storage type isnot '%s'", storageType, storage.LocalStorePrefix)
 	}
 	if node.localStore == nil {
 		return lv, fmt.Errorf("Not Found LoaclStorage of Node %s", node.Addr)
@@ -554,7 +554,7 @@ func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []struct
 		}
 		name := fmt.Sprintf("%s_%s_LV", u.Name, need[d].Name)
 
-		if store.IsLocalStore(need[d].Type) {
+		if storage.IsLocalStore(need[d].Type) {
 			lv, err := node.localStorageExtend(name, need[d].Type, need[d].Size)
 			if err != nil {
 				return pending, binds, err
@@ -574,12 +574,12 @@ func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []struct
 			continue
 		}
 
-		if dc.storage == nil {
+		if dc.store == nil {
 			return pending, binds, fmt.Errorf("Not Found Datacenter Storage")
 		}
 		vgName := u.Name + _SAN_VG
 
-		lun, lv, err := dc.storage.Alloc(name, u.ID, vgName, need[d].Size)
+		lun, lv, err := dc.store.Alloc(name, u.ID, vgName, need[d].Size)
 		if err != nil {
 			logrus.Errorf("SAN Store Alloc error:%s,%s", err, name)
 
@@ -591,7 +591,7 @@ func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []struct
 			size: need[d].Size,
 		})
 
-		err = dc.storage.Mapping(node.ID, vgName, lun.ID)
+		err = dc.store.Mapping(node.ID, vgName, lun.ID)
 		if err != nil {
 			return pending, binds, err
 		}

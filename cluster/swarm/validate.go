@@ -10,7 +10,7 @@ import (
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/docker/swarm/cluster/swarm/store"
+	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/pkg/errors"
 )
 
@@ -84,7 +84,7 @@ func ValidDatacenter(req structs.PostClusterRequest) error {
 		buf.WriteString("unsupported '" + req.StorageType + "' yet\n")
 	}
 
-	if !store.IsLocalStore(req.StorageType) && req.StorageID == "" {
+	if !storage.IsLocalStore(req.StorageType) && req.StorageID == "" {
 		buf.WriteString("missing 'StorageID' while 'StorageType' != 'local'\n")
 	}
 

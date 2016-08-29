@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/docker/swarm/cluster/swarm/store"
+	"github.com/docker/swarm/cluster/swarm/storage"
 )
 
-func (gd Gardener) GetStore(id string) (store.Store, error) {
+func (gd Gardener) GetStore(id string) (storage.Store, error) {
 	gd.RLock()
 	for i := range gd.stores {
 		if gd.stores[i].ID() == id {
@@ -17,7 +17,7 @@ func (gd Gardener) GetStore(id string) (store.Store, error) {
 	}
 	gd.RUnlock()
 
-	store, err := store.GetStoreByID(id)
+	store, err := storage.GetStoreByID(id)
 	if err == nil && store != nil {
 		gd.Lock()
 		gd.stores = append(gd.stores, store)
@@ -29,7 +29,7 @@ func (gd Gardener) GetStore(id string) (store.Store, error) {
 	return nil, fmt.Errorf("Storage Not Found,%s", id)
 }
 
-func (gd *Gardener) AddStore(store store.Store) error {
+func (gd *Gardener) AddStore(store storage.Store) error {
 	gd.Lock()
 	gd.stores = append(gd.stores, store)
 	gd.Unlock()

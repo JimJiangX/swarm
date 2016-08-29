@@ -12,7 +12,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/docker/swarm/cluster/swarm/store"
+	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/utils"
 	"github.com/pkg/errors"
@@ -257,7 +257,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}
 
 		if len(lunMap) > 0 {
-			err = sanDeactivateAndDelMapping(dc.storage, original.engine.IP, lunMap, lunSlice)
+			err = sanDeactivateAndDelMapping(dc.store, original.engine.IP, lunMap, lunSlice)
 			if err != nil {
 				return err
 			}
@@ -265,7 +265,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		defer func() {
 			if err != nil {
-				_, err := migrateVolumes(dc.storage, original.ID, original.engine, oldLVs, oldLVs, lunMap, lunSlice)
+				_, err := migrateVolumes(dc.store, original.ID, original.engine, oldLVs, oldLVs, lunMap, lunSlice)
 				if err != nil {
 					logrus.Error(err)
 					//	return err
@@ -315,7 +315,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		lvs, err := migrateVolumes(dc.storage, node.ID, engine, pending.localStore, oldLVs, lunMap, lunSlice)
+		lvs, err := migrateVolumes(dc.store, node.ID, engine, pending.localStore, oldLVs, lunMap, lunSlice)
 		if err != nil {
 			return err
 		}
@@ -490,7 +490,7 @@ func stopOldContainer(svc *Service, u *unit) error {
 	return err
 }
 
-func sanDeactivateAndDelMapping(storage store.Store, host string,
+func sanDeactivateAndDelMapping(storage storage.Store, host string,
 	lunMap map[string][]database.LUN, lunSlice []database.LUN) error {
 	if storage == nil {
 		return fmt.Errorf("Store is nil")
@@ -558,7 +558,7 @@ func listOldVolumes(unit string) ([]database.LocalVolume, map[string][]database.
 
 // migrate san volumes
 // create local volumes
-func migrateVolumes(storage store.Store, nodeID string,
+func migrateVolumes(storage storage.Store, nodeID string,
 	engine *cluster.Engine,
 	localStore, oldLVs []database.LocalVolume,
 	lunMap map[string][]database.LUN,
@@ -831,7 +831,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			// del mapping
 			if len(lunMap) > 0 {
 				// TODO:fix host
-				_err := sanDeactivateAndDelMapping(dc.storage, original.engine.IP, lunMap, lunSlice)
+				_err := sanDeactivateAndDelMapping(dc.store, original.engine.IP, lunMap, lunSlice)
 				if _err != nil {
 					logrus.Error(_err)
 				}
@@ -840,7 +840,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			logrus.Debug("recycle old container volumes resource")
 			// recycle lun
 			for i := range lunSlice {
-				_err := dc.storage.Recycle(lunSlice[i].ID, 0)
+				_err := dc.store.Recycle(lunSlice[i].ID, 0)
 				if _err != nil {
 					logrus.Error(_err)
 				}

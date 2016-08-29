@@ -15,7 +15,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/docker/swarm/cluster/swarm/store"
+	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -326,7 +326,7 @@ func createSanStoreageVG(host, name string, lun []database.LUN) error {
 		return nil
 	}
 
-	storage, err := store.GetStoreByID(list[0].StorageSystemID)
+	storage, err := storage.GetStoreByID(list[0].StorageSystemID)
 	if err != nil {
 		return err
 	}
@@ -355,7 +355,7 @@ func createSanStoreageVG(host, name string, lun []database.LUN) error {
 }
 
 func extendSanStoreageVG(host string, lun database.LUN) error {
-	storage, err := store.GetStoreByID(lun.StorageSystemID)
+	storage, err := storage.GetStoreByID(lun.StorageSystemID)
 	if err != nil {
 		return err
 	}

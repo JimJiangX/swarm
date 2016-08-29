@@ -1,7 +1,7 @@
 package swarm
 
 import (
-	"github.com/docker/swarm/cluster/swarm/store"
+	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/yiduoyunQ/sm/sm-svr/consts"
 )
 
@@ -162,7 +162,7 @@ const (
 
 var (
 	supportedServiceTypes = []string{_MysqlType, _UpsqlType, _ProxyType, _SwitchManagerType}
-	supportedStoreTypes   = []string{store.LocalStorePrefix, store.LocalStorePrefix + ":SSD", store.LocalStorePrefix + ":HDD", store.SANStore, store.HITACHI, store.HUAWEI, "nfs", "NFS"}
+	supportedStoreTypes   = []string{storage.LocalStorePrefix, storage.LocalStorePrefix + ":SSD", storage.LocalStorePrefix + ":HDD", storage.SANStore, storage.HITACHI, storage.HUAWEI, "nfs", "NFS"}
 	supportedStoreNames   = []string{"DAT", "LOG", "CNF", "BACKUP"}
 )
 
