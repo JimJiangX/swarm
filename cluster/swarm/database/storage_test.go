@@ -28,7 +28,7 @@ func TestLun(t *testing.T) {
 		VGName:          "lunName001_VG",
 		RaidGroupID:     "lunRaidGroupId001",
 		StorageSystemID: "lunStorageSystemId001",
-		Mappingto:       "lunMapingto001",
+		MappingTo:       "lunMapingto001",
 		SizeByte:        1,
 		HostLunID:       1,
 		StorageLunID:    1,
@@ -48,7 +48,7 @@ func TestLun(t *testing.T) {
 	host := "lunMapingto099"
 	hlun := 99
 	vgName := ""
-	lun.Mappingto = host
+	lun.MappingTo = host
 	lun.VGName = ""
 	lun.HostLunID = hlun
 	err = LunMapping(lun.ID, host, vgName, hlun)
@@ -62,7 +62,7 @@ func TestLun(t *testing.T) {
 	if lun.CreatedAt.Format("2006-01-02 15:04:05") != lun1.CreatedAt.Format("2006-01-02 15:04:05") ||
 		lun.HostLunID != lun1.HostLunID ||
 		lun.ID != lun1.ID ||
-		lun.Mappingto != lun1.Mappingto ||
+		lun.MappingTo != lun1.MappingTo ||
 		lun.Name != lun1.Name ||
 		lun.RaidGroupID != lun1.RaidGroupID ||
 		lun.SizeByte != lun1.SizeByte ||
@@ -78,7 +78,7 @@ func TestLun(t *testing.T) {
 	if lun.CreatedAt.Format("2006-01-02 15:04:05") != lun2.CreatedAt.Format("2006-01-02 15:04:05") ||
 		lun.HostLunID != lun2.HostLunID ||
 		lun.ID != lun2.ID ||
-		lun.Mappingto != lun2.Mappingto ||
+		lun.MappingTo != lun2.MappingTo ||
 		lun.Name != lun2.Name ||
 		lun.RaidGroupID != lun2.RaidGroupID ||
 		lun.SizeByte != lun2.SizeByte ||
@@ -94,7 +94,7 @@ func TestLun(t *testing.T) {
 		VGName:          "lunUnitId002_VG",
 		RaidGroupID:     "lunRaidGroupId002",
 		StorageSystemID: "lunStorageSystemId002",
-		Mappingto:       "lunMapingto099",
+		MappingTo:       "lunMapingto099",
 		SizeByte:        2,
 		HostLunID:       2,
 		StorageLunID:    2,
@@ -111,7 +111,7 @@ func TestLun(t *testing.T) {
 		}
 	}()
 
-	hostLunID, err := SelectHostLunIDByMapping("lunMapingto099")
+	hostLunID, err := ListHostLunIDByMapping("lunMapingto099")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestLun(t *testing.T) {
 		VGName:          "lunUnitId003_VG",
 		RaidGroupID:     "lunRaidGroupId003",
 		StorageSystemID: "lunStorageSystemId002",
-		Mappingto:       "lunMapingto003",
+		MappingTo:       "lunMapingto003",
 		SizeByte:        3,
 		HostLunID:       3,
 		StorageLunID:    3,
@@ -142,7 +142,7 @@ func TestLun(t *testing.T) {
 		}
 	}()
 
-	lunIDBySystemID, err := SelectLunIDBySystemID("lunStorageSystemId002")
+	lunIDBySystemID, err := ListLunIDBySystemID("lunStorageSystemId002")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +181,7 @@ func TestRaidGroup(t *testing.T) {
 
 	enabled = true
 	rg.Enabled = enabled
-	err = UpdateRaidGroupStatusByID(rg.ID, enabled)
+	err = UpdateRGStatusByID(rg.ID, enabled)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestRaidGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rg5, err := SelectRaidGroupByStorageID(rg.StorageID)
+	rg5, err := ListRGByStorageID(rg.StorageID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,7 +319,7 @@ func TestLocalVolume(t *testing.T) {
 		t.Fatal("GetLocalVoume name should be 1", lv5)
 	}
 
-	lv6, err := SelectVolumeByVG(lv3.VGName)
+	lv6, err := ListVolumeByVG(lv3.VGName)
 	if err != nil {
 		t.Fatal(err)
 	}

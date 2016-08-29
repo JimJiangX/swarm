@@ -106,7 +106,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
 	}
 
-	used, err := database.SelectLunIDBySystemID(h.ID())
+	used, err := database.ListLunIDBySystemID(h.ID())
 	if err != nil {
 		return lun, lv, errors.Wrap(err, h.Vendor()+" store alloc")
 	}
@@ -204,7 +204,7 @@ func (h *hitachiStore) Recycle(id string, lun int) error {
 
 // Size list store's RGs infomation
 func (h hitachiStore) Size() (map[database.RaidGroup]Space, error) {
-	out, err := database.SelectRaidGroupByStorageID(h.ID())
+	out, err := database.ListRGByStorageID(h.ID())
 	if err != nil {
 		return nil, errors.Wrap(err, h.Vendor()+" size")
 	}
@@ -367,7 +367,7 @@ func (h *hitachiStore) Mapping(host, vg, lun string) error {
 		return errors.Wrap(err, h.Vendor()+" mapping")
 	}
 
-	out, err := database.SelectHostLunIDByMapping(host)
+	out, err := database.ListHostLunIDByMapping(host)
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" mapping")
 	}

@@ -25,7 +25,7 @@ func (ip IP) tableName() string {
 
 const insertNetworkingQuery = "INSERT INTO tb_networking (id,type,gateway,enabled) VALUES (:id,:type,:gateway,:enabled)"
 
-// Networking is table tb_networking structure
+// Networking is table tb_networking structure,a goroup of IP Address
 type Networking struct {
 	ID      string `db:"id"`
 	Type    string `db:"type"`
@@ -39,7 +39,7 @@ func (net Networking) tableName() string {
 
 const insertPortQuery = "INSERT INTO tb_port (port,name,unit_id,unit_name,proto,allocated) VALUES (:port,:name,:unit_id,:unit_name,:proto,:allocated)"
 
-// Port is table tb_port structure
+// Port is table tb_port structure,correspod with computer network port that a network applications listens on
 type Port struct {
 	Port      int    `db:"port"`
 	Name      string `db:"name"`

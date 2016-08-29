@@ -125,7 +125,7 @@ func TestQueryTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if task == nil {
+	if task == (Task{}) {
 		t.Fatal("QueryTask should not be nil")
 	}
 	t.Log(task)

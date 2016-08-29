@@ -269,7 +269,7 @@ func (h *huaweiStore) Mapping(host, vg, lun string) error {
 		return errors.Wrap(err, h.Vendor()+" mapping")
 	}
 
-	out, err := database.SelectHostLunIDByMapping(host)
+	out, err := database.ListHostLunIDByMapping(host)
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" mapping")
 	}
@@ -447,7 +447,7 @@ func (h *huaweiStore) DisableSpace(id int) error {
 }
 
 func (h huaweiStore) Size() (map[database.RaidGroup]Space, error) {
-	out, err := database.SelectRaidGroupByStorageID(h.ID())
+	out, err := database.ListRGByStorageID(h.ID())
 	if err != nil {
 		return nil, errors.Wrap(err, h.Vendor()+" size")
 	}

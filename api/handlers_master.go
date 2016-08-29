@@ -1383,7 +1383,7 @@ func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := getTaskResponse(*task)
+	resp := getTaskResponse(task)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

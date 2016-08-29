@@ -529,7 +529,7 @@ func sanDeactivateAndDelMapping(storage store.Store, host string,
 
 func listOldVolumes(unit string) ([]database.LocalVolume, map[string][]database.LUN, []database.LUN, error) {
 	// local volumes
-	lvs, err := database.SelectVolumesByUnitID(unit)
+	lvs, err := database.ListVolumesByUnitID(unit)
 	if err != nil {
 		return nil, nil, nil, err
 	}

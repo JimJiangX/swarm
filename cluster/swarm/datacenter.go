@@ -54,7 +54,7 @@ func AddNewCluster(req structs.PostClusterRequest) (database.Cluster, error) {
 		UsageLimit:   req.UsageLimit,
 	}
 
-	err := cluster.Insert()
+	err := database.InsertCluster(cluster)
 	if err != nil {
 		return database.Cluster{}, err
 	}
@@ -187,7 +187,7 @@ func (gd *Gardener) UpdateDatacenterParams(nameOrID string, max int, limit float
 	}
 
 	if modify {
-		err := lately.UpdateParams()
+		err := database.UpdateClusterParams(lately)
 		if err != nil {
 			dc.Unlock()
 
@@ -203,7 +203,7 @@ func (gd *Gardener) UpdateDatacenterParams(nameOrID string, max int, limit float
 
 func (dc *Datacenter) SetStatus(enable bool) error {
 	dc.Lock()
-	err := dc.UpdateStatus(enable)
+	err := database.UpdateClusterStatus(dc.Cluster, enable)
 	dc.Unlock()
 
 	return err

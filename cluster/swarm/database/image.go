@@ -12,7 +12,7 @@ import (
 
 const insertImageQuery = "INSERT INTO tb_image (enabled,id,name,version,docker_image_id,label,size,template_config_id,config_keysets,upload_at) VALUES (:enabled,:id,:name,:version,:docker_image_id,:label,:size,:template_config_id,:config_keysets,:upload_at)"
 
-// Image table tb_image structure
+// Image table tb_image structure,correspod with docker image.
 type Image struct {
 	Enabled bool   `db:"enabled"`
 	ID      string `db:"id"`
@@ -250,7 +250,7 @@ func TxDeleteImage(ID string) error {
 
 const insertUnitConfigQuery = "INSERT INTO tb_unit_config (id,image_id,unit_id,config_file_path,version,parent_id,content,created_at) VALUES (:id,:image_id,:unit_id,:config_file_path,:version,:parent_id,:content,:created_at)"
 
-// UnitConfig is assciated to Image and Unit
+// UnitConfig is assciated to Image and Unit,correspod with application config file
 type UnitConfig struct {
 	ID        string                  `db:"id"`
 	ImageID   string                  `db:"image_id"`

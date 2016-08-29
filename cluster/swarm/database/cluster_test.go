@@ -36,7 +36,7 @@ func TestCluster(t *testing.T) {
 	}
 
 	for i := range clusters {
-		if err := clusters[i].Insert(); err != nil {
+		if err := InsertCluster(clusters[i]); err != nil {
 			t.Fatal(clusters[i].Name, err)
 		}
 
@@ -48,7 +48,7 @@ func TestCluster(t *testing.T) {
 	}
 
 	for i := range wrong {
-		if err := wrong[i].Insert(); err == nil {
+		if err := InsertCluster(wrong[i]); err == nil {
 			t.Fatal("Name should not allowed Duplicate", wrong[i].Name)
 		}
 	}
@@ -74,7 +74,7 @@ func TestCluster(t *testing.T) {
 	}
 
 	cl2 := Cluster{ID: clusters[2].ID}
-	if err := cl2.UpdateStatus(false); err != nil {
+	if err := UpdateClusterStatus(&cl2, false); err != nil {
 		t.Fatal(err)
 	}
 	cl3, err := GetCluster(cl2.ID)

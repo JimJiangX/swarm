@@ -76,7 +76,7 @@ func (l LocalStore) IdleSize() (map[string]int, error) {
 		// free := list[i].VgSize * 1000 * 1000
 
 		// allocated size
-		lvs, err := database.SelectVolumeByVG(l.list[i].VgName)
+		lvs, err := database.ListVolumeByVG(l.list[i].VgName)
 		if err != nil {
 			return nil, errors.Wrap(err, l.node.Name+" store idle size")
 		}
@@ -168,7 +168,7 @@ func (l LocalStore) Recycle(id string) error {
 
 // GetVGUsedSize returns VG used size
 func GetVGUsedSize(vg string) (int, error) {
-	vgs, err := database.SelectVolumeByVG(vg)
+	vgs, err := database.ListVolumeByVG(vg)
 	if err != nil {
 		return 0, errors.Wrap(err, "get VG used size")
 	}

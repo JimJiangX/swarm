@@ -10,7 +10,7 @@ import (
 
 const insertClusterQuery = "INSERT INTO tb_cluster (id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit) VALUES (:id,:name,:type,:storage_id,:storage_type,:networking_id,:enabled,:max_node,:usage_limit)"
 
-// tb_cluster structure
+// tb_cluster structure,correspod with a group of computers
 type Cluster struct {
 	ID           string  `db:"id"`
 	Name         string  `db:"name"`
@@ -27,8 +27,8 @@ func (c Cluster) tableName() string {
 	return "tb_cluster"
 }
 
-// Insert insert a new record to tb_cluster.
-func (c Cluster) Insert() error {
+// InsertCluster insert a new record to tb_cluster.
+func InsertCluster(c Cluster) error {
 	db, err := GetDB(false)
 	if err != nil {
 		return err
@@ -50,8 +50,8 @@ func (c Cluster) Insert() error {
 	return errors.Wrap(err, "Cluster.Insert")
 }
 
-// UpdateStatus update tb_cluster.enabled by ID
-func (c *Cluster) UpdateStatus(state bool) error {
+// UpdateClusterStatus update tb_cluster.enabled by ID
+func UpdateClusterStatus(c *Cluster, state bool) error {
 	db, err := GetDB(false)
 	if err != nil {
 		return err
@@ -81,8 +81,8 @@ func (c *Cluster) UpdateStatus(state bool) error {
 	return nil
 }
 
-// UpdateParams updates MaxNode\UsageLimit
-func (c Cluster) UpdateParams() error {
+// UpdateClusterParams updates MaxNode\UsageLimit
+func UpdateClusterParams(c Cluster) error {
 	db, err := GetDB(false)
 	if err != nil {
 		return err
@@ -210,7 +210,7 @@ func CountClusterByStorage(storageID string) (int, error) {
 
 const insertNodeQuery = "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
 
-// tb_node structure
+// tb_node structure,correspod with mainframe computer.
 type Node struct {
 	ID           string `db:"id"`
 	Name         string `db:"name"`

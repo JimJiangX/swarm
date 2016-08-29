@@ -634,7 +634,7 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 
 	logrus.Debugf("Unit %s:%s\n%s", u.Name, u.ImageName, context)
 
-	volumes, err := database.SelectVolumesByUnitID(u.ID)
+	volumes, err := database.ListVolumesByUnitID(u.ID)
 	if err != nil {
 		return err
 	}

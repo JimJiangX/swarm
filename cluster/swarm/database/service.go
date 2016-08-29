@@ -908,7 +908,7 @@ func DeteleServiceRelation(serviceID string, rmVolumes bool) error {
 			ports = append(ports, pl...)
 		}
 
-		vl, err := SelectVolumesByUnitID(units[i].ID)
+		vl, err := ListVolumesByUnitID(units[i].ID)
 		if err == nil {
 			volumes = append(volumes, vl...)
 		}

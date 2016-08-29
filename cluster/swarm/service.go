@@ -2027,7 +2027,7 @@ func (svc *Service) Delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 
 	for _, u := range svc.units {
 		logrus.Debug(u.Name, " SelectVolumesByUnitID")
-		lvs, err := database.SelectVolumesByUnitID(u.ID)
+		lvs, err := database.ListVolumesByUnitID(u.ID)
 		if err != nil {
 			logrus.Warnf("SelectVolumesByUnitID %s error:%s", u.Name, err)
 			continue

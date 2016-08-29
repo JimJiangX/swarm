@@ -11,6 +11,7 @@ import (
 // "INSERT INTO tb_system_config (dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,horus_server_ip,horus_server_port,horus_agent_port,horus_event_ip,horus_event_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts,backup_dir) VALUES (:dc_id,:consul_ip,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_server_ip,:horus_server_port,:horus_agent_port,:horus_event_ip,:horus_event_port,:registry_domain,:registry_ip,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:registry_os_username,:registry_os_password,:mon_username,:mon_password,:repl_username,:repl_password,:cup_dba_username,:cup_dba_password,:db_username,:db_password,:ap_username,:ap_password,:nfs_ip,:nfs_dir,:nfs_mount_dir,:nfs_mount_opts,:backup_dir)"
 const insertConfigurateionQuery = "INSERT INTO tb_system_config (dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,horus_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts,backup_dir) VALUES (:dc_id,:consul_ip,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_agent_port,:registry_domain,:registry_ip,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:registry_os_username,:registry_os_password,:mon_username,:mon_password,:repl_username,:repl_password,:cup_dba_username,:cup_dba_password,:db_username,:db_password,:ap_username,:ap_password,:nfs_ip,:nfs_dir,:nfs_mount_dir,:nfs_mount_opts,:backup_dir)"
 
+// Configurations is the application config file
 type Configurations struct {
 	ID         int    `db:"dc_id"`
 	DockerPort int    `db:"docker_port"`
@@ -25,12 +26,15 @@ type Configurations struct {
 	Users
 }
 
+// NFSOption nfs settings
 type NFSOption struct {
 	Addr         string `db:"nfs_ip"`
 	Dir          string `db:"nfs_dir"`
 	MountDir     string `db:"nfs_mount_dir"`
 	MountOptions string `db:"nfs_mount_opts"`
 }
+
+// Users is users of DB and Proxy
 type Users struct {
 	MonitorUsername     string `db:"mon_username"`
 	MonitorPassword     string `db:"mon_password"`
@@ -44,6 +48,7 @@ type Users struct {
 	DBPassword          string `db:"db_password"`
 }
 
+// SSHDeliver node-init and node-clean settings
 type SSHDeliver struct {
 	SourceDir       string `db:"source_dir"`
 	CA_CRT_Name     string `db:"ca_crt_name"`
@@ -61,6 +66,7 @@ func (d SSHDeliver) DestPath() (string, string, string) {
 		filepath.Join(d.Destination, d.CleanScriptName)
 }
 
+// ConsulConfig consul client config
 type ConsulConfig struct {
 	ConsulIPs        string `db:"consul_ip"`
 	ConsulPort       int    `db:"consul_port"`
@@ -69,6 +75,7 @@ type ConsulConfig struct {
 	ConsulWaitTime   int    `db:"consul_wait_time"`
 }
 
+// HorusConfig horus config
 type HorusConfig struct {
 	// HorusServerIP   string `db:"horus_server_ip"`
 	// HorusServerPort int    `db:"horus_server_port"`
@@ -77,6 +84,7 @@ type HorusConfig struct {
 	//	HorusEventPort int    `db:"horus_event_port"`
 }
 
+// Registry connection config
 type Registry struct {
 	OsUsername string `db:"registry_os_username"`
 	OsPassword string `db:"registry_os_password"`
@@ -94,6 +102,7 @@ func (c Configurations) tableName() string {
 	return "tb_system_config"
 }
 
+// Insert insert a new Configurations
 func (c Configurations) Insert() (int64, error) {
 	db, err := GetDB(false)
 	if err != nil {
@@ -115,9 +124,10 @@ func (c Configurations) Insert() (int64, error) {
 		return r.LastInsertId()
 	}
 
-	return 0, err
+	return 0, errors.Wrap(err, "insert Configurations")
 }
 
+// GetConsulConfig returns consul config
 func (c Configurations) GetConsulConfig() ([]string, string, string, int) {
 	port := strconv.Itoa(c.ConsulPort)
 	addrs := strings.Split(c.ConsulIPs, ",")
@@ -130,10 +140,12 @@ func (c Configurations) GetConsulConfig() ([]string, string, string, int) {
 	return endpoints, c.ConsulDatacenter, c.ConsulToken, c.ConsulWaitTime
 }
 
+// GetConsulAddrs returns consul IP
 func (c Configurations) GetConsulAddrs() []string {
 	return strings.Split(c.ConsulIPs, ",")
 }
 
+// GetSystemConfig returns *Configurations
 func GetSystemConfig() (*Configurations, error) {
 	db, err := GetDB(false)
 	if err != nil {
@@ -154,9 +166,6 @@ func GetSystemConfig() (*Configurations, error) {
 	}
 
 	err = db.Get(c, query)
-	if err == nil {
-		return c, nil
-	}
 
-	return nil, errors.Wrap(err, "Get SystemConfig")
+	return c, errors.Wrap(err, "get SystemConfig")
 }
