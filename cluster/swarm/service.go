@@ -23,9 +23,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-var (
-	ErrServiceNotFound = errors.New("Service Not Found")
-)
+var ErrServiceNotFound = errors.New("service not found")
 
 type Service struct {
 	sync.RWMutex
@@ -42,25 +40,22 @@ type Service struct {
 	authConfig *types.AuthConfig
 }
 
-func NewService(svc database.Service, unitNum int) *Service {
+func NewService(service database.Service, unitNum int) *Service {
 	return &Service{
-		Service: svc,
+		Service: service,
 		units:   make([]*unit, 0, unitNum),
 	}
 }
 
 func buildService(req structs.PostServiceRequest,
 	authConfig *types.AuthConfig) (*Service, *database.Task, error) {
-	// if warnings := ValidService(req); len(warnings) > 0 {
-	//	 return nil, errors.New(strings.Join(warnings, ","))
-	// }
 
 	desc, err := json.Marshal(req)
 	if err != nil {
-		logrus.Errorf("JSON Marshal Error:%s", err)
+		logrus.WithError(err).Error("JSON marshal error")
 	}
 
-	svc := database.Service{
+	service := database.Service{
 		ID:                   utils.Generate64UUID(),
 		Name:                 req.Name,
 		Desc:                 string(desc),
@@ -75,39 +70,40 @@ func buildService(req structs.PostServiceRequest,
 		CreatedAt:            time.Now(),
 	}
 
-	strategy, err := newBackupStrategy(svc.ID, req.BackupStrategy)
+	strategy, err := newBackupStrategy(service.ID, req.BackupStrategy)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	_, nodeNum, err := parseServiceArch(req.Architecture)
 	if err != nil {
-		logrus.Error("Parse Service.Architecture", err)
 		return nil, nil, err
 	}
+
 	sys, err := database.GetSystemConfig()
 	if err != nil {
 		return nil, nil, err
 	}
-	users := defaultServiceUsers(svc.ID, *sys)
-	users = append(users, converteToUsers(svc.ID, req.Users)...)
 
-	service := NewService(svc, nodeNum)
+	users := defaultServiceUsers(service.ID, *sys)
+	users = append(users, converteToUsers(service.ID, req.Users)...)
 
-	service.Lock()
-	defer service.Unlock()
+	svc := NewService(service, nodeNum)
 
-	service.backup = strategy
-	service.base = &req
-	service.authConfig = authConfig
-	service.users = users
+	svc.Lock()
+	defer svc.Unlock()
+
+	svc.backup = strategy
+	svc.base = &req
+	svc.authConfig = authConfig
+	svc.users = users
 	atomic.StoreInt64(&svc.Status, statusServcieBuilding)
 
-	task := database.NewTask(service.Name, _Service_Create_Task, service.ID, "create service", nil, 0)
+	task := database.NewTask(svc.Name, _Service_Create_Task, svc.ID, "create service", nil, 0)
 
-	err = database.TxSaveService(service.Service, service.backup, &task, service.users)
+	err = database.TxSaveService(svc.Service, svc.backup, &task, svc.users)
 
-	return service, &task, err
+	return svc, &task, err
 }
 
 func newBackupStrategy(service string, strategy *structs.BackupStrategy) (*database.BackupStrategy, error) {
@@ -121,8 +117,7 @@ func newBackupStrategy(service string, strategy *structs.BackupStrategy) (*datab
 	if strategy.Valid != "" {
 		valid, err = utils.ParseStringToTime(strategy.Valid)
 		if err != nil {
-			logrus.Error("Parse Request.BackupStrategy.Valid to time.Time", err)
-			return nil, err
+			return nil, errors.Wrap(err, "parse BackupStrategy.Valid to time.Time")
 		}
 	}
 
@@ -517,9 +512,9 @@ func (svc *Service) getUnit(nameOrID string) (*unit, error) {
 	return nil, fmt.Errorf("Unit Not Found,%s", nameOrID)
 }
 
-func (gd *Gardener) AddService(svc *Service) error {
+func (gd *Gardener) addService(svc *Service) error {
 	if svc == nil {
-		return errors.New("Service Cannot be nil pointer")
+		return errors.New("Service cannot be nil pointer")
 	}
 
 	gd.RLock()
@@ -527,7 +522,7 @@ func (gd *Gardener) AddService(svc *Service) error {
 		if gd.services[i].ID == svc.ID || gd.services[i].Name == svc.Name {
 			gd.RUnlock()
 
-			return fmt.Errorf("Service %s Existed", svc.Name)
+			return errors.Errorf("Service %s existed", svc.Name)
 		}
 	}
 	gd.RUnlock()
@@ -642,13 +637,13 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, string, string, error) {
 	authConfig, err := gd.RegistryAuthConfig()
 	if err != nil {
-		logrus.Error("get Registry Auth Config", err)
+		logrus.Errorf("get Registry Auth Config:%+v", err)
 		return nil, "", "", err
 	}
 
 	svc, task, err := buildService(req, authConfig)
 	if err != nil {
-		logrus.Error("Build Service Error:", err)
+		logrus.Error("build Service:%+v", err)
 
 		return svc, "", task.ID, err
 	}
@@ -661,13 +656,12 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 	svc.failureRetry = gd.createRetry
 
 	logrus.WithFields(logrus.Fields{
-		"ServcieName": svc.Name,
-		"ServiceID":   svc.ID,
-	}).Info("Service Saved Into Database")
+		"Servcie": svc.Name,
+	}).Info("Service saved into database")
 
-	err = gd.AddService(svc)
+	err = gd.addService(svc)
 	if err != nil {
-		logrus.WithField("ServiceName", svc.Name).Errorf("Service Add to Gardener Error:%s", err)
+		logrus.WithField("Service", svc.Name).WithError(err).Error("Service add to Gardener")
 
 		return svc, strategyID, task.ID, err
 	}
@@ -678,7 +672,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 
 		err := gd.serviceScheduler(svc, task)
 		if err != nil {
-			logrus.Error("Service Add To Scheduler", err)
+			logrus.Errorf("Service scheduler:%+v", err)
 
 			return err
 		}
@@ -686,17 +680,14 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 
 		err = gd.serviceExecute(svc)
 		if err != nil {
-			logrus.Errorf("Service %s,execute error:%s", svc.Name, err)
+			logrus.Errorf("Service %s execute:%+v", svc.Name, err)
 
 			return err
 		}
 
 		if svc.backup != nil {
-			bs := NewBackupJob(svc)
-			err = gd.RegisterBackupStrategy(bs)
-			if err != nil {
-				logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err)
-			}
+			bs := newBackupJob(svc)
+			gd.registerBackupStrategy(bs)
 		}
 
 		return nil
@@ -709,7 +700,9 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 	}
 
 	worker := NewAsyncTask(context.Background(), background, nil, updater, 10*time.Minute)
-	err = worker.Run()
+	if err = worker.Run(); err != nil {
+		logrus.WithField("Service", svc.Name).Errorf("%+v", err)
+	}
 
 	return svc, strategyID, task.ID, err
 }
@@ -717,11 +710,11 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 func (svc *Service) StartService() (err error) {
 	err = svc.statusCAS(statusServiceNoContent, statusServiceStarting)
 	if err != nil {
-		logrus.Warning(err)
+		logrus.WithField("Service", svc.Name).Warn(err)
 
 		err = svc.statusCAS(statusServiceStartFailed, statusServiceStarting)
 		if err != nil {
-			logrus.Error(err)
+			logrus.WithField("Service", svc.Name).Errorf("%+v", err)
 
 			return err
 		}
@@ -730,6 +723,8 @@ func (svc *Service) StartService() (err error) {
 	svc.Lock()
 	defer func() {
 		if err != nil {
+			logrus.WithField("Service", svc.Name).Errorf("%+v", err)
+
 			svc.SetServiceStatus(statusServiceStartFailed, time.Now())
 		} else {
 			svc.SetServiceStatus(statusServiceNoContent, time.Now())
@@ -757,13 +752,15 @@ func (svc *Service) startContainers() error {
 		err := u.startContainer()
 		if err != nil {
 			code, msg = statusUnitStartFailed, err.Error()
-
-			logrus.Errorf("%s start container error:%s", u.Name, err)
 		}
 
 		_err := database.TxUpdateUnitStatus(&u.Unit, code, msg)
 		if err != nil {
-			logrus.WithField("Unit", u.Name).Errorf("Update Unit Status,status=%d,LatestError=%s,%v", code, msg, _err)
+			logrus.WithFields(logrus.Fields{
+				"Unit":   u.Name,
+				"Status": code,
+				"Error":  msg,
+			}).Errorf("Update Unit %+v", code, msg, _err)
 
 			return err
 		}
@@ -846,7 +843,7 @@ func (svc *Service) statusCAS(expected, value int64) error {
 		return nil
 	}
 
-	return fmt.Errorf("Service %s,Status Conflict:expected %d but got %d", svc.Name, expected, atomic.LoadInt64(&svc.Status))
+	return errors.Errorf("status conflict:expected %d but got %d", svc.Name, expected, atomic.LoadInt64(&svc.Status))
 }
 
 func (svc *Service) startService() error {
@@ -872,7 +869,7 @@ func (svc *Service) startService() error {
 			logrus.WithFields(logrus.Fields{
 				"Service": svc.Name,
 				"Unit":    swm.Name,
-			}).WithError(err).Error("Service start service")
+			}).WithError(err).Error("start switch manager service")
 		}
 	}
 
@@ -2081,27 +2078,27 @@ func (svc *Service) Delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 	logrus.Debug("deregisterInHorus")
 	err = svc.deregisterInHorus()
 	if err != nil {
-		logrus.Errorf("%s deregister In Horus error:%s", svc.Name, err)
+		logrus.Errorf("%s deregister in Horus error:%s", svc.Name, err)
 	}
 
 	logrus.Debug("deregisterServices")
 
 	err = svc.deregisterServices()
 	if err != nil {
-		logrus.Errorf("%s deregister In consul error:%s", svc.Name, err)
+		logrus.Errorf("%s deregister in consul error:%s", svc.Name, err)
 	}
 
 	err = deleteConsulKVTree(svc.ID)
 	if err != nil {
-		logrus.Errorf("Delete Consul KV:%s,%s", svc.ID, err)
+		logrus.Errorf("delete consul KV:%s,%s", svc.ID, err)
 	}
 
 	return nil
 }
 
 var (
-	errContainerNotFound   = errors.New("No Such Container")
-	errContainerNotRunning = errors.New("Container Not Running")
+	errContainerNotFound   = errors.New("no such container")
+	errContainerNotRunning = errors.New("container not running")
 )
 
 func checkContainerError(err error) error {

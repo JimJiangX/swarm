@@ -7,7 +7,7 @@ import (
 )
 
 // UsedCpus returns the sum of CPUs reserved by containers.
-// Copy From engine.go L735,
+// Copy From engine.go L949,
 // Parse Config.HostConfig.CpusetCpus to get usdCPU.
 func (e *Engine) UsedCpus() int64 {
 	var r int64
@@ -30,6 +30,9 @@ func (e *Engine) UsedCpus() int64 {
 }
 
 func (e *Engine) ContainerAPIClient() client.ContainerAPIClient {
+	if e == nil {
+		return nil
+	}
 
 	return e.apiClient
 }

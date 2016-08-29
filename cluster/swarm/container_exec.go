@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	"fmt"
 	"io"
 	"os"
 
@@ -42,11 +41,11 @@ func containerExec(ctx context.Context, engine *cluster.Engine, containerID stri
 	container, err := client.ContainerInspect(ctx, containerID)
 	engine.CheckConnectionErr(err)
 	if err != nil {
-		return inspect, err
+		return inspect, errors.Wrapf(err, "container %s inspect", containerID)
 	}
 
 	if !container.State.Running {
-		return inspect, errContainerNotRunning
+		return inspect, errors.Wrap(errContainerNotRunning, containerID)
 	}
 
 	execConfig := types.ExecConfig{
@@ -66,21 +65,20 @@ func containerExec(ctx context.Context, engine *cluster.Engine, containerID stri
 	exec, err := client.ContainerExecCreate(ctx, containerID, execConfig)
 	engine.CheckConnectionErr(err)
 	if err != nil {
-		return inspect, err
+		return inspect, errors.Wrapf(err, "Container %s exec create", containerID)
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"Container":  containerID,
-		"Engine":     engine.Addr,
-		"ExecID":     exec.ID,
-		"ExecConfig": execConfig,
-	}).Infof("Start Exec:%s", cmd)
+		"Container": containerID,
+		"Engine":    engine.Addr,
+		"ExecID":    exec.ID,
+	}).Infof("start exec:%s", cmd)
 
 	if execConfig.Detach {
 		err := client.ContainerExecStart(ctx, exec.ID, types.ExecStartCheck{Detach: detach})
 		engine.CheckConnectionErr(err)
 		if err != nil {
-			return inspect, err
+			return inspect, errors.Wrapf(err, "Container %s exec start %s", containerID, exec.ID)
 		}
 	} else {
 		if err = checkTtyInput(execConfig.AttachStdin, execConfig.Tty); err != nil {
@@ -99,7 +97,7 @@ func containerExec(ctx context.Context, engine *cluster.Engine, containerID stri
 			return inspect, err
 		}
 		if status != 0 {
-			err = fmt.Errorf("Container %s Engine %s:%s ExecID %s,ExitCode:%d,ExecInspect:%v", containerID, engine.Name, engine.Addr, exec.ID, status, inspect)
+			err = errors.Errorf("Container %s,Engine %s:%s,ExecID %s,ExitCode:%d,ExecInspect:%v", containerID, engine.Name, engine.Addr, exec.ID, status, inspect)
 		}
 	}
 
@@ -113,13 +111,12 @@ func containerExecAttch(ctx context.Context, client client.ContainerAPIClient, e
 	)
 	resp, err := client.ContainerExecAttach(ctx, execID, execConfig)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Container exec attch")
 	}
 	defer resp.Close()
 
 	err = holdHijackedConnection(ctx, execConfig.Tty, in, out, stderr, resp)
 	if err != nil {
-		logrus.Debugf("Error hijack: %s", err)
 		return err
 	}
 
@@ -132,7 +129,7 @@ func getExecExitCode(ctx context.Context, cli client.ContainerAPIClient, execID 
 	if err != nil {
 		// If we can't connect, then the daemon probably died.
 		if err != client.ErrConnectionFailed {
-			return types.ContainerExecInspect{}, -1, err
+			return types.ContainerExecInspect{}, -1, errors.Wrap(err, "Container exec inspect")
 		}
 		return types.ContainerExecInspect{}, -1, nil
 	}
@@ -170,7 +167,7 @@ func holdHijackedConnection(ctx context.Context, tty bool, inputStream io.Reader
 	case err := <-receiveStdout:
 		if err != nil {
 			logrus.Debugf("Error receiveStdout: %s", err)
-			return err
+			return errors.Wrap(err, "hijack receiveStdout")
 		}
 	case <-stdinDone:
 		if outputStream != nil || errorStream != nil {
@@ -178,7 +175,7 @@ func holdHijackedConnection(ctx context.Context, tty bool, inputStream io.Reader
 			case err := <-receiveStdout:
 				if err != nil {
 					logrus.Debugf("Error receiveStdout: %s", err)
-					return err
+					return errors.Wrap(err, "hijack receiveStdout")
 				}
 			case <-ctx.Done():
 			}

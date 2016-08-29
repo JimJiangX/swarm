@@ -136,7 +136,7 @@ func parseServiceArch(arch string) (map[string]int, int, error) {
 				return nil, 0, errors.Errorf("parse Service Arch:'%s',%s", s[i], err)
 			}
 		} else {
-			return nil, 0, errors.Errorf("Unexpected format '%s'", s[i])
+			return nil, 0, errors.Errorf("unexpected format '%s'", s[i])
 		}
 	}
 

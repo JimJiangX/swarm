@@ -21,7 +21,7 @@ type serviceBackup struct {
 	svc *Service
 }
 
-func NewBackupJob(svc *Service) *serviceBackup {
+func newBackupJob(svc *Service) *serviceBackup {
 	return &serviceBackup{
 		svc:      svc,
 		strategy: svc.backup,
@@ -236,7 +236,7 @@ func checkBackupFiles(nameOrID string) (bool, error) {
 	return true, nil
 }
 
-func (gd *Gardener) RegisterBackupStrategy(strategy *serviceBackup) error {
+func (gd *Gardener) registerBackupStrategy(strategy *serviceBackup) error {
 	gd.Lock()
 
 	for key, val := range gd.cronJobs {
@@ -289,8 +289,8 @@ func (gd *Gardener) ReplaceServiceBackupStrategy(nameOrID string, req structs.Ba
 	}
 
 	if service.backup != nil {
-		bs := NewBackupJob(service)
-		err = gd.RegisterBackupStrategy(bs)
+		bs := newBackupJob(service)
+		err = gd.registerBackupStrategy(bs)
 		if err != nil {
 			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err)
 		}
@@ -353,13 +353,8 @@ func (gd *Gardener) EnableServiceBackupStrategy(strategy string) error {
 		svc.backup = backup
 		svc.Unlock()
 
-		bs := NewBackupJob(svc)
-		err = gd.RegisterBackupStrategy(bs)
-		if err != nil {
-			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err)
-		}
-
-		return err
+		bs := newBackupJob(svc)
+		gd.registerBackupStrategy(bs)
 	}
 
 	return err

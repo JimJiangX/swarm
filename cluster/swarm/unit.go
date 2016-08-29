@@ -117,7 +117,7 @@ func (u *unit) Engine() (*cluster.Engine, error) {
 		return u.engine, nil
 	}
 
-	return nil, errEngineIsNil
+	return nil, errors.Wrapf(errEngineIsNil, "get %s Engine", u.Name)
 }
 
 func (u *unit) ContainerAPIClient() (*cluster.Engine, client.ContainerAPIClient, error) {
@@ -241,7 +241,7 @@ func (u *unit) getNetworkings() ([]IPInfo, error) {
 	}
 	networkings, err := getIPInfoByUnitID(u.ID, u.engine)
 	if err != nil {
-		return nil, errors.Errorf("Get Unit Networkings By UnitID:%s Error:%s", u.ID, err)
+		return nil, errors.Wrapf(err, "get %s IPInfo by unitID '%s'", u.Name, u.ID)
 	}
 
 	u.networkings = networkings
@@ -418,7 +418,6 @@ func (u *unit) startContainer() error {
 
 	networkings, err := u.getNetworkings()
 	if err != nil {
-		logrus.Errorf("Cannot Query unit networkings By UnitID %s,Error:%s", u.ID, err)
 
 		return err
 	}
@@ -428,20 +427,26 @@ func (u *unit) startContainer() error {
 
 func startContainer(containerID string, engine *cluster.Engine, networkings []IPInfo) error {
 	if engine == nil {
-		return errEngineIsNil
+		return errors.Wrap(errEngineIsNil, "start contianer "+containerID)
 	}
 
 	err := createNetworking(engine.IP, networkings)
 	if err != nil {
-		err = errors.Errorf("%s create Networking error:%s,networkings:%v", engine.Addr, err, networkings)
-		logrus.Error(err)
-
 		return err
 	}
 
-	logrus.Debugf("Engine %s start container %s", engine.Addr, containerID)
+	err = engine.StartContainer(containerID, nil)
+	engine.CheckConnectionErr(err)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"Engine":    engine.Addr,
+			"Container": containerID,
+		}).WithError(err).Error("start container")
 
-	return engine.StartContainer(containerID, nil)
+		return errors.Wrapf(err, "unable to start container %s on engine %s", containerID, engine.Addr)
+	}
+
+	return nil
 }
 
 func (u *unit) forceStopContainer(timeout int) error {
@@ -516,8 +521,6 @@ func (u *unit) renameContainer(name string) error {
 }
 
 func createNetworking(host string, networkings []IPInfo) error {
-	logrus.Debugf("Engine %s create Networking %s", host, networkings)
-
 	addr := getPluginAddr(host, pluginPort)
 
 	for _, net := range networkings {
@@ -528,7 +531,7 @@ func createNetworking(host string, networkings []IPInfo) error {
 
 		err := sdk.CreateIP(addr, config)
 		if err != nil {
-			return errors.Wrapf(err, "Create IP ON %s,%+v", addr, config)
+			return err
 		}
 	}
 
@@ -536,8 +539,6 @@ func createNetworking(host string, networkings []IPInfo) error {
 }
 
 func removeNetworkings(host string, networkings []IPInfo) error {
-	logrus.Debugf("Engine %s remove Networkings %s", host, networkings)
-
 	addr := getPluginAddr(host, pluginPort)
 
 	for _, net := range networkings {
@@ -546,8 +547,9 @@ func removeNetworkings(host string, networkings []IPInfo) error {
 			IPCIDR: fmt.Sprintf("%s/%d", net.IP.String(), net.Prefix),
 		}
 
-		if err := sdk.RemoveIP(addr, config); err != nil {
-			return errors.Wrapf(err, "%s Remove IP,%+v", addr, config)
+		err := sdk.RemoveIP(addr, config)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -796,13 +798,17 @@ func (u *unit) startService() (err error) {
 		_err := database.TxUpdateUnitStatus(&u.Unit, code, msg)
 
 		if err != nil {
-			logrus.WithField("Unit", u.Name).Errorf("Update Unit Status,status=%d,LatestError=%s,%v", code, msg, _err)
+			logrus.WithFields(logrus.Fields{
+				"Unit":   u.Name,
+				"Status": code,
+				"Error":  msg,
+			}).Errorf("Update Unit Status %+v", _err)
 		}
 	}()
 
 	err = u.StatusCAS("!=", statusUnitBackuping, statusUnitStarting)
 	if err != nil {
-		logrus.WithError(err).Errorf("Start %s service", u.Name)
+		logrus.WithError(err).Errorf("start %s service", u.Name)
 
 		return err
 	}
@@ -818,14 +824,13 @@ func (u *unit) startService() (err error) {
 
 	cmd := u.StartServiceCmd()
 	if len(cmd) == 0 {
-		logrus.Warnf("%s StartServiceCmd is nil", u.Name)
+		logrus.WithField("Unit", u.Name).Warn("StartServiceCmd is nil")
 		return nil
 	}
 
-	logrus.Debug(u.Name, " start service ...")
 	inspect, err := containerExec(context.Background(), eng, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
-		err = fmt.Errorf("%s start service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+		err = errors.Errorf("%s start service cmd=%s exitCode=%d,%v,Error:%+v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
 
 	return err

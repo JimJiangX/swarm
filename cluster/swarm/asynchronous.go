@@ -69,7 +69,7 @@ func (es *_errors) Append(err error) {
 		es.buffer = bytes.NewBuffer(nil)
 	}
 	es.buffer.WriteString(err.Error())
-	es.buffer.WriteString("\n")
+	es.buffer.WriteByte('\n')
 
 	es.val = es.buffer.String()
 
@@ -127,7 +127,7 @@ func NewAsyncTask(ctx context.Context,
 
 func (t *asyncTask) Run() error {
 	if t.background == nil {
-		return errors.New("background function is nil")
+		return errors.New("background func is nil")
 	}
 	if t.parent == nil {
 		t.parent = context.Background()
@@ -135,7 +135,7 @@ func (t *asyncTask) Run() error {
 
 	if t.create != nil {
 		if err := t.create(); err != nil {
-			return errors.Wrap(err, "create error")
+			return err
 		}
 	}
 
@@ -143,14 +143,14 @@ func (t *asyncTask) Run() error {
 	case <-t.parent.Done():
 
 		if t.update != nil {
-			code, msg := statusTaskCancel, "Task Cancel by Parent Context"
+			code, msg := statusTaskCancel, "task cancel by parent Context"
 			if t.parent.Err() != nil {
 				msg = t.parent.Err().Error()
 			}
 
 			err := t.update(code, msg)
 			if err != nil {
-				err = errors.Errorf("asyncTask.update,code=%d,msg=%s,%s", code, msg, err)
+				err = errors.Errorf("asyncTask.update,code=%d,msg=%s,%+v", code, msg, err)
 			}
 
 			return errors.Wrap(err, "parent Context has done")
@@ -164,6 +164,7 @@ func (t *asyncTask) Run() error {
 		ctx    context.Context
 		cancel context.CancelFunc
 	)
+
 	if t.timeout == 0 {
 		ctx, cancel = context.WithCancel(t.parent)
 	} else {
@@ -180,17 +181,22 @@ func (t *asyncTask) Run() error {
 					code, msg := statusTaskFailed, fmt.Sprintf("panic:%v", r)
 					err := t.update(code, msg)
 					if err != nil {
-						logrus.Errorf("Update Error:%s,Code=%d,message=%s", err, code, msg)
+						logrus.WithFields(logrus.Fields{
+							"Code":    code,
+							"Message": msg,
+						}).Errorf("asyncTask update:%+v", err)
 					}
 				}
 			}
-			t.cancel()
+			if t.cancel != nil {
+				t.cancel()
+			}
 		}()
 
 		msg, code := "", statusTaskRunning
 		if t.update != nil {
 			if err := t.update(code, msg); err != nil {
-				logrus.Errorf("asyncTask.update error:%s", err)
+				logrus.Errorf("asyncTask.update:%+v", err)
 			}
 		}
 
@@ -204,7 +210,7 @@ func (t *asyncTask) Run() error {
 			msg = err.Error()
 		}
 
-		logrus.Info("Run background end,", msg)
+		logrus.Infof("Run background end,%+v", err)
 
 		select {
 		case <-ctx.Done():
@@ -223,7 +229,10 @@ func (t *asyncTask) Run() error {
 		if code != 0 && t.update != nil {
 			err = t.update(code, msg)
 			if err != nil {
-				logrus.Errorf("Update Error:%s,Code=%d,message=%s", err, code, msg)
+				logrus.WithFields(logrus.Fields{
+					"Code":    code,
+					"Message": msg,
+				}).Errorf("asyncTask update:%+v", err)
 			}
 		}
 	}(ctx, t)
