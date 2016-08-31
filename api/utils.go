@@ -22,6 +22,14 @@ func httpError(w http.ResponseWriter, err string, status int) {
 	http.Error(w, err, status)
 }
 
+// Emit an HTTP error and log it.
+func httpError2(w http.ResponseWriter, err error, status int) {
+	if err != nil {
+		log.WithField("status", status).Errorf("HTTP error: %+v", err)
+		http.Error(w, err.Error(), status)
+	}
+}
+
 func sendJSONMessage(w io.Writer, id, status string) {
 	message := struct {
 		ID       string      `json:"id,omitempty"`

@@ -25,7 +25,7 @@ import (
 	goctx "golang.org/x/net/context"
 )
 
-var ErrUnsupportGardener = errors.New("unsupported Gardener")
+var errUnsupportGardener = errors.New("unsupported Gardener")
 
 func getNodeInspect(gd *swarm.Gardener, node database.Node) structs.NodeInspect {
 	var (
@@ -88,12 +88,12 @@ func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	node, err := database.GetNode(name)
 	if err != nil {
-		httpError(w, fmt.Sprintf("Not Found Node by NameOrID:%s,Error:%s", name, err), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
@@ -108,13 +108,13 @@ func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	nodes, err := database.GetAllNodes()
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
@@ -134,19 +134,19 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	cl, err := database.GetCluster(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	nodes, err := database.ListNodeByCluster(cl.ID)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
@@ -182,7 +182,7 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	clusters, err := database.ListClusters()
 	if err != nil {
 		logrus.Error("List Cluster", err)
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -192,7 +192,7 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		num, err := database.CountNodeByCluster(clusters[i].ID)
 		if err != nil {
 			logrus.Error("Count Node By Cluster", err)
-			httpError(w, err.Error(), http.StatusInternalServerError)
+			httpError2(w, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -220,13 +220,13 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 func getClustersResource(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	clusters, err := database.ListClusters()
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
@@ -234,7 +234,7 @@ func getClustersResource(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 	for i := range clusters {
 		resp[i], err = getClusterResource(gd, clusters[i], false)
 		if err != nil {
-			httpError(w, err.Error(), http.StatusInternalServerError)
+			httpError2(w, err, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -250,19 +250,19 @@ func getNodesResourceByCluster(ctx goctx.Context, w http.ResponseWriter, r *http
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	cluster, err := database.GetCluster(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	resp, err := getClusterResource(gd, cluster, true)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -421,7 +421,7 @@ func containerWithResource(containers cluster.Containers) []structs.ContainerWit
 // GET /ports
 func getPorts(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -431,7 +431,7 @@ func getPorts(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ports, err := swarm.ListPorts(start, end, limit)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -456,7 +456,7 @@ func getPorts(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 func getNetworkings(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	resp, err := swarm.ListNetworkings()
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -471,7 +471,7 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	image, config, err := database.GetImageAndUnitConfig(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -483,7 +483,7 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	kvs, err := iniParse(config.Content, config.KeySets)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -511,7 +511,7 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // GET /services?from=DBAAS
 func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -519,13 +519,13 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	services, err := database.ListServices()
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
@@ -712,14 +712,14 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		// get service by unit name or ID
 		service, err = database.TxGetServiceByUnit(name)
 		if err != nil {
-			httpError(w, err.Error(), http.StatusInternalServerError)
+			httpError2(w, err, http.StatusInternalServerError)
 			return
 		}
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
@@ -891,7 +891,7 @@ func getServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	name := mux.Vars(r)["name"]
 
 	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -906,7 +906,7 @@ func getServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	users, err := database.ListUsersByService(name, _type)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -921,19 +921,19 @@ func hijackTopology(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	service, err := gd.GetService(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	addr, err := service.GetSwitchManagerAddr()
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -943,7 +943,7 @@ func hijackTopology(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err = hijack(nil, addr, w, r)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 }
@@ -954,19 +954,19 @@ func hijackProxys(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	service, err := gd.GetService(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	addr, err := service.GetSwitchManagerAddr()
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -976,7 +976,7 @@ func hijackProxys(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err = hijack(nil, addr, w, r)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 }
@@ -986,19 +986,19 @@ func getServiceServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.R
 	name := mux.Vars(r)["name"]
 	service, err := database.GetService(name)
 	if err != nil {
-		httpError(w, fmt.Sprintf("Not Found Service '%s',Error:%s", name, err), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	images, err := database.ListImages()
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	configs, err := database.ListUnitConfigByService(service.ID)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1054,13 +1054,13 @@ func getServiceBackupStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	service, err := database.GetService(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	list, err := database.ListBackupStrategyByServiceID(service.ID)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1090,7 +1090,7 @@ func getServiceBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	_, files, err := database.ListBackupFilesByService(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1124,7 +1124,7 @@ func getServiceBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	names, err := database.ListStorageID()
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1132,7 +1132,7 @@ func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	for i := range names {
 		resp[i], err = getSanStoreInfo(names[i])
 		if err != nil {
-			httpError(w, err.Error(), http.StatusInternalServerError)
+			httpError2(w, err, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -1148,7 +1148,7 @@ func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	resp, err := getSanStoreInfo(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1197,7 +1197,7 @@ func getSanStoreInfo(id string) (structs.SANStorageResponse, error) {
 func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -1213,8 +1213,7 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 		status, err := strconv.Atoi(v[0])
 		if err != nil {
-			msg := fmt.Sprintf("parse status:'%s' error:%s", v, err)
-			httpError(w, msg, http.StatusInternalServerError)
+			httpError(w, fmt.Sprintf("parse status:'%s' error:%s", v, err), http.StatusInternalServerError)
 			return
 		}
 		tasks, err = database.ListTaskByStatus(status)
@@ -1244,7 +1243,7 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 		begin, err = time.Parse(time.RFC3339, key[0])
 		if err != nil {
-			httpError(w, err.Error(), http.StatusBadRequest)
+			httpError2(w, err, http.StatusBadRequest)
 			return
 		}
 	}
@@ -1261,7 +1260,7 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 		end, err = time.Parse(time.RFC3339, key[0])
 		if err != nil {
-			httpError(w, err.Error(), http.StatusBadRequest)
+			httpError2(w, err, http.StatusBadRequest)
 			return
 		}
 	}
@@ -1280,7 +1279,7 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logrus.Errorf("getTasks error:%+v", err)
 
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1379,7 +1378,7 @@ func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	task, err := database.GetTask(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1395,18 +1394,18 @@ func postDatacenter(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.RegisterDatacenter{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err = swarm.RegisterDatacenter(gd, req)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1422,25 +1421,25 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	if err := swarm.ValidDatacenter(req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	if req.StorageType != "local" && req.StorageID != "" {
 		store, err = storage.GetStore(req.StorageID)
 		if err != nil {
-			httpError(w, err.Error(), http.StatusInternalServerError)
+			httpError2(w, err, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -1448,20 +1447,20 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if req.Type == "proxy" && req.NetworkingID != "" {
 		_, _, err := database.GetNetworkingByID(req.NetworkingID)
 		if err != nil {
-			httpError(w, fmt.Sprintf("Not Found Networking By ID:%s,error:%s", req.NetworkingID, err), http.StatusInternalServerError)
+			httpError2(w, err, http.StatusInternalServerError)
 			return
 		}
 	}
 
 	cluster, err := swarm.AddNewCluster(req)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	err = gd.AddDatacenter(cluster, store)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1475,20 +1474,20 @@ func postUpdateClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.R
 	req := structs.UpdateClusterParamsRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 	name := mux.Vars(r)["name"]
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err = gd.UpdateDatacenterParams(name, req.MaxNode, req.UsageLimit)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1501,18 +1500,18 @@ func postEnableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	dc, err := gd.Datacenter(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 	err = dc.SetStatus(true)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1525,19 +1524,19 @@ func postDisableCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	dc, err := gd.Datacenter(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	err = dc.SetStatus(false)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1550,20 +1549,20 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	dc, err := gd.Datacenter(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	list := structs.PostNodesRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(&list); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -1584,7 +1583,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err = swarm.SaveMultiNodesToDB(nodes)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1609,13 +1608,13 @@ func postEnableNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.SetNodeStatus(name, 6)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1628,13 +1627,13 @@ func postDisableNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.SetNodeStatus(name, 7)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1647,19 +1646,19 @@ func updateNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.UpdateNodeSetting{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.SetNodeParams(name, req.MaxContainer)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1671,24 +1670,24 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostServiceRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	if err := swarm.ValidService(req); err != nil {
-		httpError(w, err.Error(), http.StatusConflict)
+		httpError2(w, err, http.StatusConflict)
 		return
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	svc, strategyID, taskID, err := gd.CreateService(req)
 	if err != nil && svc == nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1709,25 +1708,25 @@ func postServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	users := []structs.User{}
 
 	if err := json.NewDecoder(r.Body).Decode(&users); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		httpError(w, fmt.Sprintf("Not Found Service %s,Error:%s", name, err), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	code, err := svc.AddServiceUsers(users)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1740,19 +1739,19 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		httpError(w, fmt.Sprintf("Not Found Service %s,Error:%s", name, err.Error()), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	err = svc.StartService()
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1765,18 +1764,18 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 	svc, err := gd.GetService(name)
 	if err != nil {
-		httpError(w, fmt.Sprintf("Not Found Service %s,Error:%s", name, err.Error()), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	err = svc.StopService()
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1789,13 +1788,13 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	taskID, err := gd.TemporaryServiceBackupTask(service, "")
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1810,19 +1809,19 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	req := structs.PostServiceScaledRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.ServiceScale(name, req)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1835,25 +1834,25 @@ func postServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	req := structs.UpdateServiceConfigRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	service, err := gd.GetService(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	err = service.UpdateUnitConfig(req.Type, req.Pairs)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1866,25 +1865,25 @@ func postServiceConfigModify(ctx goctx.Context, w http.ResponseWriter, r *http.R
 	req := structs.UpdateServiceConfigRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	service, err := gd.GetService(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	err = service.ModifyUnitConfig(req.Type, req.Pairs)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1897,13 +1896,13 @@ func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	req := structs.BackupStrategy{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 	sys, err := gd.SystemConfig()
@@ -1915,7 +1914,7 @@ func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	strategy, err := gd.ReplaceServiceBackupStrategy(name, req)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1930,12 +1929,12 @@ func postUpdateServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http
 	req := structs.BackupStrategy{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 	sys, err := gd.SystemConfig()
@@ -1947,7 +1946,7 @@ func postUpdateServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http
 
 	err = gd.UpdateServiceBackupStrategy(name, req)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1962,13 +1961,13 @@ func postEnableServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.EnableServiceBackupStrategy(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -1981,13 +1980,13 @@ func postDisableServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *htt
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.DisableBackupStrategy(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2000,13 +1999,13 @@ func postUnitStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.StartUnitService(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2016,7 +2015,7 @@ func postUnitStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // POST /units/{name:.*}/stop
 func postUnitStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 	name := mux.Vars(r)["name"]
@@ -2024,13 +2023,13 @@ func postUnitStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.StopUnitService(name, timeout)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2042,13 +2041,13 @@ func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	unit := mux.Vars(r)["name"]
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	taskID, err := gd.TemporaryServiceBackupTask("", unit)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2060,7 +2059,7 @@ func postUnitBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // POST /units/{name:.*}/restore
 func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 	name := mux.Vars(r)["name"]
@@ -2068,19 +2067,19 @@ func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	file, err := database.GetBackupFile(from)
 	if err != nil {
-		httpError(w, fmt.Sprintf("Not Found Backup File by ID:%s,Error:%s", from, err), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	taskID, err := gd.RestoreUnit(name, file.Path)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2099,13 +2098,13 @@ func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	}
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	taskID, err := gd.UnitMigrate(name, req.Candidates, req.HostConfig)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2124,13 +2123,13 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	}
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	taskID, err := gd.UnitRebuild(name, req.Candidates, req.HostConfig)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2144,13 +2143,13 @@ func postUnitIsolate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	name := mux.Vars(r)["name"]
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.UnitIsolate(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2162,13 +2161,13 @@ func postUnitSwitchback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	name := mux.Vars(r)["name"]
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.UnitSwitchBack(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2180,13 +2179,13 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	req := structs.BackupTaskCallback{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	err := swarm.BackupTaskCallback(req)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2198,25 +2197,25 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostNetworkingRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	err := swarm.ValidateIPAddress(req.Prefix, req.Start, req.End, req.Gateway)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	net, err := gd.AddNetworking(req.Start, req.End, req.Type, req.Gateway, req.Prefix)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2231,13 +2230,13 @@ func postEnableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.SetNetworkingStatus(name, true)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2250,14 +2249,14 @@ func postDisableNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.SetNetworkingStatus(name, false)
 
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2269,13 +2268,13 @@ func postImportPort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostImportPortRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	num, err := database.TxImportPort(req.Start, req.End, req.Filters...)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2290,13 +2289,13 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostLoadImageRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	imageID, taskID, err := swarm.LoadImage(req)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2316,7 +2315,7 @@ func postEnableImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	err := swarm.UpdateImageStatus(image, true)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2329,7 +2328,7 @@ func postDisableImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	err := swarm.UpdateImageStatus(image, false)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2342,13 +2341,13 @@ func updateImageTemplateConfig(ctx goctx.Context, w http.ResponseWriter, r *http
 
 	req := structs.UpdateUnitConfigRequest{}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	config, err := swarm.UpdateImageTemplateConfig(image, req)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2356,7 +2355,7 @@ func updateImageTemplateConfig(ctx goctx.Context, w http.ResponseWriter, r *http
 	if len(req.ConfigKVs) == 0 {
 		kvs, err = iniParse(config.Content, config.KeySets)
 		if err != nil {
-			httpError(w, err.Error(), http.StatusInternalServerError)
+			httpError2(w, err, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -2454,7 +2453,7 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostSANStoreRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -2462,7 +2461,7 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		req.Username, req.Password, req.Admin,
 		req.LunStart, req.LunEnd, req.HostLunStart, req.HostLunEnd)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2475,20 +2474,20 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostRaidGroupRequest{}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 	name := mux.Vars(r)["name"]
 
 	store, err := storage.GetStore(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	space, err := store.AddSpace(req.ID)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2502,19 +2501,19 @@ func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 	san := mux.Vars(r)["name"]
 	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	store, err := storage.GetStore(san)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	err = store.EnableSpace(rg)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2526,19 +2525,19 @@ func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 	san := mux.Vars(r)["name"]
 	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	store, err := storage.GetStore(san)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	err = store.DisableSpace(rg)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2549,7 +2548,7 @@ func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 // TODO:Not Done Yet
 func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -2560,13 +2559,13 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.RemoveService(name, force, volumes, timeout)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2576,7 +2575,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // DELETE /services/{name}/users
 func deleteServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -2593,19 +2592,19 @@ func deleteServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		httpError(w, fmt.Sprintf("Not Found Service '%s' Error:%s", name, err), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	err = svc.DeleteServiceUsers(users, all)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2618,7 +2617,7 @@ func deleteBackupStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 
 	err := swarm.DeleteServiceBackupStrategy(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2631,13 +2630,13 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.RemoveDatacenter(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2647,7 +2646,7 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // DELETE /clusters/nodes/{node:.*}
 func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpError(w, err.Error(), http.StatusBadRequest)
+		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -2657,13 +2656,13 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.RemoveNode(node, username, password)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2676,13 +2675,13 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.RemoveNetworking(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2704,7 +2703,7 @@ func deletePort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err = database.DeletePort(port, false)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2717,7 +2716,7 @@ func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err := storage.RemoveStore(name)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2730,13 +2729,13 @@ func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	err = storage.RemoveStoreSpace(san, rg)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -2749,13 +2748,13 @@ func deleteImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
 
 	err := gd.RemoveImage(image)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
+		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
