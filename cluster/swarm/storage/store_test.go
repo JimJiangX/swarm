@@ -220,7 +220,11 @@ func TestHUAWEIStore(t *testing.T) {
 }
 
 func TestGetStoreByID(t *testing.T) {
-	if len(stores) == 0 {
+	lock.RLock()
+	n := len(stores)
+	lock.RUnlock()
+
+	if n == 0 {
 		store, err := RegisterStore("HiTaChI", "", "", "", "AMS2100_83004824", 0, 255, 1000, 1200)
 		if err != nil {
 			t.Error(HITACHI, err)
@@ -232,15 +236,17 @@ func TestGetStoreByID(t *testing.T) {
 		}
 		t.Log(store.ID(), HUAWEI, "registered")
 	}
-	list := make([]string, 0, len(stores))
+	list := make([]string, 0, n)
 
+	lock.Lock()
 	for id := range stores {
 		list = append(list, id)
 		delete(stores, id)
 	}
+	lock.Unlock()
 
 	for i := range list {
-		store, err := GetStoreByID(list[i])
+		store, err := GetStore(list[i])
 		if err != nil || store == nil {
 			t.Error("failed to get store", list[i])
 		}

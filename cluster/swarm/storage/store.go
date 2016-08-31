@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"fmt"
 	"strings"
 	"sync"
 
@@ -29,7 +28,11 @@ const (
 	DefaultFilesystemType = "xfs"
 )
 
-var stores = make(map[string]Store)
+// stores holds all registered Stores
+var (
+	stores = make(map[string]Store, 10)
+	lock   sync.RWMutex
+)
 
 // Info describle remote storage system infomation
 type Info struct {
@@ -76,7 +79,7 @@ func RegisterStore(vendor, addr, user, password, admin string,
 	case HITACHI:
 		store = NewHitachiStore(HITACHI, admin, lstart, lend, hstart, hend)
 	default:
-		return nil, fmt.Errorf("Unsupported Vendor %s Yet", vendor)
+		return nil, errors.Errorf("unsupported Vendor '%s' yet", vendor)
 	}
 
 	if err := store.Ping(); err != nil {
@@ -87,14 +90,19 @@ func RegisterStore(vendor, addr, user, password, admin string,
 		return store, err
 	}
 
+	lock.Lock()
 	stores[store.ID()] = store
+	lock.Unlock()
 
 	return store, nil
 }
 
-// GetStoreByID returns store find by ID
-func GetStoreByID(ID string) (Store, error) {
+// GetStore returns store find by ID
+func GetStore(ID string) (Store, error) {
+	lock.RLock()
 	store, ok := stores[ID]
+	lock.RUnlock()
+
 	if ok && store != nil {
 		return store, nil
 	}
@@ -117,8 +125,58 @@ func GetStoreByID(ID string) (Store, error) {
 	}
 
 	if store != nil {
+		lock.Lock()
 		stores[store.ID()] = store
+		lock.Unlock()
 	}
 
 	return store, nil
+}
+
+// RemoveStore removes the assigned store,
+// if store is using,cannot be remove
+func RemoveStore(ID string) error {
+	count, err := database.CountClusterByStorage(ID)
+	if err != nil {
+		return err
+	}
+
+	if count > 0 {
+		return errors.Errorf("Store %s is using,cannot be removed", ID)
+	}
+
+	return removeStore(ID)
+}
+
+func removeStore(ID string) error {
+	lock.Lock()
+	delete(stores, ID)
+	lock.Unlock()
+
+	return database.DeleteStorageByID(ID)
+}
+
+// RemoveStoreSpace removes a Space of store,
+// if Space is using,cannot be removed
+func RemoveStoreSpace(ID string, space int) error {
+	store, err := GetStore(ID)
+	if err != nil {
+		return err
+	}
+
+	rg, err := database.GetRaidGroup(store.ID(), space)
+	if err != nil {
+		return err
+	}
+
+	count, err := database.CountLUNByRaidGroupID(rg.ID)
+	if err != nil {
+		return err
+	}
+
+	if count > 0 {
+		return errors.Errorf("Store %s RaidGroup %d is using,cannot be removed", store.ID(), space)
+	}
+
+	return database.DeleteRaidGroup(store.ID(), space)
 }

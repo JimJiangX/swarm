@@ -13,8 +13,8 @@ import (
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/docker/swarm/utils"
+	"github.com/pkg/errors"
 	crontab "gopkg.in/robfig/cron.v2"
 )
 
@@ -50,7 +50,6 @@ type Gardener struct {
 	datacenters []*Datacenter
 	networkings []*Networking
 	services    []*Service
-	stores      []storage.Store
 }
 
 // NewGardener is exported
@@ -71,7 +70,6 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 		datacenters: make([]*Datacenter, 0, 50),
 		networkings: make([]*Networking, 0, 50),
 		services:    make([]*Service, 0, 100),
-		stores:      make([]storage.Store, 0, 50),
 	}
 
 	for _, host := range hosts {
@@ -97,7 +95,7 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	if err != nil {
 		logrus.Errorf("Get System Config Error,%s", err)
 	} else {
-		err = gd.SetParams(sysConfig)
+		err = gd.setParams(sysConfig)
 		if err != nil {
 			logrus.Error(err)
 		}
@@ -211,7 +209,7 @@ func (gd *Gardener) RegistryAuthConfig() (*types.AuthConfig, error) {
 	}, nil
 }
 
-func (gd *Gardener) SetParams(sys *database.Configurations) error {
+func (gd *Gardener) setParams(sys *database.Configurations) error {
 	gd.Lock()
 	defer gd.Unlock()
 
@@ -245,7 +243,7 @@ func (gd *Gardener) SetParams(sys *database.Configurations) error {
 func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 	sys, err := database.GetSystemConfig()
 	if err == nil {
-		return fmt.Errorf("DC Has Registered,dc=%d", sys.ID)
+		return errors.Errorf("DC has registered,dc=%d", sys.ID)
 	}
 
 	config := database.Configurations{
@@ -305,23 +303,26 @@ func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 
 	err = pingHorus()
 	if err != nil {
-		logrus.Errorf("Ping Horus error,%s", err)
+		logrus.Warnf("%+v", err)
 	}
 
 	err = nfsSetting(config.NFSOption)
 	if err != nil {
-		logrus.Error(err)
+		logrus.Errorf("%+v", err)
+
 		return err
 	}
 
 	_, err = config.Insert()
 	if err != nil {
+		logrus.Errorf("%+v", err)
+
 		return err
 	}
 
-	err = gd.SetParams(&config)
+	err = gd.setParams(&config)
 	if err != nil {
-		logrus.Error(err)
+		logrus.Errorf("%+v", err)
 	}
 
 	return err
@@ -341,7 +342,7 @@ func (gd *Gardener) SystemConfig() (database.Configurations, error) {
 		return database.Configurations{}, err
 	}
 
-	err = gd.SetParams(sys)
+	err = gd.setParams(sys)
 	if err != nil {
 		return database.Configurations{}, err
 	}
@@ -351,14 +352,13 @@ func (gd *Gardener) SystemConfig() (database.Configurations, error) {
 
 func nfsSetting(option database.NFSOption) error {
 	if option.Addr == "" || option.Dir == "" || option.MountDir == "" {
-		logrus.Warnf("NFS Option:%v", option)
-		return nil
+		logrus.Warnf("NFS option:%v", option)
 	}
 	_, err := os.Stat(option.MountDir)
 	if os.IsNotExist(err) {
 		err := os.MkdirAll(option.MountDir, os.ModePerm)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "MountDir isnot exist,MkdirAll")
 		}
 	}
 
@@ -369,12 +369,12 @@ func nfsSetting(option database.NFSOption) error {
 
 	cmd, err := utils.ExecScript(script)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "mount NFS:%s", cmd.Args)
 	}
 
 	out, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("%v,%s", err, out)
+		return errors.Wrapf(err, "exec cmd:%s,output:%s", cmd.Args, out)
 	}
 
 	return nil
@@ -388,5 +388,5 @@ func pingHorus() error {
 
 	_, err = http.Post("http://"+addr+"/v1/ping", "", nil)
 
-	return err
+	return errors.Wrap(err, "ping Horus")
 }

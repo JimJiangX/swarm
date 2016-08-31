@@ -25,7 +25,7 @@ import (
 	goctx "golang.org/x/net/context"
 )
 
-var ErrUnsupportGardener = errors.New("Unsupported Gardener")
+var ErrUnsupportGardener = errors.New("unsupported Gardener")
 
 func getNodeInspect(gd *swarm.Gardener, node database.Node) structs.NodeInspect {
 	var (
@@ -1158,7 +1158,7 @@ func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 }
 
 func getSanStoreInfo(id string) (structs.SANStorageResponse, error) {
-	store, err := storage.GetStoreByID(id)
+	store, err := storage.GetStore(id)
 	if err != nil {
 		return structs.SANStorageResponse{}, err
 	}
@@ -1438,7 +1438,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.StorageType != "local" && req.StorageID != "" {
-		store, err = gd.GetStore(req.StorageID)
+		store, err = storage.GetStore(req.StorageID)
 		if err != nil {
 			httpError(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -2458,21 +2458,9 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	store, err := storage.RegisterStore(req.Vendor, req.Addr,
 		req.Username, req.Password, req.Admin,
 		req.LunStart, req.LunEnd, req.HostLunStart, req.HostLunEnd)
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	err = gd.AddStore(store)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -2492,13 +2480,7 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	}
 	name := mux.Vars(r)["name"]
 
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	store, err := gd.GetStore(name)
+	store, err := storage.GetStore(name)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -2524,13 +2506,13 @@ func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+	store, err := storage.GetStore(san)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	err = gd.UpdateStoreSpaceStatus(san, rg, true)
+	err = store.EnableSpace(rg)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -2548,13 +2530,13 @@ func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
+	store, err := storage.GetStore(san)
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	err = gd.UpdateStoreSpaceStatus(san, rg, false)
+	err = store.DisableSpace(rg)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -2733,13 +2715,7 @@ func deletePort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	err := gd.RemoveStore(name)
+	err := storage.RemoveStore(name)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -2758,13 +2734,7 @@ func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError(w, ErrUnsupportGardener.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	err = gd.RemoveStoreSpace(san, rg)
+	err = storage.RemoveStoreSpace(san, rg)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return

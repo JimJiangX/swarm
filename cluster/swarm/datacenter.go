@@ -570,7 +570,7 @@ func (gd *Gardener) rebuildDatacenter(nameOrID string) (*Datacenter, error) {
 
 	var store storage.Store
 	if !storage.IsLocalStore(cl.StorageType) && cl.StorageID != "" {
-		store, err = gd.GetStore(cl.StorageID)
+		store, err = storage.GetStore(cl.StorageID)
 		if err != nil {
 			return nil, err
 		}

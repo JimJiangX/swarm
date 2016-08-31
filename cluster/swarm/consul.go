@@ -227,7 +227,7 @@ func getHorusFromConsul() (string, error) {
 
 	checks, _, err := client.Health().State("passing", nil)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "passing health checks")
 	}
 
 	for i := range checks {
@@ -237,7 +237,7 @@ func getHorusFromConsul() (string, error) {
 		}
 	}
 
-	return "", errors.New("Non Available Horus Query From Consul Servers")
+	return "", errors.New("non-available Horus query from consul servers")
 }
 
 func parseIPFromHealthCheck(serviceID, output string) string {
@@ -269,7 +269,7 @@ func parseIPFromHealthCheck(serviceID, output string) string {
 	return ""
 }
 
-var errAvailableConsulClient = errors.New("Non Available Consul Client")
+var errAvailableConsulClient = errors.New("non-available consul client")
 var defaultConsuls = &consulConfigs{}
 
 func getConsulClient(ping bool) (*api.Client, error) {
@@ -341,7 +341,7 @@ func (cs *consulConfigs) set(c database.ConsulConfig) error {
 	}
 
 	if len(peers) == 0 {
-		return errors.Errorf("Unable to connect consul servers,%s", addrs)
+		return errors.Errorf("unable to connect consul servers:%s", addrs)
 	}
 
 	list := make([]*api.Client, len(peers))
@@ -396,7 +396,7 @@ func (cs *consulConfigs) getConsulClient(ping bool) (*api.Client, error) {
 		return client, nil
 	}
 
-	return nil, errAvailableConsulClient
+	return nil, errors.Wrap(errAvailableConsulClient, "get consul client")
 }
 
 func (cs *consulConfigs) getConsulConfig() (database.ConsulConfig, error) {

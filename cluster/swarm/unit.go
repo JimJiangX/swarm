@@ -326,7 +326,7 @@ func createSanStoreageVG(host, name string, lun []database.LUN) error {
 		return nil
 	}
 
-	storage, err := storage.GetStoreByID(list[0].StorageSystemID)
+	store, err := storage.GetStore(list[0].StorageSystemID)
 	if err != nil {
 		return err
 	}
@@ -341,7 +341,7 @@ func createSanStoreageVG(host, name string, lun []database.LUN) error {
 	config := sdk.VgConfig{
 		HostLunID: l,
 		VgName:    list[0].VGName,
-		Type:      storage.Vendor(),
+		Type:      store.Vendor(),
 	}
 
 	addr := getPluginAddr(host, pluginPort)
@@ -355,7 +355,7 @@ func createSanStoreageVG(host, name string, lun []database.LUN) error {
 }
 
 func extendSanStoreageVG(host string, lun database.LUN) error {
-	storage, err := storage.GetStoreByID(lun.StorageSystemID)
+	store, err := storage.GetStore(lun.StorageSystemID)
 	if err != nil {
 		return err
 	}
@@ -363,7 +363,7 @@ func extendSanStoreageVG(host string, lun database.LUN) error {
 	config := sdk.VgConfig{
 		HostLunID: []int{lun.HostLunID},
 		VgName:    lun.VGName,
-		Type:      storage.Vendor(),
+		Type:      store.Vendor(),
 	}
 
 	addr := getPluginAddr(host, pluginPort)
