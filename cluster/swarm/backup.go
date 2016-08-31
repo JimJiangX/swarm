@@ -8,6 +8,7 @@ import (
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
+	"github.com/pkg/errors"
 	"github.com/yiduoyunQ/smlib"
 	"golang.org/x/net/context"
 	crontab "gopkg.in/robfig/cron.v2"
@@ -105,7 +106,11 @@ func (svc *Service) TryBackupTask(strategy database.BackupStrategy, task *databa
 	}
 
 	err = backupTask(master, task, strategy, func() error {
-		err := smlib.UnLock(addr, port)
+		var err error
+		if r := recover(); r != nil {
+			err = errors.Errorf("%v", r)
+		}
+		err = smlib.UnLock(addr, port)
 		if err != nil {
 			logrus.Errorf("switch_manager %s:%d Unlock Error:%s", addr, port, err)
 		}
@@ -165,10 +170,22 @@ func backupTask(backup *unit, task *database.Task, strategy database.BackupStrat
 	msg, status := "", int64(0)
 
 	err := backup.backup(ctx, args...)
-	if err == nil {
-		entry.Info("Backup Done")
-		return nil
+	if err != nil {
+		backup.Status = statusUnitBackupFailed
+		backup.LatestError = err.Error()
+	} else {
+		backup.Status = statusUnitBackuped
+		backup.LatestError = ""
+
+		_err := database.TxUpdateUnitStatus(&backup.Unit, backup.Status, backup.LatestError)
+		if _err != nil {
+			entry.WithError(_err).Warnf("update backup status=%d,error=%s", backup.Status, backup.LatestError)
+		}
+
+		entry.Info("backup done")
+		return err
 	}
+
 	status = statusTaskFailed
 	msg = fmt.Sprintf("Backup Task Faild,%s", err)
 	entry.Error(msg)
