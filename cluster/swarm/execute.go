@@ -105,9 +105,9 @@ func (svc *Service) createPendingContainer(gd *Gardener, swarmID string) (err er
 	}
 
 	if svc.authConfig == nil {
-		svc.authConfig, err = gd.RegistryAuthConfig()
+		svc.authConfig, err = gd.registryAuthConfig()
 		if err != nil {
-			return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
+			return fmt.Errorf("get registryAuthConfig Error:%s", err)
 		}
 	}
 
@@ -176,7 +176,7 @@ func (gd *Gardener) createContainerInPending(swarmID string, authConfig *types.A
 }
 
 func (gd *Gardener) initAndStartService(svc *Service) (err error) {
-	sys, err := gd.SystemConfig()
+	sys, err := gd.systemConfig()
 	if err != nil {
 		logrus.Errorf("Query Database Error:%s", err)
 		return nil

@@ -466,7 +466,7 @@ func GetService(nameOrID string) (Service, error) {
 
 	err = db.Get(&s, query, nameOrID, nameOrID)
 
-	return s, errors.Wrap(err, "Get Service By nameOrID")
+	return s, errors.Wrap(err, "get Service by nameOrID")
 }
 
 // TxGetServiceByUnit returns Service select by Unit ID or Name.

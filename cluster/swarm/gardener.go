@@ -42,10 +42,10 @@ type Gardener struct {
 	*Cluster
 
 	// added by fugr
-	sysConfig          *database.Configurations
-	cron               *crontab.Cron // crontab tasks
-	registryAuthConfig *types.AuthConfig
-	cronJobs           map[crontab.EntryID]*serviceBackup
+	sysConfig           *database.Configurations
+	cron                *crontab.Cron // crontab tasks
+	registry_authConfig *types.AuthConfig
+	cronJobs            map[crontab.EntryID]*serviceBackup
 
 	datacenters []*Datacenter
 	networkings []*Networking
@@ -166,7 +166,6 @@ func (gd *Gardener) syncNodeWithEngine() {
 		} else {
 			node, err = gd.rebuildNode(nodeTab)
 			if err != nil {
-				logrus.WithError(err).Warnf("rebuildNode %s", nodeTab.Name)
 				continue
 			}
 			if dc != nil {
@@ -191,9 +190,9 @@ func (gd *Gardener) TLSConfig() *tls.Config {
 	return gd.Cluster.TLSConfig
 }
 
-func (gd *Gardener) RegistryAuthConfig() (*types.AuthConfig, error) {
-	if gd.registryAuthConfig != nil {
-		return gd.registryAuthConfig, nil
+func (gd *Gardener) registryAuthConfig() (*types.AuthConfig, error) {
+	if gd.registry_authConfig != nil {
+		return gd.registry_authConfig, nil
 	}
 
 	c, err := database.GetSystemConfig()
@@ -201,12 +200,14 @@ func (gd *Gardener) RegistryAuthConfig() (*types.AuthConfig, error) {
 		return nil, err
 	}
 
-	return &types.AuthConfig{
+	gd.registry_authConfig = &types.AuthConfig{
 		Username:      c.Username,
 		Password:      c.Password,
 		Email:         c.Email,
 		RegistryToken: c.Registry.Token,
-	}, nil
+	}
+
+	return gd.registry_authConfig, nil
 }
 
 func (gd *Gardener) setParams(sys *database.Configurations) error {
@@ -228,7 +229,7 @@ func (gd *Gardener) setParams(sys *database.Configurations) error {
 		pluginPort = sys.PluginPort
 	}
 
-	gd.registryAuthConfig = &types.AuthConfig{
+	gd.registry_authConfig = &types.AuthConfig{
 		Username:      sys.Registry.Username,
 		Password:      sys.Registry.Password,
 		Email:         sys.Registry.Email,
@@ -328,7 +329,7 @@ func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 	return err
 }
 
-func (gd *Gardener) SystemConfig() (database.Configurations, error) {
+func (gd *Gardener) systemConfig() (database.Configurations, error) {
 	gd.RLock()
 	config := gd.sysConfig
 	gd.RUnlock()

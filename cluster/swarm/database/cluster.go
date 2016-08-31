@@ -47,7 +47,7 @@ func InsertCluster(c Cluster) error {
 
 	_, err = db.NamedExec(insertClusterQuery, &c)
 
-	return errors.Wrap(err, "Cluster.Insert")
+	return errors.Wrap(err, "insert Cluster")
 }
 
 // UpdateClusterStatus update tb_cluster.enabled by ID
@@ -260,7 +260,7 @@ func TxInsertMultiNodeAndTask(nodes []*Node, tasks []*Task) error {
 
 	err = tx.Commit()
 
-	return errors.Wrap(err, "Tx insert multiple Node And Task")
+	return errors.Wrap(err, "Tx insert multiple Node and Task")
 }
 
 // UpdateStatus returns error when Node UPDATE tb_node.status.
@@ -291,7 +291,7 @@ func (n *Node) UpdateStatus(state int64) error {
 		return nil
 	}
 
-	return errors.Wrap(err, "update Node Status")
+	return errors.Wrap(err, "update Node status")
 }
 
 // UpdateParams returns error when Node update max_container.

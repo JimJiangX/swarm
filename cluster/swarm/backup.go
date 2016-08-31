@@ -300,6 +300,13 @@ func (gd *Gardener) ReplaceServiceBackupStrategy(nameOrID string, req structs.Ba
 		return nil, err
 	}
 
+	sys, err := gd.systemConfig()
+	if err != nil {
+		logrus.Warn(err)
+	}
+
+	req.BackupDir = sys.BackupDir
+
 	strategy, err := service.ReplaceBackupStrategy(req)
 	if err != nil {
 		return strategy, err
@@ -328,6 +335,14 @@ func (gd *Gardener) UpdateServiceBackupStrategy(nameOrID string, req structs.Bac
 			return err
 		}
 	}
+
+	sys, err := gd.systemConfig()
+	if err != nil {
+		logrus.Error(err)
+	}
+
+	req.BackupDir = sys.BackupDir
+
 	bs, err := database.GetBackupStrategy(nameOrID)
 	if err != nil {
 		return err

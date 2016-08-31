@@ -321,7 +321,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}
 
 		if svc.authConfig == nil {
-			svc.authConfig, err = gd.RegistryAuthConfig()
+			svc.authConfig, err = gd.registryAuthConfig()
 			if err != nil {
 				return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
 			}
@@ -396,7 +396,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			logrus.Error(err)
 		}
 
-		sys, err := gd.SystemConfig()
+		sys, err := gd.systemConfig()
 		if err != nil {
 			logrus.WithError(err).Error("Get System Config")
 		}
@@ -889,7 +889,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		}
 
 		if svc.authConfig == nil {
-			svc.authConfig, err = gd.RegistryAuthConfig()
+			svc.authConfig, err = gd.registryAuthConfig()
 			if err != nil {
 				return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
 			}
@@ -973,7 +973,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			logrus.Error(err)
 		}
 
-		sys, err := gd.SystemConfig()
+		sys, err := gd.systemConfig()
 		if err != nil {
 			logrus.WithError(err).Error("Get System Config")
 		}

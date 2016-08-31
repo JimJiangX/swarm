@@ -259,7 +259,7 @@ func GetNetworkingByID(ID string) (Networking, int, error) {
 
 	err = db.Get(&net, "SELECT * FROM tb_networking WHERE id=?", ID)
 	if err != nil {
-		return net, 0, errors.Wrap(err, "get Networking")
+		return net, 0, errors.Wrap(err, "get Networking by ID:"+ID)
 	}
 
 	prefix := 0

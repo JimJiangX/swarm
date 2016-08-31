@@ -141,7 +141,7 @@ func initialize(name, version string) (parser configParser, cmder ContainerCmd, 
 
 	default:
 
-		return nil, nil, fmt.Errorf("Unsupported Image:'%s:%s'", name, version)
+		return nil, nil, errors.Errorf("Unsupported Image:'%s:%s'", name, version)
 	}
 
 	return parser, cmder, nil

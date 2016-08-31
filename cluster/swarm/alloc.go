@@ -348,7 +348,7 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 		return err
 	}
 
-	sys, err := gd.SystemConfig()
+	sys, err := gd.systemConfig()
 	if err != nil {
 		temp, err := database.GetSystemConfig()
 		if err != nil {

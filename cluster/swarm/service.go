@@ -23,7 +23,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-var ErrServiceNotFound = errors.New("service not found")
+var errServiceNotFound = errors.New("service not found")
 
 type Service struct {
 	sync.RWMutex
@@ -557,14 +557,19 @@ func (gd *Gardener) GetService(nameOrID string) (*Service, error) {
 func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	service, err := database.GetService(nameOrID)
 	if err != nil {
-		return nil, ErrServiceNotFound
+		if _err := database.CheckError(err); _err == database.ErrNoRowsFound {
+
+			return nil, errors.Cause(errServiceNotFound)
+		}
+
+		return nil, err
 	}
 
 	base := &structs.PostServiceRequest{}
 	if len(service.Desc) > 0 {
 		err := json.Unmarshal([]byte(service.Desc), base)
 		if err != nil {
-			logrus.WithError(err).Warn("JSON Unmarshal Service.Description")
+			logrus.WithError(err).Warn("JSON unmarshal Service.Description")
 		}
 	}
 
@@ -585,15 +590,16 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	authConfig, err := gd.RegistryAuthConfig()
+
+	authConfig, err := gd.registryAuthConfig()
 	if err != nil {
-		logrus.WithError(err).Error("Registry Auth Config")
+		logrus.WithError(err).Error("Registry auth config")
 		return nil, err
 	}
+
 	users, err := database.ListUsersByService(service.ID, "")
 	if err != nil {
-		logrus.Errorf("List Users By Service %s,error:%s", service.ID, err)
-		logrus.WithField("Service", service.ID).Errorf("List Users By Service Error:%s", err)
+		logrus.WithField("Service", service.Name).WithError(err).Error("list Users by serviceID:", service.ID)
 	}
 
 	svc := NewService(service, len(units))
@@ -629,13 +635,13 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	}
 	gd.Unlock()
 
-	logrus.WithField("NameOrID", nameOrID).Debug("rebuild Service")
+	logrus.WithField("Service", service.Name).Debug("rebuild Service")
 
 	return svc, nil
 }
 
 func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, string, string, error) {
-	authConfig, err := gd.RegistryAuthConfig()
+	authConfig, err := gd.registryAuthConfig()
 	if err != nil {
 		logrus.Errorf("get Registry Auth Config:%+v", err)
 		return nil, "", "", err
@@ -643,7 +649,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 
 	svc, task, err := buildService(req, authConfig)
 	if err != nil {
-		logrus.Error("build Service:%+v", err)
+		logrus.WithError(err).Error("build Service")
 
 		return svc, "", task.ID, err
 	}
@@ -760,7 +766,7 @@ func (svc *Service) startContainers() error {
 				"Unit":   u.Name,
 				"Status": code,
 				"Error":  msg,
-			}).Errorf("Update Unit %+v", code, msg, _err)
+			}).Errorf("update Unit %+v", _err)
 
 			return err
 		}
@@ -843,7 +849,7 @@ func (svc *Service) statusCAS(expected, value int64) error {
 		return nil
 	}
 
-	return errors.Errorf("status conflict:expected %d but got %d", svc.Name, expected, atomic.LoadInt64(&svc.Status))
+	return errors.Errorf("status conflict:expected %d but got %d", expected, atomic.LoadInt64(&svc.Status))
 }
 
 func (svc *Service) startService() error {
@@ -1661,7 +1667,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 		backup = master
 	}
 
-	sys, err := gd.SystemConfig()
+	sys, err := gd.systemConfig()
 	if err != nil {
 		logrus.Errorf("Get SystemConfig Error:%s", err)
 		return "", err
@@ -1911,7 +1917,7 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 	entry.Debug("GetService From Gardener...")
 	svc, err := gd.GetService(nameOrID)
 	if err != nil {
-		if err == ErrServiceNotFound {
+		if errors.Cause(err) == errServiceNotFound {
 			return nil
 		}
 		entry.Errorf("GetService From Gardener error:%s", err)

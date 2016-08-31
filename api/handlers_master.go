@@ -1458,11 +1458,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = gd.AddDatacenter(cluster, store)
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+	gd.AddDatacenter(cluster, store)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -1905,12 +1901,6 @@ func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
-	sys, err := gd.SystemConfig()
-	if err != nil {
-		logrus.Error(err)
-	}
-
-	req.BackupDir = sys.BackupDir
 
 	strategy, err := gd.ReplaceServiceBackupStrategy(name, req)
 	if err != nil {
@@ -1937,14 +1927,8 @@ func postUpdateServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http
 		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
 		return
 	}
-	sys, err := gd.SystemConfig()
-	if err != nil {
-		logrus.Error(err)
-	}
 
-	req.BackupDir = sys.BackupDir
-
-	err = gd.UpdateServiceBackupStrategy(name, req)
+	err := gd.UpdateServiceBackupStrategy(name, req)
 	if err != nil {
 		httpError2(w, err, http.StatusInternalServerError)
 		return
