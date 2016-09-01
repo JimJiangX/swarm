@@ -436,7 +436,11 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		return database.TxUpdateUnitStatusWithTask(&migrate.Unit, &task, msg)
 	}
 
-	t := NewAsyncTask(context.Background(), background, create, update, 0)
+	t := NewAsyncTask(context.Background(),
+		background,
+		create,
+		update,
+		0)
 
 	return task.ID, t.Run()
 }
@@ -1013,7 +1017,11 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		return database.TxUpdateUnitStatusWithTask(&rebuild.Unit, &task, msg)
 	}
 
-	t := NewAsyncTask(context.Background(), background, create, update, 0)
+	t := NewAsyncTask(context.Background(),
+		background,
+		create,
+		update,
+		0)
 
 	return task.ID, t.Run()
 }

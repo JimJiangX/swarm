@@ -799,7 +799,7 @@ func (u *unit) startService() (err error) {
 				"Unit":   u.Name,
 				"Status": code,
 				"Error":  msg,
-			}).Errorf("Update Unit Status %+v", _err)
+			}).WithError(_err).Error("update Unit Status")
 		}
 	}()
 
@@ -1091,7 +1091,11 @@ func (gd *Gardener) RestoreUnit(nameOrID, source string) (string, error) {
 		return database.TxUpdateUnitStatusWithTask(&unit.Unit, &task, msg)
 	}
 
-	t := NewAsyncTask(context.Background(), background, before, update, 0)
+	t := NewAsyncTask(context.Background(),
+		background,
+		before,
+		update,
+		0)
 
 	return task.ID, t.Run()
 }

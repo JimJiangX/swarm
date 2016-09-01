@@ -105,7 +105,10 @@ func (svc *Service) TryBackupTask(strategy database.BackupStrategy, task *databa
 		return err
 	}
 
-	err = backupTask(master, task, strategy, func() error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(strategy.Timeout)*time.Second)
+	defer cancel()
+
+	err = backupTask(ctx, master, task, strategy, func() error {
 		var err error
 		if r := recover(); r != nil {
 			err = errors.Errorf("%v", r)
@@ -135,23 +138,29 @@ func lockSwitchManager(svc *Service, retries int) (string, int, *unit, error) {
 	for count := 0; count < retries; count++ {
 		addr, port, master, err = svc.getSwitchManagerAndMaster()
 		if err != nil || master == nil {
-			logrus.Errorf("Get SwitchManager And Master,retries=%d,Error:%v", retries, err)
+			logrus.WithField("Service", svc.Name).WithError(err).Errorf("get SwitchManager and Master,retries=%d", retries)
 			continue
 		}
 
 		err = smlib.Lock(addr, port)
 		if err != nil {
-			logrus.Errorf("Lock SwitchManager %s:%d,Error:%s", addr, port, err)
+			logrus.WithFields(logrus.Fields{
+				"Service": svc.Name,
+				"addr":    addr,
+				"port":    port,
+			}).WithError(err).Error("lock SwitchManager")
+
 			continue
 		}
 
 		break
 	}
 
-	return addr, port, master, nil
+	return addr, port, master, errors.Wrap(err, "lock switch manager")
 }
 
-func backupTask(backup *unit, task *database.Task, strategy database.BackupStrategy, after func() error) error {
+func backupTask(ctx context.Context, backup *unit, task *database.Task,
+	strategy database.BackupStrategy, after func() error) error {
 	if after != nil {
 		defer after()
 	}
@@ -163,9 +172,6 @@ func backupTask(backup *unit, task *database.Task, strategy database.BackupStrat
 	})
 
 	args := []string{HostAddress + ":" + httpPort + "/v1.0/tasks/backup/callback", task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(strategy.Timeout)*time.Second)
-	defer cancel()
 
 	msg, status := "", int64(0)
 
@@ -232,9 +238,10 @@ func checkBackupFiles(nameOrID string) (bool, error) {
 		}
 	}
 
-	logrus.Infof("Backup Files Expired:%v", expired)
-	// TODO:remove expired files and delete backupfile record
-
+	if len(expired) > 0 {
+		logrus.Infof("Backup files expired:%v", expired)
+		// TODO:remove expired files and delete backupfile record
+	}
 	sub := 0
 	for i := range valid {
 		sub += valid[i].SizeByte
@@ -245,7 +252,7 @@ func checkBackupFiles(nameOrID string) (bool, error) {
 			"Service": service.Name,
 			"Max":     service.BackupMaxSizeByte,
 			"Used":    sub,
-		}).Warning("No More Space For Backup Task")
+		}).Warning("no more space for backup task")
 
 		return false, nil
 	}

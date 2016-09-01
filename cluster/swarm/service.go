@@ -509,7 +509,7 @@ func (svc *Service) getUnit(nameOrID string) (*unit, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("Unit Not Found,%s", nameOrID)
+	return nil, errors.Errorf("not found Unit '%s'", nameOrID)
 }
 
 func (gd *Gardener) addService(svc *Service) error {
@@ -559,7 +559,7 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	if err != nil {
 		if _err := database.CheckError(err); _err == database.ErrNoRowsFound {
 
-			return nil, errors.Cause(errServiceNotFound)
+			return nil, errors.Wrap(errServiceNotFound, "rebuild Service:"+nameOrID)
 		}
 
 		return nil, err
@@ -700,13 +700,19 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 	}
 
 	updater := func(code int, msg string) error {
-		svcStatus := atomic.LoadInt64(&svc.Status)
+		state := atomic.LoadInt64(&svc.Status)
 
-		return database.TxSetServiceStatus(&svc.Service, task, svcStatus, int64(code), time.Now(), msg)
+		return database.TxSetServiceStatus(&svc.Service, task, state, int64(code), time.Now(), msg)
 	}
 
-	worker := NewAsyncTask(context.Background(), background, nil, updater, 10*time.Minute)
-	if err = worker.Run(); err != nil {
+	worker := NewAsyncTask(context.Background(),
+		background,
+		nil,
+		updater,
+		10*time.Minute)
+
+	err = worker.Run()
+	if err != nil {
 		logrus.WithField("Service", svc.Name).Errorf("%+v", err)
 	}
 
@@ -714,13 +720,15 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 }
 
 func (svc *Service) StartService() (err error) {
+	filed := logrus.WithField("Service", svc.Name)
+
 	err = svc.statusCAS(statusServiceNoContent, statusServiceStarting)
 	if err != nil {
-		logrus.WithField("Service", svc.Name).Warn(err)
+		filed.Warn(err)
 
 		err = svc.statusCAS(statusServiceStartFailed, statusServiceStarting)
 		if err != nil {
-			logrus.WithField("Service", svc.Name).Errorf("%+v", err)
+			filed.Errorf("%+v", err)
 
 			return err
 		}
@@ -729,7 +737,7 @@ func (svc *Service) StartService() (err error) {
 	svc.Lock()
 	defer func() {
 		if err != nil {
-			logrus.WithField("Service", svc.Name).Errorf("%+v", err)
+			filed.Errorf("%+v", err)
 
 			svc.SetServiceStatus(statusServiceStartFailed, time.Now())
 		} else {
@@ -909,22 +917,27 @@ func (svc *Service) StopService() (err error) {
 
 	svc.Lock()
 	defer func() {
+		var _err error
 		if err != nil {
-			svc.SetServiceStatus(statusServiceStopFailed, time.Now())
+			_err = svc.SetServiceStatus(statusServiceStopFailed, time.Now())
 		} else {
-			svc.SetServiceStatus(statusServiceNoContent, time.Now())
+			_err = svc.SetServiceStatus(statusServiceNoContent, time.Now())
 		}
 		svc.Unlock()
+		if _err != nil {
+			logrus.WithField("Service", svc.Name).WithError(_err).Error("set service status")
+		}
 	}()
 
 	swm, err := svc.getSwithManagerUnit()
 	if err == nil && swm != nil {
+
 		err = swm.stopService()
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				"Service": svc.Name,
 				"Unit":    swm.Name,
-			}).WithError(err).Error("stop service")
+			}).WithError(err).Error("stop switch manager service")
 
 			err = checkContainerError(err)
 			if err != errContainerNotRunning && err != errContainerNotFound {
@@ -1624,7 +1637,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 	if nameOrID != "" {
 		u, err := database.GetUnit(nameOrID)
 		if err != nil {
-			logrus.Errorf("Not Found Unit '%s',Error:%s", nameOrID, err)
+			logrus.WithField("Unit", nameOrID).WithError(err).Error("not found Unit")
 			return "", err
 		}
 
@@ -1635,7 +1648,6 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 
 	svc, err := gd.GetService(service)
 	if err != nil {
-		logrus.Errorf("Not Found Service '%s',Error:%s", service, err)
 
 		return "", err
 	}
@@ -1645,7 +1657,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 		return "", err
 	}
 	if !ok {
-		return "", errors.Errorf("Service %s,No More Space For Backup Task", svc.Name)
+		return "", errors.Errorf("Service %s:no more space for backup task", svc.Name)
 
 	}
 
@@ -1659,17 +1671,16 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 
 	addr, port, master, err := lockSwitchManager(svc, 3)
 	if err != nil {
-		logrus.Error(err)
-
 		return "", err
 	}
+
 	if backup == nil {
 		backup = master
 	}
 
 	sys, err := gd.systemConfig()
 	if err != nil {
-		logrus.Errorf("Get SystemConfig Error:%s", err)
+		logrus.WithError(err).Errorf("get SystemConfig")
 		return "", err
 	}
 
@@ -1688,28 +1699,56 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 	}
 
 	task := database.NewTask(backup.Name, _Backup_Manual_Task, backup.ID, "", nil, strategy.Timeout)
-	task.Status = statusTaskCreate
-	err = database.TxInsertBackupStrategyAndTask(strategy, task)
-	if err != nil {
-		logrus.Errorf("TxInsert BackupStrategy And Task Erorr:%s", err)
-		return "", err
+
+	entry := logrus.WithFields(logrus.Fields{
+		"Unit":     backup.Name,
+		"Strategy": strategy.ID,
+		"Task":     task.ID,
+	})
+
+	creater := func() error {
+		task.Status = statusTaskCreate
+		err = database.TxInsertBackupStrategyAndTask(strategy, task)
+
+		return err
 	}
 
-	go backupTask(master, &task, strategy, func() error {
-		var err error
-		if r := recover(); r != nil {
-			err = errors.Errorf("%v", r)
-		}
-		_err := smlib.UnLock(addr, port)
-		if _err != nil {
-			logrus.Errorf("switch_manager %s:%d Unlock Error:%s", addr, port, _err)
-			err = errors.Errorf("%s,%s", err, _err)
+	update := func(code int, msg string) error {
+		task.Status = int64(code)
+
+		err := database.TxUpdateUnitStatusWithTask(&backup.Unit, &task, msg)
+		if err != nil {
+			entry.WithError(err).Errorf("Update TaskStatus code=%d,message=%s", code, msg)
 		}
 
 		return err
-	})
+	}
 
-	return task.ID, nil
+	background := func(ctx context.Context) error {
+
+		args := []string{HostAddress + ":" + httpPort + "/v1.0/tasks/backup/callback",
+			task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
+
+		err := backup.backup(ctx, args...)
+
+		_err := smlib.UnLock(addr, port)
+		if _err != nil {
+			entry.Errorf("unlock switch_manager %s:%d:%s", addr, port, _err)
+			err = errors.Wrap(err, _err.Error())
+		}
+
+		return err
+	}
+
+	worker := NewAsyncTask(context.Background(),
+		background,
+		creater,
+		update,
+		time.Duration(strategy.Timeout)*time.Second)
+
+	err = worker.Run()
+
+	return task.ID, err
 }
 
 type pendingContainerUpdate struct {

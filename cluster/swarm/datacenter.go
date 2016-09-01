@@ -922,7 +922,7 @@ func (node Node) modifyProfile() (*database.Configurations, string, error) {
 
 	buf, err := json.Marshal(config.GetConsulAddrs())
 	if err != nil {
-		return nil, "", errors.Cause(err)
+		return nil, "", errors.Wrap(err, "JSON marshal consul addrs")
 	}
 	/*
 		#!/bin/bash
