@@ -1724,20 +1724,19 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 		return err
 	}
 
-	background := func(ctx context.Context) error {
+	background := func(ctx context.Context) (err error) {
+		defer func() {
+			_err := smlib.UnLock(addr, port)
+			if _err != nil {
+				entry.Errorf("unlock switch_manager %s:%d:%s", addr, port, _err)
+				err = errors.Wrap(err, _err.Error())
+			}
+		}()
 
 		args := []string{HostAddress + ":" + httpPort + "/v1.0/tasks/backup/callback",
 			task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
 
-		err := backup.backup(ctx, args...)
-
-		_err := smlib.UnLock(addr, port)
-		if _err != nil {
-			entry.Errorf("unlock switch_manager %s:%d:%s", addr, port, _err)
-			err = errors.Wrap(err, _err.Error())
-		}
-
-		return err
+		return backup.backup(ctx, args...)
 	}
 
 	worker := NewAsyncTask(context.Background(),
