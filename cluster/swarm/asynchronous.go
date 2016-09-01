@@ -134,7 +134,8 @@ func (t *asyncTask) Run() error {
 	}
 
 	if t.create != nil {
-		if err := t.create(); err != nil {
+		err := t.create()
+		if err != nil {
 			return err
 		}
 	}
@@ -150,7 +151,7 @@ func (t *asyncTask) Run() error {
 
 			err := t.update(code, msg)
 			if err != nil {
-				err = errors.Errorf("asyncTask.update,code=%d,msg=%s,%+v", code, msg, err)
+				err = errors.Errorf("asyncTask.update,code=%d,msg=%s\n%+v", code, msg, err)
 			}
 
 			return errors.Wrap(err, "parent Context has done")
@@ -173,29 +174,32 @@ func (t *asyncTask) Run() error {
 	t.cancel = cancel
 
 	go func(ctx context.Context, t *asyncTask) {
+		msg, code := "", statusTaskRunning
+
 		defer func() {
 			if r := recover(); r != nil {
 				logrus.Errorf("asyncTask panic:%v\n%s", r, debug.Stack())
+				code, msg = statusTaskFailed, fmt.Sprintf("panic:%v", r)
+			}
 
-				if t.update != nil {
-					code, msg := statusTaskFailed, fmt.Sprintf("panic:%v", r)
-					err := t.update(code, msg)
-					if err != nil {
-						logrus.WithFields(logrus.Fields{
-							"Code":    code,
-							"Message": msg,
-						}).Errorf("asyncTask update:%+v", err)
-					}
+			if t.update != nil {
+				err := t.update(code, msg)
+				if err != nil {
+					logrus.WithFields(logrus.Fields{
+						"Code":    code,
+						"Message": msg,
+					}).Errorf("asyncTask update:%+v", err)
 				}
 			}
+
 			if t.cancel != nil {
 				t.cancel()
 			}
 		}()
 
-		msg, code := "", statusTaskRunning
 		if t.update != nil {
-			if err := t.update(code, msg); err != nil {
+			err := t.update(code, msg)
+			if err != nil {
 				logrus.Errorf("asyncTask.update:%+v", err)
 			}
 		}
@@ -203,36 +207,27 @@ func (t *asyncTask) Run() error {
 		logrus.Debug("Running background...")
 
 		err := t.background(ctx)
+
+		logrus.Infof("Run background end,%+v", err)
+
 		if err == nil {
 			code = statusTaskDone
 		} else {
 			code = statusTaskFailed
 			msg = err.Error()
-		}
 
-		logrus.Infof("Run background end,%+v", err)
-
-		select {
-		case <-ctx.Done():
-			if err := ctx.Err(); err != nil {
-				if err == context.DeadlineExceeded {
-					msg = "Timeout " + msg
-					code = statusTaskTimeout
-				} else if err == context.Canceled {
-					msg = "Canceled " + msg
-					code = statusTaskCancel
+			select {
+			case <-ctx.Done():
+				if err := ctx.Err(); err != nil {
+					if err == context.DeadlineExceeded {
+						msg = "Timeout " + msg
+						code = statusTaskTimeout
+					} else if err == context.Canceled {
+						msg = "Canceled " + msg
+						code = statusTaskCancel
+					}
 				}
-			}
-		default:
-		}
-
-		if code != 0 && t.update != nil {
-			err = t.update(code, msg)
-			if err != nil {
-				logrus.WithFields(logrus.Fields{
-					"Code":    code,
-					"Message": msg,
-				}).Errorf("asyncTask update:%+v", err)
+			default:
 			}
 		}
 	}(ctx, t)

@@ -191,43 +191,43 @@ func ExampleAsyncTask() {
 	time.Sleep(time.Second * 20)
 
 	// output:
-	// call recorder.Insert
-	// call recorder.Insert
-	// call recorder.Insert
-	// call recorder1.Insert
-	// call recorder1.Insert
-	// call recorder1.Insert
-	// create error: call recorder2.Insert
-	// create error: call recorder2.Insert
-	// create error: call recorder2.Insert
-	// call recorder.Insert
-	// call recorder.Insert
-	// call recorder.Insert
-	// call recorder1.Insert
-	// call recorder1.Insert
-	// call recorder1.Insert
-	// create error: call recorder2.Insert
-	// create error: call recorder2.Insert
-	// create error: call recorder2.Insert
-	// call recorder.Insert
-	// call recorder.Insert
-	// call recorder.Insert
-	// call recorder1.Insert
-	// call recorder1.Insert
-	// call recorder1.Insert
-	// create error: call recorder2.Insert
-	// create error: call recorder2.Insert
-	// create error: call recorder2.Insert
-	// call recorder.Update
-	// call recorder.Update
-	// call recorder.Update
-	// call recorder.Update
-	// call recorder.Update
-	// call recorder.Update
-	// call recorder.Update
-	// call recorder.Update
-	// call recorder.Update
-	// call recorder.Update
-	// call recorder.Update
-	// call recorder.Update
+	//call recorder.Insert
+	//call recorder.Insert
+	//call recorder.Insert
+	//call recorder1.Insert
+	//call recorder1.Insert
+	//call recorder1.Insert
+	//call recorder2.Insert
+	//call recorder2.Insert
+	//call recorder2.Insert
+	//call recorder.Insert
+	//call recorder.Insert
+	//call recorder.Insert
+	//call recorder1.Insert
+	//call recorder1.Insert
+	//call recorder1.Insert
+	//call recorder2.Insert
+	//call recorder2.Insert
+	//call recorder2.Insert
+	//call recorder.Insert
+	//call recorder.Insert
+	//call recorder.Insert
+	//call recorder1.Insert
+	//call recorder1.Insert
+	//call recorder1.Insert
+	//call recorder2.Insert
+	//call recorder2.Insert
+	//call recorder2.Insert
+	//call recorder.Update
+	//call recorder.Update
+	//call recorder.Update
+	//call recorder.Update
+	//call recorder.Update
+	//call recorder.Update
+	//call recorder.Update
+	//call recorder.Update
+	//call recorder.Update
+	//call recorder.Update
+	//call recorder.Update
+	//call recorder.Update
 }
