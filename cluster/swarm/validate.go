@@ -188,7 +188,7 @@ func ValidService(req structs.PostServiceRequest) error {
 	return errors.New(buf.String())
 }
 
-func ValidateServiceScale(svc *Service, scale structs.PostServiceScaledRequest) error {
+func validateServiceScale(svc *Service, scale structs.PostServiceScaledRequest) error {
 	buf := bytes.NewBuffer(nil)
 
 	if scale.UpdateConfig != nil {

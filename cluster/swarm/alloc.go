@@ -128,7 +128,7 @@ func (gd *Gardener) allocCPUs(engine *cluster.Engine, cpusetCpus string, reserve
 	used := int(engine.UsedCpus())
 
 	if total-used < ncpu {
-		return "", fmt.Errorf("Engine Alloc CPU Error,%s CPU is Short(%d-%d<%d),", engine.Name, total, used, ncpu)
+		return "", errors.Errorf("alloc CPU,%s CPU is short(%d-%d<%d)", engine.Name, total, used, ncpu)
 	}
 
 	containers := engine.Containers()
@@ -145,13 +145,10 @@ func (gd *Gardener) allocCPUs(engine *cluster.Engine, cpusetCpus string, reserve
 		}
 	}
 
-	usedCPUs, err := parseUintList(list)
-	if err != nil {
-		return "", err
-	}
+	usedCPUs := parseUintList(list)
 
 	if total-len(usedCPUs) < ncpu {
-		return "", fmt.Errorf("Engine Alloc CPU Error,%s CPU is Short(%d-%d<%d),", engine.Name, total, used, ncpu)
+		return "", errors.Errorf("alloc CPU error,%s CPU is Short(%d-%d<%d),", engine.Name, total, used, ncpu)
 	}
 
 	free := make([]string, ncpu)
@@ -165,9 +162,9 @@ func (gd *Gardener) allocCPUs(engine *cluster.Engine, cpusetCpus string, reserve
 	return strings.Join(free, ","), nil
 }
 
-func parseUintList(list []string) (map[int]bool, error) {
+func parseUintList(list []string) map[int]bool {
 	if len(list) == 0 {
-		return map[int]bool{}, nil
+		return map[int]bool{}
 	}
 
 	ints := make(map[int]bool, len(list)*3)
@@ -185,7 +182,7 @@ func parseUintList(list []string) (map[int]bool, error) {
 		}
 	}
 
-	return ints, nil
+	return ints
 }
 
 type pendingAllocResource struct {
@@ -470,9 +467,10 @@ func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
 			}
 		}
 	}
+
 	err = tx.Commit()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Tx cancel store extension")
 	}
 
 	gd.Lock()
@@ -538,10 +536,7 @@ func (svc *Service) volumesPendingExpension(gd *Gardener, _type string, extensio
 func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []structs.DiskStorage, skipSAN bool) (*pendingAllocStore, []string, error) {
 	dc, node, err := gd.GetNode(engineID)
 	if err != nil {
-		err := fmt.Errorf("Not Found Node %s,Error:%s", engineID, err)
-		logrus.Error(err)
-
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "not found node by Engine:"+engineID)
 	}
 
 	pending := &pendingAllocStore{
@@ -623,9 +618,10 @@ func (svc *Service) handleScaleUp(gd *Gardener, _type string, updateConfig *cont
 
 	var used int64
 	if need > 0 {
-		used, err = utils.GetCPUNum(units[0].container.Info.HostConfig.CpusetCpus)
+		cpuset := units[0].container.Info.HostConfig.CpusetCpus
+		used, err = utils.GetCPUNum(cpuset)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "parse CpusetCpus:"+cpuset)
 		}
 	}
 	if (need == 0 || used == need) && (updateConfig.Memory == 0 ||
@@ -693,7 +689,7 @@ func (svc *Service) handleScaleUp(gd *Gardener, _type string, updateConfig *cont
 func reduceCPUset(cpusetCpus string, need int) (string, error) {
 	cpus, err := utils.ParseUintList(cpusetCpus)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "parse cpusetCpus:"+cpusetCpus)
 	}
 
 	cpuSlice := make([]int, 0, len(cpus))

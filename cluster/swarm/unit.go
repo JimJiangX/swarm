@@ -127,12 +127,12 @@ func (u *unit) ContainerAPIClient() (*cluster.Engine, client.ContainerAPIClient,
 	}
 
 	if eng == nil {
-		return nil, nil, errEngineIsNil
+		return nil, nil, errors.Wrap(errEngineIsNil, "get container API Client")
 	}
 
 	client := eng.ContainerAPIClient()
 	if client == nil {
-		return eng, nil, errEngineAPIisNil
+		return eng, nil, errors.Wrap(errEngineAPIisNil, "get container API Client")
 	}
 
 	return eng, client, nil
@@ -377,7 +377,7 @@ func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
 	err = client.ContainerUpdate(context.Background(), u.container.ID, updateConfig)
 	engine.CheckConnectionErr(err)
 
-	return err
+	return errors.Wrap(err, "container update")
 }
 
 func (u *unit) removeContainer(force, rmVolumes bool) error {
@@ -615,7 +615,9 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 	}
 
 	for key, val := range data {
-		if err := u.Set(key, val); err != nil {
+
+		err := u.Set(key, val)
+		if err != nil {
 			return err
 		}
 	}
@@ -625,13 +627,12 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 		return err
 	}
 
-	if err := u.saveConfigToDisk(content); err != nil {
+	err = u.saveConfigToDisk(content)
+	if err != nil {
 		return err
 	}
 
 	context := string(content)
-
-	logrus.Debugf("Unit %s:%s\n%s", u.Name, u.ImageName, context)
 
 	volumes, err := database.ListVolumesByUnitID(u.ID)
 	if err != nil {
@@ -645,11 +646,13 @@ func (u *unit) CopyConfig(data map[string]interface{}) error {
 
 	err = copyConfigIntoCNFVolume(engine.IP, u.Path(), context, volumes)
 	if err != nil {
-		logrus.Errorf("%s:%s copy Config Into CNF Volume error:%s", u.Name, u.ImageName, err)
-		return err
+		logrus.WithFields(logrus.Fields{
+			"Unit":  u.Name,
+			"Image": u.ImageName,
+		}).WithError(err).Error("copy file to Volome")
 	}
 
-	return nil
+	return err
 }
 
 func copyConfigIntoCNFVolume(host, path, content string, lvs []database.LocalVolume) error {
@@ -683,9 +686,12 @@ func copyConfigIntoCNFVolume(host, path, content string, lvs []database.LocalVol
 	addr := getPluginAddr(host, pluginPort)
 	err := sdk.CopyFileToVolume(addr, config)
 
-	logrus.Debugf("FileCopyToVolome to %s:%s config:%+v,error:%v", addr, lvs[cnf].Name, config, err)
+	logrus.WithFields(logrus.Fields{
+		"addr":   addr,
+		"volume": lvs[cnf].Name,
+	}).WithError(err).Debugf("CopyFileToVolume,config:+v", config)
 
-	return err
+	return errors.Wrap(err, "copy file to Volume")
 }
 
 func (u *unit) initService() error {
@@ -848,10 +854,9 @@ func (u *unit) forceStopService() error {
 		return nil
 	}
 
-	logrus.Debug(u.Name, " stop service ...")
 	inspect, err := containerExec(context.Background(), eng, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
-		err = fmt.Errorf("%s stop service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+		err = errors.Errorf("%s stop service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
 
 	return err
@@ -868,7 +873,11 @@ func (u *unit) stopService() error {
 	code, msg := int64(statusUnitStoping), ""
 	_err := database.TxUpdateUnitStatus(&u.Unit, code, msg)
 
-	logrus.WithField("Unit", u.Name).Errorf("Update Unit Status,status=%d,LatestError=%s,%v", code, msg, _err)
+	logrus.WithFields(logrus.Fields{
+		"Unit":    u.Name,
+		"message": code,
+		"error":   msg,
+	}).WithError(_err).Error("update Unit Status")
 
 	err = u.forceStopService()
 
@@ -880,7 +889,11 @@ func (u *unit) stopService() error {
 
 	_err = database.TxUpdateUnitStatus(&u.Unit, code, msg)
 	if err != nil {
-		logrus.WithField("Unit", u.Name).Errorf("Update Unit Status,status=%d,LatestError=%s,%v", code, msg, _err)
+		logrus.WithFields(logrus.Fields{
+			"Unit":    u.Name,
+			"code":    code,
+			"message": msg,
+		}).WithError(_err).Error("update Unit Status")
 	}
 
 	return err

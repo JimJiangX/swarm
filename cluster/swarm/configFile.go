@@ -53,7 +53,8 @@ func (u unit) MustRestart(data map[string]interface{}) bool {
 
 func (u unit) Verify(data map[string]interface{}) error {
 	if len(data) > 0 {
-		if err := u.Validate(data); err != nil {
+		err := u.Validate(data)
+		if err != nil {
 			return err
 		}
 	}
@@ -66,7 +67,7 @@ func (u *unit) SetServiceConfig(key string, val interface{}) (bool, error) {
 	restart := false
 	key = strings.ToLower(key)
 	if !u.parent.KeySets[key].CanSet {
-		return restart, fmt.Errorf("Key %s cannot Set new Value", key)
+		return restart, errors.Errorf("key %s cannot set new value", key)
 	}
 
 	if u.parent.KeySets[key].MustRestart {
@@ -78,7 +79,7 @@ func (u *unit) SetServiceConfig(key string, val interface{}) (bool, error) {
 
 func (u *unit) setServiceConfig(key string, val interface{}) error {
 	if u.configParser == nil {
-		return fmt.Errorf("Unit %s configParser is nil", u.Name)
+		return errors.Errorf("Unit %s configParser is nil", u.Name)
 	}
 
 	return u.configParser.Set(key, val)
@@ -100,9 +101,7 @@ func (u *unit) saveConfigToDisk(content []byte) error {
 	u.parent = &config
 	config.UnitID = u.ID
 
-	err := database.SaveUnitConfig(&u.Unit, config)
-
-	return err
+	return database.SaveUnitConfig(&u.Unit, config)
 }
 
 func Factory(name, version string) (configParser, ContainerCmd, error) {
@@ -116,19 +115,19 @@ func initialize(name, version string) (parser configParser, cmder ContainerCmd, 
 		cmder = &mysqlCmd{}
 
 	case _ImageProxy == name && version == "1.0.2":
-		parser = &proxyConfig_v102{}
+		parser = &proxyConfigV102{}
 		cmder = &proxyCmd{}
 
 	case _ImageProxy == name && version == "1.1.0":
-		parser = &proxyConfig_v110{}
+		parser = &proxyConfigV110{}
 		cmder = &proxyCmd{}
 
 	case _ImageSwitchManager == name && version == "1.1.19":
-		parser = &switchManagerConfig_v1119{}
+		parser = &switchManagerConfigV1119{}
 		cmder = &switchManagerCmd{}
 
 	case _ImageSwitchManager == name && version == "1.1.23":
-		parser = &switchManagerConfig_v1123{}
+		parser = &switchManagerConfigV1123{}
 		cmder = &switchManagerCmd{}
 
 	case _ImageProxy == name:
@@ -141,7 +140,7 @@ func initialize(name, version string) (parser configParser, cmder ContainerCmd, 
 
 	default:
 
-		return nil, nil, errors.Errorf("Unsupported Image:'%s:%s'", name, version)
+		return nil, nil, errors.Errorf("unsupported Image:'%s:%s'", name, version)
 	}
 
 	return parser, cmder, nil
@@ -183,19 +182,19 @@ func (mysqlConfig) Validate(data map[string]interface{}) error {
 }
 
 func (c mysqlConfig) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
-	errUnexpectedArgs := errors.Errorf("Unexpected args,len=%d", len(args))
+	errMsg := fmt.Sprintf("unexpected args,len=%d", len(args))
 
 	if len(args) < 2 {
-		return nil, errUnexpectedArgs
+		return nil, errors.New(errMsg)
 	}
 	svc, ok := args[0].(*Service)
 	if !ok || svc == nil {
-		return nil, errUnexpectedArgs
+		return nil, errors.New(errMsg)
 	}
 
 	u, ok := args[1].(*unit)
 	if !ok || svc == nil {
-		return nil, errUnexpectedArgs
+		return nil, errors.New(errMsg)
 	}
 
 	m := make(map[string]interface{}, 10)
@@ -203,7 +202,7 @@ func (c mysqlConfig) defaultUserConfig(args ...interface{}) (map[string]interfac
 	if len(u.networkings) == 1 {
 		m["mysqld::bind_address"] = u.networkings[0].IP.String()
 	} else {
-		return nil, fmt.Errorf("Unexpected IPAddress")
+		return nil, errors.New("unexpected IPAddress")
 	}
 
 	found := false
@@ -215,7 +214,7 @@ func (c mysqlConfig) defaultUserConfig(args ...interface{}) (map[string]interfac
 		}
 	}
 	if !found {
-		return nil, fmt.Errorf("Unexpected port allocation")
+		return nil, errors.New("unexpected port allocation")
 	}
 
 	m["mysqld::log_bin"] = fmt.Sprintf("/DBAASLOG/BIN/%s-binlog", u.Name)
@@ -227,7 +226,7 @@ func (c mysqlConfig) defaultUserConfig(args ...interface{}) (map[string]interfac
 
 func (c *mysqlConfig) Set(key string, val interface{}) error {
 	if c.config == nil {
-		return fmt.Errorf("mysqlConfig Configer is nil")
+		return errors.New("mysqlConfig Configer is nil")
 	}
 
 	return c.config.Set(strings.ToLower(key), fmt.Sprintf("%v", val))
@@ -236,7 +235,7 @@ func (c *mysqlConfig) Set(key string, val interface{}) error {
 func (c *mysqlConfig) ParseData(data []byte) (config.Configer, error) {
 	configer, err := config.NewConfigData("ini", data)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "parse ini file")
 	}
 
 	c.config = configer
@@ -247,7 +246,7 @@ func (c *mysqlConfig) ParseData(data []byte) (config.Configer, error) {
 func (c mysqlConfig) Marshal() ([]byte, error) {
 	tmpfile, err := ioutil.TempFile("", "serviceConfig")
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "create Tempfile")
 	}
 	tmpfile.Close()
 	defer os.Remove(tmpfile.Name())
@@ -257,7 +256,9 @@ func (c mysqlConfig) Marshal() ([]byte, error) {
 		return nil, err
 	}
 
-	return ioutil.ReadFile(tmpfile.Name())
+	data, err := ioutil.ReadFile(tmpfile.Name())
+
+	return data, errors.Wrap(err, "read file")
 }
 
 func (mysqlConfig) Requirement() require {
@@ -291,12 +292,12 @@ type healthCheck struct {
 
 func (c mysqlConfig) HealthCheck() (healthCheck, error) {
 	if c.config == nil {
-		return healthCheck{}, fmt.Errorf("params not ready")
+		return healthCheck{}, errors.New("params not ready")
 	}
 
 	port, err := c.config.Int("mysqld::port")
 	if err != nil {
-		return healthCheck{}, err
+		return healthCheck{}, errors.Wrap(err, "get 'mysqld::port'")
 	}
 	return healthCheck{
 		Port:     port,
@@ -332,7 +333,7 @@ type proxyConfig struct {
 
 func (c *proxyConfig) Set(key string, val interface{}) error {
 	if c.config == nil {
-		return fmt.Errorf("mysqlConfig Configer is nil")
+		return errors.New("mysqlConfig Configer is nil")
 	}
 
 	return c.config.Set(strings.ToLower(key), fmt.Sprintf("%v", val))
@@ -342,7 +343,7 @@ func (proxyConfig) Validate(data map[string]interface{}) error { return nil }
 func (c *proxyConfig) ParseData(data []byte) (config.Configer, error) {
 	configer, err := config.NewConfigData("ini", data)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "parse ini")
 	}
 
 	c.config = configer
@@ -353,7 +354,7 @@ func (c *proxyConfig) ParseData(data []byte) (config.Configer, error) {
 func (c *proxyConfig) Marshal() ([]byte, error) {
 	tmpfile, err := ioutil.TempFile("", "serviceConfig")
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "create tempFile")
 	}
 	tmpfile.Close()
 	defer os.Remove(tmpfile.Name())
@@ -363,7 +364,9 @@ func (c *proxyConfig) Marshal() ([]byte, error) {
 		return nil, err
 	}
 
-	return ioutil.ReadFile(tmpfile.Name())
+	data, err := ioutil.ReadFile(tmpfile.Name())
+
+	return data, errors.Wrap(err, "read file")
 }
 
 func (proxyConfig) Requirement() require {
@@ -395,12 +398,12 @@ func (proxyConfig) Requirement() require {
 
 func (c proxyConfig) HealthCheck() (healthCheck, error) {
 	if c.config == nil {
-		return healthCheck{}, fmt.Errorf("params not ready")
+		return healthCheck{}, errors.New("params not ready")
 	}
 
 	port, err := c.config.Int("adm-cli::proxy_admin_port")
 	if err != nil {
-		return healthCheck{}, err
+		return healthCheck{}, errors.Wrap(err, "get 'adm-cli::proxy_admin_port'")
 	}
 	return healthCheck{
 		Port:     port,
@@ -413,19 +416,19 @@ func (c proxyConfig) HealthCheck() (healthCheck, error) {
 }
 
 func (c proxyConfig) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
-	errUnexpectedArgs := errors.Errorf("Unexpected args,len=%d", len(args))
+	errMsg := fmt.Sprintf("unexpected args,len=%d", len(args))
 
 	if len(args) < 2 {
-		return nil, errUnexpectedArgs
+		return nil, errors.New(errMsg)
 	}
 	svc, ok := args[0].(*Service)
 	if !ok || svc == nil {
-		return nil, errUnexpectedArgs
+		return nil, errors.New(errMsg)
 	}
 
 	u, ok := args[1].(*unit)
 	if !ok || svc == nil {
-		return nil, errUnexpectedArgs
+		return nil, errors.New(errMsg)
 	}
 
 	m := make(map[string]interface{}, 10)
@@ -480,28 +483,28 @@ func (c proxyConfig) defaultUserConfig(args ...interface{}) (map[string]interfac
 	return m, nil
 }
 
-type proxyConfig_v102 struct {
+type proxyConfigV102 struct {
 	proxyConfig
 }
 
-type proxyConfig_v110 struct {
+type proxyConfigV110 struct {
 	proxyConfig
 }
 
-func (c proxyConfig_v110) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
-	errUnexpectedArgs := errors.Errorf("Unexpected args,len=%d", len(args))
+func (c proxyConfigV110) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
+	errMsg := fmt.Sprintf("unexpected args,len=%d", len(args))
 
 	if len(args) < 2 {
-		return nil, errUnexpectedArgs
+		return nil, errors.New(errMsg)
 	}
 	svc, ok := args[0].(*Service)
 	if !ok || svc == nil {
-		return nil, errUnexpectedArgs
+		return nil, errors.New(errMsg)
 	}
 
 	u, ok := args[1].(*unit)
 	if !ok || svc == nil {
-		return nil, errUnexpectedArgs
+		return nil, errors.New(errMsg)
 	}
 
 	m := make(map[string]interface{}, 10)
@@ -581,7 +584,7 @@ type switchManagerConfig struct {
 
 func (c *switchManagerConfig) Set(key string, val interface{}) error {
 	if c.config == nil {
-		return fmt.Errorf("switchManagerConfig Configer is nil")
+		return errors.New("switchManagerConfig Configer is nil")
 	}
 
 	return c.config.Set(strings.ToLower(key), fmt.Sprintf("%v", val))
@@ -591,7 +594,7 @@ func (switchManagerConfig) Validate(data map[string]interface{}) error { return 
 func (c *switchManagerConfig) ParseData(data []byte) (config.Configer, error) {
 	configer, err := config.NewConfigData("ini", data)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "parse ini")
 	}
 
 	c.config = configer
@@ -602,7 +605,7 @@ func (c *switchManagerConfig) ParseData(data []byte) (config.Configer, error) {
 func (c *switchManagerConfig) Marshal() ([]byte, error) {
 	tmpfile, err := ioutil.TempFile("", "serviceConfig")
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "create tempFile")
 	}
 	tmpfile.Close()
 	defer os.Remove(tmpfile.Name())
@@ -612,7 +615,9 @@ func (c *switchManagerConfig) Marshal() ([]byte, error) {
 		return nil, err
 	}
 
-	return ioutil.ReadFile(tmpfile.Name())
+	data, err := ioutil.ReadFile(tmpfile.Name())
+
+	return data, errors.Wrap(err, "read file")
 }
 
 func (switchManagerConfig) Requirement() require {
@@ -640,12 +645,12 @@ func (switchManagerConfig) Requirement() require {
 
 func (c switchManagerConfig) HealthCheck() (healthCheck, error) {
 	if c.config == nil {
-		return healthCheck{}, fmt.Errorf("params not ready")
+		return healthCheck{}, errors.New("params not ready")
 	}
 
 	port, err := c.config.Int("Port")
 	if err != nil {
-		return healthCheck{}, err
+		return healthCheck{}, errors.Wrap(err, "get 'Port'")
 	}
 	return healthCheck{
 		Port:     port,
@@ -658,19 +663,19 @@ func (c switchManagerConfig) HealthCheck() (healthCheck, error) {
 }
 
 func (c switchManagerConfig) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
-	errUnexpectedArgs := errors.Errorf("Unexpected args,len=%d", len(args))
+	errMsg := fmt.Sprintf("unexpected args,len=%d", len(args))
 
 	if len(args) < 2 {
-		return nil, errUnexpectedArgs
+		return nil, errors.New(errMsg)
 	}
 	svc, ok := args[0].(*Service)
 	if !ok || svc == nil {
-		return nil, errUnexpectedArgs
+		return nil, errors.New(errMsg)
 	}
 
 	u, ok := args[1].(*unit)
 	if !ok || svc == nil {
-		return nil, errUnexpectedArgs
+		return nil, errors.New(errMsg)
 	}
 
 	sys, err := database.GetSystemConfig()
@@ -705,28 +710,28 @@ func (c switchManagerConfig) defaultUserConfig(args ...interface{}) (map[string]
 	return m, nil
 }
 
-type switchManagerConfig_v1119 struct {
+type switchManagerConfigV1119 struct {
 	switchManagerConfig
 }
 
-type switchManagerConfig_v1123 struct {
+type switchManagerConfigV1123 struct {
 	switchManagerConfig
 }
 
-func (c switchManagerConfig_v1123) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
-	errUnexpectedArgs := errors.Errorf("Unexpected args,len=%d", len(args))
+func (c switchManagerConfigV1123) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
+	errMsg := fmt.Sprintf("unexpected args,len=%d", len(args))
 
 	if len(args) < 2 {
-		return nil, errUnexpectedArgs
+		return nil, errors.New(errMsg)
 	}
 	svc, ok := args[0].(*Service)
 	if !ok || svc == nil {
-		return nil, errUnexpectedArgs
+		return nil, errors.New(errMsg)
 	}
 
 	u, ok := args[1].(*unit)
 	if !ok || svc == nil {
-		return nil, errUnexpectedArgs
+		return nil, errors.New(errMsg)
 	}
 
 	sys, err := database.GetSystemConfig()

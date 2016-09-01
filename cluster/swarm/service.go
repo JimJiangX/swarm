@@ -235,20 +235,18 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 		code = 201
 		err := smlib.AddUser(addr, port, swmUsers[i])
 		if err != nil {
-			logrus.Errorf("%s add user error:%s", addr, err)
-			return 0, err
+			return 0, errors.Wrap(err, "add user to switch manager")
 		}
-		logrus.Debug("Add User:", swmUsers[i].UserName)
+		logrus.Debug("add User:", swmUsers[i].UserName)
 	}
 
 	swmUsers = converteToSWM_Users(update)
 	for i := range swmUsers {
 		err := smlib.UptUser(addr, port, swmUsers[i])
 		if err != nil {
-			logrus.Errorf("%s update user error:%s", addr, err)
-			return 0, err
+			return 0, errors.Wrap(err, "update user to switch manager")
 		}
-		logrus.Debug("Update User:", swmUsers[i].UserName)
+		logrus.Debug("update User:", swmUsers[i].UserName)
 	}
 
 	err = database.TxUpdateUsers(addition, update)
@@ -1269,7 +1267,7 @@ func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}
 	for _, u := range units {
 		keys, ok := u.CanModify(config)
 		if !ok {
-			return errors.Errorf("Illegal keys:%s,Or keys unable to modified", keys)
+			return errors.Errorf("Illegal keys:%s,or keys unable to modified", keys)
 		}
 
 		err := u.CopyConfig(config)
@@ -1765,39 +1763,43 @@ func (gd *Gardener) ServiceScale(name string, scale structs.PostServiceScaledReq
 		return err
 	}
 
-	err = ValidateServiceScale(svc, scale)
+	err = validateServiceScale(svc, scale)
 	if err != nil {
 		return err
 	}
 
 	err = gd.serviceScale(svc, scale)
 	if err != nil {
-		logrus.Errorf("Service  %s:%s Scale Error:%s", svc.Name, scale.Type, err)
+		logrus.WithFields(logrus.Fields{
+			"Service": svc.Name,
+			"Type":    scale.Type,
+		}).Error("Service scale")
 	}
 
 	return err
 }
 
-func (gd *Gardener) serviceScale(svc *Service, scale structs.PostServiceScaledRequest) (err error) {
+func (gd *Gardener) serviceScale(svc *Service,
+	scale structs.PostServiceScaledRequest) (err error) {
+
 	var storePendings []*pendingAllocStore
+
 	svc.Lock()
 	gd.scheduler.Lock()
+
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
+			err = errors.Errorf("%v", r)
 		}
 
 		if err == nil {
 			err = svc.updateDescAfterScale(scale)
-			if err != nil {
-				logrus.Errorf("service %s update Description error:%s", svc.Name, err)
-			}
 		}
 
 		if err != nil {
-			err1 := gd.cancelStoreExtend(storePendings)
-			if err1 != nil {
-				err = fmt.Errorf("%s,%s", err, err1)
+			_err := gd.cancelStoreExtend(storePendings)
+			if _err != nil {
+				err = errors.Errorf("%+v\n%+v", err, _err)
 			}
 		}
 
@@ -1812,8 +1814,6 @@ func (gd *Gardener) serviceScale(svc *Service, scale structs.PostServiceScaledRe
 
 	storePendings, err = svc.volumesPendingExpension(gd, scale.Type, scale.Extensions)
 	if err != nil {
-		logrus.Error(err)
-
 		return err
 	}
 
@@ -1883,6 +1883,7 @@ func (svc *Service) getServiceDescription() (*structs.PostServiceRequest, error)
 	if svc.base != nil {
 		return svc.base, nil
 	}
+
 	if svc.base == nil {
 		if svc.Desc == "" {
 			table, err := database.GetService(svc.ID)
@@ -1891,15 +1892,17 @@ func (svc *Service) getServiceDescription() (*structs.PostServiceRequest, error)
 			}
 			svc.Service = table
 		}
+
 		if svc.Desc != "" {
 			err := json.NewDecoder(strings.NewReader(svc.Desc)).Decode(svc.base)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "JSON decode Service.Desc")
 			}
 		}
 	}
+
 	if svc.base == nil {
-		return nil, fmt.Errorf("Service %s with null Description", svc.Name)
+		return nil, errors.Errorf("Service %s with null Description", svc.Name)
 	}
 
 	return svc.base, nil

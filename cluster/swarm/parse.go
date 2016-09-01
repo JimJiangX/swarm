@@ -109,7 +109,7 @@ func parseCpuset(cpuset string) (int, error) {
 			"CpusetCpus": cpuset,
 		}).Errorf("parse CpusetCpus error:%s", err)
 
-		return 0, errors.Wrap(err, "parse CpusetCpus")
+		return 0, errors.Wrap(err, "parse CpusetCpus:"+cpuset)
 	}
 
 	return ncpu, nil
