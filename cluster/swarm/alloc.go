@@ -358,6 +358,9 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 		sys = *temp
 	}
 
+	// add localtime
+	config.HostConfig.Binds = append(config.HostConfig.Binds, "/etc/localtime:/etc/localtime:ro")
+
 	for i := range need {
 		if need[i].Type == "nfs" || need[i].Type == "NFS" {
 			name := fmt.Sprintf("%s:%s", sys.NFSOption.MountDir, sys.BackupDir)
