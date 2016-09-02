@@ -345,7 +345,7 @@ func (gd *Gardener) systemConfig() (database.Configurations, error) {
 
 	err = gd.setParams(sys)
 	if err != nil {
-		return database.Configurations{}, err
+		return *sys, err
 	}
 
 	return *sys, nil

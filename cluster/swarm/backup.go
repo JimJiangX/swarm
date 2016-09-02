@@ -302,28 +302,28 @@ func (gd *Gardener) RemoveCronJob(strategyID string) error {
 }
 
 func (gd *Gardener) ReplaceServiceBackupStrategy(nameOrID string, req structs.BackupStrategy) (*database.BackupStrategy, error) {
-	service, err := gd.GetService(nameOrID)
+	svc, err := gd.GetService(nameOrID)
 	if err != nil {
 		return nil, err
 	}
 
 	sys, err := gd.systemConfig()
 	if err != nil {
-		logrus.Warn(err)
+		logrus.WithField("Service", svc.Name).Warn(err)
 	}
 
 	req.BackupDir = sys.BackupDir
 
-	strategy, err := service.ReplaceBackupStrategy(req)
+	strategy, err := svc.ReplaceBackupStrategy(req)
 	if err != nil {
 		return strategy, err
 	}
 
-	if service.backup != nil {
-		bs := newBackupJob(service)
+	if svc.backup != nil {
+		bs := newBackupJob(svc)
 		err = gd.registerBackupStrategy(bs)
 		if err != nil {
-			logrus.Errorf("Add BackupStrategy to Gardener.Crontab Error:%s", err)
+			logrus.WithField("Service", svc.Name).WithError(err).Error("Add BackupStrategy to Gardener.Crontab")
 		}
 	}
 
@@ -338,14 +338,14 @@ func (gd *Gardener) UpdateServiceBackupStrategy(nameOrID string, req structs.Bac
 	if req.Valid != "" {
 		valid, err = utils.ParseStringToTime(req.Valid)
 		if err != nil {
-			logrus.Error("Parse Request.BackupStrategy.Valid to time.Time", err)
-			return err
+			logrus.Error("Parse BackupStrategy.Valid from string to Time", err)
+			return errors.Wrap(err, "parse BackupStrategy.Valid")
 		}
 	}
 
 	sys, err := gd.systemConfig()
 	if err != nil {
-		logrus.Error(err)
+		logrus.Errorf("%+v", err)
 	}
 
 	req.BackupDir = sys.BackupDir
@@ -377,7 +377,7 @@ func (gd *Gardener) UpdateServiceBackupStrategy(nameOrID string, req structs.Bac
 func (gd *Gardener) EnableServiceBackupStrategy(strategy string) error {
 	backup, err := database.GetBackupStrategy(strategy)
 	if err != nil || backup == nil {
-		return fmt.Errorf("Not Found BackupStrategy,%v", err)
+		return errors.Errorf("not found BackupStrategy,%+v", err)
 	}
 
 	err = database.UpdateBackupStrategyStatus(strategy, true)

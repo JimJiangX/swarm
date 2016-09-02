@@ -146,12 +146,12 @@ func (svc *Service) BackupStrategy() *database.BackupStrategy {
 func (svc *Service) ReplaceBackupStrategy(req structs.BackupStrategy) (*database.BackupStrategy, error) {
 	backup, err := newBackupStrategy(svc.ID, &req)
 	if err != nil || backup == nil {
-		return nil, fmt.Errorf("With non Backup Strategy,Error:%v", err)
+		return nil, errors.Errorf("with non Backup Strategy,%+v", err)
 	}
 
 	err = database.InsertBackupStrategy(*backup)
 	if err != nil {
-		return nil, fmt.Errorf("Insert Backup Strategy Error:%s", err)
+		return nil, err
 	}
 
 	svc.Lock()
@@ -1085,7 +1085,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 	}
 
 	if _type != _UpsqlType {
-		return errors.Errorf("Unsupported Type:'%s'", _type)
+		return errors.Errorf("unsupported Type:'%s'", _type)
 	}
 
 	svc.Lock()
@@ -1159,9 +1159,11 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 		}
 
 		for _, u := range cmdRollback {
+			entry := logrus.WithField("Unit", u.Name)
+
 			engine, _err := u.Engine()
 			if _err != nil {
-				logrus.Error(u.Name, _err)
+				entry.Warn(err)
 				continue
 			}
 
@@ -1172,7 +1174,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 					_err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, originalCmds[i], inspect.ExitCode, inspect, err)
 				}
 				if _err != nil {
-					logrus.Errorf("Rollback:%s", _err)
+					entry.WithError(_err).Error("Rollback command modify")
 				}
 			}
 
@@ -1181,7 +1183,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 
 				_err := u.CopyConfig(nil)
 				if _err != nil {
-					logrus.Errorf("ConfigFile Rollback:%s", err)
+					entry.WithError(_err).Error("Rollback config file modify")
 				}
 			}
 		}
@@ -1232,7 +1234,6 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 				err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmdList[i], inspect.ExitCode, inspect, err)
 			}
 			if err != nil {
-				logrus.Error(err)
 				return err
 			}
 		}
@@ -1278,17 +1279,17 @@ func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}
 		if u.MustRestart(config) {
 
 			// disable restart Service for now
-			logrus.WithField("Container", u.Name).Warn("Should restart service to make new config file works")
+			logrus.WithField("Unit", u.Name).Warn("Should restart service to make new config file works")
 			return nil
 
 			err := u.stopService()
 			if err != nil {
-				logrus.Errorf("%s stop Service error,%s", u.Name, err)
+				logrus.WithField("Unit", u.Name).WithError(err).Error("Stop service")
 			}
 
 			err = u.startService()
 			if err != nil {
-				logrus.Errorf("%s start Service error,%s", u.Name, err)
+				logrus.WithField("Unit", u.Name).WithError(err).Error("Start service")
 				return err
 			}
 		}
@@ -1940,7 +1941,7 @@ func (svc *Service) updateDescAfterScale(scale structs.PostServiceScaledRequest)
 
 func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout int) (err error) {
 	entry := logrus.WithFields(logrus.Fields{
-		"Name":    nameOrID,
+		"Service": nameOrID,
 		"force":   force,
 		"volumes": volumes,
 	})
@@ -1955,13 +1956,12 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 	}
 	gd.Unlock()
 
-	entry.Debug("GetService From Gardener...")
 	svc, err := gd.GetService(nameOrID)
 	if err != nil {
 		if errors.Cause(err) == errServiceNotFound {
 			return nil
 		}
-		entry.Errorf("GetService From Gardener error:%s", err)
+		entry.Errorf("Get Service from Gardener:%+v", err)
 	}
 
 	defer func() {
@@ -1991,7 +1991,7 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 	}
 
 	// delete database records relation svc.ID
-	entry.Debug("DeteleServiceRelation...")
+	entry.Debug("Detele Service Relation...")
 	err = database.DeteleServiceRelation(svc.ID, volumes)
 	if err != nil {
 		entry.Errorf("DeteleServiceRelation error:%s", err)
@@ -2034,8 +2034,7 @@ func (svc *Service) Delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 		}
 
 		f := func() error {
-			if _, err := u.Engine(); err == errEngineIsNil {
-				logrus.Warnf("Remove Unit %s,error:%s", u.Name, err)
+			if _, err := u.Engine(); errors.Cause(err) == errEngineIsNil {
 				return nil
 			}
 

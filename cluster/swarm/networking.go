@@ -181,8 +181,8 @@ func (info IPInfo) String() string {
 	return fmt.Sprintf("%s/%d:%s", info.IP.String(), info.Prefix, info.Device)
 }
 
-func getIPInfoByUnitID(id string, engine *cluster.Engine) ([]IPInfo, error) {
-	ips, err := database.ListIPByUnitID(id)
+func getIPInfoByUnitID(ID string, engine *cluster.Engine) ([]IPInfo, error) {
+	ips, err := database.ListIPByUnitID(ID)
 	if err != nil {
 		return nil, err
 	}

@@ -96,7 +96,7 @@ func (u *unit) factory() error {
 	if u.parent != nil && parser != nil {
 		_, err := parser.ParseData([]byte(u.parent.Content))
 		if err != nil {
-			logrus.WithField("Unit", u.Name).WithError(err).Errorf("parser content")
+			logrus.WithField("Unit", u.Name).WithError(err).Errorf("Parser unitConfig content")
 		}
 	}
 
@@ -415,7 +415,6 @@ func (u *unit) startContainer() error {
 
 	networkings, err := u.getNetworkings()
 	if err != nil {
-
 		return err
 	}
 
@@ -465,12 +464,12 @@ func (u *unit) forceStopContainer(timeout int) error {
 		return nil
 	}
 
-	return err
+	return errors.Wrap(err, "container stop")
 }
 
 func (u *unit) stopContainer(timeout int) error {
 	if val := atomic.LoadInt64(&u.Status); val == statusUnitBackuping {
-		return fmt.Errorf("Unit %s is Backuping,Cannot stop", u.Name)
+		return errors.Errorf("Unit %s is Backuping,Cannot stop", u.Name)
 	}
 
 	return u.forceStopContainer(timeout)
@@ -480,21 +479,21 @@ func (u *unit) restartContainer(ctx context.Context) error {
 	if u.ContainerCmd == nil {
 		return nil
 	}
-	engine, err := u.Engine()
+
+	engine, client, err := u.ContainerAPIClient()
 	if err != nil {
 		return err
 	}
-	client := engine.ContainerAPIClient()
 
 	cmd := u.StopServiceCmd()
 	if len(cmd) == 0 {
-		logrus.Warnf("%s StopServiceCmd is nil", u.Name)
+		logrus.WithField("Unit", u.Name).Warn("StopServiceCmd is nil")
 		return nil
 	}
 
 	inspect, err := containerExec(ctx, engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
-		err = fmt.Errorf("%s stop service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+		err = errors.Errorf("%s stop service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
 
 	timeout := 5 * time.Second
@@ -502,7 +501,7 @@ func (u *unit) restartContainer(ctx context.Context) error {
 	err = client.ContainerRestart(ctx, u.Unit.ContainerID, &timeout)
 	engine.CheckConnectionErr(err)
 
-	return err
+	return errors.Wrap(err, "container restart")
 }
 
 func (u *unit) renameContainer(name string) error {
@@ -514,7 +513,7 @@ func (u *unit) renameContainer(name string) error {
 	err = client.ContainerRename(context.Background(), u.container.ID, name)
 	engine.CheckConnectionErr(err)
 
-	return err
+	return errors.Wrap(err, "container rename")
 }
 
 func (u *unit) kill() error {
@@ -711,37 +710,34 @@ func (u *unit) initService() error {
 	}
 	cmd := u.InitServiceCmd()
 	if len(cmd) == 0 {
-		logrus.Warnf("%s InitServiceCmd is nil", u.Name)
+		logrus.WithField("Unit", u.Name).Warn(" InitServiceCmd is nil")
 		return nil
 	}
 
 	inspect, err := containerExec(context.Background(), u.engine, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
-		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+		err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
 
-	atomic.StoreInt64(&u.Status, statusUnitStarted)
-
-	if err != nil {
+	if err == nil {
+		atomic.StoreInt64(&u.Status, statusUnitStarted)
+	} else {
 		atomic.StoreInt64(&u.Status, statusUnitStartFailed)
 		u.LatestError = err.Error()
-
-		logrus.Error(err)
 	}
 
 	return err
 }
 
-func initUnitService(id string, eng *cluster.Engine, cmd []string) error {
+func initUnitService(containerID string, eng *cluster.Engine, cmd []string) error {
 	if len(cmd) == 0 {
-		logrus.Warnf("%s InitServiceCmd is nil", id)
+		logrus.WithField("Container", containerID).Warn("InitServiceCmd is nil")
 		return nil
 	}
 
-	logrus.Debug(id, " init service ...")
-	inspect, err := containerExec(context.Background(), eng, id, cmd, false)
+	inspect, err := containerExec(context.Background(), eng, containerID, cmd, false)
 	if inspect.ExitCode != 0 {
-		err = fmt.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", id, cmd, inspect.ExitCode, inspect, err)
+		err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", containerID, cmd, inspect.ExitCode, inspect, err)
 	}
 
 	return err
@@ -750,7 +746,6 @@ func initUnitService(id string, eng *cluster.Engine, cmd []string) error {
 func (gd *Gardener) StartUnitService(nameOrID string) error {
 	unit, err := database.GetUnit(nameOrID)
 	if err != nil {
-		err = fmt.Errorf("Not Found unit %s,%s", nameOrID, err)
 		return err
 	}
 
@@ -767,7 +762,8 @@ func (gd *Gardener) StartUnitService(nameOrID string) error {
 		return err
 	}
 
-	if err = u.startContainer(); err != nil {
+	err = u.startContainer()
+	if err != nil {
 		return err
 	}
 
@@ -777,8 +773,7 @@ func (gd *Gardener) StartUnitService(nameOrID string) error {
 func (gd *Gardener) StopUnitService(nameOrID string, timeout int) error {
 	unit, err := database.GetUnit(nameOrID)
 	if err != nil {
-		err = fmt.Errorf("Not Found unit %s,%s", nameOrID, err)
-		return err
+		return errors.Wrap(err, "not found Unit:"+nameOrID)
 	}
 
 	svc, err := gd.GetService(unit.ServiceID)
@@ -816,13 +811,13 @@ func (u *unit) startService() (err error) {
 				"Unit":   u.Name,
 				"Status": code,
 				"Error":  msg,
-			}).WithError(_err).Error("update Unit Status")
+			}).WithError(_err).Error("Update Unit status")
 		}
 	}()
 
 	err = u.StatusCAS("!=", statusUnitBackuping, statusUnitStarting)
 	if err != nil {
-		logrus.WithError(err).Errorf("start %s service", u.Name)
+		logrus.WithError(err).Errorf("Start %s service", u.Name)
 
 		return err
 	}
@@ -861,7 +856,7 @@ func (u *unit) forceStopService() error {
 	}
 	cmd := u.StopServiceCmd()
 	if len(cmd) == 0 {
-		logrus.Warnf("%s StopServiceCmd is nil", u.Name)
+		logrus.WithField("Unit", u.Name).Warn("StopServiceCmd is nil")
 		return nil
 	}
 
@@ -886,9 +881,9 @@ func (u *unit) stopService() error {
 
 	logrus.WithFields(logrus.Fields{
 		"Unit":    u.Name,
-		"message": code,
-		"error":   msg,
-	}).WithError(_err).Error("update Unit Status")
+		"message": msg,
+		"status":  code,
+	}).WithError(_err).Error("Update Unit status")
 
 	err = u.forceStopService()
 
@@ -902,9 +897,9 @@ func (u *unit) stopService() error {
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"Unit":    u.Name,
-			"code":    code,
+			"status":  code,
 			"message": msg,
-		}).WithError(_err).Error("update Unit Status")
+		}).WithError(_err).Error("Update Unit status")
 	}
 
 	return err
@@ -912,10 +907,7 @@ func (u *unit) stopService() error {
 
 func (u *unit) backup(ctx context.Context, args ...string) (err error) {
 	if u.container.State != "running" {
-		err = fmt.Errorf("unit %s is busy,container Status=%s", u.Name, u.container.State)
-		logrus.Error(err)
-
-		return err
+		return errors.Errorf("Unit %s is busy,container Status=%s", u.Name, u.container.State)
 	}
 
 	err = u.StatusCAS("!=", statusUnitStoping, statusUnitBackuping)
@@ -943,21 +935,14 @@ func (u *unit) backup(ctx context.Context, args ...string) (err error) {
 	}
 	cmd := u.BackupCmd(args...)
 	if len(cmd) == 0 {
-		logrus.Warnf("%s BackupCmd is nil", u.Name)
+		logrus.WithField("Unit", u.Name).Warn("BackupCmd is nil")
 		return nil
 	}
-	entry := logrus.WithFields(logrus.Fields{
-		"Name": u.Name,
-		"Cmd":  cmd,
-	})
-	entry.Info("start Backup job")
 
 	inspect, err := containerExec(ctx, eng, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
-		err = fmt.Errorf("%s backup cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+		err = errors.Errorf("%s backup cmd:%s exitCode:%d,%v,Error:%+v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
-
-	entry.Infof("Backup job done,%v", err)
 
 	return err
 }
@@ -974,17 +959,13 @@ func (u *unit) restore(ctx context.Context, file string) error {
 
 	cmd := u.RestoreCmd(file)
 	if len(cmd) == 0 {
-		logrus.Warnf("%s RestoreCmd is nil", u.Name)
+		logrus.WithField("Unit", u.Name).Warn("RestoreCmd is nil")
 		return nil
 	}
-	logrus.WithFields(logrus.Fields{
-		"Name": u.Name,
-		"Cmd":  cmd,
-	}).Debugln("restore job")
 
 	inspect, err := containerExec(ctx, eng, u.ContainerID, cmd, false)
 	if inspect.ExitCode != 0 {
-		err = fmt.Errorf("%s restore cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+		err = errors.Errorf("%s restore cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
 	}
 
 	return err
@@ -1003,7 +984,7 @@ func getPluginAddr(IP string, port int) string {
 func (u *unit) saveToDisk() error {
 	err := database.UpdateUnitInfo(u.Unit)
 	if err != nil {
-		logrus.WithField("Container", u.Name).Errorf("Update Unit Info:%s,%+v", err, u.Unit)
+		logrus.WithField("Container", u.Name).WithError(err).Errorf("Update Unit Info:%+v", u.Unit)
 	}
 
 	return err

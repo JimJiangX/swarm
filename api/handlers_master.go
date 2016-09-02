@@ -1956,7 +1956,7 @@ func postStrategyToService(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	fmt.Fprintf(w, "{%q:%q}", "ID", strategy.ID)
 }
 
-// POST 	/services/backup_strategy/{name:.*}/update
+// POST /services/backup_strategy/{name:.*}/update
 func postUpdateServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 	req := structs.BackupStrategy{}
@@ -1982,7 +1982,7 @@ func postUpdateServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http
 
 }
 
-// POST 	/services/backup_strategy/{name:.*}/enable
+// POST /services/backup_strategy/{name:.*}/enable
 func postEnableServiceStrategy(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
