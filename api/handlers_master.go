@@ -651,6 +651,8 @@ func listServiceFromDBAAS(services []database.Service, containers cluster.Contai
 		Name         string //"name": "test01",
 		BusinessCode string `json:"business_code"` // "business_code": "??",
 
+		Endpoints []string
+
 		Version string // "upsql_version": "??",
 		Arch    string // "upsql_arch": "??",
 
@@ -686,6 +688,7 @@ func listServiceFromDBAAS(services []database.Service, containers cluster.Contai
 			Name:          services[i].Name,
 			ID:            services[i].ID,
 			BusinessCode:  services[i].BusinessCode,
+			Endpoints:     getServiceEndpoints(services[i].ID),
 			Version:       sql.Version,
 			Arch:          sql.Arch,
 			Memory:        sql.HostConfig.Memory,
@@ -839,16 +842,17 @@ func getServiceResponse(service database.Service, containers cluster.Containers)
 	}
 }
 
-func getUnitNetworking(id string) ([]struct {
+func getUnitNetworking(ID string) ([]struct {
 	Type string
 	Addr string
 }, []struct {
 	Name string
 	Port int
 }) {
-	ips, err := database.ListIPByUnitID(id)
+	ips, err := database.ListIPByUnitID(ID)
 	if err != nil {
-		logrus.Errorf("%s List IP error %s", id, err)
+		logrus.WithField("Unit", ID).WithError(err).Error("List IP by Unit")
+		return nil, nil
 	}
 
 	networkings := make([]struct {
@@ -859,7 +863,7 @@ func getUnitNetworking(id string) ([]struct {
 	for i := range ips {
 		networking, _, err := database.GetNetworkingByID(ips[i].NetworkingID)
 		if err != nil {
-			logrus.Error("Get Networking By ID", err, ips[i].NetworkingID)
+			logrus.WithField("Networking", ips[i].NetworkingID).Error(err)
 		}
 
 		ip := utils.Uint32ToIP(ips[i].IPAddr)
@@ -868,9 +872,11 @@ func getUnitNetworking(id string) ([]struct {
 		networkings[i].Addr = fmt.Sprintf("%s/%d", ip.String(), ips[i].Prefix)
 	}
 
-	out, err := database.ListPortsByUnit(id)
+	out, err := database.ListPortsByUnit(ID)
 	if err != nil {
-		logrus.Errorf("%s List Port error %s", id, err)
+		logrus.WithField("Unit", ID).Error(err)
+
+		return networkings, nil
 	}
 
 	ports := make([]struct {
@@ -884,6 +890,43 @@ func getUnitNetworking(id string) ([]struct {
 	}
 
 	return networkings, ports
+}
+
+func getServiceEndpoints(serviceID string) []string {
+	units, err := database.ListUnitByServiceID(serviceID)
+	if err != nil {
+		logrus.WithField("Service", serviceID).Error(err)
+
+		return nil
+	}
+
+	endpoints := make([]string, 0, len(units))
+
+	for i := range units {
+		endpoint := ""
+		networkings, ports := getUnitNetworking(units[i].ID)
+
+		for n := range networkings {
+			if networkings[n].Type == "external_access_networking" {
+				endpoint = networkings[n].Addr
+				index := strings.IndexByte(endpoint, '/')
+				if index > 0 {
+					endpoint = endpoint[:index]
+				}
+				break
+			}
+		}
+
+		for p := range ports {
+			if ports[p].Name == "proxy_data_port" {
+				endpoint = fmt.Sprint(endpoint, ":", ports[p].Port)
+				endpoints = append(endpoints, endpoint)
+				break
+			}
+		}
+	}
+
+	return endpoints
 }
 
 // GET /services/{name}/users

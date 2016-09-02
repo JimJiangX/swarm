@@ -265,7 +265,7 @@ func GetNetworkingByID(ID string) (Networking, int, error) {
 	prefix := 0
 	err = db.Get(&prefix, "SELECT prefix FROM tb_ip WHERE networking_id=? LIMIT 1", ID)
 	if err != nil {
-		return Networking{}, 0, errors.Wrap(err, "get IP.Prefix")
+		return net, 0, errors.Wrap(err, "get IP.Prefix")
 	}
 
 	return net, prefix, nil
