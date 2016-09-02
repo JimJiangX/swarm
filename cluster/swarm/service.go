@@ -811,14 +811,14 @@ func (svc *Service) copyServiceConfig() error {
 func (svc *Service) initService() error {
 	var (
 		swm   *unit
-		funcs = make([]func() error, len(svc.units))
+		funcs = make([]func() error, 0, len(svc.units))
 	)
 	for i := range svc.units {
 		if svc.units[i].Type == _SwitchManagerType {
 			swm = svc.units[i]
 			continue
 		}
-		funcs[i] = svc.units[i].initService
+		funcs = append(funcs, svc.units[i].initService)
 	}
 
 	if swm != nil {
@@ -860,13 +860,13 @@ func (svc *Service) statusCAS(expected, value int64) error {
 
 func (svc *Service) startService() error {
 	var swm *unit
-	funcs := make([]func() error, len(svc.units))
+	funcs := make([]func() error, 0, len(svc.units))
 	for i := range svc.units {
 		if svc.units[i].Type == _SwitchManagerType {
 			swm = svc.units[i]
 			continue
 		}
-		funcs[i] = svc.units[i].startService
+		funcs = append(funcs, svc.units[i].startService)
 	}
 
 	err := GoConcurrency(funcs)
@@ -951,10 +951,10 @@ func (svc *Service) StopService() (err error) {
 		return err
 	}
 
-	funcs := make([]func() error, len(units))
+	funcs := make([]func() error, 0, len(units))
 	for i := range units {
 
-		funcs[i] = units[i].stopService
+		funcs = append(funcs, units[i].stopService)
 	}
 
 	err = GoConcurrency(funcs)
@@ -982,7 +982,7 @@ func (svc *Service) StopService() (err error) {
 
 func (svc *Service) stopService() error {
 	var swm *unit
-	funcs := make([]func() error, len(svc.units))
+	funcs := make([]func() error, 0, len(svc.units))
 
 	for i := range svc.units {
 		if svc.units[i].Type == _SwitchManagerType {
@@ -990,7 +990,7 @@ func (svc *Service) stopService() error {
 			continue
 		}
 
-		funcs[i] = svc.units[i].stopService
+		funcs = append(funcs, svc.units[i].stopService)
 	}
 
 	if swm != nil {
@@ -2006,10 +2006,17 @@ func (svc *Service) Delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 	svc.Lock()
 	defer svc.Unlock()
 
-	funcs := make([]func() error, len(svc.units))
+	funcs := make([]func() error, 0, len(svc.units))
+
 	for i := range svc.units {
 		u := svc.units[i]
-		funcs[i] = func() error {
+
+		if force {
+			funcs = append(funcs, u.kill)
+			continue
+		}
+
+		f := func() error {
 			if _, err := u.Engine(); err == errEngineIsNil {
 				logrus.Warnf("Remove Unit %s,error:%s", u.Name, err)
 				return nil
@@ -2039,6 +2046,8 @@ func (svc *Service) Delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 
 			return err
 		}
+
+		funcs = append(funcs, f)
 	}
 
 	err := GoConcurrency(funcs)

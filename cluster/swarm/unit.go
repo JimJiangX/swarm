@@ -517,6 +517,17 @@ func (u *unit) renameContainer(name string) error {
 	return err
 }
 
+func (u *unit) kill() error {
+	_, client, err := u.ContainerAPIClient()
+	if err != nil {
+		return err
+	}
+
+	database.TxUpdateUnitStatus(&u.Unit, statusUnitDeleting, "")
+
+	return client.ContainerKill(context.Background(), u.ContainerID, "KILL")
+}
+
 func createNetworking(host string, networkings []IPInfo) error {
 	addr := getPluginAddr(host, pluginPort)
 

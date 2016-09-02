@@ -72,7 +72,7 @@ func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 		}
 	}()
 
-	funcs := make([]func() error, len(svc.units))
+	funcs := make([]func() error, 0, len(svc.units))
 	for i := range svc.units {
 		if svc.units[i] == nil {
 			logrus.Warning("%s:nil pointer in service units", svc.Name)
@@ -81,14 +81,14 @@ func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 
 		swarmID := svc.units[i].ID
 
-		funcs[i] = func() error {
+		funcs = append(funcs, func() error {
 			err := svc.createPendingContainer(gd, swarmID)
 			if err != nil {
 				logrus.Errorf("swarmID %s,Error:%s", swarmID, err)
 			}
 
 			return err
-		}
+		})
 	}
 
 	err = GoConcurrency(funcs)
