@@ -1938,7 +1938,7 @@ func (svc *Service) updateDescAfterScale(scale structs.PostServiceScaledRequest)
 	return nil
 }
 
-func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout int) error {
+func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout int) (err error) {
 	entry := logrus.WithFields(logrus.Fields{
 		"Name":    nameOrID,
 		"force":   force,
@@ -1964,7 +1964,24 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 		entry.Errorf("GetService From Gardener error:%s", err)
 	}
 
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+		if err != nil {
+			_err := svc.SetServiceStatus(statusServiceDeleteFailed, time.Now())
+			if _err != nil {
+				err = fmt.Errorf("%v,%v", err, _err)
+			}
+		}
+	}()
+
 	entry.Debug("Service Delete... stop service & stop containers & rm containers & deregister")
+
+	err = svc.SetServiceStatus(statusServiceDeleting, time.Now())
+	if err != nil {
+		entry.WithError(err).Error("Deleting Service")
+	}
 
 	err = svc.Delete(gd, force, volumes, true, timeout)
 	if err != nil {
