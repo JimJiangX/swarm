@@ -2538,7 +2538,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	name := mux.Vars(r)["name"]
 	force := boolValue(r, "force")
-	volumes := boolValue(r, "v")
+	volumes := boolValue(r, "volume")
 	timeout := intValueOrZero(r, "time")
 
 	ok, _, gd := fromContext(ctx, _Gardener)
