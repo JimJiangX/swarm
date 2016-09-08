@@ -812,14 +812,7 @@ func DeleteStorageByID(id string) error {
 		}
 	}
 
-	r, err = db.Exec("DELETE FROM tb_storage_HUAWEI WHERE id=?", id)
-	if err == nil {
-		num, err := r.RowsAffected()
-		if num > 0 && err == nil {
-		}
-
-		return nil
-	}
+	_, err = db.Exec("DELETE FROM tb_storage_HUAWEI WHERE id=?", id)
 
 	return errors.Wrap(err, "delete Storage by ID")
 }
