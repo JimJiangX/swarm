@@ -194,7 +194,10 @@ func (u *Unit) StatusCAS(operator string, old, value int64) error {
 
 	var status int64
 	err = db.Get(&status, "SELECT status FROM tb_unit WHERE id=?", u.ID)
-	if err == nil && status == value {
+	if err != nil {
+		return errors.Wrap(err, "Unit status CAS")
+	}
+	if status == value {
 		return nil
 	}
 
