@@ -1,4 +1,6 @@
--- MySQL dump 10.13  Distrib 5.7.9, for osx10.9 (x86_64)
+CREATE DATABASE  IF NOT EXISTS `DBaaS` /*!40100 DEFAULT CHARACTER SET utf8 */;
+USE `DBaaS`;
+-- MySQL dump 10.13  Distrib 5.6.22, for osx10.8 (x86_64)
 --
 -- Host: 192.168.2.121    Database: DBaaS
 -- ------------------------------------------------------
@@ -467,4 +469,4 @@ CREATE TABLE `tb_volumes` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-08-12 19:06:55
+-- Dump completed on 2016-09-05 13:00:48
