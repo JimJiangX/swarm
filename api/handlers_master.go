@@ -2671,6 +2671,13 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // DELETE /clusters/nodes/{node:.*}
+//
+// 204 删除成功
+// 400 request header读取失败
+// 412 因未满足条件（主机还有未删除的容器）取消出库操作
+// 500 数据库读写错误
+// 503 向Horus 注销主机失败
+// 510 SSH 出库脚本执行失败
 func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpError2(w, err, http.StatusBadRequest)
