@@ -2687,9 +2687,9 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := gd.RemoveNode(node, username, password)
+	code, err := gd.RemoveNode(node, username, password)
 	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
+		httpError2(w, err, code)
 		return
 	}
 

@@ -409,10 +409,13 @@ func (gd *Gardener) GetEngine(nameOrID string) (*cluster.Engine, error) {
 	return nil, errors.Errorf("not found engine '%s'", nameOrID)
 }
 
-func (gd *Gardener) RemoveNode(nameOrID, user, password string) error {
+func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 	node, err := database.GetNode(nameOrID)
 	if err != nil {
-		return err
+		if errors.Cause(err) == database.ErrNoRowsFound {
+			return 0, nil
+		}
+		return 500, err
 	}
 
 	eng, err := gd.GetEngine(node.EngineID)
@@ -422,7 +425,7 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) error {
 	if eng != nil {
 		eng.RefreshContainers(false)
 		if num := len(eng.Containers()); num != 0 {
-			return fmt.Errorf("%d Containers Has Created On Node %s", num, nameOrID)
+			return 412, fmt.Errorf("%d Containers Has Created On Node %s", num, nameOrID)
 		}
 
 		gd.scheduler.Lock()
@@ -430,7 +433,7 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) error {
 			if pending.Engine.ID == node.EngineID {
 				gd.scheduler.Unlock()
 
-				return fmt.Errorf("Containers Has Created On Node %s", nameOrID)
+				return 412, fmt.Errorf("Containers Has Created On Node %s", nameOrID)
 			}
 		}
 		gd.scheduler.Unlock()
@@ -438,7 +441,7 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) error {
 
 	count, err := database.CountUnitByNode(node.ID)
 	if err != nil || count != 0 {
-		return fmt.Errorf("Count Unit ByNode,%v,count:%d", err, count)
+		return 412, fmt.Errorf("Count Unit ByNode,%v,count:%d", err, count)
 	}
 
 	err = deregisterToHorus(false, node.ID)
@@ -448,13 +451,13 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) error {
 		err = deregisterToHorus(true, node.ID)
 		if err != nil {
 			logrus.WithField("Endpoints", node.ID).Errorf("Deregister Node To Horus,force=true,%s", err)
-			return err
+			return 503, err
 		}
 	}
 
 	err = database.DeleteNode(nameOrID)
 	if err != nil {
-		return err
+		return 500, err
 	}
 
 	gd.Lock()
@@ -470,9 +473,10 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) error {
 	err = nodeClean(node.ID, node.Addr, user, password)
 	if err != nil {
 		logrus.Errorf("clean script exec error:%s", err)
+		return 510, err
 	}
 
-	return err
+	return 0, nil
 }
 
 func (gd *Gardener) RemoveDatacenter(nameOrID string) error {
