@@ -500,7 +500,7 @@ func CountIPByNetwroking(networking string, allocated bool) (int, error) {
 	}
 
 	count := 0
-	const query = "SELECT COUNT(id) from tb_ip WHERE networking_id=? AND allocated=?"
+	const query = "SELECT COUNT(*) from tb_ip WHERE networking_id=? AND allocated=?"
 
 	err = db.Get(&count, query, networking, allocated)
 	if err == nil {
