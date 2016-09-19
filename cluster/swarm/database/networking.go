@@ -74,7 +74,7 @@ func DeletePort(port int, allocated bool) error {
 	return errors.Wrap(err, "delete Port")
 }
 
-// ListAvailablePorts returns []Port,len==num,which Allocated==false
+// ListAvailablePorts returns []Port with len==num and Allocated==false
 func ListAvailablePorts(num int) ([]Port, error) {
 	if num == 0 {
 		return nil, nil
@@ -104,7 +104,7 @@ func ListAvailablePorts(num int) ([]Port, error) {
 	}
 
 	if len(ports) != num {
-		return nil, errors.Errorf("unable to get required num=%d available ports", num)
+		return ports, errors.Errorf("unable to get required num=%d available ports", num)
 	}
 
 	return ports, nil
@@ -398,7 +398,7 @@ func TxInsertNetworking(start, end, gateway, _type string, prefix int) (Networki
 			Allocated:    false,
 		}
 
-		fmt.Println(i, startU32, utils.Uint32ToIP(startU32).String())
+		// fmt.Println(i, startU32, utils.Uint32ToIP(startU32).String())
 
 		startU32++
 	}

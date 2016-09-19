@@ -181,7 +181,7 @@ func DeleteServiceBackupStrategy(strategy string) error {
 	}
 
 	if backup.Enabled {
-		return fmt.Errorf("Backup Strategy %s is using,Cannot Delete", strategy)
+		return errors.Errorf("Backup Strategy %s is using,Cannot Delete", strategy)
 	}
 
 	err = database.DeleteBackupStrategy(strategy)

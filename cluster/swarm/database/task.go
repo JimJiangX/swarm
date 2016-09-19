@@ -503,7 +503,7 @@ func (bs BackupStrategy) tableName() string {
 	return "tb_backup_strategy"
 }
 
-// GetBackupStrategy returns *BackupStrategy  select by name or ID
+// GetBackupStrategy returns *BackupStrategy select by name or ID
 func GetBackupStrategy(nameOrID string) (*BackupStrategy, error) {
 	db, err := GetDB(false)
 	if err != nil {

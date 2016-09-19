@@ -526,7 +526,7 @@ func (hs HuaweiStorage) Insert() error {
 	}
 
 	_, err = db.NamedExec(insertHuaweiStorageQuery, &hs)
-	if err != nil {
+	if err == nil {
 		return nil
 	}
 

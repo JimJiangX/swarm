@@ -1,10 +1,11 @@
 package database
 
 import (
-	"bytes"
 	"encoding/json"
 	"testing"
 	"time"
+
+	"github.com/docker/swarm/utils"
 )
 
 func insertLUN(t *testing.T, lun LUN) error {
@@ -23,8 +24,8 @@ func insertLUN(t *testing.T, lun LUN) error {
 
 func TestLun(t *testing.T) {
 	lun := LUN{
-		ID:              "lunId001",
-		Name:            "lunName001",
+		ID:              utils.Generate64UUID(),
+		Name:            utils.Generate64UUID(),
 		VGName:          "lunName001_VG",
 		RaidGroupID:     "lunRaidGroupId001",
 		StorageSystemID: "lunStorageSystemId001",
@@ -59,8 +60,7 @@ func TestLun(t *testing.T) {
 	lun1, err := GetLUNByID(lun.ID)
 	b, _ := json.MarshalIndent(&lun, "", "  ")
 	b1, _ := json.MarshalIndent(&lun1, "", "  ")
-	if lun.CreatedAt.Format("2006-01-02 15:04:05") != lun1.CreatedAt.Format("2006-01-02 15:04:05") ||
-		lun.HostLunID != lun1.HostLunID ||
+	if lun.HostLunID != lun1.HostLunID ||
 		lun.ID != lun1.ID ||
 		lun.MappingTo != lun1.MappingTo ||
 		lun.Name != lun1.Name ||
@@ -75,8 +75,7 @@ func TestLun(t *testing.T) {
 	lun2, err := GetLUNByLunID("lunStorageSystemId001", 1)
 	b, _ = json.MarshalIndent(&lun, "", "  ")
 	b2, _ := json.MarshalIndent(&lun2, "", "  ")
-	if lun.CreatedAt.Format("2006-01-02 15:04:05") != lun2.CreatedAt.Format("2006-01-02 15:04:05") ||
-		lun.HostLunID != lun2.HostLunID ||
+	if lun.HostLunID != lun2.HostLunID ||
 		lun.ID != lun2.ID ||
 		lun.MappingTo != lun2.MappingTo ||
 		lun.Name != lun2.Name ||
@@ -89,8 +88,8 @@ func TestLun(t *testing.T) {
 	}
 
 	hostLun := LUN{
-		ID:              "lunId002",
-		Name:            "lunName002",
+		ID:              utils.Generate64UUID(),
+		Name:            utils.Generate64UUID(),
 		VGName:          "lunUnitId002_VG",
 		RaidGroupID:     "lunRaidGroupId002",
 		StorageSystemID: "lunStorageSystemId002",
@@ -153,7 +152,7 @@ func TestLun(t *testing.T) {
 
 func TestRaidGroup(t *testing.T) {
 	rg := RaidGroup{
-		ID:          "raidGroupId001",
+		ID:          utils.Generate64UUID(),
 		StorageID:   "raidGroupStorageID001",
 		StorageRGID: 1,
 		Enabled:     true,
@@ -163,40 +162,28 @@ func TestRaidGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	enabled := false
-	rg.Enabled = enabled
-	err = UpdateRaidGroupStatus(rg.StorageID, rg.StorageRGID, enabled)
+	defer DeleteRaidGroup(rg.StorageID, rg.StorageRGID)
+
+	err = UpdateRaidGroupStatus(rg.StorageID, rg.StorageRGID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	rg1, err := GetRaidGroup(rg.StorageID, rg.StorageRGID)
 	if err != nil {
-		t.Fatal(err)
-	}
-	b, _ := json.Marshal(&rg)
-	b1, _ := json.Marshal(&rg1)
-	if !bytes.Equal(b, b1) {
-		t.Fatal("UpdateRaidGroupStatus not equal", string(b), string(b1))
+		t.Fatal(err, rg1)
 	}
 
-	enabled = true
-	rg.Enabled = enabled
-	err = UpdateRGStatusByID(rg.ID, enabled)
+	err = UpdateRGStatusByID(rg.ID, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	rg2, err := GetRaidGroup(rg.StorageID, rg.StorageRGID)
 	if err != nil {
-		t.Fatal(err)
-	}
-	b, _ = json.Marshal(&rg)
-	b2, _ := json.Marshal(&rg2)
-	if !bytes.Equal(b, b2) {
-		t.Fatal("UpdateRaidGroupStatusByID not equal", string(b), string(b2))
+		t.Fatal(err, rg2)
 	}
 
 	rg4 := RaidGroup{
-		ID:          "raidGroupId002",
+		ID:          utils.Generate64UUID(),
 		StorageID:   rg.StorageID,
 		StorageRGID: 2,
 		Enabled:     rg.Enabled,
@@ -205,6 +192,8 @@ func TestRaidGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	defer DeleteRaidGroup(rg4.StorageID, rg4.StorageRGID)
 
 	rg5, err := ListRGByStorageID(rg.StorageID)
 	if err != nil {
@@ -217,9 +206,9 @@ func TestRaidGroup(t *testing.T) {
 
 func TestHitachiStorage(t *testing.T) {
 	hs := HitachiStorage{
-		ID:        "HitachiStorageId001",
+		ID:        utils.Generate64UUID(),
 		Vendor:    "HitachiStorageVendor001",
-		AdminUnit: "HitachiStorageAdminUnit001",
+		AdminUnit: utils.Generate64UUID(),
 		LunStart:  1,
 		LunEnd:    5,
 		HluStart:  11,
@@ -229,13 +218,18 @@ func TestHitachiStorage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	err = DeleteStorageByID(hs.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestHuaweiStorage(t *testing.T) {
 	hs := HuaweiStorage{
-		ID:       "HuaweiStorageID001",
+		ID:       utils.Generate64UUID(),
 		Vendor:   "HuaweiStorageVendor001",
-		IPAddr:   "146.240.104.1",
+		IPAddr:   randIp(),
 		Username: "HuaweiStorageUsername001",
 		Password: "HuaweiStoragePassword001",
 		HluStart: 1,
@@ -245,49 +239,53 @@ func TestHuaweiStorage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	err = DeleteStorageByID(hs.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestLocalVolume(t *testing.T) {
 	lv1 := LocalVolume{
-		ID:         "LocalVolumeID001",
-		Name:       "LocalVolumeName001",
+		ID:         utils.Generate64UUID(),
+		Name:       utils.Generate64UUID(),
 		Size:       1,
 		VGName:     "LocalVolumeVGName001",
 		Driver:     "LocalVolumeDriver001",
 		Filesystem: "LocalVolumeFilesystem001",
 	}
-	defer func() {
-		err := DeleteLocalVoume(lv1.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+
 	lv2 := LocalVolume{
-		ID:         "LocalVolumeID002",
-		Name:       "LocalVolumeName002",
+		ID:         utils.Generate64UUID(),
+		Name:       utils.Generate64UUID(),
 		Size:       2,
 		VGName:     "LocalVolumeVGName002",
 		Driver:     "LocalVolumeDriver002",
 		Filesystem: "LocalVolumeFilesystem002",
 	}
-	defer func() {
-		err := DeleteLocalVoume(lv2.Name)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}()
+
 	lv3 := LocalVolume{
-		ID:         "LocalVolumeID003",
+		ID:         utils.Generate64UUID(),
 		Name:       "LocalVolumeName003",
 		Size:       3,
 		VGName:     "LocalVolumeVGName002",
 		Driver:     "LocalVolumeDriver003",
 		Filesystem: "LocalVolumeFilesystem003",
 	}
+
 	defer func() {
-		err := DeleteLocalVoume(lv3.Name)
+		err := DeleteLocalVoume(lv1.Name)
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
+		}
+		err = DeleteLocalVoume(lv2.Name)
+		if err != nil {
+			t.Error(err)
+		}
+		err = DeleteLocalVoume(lv3.Name)
+		if err != nil {
+			t.Error(err)
 		}
 	}()
 	err := InsertLocalVolume(lv1)
@@ -328,34 +326,37 @@ func TestLocalVolume(t *testing.T) {
 	}
 }
 
-func TestHisHuaStorage(t *testing.T) {
+func TestGetStorageByID(t *testing.T) {
 	hitachiStorage := HitachiStorage{
-		ID:        "HitachiStorageId002",
+		ID:        utils.Generate64UUID(),
 		Vendor:    "HitachiStorageVendor002",
-		AdminUnit: "HitachiStorageAdminUnit002",
+		AdminUnit: utils.Generate64UUID(),
 		LunStart:  1,
 		LunEnd:    5,
 		HluStart:  11,
 		HluEnd:    55,
 	}
-	err := hitachiStorage.Insert()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	huaweiStorage := HuaweiStorage{
-		ID:       "HuaweiStorageID002",
+		ID:       utils.Generate64UUID(),
 		Vendor:   "HuaweiStorageVendor002",
-		IPAddr:   "146.240.104.1",
+		IPAddr:   randIp(),
 		Username: "HuaweiStorageUsername002",
 		Password: "HuaweiStoragePassword002",
 		HluStart: 1,
 		HluEnd:   5,
 	}
+
+	err := hitachiStorage.Insert()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer DeleteStorageByID(hitachiStorage.ID)
+
 	err = huaweiStorage.Insert()
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer DeleteStorageByID(huaweiStorage.ID)
 
 	his1, hus1, err := GetStorageByID(hitachiStorage.ID)
 	if err != nil {

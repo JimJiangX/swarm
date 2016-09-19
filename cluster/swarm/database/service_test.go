@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"testing"
 	"time"
+
+	"github.com/docker/swarm/utils"
 )
 
 func TestUnit(t *testing.T) {
-	unit := Unit{
+	unit1 := Unit{
 		ID:          "unit001",
 		Name:        "unitName001",
 		Type:        "upsql",
@@ -23,21 +25,7 @@ func TestUnit(t *testing.T) {
 		CheckInterval: 1,
 		CreatedAt:     time.Now(),
 	}
-
-	tx, err := GetTX()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = TxInsertUnit(tx, unit)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = tx.Commit()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	unit1 := &Unit{
+	unit2 := &Unit{
 		ID:          "unit002",
 		Name:        "unitName002",
 		Type:        "upproxy",
@@ -53,7 +41,7 @@ func TestUnit(t *testing.T) {
 		CheckInterval: 2,
 		CreatedAt:     time.Now(),
 	}
-	unit2 := &Unit{
+	unit3 := &Unit{
 		ID:          "unit003",
 		Name:        "unitName003",
 		Type:        "switch_manager",
@@ -69,9 +57,61 @@ func TestUnit(t *testing.T) {
 		CheckInterval: 3,
 		CreatedAt:     time.Now(),
 	}
+
+	unitConfig := UnitConfig{
+		ID:        "unitConfig99",
+		ImageID:   "imageId99",
+		Mount:     "/tmp",
+		Version:   99,
+		ParentID:  "parentId99",
+		Content:   "content99",
+		KeySets:   make(map[string]KeysetParams),
+		CreatedAt: time.Now(),
+	}
+
+	defer func() {
+		tx, err := GetTX()
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = TxDeleteUnit(tx, unit1.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = TxDeleteUnit(tx, unit2.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = TxDeleteUnit(tx, unit3.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = txDeleteUnitConfigByUnit(tx, unit2.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = tx.Commit()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	tx, err := GetTX()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = TxInsertUnit(tx, unit1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = tx.Commit()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	units := []*Unit{
-		unit1,
 		unit2,
+		unit3,
 	}
 
 	tx, err = GetTX()
@@ -87,31 +127,7 @@ func TestUnit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err = GetTX()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = TxDeleteUnit(tx, unit2.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = tx.Commit()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	unitConfig := UnitConfig{
-		ID:        "unitConfig99",
-		ImageID:   "imageId99",
-		Mount:     "/tmp",
-		Version:   99,
-		ParentID:  "parentId99",
-		Content:   "content99",
-		KeySets:   make(map[string]KeysetParams),
-		CreatedAt: time.Now(),
-	}
-
-	err = SaveUnitConfig(unit1, unitConfig)
+	err = SaveUnitConfig(unit2, unitConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,8 +135,8 @@ func TestUnit(t *testing.T) {
 
 func TestService(t *testing.T) {
 	service := Service{
-		ID:                   "serviceId001",
-		Name:                 "serviceName001",
+		ID:                   utils.Generate64UUID(),
+		Name:                 utils.Generate64UUID(),
 		Desc:                 "serviceDescription001",
 		Architecture:         "serviceArchitecture001",
 		AutoHealing:          true,
@@ -133,8 +149,8 @@ func TestService(t *testing.T) {
 		FinishedAt:           time.Now(),
 	}
 	backupStrategy := BackupStrategy{
-		ID:        "backupStrategyId001",
-		Type:      "backupStrategyType001",
+		ID:        utils.Generate64UUID(),
+		Type:      utils.Generate64UUID(),
 		ServiceID: service.ID,
 		Spec:      "backupStrategySpec001",
 		Next:      time.Now(),
@@ -145,10 +161,10 @@ func TestService(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 	task := Task{
-		ID: "taskId001",
-		//	Name        string        `db:"name"`
+		ID:          utils.Generate64UUID(),
+		Name:        utils.Generate64UUID(),
 		Related:     "taskRelated001",
-		Linkto:      "taskLinkto001",
+		Linkto:      service.ID,
 		Description: "taskDescription001",
 		Labels:      "taskLabels001",
 		Errors:      "taskErrors001",
@@ -159,19 +175,19 @@ func TestService(t *testing.T) {
 	}
 
 	user1 := User{
-		ID:        "userId001",
-		ServiceID: "userServiceId001",
+		ID:        utils.Generate64UUID(),
+		ServiceID: service.ID,
 		Type:      "userType001",
-		Username:  "userName001",
+		Username:  utils.Generate32UUID(),
 		Password:  "userPassword001",
 		Role:      "userRole001",
 		CreatedAt: time.Now(),
 	}
 	user2 := User{
-		ID:        "userId002",
-		ServiceID: "userServiceId002",
+		ID:        utils.Generate64UUID(),
+		ServiceID: service.ID,
 		Type:      "userType002",
-		Username:  "userName002",
+		Username:  utils.Generate32UUID(),
 		Password:  "userPassword002",
 		Role:      "userRole002",
 		CreatedAt: time.Now(),
@@ -185,6 +201,9 @@ func TestService(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	defer DeteleServiceRelation(service.ID, true)
+	defer DeleteTask(task.ID)
+
 	service1, err := GetService(service.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -196,9 +215,7 @@ func TestService(t *testing.T) {
 		service.AutoScaling != service1.AutoScaling ||
 		service.BackupFilesRetention != service1.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service1.BackupMaxSizeByte ||
-		service.CreatedAt.Format("2006-01-02 15:04:05") != service1.CreatedAt.Format("2006-01-02 15:04:05") ||
 		service.Desc != service1.Desc ||
-		service.FinishedAt.Format("2006-01-02 15:04:05") != service1.FinishedAt.Format("2006-01-02 15:04:05") ||
 		service.HighAvailable != service1.HighAvailable {
 		t.Fatal("GetService not equal", string(b), string(b1))
 	}
@@ -225,9 +242,7 @@ func TestService(t *testing.T) {
 		service.AutoScaling != service2.AutoScaling ||
 		service.BackupFilesRetention != service2.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service2.BackupMaxSizeByte ||
-		service.CreatedAt.Format("2006-01-02 15:04:05") != service2.CreatedAt.Format("2006-01-02 15:04:05") ||
 		service.Desc != service2.Desc ||
-		service.FinishedAt.Format("2006-01-02 15:04:05") != service2.FinishedAt.Format("2006-01-02 15:04:05") ||
 		service.HighAvailable != service2.HighAvailable {
 		t.Fatal("SetServiceStatus not equal", string(b), string(b2))
 	}
@@ -256,9 +271,7 @@ func TestService(t *testing.T) {
 		service.AutoScaling != service3.AutoScaling ||
 		service.BackupFilesRetention != service3.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service3.BackupMaxSizeByte ||
-		service.CreatedAt.Format("2006-01-02 15:04:05") != service3.CreatedAt.Format("2006-01-02 15:04:05") ||
 		service.Desc != service3.Desc ||
-		service.FinishedAt.Format("2006-01-02 15:04:05") != service3.FinishedAt.Format("2006-01-02 15:04:05") ||
 		service.HighAvailable != service3.HighAvailable {
 		t.Fatal("TxSetServiceStatus not equal", string(b), string(b3))
 	}
@@ -268,10 +281,8 @@ func TestService(t *testing.T) {
 	}
 	b, _ = json.MarshalIndent(&task, "", "  ")
 	b4, _ := json.MarshalIndent(task1, "", "  ")
-	if task.CreatedAt.Format("2006-01-02 15:04:05") != task1.CreatedAt.Format("2006-01-02 15:04:05") ||
-		task.Description != task1.Description ||
+	if task.Description != task1.Description ||
 		task.Errors != task1.Errors ||
-		task.FinishedAt.Format("2006-01-02 15:04:05") != task1.FinishedAt.Format("2006-01-02 15:04:05") ||
 		task.Labels != task1.Labels ||
 		task.Linkto != task1.Linkto ||
 		task.Related != task1.Related ||
@@ -296,9 +307,7 @@ func TestService(t *testing.T) {
 		service.AutoScaling != service4.AutoScaling ||
 		service.BackupFilesRetention != service4.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service4.BackupMaxSizeByte ||
-		service.CreatedAt.Format("2006-01-02 15:04:05") != service4.CreatedAt.Format("2006-01-02 15:04:05") ||
 		service.Desc != service4.Desc ||
-		service.FinishedAt.Format("2006-01-02 15:04:05") != service4.FinishedAt.Format("2006-01-02 15:04:05") ||
 		service.HighAvailable != service4.HighAvailable {
 		t.Fatal("TxSetServiceStatus not equal", string(b), string(b5))
 	}
@@ -308,10 +317,8 @@ func TestService(t *testing.T) {
 	}
 	b, _ = json.MarshalIndent(&task, "", "  ")
 	b6, _ := json.MarshalIndent(task2, "", "  ")
-	if task.CreatedAt.Format("2006-01-02 15:04:05") != task1.CreatedAt.Format("2006-01-02 15:04:05") ||
-		task.Description != task2.Description ||
+	if task.Description != task2.Description ||
 		task.Errors != task2.Errors ||
-		task.FinishedAt.Format("2006-01-02 15:04:05") != task2.FinishedAt.Format("2006-01-02 15:04:05") ||
 		task.Labels != task2.Labels ||
 		task.Linkto != task2.Linkto ||
 		task.Related != task2.Related ||
@@ -319,5 +326,4 @@ func TestService(t *testing.T) {
 		task.Timeout != task2.Timeout {
 		t.Fatal("TxSetServiceStatus not equal", string(b), string(b6))
 	}
-
 }

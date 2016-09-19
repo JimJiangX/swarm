@@ -258,17 +258,17 @@ func TestNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = TxUpdateNodeStatus(&list[0], tasks[1], 9977, 999, "foafghjk")
+	err = TxUpdateNodeStatus(&list[0], tasks[1], 99, 255, "foafghjk")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = TxUpdateNodeStatus(&list[1], tasks[2], 0, 999, "")
+	err = TxUpdateNodeStatus(&list[1], tasks[2], 0, 255, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = TxUpdateNodeRegister(&list[1], tasks[2], 0, 999, "", "")
+	err = TxUpdateNodeRegister(&list[1], tasks[2], 0, 255, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
