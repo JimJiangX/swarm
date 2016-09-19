@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
+	"github.com/pkg/errors"
 )
 
 var ErrNotFoundIP = errors.New("IP not found")
@@ -295,12 +295,12 @@ func isProxyType(name string) bool {
 }
 
 func (gd *Gardener) RemoveNetworking(ID string) error {
-	count, err := database.CountIPByNetwroking(ID, true)
+	ok, err := database.IsNetwrokingUsed(ID)
 	if err != nil {
 		return err
 	}
-	if count > 0 {
-		return fmt.Errorf("networking %s is using", ID)
+	if ok {
+		return errors.Errorf("networking '%s' is using", ID)
 	}
 
 	err = database.TxDeleteNetworking(ID)

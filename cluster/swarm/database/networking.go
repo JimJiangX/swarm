@@ -492,29 +492,36 @@ func TxDeleteNetworking(ID string) error {
 	return errors.Wrap(err, "Tx delete Networking and []IP by ID")
 }
 
-// CountIPByNetwroking count []IP select by NetworkingID and Allocated==allocated
-func CountIPByNetwroking(networking string, allocated bool) (int, error) {
-	db, err := GetDB(false)
+// IsNetwrokingUsed returns true on below conditions:
+// one more IP belongs to networking has allocated
+// networking has used in Cluster
+func IsNetwrokingUsed(networking string) (bool, error) {
+	db, err := GetDB(true)
 	if err != nil {
-		return 0, err
+		return false, err
 	}
 
 	count := 0
-	const query = "SELECT COUNT(*) from tb_ip WHERE networking_id=? AND allocated=?"
+	const (
+		queryIP      = "SELECT COUNT(*) from tb_ip WHERE networking_id=? AND allocated=?"
+		queryCluster = "SELECT COUNT(*) from tb_cluster WHERE networking_id=?"
+	)
 
-	err = db.Get(&count, query, networking, allocated)
-	if err == nil {
-		return count, nil
-	}
-
-	db, err = GetDB(true)
+	err = db.Get(&count, queryIP, networking, true)
 	if err != nil {
-		return 0, err
+		return false, errors.Wrap(err, "count []IP by NetworkingID")
 	}
 
-	err = db.Get(&count, query, networking, allocated)
+	if count > 0 {
+		return true, nil
+	}
 
-	return count, errors.Wrap(err, "count []IP by NetworkingID")
+	err = db.Get(&count, queryCluster, networking)
+	if err != nil {
+		return false, errors.Wrap(err, "count []Cluster by NetworkingID")
+	}
+
+	return count > 0, nil
 }
 
 // ListIPWithCondition returns []IP select by NetworkingID and Allocated==allocated
