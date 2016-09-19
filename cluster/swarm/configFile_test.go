@@ -124,7 +124,7 @@ func TestMysqlConfig(t *testing.T) {
 		data["mysqld::bind_address"] = "127.0.0.1"
 	}
 
-	t.Log("Default Config:\n", defaultMysqlContent)
+	//	t.Log("Default Config:\n", defaultMysqlContent)
 
 	_, err = config.ParseData([]byte(defaultMysqlContent))
 	if err != nil {
@@ -146,8 +146,9 @@ func TestMysqlConfig(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	_ = content
 
-	t.Log("config ini:\n", string(content))
+	// t.Log("config ini:\n", string(content))
 }
 
 var defaultSWMConfig = `
@@ -210,7 +211,7 @@ func TestSwitchManagerConfig(t *testing.T) {
 		data["ConsulPort"] = 4000
 	}
 
-	t.Log("Default Config:\n", defaultSWMConfig)
+	// t.Log("Default Config:\n", defaultSWMConfig)
 
 	_, err = config.ParseData([]byte(defaultSWMConfig))
 	if err != nil {
@@ -233,5 +234,7 @@ func TestSwitchManagerConfig(t *testing.T) {
 		t.Error(err)
 	}
 
-	t.Log("config ini:\n", string(content))
+	_ = content
+
+	// 	t.Log("config ini:\n", string(content))
 }
