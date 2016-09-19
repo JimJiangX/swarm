@@ -24,20 +24,20 @@ func NewCluster(name, _type, storageType, storageID, networking string,
 
 func TestCluster(t *testing.T) {
 	clusters := []Cluster{
-		NewCluster("cluster1", "upsql", "local", "", "", true, 256, 0.8),
-		NewCluster("cluster2", "upsql", "ssd", "", "", true, 100000000, 1.44),
-		NewCluster("cluster3", "proxy", "local", "", "", true, 100000000, 1.44),
-		NewCluster("cluster4", "proxy", "local", "", "", false, 100000000, 1.44),
+		NewCluster(utils.Generate64UUID(), "upsql", "local", "", "", true, 256, 0.8),
+		NewCluster(utils.Generate64UUID(), "upsql", "ssd", "", "", true, 100000000, 1.44),
+		NewCluster(utils.Generate64UUID(), "proxy", "local", "", "", true, 100000000, 1.44),
+		NewCluster(utils.Generate64UUID(), "proxy", "local", "", "", false, 100000000, 1.44),
 	}
 	wrong := []Cluster{
-		NewCluster("cluster2", "nomal", "ssd", "", "", false, 1000000000000, 1.44),
-		NewCluster("cluster3", "proxy", "local", "", "", false, 100000000, 1.44),
-		NewCluster("cluster4", "proxy", "local", "", "", false, 100000000, 1.44),
+		NewCluster(clusters[1].Name, "nomal", "ssd", "", "", false, 1000000000000, 1.44),
+		NewCluster(clusters[2].Name, "proxy", "local", "", "", false, 100000000, 1.44),
+		NewCluster(clusters[3].Name, "proxy", "local", "", "", false, 100000000, 1.44),
 	}
 
 	for i := range clusters {
 		if err := InsertCluster(clusters[i]); err != nil {
-			t.Fatal(clusters[i].Name, err)
+			t.Error(clusters[i].Name, err)
 		}
 
 		defer func(id string) {
@@ -49,11 +49,11 @@ func TestCluster(t *testing.T) {
 
 	for i := range wrong {
 		if err := InsertCluster(wrong[i]); err == nil {
-			t.Fatal("Name should not allowed Duplicate", wrong[i].Name)
+			t.Error("Name should not allowed Duplicate", wrong[i].Name)
 		}
 	}
 
-	cl0, err := GetCluster("cluster3")
+	cl0, err := GetCluster(clusters[2].ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +148,7 @@ func TestNode(t *testing.T) {
 			if list[i].Name == "node5" {
 				t.Log("Expected:", err)
 			} else {
-				t.Fatal(list[i].Name, err)
+				t.Error(list[i].Name, err)
 			}
 		}
 
