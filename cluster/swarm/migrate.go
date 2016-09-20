@@ -21,14 +21,12 @@ import (
 
 func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs.Module, list []database.Node, exclude []string) (*cluster.Engine, error) {
 	entry := logrus.WithFields(logrus.Fields{"Module": module.Type})
+	num := 1
 
-	num, _type := 1, module.Type
-	// TODO:maybe remove tag
-	if module.Type == _SwitchManagerType {
-		_type = _ProxyType
+	list, err := gd.resourceFilter(list, module, num)
+	if err != nil {
+		return nil, err
 	}
-
-	list = gd.shortIdleStoreFilter(list, module.Stores, _type, num)
 
 	entry.Debugf("[MG] %v,%s,%d:after filters of storage:%d", module.Stores, module.Type, num, len(list))
 

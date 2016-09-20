@@ -131,13 +131,8 @@ func (gd *Gardener) allocCPUs(engine *cluster.Engine, cpusetCpus string, reserve
 		return "", errors.Errorf("alloc CPU,%s CPU is short(%d-%d<%d)", engine.Name, total, used, ncpu)
 	}
 
-	containers := engine.Containers()
-	list := make([]string, len(reserve), len(reserve)+len(containers)+len(gd.pendingContainers))
+	list := make([]string, len(reserve), len(reserve)+len(gd.pendingContainers))
 	copy(list, reserve)
-
-	for _, c := range containers {
-		list = append(list, c.Info.HostConfig.CpusetCpus)
-	}
 
 	for _, pending := range gd.pendingContainers {
 		if pending.Engine.ID == engine.ID {
@@ -147,8 +142,8 @@ func (gd *Gardener) allocCPUs(engine *cluster.Engine, cpusetCpus string, reserve
 
 	usedCPUs := parseUintList(list)
 
-	if total-len(usedCPUs) < ncpu {
-		return "", errors.Errorf("alloc CPU error,%s CPU is Short(%d-%d<%d),", engine.Name, total, used, ncpu)
+	if total-used-len(usedCPUs) < ncpu {
+		return "", errors.Errorf("alloc CPU error,%s CPU is Short(%d-%d-%d<%d),", engine.Name, total, used, len(usedCPUs), ncpu)
 	}
 
 	free := make([]string, ncpu)

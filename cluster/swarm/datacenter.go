@@ -731,8 +731,13 @@ func GetLocalVGUsage(engine *cluster.Engine) map[string]vgUsage {
 	return out
 }
 
-func (gd *Gardener) shortIdleStoreFilter(list []database.Node, volumes []structs.DiskStorage, _type string, num int) []database.Node {
-	logrus.Debugf("shortIdleStoreFilter:nodes=%d,Type='%s',num=%d", len(list), _type, num)
+func (gd *Gardener) resourceFilter(list []database.Node, module structs.Module, num int) ([]database.Node, error) {
+	logrus.Debugf("resourceFilter:nodes=%d,Type='%s',num=%d", len(list), module.Type, num)
+
+	ncpu, err := parseCpuset(module.HostConfig.CpusetCpus)
+	if err != nil {
+		return nil, err
+	}
 
 	gd.RLock()
 	length := len(gd.datacenters)
@@ -741,7 +746,7 @@ func (gd *Gardener) shortIdleStoreFilter(list []database.Node, volumes []structs
 	if length == 0 {
 		err := gd.rebuildDatacenters()
 		if err != nil {
-			return nil
+			return nil, err
 		}
 	}
 
@@ -766,19 +771,43 @@ loop:
 			continue loop
 		}
 
-		if node.engine == nil ||
-			(node.engine != nil && (!node.engine.IsHealthy() ||
-				len(node.engine.Containers()) >= node.MaxContainer)) {
-			logrus.Debugf("%s Engine Unmatch,%s %s", node.Name, node.ID, node.EngineID)
-
+		if node.engine == nil || !node.engine.IsHealthy() {
 			dc.Unlock()
 
 			continue loop
 		}
 
+		if containers := node.engine.Containers(); len(containers) >= node.MaxContainer ||
+			node.engine.TotalCpus()-node.engine.UsedCpus() < int64(ncpu) ||
+			node.engine.TotalMemory()-node.engine.UsedMemory() < module.HostConfig.Memory {
+
+			dc.Unlock()
+			continue loop
+
+		} else {
+			list := make([]string, 0, len(gd.pendingContainers))
+			usedMemory := int64(0)
+
+			for _, pending := range gd.pendingContainers {
+				if pending.Engine.ID == node.engine.ID {
+					list = append(list, pending.Config.HostConfig.CpusetCpus)
+					usedMemory += pending.Config.HostConfig.Memory
+				}
+			}
+
+			usedCPUs := parseUintList(list)
+
+			if node.engine.TotalCpus()-node.engine.UsedCpus()-int64(len(usedCPUs)) < int64(ncpu) ||
+				node.engine.TotalMemory()-node.engine.UsedMemory()-usedMemory < module.HostConfig.Memory {
+
+				dc.Unlock()
+				continue loop
+			}
+		}
+
 		dc.Unlock()
 
-		for _, v := range volumes {
+		for _, v := range module.Stores {
 			if storage.IsLocalStore(v.Type) {
 				if !node.isIdleStoreEnough(v.Type, v.Size) {
 					logrus.Debugf("%s local store shortage:%d", node.Name, v.Size)
@@ -798,7 +827,7 @@ loop:
 		out = append(out, list[i])
 	}
 
-	return out
+	return out, nil
 }
 
 func (node *Node) isIdleStoreEnough(_type string, size int) bool {

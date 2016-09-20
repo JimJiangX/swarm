@@ -228,7 +228,10 @@ func (gd *Gardener) schedulerPerModule(svc *Service, module structs.Module) ([]*
 	}
 	logrus.Debugf("all candidate nodes num:%d,filter by Type:'%s'", len(list), _type)
 
-	list = gd.shortIdleStoreFilter(list, module.Stores, _type, num)
+	list, err = gd.resourceFilter(list, module, num)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	candidates := gd.listCandidateNodes(list)
 
