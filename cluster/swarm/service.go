@@ -1282,16 +1282,16 @@ func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}
 			logrus.WithField("Unit", u.Name).Warn("Should restart service to make new config file works")
 			return nil
 
-			err := u.stopService()
-			if err != nil {
-				logrus.WithField("Unit", u.Name).WithError(err).Error("Stop service")
-			}
+			//			err := u.stopService()
+			//			if err != nil {
+			//				logrus.WithField("Unit", u.Name).WithError(err).Error("Stop service")
+			//			}
 
-			err = u.startService()
-			if err != nil {
-				logrus.WithField("Unit", u.Name).WithError(err).Error("Start service")
-				return err
-			}
+			//			err = u.startService()
+			//			if err != nil {
+			//				logrus.WithField("Unit", u.Name).WithError(err).Error("Start service")
+			//				return err
+			//			}
 		}
 	}
 
