@@ -29,6 +29,7 @@ func (e *Engine) UsedCpus() int64 {
 	return r
 }
 
+// ContainerAPIClient returns Engine ContainerAPIClient
 func (e *Engine) ContainerAPIClient() client.ContainerAPIClient {
 	if e == nil {
 		return nil
