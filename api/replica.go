@@ -41,7 +41,7 @@ func (p *Replica) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// all GET Request handle by self
-	if IsGardenerEnable() && strings.ToUpper(r.Method) == "GET" {
+	if isGardenerEnable() && strings.ToUpper(r.Method) == "GET" {
 		p.handler.ServeHTTP(w, r)
 		return
 	}

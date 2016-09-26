@@ -21,11 +21,12 @@ const (
 
 var enableGardener = false
 
+// EnableGardener set enableGardener
 func EnableGardener(enable bool) {
 	enableGardener = enable
 }
 
-func IsGardenerEnable() bool {
+func isGardenerEnable() bool {
 	return enableGardener
 }
 

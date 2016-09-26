@@ -130,7 +130,7 @@ func NewPrimary(cluster cluster.Cluster, tlsConfig *tls.Config, status StatusHan
 	r := mux.NewRouter()
 	setupPrimaryRouter(r, context, enableCors)
 
-	if IsGardenerEnable() {
+	if isGardenerEnable() {
 		setupMasterRouter(r, context, enableCors)
 	}
 
