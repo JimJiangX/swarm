@@ -693,15 +693,15 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 }
 
 func (svc *Service) StartService() (err error) {
-	filed := logrus.WithField("Service", svc.Name)
+	field := logrus.WithField("Service", svc.Name)
 
 	err = svc.statusCAS(statusServiceNoContent, statusServiceStarting)
 	if err != nil {
-		filed.Warn(err)
+		field.Warn(err)
 
 		err = svc.statusCAS(statusServiceStartFailed, statusServiceStarting)
 		if err != nil {
-			filed.Errorf("%+v", err)
+			field.Errorf("%+v", err)
 
 			return err
 		}
@@ -710,7 +710,7 @@ func (svc *Service) StartService() (err error) {
 	svc.Lock()
 	defer func() {
 		if err != nil {
-			filed.Errorf("%+v", err)
+			field.Errorf("%+v", err)
 
 			svc.SetServiceStatus(statusServiceStartFailed, time.Now())
 		} else {
@@ -1089,7 +1089,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 
 		out, ok := u.CanModify(config)
 		if !ok {
-			return errors.Errorf("Cannot Modify UnitConfig,Key:%s", out)
+			return errors.Errorf("cannot modify UnitConfig,key:%s", out)
 		}
 	}
 
@@ -1122,7 +1122,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 
 				inspect, _err := containerExec(context.Background(), engine, u.ContainerID, originalCmds[i][:], false)
 				if inspect.ExitCode != 0 {
-					_err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, originalCmds[i], inspect.ExitCode, inspect, err)
+					_err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%+v", u.Name, originalCmds[i], inspect.ExitCode, inspect, err)
 				}
 				if _err != nil {
 					entry.WithError(_err).Error("Rollback command modify")
@@ -1182,7 +1182,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 
 			inspect, err := containerExec(context.Background(), engine, u.ContainerID, cmdList[i][:], false)
 			if inspect.ExitCode != 0 {
-				err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmdList[i], inspect.ExitCode, inspect, err)
+				err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%s", u.Name, cmdList[i], inspect.ExitCode, inspect, err)
 			}
 			if err != nil {
 				return err
@@ -1230,7 +1230,7 @@ func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}
 		if u.MustRestart(config) {
 
 			// disable restart Service for now
-			logrus.WithField("Unit", u.Name).Warn("Should restart service to make new config file works")
+			logrus.WithField("Unit", u.Name).Warn("should restart service to make new config file works")
 			return nil
 
 			// err := u.stopService()
@@ -1408,7 +1408,7 @@ func (svc *Service) getUnitByType(_type string) ([]*unit, error) {
 		return units, nil
 	}
 
-	return nil, errors.Errorf("Service:%s,not found unit by type '%s'", svc.Name, _type)
+	return nil, errors.Errorf("Service:%s,not found any unit by type '%s'", svc.Name, _type)
 }
 
 func (svc *Service) getSwithManagerUnit() (*unit, error) {
@@ -1725,7 +1725,7 @@ func (gd *Gardener) ServiceScale(name string, scale structs.PostServiceScaledReq
 		logrus.WithFields(logrus.Fields{
 			"Service": svc.Name,
 			"Type":    scale.Type,
-		}).Error("Service scale")
+		}).WithError(err).Error("Service scale")
 	}
 
 	return err
@@ -1775,7 +1775,6 @@ func (gd *Gardener) serviceScale(svc *Service,
 		}
 		err = pendings[i].containerUpdate()
 		if err != nil {
-			logrus.Errorf("container %s update error:%s", pendings[i].containerID, err)
 			return err
 		}
 	}
@@ -1784,12 +1783,10 @@ func (gd *Gardener) serviceScale(svc *Service,
 		for i := range pending.sanStore {
 			eng, err := pending.unit.Engine()
 			if err != nil {
-				logrus.Errorf("%s %s", pending.unit.Name, err)
 				return err
 			}
 			err = extendSanStoreageVG(eng.IP, pending.sanStore[i])
 			if err != nil {
-				logrus.Errorf("extend SanStoreageVG error:%s", err)
 				return err
 			}
 		}
@@ -1799,10 +1796,10 @@ func (gd *Gardener) serviceScale(svc *Service,
 		for _, lv := range pending.localStore {
 			err = localVolumeExtend(pending.unit.engine.IP, lv)
 			if err != nil {
-				logrus.Errorf("unit %s update volume error %s", pending.unit.Name, err)
+				logrus.WithField("Unit", pending.unit.Name).Errorf("update volume error:\n%+v", err)
 				return err
 			}
-			logrus.Debugf("unit %s update volume %v", pending.unit.Name, lv)
+			logrus.WithField("Unit", pending.unit.Name).Debugf("update volume %v", lv)
 		}
 	}
 

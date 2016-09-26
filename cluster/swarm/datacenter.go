@@ -604,7 +604,6 @@ func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
 		"Name": n.Name,
 		"addr": n.Addr,
 	})
-	entry.Debug("rebuild Node")
 
 	if err != nil {
 		entry.WithError(err).Warn("rebuild Node")
@@ -615,6 +614,8 @@ func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
 	node.localStore, err = storage.NewLocalDisk(pluginAddr, node.Node, 0)
 	if err != nil {
 		entry.WithError(err).Warn("rebuild Node")
+	} else {
+		entry.Debug("rebuild Node")
 	}
 
 	return node, nil
@@ -622,7 +623,7 @@ func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
 
 func getVGname(engine *cluster.Engine, _type string) (string, error) {
 	if engine == nil || engine.Labels == nil {
-		return "", errEngineIsNil
+		return "", errors.Wrap(errEngineIsNil, "get VG name")
 	}
 
 	parts := strings.SplitN(_type, ":", 2)
@@ -643,7 +644,7 @@ func getVGname(engine *cluster.Engine, _type string) (string, error) {
 		label = _SSD_VG_Label
 
 	default:
-		return "", errors.Errorf("Unable Get VG Type '%s' VG_Label In Engine %s", parts[1], engine.Addr)
+		return "", errors.Errorf("unable get VG Type '%s' VG_Label in Engine %s", parts[1], engine.Addr)
 	}
 
 	engine.RLock()
@@ -651,7 +652,7 @@ func getVGname(engine *cluster.Engine, _type string) (string, error) {
 	engine.RUnlock()
 
 	if !ok {
-		return "", errors.Errorf("Not Found VG_Name '%s' of Node:'%s'", _type, engine.Addr)
+		return "", errors.Errorf("not found VG_Name '%s' of Node:'%s'", _type, engine.Addr)
 	}
 
 	return vgName, nil

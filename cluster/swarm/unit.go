@@ -619,7 +619,7 @@ func (u *unit) copyConfig(data map[string]interface{}) error {
 		return err
 	}
 
-	err = u.Verify(data)
+	err = u.verify(data)
 	if err != nil {
 		return err
 	}

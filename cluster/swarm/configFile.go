@@ -51,7 +51,7 @@ func (u unit) MustRestart(data map[string]interface{}) bool {
 	return false
 }
 
-func (u unit) Verify(data map[string]interface{}) error {
+func (u unit) verify(data map[string]interface{}) error {
 	if len(data) > 0 {
 		err := u.Validate(data)
 		if err != nil {

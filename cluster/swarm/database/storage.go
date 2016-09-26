@@ -604,9 +604,31 @@ func UpdateLocalVolume(nameOrID string, size int) error {
 	return errors.Wrap(err, "update LocalVolume size")
 }
 
-// TxUpdateLocalVolume update Size of LocalVolume by name or ID in a Tx
-func TxUpdateLocalVolume(tx *sqlx.Tx, nameOrID string, size int) error {
-	_, err := tx.Exec("UPDATE tb_volumes SET size=? WHERE id=? OR name=?", size, nameOrID, nameOrID)
+// TxUpdateMultiLocalVolume update Size of LocalVolume by name or ID in a Tx
+func TxUpdateMultiLocalVolume(lvs []LocalVolume) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Preparex("UPDATE tb_volumes SET size=? WHERE id=? OR name=?")
+	if err != nil {
+		return errors.Wrap(err, "Tx prepare update local Volume")
+	}
+
+	for _, lv := range lvs {
+		_, err := stmt.Exec(lv.Size, lv.ID)
+		if err != nil {
+			stmt.Close()
+
+			return errors.Wrap(err, "Tx update LocalVolume size")
+		}
+	}
+
+	stmt.Close()
+
+	err = tx.Commit()
 
 	return errors.Wrap(err, "Tx update LocalVolume size")
 }

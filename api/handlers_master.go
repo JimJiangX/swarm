@@ -1914,13 +1914,13 @@ func postServiceConfigModify(ctx goctx.Context, w http.ResponseWriter, r *http.R
 		return
 	}
 
-	service, err := gd.GetService(name)
+	svc, err := gd.GetService(name)
 	if err != nil {
 		httpError2(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	err = service.ModifyUnitConfig(req.Type, req.Pairs)
+	err = svc.ModifyUnitConfig(req.Type, req.Pairs)
 	if err != nil {
 		httpError2(w, err, http.StatusInternalServerError)
 		return

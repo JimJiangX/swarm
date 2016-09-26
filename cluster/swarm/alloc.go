@@ -447,25 +447,18 @@ func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
 	if len(pendings) == 0 {
 		return nil
 	}
-	tx, err := database.GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 
+	lvs := make([]database.LocalVolume, 0, len(pendings)*3)
 	for _, pending := range pendings {
 		for _, lv := range pending.localStore {
 			lv.lv.Size -= lv.size
-			err := database.TxUpdateLocalVolume(tx, lv.lv.ID, lv.lv.Size)
-			if err != nil {
-				return err
-			}
+			lvs = append(lvs, lv.lv)
 		}
 	}
 
-	err = tx.Commit()
+	err := database.TxUpdateMultiLocalVolume(lvs)
 	if err != nil {
-		return errors.Wrap(err, "Tx cancel store extension")
+		return err
 	}
 
 	gd.Lock()
@@ -486,20 +479,19 @@ func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
 
 func (node *Node) localStorageExtend(name, storageType string, size int) (database.LocalVolume, error) {
 	lv := database.LocalVolume{}
+
 	if !storage.IsLocalStore(storageType) {
-		return lv, fmt.Errorf("'%s' storage type isnot '%s'", storageType, storage.LocalStorePrefix)
+		return lv, errors.Errorf("'%s' storage type isnot '%s'", storageType, storage.LocalStorePrefix)
 	}
 	if node.localStore == nil {
-		return lv, fmt.Errorf("Not Found LoaclStorage of Node %s", node.Addr)
+		return lv, errors.Errorf("not found LoaclStorage of Node %s", node.Addr)
 	}
 	vgName, err := getVGname(node.engine, storageType)
 	if err != nil {
 		return lv, err
 	}
 
-	lv, err = node.localStore.Extend(vgName, name, size)
-
-	return lv, err
+	return node.localStore.Extend(vgName, name, size)
 }
 
 func (svc *Service) volumesPendingExpension(gd *Gardener, _type string, extensions []structs.DiskStorage) ([]*pendingAllocStore, error) {
@@ -509,7 +501,6 @@ func (svc *Service) volumesPendingExpension(gd *Gardener, _type string, extensio
 
 	units, err := svc.getUnitByType(_type)
 	if err != nil {
-		logrus.WithField("Service", svc.Name).WithError(err).Error("get unit by type")
 		return nil, err
 	}
 
@@ -521,7 +512,7 @@ func (svc *Service) volumesPendingExpension(gd *Gardener, _type string, extensio
 			pendings = append(pendings, pending)
 		}
 		if err != nil {
-			return pendings, nil
+			return pendings, err
 		}
 	}
 
