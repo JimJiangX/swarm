@@ -244,7 +244,7 @@ func (pending *pendingAllocResource) consistency() (err error) {
 	return tx.Commit()
 }
 
-func (gd *Gardener) Recycle(pendings []*pendingAllocResource) (err error) {
+func (gd *Gardener) resourceRecycle(pendings []*pendingAllocResource) (err error) {
 	gd.scheduler.Lock()
 	for i := range pendings {
 		if pendings[i] == nil ||
@@ -297,7 +297,7 @@ func (gd *Gardener) Recycle(pendings []*pendingAllocResource) (err error) {
 
 		gd.Unlock()
 		for _, lun := range pendings[i].sanStore {
-			dc, err := gd.DatacenterByEngine(pendings[i].unit.Unit.EngineID)
+			dc, err := gd.datacenterByEngine(pendings[i].unit.Unit.EngineID)
 			if err != nil || dc == nil || dc.store == nil {
 				continue
 			}
@@ -332,7 +332,7 @@ func (gd *Gardener) allocStorage(penging *pendingAllocResource, engine *cluster.
 
 	logrus.Debugf("Engine %s alloc storage %v", engine.Addr, need)
 
-	dc, node, err := gd.GetNode(engine.ID)
+	dc, node, err := gd.getNode(engine.ID)
 	if err != nil {
 		err = errors.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
 		logrus.Error(err)
@@ -471,7 +471,7 @@ func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
 	gd.Lock()
 	for _, pending := range pendings {
 		for _, lun := range pending.sanStore {
-			dc, err := gd.DatacenterByEngine(pending.unit.Unit.EngineID)
+			dc, err := gd.datacenterByEngine(pending.unit.Unit.EngineID)
 			if err != nil || dc == nil || dc.store == nil {
 				continue
 			}
@@ -529,7 +529,7 @@ func (svc *Service) volumesPendingExpension(gd *Gardener, _type string, extensio
 }
 
 func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []structs.DiskStorage, skipSAN bool) (*pendingAllocStore, []string, error) {
-	dc, node, err := gd.GetNode(engineID)
+	dc, node, err := gd.getNode(engineID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "not found node by Engine:"+engineID)
 	}

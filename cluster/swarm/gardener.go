@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -184,10 +183,6 @@ func (gd *Gardener) generateUUID(length int) string {
 			return id
 		}
 	}
-}
-
-func (gd *Gardener) TLSConfig() *tls.Config {
-	return gd.Cluster.TLSConfig
 }
 
 func (gd *Gardener) registryAuthConfig() (*types.AuthConfig, error) {

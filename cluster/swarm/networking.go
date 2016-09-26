@@ -13,8 +13,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-var ErrNotFoundIP = errors.New("IP not found")
-var ErrNotFoundNetworking = errors.New("Networking not found")
+var errNotFoundIP = errors.New("IP not found")
+var errNotFoundNetworking = errors.New("Networking not found")
 
 type Networking struct {
 	Enable bool
@@ -53,7 +53,7 @@ func newNetworking(net database.Networking, prefix int) *Networking {
 	return networking
 }
 
-func (gd *Gardener) GetNetworking(id string) (*Networking, error) {
+func (gd *Gardener) getNetworking(id string) (*Networking, error) {
 	gd.RLock()
 
 	for i := range gd.networkings {
@@ -79,7 +79,7 @@ func (gd *Gardener) GetNetworking(id string) (*Networking, error) {
 	return networking, nil
 }
 
-func (gd *Gardener) GetNetworkingByType(_type string) (*Networking, error) {
+func (gd *Gardener) getNetworkingByType(_type string) (*Networking, error) {
 	gd.RLock()
 
 	for i := range gd.networkings {
@@ -120,7 +120,7 @@ func (gd *Gardener) GetNetworkingByType(_type string) (*Networking, error) {
 }
 
 func (gd *Gardener) SetNetworkingStatus(ID string, enable bool) error {
-	net, err := gd.GetNetworking(ID)
+	net, err := gd.getNetworking(ID)
 	if err != nil {
 		return err
 	}
@@ -165,7 +165,7 @@ type IPInfo struct {
 	ipuint32   uint32
 }
 
-func NewIPinfo(net database.Networking, ip database.IP) IPInfo {
+func newIPinfo(net database.Networking, ip database.IP) IPInfo {
 	return IPInfo{
 		Networking: net.ID,
 		IP:         utils.Uint32ToIP(ip.IPAddr),
@@ -195,7 +195,7 @@ func getIPInfoByUnitID(ID string, engine *cluster.Engine) ([]IPInfo, error) {
 			return nil, err
 		}
 
-		ip, label := NewIPinfo(net, ips[i]), "bond1"
+		ip, label := newIPinfo(net, ips[i]), "bond1"
 
 		if net.Type == _ContainersNetworking {
 			ip.Device = "bond1"
@@ -222,13 +222,13 @@ func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit string, re
 		networkingID := ""
 
 		if net.Type == _ExternalAccessNetworking {
-			dc, err := gd.DatacenterByEngine(engine.ID)
+			dc, err := gd.datacenterByEngine(engine.ID)
 			if err == nil {
 				networkingID = strings.TrimSpace(dc.Cluster.NetworkingID)
 			}
 		}
 
-		ipinfo, err := gd.AllocIP(networkingID, net.Type, unit)
+		ipinfo, err := gd.allocIP(networkingID, net.Type, unit)
 		if err != nil {
 			return nil, err
 		}
@@ -254,7 +254,7 @@ func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit string, re
 	return networkings, nil
 }
 
-func (gd *Gardener) AllocIP(id, _type, unit string) (_ IPInfo, err error) {
+func (gd *Gardener) allocIP(id, _type, unit string) (_ IPInfo, err error) {
 	var networkings []database.Networking
 
 	if len(id) > 0 {
@@ -278,11 +278,11 @@ func (gd *Gardener) AllocIP(id, _type, unit string) (_ IPInfo, err error) {
 		}
 		ip, err := database.TxAllocIPByNetworking(networkings[i].ID, unit)
 		if err == nil {
-			return NewIPinfo(networkings[i], ip), nil
+			return newIPinfo(networkings[i], ip), nil
 		}
 	}
 
-	return IPInfo{}, ErrNotFoundIP
+	return IPInfo{}, errNotFoundIP
 }
 
 func isProxyType(name string) bool {

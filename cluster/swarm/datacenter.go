@@ -87,7 +87,7 @@ func NewNode(addr, name, cluster, user, password, room, seat string, hdd, ssd []
 		Status:       statusNodeImport,
 	}
 
-	task := database.NewTask(node.Name, _Node_Install_Task, node.ID, "import node", nil, 0)
+	task := database.NewTask(node.Name, nodeInstallTask, node.ID, "import node", nil, 0)
 
 	return &Node{
 		Node:     node,
@@ -202,14 +202,6 @@ func (dc *Datacenter) SetStatus(enable bool) error {
 	return err
 }
 
-func (dc *Datacenter) ListNode() []*Node {
-	dc.RLock()
-	nodes := dc.nodes
-	dc.RUnlock()
-
-	return nodes
-}
-
 func (dc *Datacenter) isNodeExist(nameOrID string) bool {
 	dc.RLock()
 
@@ -283,8 +275,8 @@ func (dc *Datacenter) listNodeID() []string {
 	return out
 }
 
-func (gd *Gardener) GetNode(nameOrID string) (*Datacenter, *Node, error) {
-	dc, err := gd.DatacenterByNode(nameOrID)
+func (gd *Gardener) getNode(nameOrID string) (*Datacenter, *Node, error) {
+	dc, err := gd.datacenterByNode(nameOrID)
 	if dc != nil && err == nil {
 
 		node, err := dc.GetNode(nameOrID)
@@ -312,7 +304,7 @@ func (gd *Gardener) GetNode(nameOrID string) (*Datacenter, *Node, error) {
 	return dc, node, nil
 }
 
-func (gd *Gardener) DatacenterByNode(nameOrID string) (*Datacenter, error) {
+func (gd *Gardener) datacenterByNode(nameOrID string) (*Datacenter, error) {
 	node, err := database.GetNode(nameOrID)
 	if err != nil {
 		return nil, err
@@ -321,7 +313,7 @@ func (gd *Gardener) DatacenterByNode(nameOrID string) (*Datacenter, error) {
 	return gd.Datacenter(node.ClusterID)
 }
 
-func (gd *Gardener) DatacenterByEngine(nameOrID string) (*Datacenter, error) {
+func (gd *Gardener) datacenterByEngine(nameOrID string) (*Datacenter, error) {
 	node, err := database.GetNode(nameOrID)
 	if err != nil {
 		return nil, err
@@ -331,7 +323,7 @@ func (gd *Gardener) DatacenterByEngine(nameOrID string) (*Datacenter, error) {
 }
 
 func (gd *Gardener) SetNodeStatus(name string, state int64) error {
-	_, node, err := gd.GetNode(name)
+	_, node, err := gd.getNode(name)
 	if err != nil {
 		logrus.WithField("Node", name).Error(err)
 	}
@@ -350,7 +342,7 @@ func (gd *Gardener) SetNodeStatus(name string, state int64) error {
 }
 
 func (gd *Gardener) SetNodeParams(name string, max int) error {
-	_, node, err := gd.GetNode(name)
+	_, node, err := gd.getNode(name)
 	if err != nil {
 		return err
 	}
@@ -358,7 +350,7 @@ func (gd *Gardener) SetNodeParams(name string, max int) error {
 	return node.UpdateParams(max)
 }
 
-func (dc *Datacenter) RemoveNode(nameOrID string) error {
+func (dc *Datacenter) removeNode(nameOrID string) error {
 	dc.Lock()
 	for i := range dc.nodes {
 		if dc.nodes[i].ID == nameOrID ||
@@ -463,7 +455,7 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 	gd.Lock()
 	for i := range gd.datacenters {
 		if gd.datacenters[i].ID == node.ClusterID {
-			gd.datacenters[i].RemoveNode(nameOrID)
+			gd.datacenters[i].removeNode(nameOrID)
 			break
 		}
 	}
@@ -754,7 +746,7 @@ func (gd *Gardener) resourceFilter(list []database.Node, module structs.Module, 
 
 loop:
 	for i := range list {
-		dc, node, err := gd.GetNode(list[i].ID)
+		dc, node, err := gd.getNode(list[i].ID)
 		if err != nil || dc == nil || node == nil {
 			logrus.Warningf("Not Found Node By ID:%s", list[i].ID)
 

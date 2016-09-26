@@ -120,7 +120,7 @@ func (u *unit) Engine() (*cluster.Engine, error) {
 	return nil, errors.Wrapf(errEngineIsNil, "get %s Engine", u.Name)
 }
 
-func (u *unit) ContainerAPIClient() (*cluster.Engine, client.ContainerAPIClient, error) {
+func (u *unit) containerAPIClient() (*cluster.Engine, client.ContainerAPIClient, error) {
 	eng, err := u.Engine()
 	if err != nil {
 		return nil, nil, err
@@ -138,42 +138,42 @@ func (u *unit) ContainerAPIClient() (*cluster.Engine, client.ContainerAPIClient,
 	return eng, client, nil
 }
 
-func (gd *Gardener) GetUnit(table database.Unit) (*unit, error) {
-	var (
-		svc *Service
-		u   *unit
-	)
-	gd.RLock()
-	for i := range gd.services {
-		if gd.services[i].ID == table.ServiceID {
-			svc = gd.services[i]
-			break
-		}
-	}
-	gd.RUnlock()
+//func (gd *Gardener) GetUnit(table database.Unit) (*unit, error) {
+//	var (
+//		svc *Service
+//		u   *unit
+//	)
+//	gd.RLock()
+//	for i := range gd.services {
+//		if gd.services[i].ID == table.ServiceID {
+//			svc = gd.services[i]
+//			break
+//		}
+//	}
+//	gd.RUnlock()
 
-	if svc != nil {
-		svc.RLock()
-		u, _ = svc.getUnit(table.ID)
-		svc.RUnlock()
-	}
+//	if svc != nil {
+//		svc.RLock()
+//		u, _ = svc.getUnit(table.ID)
+//		svc.RUnlock()
+//	}
 
-	if u == nil || u.engine == nil {
-		value, err := gd.rebuildUnit(table)
-		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"Service": svc.Name,
-				"Unit":    table.Name,
-			}).Errorf("rebuild Unit:%s", err)
+//	if u == nil || u.engine == nil {
+//		value, err := gd.rebuildUnit(table)
+//		if err != nil {
+//			logrus.WithFields(logrus.Fields{
+//				"Service": svc.Name,
+//				"Unit":    table.Name,
+//			}).Errorf("rebuild Unit:%s", err)
 
-			return nil, err
-		}
+//			return nil, err
+//		}
 
-		u = &value
-	}
+//		u = &value
+//	}
 
-	return u, nil
-}
+//	return u, nil
+//}
 
 func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 	var c *cluster.Container
@@ -196,7 +196,7 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 	entry := logrus.WithField("Unit", u.Name)
 
 	if u.engine == nil && u.EngineID != "" {
-		_, node, err := gd.GetNode(u.EngineID)
+		_, node, err := gd.getNode(u.EngineID)
 		if err != nil {
 			entry.WithError(err).Error("not found engine:", u.EngineID)
 
@@ -369,7 +369,7 @@ func extendSanStoreageVG(host string, lun database.LUN) error {
 }
 
 func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
-	engine, client, err := u.ContainerAPIClient()
+	engine, client, err := u.containerAPIClient()
 	if err != nil {
 		return err
 	}
@@ -446,7 +446,7 @@ func startContainer(containerID string, engine *cluster.Engine, networkings []IP
 }
 
 func (u *unit) forceStopContainer(timeout int) error {
-	engine, client, err := u.ContainerAPIClient()
+	engine, client, err := u.containerAPIClient()
 	if err != nil {
 		return err
 	}
@@ -480,7 +480,7 @@ func (u *unit) restartContainer(ctx context.Context) error {
 		return nil
 	}
 
-	engine, client, err := u.ContainerAPIClient()
+	engine, client, err := u.containerAPIClient()
 	if err != nil {
 		return err
 	}
@@ -505,7 +505,7 @@ func (u *unit) restartContainer(ctx context.Context) error {
 }
 
 func (u *unit) renameContainer(name string) error {
-	engine, client, err := u.ContainerAPIClient()
+	engine, client, err := u.containerAPIClient()
 	if err != nil {
 		return err
 	}
@@ -517,7 +517,7 @@ func (u *unit) renameContainer(name string) error {
 }
 
 func (u *unit) kill() error {
-	_, client, err := u.ContainerAPIClient()
+	_, client, err := u.containerAPIClient()
 	if err != nil {
 		return err
 	}
@@ -613,7 +613,7 @@ func (u *unit) deactivateVG(config sdk.DeactivateConfig) error {
 	return err
 }
 
-func (u *unit) CopyConfig(data map[string]interface{}) error {
+func (u *unit) copyConfig(data map[string]interface{}) error {
 	_, err := u.ParseData([]byte(u.parent.Content))
 	if err != nil {
 		return err
@@ -1077,7 +1077,7 @@ func (gd *Gardener) RestoreUnit(nameOrID, source string) (string, error) {
 		return err
 	}
 
-	task := database.NewTask(unit.Name, _Unit_Restore_Task, unit.ID, "", nil, 0)
+	task := database.NewTask(unit.Name, unitRestoreTask, unit.ID, "", nil, 0)
 
 	before := func() error {
 		err := unit.StatusCAS("!=", statusUnitBackuping, statusUnitRestoring)

@@ -40,7 +40,7 @@ type Service struct {
 	authConfig *types.AuthConfig
 }
 
-func NewService(service database.Service, unitNum int) *Service {
+func newService(service database.Service, unitNum int) *Service {
 	return &Service{
 		Service: service,
 		units:   make([]*unit, 0, unitNum),
@@ -88,7 +88,7 @@ func buildService(req structs.PostServiceRequest,
 	users := defaultServiceUsers(service.ID, *sys)
 	users = append(users, converteToUsers(service.ID, req.Users)...)
 
-	svc := NewService(service, nodeNum)
+	svc := newService(service, nodeNum)
 
 	svc.Lock()
 	defer svc.Unlock()
@@ -99,7 +99,7 @@ func buildService(req structs.PostServiceRequest,
 	svc.users = users
 	atomic.StoreInt64(&svc.Status, statusServcieBuilding)
 
-	task := database.NewTask(svc.Name, _Service_Create_Task, svc.ID, "create service", nil, 0)
+	task := database.NewTask(svc.Name, serviceCreateTask, svc.ID, "create service", nil, 0)
 
 	err = database.TxSaveService(svc.Service, svc.backup, &task, svc.users)
 
@@ -135,15 +135,7 @@ func newBackupStrategy(service string, strategy *structs.BackupStrategy) (*datab
 	}, nil
 }
 
-func (svc *Service) BackupStrategy() *database.BackupStrategy {
-	svc.RLock()
-	backup := svc.backup
-	svc.RUnlock()
-
-	return backup
-}
-
-func (svc *Service) ReplaceBackupStrategy(req structs.BackupStrategy) (*database.BackupStrategy, error) {
+func (svc *Service) replaceBackupStrategy(req structs.BackupStrategy) (*database.BackupStrategy, error) {
 	backup, err := newBackupStrategy(svc.ID, &req)
 	if err != nil || backup == nil {
 		return nil, errors.Errorf("with non Backup Strategy,%+v", err)
@@ -159,19 +151,6 @@ func (svc *Service) ReplaceBackupStrategy(req structs.BackupStrategy) (*database
 	svc.Unlock()
 
 	return backup, nil
-}
-
-func (svc *Service) UpdateBackupStrategy(backup database.BackupStrategy) error {
-	err := database.UpdateBackupStrategy(backup)
-	if err != nil {
-		return fmt.Errorf("Insert Backup Strategy Error:%s", err)
-	}
-
-	svc.Lock()
-	svc.backup = &backup
-	svc.Unlock()
-
-	return nil
 }
 
 func DeleteServiceBackupStrategy(strategy string) error {
@@ -532,10 +511,6 @@ func (gd *Gardener) addService(svc *Service) error {
 	return nil
 }
 
-func (svc *Service) SaveToDB(task *database.Task) error {
-	return database.TxSaveService(svc.Service, svc.backup, task, svc.users)
-}
-
 func (gd *Gardener) GetService(nameOrID string) (*Service, error) {
 	gd.RLock()
 
@@ -600,7 +575,7 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 		logrus.WithField("Service", service.Name).WithError(err).Error("list Users by serviceID:", service.ID)
 	}
 
-	svc := NewService(service, len(units))
+	svc := newService(service, len(units))
 	svc.Lock()
 	defer svc.Unlock()
 
@@ -799,7 +774,7 @@ func (svc *Service) copyServiceConfig() error {
 			defConfig[key] = val
 		}
 
-		err = u.CopyConfig(defConfig)
+		err = u.copyConfig(defConfig)
 		if err != nil {
 			return err
 		}
@@ -1030,30 +1005,6 @@ func (svc *Service) stopService() error {
 	return err
 }
 
-func (svc *Service) RemoveContainers(force, rmVolumes bool) error {
-	if !force {
-		err := svc.checkStatus(statusServiceNoContent)
-		if err != nil {
-			return err
-		}
-	}
-
-	svc.Lock()
-
-	err := svc.stopService()
-	if err != nil {
-		svc.Unlock()
-
-		return err
-	}
-
-	err = svc.removeContainers(force, rmVolumes)
-
-	svc.Unlock()
-
-	return err
-}
-
 func (svc *Service) removeContainers(force, rmVolumes bool) error {
 	logrus.Debug(svc.Name, " remove Containers")
 	for _, u := range svc.units {
@@ -1181,7 +1132,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 			for _, u := range cnfRollback {
 				u.parent.Content = copyContent
 
-				_err := u.CopyConfig(nil)
+				_err := u.copyConfig(nil)
 				if _err != nil {
 					entry.WithError(_err).Error("Rollback config file modify")
 				}
@@ -1242,7 +1193,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 	for _, u := range units {
 		cnfRollback = append(cnfRollback, u)
 
-		err = u.CopyConfig(config)
+		err = u.copyConfig(config)
 		if err != nil {
 			return err
 		}
@@ -1271,7 +1222,7 @@ func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}
 			return errors.Errorf("Illegal keys:%s,or keys unable to modified", keys)
 		}
 
-		err := u.CopyConfig(config)
+		err := u.copyConfig(config)
 		if err != nil {
 			return err
 		}
@@ -1282,16 +1233,16 @@ func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}
 			logrus.WithField("Unit", u.Name).Warn("Should restart service to make new config file works")
 			return nil
 
-			//			err := u.stopService()
-			//			if err != nil {
-			//				logrus.WithField("Unit", u.Name).WithError(err).Error("Stop service")
-			//			}
+			// err := u.stopService()
+			// if err != nil {
+			//  logrus.WithField("Unit", u.Name).WithError(err).Error("Stop service")
+			// }
 
-			//			err = u.startService()
-			//			if err != nil {
-			//				logrus.WithField("Unit", u.Name).WithError(err).Error("Start service")
-			//				return err
-			//			}
+			// err = u.startService()
+			// if err != nil {
+			//  logrus.WithField("Unit", u.Name).WithError(err).Error("Start service")
+			//  return err
+			// }
 		}
 	}
 
@@ -1697,7 +1648,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 		CreatedAt: now,
 	}
 
-	task := database.NewTask(backup.Name, _Backup_Manual_Task, backup.ID, "", nil, strategy.Timeout)
+	task := database.NewTask(backup.Name, backupManualTask, backup.ID, "", nil, strategy.Timeout)
 
 	entry := logrus.WithFields(logrus.Fields{
 		"Unit":     backup.Name,
@@ -1872,7 +1823,7 @@ func (p *pendingContainerUpdate) containerUpdate() error {
 	if err != nil {
 		return err
 	}
-	err = p.unit.CopyConfig(defConfig)
+	err = p.unit.copyConfig(defConfig)
 	if err != nil {
 		return err
 	}
@@ -1983,7 +1934,7 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 		entry.WithError(err).Error("Deleting Service")
 	}
 
-	err = svc.Delete(gd, force, volumes, true, timeout)
+	err = svc.delete(gd, force, volumes, true, timeout)
 	if err != nil {
 		entry.Errorf("Service.Delete error:%s", err)
 
@@ -2008,7 +1959,7 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 	gd.Unlock()
 
 	if svc.backup != nil {
-		err = gd.RemoveCronJob(svc.backup.ID)
+		err = gd.removeCronJob(svc.backup.ID)
 		if err != nil {
 			entry.Errorf("RemoveCronJob %s error:%s", svc.backup.ID, err)
 
@@ -2019,7 +1970,7 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 	return nil
 }
 
-func (svc *Service) Delete(gd *Gardener, force, rmVolumes, recycle bool, timeout int) error {
+func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout int) error {
 	svc.Lock()
 	defer svc.Unlock()
 
@@ -2106,7 +2057,7 @@ func (svc *Service) Delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 		logrus.Debugf("recycle=%v", recycle)
 		if recycle {
 			logrus.Debug("DatacenterByEngine ", u.EngineID)
-			dc, err := gd.DatacenterByEngine(u.EngineID)
+			dc, err := gd.datacenterByEngine(u.EngineID)
 			if err != nil || dc == nil || dc.store == nil {
 				continue
 			}

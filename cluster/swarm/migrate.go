@@ -43,7 +43,7 @@ func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs
 
 	logrus.Debugf("filters num:%d,candidate nodes num:%d", len(exclude), len(nodes))
 
-	candidates, err := gd.Scheduler(config, num, nodes, false, false)
+	candidates, err := gd.dispatch(config, num, nodes, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		return "", errors.Errorf("Unit %s storage hasn't SAN Storage,Cannot Exec Migrate", nameOrID)
 	}
 
-	dc, original, err := gd.GetNode(migrate.EngineID)
+	dc, original, err := gd.getNode(migrate.EngineID)
 	if err != nil || dc == nil {
 		return "", err
 	}
@@ -216,7 +216,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			if err != nil {
 				logrus.Error(err)
 				// error handle
-				_err := gd.Recycle([]*pendingAllocResource{pending})
+				_err := gd.resourceRecycle([]*pendingAllocResource{pending})
 				if _err != nil {
 					logrus.Error("Recycle ", _err)
 				}
@@ -305,7 +305,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		logrus.Debugf("[MG]start pull image %s", config.Image)
 
-		dc, node, err := gd.GetNode(engine.ID)
+		dc, node, err := gd.getNode(engine.ID)
 		if err != nil {
 			err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
 			logrus.Error(err)
@@ -420,7 +420,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		return nil
 	}
 
-	task := database.NewTask(migrate.Name, _Unit_Migrate_Task, migrate.ID, "", nil, 0)
+	task := database.NewTask(migrate.Name, unitMigrateTask, migrate.ID, "", nil, 0)
 
 	create := func() error {
 		migrate.Status, migrate.LatestError = statusUnitMigrating, ""
@@ -756,7 +756,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 	svc.RUnlock()
 
-	dc, original, err := gd.GetNode(rebuild.EngineID)
+	dc, original, err := gd.getNode(rebuild.EngineID)
 	if err != nil || dc == nil {
 		return "", err
 	}
@@ -799,7 +799,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			if err != nil {
 				logrus.Error(err)
 				// error handle
-				_err := gd.Recycle([]*pendingAllocResource{pending})
+				_err := gd.resourceRecycle([]*pendingAllocResource{pending})
 				if _err != nil {
 					logrus.Error("Recycle ", _err)
 				}
@@ -1001,7 +1001,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		return nil
 	}
 
-	task := database.NewTask(rebuild.Name, _Unit_Rebuild_Task, rebuild.ID, "", nil, 0)
+	task := database.NewTask(rebuild.Name, unitRebuildTask, rebuild.ID, "", nil, 0)
 
 	create := func() error {
 		rebuild.Status, rebuild.LatestError = statusUnitRebuilding, ""

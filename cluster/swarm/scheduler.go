@@ -140,7 +140,7 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 }
 
 func dealWithSchedulerFailure(gd *Gardener, pendings []*pendingAllocResource) error {
-	err := gd.Recycle(pendings)
+	err := gd.resourceRecycle(pendings)
 	if err != nil {
 		logrus.Errorf("Recycle Failed,%s", err)
 
@@ -175,7 +175,7 @@ func templateConfig(gd *Gardener, module structs.Module) (*cluster.ContainerConf
 	}
 	logrus.Infof("Build Container Config,Validate OK:%+v", config)
 
-	image, imageIDLabel, err := gd.GetImageName(module.Config.Image, module.Name, module.Version)
+	image, imageIDLabel, err := gd.getImageName(module.Config.Image, module.Name, module.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func (gd *Gardener) schedulerPerModule(svc *Service, module structs.Module) ([]*
 
 	candidates := gd.listCandidateNodes(list)
 
-	candidates, err = gd.Scheduler(config, num, candidates, false, highAvaliable)
+	candidates, err = gd.dispatch(config, num, candidates, false, highAvaliable)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -382,7 +382,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit,
 	return pending, err
 }
 
-func (gd *Gardener) Scheduler(config *cluster.ContainerConfig, num int,
+func (gd *Gardener) dispatch(config *cluster.ContainerConfig, num int,
 	list []*node.Node, withImageAffinity, highAvaliable bool) ([]*node.Node, error) {
 
 	if len(list) < num {
@@ -454,7 +454,7 @@ func (gd *Gardener) runScheduler(list []*node.Node, config *cluster.ContainerCon
 	}
 
 	logrus.Debugf("[MG] gd.scheduler.SelectNodesForContainer ok(swarm level) ndoes:%d", len(nodes))
-	return gd.SelectNodeByCluster(nodes, num, highAvaliable)
+	return gd.selectNodeByCluster(nodes, num, highAvaliable)
 }
 
 func listCandidates(clusters []string, _type string) ([]database.Node, error) {
@@ -532,7 +532,7 @@ func isStringExist(s string, list []string) bool {
 	return false
 }
 
-func (gd *Gardener) SelectNodeByCluster(nodes []*node.Node, num int, highAvailable bool) ([]*node.Node, error) {
+func (gd *Gardener) selectNodeByCluster(nodes []*node.Node, num int, highAvailable bool) ([]*node.Node, error) {
 	if len(nodes) < num {
 		return nil, errors.New("Not Enough Nodes For Match")
 	}

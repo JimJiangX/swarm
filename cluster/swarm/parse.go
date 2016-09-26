@@ -8,7 +8,6 @@ import (
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/swarm/cluster"
-	"github.com/docker/swarm/utils"
 	"github.com/pkg/errors"
 )
 
@@ -91,10 +90,6 @@ func cloneContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerCon
 	}
 
 	return &clone
-}
-
-func ParseCPUSets(val string) (map[int]bool, error) {
-	return utils.ParseUintList(val)
 }
 
 // parse NCPU from config.HostConfig.CpusetCpus

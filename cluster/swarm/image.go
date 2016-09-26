@@ -23,7 +23,7 @@ type Image struct {
 	image *cluster.Image
 }
 
-func (gd *Gardener) GetImage(name, version string) (Image, error) {
+func (gd *Gardener) getImage(name, version string) (Image, error) {
 	im, err := database.GetImage(name, version)
 	if err != nil {
 		return Image{}, err
@@ -41,7 +41,7 @@ func (gd *Gardener) GetImage(name, version string) (Image, error) {
 	return out, nil
 }
 
-func (gd *Gardener) GetImageByID(id string) (Image, error) {
+func (gd *Gardener) getImageByID(id string) (Image, error) {
 	im, err := database.GetImageByID(id)
 	if err != nil {
 		return Image{}, err
@@ -173,7 +173,7 @@ func LoadImage(req structs.PostLoadImageRequest) (string, string, error) {
 		return err
 	}
 
-	task := database.NewTask(req.Name+":"+req.Version, _Image_Load_Task, _imageID, "", nil, 0)
+	task := database.NewTask(req.Name+":"+req.Version, imageLoadTask, _imageID, "", nil, 0)
 	t := NewAsyncTask(context.Background(),
 		background,
 		task.Insert,
@@ -262,18 +262,18 @@ func parsePushImageOutput(in string) (string, int, error) {
 	return "", 0, fmt.Errorf("Parse Output Error,%s", in)
 }
 
-func (gd *Gardener) GetImageName(id, name, version string) (string, string, error) {
+func (gd *Gardener) getImageName(id, name, version string) (string, string, error) {
 	var (
 		image Image
 		err   error
 	)
 	// query image from database
 	if id != "" {
-		image, err = gd.GetImageByID(id)
+		image, err = gd.getImageByID(id)
 	}
 
 	if (err != nil || image.ID == "") && name != "" {
-		image, err = gd.GetImage(name, version)
+		image, err = gd.getImage(name, version)
 	}
 
 	if err != nil {

@@ -47,14 +47,14 @@ func (bs *serviceBackup) Run() {
 
 	bs.strategy = strategy
 
-	task := database.NewTask(bs.svc.Name, _Backup_Auto_Task, strategy.ID, "", nil, strategy.Timeout)
+	task := database.NewTask(bs.svc.Name, backupAutoTask, strategy.ID, "", nil, strategy.Timeout)
 	task.Status = statusTaskCreate
 	err = task.Insert()
 	if err != nil {
 		return
 	}
 
-	bs.svc.TryBackupTask(*strategy, &task)
+	bs.svc.tryBackupTask(*strategy, &task)
 }
 
 func (bs *serviceBackup) Next(time.Time) time.Time {
@@ -95,7 +95,7 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 	return next
 }
 
-func (svc *Service) TryBackupTask(strategy database.BackupStrategy, task *database.Task) error {
+func (svc *Service) tryBackupTask(strategy database.BackupStrategy, task *database.Task) error {
 	addr, port, master, err := lockSwitchManager(svc, 3)
 	if err != nil {
 		err1 := database.UpdateTaskStatus(task, statusTaskCancel, time.Now(), "Cancel,"+err.Error())
@@ -286,7 +286,7 @@ func (gd *Gardener) registerBackupStrategy(strategy *serviceBackup) error {
 	return nil
 }
 
-func (gd *Gardener) RemoveCronJob(strategyID string) error {
+func (gd *Gardener) removeCronJob(strategyID string) error {
 	gd.Lock()
 
 	for key, val := range gd.cronJobs {
@@ -314,7 +314,7 @@ func (gd *Gardener) ReplaceServiceBackupStrategy(nameOrID string, req structs.Ba
 
 	req.BackupDir = sys.BackupDir
 
-	strategy, err := svc.ReplaceBackupStrategy(req)
+	strategy, err := svc.replaceBackupStrategy(req)
 	if err != nil {
 		return strategy, err
 	}
