@@ -10,7 +10,7 @@ import (
 
 const insertClusterQuery = "INSERT INTO tb_cluster (id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit) VALUES (:id,:name,:type,:storage_id,:storage_type,:networking_id,:enabled,:max_node,:usage_limit)"
 
-// tb_cluster structure,correspod with a group of computers
+// Cluster table tb_cluster structure,correspod with a group of computers
 type Cluster struct {
 	ID           string  `db:"id"`
 	Name         string  `db:"name"`
@@ -210,7 +210,7 @@ func CountClusterByStorage(storageID string) (int, error) {
 
 const insertNodeQuery = "INSERT INTO tb_node (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
 
-// tb_node structure,correspod with mainframe computer.
+// Node table tb_node structure,correspod with mainframe computer.
 type Node struct {
 	ID           string `db:"id"`
 	Name         string `db:"name"`

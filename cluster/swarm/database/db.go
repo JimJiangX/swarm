@@ -16,24 +16,29 @@ var (
 	dbSource   string
 	defaultDB  *sqlx.DB
 
+	// FlDBDriver DB driver
 	FlDBDriver = cli.StringFlag{
 		Name:  "dbDriver",
 		Value: "mysql",
 		Usage: "database driver name",
 	}
+	// FlDBName DB name
 	FlDBName = cli.StringFlag{
 		Name:  "dbName",
 		Usage: "database name",
 	}
+	// FlDBAuth DB auth for db login
 	FlDBAuth = cli.StringFlag{
 		Name:  "dbAuth",
 		Usage: "auth for login database",
 	}
+	// FlDBHost DB host address
 	FlDBHost = cli.StringFlag{
 		Name:  "dbHost",
 		Value: "127.0.0.1",
 		Usage: "connection to database host addr",
 	}
+	// FlDBPort DB port
 	FlDBPort = cli.IntFlag{
 		Name:  "dbPort",
 		Value: 3306,
@@ -44,8 +49,11 @@ var (
 var (
 	noRowsFoundMsg     = "no rows in result set"
 	connectioneRefused = "connection refused"
-	ErrNoRowsFound     = errors.New("not found object")
-	ErrDisconnected    = errors.New("DB disconnected")
+
+	// ErrNoRowsFound not found the assigned row
+	ErrNoRowsFound = errors.New("not found object")
+	// ErrDisconnected DB disconnected
+	ErrDisconnected = errors.New("DB disconnected")
 )
 
 // CheckError check error if error is ErrNoRowsFound or ErrDisconnected
@@ -129,10 +137,9 @@ func GetDB(ping bool) (*sqlx.DB, error) {
 
 		if err := defaultDB.Ping(); err == nil {
 			return defaultDB, nil
-
-		} else {
-			defaultDB.Close()
 		}
+
+		defaultDB.Close()
 	}
 
 	return Connect(driverName, dbSource)

@@ -160,7 +160,7 @@ func TestNetwork(t *testing.T) {
 	}
 }
 
-func randIp() string {
+func randomIP() string {
 	rand.Seed(time.Now().Unix())
 	ip1 := rand.Int31n(255)
 	rand.Seed(int64(ip1))

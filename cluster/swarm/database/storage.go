@@ -316,13 +316,13 @@ func (r RaidGroup) tableName() string {
 }
 
 // Insert insert a new RaidGroup
-func (rg RaidGroup) Insert() error {
+func (r RaidGroup) Insert() error {
 	db, err := GetDB(false)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.NamedExec(insertRaidGroupQuery, &rg)
+	_, err = db.NamedExec(insertRaidGroupQuery, &r)
 	if err == nil {
 		return nil
 	}
@@ -332,7 +332,7 @@ func (rg RaidGroup) Insert() error {
 		return err
 	}
 
-	_, err = db.NamedExec(insertRaidGroupQuery, &rg)
+	_, err = db.NamedExec(insertRaidGroupQuery, &r)
 	if err == nil {
 		return nil
 	}
@@ -474,7 +474,7 @@ type HitachiStorage struct {
 	HluEnd    int    `db:"hlu_end"`
 }
 
-func (hds HitachiStorage) tableName() string {
+func (HitachiStorage) tableName() string {
 	return "tb_storage_HITACHI"
 }
 
@@ -502,7 +502,7 @@ func (hs HitachiStorage) Insert() error {
 
 const insertHuaweiStorageQuery = "INSERT INTO tb_storage_HUAWEI (id,vendor,ip_addr,username,password,hlu_start,hlu_end) VALUES (:id,:vendor,:ip_addr,:username,:password,:hlu_start,:hlu_end)"
 
-// HitachiStorage is table tb_storage_HUAWEI structure,
+// HuaweiStorage is table tb_storage_HUAWEI structure,
 // correspod with HUAWEI storage
 type HuaweiStorage struct {
 	ID       string `db:"id"`
@@ -514,7 +514,7 @@ type HuaweiStorage struct {
 	HluEnd   int    `db:"hlu_end"`
 }
 
-func (h HuaweiStorage) tableName() string {
+func (HuaweiStorage) tableName() string {
 	return "tb_storage_HUAWEI"
 }
 

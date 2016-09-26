@@ -229,7 +229,7 @@ func TestHuaweiStorage(t *testing.T) {
 	hs := HuaweiStorage{
 		ID:       utils.Generate64UUID(),
 		Vendor:   "HuaweiStorageVendor001",
-		IPAddr:   randIp(),
+		IPAddr:   randomIP(),
 		Username: "HuaweiStorageUsername001",
 		Password: "HuaweiStoragePassword001",
 		HluStart: 1,
@@ -339,7 +339,7 @@ func TestGetStorageByID(t *testing.T) {
 	huaweiStorage := HuaweiStorage{
 		ID:       utils.Generate64UUID(),
 		Vendor:   "HuaweiStorageVendor002",
-		IPAddr:   randIp(),
+		IPAddr:   randomIP(),
 		Username: "HuaweiStorageUsername002",
 		Password: "HuaweiStoragePassword002",
 		HluStart: 1,

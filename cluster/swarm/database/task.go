@@ -136,15 +136,15 @@ func NewTask(object, relate, linkto, des string, labels []string, timeout int) T
 }
 
 // Insert insert a Task
-func (task Task) Insert() error {
+func (t Task) Insert() error {
 	db, err := GetDB(false)
 	if err != nil {
 		return err
 	}
 
-	task.Timestamp = task.CreatedAt.Unix()
+	t.Timestamp = t.CreatedAt.Unix()
 
-	_, err = db.NamedExec(insertTaskQuery, &task)
+	_, err = db.NamedExec(insertTaskQuery, &t)
 	if err == nil {
 		return nil
 	}
@@ -154,7 +154,7 @@ func (task Task) Insert() error {
 		return err
 	}
 
-	_, err = db.NamedExec(insertTaskQuery, &task)
+	_, err = db.NamedExec(insertTaskQuery, &t)
 
 	return errors.Wrap(err, "insert Task")
 }
@@ -279,7 +279,7 @@ func UpdateTaskStatus(task *Task, state int64, finishAt time.Time, msg string) e
 }
 
 // UpdateStatus update Task status
-func (task *Task) UpdateStatus(status int, msg string) error {
+func (t *Task) UpdateStatus(status int, msg string) error {
 	db, err := GetDB(false)
 	if err != nil {
 		return err
@@ -288,10 +288,10 @@ func (task *Task) UpdateStatus(status int, msg string) error {
 	now := time.Now()
 	const query = "UPDATE tb_task SET status=?,finished_at=?,errors=? WHERE id=?"
 
-	_, err = db.Exec(query, status, now, msg, task.ID)
+	_, err = db.Exec(query, status, now, msg, t.ID)
 	if err == nil {
-		atomic.StoreInt64(&task.Status, int64(status))
-		task.FinishedAt = now
+		atomic.StoreInt64(&t.Status, int64(status))
+		t.FinishedAt = now
 
 		return nil
 	}
@@ -301,10 +301,10 @@ func (task *Task) UpdateStatus(status int, msg string) error {
 		return err
 	}
 
-	_, err = db.Exec(query, status, now, msg, task.ID)
+	_, err = db.Exec(query, status, now, msg, t.ID)
 	if err == nil {
-		atomic.StoreInt64(&task.Status, int64(status))
-		task.FinishedAt = now
+		atomic.StoreInt64(&t.Status, int64(status))
+		t.FinishedAt = now
 
 		return nil
 	}
