@@ -18,22 +18,27 @@ import (
 	"time"
 )
 
+// Generate8UUID is used to generate a random UUID,lenth of string is 8
 func Generate8UUID() string {
 	return GenerateUUID(8)
 }
 
+// Generate16UUID is used to generate a random UUID,lenth of string is 16
 func Generate16UUID() string {
 	return GenerateUUID(16)
 }
 
+// Generate32UUID is used to generate a random UUID,lenth of string is 32
 func Generate32UUID() string {
 	return GenerateUUID(32)
 }
 
+// Generate64UUID is used to generate a random UUID,lenth of string is 64
 func Generate64UUID() string {
 	return GenerateUUID(64)
 }
 
+// Generate128UUID is used to generate a random UUID,lenth of string is 128
 func Generate128UUID() string {
 	return GenerateUUID(128)
 }
@@ -93,13 +98,13 @@ func RandomNumber() int {
 	return r.Int()
 }
 
-// decodeBody is used to JSON decode a body
+// DecodeBody is used to JSON decode a body
 func DecodeBody(resp *http.Response, out interface{}) error {
 	dec := json.NewDecoder(resp.Body)
 	return dec.Decode(out)
 }
 
-// decode base64 string,return username,password
+// Base64Decode decode base64 string,return username,password
 // http://play.golang.org/p/CNIwzF1L6l
 func Base64Decode(auth string) (username, password string, err error) {
 	authb, err := base64.StdEncoding.DecodeString(auth)
@@ -114,11 +119,13 @@ func Base64Decode(auth string) (username, password string, err error) {
 	return username, password, err
 }
 
+// Base64Encode encode string by base64
 func Base64Encode(username, password string) string {
 	src := []byte(username + ":" + password)
 	return base64.StdEncoding.EncodeToString(src)
 }
 
+// IPToUint32 convert a IP string to unit32
 func IPToUint32(ip string) uint32 {
 	addr := net.ParseIP(ip)
 	if addr == nil {
@@ -127,6 +134,7 @@ func IPToUint32(ip string) uint32 {
 	return binary.BigEndian.Uint32(addr.To4())
 }
 
+// Uint32ToIP convert a unit32 to IP
 func Uint32ToIP(cidr uint32) net.IP {
 	addr := make([]byte, 4)
 	binary.BigEndian.PutUint32(addr, cidr)
@@ -135,6 +143,7 @@ func Uint32ToIP(cidr uint32) net.IP {
 
 const defaultTimeLayout = "2006-01-02 15:04:05"
 
+// TimeToString format a time t to string,time loyout is "2006-01-02 15:04:05"
 func TimeToString(t time.Time) string {
 	if !t.IsZero() {
 		return t.Format(defaultTimeLayout)
@@ -142,7 +151,7 @@ func TimeToString(t time.Time) string {
 	return ""
 }
 
-// ParseStringToTime returns local time
+// ParseStringToTime returns local time with time loyout "2006-01-02 15:04:05",local zone
 func ParseStringToTime(s string) (time.Time, error) {
 	t, err := time.Parse(defaultTimeLayout, s)
 	if err != nil {
@@ -208,6 +217,7 @@ func GetPrivateIP(addr string) (net.IP, error) {
 	return nil, fmt.Errorf("private IP not found,%s", addr)
 }
 
+// GetAbsolutePath returns absolute path
 func GetAbsolutePath(isDir bool, path ...string) (string, error) {
 	dir := filepath.Join(path...)
 	abs, err := filepath.Abs(dir)
@@ -234,6 +244,7 @@ func GetAbsolutePath(isDir bool, path ...string) (string, error) {
 	return abs, nil
 }
 
+// GetCPUNum returns CPU num,calls ParseUintList
 func GetCPUNum(val string) (int64, error) {
 	cpus, err := ParseUintList(val)
 	if err != nil {
@@ -251,7 +262,6 @@ func GetCPUNum(val string) (int64, error) {
 	return ncpu, nil
 }
 
-// copy from github.com/docker/docker/pkg/parsers.go
 // ParseUintList parses and validates the specified string as the value
 // found in some cgroup file (e.g. `cpuset.cpus`, `cpuset.mems`), which could be
 // one of the formats below. Note that duplicates are actually allowed in the
@@ -265,6 +275,7 @@ func GetCPUNum(val string) (int64, error) {
 //     03,1-3      <- this is gonna get parsed as [1,2,3]
 //     3,2,1
 //     0-2,3,1
+// copy from github.com/docker/docker/pkg/parsers.go
 func ParseUintList(val string) (map[int]bool, error) {
 	if val == "" {
 		return map[int]bool{}, nil
