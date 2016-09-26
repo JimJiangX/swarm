@@ -747,7 +747,7 @@ func BackupTaskValidate(taskID, strategyID, unitID string) (Task, int, error) {
 	}
 
 	rent := 0
-	err = db.Get(&rent, "SELECT backup_files_retention FROM tb_service WHERE id=?", service)
+	err = db.Get(&rent, "SELECT backup_files_retention FROM tbl_dbaas_service WHERE id=?", service)
 	if err != nil {
 		return task, 0, errors.Wrap(err, "BackupTaskValidate: get Service by ID:"+service)
 	}

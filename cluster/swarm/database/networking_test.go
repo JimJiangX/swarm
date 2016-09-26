@@ -22,7 +22,7 @@ func NewPort(port int, name, unitID, unitName, proto string, allocated bool) Por
 }
 
 func delMultiPorts(tx *sqlx.Tx, ports []Port) error {
-	query := "DELETE FROM tb_port WHERE port=?"
+	query := "DELETE FROM tbl_dbaas_port WHERE port=?"
 
 	stmt, err := tx.Preparex(query)
 	if err != nil {

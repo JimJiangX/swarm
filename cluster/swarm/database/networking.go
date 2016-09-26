@@ -8,9 +8,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-const insertIPQuery = "INSERT INTO tb_ip (ip_addr,prefix,networking_id,unit_id,allocated) VALUES (:ip_addr,:prefix,:networking_id,:unit_id,:allocated)"
+const insertIPQuery = "INSERT INTO tbl_dbaas_ip (ip_addr,prefix,networking_id,unit_id,allocated) VALUES (:ip_addr,:prefix,:networking_id,:unit_id,:allocated)"
 
-// IP is table tb_ip structure, associate to Networking
+// IP is table tbl_dbaas_ip structure, associate to Networking
 type IP struct {
 	IPAddr       uint32 `db:"ip_addr"`
 	Prefix       int    `db:"prefix"`
@@ -20,12 +20,12 @@ type IP struct {
 }
 
 func (ip IP) tableName() string {
-	return "tb_ip"
+	return "tbl_dbaas_ip"
 }
 
-const insertNetworkingQuery = "INSERT INTO tb_networking (id,type,gateway,enabled) VALUES (:id,:type,:gateway,:enabled)"
+const insertNetworkingQuery = "INSERT INTO tbl_dbaas_networking (id,type,gateway,enabled) VALUES (:id,:type,:gateway,:enabled)"
 
-// Networking is table tb_networking structure,a goroup of IP Address
+// Networking is table tbl_dbaas_networking structure,a goroup of IP Address
 type Networking struct {
 	ID      string `db:"id"`
 	Type    string `db:"type"`
@@ -34,12 +34,12 @@ type Networking struct {
 }
 
 func (net Networking) tableName() string {
-	return "tb_networking"
+	return "tbl_dbaas_networking"
 }
 
-const insertPortQuery = "INSERT INTO tb_port (port,name,unit_id,unit_name,proto,allocated) VALUES (:port,:name,:unit_id,:unit_name,:proto,:allocated)"
+const insertPortQuery = "INSERT INTO tbl_dbaas_port (port,name,unit_id,unit_name,proto,allocated) VALUES (:port,:name,:unit_id,:unit_name,:proto,:allocated)"
 
-// Port is table tb_port structure,correspod with computer network port that a network applications listens on
+// Port is table tbl_dbaas_port structure,correspod with computer network port that a network applications listens on
 type Port struct {
 	Port      int    `db:"port"`
 	Name      string `db:"name"`
@@ -50,7 +50,7 @@ type Port struct {
 }
 
 func (port Port) tableName() string {
-	return "tb_port"
+	return "tbl_dbaas_port"
 }
 
 // DeletePort delete by port,only if Port.Allocated==allocated
@@ -61,7 +61,7 @@ func DeletePort(port int, allocated bool) error {
 	}
 
 	using := false
-	err = db.Get(&using, "SELECT allocated FROM tb_port WHERE port=?", port)
+	err = db.Get(&using, "SELECT allocated FROM tbl_dbaas_port WHERE port=?", port)
 	if err != nil {
 		return errors.Wrap(err, "get Port.Allocated")
 	}
@@ -69,7 +69,7 @@ func DeletePort(port int, allocated bool) error {
 		return errors.Errorf("Port %d (%t!= %t),cannot be removed", port, using, allocated)
 	}
 
-	_, err = db.Exec("DELETE FROM tb_port WHERE port=? AND allocated=?", port, allocated)
+	_, err = db.Exec("DELETE FROM tbl_dbaas_port WHERE port=? AND allocated=?", port, allocated)
 
 	return errors.Wrap(err, "delete Port")
 }
@@ -87,7 +87,7 @@ func ListAvailablePorts(num int) ([]Port, error) {
 
 	var (
 		ports []Port
-		query = fmt.Sprintf("SELECT * FROM tb_port WHERE allocated=? LIMIT %d", num)
+		query = fmt.Sprintf("SELECT * FROM tbl_dbaas_port WHERE allocated=? LIMIT %d", num)
 	)
 
 	err = db.Select(&ports, query, false)
@@ -112,7 +112,7 @@ func ListAvailablePorts(num int) ([]Port, error) {
 
 // TxUpdatePorts update []Port Name\UnitID\UnitName\Proto\Allocated in Tx
 func TxUpdatePorts(tx *sqlx.Tx, ports []Port) error {
-	const query = "UPDATE tb_port SET name=:name,unit_id=:unit_id,unit_name=:unit_name,proto=:proto,allocated=:allocated WHERE port=:port"
+	const query = "UPDATE tbl_dbaas_port SET name=:name,unit_id=:unit_id,unit_name=:unit_name,proto=:proto,allocated=:allocated WHERE port=:port"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
@@ -198,7 +198,7 @@ func ListPortsByUnit(nameOrID string) ([]Port, error) {
 	}
 
 	var ports []Port
-	const query = "SELECT * FROM tb_port WHERE unit_id=? OR unit_name=?"
+	const query = "SELECT * FROM tbl_dbaas_port WHERE unit_id=? OR unit_name=?"
 
 	err = db.Select(&ports, query, nameOrID, nameOrID)
 	if err == nil {
@@ -226,19 +226,19 @@ func ListPorts(start, end, limit int) ([]Port, error) {
 
 	switch {
 	case start == 0 && end == 0:
-		query := fmt.Sprintf("SELECT * FROM tb_port LIMIT %d", limit)
+		query := fmt.Sprintf("SELECT * FROM tbl_dbaas_port LIMIT %d", limit)
 		err = db.Select(&ports, query)
 
 	case start > 0 && end > 0:
-		query := fmt.Sprintf("SELECT * FROM tb_port WHERE port>=? AND port<=? LIMIT %d", limit)
+		query := fmt.Sprintf("SELECT * FROM tbl_dbaas_port WHERE port>=? AND port<=? LIMIT %d", limit)
 		err = db.Select(&ports, query, start, end)
 
 	case end == 0:
-		query := fmt.Sprintf("SELECT * FROM tb_port WHERE port>=? LIMIT %d", limit)
+		query := fmt.Sprintf("SELECT * FROM tbl_dbaas_port WHERE port>=? LIMIT %d", limit)
 		err = db.Select(&ports, query, start)
 
 	case start == 0:
-		query := fmt.Sprintf("SELECT * FROM tb_port WHERE port<=? LIMIT %d", limit)
+		query := fmt.Sprintf("SELECT * FROM tbl_dbaas_port WHERE port<=? LIMIT %d", limit)
 		err = db.Select(&ports, query, end)
 
 	default:
@@ -257,13 +257,13 @@ func GetNetworkingByID(ID string) (Networking, int, error) {
 
 	net := Networking{}
 
-	err = db.Get(&net, "SELECT * FROM tb_networking WHERE id=?", ID)
+	err = db.Get(&net, "SELECT * FROM tbl_dbaas_networking WHERE id=?", ID)
 	if err != nil {
 		return net, 0, errors.Wrap(err, "get Networking by ID:"+ID)
 	}
 
 	prefix := 0
-	err = db.Get(&prefix, "SELECT prefix FROM tb_ip WHERE networking_id=? LIMIT 1", ID)
+	err = db.Get(&prefix, "SELECT prefix FROM tbl_dbaas_ip WHERE networking_id=? LIMIT 1", ID)
 	if err != nil {
 		return net, 0, errors.Wrap(err, "get IP.Prefix")
 	}
@@ -279,7 +279,7 @@ func ListIPByUnitID(unit string) ([]IP, error) {
 	}
 
 	var out []IP
-	const query = "SELECT * from tb_ip WHERE unit_id=?"
+	const query = "SELECT * from tbl_dbaas_ip WHERE unit_id=?"
 
 	err = db.Select(&out, query, unit)
 	if err == nil {
@@ -304,7 +304,7 @@ func ListNetworkingByType(_type string) ([]Networking, error) {
 	}
 
 	var list []Networking
-	const query = "SELECT * FROM tb_networking WHERE type=?"
+	const query = "SELECT * FROM tbl_dbaas_networking WHERE type=?"
 
 	err = db.Select(&list, query, _type)
 	if err == nil {
@@ -329,7 +329,7 @@ func ListNetworking() ([]Networking, error) {
 	}
 
 	var list []Networking
-	const query = "SELECT * FROM tb_networking"
+	const query = "SELECT * FROM tbl_dbaas_networking"
 
 	err = db.Select(&list, query)
 	if err == nil {
@@ -354,7 +354,7 @@ func ListIPByNetworking(networkingID string) ([]IP, error) {
 	}
 
 	var list []IP
-	const query = "SELECT * FROM tb_ip WHERE networking_id=?"
+	const query = "SELECT * FROM tbl_dbaas_ip WHERE networking_id=?"
 
 	err = db.Select(&list, query, networkingID)
 	if err == nil {
@@ -419,7 +419,7 @@ func UpdateNetworkingStatus(ID string, enable bool) error {
 		return err
 	}
 
-	const query = "UPDATE tb_networking SET enabled=? WHERE id=?"
+	const query = "UPDATE tbl_dbaas_networking SET enabled=? WHERE id=?"
 
 	_, err = db.Exec(query, enable, ID)
 	if err == nil {
@@ -477,12 +477,12 @@ func TxDeleteNetworking(ID string) error {
 	}
 	defer tx.Rollback()
 
-	_, err = tx.Exec("DELETE FROM tb_networking WHERE id=?", ID)
+	_, err = tx.Exec("DELETE FROM tbl_dbaas_networking WHERE id=?", ID)
 	if err != nil {
 		return errors.Wrap(err, "Tx delete Networking by ID")
 	}
 
-	_, err = tx.Exec("DELETE FROM tb_ip WHERE networking_id=?", ID)
+	_, err = tx.Exec("DELETE FROM tbl_dbaas_ip WHERE networking_id=?", ID)
 	if err != nil {
 		return errors.Wrap(err, "Tx delete []IP by NetworkingID")
 	}
@@ -503,8 +503,8 @@ func IsNetwrokingUsed(networking string) (bool, error) {
 
 	count := 0
 	const (
-		queryIP      = "SELECT COUNT(*) from tb_ip WHERE networking_id=? AND allocated=?"
-		queryCluster = "SELECT COUNT(*) from tb_cluster WHERE networking_id=?"
+		queryIP      = "SELECT COUNT(*) from tbl_dbaas_ip WHERE networking_id=? AND allocated=?"
+		queryCluster = "SELECT COUNT(*) from tbl_dbaas_cluster WHERE networking_id=?"
 	)
 
 	err = db.Get(&count, queryIP, networking, true)
@@ -532,7 +532,7 @@ func ListIPWithCondition(networking string, allocation bool, num int) ([]IP, err
 	}
 
 	var out []IP
-	query := fmt.Sprintf("SELECT * from tb_ip WHERE networking_id=? AND allocated=? LIMIT %d", num)
+	query := fmt.Sprintf("SELECT * from tbl_dbaas_ip WHERE networking_id=? AND allocated=? LIMIT %d", num)
 
 	err = db.Select(&out, query, networking, allocation)
 	if err == nil {
@@ -558,7 +558,7 @@ func TxAllocIPByNetworking(id, unit string) (IP, error) {
 	defer tx.Rollback()
 
 	out := IP{}
-	query := tx.Rebind(fmt.Sprintf("SELECT * FROM tb_ip WHERE networking_id=? AND allocated=? LIMIT 1 FOR UPDATE;"))
+	query := tx.Rebind(fmt.Sprintf("SELECT * FROM tbl_dbaas_ip WHERE networking_id=? AND allocated=? LIMIT 1 FOR UPDATE;"))
 
 	err = tx.Get(&out, query, id, false)
 	if err != nil {
@@ -568,7 +568,7 @@ func TxAllocIPByNetworking(id, unit string) (IP, error) {
 	out.Allocated = true
 	out.UnitID = unit
 
-	query = "UPDATE tb_ip SET allocated=:allocated,unit_id=:unit_id WHERE ip_addr=:ip_addr AND prefix=:prefix"
+	query = "UPDATE tbl_dbaas_ip SET allocated=:allocated,unit_id=:unit_id WHERE ip_addr=:ip_addr AND prefix=:prefix"
 
 	_, err = tx.NamedExec(query, out)
 	if err != nil {
@@ -582,7 +582,7 @@ func TxAllocIPByNetworking(id, unit string) (IP, error) {
 
 // TxUpdateIPs update []IP in Tx
 func TxUpdateIPs(tx *sqlx.Tx, val []IP) error {
-	const query = "UPDATE tb_ip SET unit_id=:unit_id,allocated=:allocated WHERE ip_addr=:ip_addr AND prefix=:prefix"
+	const query = "UPDATE tbl_dbaas_ip SET unit_id=:unit_id,allocated=:allocated WHERE ip_addr=:ip_addr AND prefix=:prefix"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {

@@ -8,7 +8,7 @@ func deleteSystemConfig(id int64) error {
 		return err
 	}
 
-	_, err = db.Exec("DELETE FROM tb_system_config WHERE dc_id=?", id)
+	_, err = db.Exec("DELETE FROM tbl_dbaas_system_config WHERE dc_id=?", id)
 
 	return err
 }

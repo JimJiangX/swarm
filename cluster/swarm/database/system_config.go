@@ -99,7 +99,7 @@ type Registry struct {
 }
 
 func (c Configurations) tableName() string {
-	return "tb_system_config"
+	return "tbl_dbaas_system_config"
 }
 
 // Insert insert a new Configurations
@@ -153,7 +153,7 @@ func GetSystemConfig() (*Configurations, error) {
 	}
 
 	c := &Configurations{}
-	const query = "SELECT * FROM tb_system_config LIMIT 1"
+	const query = "SELECT * FROM tbl_dbaas_system_config LIMIT 1"
 
 	err = db.Get(c, query)
 	if err == nil {

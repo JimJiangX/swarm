@@ -573,7 +573,7 @@ func ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, 
 		return []Node{}, nil
 	}
 
-	query, args, err := sqlx.In("SELECT * FROM tb_node WHERE cluster_id IN (?);", list)
+	query, args, err := sqlx.In("SELECT * FROM tbl_dbaas_node WHERE cluster_id IN (?);", list)
 	if err != nil {
 		return nil, errors.Wrap(err, "select []Node IN clusterIDs")
 	}
@@ -591,7 +591,7 @@ func DeleteNode(nameOrID string) error {
 		return err
 	}
 
-	const query = "DELETE FROM tb_node WHERE id=? OR name=?"
+	const query = "DELETE FROM tbl_dbaas_node WHERE id=? OR name=?"
 
 	_, err = db.Exec(query, nameOrID, nameOrID)
 	if err == nil {
