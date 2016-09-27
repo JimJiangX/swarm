@@ -18,6 +18,7 @@ import (
 	"golang.org/x/net/context"
 )
 
+// Image containers cluster Image and database Image
 type Image struct {
 	database.Image
 	image *cluster.Image
@@ -59,19 +60,20 @@ func (gd *Gardener) getImageByID(id string) (Image, error) {
 	return out, nil
 }
 
-func UpdateImageStatus(id string, enable bool) error {
+// UpdateImageStatus update assigned Image status
+func UpdateImageStatus(image string, enable bool) error {
 
-	return database.UpdateImageStatus(id, enable)
+	return database.UpdateImageStatus(image, enable)
 }
 
-func (gd *Gardener) RemoveImage(id string) error {
-
-	err := database.TxDeleteImage(id)
+// RemoveImage remove the assigned image from database record and the Gardener
+func (gd *Gardener) RemoveImage(image string) error {
+	err := database.TxDeleteImage(image)
 	if err != nil {
 		return err
 	}
 
-	_, err = gd.RemoveImages(id, false)
+	_, err = gd.RemoveImages(image, false)
 
 	return err
 }
@@ -96,6 +98,7 @@ func converteToKeysetParams(params []structs.KeysetParams) map[string]database.K
 	return keyset
 }
 
+// LoadImage load a new Image
 func LoadImage(req structs.PostLoadImageRequest) (string, string, error) {
 	content, err := ioutil.ReadFile(req.ConfigFilePath)
 	if err != nil {
@@ -125,7 +128,7 @@ func LoadImage(req structs.PostLoadImageRequest) (string, string, error) {
 		newName := fmt.Sprintf("%s:%d/%s", config.Registry.Domain, config.Registry.Port, oldName)
 		script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
 
-		err = SSHCommand(config.Registry.Address,
+		err = runSSHCommand(config.Registry.Address,
 			config.Registry.OsUsername, config.Registry.OsPassword, script, buffer)
 		if err != nil {
 			logrus.Error(err, buffer.String())
@@ -185,6 +188,7 @@ func LoadImage(req structs.PostLoadImageRequest) (string, string, error) {
 	return _imageID, task.ID, t.Run()
 }
 
+// UpdateImageTemplateConfig update the Image template config
 func UpdateImageTemplateConfig(imageID string, req structs.UpdateUnitConfigRequest) (database.UnitConfig, error) {
 	image, config, err := database.GetImageAndUnitConfig(imageID)
 	if err != nil {

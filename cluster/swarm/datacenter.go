@@ -24,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Datacenter containers database.Cluster,remote Store,[]*Node
 type Datacenter struct {
 	sync.RWMutex
 
@@ -34,6 +35,7 @@ type Datacenter struct {
 	nodes []*Node
 }
 
+// AddNewCluster returns a new database.Cluster
 func AddNewCluster(req structs.PostClusterRequest) (database.Cluster, error) {
 	if storage.IsLocalStore(req.StorageType) && req.StorageID != "" {
 		req.StorageID = ""
@@ -62,6 +64,7 @@ func AddNewCluster(req structs.PostClusterRequest) (database.Cluster, error) {
 	return cluster, nil
 }
 
+// Node correspond a computer host
 type Node struct {
 	*database.Node
 	task       *database.Task
@@ -74,7 +77,8 @@ type Node struct {
 	port       int    // ssh port
 }
 
-func NewNode(addr, name, cluster, user, password, room, seat string, hdd, ssd []string, port, num int) *Node {
+// NewNodeWitTask returns *Node with *database.Task
+func NewNodeWitTask(addr, name, cluster, user, password, room, seat string, hdd, ssd []string, port, num int) *Node {
 	node := &database.Node{
 		ID:        utils.Generate64UUID(),
 		Name:      name,
@@ -100,10 +104,12 @@ func NewNode(addr, name, cluster, user, password, room, seat string, hdd, ssd []
 	}
 }
 
+// Task returns Node task
 func (node *Node) Task() *database.Task {
 	return node.task
 }
 
+// SaveMultiNodesToDB saves slcie of Node into database
 func SaveMultiNodesToDB(nodes []*Node) error {
 	list := make([]*database.Node, len(nodes))
 	tasks := make([]*database.Task, len(nodes))
@@ -116,6 +122,7 @@ func SaveMultiNodesToDB(nodes []*Node) error {
 	return database.TxInsertMultiNodeAndTask(list, tasks)
 }
 
+// Datacenter returns Datacenter store in Gardener,if not found try in database and rebuild a Datacenter
 func (gd *Gardener) Datacenter(nameOrID string) (*Datacenter, error) {
 	gd.RLock()
 	for i := range gd.datacenters {
@@ -141,6 +148,7 @@ func (gd *Gardener) Datacenter(nameOrID string) (*Datacenter, error) {
 	return dc, nil
 }
 
+// AddDatacenter add a Datacenter with Store
 func (gd *Gardener) AddDatacenter(cl database.Cluster, store storage.Store) {
 	dc := &Datacenter{
 		RWMutex: sync.RWMutex{},
@@ -158,6 +166,7 @@ func (gd *Gardener) AddDatacenter(cl database.Cluster, store storage.Store) {
 	}).Info("Datacenter Initializied")
 }
 
+// UpdateDatacenterParams update Datacenter settings
 func (gd *Gardener) UpdateDatacenterParams(nameOrID string, max int, limit float32) error {
 	dc, err := gd.Datacenter(nameOrID)
 	if err != nil {
@@ -194,6 +203,7 @@ func (gd *Gardener) UpdateDatacenterParams(nameOrID string, max int, limit float
 	return nil
 }
 
+// SetStatus update Datacenter.Enabled
 func (dc *Datacenter) SetStatus(enable bool) error {
 	dc.Lock()
 	err := database.UpdateClusterStatus(dc.Cluster, enable)
@@ -218,6 +228,7 @@ func (dc *Datacenter) isNodeExist(nameOrID string) bool {
 	return false
 }
 
+// GetNode get the assigned node in Datacenter
 func (dc *Datacenter) GetNode(nameOrID string) (*Node, error) {
 	if len(nameOrID) == 0 {
 		return nil, errors.New("Node nameOrID is null")
@@ -322,6 +333,7 @@ func (gd *Gardener) datacenterByEngine(nameOrID string) (*Datacenter, error) {
 	return gd.Datacenter(node.ClusterID)
 }
 
+// SetNodeStatus update assigned Node status
 func (gd *Gardener) SetNodeStatus(name string, state int64) error {
 	_, node, err := gd.getNode(name)
 	if err != nil {
@@ -341,6 +353,7 @@ func (gd *Gardener) SetNodeStatus(name string, state int64) error {
 	return node.UpdateStatus(state)
 }
 
+// SetNodeParams update Node params
 func (gd *Gardener) SetNodeParams(name string, max int) error {
 	_, node, err := gd.getNode(name)
 	if err != nil {
@@ -367,6 +380,7 @@ func (dc *Datacenter) removeNode(nameOrID string) error {
 	return nil
 }
 
+// GetEngine returns the assigned Engine of Gardener
 func (gd *Gardener) GetEngine(nameOrID string) (*cluster.Engine, error) {
 	gd.RLock()
 	eng, ok := gd.engines[nameOrID]
@@ -401,6 +415,7 @@ func (gd *Gardener) GetEngine(nameOrID string) (*cluster.Engine, error) {
 	return nil, errors.Errorf("not found engine '%s'", nameOrID)
 }
 
+// RemoveNode remove the assigned Node from the Gardener
 func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 	node, err := database.GetNode(nameOrID)
 	if err != nil {
@@ -474,6 +489,7 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 	return 0, nil
 }
 
+// RemoveDatacenter remove the assigned Datacenter from Gardener
 func (gd *Gardener) RemoveDatacenter(nameOrID string) error {
 	cl, err := database.GetCluster(nameOrID)
 	if err != nil {
@@ -669,6 +685,7 @@ type vgUsage struct {
 	Used  int
 }
 
+// GetLocalVGUsage returns the Engine local volumes infomation
 func GetLocalVGUsage(engine *cluster.Engine) map[string]vgUsage {
 	if engine == nil || engine.Labels == nil {
 		return map[string]vgUsage{}
@@ -863,6 +880,7 @@ func (node *Node) isIdleStoreEnough(_type string, size int) bool {
 	return true
 }
 
+// DeregisterNode deregister the assigned Node
 func (dc *Datacenter) DeregisterNode(nameOrID string) error {
 	dc.RLock()
 
@@ -893,6 +911,7 @@ func (dc *Datacenter) DeregisterNode(nameOrID string) error {
 	return err
 }
 
+// DistributeNode distribute,install and start agents on the remote host
 func (dc *Datacenter) DistributeNode(node *Node) error {
 	entry := logrus.WithFields(logrus.Fields{
 		"Node":    node.Name,
@@ -909,7 +928,7 @@ func (dc *Datacenter) DistributeNode(node *Node) error {
 
 	entry.Info("Adding new Node")
 
-	if err := node.Distribute(); err != nil {
+	if err := node.distribute(); err != nil {
 		entry.WithError(err).Error("SSH UploadDir")
 
 		return err
@@ -998,7 +1017,7 @@ func (node Node) modifyProfile() (*database.Configurations, string, error) {
 	}
 
 	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %d %s %s %s %d %s %s %s %s",
-		path, path, DockerNodesKVPath, node.Addr, config.ConsulDatacenter, string(buf),
+		path, path, dockerNodesKVPath, node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile,
 		config.DockerPort, hdd, ssd, config.HorusAgentPort, config.ConsulPort,
@@ -1008,7 +1027,7 @@ func (node Node) modifyProfile() (*database.Configurations, string, error) {
 	return config, script, nil
 }
 
-func (node *Node) Distribute() (err error) {
+func (node *Node) distribute() (err error) {
 	entry := logrus.WithFields(logrus.Fields{
 		"Node": node.Name,
 		"host": node.Addr,
@@ -1133,7 +1152,7 @@ func (node *Node) Distribute() (err error) {
 	return nil
 }
 
-func SSHCommand(host, user, password, shell string, output io.Writer) error {
+func runSSHCommand(host, user, password, shell string, output io.Writer) error {
 	r := &terraform.InstanceState{
 		Ephemeral: terraform.EphemeralState{
 			ConnInfo: map[string]string{
@@ -1191,6 +1210,7 @@ func SSHCommand(host, user, password, shell string, output io.Writer) error {
 	return nil
 }
 
+// RegisterNodes register Nodes
 func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Duration) error {
 	entry := logrus.WithField("DC", name)
 

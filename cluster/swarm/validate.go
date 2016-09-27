@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func validateContainerConfig(config *cluster.ContainerConfig) error {
+func validContainerConfig(config *cluster.ContainerConfig) error {
 	// validate config
 	buf := bytes.NewBuffer(nil)
 
@@ -49,7 +49,7 @@ func validateContainerConfig(config *cluster.ContainerConfig) error {
 	return errors.New(buf.String())
 }
 
-func validateContainerUpdateConfig(config container.UpdateConfig) error {
+func validContainerUpdateConfig(config container.UpdateConfig) error {
 	buf := bytes.NewBuffer(nil)
 
 	if config.Resources.CPUShares != 0 {
@@ -73,7 +73,8 @@ func validateContainerUpdateConfig(config container.UpdateConfig) error {
 	return errors.New(buf.String())
 }
 
-func ValidDatacenter(req structs.PostClusterRequest) error {
+// ValidCreateDC valid PostClusterRequest for create Datacenter
+func ValidCreateDC(req structs.PostClusterRequest) error {
 	buf := bytes.NewBuffer(nil)
 
 	if req.Name == "" {
@@ -95,7 +96,8 @@ func ValidDatacenter(req structs.PostClusterRequest) error {
 	return errors.New(buf.String())
 }
 
-func ValidService(req structs.PostServiceRequest) error {
+// ValidCreateService valid PostServiceRequest for create Service
+func ValidCreateService(req structs.PostServiceRequest) error {
 	buf := bytes.NewBuffer(nil)
 
 	if req.Name == "" {
@@ -157,7 +159,7 @@ func ValidService(req structs.PostServiceRequest) error {
 		}
 
 		config := cluster.BuildContainerConfig(module.Config, hostConfig, module.NetworkingConfig)
-		err = validateContainerConfig(config)
+		err = validContainerConfig(config)
 		if err != nil {
 			buf.WriteString(err.Error())
 			buf.WriteByte('\n')
@@ -188,11 +190,11 @@ func ValidService(req structs.PostServiceRequest) error {
 	return errors.New(buf.String())
 }
 
-func validateServiceScale(svc *Service, scale structs.PostServiceScaledRequest) error {
+func validServiceScale(svc *Service, scale structs.PostServiceScaledRequest) error {
 	buf := bytes.NewBuffer(nil)
 
 	if scale.UpdateConfig != nil {
-		err := validateContainerUpdateConfig(*scale.UpdateConfig)
+		err := validContainerUpdateConfig(*scale.UpdateConfig)
 		if err != nil {
 			buf.WriteString(err.Error())
 			buf.WriteByte('\n')
@@ -261,7 +263,8 @@ func validateServiceScale(svc *Service, scale structs.PostServiceScaledRequest) 
 	return errors.New(buf.String())
 }
 
-func ValidateIPAddress(prefix int, addrs ...string) error {
+// ValidIPAddress valid IP address
+func ValidIPAddress(prefix int, addrs ...string) error {
 	buf := bytes.NewBuffer(nil)
 
 	if prefix < 1 || prefix > 31 {

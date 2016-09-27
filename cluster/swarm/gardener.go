@@ -21,8 +21,9 @@ var (
 	leaderElectionPath = "docker/swarm/leader"
 	HostAddress        = "127.0.0.1"
 	httpPort           = "4000"
-	DockerNodesKVPath  = "docker/swarm/nodes"
-	DatacenterID       = 0
+	dockerNodesKVPath  = "docker/swarm/nodes"
+	// DatacenterID is Gardener registered ID
+	DatacenterID = 0
 )
 
 func init() {
@@ -32,11 +33,12 @@ func init() {
 	})
 }
 
-// called in mainage.go L143
+// UpdateleaderElectionPath set leaderElectionPath,called in mainage.go L143
 func UpdateleaderElectionPath(path string) {
 	leaderElectionPath = path
 }
 
+// Gardener is exported
 type Gardener struct {
 	*Cluster
 
@@ -55,7 +57,7 @@ type Gardener struct {
 func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, error) {
 	logrus.WithFields(logrus.Fields{"name": "swarm"}).Debug("Initializing Gardener")
 
-	DockerNodesKVPath = parseKVuri(uri)
+	dockerNodesKVPath = parseKVuri(uri)
 
 	cluster, ok := cli.(*Cluster)
 	if !ok {
@@ -236,7 +238,8 @@ func (gd *Gardener) setParams(sys *database.Configurations) error {
 	return nil
 }
 
-func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
+// Register set Gardener,returns a error if has registered in database
+func (gd *Gardener) Register(req structs.RegisterGardener) error {
 	sys, err := database.GetSystemConfig()
 	if err == nil {
 		return errors.Errorf("DC has registered,dc=%d", sys.ID)

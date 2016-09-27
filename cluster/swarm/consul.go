@@ -17,6 +17,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+// HealthChecksFromConsul is used to retrieve all the checks in a given state.
+// The wildcard "any" state can also be used for all checks.
 func HealthChecksFromConsul(state string, q *api.QueryOptions) (map[string]api.HealthCheck, error) {
 	client, err := getConsulClient(true)
 	if err != nil {
@@ -36,6 +38,7 @@ func HealthChecksFromConsul(state string, q *api.QueryOptions) (map[string]api.H
 	return m, nil
 }
 
+// GetUnitRoleFromConsul lookup a single key of KV store
 func GetUnitRoleFromConsul(key string) (map[string]string, error) {
 	client, err := getConsulClient(true)
 	if err != nil {

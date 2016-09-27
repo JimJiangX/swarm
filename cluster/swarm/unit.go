@@ -25,7 +25,8 @@ var (
 	errEngineAPIisNil = errors.New("Engine API client is nil")
 )
 
-type ContainerCmd interface {
+// ContainerCmd commands of actions
+type containerCmd interface {
 	StartContainerCmd() []string
 	InitServiceCmd() []string
 	StartServiceCmd() []string
@@ -34,6 +35,7 @@ type ContainerCmd interface {
 	BackupCmd(args ...string) []string
 	CleanBackupFileCmd(args ...string) []string
 }
+
 type port struct {
 	port  int
 	proto string
@@ -71,7 +73,7 @@ type unit struct {
 	configures  map[string]interface{}
 
 	configParser
-	ContainerCmd
+	containerCmd
 }
 
 func (u *unit) factory() error {
@@ -101,7 +103,7 @@ func (u *unit) factory() error {
 	}
 
 	u.configParser = parser
-	u.ContainerCmd = cmder
+	u.containerCmd = cmder
 
 	return nil
 }
@@ -476,7 +478,7 @@ func (u *unit) stopContainer(timeout int) error {
 }
 
 func (u *unit) restartContainer(ctx context.Context) error {
-	if u.ContainerCmd == nil {
+	if u.containerCmd == nil {
 		return nil
 	}
 
@@ -705,7 +707,7 @@ func copyConfigIntoCNFVolume(host, path, content string, lvs []database.LocalVol
 }
 
 func (u *unit) initService() error {
-	if u.ContainerCmd == nil {
+	if u.containerCmd == nil {
 		return nil
 	}
 	cmd := u.InitServiceCmd()
@@ -743,6 +745,7 @@ func initUnitService(containerID string, eng *cluster.Engine, cmd []string) erro
 	return err
 }
 
+// StartUnitService start the unit service
 func (gd *Gardener) StartUnitService(nameOrID string) error {
 	unit, err := database.GetUnit(nameOrID)
 	if err != nil {
@@ -770,6 +773,7 @@ func (gd *Gardener) StartUnitService(nameOrID string) error {
 	return u.startService()
 }
 
+// StopUnitService stop the unit service & container
 func (gd *Gardener) StopUnitService(nameOrID string, timeout int) error {
 	unit, err := database.GetUnit(nameOrID)
 	if err != nil {
@@ -827,7 +831,7 @@ func (u *unit) startService() (err error) {
 		return err
 	}
 
-	if u.ContainerCmd == nil {
+	if u.containerCmd == nil {
 		return nil
 	}
 
@@ -851,7 +855,7 @@ func (u *unit) forceStopService() error {
 		return err
 	}
 
-	if u.ContainerCmd == nil {
+	if u.containerCmd == nil {
 		return nil
 	}
 	cmd := u.StopServiceCmd()
@@ -930,7 +934,7 @@ func (u *unit) backup(ctx context.Context, args ...string) (err error) {
 		return err
 	}
 
-	if u.ContainerCmd == nil {
+	if u.containerCmd == nil {
 		return nil
 	}
 	cmd := u.BackupCmd(args...)
@@ -953,7 +957,7 @@ func (u *unit) restore(ctx context.Context, file string) error {
 		return err
 	}
 
-	if u.ContainerCmd == nil {
+	if u.containerCmd == nil {
 		return nil
 	}
 
@@ -1038,6 +1042,7 @@ func (gd *Gardener) unitContainer(u *unit) *cluster.Container {
 	return u.container
 }
 
+// RestoreUnit restore unit volume data from backupfile
 func (gd *Gardener) RestoreUnit(nameOrID, source string) (string, error) {
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {

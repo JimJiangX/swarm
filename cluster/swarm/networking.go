@@ -16,6 +16,7 @@ import (
 var errNotFoundIP = errors.New("IP not found")
 var errNotFoundNetworking = errors.New("Networking not found")
 
+// Networking is exported
 type Networking struct {
 	Enable bool
 	Prefix int
@@ -23,11 +24,13 @@ type Networking struct {
 	database.Networking
 }
 
+// IP containers a unit32 IP and status
 type IP struct {
 	allocated bool
 	ip        uint32
 }
 
+// NewNetworking returns a new Networking
 func NewNetworking(net database.Networking, ips []database.IP) (*Networking, error) {
 	if len(ips) == 0 {
 		return nil, errors.Errorf("Unsupport Networking with zero IP")
@@ -119,6 +122,7 @@ func (gd *Gardener) getNetworkingByType(_type string) (*Networking, error) {
 	return list[0], nil
 }
 
+// SetNetworkingStatus update Networking status
 func (gd *Gardener) SetNetworkingStatus(ID string, enable bool) error {
 	net, err := gd.getNetworking(ID)
 	if err != nil {
@@ -135,6 +139,7 @@ func (gd *Gardener) SetNetworkingStatus(ID string, enable bool) error {
 	return err
 }
 
+// AddNetworking add new Networking to Gardener
 func (gd *Gardener) AddNetworking(start, end, _type, gateway string, prefix int) (*Networking, error) {
 	net, ips, err := database.TxInsertNetworking(start, end, gateway, _type, prefix)
 	if err != nil {
@@ -153,6 +158,7 @@ func (gd *Gardener) AddNetworking(start, end, _type, gateway string, prefix int)
 	return networking, nil
 }
 
+// IPInfo IP infomation for create a IP on host networking
 type IPInfo struct {
 	Device     string
 	IP         net.IP
@@ -292,6 +298,7 @@ func isProxyType(name string) bool {
 	return false
 }
 
+// RemoveNetworking remove the assigned Networking from the Gardener
 func (gd *Gardener) RemoveNetworking(ID string) error {
 	ok, err := database.IsNetwrokingUsed(ID)
 	if err != nil {
@@ -318,6 +325,7 @@ func (gd *Gardener) RemoveNetworking(ID string) error {
 	return nil
 }
 
+// ListPorts returns []Port query from database
 func ListPorts(start, end, limit int) ([]database.Port, error) {
 	if limit == 0 || limit > 1000 {
 		limit = 1000
@@ -326,6 +334,7 @@ func ListPorts(start, end, limit int) ([]database.Port, error) {
 	return database.ListPorts(start, end, limit)
 }
 
+// ListNetworkings converts []database.Networking query from database,
 func ListNetworkings() ([]structs.ListNetworkingsResponse, error) {
 	list, err := database.ListNetworking()
 	if err != nil {

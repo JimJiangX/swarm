@@ -104,11 +104,13 @@ func (u *unit) saveConfigToDisk(content []byte) error {
 	return database.SaveUnitConfig(&u.Unit, config)
 }
 
-func Factory(name, version string) (configParser, ContainerCmd, error) {
+// Factory returns configParser and containerCmd,
+// returns a error if name&version unsupported
+func Factory(name, version string) (configParser, containerCmd, error) {
 	return initialize(name, version)
 }
 
-func initialize(name, version string) (parser configParser, cmder ContainerCmd, err error) {
+func initialize(name, version string) (parser configParser, cmder containerCmd, err error) {
 	switch {
 	case _ImageUpsql == name && version == "5.6.19":
 		parser = &mysqlConfig{}

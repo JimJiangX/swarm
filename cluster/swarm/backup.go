@@ -301,6 +301,7 @@ func (gd *Gardener) removeCronJob(strategyID string) error {
 	return nil
 }
 
+// ReplaceServiceBackupStrategy returns a new *database.BackupStrategy,replace original service backupstrategy
 func (gd *Gardener) ReplaceServiceBackupStrategy(nameOrID string, req structs.BackupStrategy) (*database.BackupStrategy, error) {
 	svc, err := gd.GetService(nameOrID)
 	if err != nil {
@@ -330,6 +331,7 @@ func (gd *Gardener) ReplaceServiceBackupStrategy(nameOrID string, req structs.Ba
 	return strategy, err
 }
 
+// UpdateServiceBackupStrategy update assigned BackupStrategy
 func (gd *Gardener) UpdateServiceBackupStrategy(nameOrID string, req structs.BackupStrategy) error {
 	var (
 		valid = time.Time{}
@@ -374,6 +376,7 @@ func (gd *Gardener) UpdateServiceBackupStrategy(nameOrID string, req structs.Bac
 	return err
 }
 
+// EnableServiceBackupStrategy enable backupStrategy
 func (gd *Gardener) EnableServiceBackupStrategy(strategy string) error {
 	backup, err := database.GetBackupStrategy(strategy)
 	if err != nil || backup == nil {
@@ -399,11 +402,13 @@ func (gd *Gardener) EnableServiceBackupStrategy(strategy string) error {
 	return err
 }
 
-func (gd *Gardener) DisableBackupStrategy(id string) error {
+// DisableBackupStrategy disable a backupStrategy
+func (gd *Gardener) DisableBackupStrategy(ID string) error {
 
-	return database.UpdateBackupStrategyStatus(id, false)
+	return database.UpdateBackupStrategyStatus(ID, false)
 }
 
+// BackupTaskCallback update backup task and save new backup file
 func BackupTaskCallback(req structs.BackupTaskCallback) error {
 	task := database.Task{ID: req.TaskID}
 

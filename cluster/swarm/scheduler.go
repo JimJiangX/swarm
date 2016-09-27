@@ -168,7 +168,7 @@ func templateConfig(gd *Gardener, module structs.Module) (*cluster.ContainerConf
 	config := cluster.BuildContainerConfig(module.Config, hostConfig, module.NetworkingConfig)
 	config = buildContainerConfig(config)
 
-	if err := validateContainerConfig(config); err != nil {
+	if err := validContainerConfig(config); err != nil {
 		logrus.Warnf("Container Config Validate:%s", err)
 
 		return nil, err

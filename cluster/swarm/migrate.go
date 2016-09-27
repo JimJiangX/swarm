@@ -113,6 +113,7 @@ func resetContainerConfig(config *cluster.ContainerConfig, hostConfig *ctypes.Ho
 	return clone, nil
 }
 
+// UnitMigrate migrate the assigned unit to another host
 func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {
@@ -705,6 +706,7 @@ func updateUnit(unit database.Unit, lvs []database.LocalVolume, reserveSAN bool)
 	return tx.Commit()
 }
 
+// UnitRebuild rebuild the unit in another host
 func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {

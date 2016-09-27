@@ -25,6 +25,7 @@ import (
 
 var errServiceNotFound = errors.New("service not found")
 
+// Service a set of units
 type Service struct {
 	sync.RWMutex
 
@@ -153,6 +154,7 @@ func (svc *Service) replaceBackupStrategy(req structs.BackupStrategy) (*database
 	return backup, nil
 }
 
+// DeleteServiceBackupStrategy delete the strategy
 func DeleteServiceBackupStrategy(strategy string) error {
 	backup, err := database.GetBackupStrategy(strategy)
 	if err != nil {
@@ -168,6 +170,7 @@ func DeleteServiceBackupStrategy(strategy string) error {
 	return err
 }
 
+// AddServiceUsers add users into service
 func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 	svc.Lock()
 	defer svc.Unlock()
@@ -243,6 +246,7 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 	return code, nil
 }
 
+// DeleteServiceUsers delete service users
 func (svc *Service) DeleteServiceUsers(usernames []string, all bool) error {
 	svc.Lock()
 	defer svc.Unlock()
@@ -522,6 +526,7 @@ func (gd *Gardener) addService(svc *Service) error {
 	return nil
 }
 
+// GetService returns Service of the Gardener
 func (gd *Gardener) GetService(nameOrID string) (*Service, error) {
 	gd.RLock()
 
@@ -624,6 +629,7 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	return svc, nil
 }
 
+// CreateService create new Service,create and start the Service
 func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, string, string, error) {
 	authConfig, err := gd.registryAuthConfig()
 	if err != nil {
@@ -703,6 +709,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 	return svc, strategyID, task.ID, err
 }
 
+// StartService start service
 func (svc *Service) StartService() (err error) {
 	field := logrus.WithField("Service", svc.Name)
 
@@ -886,6 +893,7 @@ func (svc *Service) stopContainers(timeout int) error {
 	return nil
 }
 
+// StopService stop the Service,only stop the upsql type unit service
 func (svc *Service) StopService() (err error) {
 	err = svc.statusCAS(statusServiceNoContent, statusServiceStoping)
 	if err != nil {
@@ -1041,6 +1049,7 @@ func (svc *Service) removeContainers(force, rmVolumes bool) error {
 	return nil
 }
 
+// ModifyUnitConfig modify unit service config on live
 func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}) (err error) {
 	if _type == _ProxyType || _type == _SwitchManagerType {
 		return svc.UpdateUnitConfig(_type, config)
@@ -1213,6 +1222,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 	return nil
 }
 
+// UpdateUnitConfig update unit config
 func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}) error {
 	svc.Lock()
 	defer svc.Unlock()
@@ -1449,6 +1459,7 @@ func (svc *Service) getSwitchManagerAddr() (string, int, error) {
 	return addr, port, nil
 }
 
+// GetSwitchManagerAddr returns the Service switchManager unit address
 func (svc *Service) GetSwitchManagerAddr() (string, error) {
 	svc.RLock()
 
@@ -1499,6 +1510,7 @@ loop:
 	return addr, port, master, err
 }
 
+// UnitIsolate isolate a unit
 func (gd *Gardener) UnitIsolate(nameOrID string) error {
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {
@@ -1544,6 +1556,7 @@ func (svc *Service) isolate(unitName string) error {
 	return errors.Wrap(err, "isolate unit")
 }
 
+// UnitSwitchBack switchback a unit
 func (gd *Gardener) UnitSwitchBack(nameOrID string) error {
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {
@@ -1589,6 +1602,7 @@ func (svc *Service) switchBack(unitName string) error {
 	return errors.Wrap(err, "switchback unit")
 }
 
+// TemporaryServiceBackupTask execute a temporary backup task
 func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string, error) {
 	if nameOrID != "" {
 		u, err := database.GetUnit(nameOrID)
@@ -1714,13 +1728,14 @@ type pendingContainerUpdate struct {
 	config      container.UpdateConfig
 }
 
+// ServiceScale scale assigned type units cpu\memory\volumes resources
 func (gd *Gardener) ServiceScale(name string, scale structs.PostServiceScaledRequest) error {
 	svc, err := gd.GetService(name)
 	if err != nil {
 		return err
 	}
 
-	err = validateServiceScale(svc, scale)
+	err = validServiceScale(svc, scale)
 	if err != nil {
 		return err
 	}
@@ -1892,6 +1907,7 @@ func (svc *Service) updateDescAfterScale(scale structs.PostServiceScaledRequest)
 	return nil
 }
 
+// RemoveService remove the assigned Service from the Gardener
 func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout int) (err error) {
 	entry := logrus.WithFields(logrus.Fields{
 		"Service": nameOrID,

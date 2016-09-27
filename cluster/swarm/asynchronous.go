@@ -11,6 +11,7 @@ import (
 	"golang.org/x/net/context"
 )
 
+// GoConcurrency run slice of func()error concurrency
 func GoConcurrency(funcs []func() error) error {
 	errs := NewErrors()
 	if len(funcs) == 0 {
@@ -55,6 +56,7 @@ type _errors struct {
 	errors []error
 }
 
+// NewErrors returns a inited errors
 func NewErrors() _errors {
 	return _errors{
 		buffer: bytes.NewBuffer(nil),
@@ -111,6 +113,7 @@ type asyncTask struct {
 	update     func(code int, msg string) error
 }
 
+// NewAsyncTask returns a *asyncTask
 func NewAsyncTask(ctx context.Context,
 	background func(context.Context) error,
 	create func() error,
