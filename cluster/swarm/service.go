@@ -160,7 +160,7 @@ func DeleteServiceBackupStrategy(strategy string) error {
 	}
 
 	if backup.Enabled {
-		return errors.Errorf("Backup Strategy %s is using,Cannot Delete", strategy)
+		return errors.Errorf("BackupStrategy %s is using,Cannot delete", strategy)
 	}
 
 	err = database.DeleteBackupStrategy(strategy)
@@ -252,33 +252,42 @@ func (svc *Service) DeleteServiceUsers(usernames []string, all bool) error {
 		if err != nil {
 			return err
 		}
+
 		if len(out) == 0 {
-			return fmt.Errorf("'%s' are not Service '%s' Usernames", usernames, svc.Name)
+			return nil
 		}
+
 		svc.users = out
 	}
 
 	list := make([]database.User, 0, len(usernames))
+	none := make([]string, 0, len(usernames))
+
 	if all {
 		list = svc.users
 	} else {
-		none := make([]string, 0, len(usernames))
+
 		for i := range usernames {
 			exist := false
+
 			for u := range svc.users {
+
 				if svc.users[u].Username == usernames[i] {
+
 					list = append(list, svc.users[u])
 					exist = true
+
 					break
 				}
 			}
+
 			if !exist {
 				none = append(none, usernames[i])
 			}
 		}
 
 		if len(none) > 0 {
-			return fmt.Errorf("'%s' are not Service '%s' Usernames", none, svc.Name)
+			logrus.WithField("Service", svc.Name).Warnf("%s aren't service users", none)
 		}
 	}
 
@@ -288,12 +297,14 @@ func (svc *Service) DeleteServiceUsers(usernames []string, all bool) error {
 	}
 
 	users := converteToSWM_Users(list)
+
 	for i := range users {
 		err := smlib.DelUser(addr, port, users[i])
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "delete service user in switchManager,Service=%s,user=%v", svc.Name, users[i])
 		}
 	}
+
 	err = database.TxDeleteUsers(list)
 	if err != nil {
 		return err
@@ -1015,7 +1026,7 @@ func (svc *Service) removeContainers(force, rmVolumes bool) error {
 		err := u.removeContainer(force, rmVolumes)
 		if err != nil {
 			logrus.Errorf("container %s remove,-f=%v -v=%v,error:%s", u.Name, force, rmVolumes, err)
-			if err == errEngineIsNil {
+			if errors.Cause(err) == errEngineIsNil {
 				continue
 			}
 			if err := checkContainerError(err); err == errContainerNotFound {
@@ -1491,13 +1502,11 @@ loop:
 func (gd *Gardener) UnitIsolate(nameOrID string) error {
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {
-		logrus.Errorf("Get Unit error:%s %s", err, nameOrID)
 		return err
 	}
 
 	service, err := gd.GetService(table.ServiceID)
 	if err != nil {
-		logrus.Errorf("Get Service error:%s %s", err, table.ServiceID)
 		return err
 	}
 
@@ -1512,40 +1521,37 @@ func (svc *Service) isolate(unitName string) error {
 	u, err := svc.getUnit(unitName)
 	if err != nil {
 
-		logrus.Warning(err)
-
+		return err
 	} else if u.Type == _SwitchManagerType {
 
-		return fmt.Errorf("Cann't Isolate Unit '%s:%s'", u.Type, unitName)
+		return errors.Errorf("unable to isolate Unit '%s:%s'", u.Type, u.Name)
 	}
 
 	ip, port, err := svc.getSwitchManagerAddr()
 	if err != nil {
-		logrus.Errorf("get SwitchManager Addr error:%s", err)
 		return err
 	}
 
-	logrus.Debugf("Service %s Isolate Unit %s,%s:%d", svc.Name, unitName, ip, port)
+	logrus.WithFields(logrus.Fields{
+		"Service":  svc.Name,
+		"Unit":     u.Name,
+		"swm_IP":   ip,
+		"swm_port": port,
+	}).Debug("isolate unit")
 
-	err = smlib.Isolate(ip, port, unitName)
+	err = smlib.Isolate(ip, port, u.Name)
 
-	if err != nil {
-		logrus.Errorf("Isolate %s error:%s:%d %s", unitName, ip, port, err)
-	}
-
-	return err
+	return errors.Wrap(err, "isolate unit")
 }
 
 func (gd *Gardener) UnitSwitchBack(nameOrID string) error {
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {
-		logrus.Errorf("Get Unit error:%s %s", err, nameOrID)
 		return err
 	}
 
 	service, err := gd.GetService(table.ServiceID)
 	if err != nil {
-		logrus.Errorf("Get Service error:%s %s", err, table.ServiceID)
 		return err
 	}
 
@@ -1559,28 +1565,28 @@ func (gd *Gardener) UnitSwitchBack(nameOrID string) error {
 func (svc *Service) switchBack(unitName string) error {
 	u, err := svc.getUnit(unitName)
 	if err != nil {
-
-		logrus.Warning(err)
+		return err
 
 	} else if u.Type == _SwitchManagerType {
 
-		return fmt.Errorf("Cann't SwitchBack Unit '%s:%s'", u.Type, unitName)
+		return errors.Errorf("unable to switchback Unit '%s:%s'", u.Type, u.Name)
 	}
 
 	ip, port, err := svc.getSwitchManagerAddr()
 	if err != nil {
-		logrus.Errorf("get SwitchManager Addr error:%s", err)
 		return err
 	}
 
-	logrus.Debugf("Service %s Switchback Unit %s,%s:%d", svc.Name, unitName, ip, port)
+	logrus.WithFields(logrus.Fields{
+		"Service":  svc.Name,
+		"Unit":     u.Name,
+		"swm_IP":   ip,
+		"swm_port": port,
+	}).Debug("switchback unit")
 
-	err = smlib.Recover(ip, port, unitName)
-	if err != nil {
-		logrus.Errorf("switchBack %s error:%s:%d %s", unitName, ip, port, err)
-	}
+	err = smlib.Recover(ip, port, u.Name)
 
-	return err
+	return errors.Wrap(err, "switchback unit")
 }
 
 func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string, error) {
@@ -1608,7 +1614,6 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 	}
 	if !ok {
 		return "", errors.Errorf("Service %s:no more space for backup task", svc.Name)
-
 	}
 
 	var backup *unit
@@ -1909,17 +1914,18 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 		if errors.Cause(err) == errServiceNotFound {
 			return nil
 		}
-		entry.Errorf("Get Service from Gardener:%+v", err)
+
+		return err
 	}
 
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
+			err = errors.Errorf("%v", r)
 		}
 		if err != nil {
 			_err := svc.SetServiceStatus(statusServiceDeleteFailed, time.Now())
 			if _err != nil {
-				err = fmt.Errorf("%v,%v", err, _err)
+				err = errors.Wrap(err, _err.Error())
 			}
 		}
 	}()
@@ -1933,8 +1939,6 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 
 	err = svc.delete(gd, force, volumes, true, timeout)
 	if err != nil {
-		entry.Errorf("Service.Delete error:%s", err)
-
 		return err
 	}
 
@@ -1942,10 +1946,11 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 	entry.Debug("Detele Service Relation...")
 	err = database.DeteleServiceRelation(svc.ID, volumes)
 	if err != nil {
-		entry.Errorf("DeteleServiceRelation error:%s", err)
+		entry.Errorf("DeteleServiceRelation error:%+v", err)
 	}
 
 	entry.Debug("Remove Service From Gardener...")
+
 	gd.Lock()
 	for i := range gd.services {
 		if gd.services[i].ID == nameOrID || gd.services[i].Name == nameOrID {
@@ -1958,8 +1963,6 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 	if svc.backup != nil {
 		err = gd.removeCronJob(svc.backup.ID)
 		if err != nil {
-			entry.Errorf("RemoveCronJob %s error:%s", svc.backup.ID, err)
-
 			return err
 		}
 	}
@@ -1970,6 +1973,8 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout int) error {
 	svc.Lock()
 	defer svc.Unlock()
+
+	entry := logrus.WithField("Service", svc.Name)
 
 	funcs := make([]func() error, 0, len(svc.units))
 
@@ -1986,16 +1991,18 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 				return nil
 			}
 
-			logrus.Debug(u.Name, " stop unit service")
+			entry.WithField("Unit", u.Name).Debug("stop unit service")
+
 			err := u.forceStopService()
 			if err != nil &&
 				u.container.Info.State.Running &&
 				err.Error() != "EOF" {
 
-				return errors.Wrapf(err, "%s forceStopService error", u.Name)
+				return errors.Wrapf(err, "%s force stop Service error", u.Name)
 			}
 
-			logrus.Debug(u.Name, " stop container")
+			entry.WithField("Unit", u.Name).Debug("stop container")
+
 			err = u.forceStopContainer(timeout)
 			if err != nil {
 				if !u.container.Info.State.Running {
@@ -2005,7 +2012,7 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 				if err.Error() == "EOF" {
 					return nil
 				}
-				err = errors.Wrapf(err, "%s forceStopContainer error", u.Name)
+				err = errors.Wrapf(err, "%s force stop container error", u.Name)
 			}
 
 			return err
@@ -2016,7 +2023,7 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 
 	err := GoConcurrency(funcs)
 	if err != nil {
-		logrus.Errorf("Service %s stop error:%s", svc.Name, err)
+		entry.WithError(err).Error("stop Service")
 
 		pass := true
 		_err, ok := err.(_errors)
@@ -2043,41 +2050,45 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 	volumes := make([]database.LocalVolume, 0, 10)
 
 	for _, u := range svc.units {
-		logrus.Debug(u.Name, " SelectVolumesByUnitID")
+
 		lvs, err := database.ListVolumesByUnitID(u.ID)
 		if err != nil {
-			logrus.Warnf("SelectVolumesByUnitID %s error:%s", u.Name, err)
+			entry.WithField("Unit", u.Name).Errorf("%+v", err)
 			continue
 		}
+
 		volumes = append(volumes, lvs...)
 
-		logrus.Debugf("recycle=%v", recycle)
 		if recycle {
-			logrus.Debug("DatacenterByEngine ", u.EngineID)
+
 			dc, err := gd.datacenterByEngine(u.EngineID)
 			if err != nil || dc == nil || dc.store == nil {
+				entry.WithField("Unit", u.Name).Warnf("DatacenterByEngine error:%+v", err)
 				continue
 			}
+
 			for i := range lvs {
+
 				if !isSanVG(lvs[i].VGName) {
-					logrus.Debug(i, lvs[i].VGName)
 					continue
 				}
-				logrus.Debug("ListLUNByVgName ", lvs[i].VGName)
+
 				list, err := database.ListLUNByVgName(lvs[i].VGName)
 				if err != nil {
-					logrus.Errorf("ListLUNByVgName %s error:%s", lvs[i].VGName, err)
+					entry.WithField("Unit", u.Name).WithError(err).Errorf("ListLUNByVgName %s", lvs[i].VGName)
 					return err
 				}
+
 				for l := range list {
-					logrus.Debug(i, "DelMapping & Recycle ", list[l].ID)
+
 					err := dc.store.DelMapping(list[l].ID)
 					if err != nil {
-						logrus.Errorf("DelMapping error:%s,unit:%s,lun:%s", err, u.Name, list[l].Name)
+						entry.WithField("Unit", u.Name).WithError(err).Errorf("DelMapping,lun:%s", list[l].Name)
 					}
+
 					err = dc.store.Recycle(list[l].ID, 0)
 					if err != nil {
-						logrus.Errorf("Recycle LUN error:%s,unit:%s,lun:%s", err, u.Name, list[l].Name)
+						entry.WithField("Unit", u.Name).WithError(err).Errorf("Recycle lun:%s", list[l].Name)
 					}
 				}
 			}
@@ -2088,29 +2099,26 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 	for i := range volumes {
 		found, err := gd.RemoveVolumes(volumes[i].Name)
 		if err != nil {
-			logrus.Errorf("Remove Volumes %s,Found=%t,%s", volumes[i].Name, found, err)
+			entry.Errorf("Remove volume=%s,found=%t,error=%+v", volumes[i].Name, found, err)
 			continue
 		}
 
-		logrus.Debug(i, len(volumes), "RemoveVolume ", volumes[i].Name)
+		entry.Debug(i, len(volumes), "Remove volume ", volumes[i].Name)
 	}
 
-	logrus.Debug("deregisterInHorus")
 	err = svc.deregisterInHorus()
 	if err != nil {
-		logrus.Errorf("%s deregister in Horus error:%s", svc.Name, err)
+		entry.Errorf("deregister in Horus error:%+v", err)
 	}
-
-	logrus.Debug("deregisterServices")
 
 	err = svc.deregisterServices()
 	if err != nil {
-		logrus.Errorf("%s deregister in consul error:%s", svc.Name, err)
+		entry.Errorf("deregister in consul error:%+v", err)
 	}
 
 	err = deleteConsulKVTree(svc.ID)
 	if err != nil {
-		logrus.Errorf("delete consul KV:%s,%s", svc.ID, err)
+		entry.Errorf("delete consul KV:%s,%+v", svc.ID, err)
 	}
 
 	return nil

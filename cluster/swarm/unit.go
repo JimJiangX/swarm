@@ -806,7 +806,7 @@ func (u *unit) startService() (err error) {
 
 		_err := database.TxUpdateUnitStatus(&u.Unit, code, msg)
 
-		if err != nil {
+		if _err != nil {
 			logrus.WithFields(logrus.Fields{
 				"Unit":   u.Name,
 				"Status": code,
@@ -878,13 +878,13 @@ func (u *unit) stopService() error {
 
 	code, msg := int64(statusUnitStoping), ""
 	_err := database.TxUpdateUnitStatus(&u.Unit, code, msg)
-
-	logrus.WithFields(logrus.Fields{
-		"Unit":    u.Name,
-		"message": msg,
-		"status":  code,
-	}).WithError(_err).Error("Update Unit status")
-
+	if _err != nil {
+		logrus.WithFields(logrus.Fields{
+			"Unit":    u.Name,
+			"message": msg,
+			"status":  code,
+		}).WithError(_err).Error("Update Unit status")
+	}
 	err = u.forceStopService()
 
 	code = statusUnitStoped
@@ -894,7 +894,7 @@ func (u *unit) stopService() error {
 	}
 
 	_err = database.TxUpdateUnitStatus(&u.Unit, code, msg)
-	if err != nil {
+	if _err != nil {
 		logrus.WithFields(logrus.Fields{
 			"Unit":    u.Name,
 			"status":  code,

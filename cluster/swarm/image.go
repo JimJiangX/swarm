@@ -99,11 +99,9 @@ func converteToKeysetParams(params []structs.KeysetParams) map[string]database.K
 func LoadImage(req structs.PostLoadImageRequest) (string, string, error) {
 	content, err := ioutil.ReadFile(req.ConfigFilePath)
 	if err != nil {
-		err = fmt.Errorf("ReadAll From ConfigFile %s error:%s", req.ConfigFilePath, err)
-		logrus.Error(err)
-
-		return "", "", err
+		return "", "", errors.Wrap(err, "ReadAll from configFile:"+req.ConfigFilePath)
 	}
+
 	parser, _, err := initialize(req.Name, req.Version)
 	if err != nil {
 		return "", "", err
@@ -111,7 +109,7 @@ func LoadImage(req structs.PostLoadImageRequest) (string, string, error) {
 
 	_, err = parser.ParseData(content)
 	if err != nil {
-		return "", "", fmt.Errorf("Parse PostLoadImageRequest.Content Error:%s", err)
+		return "", "", errors.Wrap(err, "parse PostLoadImageRequest.Content")
 	}
 
 	config, err := database.GetSystemConfig()
@@ -149,8 +147,12 @@ func LoadImage(req structs.PostLoadImageRequest) (string, string, error) {
 			CreatedAt: time.Now(),
 		}
 
-		buf := bytes.NewBuffer(nil)
-		json.NewEncoder(buf).Encode(req.Labels)
+		var labels string
+		if len(req.Labels) > 0 {
+			buf := bytes.NewBuffer(nil)
+			json.NewEncoder(buf).Encode(req.Labels)
+			labels = buf.String()
+		}
 
 		image := database.Image{
 			Enabled:          true,
@@ -158,7 +160,7 @@ func LoadImage(req structs.PostLoadImageRequest) (string, string, error) {
 			Name:             req.Name,
 			Version:          req.Version,
 			ImageID:          imageID,
-			Labels:           buf.String(),
+			Labels:           labels,
 			Size:             size,
 			TemplateConfigID: unitConfig.ID,
 			UploadAt:         time.Now(),
@@ -241,7 +243,7 @@ func UpdateImageTemplateConfig(imageID string, req structs.UpdateUnitConfigReque
 func parsePushImageOutput(in string) (string, int, error) {
 	index := strings.Index(in, "digest:")
 	if index == -1 {
-		return "", 0, fmt.Errorf("Not Found ImageID,%s", in)
+		return "", 0, errors.New("not found ImageID:" + in)
 	}
 
 	output := in[index:]
@@ -253,13 +255,13 @@ func parsePushImageOutput(in string) (string, int, error) {
 
 		size, err := strconv.Atoi(strings.TrimSpace(parts[3]))
 		if err != nil {
-			return id, size, fmt.Errorf("Parse Size Error,%s", parts[3])
+			return id, size, errors.Wrap(err, "parse size:"+parts[3])
 		}
 
 		return id, size, nil
 	}
 
-	return "", 0, fmt.Errorf("Parse Output Error,%s", in)
+	return "", 0, errors.New("parse output error:" + in)
 }
 
 func (gd *Gardener) getImageName(id, name, version string) (string, string, error) {

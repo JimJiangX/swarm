@@ -404,9 +404,11 @@ func (gd *Gardener) GetEngine(nameOrID string) (*cluster.Engine, error) {
 func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 	node, err := database.GetNode(nameOrID)
 	if err != nil {
+
 		if errors.Cause(err) == database.ErrNoRowsFound {
 			return 0, nil
 		}
+
 		return 500, err
 	}
 
@@ -414,10 +416,11 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 	if err != nil {
 		logrus.Warn(err)
 	}
+
 	if eng != nil {
 		eng.RefreshContainers(false)
 		if num := len(eng.Containers()); num != 0 {
-			return 412, fmt.Errorf("%d Containers Has Created On Node %s", num, nameOrID)
+			return 412, errors.Errorf("%d containers has created on Node %s", num, nameOrID)
 		}
 
 		gd.scheduler.Lock()
@@ -425,24 +428,24 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 			if pending.Engine.ID == node.EngineID {
 				gd.scheduler.Unlock()
 
-				return 412, fmt.Errorf("Containers Has Created On Node %s", nameOrID)
+				return 412, errors.Errorf("containers has created on Node %s", nameOrID)
 			}
 		}
 		gd.scheduler.Unlock()
 	}
 
 	count, err := database.CountUnitByNode(node.ID)
-	if err != nil || count != 0 {
-		return 412, fmt.Errorf("Count Unit ByNode,%v,count:%d", err, count)
+	if err != nil || count > 0 {
+		return 412, errors.Errorf("count Unit by Node,%v,count:%d", err, count)
 	}
 
 	err = deregisterToHorus(false, node.ID)
 	if err != nil {
-		logrus.WithField("Endpoints", node.ID).Errorf("Deregister Node To Horus:%s", err)
+		logrus.WithField("Endpoints", node.ID).Errorf("deregister Node to Horus:%+v", err)
 
 		err = deregisterToHorus(true, node.ID)
 		if err != nil {
-			logrus.WithField("Endpoints", node.ID).Errorf("Deregister Node To Horus,force=true,%s", err)
+			logrus.WithField("Endpoints", node.ID).Errorf("deregister Node to Horus,force=true,%s", err)
 			return 503, err
 		}
 	}
@@ -476,12 +479,14 @@ func (gd *Gardener) RemoveDatacenter(nameOrID string) error {
 	if err != nil {
 		return err
 	}
+
 	count, err := database.CountNodeByCluster(cl.ID)
 	if err != nil {
 		return err
 	}
+
 	if count > 0 {
-		return fmt.Errorf("%d Nodes In Cluster %s", count, nameOrID)
+		return errors.Errorf("%d Nodes in Cluster %s", count, nameOrID)
 	}
 
 	err = database.DeleteCluster(nameOrID)
@@ -935,7 +940,7 @@ func (node Node) modifyProfile() (*database.Configurations, string, error) {
 
 	horusIP, horusPort, err := net.SplitHostPort(horus)
 	if err != nil {
-		return nil, "", err
+		return nil, "", errors.Wrap(err, "Horus addr:"+horus)
 	}
 
 	sourceDir, err := utils.GetAbsolutePath(true, config.SourceDir)
@@ -1058,14 +1063,14 @@ func (node *Node) Distribute() (err error) {
 	if err != nil {
 		entry.WithError(err).Errorf("new SSH communicator")
 
-		return err
+		return errors.Wrap(err, "create SSH client")
 	}
 
 	err = c.Connect(nil)
 	if err != nil {
 		entry.WithError(err).Error("communicator connection")
 
-		return err
+		return errors.Wrap(err, "SSH connect")
 	}
 	defer c.Disconnect()
 
@@ -1073,7 +1078,8 @@ func (node *Node) Distribute() (err error) {
 		entry.WithError(err).Error("SSH upload dir:" + config.SourceDir)
 
 		if err := c.UploadDir(config.Destination, config.SourceDir); err != nil {
-			entry.WithError(err).Error("SSH upload dir twice:" + config.SourceDir)
+			err = errors.Wrap(err, "SSH upload dir twice:"+config.SourceDir)
+			entry.Error(err)
 
 			return err
 		}
@@ -1088,7 +1094,8 @@ func (node *Node) Distribute() (err error) {
 		entry.WithError(err).Error("SSH upload file:" + filename)
 
 		if err := c.Upload(filename, caBuf); err != nil {
-			entry.WithError(err).Error("SSH upload file twice:" + filename)
+			err = errors.Wrap(err, "SSH upload file twice:"+filename)
+			entry.Error(err)
 
 			return err
 		}
@@ -1114,7 +1121,8 @@ func (node *Node) Distribute() (err error) {
 		err = c.Start(&cp)
 		cp.Wait()
 		if err != nil || cp.ExitStatus != 0 {
-			entry.WithError(err).Errorf("Executing remote command twice:'%s',exited:%d,output:%s", cmd.Command, cmd.ExitStatus, buffer.Bytes())
+			err = errors.Errorf("Executing remote command twice:'%s',exited:%d,output:%s,%v", cmd.Command, cmd.ExitStatus, buffer.Bytes(), err)
+			entry.Error(err)
 
 			return err
 		}
@@ -1141,13 +1149,13 @@ func SSHCommand(host, user, password, shell string, output io.Writer) error {
 	if err != nil {
 		logrus.Errorf("error creating communicator: %s", err)
 
-		return err
+		return errors.Wrap(err, "create SSH client")
 	}
 	err = c.Connect(nil)
 	if err != nil {
 		logrus.Errorf("communicator connection error: %s", err)
 
-		return err
+		return errors.Wrap(err, "SSH connect")
 	}
 	defer c.Disconnect()
 
@@ -1170,7 +1178,8 @@ func SSHCommand(host, user, password, shell string, output io.Writer) error {
 		err = c.Start(&cp)
 		cp.Wait()
 		if err != nil || cp.ExitStatus != 0 {
-			err = fmt.Errorf("Twice Executing Remote Command: %s,Exited:%d,%v", cp.Command, cp.ExitStatus, err)
+
+			err = errors.Errorf("Executing remote command twice: %s,Exited:%d,%v", cp.Command, cp.ExitStatus, err)
 			logrus.Error(err)
 
 			return err
@@ -1195,6 +1204,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 	config, err := gd.systemConfig()
 	if err != nil {
 		entry.WithError(err).Error("Gardener systemConfig")
+
 		return err
 	}
 
@@ -1326,20 +1336,21 @@ func nodeClean(node, addr, user, password string) error {
 
 	horusIP, horusPort, err := net.SplitHostPort(horus)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "check Horus Addr:"+horus)
 	}
+
 	_, _, destName := config.DestPath()
 
 	srcFile, err := utils.GetAbsolutePath(false, config.SourceDir, config.CleanScriptName)
 	if err != nil {
 		logrus.Errorf("%s %s", srcFile, err)
-		return err
+
+		return errors.Wrap(err, "get absolute path")
 	}
 
 	file, err := os.Open(srcFile)
 	if err != nil {
-		logrus.Error(err)
-		return err
+		return errors.Wrap(err, "open file:"+srcFile)
 	}
 
 	r := &terraform.InstanceState{
@@ -1352,23 +1363,26 @@ func nodeClean(node, addr, user, password string) error {
 			},
 		},
 	}
+
 	entry := logrus.WithFields(logrus.Fields{
 		"host":        addr,
 		"user":        user,
 		"source":      srcFile,
 		"destination": destName,
 	})
+
 	c, err := ssh.New(r)
 	if err != nil {
 		entry.Errorf("error creating communicator: %s", err)
 
-		return err
+		return errors.Wrap(err, "create SSH client")
 	}
+
 	err = c.Connect(nil)
 	if err != nil {
 		entry.Errorf("communicator connection error: %s", err)
 
-		return err
+		return errors.Wrap(err, "SSH connect")
 	}
 	defer c.Disconnect()
 
@@ -1378,7 +1392,7 @@ func nodeClean(node, addr, user, password string) error {
 		if err := c.Upload(destName, file); err != nil {
 			entry.Errorf("SSH UploadFile %s Error Twice,%s", destName, err)
 
-			return err
+			return errors.Wrapf(err, "SSH UploadFile %s Error Twice", destName)
 		}
 	}
 
@@ -1415,8 +1429,7 @@ func nodeClean(node, addr, user, password string) error {
 		err = c.Start(&cp)
 		cp.Wait()
 		if err != nil || cp.ExitStatus != 0 {
-			err = fmt.Errorf("Twice Executing Remote Command: %s,Exited:%d,%v,Output:%s", cp.Command, cp.ExitStatus, err, buffer.String())
-			entry.Error(err)
+			err = errors.Errorf("Twice Executing Remote Command: %s,Exited:%d,%v,Output:%s", cp.Command, cp.ExitStatus, err, buffer.String())
 
 			return err
 		}

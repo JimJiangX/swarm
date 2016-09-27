@@ -65,6 +65,7 @@ func DeletePort(port int, allocated bool) error {
 	if err != nil {
 		return errors.Wrap(err, "get Port.Allocated")
 	}
+
 	if using != allocated {
 		return errors.Errorf("Port %d (%t!= %t),cannot be removed", port, using, allocated)
 	}

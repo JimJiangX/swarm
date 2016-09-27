@@ -30,7 +30,7 @@ type IP struct {
 
 func NewNetworking(net database.Networking, ips []database.IP) (*Networking, error) {
 	if len(ips) == 0 {
-		return nil, fmt.Errorf("Unsupport Networking With No IP")
+		return nil, errors.Errorf("Unsupport Networking with zero IP")
 	}
 	networking := &Networking{
 		RWMutex:    new(sync.RWMutex),
@@ -147,9 +147,7 @@ func (gd *Gardener) AddNetworking(start, end, _type, gateway string, prefix int)
 	}
 
 	gd.Lock()
-
 	gd.networkings = append(gd.networkings, networking)
-
 	gd.Unlock()
 
 	return networking, nil

@@ -407,13 +407,13 @@ func (gd *Gardener) DisableBackupStrategy(id string) error {
 func BackupTaskCallback(req structs.BackupTaskCallback) error {
 	task := database.Task{ID: req.TaskID}
 
-	if req.Error() != nil {
+	if rerr := req.Error(); rerr != nil {
 		err := database.UpdateTaskStatus(&task, structs.TaskFailed, time.Now(), req.Error().Error())
 		if err != nil {
 			return err
 		}
 
-		return req.Error()
+		return errors.Wrap(err, "from request error")
 	}
 
 	task, rent, err := database.BackupTaskValidate(req.TaskID, req.StrategyID, req.UnitID)
