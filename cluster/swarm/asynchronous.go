@@ -34,7 +34,7 @@ func GoConcurrency(funcs []func() error) error {
 		go func(f func() error) {
 			defer func() {
 				if r := recover(); r != nil {
-					logrus.Errorf("GoConcurrency panic:%v\n%s", r, debug.Stack())
+					ch <- fmt.Errorf("GoConcurrency panic:%v\n%s", r, debug.Stack())
 				}
 			}()
 

@@ -115,8 +115,8 @@ func GetUnit(nameOrID string) (Unit, error) {
 	return u, errors.Wrap(err, "Get Unit By nameOrID")
 }
 
-// TxInsertUnit insert Unit in Tx
-func TxInsertUnit(tx *sqlx.Tx, unit Unit) error {
+// txInsertUnit insert Unit in Tx
+func txInsertUnit(tx *sqlx.Tx, unit Unit) error {
 	_, err := tx.NamedExec(insertUnitQuery, &unit)
 
 	return errors.Wrap(err, "Tx insert Unit")
@@ -990,4 +990,29 @@ func DeteleServiceRelation(serviceID string, rmVolumes bool) error {
 	err = tx.Commit()
 
 	return errors.Wrap(err, "Detele Service relation")
+}
+
+// TxInsertUnitWithPorts insert Unit and update []Port in a Tx
+func TxInsertUnitWithPorts(u *Unit, ports []Port) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if u != nil {
+		err = txInsertUnit(tx, *u)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = TxUpdatePorts(tx, ports)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Tx insert Unit and []Port")
 }

@@ -496,7 +496,7 @@ func converteToSWM_Users(users []database.User) []swm_structs.User {
 
 func (svc *Service) getUnit(nameOrID string) (*unit, error) {
 	for _, u := range svc.units {
-		if u.ID == nameOrID || u.Name == nameOrID {
+		if (u.ID == nameOrID || u.Name == nameOrID) && u != nil {
 			return u, nil
 		}
 	}
@@ -666,17 +666,20 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 		svc.RLock()
 		defer svc.RUnlock()
 
+		entry := logrus.WithField("Service", svc.Name)
+
 		err := gd.serviceScheduler(svc, task)
 		if err != nil {
-			logrus.Errorf("Service scheduler:%+v", err)
+			entry.Errorf("scheduler:%+v", err)
 
 			return err
 		}
-		logrus.Debugf("Service %s Scheduler OK!", svc.Name)
+
+		entry.Debugf("scheduler OK!")
 
 		err = gd.serviceExecute(svc)
 		if err != nil {
-			logrus.Errorf("Service %s execute:%+v", svc.Name, err)
+			entry.Errorf("execute:%+v", err)
 
 			return err
 		}
@@ -778,7 +781,7 @@ func (svc *Service) copyServiceConfig() error {
 	for _, u := range svc.units {
 		forbid, can := u.CanModify(u.configures)
 		if !can {
-			return fmt.Errorf("Forbid modifying service configs,%s", forbid)
+			return errors.Errorf("forbid modifying service configs,%s", forbid)
 		}
 
 		defConfig, err := u.defaultUserConfig(svc, u)
@@ -820,7 +823,7 @@ func (svc *Service) initService() error {
 			logrus.WithFields(logrus.Fields{
 				"Service": svc.Name,
 				"Unit":    swm.Name,
-			}).WithError(err).Error("Init service")
+			}).WithError(err).Error("init service")
 
 			return err
 		}
@@ -840,7 +843,7 @@ func (svc *Service) checkStatus(expected int64) error {
 		return nil
 	}
 
-	return fmt.Errorf("Service %s,Status Conflict:expected %d but got %d", svc.Name, expected, val)
+	return errors.Errorf("Service %s,status conflict:expected %d but got %d", svc.Name, expected, val)
 }
 
 func (svc *Service) statusCAS(expected, value int64) error {
@@ -848,7 +851,7 @@ func (svc *Service) statusCAS(expected, value int64) error {
 		return nil
 	}
 
-	return errors.Errorf("status conflict:expected %d but got %d", expected, atomic.LoadInt64(&svc.Status))
+	return errors.Errorf("Service %s,status conflict:expected %d but got %d", svc.Name, expected, svc.Status)
 }
 
 func (svc *Service) startService() error {
@@ -1383,13 +1386,12 @@ func (svc *Service) registerToHorus(user, password string, agentPort int) error 
 	params := make([]registerService, len(svc.units))
 
 	for i, u := range svc.units {
+
 		obj, err := u.registerHorus(user, password, agentPort)
 		if err != nil {
-			err = fmt.Errorf("container %s register Horus Error:%s", u.Name, err)
-			logrus.Error(err)
-
 			return err
 		}
+
 		params[i] = obj
 	}
 
@@ -1502,7 +1504,7 @@ loop:
 
 	if masterName == "" {
 		// Not Found master DB
-		return addr, port, nil, fmt.Errorf("Master Unit Not Found")
+		return addr, port, nil, errors.New("not found Master Unit")
 	}
 
 	master, err := svc.getUnit(masterName)
@@ -1532,10 +1534,8 @@ func (gd *Gardener) UnitIsolate(nameOrID string) error {
 func (svc *Service) isolate(unitName string) error {
 	u, err := svc.getUnit(unitName)
 	if err != nil {
-
 		return err
 	} else if u.Type == _SwitchManagerType {
-
 		return errors.Errorf("unable to isolate Unit '%s:%s'", u.Type, u.Name)
 	}
 
@@ -1579,9 +1579,7 @@ func (svc *Service) switchBack(unitName string) error {
 	u, err := svc.getUnit(unitName)
 	if err != nil {
 		return err
-
 	} else if u.Type == _SwitchManagerType {
-
 		return errors.Errorf("unable to switchback Unit '%s:%s'", u.Type, u.Name)
 	}
 

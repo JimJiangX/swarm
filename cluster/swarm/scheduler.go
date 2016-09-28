@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"sync/atomic"
@@ -15,30 +14,34 @@ import (
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/docker/swarm/scheduler/node"
+	"github.com/pkg/errors"
 )
 
 func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err error) {
-	resourceAlloc := make([]*pendingAllocResource, 0, len(svc.base.Modules))
 	entry := logrus.WithFields(logrus.Fields{
 		"Name":   svc.Name,
 		"Action": "Schedule&Alloc",
 	})
+	resourceAlloc := make([]*pendingAllocResource, 0, len(svc.base.Modules))
+
 	defer func() {
 		if err == nil {
 			return
 		}
 
-		entry.Errorf("Task Failed:%s", err)
+		entry.WithError(err).Errorf("scheduler failed")
 
 		_err := database.TxSetServiceStatus(&svc.Service, task,
 			statusServiceAlloctionFailed, statusTaskFailed, time.Now(), err.Error())
 		if _err != nil {
-			entry.Errorf("Tx Set ServiceStatus error:%s", _err)
+			entry.Error("Tx set ServiceStatus:", _err)
 		}
+
 		if err != nil && len(resourceAlloc) > 0 {
+
 			_err := dealWithSchedulerFailure(gd, resourceAlloc)
 			if _err != nil {
-				logrus.Errorf("deal With Scheduler Failure,%s", _err)
+				logrus.Error("deal With scheduler failure,", _err)
 			}
 		}
 
@@ -47,13 +50,13 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 
 	atomic.StoreInt64(&svc.Status, statusServiceAllocting)
 
-	logrus.Debugf("[MG] start service Scheduler:%s", svc.Name)
+	entry.Debug("start service Scheduler")
 
 	for _, module := range svc.base.Modules {
 
 		candidates, config, err := gd.schedulerPerModule(svc, module)
 		if err != nil {
-			entry.WithField("Module", module.Name).Errorf("Alloction Failed %s", err)
+			entry.WithField("Module", module.Name).WithError(err).Error("scheduler failed")
 
 			return err
 		}
@@ -63,11 +66,11 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 			resourceAlloc = append(resourceAlloc, pendings...)
 		}
 		if err != nil {
-			entry.Errorf("gd.pendingAlloc: pendings Allocation Failed %s", err)
+			entry.WithError(err).Error("pendings alloc failed")
 
 			return err
 		}
-		entry.Info("gd.pendingAlloc: Allocation Succeed!")
+		entry.Info("gd.pendingAlloc: allocation Succeed!")
 	}
 
 	for i := range resourceAlloc {
@@ -75,7 +78,7 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 	}
 
 	if err := createServiceResources(gd, resourceAlloc); err != nil {
-		entry.Errorf("create Service Volumes Error:%s", err)
+		entry.WithError(err).Error("create Service volumes")
 
 		return err
 	}
@@ -87,7 +90,7 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 }
 
 func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err error) {
-	logrus.Debug("create Service Resources...")
+	logrus.Debug("create Service resources...")
 
 	volumes := make([]*types.Volume, 0, 10)
 
@@ -96,14 +99,16 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 			return
 		}
 
-		logrus.Error("Rollback create Service volumes&IP, ", err)
+		logrus.Errorf("Rollback create Service volumes & IP,%s", err)
 
 		for _, v := range volumes {
 			if v == nil {
 				continue
 			}
 			ok, _err := gd.RemoveVolumes(v.Name)
-			logrus.Debugf("Remove Volumes %s:%t,%v", v.Name, ok, _err)
+			if _err != nil {
+				logrus.Debugf("Remove volume %s:%t,%v", v.Name, ok, _err)
+			}
 		}
 
 		for _, pending := range allocs {
@@ -112,7 +117,7 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 			}
 
 			_err := removeNetworkings(pending.engine.IP, pending.networkings)
-			if err != nil {
+			if _err != nil {
 				logrus.Error(_err)
 			}
 		}
@@ -142,8 +147,6 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 func dealWithSchedulerFailure(gd *Gardener, pendings []*pendingAllocResource) error {
 	err := gd.resourceRecycle(pendings)
 	if err != nil {
-		logrus.Errorf("Recycle Failed,%s", err)
-
 		return err
 	}
 
@@ -154,7 +157,7 @@ func dealWithSchedulerFailure(gd *Gardener, pendings []*pendingAllocResource) er
 	}
 	gd.scheduler.Unlock()
 
-	return err
+	return nil
 }
 
 func templateConfig(gd *Gardener, module structs.Module) (*cluster.ContainerConfig, error) {
@@ -169,11 +172,9 @@ func templateConfig(gd *Gardener, module structs.Module) (*cluster.ContainerConf
 	config = buildContainerConfig(config)
 
 	if err := validContainerConfig(config); err != nil {
-		logrus.Warnf("Container Config Validate:%s", err)
 
 		return nil, err
 	}
-	logrus.Infof("Build Container Config,Validate OK:%+v", config)
 
 	image, imageIDLabel, err := gd.getImageName(module.Config.Image, module.Name, module.Version)
 	if err != nil {
@@ -187,14 +188,12 @@ func templateConfig(gd *Gardener, module structs.Module) (*cluster.ContainerConf
 
 func (gd *Gardener) schedulerPerModule(svc *Service, module structs.Module) ([]*node.Node, *cluster.ContainerConfig, error) {
 	entry := logrus.WithFields(logrus.Fields{
-		"svcName": svc.Name,
+		"Service": svc.Name,
 		"Module":  module.Type,
 	})
 
 	_, num, err := parseServiceArch(module.Arch)
 	if err != nil {
-		entry.Errorf("Parse Module.Arch:%s,Error:%v", module.Arch, err)
-
 		return nil, nil, err
 	}
 
@@ -226,7 +225,8 @@ func (gd *Gardener) schedulerPerModule(svc *Service, module structs.Module) ([]*
 	if err != nil {
 		return nil, nil, err
 	}
-	logrus.Debugf("all candidate nodes num:%d,filter by Type:'%s'", len(list), _type)
+
+	entry.Debugf("all candidate nodes num:%d,filter by Type:'%s'", len(list), _type)
 
 	list, err = gd.resourceFilter(list, module, num)
 	if err != nil {
@@ -243,18 +243,24 @@ func (gd *Gardener) schedulerPerModule(svc *Service, module structs.Module) ([]*
 	return candidates, config, nil
 }
 
-func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type string, stores []structs.DiskStorage,
-	templConfig *cluster.ContainerConfig, configures map[string]interface{}) ([]*pendingAllocResource, error) {
-	entry := logrus.WithFields(logrus.Fields{"Name": svcName, "Module": _type})
+func (gd *Gardener) pendingAlloc(candidates []*node.Node,
+	svcID, svcName, _type string,
+	stores []structs.DiskStorage,
+	templConfig *cluster.ContainerConfig,
+	configures map[string]interface{}) ([]*pendingAllocResource, error) {
+
+	entry := logrus.WithFields(logrus.Fields{
+		"Name":   svcName,
+		"Module": _type,
+	})
 
 	imageID, ok := templConfig.Labels[_ImageIDInRegistryLabelKey]
 	if !ok || imageID == "" {
-		return nil, fmt.Errorf("Missing Value of ContainerConfig.Labels[_ImageIDInRegistryLabelKey]")
+		return nil, errors.New("ContainerConfig.Labels[_ImageIDInRegistryLabelKey] is required")
 	}
 
 	image, parentConfig, err := database.GetImageAndUnitConfig(imageID)
 	if err != nil {
-		err = fmt.Errorf("Get Image And UnitConfig Error:%s", err)
 		entry.Error(err)
 		return nil, err
 	}
@@ -267,14 +273,16 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 	for i := range candidates {
 
 		config := cloneContainerConfig(templConfig)
-		id := gd.generateUniqueID()
 
 		engine, ok := gd.engines[candidates[i].ID]
 		if !ok || engine == nil {
-			err := fmt.Errorf("Not Found Engine '%s':'%s'", candidates[i].ID, candidates[i].Addr)
-			entry.Error(err)
+			return allocs, errors.Errorf("not found Engine '%s':'%s'", candidates[i].ID, candidates[i].Addr)
+		}
 
-			return allocs, err
+		id := gd.generateUniqueID()
+		networkMode := "host"
+		if name := config.HostConfig.NetworkMode.NetworkName(); name != "" {
+			networkMode = name
 		}
 
 		unit := &unit{
@@ -289,7 +297,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 				Status:        statusUnitAllocting,
 				LatestError:   "",
 				CheckInterval: 0,
-				NetworkMode:   config.HostConfig.NetworkMode.NetworkName(),
+				NetworkMode:   networkMode,
 				CreatedAt:     time.Now(),
 			},
 			engine:     engine,
@@ -300,7 +308,7 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 
 		forbid, can := unit.CanModify(configures)
 		if !can {
-			return allocs, fmt.Errorf("Forbid modifying service config,%s", forbid)
+			return allocs, errors.Errorf("forbid modifying service config,%s", forbid)
 		}
 
 		if err := unit.factory(); err != nil {
@@ -315,15 +323,18 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node, svcID, svcName, _type 
 			atomic.StoreInt64(&unit.Status, statusUnitAlloctionFailed)
 			unit.LatestError = err.Error()
 
-			unit.saveToDisk()
+			_err := unit.saveToDisk()
+			if err != nil {
+				entry.WithError(_err).Error("update Unit")
+			}
 
-			entry.Errorf("pendingAlloc:Alloc Resource %s", err)
+			entry.Errorf("pendingAlloc:alloc resource %+v", err)
 
 			return allocs, err
 		}
 	}
 
-	entry.Info("pendingAlloc: Allocation Succeed!")
+	entry.Info("pendingAlloc: allocation succeed!")
 
 	return allocs, nil
 }
@@ -336,17 +347,34 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit,
 		"Unit":   unit.Name,
 	})
 
-	pending, err := gd.allocResource(unit, engine, config)
+	pending := newPendingAllocResource()
+	pending.unit = unit
+	pending.engine = engine
+
+	// constraint := fmt.Sprintf("constraint:node==%s", engine.ID)
+	// config.Env = append(config.Env, constraint)
+	// conflicting options:hostname and the network mode
+	// config.Hostname = engine.ID
+	// config.Domainname = engine.Name
+
+	// Alloc CPU
+	cpuset, err := gd.allocCPUs(engine, config.HostConfig.CpusetCpus)
 	if err != nil {
-		err = fmt.Errorf("Alloc Resource Error:%s", err)
-		entry.Error(err)
+		entry.WithError(err).Errorf("alloc CPU '%s'", config.HostConfig.CpusetCpus)
+		return pending, err
+	}
+	config.HostConfig.CpusetCpus = cpuset
+
+	err = gd.allocNetworking(pending, config)
+	if err != nil {
+		entry.WithError(err).Error("alloc networking")
 
 		return pending, err
 	}
 
 	err = gd.allocStorage(pending, engine, config, stores, false)
 	if err != nil {
-		entry.Errorf("Alloc Storage Error:%s", err)
+		entry.WithError(err).Error("alloc Storage")
 
 		return pending, err
 	}
@@ -359,7 +387,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit,
 		swarmID = unit.ID
 		config.SetSwarmID(swarmID)
 	} else {
-		logrus.Errorf("ContainerConfig.SwarmID() Should be null but got %s", swarmID)
+		logrus.Warn("ContainerConfig.SwarmID() should be null but got %s", swarmID)
 	}
 
 	pending.unit.config = config
@@ -376,7 +404,7 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit,
 
 	err = pending.consistency()
 	if err != nil {
-		entry.Errorf("Pending Allocation Resouces,Consistency Error:%s", err)
+		entry.WithError(err).Error("pending allocate resouces")
 	}
 
 	return pending, err
@@ -386,7 +414,7 @@ func (gd *Gardener) dispatch(config *cluster.ContainerConfig, num int,
 	list []*node.Node, withImageAffinity, highAvaliable bool) ([]*node.Node, error) {
 
 	if len(list) < num {
-		err := fmt.Errorf("Not Enough Candidate Nodes For Allocation,%d<%d", len(list), num)
+		err := errors.Errorf("not enough candidate Nodes for allocation,%d<%d", len(list), num)
 		logrus.Warn(err)
 
 		return nil, err
@@ -394,7 +422,7 @@ func (gd *Gardener) dispatch(config *cluster.ContainerConfig, num int,
 
 	candidates, err := gd.runScheduler(list, config, num, withImageAffinity, highAvaliable)
 	if err != nil {
-		logrus.Warnf("Failed to scheduler: %s", err)
+		logrus.WithError(err).Warn("runScheduler failed")
 
 		var retries int64
 		//  fails with image not found, then try to reschedule with image affinity
@@ -414,13 +442,13 @@ func (gd *Gardener) dispatch(config *cluster.ContainerConfig, num int,
 		}
 	}
 	if err != nil {
-		logrus.Warnf("Failed to scheduler: %s", err)
+		logrus.WithError(err).Warn("runScheduler failed")
 
 		return nil, err
 	}
 
 	if len(candidates) < num {
-		err := fmt.Errorf("Not Enough Match Condition Nodes After Retries,%d<%d", len(candidates), num)
+		err := errors.Errorf("not enough match condition Nodes after retries,%d<%d", len(candidates), num)
 		logrus.Error(err)
 
 		return nil, err
@@ -448,20 +476,19 @@ func (gd *Gardener) runScheduler(list []*node.Node, config *cluster.ContainerCon
 	}
 
 	if err != nil {
-		logrus.Errorf("[MG] gd.scheduler.SelectNodesForContainer fail(swarm level):%s", err)
+		logrus.WithError(err).Errorf("gd.scheduler.SelectNodesForContainer failed(swarm scheduler level)")
 
-		return nil, err
+		return nil, errors.Wrap(err, "scheduler.SelectNodesForContainer")
 	}
 
-	logrus.Debugf("[MG] gd.scheduler.SelectNodesForContainer ok(swarm level) ndoes:%d", len(nodes))
+	logrus.Debugf("gd.scheduler.SelectNodesForContainer ok(swarm scheduler level) ndoes:%d", len(nodes))
+
 	return gd.selectNodeByCluster(nodes, num, highAvaliable)
 }
 
 func listCandidates(clusters []string, _type string) ([]database.Node, error) {
 	list, err := database.ListNodesByClusters(clusters, _type, true)
 	if err != nil {
-		logrus.Errorf("Search in Database Error: %s", err)
-
 		return nil, err
 	}
 
@@ -470,6 +497,7 @@ func listCandidates(clusters []string, _type string) ([]database.Node, error) {
 		if list[i].Status != statusNodeEnable {
 			continue
 		}
+
 		out = append(out, list[i])
 	}
 
@@ -490,7 +518,7 @@ func (gd *Gardener) listCandidateNodes(list []database.Node) []*node.Node {
 		}
 	}
 
-	logrus.Debugf("Candidate Nodes:%d", len(out))
+	logrus.Debugf("candidate Nodes:%d", len(out))
 
 	return out
 }
@@ -498,7 +526,7 @@ func (gd *Gardener) listCandidateNodes(list []database.Node) []*node.Node {
 func (gd *Gardener) checkNode(id string) *node.Node {
 	e, ok := gd.engines[id]
 	if !ok {
-		logrus.Debugf("Not Found Engine %s", id)
+		logrus.Debugf("not found Engine %s", id)
 
 		return nil
 	}
@@ -534,7 +562,7 @@ func isStringExist(s string, list []string) bool {
 
 func (gd *Gardener) selectNodeByCluster(nodes []*node.Node, num int, highAvailable bool) ([]*node.Node, error) {
 	if len(nodes) < num {
-		return nil, errors.New("Not Enough Nodes For Match")
+		return nil, errors.New("not enough Nodes for select")
 	}
 
 	if !highAvailable || num == 1 {
@@ -543,7 +571,8 @@ func (gd *Gardener) selectNodeByCluster(nodes []*node.Node, num int, highAvailab
 
 	all, err := database.GetAllNodes()
 	if err != nil {
-		logrus.Warnf("[**MG**]SelectNodeByCluster::database.GetAllNodes fail", err)
+		logrus.Warnf("database.GetAllNodes failed,%+v", err)
+
 		all = nil
 	}
 
@@ -553,25 +582,32 @@ func (gd *Gardener) selectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		dcID := ""
 
 		if len(all) == 0 {
+
 			node, err := database.GetNode(nodes[i].ID)
 			if err != nil {
-				logrus.Warnf("[MG]SelectNodeByCluster::DatacenterByNode fail", err)
+				logrus.Warnf("SelectNodeByCluster::DatacenterByNode failed,%+v", err)
+
 				continue
 			}
 			dcID = node.ClusterID
 
-			logrus.Debugf("[**MG]len(all) == 0 the dc :%s", dcID)
+			logrus.Debugf("len(all) = %d, DC:%s", len(all), dcID)
+
 		} else {
+
 			for index := range all {
+
 				if nodes[i].ID == all[index].EngineID {
 					dcID = all[index].ClusterID
+
 					break
 				}
 			}
-			logrus.Debugf("[MG]len(all) = %d, the DC:%s", len(all), dcID)
+
+			logrus.Debugf("len(all) = %d, DC:%s", len(all), dcID)
 		}
 		if err != nil || dcID == "" {
-			logrus.Warningf("%d Node %s fail,%v", i, nodes[i].ID, err)
+			logrus.Warningf("%d Node %s failed,%v", i, nodes[i].ID, err)
 			continue
 		}
 
@@ -583,13 +619,13 @@ func (gd *Gardener) selectNodeByCluster(nodes []*node.Node, num int, highAvailab
 			dcMap[dcID] = list
 		}
 
-		logrus.Debugf("DC %s Append Node:%s,len=%d", dcID, nodes[i].Name, len(dcMap[dcID]))
+		logrus.Debugf("DC %s append Node:%s,len=%d", dcID, nodes[i].Name, len(dcMap[dcID]))
 	}
 
-	logrus.Debugf("[MG]highAvailable:%t, num :%d ,dcMap len=%d", highAvailable, num, len(dcMap))
+	logrus.Debugf("highAvailable=%t, num=%d,len(dcMap)=%d", highAvailable, num, len(dcMap))
 
 	if highAvailable && num > 1 && len(dcMap) < 2 {
-		return nil, errors.New("Not Enough Cluster For Match")
+		return nil, errors.New("not enough Cluster for Match")
 	}
 
 	candidates := make([]*node.Node, num)
@@ -622,5 +658,5 @@ func (gd *Gardener) selectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		}
 	}
 
-	return nil, errors.New("Not Enough Cluster&Node For Match")
+	return nil, errors.New("not enough Cluster&Node for Match")
 }

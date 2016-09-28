@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -50,7 +49,7 @@ func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs
 
 	engine, ok := gd.engines[candidates[0].ID]
 	if !ok {
-		err = fmt.Errorf("Not Found Engine %s", candidates[0].ID)
+		err = errors.New("not found Engine:" + candidates[0].ID)
 		logrus.Error(err)
 		return nil, err
 	}
@@ -117,7 +116,7 @@ func resetContainerConfig(config *cluster.ContainerConfig, hostConfig *ctypes.Ho
 func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {
-		return "", fmt.Errorf("Not Found Unit %s,error:%s", nameOrID, err)
+		return "", err
 	}
 
 	svc, err := gd.GetService(table.ServiceID)
@@ -128,7 +127,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 	svc.RLock()
 
 	migrate, err := svc.getUnit(table.ID)
-	if migrate == nil || err != nil {
+	if err != nil {
 		svc.RUnlock()
 
 		logrus.Warn(err)
@@ -140,7 +139,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		svc.RLock()
 
 		migrate, err = svc.getUnit(table.ID)
-		if migrate == nil || err != nil {
+		if err != nil {
 			logrus.Error(err)
 			svc.RUnlock()
 
@@ -308,9 +307,6 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		dc, node, err := gd.getNode(engine.ID)
 		if err != nil {
-			err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
-			logrus.Error(err)
-
 			return err
 		}
 
@@ -322,7 +318,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		if svc.authConfig == nil {
 			svc.authConfig, err = gd.registryAuthConfig()
 			if err != nil {
-				return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
+				return err
 			}
 		}
 		container, err := engine.CreateContainer(config, swarmID, true, svc.authConfig)
@@ -496,7 +492,7 @@ func stopOldContainer(svc *Service, u *unit) error {
 func sanDeactivateAndDelMapping(storage storage.Store, host string,
 	lunMap map[string][]database.LUN, lunSlice []database.LUN) error {
 	if storage == nil {
-		return fmt.Errorf("Store is nil")
+		return errors.New("Store is required")
 	}
 
 	for vg, list := range lunMap {
@@ -569,7 +565,7 @@ func migrateVolumes(storage storage.Store, nodeID string,
 
 	// Mapping LVs
 	if len(lunSlice) > 0 && storage == nil {
-		return nil, fmt.Errorf("Store is nil")
+		return nil, errors.New("Store is required")
 	}
 
 	for i := range lunSlice {
@@ -710,7 +706,7 @@ func updateUnit(unit database.Unit, lvs []database.LocalVolume, reserveSAN bool)
 func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {
-		return "", fmt.Errorf("Not Found Unit %s,error:%s", nameOrID, err)
+		return "", err
 	}
 
 	svc, err := gd.GetService(table.ServiceID)
@@ -721,7 +717,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 	svc.RLock()
 
 	rebuild, err := svc.getUnit(table.ID)
-	if rebuild == nil || err != nil {
+	if err != nil {
 		svc.RUnlock()
 
 		logrus.Warn(err)
@@ -733,7 +729,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		svc.RLock()
 
 		rebuild, err = svc.getUnit(table.ID)
-		if rebuild == nil || err != nil {
+		if err != nil {
 			logrus.Error(err)
 			svc.RUnlock()
 
@@ -895,7 +891,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		if svc.authConfig == nil {
 			svc.authConfig, err = gd.registryAuthConfig()
 			if err != nil {
-				return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
+				return err
 			}
 		}
 
@@ -1035,7 +1031,6 @@ func registerToServers(u *unit, svc *Service, sys database.Configurations) error
 	logrus.Debug("[MG]register To Horus")
 	obj, err := u.registerHorus(sys.MonitorUsername, sys.MonitorPassword, sys.HorusAgentPort)
 	if err != nil {
-		err = fmt.Errorf("container %s register Horus Error:%s", u.Name, err)
 		logrus.Error(err)
 
 		return err

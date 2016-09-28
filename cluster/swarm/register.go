@@ -73,13 +73,13 @@ func registerToHorus(obj ...registerService) error {
 
 	body := bytes.NewBuffer(nil)
 	if err := json.NewEncoder(body).Encode(obj); err != nil {
-		return err
+		return errors.Wrap(err, "encode registerService")
 	}
 
 	url := fmt.Sprintf("http://%s/v1/agent/register", addr)
 	resp, err := http.Post(url, "application/json", body)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "post agent register to Horus request")
 	}
 
 	if resp.Body != nil {
@@ -93,9 +93,9 @@ func registerToHorus(obj ...registerService) error {
 
 		err := json.NewDecoder(resp.Body).Decode(&res)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "decode response body")
 		}
-		return fmt.Errorf("StatusCode:%d,Error:%s", resp.StatusCode, res.Err)
+		return errors.Errorf("StatusCode:%d,Error:%s", resp.StatusCode, res.Err)
 	}
 
 	return nil
@@ -118,14 +118,14 @@ func deregisterToHorus(force bool, endpoints ...string) error {
 
 	body := bytes.NewBuffer(nil)
 	if err := json.NewEncoder(body).Encode(obj); err != nil {
-		return err
+		return errors.Wrap(err, "encode deregister to Horus")
 	}
 
 	path := fmt.Sprintf("http://%s/v1/agent/deregister", addr)
 
 	req, err := http.NewRequest("POST", path, body)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "post agent deregister to Horus")
 	}
 	req.Header.Set("Content-Type", "application/json")
 
@@ -137,7 +137,7 @@ func deregisterToHorus(force bool, endpoints ...string) error {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "deregister to Horus response")
 	}
 	if resp.Body != nil {
 		defer resp.Body.Close()
@@ -150,7 +150,7 @@ func deregisterToHorus(force bool, endpoints ...string) error {
 
 		err := json.NewDecoder(resp.Body).Decode(&res)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "decode Horus response body")
 		}
 		return errors.Errorf("StatusCode:%d,Error:%s", resp.StatusCode, res.Err)
 	}

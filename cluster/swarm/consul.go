@@ -53,7 +53,7 @@ func GetUnitRoleFromConsul(key string) (map[string]string, error) {
 	}
 
 	if val == nil {
-		return nil, fmt.Errorf("Wrong KEY:%s", key)
+		return nil, errors.New("wrong KEY:" + key)
 	}
 
 	return rolesJSONUnmarshal(val.Value)
@@ -104,21 +104,22 @@ func registerHealthCheck(u *unit, context *Service) error {
 	}
 	client, err := api.NewClient(&c)
 	if err != nil {
-		logrus.Errorf("%s Register HealthCheck Error,%s %v", u.Name, err, c)
-		return err
+		logrus.WithField("Unit", u.Name).WithError(err).Errorf("register healthCheck:%v", c)
+
+		return errors.Wrap(err, "register unit healthCheck")
 	}
 
 	check, err := u.HealthCheck()
 	if err != nil {
-		logrus.Warnf("Unit %s HealthCheck error:%s", u.Name, err)
+
 		if err = u.factory(); err != nil {
-			logrus.Errorf("Unit %s factory error:%s", u.Name, err)
+			logrus.WithField("Unit", u.Name).WithError(err).Error("unit factory")
 			return err
 		}
 
 		check, err = u.HealthCheck()
 		if err != nil {
-			logrus.Errorf("Unit %s HealthCheck error:%s", u.Name, err)
+			logrus.WithField("Unit", u.Name).WithError(err).Error("register healthCheck")
 
 			return err
 		}
@@ -163,9 +164,11 @@ func registerHealthCheck(u *unit, context *Service) error {
 		},
 	}
 
-	logrus.Debugf("AgentServiceRegistration:%v %v", service, service.Check)
+	logrus.Debugf("Agent Service Registration:%v %v", service, service.Check)
 
-	return client.Agent().ServiceRegister(&service)
+	err = client.Agent().ServiceRegister(&service)
+
+	return errors.Wrap(err, "register unit service")
 }
 
 func deregisterHealthCheck(host, serviceID string) error {
@@ -184,10 +187,12 @@ func deregisterHealthCheck(host, serviceID string) error {
 	}
 	client, err := api.NewClient(&c)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "deregister healthCheck")
 	}
 
-	return client.Agent().ServiceDeregister(serviceID)
+	err = client.Agent().ServiceDeregister(serviceID)
+
+	return errors.Wrap(err, "deregister healthCheck")
 }
 
 func saveContainerToConsul(container *cluster.Container) error {
@@ -199,7 +204,7 @@ func saveContainerToConsul(container *cluster.Container) error {
 	buf := bytes.NewBuffer(nil)
 	err = json.NewEncoder(buf).Encode(container)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "encode container")
 	}
 
 	pair := &api.KVPair{
@@ -208,7 +213,7 @@ func saveContainerToConsul(container *cluster.Container) error {
 	}
 	_, err = client.KV().Put(pair, nil)
 
-	return err
+	return errors.Wrap(err, "put KV")
 }
 
 func deleteConsulKVTree(key string) error {

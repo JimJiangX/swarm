@@ -614,29 +614,26 @@ func (gd *Gardener) rebuildDatacenter(nameOrID string) (*Datacenter, error) {
 }
 
 func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
-	eng, err := gd.GetEngine(n.EngineID)
-
-	node := &Node{
-		Node:   &n,
-		engine: eng,
-	}
-
 	entry := logrus.WithFields(logrus.Fields{
 		"Name": n.Name,
 		"addr": n.Addr,
 	})
 
+	eng, err := gd.GetEngine(n.EngineID)
+	node := &Node{
+		Node:   &n,
+		engine: eng,
+	}
 	if err != nil {
-		entry.WithError(err).Warn("rebuild Node")
+		entry.WithError(err).Error("rebuild Node")
+
 		return node, err
 	}
 
 	pluginAddr := fmt.Sprintf("%s:%d", eng.IP, pluginPort)
 	node.localStore, err = storage.NewLocalDisk(pluginAddr, node.Node, 0)
 	if err != nil {
-		entry.WithError(err).Warn("rebuild Node")
-	} else {
-		entry.Debug("rebuild Node")
+		entry.WithError(err).Warn("rebuild Node with local Store error")
 	}
 
 	return node, nil
@@ -771,7 +768,7 @@ loop:
 	for i := range list {
 		dc, node, err := gd.getNode(list[i].ID)
 		if err != nil || dc == nil || node == nil {
-			logrus.Warningf("Not Found Node By ID:%s", list[i].ID)
+			logrus.Warn("not found Node by ID:" + list[i].ID)
 
 			continue loop
 		}
@@ -779,7 +776,7 @@ loop:
 		dc.Lock()
 
 		if !dc.Enabled {
-			logrus.Debug("DC Disabled ", dc.Name)
+			logrus.Debug(dc.Name + ":DC disabled")
 
 			dc.Unlock()
 
@@ -823,12 +820,15 @@ loop:
 		dc.Unlock()
 
 		for _, v := range module.Stores {
+
 			if storage.IsLocalStore(v.Type) {
+
 				if !node.isIdleStoreEnough(v.Type, v.Size) {
 					logrus.Debugf("%s local store shortage:%d", node.Name, v.Size)
 
 					continue loop
 				}
+
 			} else if v.Type == storage.SANStore {
 				// when storage is HITACHI or HUAWEI
 				if !dc.isIdleStoreEnough(num/2, v.Size) {

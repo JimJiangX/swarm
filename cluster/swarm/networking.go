@@ -13,8 +13,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var errNotFoundIP = errors.New("IP not found")
-var errNotFoundNetworking = errors.New("Networking not found")
+var (
+	errNotFoundIP         = errors.New("IP not found")
+	errNotFoundNetworking = errors.New("Networking not found")
+)
 
 // Networking is exported
 type Networking struct {
@@ -280,22 +282,14 @@ func (gd *Gardener) allocIP(id, _type, unit string) (_ IPInfo, err error) {
 		if !networkings[i].Enabled {
 			continue
 		}
+
 		ip, err := database.TxAllocIPByNetworking(networkings[i].ID, unit)
 		if err == nil {
 			return newIPinfo(networkings[i], ip), nil
 		}
 	}
 
-	return IPInfo{}, errNotFoundIP
-}
-
-func isProxyType(name string) bool {
-
-	if strings.Contains(name, "proxy") {
-		return true
-	}
-
-	return false
+	return IPInfo{}, errors.Wrap(errNotFoundIP, "alloc IP")
 }
 
 // RemoveNetworking remove the assigned Networking from the Gardener

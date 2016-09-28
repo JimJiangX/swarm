@@ -15,7 +15,6 @@ import (
 )
 
 func validContainerConfig(config *cluster.ContainerConfig) error {
-	// validate config
 	buf := bytes.NewBuffer(nil)
 
 	swarmID := config.SwarmID()
@@ -78,7 +77,7 @@ func ValidCreateDC(req structs.PostClusterRequest) error {
 	buf := bytes.NewBuffer(nil)
 
 	if req.Name == "" {
-		buf.WriteString("'name' is null\n")
+		buf.WriteString("Cluster name is required\n")
 	}
 
 	if !isStringExist(req.StorageType, supportedStoreTypes) {
@@ -101,7 +100,7 @@ func ValidCreateService(req structs.PostServiceRequest) error {
 	buf := bytes.NewBuffer(nil)
 
 	if req.Name == "" {
-		buf.WriteString("Service name should not be null\n")
+		buf.WriteString("Service name is required\n")
 	}
 
 	_, err := database.GetService(req.Name)
@@ -116,6 +115,7 @@ func ValidCreateService(req structs.PostServiceRequest) error {
 	}
 
 	for _, module := range req.Modules {
+
 		if _, _, err := initialize(module.Name, module.Version); err != nil {
 			buf.WriteString(err.Error())
 			buf.WriteByte('\n')
@@ -125,22 +125,25 @@ func ValidCreateService(req structs.PostServiceRequest) error {
 		//	buf.WriteString("Unsupported " + module.Type)
 		//}
 		if module.Config.Image == "" {
+
 			image, err := database.GetImage(module.Name, module.Version)
 			if err != nil {
 				buf.WriteString("not found Image:" + err.Error() + "\n")
-			}
-			if !image.Enabled {
+			} else if !image.Enabled {
 				buf.WriteString(fmt.Sprintf("Image '%s:%s' disabled\n", module.Name, module.Version))
 			}
+
 		} else {
+
 			image, err := database.GetImageByID(module.Config.Image)
 			if err != nil {
 				buf.WriteString("not found Image:" + err.Error() + "\n")
-			}
-			if !image.Enabled {
+			} else if !image.Enabled {
 				buf.WriteString("Image:'" + module.Config.Image + "' disabled\n")
 			}
+
 		}
+
 		_, num, err := parseServiceArch(module.Arch)
 		if err != nil {
 			buf.WriteString(err.Error())

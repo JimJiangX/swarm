@@ -99,7 +99,7 @@ func (svc *Service) tryBackupTask(strategy database.BackupStrategy, task *databa
 	addr, port, master, err := lockSwitchManager(svc, 3)
 	if err != nil {
 		err1 := database.UpdateTaskStatus(task, statusTaskCancel, time.Now(), "Cancel,"+err.Error())
-		err = fmt.Errorf("Update Task Status Errors:%v,%v", err, err1)
+		err = errors.Wrapf(err, "update Task status errors:%v", err1)
 		logrus.Error(err)
 
 		return err
