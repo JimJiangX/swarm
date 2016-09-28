@@ -9,7 +9,7 @@ import (
 )
 
 func insertLUN(t *testing.T, lun LUN) error {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		t.Fatal(err)
 	}

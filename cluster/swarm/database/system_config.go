@@ -104,7 +104,7 @@ func (c Configurations) tableName() string {
 
 // Insert insert a new Configurations
 func (c Configurations) Insert() (int64, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return 0, err
 	}
@@ -114,7 +114,7 @@ func (c Configurations) Insert() (int64, error) {
 		return r.LastInsertId()
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return 0, err
 	}
@@ -147,7 +147,7 @@ func (c Configurations) GetConsulAddrs() []string {
 
 // GetSystemConfig returns *Configurations
 func GetSystemConfig() (*Configurations, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func GetSystemConfig() (*Configurations, error) {
 		return c, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}

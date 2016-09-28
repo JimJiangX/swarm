@@ -107,7 +107,7 @@ func NewNode(name, clusterID, addr, eng string, num, status int, t1, t2 time.Tim
 }
 
 func (n Node) Insert() error {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (n Node) Insert() error {
 }
 
 func ListNode(status int) ([]Node, error) {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return nil, err
 	}

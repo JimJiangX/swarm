@@ -8,7 +8,7 @@ import (
 )
 
 func DeleteUnitConfig(id string) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -19,7 +19,7 @@ func DeleteUnitConfig(id string) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}

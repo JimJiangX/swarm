@@ -56,7 +56,7 @@ var DelLunMapping = LunMapping
 
 // LunMapping sets LUN VGName、MappingTo、HostLunID value
 func LunMapping(lun, host, vgName string, hlun int) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func LunMapping(lun, host, vgName string, hlun int) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func LunMapping(lun, host, vgName string, hlun int) error {
 
 // GetLUNByID returns LUN,select tb_lun by ID
 func GetLUNByID(id string) (LUN, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return LUN{}, err
 	}
@@ -93,7 +93,7 @@ func GetLUNByID(id string) (LUN, error) {
 		return lun, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return lun, err
 	}
@@ -105,7 +105,7 @@ func GetLUNByID(id string) (LUN, error) {
 
 // ListLUNByName returns []LUN select by Name
 func ListLUNByName(name string) ([]LUN, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func ListLUNByName(name string) ([]LUN, error) {
 		return list, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func ListLUNByName(name string) ([]LUN, error) {
 
 // ListLUNByVgName returns []LUN select by VGName
 func ListLUNByVgName(name string) ([]LUN, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func ListLUNByVgName(name string) ([]LUN, error) {
 		return list, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func ListLUNByVgName(name string) ([]LUN, error) {
 
 // GetLUNByLunID returns a LUN select by StorageLunID and StorageSystemID
 func GetLUNByLunID(systemID string, id int) (LUN, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return LUN{}, err
 	}
@@ -168,7 +168,7 @@ func GetLUNByLunID(systemID string, id int) (LUN, error) {
 		return lun, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return lun, err
 	}
@@ -180,7 +180,7 @@ func GetLUNByLunID(systemID string, id int) (LUN, error) {
 
 // CountLUNByRaidGroupID returns number of result select tb_lun by RaidGroup
 func CountLUNByRaidGroupID(rg string) (int, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return 0, err
 	}
@@ -193,7 +193,7 @@ func CountLUNByRaidGroupID(rg string) (int, error) {
 		return count, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return 0, err
 	}
@@ -205,7 +205,7 @@ func CountLUNByRaidGroupID(rg string) (int, error) {
 
 // DelLUN delete LUN by ID
 func DelLUN(id string) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func DelLUN(id string) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func TxReleaseLun(name string) error {
 
 // ListHostLunIDByMapping returns []int select HostLunID by MappingTo
 func ListHostLunIDByMapping(host string) ([]int, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +265,7 @@ func ListHostLunIDByMapping(host string) ([]int, error) {
 		return out, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +277,7 @@ func ListHostLunIDByMapping(host string) ([]int, error) {
 
 // ListLunIDBySystemID returns []int select StorageLunID by StorageSystemID
 func ListLunIDBySystemID(id string) ([]int, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +290,7 @@ func ListLunIDBySystemID(id string) ([]int, error) {
 		return out, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +317,7 @@ func (r RaidGroup) tableName() string {
 
 // Insert insert a new RaidGroup
 func (r RaidGroup) Insert() error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -327,7 +327,7 @@ func (r RaidGroup) Insert() error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -342,7 +342,7 @@ func (r RaidGroup) Insert() error {
 
 // UpdateRaidGroupStatus update Enabled select by StorageSystemID and StorageRGID
 func UpdateRaidGroupStatus(ssid string, rgid int, state bool) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -354,7 +354,7 @@ func UpdateRaidGroupStatus(ssid string, rgid int, state bool) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -366,7 +366,7 @@ func UpdateRaidGroupStatus(ssid string, rgid int, state bool) error {
 
 // UpdateRGStatusByID update Enabled select by ID
 func UpdateRGStatusByID(id string, state bool) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -378,7 +378,7 @@ func UpdateRGStatusByID(id string, state bool) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -390,7 +390,7 @@ func UpdateRGStatusByID(id string, state bool) error {
 
 // ListRGByStorageID returns []RaidGroup select by StorageSystemID
 func ListRGByStorageID(id string) ([]RaidGroup, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -403,7 +403,7 @@ func ListRGByStorageID(id string) ([]RaidGroup, error) {
 		return out, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -415,7 +415,7 @@ func ListRGByStorageID(id string) ([]RaidGroup, error) {
 
 // GetRaidGroup returns RaidGroup select by StorageSystemID and StorageRGID.
 func GetRaidGroup(id string, rg int) (RaidGroup, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return RaidGroup{}, err
 	}
@@ -428,14 +428,14 @@ func GetRaidGroup(id string, rg int) (RaidGroup, error) {
 		return out, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 
 	return out, errors.Wrap(err, "get RaidGroup")
 }
 
 // DeleteRaidGroup delete RaidGroup by StorageSystemID and StorageRGID
 func DeleteRaidGroup(id string, rg int) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -447,7 +447,7 @@ func DeleteRaidGroup(id string, rg int) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -480,7 +480,7 @@ func (HitachiStorage) tableName() string {
 
 // Insert inserts a new HitachiStorage
 func (hs HitachiStorage) Insert() error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -490,7 +490,7 @@ func (hs HitachiStorage) Insert() error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -520,7 +520,7 @@ func (HuaweiStorage) tableName() string {
 
 // Insert inserts a new HuaweiStorage
 func (hs HuaweiStorage) Insert() error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -530,7 +530,7 @@ func (hs HuaweiStorage) Insert() error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -560,7 +560,7 @@ func (LocalVolume) tableName() string {
 
 // InsertLocalVolume insert a new LocalVolume
 func InsertLocalVolume(lv LocalVolume) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -570,7 +570,7 @@ func InsertLocalVolume(lv LocalVolume) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -582,7 +582,7 @@ func InsertLocalVolume(lv LocalVolume) error {
 
 // UpdateLocalVolume update size of LocalVolume by name or ID
 func UpdateLocalVolume(nameOrID string, size int) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -594,7 +594,7 @@ func UpdateLocalVolume(nameOrID string, size int) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -635,7 +635,7 @@ func TxUpdateMultiLocalVolume(lvs []LocalVolume) error {
 
 // DeleteLocalVoume delete LocalVolume by name or ID
 func DeleteLocalVoume(nameOrID string) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -647,7 +647,7 @@ func DeleteLocalVoume(nameOrID string) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -698,7 +698,7 @@ func TxDeleteVolumes(volumes []LocalVolume) error {
 func GetLocalVolume(nameOrID string) (LocalVolume, error) {
 	lv := LocalVolume{}
 
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return lv, err
 	}
@@ -710,7 +710,7 @@ func GetLocalVolume(nameOrID string) (LocalVolume, error) {
 		return lv, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return lv, err
 	}
@@ -722,7 +722,7 @@ func GetLocalVolume(nameOrID string) (LocalVolume, error) {
 
 // ListVolumeByVG returns []LocalVolume select by VGName
 func ListVolumeByVG(name string) ([]LocalVolume, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -735,7 +735,7 @@ func ListVolumeByVG(name string) ([]LocalVolume, error) {
 		return lvs, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -747,7 +747,7 @@ func ListVolumeByVG(name string) ([]LocalVolume, error) {
 
 // ListVolumesByUnitID returns []LocalVolume select by UnitID
 func ListVolumesByUnitID(id string) ([]LocalVolume, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -760,7 +760,7 @@ func ListVolumesByUnitID(id string) ([]LocalVolume, error) {
 		return lvs, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -772,7 +772,7 @@ func ListVolumesByUnitID(id string) ([]LocalVolume, error) {
 
 // GetStorageByID returns *HitachiStorage or *HuaweiStorage,select by ID
 func GetStorageByID(id string) (*HitachiStorage, *HuaweiStorage, error) {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -794,7 +794,7 @@ func GetStorageByID(id string) (*HitachiStorage, *HuaweiStorage, error) {
 
 // ListStorageID returns all StorageSystemID
 func ListStorageID() ([]string, error) {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -821,7 +821,7 @@ func ListStorageID() ([]string, error) {
 
 // DeleteStorageByID delete storage system by ID
 func DeleteStorageByID(id string) error {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return err
 	}

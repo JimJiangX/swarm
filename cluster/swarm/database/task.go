@@ -54,7 +54,7 @@ func (bf BackupFile) tableName() string {
 
 // ListBackupFilesByService returns Service and []BackupFile select by name or ID
 func ListBackupFilesByService(nameOrID string) (Service, []BackupFile, error) {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return Service{}, nil, err
 	}
@@ -91,7 +91,7 @@ func ListBackupFilesByService(nameOrID string) (Service, []BackupFile, error) {
 
 // GetBackupFile returns BackupFile select by ID
 func GetBackupFile(id string) (BackupFile, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return BackupFile{}, err
 	}
@@ -104,7 +104,7 @@ func GetBackupFile(id string) (BackupFile, error) {
 		return row, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return BackupFile{}, err
 	}
@@ -137,7 +137,7 @@ func NewTask(object, relate, linkto, des string, labels []string, timeout int) T
 
 // Insert insert a Task
 func (t Task) Insert() error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -149,7 +149,7 @@ func (t Task) Insert() error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -247,7 +247,7 @@ func TxBackupTaskDone(task *Task, state int64, backupFile BackupFile) error {
 
 // UpdateTaskStatus update Task status
 func UpdateTaskStatus(task *Task, state int64, finishAt time.Time, msg string) error {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return err
 	}
@@ -280,7 +280,7 @@ func UpdateTaskStatus(task *Task, state int64, finishAt time.Time, msg string) e
 
 // UpdateStatus update Task status
 func (t *Task) UpdateStatus(status int, msg string) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -296,7 +296,7 @@ func (t *Task) UpdateStatus(status int, msg string) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -314,7 +314,7 @@ func (t *Task) UpdateStatus(status int, msg string) error {
 
 // GetTask returns Task select by ID
 func GetTask(id string) (Task, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return Task{}, err
 	}
@@ -327,7 +327,7 @@ func GetTask(id string) (Task, error) {
 		return task, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return task, err
 	}
@@ -339,7 +339,7 @@ func GetTask(id string) (Task, error) {
 
 // ListTask returns all []Task
 func ListTask() ([]Task, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +352,7 @@ func ListTask() ([]Task, error) {
 		return list, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +364,7 @@ func ListTask() ([]Task, error) {
 
 // ListTaskByStatus returns []Task select by status
 func ListTaskByStatus(status int) ([]Task, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +377,7 @@ func ListTaskByStatus(status int) ([]Task, error) {
 		return list, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -389,7 +389,7 @@ func ListTaskByStatus(status int) ([]Task, error) {
 
 // ListTaskByRelated returns []Task select by Related
 func ListTaskByRelated(related string) ([]Task, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +402,7 @@ func ListTaskByRelated(related string) ([]Task, error) {
 		return list, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +419,7 @@ func ListTaskByTimestamp(begin, end time.Time) ([]Task, error) {
 		begin, end = end, begin
 	}
 
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -459,7 +459,7 @@ func ListTaskByTimestamp(begin, end time.Time) ([]Task, error) {
 
 // DeleteTask delete a Task by ID
 func DeleteTask(ID string) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -471,7 +471,7 @@ func DeleteTask(ID string) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -505,7 +505,7 @@ func (bs BackupStrategy) tableName() string {
 
 // GetBackupStrategy returns *BackupStrategy select by name or ID
 func GetBackupStrategy(nameOrID string) (*BackupStrategy, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -518,7 +518,7 @@ func GetBackupStrategy(nameOrID string) (*BackupStrategy, error) {
 		return strategy, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -533,7 +533,7 @@ func GetBackupStrategy(nameOrID string) (*BackupStrategy, error) {
 
 // ListBackupStrategyByServiceID returns []BackupStrategy select by serviceID
 func ListBackupStrategyByServiceID(serviceID string) ([]BackupStrategy, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -546,7 +546,7 @@ func ListBackupStrategyByServiceID(serviceID string) ([]BackupStrategy, error) {
 		return strategies, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -558,7 +558,7 @@ func ListBackupStrategyByServiceID(serviceID string) ([]BackupStrategy, error) {
 
 // UpdateBackupStrategyStatus update BackupStrategy Enabled
 func UpdateBackupStrategyStatus(id string, enable bool) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -570,7 +570,7 @@ func UpdateBackupStrategyStatus(id string, enable bool) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -582,7 +582,7 @@ func UpdateBackupStrategyStatus(id string, enable bool) error {
 
 // UpdateNext update BackupStrategy Next\Enabled
 func (bs *BackupStrategy) UpdateNext(next time.Time, enable bool) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -597,7 +597,7 @@ func (bs *BackupStrategy) UpdateNext(next time.Time, enable bool) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -615,7 +615,7 @@ func (bs *BackupStrategy) UpdateNext(next time.Time, enable bool) error {
 
 // DeleteBackupStrategy delete BackupStrategy by ID
 func DeleteBackupStrategy(ID string) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -627,7 +627,7 @@ func DeleteBackupStrategy(ID string) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -675,7 +675,7 @@ func TxInsertBackupStrategyAndTask(strategy BackupStrategy, task Task) error {
 
 // InsertBackupStrategy insert BackupStrategy
 func InsertBackupStrategy(strategy BackupStrategy) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -685,7 +685,7 @@ func InsertBackupStrategy(strategy BackupStrategy) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -697,7 +697,7 @@ func InsertBackupStrategy(strategy BackupStrategy) error {
 
 // UpdateBackupStrategy update BackupStrategy
 func UpdateBackupStrategy(strategy BackupStrategy) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -709,7 +709,7 @@ func UpdateBackupStrategy(strategy BackupStrategy) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -722,7 +722,7 @@ func UpdateBackupStrategy(strategy BackupStrategy) error {
 // BackupTaskValidate valid taskID\strategyID\unitID if all exist,
 // if true,returns the Task
 func BackupTaskValidate(taskID, strategyID, unitID string) (Task, int, error) {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return Task{}, 0, err
 	}
