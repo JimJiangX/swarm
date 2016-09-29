@@ -29,7 +29,7 @@ func (c Cluster) tableName() string {
 
 // InsertCluster insert a new record to tbl_dbaas_cluster.
 func InsertCluster(c Cluster) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -40,7 +40,7 @@ func InsertCluster(c Cluster) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func InsertCluster(c Cluster) error {
 
 // UpdateClusterStatus update tbl_dbaas_cluster.enabled by ID
 func UpdateClusterStatus(c *Cluster, state bool) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -66,7 +66,7 @@ func UpdateClusterStatus(c *Cluster, state bool) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func UpdateClusterStatus(c *Cluster, state bool) error {
 
 // UpdateClusterParams updates MaxNode\UsageLimit
 func UpdateClusterParams(c Cluster) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func UpdateClusterParams(c Cluster) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func UpdateClusterParams(c Cluster) error {
 
 // DeleteCluster delete a record of tbl_dbaas_cluster by nameOrID
 func DeleteCluster(nameOrID string) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func DeleteCluster(nameOrID string) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -133,7 +133,7 @@ func DeleteCluster(nameOrID string) error {
 func GetCluster(nameOrID string) (Cluster, error) {
 	c := Cluster{}
 
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return c, err
 	}
@@ -148,7 +148,7 @@ func GetCluster(nameOrID string) (Cluster, error) {
 		return c, errors.Wrap(err, "not found Cluster:"+nameOrID)
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return c, err
 	}
@@ -160,7 +160,7 @@ func GetCluster(nameOrID string) (Cluster, error) {
 
 // ListClusters select tbl_dbaas_cluster
 func ListClusters() ([]Cluster, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +173,7 @@ func ListClusters() ([]Cluster, error) {
 		return clusters, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +185,7 @@ func ListClusters() ([]Cluster, error) {
 
 // CountClusterByStorage count Clusters by storageID.
 func CountClusterByStorage(storageID string) (int, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return 0, err
 	}
@@ -198,7 +198,7 @@ func CountClusterByStorage(storageID string) (int, error) {
 		return count, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return 0, err
 	}
@@ -265,7 +265,7 @@ func TxInsertMultiNodeAndTask(nodes []*Node, tasks []*Task) error {
 
 // UpdateStatus returns error when Node UPDATE tbl_dbaas_node.status.
 func (n *Node) UpdateStatus(state int64) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -279,7 +279,7 @@ func (n *Node) UpdateStatus(state int64) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -296,7 +296,7 @@ func (n *Node) UpdateStatus(state int64) error {
 
 // UpdateParams returns error when Node update max_container.
 func (n *Node) UpdateParams(max int) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -310,7 +310,7 @@ func (n *Node) UpdateParams(max int) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -387,7 +387,7 @@ func TxUpdateNodeRegister(n *Node, task *Task, nstate, tstate int64, eng, msg st
 
 // GetNode get Node by nameOrID.
 func GetNode(nameOrID string) (Node, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return Node{}, err
 	}
@@ -403,7 +403,7 @@ func GetNode(nameOrID string) (Node, error) {
 		return node, errors.Wrap(err, "not found Node by:"+nameOrID)
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return Node{}, err
 	}
@@ -418,7 +418,7 @@ func GetNode(nameOrID string) (Node, error) {
 
 // GetNodeByAddr returns Node by addr.
 func GetNodeByAddr(addr string) (Node, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return Node{}, err
 	}
@@ -434,7 +434,7 @@ func GetNodeByAddr(addr string) (Node, error) {
 		return node, errors.Wrap(err, "not found Node by addr:"+addr)
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return Node{}, err
 	}
@@ -446,7 +446,7 @@ func GetNodeByAddr(addr string) (Node, error) {
 
 // GetAllNodes returns all nodes.
 func GetAllNodes() ([]Node, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -459,7 +459,7 @@ func GetAllNodes() ([]Node, error) {
 		return nodes, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -471,7 +471,7 @@ func GetAllNodes() ([]Node, error) {
 
 // ListNodeByCluster returns nodes,select by cluster
 func ListNodeByCluster(cluster string) ([]*Node, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -484,7 +484,7 @@ func ListNodeByCluster(cluster string) ([]*Node, error) {
 		return nodes, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -496,7 +496,7 @@ func ListNodeByCluster(cluster string) ([]*Node, error) {
 
 // CountNodeByCluster returns num of node select by cluster.
 func CountNodeByCluster(cluster string) (int, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return 0, err
 	}
@@ -509,7 +509,7 @@ func CountNodeByCluster(cluster string) (int, error) {
 		return num, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return 0, err
 	}
@@ -525,7 +525,7 @@ func ListNodesByEngines(names []string) ([]Node, error) {
 		return []Node{}, nil
 	}
 
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -545,7 +545,7 @@ func ListNodesByEngines(names []string) ([]Node, error) {
 
 // ListNodesByClusters returns nodes,select by clusters\type\enabled.
 func ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, error) {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -586,7 +586,7 @@ func ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, 
 
 // DeleteNode delete node by name or ID
 func DeleteNode(nameOrID string) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -598,7 +598,7 @@ func DeleteNode(nameOrID string) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}

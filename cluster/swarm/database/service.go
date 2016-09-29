@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -93,7 +94,7 @@ func (u Unit) tableName() string {
 func GetUnit(nameOrID string) (Unit, error) {
 	u := Unit{}
 
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return u, err
 	}
@@ -105,7 +106,7 @@ func GetUnit(nameOrID string) (Unit, error) {
 		return u, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return u, err
 	}
@@ -115,8 +116,8 @@ func GetUnit(nameOrID string) (Unit, error) {
 	return u, errors.Wrap(err, "Get Unit By nameOrID")
 }
 
-// TxInsertUnit insert Unit in Tx
-func TxInsertUnit(tx *sqlx.Tx, unit Unit) error {
+// txInsertUnit insert Unit in Tx
+func txInsertUnit(tx *sqlx.Tx, unit Unit) error {
 	_, err := tx.NamedExec(insertUnitQuery, &unit)
 
 	return errors.Wrap(err, "Tx insert Unit")
@@ -147,7 +148,7 @@ func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
 
 // UpdateUnitInfo could update params of unit
 func UpdateUnitInfo(unit Unit) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -159,7 +160,7 @@ func UpdateUnitInfo(unit Unit) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -169,8 +170,8 @@ func UpdateUnitInfo(unit Unit) error {
 	return errors.Wrap(err, "update Unit params")
 }
 
-// TxUpdateUnit upate unit params in tx
-func TxUpdateUnit(tx *sqlx.Tx, unit Unit) error {
+// txUpdateUnit upate unit params in tx
+func txUpdateUnit(tx *sqlx.Tx, unit Unit) error {
 	const query = "UPDATE tbl_dbaas_unit SET node_id=:node_id,container_id=:container_id,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
 
 	_, err := tx.NamedExec(query, unit)
@@ -187,7 +188,7 @@ func (u *Unit) StatusCAS(operator string, old, value int64) error {
 
 	query := fmt.Sprintf("UPDATE tbl_dbaas_unit SET status=? WHERE id=? AND status%s?", operator)
 
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return err
 	}
@@ -300,7 +301,7 @@ func TxDeleteUnit(tx *sqlx.Tx, nameOrID string) error {
 
 // ListUnitByServiceID returns []Unit select by ServiceID
 func ListUnitByServiceID(id string) ([]Unit, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +314,7 @@ func ListUnitByServiceID(id string) ([]Unit, error) {
 		return out, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +326,7 @@ func ListUnitByServiceID(id string) ([]Unit, error) {
 
 // CountUnitByNode returns len of []Unit select Unit by EngineID
 func CountUnitByNode(id string) (int, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return 0, err
 	}
@@ -338,7 +339,7 @@ func CountUnitByNode(id string) (int, error) {
 		return count, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return 0, err
 	}
@@ -354,7 +355,7 @@ func CountUnitsInNodes(engines []string) (int, error) {
 		return 0, nil
 	}
 
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return 0, err
 	}
@@ -430,7 +431,7 @@ func (svc Service) tableName() string {
 
 // ListServices returns all []Service
 func ListServices() ([]Service, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -443,7 +444,7 @@ func ListServices() ([]Service, error) {
 		return out, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -455,7 +456,7 @@ func ListServices() ([]Service, error) {
 
 // GetService returns Service select by ID or Name
 func GetService(nameOrID string) (Service, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return Service{}, err
 	}
@@ -468,7 +469,7 @@ func GetService(nameOrID string) (Service, error) {
 		return s, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return Service{}, err
 	}
@@ -513,7 +514,7 @@ func TxGetServiceByUnit(unit string) (Service, error) {
 
 // UpdateServcieDesc update Service Description
 func UpdateServcieDesc(id, desc string) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -525,7 +526,7 @@ func UpdateServcieDesc(id, desc string) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -582,7 +583,7 @@ func txInsertSerivce(tx *sqlx.Tx, svc Service) error {
 
 // SetServiceStatus update Service Status
 func (svc *Service) SetServiceStatus(state int64, finish time.Time) error {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return err
 	}
@@ -680,7 +681,7 @@ func (u User) tableName() string {
 
 // ListUsersByService returns []User select by serviceID and User type if assigned
 func ListUsersByService(service, _type string) ([]User, error) {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -990,4 +991,55 @@ func DeteleServiceRelation(serviceID string, rmVolumes bool) error {
 	err = tx.Commit()
 
 	return errors.Wrap(err, "Detele Service relation")
+}
+
+// TxInsertUnitWithPorts insert Unit and update []Port in a Tx
+func TxInsertUnitWithPorts(u *Unit, ports []Port) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if u != nil {
+		err = txInsertUnit(tx, *u)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = TxUpdatePorts(tx, ports)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Tx insert Unit and []Port")
+}
+
+// TxUpdateMigrateUnit update Unit and delete old LocalVolumes in a Tx
+func TxUpdateMigrateUnit(u Unit, lvs []LocalVolume, reserveSAN bool) error {
+	// update database :tb_unit
+	// delete old localVolumes
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for i := range lvs {
+		if reserveSAN && strings.HasSuffix(lvs[i].VGName, "_SAN_VG") {
+			continue
+		}
+		TxDeleteVolume(tx, lvs[i].ID)
+	}
+	err = txUpdateUnit(tx, u)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Tx update unit & delete volumes")
 }

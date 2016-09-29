@@ -19,10 +19,11 @@ import (
 
 var (
 	leaderElectionPath = "docker/swarm/leader"
-	HostAddress        = "127.0.0.1"
+	hostAddress        = "127.0.0.1"
 	httpPort           = "4000"
-	DockerNodesKVPath  = "docker/swarm/nodes"
-	DatacenterID       = 0
+	dockerNodesKVPath  = "docker/swarm/nodes"
+	// DatacenterID is Gardener registered ID
+	DatacenterID = 0
 )
 
 func init() {
@@ -32,11 +33,12 @@ func init() {
 	})
 }
 
-// called in mainage.go L143
+// UpdateleaderElectionPath set leaderElectionPath,called in mainage.go L143
 func UpdateleaderElectionPath(path string) {
 	leaderElectionPath = path
 }
 
+// Gardener is exported
 type Gardener struct {
 	*Cluster
 
@@ -55,7 +57,7 @@ type Gardener struct {
 func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, error) {
 	logrus.WithFields(logrus.Fields{"name": "swarm"}).Debug("Initializing Gardener")
 
-	DockerNodesKVPath = parseKVuri(uri)
+	dockerNodesKVPath = parseKVuri(uri)
 
 	cluster, ok := cli.(*Cluster)
 	if !ok {
@@ -83,7 +85,7 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 				return nil, err
 			}
 
-			HostAddress = ip
+			hostAddress = ip
 			httpPort = port
 			break
 		}
@@ -123,11 +125,11 @@ func (gd *Gardener) syncNodeWithEngine() {
 
 		nodeTab, err := database.GetNode(engine.ID)
 		if err != nil {
-			logrus.Warnf("sync Node With Engine %s:%s", engine.Addr, err)
+			logrus.WithField("Engine", engine.Addr).WithError(err).Warn("sync Node with Engine")
 
 			nodeTab, err = database.GetNodeByAddr(engine.Addr)
 			if err != nil {
-				logrus.Warn(err)
+				logrus.WithField("Engine", engine.Addr).Warn(err)
 				continue
 			}
 			if nodeTab.Status < statusNodeEnable {
@@ -149,7 +151,7 @@ func (gd *Gardener) syncNodeWithEngine() {
 		if dc == nil {
 			dc, err = gd.Datacenter(nodeTab.ClusterID)
 			if err != nil {
-				logrus.WithError(err).Warnf("sync Node With Engine:%s", engine.Addr)
+				logrus.WithField("Engine", engine.Addr).Warn(err)
 			}
 			continue
 		}
@@ -236,7 +238,8 @@ func (gd *Gardener) setParams(sys *database.Configurations) error {
 	return nil
 }
 
-func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
+// Register set Gardener,returns a error if has registered in database
+func (gd *Gardener) Register(req structs.RegisterGardener) error {
 	sys, err := database.GetSystemConfig()
 	if err == nil {
 		return errors.Errorf("DC has registered,dc=%d", sys.ID)
@@ -302,12 +305,12 @@ func RegisterDatacenter(gd *Gardener, req structs.RegisterDatacenter) error {
 		logrus.Warnf("%+v", err)
 	}
 
-	err = nfsSetting(config.NFSOption)
-	if err != nil {
-		logrus.Errorf("%+v", err)
+	//	err = nfsSetting(config.NFSOption)
+	//	if err != nil {
+	//		logrus.Errorf("%+v", err)
 
-		return err
-	}
+	//		return err
+	//	}
 
 	_, err = config.Insert()
 	if err != nil {
@@ -350,11 +353,12 @@ func nfsSetting(option database.NFSOption) error {
 	if option.Addr == "" || option.Dir == "" || option.MountDir == "" {
 		logrus.Warnf("NFS option:%v", option)
 	}
+
 	_, err := os.Stat(option.MountDir)
 	if os.IsNotExist(err) {
 		err := os.MkdirAll(option.MountDir, os.ModePerm)
 		if err != nil {
-			return errors.Wrap(err, "MountDir isnot exist,MkdirAll")
+			return errors.Wrap(err, "MountDir is required,MkdirAll")
 		}
 	}
 

@@ -1,7 +1,7 @@
 package swarm
 
 import (
-	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +16,7 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/utils"
 	"github.com/pkg/errors"
+	"github.com/tatsushid/go-fastping"
 	"golang.org/x/net/context"
 )
 
@@ -41,7 +42,7 @@ func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs
 		}
 	}
 
-	logrus.Debugf("filters num:%d,candidate nodes num:%d", len(exclude), len(nodes))
+	entry.Debugf("filters num:%d,candidate nodes num:%d", len(exclude), len(nodes))
 
 	candidates, err := gd.dispatch(config, num, nodes, false, false)
 	if err != nil {
@@ -50,8 +51,8 @@ func (gd *Gardener) selectEngine(config *cluster.ContainerConfig, module structs
 
 	engine, ok := gd.engines[candidates[0].ID]
 	if !ok {
-		err = fmt.Errorf("Not Found Engine %s", candidates[0].ID)
-		logrus.Error(err)
+		err = errors.New("not found Engine:" + candidates[0].ID)
+		entry.Error(err)
 		return nil, err
 	}
 
@@ -103,7 +104,7 @@ func resetContainerConfig(config *cluster.ContainerConfig, hostConfig *ctypes.Ho
 		// reset CpusetCpus
 		ncpu, err := utils.GetCPUNum(config.HostConfig.CpusetCpus)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "get CPU num")
 		}
 		clone.HostConfig.CpusetCpus = strconv.FormatInt(ncpu, 10)
 	}
@@ -113,10 +114,12 @@ func resetContainerConfig(config *cluster.ContainerConfig, hostConfig *ctypes.Ho
 	return clone, nil
 }
 
+// UnitMigrate migrate the assigned unit to another host
 func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
+
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {
-		return "", fmt.Errorf("Not Found Unit %s,error:%s", nameOrID, err)
+		return "", err
 	}
 
 	svc, err := gd.GetService(table.ServiceID)
@@ -127,25 +130,27 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 	svc.RLock()
 
 	migrate, err := svc.getUnit(table.ID)
-	if migrate == nil || err != nil {
+	if err != nil {
 		svc.RUnlock()
 
-		logrus.Warn(err)
 		svc, err = gd.rebuildService(table.ServiceID)
 		if err != nil {
 			return "", err
 		}
 
 		svc.RLock()
-
 		migrate, err = svc.getUnit(table.ID)
-		if migrate == nil || err != nil {
-			logrus.Error(err)
+		if err != nil {
 			svc.RUnlock()
 
 			return "", err
 		}
 	}
+
+	entry := logrus.WithFields(logrus.Fields{
+		"Service": svc.Name,
+		"Migrate": migrate.Name,
+	})
 
 	oldContainer := migrate.container
 
@@ -183,7 +188,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 	if err != nil {
 		return "", err
 	}
-	logrus.Debugf("listCandidates:%d", len(out))
+	entry.Debugf("list Candidates:%d", len(out))
 
 	config, err := resetContainerConfig(migrate.container.Config, hostConfig)
 	if err != nil {
@@ -214,11 +219,11 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 			gd.scheduler.Unlock()
 			if err != nil {
-				logrus.Error(err)
+				entry.Errorf("Unit migrate failed,%+v", err)
 				// error handle
 				_err := gd.resourceRecycle([]*pendingAllocResource{pending})
 				if _err != nil {
-					logrus.Error("Recycle ", _err)
+					entry.Errorf("Recycle,%+v", _err)
 				}
 			}
 
@@ -232,7 +237,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		cpuset, err := gd.allocCPUs(engine, config.HostConfig.CpusetCpus)
 		if err != nil {
-			logrus.Errorf("Alloc CPU '%s' Error:%s", config.HostConfig.CpusetCpus, err)
+			entry.Errorf("alloc CPU '%s' error:%s", config.HostConfig.CpusetCpus, err)
 			return err
 		}
 		config.HostConfig.CpusetCpus = cpuset
@@ -240,7 +245,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		if migrate.Type != _SwitchManagerType {
 			err := svc.isolate(migrate.Name)
 			if err != nil {
-				logrus.Errorf("isolate container %s error:%s", migrate.Name, err)
+				entry.Errorf("isolate container error:%+v", err)
 			}
 		}
 
@@ -265,13 +270,13 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			if err != nil {
 				_, err := migrateVolumes(dc.store, original.ID, original.engine, oldLVs, oldLVs, lunMap, lunSlice)
 				if err != nil {
-					logrus.Error(err)
+					entry.Errorf("migrate volumes,%+v", err)
 					//	return err
 				}
 				return
 			}
 
-			logrus.Debug("recycle old container volumes resource")
+			entry.Debug("recycle old container volumes resource")
 
 			// clean local volumes
 			for i := range oldLVs {
@@ -280,7 +285,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 				}
 				_err := original.localStore.Recycle(oldLVs[i].ID)
 				if err != nil {
-					logrus.Error(_err)
+					entry.Errorf("recycle local volume,%+v", _err)
 				}
 			}
 		}()
@@ -303,13 +308,8 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		gd.pendingContainers[swarmID] = pending.pendingContainer
 
-		logrus.Debugf("[MG]start pull image %s", config.Image)
-
 		dc, node, err := gd.getNode(engine.ID)
 		if err != nil {
-			err := fmt.Errorf("Not Found Node %s,Error:%s", engine.Name, err)
-			logrus.Error(err)
-
 			return err
 		}
 
@@ -321,7 +321,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		if svc.authConfig == nil {
 			svc.authConfig, err = gd.registryAuthConfig()
 			if err != nil {
-				return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
+				return err
 			}
 		}
 		container, err := engine.CreateContainer(config, swarmID, true, svc.authConfig)
@@ -335,16 +335,17 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			if err == nil {
 				return
 			}
-			logrus.Debugf("clean new container %s", c.ID)
 
 			_err := cleanOldContainer(c, lvs)
 			if _err != nil {
-				logrus.Error(_err)
+				entry.Errorf("clean container %s,%+v", c.Info.Name, _err)
 			}
+
 			err = removeNetworkings(addr, networkings)
 			if err != nil {
-				logrus.Errorf("container %s remove Networkings error:%s", migrate.Name, err)
+				entry.Errorf("container %s remove Networkings:%+v", migrate.Name, err)
 			}
+
 		}(container, engine.IP, networkings, pending.localStore)
 
 		err = startUnit(engine, container.ID, migrate, networkings, lvs)
@@ -356,15 +357,13 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		err = engine.RenameContainer(container, migrate.Name)
 		if err != nil {
-			logrus.Error(err)
-
-			return err
+			return errors.Wrap(err, "rename container")
 		}
 
 		logrus.WithFields(logrus.Fields{
 			"Engine":    engine.Addr,
 			"Container": container.ID,
-			"NewName":   container.Names,
+			"NewName":   migrate.Name,
 		}).Debug("Rename Container")
 
 		migrate.container = container
@@ -377,14 +376,12 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		err = updateUnit(migrate.Unit, oldLVs, false)
 		if err != nil {
-			logrus.Errorf("updateUnit in database error:%s", err)
-
 			return err
 		}
 
 		err = saveContainerToConsul(container)
 		if err != nil {
-			logrus.Errorf("Save Container To Consul error:%s", err)
+			logrus.Errorf("Save Container To Consul error:%+v", err)
 			// return err
 		}
 
@@ -396,24 +393,17 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		sys, err := gd.systemConfig()
 		if err != nil {
-			logrus.WithError(err).Error("Get System Config")
+			logrus.WithError(err).Error("get System Config")
 		}
 
 		err = deregisterToServices(oldEngineIP, migrate.ID)
-		if err != nil {
-			logrus.Error(err)
-		}
-
 		err = registerToServers(migrate, svc, sys)
-		if err != nil {
-			logrus.Errorf("registerToServers error:%s", err)
-		}
 
 		if migrate.Type != _SwitchManagerType {
 			// switchback unit
 			err = svc.switchBack(migrate.Name)
 			if err != nil {
-				logrus.Errorf("switchBack error:%s", err)
+				entry.Errorf("switchBack error:%+v", err)
 			}
 		}
 
@@ -459,43 +449,46 @@ func startUnit(engine *cluster.Engine, containerID string,
 
 	logrus.Debug("init & Start Service")
 	err = initUnitService(containerID, engine, u.InitServiceCmd())
-	if err != nil {
-		logrus.Error(err)
-	}
 
 	return err
 }
 
 func stopOldContainer(svc *Service, u *unit) error {
+	ok, _ := fastPing(u.engine.IP, 5, true)
+	if ok {
+		err := removeNetworkings(u.engine.IP, u.networkings)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"Unit":   u.Name,
+				"Engine": u.engine.Addr,
+			}).WithError(err).Error("remove Networkings")
+
+			return err
+		}
+	}
+
 	err := u.forceStopService()
 	if err != nil {
-		logrus.Errorf("container %s stop service error:%s", u.Name, err)
-
-		err1 := checkContainerError(err)
-		if err.Error() != "EOF" && err1 != errContainerNotFound || err1 != errContainerNotRunning {
+		_err := checkContainerError(err)
+		if _err.Error() != "EOF" && _err != errContainerNotFound || _err != errContainerNotRunning {
 			return err
 		}
 	}
 
 	if err = u.forceStopContainer(0); err != nil {
-		logrus.Errorf("%s stop container error:%s", u.Name, err)
-		err1 := checkContainerError(err)
-		if err1 != errContainerNotRunning && err1 != errContainerNotFound {
+		_err := checkContainerError(err)
+		if _err != errContainerNotRunning && _err != errContainerNotFound {
 			return err
 		}
 	}
 
-	err = removeNetworkings(u.engine.IP, u.networkings)
-	if err != nil {
-		logrus.Errorf("container %s remove Networkings error:%s", u.Name, err)
-	}
 	return err
 }
 
 func sanDeactivateAndDelMapping(storage storage.Store, host string,
 	lunMap map[string][]database.LUN, lunSlice []database.LUN) error {
 	if storage == nil {
-		return fmt.Errorf("Store is nil")
+		return errors.New("Store is required")
 	}
 
 	for vg, list := range lunMap {
@@ -538,16 +531,20 @@ func listOldVolumes(unit string) ([]database.LocalVolume, map[string][]database.
 
 	lunMap := make(map[string][]database.LUN, len(lvs))
 	lunSlice := make([]database.LUN, 0, len(lvs))
+
 	for i := range lvs {
+
 		vg := lvs[i].VGName
 		if val, ok := lunMap[vg]; ok && len(val) > 0 {
 			continue
 		}
+
 		if isSanVG(vg) {
 			out, err := database.ListLUNByVgName(vg)
 			if err != nil {
 				return nil, nil, nil, err
 			}
+
 			if len(out) > 0 {
 				lunMap[vg] = out
 				lunSlice = append(lunSlice, out...)
@@ -568,7 +565,7 @@ func migrateVolumes(storage storage.Store, nodeID string,
 
 	// Mapping LVs
 	if len(lunSlice) > 0 && storage == nil {
-		return nil, fmt.Errorf("Store is nil")
+		return nil, errors.New("Store is required")
 	}
 
 	for i := range lunSlice {
@@ -657,58 +654,48 @@ func cleanOldContainer(old *cluster.Container, lvs []database.LocalVolume) error
 		return errEngineIsNil
 	}
 
-	logrus.Debugf("Engine %s remove container %s", engine.Addr, old.ID)
-
 	// remove old container
 	err := engine.RemoveContainer(old, true, true)
 	engine.CheckConnectionErr(err)
 	if err != nil {
-		logrus.Errorf("engine %s remove container %s error:%s", engine.Addr, old.Info.Name, err)
+		logrus.WithFields(logrus.Fields{
+			"Engine":    engine.Addr,
+			"Container": old.Info.Name,
+		}).WithError(err).Error("remove container")
 	}
 
 	// remove old LocalVolume
 	for i := range lvs {
 		err := engine.RemoveVolume(lvs[i].Name)
 		if err != nil {
-			logrus.Errorf("%s remove old volume %s", old.Info.Name, lvs[i].Name)
+			logrus.WithFields(logrus.Fields{
+				"Engine":    engine.Addr,
+				"Container": old.Info.Name,
+				"Volume":    lvs[i].Name,
+			}).WithError(err).Error("remove Volume")
+
 			return err
 		}
-		logrus.Debugf("Engine %s remove volume %s", engine.Addr, lvs[i].Name)
+
+		logrus.WithFields(logrus.Fields{
+			"Engine":    engine.Addr,
+			"Container": old.Info.Name,
+			"Volume":    lvs[i].Name,
+		}).Info("remove Volume")
 	}
 
 	return nil
 }
 
 func updateUnit(unit database.Unit, lvs []database.LocalVolume, reserveSAN bool) error {
-	// update database :tb_unit
-	// delete old localVolumes
-	tx, err := database.GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	for i := range lvs {
-		if reserveSAN && isSanVG(lvs[i].VGName) {
-			continue
-		}
-		err := database.TxDeleteVolume(tx, lvs[i].ID)
-		if err != nil {
-			logrus.Error(err)
-		}
-	}
-	err = database.TxUpdateUnit(tx, unit)
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	return database.TxUpdateMigrateUnit(unit, lvs, reserveSAN)
 }
 
+// UnitRebuild rebuild the unit in another host
 func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {
-		return "", fmt.Errorf("Not Found Unit %s,error:%s", nameOrID, err)
+		return "", err
 	}
 
 	svc, err := gd.GetService(table.ServiceID)
@@ -719,10 +706,9 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 	svc.RLock()
 
 	rebuild, err := svc.getUnit(table.ID)
-	if rebuild == nil || err != nil {
+	if err != nil {
 		svc.RUnlock()
 
-		logrus.Warn(err)
 		svc, err = gd.rebuildService(table.ServiceID)
 		if err != nil {
 			return "", err
@@ -731,13 +717,17 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		svc.RLock()
 
 		rebuild, err = svc.getUnit(table.ID)
-		if rebuild == nil || err != nil {
-			logrus.Error(err)
+		if err != nil {
 			svc.RUnlock()
 
 			return "", err
 		}
 	}
+
+	entry := logrus.WithFields(logrus.Fields{
+		"Service": svc.Name,
+		"Rebuild": rebuild.Name,
+	})
 
 	oldContainer := rebuild.container
 
@@ -765,7 +755,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 	if err != nil {
 		return "", err
 	}
-	logrus.Debugf("listCandidates:%d", len(out))
+	entry.Debugf("list Candidates:%d", len(out))
 
 	config, err := resetContainerConfig(rebuild.container.Config, hostConfig)
 	if err != nil {
@@ -797,11 +787,11 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 			gd.scheduler.Unlock()
 			if err != nil {
-				logrus.Error(err)
+				entry.Errorf("Unit rebuild failed,%+v", err)
 				// error handle
 				_err := gd.resourceRecycle([]*pendingAllocResource{pending})
 				if _err != nil {
-					logrus.Error("Recycle ", _err)
+					entry.Errorf("Recycle,%+v", _err)
 				}
 			}
 
@@ -815,7 +805,6 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 		cpuset, err := gd.allocCPUs(engine, config.HostConfig.CpusetCpus)
 		if err != nil {
-			logrus.Errorf("Alloc CPU '%s' Error:%s", config.HostConfig.CpusetCpus, err)
 			return err
 		}
 		config.HostConfig.CpusetCpus = cpuset
@@ -835,16 +824,16 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 				// TODO:fix host
 				_err := sanDeactivateAndDelMapping(dc.store, original.engine.IP, lunMap, lunSlice)
 				if _err != nil {
-					logrus.Error(_err)
+					entry.Errorf("san Deactivate and delete Mapping,%+v", _err)
 				}
 			}
 
-			logrus.Debug("recycle old container volumes resource")
+			entry.Debug("recycle old container volumes resource")
 			// recycle lun
 			for i := range lunSlice {
 				_err := dc.store.Recycle(lunSlice[i].ID, 0)
 				if _err != nil {
-					logrus.Error(_err)
+					entry.Errorf("Store recycle,%+v", _err)
 				}
 			}
 
@@ -855,14 +844,14 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 				}
 				_err := original.localStore.Recycle(oldLVs[i].ID)
 				if err != nil {
-					logrus.Error(_err)
+					entry.Errorf("local Store recycle,%+v", _err)
 				}
 			}
 
 			// clean database
 			_err := database.TxDeleteVolumes(oldLVs)
 			if _err != nil {
-				logrus.Error(_err)
+				entry.Errorf("%+v", _err)
 			}
 		}()
 
@@ -886,18 +875,18 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 		err = createServiceResources(gd, []*pendingAllocResource{pending})
 		if err != nil {
-			logrus.Errorf("create Service Resources error:%s", err)
 			return err
 		}
 
 		if svc.authConfig == nil {
 			svc.authConfig, err = gd.registryAuthConfig()
 			if err != nil {
-				return fmt.Errorf("get RegistryAuthConfig Error:%s", err)
+				return err
 			}
 		}
 
-		logrus.Debugf("Engine %s create container %s", engine.Addr, swarmID)
+		entry.WithField("Engine", engine.Addr).Debug("create container")
+
 		container, err := engine.CreateContainer(config, swarmID, true, svc.authConfig)
 		delete(gd.pendingContainers, swarmID)
 
@@ -911,42 +900,39 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			if err == nil {
 				return
 			}
-			logrus.Debugf("clean new container %s", c.ID)
+			entry.Debugf("clean created container %s", c.ID)
 
 			_err := cleanOldContainer(c, lvs)
 			if _err != nil {
-				logrus.Error(_err)
+				entry.Errorf("clean old container,%+v", _err)
 			}
-			err = removeNetworkings(addr, networkings)
-			if err != nil {
-				logrus.Errorf("container %s remove Networkings error:%s", rebuild.Name, err)
+			_err = removeNetworkings(addr, networkings)
+			if _err != nil {
+				entry.Errorf("remove Networkings error:%+v", _err)
 			}
 
 		}(container, engine.IP, networkings, pending.localStore)
+
+		if rebuild.Type != _SwitchManagerType {
+			err := svc.isolate(rebuild.Name)
+			if err != nil {
+				entry.Errorf("isolate container:%+v", err)
+			}
+		}
+
+		err = stopOldContainer(svc, rebuild)
+		if err != nil {
+			return err
+		}
 
 		err = startUnit(engine, container.ID, rebuild, networkings, pending.localStore)
 		if err != nil {
 			return err
 		}
 
-		if rebuild.Type != _SwitchManagerType {
-			err := svc.isolate(rebuild.Name)
-			if err != nil {
-				logrus.Errorf("isolate container %s error:%s", rebuild.Name, err)
-			}
-		}
-
-		err = stopOldContainer(svc, rebuild)
-		if err != nil {
-			logrus.Error(err)
-			// return err
-		}
-
 		err = engine.RenameContainer(container, rebuild.Name)
 		if err != nil {
-			logrus.Error(err)
-
-			return err
+			return errors.Wrap(err, "rename container")
 		}
 
 		rebuild.container = container
@@ -959,42 +945,41 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 		err = updateUnit(rebuild.Unit, oldLVs, true)
 		if err != nil {
-			logrus.Errorf("updateUnit in database error:%s", err)
 			return err
 		}
 
 		err = saveContainerToConsul(container)
 		if err != nil {
-			logrus.Errorf("Save Container To Consul error:%s", err)
+			entry.Errorf("save container to Consul:%+v", err)
 			// return err
 		}
 
 		oldEngineIP := oldContainer.Engine.IP
 		err = cleanOldContainer(oldContainer, oldLVs)
 		if err != nil {
-			logrus.Error(err)
+			entry.Errorf("clean old container,%+v", err)
 		}
 
 		sys, err := gd.systemConfig()
 		if err != nil {
-			logrus.WithError(err).Error("Get System Config")
+			entry.WithError(err).Error("get System Config")
 		}
 
 		err = deregisterToServices(oldEngineIP, rebuild.ID)
 		if err != nil {
-			logrus.Error(err)
+			entry.Errorf("deregister service,%+v", err)
 		}
 
 		err = registerToServers(rebuild, svc, sys)
 		if err != nil {
-			logrus.Errorf("registerToServers error:%s", err)
+			entry.Errorf("register service:%+v", err)
 		}
 
 		if rebuild.Type != _SwitchManagerType {
 			// switchback unit
 			err = svc.switchBack(rebuild.Name)
 			if err != nil {
-				logrus.Errorf("switchBack error:%s", err)
+				entry.Errorf("switchBack error:%+v", err)
 			}
 		}
 
@@ -1024,48 +1009,109 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 	return task.ID, t.Run()
 }
 
+// register service to consul and Horus
 func registerToServers(u *unit, svc *Service, sys database.Configurations) error {
-	logrus.Debug("[MG]register Services")
 	if err := registerHealthCheck(u, svc); err != nil {
-		logrus.Error(err)
+		logrus.WithField("Unit", u.Name).Errorf("register service health check,%+v", err)
 	}
 
-	logrus.Debug("[MG]register To Horus")
 	obj, err := u.registerHorus(sys.MonitorUsername, sys.MonitorPassword, sys.HorusAgentPort)
 	if err != nil {
-		err = fmt.Errorf("container %s register Horus Error:%s", u.Name, err)
-		logrus.Error(err)
-
 		return err
 	}
 
 	err = registerToHorus(obj)
 	if err != nil {
-		logrus.Errorf("register To Horus error:%s", err)
+		logrus.WithField("Unit", u.Name).Errorf("register To Horus error:%+v", err)
 	}
 
 	return err
 }
 
+// deregister service to consul and Horus
 func deregisterToServices(addr, unitID string) error {
-	logrus.Debugf("deregister HealthCheck %s", unitID)
-
 	err := deregisterHealthCheck(addr, unitID)
 	if err != nil {
-		logrus.Error(err)
+		logrus.WithField("Unit", unitID).Errorf("deregister service to consul,%+v", err)
 	}
-
-	logrus.Debugf("deregister Horus %s", unitID)
 
 	err = deregisterToHorus(false, unitID)
 	if err != nil {
-		logrus.WithField("Endpoints", unitID).Errorf("Deregister To Horus:%s", err)
+		logrus.WithField("Endpoints", unitID).Errorf("deregister To Horus:%s", err)
 
 		err = deregisterToHorus(true, unitID)
 		if err != nil {
-			logrus.WithField("Endpoints", unitID).Errorf("Deregister To Horus,force=true,%s", err)
+			logrus.WithField("Endpoints", unitID).Errorf("deregister To Horus,force=true,%s", err)
 		}
 	}
 
 	return err
+}
+
+// fastPing sends an ICMP packet and wait a response,
+// when udp is true,use non-privileged datagram-oriented UDP as ICMP endpoints
+func fastPing(hostname string, count int, udp bool) (bool, error) {
+	type response struct {
+		addr *net.IPAddr
+		rtt  time.Duration
+	}
+
+	p := fastping.NewPinger()
+	if udp {
+		p.Network("udp")
+	}
+
+	netProto := "ip4:icmp"
+	if strings.Index(hostname, ":") != -1 {
+		netProto = "ip6:ipv6-icmp"
+	}
+	ra, err := net.ResolveIPAddr(netProto, hostname)
+	if err != nil {
+		return false, err
+	}
+
+	results := make(map[string]*response)
+	results[ra.String()] = nil
+	p.AddIPAddr(ra)
+
+	onRecv, onIdle := make(chan *response), make(chan bool)
+	p.OnRecv = func(addr *net.IPAddr, t time.Duration) {
+		onRecv <- &response{addr: addr, rtt: t}
+	}
+	p.OnIdle = func() {
+		onIdle <- true
+	}
+
+	p.MaxRTT = time.Millisecond * 200
+	p.RunLoop()
+	defer p.Stop()
+
+	for i, reach := 0, 0; i < count; i++ {
+		select {
+		case res := <-onRecv:
+			if _, ok := results[res.addr.String()]; ok {
+				results[res.addr.String()] = res
+			}
+
+			if res.addr.String() == hostname {
+				reach++
+			}
+			if reach > count/2 {
+				return true, nil
+			}
+		case <-onIdle:
+			for host, r := range results {
+				if r == nil {
+					logrus.Warn("%s : unreachable %v\n", host, time.Now())
+				}
+				results[host] = nil
+			}
+		case <-p.Done():
+			if err = p.Err(); err != nil {
+				return false, err
+			}
+		}
+	}
+
+	return false, errors.New(hostname + ":unreachable")
 }

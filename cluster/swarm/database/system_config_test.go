@@ -3,7 +3,7 @@ package database
 import "testing"
 
 func deleteSystemConfig(id int64) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}

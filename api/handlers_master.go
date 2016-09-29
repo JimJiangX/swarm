@@ -1434,7 +1434,7 @@ func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 // POST /datacenter
 func postDatacenter(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	req := structs.RegisterDatacenter{}
+	req := structs.RegisterGardener{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		httpError2(w, err, http.StatusBadRequest)
@@ -1446,7 +1446,7 @@ func postDatacenter(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = swarm.RegisterDatacenter(gd, req)
+	err = gd.Register(req)
 	if err != nil {
 		httpError2(w, err, http.StatusInternalServerError)
 		return
@@ -1468,7 +1468,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := swarm.ValidDatacenter(req); err != nil {
+	if err := swarm.ValidCreateDC(req); err != nil {
 		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
@@ -1609,7 +1609,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	response := make([]structs.PostNodeResponse, len(list))
 
 	for i, l := range list {
-		nodes[i] = swarm.NewNode(l.Address, l.Name, dc.ID,
+		nodes[i] = swarm.NewNodeWitTask(l.Address, l.Name, dc.ID,
 			l.Username, l.Password, l.Room, l.Seat, l.HDD, l.SSD,
 			l.Port, l.MaxContainer)
 
@@ -1713,7 +1713,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := swarm.ValidService(req); err != nil {
+	if err := swarm.ValidCreateService(req); err != nil {
 		httpError2(w, err, http.StatusConflict)
 		return
 	}
@@ -2228,7 +2228,7 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := swarm.ValidateIPAddress(req.Prefix, req.Start, req.End, req.Gateway)
+	err := swarm.ValidIPAddress(req.Prefix, req.Start, req.End, req.Gateway)
 	if err != nil {
 		httpError2(w, err, http.StatusBadRequest)
 		return
@@ -2673,10 +2673,10 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // DELETE /clusters/nodes/{node:.*}
 //
 // 204 删除成功
-// 400 request header读取失败
+// 400 request header 读取失败
 // 412 因未满足条件（主机还有未删除的容器）取消出库操作
 // 500 数据库读写错误
-// 503 向Horus 注销主机失败
+// 503 向 Horus 注销主机失败
 // 510 SSH 出库脚本执行失败
 func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {

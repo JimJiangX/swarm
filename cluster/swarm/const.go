@@ -38,6 +38,7 @@ const (
 	statusNodeDeregisted
 )
 
+// ParseNodeStatus returns the meaning of the number corresponding
 func ParseNodeStatus(status int64) string {
 	switch status {
 	case statusNodeImport:

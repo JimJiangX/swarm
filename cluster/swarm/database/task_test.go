@@ -102,7 +102,7 @@ func TestTxInsertMultiTask(t *testing.T) {
 }
 
 func deleteBackupFile(ID string) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}

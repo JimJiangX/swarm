@@ -100,7 +100,7 @@ func TestUnit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = TxInsertUnit(tx, unit1)
+	err = txInsertUnit(tx, unit1)
 	if err != nil {
 		t.Fatal(err)
 	}

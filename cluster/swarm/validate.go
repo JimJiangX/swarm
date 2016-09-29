@@ -14,8 +14,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func validateContainerConfig(config *cluster.ContainerConfig) error {
-	// validate config
+func validContainerConfig(config *cluster.ContainerConfig) error {
 	buf := bytes.NewBuffer(nil)
 
 	swarmID := config.SwarmID()
@@ -49,7 +48,7 @@ func validateContainerConfig(config *cluster.ContainerConfig) error {
 	return errors.New(buf.String())
 }
 
-func validateContainerUpdateConfig(config container.UpdateConfig) error {
+func validContainerUpdateConfig(config container.UpdateConfig) error {
 	buf := bytes.NewBuffer(nil)
 
 	if config.Resources.CPUShares != 0 {
@@ -73,11 +72,12 @@ func validateContainerUpdateConfig(config container.UpdateConfig) error {
 	return errors.New(buf.String())
 }
 
-func ValidDatacenter(req structs.PostClusterRequest) error {
+// ValidCreateDC valid PostClusterRequest for create Datacenter
+func ValidCreateDC(req structs.PostClusterRequest) error {
 	buf := bytes.NewBuffer(nil)
 
 	if req.Name == "" {
-		buf.WriteString("'name' is null\n")
+		buf.WriteString("Cluster name is required\n")
 	}
 
 	if !isStringExist(req.StorageType, supportedStoreTypes) {
@@ -95,11 +95,12 @@ func ValidDatacenter(req structs.PostClusterRequest) error {
 	return errors.New(buf.String())
 }
 
-func ValidService(req structs.PostServiceRequest) error {
+// ValidCreateService valid PostServiceRequest for create Service
+func ValidCreateService(req structs.PostServiceRequest) error {
 	buf := bytes.NewBuffer(nil)
 
 	if req.Name == "" {
-		buf.WriteString("Service name should not be null\n")
+		buf.WriteString("Service name is required\n")
 	}
 
 	_, err := database.GetService(req.Name)
@@ -114,6 +115,7 @@ func ValidService(req structs.PostServiceRequest) error {
 	}
 
 	for _, module := range req.Modules {
+
 		if _, _, err := initialize(module.Name, module.Version); err != nil {
 			buf.WriteString(err.Error())
 			buf.WriteByte('\n')
@@ -123,22 +125,25 @@ func ValidService(req structs.PostServiceRequest) error {
 		//	buf.WriteString("Unsupported " + module.Type)
 		//}
 		if module.Config.Image == "" {
+
 			image, err := database.GetImage(module.Name, module.Version)
 			if err != nil {
 				buf.WriteString("not found Image:" + err.Error() + "\n")
-			}
-			if !image.Enabled {
+			} else if !image.Enabled {
 				buf.WriteString(fmt.Sprintf("Image '%s:%s' disabled\n", module.Name, module.Version))
 			}
+
 		} else {
+
 			image, err := database.GetImageByID(module.Config.Image)
 			if err != nil {
 				buf.WriteString("not found Image:" + err.Error() + "\n")
-			}
-			if !image.Enabled {
+			} else if !image.Enabled {
 				buf.WriteString("Image:'" + module.Config.Image + "' disabled\n")
 			}
+
 		}
+
 		_, num, err := parseServiceArch(module.Arch)
 		if err != nil {
 			buf.WriteString(err.Error())
@@ -157,7 +162,7 @@ func ValidService(req structs.PostServiceRequest) error {
 		}
 
 		config := cluster.BuildContainerConfig(module.Config, hostConfig, module.NetworkingConfig)
-		err = validateContainerConfig(config)
+		err = validContainerConfig(config)
 		if err != nil {
 			buf.WriteString(err.Error())
 			buf.WriteByte('\n')
@@ -188,11 +193,11 @@ func ValidService(req structs.PostServiceRequest) error {
 	return errors.New(buf.String())
 }
 
-func validateServiceScale(svc *Service, scale structs.PostServiceScaledRequest) error {
+func validServiceScale(svc *Service, scale structs.PostServiceScaledRequest) error {
 	buf := bytes.NewBuffer(nil)
 
 	if scale.UpdateConfig != nil {
-		err := validateContainerUpdateConfig(*scale.UpdateConfig)
+		err := validContainerUpdateConfig(*scale.UpdateConfig)
 		if err != nil {
 			buf.WriteString(err.Error())
 			buf.WriteByte('\n')
@@ -261,7 +266,8 @@ func validateServiceScale(svc *Service, scale structs.PostServiceScaledRequest) 
 	return errors.New(buf.String())
 }
 
-func ValidateIPAddress(prefix int, addrs ...string) error {
+// ValidIPAddress valid IP address
+func ValidIPAddress(prefix int, addrs ...string) error {
 	buf := bytes.NewBuffer(nil)
 
 	if prefix < 1 || prefix > 31 {
