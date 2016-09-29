@@ -55,7 +55,7 @@ func (port Port) tableName() string {
 
 // DeletePort delete by port,only if Port.Allocated==allocated
 func DeletePort(port int, allocated bool) error {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return err
 	}
@@ -65,6 +65,7 @@ func DeletePort(port int, allocated bool) error {
 	if err != nil {
 		return errors.Wrap(err, "get Port.Allocated")
 	}
+
 	if using != allocated {
 		return errors.Errorf("Port %d (%t!= %t),cannot be removed", port, using, allocated)
 	}
@@ -80,7 +81,7 @@ func ListAvailablePorts(num int) ([]Port, error) {
 		return nil, nil
 	}
 
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +93,7 @@ func ListAvailablePorts(num int) ([]Port, error) {
 
 	err = db.Select(&ports, query, false)
 	if err != nil {
-		db, err = GetDB(true)
+		db, err = getDB(true)
 		if err != nil {
 			return nil, err
 		}
@@ -192,7 +193,7 @@ func txInsertPorts(tx *sqlx.Tx, ports []Port) error {
 
 // ListPortsByUnit returns []Port select by UnitID or UnitName
 func ListPortsByUnit(nameOrID string) ([]Port, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +206,7 @@ func ListPortsByUnit(nameOrID string) ([]Port, error) {
 		return ports, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +218,7 @@ func ListPortsByUnit(nameOrID string) ([]Port, error) {
 
 // ListPorts returns []Port by condition start\end\limit.
 func ListPorts(start, end, limit int) ([]Port, error) {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +251,7 @@ func ListPorts(start, end, limit int) ([]Port, error) {
 
 // GetNetworkingByID returns Networking and IP.Prefix select by Networking ID.
 func GetNetworkingByID(ID string) (Networking, int, error) {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return Networking{}, 0, err
 	}
@@ -273,7 +274,7 @@ func GetNetworkingByID(ID string) (Networking, int, error) {
 
 // ListIPByUnitID returns []IP select by UnitID
 func ListIPByUnitID(unit string) ([]IP, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +287,7 @@ func ListIPByUnitID(unit string) ([]IP, error) {
 		return out, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +299,7 @@ func ListIPByUnitID(unit string) ([]IP, error) {
 
 // ListNetworkingByType returns []Netwroking select by Networking.Type
 func ListNetworkingByType(_type string) ([]Networking, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -311,7 +312,7 @@ func ListNetworkingByType(_type string) ([]Networking, error) {
 		return list, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +324,7 @@ func ListNetworkingByType(_type string) ([]Networking, error) {
 
 // ListNetworking returns all []Networking.
 func ListNetworking() ([]Networking, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +337,7 @@ func ListNetworking() ([]Networking, error) {
 		return list, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -348,7 +349,7 @@ func ListNetworking() ([]Networking, error) {
 
 // ListIPByNetworking returns []IP select by NetworkingID
 func ListIPByNetworking(networkingID string) ([]IP, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -361,7 +362,7 @@ func ListIPByNetworking(networkingID string) ([]IP, error) {
 		return list, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}
@@ -414,7 +415,7 @@ func TxInsertNetworking(start, end, gateway, _type string, prefix int) (Networki
 
 // UpdateNetworkingStatus upate Networking Enabled by ID
 func UpdateNetworkingStatus(ID string, enable bool) error {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -426,7 +427,7 @@ func UpdateNetworkingStatus(ID string, enable bool) error {
 		return nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -496,7 +497,7 @@ func TxDeleteNetworking(ID string) error {
 // one more IP belongs to networking has allocated
 // networking has used in Cluster
 func IsNetwrokingUsed(networking string) (bool, error) {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return false, err
 	}
@@ -526,7 +527,7 @@ func IsNetwrokingUsed(networking string) (bool, error) {
 
 // ListIPWithCondition returns []IP select by NetworkingID and Allocated==allocated
 func ListIPWithCondition(networking string, allocation bool, num int) ([]IP, error) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -539,7 +540,7 @@ func ListIPWithCondition(networking string, allocation bool, num int) ([]IP, err
 		return out, nil
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil {
 		return nil, err
 	}

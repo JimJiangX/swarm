@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -58,7 +57,7 @@ func (h *huaweiStore) Ping() error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return errors.Wrapf(err, "Exec:%s,Output:%s", cmd.Args, output)
 	}
 
 	return nil
@@ -179,7 +178,7 @@ func (h *huaweiStore) Recycle(id string, lun int) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return errors.Wrapf(err, "Exec:%s,Output:%s", cmd.Args, output)
 	}
 
 	err = database.TxReleaseLun(l.Name)
@@ -297,7 +296,7 @@ func (h *huaweiStore) Mapping(host, vg, lun string) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return errors.Wrapf(err, "Exec:%s,Output:%s", cmd.Args, output)
 	}
 
 	return nil
@@ -325,7 +324,7 @@ func (h *huaweiStore) DelMapping(lun string) error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return errors.Wrapf(err, "Exec:%s,Output:%s", cmd.Args, output)
 	}
 
 	err = database.DelLunMapping(lun, "", "", 0)

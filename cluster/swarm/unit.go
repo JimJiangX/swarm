@@ -25,7 +25,8 @@ var (
 	errEngineAPIisNil = errors.New("Engine API client is nil")
 )
 
-type ContainerCmd interface {
+// ContainerCmd commands of actions
+type containerCmd interface {
 	StartContainerCmd() []string
 	InitServiceCmd() []string
 	StartServiceCmd() []string
@@ -34,6 +35,7 @@ type ContainerCmd interface {
 	BackupCmd(args ...string) []string
 	CleanBackupFileCmd(args ...string) []string
 }
+
 type port struct {
 	port  int
 	proto string
@@ -71,7 +73,7 @@ type unit struct {
 	configures  map[string]interface{}
 
 	configParser
-	ContainerCmd
+	containerCmd
 }
 
 func (u *unit) factory() error {
@@ -101,7 +103,7 @@ func (u *unit) factory() error {
 	}
 
 	u.configParser = parser
-	u.ContainerCmd = cmder
+	u.containerCmd = cmder
 
 	return nil
 }
@@ -272,7 +274,7 @@ func pullImage(engine *cluster.Engine, image string, authConfig *types.AuthConfi
 		return errEngineIsNil
 	}
 	if image == "" {
-		return fmt.Errorf("params error,image:%s", image)
+		return errors.New("image name is required")
 	}
 
 	logrus.Debugf("Engine %s Pull image:%s", engine.Addr, image)
@@ -287,7 +289,7 @@ func pullImage(engine *cluster.Engine, image string, authConfig *types.AuthConfi
 	}
 
 	if image1 := engine.Image(image); image1 == nil {
-		return fmt.Errorf("Not Found Image %s On Engine %s", image, engine.Addr)
+		return errors.Errorf("not found Image %s on Engine %s", image, engine.Addr)
 	}
 
 	return nil
@@ -302,6 +304,7 @@ func createVolume(eng *cluster.Engine, lv database.LocalVolume) (*types.Volume, 
 		DriverOpts: map[string]string{"size": strconv.Itoa(lv.Size), "fstype": lv.Filesystem, "vgname": lv.VGName},
 		Labels:     nil,
 	}
+
 	v, err := eng.CreateVolume(req)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Engine %s Create Volume %v", eng.Addr, req)
@@ -312,6 +315,7 @@ func createVolume(eng *cluster.Engine, lv database.LocalVolume) (*types.Volume, 
 
 func createSanStoreageVG(host, name string, lun []database.LUN) error {
 	logrus.Debugf("Engine %s create San Storeage VG,name=%s", host, name)
+
 	list := make([]database.LUN, 0, len(lun))
 	for i := range lun {
 		if lun[i].Name == name {
@@ -343,12 +347,8 @@ func createSanStoreageVG(host, name string, lun []database.LUN) error {
 
 	addr := getPluginAddr(host, pluginPort)
 
-	err = sdk.SanVgCreate(addr, config)
-	if err != nil {
-		return errors.Wrapf(err, "Create SAN VG ON %s", addr)
-	}
+	return sdk.SanVgCreate(addr, config)
 
-	return nil
 }
 
 func extendSanStoreageVG(host string, lun database.LUN) error {
@@ -476,7 +476,7 @@ func (u *unit) stopContainer(timeout int) error {
 }
 
 func (u *unit) restartContainer(ctx context.Context) error {
-	if u.ContainerCmd == nil {
+	if u.containerCmd == nil {
 		return nil
 	}
 
@@ -705,7 +705,7 @@ func copyConfigIntoCNFVolume(host, path, content string, lvs []database.LocalVol
 }
 
 func (u *unit) initService() error {
-	if u.ContainerCmd == nil {
+	if u.containerCmd == nil {
 		return nil
 	}
 	cmd := u.InitServiceCmd()
@@ -743,6 +743,7 @@ func initUnitService(containerID string, eng *cluster.Engine, cmd []string) erro
 	return err
 }
 
+// StartUnitService start the unit service
 func (gd *Gardener) StartUnitService(nameOrID string) error {
 	unit, err := database.GetUnit(nameOrID)
 	if err != nil {
@@ -770,6 +771,7 @@ func (gd *Gardener) StartUnitService(nameOrID string) error {
 	return u.startService()
 }
 
+// StopUnitService stop the unit service & container
 func (gd *Gardener) StopUnitService(nameOrID string, timeout int) error {
 	unit, err := database.GetUnit(nameOrID)
 	if err != nil {
@@ -806,7 +808,7 @@ func (u *unit) startService() (err error) {
 
 		_err := database.TxUpdateUnitStatus(&u.Unit, code, msg)
 
-		if err != nil {
+		if _err != nil {
 			logrus.WithFields(logrus.Fields{
 				"Unit":   u.Name,
 				"Status": code,
@@ -827,7 +829,7 @@ func (u *unit) startService() (err error) {
 		return err
 	}
 
-	if u.ContainerCmd == nil {
+	if u.containerCmd == nil {
 		return nil
 	}
 
@@ -851,7 +853,7 @@ func (u *unit) forceStopService() error {
 		return err
 	}
 
-	if u.ContainerCmd == nil {
+	if u.containerCmd == nil {
 		return nil
 	}
 	cmd := u.StopServiceCmd()
@@ -878,13 +880,13 @@ func (u *unit) stopService() error {
 
 	code, msg := int64(statusUnitStoping), ""
 	_err := database.TxUpdateUnitStatus(&u.Unit, code, msg)
-
-	logrus.WithFields(logrus.Fields{
-		"Unit":    u.Name,
-		"message": msg,
-		"status":  code,
-	}).WithError(_err).Error("Update Unit status")
-
+	if _err != nil {
+		logrus.WithFields(logrus.Fields{
+			"Unit":    u.Name,
+			"message": msg,
+			"status":  code,
+		}).WithError(_err).Error("Update Unit status")
+	}
 	err = u.forceStopService()
 
 	code = statusUnitStoped
@@ -894,7 +896,7 @@ func (u *unit) stopService() error {
 	}
 
 	_err = database.TxUpdateUnitStatus(&u.Unit, code, msg)
-	if err != nil {
+	if _err != nil {
 		logrus.WithFields(logrus.Fields{
 			"Unit":    u.Name,
 			"status":  code,
@@ -930,7 +932,7 @@ func (u *unit) backup(ctx context.Context, args ...string) (err error) {
 		return err
 	}
 
-	if u.ContainerCmd == nil {
+	if u.containerCmd == nil {
 		return nil
 	}
 	cmd := u.BackupCmd(args...)
@@ -953,7 +955,7 @@ func (u *unit) restore(ctx context.Context, file string) error {
 		return err
 	}
 
-	if u.ContainerCmd == nil {
+	if u.containerCmd == nil {
 		return nil
 	}
 
@@ -984,7 +986,7 @@ func getPluginAddr(IP string, port int) string {
 func (u *unit) saveToDisk() error {
 	err := database.UpdateUnitInfo(u.Unit)
 	if err != nil {
-		logrus.WithField("Container", u.Name).WithError(err).Errorf("Update Unit Info:%+v", u.Unit)
+		logrus.WithField("Unit", u.Name).WithError(err).Errorf("update Unit info:%+v", u.Unit)
 	}
 
 	return err
@@ -1005,7 +1007,7 @@ func (u *unit) registerHorus(user, password string, agentPort int) (registerServ
 	case _UpsqlType:
 		_type = "upsql"
 	default:
-		return registerService{}, fmt.Errorf("Unsupported Type:'%s'", u.Type)
+		return registerService{}, errors.Errorf("unsupported Type:'%s'", u.Type)
 	}
 
 	return registerService{
@@ -1038,6 +1040,7 @@ func (gd *Gardener) unitContainer(u *unit) *cluster.Container {
 	return u.container
 }
 
+// RestoreUnit restore unit volume data from backupfile
 func (gd *Gardener) RestoreUnit(nameOrID, source string) (string, error) {
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {

@@ -1,6 +1,6 @@
 package structs
 
-type RegisterDatacenter struct {
+type RegisterGardener struct {
 	ID         int          `json:"dc_id"`
 	DockerPort int          `json:"docker_port"`
 	PluginPort int          `json:"plugin_port"`

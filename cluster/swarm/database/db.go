@@ -128,7 +128,7 @@ func Connect(driver, source string) (*sqlx.DB, error) {
 // if defaultDB is non-nil,use defaultDB.
 // if ping is true calls DB.Ping.
 // open a new DB if error happened.
-func GetDB(ping bool) (*sqlx.DB, error) {
+func getDB(ping bool) (*sqlx.DB, error) {
 	if defaultDB != nil {
 
 		if !ping {
@@ -147,7 +147,7 @@ func GetDB(ping bool) (*sqlx.DB, error) {
 
 // GetTX begin a new Tx.
 func GetTX() (*sqlx.Tx, error) {
-	db, err := GetDB(true)
+	db, err := getDB(true)
 	if err != nil {
 		return nil, err
 	}
