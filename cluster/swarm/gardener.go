@@ -353,11 +353,12 @@ func nfsSetting(option database.NFSOption) error {
 	if option.Addr == "" || option.Dir == "" || option.MountDir == "" {
 		logrus.Warnf("NFS option:%v", option)
 	}
+
 	_, err := os.Stat(option.MountDir)
 	if os.IsNotExist(err) {
 		err := os.MkdirAll(option.MountDir, os.ModePerm)
 		if err != nil {
-			return errors.Wrap(err, "MountDir isnot exist,MkdirAll")
+			return errors.Wrap(err, "MountDir is required,MkdirAll")
 		}
 	}
 
