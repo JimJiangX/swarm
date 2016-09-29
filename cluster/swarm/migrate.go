@@ -245,7 +245,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		if migrate.Type != _SwitchManagerType {
 			err := svc.isolate(migrate.Name)
 			if err != nil {
-				entry.Errorf("isolate container error:%+v", migrate.Name, err)
+				entry.Errorf("isolate container error:%+v", err)
 			}
 		}
 

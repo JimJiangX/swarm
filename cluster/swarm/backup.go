@@ -171,7 +171,7 @@ func backupTask(ctx context.Context, backup *unit, task *database.Task,
 		"Task":     task.ID,
 	})
 
-	args := []string{HostAddress + ":" + httpPort + "/v1.0/tasks/backup/callback", task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
+	args := []string{hostAddress + ":" + httpPort + "/v1.0/tasks/backup/callback", task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
 
 	msg, status := "", int64(0)
 
