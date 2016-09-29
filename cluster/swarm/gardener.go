@@ -305,12 +305,12 @@ func (gd *Gardener) Register(req structs.RegisterGardener) error {
 		logrus.Warnf("%+v", err)
 	}
 
-	err = nfsSetting(config.NFSOption)
-	if err != nil {
-		logrus.Errorf("%+v", err)
+	//	err = nfsSetting(config.NFSOption)
+	//	if err != nil {
+	//		logrus.Errorf("%+v", err)
 
-		return err
-	}
+	//		return err
+	//	}
 
 	_, err = config.Insert()
 	if err != nil {
