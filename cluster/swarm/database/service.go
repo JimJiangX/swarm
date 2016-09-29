@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -169,8 +170,8 @@ func UpdateUnitInfo(unit Unit) error {
 	return errors.Wrap(err, "update Unit params")
 }
 
-// TxUpdateUnit upate unit params in tx
-func TxUpdateUnit(tx *sqlx.Tx, unit Unit) error {
+// txUpdateUnit upate unit params in tx
+func txUpdateUnit(tx *sqlx.Tx, unit Unit) error {
 	const query = "UPDATE tb_unit SET node_id=:node_id,container_id=:container_id,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
 
 	_, err := tx.NamedExec(query, unit)
@@ -1015,4 +1016,30 @@ func TxInsertUnitWithPorts(u *Unit, ports []Port) error {
 	err = tx.Commit()
 
 	return errors.Wrap(err, "Tx insert Unit and []Port")
+}
+
+// TxUpdateMigrateUnit update Unit and delete old LocalVolumes in a Tx
+func TxUpdateMigrateUnit(u Unit, lvs []LocalVolume, reserveSAN bool) error {
+	// update database :tb_unit
+	// delete old localVolumes
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for i := range lvs {
+		if reserveSAN && strings.HasSuffix(lvs[i].VGName, "_SAN_VG") {
+			continue
+		}
+		TxDeleteVolume(tx, lvs[i].ID)
+	}
+	err = txUpdateUnit(tx, u)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Tx update unit & delete volumes")
 }
