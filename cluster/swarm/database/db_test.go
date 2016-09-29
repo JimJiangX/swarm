@@ -40,14 +40,14 @@ func TestMustConnect(t *testing.T) {
 }
 
 func TestGetDB(t *testing.T) {
-	db, err := GetDB(false)
+	db, err := getDB(false)
 	if err != nil || db == nil {
 		t.Error("Unexpected", err)
 	}
 
 	db.Close()
 
-	db, err = GetDB(false)
+	db, err = getDB(false)
 	if err != nil || db == nil {
 		t.Error("Unexpected", err)
 	}
@@ -56,7 +56,7 @@ func TestGetDB(t *testing.T) {
 		t.Log("Expected", err)
 	}
 
-	db, err = GetDB(true)
+	db, err = getDB(true)
 	if err != nil || db == nil {
 		t.Fatal("With Ping", err, db)
 	}
