@@ -1,6 +1,9 @@
 package scplib
 
 import (
+	"io/ioutil"
+	"os"
+
 	"github.com/hnakamur/go-scp"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
@@ -24,20 +27,37 @@ func NewClient(addr, user, password string) (*Client, error) {
 	return &Client{c}, nil
 }
 
-func (c *Client) SendDir(local, remote string) error {
+func (c *Client) UploadDir(local, remote string) error {
 	cli := scp.NewSCP(c.c)
 
 	err := cli.SendDir(local, remote, nil)
 
-	return errors.Wrap(err, "ssh send dir")
+	return errors.Wrap(err, "upload dir")
 }
 
-func (c *Client) SendFile(local, remote string) error {
+func (c *Client) UploadFile(local, remote string) error {
 	cli := scp.NewSCP(c.c)
 
 	err := cli.SendFile(local, remote)
 
-	return errors.Wrap(err, "ssh send file")
+	return errors.Wrap(err, "upload file")
+}
+
+func (c *Client) Upload(context []byte, remote string) error {
+	local, err := ioutil.TempFile("", "go-scp-UploadFile-local")
+	if err != nil {
+		return errors.Wrap(err, "create tempFile")
+	}
+	defer os.Remove(local.Name())
+
+	_, err = local.Write(context)
+	if err != nil {
+		return errors.Wrap(err, "write to file")
+	}
+
+	local.Close()
+
+	return c.UploadFile(local.Name(), remote)
 }
 
 func (c *Client) RemoteExec(cmd string) (int, []byte, error) {
