@@ -2,12 +2,15 @@ package scplib
 
 import (
 	"io/ioutil"
+	"net"
 	"os"
 
 	"github.com/hnakamur/go-scp"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 )
+
+const defaultSSHPort = "22"
 
 // Client contains SSH client.
 type Client struct {
@@ -16,6 +19,15 @@ type Client struct {
 
 // NewClient returns a pointer of Client.
 func NewClient(addr, user, password string) (*Client, error) {
+	_, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		if net.ParseIP(addr) != nil {
+			addr = net.JoinHostPort(addr, defaultSSHPort)
+		} else {
+			return nil, errors.Wrap(err, "parse addr error:"+addr)
+		}
+	}
+
 	config := &ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{ssh.Password(password)},

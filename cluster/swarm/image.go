@@ -13,6 +13,7 @@ import (
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
+	"github.com/docker/swarm/scplib"
 	"github.com/docker/swarm/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -123,19 +124,23 @@ func LoadImage(req structs.PostLoadImageRequest) (string, string, error) {
 	_imageID := utils.Generate64UUID()
 
 	background := func(ctx context.Context) error {
-		buffer := bytes.NewBuffer(nil)
 		oldName := fmt.Sprintf("%s:%s", req.Name, req.Version)
 		newName := fmt.Sprintf("%s:%d/%s", config.Registry.Domain, config.Registry.Port, oldName)
 		script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
 
-		err = runSSHCommand(config.Registry.Address,
-			config.Registry.OsUsername, config.Registry.OsPassword, script, buffer)
+		c, err := scplib.NewClient(config.Registry.Address, config.Registry.OsUsername, config.Registry.OsPassword)
 		if err != nil {
-			logrus.Error(err, buffer.String())
+			return err
+		}
+		defer c.Close()
+
+		out, err := c.Exec(script)
+		if err != nil {
+			logrus.Error(err, string(out))
 			return err
 		}
 
-		imageID, size, err := parsePushImageOutput(buffer.String())
+		imageID, size, err := parsePushImageOutput(string(out))
 		if err != nil {
 			return err
 		}
