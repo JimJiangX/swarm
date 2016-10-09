@@ -429,6 +429,11 @@ func GetRaidGroup(id string, rg int) (RaidGroup, error) {
 	}
 
 	db, err = getDB(true)
+	if err != nil {
+		return RaidGroup{}, err
+	}
+
+	err = db.Get(&out, query, id, rg)
 
 	return out, errors.Wrap(err, "get RaidGroup")
 }
