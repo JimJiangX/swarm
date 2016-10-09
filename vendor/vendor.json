@@ -27,6 +27,12 @@
 			"revisionTime": "2016-08-02T11:38:42Z"
 		},
 		{
+			"checksumSHA1": "9cD58uOdBmGf+hWEppveBi6jbJI=",
+			"path": "github.com/hnakamur/go-scp",
+			"revision": "866e7b72b9329f9856c13e2887ebe5214ec2edf6",
+			"revisionTime": "2016-09-20T22:53:08Z"
+		},
+		{
 			"checksumSHA1": "5I0G+0o3xHUQ53jlq70Ujrw0d2A=",
 			"path": "github.com/jmoiron/sqlx",
 			"revision": "7396209bbeada6a4fcc28aa9408f89b2e71cac39",
@@ -67,6 +73,30 @@
 			"path": "github.com/yiduoyunQ/smlib",
 			"revision": "7a33d8d00a4768b8dbf261048ab507503d48f5cd",
 			"revisionTime": "2016-09-21T11:08:03Z"
+		},
+		{
+			"checksumSHA1": "h+pFYiRHBogczS8/F1NoN3Ata44=",
+			"path": "golang.org/x/crypto/curve25519",
+			"revision": "d172538b2cfce0c13cee31e647d0367aa8cd2486",
+			"revisionTime": "2015-06-02T14:54:44Z"
+		},
+		{
+			"checksumSHA1": "wGb//LjBPNxYHqk+dcLo7BjPXK8=",
+			"path": "golang.org/x/crypto/ed25519",
+			"revision": "d172538b2cfce0c13cee31e647d0367aa8cd2486",
+			"revisionTime": "2015-06-02T14:54:44Z"
+		},
+		{
+			"checksumSHA1": "LXFcVx8I587SnWmKycSDEq9yvK8=",
+			"path": "golang.org/x/crypto/ed25519/internal/edwards25519",
+			"revision": "d172538b2cfce0c13cee31e647d0367aa8cd2486",
+			"revisionTime": "2015-06-02T14:54:44Z"
+		},
+		{
+			"checksumSHA1": "1LydpuiE3oBdkbYvSdKKwe9lsLs=",
+			"path": "golang.org/x/crypto/ssh",
+			"revision": "d172538b2cfce0c13cee31e647d0367aa8cd2486",
+			"revisionTime": "2015-06-02T14:54:44Z"
 		},
 		{
 			"checksumSHA1": "tK8eFmQ0JeKpR3P0TjiGobzlIh0=",
