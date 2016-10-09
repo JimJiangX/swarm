@@ -41,7 +41,7 @@ func newFileInfoFromOS(fi os.FileInfo, replaceName string) *FileInfo {
 	var accessTime time.Time
 	sysStat, ok := fi.Sys().(*syscall.Stat_t)
 	if ok {
-		sec, nsec := sysStat.Atimespec.Unix()
+		sec, nsec := sysStat.Atim.Unix()
 		accessTime = time.Unix(sec, nsec)
 	}
 
