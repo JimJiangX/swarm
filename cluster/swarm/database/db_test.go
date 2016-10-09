@@ -8,15 +8,16 @@ import (
 func init() {
 	dbSource = "root:111111@tcp(192.168.2.121:3306)/DBaaS_test?parseTime=true&charset=utf8&loc=Asia%2FShanghai&sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'"
 	driverName = "mysql"
+	dbMaxOpenConns = 8
 }
 
 func TestConnect(t *testing.T) {
-	db, err := Connect(driverName, dbSource)
+	db, err := Connect(driverName, dbSource, dbMaxOpenConns)
 	if db == nil || err != nil {
 		t.Fatal(err)
 	}
 
-	if dbSource == "" || driverName != "mysql" || defaultDB != db {
+	if dbSource == "" || driverName != "mysql" {
 		t.Fatal("Unexpected")
 	}
 }
@@ -28,7 +29,8 @@ func TestMustConnect(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
-	db := MustConnect(driverName, dbSource)
+
+	db := MustConnect(driverName, dbSource, dbMaxOpenConns)
 	if db == nil {
 		t.FailNow()
 	}

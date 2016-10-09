@@ -19,7 +19,7 @@ import (
 
 var (
 	leaderElectionPath = "docker/swarm/leader"
-	HostAddress        = "127.0.0.1"
+	hostAddress        = "127.0.0.1"
 	httpPort           = "4000"
 	dockerNodesKVPath  = "docker/swarm/nodes"
 	// DatacenterID is Gardener registered ID
@@ -85,7 +85,7 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 				return nil, err
 			}
 
-			HostAddress = ip
+			hostAddress = ip
 			httpPort = port
 			break
 		}
