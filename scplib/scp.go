@@ -31,7 +31,7 @@ func NewClient(addr, user, password string) (*Client, error) {
 
 // UploadDir copies files and directories under the local dir
 // to the remote dir.
-func (c *Client) UploadDir(local, remote string) error {
+func (c *Client) UploadDir(remote, local string) error {
 	cli := scp.NewSCP(c.c)
 
 	err := cli.SendDir(local, remote, nil)
@@ -40,7 +40,7 @@ func (c *Client) UploadDir(local, remote string) error {
 }
 
 // UploadFile copies a single local file to the remote server.
-func (c *Client) UploadFile(local, remote string) error {
+func (c *Client) UploadFile(remote, local string) error {
 	cli := scp.NewSCP(c.c)
 
 	err := cli.SendFile(local, remote)
@@ -48,8 +48,8 @@ func (c *Client) UploadFile(local, remote string) error {
 	return errors.Wrap(err, "upload file")
 }
 
-// UploadFile upload  bytes save on the remote server.
-func (c *Client) Upload(context []byte, remote string, mode os.FileMode) error {
+// Upload upload string to the remote server.
+func (c *Client) Upload(context, remote string, mode os.FileMode) error {
 	local, err := ioutil.TempFile("", "go-scp-UploadFile-local")
 	if err != nil {
 		return errors.Wrap(err, "create tempFile")
@@ -61,9 +61,9 @@ func (c *Client) Upload(context []byte, remote string, mode os.FileMode) error {
 		return errors.Wrap(err, "changes file mode")
 	}
 
-	_, err = local.Write(context)
+	_, err = local.WriteString(context)
 	if err != nil {
-		return errors.Wrap(err, "write bytes to file")
+		return errors.Wrap(err, "write string to file")
 	}
 
 	local.Close()
@@ -71,27 +71,18 @@ func (c *Client) Upload(context []byte, remote string, mode os.FileMode) error {
 	return c.UploadFile(local.Name(), remote)
 }
 
-// Exec runs cmd on the remote host.
-func (c *Client) Exec(cmd string) (int, []byte, error) {
+// Exec runs cmd on the remote host,
+// returns output and error.
+func (c *Client) Exec(cmd string) ([]byte, error) {
 	session, err := c.c.NewSession()
 	if err != nil {
-		return 0, nil, errors.Wrap(err, "ssh client new session")
+		return nil, errors.Wrap(err, "ssh client new session")
 	}
 	defer session.Close()
 
 	out, err := session.CombinedOutput(cmd)
 
-	if err != nil {
-		exitStatus := -1
-		exitErr, ok := err.(*ssh.ExitError)
-		if ok {
-			exitStatus = exitErr.ExitStatus()
-		}
-
-		return exitStatus, out, errors.Wrap(err, "ssh command run error")
-	}
-
-	return 0, out, nil
+	return out, errors.Wrap(err, "ssh command run error")
 }
 
 // Close closes the underlying network connection
