@@ -43,12 +43,17 @@ func (c *Client) UploadFile(local, remote string) error {
 	return errors.Wrap(err, "upload file")
 }
 
-func (c *Client) Upload(context []byte, remote string) error {
+func (c *Client) Upload(context []byte, remote string, mode os.FileMode) error {
 	local, err := ioutil.TempFile("", "go-scp-UploadFile-local")
 	if err != nil {
 		return errors.Wrap(err, "create tempFile")
 	}
 	defer os.Remove(local.Name())
+
+	err = local.Chmod(mode)
+	if err != nil {
+		return errors.Wrap(err, "change file mode")
+	}
 
 	_, err = local.Write(context)
 	if err != nil {
@@ -60,7 +65,7 @@ func (c *Client) Upload(context []byte, remote string) error {
 	return c.UploadFile(local.Name(), remote)
 }
 
-func (c *Client) RemoteExec(cmd string) (int, []byte, error) {
+func (c *Client) Exec(cmd string) (int, []byte, error) {
 	session, err := c.c.NewSession()
 	if err != nil {
 		return 0, nil, errors.Wrap(err, "ssh client new session")
