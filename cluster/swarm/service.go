@@ -1700,7 +1700,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (string
 			}
 		}()
 
-		args := []string{HostAddress + ":" + httpPort + "/v1.0/tasks/backup/callback",
+		args := []string{hostAddress + ":" + httpPort + "/v1.0/tasks/backup/callback",
 			task.ID, strategy.ID, backup.ID, strategy.Type, strategy.BackupDir}
 
 		return backup.backup(ctx, args...)

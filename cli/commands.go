@@ -33,7 +33,7 @@ var (
 				flHeartBeat,
 				flEnableCors,
 				flCluster, flDiscoveryOpt, flClusterOpt,
-				database.FlDBDriver, database.FlDBName, database.FlDBAuth, database.FlDBHost, database.FlDBPort,
+				database.FlDBDriver, database.FlDBName, database.FlDBAuth, database.FlDBHost, database.FlDBPort, database.FlDBMaxOpenConns,
 			},
 			Action: manage,
 		},

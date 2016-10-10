@@ -29,7 +29,7 @@ cur_dir=`dirname $0`
 hdd_vgname=${HOSTNAME}_HDD_VG
 ssd_vgname=${HOSTNAME}_SSD_VG
 
-adm_nic=bond0
+adm_nic=bond1
 int_nic=bond1
 ext_nic=bond2
 

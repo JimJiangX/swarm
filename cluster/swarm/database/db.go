@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	driverName string
-	dbSource   string
-	defaultDB  *sqlx.DB
+	driverName     string
+	dbSource       string
+	dbMaxOpenConns int
+	defaultDB      *sqlx.DB
 
 	// FlDBDriver DB driver
 	FlDBDriver = cli.StringFlag{
@@ -43,6 +44,12 @@ var (
 		Name:  "dbPort",
 		Value: 3306,
 		Usage: "connection to database port",
+	}
+	// FlDBMaxOpenConns DB max open conns
+	FlDBMaxOpenConns = cli.IntFlag{
+		Name:  "dbMaxOpen",
+		Value: 20,
+		Usage: "max open connection of DB,<= 0 means unlimited",
 	}
 )
 
@@ -87,27 +94,30 @@ func SetupDB(c *cli.Context) error {
 
 	host := c.String("dbHost")
 	port := c.Int("dbPort")
+	maxOpen := c.Int("dbMaxOpen")
 
 	source := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&charset=utf8&loc=Asia%%2FShanghai&sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'",
 		user, password, host, port, name)
 
-	_, err = Connect(driver, source)
+	dbMaxOpenConns = maxOpen
+	driverName = driver
+	dbSource = source
+
+	defaultDB, err = Connect(driver, source, maxOpen)
 
 	return err
 }
 
 // MustConnect connects to a database and panics on error.
-func MustConnect(driver, source string) *sqlx.DB {
+func MustConnect(driver, source string, maxOpen int) *sqlx.DB {
 	defaultDB = sqlx.MustConnect(driver, source)
-
-	driverName = driver
-	dbSource = source
+	defaultDB.SetMaxOpenConns(maxOpen)
 
 	return defaultDB
 }
 
 // Connect to a database and verify with Ping.
-func Connect(driver, source string) (*sqlx.DB, error) {
+func Connect(driver, source string, maxOpen int) (*sqlx.DB, error) {
 	db, err := sqlx.Connect(driver, source)
 	if err != nil {
 		if db != nil {
@@ -117,9 +127,7 @@ func Connect(driver, source string) (*sqlx.DB, error) {
 		return nil, errors.Wrap(err, "DB connection")
 	}
 
-	driverName = driver
-	dbSource = source
-	defaultDB = db
+	db.SetMaxOpenConns(maxOpen)
 
 	return db, nil
 }
@@ -142,7 +150,10 @@ func getDB(ping bool) (*sqlx.DB, error) {
 		defaultDB.Close()
 	}
 
-	return Connect(driverName, dbSource)
+	db, err := Connect(driverName, dbSource, dbMaxOpenConns)
+	defaultDB = db
+
+	return db, err
 }
 
 // GetTX begin a new Tx.
@@ -154,7 +165,7 @@ func GetTX() (*sqlx.Tx, error) {
 
 	tx, err := db.Beginx()
 	if err != nil {
-		db, err = Connect(driverName, dbSource)
+		db, err = Connect(driverName, dbSource, dbMaxOpenConns)
 		if err != nil {
 			return nil, err
 		}
