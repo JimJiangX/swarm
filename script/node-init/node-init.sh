@@ -535,7 +535,7 @@ install_swarm_agent() {
 ## ServiceRestart : swarm
 
 #
-SWARM_AGENT_OPTS="join --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/DBaaS"
+SWARM_AGENT_OPTS="join --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/${swarm_key}"
 
 EOF
 
