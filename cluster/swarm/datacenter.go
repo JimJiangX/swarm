@@ -1033,16 +1033,21 @@ func (node *Node) distribute() (err error) {
 		"host": node.Addr,
 		"user": node.user,
 	})
+
+	nodeState, taskState := int64(statusNodeInstalling), int64(statusTaskRunning)
+
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.Errorf("Recover from Panic:%v", r)
 		}
 
-		nodeState, taskState, msg := int64(0), int64(0), ""
+		var msg string
 		if err == nil {
 			nodeState = statusNodeInstalled
 		} else {
-			nodeState = statusNodeInstallFailed
+			if nodeState == statusNodeInstalling {
+				nodeState = statusNodeInstallFailed
+			}
 			taskState = statusTaskFailed
 			msg = err.Error()
 		}
@@ -1088,6 +1093,7 @@ func (node *Node) distribute() (err error) {
 	err = c.Connect(nil)
 	if err != nil {
 		entry.WithError(err).Error("communicator connection")
+		nodeState = statusNodeSSHLoginFailed
 
 		return errors.Wrap(err, "SSH connect")
 	}
@@ -1100,6 +1106,7 @@ func (node *Node) distribute() (err error) {
 			err = errors.Wrap(err, "SSH upload dir twice:"+config.SourceDir)
 			entry.Error(err)
 
+			nodeState = statusNodeSCPFailed
 			return err
 		}
 	}
@@ -1116,6 +1123,7 @@ func (node *Node) distribute() (err error) {
 			err = errors.Wrap(err, "SSH upload file twice:"+filename)
 			entry.Error(err)
 
+			nodeState = statusNodeSCPFailed
 			return err
 		}
 	}
@@ -1142,6 +1150,8 @@ func (node *Node) distribute() (err error) {
 		if err != nil || cp.ExitStatus != 0 {
 			err = errors.Errorf("Executing remote command twice:'%s',exited:%d,output:%s,%v", cmd.Command, cmd.ExitStatus, buffer.Bytes(), err)
 			entry.Error(err)
+
+			nodeState = statusNodeSSHExecFailed
 
 			return err
 		}
