@@ -1,5 +1,6 @@
 -- MySQL dump 10.13  Distrib 5.6.22, for osx10.8 (x86_64)
 --
+-- Host: 192.168.2.121    Database: DBaaS
 -- ------------------------------------------------------
 -- Server version	5.7.10-enterprise-commercial-advanced
 
@@ -15,16 +16,16 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
--- Table structure for table `tbl_dbaas_backup_files`
+-- Table structure for table `tb_backup_files`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_backup_files`;
+DROP TABLE IF EXISTS `tb_backup_files`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_backup_files` (
+CREATE TABLE `tb_backup_files` (
   `id` varchar(128) NOT NULL,
   `strategy_id` varchar(128) NOT NULL COMMENT '关联的备份策略id',
-  `task_id` varchar(128) NOT NULL COMMENT '关联tbl_dbaas_task.id',
+  `task_id` varchar(128) NOT NULL COMMENT '关联tb_task.id',
   `unit_id` varchar(128) NOT NULL COMMENT '所属容器的id',
   `type` varchar(45) DEFAULT NULL COMMENT '全量／增量\n\nfull/incremental',
   `path` varchar(1024) DEFAULT NULL COMMENT '备份文件路径（包含文件名）',
@@ -38,13 +39,22 @@ CREATE TABLE `tbl_dbaas_backup_files` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_backup_strategy`
+-- Dumping data for table `tb_backup_files`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_backup_strategy`;
+LOCK TABLES `tb_backup_files` WRITE;
+/*!40000 ALTER TABLE `tb_backup_files` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_backup_files` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_backup_strategy`
+--
+
+DROP TABLE IF EXISTS `tb_backup_strategy`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_backup_strategy` (
+CREATE TABLE `tb_backup_strategy` (
   `id` varchar(128) NOT NULL COMMENT '备份策略ID',
   `name` varchar(128) NOT NULL COMMENT '备份策略名称',
   `service_id` varchar(128) NOT NULL COMMENT '所属服务ID',
@@ -62,13 +72,22 @@ CREATE TABLE `tbl_dbaas_backup_strategy` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_cluster`
+-- Dumping data for table `tb_backup_strategy`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_cluster`;
+LOCK TABLES `tb_backup_strategy` WRITE;
+/*!40000 ALTER TABLE `tb_backup_strategy` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_backup_strategy` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_cluster`
+--
+
+DROP TABLE IF EXISTS `tb_cluster`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_cluster` (
+CREATE TABLE `tb_cluster` (
   `id` varchar(128) NOT NULL COMMENT '主键',
   `name` varchar(128) NOT NULL COMMENT '集群名称',
   `type` varchar(64) NOT NULL COMMENT '集群类型\nupsql / upproxy',
@@ -85,13 +104,22 @@ CREATE TABLE `tbl_dbaas_cluster` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_image`
+-- Dumping data for table `tb_cluster`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_image`;
+LOCK TABLES `tb_cluster` WRITE;
+/*!40000 ALTER TABLE `tb_cluster` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_cluster` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_image`
+--
+
+DROP TABLE IF EXISTS `tb_image`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_image` (
+CREATE TABLE `tb_image` (
   `id` varchar(128) NOT NULL COMMENT '主键',
   `name` varchar(128) NOT NULL COMMENT '软件包名称',
   `size` int(64) DEFAULT NULL COMMENT '镜像大小，单位byte',
@@ -108,13 +136,22 @@ CREATE TABLE `tbl_dbaas_image` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_ip`
+-- Dumping data for table `tb_image`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_ip`;
+LOCK TABLES `tb_image` WRITE;
+/*!40000 ALTER TABLE `tb_image` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_image` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_ip`
+--
+
+DROP TABLE IF EXISTS `tb_ip`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_ip` (
+CREATE TABLE `tb_ip` (
   `ip_addr` int(11) unsigned NOT NULL COMMENT 'IP地址,encoding into uint32 by Big-Endian',
   `prefix` int(11) unsigned NOT NULL COMMENT 'IP 掩码，0～32',
   `networking_id` varchar(128) NOT NULL COMMENT '所属networking ID',
@@ -125,13 +162,22 @@ CREATE TABLE `tbl_dbaas_ip` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_lun`
+-- Dumping data for table `tb_ip`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_lun`;
+LOCK TABLES `tb_ip` WRITE;
+/*!40000 ALTER TABLE `tb_ip` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_ip` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_lun`
+--
+
+DROP TABLE IF EXISTS `tb_lun`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_lun` (
+CREATE TABLE `tb_lun` (
   `id` varchar(128) NOT NULL COMMENT 'LUN ID',
   `storage_lun_id` int(11) NOT NULL COMMENT '在存储系统上的LUN ID',
   `name` varchar(128) NOT NULL COMMENT 'LUN 名称',
@@ -147,13 +193,22 @@ CREATE TABLE `tbl_dbaas_lun` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_networking`
+-- Dumping data for table `tb_lun`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_networking`;
+LOCK TABLES `tb_lun` WRITE;
+/*!40000 ALTER TABLE `tb_lun` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_lun` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_networking`
+--
+
+DROP TABLE IF EXISTS `tb_networking`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_networking` (
+CREATE TABLE `tb_networking` (
   `id` varchar(128) NOT NULL COMMENT '网段ID',
   `type` varchar(64) NOT NULL COMMENT '网络类型：\ninternal_access_networking	内部业务网	\nexternal_access_networking	外部接入网',
   `gateway` varchar(64) NOT NULL COMMENT '网关IP',
@@ -164,13 +219,22 @@ CREATE TABLE `tbl_dbaas_networking` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_node`
+-- Dumping data for table `tb_networking`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_node`;
+LOCK TABLES `tb_networking` WRITE;
+/*!40000 ALTER TABLE `tb_networking` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_networking` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_node`
+--
+
+DROP TABLE IF EXISTS `tb_node`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_node` (
+CREATE TABLE `tb_node` (
   `id` varchar(128) NOT NULL COMMENT 'node ID',
   `name` varchar(128) NOT NULL COMMENT 'node 名称',
   `cluster_id` varchar(128) NOT NULL COMMENT '所属 Cluster',
@@ -190,13 +254,22 @@ CREATE TABLE `tbl_dbaas_node` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_port`
+-- Dumping data for table `tb_node`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_port`;
+LOCK TABLES `tb_node` WRITE;
+/*!40000 ALTER TABLE `tb_node` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_node` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_port`
+--
+
+DROP TABLE IF EXISTS `tb_port`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_port` (
+CREATE TABLE `tb_port` (
   `port` int(11) unsigned NOT NULL COMMENT '端口号，10000+，分配给容器使用，容器的端口是唯一的。',
   `name` varchar(128) DEFAULT NULL COMMENT '端口名称',
   `unit_id` varchar(128) DEFAULT NULL COMMENT '所属单元ID',
@@ -208,30 +281,48 @@ CREATE TABLE `tbl_dbaas_port` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_raid_group`
+-- Dumping data for table `tb_port`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_raid_group`;
+LOCK TABLES `tb_port` WRITE;
+/*!40000 ALTER TABLE `tb_port` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_port` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_raid_group`
+--
+
+DROP TABLE IF EXISTS `tb_raid_group`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_raid_group` (
+CREATE TABLE `tb_raid_group` (
   `id` varchar(128) NOT NULL COMMENT '存储RAID ID',
   `storage_rg_id` int(11) NOT NULL COMMENT '在存储系统上的Raid group ID',
   `storage_system_id` varchar(128) NOT NULL COMMENT 'RAID GROUP 所属存储系统ID',
   `enabled` tinyint(1) unsigned NOT NULL DEFAULT '1' COMMENT '是否启用，0：停用，1：启用。',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `id_UNIQUE` (`id`)
+  UNIQUE KEY `index2` (`storage_rg_id`,`storage_system_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_service`
+-- Dumping data for table `tb_raid_group`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_service`;
+LOCK TABLES `tb_raid_group` WRITE;
+/*!40000 ALTER TABLE `tb_raid_group` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_raid_group` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_service`
+--
+
+DROP TABLE IF EXISTS `tb_service`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_service` (
+CREATE TABLE `tb_service` (
   `id` varchar(128) NOT NULL COMMENT '服务ID',
   `name` varchar(128) NOT NULL COMMENT 'Service 名称',
   `business_code` varchar(128) NOT NULL COMMENT '子系统代码',
@@ -252,13 +343,22 @@ CREATE TABLE `tbl_dbaas_service` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_storage_HITACHI`
+-- Dumping data for table `tb_service`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_storage_HITACHI`;
+LOCK TABLES `tb_service` WRITE;
+/*!40000 ALTER TABLE `tb_service` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_service` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_storage_HITACHI`
+--
+
+DROP TABLE IF EXISTS `tb_storage_HITACHI`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_storage_HITACHI` (
+CREATE TABLE `tb_storage_HITACHI` (
   `id` varchar(128) NOT NULL COMMENT 'storage_system_ID',
   `vendor` varchar(128) NOT NULL COMMENT '厂商，HUAWEI / HITACHI',
   `admin_unit` varchar(128) NOT NULL COMMENT '管理域名称，HDS专有',
@@ -273,13 +373,22 @@ CREATE TABLE `tbl_dbaas_storage_HITACHI` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_storage_HUAWEI`
+-- Dumping data for table `tb_storage_HITACHI`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_storage_HUAWEI`;
+LOCK TABLES `tb_storage_HITACHI` WRITE;
+/*!40000 ALTER TABLE `tb_storage_HITACHI` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_storage_HITACHI` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_storage_HUAWEI`
+--
+
+DROP TABLE IF EXISTS `tb_storage_HUAWEI`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_storage_HUAWEI` (
+CREATE TABLE `tb_storage_HUAWEI` (
   `id` varchar(128) NOT NULL COMMENT 'storage_system_ID',
   `vendor` varchar(128) NOT NULL COMMENT '厂商，huawei / HDS',
   `ip_addr` varchar(45) NOT NULL COMMENT '管理IP，huawei专有',
@@ -293,13 +402,22 @@ CREATE TABLE `tbl_dbaas_storage_HUAWEI` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_system_config`
+-- Dumping data for table `tb_storage_HUAWEI`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_system_config`;
+LOCK TABLES `tb_storage_HUAWEI` WRITE;
+/*!40000 ALTER TABLE `tb_storage_HUAWEI` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_storage_HUAWEI` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_system_config`
+--
+
+DROP TABLE IF EXISTS `tb_system_config`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_system_config` (
+CREATE TABLE `tb_system_config` (
   `dc_id` int(11) NOT NULL COMMENT '站点ID',
   `retry` tinyint(4) DEFAULT NULL COMMENT '资源分配失败重试次数',
   `consul_ip` varchar(128) NOT NULL COMMENT 'Consul server IP地址, 包含多个IP',
@@ -345,13 +463,22 @@ CREATE TABLE `tbl_dbaas_system_config` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_task`
+-- Dumping data for table `tb_system_config`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_task`;
+LOCK TABLES `tb_system_config` WRITE;
+/*!40000 ALTER TABLE `tb_system_config` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_system_config` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_task`
+--
+
+DROP TABLE IF EXISTS `tb_task`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_task` (
+CREATE TABLE `tb_task` (
   `id` varchar(128) NOT NULL COMMENT '任务ID',
   `name` varchar(128) NOT NULL,
   `related` varchar(128) NOT NULL COMMENT '关联表名称或者对象。',
@@ -370,13 +497,22 @@ CREATE TABLE `tbl_dbaas_task` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_unit`
+-- Dumping data for table `tb_task`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_unit`;
+LOCK TABLES `tb_task` WRITE;
+/*!40000 ALTER TABLE `tb_task` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_task` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_unit`
+--
+
+DROP TABLE IF EXISTS `tb_unit`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_unit` (
+CREATE TABLE `tb_unit` (
   `id` varchar(128) NOT NULL COMMENT 'unit ID',
   `name` varchar(128) NOT NULL COMMENT 'unit 名称，命名规则为<unit_id_8bit>_<service_name>',
   `type` varchar(45) NOT NULL COMMENT 'unit 类型， switch_manager / upproxy / upsql ',
@@ -396,13 +532,22 @@ CREATE TABLE `tbl_dbaas_unit` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_unit_config`
+-- Dumping data for table `tb_unit`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_unit_config`;
+LOCK TABLES `tb_unit` WRITE;
+/*!40000 ALTER TABLE `tb_unit` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_unit` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_unit_config`
+--
+
+DROP TABLE IF EXISTS `tb_unit_config`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_unit_config` (
+CREATE TABLE `tb_unit_config` (
   `id` varchar(128) NOT NULL COMMENT '配置文件ID',
   `image_id` varchar(128) NOT NULL COMMENT '镜像软件ID',
   `version` int(11) NOT NULL COMMENT '版本号\n从0 开始，更新一次＋1',
@@ -416,13 +561,22 @@ CREATE TABLE `tbl_dbaas_unit_config` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_users`
+-- Dumping data for table `tb_unit_config`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_users`;
+LOCK TABLES `tb_unit_config` WRITE;
+/*!40000 ALTER TABLE `tb_unit_config` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_unit_config` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_users`
+--
+
+DROP TABLE IF EXISTS `tb_users`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_users` (
+CREATE TABLE `tb_users` (
   `id` varchar(128) NOT NULL COMMENT '数据库用户ID',
   `service_id` varchar(128) NOT NULL COMMENT '所属服务ID',
   `type` varchar(45) NOT NULL COMMENT '用户类型\nupsql        数据库\nupproxy	 代理',
@@ -439,13 +593,22 @@ CREATE TABLE `tbl_dbaas_users` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tbl_dbaas_volumes`
+-- Dumping data for table `tb_users`
 --
 
-DROP TABLE IF EXISTS `tbl_dbaas_volumes`;
+LOCK TABLES `tb_users` WRITE;
+/*!40000 ALTER TABLE `tb_users` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_users` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tb_volumes`
+--
+
+DROP TABLE IF EXISTS `tb_volumes`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_dbaas_volumes` (
+CREATE TABLE `tb_volumes` (
   `id` varchar(128) NOT NULL COMMENT 'volume ID',
   `name` varchar(128) NOT NULL COMMENT '名称',
   `size` bigint(128) NOT NULL COMMENT 'volume 容量大小，单位byte',
@@ -456,6 +619,15 @@ CREATE TABLE `tbl_dbaas_volumes` (
   PRIMARY KEY (`id`,`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `tb_volumes`
+--
+
+LOCK TABLES `tb_volumes` WRITE;
+/*!40000 ALTER TABLE `tb_volumes` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tb_volumes` ENABLE KEYS */;
+UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -466,4 +638,4 @@ CREATE TABLE `tbl_dbaas_volumes` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-09-05 13:00:48
+-- Dump completed on 2016-10-10 14:35:46
