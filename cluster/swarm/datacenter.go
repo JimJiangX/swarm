@@ -1028,16 +1028,21 @@ func (node *Node) distribute() (err error) {
 		"host": node.Addr,
 		"user": node.user,
 	})
+
+	nodeState, taskState := int64(statusNodeInstalling), int64(statusTaskRunning)
+
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.Errorf("Recover from Panic:%v", r)
 		}
 
-		nodeState, taskState, msg := int64(0), int64(0), ""
+		var msg string
 		if err == nil {
 			nodeState = statusNodeInstalled
 		} else {
-			nodeState = statusNodeInstallFailed
+			if nodeState == statusNodeInstalling {
+				nodeState = statusNodeInstallFailed
+			}
 			taskState = statusTaskFailed
 			msg = err.Error()
 		}
@@ -1063,6 +1068,7 @@ func (node *Node) distribute() (err error) {
 
 	c, err := scplib.NewClient(node.Addr, node.user, node.password)
 	if err != nil {
+		nodeState = statusNodeSSHLoginFailed
 		return err
 	}
 	defer c.Close()
@@ -1073,6 +1079,7 @@ func (node *Node) distribute() (err error) {
 		if err := c.UploadDir(config.Destination, config.SourceDir); err != nil {
 			entry.WithError(err).Error("SSH upload dir twice:" + config.SourceDir)
 
+			nodeState = statusNodeSCPFailed
 			return err
 		}
 	}
@@ -1087,6 +1094,7 @@ func (node *Node) distribute() (err error) {
 		if err := c.Upload(config.Registry.CA_CRT, filename, 0644); err != nil {
 			entry.WithError(err).Error("SSH upload file twice:" + filename)
 
+			nodeState = statusNodeSCPFailed
 			return err
 		}
 	}
@@ -1098,6 +1106,7 @@ func (node *Node) distribute() (err error) {
 		if out, err = c.Exec(script); err != nil {
 			entry.WithError(err).Errorf("exec remote command twice:'%s',output:%s", script, out)
 
+			nodeState = statusNodeSSHExecFailed
 			return err
 		}
 	}
