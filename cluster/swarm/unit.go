@@ -507,7 +507,7 @@ func createNetworking(host string, networkings []IPInfo) error {
 	return nil
 }
 
-func removeNetworkings(host string, networkings []IPInfo) error {
+func removeNetworkings(host string, networkings []IPInfo) (err error) {
 	addr := getPluginAddr(host, pluginPort)
 
 	for _, net := range networkings {
@@ -516,13 +516,15 @@ func removeNetworkings(host string, networkings []IPInfo) error {
 			IPCIDR: fmt.Sprintf("%s/%d", net.IP.String(), net.Prefix),
 		}
 
-		err := sdk.RemoveIP(addr, config)
-		if err != nil {
-			return err
+		er := sdk.RemoveIP(addr, config)
+		if er != nil {
+			logrus.WithField("host", addr).WithError(er).Errorf("remove networking:%v", config)
+
+			err = er
 		}
 	}
 
-	return nil
+	return err
 }
 
 func (u *unit) createVolume() (*cluster.Volume, error) {
