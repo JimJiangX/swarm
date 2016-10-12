@@ -15,6 +15,43 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ContainerCmd commands of actions
+type containerCmd interface {
+	StartContainerCmd() []string
+	InitServiceCmd() []string
+	StartServiceCmd() []string
+	StopServiceCmd() []string
+	RestoreCmd(file, backupDir string) []string
+	BackupCmd(args ...string) []string
+	CleanBackupFileCmd(args ...string) []string
+}
+
+type port struct {
+	port  int
+	proto string
+	name  string
+}
+
+type netRequire struct {
+	Type string
+	num  int
+}
+
+type require struct {
+	ports       []port
+	networkings []netRequire
+}
+
+type configParser interface {
+	Validate(data map[string]interface{}) error
+	ParseData(data []byte) (config.Configer, error)
+	defaultUserConfig(args ...interface{}) (map[string]interface{}, error)
+	Marshal() ([]byte, error)
+	Requirement() require
+	HealthCheck() (healthCheck, error)
+	Set(key string, val interface{}) error
+}
+
 func (u unit) Path() string {
 	if u.parent == nil {
 		return "/"
@@ -162,8 +199,8 @@ func (mysqlCmd) StartServiceCmd() []string {
 func (mysqlCmd) StopServiceCmd() []string {
 	return []string{"/root/upsql.service", "stop"}
 }
-func (mysqlCmd) RestoreCmd(file string) []string {
-	return []string{"/root/upsql-restore.sh", file}
+func (mysqlCmd) RestoreCmd(file, backupDir string) []string {
+	return []string{"/root/upsql-restore.sh", file, backupDir}
 }
 func (mysqlCmd) BackupCmd(args ...string) []string {
 	cmd := make([]string, len(args)+1)
@@ -325,7 +362,7 @@ func (proxyCmd) StartServiceCmd() []string {
 func (proxyCmd) StopServiceCmd() []string {
 	return []string{"/root/upproxy.service", "stop"}
 }
-func (proxyCmd) RestoreCmd(file string) []string            { return nil }
+func (proxyCmd) RestoreCmd(file, backupDir string) []string { return nil }
 func (proxyCmd) BackupCmd(args ...string) []string          { return nil }
 func (proxyCmd) CleanBackupFileCmd(args ...string) []string { return nil }
 
@@ -576,7 +613,7 @@ func (switchManagerCmd) StartServiceCmd() []string {
 func (switchManagerCmd) StopServiceCmd() []string {
 	return []string{"/root/swm.service", "stop"}
 }
-func (switchManagerCmd) RestoreCmd(file string) []string            { return nil }
+func (switchManagerCmd) RestoreCmd(file, backupDir string) []string { return nil }
 func (switchManagerCmd) BackupCmd(args ...string) []string          { return nil }
 func (switchManagerCmd) CleanBackupFileCmd(args ...string) []string { return nil }
 
