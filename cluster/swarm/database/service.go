@@ -332,7 +332,7 @@ func ListUnitByEngine(id string) ([]Unit, error) {
 	}
 
 	var out []Unit
-	const query = "SELECT * FROM tbl_dbaas_unit WHERE node_id=?"
+	const query = "SELECT * FROM tb_unit WHERE node_id=?"
 
 	err = db.Select(&out, query, id)
 	if err == nil {
