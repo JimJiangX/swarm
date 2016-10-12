@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/astaxie/beego/config"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
 	"github.com/docker/engine-api/types/container"
@@ -24,43 +23,6 @@ var (
 	errEngineIsNil    = errors.New("Engine is nil")
 	errEngineAPIisNil = errors.New("Engine API client is nil")
 )
-
-// ContainerCmd commands of actions
-type containerCmd interface {
-	StartContainerCmd() []string
-	InitServiceCmd() []string
-	StartServiceCmd() []string
-	StopServiceCmd() []string
-	RestoreCmd(file string) []string
-	BackupCmd(args ...string) []string
-	CleanBackupFileCmd(args ...string) []string
-}
-
-type port struct {
-	port  int
-	proto string
-	name  string
-}
-
-type netRequire struct {
-	Type string
-	num  int
-}
-
-type require struct {
-	ports       []port
-	networkings []netRequire
-}
-
-type configParser interface {
-	Validate(data map[string]interface{}) error
-	ParseData(data []byte) (config.Configer, error)
-	defaultUserConfig(args ...interface{}) (map[string]interface{}, error)
-	Marshal() ([]byte, error)
-	Requirement() require
-	HealthCheck() (healthCheck, error)
-	Set(key string, val interface{}) error
-}
 
 type unit struct {
 	database.Unit
@@ -949,7 +911,7 @@ func (u *unit) backup(ctx context.Context, args ...string) (err error) {
 	return err
 }
 
-func (u *unit) restore(ctx context.Context, file string) error {
+func (u *unit) restore(ctx context.Context, file, backupDir string) error {
 	eng, err := u.Engine()
 	if err != nil {
 		return err
@@ -959,7 +921,7 @@ func (u *unit) restore(ctx context.Context, file string) error {
 		return nil
 	}
 
-	cmd := u.RestoreCmd(file)
+	cmd := u.RestoreCmd(file, backupDir)
 	if len(cmd) == 0 {
 		logrus.WithField("Unit", u.Name).Warn("RestoreCmd is nil")
 		return nil
@@ -1042,6 +1004,11 @@ func (gd *Gardener) unitContainer(u *unit) *cluster.Container {
 
 // RestoreUnit restore unit volume data from backupfile
 func (gd *Gardener) RestoreUnit(nameOrID, source string) (string, error) {
+	sys, err := gd.systemConfig()
+	if err != nil {
+		return "", err
+	}
+
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {
 		return "", err
@@ -1069,7 +1036,7 @@ func (gd *Gardener) RestoreUnit(nameOrID, source string) (string, error) {
 
 		unit.Status, unit.LatestError = statusUnitRestored, ""
 
-		err = unit.restore(ctx, source)
+		err = unit.restore(ctx, source, sys.BackupDir)
 		if err != nil {
 			err = errors.Wrapf(err, "Unit %s restore", unit.Name)
 			logrus.Error(err)
