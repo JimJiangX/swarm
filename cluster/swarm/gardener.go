@@ -175,7 +175,44 @@ func (gd *Gardener) syncNodeWithEngine() {
 				dc.Unlock()
 			}
 		}
+
+		err = gd.rebuildServiceByEngine(engine.ID)
+		if err != nil {
+			logrus.WithField("Engine", engine.Addr).WithError(err).Warn("sync Node with Engine,rebuild Services on engine")
+		}
 	}
+}
+
+func (gd *Gardener) rebuildServiceByEngine(engineID string) error {
+	units, err := database.ListUnitByEngine(engineID)
+	if err != nil {
+		return err
+	}
+
+	list := make([]string, 0, len(units))
+
+	for i := range units {
+		exist := false
+		for j := range list {
+			if list[j] == units[i].ServiceID {
+				exist = true
+				break
+			}
+		}
+
+		if !exist {
+			list = append(list, units[i].ServiceID)
+		}
+	}
+
+	for i := range list {
+		_, err := gd.rebuildService(list[i])
+		if err != nil {
+			logrus.WithField("Service", list[i]).WithError(err).Error("rebuild service")
+		}
+	}
+
+	return nil
 }
 
 func (gd *Gardener) generateUUID(length int) string {

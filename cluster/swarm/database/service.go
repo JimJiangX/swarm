@@ -324,6 +324,31 @@ func ListUnitByServiceID(id string) ([]Unit, error) {
 	return out, errors.Wrap(err, "list []Unit by ServiceID")
 }
 
+// ListUnitByEngine returns []Unit select by EngineID
+func ListUnitByEngine(id string) ([]Unit, error) {
+	db, err := getDB(false)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []Unit
+	const query = "SELECT * FROM tbl_dbaas_unit WHERE node_id=?"
+
+	err = db.Select(&out, query, id)
+	if err == nil {
+		return out, nil
+	}
+
+	db, err = getDB(true)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.Select(&out, query, id)
+
+	return out, errors.Wrap(err, "list []Unit by EngineID")
+}
+
 // CountUnitByNode returns len of []Unit select Unit by EngineID
 func CountUnitByNode(id string) (int, error) {
 	db, err := getDB(false)
