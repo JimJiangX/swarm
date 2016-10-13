@@ -26,7 +26,7 @@ type ProxyInfo struct {
 	ClientAddress string `json:"cli-address,omitempty"`
 	ProxyAddress  string `json:"proxy-address,omitempty"`
 	StartupTime   string `json:"startup-time,omitempty"`
-	Status        int    `json:"status,omitempty"`
+	Status        int    `json:"status"`
 	ActiveTime    int64  `json:"active-time,omitempty"`
 }
 
