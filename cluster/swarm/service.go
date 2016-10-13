@@ -50,6 +50,9 @@ func newService(service database.Service, unitNum int) *Service {
 
 func buildService(req structs.PostServiceRequest,
 	authConfig *types.AuthConfig) (*Service, *database.Task, error) {
+	if req.ID == "" {
+		req.ID = utils.Generate64UUID()
+	}
 
 	desc, err := json.Marshal(req)
 	if err != nil {
@@ -57,7 +60,7 @@ func buildService(req structs.PostServiceRequest,
 	}
 
 	service := database.Service{
-		ID:                   utils.Generate64UUID(),
+		ID:                   req.ID,
 		Name:                 req.Name,
 		Desc:                 string(desc),
 		Architecture:         req.Architecture,
@@ -599,7 +602,10 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 		// rebuild units
 		u, err := gd.rebuildUnit(units[i])
 		if err != nil {
-			return nil, err
+			logrus.WithFields(logrus.Fields{
+				"Service": service.Name,
+				"Unit":    units[i].Name,
+			}).WithError(err).Error("rebuild unit")
 		}
 
 		svc.units = append(svc.units, &u)
@@ -710,6 +716,34 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 	}
 
 	return svc, strategyID, task.ID, err
+}
+
+// RebuildService rebuilds the nameOrID Service
+func (gd *Gardener) RebuildService(nameOrID string) (*Service, string, string, error) {
+	svc, err := gd.rebuildService(nameOrID)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	if svc.Status != statusServiceAlloctionFailed ||
+		svc.Status != statusServiceCreateFailed ||
+		svc.Status != statusServiceStartFailed {
+		return nil, "", "", errors.Errorf("Service status conflict,%d not one of (%d,%d,%d)",
+			svc.Status, statusServiceAlloctionFailed, statusServiceCreateFailed, statusServiceStartFailed)
+	}
+
+	desc := structs.PostServiceRequest{ID: svc.ID}
+
+	if err := json.Unmarshal([]byte(svc.Desc), &desc); err != nil {
+		return nil, "", "", errors.Wrap(err, "decode description failed")
+	}
+
+	err = gd.RemoveService(nameOrID, true, true, 0)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	return gd.CreateService(desc)
 }
 
 // StartService start service
