@@ -29,13 +29,9 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 			return
 		}
 
-		entry.WithError(err).Errorf("scheduler failed")
+		atomic.StoreInt64(&svc.Status, statusServiceAlloctionFailed)
 
-		_err := database.TxSetServiceStatus(&svc.Service, task,
-			statusServiceAlloctionFailed, statusTaskFailed, time.Now(), err.Error())
-		if _err != nil {
-			entry.Error("Tx set ServiceStatus:", _err)
-		}
+		entry.WithError(err).Errorf("scheduler failed")
 
 		if err != nil && len(resourceAlloc) > 0 {
 

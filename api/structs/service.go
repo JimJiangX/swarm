@@ -7,6 +7,7 @@ import (
 )
 
 type PostServiceRequest struct {
+	ID           string `json:"-"`
 	Name         string
 	Description  string `json:",omitempty"`
 	Architecture string `json:"arch"`

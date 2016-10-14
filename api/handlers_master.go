@@ -1741,6 +1741,33 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// POST /services/{name:.*}/rebuild
+func postServiceRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Gardener)
+	if !ok && gd == nil {
+		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
+		return
+	}
+
+	svc, strategyID, taskID, err := gd.RebuildService(name)
+	if err != nil && svc == nil {
+		httpError2(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	response := structs.PostServiceResponse{
+		ID:               svc.ID,
+		BackupStrategyID: strategyID,
+		TaskID:           taskID,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(response)
+}
+
 // POST /services/{name:.*}/users
 func postServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]

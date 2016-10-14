@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -16,7 +15,6 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/utils"
 	"github.com/pkg/errors"
-	"github.com/tatsushid/go-fastping"
 	"golang.org/x/net/context"
 )
 
@@ -454,20 +452,15 @@ func startUnit(engine *cluster.Engine, containerID string,
 }
 
 func stopOldContainer(svc *Service, u *unit) error {
-	ok, _ := fastPing(u.engine.IP, 5, true)
-	if ok {
-		err := removeNetworkings(u.engine.IP, u.networkings)
-		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"Unit":   u.Name,
-				"Engine": u.engine.Addr,
-			}).WithError(err).Error("remove Networkings")
-
-			return err
-		}
+	err := removeNetworkings(u.engine.IP, u.networkings)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"Unit":   u.Name,
+			"Engine": u.engine.Addr,
+		}).WithError(err).Error("remove Networkings")
 	}
 
-	err := u.forceStopService()
+	err = u.forceStopService()
 	if err != nil {
 		_err := checkContainerError(err)
 		if _err.Error() != "EOF" && _err != errContainerNotFound || _err != errContainerNotRunning {
@@ -1007,111 +1000,4 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		0)
 
 	return task.ID, t.Run()
-}
-
-// register service to consul and Horus
-func registerToServers(u *unit, svc *Service, sys database.Configurations) error {
-	if err := registerHealthCheck(u, svc); err != nil {
-		logrus.WithField("Unit", u.Name).Errorf("register service health check,%+v", err)
-	}
-
-	obj, err := u.registerHorus(sys.MonitorUsername, sys.MonitorPassword, sys.HorusAgentPort)
-	if err != nil {
-		return err
-	}
-
-	err = registerToHorus(obj)
-	if err != nil {
-		logrus.WithField("Unit", u.Name).Errorf("register To Horus error:%+v", err)
-	}
-
-	return err
-}
-
-// deregister service to consul and Horus
-func deregisterToServices(addr, unitID string) error {
-	err := deregisterHealthCheck(addr, unitID)
-	if err != nil {
-		logrus.WithField("Unit", unitID).Errorf("deregister service to consul,%+v", err)
-	}
-
-	err = deregisterToHorus(false, unitID)
-	if err != nil {
-		logrus.WithField("Endpoints", unitID).Errorf("deregister To Horus:%s", err)
-
-		err = deregisterToHorus(true, unitID)
-		if err != nil {
-			logrus.WithField("Endpoints", unitID).Errorf("deregister To Horus,force=true,%s", err)
-		}
-	}
-
-	return err
-}
-
-// fastPing sends an ICMP packet and wait a response,
-// when udp is true,use non-privileged datagram-oriented UDP as ICMP endpoints
-func fastPing(hostname string, count int, udp bool) (bool, error) {
-	type response struct {
-		addr *net.IPAddr
-		rtt  time.Duration
-	}
-
-	p := fastping.NewPinger()
-	if udp {
-		p.Network("udp")
-	}
-
-	netProto := "ip4:icmp"
-	if strings.Index(hostname, ":") != -1 {
-		netProto = "ip6:ipv6-icmp"
-	}
-	ra, err := net.ResolveIPAddr(netProto, hostname)
-	if err != nil {
-		return false, err
-	}
-
-	results := make(map[string]*response)
-	results[ra.String()] = nil
-	p.AddIPAddr(ra)
-
-	onRecv, onIdle := make(chan *response), make(chan bool)
-	p.OnRecv = func(addr *net.IPAddr, t time.Duration) {
-		onRecv <- &response{addr: addr, rtt: t}
-	}
-	p.OnIdle = func() {
-		onIdle <- true
-	}
-
-	p.MaxRTT = time.Millisecond * 200
-	p.RunLoop()
-	defer p.Stop()
-
-	for i, reach := 0, 0; i < count; i++ {
-		select {
-		case res := <-onRecv:
-			if _, ok := results[res.addr.String()]; ok {
-				results[res.addr.String()] = res
-			}
-
-			if res.addr.String() == hostname {
-				reach++
-			}
-			if reach > count/2 {
-				return true, nil
-			}
-		case <-onIdle:
-			for host, r := range results {
-				if r == nil {
-					logrus.Warn("%s : unreachable %v\n", host, time.Now())
-				}
-				results[host] = nil
-			}
-		case <-p.Done():
-			if err = p.Err(); err != nil {
-				return false, err
-			}
-		}
-	}
-
-	return false, errors.New(hostname + ":unreachable")
 }
