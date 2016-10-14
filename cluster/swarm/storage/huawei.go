@@ -101,8 +101,9 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 	if err != nil {
 		return lun, lv, errors.Wrap(err, h.Vendor()+" store alloc")
 	}
+	// size:byte-->MB
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password,
-		strconv.Itoa(rg.StorageRGID), name, strconv.Itoa(size)}
+		strconv.Itoa(rg.StorageRGID), name, strconv.Itoa(size >> 20)}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
