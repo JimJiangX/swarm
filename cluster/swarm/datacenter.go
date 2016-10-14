@@ -1340,7 +1340,7 @@ func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
 
 		list := strings.Split(wwn, ",")
 
-		err := dc.store.AddHost(node.ID, list...)
+		err = dc.store.AddHost(node.ID, list...)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				"Node":   node.Name,
