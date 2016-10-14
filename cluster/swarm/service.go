@@ -725,10 +725,10 @@ func (gd *Gardener) RebuildService(nameOrID string) (*Service, string, string, e
 		return nil, "", "", err
 	}
 
-	if svc.Status != statusServiceAlloctionFailed ||
-		svc.Status != statusServiceCreateFailed ||
+	if svc.Status != statusServiceAlloctionFailed &&
+		svc.Status != statusServiceCreateFailed &&
 		svc.Status != statusServiceStartFailed {
-		return nil, "", "", errors.Errorf("Service status conflict,%d not one of (%d,%d,%d)",
+		return nil, "", "", errors.Errorf("Service status conflict,%d none of (%d,%d,%d)",
 			svc.Status, statusServiceAlloctionFailed, statusServiceCreateFailed, statusServiceStartFailed)
 	}
 
