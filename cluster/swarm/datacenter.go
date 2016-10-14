@@ -75,7 +75,7 @@ type Node struct {
 // NewNodeWitTask returns *Node with *database.Task
 func NewNodeWitTask(addr, name, cluster, user, password, room, seat string, hdd, ssd []string, port, num int) *Node {
 	node := &database.Node{
-		ID:        utils.Generate64UUID(),
+		ID:        utils.Generate32UUID(),
 		Name:      name,
 		ClusterID: cluster,
 		Addr:      addr,
