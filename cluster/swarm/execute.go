@@ -55,7 +55,7 @@ func (gd *Gardener) serviceExecute(svc *Service) (err error) {
 		return err
 	}
 
-	entry.Debug("Service %s Created,running...")
+	entry.Debug("Service Created,running...")
 
 	return nil
 }
