@@ -1227,6 +1227,9 @@ func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
 
 	node.localStore = localStore
 
+	dc.RLock()
+	defer dc.RUnlock()
+
 	if dc.store == nil || dc.store.Driver() != storage.SANStoreDriver {
 		return nil
 	}
