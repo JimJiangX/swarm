@@ -2,6 +2,7 @@ package database
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"strings"
 	"time"
@@ -68,16 +69,6 @@ func ListImages() ([]Image, error) {
 	const query = "SELECT * FROM tb_image"
 
 	err = db.Select(&images, query)
-	if err == nil {
-		return images, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.Select(&images, query)
 
 	return images, errors.Wrap(err, "list []Image")
 }
@@ -91,16 +82,6 @@ func GetImage(name, version string) (Image, error) {
 
 	image := Image{}
 	const query = "SELECT * FROM tb_image WHERE name=? AND version=?"
-
-	err = db.Get(&image, query, name, version)
-	if err == nil {
-		return image, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return Image{}, err
-	}
 
 	err = db.Get(&image, query, name, version)
 
@@ -120,7 +101,7 @@ func GetImageAndUnitConfig(ID string) (Image, UnitConfig, error) {
 	image := Image{}
 	config := UnitConfig{}
 
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return image, config, err
 	}
@@ -151,16 +132,6 @@ func GetImageByID(ID string) (Image, error) {
 	const query = "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?"
 
 	err = db.Get(&image, query, ID, ID)
-	if err == nil {
-		return image, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return Image{}, err
-	}
-
-	err = db.Get(&image, query, ID, ID)
 
 	return image, errors.Wrap(err, "get Image by ID")
 }
@@ -173,16 +144,6 @@ func UpdateImageStatus(ID string, enable bool) error {
 	}
 
 	const query = "UPDATE tb_image SET enabled=? WHERE id=? OR docker_image_id=?"
-	_, err = db.Exec(query, enable, ID, ID)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
-
 	_, err = db.Exec(query, enable, ID, ID)
 
 	return errors.Wrap(err, "update Image by ID")
@@ -218,7 +179,7 @@ func TxDeleteImage(ID string) error {
 
 	image, err := txGetImage(tx, ID)
 	if err != nil {
-		if ErrNoRowsFound == CheckError(err) {
+		if err == sql.ErrNoRows {
 			return nil
 		}
 
@@ -298,7 +259,7 @@ func unitConfigDecode(src string) (map[string]KeysetParams, error) {
 
 // GetUnitConfigByID returns *UnitConfig select by ID
 func GetUnitConfigByID(ID string) (*UnitConfig, error) {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +289,7 @@ type UnitWithConfig struct {
 
 // ListUnitConfigByService returns []UnitWithConfig belongs to service.
 func ListUnitConfigByService(service string) ([]UnitWithConfig, error) {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}

@@ -55,7 +55,7 @@ func (port Port) tableName() string {
 
 // DeletePort delete by port,only if Port.Allocated==allocated
 func DeletePort(port int, allocated bool) error {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -93,15 +93,7 @@ func ListAvailablePorts(num int) ([]Port, error) {
 
 	err = db.Select(&ports, query, false)
 	if err != nil {
-		db, err = getDB(true)
-		if err != nil {
-			return nil, err
-		}
-
-		err = db.Select(&ports, query, false)
-		if err != nil {
-			return nil, errors.Wrap(err, "list []Port")
-		}
+		return nil, errors.Wrap(err, "list []Port")
 	}
 
 	if len(ports) != num {
@@ -202,23 +194,13 @@ func ListPortsByUnit(nameOrID string) ([]Port, error) {
 	const query = "SELECT * FROM tb_port WHERE unit_id=? OR unit_name=?"
 
 	err = db.Select(&ports, query, nameOrID, nameOrID)
-	if err == nil {
-		return ports, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.Select(&ports, query, nameOrID, nameOrID)
 
 	return ports, errors.Wrap(err, "list []Port")
 }
 
 // ListPorts returns []Port by condition start\end\limit.
 func ListPorts(start, end, limit int) ([]Port, error) {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +233,7 @@ func ListPorts(start, end, limit int) ([]Port, error) {
 
 // GetNetworkingByID returns Networking and IP.Prefix select by Networking ID.
 func GetNetworkingByID(ID string) (Networking, int, error) {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return Networking{}, 0, err
 	}
@@ -283,16 +265,6 @@ func ListIPByUnitID(unit string) ([]IP, error) {
 	const query = "SELECT * from tb_ip WHERE unit_id=?"
 
 	err = db.Select(&out, query, unit)
-	if err == nil {
-		return out, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.Select(&out, query, unit)
 
 	return out, errors.Wrap(err, "list []IP by UnitID")
 }
@@ -306,16 +278,6 @@ func ListNetworkingByType(_type string) ([]Networking, error) {
 
 	var list []Networking
 	const query = "SELECT * FROM tb_networking WHERE type=?"
-
-	err = db.Select(&list, query, _type)
-	if err == nil {
-		return list, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
 
 	err = db.Select(&list, query, _type)
 
@@ -333,16 +295,6 @@ func ListNetworking() ([]Networking, error) {
 	const query = "SELECT * FROM tb_networking"
 
 	err = db.Select(&list, query)
-	if err == nil {
-		return list, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.Select(&list, query)
 
 	return list, errors.Wrap(err, "list all []Networking")
 }
@@ -356,16 +308,6 @@ func ListIPByNetworking(networkingID string) ([]IP, error) {
 
 	var list []IP
 	const query = "SELECT * FROM tb_ip WHERE networking_id=?"
-
-	err = db.Select(&list, query, networkingID)
-	if err == nil {
-		return list, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
 
 	err = db.Select(&list, query, networkingID)
 
@@ -421,16 +363,6 @@ func UpdateNetworkingStatus(ID string, enable bool) error {
 	}
 
 	const query = "UPDATE tb_networking SET enabled=? WHERE id=?"
-
-	_, err = db.Exec(query, enable, ID)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
 
 	_, err = db.Exec(query, enable, ID)
 
@@ -497,7 +429,7 @@ func TxDeleteNetworking(ID string) error {
 // one more IP belongs to networking has allocated
 // networking has used in Cluster
 func IsNetwrokingUsed(networking string) (bool, error) {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return false, err
 	}
@@ -536,18 +468,8 @@ func ListIPWithCondition(networking string, allocation bool, num int) ([]IP, err
 	query := fmt.Sprintf("SELECT * from tb_ip WHERE networking_id=? AND allocated=? LIMIT %d", num)
 
 	err = db.Select(&out, query, networking, allocation)
-	if err == nil {
-		return out, nil
-	}
 
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.Select(&out, query, networking, allocation)
-
-	return nil, errors.Wrap(err, "list []IP with condition")
+	return out, errors.Wrap(err, "list []IP with condition")
 }
 
 // TxAllocIPByNetworking update IP UnitID in Tx

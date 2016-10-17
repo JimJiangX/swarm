@@ -102,16 +102,6 @@ func GetUnit(nameOrID string) (Unit, error) {
 	const query = "SELECT * FROM tb_unit WHERE id=? OR name=? OR container_id=?"
 
 	err = db.Get(&u, query, nameOrID, nameOrID, nameOrID)
-	if err == nil {
-		return u, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return u, err
-	}
-
-	err = db.Get(&u, query, nameOrID, nameOrID, nameOrID)
 
 	return u, errors.Wrap(err, "Get Unit By nameOrID")
 }
@@ -156,16 +146,6 @@ func UpdateUnitInfo(unit Unit) error {
 	const query = "UPDATE tb_unit SET name=:name,type=:type,image_id=:image_id,image_name=:image_name,service_id=:service_id,node_id=:node_id,container_id=:container_id,unit_config_id=:unit_config_id,network_mode=:network_mode,status=:status,latest_error=:latest_error,check_interval=:check_interval,created_at=:created_at WHERE id=:id"
 
 	_, err = db.NamedExec(query, &unit)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.NamedExec(query, &unit)
 
 	return errors.Wrap(err, "update Unit params")
 }
@@ -188,7 +168,7 @@ func (u *Unit) StatusCAS(operator string, old, value int64) error {
 
 	query := fmt.Sprintf("UPDATE tb_unit SET status=? WHERE id=? AND status%s?", operator)
 
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -310,16 +290,6 @@ func ListUnitByServiceID(id string) ([]Unit, error) {
 	const query = "SELECT * FROM tb_unit WHERE service_id=?"
 
 	err = db.Select(&out, query, id)
-	if err == nil {
-		return out, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.Select(&out, query, id)
 
 	return out, errors.Wrap(err, "list []Unit by ServiceID")
 }
@@ -333,16 +303,6 @@ func ListUnitByEngine(id string) ([]Unit, error) {
 
 	var out []Unit
 	const query = "SELECT * FROM tb_unit WHERE node_id=?"
-
-	err = db.Select(&out, query, id)
-	if err == nil {
-		return out, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
 
 	err = db.Select(&out, query, id)
 
@@ -360,16 +320,6 @@ func CountUnitByNode(id string) (int, error) {
 	const query = "SELECT COUNT(id) from tb_unit WHERE node_id=?"
 
 	err = db.Get(&count, query, id)
-	if err == nil {
-		return count, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return 0, err
-	}
-
-	err = db.Get(&count, query, id)
 
 	return count, errors.Wrap(err, "count Unit by NodeID")
 }
@@ -380,7 +330,7 @@ func CountUnitsInNodes(engines []string) (int, error) {
 		return 0, nil
 	}
 
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return 0, err
 	}
@@ -465,16 +415,6 @@ func ListServices() ([]Service, error) {
 	const query = "SELECT * FROM tb_service"
 
 	err = db.Select(&out, query)
-	if err == nil {
-		return out, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.Select(&out, query)
 
 	return out, errors.Wrap(err, "list []Service")
 }
@@ -488,16 +428,6 @@ func GetService(nameOrID string) (Service, error) {
 
 	s := Service{}
 	const query = "SELECT * FROM tb_service WHERE id=? OR name=?"
-
-	err = db.Get(&s, query, nameOrID, nameOrID)
-	if err == nil {
-		return s, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return Service{}, err
-	}
 
 	err = db.Get(&s, query, nameOrID, nameOrID)
 
@@ -545,16 +475,6 @@ func UpdateServcieDesc(id, desc string) error {
 	}
 
 	const query = "UPDATE tb_service SET description=? WHERE id=?"
-
-	_, err = db.Exec(query, desc, id)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
 
 	_, err = db.Exec(query, desc, id)
 
@@ -608,7 +528,7 @@ func txInsertSerivce(tx *sqlx.Tx, svc Service) error {
 
 // SetServiceStatus update Service Status
 func (svc *Service) SetServiceStatus(state int64, finish time.Time) error {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
@@ -706,7 +626,7 @@ func (u User) tableName() string {
 
 // ListUsersByService returns []User select by serviceID and User type if assigned
 func ListUsersByService(service, _type string) ([]User, error) {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
