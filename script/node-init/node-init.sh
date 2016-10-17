@@ -338,10 +338,10 @@ install_docker() {
 	for fc_host in `ls /sys/class/fc_host/`
 	do
 		s=`cat /sys/class/fc_host/${fc_host}/port_name | cut -c 3-`
-		wwn=$wwn + $s
+		wwn=${wwn}","${s}
 	done
 	
-	wwn=${wwn:2}
+	wwn=${wwn:1}
 
 	# check nic
 	ifconfig $adm_nic >/dev/null 2>&1 
