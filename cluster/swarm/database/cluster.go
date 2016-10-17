@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"sync/atomic"
 	"time"
 
@@ -144,7 +145,7 @@ func GetCluster(nameOrID string) (Cluster, error) {
 	if err == nil {
 		return c, nil
 	}
-	if _err := CheckError(err); _err == ErrNoRowsFound {
+	if err == sql.ErrNoRows {
 		return c, errors.Wrap(err, "not found Cluster:"+nameOrID)
 	}
 
@@ -399,7 +400,7 @@ func GetNode(nameOrID string) (Node, error) {
 	if err == nil {
 		return node, nil
 	}
-	if _err := CheckError(err); _err == ErrNoRowsFound {
+	if err == sql.ErrNoRows {
 		return node, errors.Wrap(err, "not found Node by:"+nameOrID)
 	}
 
@@ -430,7 +431,7 @@ func GetNodeByAddr(addr string) (Node, error) {
 	if err == nil {
 		return node, nil
 	}
-	if _err := CheckError(err); _err == ErrNoRowsFound {
+	if err == sql.ErrNoRows {
 		return node, errors.Wrap(err, "not found Node by addr:"+addr)
 	}
 
@@ -536,11 +537,29 @@ func ListNodesByEngines(names []string) ([]Node, error) {
 
 	var nodes []Node
 	err = db.Select(&nodes, query, args...)
-	if err == nil {
-		return nodes, nil
+
+	return nodes, errors.Wrapf(err, "list Nodes by engines:%s", names)
+}
+
+// ListNodesByIDs returns nodes,select by ID.
+func ListNodesByIDs(in []string) ([]Node, error) {
+	if len(in) == 0 {
+		return []Node{}, nil
 	}
 
-	return nil, errors.Wrapf(err, "list Nodes by engines:%s", names)
+	db, err := getDB(false)
+	if err != nil {
+		return nil, err
+	}
+	query, args, err := sqlx.In("SELECT * FROM tb_node WHERE id IN (?);", in)
+	if err != nil {
+		return nil, errors.Wrap(err, "select []Node IN IDs")
+	}
+
+	var nodes []Node
+	err = db.Select(&nodes, query, args...)
+
+	return nodes, errors.Wrapf(err, "list Nodes by IDs:%s", in)
 }
 
 // ListNodesByClusters returns nodes,select by clusters\type\enabled.

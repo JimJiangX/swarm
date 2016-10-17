@@ -1632,7 +1632,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	min := 600
 	if len(nodes) > 5 {
-		min = len(nodes) * 120
+		min += len(nodes) * 30
 	}
 	go gd.RegisterNodes(name, nodes, time.Second*time.Duration(min))
 
