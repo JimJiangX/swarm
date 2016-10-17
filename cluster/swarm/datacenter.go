@@ -1227,15 +1227,14 @@ func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
 
 	node.localStore = localStore
 
+	if dc.store == nil || dc.store.Driver() != storage.SANStoreDriver {
+		return nil
+	}
+
 	wwn := eng.Labels[_SAN_HBA_WWN_Lable]
 	if strings.TrimSpace(wwn) != "" {
 
-		if dc.store == nil || dc.store.Driver() != storage.SANStoreDriver {
-			return nil
-		}
-
 		list := strings.Split(wwn, ",")
-
 		err = dc.store.AddHost(node.ID, list...)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
@@ -1244,6 +1243,10 @@ func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
 				"Vendor": dc.store.Vendor(),
 			}).WithError(err).Warn("add node to store")
 		}
+	} else {
+		logrus.WithField("Node", node.Name).Warn("engine label:WWWN is required")
+
+		err = errors.New("Node WWWN is required")
 	}
 
 	return err
