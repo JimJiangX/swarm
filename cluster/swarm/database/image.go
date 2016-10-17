@@ -2,6 +2,7 @@ package database
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"strings"
 	"time"
@@ -218,7 +219,7 @@ func TxDeleteImage(ID string) error {
 
 	image, err := txGetImage(tx, ID)
 	if err != nil {
-		if ErrNoRowsFound == CheckError(err) {
+		if err == sql.ErrNoRows {
 			return nil
 		}
 
