@@ -204,25 +204,18 @@ func txUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int64, finish time.Time, msg
 
 // TxBackupTaskDone insert BackupFile and update Task status in Tx
 func TxBackupTaskDone(task *Task, state int64, backupFile BackupFile) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	do := func(tx *sqlx.Tx) error {
+		err := txInsertBackupFile(tx, backupFile)
+		if err != nil {
+			return err
+		}
 
-	err = txInsertBackupFile(tx, backupFile)
-	if err != nil {
-		return err
-	}
+		err = txUpdateTaskStatus(tx, task, state, time.Now(), "")
 
-	err = txUpdateTaskStatus(tx, task, state, time.Now(), "")
-	if err != nil {
 		return err
 	}
 
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx insert BackupFile and update Task status")
+	return txFrame(do)
 }
 
 // UpdateTaskStatus update Task status
@@ -513,25 +506,18 @@ func TxInsertBackupStrategy(tx *sqlx.Tx, strategy BackupStrategy) error {
 
 // TxInsertBackupStrategyAndTask insert BackupStrategy and Task in a Tx
 func TxInsertBackupStrategyAndTask(strategy BackupStrategy, task Task) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	do := func(tx *sqlx.Tx) error {
+		err := TxInsertBackupStrategy(tx, strategy)
+		if err != nil {
+			return err
+		}
 
-	err = TxInsertBackupStrategy(tx, strategy)
-	if err != nil {
-		return err
-	}
+		err = TxInsertTask(tx, task)
 
-	err = TxInsertTask(tx, task)
-	if err != nil {
 		return err
 	}
 
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx insert BackupStrategy and Task")
+	return txFrame(do)
 }
 
 // InsertBackupStrategy insert BackupStrategy

@@ -30,25 +30,18 @@ func (l LUN) tableName() string {
 // TxInsertLUNAndVolume insert LUN and LocalVolume in a Tx,
 // the LUN is to creating a Volume
 func TxInsertLUNAndVolume(lun LUN, lv LocalVolume) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	do := func(tx *sqlx.Tx) error {
+		_, err := tx.NamedExec(insertLUNQuery, &lun)
+		if err != nil {
+			return errors.Wrap(err, "Tx insert LUN")
+		}
 
-	_, err = tx.NamedExec(insertLUNQuery, &lun)
-	if err != nil {
-		return errors.Wrap(err, "Tx insert LUN")
-	}
+		_, err = tx.NamedExec(insertLocalVolumeQuery, &lv)
 
-	_, err = tx.NamedExec(insertLocalVolumeQuery, &lv)
-	if err != nil {
 		return errors.Wrap(err, "Tx insert LocalVolume")
 	}
 
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx insert LUN and Volume")
+	return txFrame(do)
 }
 
 // DelLunMapping delete a mapping record,set LUN VGName、MappingTo and HostLunID to be null
@@ -159,25 +152,18 @@ func DelLUN(id string) error {
 
 // TxReleaseLun Delete LUN and LocalVolume by Name or VGName
 func TxReleaseLun(name string) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	do := func(tx *sqlx.Tx) error {
+		_, err := tx.Exec("DELETE FROM tb_lun WHERE name OR vg_name=?", name, name)
+		if err != nil {
+			return errors.Wrap(err, "Tx delete LUN")
+		}
 
-	_, err = tx.Exec("DELETE FROM tb_lun WHERE name OR vg_name=?", name, name)
-	if err != nil {
-		return errors.Wrap(err, "Tx delete LUN")
-	}
+		_, err = tx.Exec("DELETE FROM tb_volumes WHERE name OR VGname=?", name, name)
 
-	_, err = tx.Exec("DELETE FROM tb_volumes WHERE name OR VGname=?", name, name)
-	if err != nil {
 		return errors.Wrap(err, "Tx delete LocalVolume")
 	}
 
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx delete LUN and LocalVolume")
+	return txFrame(do)
 }
 
 // ListHostLunIDByMapping returns []int select HostLunID by MappingTo
@@ -415,31 +401,27 @@ func UpdateLocalVolume(nameOrID string, size int) error {
 
 // TxUpdateMultiLocalVolume update Size of LocalVolume by name or ID in a Tx
 func TxUpdateMultiLocalVolume(lvs []LocalVolume) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	stmt, err := tx.Preparex("UPDATE tb_volumes SET size=? WHERE id=? OR name=?")
-	if err != nil {
-		return errors.Wrap(err, "Tx prepare update local Volume")
-	}
-
-	for _, lv := range lvs {
-		_, err := stmt.Exec(lv.Size, lv.ID)
+	do := func(tx *sqlx.Tx) error {
+		stmt, err := tx.Preparex("UPDATE tb_volumes SET size=? WHERE id=? OR name=?")
 		if err != nil {
-			stmt.Close()
-
-			return errors.Wrap(err, "Tx update LocalVolume size")
+			return errors.Wrap(err, "Tx prepare update local Volume")
 		}
+
+		for _, lv := range lvs {
+			_, err := stmt.Exec(lv.Size, lv.ID)
+			if err != nil {
+				stmt.Close()
+
+				return errors.Wrap(err, "Tx update LocalVolume size")
+			}
+		}
+
+		stmt.Close()
+
+		return errors.Wrap(err, "Tx update LocalVolume size")
 	}
 
-	stmt.Close()
-
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx update LocalVolume size")
+	return txFrame(do)
 }
 
 // DeleteLocalVoume delete LocalVolume by name or ID
@@ -465,32 +447,27 @@ func TxDeleteVolume(tx *sqlx.Tx, nameOrID string) error {
 
 // TxDeleteVolumes delete []LocalVoume in a Tx.
 func TxDeleteVolumes(volumes []LocalVolume) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-
-	defer tx.Rollback()
-
-	stmt, err := tx.Preparex("DELETE FROM tb_volumes WHERE id=?")
-	if err != nil {
-		return errors.Wrap(err, "Tx prepare delete []LocalVolume")
-	}
-
-	for i := range volumes {
-		_, err = stmt.Exec(volumes[i].ID)
+	do := func(tx *sqlx.Tx) error {
+		stmt, err := tx.Preparex("DELETE FROM tb_volumes WHERE id=?")
 		if err != nil {
-			stmt.Close()
-
-			return errors.Wrap(err, "Tx delete LocalVolume:"+volumes[i].ID)
+			return errors.Wrap(err, "Tx prepare delete []LocalVolume")
 		}
+
+		for i := range volumes {
+			_, err = stmt.Exec(volumes[i].ID)
+			if err != nil {
+				stmt.Close()
+
+				return errors.Wrap(err, "Tx delete LocalVolume:"+volumes[i].ID)
+			}
+		}
+
+		stmt.Close()
+
+		return errors.Wrap(err, "Tx delete []LocalVolume")
 	}
 
-	stmt.Close()
-
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx delete []LocalVolume")
+	return txFrame(do)
 }
 
 // GetLocalVolume returns LocalVolume select by name or ID

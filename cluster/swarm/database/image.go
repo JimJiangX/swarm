@@ -35,7 +35,6 @@ func (Image) tableName() string {
 
 // TxInsertImage insert Image and UnitConfig in Tx
 func TxInsertImage(image Image, config UnitConfig) error {
-
 	do := func(tx *sqlx.Tx) (err error) {
 		image.ConfigKeySets, err = unitConfigEncode(config.KeySets)
 
@@ -190,11 +189,8 @@ func TxDeleteImage(ID string) error {
 		}
 
 		_, err = tx.Exec("DELETE FROM tb_unit_config WHERE image_id=?", image.ID)
-		if err != nil {
-			return errors.Wrapf(err, "Tx delete UnitConfig by ImageID:%s", image.ID)
-		}
 
-		return nil
+		return errors.Wrapf(err, "Tx delete UnitConfig by ImageID:%s", image.ID)
 	}
 
 	return txFrame(do)

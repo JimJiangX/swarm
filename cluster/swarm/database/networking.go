@@ -144,6 +144,15 @@ loop:
 		})
 	}
 
+	err := txInsertPorts(ports)
+	if err == nil {
+		return len(ports), nil
+	}
+
+	return 0, err
+}
+
+func txInsertPorts(ports []Port) error {
 	do := func(tx *sqlx.Tx) error {
 		stmt, err := tx.PrepareNamed(insertPortQuery)
 		if err != nil {
@@ -159,17 +168,12 @@ loop:
 			}
 		}
 
-		err = stmt.Close()
+		stmt.Close()
 
 		return errors.Wrap(err, "Tx insert []Port")
 	}
 
-	err := txFrame(do)
-	if err == nil {
-		return len(ports), nil
-	}
-
-	return 0, err
+	return txFrame(do)
 }
 
 // ListPortsByUnit returns []Port select by UnitID or UnitName

@@ -713,7 +713,7 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	service, err := database.GetService(name)
 	if err != nil {
 		// get service by unit name or ID
-		service, err = database.TxGetServiceByUnit(name)
+		service, err = database.GetServiceByUnit(name)
 		if err != nil {
 			httpError2(w, err, http.StatusInternalServerError)
 			return
