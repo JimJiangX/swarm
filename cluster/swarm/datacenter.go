@@ -1268,20 +1268,25 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 			}
 
 			err = initNodeStores(dc, nodes[i], eng)
-			if err != nil {
+			if err == nil {
+				err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, statusNodeEnable, statusTaskDone, eng.ID, "")
+				if err != nil {
+					_entry.WithError(err).Error("Node register")
+
+					continue
+				}
+				nodes[i].engine = eng
+				nodes[i].EngineID = eng.ID
+
+			} else {
+
 				_entry.Error(err)
-				continue
+
+				err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, statusNodeInstallFailed, statusTaskFailed, "", err.Error())
+				if err != nil {
+					_entry.WithError(err).Error("Node register Failed")
+				}
 			}
-
-			err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, statusNodeEnable, statusTaskDone, eng.ID, "")
-			if err != nil {
-				_entry.WithError(err).Error("Node register")
-
-				continue
-			}
-
-			nodes[i].engine = eng
-			nodes[i].EngineID = eng.ID
 		}
 	}
 }
@@ -1357,7 +1362,7 @@ func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
 	defer dc.RUnlock()
 
 	if dc.store == nil || dc.store.Driver() != storage.SANStoreDriver {
-		return nil
+		return err
 	}
 
 	wwn := eng.Labels[_SAN_HBA_WWN_Lable]
