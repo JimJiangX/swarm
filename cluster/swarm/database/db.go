@@ -139,7 +139,7 @@ func GetTX() (*sqlx.Tx, error) {
 	return tx, errors.Wrap(err, "Tx begin")
 }
 
-func txFrame(f func(tx *sqlx.Tx) error) error {
+func txFrame(do func(tx *sqlx.Tx) error) error {
 	db, err := getDB(false)
 	if err != nil {
 		return err
@@ -152,10 +152,12 @@ func txFrame(f func(tx *sqlx.Tx) error) error {
 
 	defer tx.Rollback()
 
-	err = f(tx)
+	err = do(tx)
 	if err == nil {
 		err = errors.Wrap(tx.Commit(), "Tx commit")
 	}
 
 	return err
 }
+
+var TxFrame = txFrame

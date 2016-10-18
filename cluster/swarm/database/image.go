@@ -35,27 +35,21 @@ func (Image) tableName() string {
 
 // TxInsertImage insert Image and UnitConfig in Tx
 func TxInsertImage(image Image, config UnitConfig) error {
-	tx, err := GetTX()
-	if err != nil {
+
+	do := func(tx *sqlx.Tx) (err error) {
+		image.ConfigKeySets, err = unitConfigEncode(config.KeySets)
+
+		_, err = tx.NamedExec(insertImageQuery, &image)
+		if err != nil {
+			return errors.Wrap(err, "TX insert Image")
+		}
+
+		err = TXInsertUnitConfig(tx, &config)
+
 		return err
 	}
-	defer tx.Rollback()
 
-	image.ConfigKeySets, err = unitConfigEncode(config.KeySets)
-
-	_, err = tx.NamedExec(insertImageQuery, &image)
-	if err != nil {
-		return errors.Wrap(err, "TX insert Image")
-	}
-
-	err = TXInsertUnitConfig(tx, &config)
-	if err != nil {
-		return errors.Wrap(err, "Tx insert UnitConfig")
-	}
-
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx insert image & UnitConfig")
+	return txFrame(do)
 }
 
 // ListImages returns Image slice select for DB.
@@ -171,42 +165,39 @@ func isImageUsed(tx *sqlx.Tx, image string) (bool, error) {
 
 // TxDeleteImage delete Image and UnitConfig by ID in Tx.
 func TxDeleteImage(ID string) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 
-	image, err := txGetImage(tx, ID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil
+	do := func(tx *sqlx.Tx) error {
+		image, err := txGetImage(tx, ID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return nil
+			}
+
+			return err
 		}
 
-		return err
+		ok, err := isImageUsed(tx, image.ID)
+		if err != nil {
+			return err
+		}
+		if ok {
+			return errors.Errorf("Image %s is using", ID)
+		}
+
+		_, err = tx.Exec("DELETE FROM tb_image WHERE id=? OR docker_image_id=?", ID, ID)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Exec("DELETE FROM tb_unit_config WHERE image_id=?", image.ID)
+		if err != nil {
+			return errors.Wrapf(err, "Tx delete UnitConfig by ImageID:%s", image.ID)
+		}
+
+		return nil
 	}
 
-	ok, err := isImageUsed(tx, image.ID)
-	if err != nil {
-		return err
-	}
-	if ok {
-		return errors.Errorf("Image %s is using", ID)
-	}
-
-	_, err = tx.Exec("DELETE FROM tb_image WHERE id=? OR docker_image_id=?", ID, ID)
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.Exec("DELETE FROM tb_unit_config WHERE image_id=?", image.ID)
-	if err != nil {
-		return errors.Wrapf(err, "Tx delete UnitConfig by ImageID:%s", image.ID)
-	}
-
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx delete Image by ID")
+	return txFrame(do)
 }
 
 const insertUnitConfigQuery = "INSERT INTO tb_unit_config (id,image_id,unit_id,config_file_path,version,parent_id,content,created_at) VALUES (:id,:image_id,:unit_id,:config_file_path,:version,:parent_id,:content,:created_at)"
@@ -376,35 +367,28 @@ func TXInsertUnitConfig(tx *sqlx.Tx, config *UnitConfig) error {
 
 // TxUpdateImageTemplateConfig update Image.TemplateConfigID and insert UnitConfig in Tx.
 func TxUpdateImageTemplateConfig(image string, config UnitConfig) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 
-	err = TXInsertUnitConfig(tx, &config)
-	if err != nil {
-		return err
-	}
-
-	if keysets := ""; len(config.KeySets) == 0 {
-		_, err = tx.Exec("UPDATE tb_image SET template_config_id=? WHERE id=?", config.ID, image)
-	} else {
-		keysets, err = unitConfigEncode(config.KeySets)
+	do := func(tx *sqlx.Tx) error {
+		err := TXInsertUnitConfig(tx, &config)
 		if err != nil {
 			return err
 		}
 
-		_, err = tx.Exec("UPDATE tb_image SET template_config_id=?,config_keysets=? WHERE id=?", config.ID, keysets, image)
-	}
+		if keysets := ""; len(config.KeySets) == 0 {
+			_, err = tx.Exec("UPDATE tb_image SET template_config_id=? WHERE id=?", config.ID, image)
+		} else {
+			keysets, err = unitConfigEncode(config.KeySets)
+			if err != nil {
+				return err
+			}
 
-	if err != nil {
+			_, err = tx.Exec("UPDATE tb_image SET template_config_id=?,config_keysets=? WHERE id=?", config.ID, keysets, image)
+		}
+
 		return errors.Wrap(err, "Tx update Image")
 	}
 
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx update Image Template Config")
+	return txFrame(do)
 }
 
 func txDeleteUnitConfigByUnit(tx *sqlx.Tx, unitID string) error {

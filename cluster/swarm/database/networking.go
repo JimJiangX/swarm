@@ -144,43 +144,32 @@ loop:
 		})
 	}
 
-	tx, err := GetTX()
-	if err != nil {
-		return 0, err
-	}
-	defer tx.Rollback()
-
-	err = txInsertPorts(tx, ports)
-	if err != nil {
-		return 0, err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return 0, errors.Wrap(err, "Tx insert []Port")
-	}
-
-	return len(ports), nil
-}
-
-func txInsertPorts(tx *sqlx.Tx, ports []Port) error {
-	stmt, err := tx.PrepareNamed(insertPortQuery)
-	if err != nil {
-		return errors.Wrap(err, "Tx prepare insert Port")
-	}
-
-	for i := range ports {
-		_, err = stmt.Exec(&ports[i])
+	do := func(tx *sqlx.Tx) error {
+		stmt, err := tx.PrepareNamed(insertPortQuery)
 		if err != nil {
-			stmt.Close()
-
-			return errors.Wrap(err, "Tx insert Port")
+			return errors.Wrap(err, "Tx prepare insert Port")
 		}
+
+		for i := range ports {
+			_, err = stmt.Exec(&ports[i])
+			if err != nil {
+				stmt.Close()
+
+				return errors.Wrap(err, "Tx insert Port")
+			}
+		}
+
+		err = stmt.Close()
+
+		return errors.Wrap(err, "Tx insert []Port")
 	}
 
-	err = stmt.Close()
+	err := txFrame(do)
+	if err == nil {
+		return len(ports), nil
+	}
 
-	return errors.Wrap(err, "Tx insert []Port")
+	return 0, err
 }
 
 // ListPortsByUnit returns []Port select by UnitID or UnitName
@@ -370,59 +359,45 @@ func UpdateNetworkingStatus(ID string, enable bool) error {
 }
 
 func txInsertNetworking(net Networking, ips []IP) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	stmt, err := tx.PrepareNamed(insertIPQuery)
-	if err != nil {
-		return errors.Wrap(err, "Tx prepare insert []IP")
-	}
-
-	for i := range ips {
-		_, err = stmt.Exec(&ips[i])
+	do := func(tx *sqlx.Tx) error {
+		stmt, err := tx.PrepareNamed(insertIPQuery)
 		if err != nil {
-			stmt.Close()
-
-			return errors.Wrap(err, "Tx insert IP")
+			return errors.Wrap(err, "Tx prepare insert []IP")
 		}
-	}
 
-	stmt.Close()
+		for i := range ips {
+			_, err = stmt.Exec(&ips[i])
+			if err != nil {
+				stmt.Close()
 
-	_, err = tx.NamedExec(insertNetworkingQuery, &net)
-	if err != nil {
+				return errors.Wrap(err, "Tx insert IP")
+			}
+		}
+
+		stmt.Close()
+
+		_, err = tx.NamedExec(insertNetworkingQuery, &net)
+
 		return errors.Wrap(err, "Tx insert Networking")
 	}
 
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx insert []IP and Networking")
+	return txFrame(do)
 }
 
 // TxDeleteNetworking delete Networking and []IP in Tx
 func TxDeleteNetworking(ID string) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	do := func(tx *sqlx.Tx) error {
+		_, err := tx.Exec("DELETE FROM tb_networking WHERE id=?", ID)
+		if err != nil {
+			return errors.Wrap(err, "Tx delete Networking by ID")
+		}
 
-	_, err = tx.Exec("DELETE FROM tb_networking WHERE id=?", ID)
-	if err != nil {
-		return errors.Wrap(err, "Tx delete Networking by ID")
-	}
+		_, err = tx.Exec("DELETE FROM tb_ip WHERE networking_id=?", ID)
 
-	_, err = tx.Exec("DELETE FROM tb_ip WHERE networking_id=?", ID)
-	if err != nil {
 		return errors.Wrap(err, "Tx delete []IP by NetworkingID")
 	}
 
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx delete Networking and []IP by ID")
+	return txFrame(do)
 }
 
 // IsNetwrokingUsed returns true on below conditions:
@@ -474,33 +449,29 @@ func ListIPWithCondition(networking string, allocation bool, num int) ([]IP, err
 
 // TxAllocIPByNetworking update IP UnitID in Tx
 func TxAllocIPByNetworking(id, unit string) (IP, error) {
-	tx, err := GetTX()
-	if err != nil {
-		return IP{}, err
-	}
-	defer tx.Rollback()
+	out := &IP{}
 
-	out := IP{}
-	query := tx.Rebind(fmt.Sprintf("SELECT * FROM tb_ip WHERE networking_id=? AND allocated=? LIMIT 1 FOR UPDATE;"))
+	do := func(tx *sqlx.Tx) error {
+		query := tx.Rebind(fmt.Sprintf("SELECT * FROM tb_ip WHERE networking_id=? AND allocated=? LIMIT 1 FOR UPDATE;"))
 
-	err = tx.Get(&out, query, id, false)
-	if err != nil {
-		return out, errors.Wrap(err, "Tx get available IP")
-	}
+		err := tx.Get(out, query, id, false)
+		if err != nil {
+			return errors.Wrap(err, "Tx get available IP")
+		}
 
-	out.Allocated = true
-	out.UnitID = unit
+		out.Allocated = true
+		out.UnitID = unit
 
-	query = "UPDATE tb_ip SET allocated=:allocated,unit_id=:unit_id WHERE ip_addr=:ip_addr AND prefix=:prefix"
+		query = "UPDATE tb_ip SET allocated=:allocated,unit_id=:unit_id WHERE ip_addr=:ip_addr AND prefix=:prefix"
 
-	_, err = tx.NamedExec(query, out)
-	if err != nil {
-		return out, errors.Wrap(err, "tx update IP")
+		_, err = tx.NamedExec(query, *out)
+
+		return errors.Wrap(err, "tx update IP")
 	}
 
-	err = tx.Commit()
+	err := txFrame(do)
 
-	return out, errors.Wrap(err, "tx update IP")
+	return *out, errors.Wrap(err, "tx update IP")
 }
 
 // TxUpdateIPs update []IP in Tx

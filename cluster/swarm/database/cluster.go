@@ -162,35 +162,29 @@ func (n Node) tableName() string {
 
 // TxInsertMultiNodeAndTask insert nodes and tasks in one Tx
 func TxInsertMultiNodeAndTask(nodes []*Node, tasks []*Task) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	// use prepare insert into database
-	stmt, err := tx.PrepareNamed(insertNodeQuery)
-	if err != nil {
-		return errors.Wrap(err, "tx prepare insert Node")
-	}
-	for i := range nodes {
-		_, err = stmt.Exec(nodes[i])
+	do := func(tx *sqlx.Tx) error {
+		// use prepare insert into database
+		stmt, err := tx.PrepareNamed(insertNodeQuery)
 		if err != nil {
-			stmt.Close()
-
-			return errors.Wrap(err, "tx prepare insert []Node")
+			return errors.Wrap(err, "tx prepare insert Node")
 		}
-	}
-	stmt.Close()
 
-	err = TxInsertMultiTask(tx, tasks)
-	if err != nil {
+		for i := range nodes {
+			_, err = stmt.Exec(nodes[i])
+			if err != nil {
+				stmt.Close()
+
+				return errors.Wrap(err, "tx prepare insert []Node")
+			}
+		}
+		stmt.Close()
+
+		err = TxInsertMultiTask(tx, tasks)
+
 		return err
 	}
 
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx insert multiple Node and Task")
+	return txFrame(do)
 }
 
 // UpdateStatus returns error when Node UPDATE tb_node.status.
@@ -233,62 +227,48 @@ func (n *Node) UpdateParams(max int) error {
 
 // TxUpdateNodeStatus returns error when Node UPDATE status.
 func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int64, msg string) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	do := func(tx *sqlx.Tx) error {
+		_, err := tx.Exec("UPDATE tb_node SET status=? WHERE id=?", nstate, n.ID)
+		if err != nil {
+			return errors.Wrap(err, "Tx update Node status")
+		}
 
-	_, err = tx.Exec("UPDATE tb_node SET status=? WHERE id=?", nstate, n.ID)
-	if err != nil {
-		return errors.Wrap(err, "Tx update Node status")
-	}
+		err = txUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
 
-	err = txUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
-	if err != nil {
 		return err
 	}
 
-	err = tx.Commit()
-	if err != nil {
-		return errors.Wrap(err, "Tx update Node status by ID:"+n.ID)
+	err := txFrame(do)
+	if err == nil {
+		n.Status = nstate
 	}
 
-	n.Status = nstate
-
-	return nil
+	return err
 }
 
 // TxUpdateNodeRegister returns error when Node UPDATE infomation.
 func TxUpdateNodeRegister(n *Node, task *Task, nstate, tstate int64, eng, msg string) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	do := func(tx *sqlx.Tx) (err error) {
+		if eng != "" {
+			_, err = tx.Exec("UPDATE tb_node SET engine_id=?,status=?,register_at=? WHERE id=?", eng, nstate, time.Now(), n.ID)
+		} else {
+			_, err = tx.Exec("UPDATE tb_node SET status=?,register_at=? WHERE id=?", nstate, time.Now(), n.ID)
+		}
+		if err != nil {
+			return errors.Wrap(err, "Tx update Node status")
+		}
 
-	if eng != "" {
-		_, err = tx.Exec("UPDATE tb_node SET engine_id=?,status=?,register_at=? WHERE id=?", eng, nstate, time.Now(), n.ID)
-	} else {
-		_, err = tx.Exec("UPDATE tb_node SET status=?,register_at=? WHERE id=?", nstate, time.Now(), n.ID)
-	}
-	if err != nil {
-		return errors.Wrap(err, "Tx update Node status")
-	}
+		err = txUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
 
-	err = txUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
-	if err != nil {
 		return err
 	}
 
-	err = tx.Commit()
-	if err != nil {
-		return errors.Wrap(err, "Tx update Node Status by ID:"+n.ID)
+	err := txFrame(do)
+	if err == nil {
+		atomic.StoreInt64(&n.Status, nstate)
 	}
 
-	atomic.StoreInt64(&n.Status, nstate)
-
-	return nil
+	return err
 }
 
 // GetNode get Node by nameOrID.
