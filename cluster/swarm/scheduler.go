@@ -123,7 +123,7 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 		if pending == nil || pending.engine == nil {
 			continue
 		}
-		out, err := createVolumes(pending.engine, pending.localStore, pending.sanStore)
+		out, err := createVolumes(pending.engine, pending.localStore)
 		volumes = append(volumes, out...)
 		if err != nil {
 			return err

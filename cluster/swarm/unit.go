@@ -275,16 +275,13 @@ func createVolume(eng *cluster.Engine, lv database.LocalVolume) (*types.Volume, 
 	return v, nil
 }
 
-func createSanStoreageVG(host, name string, lun []database.LUN) error {
+func createSanStoreageVG(host, name string) error {
 	logrus.Debugf("Engine %s create San Storeage VG,name=%s", host, name)
 
-	list := make([]database.LUN, 0, len(lun))
-	for i := range lun {
-		if lun[i].Name == name {
-			list = append(list, lun[i])
-		}
+	list, err := database.ListLUNByName(name)
+	if err != nil {
+		return err
 	}
-
 	if len(list) == 0 {
 		return nil
 	}
