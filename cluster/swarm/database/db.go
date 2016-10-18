@@ -136,5 +136,26 @@ func GetTX() (*sqlx.Tx, error) {
 
 	tx, err := db.Beginx()
 
-	return tx, errors.Wrap(err, "TX begin")
+	return tx, errors.Wrap(err, "Tx begin")
+}
+
+func txFrame(f func(tx *sqlx.Tx) error) error {
+	db, err := getDB(false)
+	if err != nil {
+		return err
+	}
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return errors.Wrap(err, "Tx begin")
+	}
+
+	defer tx.Rollback()
+
+	err = f(tx)
+	if err == nil {
+		err = errors.Wrap(tx.Commit(), "Tx commit")
+	}
+
+	return err
 }
