@@ -23,7 +23,7 @@ func TestInsertTask(t *testing.T) {
 
 func TestTxInsertTask(t *testing.T) {
 	task := NewTask(utils.Generate64UUID(), "TaskRelated002", "TaskLinkto002", "TaskDescription002", []string{"TaskLabels021", "TaskLabels022"}, 1021)
-	tx, err := GetTX()
+	tx, err := getTX()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestTxInsertMultiTask(t *testing.T) {
 	t2 := NewTask(utils.Generate64UUID(), "TaskRelated004", "TaskLinkto004", "TaskDescription004", []string{"TaskLabels041", "TaskLabels041"}, 1041)
 
 	tasks := []*Task{&t1, &t2}
-	tx, err := GetTX()
+	tx, err := getTX()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestTxInsertMultiTask(t *testing.T) {
 	finish := time.Now()
 	msg := "msg001"
 
-	tx, err = GetTX()
+	tx, err = getTX()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +161,7 @@ func TestBackupStrategy(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 
-	tx, err := GetTX()
+	tx, err := getTX()
 	if err != nil {
 		t.Fatal(err)
 	}

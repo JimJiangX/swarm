@@ -114,16 +114,6 @@ func (c Configurations) Insert() (int64, error) {
 		return r.LastInsertId()
 	}
 
-	db, err = getDB(true)
-	if err != nil {
-		return 0, err
-	}
-
-	r, err = db.NamedExec(insertConfigurateionQuery, &c)
-	if err == nil {
-		return r.LastInsertId()
-	}
-
 	return 0, errors.Wrap(err, "insert Configurations")
 }
 
@@ -154,16 +144,6 @@ func GetSystemConfig() (*Configurations, error) {
 
 	c := &Configurations{}
 	const query = "SELECT * FROM tb_system_config LIMIT 1"
-
-	err = db.Get(c, query)
-	if err == nil {
-		return c, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
 
 	err = db.Get(c, query)
 

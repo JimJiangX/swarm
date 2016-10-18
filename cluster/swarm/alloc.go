@@ -14,6 +14,7 @@ import (
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/docker/swarm/utils"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
@@ -224,60 +225,57 @@ func (gd *Gardener) resourceRecycle(pendings []*pendingAllocResource) (err error
 	}
 	gd.scheduler.Unlock()
 
-	tx, err := database.GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
 	gd.Lock()
 	defer gd.Unlock()
 
-	for i := range pendings {
-		if pendings[i] == nil {
-			continue
-		}
-
-		if len(pendings[i].networkings) > 0 {
-			ips := pendings[i].recycleNetworking()
-			database.TxUpdateIPs(tx, ips)
-		}
-
-		if pendings[i].unit != nil && len(pendings[i].ports) > 0 {
-			ports := pendings[i].ports
-
-			for p := range ports {
-				ports[p].Allocated = false
-				ports[p].Name = ""
-				ports[p].UnitID = ""
-				ports[p].UnitName = ""
-				ports[p].Proto = ""
-			}
-
-			database.TxUpdatePorts(tx, ports)
-			database.TxDeleteUnit(tx, pendings[i].unit.Unit.ServiceID)
-			database.TxDeleteVolume(tx, pendings[i].unit.Unit.ID)
-		}
-
-		for _, lv := range pendings[i].localStore {
-			database.TxDeleteVolume(tx, lv.ID)
-		}
-
-		gd.Unlock()
-		for _, lun := range pendings[i].sanStore {
-
-			dc, err := gd.datacenterByEngine(pendings[i].unit.Unit.EngineID)
-			if err != nil || dc == nil || dc.store == nil {
+	do := func(tx *sqlx.Tx) error {
+		for i := range pendings {
+			if pendings[i] == nil {
 				continue
 			}
 
-			dc.store.DelMapping(lun.ID)
-			dc.store.Recycle(lun.ID, 0)
+			if len(pendings[i].networkings) > 0 {
+				ips := pendings[i].recycleNetworking()
+				database.TxUpdateIPs(tx, ips)
+			}
+
+			if pendings[i].unit != nil && len(pendings[i].ports) > 0 {
+				ports := pendings[i].ports
+
+				for p := range ports {
+					ports[p].Allocated = false
+					ports[p].Name = ""
+					ports[p].UnitID = ""
+					ports[p].UnitName = ""
+					ports[p].Proto = ""
+				}
+
+				database.TxUpdatePorts(tx, ports)
+				database.TxDeleteUnit(tx, pendings[i].unit.Unit.ServiceID)
+				database.TxDeleteVolume(tx, pendings[i].unit.Unit.ID)
+			}
+
+			for _, lv := range pendings[i].localStore {
+				database.TxDeleteVolume(tx, lv.ID)
+			}
+
+			gd.Unlock()
+			for _, lun := range pendings[i].sanStore {
+
+				dc, err := gd.datacenterByEngine(pendings[i].unit.Unit.EngineID)
+				if err != nil || dc == nil || dc.store == nil {
+					continue
+				}
+
+				dc.store.DelMapping(lun.ID)
+				dc.store.Recycle(lun.ID, 0)
+			}
+			gd.Lock()
 		}
-		gd.Lock()
+		return nil
 	}
 
-	err = tx.Commit()
+	err = database.TxFrame(do)
 
 	return errors.Wrap(err, "alloction resource recycle")
 }

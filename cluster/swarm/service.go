@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"bytes"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -549,8 +550,7 @@ func (gd *Gardener) GetService(nameOrID string) (*Service, error) {
 func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	service, err := database.GetService(nameOrID)
 	if err != nil {
-		if _err := database.CheckError(err); _err == database.ErrNoRowsFound {
-
+		if _err := errors.Cause(err); _err == driver.ErrBadConn {
 			return nil, errors.Wrap(errServiceNotFound, "rebuild Service:"+nameOrID)
 		}
 

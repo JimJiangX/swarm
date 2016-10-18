@@ -30,25 +30,18 @@ func (l LUN) tableName() string {
 // TxInsertLUNAndVolume insert LUN and LocalVolume in a Tx,
 // the LUN is to creating a Volume
 func TxInsertLUNAndVolume(lun LUN, lv LocalVolume) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	do := func(tx *sqlx.Tx) error {
+		_, err := tx.NamedExec(insertLUNQuery, &lun)
+		if err != nil {
+			return errors.Wrap(err, "Tx insert LUN")
+		}
 
-	_, err = tx.NamedExec(insertLUNQuery, &lun)
-	if err != nil {
-		return errors.Wrap(err, "Tx insert LUN")
-	}
+		_, err = tx.NamedExec(insertLocalVolumeQuery, &lv)
 
-	_, err = tx.NamedExec(insertLocalVolumeQuery, &lv)
-	if err != nil {
 		return errors.Wrap(err, "Tx insert LocalVolume")
 	}
 
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx insert LUN and Volume")
+	return txFrame(do)
 }
 
 // DelLunMapping delete a mapping record,set LUN VGName、MappingTo and HostLunID to be null
@@ -62,16 +55,6 @@ func LunMapping(lun, host, vgName string, hlun int) error {
 	}
 
 	const query = "UPDATE tb_lun SET vg_name=?,mapping_hostname=?,host_lun_id=? WHERE id=?"
-
-	_, err = db.Exec(query, vgName, host, hlun, lun)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
 
 	_, err = db.Exec(query, vgName, host, hlun, lun)
 
@@ -89,16 +72,6 @@ func GetLUNByID(id string) (LUN, error) {
 	const query = "SELECT * FROM tb_lun WHERE id=? LIMIT 1"
 
 	err = db.Get(&lun, query, id)
-	if err == nil {
-		return lun, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return lun, err
-	}
-
-	err = db.Get(&lun, query, id)
 
 	return lun, errors.Wrap(err, "get LUN ny ID")
 }
@@ -112,16 +85,6 @@ func ListLUNByName(name string) ([]LUN, error) {
 
 	var list []LUN
 	const query = "SELECT * FROM tb_lun WHERE name=?"
-
-	err = db.Select(&list, query, name)
-	if err == nil {
-		return list, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
 
 	err = db.Select(&list, query, name)
 
@@ -139,16 +102,6 @@ func ListLUNByVgName(name string) ([]LUN, error) {
 	const query = "SELECT * FROM tb_lun WHERE vg_name=?"
 
 	err = db.Select(&list, query, name)
-	if err == nil {
-		return list, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.Select(&list, query, name)
 
 	return list, errors.Wrap(err, "list []LUN by VGName")
 }
@@ -162,16 +115,6 @@ func GetLUNByLunID(systemID string, id int) (LUN, error) {
 
 	lun := LUN{}
 	const query = "SELECT * FROM tb_lun WHERE storage_system_id=? AND storage_lun_id=?"
-
-	err = db.Get(&lun, query, systemID, id)
-	if err == nil {
-		return lun, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return lun, err
-	}
 
 	err = db.Get(&lun, query, systemID, id)
 
@@ -189,16 +132,6 @@ func CountLUNByRaidGroupID(rg string) (int, error) {
 	const query = "SELECT COUNT(id) from tb_lun WHERE raid_group_id=?"
 
 	err = db.Get(&count, query, rg)
-	if err == nil {
-		return count, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return 0, err
-	}
-
-	err = db.Get(&count, query, rg)
 
 	return count, errors.Wrap(err, "count LUN by RaidGroupID")
 }
@@ -213,41 +146,24 @@ func DelLUN(id string) error {
 	const query = "DELETE FROM tb_lun WHERE id=?"
 
 	_, err = db.Exec(query, id)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec(query, id)
 
 	return errors.Wrap(err, "delete LUN by ID")
 }
 
 // TxReleaseLun Delete LUN and LocalVolume by Name or VGName
 func TxReleaseLun(name string) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	do := func(tx *sqlx.Tx) error {
+		_, err := tx.Exec("DELETE FROM tb_lun WHERE name OR vg_name=?", name, name)
+		if err != nil {
+			return errors.Wrap(err, "Tx delete LUN")
+		}
 
-	_, err = tx.Exec("DELETE FROM tb_lun WHERE name OR vg_name=?", name, name)
-	if err != nil {
-		return errors.Wrap(err, "Tx delete LUN")
-	}
+		_, err = tx.Exec("DELETE FROM tb_volumes WHERE name OR VGname=?", name, name)
 
-	_, err = tx.Exec("DELETE FROM tb_volumes WHERE name OR VGname=?", name, name)
-	if err != nil {
 		return errors.Wrap(err, "Tx delete LocalVolume")
 	}
 
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx delete LUN and LocalVolume")
+	return txFrame(do)
 }
 
 // ListHostLunIDByMapping returns []int select HostLunID by MappingTo
@@ -259,16 +175,6 @@ func ListHostLunIDByMapping(host string) ([]int, error) {
 
 	var out []int
 	const query = "SELECT host_lun_id FROM tb_lun WHERE mapping_hostname=?"
-
-	err = db.Select(&out, query, host)
-	if err == nil {
-		return out, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
 
 	err = db.Select(&out, query, host)
 
@@ -284,16 +190,6 @@ func ListLunIDBySystemID(id string) ([]int, error) {
 
 	var out []int
 	const query = "SELECT storage_lun_id FROM tb_lun WHERE storage_system_id=?"
-
-	err = db.Select(&out, query, id)
-	if err == nil {
-		return out, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
 
 	err = db.Select(&out, query, id)
 
@@ -323,19 +219,6 @@ func (r RaidGroup) Insert() error {
 	}
 
 	_, err = db.NamedExec(insertRaidGroupQuery, &r)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.NamedExec(insertRaidGroupQuery, &r)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "Insert RaidGroup")
 }
@@ -350,16 +233,6 @@ func UpdateRaidGroupStatus(ssid string, rgid int, state bool) error {
 	const query = "UPDATE tb_raid_group SET enabled=? WHERE storage_system_id=? AND storage_rg_id=?"
 
 	_, err = db.Exec(query, state, ssid, rgid)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec(query, state, ssid, rgid)
 
 	return errors.Wrap(err, "update RaidGroup.Enabled")
 }
@@ -372,16 +245,6 @@ func UpdateRGStatusByID(id string, state bool) error {
 	}
 
 	const query = "UPDATE tb_raid_group SET enabled=? WHERE id=?"
-
-	_, err = db.Exec(query, state, id)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
 
 	_, err = db.Exec(query, state, id)
 
@@ -399,16 +262,6 @@ func ListRGByStorageID(id string) ([]RaidGroup, error) {
 	const query = "SELECT * FROM tb_raid_group WHERE storage_system_id=?"
 
 	err = db.Select(&out, query, id)
-	if err == nil {
-		return out, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.Select(&out, query, id)
 
 	return out, errors.Wrap(err, "list []RaidGroup by StorageSystemID")
 }
@@ -422,16 +275,6 @@ func GetRaidGroup(id string, rg int) (RaidGroup, error) {
 
 	out := RaidGroup{}
 	const query = "SELECT * FROM tb_raid_group WHERE storage_system_id=? AND storage_rg_id=? LIMIT 1"
-
-	err = db.Get(&out, query, id, rg)
-	if err == nil {
-		return out, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return RaidGroup{}, err
-	}
 
 	err = db.Get(&out, query, id, rg)
 
@@ -448,19 +291,6 @@ func DeleteRaidGroup(id string, rg int) error {
 	const query = "DELETE FROM tb_raid_group WHERE storage_system_id=? AND storage_rg_id=?"
 
 	_, err = db.Exec(query, id, rg)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec(query, id, rg)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "Delete RaidGroup")
 }
@@ -486,16 +316,6 @@ func (HitachiStorage) tableName() string {
 // Insert inserts a new HitachiStorage
 func (hs HitachiStorage) Insert() error {
 	db, err := getDB(false)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.NamedExec(insertHitachiStorageQuery, &hs)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -531,16 +351,6 @@ func (hs HuaweiStorage) Insert() error {
 	}
 
 	_, err = db.NamedExec(insertHuaweiStorageQuery, &hs)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.NamedExec(insertHuaweiStorageQuery, &hs)
 
 	return errors.Wrap(err, "insert HUAWEI Storage")
 }
@@ -571,16 +381,6 @@ func InsertLocalVolume(lv LocalVolume) error {
 	}
 
 	_, err = db.NamedExec(insertLocalVolumeQuery, &lv)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.NamedExec(insertLocalVolumeQuery, &lv)
 
 	return errors.Wrap(err, "insert LocalVolume")
 }
@@ -595,47 +395,33 @@ func UpdateLocalVolume(nameOrID string, size int) error {
 	const query = "UPDATE tb_volumes SET size=? WHERE id=? OR name=?"
 
 	_, err = db.Exec(query, size, nameOrID, nameOrID)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec(query, size, nameOrID, nameOrID)
 
 	return errors.Wrap(err, "update LocalVolume size")
 }
 
 // TxUpdateMultiLocalVolume update Size of LocalVolume by name or ID in a Tx
 func TxUpdateMultiLocalVolume(lvs []LocalVolume) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	stmt, err := tx.Preparex("UPDATE tb_volumes SET size=? WHERE id=? OR name=?")
-	if err != nil {
-		return errors.Wrap(err, "Tx prepare update local Volume")
-	}
-
-	for _, lv := range lvs {
-		_, err := stmt.Exec(lv.Size, lv.ID)
+	do := func(tx *sqlx.Tx) error {
+		stmt, err := tx.Preparex("UPDATE tb_volumes SET size=? WHERE id=? OR name=?")
 		if err != nil {
-			stmt.Close()
-
-			return errors.Wrap(err, "Tx update LocalVolume size")
+			return errors.Wrap(err, "Tx prepare update local Volume")
 		}
+
+		for _, lv := range lvs {
+			_, err := stmt.Exec(lv.Size, lv.ID)
+			if err != nil {
+				stmt.Close()
+
+				return errors.Wrap(err, "Tx update LocalVolume size")
+			}
+		}
+
+		stmt.Close()
+
+		return errors.Wrap(err, "Tx update LocalVolume size")
 	}
 
-	stmt.Close()
-
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx update LocalVolume size")
+	return txFrame(do)
 }
 
 // DeleteLocalVoume delete LocalVolume by name or ID
@@ -646,16 +432,6 @@ func DeleteLocalVoume(nameOrID string) error {
 	}
 
 	const query = "DELETE FROM tb_volumes WHERE id=? OR name=?"
-
-	_, err = db.Exec(query, nameOrID, nameOrID)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
 
 	_, err = db.Exec(query, nameOrID, nameOrID)
 
@@ -671,32 +447,27 @@ func TxDeleteVolume(tx *sqlx.Tx, nameOrID string) error {
 
 // TxDeleteVolumes delete []LocalVoume in a Tx.
 func TxDeleteVolumes(volumes []LocalVolume) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-
-	defer tx.Rollback()
-
-	stmt, err := tx.Preparex("DELETE FROM tb_volumes WHERE id=?")
-	if err != nil {
-		return errors.Wrap(err, "Tx prepare delete []LocalVolume")
-	}
-
-	for i := range volumes {
-		_, err = stmt.Exec(volumes[i].ID)
+	do := func(tx *sqlx.Tx) error {
+		stmt, err := tx.Preparex("DELETE FROM tb_volumes WHERE id=?")
 		if err != nil {
-			stmt.Close()
-
-			return errors.Wrap(err, "Tx delete LocalVolume:"+volumes[i].ID)
+			return errors.Wrap(err, "Tx prepare delete []LocalVolume")
 		}
+
+		for i := range volumes {
+			_, err = stmt.Exec(volumes[i].ID)
+			if err != nil {
+				stmt.Close()
+
+				return errors.Wrap(err, "Tx delete LocalVolume:"+volumes[i].ID)
+			}
+		}
+
+		stmt.Close()
+
+		return errors.Wrap(err, "Tx delete []LocalVolume")
 	}
 
-	stmt.Close()
-
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx delete []LocalVolume")
+	return txFrame(do)
 }
 
 // GetLocalVolume returns LocalVolume select by name or ID
@@ -709,16 +480,6 @@ func GetLocalVolume(nameOrID string) (LocalVolume, error) {
 	}
 
 	const query = "SELECT * FROM tb_volumes WHERE id=? OR name=?"
-
-	err = db.Get(&lv, query, nameOrID, nameOrID)
-	if err == nil {
-		return lv, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return lv, err
-	}
 
 	err = db.Get(&lv, query, nameOrID, nameOrID)
 
@@ -736,16 +497,6 @@ func ListVolumeByVG(name string) ([]LocalVolume, error) {
 	const query = "SELECT * FROM tb_volumes WHERE VGname=?"
 
 	err = db.Select(&lvs, query, name)
-	if err == nil {
-		return lvs, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.Select(&lvs, query, name)
 
 	return lvs, errors.Wrap(err, "list []LocalVolume by VGName")
 }
@@ -761,23 +512,13 @@ func ListVolumesByUnitID(id string) ([]LocalVolume, error) {
 	const query = "SELECT * FROM tb_volumes WHERE unit_id=?"
 
 	err = db.Select(&lvs, query, id)
-	if err == nil {
-		return lvs, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.Select(&lvs, query, id)
 
 	return lvs, errors.Wrap(err, "list []LocalVolume by UnitID")
 }
 
 // GetStorageByID returns *HitachiStorage or *HuaweiStorage,select by ID
 func GetStorageByID(id string) (*HitachiStorage, *HuaweiStorage, error) {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -799,7 +540,7 @@ func GetStorageByID(id string) (*HitachiStorage, *HuaweiStorage, error) {
 
 // ListStorageID returns all StorageSystemID
 func ListStorageID() ([]string, error) {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -826,7 +567,7 @@ func ListStorageID() ([]string, error) {
 
 // DeleteStorageByID delete storage system by ID
 func DeleteStorageByID(id string) error {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}

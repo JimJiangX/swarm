@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -415,7 +416,7 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 	node, err := database.GetNode(nameOrID)
 	if err != nil {
 
-		if errors.Cause(err) == database.ErrNoRowsFound {
+		if errors.Cause(err) == driver.ErrBadConn {
 			return 0, nil
 		}
 
@@ -1182,6 +1183,27 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 }
 
 func dealWithTimeout(nodes []*Node) error {
+	in := make([]string, 0, len(nodes))
+	for i := range nodes {
+		if nodes[i] != nil {
+			in = append(in, nodes[i].ID)
+		}
+	}
+
+	list, err := database.ListNodesByIDs(in)
+	if err != nil {
+		return err
+	}
+
+	for i := range list {
+		for n := range nodes {
+			if list[i].ID == nodes[n].ID {
+				nodes[n].Node = &list[i]
+				break
+			}
+		}
+	}
+
 	for i := range nodes {
 		if nodes[i].Status >= statusNodeEnable {
 			continue

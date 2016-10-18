@@ -33,7 +33,7 @@ func DeleteUnitConfig(id string) error {
 }
 
 func TestTXInsertUnitConfig(t *testing.T) {
-	tx, err := GetTX()
+	tx, err := getTX()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -70,7 +70,7 @@ func TestUnit(t *testing.T) {
 	}
 
 	defer func() {
-		tx, err := GetTX()
+		tx, err := getTX()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -96,7 +96,7 @@ func TestUnit(t *testing.T) {
 		}
 	}()
 
-	tx, err := GetTX()
+	tx, err := getTX()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestUnit(t *testing.T) {
 		unit3,
 	}
 
-	tx, err = GetTX()
+	tx, err = getTX()
 	if err != nil {
 		t.Fatal(err)
 	}
