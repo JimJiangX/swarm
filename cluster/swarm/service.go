@@ -2108,8 +2108,19 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 
 		volumes = append(volumes, lvs...)
 
-		if recycle {
+		if rmVolumes {
+			// remove volumes
+			for i := range lvs {
+				found, err := gd.RemoveVolumes(lvs[i].Name)
+				if err != nil {
+					entry.Errorf("Remove volume=%s,found=%t,error=%+v", lvs[i].Name, found, err)
+					continue
+				}
+				entry.Debug(i, len(lvs), "Remove volume ", lvs[i].Name)
+			}
+		}
 
+		if recycle {
 			dc, err := gd.datacenterByEngine(u.EngineID)
 			if err != nil || dc == nil || dc.store == nil {
 				entry.WithField("Unit", u.Name).Warnf("DatacenterByEngine error:%+v", err)
@@ -2142,17 +2153,6 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 				}
 			}
 		}
-	}
-
-	// remove volumes
-	for i := range volumes {
-		found, err := gd.RemoveVolumes(volumes[i].Name)
-		if err != nil {
-			entry.Errorf("Remove volume=%s,found=%t,error=%+v", volumes[i].Name, found, err)
-			continue
-		}
-
-		entry.Debug(i, len(volumes), "Remove volume ", volumes[i].Name)
 	}
 
 	err = svc.deregisterInHorus()
