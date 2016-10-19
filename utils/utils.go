@@ -180,7 +180,6 @@ func ExecScript(script ...string) (*exec.Cmd, error) {
 	}
 
 	cmd := exec.Command(shell, flag, strings.Join(script, " "))
-	fmt.Println("exec:", cmd.Path, cmd.Args)
 
 	return cmd, nil
 }

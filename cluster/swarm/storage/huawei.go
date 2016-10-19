@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -56,6 +57,7 @@ func (h *huaweiStore) Ping() error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Wrapf(err, "Exec:%s,Output:%s", cmd.Args, output)
 	}
@@ -111,6 +113,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return lun, lv, errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
@@ -178,6 +181,7 @@ func (h *huaweiStore) Recycle(id string, lun int) error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Wrapf(err, "Exec:%s,Output:%s", cmd.Args, output)
 	}
@@ -226,6 +230,7 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
@@ -253,6 +258,7 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
@@ -296,6 +302,7 @@ func (h *huaweiStore) Mapping(host, vg, lun string) error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Wrapf(err, "Exec:%s,Output:%s", cmd.Args, output)
 	}
@@ -324,6 +331,7 @@ func (h *huaweiStore) DelMapping(lun string) error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Wrapf(err, "Exec:%s,Output:%s", cmd.Args, output)
 	}

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -60,6 +61,7 @@ func (h hitachiStore) Ping() error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
@@ -129,6 +131,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
 	}
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return lun, lv, errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
@@ -191,6 +194,7 @@ func (h *hitachiStore) Recycle(id string, lun int) error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
@@ -325,6 +329,7 @@ func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
@@ -351,6 +356,7 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
@@ -395,6 +401,7 @@ func (h *hitachiStore) Mapping(host, vg, lun string) error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
@@ -424,6 +431,7 @@ func (h *hitachiStore) DelMapping(lun string) error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
