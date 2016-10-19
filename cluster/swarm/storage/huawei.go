@@ -186,7 +186,7 @@ func (h *huaweiStore) Recycle(id string, lun int) error {
 		return errors.Wrapf(err, "Exec:%s,Output:%s", cmd.Args, output)
 	}
 
-	err = database.TxReleaseLun(l.Name)
+	err = database.DelLUN(l.ID)
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" recycle")
 	}

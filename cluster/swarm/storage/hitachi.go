@@ -199,7 +199,7 @@ func (h *hitachiStore) Recycle(id string, lun int) error {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
 
-	err = database.TxReleaseLun(l.Name)
+	err = database.DelLUN(l.ID)
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" recycle")
 	}
