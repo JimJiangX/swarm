@@ -2140,33 +2140,17 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 					return err
 				}
 
-				names := make([]string, len(list))
 				hostLuns := make([]int, len(list))
 				for i := range list {
-					names[i] = list[i].Name
 					hostLuns[i] = list[i].HostLunID
 				}
-				config := sdk.DeactivateConfig{
-					VgName:    lvs[i].VGName,
-					Lvname:    names,
-					HostLunID: hostLuns,
-					Vendor:    dc.store.Vendor(),
-				}
 
-				err = u.deactivateVG(config)
-				if err != nil {
-					entry.WithFields(logrus.Fields{
-						"Unit": u.Name,
-						"VG":   lvs[i].VGName,
-					}).WithError(err).Error("deactivate VG")
-				}
-
-				rmVGConfig := sdk.RmVGConfig{
+				config := sdk.RmVGConfig{
 					VgName:    lvs[i].VGName,
 					HostLunID: hostLuns,
 					Vendor:    dc.store.Vendor(),
 				}
-				err = u.rmVG(rmVGConfig)
+				err = u.rmVG(config)
 				if err != nil {
 					entry.WithFields(logrus.Fields{
 						"Unit": u.Name,
