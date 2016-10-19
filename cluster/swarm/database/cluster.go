@@ -551,7 +551,7 @@ func ListNodesByIDs(in []string) ([]Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	query, args, err := sqlx.In("SELECT * FROM tb_node WHERE id IN (?);", in)
+	query, args, err := sqlx.In("SELECT * FROM tbl_dbaas_node WHERE id IN (?);", in)
 	if err != nil {
 		return nil, errors.Wrap(err, "select []Node IN IDs")
 	}
