@@ -2161,7 +2161,18 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 					}).WithError(err).Error("deactivate VG")
 				}
 
-				// TODO:remove VG
+				rmVGConfig := sdk.RmVGConfig{
+					VgName:    lvs[i].VGName,
+					HostLunID: hostLuns,
+					Vendor:    dc.store.Vendor(),
+				}
+				err = u.rmVG(rmVGConfig)
+				if err != nil {
+					entry.WithFields(logrus.Fields{
+						"Unit": u.Name,
+						"VG":   lvs[i].VGName,
+					}).WithError(err).Error("remove VG")
+				}
 
 				for l := range list {
 					err := dc.store.DelMapping(list[l].ID)

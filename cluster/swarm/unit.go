@@ -567,9 +567,18 @@ func (u *unit) deactivateVG(config sdk.DeactivateConfig) error {
 
 	addr := getPluginAddr(engine.IP, pluginPort)
 	err = sdk.SanDeActivate(addr, config)
+
+	return err
+}
+
+func (u *unit) rmVG(config sdk.RmVGConfig) error {
+	engine, err := u.Engine()
 	if err != nil {
-		logrus.Errorf("%s SanDeActivate error:%s", u.Name, err)
+		return err
 	}
+
+	addr := getPluginAddr(engine.IP, pluginPort)
+	err = sdk.RemoveVG(addr, config)
 
 	return err
 }
