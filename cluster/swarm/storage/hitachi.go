@@ -124,7 +124,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 	}
 	// size:byte-->MB
 	param := []string{path, h.hs.AdminUnit,
-		strconv.Itoa(rg.StorageRGID), strconv.Itoa(id), strconv.Itoa(size >> 20)}
+		strconv.Itoa(rg.StorageRGID), strconv.Itoa(id), strconv.Itoa(size>>20 + 100)}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
