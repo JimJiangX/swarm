@@ -278,7 +278,7 @@ func createVolume(eng *cluster.Engine, lv database.LocalVolume) (*types.Volume, 
 func createSanStoreageVG(host, name string) error {
 	logrus.Debugf("Engine %s create San Storeage VG,name=%s", host, name)
 
-	list, err := database.ListLUNByName(name)
+	list, err := database.ListLUNByVgName(name)
 	if err != nil {
 		return err
 	}

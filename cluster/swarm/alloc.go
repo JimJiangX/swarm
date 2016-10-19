@@ -183,16 +183,21 @@ func newPendingAllocResource() *pendingAllocResource {
 func createVolumes(engine *cluster.Engine, lvs []database.LocalVolume) ([]*types.Volume, error) {
 	logrus.Debugf("Engine %s create volumes %d", engine.Addr, len(lvs))
 	volumes := make([]*types.Volume, 0, len(lvs))
+	vglist := make(map[string]struct{}, len(lvs))
 
 	for i := range lvs {
+		vglist[lvs[i].VGName] = struct{}{}
+	}
+	for vg := range vglist {
 		// if volume create on san storage,should created VG before create Volume
-		if isSanVG(lvs[i].VGName) {
-			err := createSanStoreageVG(engine.IP, lvs[i].Name)
+		if isSanVG(vg) {
+			err := createSanStoreageVG(engine.IP, vg)
 			if err != nil {
 				return volumes, err
 			}
 		}
-
+	}
+	for i := range lvs {
 		volume, err := createVolume(engine, lvs[i])
 		if err != nil {
 			return volumes, err
