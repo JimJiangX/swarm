@@ -16,6 +16,7 @@ import (
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
 	"github.com/pkg/errors"
@@ -2139,8 +2140,30 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 					return err
 				}
 
-				for l := range list {
+				names := make([]string, len(list))
+				hostLuns := make([]int, len(list))
+				for i := range list {
+					names[i] = list[i].Name
+					hostLuns[i] = list[i].HostLunID
+				}
+				config := sdk.DeactivateConfig{
+					VgName:    lvs[i].VGName,
+					Lvname:    names,
+					HostLunID: hostLuns,
+					Vendor:    dc.store.Vendor(),
+				}
 
+				err = u.deactivateVG(config)
+				if err != nil {
+					entry.WithFields(logrus.Fields{
+						"Unit": u.Name,
+						"VG":   lvs[i].VGName,
+					}).WithError(err).Error("deactivate VG")
+				}
+
+				// TODO:remove VG
+
+				for l := range list {
 					err := dc.store.DelMapping(list[l].ID)
 					if err != nil {
 						entry.WithField("Unit", u.Name).WithError(err).Errorf("DelMapping,lun:%s", list[l].Name)
