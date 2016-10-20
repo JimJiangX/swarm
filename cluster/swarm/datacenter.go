@@ -465,27 +465,17 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 	}
 
 	dc.RLock()
-	if dc.store != nil && node.engine != nil &&
+	if dc.store != nil &&
 		dc.store.Driver() == storage.SANStoreDriver {
+		err = dc.store.DelHost(node.ID)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"Node":   node.Name,
+				"Store":  dc.store.ID(),
+				"Vendor": dc.store.Vendor(),
+			}).WithError(err).Warn("remove node from store")
 
-		wwn := node.engine.Labels[_SAN_HBA_WWN_Lable]
-		if strings.TrimSpace(wwn) != "" {
-			logrus.WithField("Node", node.Name).Warn("engine label:WWN is required")
-			dc.RUnlock()
-			return 503, errors.New("Node WWN is required")
-
-		} else {
-
-			list := strings.Split(wwn, ",")
-			err = dc.store.DelHost(node.ID, list...)
-			if err != nil {
-				logrus.WithFields(logrus.Fields{
-					"Node":   node.Name,
-					"Store":  dc.store.ID(),
-					"Vendor": dc.store.Vendor(),
-				}).WithError(err).Warn("remove node from store")
-
-				dc.RUnlock()
+			if node.Status == statusNodeEnable || node.Status == statusNodeDisable {
 				return 503, err
 			}
 		}
