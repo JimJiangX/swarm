@@ -15,9 +15,20 @@ expect {
 expect eof
 EOF
 
-if [ $? -ne 0 ]; then
-	echo "create lun fail !"
-	exit 1
-fi
 
-echo $lun_id
+loop=0
+while(( $loop<=10 ))
+do
+	auluref -unit ${admin_unit} -g -lu ${lun_id} | grep -w ${lun_id} | grep -w "Normal"
+	if [ $? -eq 0 ]; then
+		echo "create lun and format succeeded!"
+		exit 0
+	fi
+	
+	let "loop++"
+	sleep 5
+done
+
+# if timeout over exit 1
+echo "check lun status timeout !"
+exit 1
