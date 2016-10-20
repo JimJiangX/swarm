@@ -2,7 +2,7 @@ package swarm
 
 import (
 	"bytes"
-	"database/sql/driver"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -418,37 +418,35 @@ func (gd *Gardener) GetEngine(nameOrID string) (*cluster.Engine, error) {
 
 // RemoveNode remove the assigned Node from the Gardener
 func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
-	node, err := database.GetNode(nameOrID)
+	table, err := database.GetNode(nameOrID)
 	if err != nil {
-
-		if errors.Cause(err) == driver.ErrBadConn {
+		if errors.Cause(err) == sql.ErrNoRows {
 			return 0, nil
 		}
 
 		return 500, err
 	}
 
-	eng, err := gd.GetEngine(node.EngineID)
+	dc, node, err := gd.getNode(table.ID)
 	if err != nil {
 		logrus.Warn(err)
 	}
 
-	if eng != nil {
-		eng.RefreshContainers(false)
-		if num := len(eng.Containers()); num != 0 {
+	if node.engine != nil {
+		node.engine.RefreshContainers(false)
+		if num := len(node.engine.Containers()); num != 0 {
 			return 412, errors.Errorf("%d containers has created on Node %s", num, nameOrID)
 		}
-
-		gd.scheduler.Lock()
-		for _, pending := range gd.pendingContainers {
-			if pending.Engine.ID == node.EngineID {
-				gd.scheduler.Unlock()
-
-				return 412, errors.Errorf("containers has created on Node %s", nameOrID)
-			}
-		}
-		gd.scheduler.Unlock()
 	}
+	gd.scheduler.Lock()
+	for _, pending := range gd.pendingContainers {
+		if pending.Engine.ID == node.EngineID {
+			gd.scheduler.Unlock()
+
+			return 412, errors.Errorf("containers has created on Node %s", nameOrID)
+		}
+	}
+	gd.scheduler.Unlock()
 
 	count, err := database.CountUnitByNode(node.ID)
 	if err != nil || count > 0 {
@@ -466,47 +464,42 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 		}
 	}
 
-	gd.Lock()
-	for i := range gd.datacenters {
-		if gd.datacenters[i].ID == node.ClusterID {
-			dc := gd.datacenters[i]
-			dc.removeNode(nameOrID)
+	dc.RLock()
+	if dc.store != nil && dc.store.Driver() == storage.SANStoreDriver {
+		if node.engine == nil {
+			return 503, errors.New("Node Engine is required")
+		}
 
-			dc.RLock()
-			if dc.store == nil || dc.store.Driver() != storage.SANStoreDriver {
-				dc.RUnlock()
-				break
-			}
+		wwn := node.engine.Labels[_SAN_HBA_WWN_Lable]
+		if strings.TrimSpace(wwn) != "" {
+			logrus.WithField("Node", node.Name).Warn("engine label:WWN is required")
 			dc.RUnlock()
+			return 503, errors.New("Node WWN is required")
 
-			wwn := eng.Labels[_SAN_HBA_WWN_Lable]
-			if strings.TrimSpace(wwn) != "" {
-				logrus.WithField("Node", node.Name).Warn("engine label:WWN is required")
+		} else {
 
-				return 503, errors.New("Node WWN is required")
+			list := strings.Split(wwn, ",")
+			err = dc.store.DelHost(node.ID, list...)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{
+					"Node":   node.Name,
+					"Store":  dc.store.ID(),
+					"Vendor": dc.store.Vendor(),
+				}).WithError(err).Warn("remove node from store")
 
-			} else {
-
-				list := strings.Split(wwn, ",")
-				err = dc.store.DelHost(node.ID, list...)
-				if err != nil {
-					logrus.WithFields(logrus.Fields{
-						"Node":   node.Name,
-						"Store":  dc.store.ID(),
-						"Vendor": dc.store.Vendor(),
-					}).WithError(err).Warn("remove node from store")
-					return 503, err
-				}
+				dc.RUnlock()
+				return 503, err
 			}
-			break
 		}
 	}
-	gd.Unlock()
+	dc.RUnlock()
 
 	err = database.DeleteNode(nameOrID)
 	if err != nil {
 		return 500, err
 	}
+
+	dc.removeNode(nameOrID)
 
 	// ssh exec clean script
 	err = nodeClean(node.ID, node.Addr, user, password)
