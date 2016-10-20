@@ -152,7 +152,7 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	list := make([]structs.NodeInspect, len(nodes))
 	for i := range nodes {
-		list[i] = getNodeInspect(gd, *nodes[i])
+		list[i] = getNodeInspect(gd, nodes[i])
 	}
 
 	resp := structs.PerClusterInfoResponse{

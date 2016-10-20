@@ -595,7 +595,7 @@ func (gd *Gardener) rebuildDatacenter(nameOrID string) (*Datacenter, error) {
 
 	out := make([]*Node, 0, len(nodes))
 	for n := range nodes {
-		node, err := gd.rebuildNode(*nodes[n])
+		node, err := gd.rebuildNode(nodes[n])
 		if err != nil {
 			continue
 		}
