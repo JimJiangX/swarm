@@ -465,10 +465,8 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 	}
 
 	dc.RLock()
-	if dc.store != nil && dc.store.Driver() == storage.SANStoreDriver {
-		if node.engine == nil {
-			return 503, errors.New("Node Engine is required")
-		}
+	if dc.store != nil && node.engine != nil &&
+		dc.store.Driver() == storage.SANStoreDriver {
 
 		wwn := node.engine.Labels[_SAN_HBA_WWN_Lable]
 		if strings.TrimSpace(wwn) != "" {
