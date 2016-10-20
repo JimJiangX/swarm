@@ -471,13 +471,13 @@ func GetAllNodes() ([]Node, error) {
 }
 
 // ListNodeByCluster returns nodes,select by cluster
-func ListNodeByCluster(cluster string) ([]*Node, error) {
+func ListNodeByCluster(cluster string) ([]Node, error) {
 	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
 
-	var nodes []*Node
+	var nodes []Node
 	const query = "SELECT * FROM tbl_dbaas_node WHERE cluster_id=?"
 
 	err = db.Select(&nodes, query, cluster)

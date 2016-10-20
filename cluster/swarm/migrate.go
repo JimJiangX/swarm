@@ -74,15 +74,13 @@ func (dc *Datacenter) listCandidates(candidates []string) ([]database.Node, erro
 			if nodes[n].ID == candidates[i] ||
 				nodes[n].Name == candidates[i] ||
 				nodes[n].EngineID == candidates[i] {
-				out = append(out, *nodes[n])
+				out = append(out, nodes[n])
 				break
 			}
 		}
 	}
 	if len(out) == 0 {
-		for i := range nodes {
-			out = append(out, *nodes[i])
-		}
+		out = nodes
 	}
 
 	return out, nil
