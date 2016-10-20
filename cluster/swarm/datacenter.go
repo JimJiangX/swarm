@@ -466,19 +466,47 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 		}
 	}
 
-	err = database.DeleteNode(nameOrID)
-	if err != nil {
-		return 500, err
-	}
-
 	gd.Lock()
 	for i := range gd.datacenters {
 		if gd.datacenters[i].ID == node.ClusterID {
-			gd.datacenters[i].removeNode(nameOrID)
+			dc := gd.datacenters[i]
+			dc.removeNode(nameOrID)
+
+			dc.RLock()
+			if dc.store == nil || dc.store.Driver() != storage.SANStoreDriver {
+				dc.RUnlock()
+				break
+			}
+			dc.RUnlock()
+
+			wwn := eng.Labels[_SAN_HBA_WWN_Lable]
+			if strings.TrimSpace(wwn) != "" {
+				logrus.WithField("Node", node.Name).Warn("engine label:WWN is required")
+
+				return 503, errors.New("Node WWN is required")
+
+			} else {
+
+				list := strings.Split(wwn, ",")
+				err = dc.store.DelHost(node.ID, list...)
+				if err != nil {
+					logrus.WithFields(logrus.Fields{
+						"Node":   node.Name,
+						"Store":  dc.store.ID(),
+						"Vendor": dc.store.Vendor(),
+					}).WithError(err).Warn("remove node from store")
+					return 503, err
+				}
+			}
 			break
 		}
 	}
 	gd.Unlock()
+
+	err = database.DeleteNode(nameOrID)
+	if err != nil {
+		return 500, err
+	}
 
 	// ssh exec clean script
 	err = nodeClean(node.ID, node.Addr, user, password)
