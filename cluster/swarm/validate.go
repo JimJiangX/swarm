@@ -183,6 +183,10 @@ func ValidCreateService(req structs.PostServiceRequest) error {
 			if !isStringExist(ds.Type, supportedStoreTypes) {
 				buf.WriteString(fmt.Sprintf("unsupported Storage Type '%s' yet,should be one of %s\n", ds.Type, supportedStoreTypes))
 			}
+
+			if ds.Size < 0 {
+				buf.WriteString(fmt.Sprintf("Storage Size '%d' must > 0\n", ds.Size))
+			}
 		}
 	}
 
