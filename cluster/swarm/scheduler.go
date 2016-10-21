@@ -103,13 +103,20 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 			}
 			ok, _err := gd.RemoveVolumes(v.Name)
 			if _err != nil {
-				logrus.Debugf("Remove volume %s:%t,%v", v.Name, ok, _err)
+				logrus.WithError(_err).Warnf("Remove volume %s:%t", v.Name, ok)
 			}
 		}
 
 		for _, pending := range allocs {
 			if pending == nil || pending.engine == nil || len(pending.networkings) == 0 {
 				continue
+			}
+
+			for i := range pending.localStore {
+				_err := delSanVG(pending.engine.IP, pending.localStore[i].VGName)
+				if _err != nil {
+					logrus.WithError(_err).Warnf("Delete SAN VG:%s", pending.localStore[i].VGName)
+				}
 			}
 
 			_err := removeNetworkings(pending.engine.IP, pending.networkings)

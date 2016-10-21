@@ -571,6 +571,38 @@ func (u *unit) deactivateVG(config sdk.DeactivateConfig) error {
 	return err
 }
 
+func delSanVG(host, vg string) error {
+	if !isSanVG(vg) {
+		return nil
+	}
+
+	list, err := database.ListLUNByVgName(vg)
+	if err != nil || len(list) == 0 {
+		return err
+	}
+
+	store, err := storage.GetStore(list[0].StorageSystemID)
+	if err != nil {
+		return err
+	}
+
+	hostLuns := make([]int, len(list))
+	for i := range list {
+		hostLuns[i] = list[i].HostLunID
+	}
+
+	config := sdk.RmVGConfig{
+		VgName:    vg,
+		HostLunID: hostLuns,
+		Vendor:    store.Vendor(),
+	}
+
+	addr := getPluginAddr(host, pluginPort)
+	err = sdk.RemoveVG(addr, config)
+
+	return err
+}
+
 func (u *unit) rmVG(config sdk.RmVGConfig) error {
 	engine, err := u.Engine()
 	if err != nil {
