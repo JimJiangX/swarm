@@ -16,7 +16,6 @@ import (
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
-	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
 	"github.com/pkg/errors"
@@ -2128,33 +2127,17 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 			}
 
 			for i := range lvs {
-
-				if !isSanVG(lvs[i].VGName) {
-					continue
-				}
-
-				list, err := database.ListLUNByVgName(lvs[i].VGName)
-				if err != nil {
-					entry.WithField("Unit", u.Name).WithError(err).Errorf("ListLUNByVgName %s", lvs[i].VGName)
-					return err
-				}
-
-				hostLuns := make([]int, len(list))
-				for i := range list {
-					hostLuns[i] = list[i].HostLunID
-				}
-
-				config := sdk.RmVGConfig{
-					VgName:    lvs[i].VGName,
-					HostLunID: hostLuns,
-					Vendor:    dc.store.Vendor(),
-				}
-				err = u.rmVG(config)
+				err = delSanVG(u.engine.IP, lvs[i].VGName)
 				if err != nil {
 					entry.WithFields(logrus.Fields{
 						"Unit": u.Name,
 						"VG":   lvs[i].VGName,
 					}).WithError(err).Error("remove VG")
+				}
+
+				list, err := database.ListLUNByVgName(lvs[i].VGName)
+				if err != nil {
+					entry.WithField("Unit", u.Name).WithError(err).Errorf("ListLUNByVgName,VG:%s", lvs[i].VGName)
 				}
 
 				for l := range list {
