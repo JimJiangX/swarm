@@ -5,8 +5,9 @@ set -o nounset
 vendor=$1
 hostlun_id=$2
 
+#timeout 180*2=360(s)=6(min)
 loop=0
-while(( $loop<=10 ))
+while(( $loop<=179 ))
 do
 	subdev_name=`lsscsi | grep ":${hostlun_id}]" | grep "${vendor}" | head -n 1 | awk '{print $6}'`
 	if [ "$subdev_name" != '' ]; then
