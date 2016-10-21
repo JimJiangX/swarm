@@ -80,9 +80,9 @@ func SetupDB(c *cli.Context) error {
 }
 
 // MustConnect connects to a database and panics on error.
-func MustConnect(driver, source string, maxOpen int) *sqlx.DB {
+func MustConnect(driver, source string, max int) *sqlx.DB {
 	defaultDB = sqlx.MustConnect(driver, source)
-	defaultDB.SetMaxIdleConns(maxOpen)
+	defaultDB.SetMaxIdleConns(max)
 
 	return defaultDB
 }

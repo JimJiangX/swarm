@@ -68,6 +68,13 @@ type DeactivateConfig struct {
 	Vendor    string   `json:"Vendor"`
 }
 
+// RmVGConfig used in RemoveVG
+type RmVGConfig struct {
+	VgName    string `json:"VgName"`
+	Vendor    string `json:"Vendor"`
+	HostLunID []int  `json:"HostLunId"`
+}
+
 // VolumeFileConfig contains file infomation and volume placed
 // used in CopyFileToVolume
 type VolumeFileConfig struct {
@@ -193,6 +200,18 @@ func SanDeActivate(addr string, opt DeactivateConfig) error {
 	}
 
 	uri := "http://" + addr + "/san/deactivate"
+	return postHTTP(uri, body)
+}
+
+// RemoveVG removes the specified VG on remote host
+// addr is the remote host server agent bind address
+func RemoveVG(addr string, opt RmVGConfig) error {
+	body, err := encodeBody(&opt)
+	if err != nil {
+		return errors.Wrap(err, addr+": Remove VG")
+	}
+
+	uri := "http://" + addr + "/san/vg/remove"
 	return postHTTP(uri, body)
 }
 

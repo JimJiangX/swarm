@@ -450,23 +450,12 @@ func startUnit(engine *cluster.Engine, containerID string,
 }
 
 func stopOldContainer(svc *Service, u *unit) error {
-	ok, err := fastPing(u.engine.IP, 5, true)
-	if ok {
-		err := removeNetworkings(u.engine.IP, u.networkings)
-		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"Unit":   u.Name,
-				"Engine": u.engine.Addr,
-			}).WithError(err).Error("remove Networkings")
-
-			return err
-		}
-	}
+	err := removeNetworkings(u.engine.IP, u.networkings)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"Unit":   u.Name,
-			"Engine": u.engine.IP,
-		}).WithError(err).Warn("ping Engine")
+			"Engine": u.engine.Addr,
+		}).WithError(err).Error("remove Networkings")
 	}
 
 	err = u.forceStopService()

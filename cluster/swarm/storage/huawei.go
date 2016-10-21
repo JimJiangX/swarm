@@ -103,7 +103,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 	}
 	// size:byte-->MB
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password,
-		strconv.Itoa(rg.StorageRGID), name, strconv.Itoa(size >> 20)}
+		strconv.Itoa(rg.StorageRGID), name, strconv.Itoa(size>>20 + 100)}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
@@ -182,7 +182,7 @@ func (h *huaweiStore) Recycle(id string, lun int) error {
 		return errors.Wrapf(err, "Exec:%s,Output:%s", cmd.Args, output)
 	}
 
-	err = database.TxReleaseLun(l.Name)
+	err = database.DelLUN(l.ID)
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" recycle")
 	}

@@ -275,16 +275,13 @@ func createVolume(eng *cluster.Engine, lv database.LocalVolume) (*types.Volume, 
 	return v, nil
 }
 
-func createSanStoreageVG(host, name string, lun []database.LUN) error {
+func createSanStoreageVG(host, name string) error {
 	logrus.Debugf("Engine %s create San Storeage VG,name=%s", host, name)
 
-	list := make([]database.LUN, 0, len(lun))
-	for i := range lun {
-		if lun[i].Name == name {
-			list = append(list, lun[i])
-		}
+	list, err := database.ListLUNByVgName(name)
+	if err != nil {
+		return err
 	}
-
 	if len(list) == 0 {
 		return nil
 	}
@@ -507,7 +504,7 @@ func createNetworking(host string, networkings []IPInfo) error {
 	return nil
 }
 
-func removeNetworkings(host string, networkings []IPInfo) error {
+func removeNetworkings(host string, networkings []IPInfo) (err error) {
 	addr := getPluginAddr(host, pluginPort)
 
 	for _, net := range networkings {
@@ -516,9 +513,11 @@ func removeNetworkings(host string, networkings []IPInfo) error {
 			IPCIDR: fmt.Sprintf("%s/%d", net.IP.String(), net.Prefix),
 		}
 
-		err := sdk.RemoveIP(addr, config)
-		if err != nil {
-			return err
+		er := sdk.RemoveIP(addr, config)
+		if er != nil {
+			logrus.WithField("host", addr).WithError(er).Errorf("remove networking:%v", config)
+
+			err = er
 		}
 	}
 
@@ -571,6 +570,18 @@ func (u *unit) deactivateVG(config sdk.DeactivateConfig) error {
 	if err != nil {
 		logrus.Errorf("%s SanDeActivate error:%s", u.Name, err)
 	}
+
+	return err
+}
+
+func (u *unit) rmVG(config sdk.RmVGConfig) error {
+	engine, err := u.Engine()
+	if err != nil {
+		return err
+	}
+
+	addr := getPluginAddr(engine.IP, pluginPort)
+	err = sdk.RemoveVG(addr, config)
 
 	return err
 }

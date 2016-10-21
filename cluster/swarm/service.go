@@ -2,7 +2,7 @@ package swarm
 
 import (
 	"bytes"
-	"database/sql/driver"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -16,6 +16,7 @@ import (
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
 	"github.com/pkg/errors"
@@ -550,7 +551,7 @@ func (gd *Gardener) GetService(nameOrID string) (*Service, error) {
 func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	service, err := database.GetService(nameOrID)
 	if err != nil {
-		if _err := errors.Cause(err); _err == driver.ErrBadConn {
+		if _err := errors.Cause(err); _err == sql.ErrNoRows {
 			return nil, errors.Wrap(errServiceNotFound, "rebuild Service:"+nameOrID)
 		}
 
@@ -2107,8 +2108,19 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 
 		volumes = append(volumes, lvs...)
 
-		if recycle {
+		if rmVolumes {
+			// remove volumes
+			for i := range lvs {
+				found, err := gd.RemoveVolumes(lvs[i].Name)
+				if err != nil {
+					entry.Errorf("Remove volume=%s,found=%t,error=%+v", lvs[i].Name, found, err)
+					continue
+				}
+				entry.Debug(i, len(lvs), "Remove volume ", lvs[i].Name)
+			}
+		}
 
+		if recycle {
 			dc, err := gd.datacenterByEngine(u.EngineID)
 			if err != nil || dc == nil || dc.store == nil {
 				entry.WithField("Unit", u.Name).Warnf("DatacenterByEngine error:%+v", err)
@@ -2127,8 +2139,25 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 					return err
 				}
 
-				for l := range list {
+				hostLuns := make([]int, len(list))
+				for i := range list {
+					hostLuns[i] = list[i].HostLunID
+				}
 
+				config := sdk.RmVGConfig{
+					VgName:    lvs[i].VGName,
+					HostLunID: hostLuns,
+					Vendor:    dc.store.Vendor(),
+				}
+				err = u.rmVG(config)
+				if err != nil {
+					entry.WithFields(logrus.Fields{
+						"Unit": u.Name,
+						"VG":   lvs[i].VGName,
+					}).WithError(err).Error("remove VG")
+				}
+
+				for l := range list {
 					err := dc.store.DelMapping(list[l].ID)
 					if err != nil {
 						entry.WithField("Unit", u.Name).WithError(err).Errorf("DelMapping,lun:%s", list[l].Name)
@@ -2141,17 +2170,6 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 				}
 			}
 		}
-	}
-
-	// remove volumes
-	for i := range volumes {
-		found, err := gd.RemoveVolumes(volumes[i].Name)
-		if err != nil {
-			entry.Errorf("Remove volume=%s,found=%t,error=%+v", volumes[i].Name, found, err)
-			continue
-		}
-
-		entry.Debug(i, len(volumes), "Remove volume ", volumes[i].Name)
 	}
 
 	err = svc.deregisterInHorus()

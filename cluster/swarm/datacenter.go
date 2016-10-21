@@ -1,7 +1,7 @@
 package swarm
 
 import (
-	"database/sql/driver"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -413,37 +413,35 @@ func (gd *Gardener) GetEngine(nameOrID string) (*cluster.Engine, error) {
 
 // RemoveNode remove the assigned Node from the Gardener
 func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
-	node, err := database.GetNode(nameOrID)
+	table, err := database.GetNode(nameOrID)
 	if err != nil {
-
-		if errors.Cause(err) == driver.ErrBadConn {
+		if errors.Cause(err) == sql.ErrNoRows {
 			return 0, nil
 		}
 
 		return 500, err
 	}
 
-	eng, err := gd.GetEngine(node.EngineID)
+	dc, node, err := gd.getNode(table.ID)
 	if err != nil {
 		logrus.Warn(err)
 	}
 
-	if eng != nil {
-		eng.RefreshContainers(false)
-		if num := len(eng.Containers()); num != 0 {
+	if node.engine != nil {
+		node.engine.RefreshContainers(false)
+		if num := len(node.engine.Containers()); num != 0 {
 			return 412, errors.Errorf("%d containers has created on Node %s", num, nameOrID)
 		}
-
-		gd.scheduler.Lock()
-		for _, pending := range gd.pendingContainers {
-			if pending.Engine.ID == node.EngineID {
-				gd.scheduler.Unlock()
-
-				return 412, errors.Errorf("containers has created on Node %s", nameOrID)
-			}
-		}
-		gd.scheduler.Unlock()
 	}
+	gd.scheduler.Lock()
+	for _, pending := range gd.pendingContainers {
+		if pending.Engine.ID == node.EngineID {
+			gd.scheduler.Unlock()
+
+			return 412, errors.Errorf("containers has created on Node %s", nameOrID)
+		}
+	}
+	gd.scheduler.Unlock()
 
 	count, err := database.CountUnitByNode(node.ID)
 	if err != nil || count > 0 {
@@ -461,19 +459,30 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 		}
 	}
 
+	dc.RLock()
+	if dc.store != nil &&
+		dc.store.Driver() == storage.SANStoreDriver {
+		err = dc.store.DelHost(node.ID)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"Node":   node.Name,
+				"Store":  dc.store.ID(),
+				"Vendor": dc.store.Vendor(),
+			}).WithError(err).Warn("remove node from store")
+
+			if node.Status == statusNodeEnable || node.Status == statusNodeDisable {
+				return 503, err
+			}
+		}
+	}
+	dc.RUnlock()
+
 	err = database.DeleteNode(nameOrID)
 	if err != nil {
 		return 500, err
 	}
 
-	gd.Lock()
-	for i := range gd.datacenters {
-		if gd.datacenters[i].ID == node.ClusterID {
-			gd.datacenters[i].removeNode(nameOrID)
-			break
-		}
-	}
-	gd.Unlock()
+	dc.removeNode(nameOrID)
 
 	// ssh exec clean script
 	err = nodeClean(node.ID, node.Addr, user, password)
@@ -1164,20 +1173,25 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 			}
 
 			err = initNodeStores(dc, nodes[i], eng)
-			if err != nil {
+			if err == nil {
+				err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, statusNodeEnable, statusTaskDone, eng.ID, "")
+				if err != nil {
+					_entry.WithError(err).Error("Node register")
+
+					continue
+				}
+				nodes[i].engine = eng
+				nodes[i].EngineID = eng.ID
+
+			} else {
+
 				_entry.Error(err)
-				continue
+
+				err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, statusNodeInstallFailed, statusTaskFailed, "", err.Error())
+				if err != nil {
+					_entry.WithError(err).Error("Node register Failed")
+				}
 			}
-
-			err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, statusNodeEnable, statusTaskDone, eng.ID, "")
-			if err != nil {
-				_entry.WithError(err).Error("Node register")
-
-				continue
-			}
-
-			nodes[i].engine = eng
-			nodes[i].EngineID = eng.ID
 		}
 	}
 }
@@ -1253,7 +1267,7 @@ func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
 	defer dc.RUnlock()
 
 	if dc.store == nil || dc.store.Driver() != storage.SANStoreDriver {
-		return nil
+		return err
 	}
 
 	wwn := eng.Labels[_SAN_HBA_WWN_Lable]

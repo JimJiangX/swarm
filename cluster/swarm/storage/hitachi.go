@@ -122,7 +122,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 	}
 	// size:byte-->MB
 	param := []string{path, h.hs.AdminUnit,
-		strconv.Itoa(rg.StorageRGID), strconv.Itoa(id), strconv.Itoa(size >> 20)}
+		strconv.Itoa(rg.StorageRGID), strconv.Itoa(id), strconv.Itoa(size>>20 + 100)}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
@@ -195,7 +195,7 @@ func (h *hitachiStore) Recycle(id string, lun int) error {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
 
-	err = database.TxReleaseLun(l.Name)
+	err = database.DelLUN(l.ID)
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" recycle")
 	}
@@ -343,7 +343,7 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 	defer h.lock.Unlock()
 
 	param := []string{path, h.hs.AdminUnit, name}
-	param = append(param, wwwn...)
+	//	param = append(param, wwwn...)
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
