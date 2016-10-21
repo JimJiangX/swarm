@@ -404,7 +404,7 @@ func GetService(nameOrID string) (Service, error) {
 }
 
 // GetServiceByUnit returns Service select by Unit ID or Name.
-func GetServiceByUnit(unit string) (Service, error) {
+func GetServiceByUnit(nameOrID string) (Service, error) {
 	db, err := getDB(false)
 	if err != nil {
 		return Service{}, err
@@ -420,7 +420,7 @@ func GetServiceByUnit(unit string) (Service, error) {
 		service Service
 	)
 
-	err = db.Get(&id, queryUnit, unit)
+	err = db.Get(&id, queryUnit, nameOrID, nameOrID)
 	if err != nil {
 		return Service{}, errors.Wrap(err, "Tx get Unit")
 	}
