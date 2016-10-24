@@ -574,7 +574,7 @@ func (u *unit) deactivateVG(config sdk.DeactivateConfig) error {
 	return err
 }
 
-func delSanVG(host, vg string) error {
+func removeVGAndLUN(host, vg string) error {
 	if !isSanVG(vg) {
 		return nil
 	}
@@ -602,6 +602,23 @@ func delSanVG(host, vg string) error {
 
 	addr := getPluginAddr(host, pluginPort)
 	err = sdk.RemoveVG(addr, config)
+	if err != nil {
+		return err
+	}
+
+	for i := range list {
+		err := store.DelMapping(list[i].ID)
+		if err != nil {
+			logrus.Errorf("DelMapping,lun:%s,%+v", list[i].Name, err)
+			return err
+		}
+
+		err = store.Recycle(list[i].ID, 0)
+		if err != nil {
+			logrus.Errorf("Recycle lun:%s,%+v", list[i].Name, err)
+			return err
+		}
+	}
 
 	return err
 }

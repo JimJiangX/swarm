@@ -2127,29 +2127,14 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 			}
 
 			for i := range lvs {
-				err = delSanVG(u.engine.IP, lvs[i].VGName)
+				err = removeVGAndLUN(u.engine.IP, lvs[i].VGName)
 				if err != nil {
 					entry.WithFields(logrus.Fields{
 						"Unit": u.Name,
 						"VG":   lvs[i].VGName,
-					}).WithError(err).Error("remove VG")
-				}
+					}).WithError(err).Error("recycle VG & LUN")
 
-				list, err := database.ListLUNByVgName(lvs[i].VGName)
-				if err != nil {
-					entry.WithField("Unit", u.Name).WithError(err).Errorf("ListLUNByVgName,VG:%s", lvs[i].VGName)
-				}
-
-				for l := range list {
-					err := dc.store.DelMapping(list[l].ID)
-					if err != nil {
-						entry.WithField("Unit", u.Name).WithError(err).Errorf("DelMapping,lun:%s", list[l].Name)
-					}
-
-					err = dc.store.Recycle(list[l].ID, 0)
-					if err != nil {
-						entry.WithField("Unit", u.Name).WithError(err).Errorf("Recycle lun:%s", list[l].Name)
-					}
+					return err
 				}
 			}
 		}

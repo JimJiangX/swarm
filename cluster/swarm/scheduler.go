@@ -113,7 +113,7 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 			}
 
 			for i := range pending.localStore {
-				_err := delSanVG(pending.engine.IP, pending.localStore[i].VGName)
+				_err := removeVGAndLUN(pending.engine.IP, pending.localStore[i].VGName)
 				if _err != nil {
 					logrus.WithError(_err).Warnf("Delete SAN VG:%s", pending.localStore[i].VGName)
 				}

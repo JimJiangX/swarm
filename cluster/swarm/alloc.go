@@ -264,19 +264,6 @@ func (gd *Gardener) resourceRecycle(pendings []*pendingAllocResource) (err error
 			for _, lv := range pendings[i].localStore {
 				database.TxDeleteVolume(tx, lv.ID)
 			}
-
-			gd.Unlock()
-			for _, lun := range pendings[i].sanStore {
-
-				dc, err := gd.datacenterByEngine(pendings[i].unit.Unit.EngineID)
-				if err != nil || dc == nil || dc.store == nil {
-					continue
-				}
-
-				dc.store.DelMapping(lun.ID)
-				dc.store.Recycle(lun.ID, 0)
-			}
-			gd.Lock()
 		}
 		return nil
 	}
