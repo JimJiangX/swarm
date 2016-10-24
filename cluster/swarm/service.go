@@ -2172,7 +2172,7 @@ func checkContainerError(err error) error {
 		return err
 	}
 
-	if strings.Contains(err.Error(), "Error response from daemon: No such container") {
+	if strings.Contains(err.Error(), "No such container") {
 		return errContainerNotFound
 	}
 
