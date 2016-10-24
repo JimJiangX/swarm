@@ -321,7 +321,10 @@ func (u *unit) removeContainer(force, rmVolumes bool) error {
 
 	err = engine.RemoveContainer(c, force, rmVolumes)
 	if err != nil {
-		return err
+		engine.RefreshContainers(false)
+		if engine.Containers().Get(c.ID) != nil {
+			return err
+		}
 	}
 
 	err = removeNetworkings(engine.IP, u.networkings)
@@ -446,7 +449,15 @@ func (u *unit) kill() error {
 
 	database.TxUpdateUnitStatus(&u.Unit, statusUnitDeleting, "")
 
-	return client.ContainerKill(context.Background(), u.ContainerID, "KILL")
+	err = client.ContainerKill(context.Background(), u.ContainerID, "KILL")
+	if err != nil {
+		err := checkContainerError(err)
+		if err == errContainerNotFound || err == errContainerNotRunning {
+			return nil
+		}
+	}
+
+	return err
 }
 
 func createNetworking(host string, networkings []IPInfo) error {
