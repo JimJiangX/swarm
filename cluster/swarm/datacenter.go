@@ -123,7 +123,7 @@ func SaveMultiNodesToDB(nodes []*Node) error {
 	return database.TxInsertMultiNodeAndTask(list, tasks)
 }
 
-// Datacenter returns Datacenter store in Gardener,if not found try in database and rebuild a Datacenter
+// Datacenter returns Datacenter store in Gardener,if not found try in database and reload the Datacenter
 func (gd *Gardener) Datacenter(nameOrID string) (*Datacenter, error) {
 	gd.RLock()
 	for i := range gd.datacenters {
@@ -137,7 +137,7 @@ func (gd *Gardener) Datacenter(nameOrID string) (*Datacenter, error) {
 	gd.RUnlock()
 
 	// if not found
-	dc, err := gd.rebuildDatacenter(nameOrID)
+	dc, err := gd.reloadDatacenter(nameOrID)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +302,7 @@ func (gd *Gardener) getNode(nameOrID string) (*Datacenter, *Node, error) {
 		return dc, nil, err
 	}
 
-	node, err := gd.rebuildNode(n)
+	node, err := gd.reloadNode(n)
 	if err != nil {
 		return dc, node, err
 	}
@@ -554,8 +554,8 @@ func (dc *Datacenter) isIdleStoreEnough(num, size int) bool {
 	return enough > num
 }
 
-func (gd *Gardener) rebuildDatacenters() error {
-	logrus.Debug("rebuild Datacenters")
+func (gd *Gardener) reloadDatacenters() error {
+	logrus.Debug("reload Datacenters")
 
 	list, err := database.ListClusters()
 	if err != nil {
@@ -566,7 +566,7 @@ func (gd *Gardener) rebuildDatacenters() error {
 	gd.Unlock()
 
 	for i := range list {
-		dc, err := gd.rebuildDatacenter(list[i].ID)
+		dc, err := gd.reloadDatacenter(list[i].ID)
 		if err != nil {
 			continue
 		}
@@ -579,8 +579,8 @@ func (gd *Gardener) rebuildDatacenters() error {
 	return nil
 }
 
-func (gd *Gardener) rebuildDatacenter(nameOrID string) (*Datacenter, error) {
-	logrus.WithField("DC", nameOrID).Debug("rebuild Datacenter")
+func (gd *Gardener) reloadDatacenter(nameOrID string) (*Datacenter, error) {
+	logrus.WithField("DC", nameOrID).Debug("reload Datacenter")
 
 	cl, err := database.GetCluster(nameOrID)
 	if err != nil {
@@ -609,7 +609,7 @@ func (gd *Gardener) rebuildDatacenter(nameOrID string) (*Datacenter, error) {
 
 	out := make([]*Node, 0, len(nodes))
 	for n := range nodes {
-		node, err := gd.rebuildNode(nodes[n])
+		node, err := gd.reloadNode(nodes[n])
 		if err != nil {
 			continue
 		}
@@ -623,7 +623,7 @@ func (gd *Gardener) rebuildDatacenter(nameOrID string) (*Datacenter, error) {
 	return dc, nil
 }
 
-func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
+func (gd *Gardener) reloadNode(n database.Node) (*Node, error) {
 	entry := logrus.WithFields(logrus.Fields{
 		"Name": n.Name,
 		"addr": n.Addr,
@@ -635,7 +635,7 @@ func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
 		engine: eng,
 	}
 	if err != nil {
-		entry.WithError(err).Error("rebuild Node")
+		entry.WithError(err).Error("reload Node")
 
 		return node, err
 	}
@@ -643,7 +643,7 @@ func (gd *Gardener) rebuildNode(n database.Node) (*Node, error) {
 	pluginAddr := fmt.Sprintf("%s:%d", eng.IP, pluginPort)
 	node.localStore, err = storage.NewLocalDisk(pluginAddr, node.Node, 0)
 	if err != nil {
-		entry.WithError(err).Warn("rebuild Node with local Store error")
+		entry.WithError(err).Warn("reload Node with local Store error")
 	}
 
 	return node, nil
@@ -766,7 +766,7 @@ func (gd *Gardener) resourceFilter(list []database.Node, module structs.Module, 
 	gd.RUnlock()
 
 	if length == 0 {
-		err := gd.rebuildDatacenters()
+		err := gd.reloadDatacenters()
 		if err != nil {
 			return nil, err
 		}

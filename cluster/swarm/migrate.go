@@ -129,7 +129,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 	if err != nil {
 		svc.RUnlock()
 
-		svc, err = gd.rebuildService(table.ServiceID)
+		svc, err = gd.reloadService(table.ServiceID)
 		if err != nil {
 			return "", err
 		}
@@ -700,7 +700,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 	if err != nil {
 		svc.RUnlock()
 
-		svc, err = gd.rebuildService(table.ServiceID)
+		svc, err = gd.reloadService(table.ServiceID)
 		if err != nil {
 			return "", err
 		}

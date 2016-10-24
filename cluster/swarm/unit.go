@@ -102,44 +102,7 @@ func (u *unit) containerAPIClient() (*cluster.Engine, client.ContainerAPIClient,
 	return eng, client, nil
 }
 
-//func (gd *Gardener) GetUnit(table database.Unit) (*unit, error) {
-//	var (
-//		svc *Service
-//		u   *unit
-//	)
-//	gd.RLock()
-//	for i := range gd.services {
-//		if gd.services[i].ID == table.ServiceID {
-//			svc = gd.services[i]
-//			break
-//		}
-//	}
-//	gd.RUnlock()
-
-//	if svc != nil {
-//		svc.RLock()
-//		u, _ = svc.getUnit(table.ID)
-//		svc.RUnlock()
-//	}
-
-//	if u == nil || u.engine == nil {
-//		value, err := gd.rebuildUnit(table)
-//		if err != nil {
-//			logrus.WithFields(logrus.Fields{
-//				"Service": svc.Name,
-//				"Unit":    table.Name,
-//			}).Errorf("rebuild Unit:%s", err)
-
-//			return nil, err
-//		}
-
-//		u = &value
-//	}
-
-//	return u, nil
-//}
-
-func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
+func (gd *Gardener) reloadUnit(table database.Unit) (unit, error) {
 	var c *cluster.Container
 	u := unit{
 		Unit: table,
@@ -191,7 +154,7 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 
 	err = u.factory()
 
-	entry.Debugf("rebuild Unit:%v", err)
+	entry.Debugf("reload Unit:%v", err)
 
 	return u, err
 }
