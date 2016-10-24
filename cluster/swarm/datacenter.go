@@ -1148,7 +1148,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 
 	for {
 		if time.Now().After(deadline) {
-			err := dealWithTimeout(nodes)
+			err := dealWithTimeout(nodes, dc.ID)
 
 			return errors.Errorf("Node register timeout %ds,%v", timeout, err)
 		}
@@ -1187,7 +1187,7 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 
 				_entry.Error(err)
 
-				err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, statusNodeInstallFailed, statusTaskFailed, "", err.Error())
+				err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, statusNodeRegisterFailed, statusTaskFailed, "", err.Error())
 				if err != nil {
 					_entry.WithError(err).Error("Node register Failed")
 				}
@@ -1196,7 +1196,10 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 	}
 }
 
-func dealWithTimeout(nodes []*Node) error {
+func dealWithTimeout(nodes []*Node, dc string) error {
+	if len(nodes) == 0 {
+		return nil
+	}
 	in := make([]string, 0, len(nodes))
 	for i := range nodes {
 		if nodes[i] != nil {
@@ -1204,13 +1207,13 @@ func dealWithTimeout(nodes []*Node) error {
 		}
 	}
 
-	list, err := database.ListNodesByIDs(in)
+	list, err := database.ListNodesByIDs(in, dc)
 	if err != nil {
 		return err
 	}
 
-	for i := range list {
-		for n := range nodes {
+	for n := range nodes {
+		for i := range list {
 			if list[i].ID == nodes[n].ID {
 				nodes[n].Node = &list[i]
 				break
@@ -1224,7 +1227,7 @@ func dealWithTimeout(nodes []*Node) error {
 		}
 
 		if nodes[i].Status != statusNodeInstalled {
-			nodes[i].Status = statusNodeInstallFailed
+			nodes[i].Status = statusNodeRegisterTimeout
 		}
 
 		err := database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, nodes[i].Status, statusTaskTimeout, "", "Node Register Timeout")

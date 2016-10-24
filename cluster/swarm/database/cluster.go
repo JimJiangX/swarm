@@ -380,9 +380,9 @@ func ListNodesByEngines(names []string) ([]Node, error) {
 }
 
 // ListNodesByIDs returns nodes,select by ID.
-func ListNodesByIDs(in []string) ([]Node, error) {
+func ListNodesByIDs(in []string, cluster string) ([]Node, error) {
 	if len(in) == 0 {
-		return []Node{}, nil
+		return ListNodeByCluster(cluster)
 	}
 
 	db, err := getDB(false)
