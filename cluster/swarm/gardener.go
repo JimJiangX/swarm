@@ -165,7 +165,7 @@ func (gd *Gardener) syncNodeWithEngine() {
 			}
 
 		} else {
-			node, err = gd.rebuildNode(nodeTab)
+			node, err = gd.reloadNode(nodeTab)
 			if err != nil {
 				continue
 			}
@@ -176,14 +176,14 @@ func (gd *Gardener) syncNodeWithEngine() {
 			}
 		}
 
-		err = gd.rebuildServiceByEngine(engine.ID)
+		err = gd.reloadServiceByEngine(engine.ID)
 		if err != nil {
-			logrus.WithField("Engine", engine.Addr).WithError(err).Warn("sync Node with Engine,rebuild Services on engine")
+			logrus.WithField("Engine", engine.Addr).WithError(err).Warn("sync Node with Engine,reload Services on engine")
 		}
 	}
 }
 
-func (gd *Gardener) rebuildServiceByEngine(engineID string) error {
+func (gd *Gardener) reloadServiceByEngine(engineID string) error {
 	units, err := database.ListUnitByEngine(engineID)
 	if err != nil {
 		return err
@@ -195,9 +195,9 @@ func (gd *Gardener) rebuildServiceByEngine(engineID string) error {
 	}
 
 	for id := range m {
-		_, err := gd.rebuildService(id)
+		_, err := gd.reloadService(id)
 		if err != nil {
-			logrus.WithField("Service", id).WithError(err).Error("rebuild service")
+			logrus.WithField("Service", id).WithError(err).Error("reload service")
 		}
 	}
 

@@ -544,14 +544,14 @@ func (gd *Gardener) GetService(nameOrID string) (*Service, error) {
 
 	gd.RUnlock()
 
-	return gd.rebuildService(nameOrID)
+	return gd.reloadService(nameOrID)
 }
 
-func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
+func (gd *Gardener) reloadService(nameOrID string) (*Service, error) {
 	service, err := database.GetService(nameOrID)
 	if err != nil {
-		if _err := errors.Cause(err); _err == sql.ErrNoRows {
-			return nil, errors.Wrap(errServiceNotFound, "rebuild Service:"+nameOrID)
+		if errors.Cause(err) == sql.ErrNoRows {
+			return nil, errors.Wrap(errServiceNotFound, "reload Service:"+nameOrID)
 		}
 
 		return nil, err
@@ -600,12 +600,12 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 
 	for i := range units {
 		// rebuild units
-		u, err := gd.rebuildUnit(units[i])
+		u, err := gd.reloadUnit(units[i])
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				"Service": service.Name,
 				"Unit":    units[i].Name,
-			}).WithError(err).Error("rebuild unit")
+			}).WithError(err).Error("reload unit")
 		}
 
 		svc.units = append(svc.units, &u)
@@ -630,7 +630,7 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	}
 	gd.Unlock()
 
-	logrus.WithField("Service", service.Name).Debug("rebuild Service")
+	logrus.WithField("Service", service.Name).Debug("reload Service")
 
 	return svc, nil
 }
@@ -720,7 +720,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 
 // RebuildService rebuilds the nameOrID Service
 func (gd *Gardener) RebuildService(nameOrID string) (*Service, string, string, error) {
-	svc, err := gd.rebuildService(nameOrID)
+	svc, err := gd.reloadService(nameOrID)
 	if err != nil {
 		return nil, "", "", err
 	}
