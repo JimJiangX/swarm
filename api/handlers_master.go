@@ -2151,7 +2151,8 @@ func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	req := structs.PostMigrateUnit{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logrus.Warningf("postUnitRebuild,JSON Decode error:%s", err)
+		httpError2(w, err, http.StatusBadRequest)
+		return
 	}
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
@@ -2176,7 +2177,8 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	req := structs.PostRebuildUnit{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logrus.Warningf("postUnitRebuild,JSON Decode error:%s", err)
+		httpError2(w, err, http.StatusBadRequest)
+		return
 	}
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
