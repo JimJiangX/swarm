@@ -168,7 +168,7 @@ func TxDeleteImage(ID string) error {
 	do := func(tx *sqlx.Tx) error {
 		image, err := txGetImage(tx, ID)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Cause(err) == sql.ErrNoRows {
 				return nil
 			}
 
