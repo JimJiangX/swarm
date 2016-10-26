@@ -3,6 +3,7 @@ package storage
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"sort"
 	"strconv"
@@ -77,6 +78,8 @@ func parseSpace(r io.Reader) []Space {
 		if err != nil {
 			break
 		}
+
+		fmt.Printf("rg list:%s", line)
 
 		parts := bytes.Split(line, []byte{' '})
 

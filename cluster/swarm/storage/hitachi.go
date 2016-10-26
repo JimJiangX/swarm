@@ -210,6 +210,7 @@ func (h *hitachiStore) Recycle(id string, lun int) error {
 // Size list store's RGs infomation
 func (h hitachiStore) Size() (map[database.RaidGroup]Space, error) {
 	out, err := database.ListRGByStorageID(h.ID())
+	fmt.Println("san:", h.ID(), out, err)
 	if err != nil {
 		return nil, errors.Wrap(err, h.Vendor()+" size")
 	}
@@ -256,6 +257,8 @@ func (h *hitachiStore) list(rg ...int) ([]Space, error) {
 	} else {
 		list = intSliceToString(rg, " ")
 	}
+
+	fmt.Println("RG list:", list)
 
 	path, err := utils.GetAbsolutePath(false, scriptPath, HITACHI, "listrg.sh")
 	if err != nil {
