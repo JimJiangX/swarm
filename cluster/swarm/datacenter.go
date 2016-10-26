@@ -422,6 +422,11 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 		return 500, err
 	}
 
+	count, err := database.CountUnitByNode(table.EngineID)
+	if err != nil || count > 0 {
+		return 412, errors.Errorf("count Unit by Node,%v,count:%d", err, count)
+	}
+
 	dc, node, err := gd.getNode(table.ID)
 	if err != nil {
 		logrus.Warn(err)
@@ -442,11 +447,6 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 		}
 	}
 	gd.scheduler.Unlock()
-
-	count, err := database.CountUnitByNode(node.ID)
-	if err != nil || count > 0 {
-		return 412, errors.Errorf("count Unit by Node,%v,count:%d", err, count)
-	}
 
 	err = deregisterToHorus(false, node.ID)
 	if err != nil {
