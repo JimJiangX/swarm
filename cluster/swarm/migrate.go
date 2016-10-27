@@ -219,7 +219,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 				// error handle
 				_err := gd.resourceRecycle([]*pendingAllocResource{pending})
 				if _err != nil {
-					entry.Errorf("Recycle,%+v", _err)
+					entry.Errorf("defer resourceRecycle:%+v", _err)
 				}
 			}
 
@@ -242,6 +242,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			err := svc.isolate(migrate.Name)
 			if err != nil {
 				entry.Errorf("isolate container error:%+v", err)
+				return err
 			}
 		}
 
@@ -266,7 +267,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			if err != nil {
 				_, err := migrateVolumes(dc.store, original.ID, original.engine, oldLVs, oldLVs, lunMap, lunSlice)
 				if err != nil {
-					entry.Errorf("migrate volumes,%+v", err)
+					entry.Errorf("defer migrate volumes,%+v", err)
 					//	return err
 				}
 				return
@@ -279,9 +280,9 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 				if isSanVG(oldLVs[i].VGName) {
 					continue
 				}
-				_err := original.localStore.Recycle(oldLVs[i].ID)
+				err := original.localStore.Recycle(oldLVs[i].ID)
 				if err != nil {
-					entry.Errorf("recycle local volume,%+v", _err)
+					entry.Errorf("defer recycle local volume,%+v", err)
 				}
 			}
 		}()
@@ -334,12 +335,12 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 			_err := cleanOldContainer(c, lvs)
 			if _err != nil {
-				entry.Errorf("clean container %s,%+v", c.Info.Name, _err)
+				entry.Errorf("defer,clean container %s,%+v", c.Info.Name, _err)
 			}
 
 			err = removeNetworkings(addr, networkings)
 			if err != nil {
-				entry.Errorf("container %s remove Networkings:%+v", migrate.Name, err)
+				entry.Errorf("defer,container %s remove Networkings:%+v", migrate.Name, err)
 			}
 
 		}(container, engine.IP, networkings, pending.localStore)
@@ -500,6 +501,7 @@ func sanDeactivateAndDelMapping(storage storage.Store, host string,
 		err := sdk.SanDeActivate(addr, config)
 		if err != nil {
 			logrus.Errorf("%s SanDeActivate error:%s", host, err)
+			return err
 		}
 	}
 
@@ -507,6 +509,7 @@ func sanDeactivateAndDelMapping(storage storage.Store, host string,
 		err := storage.DelMapping(lunSlice[i].ID)
 		if err != nil {
 			logrus.Errorf("%s DelMapping %s", storage.Vendor(), lunSlice[i].ID)
+			return err
 		}
 	}
 
