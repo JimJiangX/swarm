@@ -245,7 +245,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			}
 		}
 
-		err = stopOldContainer(svc, migrate)
+		err = stopOldContainer(migrate)
 		if err != nil {
 			return err
 		}
@@ -449,7 +449,7 @@ func startUnit(engine *cluster.Engine, containerID string,
 	return err
 }
 
-func stopOldContainer(svc *Service, u *unit) error {
+func stopOldContainer(u *unit) error {
 	err := removeNetworkings(u.engine.IP, u.networkings)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
@@ -911,7 +911,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			}
 		}
 
-		err = stopOldContainer(svc, rebuild)
+		err = stopOldContainer(rebuild)
 		if err != nil {
 			return err
 		}
