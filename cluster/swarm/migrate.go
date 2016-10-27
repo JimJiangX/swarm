@@ -265,6 +265,13 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		defer func() {
 			if err != nil {
+				if len(lunMap) > 0 {
+					err = sanDeactivateAndDelMapping(dc.store, engine.IP, lunMap, lunSlice)
+					if err != nil {
+						entry.Errorf("defer san Deactivate And DelMapping,%+v", err)
+					}
+				}
+
 				_, err := migrateVolumes(dc.store, original.ID, original.engine, oldLVs, oldLVs, lunMap, lunSlice)
 				if err != nil {
 					entry.Errorf("defer migrate volumes,%+v", err)
