@@ -321,9 +321,9 @@ EOF
 	systemctl daemon-reload
 
 	# Enable & start the service
-	systemctl enable consul
-	systemctl start consul
-        systemctl status consul
+	systemctl enable consul.service
+	systemctl restart consul.service
+        systemctl status consul.service
         if [ $? -ne 0 ]; then
                 echo "start consul failed!"
                 exit 2
@@ -435,9 +435,9 @@ EOF
 	systemctl daemon-reload
 
 	# Enable & start the service
-	systemctl enable docker
-	systemctl start docker
-	systemctl status docker
+	systemctl enable docker.service
+	systemctl restart docker.service
+	systemctl status docker.service
 	if [ $? -ne 0 ]; then
 		echo "start docker failed!"
 		exit 2
@@ -505,9 +505,9 @@ EOF
 	# reload
 	systemctl daemon-reload
 	# Enable & start the service
-	systemctl enable local-volume-plugin
-	systemctl start local-volume-plugin	
-	systemctl status local-volume-plugin
+	systemctl enable local-volume-plugin.service
+	systemctl restart local-volume-plugin.service
+	systemctl status local-volume-plugin.service
         if [ $? -ne 0 ]; then
                 echo "start docker-plugin failed!"
                 exit 2
@@ -562,8 +562,9 @@ EOF
 	systemctl daemon-reload
 
 	# Enable & start the service
-	systemctl enable swarm-agent
-	systemctl start swarm-agent
+	systemctl enable swarm-agent.service
+	systemctl restart swarm-agent.service
+	systemctl status swarm-agent.service
 	if [ $? -ne 0 ]; then
 		echo "start swarm-agent failed!"
 		exit 2
@@ -625,8 +626,9 @@ EOF
 	systemctl daemon-reload
 
 	# Enable & start the service
-	systemctl enable horus-agent
-	systemctl start horus-agent
+	systemctl enable horus-agent.service
+	systemctl restart horus-agent.service
+	systemctl status horus-agent.service
 	if [ $? -ne 0 ]; then
 		echo "start horus-agent failed!"
 		exit 2

@@ -43,6 +43,7 @@ dereg_to_consul() {
 remove_consul() {
 	
 	# stop consul
+	systemctl stop consul.service >/dev/null 2>&1
 	pkill -9 consul >/dev/null 2>&1
 
 	# remove data dir
@@ -56,6 +57,7 @@ remove_consul() {
 
 remove_docker() {
 	# stop docker
+	systemctl stop docker.service >/dev/null 2>&1
 	pkill -9 docker >/dev/null 2>&1
 	rm -rf /usr/bin/docker /usr/bin/docker-containerd /usr/bin/docker-containerd-shim /usr/bin/docker-containerd-ctr /usr/bin/docker-runc
 	rm -rf /etc/sysconfig/docker
@@ -65,6 +67,7 @@ remove_docker() {
 }
 
 remove_docker_plugin() {
+	systemctl stop local-volume-plugin.service >/dev/null 2>&1
 	pkill -9 local-volume-plugin > /dev/null 2>&1
 	rm -rf /usr/local/local_volume_plugin
 	rm -rf /usr/bin/local_volume_plugin
@@ -73,6 +76,7 @@ remove_docker_plugin() {
 
 remove_swarm_agent() {
 	# stop swarm-agent
+	systemctl stop swarm-agent.service >/dev/null 2>&1
 	pkill -9 swarm >/dev/null 2>&1
 	rm -rf /usr/bin/swarm
 	rm -rf /etc/sysconfig/swarm-agent
@@ -81,6 +85,7 @@ remove_swarm_agent() {
 
 remove_horus_agent() {
 	# stop swarm-agent
+	systemctl stop horus-agent.service >/dev/null 2>&1
 	pkill -9 horus-agent >/dev/null 2>&1
 	rm -rf /usr/local/horus-agent
 	rm -rf /usr/bin/horus-agent
