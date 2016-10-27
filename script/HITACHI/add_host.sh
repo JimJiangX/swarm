@@ -41,7 +41,7 @@ do
 		if [ $? -ne 0 ]; then
 			echo "auhgdef failed!"
 			# clean
-			sleep 1
+			#sleep 1
 			#del_host ${admin_unit} ${hostname}
 			exit 1
 		fi
@@ -49,7 +49,7 @@ do
 		if [ $? -ne 0 ]; then
 			echo "auhgwwn failed!"
 			# clean
-			sleep 1
+			#sleep 1
 			#del_host ${admin_unit} ${hostname}
 			exit 1
 		fi
