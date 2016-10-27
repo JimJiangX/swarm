@@ -600,25 +600,25 @@ func migrateVolumes(storage storage.Store, nodeID string,
 	}
 
 	// SanVgCreate
-	for vg, list := range vgMap {
-		l, size := make([]int, len(list)), 0
+	//	for vg, list := range vgMap {
+	//		l, size := make([]int, len(list)), 0
 
-		for i := range list {
-			l[i] = list[i].HostLunID
-			size += list[i].SizeByte
-		}
+	//		for i := range list {
+	//			l[i] = list[i].HostLunID
+	//			size += list[i].SizeByte
+	//		}
 
-		config := sdk.VgConfig{
-			HostLunID: l,
-			VgName:    vg,
-			Type:      storage.Vendor(),
-		}
+	//		config := sdk.VgConfig{
+	//			HostLunID: l,
+	//			VgName:    vg,
+	//			Type:      storage.Vendor(),
+	//		}
 
-		err := sdk.SanVgCreate(addr, config)
-		if err != nil {
-			return nil, err
-		}
-	}
+	//		err := sdk.SanVgCreate(addr, config)
+	//		if err != nil {
+	//			return nil, err
+	//		}
+	//	}
 
 	lvs := make([]database.LocalVolume, len(localStore), len(oldLVs))
 	copy(lvs, localStore)
