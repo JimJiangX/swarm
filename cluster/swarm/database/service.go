@@ -522,7 +522,7 @@ func TxGetServiceByUnit(unit string) (Service, error) {
 		service Service
 	)
 
-	err = tx.Get(&id, queryUnit, unit)
+	err = tx.Get(&id, queryUnit, unit, unit)
 	if err != nil {
 		return Service{}, errors.Wrap(err, "Tx get Unit")
 	}

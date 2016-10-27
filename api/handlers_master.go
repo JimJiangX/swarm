@@ -564,11 +564,14 @@ const (
 
 func getServiceRunningStatus(serviceID string, units []database.Unit,
 	containers cluster.Containers, checks map[string]consulapi.HealthCheck) string {
+	entry := logrus.WithField("Service", serviceID)
+
 	if len(units) == 0 && serviceID != "" {
 		var err error
 		units, err = database.ListUnitByServiceID(serviceID)
 		if err != nil {
-			logrus.Errorf("List Unit By ServiceID Error:%s,serviceID=%s", err, serviceID)
+			entry.WithError(err).Error("List Unit By ServiceID")
+
 			return serviceUnknown
 		}
 	}
@@ -595,39 +598,41 @@ func getServiceRunningStatus(serviceID string, units []database.Unit,
 		count := 0
 		for _, index := range list {
 			u := units[index]
+
+			_log := entry.WithField("Unit", u.Name)
+
+			if u.ContainerID == "" {
+				_log.Warn("Container ID is null")
+			}
 			c := containers.Get(u.ContainerID)
 
 			if c == nil {
 				count++
-
-				logrus.Warnf(" Unit '%s',Not Found Container By '%s'", u.Name, u.ContainerID)
+				_log.Warnf("Not Found Container By '%s'", u.ContainerID)
 				continue
 			}
 			if c.Engine == nil {
 				count++
-
-				logrus.Warnf("Unit '%s',Engine is nil", u.Name)
+				_log.Warnf("Engine is nil,EngineID:'%s'", u.EngineID)
 				continue
 			}
 			if c.State != "running" {
 				count++
-
-				logrus.Warnf("Unit '%s',Container State=%s Status=%s", u.Name, c.State, c.Status)
+				_log.Warnf("Container State=%s Status=%s", c.State, c.Status)
 				continue
 			}
 			if status := c.Engine.Status(); status != "Healthy" {
 				count++
-
-				logrus.Warnf("Unit '%s',Engine Status=%s", u.Name, status)
+				_log.Warnf("Engine Status=%s", status)
 				continue
 			}
 			if val, ok := checks[u.ID]; !ok || val.Status != servicePassing {
 				count++
 
 				if !ok {
-					logrus.Warnf("Unit '%s',Not Found Status In Consul", u.Name)
+					_log.Warn("Not Found Status In Consul")
 				} else {
-					logrus.Warnf("Unit '%s',Status In Consul:'%s'", u.Name, val.Status)
+					_log.Warnf("Status In Consul:'%s'", val.Status)
 				}
 				continue
 			}
@@ -762,7 +767,7 @@ func getServiceResponse(service database.Service, containers cluster.Containers)
 			if err == nil {
 				break
 			} else {
-				logrus.Error(err)
+				logrus.WithError(err).Warn("Get Unit Role From Consul")
 			}
 		}
 	}
@@ -2148,7 +2153,8 @@ func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	req := structs.PostMigrateUnit{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logrus.Warningf("postUnitRebuild,JSON Decode error:%s", err)
+		httpError2(w, err, http.StatusBadRequest)
+		return
 	}
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {
@@ -2173,7 +2179,8 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	req := structs.PostRebuildUnit{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logrus.Warningf("postUnitRebuild,JSON Decode error:%s", err)
+		httpError2(w, err, http.StatusBadRequest)
+		return
 	}
 	ok, _, gd := fromContext(ctx, _Gardener)
 	if !ok && gd == nil {

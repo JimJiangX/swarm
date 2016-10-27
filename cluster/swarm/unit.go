@@ -102,44 +102,7 @@ func (u *unit) containerAPIClient() (*cluster.Engine, client.ContainerAPIClient,
 	return eng, client, nil
 }
 
-//func (gd *Gardener) GetUnit(table database.Unit) (*unit, error) {
-//	var (
-//		svc *Service
-//		u   *unit
-//	)
-//	gd.RLock()
-//	for i := range gd.services {
-//		if gd.services[i].ID == table.ServiceID {
-//			svc = gd.services[i]
-//			break
-//		}
-//	}
-//	gd.RUnlock()
-
-//	if svc != nil {
-//		svc.RLock()
-//		u, _ = svc.getUnit(table.ID)
-//		svc.RUnlock()
-//	}
-
-//	if u == nil || u.engine == nil {
-//		value, err := gd.rebuildUnit(table)
-//		if err != nil {
-//			logrus.WithFields(logrus.Fields{
-//				"Service": svc.Name,
-//				"Unit":    table.Name,
-//			}).Errorf("rebuild Unit:%s", err)
-
-//			return nil, err
-//		}
-
-//		u = &value
-//	}
-
-//	return u, nil
-//}
-
-func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
+func (gd *Gardener) reloadUnit(table database.Unit) (unit, error) {
 	var c *cluster.Container
 	u := unit{
 		Unit: table,
@@ -191,7 +154,7 @@ func (gd *Gardener) rebuildUnit(table database.Unit) (unit, error) {
 
 	err = u.factory()
 
-	entry.Debugf("rebuild Unit:%v", err)
+	entry.Debugf("reload Unit:%v", err)
 
 	return u, err
 }
@@ -358,7 +321,10 @@ func (u *unit) removeContainer(force, rmVolumes bool) error {
 
 	err = engine.RemoveContainer(c, force, rmVolumes)
 	if err != nil {
-		return err
+		engine.RefreshContainers(false)
+		if engine.Containers().Get(c.ID) != nil {
+			return err
+		}
 	}
 
 	err = removeNetworkings(engine.IP, u.networkings)
@@ -483,7 +449,15 @@ func (u *unit) kill() error {
 
 	database.TxUpdateUnitStatus(&u.Unit, statusUnitDeleting, "")
 
-	return client.ContainerKill(context.Background(), u.ContainerID, "KILL")
+	err = client.ContainerKill(context.Background(), u.ContainerID, "KILL")
+	if err != nil {
+		err := checkContainerError(err)
+		if err == errContainerNotFound || err == errContainerNotRunning {
+			return nil
+		}
+	}
+
+	return err
 }
 
 func createNetworking(host string, networkings []IPInfo) error {
@@ -567,6 +541,55 @@ func (u *unit) deactivateVG(config sdk.DeactivateConfig) error {
 
 	addr := getPluginAddr(engine.IP, pluginPort)
 	err = sdk.SanDeActivate(addr, config)
+
+	return err
+}
+
+func removeVGAndLUN(host, vg string) error {
+	if !isSanVG(vg) {
+		return nil
+	}
+
+	list, err := database.ListLUNByVgName(vg)
+	if err != nil || len(list) == 0 {
+		return err
+	}
+
+	store, err := storage.GetStore(list[0].StorageSystemID)
+	if err != nil {
+		return err
+	}
+
+	hostLuns := make([]int, len(list))
+	for i := range list {
+		hostLuns[i] = list[i].HostLunID
+	}
+
+	config := sdk.RmVGConfig{
+		VgName:    vg,
+		HostLunID: hostLuns,
+		Vendor:    store.Vendor(),
+	}
+
+	addr := getPluginAddr(host, pluginPort)
+	err = sdk.RemoveVG(addr, config)
+	if err != nil {
+		return err
+	}
+
+	for i := range list {
+		err := store.DelMapping(list[i].ID)
+		if err != nil {
+			logrus.Errorf("DelMapping,lun:%s,%+v", list[i].Name, err)
+			return err
+		}
+
+		err = store.Recycle(list[i].ID, 0)
+		if err != nil {
+			logrus.Errorf("Recycle lun:%s,%+v", list[i].Name, err)
+			return err
+		}
+	}
 
 	return err
 }

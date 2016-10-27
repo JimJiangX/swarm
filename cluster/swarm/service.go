@@ -16,7 +16,6 @@ import (
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
-	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/utils"
 	"github.com/pkg/errors"
@@ -545,15 +544,15 @@ func (gd *Gardener) GetService(nameOrID string) (*Service, error) {
 
 	gd.RUnlock()
 
-	return gd.rebuildService(nameOrID)
+	return gd.reloadService(nameOrID)
 }
 
-func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
+func (gd *Gardener) reloadService(nameOrID string) (*Service, error) {
 	service, err := database.GetService(nameOrID)
 	if err != nil {
 		if errors.Cause(err) == sql.ErrNoRows {
 
-			return nil, errors.Wrap(errServiceNotFound, "rebuild Service:"+nameOrID)
+			return nil, errors.Wrap(errServiceNotFound, "reload Service:"+nameOrID)
 		}
 
 		return nil, err
@@ -602,12 +601,12 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 
 	for i := range units {
 		// rebuild units
-		u, err := gd.rebuildUnit(units[i])
+		u, err := gd.reloadUnit(units[i])
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				"Service": service.Name,
 				"Unit":    units[i].Name,
-			}).WithError(err).Error("rebuild unit")
+			}).WithError(err).Error("reload unit")
 		}
 
 		svc.units = append(svc.units, &u)
@@ -632,7 +631,7 @@ func (gd *Gardener) rebuildService(nameOrID string) (*Service, error) {
 	}
 	gd.Unlock()
 
-	logrus.WithField("Service", service.Name).Debug("rebuild Service")
+	logrus.WithField("Service", service.Name).Debug("reload Service")
 
 	return svc, nil
 }
@@ -722,7 +721,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 
 // RebuildService rebuilds the nameOrID Service
 func (gd *Gardener) RebuildService(nameOrID string) (*Service, string, string, error) {
-	svc, err := gd.rebuildService(nameOrID)
+	svc, err := gd.reloadService(nameOrID)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -2129,45 +2128,14 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 			}
 
 			for i := range lvs {
-
-				if !isSanVG(lvs[i].VGName) {
-					continue
-				}
-
-				list, err := database.ListLUNByVgName(lvs[i].VGName)
-				if err != nil {
-					entry.WithField("Unit", u.Name).WithError(err).Errorf("ListLUNByVgName %s", lvs[i].VGName)
-					return err
-				}
-
-				hostLuns := make([]int, len(list))
-				for i := range list {
-					hostLuns[i] = list[i].HostLunID
-				}
-
-				config := sdk.RmVGConfig{
-					VgName:    lvs[i].VGName,
-					HostLunID: hostLuns,
-					Vendor:    dc.store.Vendor(),
-				}
-				err = u.rmVG(config)
+				err = removeVGAndLUN(u.engine.IP, lvs[i].VGName)
 				if err != nil {
 					entry.WithFields(logrus.Fields{
 						"Unit": u.Name,
 						"VG":   lvs[i].VGName,
-					}).WithError(err).Error("remove VG")
-				}
+					}).WithError(err).Error("recycle VG & LUN")
 
-				for l := range list {
-					err := dc.store.DelMapping(list[l].ID)
-					if err != nil {
-						entry.WithField("Unit", u.Name).WithError(err).Errorf("DelMapping,lun:%s", list[l].Name)
-					}
-
-					err = dc.store.Recycle(list[l].ID, 0)
-					if err != nil {
-						entry.WithField("Unit", u.Name).WithError(err).Errorf("Recycle lun:%s", list[l].Name)
-					}
+					return err
 				}
 			}
 		}
@@ -2205,7 +2173,7 @@ func checkContainerError(err error) error {
 		return err
 	}
 
-	if strings.Contains(err.Error(), "Error response from daemon: No such container") {
+	if strings.Contains(err.Error(), "No such container") {
 		return errContainerNotFound
 	}
 

@@ -35,11 +35,13 @@ const (
 	statusNodeFailedTest
 	statusNodeEnable
 	statusNodeDisable
-	statusNodeDeregisted
 
 	statusNodeSSHLoginFailed
 	statusNodeSCPFailed
 	statusNodeSSHExecFailed
+	statusNodeRegisterFailed
+	statusNodeRegisterTimeout
+	statusNodeDeregisted
 )
 
 // ParseNodeStatus returns the meaning of the number corresponding
