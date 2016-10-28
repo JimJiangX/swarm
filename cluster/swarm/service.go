@@ -2121,12 +2121,6 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 		}
 
 		if recycle {
-			dc, err := gd.datacenterByEngine(u.EngineID)
-			if err != nil || dc == nil || dc.store == nil {
-				entry.WithField("Unit", u.Name).Warnf("DatacenterByEngine error:%+v", err)
-				continue
-			}
-
 			for i := range lvs {
 				err = removeVGAndLUN(u.engine.IP, lvs[i].VGName)
 				if err != nil {
