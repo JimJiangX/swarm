@@ -27,6 +27,19 @@
 			"revisionTime": "2016-08-02T11:38:42Z"
 		},
 		{
+			"checksumSHA1": "LclVLJYrBi03PBjsVPpgoMbUDQ8=",
+			"path": "github.com/hashicorp/consul/api",
+			"revision": "6a135c52d64bf705419669715bf278b68a981c07",
+			"revisionTime": "2016-11-01T01:28:03Z"
+		},
+		{
+			"checksumSHA1": "fSe5y1UgTDeYlnFfUcDA1zzcw+U=",
+			"origin": "github.com/docker/swarm/vendor/github.com/hashicorp/go-cleanhttp",
+			"path": "github.com/hashicorp/go-cleanhttp",
+			"revision": "875fb671b3ddc66f8e2f0acc33829c8cb989a38d",
+			"revisionTime": "2016-02-17T21:48:20Z"
+		},
+		{
 			"checksumSHA1": "5I0G+0o3xHUQ53jlq70Ujrw0d2A=",
 			"path": "github.com/jmoiron/sqlx",
 			"revision": "7396209bbeada6a4fcc28aa9408f89b2e71cac39",
