@@ -563,20 +563,23 @@ func removeVGAndLUN(host, vg string) error {
 		return err
 	}
 
+	names := make([]string, len(list))
 	hostLuns := make([]int, len(list))
 	for i := range list {
+		names[i] = list[i].Name
 		hostLuns[i] = list[i].HostLunID
 	}
-
-	config := sdk.RmVGConfig{
+	config := sdk.DeactivateConfig{
 		VgName:    vg,
+		Lvname:    names,
 		HostLunID: hostLuns,
 		Vendor:    store.Vendor(),
 	}
-
+	// san volumes
 	addr := getPluginAddr(host, pluginPort)
-	err = sdk.RemoveVG(addr, config)
+	err = sdk.SanDeActivate(addr, config)
 	if err != nil {
+		logrus.Errorf("%s SanDeActivate error:%s", host, err)
 		return err
 	}
 
