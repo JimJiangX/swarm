@@ -3,11 +3,9 @@ package api
 import (
 	"bytes"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -80,9 +78,6 @@ type QueryMeta struct {
 
 	// How long did the request take
 	RequestTime time.Duration
-
-	// Is address translation enabled for HTTP responses on this agent
-	AddressTranslationEnabled bool
 }
 
 // WriteMeta is used to return meta data about a write
@@ -127,58 +122,12 @@ type Config struct {
 	Token string
 }
 
-// TLSConfig is used to generate a TLSClientConfig that's useful for talking to
-// Consul using TLS.
-type TLSConfig struct {
-	// Address is the optional address of the Consul server. The port, if any
-	// will be removed from here and this will be set to the ServerName of the
-	// resulting config.
-	Address string
-
-	// CAFile is the optional path to the CA certificate used for Consul
-	// communication, defaults to the system bundle if not specified.
-	CAFile string
-
-	// CertFile is the optional path to the certificate for Consul
-	// communication. If this is set then you need to also set KeyFile.
-	CertFile string
-
-	// KeyFile is the optional path to the private key for Consul communication.
-	// If this is set then you need to also set CertFile.
-	KeyFile string
-
-	// InsecureSkipVerify if set to true will disable TLS host verification.
-	InsecureSkipVerify bool
-}
-
-// DefaultConfig returns a default configuration for the client. By default this
-// will pool and reuse idle connections to Consul. If you have a long-lived
-// client object, this is the desired behavior and should make the most efficient
-// use of the connections to Consul. If you don't reuse a client object , which
-// is not recommended, then you may notice idle connections building up over
-// time. To avoid this, use the DefaultNonPooledConfig() instead.
+// DefaultConfig returns a default configuration for the client
 func DefaultConfig() *Config {
-	return defaultConfig(cleanhttp.DefaultPooledTransport)
-}
-
-// DefaultNonPooledConfig returns a default configuration for the client which
-// does not pool connections. This isn't a recommended configuration because it
-// will reconnect to Consul on every request, but this is useful to avoid the
-// accumulation of idle connections if you make many client objects during the
-// lifetime of your application.
-func DefaultNonPooledConfig() *Config {
-	return defaultConfig(cleanhttp.DefaultTransport)
-}
-
-// defaultConfig returns the default configuration for the client, using the
-// given function to make the transport.
-func defaultConfig(transportFn func() *http.Transport) *Config {
 	config := &Config{
-		Address: "127.0.0.1:8500",
-		Scheme:  "http",
-		HttpClient: &http.Client{
-			Transport: transportFn(),
-		},
+		Address:    "127.0.0.1:8500",
+		Scheme:     "http",
+		HttpClient: cleanhttp.DefaultClient(),
 	}
 
 	if addr := os.Getenv("CONSUL_HTTP_ADDR"); addr != "" {
@@ -223,68 +172,15 @@ func defaultConfig(transportFn func() *http.Transport) *Config {
 		}
 
 		if !doVerify {
-			tlsClientConfig, err := SetupTLSConfig(&TLSConfig{
+			transport := cleanhttp.DefaultTransport()
+			transport.TLSClientConfig = &tls.Config{
 				InsecureSkipVerify: true,
-			})
-
-			// We don't expect this to fail given that we aren't
-			// parsing any of the input, but we panic just in case
-			// since this doesn't have an error return.
-			if err != nil {
-				panic(err)
 			}
-
-			transport := transportFn()
-			transport.TLSClientConfig = tlsClientConfig
 			config.HttpClient.Transport = transport
 		}
 	}
 
 	return config
-}
-
-// TLSConfig is used to generate a TLSClientConfig that's useful for talking to
-// Consul using TLS.
-func SetupTLSConfig(tlsConfig *TLSConfig) (*tls.Config, error) {
-	tlsClientConfig := &tls.Config{
-		InsecureSkipVerify: tlsConfig.InsecureSkipVerify,
-	}
-
-	if tlsConfig.Address != "" {
-		server := tlsConfig.Address
-		hasPort := strings.LastIndex(server, ":") > strings.LastIndex(server, "]")
-		if hasPort {
-			var err error
-			server, _, err = net.SplitHostPort(server)
-			if err != nil {
-				return nil, err
-			}
-		}
-		tlsClientConfig.ServerName = server
-	}
-
-	if tlsConfig.CertFile != "" && tlsConfig.KeyFile != "" {
-		tlsCert, err := tls.LoadX509KeyPair(tlsConfig.CertFile, tlsConfig.KeyFile)
-		if err != nil {
-			return nil, err
-		}
-		tlsClientConfig.Certificates = []tls.Certificate{tlsCert}
-	}
-
-	if tlsConfig.CAFile != "" {
-		data, err := ioutil.ReadFile(tlsConfig.CAFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read CA file: %v", err)
-		}
-
-		caPool := x509.NewCertPool()
-		if !caPool.AppendCertsFromPEM(data) {
-			return nil, fmt.Errorf("failed to parse CA certificate")
-		}
-		tlsClientConfig.RootCAs = caPool
-	}
-
-	return tlsClientConfig, nil
 }
 
 // Client provides a client to the Consul API
@@ -333,7 +229,6 @@ type request struct {
 	url    *url.URL
 	params url.Values
 	body   io.Reader
-	header http.Header
 	obj    interface{}
 }
 
@@ -359,7 +254,7 @@ func (r *request) setQueryOptions(q *QueryOptions) {
 		r.params.Set("wait", durToMsec(q.WaitTime))
 	}
 	if q.Token != "" {
-		r.header.Set("X-Consul-Token", q.Token)
+		r.params.Set("token", q.Token)
 	}
 	if q.Near != "" {
 		r.params.Set("near", q.Near)
@@ -403,7 +298,7 @@ func (r *request) setWriteOptions(q *WriteOptions) {
 		r.params.Set("dc", q.Datacenter)
 	}
 	if q.Token != "" {
-		r.header.Set("X-Consul-Token", q.Token)
+		r.params.Set("token", q.Token)
 	}
 }
 
@@ -430,7 +325,6 @@ func (r *request) toHTTP() (*http.Request, error) {
 	req.URL.Host = r.url.Host
 	req.URL.Scheme = r.url.Scheme
 	req.Host = r.url.Host
-	req.Header = r.header
 
 	// Setup auth
 	if r.config.HttpAuth != nil {
@@ -451,7 +345,6 @@ func (c *Client) newRequest(method, path string) *request {
 			Path:   path,
 		},
 		params: make(map[string][]string),
-		header: make(http.Header),
 	}
 	if c.config.Datacenter != "" {
 		r.params.Set("dc", c.config.Datacenter)
@@ -460,7 +353,7 @@ func (c *Client) newRequest(method, path string) *request {
 		r.params.Set("wait", durToMsec(r.config.WaitTime))
 	}
 	if c.config.Token != "" {
-		r.header.Set("X-Consul-Token", r.config.Token)
+		r.params.Set("token", r.config.Token)
 	}
 	return r
 }
@@ -545,15 +438,6 @@ func parseQueryMeta(resp *http.Response, q *QueryMeta) error {
 	default:
 		q.KnownLeader = false
 	}
-
-	// Parse X-Consul-Translate-Addresses
-	switch header.Get("X-Consul-Translate-Addresses") {
-	case "true":
-		q.AddressTranslationEnabled = true
-	default:
-		q.AddressTranslationEnabled = false
-	}
-
 	return nil
 }
 

@@ -1,21 +1,18 @@
 package api
 
 type Node struct {
-	Node            string
-	Address         string
-	TaggedAddresses map[string]string
+	Node    string
+	Address string
 }
 
 type CatalogService struct {
-	Node                     string
-	Address                  string
-	TaggedAddresses          map[string]string
-	ServiceID                string
-	ServiceName              string
-	ServiceAddress           string
-	ServiceTags              []string
-	ServicePort              int
-	ServiceEnableTagOverride bool
+	Node           string
+	Address        string
+	ServiceID      string
+	ServiceName    string
+	ServiceAddress string
+	ServiceTags    []string
+	ServicePort    int
 }
 
 type CatalogNode struct {
@@ -24,12 +21,11 @@ type CatalogNode struct {
 }
 
 type CatalogRegistration struct {
-	Node            string
-	Address         string
-	TaggedAddresses map[string]string
-	Datacenter      string
-	Service         *AgentService
-	Check           *AgentCheck
+	Node       string
+	Address    string
+	Datacenter string
+	Service    *AgentService
+	Check      *AgentCheck
 }
 
 type CatalogDeregistration struct {
