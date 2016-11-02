@@ -725,15 +725,15 @@ func (u *unit) initService() error {
 	return err
 }
 
-func initUnitService(containerID string, eng *cluster.Engine, cmd []string) error {
+func startUnitService(containerID string, eng *cluster.Engine, cmd []string) error {
 	if len(cmd) == 0 {
-		logrus.WithField("Container", containerID).Warn("InitServiceCmd is nil")
+		logrus.WithField("Container", containerID).Warn("cmd is nil")
 		return nil
 	}
 
 	inspect, err := containerExec(context.Background(), eng, containerID, cmd, false)
 	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", containerID, cmd, inspect.ExitCode, inspect, err)
+		err = errors.Errorf("%s start service cmd:%s exitCode:%d,%v,Error:%v", containerID, cmd, inspect.ExitCode, inspect, err)
 	}
 
 	return err

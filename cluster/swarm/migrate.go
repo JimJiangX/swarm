@@ -374,7 +374,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		}(container, engine.IP, networkings, pending.localStore)
 
-		err = startUnit(engine, container.ID, migrate, networkings, lvs)
+		err = startUnit(engine, container.ID, migrate.StartContainerCmd(), migrate, networkings, lvs)
 		delete(gd.pendingContainers, swarmID)
 
 		if err != nil {
@@ -459,7 +459,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 	return task.ID, t.Run()
 }
 
-func startUnit(engine *cluster.Engine, containerID string,
+func startUnit(engine *cluster.Engine, containerID string, cmd []string,
 	u *unit, networkings []IPInfo, lvs []database.LocalVolume) error {
 
 	err := startContainer(containerID, engine, networkings)
@@ -473,8 +473,8 @@ func startUnit(engine *cluster.Engine, containerID string,
 		return err
 	}
 
-	logrus.Debug("init & Start Service")
-	err = initUnitService(containerID, engine, u.InitServiceCmd())
+	logrus.Debug("Start Service")
+	err = startUnitService(containerID, engine, cmd)
 
 	return err
 }
@@ -948,7 +948,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		err = startUnit(engine, container.ID, rebuild, networkings, pending.localStore)
+		err = startUnit(engine, container.ID, rebuild.InitServiceCmd(), rebuild, networkings, pending.localStore)
 		if err != nil {
 			return err
 		}
