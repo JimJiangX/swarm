@@ -10,17 +10,28 @@ do
 	if [ "$subdev_name" != '' ]; then
 		dev_name=`multipath -l ${subdev_name} | grep ${vendor} | awk '{print $1}'`
 		if [ "${dev_name}" != '' ]; then
-			multipath -f ${dev_name}
-			if [ $? -eq 0 ]; then
-				for name in `lsscsi | grep ":${hostlun_id}]" | grep "${vendor}" | awk '{print $1}' | sed  's/\[//g; s/\]//g'`
-				do
-					name=`echo ${name} | sed 's/\:/\ /g'`
-					echo "scsi remove-single-device ${name}" > /proc/scsi/scsi
-				done
-			else
-				echo "multipath flush device faild"
-				exit 1
-			fi
+			loop=0
+			max=4
+			while(( $loop<=$max ))
+			do
+				multipath -f ${dev_name}
+				if [ $? -eq 0 ]; then
+					break
+				else
+					let "loop++"
+					if [ $loop -ge $max ]; then
+						echo "multipath flush device faild"
+						exit 1
+					fi	
+					sleep 2	
+				fi
+				
+			done
+			for name in `lsscsi | grep ":${hostlun_id}]" | grep "${vendor}" | awk '{print $1}' | sed  's/\[//g; s/\]//g'`
+			do
+				name=`echo ${name} | sed 's/\:/\ /g'`
+				echo "scsi remove-single-device ${name}" > /proc/scsi/scsi
+			done
 		else
 			echo "cannot find multipath device"
 			exit 1
@@ -30,3 +41,5 @@ do
 		exit 1
 	fi
 done
+
+
