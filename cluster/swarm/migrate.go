@@ -374,7 +374,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		}(container, engine.IP, networkings, pending.localStore)
 
-		err = startUnit(engine, container.ID, migrate.StartContainerCmd(), migrate, networkings, lvs)
+		err = startUnit(engine, container.ID, migrate.StartServiceCmd(), migrate, networkings, lvs)
 		delete(gd.pendingContainers, swarmID)
 
 		if err != nil {
