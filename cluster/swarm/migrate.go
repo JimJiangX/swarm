@@ -9,12 +9,12 @@ import (
 	ctypes "github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/utils"
 	"github.com/pkg/errors"
-	"github.com/upmio/local_plugin_volume/sdk"
 	"golang.org/x/net/context"
 )
 
