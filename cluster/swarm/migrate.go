@@ -9,12 +9,12 @@ import (
 	ctypes "github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
-	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/utils"
 	"github.com/pkg/errors"
+	"github.com/upmio/local_plugin_volume/sdk"
 	"golang.org/x/net/context"
 )
 
@@ -207,6 +207,9 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		gd.scheduler.Lock()
 
 		defer func() {
+			if err != nil {
+				entry.Errorf("%+v", err)
+			}
 			if err == nil {
 				migrate.Status, migrate.LatestError = statusUnitMigrated, ""
 			} else {
@@ -265,8 +268,10 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		defer func() {
 			if err != nil {
+				entry.Errorf("%+v", err)
+
 				if len(lunMap) > 0 {
-					err = sanDeactivateAndDelMapping(dc.store, engine.IP, lunMap, lunSlice)
+					err := sanDeactivateAndDelMapping(dc.store, engine.IP, lunMap, lunSlice)
 					if err != nil {
 						entry.Errorf("defer san Deactivate And DelMapping,%+v", err)
 					}
@@ -338,6 +343,8 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 			if err == nil {
 				return
+			} else {
+				entry.Errorf("%+v", err)
 			}
 
 			_err := cleanOldContainer(c, lvs)
@@ -345,9 +352,9 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 				entry.Errorf("defer,clean container %s,%+v", c.Info.Name, _err)
 			}
 
-			err = removeNetworkings(addr, networkings)
-			if err != nil {
-				entry.Errorf("defer,container %s remove Networkings:%+v", migrate.Name, err)
+			_err = removeNetworkings(addr, networkings)
+			if _err != nil {
+				entry.Errorf("defer,container %s remove Networkings:%+v", migrate.Name, _err)
 			}
 
 		}(container, engine.IP, networkings, pending.localStore)
