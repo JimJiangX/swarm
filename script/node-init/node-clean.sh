@@ -14,7 +14,7 @@ ssd_vgname=${HOSTNAME}_SSD_VG
 remove_vg() {
 	local vg_name=$1
 	vgs ${vg_name} >/dev/null 2>&1
-	if [ $? -eq 0 ] 
+	if [ $? -eq 0 ]; then
 		vgremove -f ${vg_name}
 	fi
 }
