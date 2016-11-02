@@ -7,8 +7,17 @@ node_id=$3
 horus_server_ip=$4
 horus_server_port=$5
 backup_dir=$6
+hdd_vgname=${HOSTNAME}_HDD_VG
+ssd_vgname=${HOSTNAME}_SSD_VG
 
 
+remove_vg() {
+	local vg_name=$1
+	vgs ${vg_name} >/dev/null 2>&1
+	if [ $? -eq 0 ] 
+		vgremove -f ${vg_name}
+	fi
+}
 
 umount_backup_dir() {
 	umount -f $backup_dir
@@ -110,5 +119,7 @@ remove_swarm_agent
 remove_check_script
 remove_horus_agent
 remove_consul
+remove_vg ${hdd_vgname}
+remove_vg ${ssd_vgname}
 
 exit 0

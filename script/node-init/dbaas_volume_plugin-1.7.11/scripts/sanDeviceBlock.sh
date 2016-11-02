@@ -11,11 +11,12 @@ do
 		dev_name=`multipath -l ${subdev_name} | grep ${vendor} | awk '{print $1}'`
 		if [ "${dev_name}" != '' ]; then
 			loop=0
-			max=4
+			max=10
 			while(( $loop<=$max ))
 			do
-				multipath -f ${dev_name}
+				multipath -f ${dev_name} >/dev/null 2>&1
 				if [ $? -eq 0 ]; then
+					echo "multipath flush ${dev_name} successful"
 					break
 				else
 					let "loop++"
@@ -23,7 +24,7 @@ do
 						echo "multipath flush device faild"
 						exit 1
 					fi	
-					sleep 2	
+					sleep 1	
 				fi
 				
 			done
