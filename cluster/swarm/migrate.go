@@ -260,9 +260,17 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}
 
 		if len(lunMap) > 0 {
-			err = sanDeactivateAndDelMapping(dc.store, original.engine.IP, lunMap, lunSlice)
+			err = sanDeactivate(dc.store, original.engine.IP, lunMap)
 			if err != nil {
 				return err
+			}
+
+			for i := range lunSlice {
+				err = dc.store.DelMapping(lunSlice[i].ID)
+				if err != nil {
+					logrus.Errorf("%s DelMapping %s", dc.store.Vendor(), lunSlice[i].ID)
+					return err
+				}
 			}
 		}
 
@@ -271,9 +279,16 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 				entry.Errorf("%+v", err)
 
 				if len(lunMap) > 0 {
-					err := sanDeactivateAndDelMapping(dc.store, engine.IP, lunMap, lunSlice)
+					err := sanDeactivate(dc.store, engine.IP, lunMap)
 					if err != nil {
 						entry.Errorf("defer san Deactivate And DelMapping,%+v", err)
+					}
+
+					for i := range lunSlice {
+						err := dc.store.DelMapping(lunSlice[i].ID)
+						if err != nil {
+							logrus.Errorf("%s DelMapping %s", dc.store.Vendor(), lunSlice[i].ID)
+						}
 					}
 				}
 
@@ -491,8 +506,7 @@ func stopOldContainer(u *unit) error {
 	return err
 }
 
-func sanDeactivateAndDelMapping(storage storage.Store, host string,
-	lunMap map[string][]database.LUN, lunSlice []database.LUN) error {
+func sanDeactivate(storage storage.Store, host string, lunMap map[string][]database.LUN) error {
 	if storage == nil {
 		return errors.New("Store is required")
 	}
@@ -515,14 +529,6 @@ func sanDeactivateAndDelMapping(storage storage.Store, host string,
 		err := sdk.SanDeActivate(addr, config)
 		if err != nil {
 			logrus.Errorf("%s SanDeActivate error:%s", host, err)
-			return err
-		}
-	}
-
-	for i := range lunSlice {
-		err := storage.DelMapping(lunSlice[i].ID)
-		if err != nil {
-			logrus.Errorf("%s DelMapping %s", storage.Vendor(), lunSlice[i].ID)
 			return err
 		}
 	}
@@ -825,12 +831,14 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		defer func() {
 			if err != nil {
 				return
+			} else {
+				entry.Errorf("%+v", err)
 			}
 			// deactivate
 			// del mapping
 			if len(lunMap) > 0 {
 				// TODO:fix host
-				_err := sanDeactivateAndDelMapping(dc.store, original.engine.IP, lunMap, lunSlice)
+				_err := sanDeactivate(dc.store, original.engine.IP, lunMap)
 				if _err != nil {
 					entry.Errorf("san Deactivate and delete Mapping,%+v", _err)
 				}
@@ -839,7 +847,12 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			entry.Debug("recycle old container volumes resource")
 			// recycle lun
 			for i := range lunSlice {
-				_err := dc.store.Recycle(lunSlice[i].ID, 0)
+				_err := dc.store.DelMapping(lunSlice[i].ID)
+				if err != nil {
+					logrus.Errorf("%s DelMapping %s", dc.store.Vendor(), lunSlice[i].ID)
+				}
+
+				_err = dc.store.Recycle(lunSlice[i].ID, 0)
 				if _err != nil {
 					entry.Errorf("Store recycle,%+v", _err)
 				}
@@ -851,7 +864,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 					continue
 				}
 				_err := original.localStore.Recycle(oldLVs[i].ID)
-				if err != nil {
+				if _err != nil {
 					entry.Errorf("local Store recycle,%+v", _err)
 				}
 			}
@@ -907,6 +920,8 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 			if err == nil {
 				return
+			} else {
+				entry.Errorf("%+v", err)
 			}
 			entry.Debugf("clean created container %s", c.ID)
 
