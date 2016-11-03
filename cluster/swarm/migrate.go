@@ -244,7 +244,6 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			err := svc.isolate(migrate.Name)
 			if err != nil {
 				entry.Errorf("isolate container error:%+v", err)
-				return err
 			}
 		}
 
@@ -436,13 +435,13 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		err = deregisterToServices(oldEngineIP, migrate.ID)
 		err = registerToServers(migrate, svc, sys)
 
-		if migrate.Type != _SwitchManagerType {
-			// switchback unit
-			err = svc.switchBack(migrate.Name)
-			if err != nil {
-				entry.Errorf("switchBack error:%+v", err)
-			}
-		}
+		//		if migrate.Type != _SwitchManagerType {
+		//			// switchback unit
+		//			err = svc.switchBack(migrate.Name)
+		//			if err != nil {
+		//				entry.Errorf("switchBack error:%+v", err)
+		//			}
+		//		}
 
 		return nil
 	}
@@ -997,13 +996,13 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			entry.Errorf("register service:%+v", err)
 		}
 
-		if rebuild.Type != _SwitchManagerType {
-			// switchback unit
-			err = svc.switchBack(rebuild.Name)
-			if err != nil {
-				entry.Errorf("switchBack error:%+v", err)
-			}
-		}
+		//		if rebuild.Type != _SwitchManagerType {
+		//			// switchback unit
+		//			err = svc.switchBack(rebuild.Name)
+		//			if err != nil {
+		//				entry.Errorf("switchBack error:%+v", err)
+		//			}
+		//		}
 
 		return nil
 	}
