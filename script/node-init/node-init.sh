@@ -475,7 +475,7 @@ init_docker() {
 
 # install docker plugin
 install_docker_plugin() {
-	local version=1.7.11
+	local version=1.7.13
 	local script_dir=/usr/local/local_volume_plugin/scripts
 	mkdir -p ${script_dir}
 
