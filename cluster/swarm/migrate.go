@@ -680,6 +680,9 @@ func cleanOldContainer(old *cluster.Container, lvs []database.LocalVolume) error
 
 	// remove old LocalVolume
 	for i := range lvs {
+		if isSanVG(lvs[i].VGName) {
+			continue
+		}
 		err := engine.RemoveVolume(lvs[i].Name)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
