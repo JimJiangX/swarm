@@ -502,7 +502,7 @@ func stopOldContainer(u *unit) error {
 	err = u.forceStopService()
 	if err != nil {
 		_err := checkContainerError(err)
-		if _err.Error() != "EOF" && _err != errContainerNotFound || _err != errContainerNotRunning {
+		if _err.Error() != "EOF" && _err != errContainerNotFound && _err != errContainerNotRunning {
 			return err
 		}
 	}
