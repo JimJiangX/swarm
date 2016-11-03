@@ -175,7 +175,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 	}
 
 	dc, original, err := gd.getNode(migrate.EngineID)
-	if err != nil || dc == nil || dc.store == nil {
+	if err != nil || dc == nil || (san && dc.store == nil) {
 		return "", errors.Errorf("getNode error:%s,dc=%p,dc.store=%p", err, dc, dc.store)
 	}
 
@@ -217,7 +217,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 			gd.scheduler.Unlock()
 			if err != nil {
-				entry.Errorf("Unit migrate failed,%+v", err)
+				entry.Errorf("Unit migrate failed,%+v,len(localVolume)=%s", err, len(pending.localStore))
 				// error handle
 				_err := gd.resourceRecycle([]*pendingAllocResource{pending})
 				if _err != nil {
@@ -310,13 +310,14 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 				return
 			}
 
-			entry.Debug("recycle old container volumes resource")
-
 			// clean local volumes
 			for i := range oldLVs {
 				if isSanVG(oldLVs[i].VGName) {
 					continue
 				}
+
+				entry.Debugf("recycle old localVolume,VG=%s,Name=%s", oldLVs[i].VGName, oldLVs[i].Name)
+
 				err := original.localStore.Recycle(oldLVs[i].ID)
 				if err != nil {
 					entry.Errorf("defer recycle local volume,%+v", err)
