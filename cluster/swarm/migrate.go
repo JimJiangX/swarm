@@ -111,8 +111,7 @@ func resetContainerConfig(config *cluster.ContainerConfig, hostConfig *ctypes.Ho
 }
 
 // UnitMigrate migrate the assigned unit to another host
-func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
-
+func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig, force bool) (string, error) {
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {
 		return "", err
@@ -249,9 +248,11 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			}
 		}
 
-		err = stopOldContainer(migrate)
-		if err != nil {
-			return err
+		if !force {
+			err = stopOldContainer(migrate)
+			if err != nil {
+				return err
+			}
 		}
 
 		oldLVs, lunMap, lunSlice, err := listOldVolumes(migrate.ID)
@@ -260,16 +261,18 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}
 
 		if len(lunMap) > 0 && dc.store != nil {
-			err = sanDeactivate(dc.store.Vendor(), original.engine.IP, lunMap)
-			if err != nil {
-				time.Sleep(3 * time.Second)
+			if !force {
+				err = sanDeactivate(dc.store.Vendor(), original.engine.IP, lunMap)
+				if err != nil {
+					time.Sleep(3 * time.Second)
 
-				_err := sanActivate(original.engine.IP, lunMap)
-				if _err != nil {
-					return errors.Errorf("sanDeactivate error:%+v\nThen exec sanActivate error:%+v", err, _err)
+					_err := sanActivate(original.engine.IP, lunMap)
+					if _err != nil {
+						return errors.Errorf("sanDeactivate error:%+v\nThen exec sanActivate error:%+v", err, _err)
+					}
+
+					return err
 				}
-
-				return err
 			}
 
 			for i := range lunSlice {
@@ -285,7 +288,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			if err != nil {
 				entry.Errorf("%+v", err)
 
-				if len(lunMap) > 0 && dc.store != nil {
+				if !force && len(lunMap) > 0 && dc.store != nil {
 					err := sanDeactivate(dc.store.Vendor(), engine.IP, lunMap)
 					if err != nil {
 						entry.Errorf("defer san Deactivate And DelMapping,%+v", err)

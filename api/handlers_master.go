@@ -2147,9 +2147,14 @@ func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	fmt.Fprintf(w, "{%q:%q}", "task_id", taskID)
 }
 
-// POST /units/{name:.*}/migrate
+// POST /units/{name:.*}/migrate?force=true
 func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpError2(w, err, http.StatusBadRequest)
+		return
+	}
 	name := mux.Vars(r)["name"]
+	force := boolValue(r, "force")
 	req := structs.PostMigrateUnit{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -2162,7 +2167,7 @@ func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	taskID, err := gd.UnitMigrate(name, req.Candidates, req.HostConfig)
+	taskID, err := gd.UnitMigrate(name, req.Candidates, req.HostConfig, force)
 	if err != nil {
 		httpError2(w, err, http.StatusInternalServerError)
 		return
