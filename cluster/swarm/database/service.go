@@ -1044,7 +1044,7 @@ func TxInsertUnitWithPorts(u *Unit, ports []Port) error {
 }
 
 // TxUpdateMigrateUnit update Unit and delete old LocalVolumes in a Tx
-func TxUpdateMigrateUnit(u Unit, lvs []LocalVolume, reserveSAN bool) error {
+func TxUpdateMigrateUnit(u Unit, lvs []LocalVolume) error {
 	// update database :tb_unit
 	// delete old localVolumes
 	tx, err := GetTX()
@@ -1054,11 +1054,16 @@ func TxUpdateMigrateUnit(u Unit, lvs []LocalVolume, reserveSAN bool) error {
 	defer tx.Rollback()
 
 	for i := range lvs {
-		if reserveSAN && strings.HasSuffix(lvs[i].VGName, "_SAN_VG") {
+		if strings.HasSuffix(lvs[i].VGName, "_SAN_VG") {
 			continue
 		}
-		TxDeleteVolume(tx, lvs[i].ID)
+
+		err := TxDeleteVolume(tx, lvs[i].ID)
+		if err != nil {
+			return err
+		}
 	}
+
 	err = txUpdateUnit(tx, u)
 	if err != nil {
 		return err
