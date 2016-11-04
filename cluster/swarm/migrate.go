@@ -216,7 +216,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 			gd.scheduler.Unlock()
 			if err != nil {
-				entry.Errorf("len(localVolume)=%s", len(pending.localStore))
+				entry.Errorf("len(localVolume)=%d", len(pending.localStore))
 				// error handle
 				_err := gd.resourceRecycle([]*pendingAllocResource{pending})
 				if _err != nil {
@@ -419,7 +419,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		migrate.networkings = networkings
 		migrate.CreatedAt = time.Now()
 
-		err = updateUnit(migrate.Unit, oldLVs, false)
+		err = updateUnit(migrate.Unit, oldLVs, true)
 		if err != nil {
 			return err
 		}
@@ -961,7 +961,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		rebuild.networkings = networkings
 		rebuild.CreatedAt = time.Now()
 
-		err = updateUnit(rebuild.Unit, oldLVs, true)
+		err = updateUnit(rebuild.Unit, oldLVs, false)
 		if err != nil {
 			return err
 		}

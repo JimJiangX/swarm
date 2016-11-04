@@ -1057,8 +1057,13 @@ func TxUpdateMigrateUnit(u Unit, lvs []LocalVolume, reserveSAN bool) error {
 		if reserveSAN && strings.HasSuffix(lvs[i].VGName, "_SAN_VG") {
 			continue
 		}
-		TxDeleteVolume(tx, lvs[i].ID)
+
+		err := TxDeleteVolume(tx, lvs[i].ID)
+		if err != nil {
+			return err
+		}
 	}
+
 	err = txUpdateUnit(tx, u)
 	if err != nil {
 		return err
