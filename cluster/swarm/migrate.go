@@ -399,7 +399,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		}(container, engine.IP, networkings, pending.localStore)
 
-		err = startUnit(engine, container.ID, migrate.StartServiceCmd(), migrate, networkings, lvs)
+		err = startUnit(engine, container.ID, migrate, networkings, lvs, false)
 		delete(gd.pendingContainers, swarmID)
 
 		if err != nil {
@@ -484,18 +484,33 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 	return task.ID, t.Run()
 }
 
-func startUnit(engine *cluster.Engine, containerID string, cmd []string,
-	u *unit, networkings []IPInfo, lvs []database.LocalVolume) error {
+func startUnit(engine *cluster.Engine, containerID string, u *unit,
+	networkings []IPInfo, lvs []database.LocalVolume, init bool) error {
 
 	err := startContainer(containerID, engine, networkings)
 	if err != nil {
 		return err
 	}
 
-	logrus.Debug("copy Service Config")
-	err = copyConfigIntoCNFVolume(engine.IP, u.Path(), u.parent.Content, lvs)
-	if err != nil {
-		return err
+	cnf, cmd := 0, u.InitServiceCmd()
+	for i := range lvs {
+		if strings.Contains(lvs[i].Name, "_CNF_LV") {
+			cnf = i
+			break
+		}
+		if strings.Contains(lvs[i].Name, "_DAT_LV") {
+			cnf = i
+		}
+	}
+
+	if !init && isSanVG(lvs[cnf].VGName) {
+		cmd = u.StartServiceCmd()
+	} else {
+		logrus.Debug("copy Service Config")
+		err = copyConfigIntoCNFVolume(engine.IP, u.Path(), u.parent.Content, lvs)
+		if err != nil {
+			return err
+		}
 	}
 
 	logrus.Debug("Start Service")
@@ -953,7 +968,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		err = startUnit(engine, container.ID, rebuild.InitServiceCmd(), rebuild, networkings, pending.localStore)
+		err = startUnit(engine, container.ID, rebuild, networkings, pending.localStore, true)
 		if err != nil {
 			return err
 		}
