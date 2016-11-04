@@ -80,7 +80,13 @@ func (dc *Datacenter) listCandidates(candidates []string) ([]database.Node, erro
 		}
 	}
 	if len(out) == 0 {
-		out = nodes
+		for i := range nodes {
+			if nodes[i].Status != statusNodeEnable {
+				continue
+			}
+
+			out = append(out, nodes[i])
+		}
 	}
 
 	return out, nil
@@ -176,7 +182,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 	dc, original, err := gd.getNode(migrate.EngineID)
 	if err != nil || dc == nil || (san && dc.store == nil) {
-		return "", errors.Errorf("getNode error:%s,dc=%p,dc.store=%p", err, dc, dc.store)
+		return "", errors.Errorf("getNode error:%s,dc=%p,dc.store==nil:%t", err, dc, dc.store == nil)
 	}
 
 	out, err := dc.listCandidates(candidates)
@@ -645,6 +651,10 @@ func migrateVolumes(storage storage.Store, nodeID string,
 	}
 
 	for i := range lvs {
+		if isSanVG(lvs[i].VGName) {
+			continue
+		}
+
 		_, err := createVolume(engine, lvs[i])
 		if err != nil {
 			return err
