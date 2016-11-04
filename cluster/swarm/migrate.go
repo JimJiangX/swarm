@@ -206,18 +206,17 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		gd.scheduler.Lock()
 
 		defer func() {
-			if err != nil {
-				entry.Errorf("%+v", err)
-			}
 			if err == nil {
+				entry.Infof("migrate service done,%v", err)
 				migrate.Status, migrate.LatestError = statusUnitMigrated, ""
 			} else {
+				entry.Errorf("%+v", err)
 				migrate.Status, migrate.LatestError = statusUnitMigrateFailed, err.Error()
 			}
 
 			gd.scheduler.Unlock()
 			if err != nil {
-				entry.Errorf("Unit migrate failed,%+v,len(localVolume)=%s", err, len(pending.localStore))
+				entry.Errorf("len(localVolume)=%s", len(pending.localStore))
 				// error handle
 				_err := gd.resourceRecycle([]*pendingAllocResource{pending})
 				if _err != nil {
@@ -288,21 +287,21 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 				entry.Errorf("%+v", err)
 
 				if !force && len(lunMap) > 0 && dc.store != nil {
-					err := sanDeactivate(dc.store.Vendor(), engine.IP, lunMap)
-					if err != nil {
-						entry.Errorf("defer san Deactivate And DelMapping,%+v", err)
+					_err := sanDeactivate(dc.store.Vendor(), engine.IP, lunMap)
+					if _err != nil {
+						entry.Errorf("defer san Deactivate And DelMapping,%+v", _err)
 					}
 
 					for i := range lunSlice {
-						err := dc.store.DelMapping(lunSlice[i].ID)
-						if err != nil {
-							logrus.Errorf("%s DelMapping %s", dc.store.Vendor(), lunSlice[i].ID)
+						_err := dc.store.DelMapping(lunSlice[i].ID)
+						if _err != nil {
+							logrus.Errorf("%s DelMapping %s,%+v", dc.store.Vendor(), lunSlice[i].ID, _err)
 						}
 					}
 
-					_, err = migrateVolumes(dc.store, original.ID, original.engine, oldLVs, oldLVs, lunMap, lunSlice)
-					if err != nil {
-						entry.Errorf("defer migrate volumes,%+v", err)
+					_err = migrateVolumes(dc.store, original.ID, original.engine, oldLVs, lunMap, lunSlice)
+					if _err != nil {
+						entry.Errorf("defer migrate volumes,%+v", _err)
 						//	return err
 					}
 				}
@@ -318,9 +317,9 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 				entry.Debugf("recycle old localVolume,VG=%s,Name=%s", oldLVs[i].VGName, oldLVs[i].Name)
 
-				err := original.localStore.Recycle(oldLVs[i].ID)
-				if err != nil {
-					entry.Errorf("defer recycle local volume,%+v", err)
+				_err := original.localStore.Recycle(oldLVs[i].ID)
+				if _err != nil {
+					entry.Errorf("defer recycle local volume,%+v", _err)
 				}
 			}
 		}()
@@ -348,7 +347,15 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		lvs, err := migrateVolumes(dc.store, node.ID, engine, pending.localStore, oldLVs, lunMap, lunSlice)
+		lvs := make([]database.LocalVolume, len(pending.localStore), len(oldLVs))
+		copy(lvs, pending.localStore)
+		for i := range oldLVs {
+			if isSanVG(oldLVs[i].VGName) {
+				lvs = append(lvs, oldLVs[i])
+			}
+		}
+
+		err = migrateVolumes(dc.store, node.ID, engine, lvs, lunMap, lunSlice)
 		if err != nil {
 			return err
 		}
@@ -359,6 +366,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 				return err
 			}
 		}
+
 		container, err := engine.CreateContainer(config, swarmID, true, svc.authConfig)
 		if err != nil {
 			return err
@@ -602,19 +610,19 @@ func listOldVolumes(unit string) ([]database.LocalVolume, map[string][]database.
 // create local volumes
 func migrateVolumes(storage storage.Store, nodeID string,
 	engine *cluster.Engine,
-	localStore, oldLVs []database.LocalVolume,
+	lvs []database.LocalVolume,
 	lunMap map[string][]database.LUN,
-	lunSlice []database.LUN) ([]database.LocalVolume, error) {
+	lunSlice []database.LUN) error {
 
 	// Mapping LVs
 	if len(lunSlice) > 0 && storage == nil {
-		return nil, errors.New("Store is required")
+		return errors.New("Store is required")
 	}
 
 	for i := range lunSlice {
 		err := storage.Mapping(nodeID, lunSlice[i].VGName, lunSlice[i].ID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -623,7 +631,7 @@ func migrateVolumes(storage storage.Store, nodeID string,
 		if isSanVG(vg) {
 			out, err := database.ListLUNByVgName(vg)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			if len(out) > 0 {
 				vgMap[vg] = out
@@ -633,29 +641,17 @@ func migrateVolumes(storage storage.Store, nodeID string,
 
 	err := sanActivate(engine.IP, vgMap)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	lvs := make([]database.LocalVolume, len(localStore), len(oldLVs))
-	copy(lvs, localStore)
-	for i := range localStore {
-		_, err := createVolume(engine, localStore[i])
+	for i := range lvs {
+		_, err := createVolume(engine, lvs[i])
 		if err != nil {
-			return lvs, err
+			return err
 		}
 	}
 
-	for i := range oldLVs {
-		if isSanVG(oldLVs[i].VGName) {
-			lvs = append(lvs, oldLVs[i])
-			_, err := createVolume(engine, oldLVs[i])
-			if err != nil {
-				return lvs, err
-			}
-		}
-	}
-
-	return lvs, nil
+	return nil
 }
 
 func cleanOldContainer(old *cluster.Container, lvs []database.LocalVolume) error {
