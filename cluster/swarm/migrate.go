@@ -419,7 +419,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		migrate.networkings = networkings
 		migrate.CreatedAt = time.Now()
 
-		err = updateUnit(migrate.Unit, oldLVs)
+		err = updateUnit(migrate.Unit, oldLVs, false)
 		if err != nil {
 			return err
 		}
@@ -696,8 +696,8 @@ func cleanOldContainer(old *cluster.Container, lvs []database.LocalVolume) error
 	return nil
 }
 
-func updateUnit(unit database.Unit, lvs []database.LocalVolume) error {
-	return database.TxUpdateMigrateUnit(unit, lvs)
+func updateUnit(unit database.Unit, lvs []database.LocalVolume, reserveSAN bool) error {
+	return database.TxUpdateMigrateUnit(unit, lvs, reserveSAN)
 }
 
 // UnitRebuild rebuild the unit in another host
@@ -961,7 +961,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		rebuild.networkings = networkings
 		rebuild.CreatedAt = time.Now()
 
-		err = updateUnit(rebuild.Unit, oldLVs)
+		err = updateUnit(rebuild.Unit, oldLVs, true)
 		if err != nil {
 			return err
 		}
