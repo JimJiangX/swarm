@@ -149,9 +149,6 @@ func Factory(name, version string) (configParser, containerCmd, error) {
 
 func initialize(name, version string) (parser configParser, cmder containerCmd, err error) {
 	switch {
-	case _ImageUpsql == name && version == "5.6.19":
-		parser = &mysqlConfig{}
-		cmder = &mysqlCmd{}
 
 	case _ImageProxy == name && version == "1.0.2":
 		parser = &proxyConfigV102{}
@@ -176,6 +173,10 @@ func initialize(name, version string) (parser configParser, cmder containerCmd, 
 	case _ImageSwitchManager == name:
 		parser = &switchManagerConfig{}
 		cmder = &switchManagerCmd{}
+
+	case _ImageUpsql == name && strings.HasPrefix(version, "5.6."):
+		parser = &mysqlConfig{}
+		cmder = &mysqlCmd{}
 
 	default:
 
