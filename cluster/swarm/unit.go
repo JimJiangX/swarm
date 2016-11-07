@@ -700,11 +700,12 @@ func copyConfigIntoCNFVolume(host, path, content string, lvs []database.LocalVol
 	return errors.Wrap(err, "copy file to Volume")
 }
 
-func (u *unit) initService() error {
+func (u *unit) initService(args ...string) error {
 	if u.containerCmd == nil {
 		return nil
 	}
-	cmd := u.InitServiceCmd()
+
+	cmd := u.InitServiceCmd(args...)
 	if len(cmd) == 0 {
 		logrus.WithField("Unit", u.Name).Warn(" InitServiceCmd is nil")
 		return nil
@@ -720,20 +721,6 @@ func (u *unit) initService() error {
 	} else {
 		atomic.StoreInt64(&u.Status, statusUnitStartFailed)
 		u.LatestError = err.Error()
-	}
-
-	return err
-}
-
-func startUnitService(containerID string, eng *cluster.Engine, cmd []string) error {
-	if len(cmd) == 0 {
-		logrus.WithField("Container", containerID).Warn("cmd is nil")
-		return nil
-	}
-
-	inspect, err := containerExec(context.Background(), eng, containerID, cmd, false)
-	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s start service cmd:%s exitCode:%d,%v,Error:%v", containerID, cmd, inspect.ExitCode, inspect, err)
 	}
 
 	return err

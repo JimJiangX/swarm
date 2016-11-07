@@ -18,7 +18,7 @@ import (
 // ContainerCmd commands of actions
 type containerCmd interface {
 	StartContainerCmd() []string
-	InitServiceCmd() []string
+	InitServiceCmd(args ...string) []string
 	StartServiceCmd() []string
 	StopServiceCmd() []string
 	RestoreCmd(file, backupDir string) []string
@@ -190,8 +190,12 @@ type mysqlCmd struct{}
 func (mysqlCmd) StartContainerCmd() []string {
 	return []string{"/bin/bash"}
 }
-func (mysqlCmd) InitServiceCmd() []string {
-	return []string{"/root/upsql-init.sh"}
+func (mysqlCmd) InitServiceCmd(args ...string) []string {
+	cmd := make([]string, len(args)+1)
+	cmd[0] = "/root/upsql-init.sh"
+	copy(cmd[1:], args)
+
+	return cmd
 }
 func (mysqlCmd) StartServiceCmd() []string {
 	return []string{"/root/upsql.service", "start"}
@@ -353,7 +357,7 @@ type proxyCmd struct{}
 func (proxyCmd) StartContainerCmd() []string {
 	return []string{"/bin/bash"}
 }
-func (proxyCmd) InitServiceCmd() []string {
+func (proxyCmd) InitServiceCmd(args ...string) []string {
 	return []string{"/root/upproxy.service", "start"}
 }
 func (proxyCmd) StartServiceCmd() []string {
@@ -604,7 +608,7 @@ type switchManagerCmd struct{}
 func (switchManagerCmd) StartContainerCmd() []string {
 	return []string{"/bin/bash"}
 }
-func (switchManagerCmd) InitServiceCmd() []string {
+func (switchManagerCmd) InitServiceCmd(args ...string) []string {
 	return []string{"/root/swm.service", "start"}
 }
 func (switchManagerCmd) StartServiceCmd() []string {

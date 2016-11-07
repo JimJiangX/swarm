@@ -148,6 +148,11 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}
 	}
 
+	users, err := svc.getUsers()
+	if err != nil {
+		return "", err
+	}
+
 	entry := logrus.WithFields(logrus.Fields{
 		"Service": svc.Name,
 		"Migrate": migrate.Name,
@@ -402,7 +407,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		}(container, engine.IP, networkings, pending.localStore)
 
-		err = startUnit(engine, container.ID, migrate, networkings, lvs, false)
+		err = startUnit(engine, container.ID, migrate, users, networkings, lvs, false)
 		delete(gd.pendingContainers, swarmID)
 
 		if err != nil {
@@ -431,6 +436,12 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		err = updateUnit(migrate.Unit, oldLVs, true)
 		if err != nil {
 			return err
+		}
+
+		if migrate.Type == _SwitchManagerType {
+			if err = swmInitTopology(svc, migrate, users); err != nil {
+				entry.Errorf("init Topology:%+v", err)
+			}
 		}
 
 		err = saveContainerToConsul(container)
@@ -489,7 +500,7 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 	return task.ID, t.Run()
 }
 
-func startUnit(engine *cluster.Engine, containerID string, u *unit,
+func startUnit(engine *cluster.Engine, containerID string, u *unit, users []database.User,
 	networkings []IPInfo, lvs []database.LocalVolume, init bool) error {
 
 	err := startContainer(containerID, engine, networkings)
@@ -497,7 +508,11 @@ func startUnit(engine *cluster.Engine, containerID string, u *unit,
 		return err
 	}
 
-	cnf, cmd := 0, u.InitServiceCmd()
+	var (
+		cnf = 0
+		cmd []string
+	)
+
 	for i := range lvs {
 		if strings.Contains(lvs[i].Name, "_CNF_LV") {
 			cnf = i
@@ -511,6 +526,18 @@ func startUnit(engine *cluster.Engine, containerID string, u *unit,
 	if !init && isSanVG(lvs[cnf].VGName) {
 		cmd = u.StartServiceCmd()
 	} else {
+
+		args := make([]string, 0, len(users)*3)
+		for i := range users {
+			if users[i].Type != User_Type_DB {
+				continue
+			}
+
+			args = append(args, users[i].Role, users[i].Username, users[i].Password)
+		}
+
+		cmd = u.InitServiceCmd(args...)
+
 		logrus.Debug("copy Service Config")
 		err = copyConfigIntoCNFVolume(engine.IP, u.Path(), u.parent.Content, lvs)
 		if err != nil {
@@ -519,7 +546,16 @@ func startUnit(engine *cluster.Engine, containerID string, u *unit,
 	}
 
 	logrus.Debug("Start Service")
-	err = startUnitService(containerID, engine, cmd)
+
+	if len(cmd) == 0 {
+		logrus.WithField("Container", containerID).Warn("cmd is nil")
+		return nil
+	}
+
+	inspect, err := containerExec(context.Background(), engine, containerID, cmd, false)
+	if inspect.ExitCode != 0 {
+		err = errors.Errorf("%s start service cmd:%s exitCode:%d,%v,Error:%v", containerID, cmd, inspect.ExitCode, inspect, err)
+	}
 
 	return err
 }
@@ -763,6 +799,11 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		}
 	}
 
+	users, err := svc.getUsers()
+	if err != nil {
+		return "", err
+	}
+
 	entry := logrus.WithFields(logrus.Fields{
 		"Service": svc.Name,
 		"Rebuild": rebuild.Name,
@@ -973,7 +1014,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		err = startUnit(engine, container.ID, rebuild, networkings, pending.localStore, true)
+		err = startUnit(engine, container.ID, rebuild, users, networkings, pending.localStore, true)
 		if err != nil {
 			return err
 		}
@@ -994,6 +1035,12 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		err = updateUnit(rebuild.Unit, oldLVs, false)
 		if err != nil {
 			return err
+		}
+
+		if rebuild.Type == _SwitchManagerType {
+			if err = swmInitTopology(svc, rebuild, users); err != nil {
+				entry.Errorf("init Topology:%+v", err)
+			}
 		}
 
 		err = saveContainerToConsul(container)

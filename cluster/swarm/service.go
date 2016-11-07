@@ -872,16 +872,33 @@ func (svc *Service) copyServiceConfig() error {
 }
 
 func (svc *Service) initService() error {
+	users, err := svc.getUsers()
+	if err != nil {
+		return err
+	}
+
 	var (
 		swm   *unit
+		args  = make([]string, 0, len(users)*3)
 		funcs = make([]func() error, 0, len(svc.units))
 	)
+
+	for i := range users {
+		if users[i].Type != User_Type_DB {
+			continue
+		}
+
+		args = append(args, users[i].Role, users[i].Username, users[i].Password)
+	}
+
 	for i := range svc.units {
 		if svc.units[i].Type == _SwitchManagerType {
 			swm = svc.units[i]
 			continue
 		}
-		funcs = append(funcs, svc.units[i].initService)
+		funcs = append(funcs, func() error {
+			return svc.units[i].initService(args...)
+		})
 	}
 
 	if swm != nil {
@@ -896,7 +913,7 @@ func (svc *Service) initService() error {
 		}
 	}
 
-	err := GoConcurrency(funcs)
+	err = GoConcurrency(funcs)
 	if err != nil {
 		logrus.WithField("Service", svc.Name).WithError(err).Error("Init services")
 	}
@@ -1340,8 +1357,7 @@ func (svc *Service) UpdateUnitConfig(_type string, config map[string]interface{}
 	return nil
 }
 
-func (svc *Service) initTopology() error {
-	swm, _ := svc.getSwithManagerUnit()
+func swmInitTopology(svc *Service, swm *unit, users []database.User) error {
 	sqls, _ := svc.getUnitByType(_UpsqlType)
 	proxys, _ := svc.getUnitByType(_ProxyType)
 
@@ -1364,13 +1380,13 @@ func (svc *Service) initTopology() error {
 
 	var (
 		dba, replicater database.User
-		users           = converteToSWM_Users(svc.users)
+		swmUsers        = converteToSWM_Users(users)
 	)
-	for i := range svc.users {
-		if svc.users[i].Role == _User_DBA_Role {
-			dba = svc.users[i]
-		} else if svc.users[i].Role == _User_Replication_Role {
-			replicater = svc.users[i]
+	for i := range users {
+		if users[i].Role == _User_DBA_Role {
+			dba = users[i]
+		} else if users[i].Role == _User_Replication_Role {
+			replicater = users[i]
 		}
 	}
 
@@ -1406,7 +1422,7 @@ func (svc *Service) initTopology() error {
 		DbReplicatePassword: replicater.Password, //  string   `json:"db-replicate-password"`
 		SwarmApiVersion:     "1.22",              //  string   `json:"swarm-api-version,omitempty"`
 		ProxyNames:          proxyNames,          //  []string `json:"proxy-names"`
-		Users:               users,               //  []User   `json:"users"`
+		Users:               swmUsers,            //  []User   `json:"users"`
 		DataNode:            dataNodes,           //  map[string]DatabaseInfo `json:"data-node"`
 	}
 
@@ -1419,6 +1435,21 @@ func (svc *Service) initTopology() error {
 	}
 
 	return errors.Wrap(err, "init topology")
+
+}
+
+func (svc *Service) initTopology() error {
+	users, err := svc.getUsers()
+	if err != nil {
+		return err
+	}
+
+	swm, err := svc.getSwithManagerUnit()
+	if err != nil {
+		return err
+	}
+
+	return swmInitTopology(svc, swm, users)
 }
 
 func (svc *Service) registerServices() (err error) {
