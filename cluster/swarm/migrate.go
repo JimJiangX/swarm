@@ -289,6 +289,9 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}
 
 		defer func() {
+			if force {
+				return
+			}
 			if err != nil {
 				entry.Errorf("%+v", err)
 
@@ -437,9 +440,11 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}
 
 		oldEngineIP := oldContainer.Engine.IP
-		err = cleanOldContainer(oldContainer, oldLVs)
-		if err != nil {
-			logrus.Error(err)
+		if !force {
+			err = cleanOldContainer(oldContainer, oldLVs)
+			if err != nil {
+				logrus.Error(err)
+			}
 		}
 
 		sys, err := gd.systemConfig()
