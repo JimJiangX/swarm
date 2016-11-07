@@ -958,6 +958,12 @@ func getServiceUsers(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	for i := range users {
+		if users[i].Type == swarm.User_Type_DB {
+			users[i].Password = "***********"
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(users)

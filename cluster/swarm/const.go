@@ -181,8 +181,8 @@ const (
 	_User_Replication_Role = "repl"
 	_User_Check_Role       = "check"
 
-	_User_Type_DB    = consts.Type_Db
-	_User_Type_Proxy = consts.Type_Proxy
+	User_Type_DB    = consts.Type_Db
+	User_Type_Proxy = consts.Type_Proxy
 
 	_DB_Type_M       = consts.Type_M
 	_DB_Type_M_SB    = consts.Type_M_SB

@@ -312,7 +312,7 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 		database.User{
 			ID:        utils.Generate32UUID(),
 			ServiceID: service,
-			Type:      _User_Type_DB,
+			Type:      User_Type_DB,
 			Username:  sys.MonitorUsername,
 			Password:  sys.MonitorPassword,
 			Role:      _User_Monitor_Role,
@@ -322,7 +322,7 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 		database.User{
 			ID:        utils.Generate32UUID(),
 			ServiceID: service,
-			Type:      _User_Type_DB,
+			Type:      User_Type_DB,
 			Username:  sys.ApplicationUsername,
 			Password:  sys.ApplicationPassword,
 			Role:      _User_Application_Role,
@@ -332,7 +332,7 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 		database.User{
 			ID:        utils.Generate32UUID(),
 			ServiceID: service,
-			Type:      _User_Type_DB,
+			Type:      User_Type_DB,
 			Username:  sys.DBAUsername,
 			Password:  sys.DBAPassword,
 			Role:      _User_DBA_Role,
@@ -342,7 +342,7 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 		database.User{
 			ID:        utils.Generate32UUID(),
 			ServiceID: service,
-			Type:      _User_Type_DB,
+			Type:      User_Type_DB,
 			Username:  sys.DBUsername,
 			Password:  sys.DBPassword,
 			Role:      _User_DB_Role,
@@ -352,7 +352,7 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 		database.User{
 			ID:        utils.Generate32UUID(),
 			ServiceID: service,
-			Type:      _User_Type_DB,
+			Type:      User_Type_DB,
 			Username:  sys.ReplicationUsername,
 			Password:  sys.ReplicationPassword,
 			Role:      _User_Replication_Role,
@@ -369,16 +369,16 @@ func converteToUsers(service string, users []structs.User) []database.User {
 	for i := range users {
 
 		switch {
-		case users[i].Type == _User_Type_DB:
-		case users[i].Type == _User_Type_Proxy:
+		case users[i].Type == User_Type_DB:
+		case users[i].Type == User_Type_Proxy:
 
-		case strings.ToLower(users[i].Type) == strings.ToLower(_User_Type_DB):
+		case strings.ToLower(users[i].Type) == strings.ToLower(User_Type_DB):
 
-			users[i].Type = _User_Type_DB
+			users[i].Type = User_Type_DB
 
-		case strings.ToLower(users[i].Type) == strings.ToLower(_User_Type_Proxy):
+		case strings.ToLower(users[i].Type) == strings.ToLower(User_Type_Proxy):
 
-			users[i].Type = _User_Type_Proxy
+			users[i].Type = User_Type_Proxy
 
 		default:
 			logrus.WithField("Service", service).Warnf("skip:%s Role='%s'", users[i].Username, users[i].Type)
@@ -428,16 +428,16 @@ func converteToSWM_Users(users []database.User) []swm_structs.User {
 
 	for i := range users {
 		switch {
-		case users[i].Type == _User_Type_Proxy:
-		case users[i].Type == _User_Type_DB:
+		case users[i].Type == User_Type_Proxy:
+		case users[i].Type == User_Type_DB:
 
-		case strings.ToLower(users[i].Type) == strings.ToLower(_User_Type_DB):
+		case strings.ToLower(users[i].Type) == strings.ToLower(User_Type_DB):
 
-			users[i].Type = _User_Type_DB
+			users[i].Type = User_Type_DB
 
-		case strings.ToLower(users[i].Type) == strings.ToLower(_User_Type_Proxy):
+		case strings.ToLower(users[i].Type) == strings.ToLower(User_Type_Proxy):
 
-			users[i].Type = _User_Type_Proxy
+			users[i].Type = User_Type_Proxy
 
 		default:
 			logrus.WithField("Service", users[i].ServiceID).Warnf("skip:%s Type='%s'", users[i].Username, users[i].Type)
