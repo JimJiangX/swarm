@@ -177,9 +177,14 @@ func (gd *Gardener) createContainerInPending(swarmID string, authConfig *types.A
 }
 
 func (gd *Gardener) initAndStartService(svc *Service) (err error) {
+	mon, err := svc.getUserByRole(_User_Monitor_Role)
+	if err != nil {
+		return err
+	}
+
 	sys, err := gd.systemConfig()
 	if err != nil {
-		return nil
+		return err
 	}
 
 	err = svc.statusCAS(statusServiceCreating, statusServiceStarting)
@@ -225,7 +230,7 @@ func (gd *Gardener) initAndStartService(svc *Service) (err error) {
 	}
 
 	logrus.Debug("registerToHorus")
-	err = svc.registerToHorus(sys.MonitorUsername, sys.MonitorPassword, sys.HorusAgentPort)
+	err = svc.registerToHorus(mon.Username, mon.Password, sys.HorusAgentPort)
 	if err != nil {
 		logrus.Warnf("register To Horus Error:%s", err)
 	}

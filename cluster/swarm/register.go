@@ -126,11 +126,16 @@ func deregisterToHorus(force bool, endpoints ...string) error {
 
 // register service to consul and Horus
 func registerToServers(u *unit, svc *Service, sys database.Configurations) error {
+	mon, err := svc.getUserByRole(_User_Monitor_Role)
+	if err != nil {
+		return err
+	}
+
 	if err := registerHealthCheck(u, svc); err != nil {
 		logrus.WithField("Unit", u.Name).Errorf("register service health check,%+v", err)
 	}
 
-	obj, err := u.registerHorus(sys.MonitorUsername, sys.MonitorPassword, sys.HorusAgentPort)
+	obj, err := u.registerHorus(mon.Username, mon.Password, sys.HorusAgentPort)
 	if err != nil {
 		return err
 	}

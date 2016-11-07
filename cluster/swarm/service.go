@@ -181,13 +181,9 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 
 	code := 200
 
-	if len(svc.users) == 0 {
-		out, err := database.ListUsersByService(svc.ID, "")
-		if err != nil {
-			return 0, err
-		}
-
-		svc.users = out
+	list, err := svc.getUsers()
+	if err != nil {
+		return 0, err
 	}
 
 	users := converteToUsers(svc.ID, req)
@@ -195,10 +191,10 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 	addition := make([]database.User, 0, len(req))
 	for i := range users {
 		exist := false
-		for u := range svc.users {
-			if svc.users[u].Username == users[i].Username {
-				users[i].ID = svc.users[u].ID
-				users[i].CreatedAt = svc.users[u].CreatedAt
+		for u := range list {
+			if list[u].Username == users[i].Username {
+				users[i].ID = list[u].ID
+				users[i].CreatedAt = list[u].CreatedAt
 
 				update = append(update, users[i])
 				exist = true
@@ -240,14 +236,9 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 		return 0, err
 	}
 
-	out, err := database.ListUsersByService(svc.ID, "")
-	if err != nil {
-		return 0, err
-	}
+	_, err = svc.reloadUsers()
 
-	svc.users = out
-
-	return code, nil
+	return code, err
 }
 
 // DeleteServiceUsers delete service users
@@ -255,34 +246,26 @@ func (svc *Service) DeleteServiceUsers(usernames []string, all bool) error {
 	svc.Lock()
 	defer svc.Unlock()
 
-	if len(svc.users) == 0 {
-		out, err := database.ListUsersByService(svc.ID, "")
-		if err != nil {
-			return err
-		}
-
-		if len(out) == 0 {
-			return nil
-		}
-
-		svc.users = out
+	users, err := svc.getUsers()
+	if err != nil {
+		return err
 	}
 
 	list := make([]database.User, 0, len(usernames))
 	none := make([]string, 0, len(usernames))
 
 	if all {
-		list = svc.users
+		list = users
 	} else {
 
 		for i := range usernames {
 			exist := false
 
-			for u := range svc.users {
+			for u := range users {
 
-				if svc.users[u].Username == usernames[i] {
+				if users[u].Username == usernames[i] {
 
-					list = append(list, svc.users[u])
+					list = append(list, users[u])
 					exist = true
 
 					break
@@ -304,12 +287,12 @@ func (svc *Service) DeleteServiceUsers(usernames []string, all bool) error {
 		return err
 	}
 
-	users := converteToSWM_Users(list)
+	swmUsers := converteToSWM_Users(list)
 
-	for i := range users {
-		err := smlib.DelUser(addr, port, users[i])
+	for i := range swmUsers {
+		err := smlib.DelUser(addr, port, swmUsers[i])
 		if err != nil {
-			return errors.Wrapf(err, "delete service user in switchManager,Service=%s,user=%v", svc.Name, users[i])
+			return errors.Wrapf(err, "delete service user in switchManager,Service=%s,user=%v", svc.Name, swmUsers[i])
 		}
 	}
 
@@ -318,12 +301,7 @@ func (svc *Service) DeleteServiceUsers(usernames []string, all bool) error {
 		return err
 	}
 
-	out, err := database.ListUsersByService(svc.ID, "")
-	if err != nil {
-		return err
-	}
-
-	svc.users = out
+	svc.reloadUsers()
 
 	return nil
 }
@@ -337,7 +315,7 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 			Type:      _User_Type_DB,
 			Username:  sys.MonitorUsername,
 			Password:  sys.MonitorPassword,
-			Role:      _User_Monitor,
+			Role:      _User_Monitor_Role,
 			ReadOnly:  false,
 			CreatedAt: now,
 		},
@@ -347,7 +325,7 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 			Type:      _User_Type_DB,
 			Username:  sys.ApplicationUsername,
 			Password:  sys.ApplicationPassword,
-			Role:      _User_Application,
+			Role:      _User_Application_Role,
 			ReadOnly:  false,
 			CreatedAt: now,
 		},
@@ -357,7 +335,7 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 			Type:      _User_Type_DB,
 			Username:  sys.DBAUsername,
 			Password:  sys.DBAPassword,
-			Role:      _User_DBA,
+			Role:      _User_DBA_Role,
 			ReadOnly:  false,
 			CreatedAt: now,
 		},
@@ -367,7 +345,7 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 			Type:      _User_Type_DB,
 			Username:  sys.DBUsername,
 			Password:  sys.DBPassword,
-			Role:      _User_DB,
+			Role:      _User_DB_Role,
 			ReadOnly:  false,
 			CreatedAt: now,
 		},
@@ -377,7 +355,7 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 			Type:      _User_Type_DB,
 			Username:  sys.ReplicationUsername,
 			Password:  sys.ReplicationPassword,
-			Role:      _User_Replication,
+			Role:      _User_Replication_Role,
 			ReadOnly:  false,
 			CreatedAt: now,
 		},
@@ -408,20 +386,20 @@ func converteToUsers(service string, users []structs.User) []database.User {
 		}
 
 		switch {
-		case users[i].Role == _User_DB:
-		case users[i].Role == _User_Application:
-		case users[i].Role == _User_Check:
-		case users[i].Role == _User_DBA:
-		case users[i].Role == _User_Monitor:
-		case users[i].Role == _User_Replication:
+		case users[i].Role == _User_DB_Role:
+		case users[i].Role == _User_Application_Role:
+		case users[i].Role == _User_Check_Role:
+		case users[i].Role == _User_DBA_Role:
+		case users[i].Role == _User_Monitor_Role:
+		case users[i].Role == _User_Replication_Role:
 
-		case strings.ToLower(users[i].Role) == strings.ToLower(_User_DB):
+		case strings.ToLower(users[i].Role) == strings.ToLower(_User_DB_Role):
 
-			users[i].Role = _User_DB
+			users[i].Role = _User_DB_Role
 
-		case strings.ToLower(users[i].Role) == strings.ToLower(_User_Application):
+		case strings.ToLower(users[i].Role) == strings.ToLower(_User_Application_Role):
 
-			users[i].Role = _User_Application
+			users[i].Role = _User_Application_Role
 
 		default:
 			logrus.WithField("Service", service).Warnf("skip:%s Role='%s'", users[i].Username, users[i].Role)
@@ -467,16 +445,16 @@ func converteToSWM_Users(users []database.User) []swm_structs.User {
 		}
 
 		switch {
-		case users[i].Role == _User_DB:
-		case users[i].Role == _User_Application:
+		case users[i].Role == _User_DB_Role:
+		case users[i].Role == _User_Application_Role:
 
-		case strings.ToLower(users[i].Role) == strings.ToLower(_User_DB):
+		case strings.ToLower(users[i].Role) == strings.ToLower(_User_DB_Role):
 
-			users[i].Role = _User_DB
+			users[i].Role = _User_DB_Role
 
-		case strings.ToLower(users[i].Role) == strings.ToLower(_User_Application):
+		case strings.ToLower(users[i].Role) == strings.ToLower(_User_Application_Role):
 
-			users[i].Role = _User_Application
+			users[i].Role = _User_Application_Role
 
 		default:
 			logrus.WithField("Service", users[i].ServiceID).Warnf("skip:%s Role='%s'", users[i].Username, users[i].Role)
@@ -496,6 +474,60 @@ func converteToSWM_Users(users []database.User) []swm_structs.User {
 	}
 
 	return out
+}
+
+func (svc *Service) getUsers() ([]database.User, error) {
+	if len(svc.users) > 0 {
+		return svc.users, nil
+	}
+
+	out, err := database.ListUsersByService(svc.ID, "")
+	if err != nil {
+		return nil, err
+	}
+
+	if len(out) > 0 {
+		svc.users = out
+	}
+
+	return svc.users, nil
+}
+
+func (svc *Service) reloadUsers() ([]database.User, error) {
+	out, err := database.ListUsersByService(svc.ID, "")
+	if err != nil {
+		return nil, err
+	}
+
+	svc.users = out
+
+	return out, nil
+}
+
+func (svc *Service) getUserByRole(role string) (database.User, error) {
+	users, err := svc.getUsers()
+	if err != nil {
+		return database.User{}, err
+	}
+
+	for i := range users {
+		if users[i].Role == role {
+			return users[i], nil
+		}
+	}
+
+	users, err = svc.reloadUsers()
+	if err != nil {
+		return database.User{}, err
+	}
+
+	for i := range users {
+		if users[i].Role == role {
+			return users[i], nil
+		}
+	}
+
+	return database.User{}, errors.New("not found Service User")
 }
 
 func (svc *Service) getUnit(nameOrID string) (*unit, error) {
@@ -590,11 +622,6 @@ func (gd *Gardener) reloadService(nameOrID string) (*Service, error) {
 		return nil, err
 	}
 
-	users, err := database.ListUsersByService(service.ID, "")
-	if err != nil {
-		logrus.WithField("Service", service.Name).WithError(err).Error("list Users by serviceID:", service.ID)
-	}
-
 	svc := newService(service, len(units))
 	svc.Lock()
 	defer svc.Unlock()
@@ -611,10 +638,15 @@ func (gd *Gardener) reloadService(nameOrID string) (*Service, error) {
 
 		svc.units = append(svc.units, &u)
 	}
+
 	svc.backup = backup
 	svc.base = base
-	svc.users = users
 	svc.authConfig = authConfig
+
+	_, err = svc.reloadUsers()
+	if err != nil {
+		logrus.WithField("Service", service.Name).WithError(err).Error("list Users by serviceID:", service.ID)
+	}
 
 	gd.Lock()
 
@@ -670,8 +702,8 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 	}
 
 	background := func(context.Context) error {
-		svc.RLock()
-		defer svc.RUnlock()
+		svc.Lock()
+		defer svc.Unlock()
 
 		entry := logrus.WithField("Service", svc.Name)
 
@@ -1107,14 +1139,14 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 
 	dba, found := database.User{}, false
 	for i := range svc.users {
-		if svc.users[i].Username == _User_DBA {
+		if svc.users[i].Role == _User_DBA_Role {
 			dba = svc.users[i]
 			found = true
 			break
 		}
 	}
 	if !found {
-		return errors.Errorf("Service %s missing User:%s", svc.Name, _User_DBA)
+		return errors.Errorf("Service %s missing User Role:%s", svc.Name, _User_DBA_Role)
 	}
 
 	for key, val := range config {
@@ -1335,9 +1367,9 @@ func (svc *Service) initTopology() error {
 		users           = converteToSWM_Users(svc.users)
 	)
 	for i := range svc.users {
-		if svc.users[i].Role == _User_DBA {
+		if svc.users[i].Role == _User_DBA_Role {
 			dba = svc.users[i]
-		} else if svc.users[i].Role == _User_Replication {
+		} else if svc.users[i].Role == _User_Replication_Role {
 			replicater = svc.users[i]
 		}
 	}

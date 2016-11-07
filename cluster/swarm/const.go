@@ -174,12 +174,12 @@ var (
 )
 
 const (
-	_User_DB          = "db"
-	_User_DBA         = "cup_dba"
-	_User_Application = "ap"
-	_User_Monitor     = "mon"
-	_User_Replication = "repl"
-	_User_Check       = "check"
+	_User_DB_Role          = "db"
+	_User_DBA_Role         = "cup_dba"
+	_User_Application_Role = "ap"
+	_User_Monitor_Role     = "mon"
+	_User_Replication_Role = "repl"
+	_User_Check_Role       = "check"
 
 	_User_Type_DB    = consts.Type_Db
 	_User_Type_Proxy = consts.Type_Proxy
