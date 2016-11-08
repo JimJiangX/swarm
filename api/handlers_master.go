@@ -831,11 +831,11 @@ func getServiceResponse(service database.Service, containers cluster.Containers)
 	}
 
 	return structs.ServiceResponse{
-		ID:                   service.ID,
-		Name:                 service.Name,
-		Architecture:         service.Architecture,
-		Description:          desc,
-		HighAvailable:        service.HighAvailable,
+		ID:           service.ID,
+		Name:         service.Name,
+		Architecture: service.Architecture,
+		Description:  desc,
+		//	HighAvailable:        service.HighAvailable,
 		Status:               service.Status,
 		BackupMaxSizeByte:    service.BackupMaxSizeByte,
 		BackupUsedSizeByte:   usedSpaceByte,

@@ -12,7 +12,6 @@ import (
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/pkg/errors"
 )
@@ -210,17 +209,6 @@ func (gd *Gardener) schedulerPerModule(svc *Service, module structs.Module) ([]*
 		_type = _ProxyType
 	}
 
-	highAvaliable := svc.HighAvailable
-	if length := len(module.Clusters); length > 1 {
-		highAvaliable = true
-	}
-
-	for i := range module.Stores {
-		if !storage.IsLocalStore(module.Stores[i].Type) {
-			highAvaliable = true
-		}
-	}
-
 	gd.scheduler.Lock()
 	defer gd.scheduler.Unlock()
 
@@ -238,7 +226,7 @@ func (gd *Gardener) schedulerPerModule(svc *Service, module structs.Module) ([]*
 
 	candidates := gd.listCandidateNodes(list)
 
-	candidates, err = gd.dispatch(config, num, candidates, false, highAvaliable)
+	candidates, err = gd.dispatch(config, num, candidates, false, module.HighAvailable)
 	if err != nil {
 		return nil, nil, err
 	}

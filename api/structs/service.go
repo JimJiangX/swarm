@@ -13,9 +13,8 @@ type PostServiceRequest struct {
 	Architecture string `json:"arch"`
 	BusinessCode string `json:"business_code"`
 
-	AutoHealing   bool `json:",omitempty"`
-	AutoScaling   bool `json:",omitempty"`
-	HighAvailable bool `json:",omitempty"`
+	AutoHealing bool `json:",omitempty"`
+	AutoScaling bool `json:",omitempty"`
 
 	Modules         []Module
 	Users           []User          `json:",omitempty"`
@@ -36,13 +35,14 @@ type User struct {
 }
 
 type Module struct {
-	Name       string
-	Version    string
-	Type       string                 // upsql\upproxy\sm
-	Arch       string                 `json:"arch"`
-	Clusters   []string               `json:",omitempty"`
-	Stores     []DiskStorage          `json:",omitempty"`
-	Configures map[string]interface{} `json:",omitempty"`
+	HighAvailable bool `json:"high_available"`
+	Name          string
+	Version       string
+	Type          string                 // upsql\upproxy\sm
+	Arch          string                 `json:"arch"`
+	Clusters      []string               `json:",omitempty"`
+	Stores        []DiskStorage          `json:",omitempty"`
+	Configures    map[string]interface{} `json:",omitempty"`
 
 	Config           container.Config         `json:"-"`
 	HostConfig       ResourceRequired         `json:"host_config,omitempty"`

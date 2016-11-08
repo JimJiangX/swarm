@@ -141,7 +141,6 @@ func ValidCreateService(req structs.PostServiceRequest) error {
 			} else if !image.Enabled {
 				buf.WriteString("Image:'" + module.Config.Image + "' disabled\n")
 			}
-
 		}
 
 		_, num, err := parseServiceArch(module.Arch)
@@ -152,6 +151,12 @@ func ValidCreateService(req structs.PostServiceRequest) error {
 
 		if arch[module.Type] != num {
 			buf.WriteString(fmt.Sprintf("%s nodeNum  unequal Architecture,(%s)\n", module.Type, module.Arch))
+		}
+
+		if module.HighAvailable {
+			if len(module.Clusters) == 1 && module.Type == _MysqlType && num > 1 {
+				buf.WriteString("more clusters required for upsql high available cluster\n")
+			}
 		}
 
 		hostConfig := container.HostConfig{
