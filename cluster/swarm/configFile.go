@@ -48,7 +48,7 @@ type configParser interface {
 	defaultUserConfig(args ...interface{}) (map[string]interface{}, error)
 	Marshal() ([]byte, error)
 	Requirement() require
-	HealthCheck() (healthCheck, error)
+	HealthCheck(args ...string) (healthCheck, error)
 	Set(key string, val interface{}) error
 }
 
@@ -334,8 +334,8 @@ type healthCheck struct {
 	Tags     []string
 }
 
-func (c mysqlConfig) HealthCheck() (healthCheck, error) {
-	if c.config == nil {
+func (c mysqlConfig) HealthCheck(args ...string) (healthCheck, error) {
+	if c.config == nil || len(args) < 3 {
 		return healthCheck{}, errors.New("params not ready")
 	}
 
@@ -345,7 +345,7 @@ func (c mysqlConfig) HealthCheck() (healthCheck, error) {
 	}
 	return healthCheck{
 		Port:     port,
-		Script:   "/opt/DBaaS/script/check_db.sh ",
+		Script:   "/opt/DBaaS/script/check_db.sh " + args[0] + " " + args[1] + " " + args[2],
 		Shell:    "",
 		Interval: "10s",
 		//TTL:      "15s",
@@ -440,7 +440,7 @@ func (proxyConfig) Requirement() require {
 	}
 }
 
-func (c proxyConfig) HealthCheck() (healthCheck, error) {
+func (c proxyConfig) HealthCheck(args ...string) (healthCheck, error) {
 	if c.config == nil {
 		return healthCheck{}, errors.New("params not ready")
 	}
@@ -687,7 +687,7 @@ func (switchManagerConfig) Requirement() require {
 	}
 }
 
-func (c switchManagerConfig) HealthCheck() (healthCheck, error) {
+func (c switchManagerConfig) HealthCheck(args ...string) (healthCheck, error) {
 	if c.config == nil {
 		return healthCheck{}, errors.New("params not ready")
 	}

@@ -84,6 +84,18 @@ func rolesJSONUnmarshal(data []byte) (map[string]string, error) {
 }
 
 func registerHealthCheck(u *unit, context *Service) error {
+	var (
+		err  error
+		user database.User
+	)
+
+	if u.Type == _MysqlType {
+		user, err = context.getUserByRole(_User_Check_Role)
+		if err != nil {
+			return err
+		}
+	}
+
 	eng, err := u.Engine()
 	if err != nil {
 		return err
@@ -109,7 +121,7 @@ func registerHealthCheck(u *unit, context *Service) error {
 		return errors.Wrap(err, "register unit healthCheck")
 	}
 
-	check, err := u.HealthCheck()
+	check, err := u.HealthCheck(u.Name, user.Username, user.Password)
 	if err != nil {
 
 		if err = u.factory(); err != nil {
@@ -117,7 +129,7 @@ func registerHealthCheck(u *unit, context *Service) error {
 			return err
 		}
 
-		check, err = u.HealthCheck()
+		check, err = u.HealthCheck(u.Name, user.Username, user.Password)
 		if err != nil {
 			logrus.WithField("Unit", u.Name).WithError(err).Error("register healthCheck")
 
@@ -156,7 +168,7 @@ func registerHealthCheck(u *unit, context *Service) error {
 		Port:    check.Port,
 		Address: addr,
 		Check: &api.AgentServiceCheck{
-			Script: check.Script + u.Name,
+			Script: check.Script,
 			// DockerContainerID: containerID,
 			Shell:    check.Shell,
 			Interval: check.Interval,
