@@ -282,6 +282,11 @@ func (gd *Gardener) Register(req structs.RegisterGardener) error {
 		return errors.Errorf("DC has registered,dc=%d", sys.ID)
 	}
 
+	err = validGardenerRegister(&req)
+	if err != nil {
+		return err
+	}
+
 	config := database.Configurations{
 		ID:         req.ID,
 		DockerPort: req.DockerPort,
