@@ -214,8 +214,7 @@ func TestService(t *testing.T) {
 		service.AutoScaling != service1.AutoScaling ||
 		service.BackupFilesRetention != service1.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service1.BackupMaxSizeByte ||
-		service.Desc != service1.Desc ||
-		service.HighAvailable != service1.HighAvailable {
+		service.Desc != service1.Desc {
 		t.Fatal("GetService not equal", string(b), string(b1))
 	}
 
@@ -241,8 +240,7 @@ func TestService(t *testing.T) {
 		service.AutoScaling != service2.AutoScaling ||
 		service.BackupFilesRetention != service2.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service2.BackupMaxSizeByte ||
-		service.Desc != service2.Desc ||
-		service.HighAvailable != service2.HighAvailable {
+		service.Desc != service2.Desc {
 		t.Fatal("SetServiceStatus not equal", string(b), string(b2))
 	}
 
@@ -270,8 +268,7 @@ func TestService(t *testing.T) {
 		service.AutoScaling != service3.AutoScaling ||
 		service.BackupFilesRetention != service3.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service3.BackupMaxSizeByte ||
-		service.Desc != service3.Desc ||
-		service.HighAvailable != service3.HighAvailable {
+		service.Desc != service3.Desc {
 		t.Fatal("TxSetServiceStatus not equal", string(b), string(b3))
 	}
 	task1, err := GetTask(task.ID)
@@ -306,8 +303,7 @@ func TestService(t *testing.T) {
 		service.AutoScaling != service4.AutoScaling ||
 		service.BackupFilesRetention != service4.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service4.BackupMaxSizeByte ||
-		service.Desc != service4.Desc ||
-		service.HighAvailable != service4.HighAvailable {
+		service.Desc != service4.Desc {
 		t.Fatal("TxSetServiceStatus not equal", string(b), string(b5))
 	}
 	task2, err := GetTask(task.ID)
