@@ -146,7 +146,8 @@ output=\`mktemp /tmp/XXXXX\`
 
 docker inspect \$container_name > \$output 2>&1
 if [ \$? -ne 0 ]; then
-	 exit 2
+	rm -f \$output
+	exit 2
 fi
 
 ip_addr=\`cat \$output | grep IPADDR | awk -F= '{print \$2}' | sed 's/",//g'\`
@@ -156,7 +157,7 @@ rm -f \$output
 
 stat_code=\`curl -o /dev/null -s -w %{http_code} -X POST http://\${ip_addr}:\${port}/ping\`
 if [ "\${stat_code}" != "200" ]; then
-	 exit 2
+	exit 2
 fi
 EOF
 	chmod -R +x ${dir}
