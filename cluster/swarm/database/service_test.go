@@ -141,7 +141,6 @@ func TestService(t *testing.T) {
 		Architecture:         "serviceArchitecture001",
 		AutoHealing:          true,
 		AutoScaling:          true,
-		HighAvailable:        true,
 		Status:               1,
 		BackupMaxSizeByte:    79294802,
 		BackupFilesRetention: 3258011085015,
