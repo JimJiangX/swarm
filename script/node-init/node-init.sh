@@ -92,6 +92,8 @@ EOF
 set -o nounset
 
 container_name=\$1
+username=\$2
+password=\$3
 dir=${dir}
 
 docker inspect \${container_name} > /dev/null 2>&1
@@ -105,7 +107,7 @@ if [ "\${running_status}" != "true" ]; then
 	exit 3
 fi
 
-\${dir}/check_db --default-file /\${container_name}_DAT_LV/my.cnf
+\${dir}/check_db --default-file /\${container_name}_DAT_LV/my.cnf --user \$username --password \$password
 if [ \$? -ne 0 ]; then
 	 exit 4
 fi
