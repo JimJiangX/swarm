@@ -62,6 +62,7 @@ remove_consul() {
 	rm -rf /usr/bin/consul
 	rm -rf /etc/sysconfig/consul
 	rm -rf /usr/lib/systemd/system/consul.service
+	rm -rf /var/lib/docker
 }
 
 remove_docker() {
