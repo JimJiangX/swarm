@@ -2191,9 +2191,11 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 			// remove volumes
 			for i := range lvs {
 				found, err := gd.RemoveVolumes(lvs[i].Name)
+
 				if err != nil {
 					entry.Errorf("Remove volume=%s,found=%t,error=%+v", lvs[i].Name, found, err)
-					continue
+
+					return err
 				}
 				entry.Debug(i, len(lvs), "Remove volume ", lvs[i].Name)
 			}
