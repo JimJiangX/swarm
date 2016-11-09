@@ -62,21 +62,31 @@ remove_consul() {
 	rm -rf /usr/bin/consul
 	rm -rf /etc/sysconfig/consul
 	rm -rf /usr/lib/systemd/system/consul.service
-	rm -rf /var/lib/docker
 }
 
 remove_docker() {
 	# stop docker
 	systemctl stop docker.service >/dev/null 2>&1
 	pkill -9 docker >/dev/null 2>&1
+	
+	local dir=/var/lib/docker/btrfs/subvolumes
+
+	if [ -d ${dir} ]; then
+		for fs in `ls ${dir}`
+		do
+			btrfs subvolume delete ${dir}/${fs}
+		done
+	fi
+
 	rm -rf /usr/bin/docker /usr/bin/docker-containerd /usr/bin/docker-containerd-shim /usr/bin/docker-containerd-ctr /usr/bin/docker-runc
 	rm -rf /etc/sysconfig/docker
+	rm -rf /etc/systemd/system/multi-user.target.wants/docker.service
 	rm -rf /usr/lib/systemd/system/docker.service
 	rm -rf /usr/lib/systemd/system/docker.socket
 	rm -rf /etc/docker/
+	rm -rf /var/lib/docker
 	rm -rf /run/docker/
 	rm -rf /root/.docker/
-	rm -rf /etc/systemd/system/multi-user.target.wants/docker.service
 }
 
 remove_docker_plugin() {
