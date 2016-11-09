@@ -74,6 +74,9 @@ remove_docker() {
 	rm -rf /usr/lib/systemd/system/docker.service
 	rm -rf /usr/lib/systemd/system/docker.socket
 	rm -rf /etc/docker/
+	rm -rf /run/docker/
+	rm -rf /root/.docker/
+	rm -rf /etc/systemd/system/multi-user.target.wants/docker.service
 }
 
 remove_docker_plugin() {
