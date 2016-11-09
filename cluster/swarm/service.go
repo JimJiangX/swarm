@@ -902,12 +902,15 @@ func (svc *Service) initService() error {
 	}
 
 	for i := range svc.units {
-		if svc.units[i].Type == _SwitchManagerType {
-			swm = svc.units[i]
+		u := svc.units[i]
+
+		if u.Type == _SwitchManagerType {
+			swm = u
 			continue
 		}
+
 		funcs = append(funcs, func() error {
-			return svc.units[i].initService(args...)
+			return u.initService(args...)
 		})
 	}
 
@@ -949,8 +952,11 @@ func (svc *Service) statusCAS(expected, value int64) error {
 }
 
 func (svc *Service) startService() error {
-	var swm *unit
-	funcs := make([]func() error, 0, len(svc.units))
+	var (
+		swm   *unit
+		funcs = make([]func() error, 0, len(svc.units))
+	)
+
 	for i := range svc.units {
 		if svc.units[i].Type == _SwitchManagerType {
 			swm = svc.units[i]
