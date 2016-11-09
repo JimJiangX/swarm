@@ -441,7 +441,7 @@ func (proxyConfig) Requirement() require {
 }
 
 func (c proxyConfig) HealthCheck(args ...string) (healthCheck, error) {
-	if c.config == nil {
+	if c.config == nil || len(args) == 0 {
 		return healthCheck{}, errors.New("params not ready")
 	}
 
@@ -451,7 +451,7 @@ func (c proxyConfig) HealthCheck(args ...string) (healthCheck, error) {
 	}
 	return healthCheck{
 		Port:     port,
-		Script:   "/opt/DBaaS/script/check_proxy.sh ",
+		Script:   "/opt/DBaaS/script/check_proxy.sh " + args[0],
 		Shell:    "",
 		Interval: "10s",
 		TTL:      "15s",
@@ -688,7 +688,7 @@ func (switchManagerConfig) Requirement() require {
 }
 
 func (c switchManagerConfig) HealthCheck(args ...string) (healthCheck, error) {
-	if c.config == nil {
+	if c.config == nil || len(args) == 0 {
 		return healthCheck{}, errors.New("params not ready")
 	}
 
@@ -696,9 +696,10 @@ func (c switchManagerConfig) HealthCheck(args ...string) (healthCheck, error) {
 	if err != nil {
 		return healthCheck{}, errors.Wrap(err, "get 'Port'")
 	}
+
 	return healthCheck{
 		Port:     port,
-		Script:   "/opt/DBaaS/script/check_switchmanager.sh ",
+		Script:   "/opt/DBaaS/script/check_switchmanager.sh " + args[0],
 		Shell:    "",
 		Interval: "10s",
 		TTL:      "15s",
