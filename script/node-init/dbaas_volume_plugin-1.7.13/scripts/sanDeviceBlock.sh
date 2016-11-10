@@ -35,11 +35,11 @@ do
 			done
 		else
 			echo "cannot find multipath device"
-			exit 1
+			exit 2
 		fi
 	else
 		echo "cannot find multipath subdevice"
-		exit 0
+		continue
 	fi
 done
 
