@@ -123,27 +123,16 @@ func txInsertUnit(tx *sqlx.Tx, unit Unit) error {
 	return errors.Wrap(err, "Tx insert Unit")
 }
 
-// TxInsertMultiUnit insert []Unit in Tx
-func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
-	stmt, err := tx.PrepareNamed(insertUnitQuery)
+// InsertUnit insert Unit
+func InsertUnit(u Unit) error {
+	db, err := getDB(false)
 	if err != nil {
-		return errors.Wrap(err, "Tx prepare insert Unit")
+		return err
 	}
 
-	for i := range units {
-		if units[i] == nil {
-			continue
-		}
+	_, err = db.NamedExec(insertUnitQuery, &u)
 
-		_, err = stmt.Exec(units[i])
-		if err != nil {
-			stmt.Close()
-
-			return errors.Wrap(err, "Tx Insert Unit")
-		}
-	}
-
-	return stmt.Close()
+	return errors.Wrap(err, "insert Unit")
 }
 
 // UpdateUnitInfo could update params of unit
@@ -1016,31 +1005,6 @@ func DeteleServiceRelation(serviceID string, rmVolumes bool) error {
 	err = tx.Commit()
 
 	return errors.Wrap(err, "Detele Service relation")
-}
-
-// TxInsertUnitWithPorts insert Unit and update []Port in a Tx
-func TxInsertUnitWithPorts(u *Unit, ports []Port) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if u != nil {
-		err = txInsertUnit(tx, *u)
-		if err != nil {
-			return err
-		}
-	}
-
-	err = TxUpdatePorts(tx, ports)
-	if err != nil {
-		return err
-	}
-
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx insert Unit and []Port")
 }
 
 // TxUpdateMigrateUnit update Unit and delete old LocalVolumes in a Tx

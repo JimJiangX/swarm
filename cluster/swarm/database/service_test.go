@@ -322,3 +322,52 @@ func TestService(t *testing.T) {
 		t.Fatal("TxSetServiceStatus not equal", string(b), string(b6))
 	}
 }
+
+// TxInsertUnitWithPorts insert Unit and update []Port in a Tx
+func TxInsertUnitWithPorts(u *Unit, ports []Port) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if u != nil {
+		err = txInsertUnit(tx, *u)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = TxUpdatePorts(tx, ports)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Tx insert Unit and []Port")
+}
+
+
+// TxInsertMultiUnit insert []Unit in Tx
+func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
+	stmt, err := tx.PrepareNamed(insertUnitQuery)
+	if err != nil {
+		return errors.Wrap(err, "Tx prepare insert Unit")
+	}
+
+	for i := range units {
+		if units[i] == nil {
+			continue
+		}
+
+		_, err = stmt.Exec(units[i])
+		if err != nil {
+			stmt.Close()
+
+			return errors.Wrap(err, "Tx Insert Unit")
+		}
+	}
+
+	return stmt.Close()
+}

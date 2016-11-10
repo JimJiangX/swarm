@@ -111,6 +111,24 @@ func ListAvailablePorts(num int) ([]Port, error) {
 	return ports, nil
 }
 
+// TxUpdatePortSlice update []Port Name\UnitID\UnitName\Proto\Allocated in Tx
+func TxUpdatePortSlice(ports []Port) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = TxUpdatePorts(tx, ports)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Tx update []Port")
+}
+
 // TxUpdatePorts update []Port Name\UnitID\UnitName\Proto\Allocated in Tx
 func TxUpdatePorts(tx *sqlx.Tx, ports []Port) error {
 	const query = "UPDATE tbl_dbaas_port SET name=:name,unit_id=:unit_id,unit_name=:unit_name,proto=:proto,allocated=:allocated WHERE port=:port"
