@@ -502,7 +502,7 @@ func (u *unit) createVolume() (*cluster.Volume, error) {
 	return nil, nil
 }
 
-func updateVolume(host string, lv database.LocalVolume, size int) error {
+func updateVolume(host string, lv database.LocalVolume) error {
 	option := sdk.VolumeUpdateOption{
 		VgName: lv.VGName,
 		LvName: lv.Name,
