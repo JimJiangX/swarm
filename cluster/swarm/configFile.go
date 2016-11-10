@@ -723,6 +723,11 @@ func (c switchManagerConfig) defaultUserConfig(args ...interface{}) (map[string]
 		return nil, errors.New(errMsg)
 	}
 
+	user, err := svc.getUserByRole(_User_Check_Role)
+	if err != nil {
+		return nil, err
+	}
+
 	sys, err := database.GetSystemConfig()
 	if err != nil {
 		return nil, err
@@ -751,6 +756,8 @@ func (c switchManagerConfig) defaultUserConfig(args ...interface{}) (map[string]
 	m["SwarmHostKey"] = leaderElectionPath
 
 	// _User_Check Role
+	m["swarmhealthcheckuser"] = user.Username
+	m["swarmhealthcheckpassword"] = user.Password
 
 	return m, nil
 }
@@ -779,6 +786,11 @@ func (c switchManagerConfigV1123) defaultUserConfig(args ...interface{}) (map[st
 		return nil, errors.New(errMsg)
 	}
 
+	user, err := svc.getUserByRole(_User_Check_Role)
+	if err != nil {
+		return nil, err
+	}
+
 	sys, err := database.GetSystemConfig()
 	if err != nil {
 		return nil, err
@@ -807,6 +819,8 @@ func (c switchManagerConfigV1123) defaultUserConfig(args ...interface{}) (map[st
 	m["SwarmHostKey"] = leaderElectionPath
 
 	// _User_Check Role
+	m["swarmhealthcheckuser"] = user.Username
+	m["swarmhealthcheckpassword"] = user.Password
 
 	return m, nil
 }
