@@ -400,7 +400,7 @@ type pendingAllocStore struct {
 }
 
 func localVolumeExtend(host string, lv localVolume) error {
-	return updateVolume(host, lv.lv, lv.size)
+	return updateVolume(host, lv.lv)
 }
 
 func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
@@ -424,12 +424,13 @@ func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
 	gd.Lock()
 	for _, pending := range pendings {
 		for _, lun := range pending.sanStore {
-			dc, err := gd.datacenterByEngine(pending.unit.Unit.EngineID)
-			if err != nil || dc == nil || dc.store == nil {
+			store, err := storage.GetStore(lun.StorageSystemID)
+			if err != nil {
 				continue
 			}
-			dc.store.DelMapping(lun.ID)
-			dc.store.Recycle(lun.ID, 0)
+
+			store.DelMapping(lun.ID)
+			store.Recycle(lun.ID, 0)
 		}
 	}
 	gd.Unlock()
@@ -467,7 +468,7 @@ func (svc *Service) volumesPendingExpension(gd *Gardener, _type string, extensio
 	pendings := make([]*pendingAllocStore, 0, len(units))
 
 	for _, u := range units {
-		pending, _, err := pendingAllocUnitStore(gd, u, u.EngineID, extensions, false)
+		pending, _, err := pendingAllocUnitStore(gd, u, u.EngineID, extensions)
 		if pending != nil {
 			pendings = append(pendings, pending)
 		}
@@ -479,7 +480,7 @@ func (svc *Service) volumesPendingExpension(gd *Gardener, _type string, extensio
 	return pendings, nil
 }
 
-func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []structs.DiskStorage, skipSAN bool) (*pendingAllocStore, []string, error) {
+func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []structs.DiskStorage) (*pendingAllocStore, []string, error) {
 	dc, node, err := gd.getNode(engineID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "not found node by Engine:"+engineID)
@@ -498,7 +499,7 @@ func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []struct
 		}
 		name := fmt.Sprintf("%s_%s_LV", u.Name, need[d].Name)
 
-		if storage.IsLocalStore(need[d].Type) {
+		if storage.IsLocalStore(need[d].Type) && need[d].Size > 0 {
 			lv, err := node.localStorageExtend(name, need[d].Type, need[d].Size)
 			if err != nil {
 				return pending, binds, err
@@ -514,13 +515,10 @@ func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []struct
 			continue
 		}
 
-		if skipSAN {
-			continue
-		}
-
 		if dc.store == nil {
 			return pending, binds, errors.Errorf("Datacenter Store required")
 		}
+
 		vgName := u.Name + _SAN_VG
 
 		lun, lv, err := dc.store.Alloc(name, u.ID, vgName, need[d].Size)
