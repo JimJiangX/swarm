@@ -39,7 +39,7 @@ do
 		fi
 	else
 		echo "cannot find multipath subdevice"
-		exit 1
+		exit 0
 	fi
 done
 
