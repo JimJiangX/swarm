@@ -67,6 +67,22 @@ func GetTopology(ip string, port int) (*structs.Topology, error) {
 	return &topology, nil
 }
 
+func GetServiceStatus(ip string, port int) (string, error) {
+	res, err := get(ip, port, "serivceStatus", "")
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+
+	b, _ := ioutil.ReadAll(res.Body)
+
+	if res.StatusCode != http.StatusOK {
+		return "", errors.New(string(b))
+	}
+
+	return string(b), nil
+}
+
 // need close res.Body in call function
 func get(ip string, port int, method, arg string) (*http.Response, error) {
 	uri := "http://" + ip + ":" + strconv.Itoa(port) + "/" + method

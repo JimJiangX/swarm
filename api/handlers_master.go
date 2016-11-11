@@ -22,6 +22,7 @@ import (
 	"github.com/docker/swarm/utils"
 	"github.com/gorilla/mux"
 	consulapi "github.com/hashicorp/consul/api"
+	"github.com/yiduoyunQ/smlib"
 	goctx "golang.org/x/net/context"
 )
 
@@ -666,7 +667,8 @@ func listServiceFromDBAAS(services []database.Service, containers cluster.Contai
 
 		ManageStatus  int64  `json:"manage_status"`  //"manage_status": "??",
 		RunningStatus string `json:"running_status"` //"running_status": "??",
-		CreatedAt     string `json:"created_at"`     // "created_at": "??"
+		ServiceStatus string `json:"service_status"`
+		CreatedAt     string `json:"created_at"` // "created_at": "??"
 	}
 
 	checks, err := swarm.HealthChecksFromConsul("any", nil)
@@ -680,7 +682,7 @@ func listServiceFromDBAAS(services []database.Service, containers cluster.Contai
 		desc := structs.PostServiceRequest{}
 		err := json.NewDecoder(bytes.NewBufferString(services[i].Desc)).Decode(&desc)
 		if err != nil {
-			logrus.Warningf("JSON Decode Serivce.Desc %s:%s,%s", services[i].Name, err, services[i].Desc)
+			logrus.WithError(err).Warningf("JSON Decode Serivce.Desc %s,%s", services[i].Name, services[i].Desc)
 		}
 		sql := structs.Module{}
 		for _, m := range desc.Modules {
@@ -689,6 +691,12 @@ func listServiceFromDBAAS(services []database.Service, containers cluster.Contai
 				break
 			}
 		}
+
+		units, err := database.ListUnitByServiceID(services[i].ID)
+		if err != nil {
+			logrus.WithError(err).Error("List Unit By ServiceID")
+		}
+
 		out[i] = response{
 			Name:          services[i].Name,
 			ID:            services[i].ID,
@@ -699,8 +707,61 @@ func listServiceFromDBAAS(services []database.Service, containers cluster.Contai
 			Memory:        sql.HostConfig.Memory,
 			CpusetCpus:    sql.HostConfig.CpusetCpus,
 			ManageStatus:  services[i].Status,
-			RunningStatus: getServiceRunningStatus(services[i].ID, nil, containers, checks),
+			RunningStatus: getServiceRunningStatus(services[i].ID, units, containers, checks),
+			ServiceStatus: serviceUnknown,
 			CreatedAt:     utils.TimeToString(services[i].CreatedAt),
+		}
+
+		var (
+			found bool
+			addr  string
+			port  int
+			swm   database.Unit
+		)
+		for i := range units {
+			if units[i].Type == "switch_manager" {
+				swm = units[i]
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			continue
+		}
+
+		found = false
+
+		networkings, ports := getUnitNetworking(swm.ID)
+		for _, net := range networkings {
+			if net.Type == "internal_access_networking" {
+				addr = net.Addr
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			continue
+		}
+
+		found = false
+
+		for i := range ports {
+			if ports[i].Name == "Port" {
+				port = ports[i].Port
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			continue
+		}
+
+		out[i].ServiceStatus, err = smlib.GetServiceStatus(addr, port)
+		if err != nil {
+			logrus.WithError(err).Warnf("%s cannot get ServiceStatus,addr=%s:%d", services[i].Name, addr, port)
 		}
 	}
 
