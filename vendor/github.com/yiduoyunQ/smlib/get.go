@@ -68,7 +68,7 @@ func GetTopology(ip string, port int) (*structs.Topology, error) {
 }
 
 func GetServiceStatus(ip string, port int) (string, error) {
-	res, err := get(ip, port, "serivceStatus", "")
+	res, err := get(ip, port, "serviceStatus", "")
 	if err != nil {
 		return "", err
 	}
