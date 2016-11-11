@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"path"
 	"sort"
@@ -651,118 +652,141 @@ func getServiceRunningStatus(serviceID string, units []database.Unit,
 	return state
 }
 
-func listServiceFromDBAAS(services []database.Service, containers cluster.Containers) io.Reader {
-	type response struct {
-		ID           string //"id": "??",
-		Name         string //"name": "test01",
-		BusinessCode string `json:"business_code"` // "business_code": "??",
+type dbaasServiceResp struct {
+	ID           string //"id": "??",
+	Name         string //"name": "test01",
+	BusinessCode string `json:"business_code"` // "business_code": "??",
 
-		Endpoints []string
+	Endpoints []string
 
-		Version string // "upsql_version": "??",
-		Arch    string // "upsql_arch": "??",
+	Version string // "upsql_version": "??",
+	Arch    string // "upsql_arch": "??",
 
-		CpusetCpus string // "upsql_cpusetCpus": "??",
-		Memory     int64  // "upsql_memory": "??",
+	CpusetCpus string // "upsql_cpusetCpus": "??",
+	Memory     int64  // "upsql_memory": "??",
 
-		ManageStatus  int64  `json:"manage_status"`  //"manage_status": "??",
-		RunningStatus string `json:"running_status"` //"running_status": "??",
-		ServiceStatus string `json:"service_status"`
-		CreatedAt     string `json:"created_at"` // "created_at": "??"
+	ManageStatus  int64  `json:"manage_status"`  //"manage_status": "??",
+	RunningStatus string `json:"running_status"` //"running_status": "??",
+	ServiceStatus string `json:"service_status"`
+	CreatedAt     string `json:"created_at"` // "created_at": "??"
+}
+
+func getServiceStatusFromSWM(units []database.Unit) string {
+	var (
+		found bool
+		addr  string
+		port  int
+		swm   database.Unit
+	)
+	for i := range units {
+		if units[i].Type == "switch_manager" {
+			swm = units[i]
+			found = true
+			break
+		}
 	}
 
+	if !found {
+		return ""
+	}
+
+	found = false
+
+	networkings, ports := getUnitNetworking(swm.ID)
+	for _, network := range networkings {
+		if network.Type == "internal_access_networking" {
+			ip, _, err := net.ParseCIDR(network.Addr)
+			if err != nil {
+				logrus.WithError(err).Warnf("ParseCIDR %s", network.Addr)
+				continue
+			}
+			addr = ip.String()
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return ""
+	}
+
+	found = false
+
+	for i := range ports {
+		if ports[i].Name == "Port" {
+			port = ports[i].Port
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return ""
+	}
+
+	status, err := smlib.GetServiceStatus(addr, port)
+	if err != nil {
+		logrus.WithError(err).Warnf("%s cannot get ServiceStatus,addr=%s:%d", swm.Name, addr, port)
+	}
+
+	return status
+
+}
+
+func serviceFromDBAAS(svc database.Service, containers cluster.Containers, checks map[string]consulapi.HealthCheck, ch chan dbaasServiceResp) {
+	desc := structs.PostServiceRequest{}
+	err := json.NewDecoder(bytes.NewBufferString(svc.Desc)).Decode(&desc)
+	if err != nil {
+		logrus.WithError(err).Warningf("JSON Decode Serivce.Desc %s,%s", svc.Name, svc.Desc)
+	}
+
+	sql := structs.Module{}
+	for _, m := range desc.Modules {
+		if m.Type == "upsql" {
+			sql = m
+			break
+		}
+	}
+
+	units, err := database.ListUnitByServiceID(svc.ID)
+	if err != nil {
+		logrus.WithError(err).Error("List Unit By ServiceID")
+	}
+
+	resp := dbaasServiceResp{
+		Name:          svc.Name,
+		ID:            svc.ID,
+		BusinessCode:  svc.BusinessCode,
+		Endpoints:     getServiceEndpoints(svc.ID),
+		Version:       sql.Version,
+		Arch:          sql.Arch,
+		Memory:        sql.HostConfig.Memory,
+		CpusetCpus:    sql.HostConfig.CpusetCpus,
+		ManageStatus:  svc.Status,
+		RunningStatus: getServiceRunningStatus(svc.ID, units, containers, checks),
+		ServiceStatus: getServiceStatusFromSWM(units),
+		CreatedAt:     utils.TimeToString(svc.CreatedAt),
+	}
+
+	ch <- resp
+}
+
+func listServiceFromDBAAS(services []database.Service, containers cluster.Containers) io.Reader {
 	checks, err := swarm.HealthChecksFromConsul("any", nil)
 	if err != nil {
 		logrus.Error(err)
 		checks = make(map[string]consulapi.HealthCheck, 0)
 	}
 
-	out := make([]response, len(services))
+	result := make(chan dbaasServiceResp, len(services)/3+1)
 	for i := range services {
-		desc := structs.PostServiceRequest{}
-		err := json.NewDecoder(bytes.NewBufferString(services[i].Desc)).Decode(&desc)
-		if err != nil {
-			logrus.WithError(err).Warningf("JSON Decode Serivce.Desc %s,%s", services[i].Name, services[i].Desc)
-		}
-		sql := structs.Module{}
-		for _, m := range desc.Modules {
-			if m.Type == "upsql" {
-				sql = m
-				break
-			}
-		}
+		go serviceFromDBAAS(services[i], containers, checks, result)
+	}
 
-		units, err := database.ListUnitByServiceID(services[i].ID)
-		if err != nil {
-			logrus.WithError(err).Error("List Unit By ServiceID")
-		}
+	out := make([]dbaasServiceResp, len(services))
 
-		out[i] = response{
-			Name:          services[i].Name,
-			ID:            services[i].ID,
-			BusinessCode:  services[i].BusinessCode,
-			Endpoints:     getServiceEndpoints(services[i].ID),
-			Version:       sql.Version,
-			Arch:          sql.Arch,
-			Memory:        sql.HostConfig.Memory,
-			CpusetCpus:    sql.HostConfig.CpusetCpus,
-			ManageStatus:  services[i].Status,
-			RunningStatus: getServiceRunningStatus(services[i].ID, units, containers, checks),
-			ServiceStatus: serviceUnknown,
-			CreatedAt:     utils.TimeToString(services[i].CreatedAt),
-		}
-
-		var (
-			found bool
-			addr  string
-			port  int
-			swm   database.Unit
-		)
-		for i := range units {
-			if units[i].Type == "switch_manager" {
-				swm = units[i]
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			continue
-		}
-
-		found = false
-
-		networkings, ports := getUnitNetworking(swm.ID)
-		for _, net := range networkings {
-			if net.Type == "internal_access_networking" {
-				addr = net.Addr
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			continue
-		}
-
-		found = false
-
-		for i := range ports {
-			if ports[i].Name == "Port" {
-				port = ports[i].Port
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			continue
-		}
-
-		out[i].ServiceStatus, err = smlib.GetServiceStatus(addr, port)
-		if err != nil {
-			logrus.WithError(err).Warnf("%s cannot get ServiceStatus,addr=%s:%d", services[i].Name, addr, port)
-		}
+	for i := 0; i < len(services); i++ {
+		out[i] = <-result
 	}
 
 	rw := bytes.NewBuffer(nil)
