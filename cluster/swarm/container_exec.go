@@ -33,7 +33,7 @@ func containerExec(ctx context.Context, engine *cluster.Engine, containerID stri
 		return inspect, errEngineIsNil
 	}
 
-	client := engine.ContainerAPIClient()
+	client := engine.SwarmAPIClient()
 	if client == nil {
 		return inspect, errEngineAPIisNil
 	}

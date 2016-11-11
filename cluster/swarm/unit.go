@@ -94,7 +94,7 @@ func (u *unit) containerAPIClient() (*cluster.Engine, client.ContainerAPIClient,
 		return nil, nil, errors.Wrap(errEngineIsNil, "get container API Client")
 	}
 
-	client := eng.ContainerAPIClient()
+	client := eng.SwarmAPIClient()
 	if client == nil {
 		return eng, nil, errors.Wrap(errEngineAPIisNil, "get container API Client")
 	}

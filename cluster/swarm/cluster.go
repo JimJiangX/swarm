@@ -24,6 +24,7 @@ import (
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/samalba/dockerclient"
+	"golang.org/x/net/context"
 )
 
 type pendingContainer struct {
@@ -372,6 +373,19 @@ func (c *Cluster) removeEngine(addr string) bool {
 	if engine == nil {
 		return false
 	}
+
+	// avoid remove engine cause by swarm-join register failed
+	if engine.IsHealthy() {
+		client := engine.SwarmAPIClient()
+		if client != nil {
+			_, err := client.ServerVersion(context.Background())
+			engine.CheckConnectionErr(err)
+			if err == nil {
+				return false
+			}
+		}
+	}
+
 	c.Lock()
 	defer c.Unlock()
 

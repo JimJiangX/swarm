@@ -2,7 +2,7 @@ package cluster
 
 import (
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/engine-api/client"
+	"github.com/docker/swarm/swarmclient"
 	"github.com/docker/swarm/utils"
 )
 
@@ -29,11 +29,15 @@ func (e *Engine) UsedCpus() int64 {
 	return r
 }
 
-// ContainerAPIClient returns Engine ContainerAPIClient
-func (e *Engine) ContainerAPIClient() client.ContainerAPIClient {
+// ContainerAPIClient returns Engine SwarmAPIClient
+func (e *Engine) SwarmAPIClient() swarmclient.SwarmAPIClient {
 	if e == nil {
 		return nil
 	}
 
-	return e.apiClient
+	e.Lock()
+	client := e.apiClient
+	e.Unlock()
+
+	return client
 }
