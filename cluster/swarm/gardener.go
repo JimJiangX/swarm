@@ -428,7 +428,11 @@ func pingHorus() error {
 		return err
 	}
 
-	_, err = http.Post("http://"+addr+"/v1/ping", "", nil)
+	resp, err := http.Post("http://"+addr+"/v1/ping", "", nil)
+	if err == nil {
+		ensureReaderClosed(resp)
+		return nil
+	}
 
 	return errors.Wrap(err, "ping Horus")
 }
