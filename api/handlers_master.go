@@ -724,12 +724,33 @@ func getServiceStatusFromSWM(units []database.Unit) string {
 		return ""
 	}
 
-	status, err := smlib.GetServiceStatus(addr, port)
-	if err != nil {
-		logrus.WithError(err).Warnf("%s cannot get ServiceStatus,addr=%s:%d", swm.Name, addr, port)
+	ch := make(chan string, 1)
+
+	go func(name, addr string, port int, r chan<- string) {
+		status, err := smlib.GetServiceStatus(addr, port)
+		if err != nil {
+			logrus.WithError(err).Warnf("%s cannot get ServiceStatus,addr=%s:%d", name, addr, port)
+		}
+
+		r <- status
+		close(r)
+
+	}(swm.Name, addr, port, ch)
+
+	select {
+	case <-time.After(time.Second):
+		go func(ch chan string) {
+			for range ch {
+			}
+		}(ch)
+
+		return ""
+
+	case status := <-ch:
+		return status
 	}
 
-	return status
+	return ""
 
 }
 
