@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/yiduoyunQ/sm/sm-svr/consts"
 	"github.com/yiduoyunQ/sm/sm-svr/structs"
 )
 
@@ -68,19 +69,24 @@ func GetTopology(ip string, port int) (*structs.Topology, error) {
 }
 
 func GetServiceStatus(ip string, port int) (string, error) {
-	res, err := get(ip, port, "serviceStatus", "")
+	topology, err := GetTopology(ip, port)
 	if err != nil {
 		return "", err
 	}
-	defer res.Body.Close()
 
-	b, _ := ioutil.ReadAll(res.Body)
+	serviceStatus := consts.StatusOK
 
-	if res.StatusCode != http.StatusOK {
-		return "", errors.New(string(b))
+	for _, dbInfo := range topology.DataNodeGroup["default"] {
+		if dbInfo.Status != consts.Normal {
+			serviceStatus = consts.StatusWarning
+			if dbInfo.Type == consts.Master {
+				serviceStatus = consts.StatusError
+				break
+			}
+		}
 	}
 
-	return string(b), nil
+	return serviceStatus, nil
 }
 
 // need close res.Body in call function
