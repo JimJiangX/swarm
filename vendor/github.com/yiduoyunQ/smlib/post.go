@@ -111,6 +111,8 @@ func post(body []byte, ip string, port int, method, arg string) error {
 
 		return errors.New(string(body))
 	}
+        
+	io.CopyN(ioutil.Discard, res.Body, 1024)
 
 	return nil
 }
