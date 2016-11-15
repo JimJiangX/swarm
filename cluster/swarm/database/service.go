@@ -493,6 +493,64 @@ func GetService(nameOrID string) (Service, error) {
 	return s, errors.Wrap(err, "get Service by nameOrID")
 }
 
+// GetServiceStatus returns Service Status select by ID or Name
+func GetServiceStatus(nameOrID string) (int, error) {
+	db, err := getDB(false)
+	if err != nil {
+		return 0, err
+	}
+
+	var n int
+	const query = "SELECT status FROM tbl_dbaas_service WHERE id=? OR name=?"
+
+	err = db.Get(&n, query, nameOrID, nameOrID)
+
+	return n, errors.Wrap(err, "get Service.Status by nameOrID")
+}
+
+func TxServiceStatusCAS(nameOrID string, val int, f func(val int) bool) (bool, int, error) {
+	tx, err := GetTX()
+	if err != nil {
+		return false, 0, err
+	}
+	defer tx.Rollback()
+
+	var n int
+	const query = "SELECT status FROM tbl_dbaas_service WHERE id=? OR name=?"
+
+	err = tx.Get(&n, query, nameOrID, nameOrID)
+	if err != nil {
+		return false, 0, errors.Wrap(err, "Tx get Service Status")
+	}
+
+	if !f(n) {
+		return false, n, nil
+	}
+
+	_, err = tx.Exec("UPDATE tbl_dbaas_service SET status=? WHERE id=? OR name=?", val, nameOrID, nameOrID)
+	if err != nil {
+		return false, val, errors.Wrap(err, "Tx update Service status")
+	}
+
+	err = tx.Commit()
+	if err == nil {
+		return true, val, nil
+	}
+
+	return false, n, errors.Wrap(err, "Tx Service Status CAS")
+}
+
+func UpdateServiceStatus(nameOrID string, val int) error {
+	db, err := getDB(false)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("UPDATE tbl_dbaas_service SET status=? WHERE id=? OR name=?", val, nameOrID, nameOrID)
+
+	return errors.Wrap(err, "update Service Status")
+}
+
 // TxGetServiceByUnit returns Service select by Unit ID or Name.
 func TxGetServiceByUnit(unit string) (Service, error) {
 	tx, err := GetTX()

@@ -127,6 +127,47 @@ const (
 )
 
 const (
+	_ing    = 0
+	_done   = 1
+	_failed = 2
+
+//	statusServcieBuilding    = 1<<4 + _ing
+//	statusServcieBuilt       = statusServcieBuilding + _done
+//	statusServcieBuildFailed = statusServcieBuilding + _failed
+
+//	statusServiceScheduling     = 2<<4 + _ing
+//	statusServiceScheduled      = statusServiceScheduling + _done
+//	statusServiceScheduleFailed = statusServiceScheduling + _failed
+
+//	statusServiceAllocating     = 3<<4 + _ing
+//	statusServiceAllocated      = statusServiceAllocating + _done
+//	statusServiceAllocateFailed = statusServiceAllocating + _failed
+
+//	statusServiceCreating     = 4<<4 + _ing
+//	statusServiceCreated      = statusServiceCreating + _done
+//	statusServiceCreateFailed = statusServiceCreating + _failed
+
+//	statusServiceStarting    = 5<<4 + _ing // start contaier and start service
+//	statusServiceStarted     = statusServiceStarting + _done
+//	statusServiceStartFailed = statusServiceStarting + _failed
+
+//	statusServiceStoping    = 6<<4 + _ing
+//	statusServiceStoped     = statusServiceStoping + _done
+//	statusServiceStopFailed = statusServiceStoping + _failed
+
+//	statusServiceBackuping    = 8<<4 + _ing
+//	statusServiceBackupDone   = statusServiceBackuping + _done
+//	statusServiceBackupFailed = statusServiceBackuping + _failed
+
+//	statusServiceRestoring     = 9<<4 + _ing
+//	statusServiceRestored      = statusServiceRestoring + _done
+//	statusServiceRestoreFailed = statusServiceRestoring + _failed
+
+//	statusServiceDeleting     = 7<<4 + _ing
+//	statusServiceDeleteFailed = statusServiceDeleting + _failed
+)
+
+const (
 	_MysqlType         = "upsql" // cluster_type,networking_type
 	_UpsqlType         = "upsql"
 	_ProxyType         = "proxy"          // cluster_type,networking_type
