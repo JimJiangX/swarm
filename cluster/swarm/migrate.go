@@ -348,13 +348,12 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 		swarmID := gd.generateUniqueID()
 		config.SetSwarmID(swarmID)
-		pending.pendingContainer = &pendingContainer{
+
+		gd.pendingContainers[swarmID] = &pendingContainer{
 			Name:   swarmID,
 			Config: config,
 			Engine: engine,
 		}
-
-		gd.pendingContainers[swarmID] = pending.pendingContainer
 
 		dc, node, err := gd.getNode(engine.ID)
 		if err != nil {
@@ -952,13 +951,12 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 		swarmID := gd.generateUniqueID()
 		config.SetSwarmID(swarmID)
-		pending.pendingContainer = &pendingContainer{
+
+		gd.pendingContainers[swarmID] = &pendingContainer{
 			Name:   swarmID,
 			Config: config,
 			Engine: engine,
 		}
-
-		gd.pendingContainers[swarmID] = pending.pendingContainer
 
 		err = createServiceResources(gd, []*pendingAllocResource{pending})
 		if err != nil {
