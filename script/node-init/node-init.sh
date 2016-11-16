@@ -253,7 +253,7 @@ init_ssd_vg() {
 
 # install consul agent
 install_consul() {
-	local version=0.6.4
+	local version=0.7.1
 	
 	# stop consul
 	pkill -9 consul >/dev/null 2>&1
