@@ -117,7 +117,7 @@ func resetContainerConfig(config *cluster.ContainerConfig, hostConfig *ctypes.Ho
 }
 
 // UnitMigrate migrate the assigned unit to another host
-func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig, force bool) (string, error) {
+func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig, force bool) (_ string, err error) {
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {
 		return "", err
@@ -128,7 +128,25 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 
-	svc.RLock()
+	done, val, err := svc.statusLock.CAS(statusServiceUnitMigrating, isStatusNotInProgress)
+	if err != nil {
+		return "", err
+	}
+	if !done {
+		return "", errors.Errorf("Service %s status conflict,got (%d)", svc.Name, val)
+	}
+
+	entry := logrus.WithField("Service", svc.Name)
+
+	svc.Lock()
+	defer func() {
+		if err != nil {
+			_err := svc.statusLock.SetStatus(statusServiceUnitMigrateFailed)
+			if _err != nil {
+				entry.Errorf("%+v", _err)
+			}
+		}
+	}()
 
 	migrate, err := svc.getUnit(table.ID)
 	if err != nil {
@@ -148,15 +166,12 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}
 	}
 
+	entry = entry.WithField("Migrate", migrate.Name)
+
 	users, err := svc.getUsers()
 	if err != nil {
 		return "", err
 	}
-
-	entry := logrus.WithFields(logrus.Fields{
-		"Service": svc.Name,
-		"Migrate": migrate.Name,
-	})
 
 	oldContainer := migrate.container
 
@@ -217,12 +232,13 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		gd.scheduler.Lock()
 
 		defer func() {
+			svcStatus := statusServiceUnitMigrated
 			if err == nil {
 				entry.Infof("migrate service done,%v", err)
 				migrate.Status, migrate.LatestError = statusUnitMigrated, ""
 			} else {
 				entry.Errorf("%+v", err)
-				migrate.Status, migrate.LatestError = statusUnitMigrateFailed, err.Error()
+				migrate.Status, migrate.LatestError, svcStatus = statusUnitMigrateFailed, err.Error(), statusServiceUnitMigrateFailed
 			}
 
 			gd.scheduler.Unlock()
@@ -233,6 +249,11 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 				if _err != nil {
 					entry.Errorf("defer resourceRecycle:%+v", _err)
 				}
+			}
+
+			_err := svc.statusLock.SetStatus(svcStatus)
+			if _err != nil {
+				entry.Errorf("defer update service status:%+v", _err)
 			}
 
 			svc.Unlock()
@@ -777,7 +798,25 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 
-	svc.RLock()
+	done, val, err := svc.statusLock.CAS(statusServiceUnitRebuilding, isStatusNotInProgress)
+	if err != nil {
+		return "", err
+	}
+	if !done {
+		return "", errors.Errorf("Service %s status conflict,got (%d)", svc.Name, val)
+	}
+
+	entry := logrus.WithField("Service", svc.Name)
+
+	svc.Lock()
+	defer func() {
+		if err != nil {
+			_err := svc.statusLock.SetStatus(statusServiceUnitRebuildFailed)
+			if _err != nil {
+				entry.Errorf("%+v", _err)
+			}
+		}
+	}()
 
 	rebuild, err := svc.getUnit(table.ID)
 	if err != nil {
@@ -798,15 +837,12 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		}
 	}
 
+	entry = entry.WithField("Rebuild", rebuild.Name)
+
 	users, err := svc.getUsers()
 	if err != nil {
 		return "", err
 	}
-
-	entry := logrus.WithFields(logrus.Fields{
-		"Service": svc.Name,
-		"Rebuild": rebuild.Name,
-	})
 
 	oldContainer := rebuild.container
 
@@ -858,10 +894,11 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		gd.scheduler.Lock()
 
 		defer func() {
+			svcStatus := statusServiceUnitRebuilt
 			if err == nil {
 				rebuild.Status, rebuild.LatestError = statusUnitRebuilt, ""
 			} else {
-				rebuild.Status, rebuild.LatestError = statusUnitRebuildFailed, err.Error()
+				rebuild.Status, rebuild.LatestError, svcStatus = statusUnitRebuildFailed, err.Error(), statusServiceRestoreFailed
 			}
 
 			gd.scheduler.Unlock()
@@ -872,6 +909,11 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 				if _err != nil {
 					entry.Errorf("Recycle,%+v", _err)
 				}
+			}
+
+			_err := svc.statusLock.SetStatus(svcStatus)
+			if _err != nil {
+				entry.Errorf("%+v", _err)
 			}
 
 			svc.Unlock()

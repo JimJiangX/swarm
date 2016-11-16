@@ -2,10 +2,13 @@ package database
 
 import (
 	"encoding/json"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/docker/swarm/utils"
+	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 )
 
 func TestUnit(t *testing.T) {
@@ -348,7 +351,6 @@ func TxInsertUnitWithPorts(u *Unit, ports []Port) error {
 	return errors.Wrap(err, "Tx insert Unit and []Port")
 }
 
-
 // TxInsertMultiUnit insert []Unit in Tx
 func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
 	stmt, err := tx.PrepareNamed(insertUnitQuery)
@@ -370,4 +372,33 @@ func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
 	}
 
 	return stmt.Close()
+}
+
+// SetServiceStatus update Service Status
+func (svc *Service) SetServiceStatus(state int64, finish time.Time) error {
+	db, err := getDB(true)
+	if err != nil {
+		return err
+	}
+
+	if finish.IsZero() {
+		_, err = db.Exec("UPDATE tbl_dbaas_service SET status=? WHERE id=?", state, svc.ID)
+		if err != nil {
+			return errors.Wrap(err, "update Service Status")
+		}
+
+		atomic.StoreInt64(&svc.Status, state)
+
+		return nil
+	}
+
+	_, err = db.Exec("UPDATE tbl_dbaas_service SET status=?,finished_at=? WHERE id=?", state, finish, svc.ID)
+	if err != nil {
+		return errors.Wrap(err, "update Service Status & FinishedAt")
+	}
+
+	atomic.StoreInt64(&svc.Status, state)
+	svc.FinishedAt = finish
+
+	return nil
 }

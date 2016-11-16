@@ -1,25 +1,29 @@
 package swarm
 
 import (
-	"sync"
 	"time"
 
+	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/pkg/errors"
 )
 
-func IsStatusInProgress(val int) bool {
+func isStatusInProgress(val int) bool {
 	return val&0x0F == _ing
 }
 
-func IsStatusDone(val int) bool {
+func isStatusNotInProgress(val int) bool {
+	return val&0x0F != _ing
+}
+
+func isStatusDone(val int) bool {
 	return val&0x0F == _done
 }
 
-func IsStatusFailure(val int) bool {
+func isStatusFailure(val int) bool {
 	return val&0X0F == _failed
 }
 
-func IsStatusEqual(old int) func(val int) bool {
+func isStatusEqual(old int) func(val int) bool {
 	return func(val int) bool {
 		return old == val
 	}
@@ -29,10 +33,9 @@ type statusLock struct {
 	key      string
 	retries  int
 	waitTime time.Duration
-	lock     *sync.Mutex
 	load     func(key string) (int, error)
-	set      func(key string, val int) error
-	cas      func(key string, new int, f func(val int) bool) (bool, int, error)
+	set      func(key string, val int, t time.Time) error
+	cas      func(key string, new int, t time.Time, f func(val int) bool) (bool, int, error)
 }
 
 func (sl statusLock) Load() (int, error) {
@@ -43,7 +46,7 @@ func (sl statusLock) Load() (int, error) {
 	return sl.load(sl.key)
 }
 
-func (sl statusLock) CasAndLock(val int, f func(val int) bool) (bool, int, error) {
+func (sl statusLock) CAS(val int, f func(val int) bool) (bool, int, error) {
 	if sl.cas == nil || f == nil {
 		return false, 0, errors.New("cas or f is nil")
 	}
@@ -61,9 +64,8 @@ func (sl statusLock) CasAndLock(val int, f func(val int) bool) (bool, int, error
 
 	for c := sl.retries; c > 0; c-- {
 
-		done, value, err = sl.cas(sl.key, val, f)
+		done, value, err = sl.cas(sl.key, val, time.Now(), f)
 		if done {
-			sl.lock.Lock()
 			return done, value, err
 		}
 
@@ -79,7 +81,7 @@ func (sl statusLock) CasAndLock(val int, f func(val int) bool) (bool, int, error
 	return done, value, err
 }
 
-func (sl statusLock) ReleaseLock(val int) error {
+func (sl statusLock) SetStatus(val int) error {
 	if sl.set == nil {
 		return errors.New("set is nil")
 	}
@@ -95,9 +97,8 @@ func (sl statusLock) ReleaseLock(val int) error {
 
 	for c := sl.retries; c > 0; c-- {
 
-		err = sl.set(sl.key, val)
+		err = sl.set(sl.key, val, time.Now())
 		if err == nil {
-			sl.lock.Unlock()
 			return nil
 		}
 
@@ -111,4 +112,15 @@ func (sl statusLock) ReleaseLock(val int) error {
 	}
 
 	return err
+}
+
+func defaultServiceStatusLock(key string) statusLock {
+	return statusLock{
+		key:      key,
+		retries:  3,
+		waitTime: time.Second,
+		load:     database.GetServiceStatus,
+		set:      database.UpdateServiceStatus,
+		cas:      database.TxServiceStatusCAS,
+	}
 }

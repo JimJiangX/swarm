@@ -2012,35 +2012,35 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 }
 
 // POST /services/{name:.*}/service-config/update
-func postServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-	req := structs.UpdateServiceConfigRequest{}
+//func postServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+//	name := mux.Vars(r)["name"]
+//	req := structs.UpdateServiceConfigRequest{}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError2(w, err, http.StatusBadRequest)
-		return
-	}
+//	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+//		httpError2(w, err, http.StatusBadRequest)
+//		return
+//	}
 
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
-		return
-	}
+//	ok, _, gd := fromContext(ctx, _Gardener)
+//	if !ok && gd == nil {
+//		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
+//		return
+//	}
 
-	service, err := gd.GetService(name)
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//	service, err := gd.GetService(name)
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	err = service.UpdateUnitConfig(req.Type, req.Pairs)
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//	err = service.UpdateUnitConfig(req.Type, req.Pairs)
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	w.WriteHeader(http.StatusOK)
-}
+//	w.WriteHeader(http.StatusOK)
+//}
 
 // POST /services/{name:.*}/service_config/modify
 func postServiceConfigModify(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {

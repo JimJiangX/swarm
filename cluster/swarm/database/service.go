@@ -508,7 +508,7 @@ func GetServiceStatus(nameOrID string) (int, error) {
 	return n, errors.Wrap(err, "get Service.Status by nameOrID")
 }
 
-func TxServiceStatusCAS(nameOrID string, val int, f func(val int) bool) (bool, int, error) {
+func TxServiceStatusCAS(nameOrID string, val int, finish time.Time, f func(val int) bool) (bool, int, error) {
 	tx, err := GetTX()
 	if err != nil {
 		return false, 0, err
@@ -527,7 +527,7 @@ func TxServiceStatusCAS(nameOrID string, val int, f func(val int) bool) (bool, i
 		return false, n, nil
 	}
 
-	_, err = tx.Exec("UPDATE tbl_dbaas_service SET status=? WHERE id=? OR name=?", val, nameOrID, nameOrID)
+	_, err = tx.Exec("UPDATE tbl_dbaas_service SET status=?,finished_at=? WHERE id=? OR name=?", val, finish, nameOrID, nameOrID)
 	if err != nil {
 		return false, val, errors.Wrap(err, "Tx update Service status")
 	}
@@ -540,13 +540,13 @@ func TxServiceStatusCAS(nameOrID string, val int, f func(val int) bool) (bool, i
 	return false, n, errors.Wrap(err, "Tx Service Status CAS")
 }
 
-func UpdateServiceStatus(nameOrID string, val int) error {
+func UpdateServiceStatus(nameOrID string, val int, finish time.Time) error {
 	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("UPDATE tbl_dbaas_service SET status=? WHERE id=? OR name=?", val, nameOrID, nameOrID)
+	_, err = db.Exec("UPDATE tbl_dbaas_service SET status=?,finished_at=? WHERE id=? OR name=?", val, finish, nameOrID, nameOrID)
 
 	return errors.Wrap(err, "update Service Status")
 }
@@ -651,35 +651,6 @@ func txInsertSerivce(tx *sqlx.Tx, svc Service) error {
 	_, err := tx.NamedExec(insertServiceQuery, &svc)
 
 	return errors.Wrap(err, "Tx insert Service")
-}
-
-// SetServiceStatus update Service Status
-func (svc *Service) SetServiceStatus(state int64, finish time.Time) error {
-	db, err := getDB(true)
-	if err != nil {
-		return err
-	}
-
-	if finish.IsZero() {
-		_, err = db.Exec("UPDATE tbl_dbaas_service SET status=? WHERE id=?", state, svc.ID)
-		if err != nil {
-			return errors.Wrap(err, "update Service Status")
-		}
-
-		atomic.StoreInt64(&svc.Status, state)
-
-		return nil
-	}
-
-	_, err = db.Exec("UPDATE tbl_dbaas_service SET status=?,finished_at=? WHERE id=?", state, finish, svc.ID)
-	if err != nil {
-		return errors.Wrap(err, "update Service Status & FinishedAt")
-	}
-
-	atomic.StoreInt64(&svc.Status, state)
-	svc.FinishedAt = finish
-
-	return nil
 }
 
 // TxSetServiceStatus update Service Status and Task Status in Tx.

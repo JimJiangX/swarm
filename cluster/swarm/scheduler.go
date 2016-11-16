@@ -19,16 +19,18 @@ import (
 func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err error) {
 	entry := logrus.WithFields(logrus.Fields{
 		"Name":   svc.Name,
-		"Action": "Schedule&Alloc",
+		"Action": "Schedule",
 	})
 	resourceAlloc := make([]*pendingAllocResource, 0, len(svc.base.Modules))
 
 	defer func() {
 		if err == nil {
+			_err := svc.statusLock.SetStatus(statusServiceAllocated)
+			if _err != nil {
+				entry.Errorf("Set Service Status:statusServiceAllocated(%d),%+v", statusServiceAllocated, _err)
+			}
 			return
 		}
-
-		atomic.StoreInt64(&svc.Status, statusServiceAlloctionFailed)
 
 		entry.WithError(err).Errorf("scheduler failed")
 
@@ -41,9 +43,12 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 			}
 			gd.scheduler.Unlock()
 		}
-	}()
 
-	atomic.StoreInt64(&svc.Status, statusServiceAllocting)
+		_err := svc.statusLock.SetStatus(statusServiceAllocateFailed)
+		if _err != nil {
+			entry.Errorf("Set Service Status:statusServiceAllocateFailed(%d),%+v", statusServiceAllocateFailed, _err)
+		}
+	}()
 
 	entry.Debug("start service Scheduler")
 
@@ -212,12 +217,12 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node,
 			return allocs, errors.Errorf("not found Engine '%s':'%s'", candidates[i].ID, candidates[i].Addr)
 		}
 
-		id := gd.generateUniqueID()
 		networkMode := "host"
 		if name := config.HostConfig.NetworkMode.NetworkName(); name != "" {
 			networkMode = name
 		}
 
+		id := gd.generateUniqueID()
 		unit := &unit{
 			Unit: database.Unit{
 				ID:            id,
