@@ -74,7 +74,11 @@ func GetServiceStatus(ip string, port int) (string, error) {
 		return "", err
 	}
 
-	serviceStatus := ""
+	if topology == nil {
+		return "", nil
+	}
+
+	serviceStatus := consts.StatusOK
 
 	for _, dbInfo := range topology.DataNodeGroup["default"] {
 		if dbInfo.Status != consts.Normal {
