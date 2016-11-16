@@ -48,7 +48,7 @@ cat << EOF > /etc/sysconfig/consul
 ## ServiceRestart : consul
 
 #
-CONSUL_OPTS="agent -log-level=debug -config-dir=/etc/consul.d -bind=${ip_addr}"
+CONSUL_OPTS="agent -protocol=3 -log-level=debug -config-dir=/etc/consul.d -bind=${ip_addr}"
 
 EOF
 
