@@ -287,6 +287,8 @@ func extendSanStoreageVG(host string, lun database.LUN) error {
 
 	addr := getPluginAddr(host, pluginPort)
 
+	logrus.WithField("Addr", addr).Debugf("extend San Storeage VG,%+v", config)
+
 	return sdk.SanVgExtend(addr, config)
 }
 
@@ -498,10 +500,6 @@ func removeNetworkings(host string, networkings []IPInfo) (err error) {
 	return err
 }
 
-func (u *unit) createVolume() (*cluster.Volume, error) {
-	return nil, nil
-}
-
 func updateVolume(host string, lv database.LocalVolume) error {
 	option := sdk.VolumeUpdateOption{
 		VgName: lv.VGName,
@@ -511,6 +509,9 @@ func updateVolume(host string, lv database.LocalVolume) error {
 	}
 
 	addr := getPluginAddr(host, pluginPort)
+
+	logrus.WithField("Addr", addr).Debugf("update volume,%+v", option)
+
 	err := sdk.VolumeUpdate(addr, option)
 	if err != nil {
 		logrus.Errorf("host:%s volume update error:%s", addr, err)

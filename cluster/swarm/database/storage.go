@@ -647,7 +647,7 @@ func TxUpdateMultiLocalVolume(lvs []LocalVolume) error {
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.Preparex("UPDATE tbl_dbaas_volumes SET size=? WHERE id=? OR name=?")
+	stmt, err := tx.Preparex("UPDATE tbl_dbaas_volumes SET size=? WHERE id=?")
 	if err != nil {
 		return errors.Wrap(err, "Tx prepare update local Volume")
 	}
