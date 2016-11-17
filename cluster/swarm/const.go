@@ -179,11 +179,11 @@ const (
 	statusServiceUnitMigrated      = statusServiceUnitMigrating + _done
 	statusServiceUnitMigrateFailed = statusServiceUnitMigrating + _failed
 
-	statusServiceUnitRebuilding    = 12<<4 + _ing
+	statusServiceUnitRebuilding    = 13<<4 + _ing
 	statusServiceUnitRebuilt       = statusServiceUnitRebuilding + _done
 	statusServiceUnitRebuildFailed = statusServiceUnitRebuilding + _failed
 
-	statusServiceDeleting     = 13<<4 + _ing
+	statusServiceDeleting     = 14<<4 + _ing
 	statusServiceDeleteFailed = statusServiceDeleting + _failed
 )
 
