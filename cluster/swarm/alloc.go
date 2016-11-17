@@ -301,12 +301,13 @@ func (gd *Gardener) allocStorage(
 			vgName := penging.unit.Unit.Name + _SAN_VG
 
 			lun, lv, err := dc.store.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
+			if lun.ID != "" {
+				penging.sanStore = append(penging.sanStore, lun)
+				penging.localStore = append(penging.localStore, lv)
+			}
 			if err != nil {
 				return err
 			}
-
-			penging.sanStore = append(penging.sanStore, lun)
-			penging.localStore = append(penging.localStore, lv)
 
 			err = dc.store.Mapping(node.ID, vgName, lun.ID)
 			if err != nil {
@@ -478,17 +479,18 @@ func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []struct
 		}
 
 		lun, lv, err := dc.store.Extend(name, need[d].Size)
+		if lun.ID != "" {
+			pending.sanStore = append(pending.sanStore, lun)
+			pending.localStore = append(pending.localStore, localVolume{
+				lv:   lv,
+				size: need[d].Size,
+			})
+		}
 		if err != nil {
 			logrus.Errorf("SAN Store Alloc error:%s,%s", err, name)
 
 			return pending, binds, err
 		}
-
-		pending.sanStore = append(pending.sanStore, lun)
-		pending.localStore = append(pending.localStore, localVolume{
-			lv:   lv,
-			size: need[d].Size,
-		})
 
 		err = dc.store.Mapping(node.ID, lun.VGName, lun.ID)
 		if err != nil {

@@ -279,6 +279,11 @@ func extendSanStoreageVG(host string, lun database.LUN) error {
 		return err
 	}
 
+	lun, err = database.GetLUNByID(lun.ID)
+	if err != nil {
+		return err
+	}
+
 	config := sdk.VgConfig{
 		HostLunID: []int{lun.HostLunID},
 		VgName:    lun.VGName,
