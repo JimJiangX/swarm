@@ -477,21 +477,20 @@ func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []struct
 			return pending, binds, errors.Errorf("Datacenter Store required")
 		}
 
-		vgName := u.Name + _SAN_VG
-
-		lun, lv, err := dc.store.Alloc(name, u.ID, vgName, need[d].Size)
+		lun, lv, err := dc.store.Extend(name, need[d].Size)
 		if err != nil {
 			logrus.Errorf("SAN Store Alloc error:%s,%s", err, name)
 
 			return pending, binds, err
 		}
+
 		pending.sanStore = append(pending.sanStore, lun)
 		pending.localStore = append(pending.localStore, localVolume{
 			lv:   lv,
 			size: need[d].Size,
 		})
 
-		err = dc.store.Mapping(node.ID, vgName, lun.ID)
+		err = dc.store.Mapping(node.ID, lun.VGName, lun.ID)
 		if err != nil {
 			return pending, binds, err
 		}

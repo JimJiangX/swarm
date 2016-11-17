@@ -734,7 +734,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 	}
 
 	background := func(context.Context) error {
-		ok, val, err := svc.statusLock.CAS(statusServiceScheduling, func(val int) bool {
+		ok, val, err := svc.statusLock.CAS(statusServiceAllocating, func(val int) bool {
 			return val == statusServcieBuilding
 		})
 		if err != nil {
