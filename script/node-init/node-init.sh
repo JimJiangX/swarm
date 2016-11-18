@@ -296,7 +296,7 @@ EOF
 ## ServiceRestart : consul
 
 #
-CONSUL_OPTS="agent -config-dir=/etc/consul.d -bind=${adm_ip}"
+CONSUL_OPTS="agent -protocol=3 -log-level=debug -config-dir=/etc/consul.d -bind=${adm_ip}"
 
 EOF
 
