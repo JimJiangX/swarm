@@ -1939,20 +1939,6 @@ func (gd *Gardener) ServiceScale(name string, scale structs.PostServiceScaledReq
 		return err
 	}
 
-	err = gd.serviceScale(svc, scale)
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"Service": svc.Name,
-			"Type":    scale.Type,
-		}).WithError(err).Error("Service scale")
-	}
-
-	return err
-}
-
-func (gd *Gardener) serviceScale(svc *Service,
-	scale structs.PostServiceScaledRequest) (err error) {
-
 	done, val, err := svc.statusLock.CAS(statusServiceScaling, isStatusNotInProgress)
 	if err != nil {
 		return err
@@ -1960,6 +1946,21 @@ func (gd *Gardener) serviceScale(svc *Service,
 	if !done {
 		return errors.Errorf("Service %s status conflict,got (%d)", svc.Name, val)
 	}
+
+	go gd.serviceScale(svc, scale)
+
+	return nil
+}
+
+func (gd *Gardener) serviceScale(svc *Service,
+	scale structs.PostServiceScaledRequest) (err error) {
+
+	field := logrus.WithFields(logrus.Fields{
+		"Service": svc.Name,
+		"Type":    scale.Type,
+	})
+
+	field.Debugf("Service Scale,%+v", scale)
 
 	var storePendings []*pendingAllocStore
 
@@ -1973,7 +1974,9 @@ func (gd *Gardener) serviceScale(svc *Service,
 
 		status := statusServiceScaled
 
-		if err != nil {
+		if err == nil {
+			err = svc.updateDescAfterScale(scale)
+		} else {
 			status = statusServiceScaleFailed
 
 			_err := gd.cancelStoreExtend(storePendings)
@@ -1982,13 +1985,9 @@ func (gd *Gardener) serviceScale(svc *Service,
 			}
 		}
 
-		if err == nil {
-			err = svc.updateDescAfterScale(scale)
-		}
-
 		_err := svc.statusLock.SetStatus(status)
 		if _err != nil {
-			logrus.WithField("Service", svc.Name).Errorf("%+v", _err)
+			field.Errorf("%+v", _err)
 		}
 
 		svc.Unlock()
@@ -2032,10 +2031,10 @@ func (gd *Gardener) serviceScale(svc *Service,
 		for _, lv := range pending.localStore {
 			err = localVolumeExtend(pending.unit.engine.IP, lv)
 			if err != nil {
-				logrus.WithField("Unit", pending.unit.Name).Errorf("update volume error:\n%+v", err)
+				field.WithField("Unit", pending.unit.Name).Errorf("update volume error:\n%+v", err)
 				return err
 			}
-			logrus.WithField("Unit", pending.unit.Name).Debugf("update volume %v", lv)
+			field.WithField("Unit", pending.unit.Name).Debugf("update volume %v", lv)
 		}
 	}
 

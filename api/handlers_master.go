@@ -724,7 +724,7 @@ func getServiceStatusFromSWM(units []database.Unit) string {
 		return ""
 	}
 
-	ch := make(chan string, 1)
+	ch := make(chan string)
 
 	go func(name, addr string, port int, r chan<- string) {
 		status, err := smlib.GetServiceStatus(addr, port)
