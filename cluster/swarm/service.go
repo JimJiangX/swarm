@@ -2100,9 +2100,13 @@ func (svc *Service) updateDescAfterScale(scale structs.PostServiceScaledRequest)
 
 	des := *dsp
 
-	des.UpdateModuleConfig(scale.Type, *scale.UpdateConfig)
+	if scale.UpdateConfig != nil {
+		des.UpdateModuleConfig(scale.Type, *scale.UpdateConfig)
+	}
 
-	des.UpdateModuleStore(scale.Type, scale.Extensions)
+	if len(scale.Extensions) > 0 {
+		des.UpdateModuleStore(scale.Type, scale.Extensions)
+	}
 
 	buffer := bytes.NewBuffer(nil)
 	err = json.NewEncoder(buffer).Encode(&des)
