@@ -671,7 +671,7 @@ type dbaasServiceResp struct {
 	CreatedAt     string `json:"created_at"` // "created_at": "??"
 }
 
-func getServiceStatusFromSWM(units []database.Unit) string {
+func getServiceStatusFromSWM(units []database.Unit, result chan<- string) {
 	var (
 		found bool
 		addr  string
@@ -687,7 +687,8 @@ func getServiceStatusFromSWM(units []database.Unit) string {
 	}
 
 	if !found {
-		return ""
+		result <- ""
+		return
 	}
 
 	found = false
@@ -707,7 +708,8 @@ func getServiceStatusFromSWM(units []database.Unit) string {
 	}
 
 	if !found {
-		return ""
+		result <- ""
+		return
 	}
 
 	found = false
@@ -721,42 +723,31 @@ func getServiceStatusFromSWM(units []database.Unit) string {
 	}
 
 	if !found {
-		return ""
+		result <- ""
+		return
 	}
 
-	ch := make(chan string)
-
-	go func(name, addr string, port int, r chan<- string) {
-		status, err := smlib.GetServiceStatus(addr, port)
-		if err != nil {
-			logrus.WithError(err).Warnf("%s cannot get ServiceStatus,addr=%s:%d", name, addr, port)
-		}
-
-		r <- status
-		close(r)
-
-	}(swm.Name, addr, port, ch)
-
-	select {
-	case <-time.After(time.Second):
-		go func(ch chan string) {
-			for range ch {
-			}
-		}(ch)
-
-		return ""
-
-	case status := <-ch:
-		return status
+	status, err := smlib.GetServiceStatus(addr, port)
+	if err != nil {
+		logrus.WithError(err).Warnf("%s cannot get ServiceStatus,addr=%s:%d", swm.Name, addr, port)
 	}
 
-	return ""
-
+	result <- status
 }
 
 func serviceFromDBAAS(svc database.Service, containers cluster.Containers, checks map[string]consulapi.HealthCheck, ch chan dbaasServiceResp) {
+	units, err := database.ListUnitByServiceID(svc.ID)
+	if err != nil {
+		logrus.WithError(err).Error("List Unit By ServiceID")
+	}
+
+	r := make(chan string, 1)
+	if len(units) > 0 {
+		go getServiceStatusFromSWM(units, r)
+	}
+
 	desc := structs.PostServiceRequest{}
-	err := json.NewDecoder(bytes.NewBufferString(svc.Desc)).Decode(&desc)
+	err = json.NewDecoder(bytes.NewBufferString(svc.Desc)).Decode(&desc)
 	if err != nil {
 		logrus.WithError(err).Warningf("JSON Decode Serivce.Desc %s,%s", svc.Name, svc.Desc)
 	}
@@ -767,11 +758,6 @@ func serviceFromDBAAS(svc database.Service, containers cluster.Containers, check
 			sql = m
 			break
 		}
-	}
-
-	units, err := database.ListUnitByServiceID(svc.ID)
-	if err != nil {
-		logrus.WithError(err).Error("List Unit By ServiceID")
 	}
 
 	resp := dbaasServiceResp{
@@ -785,8 +771,17 @@ func serviceFromDBAAS(svc database.Service, containers cluster.Containers, check
 		CpusetCpus:    sql.HostConfig.CpusetCpus,
 		ManageStatus:  svc.Status,
 		RunningStatus: getServiceRunningStatus(svc.ID, units, containers, checks),
-		ServiceStatus: getServiceStatusFromSWM(units),
+		ServiceStatus: "",
 		CreatedAt:     utils.TimeToString(svc.CreatedAt),
+	}
+
+	if len(units) > 0 {
+		select {
+		case <-time.After(time.Second):
+		case status := <-r:
+			resp.ServiceStatus = status
+			close(r)
+		}
 	}
 
 	ch <- resp
