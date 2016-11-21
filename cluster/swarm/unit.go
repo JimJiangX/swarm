@@ -423,9 +423,9 @@ func (u *unit) restartContainer(ctx context.Context) error {
 		return nil
 	}
 
-	inspect, err := containerExec(ctx, engine, u.ContainerID, cmd, false)
-	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s stop service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+	_, err = containerExec(ctx, engine, u.ContainerID, cmd, false)
+	if err != nil {
+		logrus.WithField("Unit", u.Name).WithError(err).Warn("stop service")
 	}
 
 	timeout := 5 * time.Second
@@ -717,11 +717,7 @@ func (u *unit) initService(args ...string) error {
 		return nil
 	}
 
-	inspect, err := containerExec(context.Background(), u.engine, u.ContainerID, cmd, false)
-	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
-	}
-
+	_, err := containerExec(context.Background(), u.engine, u.ContainerID, cmd, false)
 	if err == nil {
 		atomic.StoreInt64(&u.Status, statusUnitStarted)
 	} else {
@@ -876,10 +872,7 @@ func (u *unit) startService() (err error) {
 		return nil
 	}
 
-	inspect, err := containerExec(context.Background(), eng, u.ContainerID, cmd, false)
-	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s start service cmd=%s exitCode=%d,%v,Error:%+v", u.Name, cmd, inspect.ExitCode, inspect, err)
-	}
+	_, err = containerExec(context.Background(), eng, u.ContainerID, cmd, false)
 
 	return err
 }
@@ -899,10 +892,7 @@ func (u *unit) forceStopService() error {
 		return nil
 	}
 
-	inspect, err := containerExec(context.Background(), eng, u.ContainerID, cmd, false)
-	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s stop service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
-	}
+	_, err = containerExec(context.Background(), eng, u.ContainerID, cmd, false)
 
 	return err
 }
@@ -978,10 +968,7 @@ func (u *unit) backup(ctx context.Context, args ...string) (err error) {
 		return nil
 	}
 
-	inspect, err := containerExec(ctx, eng, u.ContainerID, cmd, false)
-	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s backup cmd:%s exitCode:%d,%v,Error:%+v", u.Name, cmd, inspect.ExitCode, inspect, err)
-	}
+	_, err = containerExec(ctx, eng, u.ContainerID, cmd, false)
 
 	return err
 }
@@ -1002,10 +989,7 @@ func (u *unit) restore(ctx context.Context, file, backupDir string) error {
 		return nil
 	}
 
-	inspect, err := containerExec(ctx, eng, u.ContainerID, cmd, false)
-	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s restore cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
-	}
+	_, err = containerExec(ctx, eng, u.ContainerID, cmd, false)
 
 	return err
 }

@@ -572,10 +572,7 @@ func startUnit(engine *cluster.Engine, containerID string, u *unit, users []data
 		return nil
 	}
 
-	inspect, err := containerExec(context.Background(), engine, containerID, cmd, false)
-	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s start service cmd:%s exitCode:%d,%v,Error:%v", containerID, cmd, inspect.ExitCode, inspect, err)
-	}
+	_, err = containerExec(context.Background(), engine, containerID, cmd, false)
 
 	return err
 }

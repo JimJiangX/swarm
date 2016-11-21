@@ -1306,10 +1306,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 
 			for i := range originalCmds {
 
-				inspect, _err := containerExec(context.Background(), engine, u.ContainerID, originalCmds[i][:], false)
-				if inspect.ExitCode != 0 {
-					_err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%+v", u.Name, originalCmds[i], inspect.ExitCode, inspect, err)
-				}
+				_, _err := containerExec(context.Background(), engine, u.ContainerID, originalCmds[i][:], false)
 				if _err != nil {
 					entry.WithError(_err).Error("Rollback command modify")
 				}
@@ -1366,10 +1363,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 
 		for i := range cmdList {
 
-			inspect, err := containerExec(context.Background(), engine, u.ContainerID, cmdList[i][:], false)
-			if inspect.ExitCode != 0 {
-				err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%s", u.Name, cmdList[i], inspect.ExitCode, inspect, err)
-			}
+			_, err := containerExec(context.Background(), engine, u.ContainerID, cmdList[i][:], false)
 			if err != nil {
 				return err
 			}
@@ -2363,6 +2357,10 @@ func checkContainerError(err error) error {
 
 	if err == errContainerNotRunning || err == errContainerNotFound {
 		return err
+	}
+
+	if _err := errors.Cause(err); _err == errContainerNotRunning || _err == errContainerNotFound {
+		return _err
 	}
 
 	if strings.Contains(err.Error(), "No such container") {
