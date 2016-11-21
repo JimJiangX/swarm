@@ -229,11 +229,6 @@ func (gd *Gardener) initAndStartService(svc *Service) (err error) {
 		return err
 	}
 
-	logrus.Debug("init Topology")
-	if err := svc.initTopology(); err != nil {
-		return err
-	}
-
 	logrus.Debug("register Services")
 	if err := svc.registerServices(); err != nil {
 		return err
@@ -243,6 +238,11 @@ func (gd *Gardener) initAndStartService(svc *Service) (err error) {
 	err = svc.registerToHorus(mon.Username, mon.Password, sys.HorusAgentPort)
 	if err != nil {
 		logrus.Warnf("register To Horus Error:%s", err)
+	}
+
+	logrus.Debug("init Topology")
+	if err := svc.initTopology(); err != nil {
+		return err
 	}
 
 	return nil

@@ -923,7 +923,6 @@ func (svc *Service) initService() error {
 	}
 
 	var (
-		swm   *unit
 		args  = make([]string, 0, len(users)*3)
 		funcs = make([]func() error, 0, len(svc.units))
 	)
@@ -939,26 +938,9 @@ func (svc *Service) initService() error {
 	for i := range svc.units {
 		u := svc.units[i]
 
-		if u.Type == _SwitchManagerType {
-			swm = u
-			continue
-		}
-
 		funcs = append(funcs, func() error {
 			return u.initService(args...)
 		})
-	}
-
-	if swm != nil {
-		err := swm.initService()
-		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"Service": svc.Name,
-				"Unit":    swm.Name,
-			}).WithError(err).Error("init service")
-
-			return err
-		}
 	}
 
 	err = GoConcurrency(funcs)
