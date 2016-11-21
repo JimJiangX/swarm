@@ -749,7 +749,7 @@ func (gd *Gardener) StartUnitService(nameOrID string) (err error) {
 		return err
 	}
 	if !done {
-		return errors.Errorf("Service %s status conflict,got (%d)", svc.Name, val)
+		return errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
 	}
 
 	svc.Lock()
@@ -800,7 +800,7 @@ func (gd *Gardener) StopUnitService(nameOrID string, timeout int) (err error) {
 		return err
 	}
 	if !done {
-		return errors.Errorf("Service %s status conflict,got (%d)", svc.Name, val)
+		return errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
 	}
 
 	field := logrus.WithField("Service", svc.Name)
@@ -1099,7 +1099,7 @@ func (gd *Gardener) RestoreUnit(nameOrID, source string) (_ string, err error) {
 		return "", err
 	}
 	if !done {
-		return "", errors.Errorf("Service %s status conflict,got (%d)", svc.Name, val)
+		return "", errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
 	}
 
 	svc.RLock()

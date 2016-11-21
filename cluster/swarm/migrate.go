@@ -133,12 +133,12 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 	if !done {
-		return "", errors.Errorf("Service %s status conflict,got (%d)", svc.Name, val)
+		return "", errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
 	}
 
 	entry := logrus.WithField("Service", svc.Name)
 
-	svc.Lock()
+	svc.RLock()
 	defer func() {
 		if err != nil {
 			_err := svc.statusLock.SetStatus(statusServiceUnitMigrateFailed)
@@ -803,12 +803,12 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 	if !done {
-		return "", errors.Errorf("Service %s status conflict,got (%d)", svc.Name, val)
+		return "", errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
 	}
 
 	entry := logrus.WithField("Service", svc.Name)
 
-	svc.Lock()
+	svc.RLock()
 	defer func() {
 		if err != nil {
 			_err := svc.statusLock.SetStatus(statusServiceUnitRebuildFailed)

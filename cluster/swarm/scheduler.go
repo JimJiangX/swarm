@@ -27,7 +27,7 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 		if err == nil {
 			_err := svc.statusLock.SetStatus(statusServiceAllocated)
 			if _err != nil {
-				entry.Errorf("Set Service Status:statusServiceAllocated(%d),%+v", statusServiceAllocated, _err)
+				entry.Errorf("Set Service Status:statusServiceAllocated(%x),%+v", statusServiceAllocated, _err)
 			}
 			return
 		}
@@ -46,7 +46,7 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 
 		_err := svc.statusLock.SetStatus(statusServiceAllocateFailed)
 		if _err != nil {
-			entry.Errorf("Set Service Status:statusServiceAllocateFailed(%d),%+v", statusServiceAllocateFailed, _err)
+			entry.Errorf("Set Service Status:statusServiceAllocateFailed(%x),%+v", statusServiceAllocateFailed, _err)
 		}
 	}()
 

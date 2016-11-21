@@ -179,7 +179,7 @@ func (svc *Service) AddServiceUsers(req []structs.User) (int, error) {
 		return 0, err
 	}
 	if !done {
-		return 0, errors.Errorf("Service %s status conflict,got (%d)", svc.Name, val)
+		return 0, errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
 	}
 
 	field := logrus.WithField("Service", svc.Name)
@@ -741,7 +741,7 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 			return err
 		}
 		if !ok {
-			return errors.Errorf("Service %s status conflict,want %d but got %d", svc.Name, statusServcieBuilding, val)
+			return errors.Errorf("Service %s status conflict,want %x but got %x", svc.Name, statusServcieBuilding, val)
 		}
 
 		svc.Lock()
@@ -804,7 +804,7 @@ func (gd *Gardener) RebuildService(nameOrID string) (*Service, string, string, e
 	}
 
 	if !ok {
-		return nil, "", "", errors.Errorf("Service status conflict,%d is none of (%d,%d,%d)",
+		return nil, "", "", errors.Errorf("Service status conflict,%x is none of (%x,%x,%x)",
 			status, statusServiceAllocateFailed, statusServiceContainerCreateFailed, statusServiceStartFailed)
 	}
 
@@ -829,7 +829,7 @@ func (svc *Service) StartService() (err error) {
 		return err
 	}
 	if !done {
-		return errors.Errorf("Service %s status conflict,got (%d)", svc.Name, val)
+		return errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
 	}
 
 	field := logrus.WithField("Service", svc.Name)
@@ -1039,7 +1039,7 @@ func (svc *Service) StopService() (err error) {
 		return err
 	}
 	if !done {
-		return errors.Errorf("Service %s status conflict,got (%d)", svc.Name, val)
+		return errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
 	}
 
 	field := logrus.WithField("Service", svc.Name)
@@ -1197,7 +1197,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 		return err
 	}
 	if !done {
-		return errors.Errorf("Service %s status conflict,got (%d)", svc.Name, val)
+		return errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
 	}
 
 	field := logrus.WithField("Service", svc.Name)
@@ -1799,7 +1799,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (_ stri
 		return "", err
 	}
 	if !done {
-		return "", errors.Errorf("Service %s status conflict,got (%d)", svc.Name, val)
+		return "", errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
 	}
 
 	defer func() {
@@ -1944,7 +1944,7 @@ func (gd *Gardener) ServiceScale(name string, scale structs.PostServiceScaledReq
 		return err
 	}
 	if !done {
-		return errors.Errorf("Service %s status conflict,got (%d)", svc.Name, val)
+		return errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
 	}
 
 	go gd.serviceScale(svc, scale)
