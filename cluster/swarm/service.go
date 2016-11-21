@@ -2024,6 +2024,7 @@ func (gd *Gardener) serviceScale(svc *Service,
 			if err != nil {
 				return err
 			}
+			pending.created = true
 		}
 	}
 
@@ -2108,6 +2109,8 @@ func (svc *Service) updateDescAfterScale(scale structs.PostServiceScaledRequest)
 		des.UpdateModuleStore(scale.Type, scale.Extensions)
 	}
 
+	des.BackupMaxSize += scale.ExtendBackup
+
 	buffer := bytes.NewBuffer(nil)
 	err = json.NewEncoder(buffer).Encode(&des)
 	if err != nil {
@@ -2115,7 +2118,7 @@ func (svc *Service) updateDescAfterScale(scale structs.PostServiceScaledRequest)
 	}
 
 	desc := buffer.String()
-	err = database.UpdateServcieDesc(svc.ID, desc)
+	err = database.UpdateServcieDesc(svc.ID, desc, svc.BackupMaxSizeByte)
 	if err != nil {
 		return err
 	}
@@ -2291,7 +2294,7 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 					if v != nil {
 						_err := v.Engine.RefreshVolumes()
 						if _err != nil {
-							return _err
+							return errors.Wrap(_err, "Engine refresh volumes,Addr:"+v.Engine.Addr)
 						}
 
 						v = v.Engine.Volumes().Get(lvs[i].Name)
@@ -2303,7 +2306,8 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 						if _err == nil {
 							continue
 						} else {
-							return _err
+							return errors.Wrap(_err, "Engine remove volume,Addr:"+v.Engine.Addr)
+
 						}
 					}
 

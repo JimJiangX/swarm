@@ -348,11 +348,12 @@ func (node *Node) localStorageAlloc(name, unitID, storageType string, size int) 
 }
 
 type localVolume struct {
-	lv   database.LocalVolume
 	size int
+	lv   database.LocalVolume
 }
 
 type pendingAllocStore struct {
+	created    bool
 	unit       *unit
 	localStore []localVolume
 	sanStore   []database.LUN
@@ -382,14 +383,26 @@ func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
 
 	gd.Lock()
 	for _, pending := range pendings {
+		if pending.created {
+			// TODO:cancel san VG extend
+		}
+
 		for _, lun := range pending.sanStore {
 			store, err := storage.GetStore(lun.StorageSystemID)
 			if err != nil {
+				logrus.Warnf("cancel Store Extend,%+v", err)
 				continue
 			}
 
-			store.DelMapping(lun.ID)
-			store.Recycle(lun.ID, 0)
+			err = store.DelMapping(lun.ID)
+			if err != nil {
+				logrus.Warnf("cancel Store Extend,%+v", err)
+			}
+
+			err = store.Recycle(lun.ID, 0)
+			if err != nil {
+				logrus.Warnf("cancel Store Extend,%+v", err)
+			}
 		}
 	}
 	gd.Unlock()

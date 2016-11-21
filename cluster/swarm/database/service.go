@@ -585,15 +585,15 @@ func TxGetServiceByUnit(unit string) (Service, error) {
 }
 
 // UpdateServcieDesc update Service Description
-func UpdateServcieDesc(id, desc string) error {
+func UpdateServcieDesc(id, desc string, size int) error {
 	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
 
-	const query = "UPDATE tbl_dbaas_service SET description=? WHERE id=?"
+	const query = "UPDATE tbl_dbaas_service SET backup_max_size=?,description=? WHERE id=?"
 
-	_, err = db.Exec(query, desc, id)
+	_, err = db.Exec(query, size, desc, id)
 	if err == nil {
 		return nil
 	}

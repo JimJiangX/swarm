@@ -85,6 +85,7 @@ type ScaleUpModule struct {
 }
 
 type PostServiceScaledRequest struct {
+	ExtendBackup int
 	Type         string
 	UpdateConfig *container.UpdateConfig
 	Extensions   []DiskStorage
