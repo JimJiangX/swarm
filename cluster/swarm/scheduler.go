@@ -507,6 +507,11 @@ func (gd *Gardener) selectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		return nodes[0:num:num], nil
 	}
 
+	for i, n := range nodes {
+		fmt.Println("selectNodeByCluster....  highAvailable =", highAvailable)
+		fmt.Println(i, n.Name, n.Addr, n.UsedCpus)
+	}
+
 	all, err := database.GetAllNodes()
 	if err != nil {
 		logrus.Warnf("database.GetAllNodes failed,%+v", err)
@@ -571,6 +576,7 @@ func (gd *Gardener) selectNodeByCluster(nodes []*node.Node, num int, highAvailab
 	for index := 0; index < num && len(dcMap) > 0; {
 
 		for key, list := range dcMap {
+			fmt.Println("cluster:", key, len(list))
 			if len(list) == 0 {
 				delete(dcMap, key)
 				continue
@@ -582,6 +588,11 @@ func (gd *Gardener) selectNodeByCluster(nodes []*node.Node, num int, highAvailab
 
 				if index == num {
 					dcMap = nil
+
+					for i, n := range candidates {
+						fmt.Println("Output:")
+						fmt.Println(i, n.Name, n.Addr, n.UsedCpus)
+					}
 
 					return candidates, nil
 				}
