@@ -44,6 +44,29 @@ func TxInsertLUNAndVolume(lun LUN, lv LocalVolume) error {
 	return txFrame(do)
 }
 
+func txInsertLun(tx *sqlx.Tx, lun LUN) error {
+	_, err := tx.NamedExec(insertLUNQuery, &lun)
+
+	return errors.Wrap(err, "Tx insert LUN")
+}
+
+func TxInsertLunUpdateVolume(lun LUN, lv LocalVolume) error {
+	do := func(tx *sqlx.Tx) error {
+		err := txInsertLun(tx, lun)
+		if err != nil {
+			return err
+		}
+
+		const query = "UPDATE tb_volumes SET size=? WHERE id=?"
+
+		_, err = tx.Exec(query, lv.Size, lv.ID)
+
+		return errors.Wrap(err, "Tx insert LUN and update Volume")
+	}
+
+	return txFrame(do)
+}
+
 // DelLunMapping delete a mapping record,set LUN VGName、MappingTo and HostLunID to be null
 var DelLunMapping = LunMapping
 
@@ -153,12 +176,12 @@ func DelLUN(id string) error {
 // TxReleaseLun Delete LUN and LocalVolume by Name or VGName
 func TxReleaseLun(name string) error {
 	do := func(tx *sqlx.Tx) error {
-		_, err := tx.Exec("DELETE FROM tb_lun WHERE name OR vg_name=?", name, name)
+		_, err := tx.Exec("DELETE FROM tb_lun WHERE name=? OR vg_name=?", name, name)
 		if err != nil {
 			return errors.Wrap(err, "Tx delete LUN")
 		}
 
-		_, err = tx.Exec("DELETE FROM tb_volumes WHERE name OR VGname=?", name, name)
+		_, err = tx.Exec("DELETE FROM tb_volumes WHERE name=? OR VGname=?", name, name)
 
 		return errors.Wrap(err, "Tx delete LocalVolume")
 	}

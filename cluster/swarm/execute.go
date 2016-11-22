@@ -21,7 +21,6 @@ func (gd *Gardener) serviceExecute(svc *Service) (err error) {
 		}
 
 		if err == nil {
-			atomic.StoreInt64(&svc.Status, statusServiceNoContent)
 			return
 		}
 
@@ -37,7 +36,7 @@ func (gd *Gardener) serviceExecute(svc *Service) (err error) {
 		gd.scheduler.Unlock()
 	}()
 
-	err = svc.statusCAS(statusServiceAllocting, statusServiceCreating)
+	err = svc.statusLock.SetStatus(statusServiceContainerCreating)
 	if err != nil {
 		return err
 	}
@@ -63,7 +62,10 @@ func (gd *Gardener) serviceExecute(svc *Service) (err error) {
 func (gd *Gardener) createServiceContainers(svc *Service) (err error) {
 	defer func() {
 		if err != nil {
-			atomic.StoreInt64(&svc.Status, statusServiceCreateFailed)
+			_err := svc.statusLock.SetStatus(statusServiceContainerCreateFailed)
+			if _err != nil {
+				logrus.Errorf("%s create Service Containers failed,%+v", svc.Name, _err)
+			}
 		}
 	}()
 
@@ -163,6 +165,7 @@ func (gd *Gardener) createContainerInPending(swarmID string, authConfig *types.A
 
 	engine := pending.Engine
 	container, err := engine.CreateContainer(pending.Config, pending.Name, true, authConfig)
+	engine.CheckConnectionErr(err)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{"Name": "Swarm"}).Warnf("Failed to create container: %s", err)
 	}
@@ -177,27 +180,39 @@ func (gd *Gardener) createContainerInPending(swarmID string, authConfig *types.A
 }
 
 func (gd *Gardener) initAndStartService(svc *Service) (err error) {
-	sys, err := gd.systemConfig()
-	if err != nil {
-		return nil
-	}
-
-	err = svc.statusCAS(statusServiceCreating, statusServiceStarting)
+	err = svc.statusLock.SetStatus(statusServiceStarting)
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		for _, u := range svc.units {
-			u.saveToDisk()
+			_err := u.saveToDisk()
+			if _err != nil {
+				logrus.WithField("Unit", u.Name).Errorf("%+v", err)
+			}
 		}
 
+		state := statusServiceStarted
 		if err != nil {
-			// mark failed
-			atomic.StoreInt64(&svc.Status, statusServiceStartFailed)
-		} else {
-			atomic.StoreInt64(&svc.Status, statusServiceNoContent)
+			state = statusServiceStartFailed
+		}
+
+		_err := svc.statusLock.SetStatus(state)
+		if _err != nil {
+			logrus.WithField("Service", svc.Name).Errorf("%+v", err)
 		}
 	}()
+
+	mon, err := svc.getUserByRole(_User_Monitor_Role)
+	if err != nil {
+		return err
+	}
+
+	sys, err := gd.systemConfig()
+	if err != nil {
+		return err
+	}
 
 	logrus.Debug("starting Containers")
 	if err := svc.startContainers(); err != nil {
@@ -214,20 +229,20 @@ func (gd *Gardener) initAndStartService(svc *Service) (err error) {
 		return err
 	}
 
-	logrus.Debug("init Topology")
-	if err := svc.initTopology(); err != nil {
-		return err
-	}
-
 	logrus.Debug("register Services")
 	if err := svc.registerServices(); err != nil {
 		return err
 	}
 
 	logrus.Debug("registerToHorus")
-	err = svc.registerToHorus(sys.MonitorUsername, sys.MonitorPassword, sys.HorusAgentPort)
+	err = svc.registerToHorus(mon.Username, mon.Password, sys.HorusAgentPort)
 	if err != nil {
 		logrus.Warnf("register To Horus Error:%s", err)
+	}
+
+	logrus.Debug("init Topology")
+	if err := svc.initTopology(); err != nil {
+		return err
 	}
 
 	return nil

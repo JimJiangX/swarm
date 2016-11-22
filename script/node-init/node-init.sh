@@ -29,7 +29,7 @@ cur_dir=`dirname $0`
 hdd_vgname=${HOSTNAME}_HDD_VG
 ssd_vgname=${HOSTNAME}_SSD_VG
 
-adm_nic=bond0
+adm_nic=bond1
 int_nic=bond1
 ext_nic=bond2
 
@@ -44,14 +44,19 @@ rpm_install() {
 }
 
 nfs_mount() {
+	local dir=/etc/fstab
 	umount -f ${nfs_mount_dir} > /dev/null 2>&1
-	sed -i "/${nfs_ip}:${nfs_dir}/d" /etc/fstab > /dev/null 2>&1
 	rm -rf ${nfs_mount_dir}
 	mkdir ${nfs_mount_dir}
-	mount -t nfs -o ${nfs_mount_opts} ${nfs_ip}:${nfs_dir} ${nfs_mount_dir} && echo "${nfs_ip}:${nfs_dir}	${nfs_mount_dir}	nfs	defaults	0 0" >> /etc/fstab
+	mount -t nfs -o ${nfs_mount_opts} ${nfs_ip}:${nfs_dir} ${nfs_mount_dir} 
 	if [ $? -ne 0 ]; then
 		echo "nfs mount failed"
 		exit 2
+	else
+		grep "${nfs_ip}:${nfs_dir}" ${dir} 
+		if [ $? -ne 0 ]; then
+			echo "${nfs_ip}:${nfs_dir}	${nfs_mount_dir}	nfs	defaults	0 0" >> ${dir}
+		fi
 	fi	
 }
 
@@ -87,6 +92,8 @@ EOF
 set -o nounset
 
 container_name=\$1
+username=\$2
+password=\$3
 dir=${dir}
 
 docker inspect \${container_name} > /dev/null 2>&1
@@ -100,7 +107,7 @@ if [ "\${running_status}" != "true" ]; then
 	exit 3
 fi
 
-\${dir}/check_db --default-file /\${container_name}_DAT_LV/my.cnf
+\${dir}/check_db --default-file /\${container_name}_DAT_LV/my.cnf --user \$username --password \$password
 if [ \$? -ne 0 ]; then
 	 exit 4
 fi
@@ -139,7 +146,8 @@ output=\`mktemp /tmp/XXXXX\`
 
 docker inspect \$container_name > \$output 2>&1
 if [ \$? -ne 0 ]; then
-	 exit 2
+	rm -f \$output
+	exit 2
 fi
 
 ip_addr=\`cat \$output | grep IPADDR | awk -F= '{print \$2}' | sed 's/",//g'\`
@@ -149,7 +157,7 @@ rm -f \$output
 
 stat_code=\`curl -o /dev/null -s -w %{http_code} -X POST http://\${ip_addr}:\${port}/ping\`
 if [ "\${stat_code}" != "200" ]; then
-	 exit 2
+	exit 2
 fi
 EOF
 	chmod -R +x ${dir}
@@ -245,7 +253,7 @@ init_ssd_vg() {
 
 # install consul agent
 install_consul() {
-	local version=0.6.4
+	local version=0.7.1
 	
 	# stop consul
 	pkill -9 consul >/dev/null 2>&1
@@ -288,7 +296,7 @@ EOF
 ## ServiceRestart : consul
 
 #
-CONSUL_OPTS="agent -config-dir=/etc/consul.d -bind=${adm_ip}"
+CONSUL_OPTS="agent -protocol=3 -log-level=debug -config-dir=/etc/consul.d -bind=${adm_ip}"
 
 EOF
 
@@ -470,7 +478,7 @@ init_docker() {
 
 # install docker plugin
 install_docker_plugin() {
-	local version=1.6.6
+	local version=1.7.13
 	local script_dir=/usr/local/local_volume_plugin/scripts
 	mkdir -p ${script_dir}
 

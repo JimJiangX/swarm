@@ -99,6 +99,10 @@ func (c *Client) Exec(cmd string) ([]byte, error) {
 
 // Close closes the underlying network connection
 func (c *Client) Close() error {
+	if c == nil || c.c == nil {
+		return nil
+	}
+
 	err := c.c.Close()
 
 	return errors.Wrap(err, "close ssh client error")

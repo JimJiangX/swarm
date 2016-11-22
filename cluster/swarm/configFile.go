@@ -18,7 +18,7 @@ import (
 // ContainerCmd commands of actions
 type containerCmd interface {
 	StartContainerCmd() []string
-	InitServiceCmd() []string
+	InitServiceCmd(args ...string) []string
 	StartServiceCmd() []string
 	StopServiceCmd() []string
 	RestoreCmd(file, backupDir string) []string
@@ -48,7 +48,7 @@ type configParser interface {
 	defaultUserConfig(args ...interface{}) (map[string]interface{}, error)
 	Marshal() ([]byte, error)
 	Requirement() require
-	HealthCheck() (healthCheck, error)
+	HealthCheck(args ...string) (healthCheck, error)
 	Set(key string, val interface{}) error
 }
 
@@ -149,9 +149,6 @@ func Factory(name, version string) (configParser, containerCmd, error) {
 
 func initialize(name, version string) (parser configParser, cmder containerCmd, err error) {
 	switch {
-	case _ImageUpsql == name && version == "5.6.19":
-		parser = &mysqlConfig{}
-		cmder = &mysqlCmd{}
 
 	case _ImageProxy == name && version == "1.0.2":
 		parser = &proxyConfigV102{}
@@ -177,6 +174,10 @@ func initialize(name, version string) (parser configParser, cmder containerCmd, 
 		parser = &switchManagerConfig{}
 		cmder = &switchManagerCmd{}
 
+	case _ImageUpsql == name && strings.HasPrefix(version, "5.6."):
+		parser = &mysqlConfig{}
+		cmder = &mysqlCmd{}
+
 	default:
 
 		return nil, nil, errors.Errorf("unsupported Image:'%s:%s'", name, version)
@@ -190,8 +191,12 @@ type mysqlCmd struct{}
 func (mysqlCmd) StartContainerCmd() []string {
 	return []string{"/bin/bash"}
 }
-func (mysqlCmd) InitServiceCmd() []string {
-	return []string{"/root/upsql-init.sh"}
+func (mysqlCmd) InitServiceCmd(args ...string) []string {
+	cmd := make([]string, len(args)+1)
+	cmd[0] = "/root/upsql-init.sh"
+	copy(cmd[1:], args)
+
+	return cmd
 }
 func (mysqlCmd) StartServiceCmd() []string {
 	return []string{"/root/upsql.service", "start"}
@@ -329,8 +334,8 @@ type healthCheck struct {
 	Tags     []string
 }
 
-func (c mysqlConfig) HealthCheck() (healthCheck, error) {
-	if c.config == nil {
+func (c mysqlConfig) HealthCheck(args ...string) (healthCheck, error) {
+	if c.config == nil || len(args) < 3 {
 		return healthCheck{}, errors.New("params not ready")
 	}
 
@@ -340,7 +345,7 @@ func (c mysqlConfig) HealthCheck() (healthCheck, error) {
 	}
 	return healthCheck{
 		Port:     port,
-		Script:   "/opt/DBaaS/script/check_db.sh ",
+		Script:   "/opt/DBaaS/script/check_db.sh " + args[0] + " " + args[1] + " " + args[2],
 		Shell:    "",
 		Interval: "10s",
 		//TTL:      "15s",
@@ -353,7 +358,7 @@ type proxyCmd struct{}
 func (proxyCmd) StartContainerCmd() []string {
 	return []string{"/bin/bash"}
 }
-func (proxyCmd) InitServiceCmd() []string {
+func (proxyCmd) InitServiceCmd(args ...string) []string {
 	return []string{"/root/upproxy.service", "start"}
 }
 func (proxyCmd) StartServiceCmd() []string {
@@ -435,8 +440,8 @@ func (proxyConfig) Requirement() require {
 	}
 }
 
-func (c proxyConfig) HealthCheck() (healthCheck, error) {
-	if c.config == nil {
+func (c proxyConfig) HealthCheck(args ...string) (healthCheck, error) {
+	if c.config == nil || len(args) == 0 {
 		return healthCheck{}, errors.New("params not ready")
 	}
 
@@ -446,7 +451,7 @@ func (c proxyConfig) HealthCheck() (healthCheck, error) {
 	}
 	return healthCheck{
 		Port:     port,
-		Script:   "/opt/DBaaS/script/check_proxy.sh ",
+		Script:   "/opt/DBaaS/script/check_proxy.sh " + args[0],
 		Shell:    "",
 		Interval: "10s",
 		TTL:      "15s",
@@ -604,7 +609,7 @@ type switchManagerCmd struct{}
 func (switchManagerCmd) StartContainerCmd() []string {
 	return []string{"/bin/bash"}
 }
-func (switchManagerCmd) InitServiceCmd() []string {
+func (switchManagerCmd) InitServiceCmd(args ...string) []string {
 	return []string{"/root/swm.service", "start"}
 }
 func (switchManagerCmd) StartServiceCmd() []string {
@@ -682,8 +687,8 @@ func (switchManagerConfig) Requirement() require {
 	}
 }
 
-func (c switchManagerConfig) HealthCheck() (healthCheck, error) {
-	if c.config == nil {
+func (c switchManagerConfig) HealthCheck(args ...string) (healthCheck, error) {
+	if c.config == nil || len(args) == 0 {
 		return healthCheck{}, errors.New("params not ready")
 	}
 
@@ -691,9 +696,10 @@ func (c switchManagerConfig) HealthCheck() (healthCheck, error) {
 	if err != nil {
 		return healthCheck{}, errors.Wrap(err, "get 'Port'")
 	}
+
 	return healthCheck{
 		Port:     port,
-		Script:   "/opt/DBaaS/script/check_switchmanager.sh ",
+		Script:   "/opt/DBaaS/script/check_switchmanager.sh " + args[0],
 		Shell:    "",
 		Interval: "10s",
 		TTL:      "15s",
@@ -715,6 +721,11 @@ func (c switchManagerConfig) defaultUserConfig(args ...interface{}) (map[string]
 	u, ok := args[1].(*unit)
 	if !ok || svc == nil {
 		return nil, errors.New(errMsg)
+	}
+
+	user, err := svc.getUserByRole(_User_Check_Role)
+	if err != nil {
+		return nil, err
 	}
 
 	sys, err := database.GetSystemConfig()
@@ -745,6 +756,8 @@ func (c switchManagerConfig) defaultUserConfig(args ...interface{}) (map[string]
 	m["SwarmHostKey"] = leaderElectionPath
 
 	// _User_Check Role
+	m["swarmhealthcheckuser"] = user.Username
+	m["swarmhealthcheckpassword"] = user.Password
 
 	return m, nil
 }
@@ -773,6 +786,11 @@ func (c switchManagerConfigV1123) defaultUserConfig(args ...interface{}) (map[st
 		return nil, errors.New(errMsg)
 	}
 
+	user, err := svc.getUserByRole(_User_Check_Role)
+	if err != nil {
+		return nil, err
+	}
+
 	sys, err := database.GetSystemConfig()
 	if err != nil {
 		return nil, err
@@ -801,6 +819,8 @@ func (c switchManagerConfigV1123) defaultUserConfig(args ...interface{}) (map[st
 	m["SwarmHostKey"] = leaderElectionPath
 
 	// _User_Check Role
+	m["swarmhealthcheckuser"] = user.Username
+	m["swarmhealthcheckpassword"] = user.Password
 
 	return m, nil
 }

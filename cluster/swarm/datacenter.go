@@ -1078,8 +1078,10 @@ func (node *Node) distribute() (err error) {
 
 	c, err := scplib.NewClient(node.Addr, node.user, node.password)
 	if err != nil {
+		entry.WithError(err).Errorf("new SSH communicator")
 		nodeState = statusNodeSSHLoginFailed
-		return err
+
+		return errors.Wrap(err, "create SSH client")
 	}
 	defer c.Close()
 

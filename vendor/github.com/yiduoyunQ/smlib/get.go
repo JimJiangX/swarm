@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/yiduoyunQ/sm/sm-svr/consts"
 	"github.com/yiduoyunQ/sm/sm-svr/structs"
 )
 
@@ -65,6 +66,31 @@ func GetTopology(ip string, port int) (*structs.Topology, error) {
 	json.Unmarshal(b, &topology)
 
 	return &topology, nil
+}
+
+func GetServiceStatus(ip string, port int) (string, error) {
+	topology, err := GetTopology(ip, port)
+	if err != nil {
+		return "", err
+	}
+
+	if topology == nil {
+		return "", nil
+	}
+
+	serviceStatus := consts.StatusOK
+
+	for _, dbInfo := range topology.DataNodeGroup["default"] {
+		if dbInfo.Status != consts.Normal {
+			serviceStatus = consts.StatusWarning
+			if dbInfo.Type == consts.Master {
+				serviceStatus = consts.StatusError
+				break
+			}
+		}
+	}
+
+	return serviceStatus, nil
 }
 
 // need close res.Body in call function

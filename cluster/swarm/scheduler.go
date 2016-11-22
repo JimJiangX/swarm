@@ -12,7 +12,6 @@ import (
 	"github.com/docker/swarm/api/structs"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/pkg/errors"
 )
@@ -20,31 +19,34 @@ import (
 func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err error) {
 	entry := logrus.WithFields(logrus.Fields{
 		"Name":   svc.Name,
-		"Action": "Schedule&Alloc",
+		"Action": "Schedule",
 	})
 	resourceAlloc := make([]*pendingAllocResource, 0, len(svc.base.Modules))
 
 	defer func() {
 		if err == nil {
+			_err := svc.statusLock.SetStatus(statusServiceAllocated)
+			if _err != nil {
+				entry.Errorf("Set Service Status:statusServiceAllocated(%x),%+v", statusServiceAllocated, _err)
+			}
 			return
 		}
 
-		atomic.StoreInt64(&svc.Status, statusServiceAlloctionFailed)
-
-		entry.WithError(err).Errorf("scheduler failed")
-
 		if err != nil && len(resourceAlloc) > 0 {
 
-			_err := dealWithSchedulerFailure(gd, resourceAlloc)
-			if _err != nil {
-				logrus.Error("deal With scheduler failure,", _err)
+			// scheduler failed
+			gd.scheduler.Lock()
+			for i := range resourceAlloc {
+				delete(gd.pendingContainers, resourceAlloc[i].swarmID)
 			}
+			gd.scheduler.Unlock()
 		}
 
-		svc.units = nil
+		_err := svc.statusLock.SetStatus(statusServiceAllocateFailed)
+		if _err != nil {
+			entry.Errorf("Set Service Status:statusServiceAllocateFailed(%x),%+v", statusServiceAllocateFailed, _err)
+		}
 	}()
-
-	atomic.StoreInt64(&svc.Status, statusServiceAllocting)
 
 	entry.Debug("start service Scheduler")
 
@@ -90,75 +92,17 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 
 	volumes := make([]*types.Volume, 0, 10)
 
-	defer func() {
-		if err == nil {
-			return
-		}
-
-		logrus.Errorf("Rollback create Service volumes & IP,%s", err)
-
-		for _, v := range volumes {
-			if v == nil {
-				continue
-			}
-			ok, _err := gd.RemoveVolumes(v.Name)
-			if _err != nil {
-				logrus.WithError(_err).Warnf("Remove volume %s:%t", v.Name, ok)
-			}
-		}
-
-		for _, pending := range allocs {
-			if pending == nil || pending.engine == nil || len(pending.networkings) == 0 {
-				continue
-			}
-
-			for i := range pending.localStore {
-				_err := removeVGAndLUN(pending.engine.IP, pending.localStore[i].VGName)
-				if _err != nil {
-					logrus.WithError(_err).Warnf("Delete SAN VG:%s", pending.localStore[i].VGName)
-				}
-			}
-
-			_err := removeNetworkings(pending.engine.IP, pending.networkings)
-			if _err != nil {
-				logrus.Error(_err)
-			}
-		}
-	}()
-
 	for _, pending := range allocs {
 		if pending == nil || pending.engine == nil {
 			continue
 		}
+
 		out, err := createVolumes(pending.engine, pending.localStore)
 		volumes = append(volumes, out...)
 		if err != nil {
 			return err
 		}
-
-		if len(pending.networkings) > 0 {
-			err = createNetworking(pending.engine.IP, pending.networkings)
-			if err != nil {
-				return err
-			}
-		}
 	}
-
-	return nil
-}
-
-func dealWithSchedulerFailure(gd *Gardener, pendings []*pendingAllocResource) error {
-	err := gd.resourceRecycle(pendings)
-	if err != nil {
-		return err
-	}
-
-	// scheduler failed
-	gd.scheduler.Lock()
-	for i := range pendings {
-		delete(gd.pendingContainers, pendings[i].swarmID)
-	}
-	gd.scheduler.Unlock()
 
 	return nil
 }
@@ -210,17 +154,6 @@ func (gd *Gardener) schedulerPerModule(svc *Service, module structs.Module) ([]*
 		_type = _ProxyType
 	}
 
-	highAvaliable := svc.HighAvailable
-	if length := len(module.Clusters); length > 1 {
-		highAvaliable = true
-	}
-
-	for i := range module.Stores {
-		if !storage.IsLocalStore(module.Stores[i].Type) {
-			highAvaliable = true
-		}
-	}
-
 	gd.scheduler.Lock()
 	defer gd.scheduler.Unlock()
 
@@ -238,7 +171,7 @@ func (gd *Gardener) schedulerPerModule(svc *Service, module structs.Module) ([]*
 
 	candidates := gd.listCandidateNodes(list)
 
-	candidates, err = gd.dispatch(config, num, candidates, false, highAvaliable)
+	candidates, err = gd.dispatch(config, num, candidates, false, module.HighAvailable)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -282,12 +215,12 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node,
 			return allocs, errors.Errorf("not found Engine '%s':'%s'", candidates[i].ID, candidates[i].Addr)
 		}
 
-		id := gd.generateUniqueID()
 		networkMode := "host"
 		if name := config.HostConfig.NetworkMode.NetworkName(); name != "" {
 			networkMode = name
 		}
 
+		id := gd.generateUniqueID()
 		unit := &unit{
 			Unit: database.Unit{
 				ID:            id,
@@ -315,6 +248,12 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node,
 		}
 
 		if err := unit.factory(); err != nil {
+			entry.Error(err)
+
+			return allocs, err
+		}
+
+		if err := database.InsertUnit(unit.Unit); err != nil {
 			entry.Error(err)
 
 			return allocs, err
@@ -395,20 +334,14 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit,
 
 	pending.unit.config = config
 	pending.swarmID = swarmID
-	pending.pendingContainer = &pendingContainer{
+
+	gd.pendingContainers[swarmID] = &pendingContainer{
 		Name:   unit.Name,
 		Config: config,
 		Engine: engine,
 	}
 
-	gd.pendingContainers[swarmID] = pending.pendingContainer
-
 	atomic.StoreInt64(&pending.unit.Status, statusUnitAllocted)
-
-	err = pending.consistency()
-	if err != nil {
-		entry.WithError(err).Error("pending allocate resouces")
-	}
 
 	return pending, err
 }

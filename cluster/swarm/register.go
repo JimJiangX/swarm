@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -47,10 +49,7 @@ func registerToHorus(obj ...registerService) error {
 	if err != nil {
 		return errors.Wrap(err, "post agent register to Horus request")
 	}
-
-	if resp.Body != nil {
-		defer resp.Body.Close()
-	}
+	defer ensureReaderClosed(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		res := struct {
@@ -105,9 +104,7 @@ func deregisterToHorus(force bool, endpoints ...string) error {
 	if err != nil {
 		return errors.Wrap(err, "deregister to Horus response")
 	}
-	if resp.Body != nil {
-		defer resp.Body.Close()
-	}
+	defer ensureReaderClosed(resp)
 
 	if resp.StatusCode != http.StatusOK {
 		res := struct {
@@ -126,11 +123,16 @@ func deregisterToHorus(force bool, endpoints ...string) error {
 
 // register service to consul and Horus
 func registerToServers(u *unit, svc *Service, sys database.Configurations) error {
+	mon, err := svc.getUserByRole(_User_Monitor_Role)
+	if err != nil {
+		return err
+	}
+
 	if err := registerHealthCheck(u, svc); err != nil {
 		logrus.WithField("Unit", u.Name).Errorf("register service health check,%+v", err)
 	}
 
-	obj, err := u.registerHorus(sys.MonitorUsername, sys.MonitorPassword, sys.HorusAgentPort)
+	obj, err := u.registerHorus(mon.Username, mon.Password, sys.HorusAgentPort)
 	if err != nil {
 		return err
 	}
@@ -229,4 +231,12 @@ func fastPing(hostname string, count int, udp bool) (bool, error) {
 	}
 
 	return false, errors.New(hostname + ":unreachable")
+}
+
+func ensureReaderClosed(resp *http.Response) {
+	if resp != nil && resp.Body != nil {
+		// Drain up to 512 bytes and close the body to let the Transport reuse the connection
+		io.CopyN(ioutil.Discard, resp.Body, 512)
+		resp.Body.Close()
+	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/docker/engine-api/types/container"
 	"github.com/docker/swarm/api/structs"
@@ -13,6 +14,79 @@ import (
 	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/pkg/errors"
 )
+
+func validGardenerRegister(req *structs.RegisterGardener) error {
+	buf := bytes.NewBuffer(nil)
+
+	s := strings.TrimSpace(req.Users.ApplicationUsername)
+	if len(s) > 0 {
+		req.Users.ApplicationUsername = s
+	} else {
+		buf.WriteString("Users:Application Username is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.ApplicationPassword)
+	if len(s) > 0 {
+		req.Users.ApplicationPassword = s
+	} else {
+		buf.WriteString("Users:Application Password is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.DBAUsername)
+	if len(s) > 0 {
+		req.Users.DBAUsername = s
+	} else {
+		buf.WriteString("Users:DBA Username is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.DBAPassword)
+	if len(s) > 0 {
+		req.Users.DBAPassword = s
+	} else {
+		buf.WriteString("Users:DBA Password is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.DBUsername)
+	if len(s) > 0 {
+		req.Users.DBUsername = s
+	} else {
+		buf.WriteString("Users:DB Username is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.MonitorUsername)
+	if len(s) > 0 {
+		req.Users.MonitorUsername = s
+	} else {
+		buf.WriteString("Users:Monitor Username is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.MonitorPassword)
+	if len(s) > 0 {
+		req.Users.MonitorPassword = s
+	} else {
+		buf.WriteString("Users:Monitor Password is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.ReplicationUsername)
+	if len(s) > 0 {
+		req.Users.ReplicationUsername = s
+	} else {
+		buf.WriteString("Users:Replication Username is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.ReplicationPassword)
+	if len(s) > 0 {
+		req.Users.ReplicationPassword = s
+	} else {
+		buf.WriteString("Users:Replication Password is nil\n")
+	}
+
+	if buf.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(buf.String())
+}
 
 func validContainerConfig(config *cluster.ContainerConfig) error {
 	buf := bytes.NewBuffer(nil)
@@ -141,7 +215,6 @@ func ValidCreateService(req structs.PostServiceRequest) error {
 			} else if !image.Enabled {
 				buf.WriteString("Image:'" + module.Config.Image + "' disabled\n")
 			}
-
 		}
 
 		_, num, err := parseServiceArch(module.Arch)
@@ -152,6 +225,12 @@ func ValidCreateService(req structs.PostServiceRequest) error {
 
 		if arch[module.Type] != num {
 			buf.WriteString(fmt.Sprintf("%s nodeNum  unequal Architecture,(%s)\n", module.Type, module.Arch))
+		}
+
+		if module.HighAvailable {
+			if len(module.Clusters) == 1 && module.Type == _MysqlType && num > 1 {
+				buf.WriteString("more clusters required for upsql high available cluster\n")
+			}
 		}
 
 		hostConfig := container.HostConfig{

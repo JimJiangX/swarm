@@ -53,6 +53,17 @@ func (port Port) tableName() string {
 	return "tb_port"
 }
 
+// TxUpdatePortSlice update []Port Name\UnitID\UnitName\Proto\Allocated in Tx
+func TxUpdatePortSlice(ports []Port) error {
+	do := func(tx *sqlx.Tx) error {
+		err := TxUpdatePorts(tx, ports)
+
+		return errors.Wrap(err, "Tx update []Port")
+	}
+
+	return txFrame(do)
+}
+
 // DeletePort delete by port,only if Port.Allocated==allocated
 func DeletePort(port int, allocated bool) error {
 	db, err := getDB(false)

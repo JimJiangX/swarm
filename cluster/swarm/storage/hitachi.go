@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -60,6 +61,7 @@ func (h hitachiStore) Ping() error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
@@ -129,6 +131,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
 	}
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return lun, lv, errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
@@ -155,6 +158,81 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 	}
 
 	err = database.TxInsertLUNAndVolume(lun, lv)
+	if err != nil {
+		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
+	}
+
+	return lun, lv, nil
+}
+
+func (h *hitachiStore) Extend(name string, size int) (database.LUN, database.LocalVolume, error) {
+	lun := database.LUN{}
+	lv, err := database.GetLocalVolume(name)
+	if err != nil {
+		return lun, lv, err
+	}
+
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	out, err := h.Size()
+	if err != nil {
+		return lun, lv, err
+	}
+
+	for key := range out {
+		if !key.Enabled {
+			delete(out, key)
+		}
+	}
+
+	rg := maxIdleSizeRG(out)
+	if out[rg].Free < size {
+		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
+	}
+
+	used, err := database.ListLunIDBySystemID(h.ID())
+	if err != nil {
+		return lun, lv, errors.Wrap(err, h.Vendor()+" store alloc")
+	}
+
+	ok, id := findIdleNum(h.hs.LunStart, h.hs.LunEnd, used)
+	if !ok {
+		return lun, lv, errors.New("no available LUN ID in store:" + h.Vendor())
+	}
+
+	path, err := utils.GetAbsolutePath(false, scriptPath, HITACHI, "create_lun.sh")
+	if err != nil {
+		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
+	}
+	// size:byte-->MB
+	param := []string{path, h.hs.AdminUnit,
+		strconv.Itoa(rg.StorageRGID), strconv.Itoa(id), strconv.Itoa(size>>20 + 100)}
+
+	cmd, err := utils.ExecScript(param...)
+	if err != nil {
+		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
+	}
+	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
+	if err != nil {
+		return lun, lv, errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+	}
+
+	lun = database.LUN{
+		ID:              utils.Generate64UUID(),
+		Name:            name,
+		VGName:          lv.VGName,
+		RaidGroupID:     rg.ID,
+		StorageSystemID: h.ID(),
+		SizeByte:        size,
+		StorageLunID:    id,
+		CreatedAt:       time.Now(),
+	}
+
+	lv.Size += size
+
+	err = database.TxInsertLunUpdateVolume(lun, lv)
 	if err != nil {
 		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
 	}
@@ -191,6 +269,7 @@ func (h *hitachiStore) Recycle(id string, lun int) error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
@@ -325,6 +404,7 @@ func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
@@ -343,7 +423,8 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 	defer h.lock.Unlock()
 
 	param := []string{path, h.hs.AdminUnit, name}
-	//	param = append(param, wwwn...)
+
+	// param = append(param, wwwn...)
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
@@ -351,6 +432,7 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
@@ -395,6 +477,7 @@ func (h *hitachiStore) Mapping(host, vg, lun string) error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}
@@ -424,6 +507,7 @@ func (h *hitachiStore) DelMapping(lun string) error {
 	}
 
 	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
 		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
 	}

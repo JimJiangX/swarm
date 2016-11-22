@@ -106,6 +106,18 @@ func GetUnit(nameOrID string) (Unit, error) {
 	return u, errors.Wrap(err, "Get Unit By nameOrID")
 }
 
+// InsertUnit insert Unit
+func InsertUnit(u Unit) error {
+	db, err := getDB(false)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.NamedExec(insertUnitQuery, &u)
+
+	return errors.Wrap(err, "insert Unit")
+}
+
 // txInsertUnit insert Unit in Tx
 func txInsertUnit(tx *sqlx.Tx, unit Unit) error {
 	_, err := tx.NamedExec(insertUnitQuery, &unit)
@@ -349,7 +361,7 @@ func SaveUnitConfig(unit *Unit, config UnitConfig) error {
 	return err
 }
 
-const insertServiceQuery = "INSERT INTO tb_service (id,name,description,architecture,business_code,auto_healing,auto_scaling,high_available,status,backup_max_size,backup_files_retention,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:business_code,:auto_healing,:auto_scaling,:high_available,:status,:backup_max_size,:backup_files_retention,:created_at,:finished_at)"
+const insertServiceQuery = "INSERT INTO tb_service (id,name,description,architecture,business_code,auto_healing,auto_scaling,status,backup_max_size,backup_files_retention,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:business_code,:auto_healing,:auto_scaling,:status,:backup_max_size,:backup_files_retention,:created_at,:finished_at)"
 
 // Service if table tb_service structure
 type Service struct {
@@ -360,7 +372,6 @@ type Service struct {
 	BusinessCode      string `db:"business_code"`
 	AutoHealing       bool   `db:"auto_healing"`
 	AutoScaling       bool   `db:"auto_scaling"`
-	HighAvailable     bool   `db:"high_available"`
 	Status            int64  `db:"status"`
 	BackupMaxSizeByte int    `db:"backup_max_size"`
 	// count by Day,used in swarm.BackupTaskCallback(),calculate BackupFile.Retention
@@ -403,6 +414,21 @@ func GetService(nameOrID string) (Service, error) {
 	return s, errors.Wrap(err, "get Service by nameOrID")
 }
 
+// GetServiceStatus returns Service Status select by ID or Name
+func GetServiceStatus(nameOrID string) (int, error) {
+	db, err := getDB(false)
+	if err != nil {
+		return 0, err
+	}
+
+	var n int
+	const query = "SELECT status FROM tb_service WHERE id=? OR name=?"
+
+	err = db.Get(&n, query, nameOrID, nameOrID)
+
+	return n, errors.Wrap(err, "get Service.Status by nameOrID")
+}
+
 // GetServiceByUnit returns Service select by Unit ID or Name.
 func GetServiceByUnit(nameOrID string) (Service, error) {
 	db, err := getDB(false)
@@ -434,17 +460,61 @@ func GetServiceByUnit(nameOrID string) (Service, error) {
 }
 
 // UpdateServcieDesc update Service Description
-func UpdateServcieDesc(id, desc string) error {
+func UpdateServiceStatus(nameOrID string, val int, finish time.Time) error {
 	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
 
-	const query = "UPDATE tb_service SET description=? WHERE id=?"
+	_, err = db.Exec("UPDATE tb_service SET status=?,finished_at=? WHERE id=? OR name=?", val, finish, nameOrID, nameOrID)
 
-	_, err = db.Exec(query, desc, id)
+	return errors.Wrap(err, "update Service Status")
+}
+
+// UpdateServcieDesc update Service Description
+func UpdateServcieDesc(id, desc string, size int) error {
+	db, err := getDB(false)
+	if err != nil {
+		return err
+	}
+
+	const query = "UPDATE tb_service SET backup_max_size=?,description=? WHERE id=?"
+
+	_, err = db.Exec(query, size, desc, id)
 
 	return errors.Wrap(err, "update Service.Desc")
+}
+
+func TxServiceStatusCAS(nameOrID string, val int, finish time.Time, f func(val int) bool) (bool, int, error) {
+	tx, err := getTx()
+	if err != nil {
+		return false, 0, err
+	}
+	defer tx.Rollback()
+
+	var n int
+	const query = "SELECT status FROM tb_service WHERE id=? OR name=?"
+
+	err = tx.Get(&n, query, nameOrID, nameOrID)
+	if err != nil {
+		return false, 0, errors.Wrap(err, "Tx get Service Status")
+	}
+
+	if !f(n) {
+		return false, n, nil
+	}
+
+	_, err = tx.Exec("UPDATE tb_service SET status=?,finished_at=? WHERE id=? OR name=?", val, finish, nameOrID, nameOrID)
+	if err != nil {
+		return false, val, errors.Wrap(err, "Tx update Service status")
+	}
+
+	err = tx.Commit()
+	if err == nil {
+		return true, val, nil
+	}
+
+	return false, n, errors.Wrap(err, "Tx Service Status CAS")
 }
 
 // TxSaveService insert Service & BackupStrategy & Task & []User in Tx.

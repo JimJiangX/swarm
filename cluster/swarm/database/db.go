@@ -127,6 +127,18 @@ func getDB(ping bool) (*sqlx.DB, error) {
 	return db, err
 }
 
+// getTx begin a new Tx.
+func getTx() (*sqlx.Tx, error) {
+	db, err := getDB(false)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := db.Beginx()
+
+	return tx, err
+}
+
 func txFrame(do func(tx *sqlx.Tx) error) error {
 	db, err := getDB(false)
 	if err != nil {

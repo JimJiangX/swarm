@@ -7,8 +7,17 @@ node_id=$3
 horus_server_ip=$4
 horus_server_port=$5
 backup_dir=$6
+hdd_vgname=${HOSTNAME}_HDD_VG
+ssd_vgname=${HOSTNAME}_SSD_VG
 
 
+remove_vg() {
+	local vg_name=$1
+	vgs ${vg_name} >/dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		vgremove -f ${vg_name}
+	fi
+}
 
 umount_backup_dir() {
 	umount -f $backup_dir
@@ -59,11 +68,25 @@ remove_docker() {
 	# stop docker
 	systemctl stop docker.service >/dev/null 2>&1
 	pkill -9 docker >/dev/null 2>&1
+	
+	local dir=/var/lib/docker/btrfs/subvolumes
+
+	if [ -d ${dir} ]; then
+		for fs in `ls ${dir}`
+		do
+			btrfs subvolume delete ${dir}/${fs}
+		done
+	fi
+
 	rm -rf /usr/bin/docker /usr/bin/docker-containerd /usr/bin/docker-containerd-shim /usr/bin/docker-containerd-ctr /usr/bin/docker-runc
 	rm -rf /etc/sysconfig/docker
+	rm -rf /etc/systemd/system/multi-user.target.wants/docker.service
 	rm -rf /usr/lib/systemd/system/docker.service
 	rm -rf /usr/lib/systemd/system/docker.socket
 	rm -rf /etc/docker/
+	rm -rf /var/lib/docker
+	rm -rf /run/docker/
+	rm -rf /root/.docker/
 }
 
 remove_docker_plugin() {
@@ -110,5 +133,7 @@ remove_swarm_agent
 remove_check_script
 remove_horus_agent
 remove_consul
+remove_vg ${hdd_vgname}
+remove_vg ${ssd_vgname}
 
 exit 0

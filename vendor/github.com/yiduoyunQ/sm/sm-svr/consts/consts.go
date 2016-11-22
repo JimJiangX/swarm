@@ -12,6 +12,13 @@ const (
 )
 
 const (
+	// status
+	StatusOK      = "OK"
+	StatusWarning = "Warning"
+	StatusError   = "Error"
+)
+
+const (
 	// global
 	ConfigFile   = "/tmp/sm.conf"
 	ProxyFile    = "/tmp/proxy.json"

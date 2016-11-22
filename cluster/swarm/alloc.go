@@ -23,7 +23,6 @@ func (gd *Gardener) allocNetworking(pending *pendingAllocResource, config *clust
 	req := u.Requirement()
 
 	ports, portENV, err := allocPorts(req.ports, u.ID, u.Name)
-	pending.ports = ports
 	if err != nil {
 		return err
 	}
@@ -33,7 +32,6 @@ func (gd *Gardener) allocNetworking(pending *pendingAllocResource, config *clust
 	u.ports = ports
 
 	networkings, err := gd.allocNetworkings(u.ID, pending.engine, req.networkings, config)
-	pending.networkings = append(pending.networkings, networkings...)
 	if err != nil {
 		return err
 	}
@@ -48,8 +46,6 @@ func (gd *Gardener) allocNetworkings(unit string, engine *cluster.Engine,
 
 	networkings, err := gd.getNetworkingSetting(engine, unit, req)
 	if err != nil {
-		logrus.Errorf("alloc Networking:%s", err)
-
 		return networkings, err
 	}
 
@@ -79,7 +75,7 @@ func allocPorts(need []port, unitID, unitName string) ([]database.Port, string, 
 	if err != nil || len(ports) < length {
 		logrus.Errorf("Alloc Ports Error:%v", err)
 
-		return nil, "", err
+		return nil, "", errors.Errorf("no enough available ports(%d<%d),%+v", len(ports), length, err)
 	}
 
 	for i := range need {
@@ -88,6 +84,11 @@ func allocPorts(need []port, unitID, unitName string) ([]database.Port, string, 
 		ports[i].UnitID = unitID
 		ports[i].UnitName = unitName
 		ports[i].Allocated = true
+	}
+
+	err = database.TxUpdatePortSlice(ports)
+	if err != nil {
+		return nil, "", err
 	}
 
 	portSlice := make([]string, len(ports))
@@ -163,21 +164,20 @@ func parseUintList(list []string) map[int]bool {
 }
 
 type pendingAllocResource struct {
-	unit             *unit
-	engine           *cluster.Engine
-	pendingContainer *pendingContainer
-	swarmID          string
-	ports            []database.Port
-	networkings      []IPInfo
-	localStore       []database.LocalVolume
-	sanStore         []database.LUN
+	unit   *unit
+	engine *cluster.Engine
+	// pendingContainer *pendingContainer
+	swarmID string
+	// ports       []database.Port
+	// networkings []IPInfo
+	localStore []database.LocalVolume
+	sanStore   []database.LUN
 }
 
 func newPendingAllocResource() *pendingAllocResource {
 	return &pendingAllocResource{
-		networkings: make([]IPInfo, 0, 2),
-		localStore:  make([]database.LocalVolume, 0, 5),
-		sanStore:    make([]database.LUN, 0, 2),
+		localStore: make([]database.LocalVolume, 0, 5),
+		sanStore:   make([]database.LUN, 0, 2),
 	}
 }
 
@@ -190,7 +190,8 @@ func createVolumes(engine *cluster.Engine, lvs []database.LocalVolume) ([]*types
 		vglist[lvs[i].VGName] = struct{}{}
 	}
 	for vg := range vglist {
-		// if volume create on san storage,should created VG before create Volume		 		// if volume create on san storage,should created VG before create Volume
+
+		// if volume create on san storage,should created VG before create Volume
 		if isSanVG(vg) {
 			err := createSanStoreageVG(engine.IP, vg)
 			if err != nil {
@@ -211,23 +212,14 @@ func createVolumes(engine *cluster.Engine, lvs []database.LocalVolume) ([]*types
 	return volumes, nil
 }
 
-func (pending *pendingAllocResource) consistency() error {
-	return database.TxInsertUnitWithPorts(&pending.unit.Unit, pending.ports)
-}
-
 func (gd *Gardener) resourceRecycle(pendings []*pendingAllocResource) (err error) {
 	gd.scheduler.Lock()
 	for i := range pendings {
 
-		if pendings[i] == nil ||
-			pendings[i].pendingContainer == nil ||
-			pendings[i].pendingContainer.Config == nil {
-
+		if pendings[i] == nil || pendings[i].swarmID == "" {
 			continue
 		}
-
-		swarmID := pendings[i].pendingContainer.Config.SwarmID()
-		delete(gd.pendingContainers, swarmID)
+		delete(gd.pendingContainers, pendings[i].swarmID)
 	}
 	gd.scheduler.Unlock()
 
@@ -240,23 +232,7 @@ func (gd *Gardener) resourceRecycle(pendings []*pendingAllocResource) (err error
 				continue
 			}
 
-			if len(pendings[i].networkings) > 0 {
-				ips := pendings[i].recycleNetworking()
-				database.TxUpdateIPs(tx, ips)
-			}
-
-			if pendings[i].unit != nil && len(pendings[i].ports) > 0 {
-				ports := pendings[i].ports
-
-				for p := range ports {
-					ports[p].Allocated = false
-					ports[p].Name = ""
-					ports[p].UnitID = ""
-					ports[p].UnitName = ""
-					ports[p].Proto = ""
-				}
-
-				database.TxUpdatePorts(tx, ports)
+			if pendings[i].unit != nil {
 				database.TxDeleteUnit(tx, pendings[i].unit.Unit.ServiceID)
 				database.TxDeleteVolume(tx, pendings[i].unit.Unit.ID)
 			}
@@ -264,30 +240,15 @@ func (gd *Gardener) resourceRecycle(pendings []*pendingAllocResource) (err error
 			for _, lv := range pendings[i].localStore {
 				database.TxDeleteVolume(tx, lv.ID)
 			}
+
 		}
-		return nil
+
+		return err
 	}
 
 	err = database.TxFrame(do)
 
 	return errors.Wrap(err, "alloction resource recycle")
-}
-
-func (pending *pendingAllocResource) recycleNetworking() []database.IP {
-	// networking recycle
-	ips := make([]database.IP, 0, len(pending.networkings)*2)
-
-	for i := range pending.networkings {
-		ips = append(ips, database.IP{
-			IPAddr:       pending.networkings[i].ipuint32,
-			Prefix:       pending.networkings[i].Prefix,
-			NetworkingID: pending.networkings[i].Networking,
-			UnitID:       "",
-			Allocated:    false,
-		})
-	}
-
-	return ips
 }
 
 func (gd *Gardener) allocStorage(
@@ -342,12 +303,13 @@ func (gd *Gardener) allocStorage(
 			vgName := penging.unit.Unit.Name + _SAN_VG
 
 			lun, lv, err := dc.store.Alloc(name, penging.unit.Unit.ID, vgName, need[i].Size)
+			if lun.ID != "" {
+				penging.sanStore = append(penging.sanStore, lun)
+				penging.localStore = append(penging.localStore, lv)
+			}
 			if err != nil {
 				return err
 			}
-
-			penging.sanStore = append(penging.sanStore, lun)
-			penging.localStore = append(penging.localStore, lv)
 
 			err = dc.store.Mapping(node.ID, vgName, lun.ID)
 			if err != nil {
@@ -388,18 +350,19 @@ func (node *Node) localStorageAlloc(name, unitID, storageType string, size int) 
 }
 
 type localVolume struct {
-	lv   database.LocalVolume
 	size int
+	lv   database.LocalVolume
 }
 
 type pendingAllocStore struct {
+	created    bool
 	unit       *unit
 	localStore []localVolume
 	sanStore   []database.LUN
 }
 
 func localVolumeExtend(host string, lv localVolume) error {
-	return updateVolume(host, lv.lv, lv.size)
+	return updateVolume(host, lv.lv)
 }
 
 func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
@@ -422,13 +385,26 @@ func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
 
 	gd.Lock()
 	for _, pending := range pendings {
+		if pending.created {
+			// TODO:cancel san VG extend
+		}
+
 		for _, lun := range pending.sanStore {
-			dc, err := gd.datacenterByEngine(pending.unit.Unit.EngineID)
-			if err != nil || dc == nil || dc.store == nil {
+			store, err := storage.GetStore(lun.StorageSystemID)
+			if err != nil {
+				logrus.Warnf("cancel Store Extend,%+v", err)
 				continue
 			}
-			dc.store.DelMapping(lun.ID)
-			dc.store.Recycle(lun.ID, 0)
+
+			err = store.DelMapping(lun.ID)
+			if err != nil {
+				logrus.Warnf("cancel Store Extend,%+v", err)
+			}
+
+			err = store.Recycle(lun.ID, 0)
+			if err != nil {
+				logrus.Warnf("cancel Store Extend,%+v", err)
+			}
 		}
 	}
 	gd.Unlock()
@@ -466,7 +442,7 @@ func (svc *Service) volumesPendingExpension(gd *Gardener, _type string, extensio
 	pendings := make([]*pendingAllocStore, 0, len(units))
 
 	for _, u := range units {
-		pending, _, err := pendingAllocUnitStore(gd, u, u.EngineID, extensions, false)
+		pending, _, err := pendingAllocUnitStore(gd, u, u.EngineID, extensions)
 		if pending != nil {
 			pendings = append(pendings, pending)
 		}
@@ -478,7 +454,7 @@ func (svc *Service) volumesPendingExpension(gd *Gardener, _type string, extensio
 	return pendings, nil
 }
 
-func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []structs.DiskStorage, skipSAN bool) (*pendingAllocStore, []string, error) {
+func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []structs.DiskStorage) (*pendingAllocStore, []string, error) {
 	dc, node, err := gd.getNode(engineID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "not found node by Engine:"+engineID)
@@ -497,7 +473,7 @@ func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []struct
 		}
 		name := fmt.Sprintf("%s_%s_LV", u.Name, need[d].Name)
 
-		if storage.IsLocalStore(need[d].Type) {
+		if storage.IsLocalStore(need[d].Type) && need[d].Size > 0 {
 			lv, err := node.localStorageExtend(name, need[d].Type, need[d].Size)
 			if err != nil {
 				return pending, binds, err
@@ -513,28 +489,25 @@ func pendingAllocUnitStore(gd *Gardener, u *unit, engineID string, need []struct
 			continue
 		}
 
-		if skipSAN {
-			continue
-		}
-
 		if dc.store == nil {
 			return pending, binds, errors.Errorf("Datacenter Store required")
 		}
-		vgName := u.Name + _SAN_VG
 
-		lun, lv, err := dc.store.Alloc(name, u.ID, vgName, need[d].Size)
+		lun, lv, err := dc.store.Extend(name, need[d].Size)
+		if lun.ID != "" {
+			pending.sanStore = append(pending.sanStore, lun)
+			pending.localStore = append(pending.localStore, localVolume{
+				lv:   lv,
+				size: need[d].Size,
+			})
+		}
 		if err != nil {
 			logrus.Errorf("SAN Store Alloc error:%s,%s", err, name)
 
 			return pending, binds, err
 		}
-		pending.sanStore = append(pending.sanStore, lun)
-		pending.localStore = append(pending.localStore, localVolume{
-			lv:   lv,
-			size: need[d].Size,
-		})
 
-		err = dc.store.Mapping(node.ID, vgName, lun.ID)
+		err = dc.store.Mapping(node.ID, lun.VGName, lun.ID)
 		if err != nil {
 			return pending, binds, err
 		}
