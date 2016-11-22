@@ -257,29 +257,6 @@ func DelLUN(id string) error {
 	return errors.Wrap(err, "delete LUN by ID")
 }
 
-// TxReleaseLun Delete LUN and LocalVolume by Name or VGName
-func TxReleaseLun(name string) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	_, err = tx.Exec("DELETE FROM tbl_dbaas_lun WHERE name OR vg_name=?", name, name)
-	if err != nil {
-		return errors.Wrap(err, "Tx delete LUN")
-	}
-
-	_, err = tx.Exec("DELETE FROM tbl_dbaas_volumes WHERE name OR VGname=?", name, name)
-	if err != nil {
-		return errors.Wrap(err, "Tx delete LocalVolume")
-	}
-
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx delete LUN and LocalVolume")
-}
-
 // ListHostLunIDByMapping returns []int select HostLunID by MappingTo
 func ListHostLunIDByMapping(host string) ([]int, error) {
 	db, err := getDB(false)
