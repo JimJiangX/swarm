@@ -216,20 +216,29 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 
+	swarmID := gd.generateUniqueID()
 	gd.scheduler.Lock()
 
 	engine, err := gd.selectEngine(config, module, out, filters)
 	if err != nil {
 		gd.scheduler.Unlock()
+
 		return "", err
 	}
+
+	config.SetSwarmID(swarmID)
+	gd.pendingContainers[swarmID] = &pendingContainer{
+		Name:   swarmID,
+		Config: config,
+		Engine: engine,
+	}
+
 	gd.scheduler.Unlock()
 
 	background := func(ctx context.Context) (err error) {
 		pending := newPendingAllocResource()
 
 		svc.Lock()
-		gd.scheduler.Lock()
 
 		defer func() {
 			svcStatus := statusServiceUnitMigrated
@@ -241,7 +250,6 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 				migrate.Status, migrate.LatestError, svcStatus = statusUnitMigrateFailed, err.Error(), statusServiceUnitMigrateFailed
 			}
 
-			gd.scheduler.Unlock()
 			if err != nil {
 				entry.Errorf("len(localVolume)=%d", len(pending.localStore))
 				// error handle
@@ -367,15 +375,6 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		swarmID := gd.generateUniqueID()
-		config.SetSwarmID(swarmID)
-
-		gd.pendingContainers[swarmID] = &pendingContainer{
-			Name:   swarmID,
-			Config: config,
-			Engine: engine,
-		}
-
 		dc, node, err := gd.getNode(engine.ID)
 		if err != nil {
 			return err
@@ -402,6 +401,11 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}
 
 		container, err := engine.CreateContainer(config, swarmID, true, svc.authConfig)
+
+		gd.scheduler.Lock()
+		delete(gd.pendingContainers, swarmID)
+		gd.scheduler.Unlock()
+
 		if err != nil {
 			return err
 		}
@@ -428,7 +432,6 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}(container, engine.IP, networkings, pending.localStore)
 
 		err = startUnit(engine, container.ID, migrate, users, networkings, lvs, false)
-		delete(gd.pendingContainers, swarmID)
 
 		if err != nil {
 			return err
@@ -874,6 +877,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 
+	swarmID := gd.generateUniqueID()
 	gd.scheduler.Lock()
 
 	engine, err := gd.selectEngine(config, module, out, filters)
@@ -882,13 +886,20 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 		return "", err
 	}
+
+	config.SetSwarmID(swarmID)
+	gd.pendingContainers[swarmID] = &pendingContainer{
+		Name:   swarmID,
+		Config: config,
+		Engine: engine,
+	}
+
 	gd.scheduler.Unlock()
 
 	background := func(ctx context.Context) (err error) {
 		pending := newPendingAllocResource()
 
 		svc.Lock()
-		gd.scheduler.Lock()
 
 		defer func() {
 			svcStatus := statusServiceUnitRebuilt
@@ -898,7 +909,6 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 				rebuild.Status, rebuild.LatestError, svcStatus = statusUnitRebuildFailed, err.Error(), statusServiceRestoreFailed
 			}
 
-			gd.scheduler.Unlock()
 			if err != nil {
 				entry.Errorf("Unit rebuild failed,%+v", err)
 				// error handle
@@ -988,15 +998,6 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		swarmID := gd.generateUniqueID()
-		config.SetSwarmID(swarmID)
-
-		gd.pendingContainers[swarmID] = &pendingContainer{
-			Name:   swarmID,
-			Config: config,
-			Engine: engine,
-		}
-
 		err = createServiceResources(gd, []*pendingAllocResource{pending})
 		if err != nil {
 			return err
@@ -1012,7 +1013,10 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		entry.WithField("Engine", engine.Addr).Debug("create container")
 
 		container, err := engine.CreateContainer(config, swarmID, true, svc.authConfig)
+
+		gd.scheduler.Lock()
 		delete(gd.pendingContainers, swarmID)
+		gd.scheduler.Unlock()
 
 		if err != nil {
 			return err

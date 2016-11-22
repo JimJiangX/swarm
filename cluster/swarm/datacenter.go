@@ -443,6 +443,7 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 			return 412, errors.Errorf("%d containers has created on Node %s", num, nameOrID)
 		}
 	}
+
 	gd.scheduler.Lock()
 	for _, pending := range gd.pendingContainers {
 		if pending.Engine.ID == node.EngineID {

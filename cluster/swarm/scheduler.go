@@ -54,10 +54,13 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 
 	for _, module := range svc.base.Modules {
 
+		gd.scheduler.Lock()
+
 		candidates, config, err := gd.schedulerPerModule(svc, module)
 		if err != nil {
 			entry.WithField("Module", module.Name).WithError(err).Error("scheduler failed")
 
+			gd.scheduler.Unlock()
 			return err
 		}
 
@@ -67,9 +70,13 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 		}
 		if err != nil {
 			entry.WithError(err).Error("pendings alloc failed")
+			gd.scheduler.Unlock()
 
 			return err
 		}
+
+		gd.scheduler.Unlock()
+
 		entry.Info("gd.pendingAlloc: allocation Succeed!")
 	}
 
@@ -156,9 +163,6 @@ func (gd *Gardener) schedulerPerModule(svc *Service, module structs.Module) ([]*
 		_type = _ProxyType
 	}
 
-	gd.scheduler.Lock()
-	defer gd.scheduler.Unlock()
-
 	list, err := listCandidates(module.Clusters, _type)
 	if err != nil {
 		return nil, nil, err
@@ -202,9 +206,6 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node,
 		entry.Error(err)
 		return nil, err
 	}
-
-	gd.scheduler.Lock()
-	defer gd.scheduler.Unlock()
 
 	allocs := make([]*pendingAllocResource, 0, 5)
 
