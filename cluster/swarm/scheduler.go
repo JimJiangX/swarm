@@ -503,13 +503,13 @@ func (gd *Gardener) selectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		return nil, errors.New("not enough Nodes for select")
 	}
 
-	if !highAvailable || num == 1 {
-		return nodes[0:num:num], nil
+	fmt.Println("selectNodeByCluster....  highAvailable =", highAvailable, num)
+	for i, n := range nodes {
+		fmt.Println(i, n.Name, n.Addr, n.UsedCpus)
 	}
 
-	for i, n := range nodes {
-		fmt.Println("selectNodeByCluster....  highAvailable =", highAvailable)
-		fmt.Println(i, n.Name, n.Addr, n.UsedCpus)
+	if !highAvailable || num == 1 {
+		return nodes[0:num:num], nil
 	}
 
 	all, err := database.GetAllNodes()
@@ -589,8 +589,8 @@ func (gd *Gardener) selectNodeByCluster(nodes []*node.Node, num int, highAvailab
 				if index == num {
 					dcMap = nil
 
+					fmt.Println("Output:")
 					for i, n := range candidates {
-						fmt.Println("Output:")
 						fmt.Println(i, n.Name, n.Addr, n.UsedCpus)
 					}
 
