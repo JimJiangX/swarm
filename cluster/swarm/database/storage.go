@@ -425,7 +425,7 @@ func UpdateLocalVolume(nameOrID string, size int) error {
 // TxUpdateMultiLocalVolume update Size of LocalVolume by name or ID in a Tx
 func TxUpdateMultiLocalVolume(lvs []LocalVolume) error {
 	do := func(tx *sqlx.Tx) error {
-		stmt, err := tx.Preparex("UPDATE tb_volumes SET size=? WHERE id=? OR name=?")
+		stmt, err := tx.Preparex("UPDATE tb_volumes SET size=? WHERE id=?")
 		if err != nil {
 			return errors.Wrap(err, "Tx prepare update local Volume")
 		}
