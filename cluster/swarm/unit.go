@@ -935,10 +935,6 @@ func (u *unit) stopService() error {
 }
 
 func (u *unit) backup(ctx context.Context, args ...string) (err error) {
-	if u.container.State != "running" {
-		return errors.Errorf("Unit %s is busy,container Status=%s", u.Name, u.container.State)
-	}
-
 	err = u.StatusCAS("!=", statusUnitStoping, statusUnitBackuping)
 	if err != nil {
 		return err

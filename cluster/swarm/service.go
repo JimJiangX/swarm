@@ -1818,6 +1818,10 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (_ stri
 		return "", err
 	}
 
+	if state := gd.Containers().Get(master.Name).State; state != "running" {
+		return "", errors.Errorf("Unit %s is busy,container Status=%s", master.Name, state)
+	}
+
 	now := time.Now()
 	strategy := database.BackupStrategy{
 		ID:        utils.Generate64UUID(),
