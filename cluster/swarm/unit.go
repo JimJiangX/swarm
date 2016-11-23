@@ -600,17 +600,12 @@ func removeVGAndLUN(host, vg string) error {
 		}
 	}
 
-	return err
-}
-
-func (u *unit) rmVG(config sdk.RmVGConfig) error {
-	engine, err := u.Engine()
-	if err != nil {
-		return err
+	opt := sdk.RemoveSCSIConfig{
+		Vendor:    store.Vendor(),
+		HostLunId: hostLuns,
 	}
 
-	addr := getPluginAddr(engine.IP, pluginPort)
-	err = sdk.RemoveVG(addr, config)
+	err = sdk.RemoveSCSI(addr, opt)
 
 	return err
 }
