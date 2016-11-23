@@ -80,7 +80,7 @@ func (c *Client) Upload(context, remote string, mode os.FileMode) error {
 
 	local.Close()
 
-	return c.UploadFile(local.Name(), remote)
+	return c.UploadFile(remote, local.Name())
 }
 
 // Exec runs cmd on the remote host,
