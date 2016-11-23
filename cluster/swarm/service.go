@@ -989,7 +989,6 @@ func (svc *Service) startService() error {
 	}
 
 	if swm != nil {
-
 		err = swm.startService()
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
@@ -1061,17 +1060,13 @@ func (svc *Service) StopService() (err error) {
 		}
 	}
 
-	units, err := svc.getUnitByType(_UpsqlType)
-	if err != nil {
-		logrus.WithField("Service", svc.Name).WithError(err).Error("get unit by type")
+	funcs := make([]func() error, 0, len(svc.units))
+	for i := range svc.units {
+		if svc.units[i].Type == _SwitchManagerType {
+			continue
+		}
 
-		return err
-	}
-
-	funcs := make([]func() error, 0, len(units))
-	for i := range units {
-
-		funcs = append(funcs, units[i].stopService)
+		funcs = append(funcs, svc.units[i].stopService)
 	}
 
 	err = GoConcurrency(funcs)
