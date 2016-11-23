@@ -818,7 +818,11 @@ loop:
 				}
 			}
 
-			usedCPUs := parseUintList(list)
+			usedCPUs, err := parseUintList(list)
+			if err != nil {
+				dc.Unlock()
+				continue loop
+			}
 
 			if node.engine.TotalCpus()-node.engine.UsedCpus()-int64(len(usedCPUs)) < int64(ncpu) ||
 				node.engine.TotalMemory()-node.engine.UsedMemory()-usedMemory < module.HostConfig.Memory {

@@ -108,12 +108,13 @@ func (gd *Gardener) allocCPUs(engine *cluster.Engine, cpusetCpus string, reserve
 
 	total := int(engine.Cpus)
 	used := int(engine.UsedCpus())
+	containers := engine.Containers()
 
 	if total-used < ncpu {
 		return "", errors.Errorf("alloc CPU,%s CPU is short(%d-%d<%d)", engine.Name, total, used, ncpu)
 	}
 
-	list := make([]string, len(reserve), len(reserve)+len(gd.pendingContainers))
+	list := make([]string, len(reserve), len(reserve)+len(gd.pendingContainers)+len(containers))
 	copy(list, reserve)
 
 	for _, pending := range gd.pendingContainers {
@@ -122,15 +123,26 @@ func (gd *Gardener) allocCPUs(engine *cluster.Engine, cpusetCpus string, reserve
 		}
 	}
 
-	usedCPUs := parseUintList(list)
+	for _, c := range containers {
+		list = append(list, c.Config.HostConfig.CpusetCpus)
+	}
 
-	if total-used-len(usedCPUs) < ncpu {
-		return "", errors.Errorf("alloc CPU error,%s CPU is Short(%d-%d-%d<%d),", engine.Name, total, used, len(usedCPUs), ncpu)
+	return findIdleCPUs(list, total, ncpu)
+}
+
+func findIdleCPUs(used []string, total, ncpu int) (string, error) {
+	list, err := parseUintList(used)
+	if err != nil {
+		return "", err
+	}
+
+	if total-len(list) < ncpu {
+		return "", errors.Errorf("not enough CPU,total=%d,used=%d,required=%d", total, len(list), ncpu)
 	}
 
 	free := make([]string, ncpu)
 	for i, n := 0, 0; i < total && n < ncpu; i++ {
-		if !usedCPUs[i] {
+		if !list[i] {
 			free[n] = strconv.Itoa(i)
 			n++
 		}
@@ -139,9 +151,9 @@ func (gd *Gardener) allocCPUs(engine *cluster.Engine, cpusetCpus string, reserve
 	return strings.Join(free, ","), nil
 }
 
-func parseUintList(list []string) map[int]bool {
+func parseUintList(list []string) (map[int]bool, error) {
 	if len(list) == 0 {
-		return map[int]bool{}
+		return map[int]bool{}, nil
 	}
 
 	ints := make(map[int]bool, len(list)*3)
@@ -149,9 +161,9 @@ func parseUintList(list []string) map[int]bool {
 	for i := range list {
 		cpus, err := utils.ParseUintList(list[i])
 		if err != nil {
-			logrus.Errorf("parseUintList '%s' error:%s", list[i], err)
-			continue
+			return ints, errors.Errorf("parseUintList '%s',%s", list[i], err)
 		}
+
 		for k, v := range cpus {
 			if v {
 				ints[k] = v
@@ -159,7 +171,7 @@ func parseUintList(list []string) map[int]bool {
 		}
 	}
 
-	return ints
+	return ints, nil
 }
 
 type pendingAllocResource struct {
@@ -363,7 +375,7 @@ func localVolumeExtend(host string, lv localVolume) error {
 	return updateVolume(host, lv.lv)
 }
 
-func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
+func cancelStoreExtend(pendings []*pendingAllocStore) error {
 	if len(pendings) == 0 {
 		return nil
 	}
@@ -381,7 +393,6 @@ func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
 		return err
 	}
 
-	gd.Lock()
 	for _, pending := range pendings {
 		if pending.created {
 			// TODO:cancel san VG extend
@@ -405,7 +416,6 @@ func (gd *Gardener) cancelStoreExtend(pendings []*pendingAllocStore) error {
 			}
 		}
 	}
-	gd.Unlock()
 
 	return nil
 }
@@ -614,6 +624,11 @@ func reduceCPUset(cpusetCpus string, need int) (string, error) {
 			cpuSlice = append(cpuSlice, k)
 		}
 	}
+
+	if len(cpuSlice) < need {
+		return cpusetCpus, errors.Errorf("%s is shortage for need %d", cpusetCpus, need)
+	}
+
 	sort.Ints(cpuSlice)
 
 	cpuString := make([]string, need)

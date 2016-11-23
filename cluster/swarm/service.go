@@ -1955,7 +1955,7 @@ func (gd *Gardener) serviceScale(svc *Service,
 		} else {
 			status = statusServiceScaleFailed
 
-			_err := gd.cancelStoreExtend(storePendings)
+			_err := cancelStoreExtend(storePendings)
 			if _err != nil {
 				err = errors.Errorf("%+v\n%+v", err, _err)
 			}
