@@ -248,14 +248,20 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			} else {
 				entry.Errorf("%+v", err)
 				migrate.Status, migrate.LatestError, svcStatus = statusUnitMigrateFailed, err.Error(), statusServiceUnitMigrateFailed
-			}
 
-			if err != nil {
 				entry.Errorf("len(localVolume)=%d", len(pending.localStore))
-				// error handle
-				_err := gd.resourceRecycle([]*pendingAllocResource{pending})
-				if _err != nil {
-					entry.Errorf("defer resourceRecycle:%+v", _err)
+				// clean local volumes
+				for _, lv := range pending.localStore {
+					if isSanVG(lv.VGName) {
+						continue
+					}
+
+					entry.Debugf("recycle localVolume,VG=%s,Name=%s", lv.VGName, lv.Name)
+
+					_err := database.DeleteLocalVoume(lv.Name)
+					if _err != nil {
+						entry.Errorf("delete localVolume %s,%+v", lv.Name, _err)
+					}
 				}
 			}
 
@@ -907,14 +913,20 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 				rebuild.Status, rebuild.LatestError = statusUnitRebuilt, ""
 			} else {
 				rebuild.Status, rebuild.LatestError, svcStatus = statusUnitRebuildFailed, err.Error(), statusServiceRestoreFailed
-			}
 
-			if err != nil {
-				entry.Errorf("Unit rebuild failed,%+v", err)
-				// error handle
-				_err := gd.resourceRecycle([]*pendingAllocResource{pending})
-				if _err != nil {
-					entry.Errorf("Recycle,%+v", _err)
+				entry.Errorf("len(localVolume)=%d", len(pending.localStore))
+				// clean local volumes
+				for _, lv := range pending.localStore {
+					if isSanVG(lv.VGName) {
+						continue
+					}
+
+					entry.Debugf("recycle localVolume,VG=%s,Name=%s", lv.VGName, lv.Name)
+
+					_err := database.DeleteLocalVoume(lv.Name)
+					if _err != nil {
+						entry.Errorf("delete localVolume %s,%+v", lv.Name, _err)
+					}
 				}
 			}
 
@@ -937,7 +949,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		}
 		config.HostConfig.CpusetCpus = cpuset
 
-		oldLVs, lunMap, lunSlice, err := listOldVolumes(rebuild.ID)
+		oldLVs, lunMap, _, err := listOldVolumes(rebuild.ID)
 		if err != nil {
 			return err
 		}
@@ -951,23 +963,11 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			// deactivate
 			// del mapping
 			if len(lunMap) > 0 && dc.store != nil {
-				// TODO:fix host
-				_err := sanDeactivate(dc.store.Vendor(), original.engine.IP, lunMap)
-				if _err != nil {
-					entry.Errorf("san Deactivate and delete Mapping,%+v", _err)
-				}
 
-				entry.Debug("recycle old container volumes resource")
-				// recycle lun
-				for i := range lunSlice {
-					_err := dc.store.DelMapping(lunSlice[i].ID)
-					if err != nil {
-						logrus.Errorf("%s DelMapping %s", dc.store.Vendor(), lunSlice[i].ID)
-					}
-
-					_err = dc.store.Recycle(lunSlice[i].ID, 0)
+				for vg, list := range lunMap {
+					_err := removeVGAndLUN(original.engine.IP, vg, list)
 					if _err != nil {
-						entry.Errorf("Store recycle,%+v", _err)
+						entry.Errorf("san remove VG and LUN,%+v", _err)
 					}
 				}
 			}

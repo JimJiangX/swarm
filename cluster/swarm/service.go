@@ -2295,7 +2295,12 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 		if recycle {
 			for i := range lvs {
 
-				err = removeVGAndLUN(u.engine.IP, lvs[i].VGName)
+				luns, err := database.ListLUNByVgName(lvs[i].VGName)
+				if err != nil {
+					return err
+				}
+
+				err = removeVGAndLUN(u.engine.IP, lvs[i].VGName, luns)
 				if err != nil {
 					entry.WithFields(logrus.Fields{
 						"Unit": u.Name,

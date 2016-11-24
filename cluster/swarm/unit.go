@@ -551,14 +551,13 @@ func (u *unit) deactivateVG(config sdk.DeactivateConfig) error {
 	return err
 }
 
-func removeVGAndLUN(host, vg string) error {
+func removeVGAndLUN(host, vg string, list []database.LUN) error {
 	if !isSanVG(vg) {
 		return nil
 	}
 
-	list, err := database.ListLUNByVgName(vg)
-	if err != nil || len(list) == 0 {
-		return err
+	if len(list) == 0 {
+		return nil
 	}
 
 	store, err := storage.GetStore(list[0].StorageSystemID)

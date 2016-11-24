@@ -221,46 +221,6 @@ func createVolumes(engine *cluster.Engine, lvs []database.LocalVolume) ([]*types
 	return volumes, nil
 }
 
-func (gd *Gardener) resourceRecycle(pendings []*pendingAllocResource) (err error) {
-	gd.scheduler.Lock()
-	for i := range pendings {
-
-		if pendings[i] == nil || pendings[i].swarmID == "" {
-			continue
-		}
-		delete(gd.pendingContainers, pendings[i].swarmID)
-	}
-	gd.scheduler.Unlock()
-
-	tx, err := database.GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	gd.Lock()
-	defer gd.Unlock()
-
-	for i := range pendings {
-		if pendings[i] == nil {
-			continue
-		}
-
-		if pendings[i].unit != nil {
-			database.TxDeleteUnit(tx, pendings[i].unit.Unit.ServiceID)
-			database.TxDeleteVolume(tx, pendings[i].unit.Unit.ID)
-		}
-
-		for _, lv := range pendings[i].localStore {
-			database.TxDeleteVolume(tx, lv.ID)
-		}
-	}
-
-	err = tx.Commit()
-
-	return errors.Wrap(err, "alloction resource recycle")
-}
-
 func (gd *Gardener) allocStorage(
 	penging *pendingAllocResource,
 	engine *cluster.Engine,
