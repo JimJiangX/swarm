@@ -486,6 +486,10 @@ func getContainersJSON(c *context, w http.ResponseWriter, r *http.Request) {
 // GET /containers/{name:.*}/json
 func getContainerJSON(c *context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
+	sizeQuery := ""
+	if boolValue(r, "size") {
+		sizeQuery = "?size=1"
+	}
 	container := c.cluster.Container(name)
 	if container == nil {
 		httpError(w, fmt.Sprintf("No such container %s", name), http.StatusNotFound)
@@ -503,7 +507,7 @@ func getContainerJSON(c *context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := client.Get(scheme + "://" + container.Engine.Addr + "/containers/" + container.ID + "/json")
+	resp, err := client.Get(scheme + "://" + container.Engine.Addr + "/containers/" + container.ID + "/json" + sizeQuery)
 	container.Engine.CheckConnectionErr(err)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
@@ -1181,11 +1185,10 @@ func postTagImage(c *context, w http.ResponseWriter, r *http.Request) {
 	if err := c.cluster.TagImage(name, ref, force); err != nil {
 		if strings.HasPrefix(err.Error(), "No such image") {
 			httpError(w, err.Error(), http.StatusNotFound)
-			return
 		} else {
 			httpError(w, err.Error(), http.StatusInternalServerError)
-			return
 		}
+		return
 	}
 	w.WriteHeader(http.StatusCreated)
 }
@@ -1330,11 +1333,10 @@ func postRenameContainer(c *context, w http.ResponseWriter, r *http.Request) {
 	if err = c.cluster.RenameContainer(container, r.Form.Get("name")); err != nil {
 		if strings.HasPrefix(err.Error(), "Conflict") {
 			httpError(w, err.Error(), http.StatusConflict)
-			return
 		} else {
 			httpError(w, err.Error(), http.StatusInternalServerError)
-			return
 		}
+		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 
