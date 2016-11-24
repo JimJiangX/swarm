@@ -2093,7 +2093,7 @@ func (svc *Service) updateDescAfterScale(scale structs.PostServiceScaledRequest)
 	}
 
 	desc := buffer.String()
-	err = database.UpdateServcieDesc(svc.ID, desc, svc.BackupMaxSizeByte)
+	err = database.UpdateServcieDesc(svc.ID, desc, des.BackupMaxSize)
 	if err != nil {
 		return err
 	}
