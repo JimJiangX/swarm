@@ -1018,8 +1018,10 @@ func (u *unit) registerHorus(user, password string, agentPort int) (registerServ
 		_type = "upproxy"
 	case _UpsqlType:
 		_type = "upsql"
+	case _RedisType:
+		_type = "redis"
 	default:
-		return registerService{}, errors.Errorf("unsupported Type:'%s'", u.Type)
+		//	return registerService{}, errors.Errorf("unsupported Type:'%s'", u.Type)
 	}
 
 	return registerService{
