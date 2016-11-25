@@ -44,12 +44,13 @@ type require struct {
 
 type configParser interface {
 	Validate(data map[string]interface{}) error
-	ParseData(data []byte) (config.Configer, error)
+	ParseData(data []byte) error
 	defaultUserConfig(args ...interface{}) (map[string]interface{}, error)
 	Marshal() ([]byte, error)
 	Requirement() require
 	HealthCheck(args ...string) (healthCheck, error)
 	Set(key string, val interface{}) error
+	String(key string) string
 }
 
 func (u unit) Path() string {
@@ -179,7 +180,6 @@ func initialize(name, version string) (parser configParser, cmder containerCmd, 
 		cmder = &mysqlCmd{}
 
 	default:
-
 		return nil, nil, errors.Errorf("unsupported Image:'%s:%s'", name, version)
 	}
 
@@ -276,15 +276,23 @@ func (c *mysqlConfig) Set(key string, val interface{}) error {
 	return c.config.Set(strings.ToLower(key), fmt.Sprintf("%v", val))
 }
 
-func (c *mysqlConfig) ParseData(data []byte) (config.Configer, error) {
+func (c mysqlConfig) String(key string) string {
+	if c.config == nil {
+		return ""
+	}
+
+	return c.config.String(strings.ToLower(key))
+}
+
+func (c *mysqlConfig) ParseData(data []byte) error {
 	configer, err := config.NewConfigData("ini", data)
 	if err != nil {
-		return nil, errors.Wrap(err, "parse ini file")
+		return errors.Wrap(err, "parse ini file")
 	}
 
 	c.config = configer
 
-	return c.config, nil
+	return nil
 }
 
 func (c mysqlConfig) Marshal() ([]byte, error) {
@@ -383,16 +391,24 @@ func (c *proxyConfig) Set(key string, val interface{}) error {
 	return c.config.Set(strings.ToLower(key), fmt.Sprintf("%v", val))
 }
 
+func (c proxyConfig) String(key string) string {
+	if c.config == nil {
+		return ""
+	}
+
+	return c.config.String(strings.ToLower(key))
+}
+
 func (proxyConfig) Validate(data map[string]interface{}) error { return nil }
-func (c *proxyConfig) ParseData(data []byte) (config.Configer, error) {
+func (c *proxyConfig) ParseData(data []byte) error {
 	configer, err := config.NewConfigData("ini", data)
 	if err != nil {
-		return nil, errors.Wrap(err, "parse ini")
+		return errors.Wrap(err, "parse ini")
 	}
 
 	c.config = configer
 
-	return c.config, nil
+	return nil
 }
 
 func (c *proxyConfig) Marshal() ([]byte, error) {
@@ -634,16 +650,24 @@ func (c *switchManagerConfig) Set(key string, val interface{}) error {
 	return c.config.Set(strings.ToLower(key), fmt.Sprintf("%v", val))
 }
 
+func (c switchManagerConfig) String(key string) string {
+	if c.config == nil {
+		return ""
+	}
+
+	return c.config.String(strings.ToLower(key))
+}
+
 func (switchManagerConfig) Validate(data map[string]interface{}) error { return nil }
-func (c *switchManagerConfig) ParseData(data []byte) (config.Configer, error) {
+func (c *switchManagerConfig) ParseData(data []byte) error {
 	configer, err := config.NewConfigData("ini", data)
 	if err != nil {
-		return nil, errors.Wrap(err, "parse ini")
+		return errors.Wrap(err, "parse ini")
 	}
 
 	c.config = configer
 
-	return c.config, nil
+	return nil
 }
 
 func (c *switchManagerConfig) Marshal() ([]byte, error) {

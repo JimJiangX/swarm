@@ -110,7 +110,7 @@ func LoadImage(req structs.PostLoadImageRequest) (string, string, error) {
 		return "", "", err
 	}
 
-	_, err = parser.ParseData(content)
+	err = parser.ParseData(content)
 	if err != nil {
 		return "", "", errors.Wrap(err, "parse PostLoadImageRequest.Content")
 	}
@@ -205,14 +205,14 @@ func UpdateImageTemplateConfig(imageID string, req structs.UpdateUnitConfigReque
 			return config, err
 		}
 
-		configer, err := parser.ParseData(nil)
+		err = parser.ParseData(nil)
 		if err != nil {
 			return config, errors.Wrap(err, "ParseDate")
 		}
 
 		keysets := make(map[string]database.KeysetParams, len(config.KeySets))
 		for _, kv := range req.ConfigKVs {
-			err := configer.Set(kv.Key, kv.Value)
+			err := parser.Set(kv.Key, kv.Value)
 			if err != nil {
 				return config, errors.Wrap(err, "Configer Set")
 			}

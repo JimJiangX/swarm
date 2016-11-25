@@ -1183,14 +1183,14 @@ func getServiceServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.R
 
 			continue
 		}
-		configer, err := parser.ParseData([]byte(configs[i].Config.Content))
+		err = parser.ParseData([]byte(configs[i].Config.Content))
 		if err != nil {
 			logrus.Error("ParseData error", err, configs[i].Config.Content)
 			continue
 		}
 
 		for key, val := range keysetsMap {
-			value := configer.String(key)
+			value := parser.String(key)
 			resp[i].Config = append(resp[i].Config, structs.ValueAndKeyset{
 				Value:        value,
 				KeysetParams: val,

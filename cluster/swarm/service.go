@@ -1300,13 +1300,13 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 		}
 	}()
 
-	configer, err := u.ParseData([]byte(copyContent))
+	err = u.configParser.ParseData([]byte(copyContent))
 	if err != nil {
 		return err
 	}
 
 	for key, val := range config {
-		oldValue := configer.String(key)
+		oldValue := u.configParser.String(key)
 		cmds := template
 		old := template
 		parts := strings.SplitAfterN(key, "::", 2)
@@ -1316,7 +1316,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 			key = parts[0]
 		}
 
-		err = configer.Set(key, fmt.Sprintf("%v", val))
+		err = u.configParser.Set(key, fmt.Sprintf("%v", val))
 		if err != nil {
 			return err
 		}

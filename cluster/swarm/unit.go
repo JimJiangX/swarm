@@ -58,7 +58,7 @@ func (u *unit) factory() error {
 	}
 
 	if u.parent != nil && parser != nil {
-		_, err := parser.ParseData([]byte(u.parent.Content))
+		err := parser.ParseData([]byte(u.parent.Content))
 		if err != nil {
 			logrus.WithField("Unit", u.Name).WithError(err).Errorf("Parser unitConfig content")
 		}
@@ -610,7 +610,7 @@ func removeVGAndLUN(host, vg string, list []database.LUN) error {
 }
 
 func (u *unit) copyConfig(data map[string]interface{}) error {
-	_, err := u.ParseData([]byte(u.parent.Content))
+	err := u.ParseData([]byte(u.parent.Content))
 	if err != nil {
 		return err
 	}
