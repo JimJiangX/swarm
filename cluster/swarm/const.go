@@ -199,8 +199,7 @@ const (
 	_ImageSwitchManager = "switch_manager"
 	_ImageRedis         = "redis"
 
-	_UnitRole_Master        = "master"
-	_UnitRole_SwitchManager = "switch_manager"
+	_UnitRole_Master = "master"
 
 	manuallyBackupStrategy = "manually"
 

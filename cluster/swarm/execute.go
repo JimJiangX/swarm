@@ -241,9 +241,13 @@ func (gd *Gardener) initAndStartService(svc *Service) (err error) {
 	}
 
 	logrus.Debug("init Topology")
-	if err := svc.initTopology(); err != nil {
-		return err
+	err = svc.initTopology()
+	if err != nil {
+		logrus.Warnf("init topology,%+v", err)
+		if errors.Cause(err) == ErrSwitchManagerUnitNotFound {
+			return nil
+		}
 	}
 
-	return nil
+	return err
 }

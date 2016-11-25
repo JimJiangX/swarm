@@ -3,6 +3,7 @@ package swarm
 import (
 	"bytes"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -295,7 +296,7 @@ func parseIPFromHealthCheck(serviceID, output string) string {
 	return ""
 }
 
-var errAvailableConsulClient = errors.New("non-available consul client")
+var errAvailableConsulClient = stderrors.New("non-available consul client")
 var defaultConsuls = &consulConfigs{}
 
 func getConsulClient(ping bool) (*api.Client, error) {

@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	stderrors "errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -20,8 +21,8 @@ import (
 )
 
 var (
-	errEngineIsNil    = errors.New("Engine is nil")
-	errEngineAPIisNil = errors.New("Engine API client is nil")
+	errEngineIsNil    = stderrors.New("Engine is nil")
+	errEngineAPIisNil = stderrors.New("Engine API client is nil")
 )
 
 type unit struct {
