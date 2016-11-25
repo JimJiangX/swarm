@@ -150,14 +150,16 @@ func registerHealthCheck(u *unit, context *Service) error {
 		u.ContainerID = u.container.ID
 	}
 
-	addr := ""
-	ips, err := u.getNetworkings()
-	if err != nil {
-		return err
-	}
-	for i := range ips {
-		if ips[i].Type == _ContainersNetworking {
-			addr = ips[i].IP.String()
+	if check.Addr == "" {
+		ips, err := u.getNetworkings()
+		if err != nil {
+			return err
+		}
+		for i := range ips {
+			if ips[i].Type == _ContainersNetworking {
+				check.Addr = ips[i].IP.String()
+				break
+			}
 		}
 	}
 
@@ -166,13 +168,17 @@ func registerHealthCheck(u *unit, context *Service) error {
 		Name:    u.Name,
 		Tags:    check.Tags,
 		Port:    check.Port,
-		Address: addr,
+		Address: check.Addr,
 		Check: &api.AgentServiceCheck{
-			Script: check.Script,
-			// DockerContainerID: containerID,
-			Shell:    check.Shell,
-			Interval: check.Interval,
-			// TTL:      check.TTL,
+			Script:            check.Script,
+			DockerContainerID: check.DockerContainerID,
+			Shell:             check.Shell,
+			Interval:          check.Interval,
+			Timeout:           check.Timeout,
+			TTL:               check.TTL,
+			TCP:               check.TCP,
+			HTTP:              check.HTTP,
+			Status:            check.Status,
 		},
 	}
 

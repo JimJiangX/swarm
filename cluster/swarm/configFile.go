@@ -1,9 +1,11 @@
 package swarm
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -179,7 +181,12 @@ func initialize(name, version string) (parser configParser, cmder containerCmd, 
 		parser = &mysqlConfig{}
 		cmder = &mysqlCmd{}
 
+	case _ImageRedis == name:
+		parser = &redisConfig{}
+		cmder = &redisCmd{}
+
 	default:
+
 		return nil, nil, errors.Errorf("unsupported Image:'%s:%s'", name, version)
 	}
 
@@ -225,7 +232,13 @@ func (mysqlConfig) Validate(data map[string]interface{}) error {
 	return nil
 }
 
-func (c mysqlConfig) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
+func (c mysqlConfig) defaultUserConfig(args ...interface{}) (_ map[string]interface{}, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.Errorf("%v", r)
+		}
+	}()
+
 	errMsg := fmt.Sprintf("unexpected args,len=%d", len(args))
 
 	if len(args) < 2 {
@@ -237,7 +250,7 @@ func (c mysqlConfig) defaultUserConfig(args ...interface{}) (map[string]interfac
 	}
 
 	u, ok := args[1].(*unit)
-	if !ok || svc == nil {
+	if !ok || u == nil {
 		return nil, errors.New(errMsg)
 	}
 
@@ -333,13 +346,18 @@ func (mysqlConfig) Requirement() require {
 }
 
 type healthCheck struct {
-	Port     int
-	Script   string
-	Shell    string
-	Interval string
-	Timeout  string
-	TTL      string
-	Tags     []string
+	Addr              string
+	Port              int
+	Script            string
+	Shell             string
+	Interval          string
+	Timeout           string
+	TTL               string
+	Tags              []string
+	TCP               string
+	HTTP              string
+	DockerContainerID string
+	Status            string
 }
 
 func (c mysqlConfig) HealthCheck(args ...string) (healthCheck, error) {
@@ -347,11 +365,13 @@ func (c mysqlConfig) HealthCheck(args ...string) (healthCheck, error) {
 		return healthCheck{}, errors.New("params not ready")
 	}
 
+	addr := c.config.String("mysqld::bind_address")
 	port, err := c.config.Int("mysqld::port")
 	if err != nil {
 		return healthCheck{}, errors.Wrap(err, "get 'mysqld::port'")
 	}
 	return healthCheck{
+		Addr:     addr,
 		Port:     port,
 		Script:   "/opt/DBaaS/script/check_db.sh " + args[0] + " " + args[1] + " " + args[2],
 		Shell:    "",
@@ -461,21 +481,30 @@ func (c proxyConfig) HealthCheck(args ...string) (healthCheck, error) {
 		return healthCheck{}, errors.New("params not ready")
 	}
 
+	addr := c.config.String("adm-cli::adm-cli-address")
 	port, err := c.config.Int("adm-cli::proxy_admin_port")
 	if err != nil {
 		return healthCheck{}, errors.Wrap(err, "get 'adm-cli::proxy_admin_port'")
 	}
+
 	return healthCheck{
+		Addr:     addr,
 		Port:     port,
 		Script:   "/opt/DBaaS/script/check_proxy.sh " + args[0],
 		Shell:    "",
 		Interval: "10s",
-		TTL:      "15s",
+		TTL:      "",
 		Tags:     nil,
 	}, nil
 }
 
-func (c proxyConfig) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
+func (c proxyConfig) defaultUserConfig(args ...interface{}) (_ map[string]interface{}, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.Errorf("%v", r)
+		}
+	}()
+
 	errMsg := fmt.Sprintf("unexpected args,len=%d", len(args))
 
 	if len(args) < 2 {
@@ -487,7 +516,7 @@ func (c proxyConfig) defaultUserConfig(args ...interface{}) (map[string]interfac
 	}
 
 	u, ok := args[1].(*unit)
-	if !ok || svc == nil {
+	if !ok || u == nil {
 		return nil, errors.New(errMsg)
 	}
 
@@ -551,7 +580,13 @@ type proxyConfigV110 struct {
 	proxyConfig
 }
 
-func (c proxyConfigV110) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
+func (c proxyConfigV110) defaultUserConfig(args ...interface{}) (_ map[string]interface{}, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.Errorf("%v", r)
+		}
+	}()
+
 	errMsg := fmt.Sprintf("unexpected args,len=%d", len(args))
 
 	if len(args) < 2 {
@@ -563,7 +598,7 @@ func (c proxyConfigV110) defaultUserConfig(args ...interface{}) (map[string]inte
 	}
 
 	u, ok := args[1].(*unit)
-	if !ok || svc == nil {
+	if !ok || u == nil {
 		return nil, errors.New(errMsg)
 	}
 
@@ -722,16 +757,23 @@ func (c switchManagerConfig) HealthCheck(args ...string) (healthCheck, error) {
 	}
 
 	return healthCheck{
+		Addr:     "",
 		Port:     port,
 		Script:   "/opt/DBaaS/script/check_switchmanager.sh " + args[0],
 		Shell:    "",
 		Interval: "10s",
-		TTL:      "15s",
+		TTL:      "",
 		Tags:     nil,
 	}, nil
 }
 
-func (c switchManagerConfig) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
+func (c switchManagerConfig) defaultUserConfig(args ...interface{}) (_ map[string]interface{}, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.Errorf("%v", r)
+		}
+	}()
+
 	errMsg := fmt.Sprintf("unexpected args,len=%d", len(args))
 
 	if len(args) < 2 {
@@ -743,7 +785,7 @@ func (c switchManagerConfig) defaultUserConfig(args ...interface{}) (map[string]
 	}
 
 	u, ok := args[1].(*unit)
-	if !ok || svc == nil {
+	if !ok || u == nil {
 		return nil, errors.New(errMsg)
 	}
 
@@ -794,7 +836,13 @@ type switchManagerConfigV1123 struct {
 	switchManagerConfig
 }
 
-func (c switchManagerConfigV1123) defaultUserConfig(args ...interface{}) (map[string]interface{}, error) {
+func (c switchManagerConfigV1123) defaultUserConfig(args ...interface{}) (_ map[string]interface{}, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.Errorf("%v", r)
+		}
+	}()
+
 	errMsg := fmt.Sprintf("unexpected args,len=%d", len(args))
 
 	if len(args) < 2 {
@@ -806,7 +854,7 @@ func (c switchManagerConfigV1123) defaultUserConfig(args ...interface{}) (map[st
 	}
 
 	u, ok := args[1].(*unit)
-	if !ok || svc == nil {
+	if !ok || u == nil {
 		return nil, errors.New(errMsg)
 	}
 
@@ -847,4 +895,194 @@ func (c switchManagerConfigV1123) defaultUserConfig(args ...interface{}) (map[st
 	m["swarmhealthcheckpassword"] = user.Password
 
 	return m, nil
+}
+
+type redisConfig struct {
+	config map[string]string
+}
+
+func (c redisConfig) Validate(data map[string]interface{}) error {
+	return nil
+}
+
+func (c *redisConfig) ParseData(data []byte) error {
+	if c.config == nil {
+		c.config = make(map[string]string, 20)
+	}
+
+	lines := bytes.Split(data, []byte{'\n'})
+	for _, l := range lines {
+		if bytes.HasPrefix(l, []byte{'#'}) {
+			continue
+		}
+
+		line := bytes.TrimSpace(l)
+		if len(line) == 0 {
+			continue
+		}
+
+		parts := bytes.SplitN(line, []byte{' '}, 2)
+		if len(parts) == 2 {
+			c.config[string(parts[0])] = string(parts[1])
+		}
+	}
+
+	return nil
+}
+
+func (redisConfig) defaultUserConfig(args ...interface{}) (_ map[string]interface{}, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.Errorf("%v", r)
+		}
+	}()
+
+	errMsg := fmt.Sprintf("unexpected args,len=%d", len(args))
+
+	if len(args) < 1 {
+		return nil, errors.New(errMsg)
+	}
+
+	u, ok := args[0].(*unit)
+	if !ok || u == nil {
+		return nil, errors.New(errMsg)
+	}
+
+	var (
+		m    = make(map[string]interface{}, 10)
+		port = 0
+	)
+	for i := range u.ports {
+		if u.ports[i].Name == "port" {
+			port = u.ports[i].Port
+			break
+		}
+	}
+	m["port"] = port
+
+	if len(u.networkings) == 1 {
+		m["bind"] = u.networkings[0].IP.String()
+	}
+
+	m["maxmemory"] = u.config.HostConfig.Resources.Memory
+
+	return m, nil
+}
+
+func (c redisConfig) Marshal() ([]byte, error) {
+	buffer := bytes.NewBuffer(nil)
+
+	for key, val := range c.config {
+		_, err := buffer.WriteString(key)
+		if err != nil {
+			return buffer.Bytes(), err
+		}
+
+		err = buffer.WriteByte(' ')
+		if err != nil {
+			return buffer.Bytes(), err
+		}
+
+		_, err = buffer.WriteString(val)
+		if err != nil {
+			return buffer.Bytes(), err
+		}
+
+		err = buffer.WriteByte('\n')
+		if err != nil {
+			return buffer.Bytes(), err
+		}
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func (redisConfig) Requirement() require {
+	ports := []port{
+		port{
+			proto: "tcp",
+			name:  "port",
+		},
+	}
+	nets := []netRequire{
+		netRequire{
+			Type: _ContainersNetworking,
+			num:  1,
+		},
+	}
+	return require{
+		ports:       ports,
+		networkings: nets,
+	}
+}
+
+func (c redisConfig) HealthCheck(args ...string) (healthCheck, error) {
+	if c.config == nil {
+		return healthCheck{}, errors.New("params not ready")
+	}
+
+	addr := c.config["bind"]
+	port, err := strconv.Atoi(c.config["port"])
+	if err != nil {
+		return healthCheck{}, errors.Wrap(err, "get 'Port'")
+	}
+
+	return healthCheck{
+		Addr: addr,
+		Port: port,
+		// Script:   "/opt/DBaaS/script/check_switchmanager.sh " + args[0],
+		Shell:    "",
+		Interval: "10s",
+		TTL:      "",
+		Tags:     nil,
+		TCP:      addr + ":" + c.config["port"],
+	}, nil
+}
+
+func (c *redisConfig) Set(key string, val interface{}) error {
+	if c.config == nil {
+		c.config = make(map[string]string, 20)
+	}
+
+	c.config[strings.ToLower(key)] = fmt.Sprintf("%v", val)
+
+	return nil
+}
+
+func (c redisConfig) String(key string) string {
+	if c.config == nil {
+		return ""
+	}
+
+	return c.config[strings.ToLower(key)]
+}
+
+type redisCmd struct{}
+
+func (redisCmd) StartContainerCmd() []string {
+	return []string{"bin/bash"}
+}
+
+func (redisCmd) InitServiceCmd(args ...string) []string {
+	return []string{"/root/redis.service", "start"}
+}
+
+func (redisCmd) StartServiceCmd() []string {
+	return []string{"/root/redis.service", "start"}
+}
+
+func (redisCmd) StopServiceCmd() []string {
+	return []string{"/root/redis.service", "stop"}
+}
+
+func (redisCmd) RestoreCmd(file, backupDir string) []string {
+	return nil
+}
+
+func (redisCmd) BackupCmd(args ...string) []string {
+	return nil
+}
+
+func (redisCmd) CleanBackupFileCmd(args ...string) []string {
+	return nil
 }
