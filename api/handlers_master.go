@@ -664,6 +664,8 @@ type dbaasServiceResp struct {
 
 	CpusetCpus string // "upsql_cpusetCpus": "??",
 	Memory     int64  // "upsql_memory": "??",
+	DatSizze   int
+	BackupSize int
 
 	ManageStatus  int64  `json:"manage_status"`  //"manage_status": "??",
 	RunningStatus string `json:"running_status"` //"running_status": "??",
@@ -672,6 +674,8 @@ type dbaasServiceResp struct {
 }
 
 func getServiceStatusFromSWM(units []database.Unit, result chan<- string) {
+	defer close(result)
+
 	var (
 		found bool
 		addr  string
@@ -752,10 +756,17 @@ func serviceFromDBAAS(svc database.Service, containers cluster.Containers, check
 		logrus.WithError(err).Warningf("JSON Decode Serivce.Desc %s,%s", svc.Name, svc.Desc)
 	}
 
-	sql := structs.Module{}
+	sql, datSize := structs.Module{}, 0
+
 	for _, m := range desc.Modules {
 		if m.Type == "upsql" {
 			sql = m
+			for n := range m.Stores {
+				if m.Stores[n].Name == "DAT" {
+					datSize = m.Stores[n].Size
+					break
+				}
+			}
 			break
 		}
 	}
@@ -769,6 +780,8 @@ func serviceFromDBAAS(svc database.Service, containers cluster.Containers, check
 		Arch:          sql.Arch,
 		Memory:        sql.HostConfig.Memory,
 		CpusetCpus:    sql.HostConfig.CpusetCpus,
+		DatSizze:      datSize,
+		BackupSize:    svc.BackupMaxSizeByte,
 		ManageStatus:  svc.Status,
 		RunningStatus: getServiceRunningStatus(svc.ID, units, containers, checks),
 		ServiceStatus: "",
@@ -778,9 +791,13 @@ func serviceFromDBAAS(svc database.Service, containers cluster.Containers, check
 	if len(units) > 0 {
 		select {
 		case <-time.After(time.Second):
+			ch <- resp
+
+			for range r {
+			}
+			return
 		case status := <-r:
 			resp.ServiceStatus = status
-			close(r)
 		}
 	}
 
