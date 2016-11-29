@@ -939,11 +939,11 @@ func (redisConfig) defaultUserConfig(args ...interface{}) (_ map[string]interfac
 
 	errMsg := fmt.Sprintf("unexpected args,len=%d", len(args))
 
-	if len(args) < 1 {
+	if len(args) < 2 {
 		return nil, errors.New(errMsg)
 	}
 
-	u, ok := args[0].(*unit)
+	u, ok := args[1].(*unit)
 	if !ok || u == nil {
 		return nil, errors.New(errMsg)
 	}
