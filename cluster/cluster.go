@@ -10,7 +10,7 @@ import (
 // Cluster is exported
 type Cluster interface {
 	// Create a container
-	CreateContainer(config *ContainerConfig, name string, authConfig *dockerclient.AuthConfig) (*Container, error)
+	CreateContainer(config *ContainerConfig, name string, authConfig *types.AuthConfig) (*Container, error)
 
 	// Remove a container
 	RemoveContainer(container *Container, force, volumes bool) error
@@ -39,13 +39,13 @@ type Cluster interface {
 	Networks() Networks
 
 	// Create a network
-	CreateNetwork(request *types.NetworkCreate) (*types.NetworkCreateResponse, error)
+	CreateNetwork(name string, request *types.NetworkCreate) (*types.NetworkCreateResponse, error)
 
 	// Remove a network from the cluster
 	RemoveNetwork(network *Network) error
 
 	// Create a volume
-	CreateVolume(request *types.VolumeCreateRequest) (*Volume, error)
+	CreateVolume(request *types.VolumeCreateRequest) (*types.Volume, error)
 
 	// Return all volumes
 	Volumes() Volumes
@@ -56,14 +56,14 @@ type Cluster interface {
 	// Pull images
 	// `callback` can be called multiple time
 	//  `where` is where it is being pulled
-	//  `status` is the current status, like "", "in progress" or "downloaded
-	Pull(name string, authConfig *dockerclient.AuthConfig, callback func(where, status string, err error))
+	//  `status` is the current status, like "", "in progress" or "downloaded"
+	Pull(name string, authConfig *types.AuthConfig, callback func(where, status string, err error))
 
 	// Import image
 	// `callback` can be called multiple time
 	// `where` is where it is being imported
 	// `status` is the current status, like "", "in progress" or "imported"
-	Import(source string, repository string, tag string, imageReader io.Reader, callback func(where, status string, err error))
+	Import(source string, ref string, tag string, imageReader io.Reader, callback func(where, status string, err error))
 
 	// Load images
 	// `callback` can be called multiple time
@@ -79,7 +79,7 @@ type Cluster interface {
 	TotalMemory() int64
 
 	// Return the number of CPUs in the cluster
-	TotalCpus() int
+	TotalCpus() int64
 
 	// Register an event handler for cluster-wide events.
 	RegisterEventHandler(h EventHandler) error
@@ -95,8 +95,8 @@ type Cluster interface {
 	RenameContainer(container *Container, newName string) error
 
 	// Build an image
-	BuildImage(*types.ImageBuildOptions, io.Writer) error
+	BuildImage(io.Reader, *types.ImageBuildOptions, io.Writer) error
 
 	// Tag an image
-	TagImage(IDOrName string, repo string, tag string, force bool) error
+	TagImage(IDOrName string, ref string, force bool) error
 }

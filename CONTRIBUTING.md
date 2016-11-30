@@ -23,9 +23,9 @@ If you don't already have `git` installed, you should install it.  For example, 
 sudo apt-get install git
 ```
 
-You also need Go 1.5 or higher.  Download Go from [https://golang.org/dl/](https://golang.org/dl/).  To install on Linux:
+You also need Go 1.7 or higher.  Download Go from [https://golang.org/dl/](https://golang.org/dl/).  To install on Linux:
 ```sh
-tar xzvf go1.5.3.linux-amd64.tar.gz
+tar xzvf go1.7.1.linux-amd64.tar.gz
 sudo mv go /usr/local
 ```
 
@@ -33,7 +33,7 @@ sudo mv go /usr/local
 > to include older versions of Go.  Instead, install the latest Go manually using the
 > instructions provided on the Go site.
 
-Create a go project directory in your home directory:
+Create a Go project directory in your home directory:
 ```sh
 mkdir ~/gocode    # any name is fine
 ```
@@ -94,8 +94,8 @@ git remote set-url --push upstream no-pushing
 You can check your configuration like this:
 ```sh
 $ git remote -v
-origin     https://github.com/mgoelzer/swarm.git (fetch)
-origin     https://github.com/mgoelzer/swarm.git (push)
+origin     https://github.com/<username>/swarm.git (fetch)
+origin     https://github.com/<username>/swarm.git (push)
 upstream   https://github.com/docker/swarm.git (fetch)
 upstream   no-pushing (push)
 ```
@@ -118,9 +118,9 @@ Build the binary, installing it to `$GOPATH/bin/swarm`:
 
 ```sh
 cd $GOPATH/src/github.com/docker/swarm
-godep go install .
+go install .
 ```
- 
+
 Run the binary you just created:
 
 ```sh
@@ -154,7 +154,7 @@ For complete documentation on how to use Swarm, refer to the Swarm section of [d
 To run unit tests:
 
 ```sh
-godep go test -race ./...
+go test -v -race `go list ./... | grep -v /vendor/`
 ```
 
 To run integration tests:
@@ -228,7 +228,7 @@ git diff # check what added or removed in Godep/Godeps.json
 To make sure you newly added codes will make the build process happy, you can try building Swarm in the same way as defined in `Dockerfile`.
 
 ```sh
-$GOBIN/godep go install
+go install
 ```
 Then you should find the `swarm` binary under the `$GOBIN` directory.
 

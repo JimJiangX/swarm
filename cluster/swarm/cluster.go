@@ -14,7 +14,11 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/discovery"
 	"github.com/docker/docker/pkg/stringid"
+	"github.com/docker/engine-api/client"
+	engineapi "github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
+	containertypes "github.com/docker/engine-api/types/container"
+	networktypes "github.com/docker/engine-api/types/network"
 	"github.com/docker/go-units"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler"
@@ -30,12 +34,14 @@ type pendingContainer struct {
 
 func (p *pendingContainer) ToContainer() *cluster.Container {
 	container := &cluster.Container{
-		Container: dockerclient.Container{
+		Container: types.Container{
 			Labels: p.Config.Labels,
 		},
 		Config: p.Config,
-		Info: dockerclient.ContainerInfo{
-			HostConfig: &dockerclient.HostConfig{},
+		Info: types.ContainerJSON{
+			ContainerJSONBase: &types.ContainerJSONBase{
+				HostConfig: &containertypes.HostConfig{},
+			},
 		},
 		Engine: p.Engine,
 	}
@@ -82,12 +88,19 @@ func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery
 	}
 
 	if val, ok := options.Float("swarm.overcommit", ""); ok {
-		cluster.overcommitRatio = val
+		if val <= float64(-1) {
+			log.Fatalf("swarm.overcommit should be larger than -1, %f is invalid", val)
+		} else if val < float64(0) {
+			log.Warn("-1 < swarm.overcommit < 0 will make swarm take less resource than docker engine offers")
+			cluster.overcommitRatio = val
+		} else {
+			cluster.overcommitRatio = val
+		}
 	}
 
 	if val, ok := options.Int("swarm.createretry", ""); ok {
 		if val < 0 {
-			log.Fatalf("swarm.createretry=%d is invalid", val)
+			log.Fatalf("swarm.createretry can not be negative, %d is invalid", val)
 		}
 		cluster.createRetry = val
 	}
@@ -127,20 +140,21 @@ func (c *Cluster) generateUniqueID() string {
 
 // StartContainer starts a container
 func (c *Cluster) StartContainer(container *cluster.Container, hostConfig *dockerclient.HostConfig) error {
-	return container.Engine.StartContainer(container.Id, hostConfig)
+	return container.Engine.StartContainer(container.ID, hostConfig)
 }
 
 // CreateContainer aka schedule a brand new container into the cluster.
-func (c *Cluster) CreateContainer(config *cluster.ContainerConfig, name string, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
+func (c *Cluster) CreateContainer(config *cluster.ContainerConfig, name string, authConfig *types.AuthConfig) (*cluster.Container, error) {
 	container, err := c.createContainer(config, name, false, authConfig)
 
 	if err != nil {
 		var retries int64
 		//  fails with image not found, then try to reschedule with image affinity
+		// ENGINEAPIFIXME: The first error can be removed once dockerclient is removed
 		bImageNotFoundError, _ := regexp.MatchString(`image \S* not found`, err.Error())
-		if bImageNotFoundError && !config.HaveNodeConstraint() {
+		if (bImageNotFoundError || client.IsErrImageNotFound(err)) && !config.HaveNodeConstraint() {
 			// Check if the image exists in the cluster
-			// If exists, retry with a image affinity
+			// If exists, retry with an image affinity
 			if c.Image(config.Image) != nil {
 				container, err = c.createContainer(config, name, true, authConfig)
 				retries++
@@ -155,7 +169,7 @@ func (c *Cluster) CreateContainer(config *cluster.ContainerConfig, name string, 
 	return container, err
 }
 
-func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, withImageAffinity bool, authConfig *dockerclient.AuthConfig) (*cluster.Container, error) {
+func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, withImageAffinity bool, authConfig *types.AuthConfig) (*cluster.Container, error) {
 	c.scheduler.Lock()
 
 	// Ensure the name is available
@@ -171,11 +185,11 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 		config.SetSwarmID(swarmID)
 	}
 
-	if network := c.Networks().Get(config.HostConfig.NetworkMode); network != nil && network.Scope == "local" {
+	if network := c.Networks().Get(string(config.HostConfig.NetworkMode)); network != nil && network.Scope == "local" {
 		if !config.HaveNodeConstraint() {
 			config.AddConstraint("node==~" + network.Engine.Name)
 		}
-		config.HostConfig.NetworkMode = network.Name
+		config.HostConfig.NetworkMode = containertypes.NetworkMode(network.Name)
 	}
 
 	if withImageAffinity {
@@ -207,7 +221,17 @@ func (c *Cluster) createContainer(config *cluster.ContainerConfig, name string, 
 
 	c.scheduler.Unlock()
 
-	container, err := engine.Create(config, name, true, authConfig)
+	container, err := engine.CreateContainer(config, name, true, authConfig)
+
+	if err != nil {
+		log.WithFields(log.Fields{"NodeName": n.Name, "NodeID": n.ID}).WithError(err).Error("Failed to create container")
+	} else {
+		containerFlag := name
+		if containerFlag == "" {
+			containerFlag = stringid.TruncateID(container.ID)
+		}
+		log.WithFields(log.Fields{"NodeName": n.Name, "NodeID": n.ID}).Debugf("Scheduling container %s to ", containerFlag)
+	}
 
 	c.scheduler.Lock()
 	delete(c.pendingContainers, swarmID)
@@ -224,10 +248,27 @@ func (c *Cluster) RemoveContainer(container *cluster.Container, force, volumes b
 // RemoveNetwork removes a network from the cluster
 func (c *Cluster) RemoveNetwork(network *cluster.Network) error {
 	err := network.Engine.RemoveNetwork(network)
-	if err == nil && network.Scope == "global" {
-		for _, engine := range c.engines {
-			engine.DeleteNetwork(network)
+	if err == nil {
+		if network.Scope == "global" {
+			for _, engine := range c.engines {
+				engine.DeleteNetwork(network)
+			}
 		}
+	} else if engineapi.ErrConnectionFailed == err && network.Scope == "global" {
+		log.Debug("The original engine is unreachable - Attempting to remove global network from the reachable engines...")
+		for _, engine := range c.engines {
+			e1 := engine.RemoveNetwork(network)
+			if e1 == nil {
+				for _, engine := range c.engines {
+					engine.DeleteNetwork(network)
+				}
+				err = nil
+				break
+			}
+		}
+	}
+	if err != nil && network.Scope == "global" {
+		log.Debugf("Failed to remove global scope network %s from any engine...", network.ID)
 	}
 	return err
 }
@@ -446,29 +487,17 @@ func (c *Cluster) RemoveImages(name string, force bool) ([]types.ImageDelete, er
 	return out, err
 }
 
-func (c *Cluster) refreshVolumes() {
-	var wg sync.WaitGroup
-	for _, e := range c.engines {
-		wg.Add(1)
-		go func(e *cluster.Engine) {
-			e.RefreshVolumes()
-			wg.Done()
-		}(e)
-	}
-	wg.Wait()
-}
-
 // CreateNetwork creates a network in the cluster
-func (c *Cluster) CreateNetwork(request *types.NetworkCreate) (response *types.NetworkCreateResponse, err error) {
+func (c *Cluster) CreateNetwork(name string, request *types.NetworkCreate) (response *types.NetworkCreateResponse, err error) {
 	var (
-		parts  = strings.SplitN(request.Name, "/", 2)
+		parts  = strings.SplitN(name, "/", 2)
 		config = &cluster.ContainerConfig{}
 	)
 
 	if len(parts) == 2 {
 		// a node was specified, create the container only on this node
-		request.Name = parts[1]
-		config = cluster.BuildContainerConfig(dockerclient.ContainerConfig{Env: []string{"constraint:node==" + parts[0]}})
+		name = parts[1]
+		config = cluster.BuildContainerConfig(containertypes.Config{Env: []string{"constraint:node==" + parts[0]}}, containertypes.HostConfig{}, networktypes.NetworkingConfig{})
 	}
 
 	nodes, err := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
@@ -476,7 +505,7 @@ func (c *Cluster) CreateNetwork(request *types.NetworkCreate) (response *types.N
 		return nil, err
 	}
 	if nodes != nil {
-		resp, err := c.engines[nodes[0].ID].CreateNetwork(request)
+		resp, err := c.engines[nodes[0].ID].CreateNetwork(name, request)
 		if err == nil {
 			if network := c.engines[nodes[0].ID].Networks().Get(resp.ID); network != nil && network.Scope == "global" {
 				for id, engine := range c.engines {
@@ -492,10 +521,10 @@ func (c *Cluster) CreateNetwork(request *types.NetworkCreate) (response *types.N
 }
 
 // CreateVolume creates a volume in the cluster
-func (c *Cluster) CreateVolume(request *types.VolumeCreateRequest) (*cluster.Volume, error) {
+func (c *Cluster) CreateVolume(request *types.VolumeCreateRequest) (*types.Volume, error) {
 	var (
 		wg     sync.WaitGroup
-		volume *cluster.Volume
+		volume *types.Volume
 		err    error
 		parts  = strings.SplitN(request.Name, "/", 2)
 		node   = ""
@@ -529,7 +558,7 @@ func (c *Cluster) CreateVolume(request *types.VolumeCreateRequest) (*cluster.Vol
 
 		wg.Wait()
 	} else {
-		config := cluster.BuildContainerConfig(dockerclient.ContainerConfig{Env: []string{"constraint:node==" + parts[0]}})
+		config := cluster.BuildContainerConfig(containertypes.Config{Env: []string{"constraint:node==" + parts[0]}}, containertypes.HostConfig{}, networktypes.NetworkingConfig{})
 		nodes, err := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
 		if err != nil {
 			return nil, err
@@ -573,7 +602,7 @@ func (c *Cluster) RemoveVolumes(name string) (bool, error) {
 }
 
 // Pull is exported
-func (c *Cluster) Pull(name string, authConfig *dockerclient.AuthConfig, callback func(where, status string, err error)) {
+func (c *Cluster) Pull(name string, authConfig *types.AuthConfig, callback func(where, status string, err error)) {
 	var wg sync.WaitGroup
 
 	c.RLock()
@@ -650,7 +679,7 @@ func (c *Cluster) Load(imageReader io.Reader, callback func(where, status string
 }
 
 // Import image
-func (c *Cluster) Import(source string, repository string, tag string, imageReader io.Reader, callback func(what, status string, err error)) {
+func (c *Cluster) Import(source string, ref string, tag string, imageReader io.Reader, callback func(what, status string, err error)) {
 	var wg sync.WaitGroup
 	c.RLock()
 	pipeWriters := []*io.PipeWriter{}
@@ -666,7 +695,7 @@ func (c *Cluster) Import(source string, repository string, tag string, imageRead
 			defer reader.Close()
 
 			// call engine import
-			err := engine.Import(source, repository, tag, reader)
+			err := engine.Import(source, ref, tag, reader)
 			if callback != nil {
 				if err != nil {
 					callback(engine.Name, "", err)
@@ -747,10 +776,6 @@ func (c *Cluster) Container(IDOrName string) *cluster.Container {
 	if len(IDOrName) == 0 {
 		return nil
 	}
-
-	c.RLock()
-	defer c.RUnlock()
-
 	return c.Containers().Get(IDOrName)
 }
 
@@ -788,9 +813,9 @@ func (c *Cluster) listNodes() []*node.Node {
 	out := make([]*node.Node, 0, len(c.engines))
 	for _, e := range c.engines {
 		node := node.NewNode(e)
-		for _, c := range c.pendingContainers {
-			if c.Engine.ID == e.ID && node.Container(c.Config.SwarmID()) == nil {
-				node.AddContainer(c.ToContainer())
+		for _, pc := range c.pendingContainers {
+			if pc.Engine.ID == e.ID && node.Container(pc.Config.SwarmID()) == nil {
+				node.AddContainer(pc.ToContainer())
 			}
 		}
 		out = append(out, node)
@@ -815,7 +840,7 @@ func (c *Cluster) listEngines() []*cluster.Engine {
 	return out
 }
 
-// TotalMemory return the total memory of the cluster
+// TotalMemory returns the total memory of the cluster
 func (c *Cluster) TotalMemory() int64 {
 	var totalMemory int64
 	for _, engine := range c.engines {
@@ -824,9 +849,9 @@ func (c *Cluster) TotalMemory() int64 {
 	return totalMemory
 }
 
-// TotalCpus return the total memory of the cluster
-func (c *Cluster) TotalCpus() int {
-	var totalCpus int
+// TotalCpus returns the total CPUs of the cluster
+func (c *Cluster) TotalCpus() int64 {
+	var totalCpus int64
 	for _, engine := range c.engines {
 		totalCpus += engine.TotalCpus()
 	}
@@ -850,8 +875,26 @@ func (c *Cluster) Info() [][2]string {
 			engineName = engine.Name
 		}
 		info = append(info, [2]string{" " + engineName, engine.Addr})
+		info = append(info, [2]string{"  └ ID", engine.ID})
 		info = append(info, [2]string{"  └ Status", engine.Status()})
-		info = append(info, [2]string{"  └ Containers", fmt.Sprintf("%d", len(engine.Containers()))})
+
+		// if engine's status is healthy, show container details of the node
+		if engine.IsHealthy() {
+			var paused, running, stopped int = 0, 0, 0
+			for _, c := range engine.Containers() {
+				if c.Info.State.Paused {
+					paused++
+				} else if c.Info.State.Running {
+					running++
+				} else {
+					stopped++
+				}
+			}
+			info = append(info, [2]string{"  └ Containers", fmt.Sprintf("%d (%d Running, %d Paused, %d Stopped)", len(engine.Containers()), running, paused, stopped)})
+		} else {
+			info = append(info, [2]string{"  └ Containers", fmt.Sprintf("%d", len(engine.Containers()))})
+		}
+
 		info = append(info, [2]string{"  └ Reserved CPUs", fmt.Sprintf("%d / %d", engine.UsedCpus(), engine.TotalCpus())})
 		info = append(info, [2]string{"  └ Reserved Memory", fmt.Sprintf("%s / %s", units.BytesSize(float64(engine.UsedMemory())), units.BytesSize(float64(engine.TotalMemory())))})
 		labels := make([]string, 0, len(engine.Labels))
@@ -861,10 +904,9 @@ func (c *Cluster) Info() [][2]string {
 		sort.Strings(labels)
 		info = append(info, [2]string{"  └ Labels", fmt.Sprintf("%s", strings.Join(labels, ", "))})
 		errMsg := engine.ErrMsg()
-		if len(errMsg) == 0 {
-			errMsg = "(none)"
+		if len(errMsg) != 0 {
+			info = append(info, [2]string{"  └ Error", errMsg})
 		}
-		info = append(info, [2]string{"  └ Error", errMsg})
 		info = append(info, [2]string{"  └ UpdatedAt", engine.UpdatedAt().UTC().Format(time.RFC3339)})
 		info = append(info, [2]string{"  └ ServerVersion", engine.Version})
 	}
@@ -881,11 +923,8 @@ func (c *Cluster) RANDOMENGINE() (*cluster.Engine, error) {
 	return c.engines[nodes[0].ID], nil
 }
 
-// RenameContainer rename a container
+// RenameContainer renames a container
 func (c *Cluster) RenameContainer(container *cluster.Container, newName string) error {
-	c.RLock()
-	defer c.RUnlock()
-
 	// check new name whether available
 	if !c.checkNameUniqueness(newName) {
 		return fmt.Errorf("Conflict: The name %s is already assigned. You have to delete (or rename) that container to be able to assign %s to a container again.", newName, newName)
@@ -896,16 +935,14 @@ func (c *Cluster) RenameContainer(container *cluster.Container, newName string) 
 	return err
 }
 
-// BuildImage build an image
-func (c *Cluster) BuildImage(buildImage *types.ImageBuildOptions, out io.Writer) error {
+// BuildImage builds an image
+func (c *Cluster) BuildImage(buildContext io.Reader, buildImage *types.ImageBuildOptions, out io.Writer) error {
 	c.scheduler.Lock()
 
 	// get an engine
-	config := cluster.BuildContainerConfig(dockerclient.ContainerConfig{
-		CpuShares: buildImage.CPUShares,
-		Memory:    buildImage.Memory,
-		Env:       convertMapToKVStrings(buildImage.BuildArgs),
-	})
+	config := cluster.BuildContainerConfig(containertypes.Config{Env: convertMapToKVStrings(buildImage.BuildArgs)},
+		containertypes.HostConfig{Resources: containertypes.Resources{CPUShares: buildImage.CPUShares, Memory: buildImage.Memory}},
+		networktypes.NetworkingConfig{})
 	buildImage.BuildArgs = convertKVStringsToMap(config.Env)
 	nodes, err := c.scheduler.SelectNodesForContainer(c.listNodes(), config)
 	c.scheduler.Unlock()
@@ -914,7 +951,7 @@ func (c *Cluster) BuildImage(buildImage *types.ImageBuildOptions, out io.Writer)
 	}
 	n := nodes[0]
 
-	reader, err := c.engines[n.ID].BuildImage(buildImage)
+	reader, err := c.engines[n.ID].BuildImage(buildContext, buildImage)
 	if err != nil {
 		return err
 	}
@@ -927,8 +964,8 @@ func (c *Cluster) BuildImage(buildImage *types.ImageBuildOptions, out io.Writer)
 	return nil
 }
 
-// TagImage tag an image
-func (c *Cluster) TagImage(IDOrName string, repo string, tag string, force bool) error {
+// TagImage tags an image
+func (c *Cluster) TagImage(IDOrName string, ref string, force bool) error {
 	c.RLock()
 	defer c.RUnlock()
 
@@ -939,7 +976,7 @@ func (c *Cluster) TagImage(IDOrName string, repo string, tag string, force bool)
 		for _, image := range e.Images() {
 			if image.Match(IDOrName, true) {
 				found = true
-				err := image.Engine.TagImage(IDOrName, repo, tag, force)
+				err := image.Engine.TagImage(IDOrName, ref, force)
 				if err != nil {
 					errs = append(errs, fmt.Sprintf("%s: %s", image.Engine.Name, err.Error()))
 					continue

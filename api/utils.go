@@ -93,7 +93,11 @@ func proxyAsync(engine *cluster.Engine, w http.ResponseWriter, r *http.Request, 
 	// RequestURI may not be sent to client
 	r.RequestURI = ""
 
-	client, scheme := engine.HTTPClientAndScheme()
+	client, scheme, err := engine.HTTPClientAndScheme()
+
+	if err != nil {
+		return err
+	}
 
 	r.URL.Scheme = scheme
 	r.URL.Host = engine.Addr
@@ -190,9 +194,29 @@ func tlsDialWithDialer(dialer *net.Dialer, network, addr string, config *tls.Con
 	// from the hostname we're connecting to.
 	if config.ServerName == "" {
 		// Make a copy to avoid polluting argument or default.
-		c := *config
+		c := &tls.Config{
+			Rand:                     config.Rand,
+			Time:                     config.Time,
+			Certificates:             config.Certificates,
+			NameToCertificate:        config.NameToCertificate,
+			GetCertificate:           config.GetCertificate,
+			RootCAs:                  config.RootCAs,
+			NextProtos:               config.NextProtos,
+			ServerName:               config.ServerName,
+			ClientAuth:               config.ClientAuth,
+			ClientCAs:                config.ClientCAs,
+			InsecureSkipVerify:       config.InsecureSkipVerify,
+			CipherSuites:             config.CipherSuites,
+			PreferServerCipherSuites: config.PreferServerCipherSuites,
+			SessionTicketsDisabled:   config.SessionTicketsDisabled,
+			SessionTicketKey:         config.SessionTicketKey,
+			ClientSessionCache:       config.ClientSessionCache,
+			MinVersion:               config.MinVersion,
+			MaxVersion:               config.MaxVersion,
+			CurvePreferences:         config.CurvePreferences,
+		}
 		c.ServerName = hostname
-		config = &c
+		config = c
 	}
 
 	conn := tls.Client(rawConn, config)
@@ -240,14 +264,17 @@ func hijack(tlsConfig *tls.Config, addr string, w http.ResponseWriter, r *http.R
 	if err != nil {
 		return err
 	}
+
 	hj, ok := w.(http.Hijacker)
 	if !ok {
-		return err
+		return errors.New("Docker server does not support hijacking")
 	}
+
 	nc, _, err := hj.Hijack()
 	if err != nil {
 		return err
 	}
+
 	defer nc.Close()
 	defer d.Close()
 
@@ -276,7 +303,7 @@ func hijack(tlsConfig *tls.Config, addr string, w http.ResponseWriter, r *http.R
 	// On 2, stdin copy should return immediately now since the out stream is closed.
 	// Note that we probably don't actually even need to wait here.
 	//
-	// If we don't close the stream when stdout is done, in some cases stdin will hange
+	// If we don't close the stream when stdout is done, in some cases stdin will hang
 	select {
 	case <-inDone:
 		// wait for out to be done
@@ -312,4 +339,18 @@ func int64ValueOrZero(r *http.Request, k string) int64 {
 
 func tagHasDigest(tag string) bool {
 	return strings.Contains(tag, ":")
+}
+
+// TODO(nishanttotla): There might be a better way to pass a ref string than construct it here
+// getImageRef returns a string containing the registry reference given a repo and tag
+func getImageRef(repo, tag string) string {
+	ref := repo
+	if tag != "" {
+		if tagHasDigest(tag) {
+			ref += "@" + tag
+		} else {
+			ref += ":" + tag
+		}
+	}
+	return ref
 }

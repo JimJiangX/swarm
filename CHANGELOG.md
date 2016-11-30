@@ -1,6 +1,111 @@
 # Changelog
 
-## 1.2.0 (2016-04-01)
+## 1.2.5 (2016-08-18)
+
+#### Scheduler
+
+- Fix container rescheduling with overlay network
+- Fix scheduler detail log improper effect when container name is empty
+- Check unique container name on create and rename for Mesos cluster
+
+#### Health check
+
+- Refresh container status on health_status events
+
+#### Doc
+
+- Fix install-w-machine.md using docker-machine --swarm feature
+
+## 1.2.4 (2016-07-28)
+
+#### API
+
+- New client interface in Swarm, to differentiate from Swarm mode in Docker 1.12
+- Underlying HTTP client for API is created inside Swarm
+- Update minimum Docker Engine version supported by Swarm to 1.8
+- Additional error handling
+- Code refactoring
+
+#### Networking
+
+- Fix concurrent map writes race condition
+- Refresh single network when network event is emitted (performance improvement)
+- Avoid network refresh when creating container (performance improvement)
+
+#### Volumes
+
+- Refresh single volume when volume event is emitted (performance improvement)
+- Avoid volume refresh when creating container (performance improvement)
+
+#### Events
+
+- Support daemon events for Swarm
+
+#### Test
+
+- Fix leader election tests
+- Fix rescheduling test
+
+#### Mesos
+
+- Fix double locking issue
+
+#### Misc
+
+- Handle systime difference between Swarm and Engines
+- Add healthcheck information to CLI
+- Fix `engine_reconnect` issue that led to reconnected engine being treated as new
+
+## 1.2.3 (2016-05-25)
+
+#### API
+
+- Update `engine-api` vendoring (supports new functions and signatures)
+- Fix registry auth bug for image pulls
+
+## 1.2.2 (2016-05-05)
+
+#### Cluster management
+
+- Fix deadlock that causes Swarm to hang
+
+## 1.2.1 (2016-05-03)
+
+#### Scheduler
+
+- Add containerslots filter to allow user to limit container number on a node
+
+#### API
+
+- Use engine-api to handle large number of API calls
+- Update ContainerConfig to embed HostConfig and NetworkingConfig
+- stop/restart/kill a non-existent container should return 500 rather than 404
+- Return an error when assertion fails in hijack
+- Return an error when Image Pull fails
+- Fix image pull bug (wait until download finishes)
+- Fix and document some api response status codes
+- Add NodeID in docker info
+- Support docker ps --filter by volume
+
+#### Build
+
+- Move dependencies to vendor/
+- Update Image Pull to use docker/distribution package
+- Convert docs Dockerfiles to use docs/base:oss
+
+#### Test
+
+- Fix api/ps tests
+- Update api/stats test to prevent timeout on master branch
+- Use --cpu-shares instead of -c in integration test
+
+#### Misc
+
+- Documentation clean up
+- Close http response body to avoid potential memory leak
+- Switch context.TODO() to context.Background() to enable context setting
+
+## 1.2.0 (2016-04-13)
 
 #### Scheduler
 
@@ -8,7 +113,8 @@
 - Differentiate constraint errors from affinity errors
 - Printing unsatisfiable constraints for container scheduling failure
 - Enable rescheduling on master manager to prevent replica managers from rescheduling containers
-- Output error when starting a rescheduled container fails
+- Output error when starting a rescheduled container fails, and when removing container fails at node recovery
+- Validate cluster swarm.overcommit option
 
 #### API
 
@@ -22,6 +128,7 @@
 - Print container 'created' state at ps
 - Update dockerclient to get labels on volumes, networks, images
 - Support private images, labels and other new flags in docker build
+- Select apiClient version according to node docker version
 
 #### Node management
 
@@ -32,6 +139,14 @@
 - Increase max thread count to 50k to accommodate large cluster or heavy workload
 - Force to validate min and max refresh interval to be positive
 - Skip unstable tests from Docker bug 14203
+- Fix race condition between node removal from discovery and scheduler
+- Fix data race with node failureCount
+- Display warning message if an engine has labels with "node=xxx"
+
+#### Discovery
+
+- Remove parameter which is not used in createDiscovery
+- Fix Consul leader election failure on multi-server
 
 #### Mesos integration
 
@@ -40,8 +155,8 @@
 
 #### Misc
 
+- Update golang version to 1.5.4
 - Skip redundant endpoints in "network inspect"
-- Remove parameter which is not used in createDiscovery
 - Validate duration flags:--delay, --timeout, --replication-ttl
 - Fix image matching via id
 - Make port 0 invalid as listening port

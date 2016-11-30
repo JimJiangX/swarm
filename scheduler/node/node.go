@@ -37,7 +37,7 @@ func NewNode(e *cluster.Engine) *Node {
 		UsedMemory:      e.UsedMemory(),
 		UsedCpus:        e.UsedCpus(),
 		TotalMemory:     e.TotalMemory(),
-		TotalCpus:       int64(e.TotalCpus()),
+		TotalCpus:       e.TotalCpus(),
 		HealthIndicator: e.HealthIndicator(),
 	}
 }
@@ -55,8 +55,8 @@ func (n *Node) Container(IDOrName string) *cluster.Container {
 // AddContainer injects a container into the internal state.
 func (n *Node) AddContainer(container *cluster.Container) error {
 	if container.Config != nil {
-		memory := container.Config.Memory
-		cpus := container.Config.CpuShares
+		memory := container.Config.HostConfig.Memory
+		cpus := container.Config.HostConfig.CPUShares
 		if n.TotalMemory-memory < 0 || n.TotalCpus-cpus < 0 {
 			return errors.New("not enough resources")
 		}
