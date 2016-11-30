@@ -126,7 +126,7 @@ func TestMysqlConfig(t *testing.T) {
 
 	//	t.Log("Default Config:\n", defaultMysqlContent)
 
-	_, err = config.ParseData([]byte(defaultMysqlContent))
+	err = config.ParseData([]byte(defaultMysqlContent))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +213,7 @@ func TestSwitchManagerConfig(t *testing.T) {
 
 	// t.Log("Default Config:\n", defaultSWMConfig)
 
-	_, err = config.ParseData([]byte(defaultSWMConfig))
+	err = config.ParseData([]byte(defaultSWMConfig))
 	if err != nil {
 		t.Fatal(err)
 	}
