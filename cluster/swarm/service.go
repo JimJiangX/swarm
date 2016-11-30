@@ -1943,8 +1943,6 @@ func (gd *Gardener) serviceScale(svc *Service,
 		"Type":    scale.Type,
 	})
 
-	field.Debugf("Service Scale,%+v", scale)
-
 	var storePendings []*pendingAllocStore
 
 	svc.Lock()
@@ -1960,6 +1958,8 @@ func (gd *Gardener) serviceScale(svc *Service,
 		if err == nil {
 			err = svc.updateDescAfterScale(scale)
 		} else {
+			field.Errorf("Service scale,%+v\n%+v", scale, err)
+
 			status = statusServiceScaleFailed
 
 			_err := cancelStoreExtend(storePendings)
