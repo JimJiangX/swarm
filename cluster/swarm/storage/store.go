@@ -59,7 +59,8 @@ type Store interface {
 	DelHost(name string, wwwn ...string) error
 
 	Alloc(name, unitID, vgName string, size int) (database.LUN, database.LocalVolume, error) // create LUN
-	Recycle(id string, lun int) error                                                        // delete LUN
+	Extend(name string, size int) (database.LUN, database.LocalVolume, error)
+	Recycle(id string, lun int) error // delete LUN
 
 	Mapping(host, vgName, lun string) error
 	DelMapping(lun string) error

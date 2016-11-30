@@ -19,40 +19,48 @@ import (
 func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err error) {
 	entry := logrus.WithFields(logrus.Fields{
 		"Name":   svc.Name,
-		"Action": "Schedule&Alloc",
+		"Action": "Schedule",
 	})
 	resourceAlloc := make([]*pendingAllocResource, 0, len(svc.base.Modules))
 
 	defer func() {
 		if err == nil {
+			_err := svc.statusLock.SetStatus(statusServiceAllocated)
+			if _err != nil {
+				entry.Errorf("Set Service Status:statusServiceAllocated(%x),%+v", statusServiceAllocated, _err)
+			}
 			return
 		}
-
-		atomic.StoreInt64(&svc.Status, statusServiceAlloctionFailed)
 
 		entry.WithError(err).Errorf("scheduler failed")
 
 		if err != nil && len(resourceAlloc) > 0 {
 
-			_err := dealWithSchedulerFailure(gd, resourceAlloc)
-			if _err != nil {
-				logrus.Error("deal With scheduler failure,", _err)
+			// scheduler failed
+			gd.scheduler.Lock()
+			for i := range resourceAlloc {
+				delete(gd.pendingContainers, resourceAlloc[i].swarmID)
 			}
+			gd.scheduler.Unlock()
 		}
 
-		svc.units = nil
+		_err := svc.statusLock.SetStatus(statusServiceAllocateFailed)
+		if _err != nil {
+			entry.Errorf("Set Service Status:statusServiceAllocateFailed(%x),%+v", statusServiceAllocateFailed, _err)
+		}
 	}()
-
-	atomic.StoreInt64(&svc.Status, statusServiceAllocting)
 
 	entry.Debug("start service Scheduler")
 
 	for _, module := range svc.base.Modules {
 
+		gd.scheduler.Lock()
+
 		candidates, config, err := gd.schedulerPerModule(svc, module)
 		if err != nil {
 			entry.WithField("Module", module.Name).WithError(err).Error("scheduler failed")
 
+			gd.scheduler.Unlock()
 			return err
 		}
 
@@ -62,9 +70,13 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 		}
 		if err != nil {
 			entry.WithError(err).Error("pendings alloc failed")
+			gd.scheduler.Unlock()
 
 			return err
 		}
+
+		gd.scheduler.Unlock()
+
 		entry.Info("gd.pendingAlloc: allocation Succeed!")
 	}
 
@@ -89,75 +101,17 @@ func createServiceResources(gd *Gardener, allocs []*pendingAllocResource) (err e
 
 	volumes := make([]*types.Volume, 0, 10)
 
-	defer func() {
-		if err == nil {
-			return
-		}
-
-		logrus.Errorf("Rollback create Service volumes & IP,%s", err)
-
-		for _, v := range volumes {
-			if v == nil {
-				continue
-			}
-			ok, _err := gd.RemoveVolumes(v.Name)
-			if _err != nil {
-				logrus.WithError(_err).Warnf("Remove volume %s:%t", v.Name, ok)
-			}
-		}
-
-		for _, pending := range allocs {
-			if pending == nil || pending.engine == nil || len(pending.networkings) == 0 {
-				continue
-			}
-
-			for i := range pending.localStore {
-				_err := removeVGAndLUN(pending.engine.IP, pending.localStore[i].VGName)
-				if _err != nil {
-					logrus.WithError(_err).Warnf("Delete SAN VG:%s", pending.localStore[i].VGName)
-				}
-			}
-
-			_err := removeNetworkings(pending.engine.IP, pending.networkings)
-			if _err != nil {
-				logrus.Error(_err)
-			}
-		}
-	}()
-
 	for _, pending := range allocs {
 		if pending == nil || pending.engine == nil {
 			continue
 		}
+
 		out, err := createVolumes(pending.engine, pending.localStore)
 		volumes = append(volumes, out...)
 		if err != nil {
 			return err
 		}
-
-		if len(pending.networkings) > 0 {
-			err = createNetworking(pending.engine.IP, pending.networkings)
-			if err != nil {
-				return err
-			}
-		}
 	}
-
-	return nil
-}
-
-func dealWithSchedulerFailure(gd *Gardener, pendings []*pendingAllocResource) error {
-	err := gd.resourceRecycle(pendings)
-	if err != nil {
-		return err
-	}
-
-	// scheduler failed
-	gd.scheduler.Lock()
-	for i := range pendings {
-		delete(gd.pendingContainers, pendings[i].swarmID)
-	}
-	gd.scheduler.Unlock()
 
 	return nil
 }
@@ -209,9 +163,6 @@ func (gd *Gardener) schedulerPerModule(svc *Service, module structs.Module) ([]*
 		_type = _ProxyType
 	}
 
-	gd.scheduler.Lock()
-	defer gd.scheduler.Unlock()
-
 	list, err := listCandidates(module.Clusters, _type)
 	if err != nil {
 		return nil, nil, err
@@ -256,9 +207,6 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node,
 		return nil, err
 	}
 
-	gd.scheduler.Lock()
-	defer gd.scheduler.Unlock()
-
 	allocs := make([]*pendingAllocResource, 0, 5)
 
 	for i := range candidates {
@@ -270,12 +218,12 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node,
 			return allocs, errors.Errorf("not found Engine '%s':'%s'", candidates[i].ID, candidates[i].Addr)
 		}
 
-		id := gd.generateUniqueID()
 		networkMode := "host"
 		if name := config.HostConfig.NetworkMode.NetworkName(); name != "" {
 			networkMode = name
 		}
 
+		id := gd.generateUniqueID()
 		unit := &unit{
 			Unit: database.Unit{
 				ID:            id,
@@ -303,6 +251,12 @@ func (gd *Gardener) pendingAlloc(candidates []*node.Node,
 		}
 
 		if err := unit.factory(); err != nil {
+			entry.Error(err)
+
+			return allocs, err
+		}
+
+		if err := database.InsertUnit(unit.Unit); err != nil {
 			entry.Error(err)
 
 			return allocs, err
@@ -383,20 +337,14 @@ func (gd *Gardener) pendingAllocOneNode(engine *cluster.Engine, unit *unit,
 
 	pending.unit.config = config
 	pending.swarmID = swarmID
-	pending.pendingContainer = &pendingContainer{
+
+	gd.pendingContainers[swarmID] = &pendingContainer{
 		Name:   unit.Name,
 		Config: config,
 		Engine: engine,
 	}
 
-	gd.pendingContainers[swarmID] = pending.pendingContainer
-
 	atomic.StoreInt64(&pending.unit.Status, statusUnitAllocted)
-
-	err = pending.consistency()
-	if err != nil {
-		entry.WithError(err).Error("pending allocate resouces")
-	}
 
 	return pending, err
 }
@@ -556,6 +504,11 @@ func (gd *Gardener) selectNodeByCluster(nodes []*node.Node, num int, highAvailab
 		return nil, errors.New("not enough Nodes for select")
 	}
 
+	fmt.Println("selectNodeByCluster....  highAvailable =", highAvailable, num)
+	for i, n := range nodes {
+		fmt.Println(i, n.Name, n.Addr, n.UsedCpus)
+	}
+
 	if !highAvailable || num == 1 {
 		return nodes[0:num:num], nil
 	}
@@ -624,6 +577,7 @@ func (gd *Gardener) selectNodeByCluster(nodes []*node.Node, num int, highAvailab
 	for index := 0; index < num && len(dcMap) > 0; {
 
 		for key, list := range dcMap {
+			fmt.Println("cluster:", key, len(list))
 			if len(list) == 0 {
 				delete(dcMap, key)
 				continue
@@ -635,6 +589,11 @@ func (gd *Gardener) selectNodeByCluster(nodes []*node.Node, num int, highAvailab
 
 				if index == num {
 					dcMap = nil
+
+					fmt.Println("Output:")
+					for i, n := range candidates {
+						fmt.Println(i, n.Name, n.Addr, n.UsedCpus)
+					}
 
 					return candidates, nil
 				}

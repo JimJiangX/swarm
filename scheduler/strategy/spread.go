@@ -1,6 +1,7 @@
 package strategy
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/docker/swarm/cluster"
@@ -35,6 +36,7 @@ func (p *SpreadPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, n
 	output := make([]*node.Node, len(weightedNodes))
 	for i, n := range weightedNodes {
 		output[i] = n.Node
+		fmt.Println(i, n.Node.Name, n.Node.Addr, n.Weight, n.Node.UsedCpus, n.Node.TotalCpus)
 	}
 	return output, nil
 }

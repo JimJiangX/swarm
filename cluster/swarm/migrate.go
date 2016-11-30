@@ -117,7 +117,7 @@ func resetContainerConfig(config *cluster.ContainerConfig, hostConfig *ctypes.Ho
 }
 
 // UnitMigrate migrate the assigned unit to another host
-func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig, force bool) (string, error) {
+func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig, force bool) (_ string, err error) {
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {
 		return "", err
@@ -128,7 +128,25 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 
+	done, val, err := svc.statusLock.CAS(statusServiceUnitMigrating, isStatusNotInProgress)
+	if err != nil {
+		return "", err
+	}
+	if !done {
+		return "", errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
+	}
+
+	entry := logrus.WithField("Service", svc.Name)
+
 	svc.RLock()
+	defer func() {
+		if err != nil {
+			_err := svc.statusLock.SetStatus(statusServiceUnitMigrateFailed)
+			if _err != nil {
+				entry.Errorf("%+v", _err)
+			}
+		}
+	}()
 
 	migrate, err := svc.getUnit(table.ID)
 	if err != nil {
@@ -148,15 +166,12 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}
 	}
 
+	entry = entry.WithField("Migrate", migrate.Name)
+
 	users, err := svc.getUsers()
 	if err != nil {
 		return "", err
 	}
-
-	entry := logrus.WithFields(logrus.Fields{
-		"Service": svc.Name,
-		"Migrate": migrate.Name,
-	})
 
 	oldContainer := migrate.container
 
@@ -201,38 +216,58 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 
+	swarmID := gd.generateUniqueID()
 	gd.scheduler.Lock()
 
 	engine, err := gd.selectEngine(config, module, out, filters)
 	if err != nil {
 		gd.scheduler.Unlock()
+
 		return "", err
 	}
+
+	config.SetSwarmID(swarmID)
+	gd.pendingContainers[swarmID] = &pendingContainer{
+		Name:   swarmID,
+		Config: config,
+		Engine: engine,
+	}
+
 	gd.scheduler.Unlock()
 
 	background := func(ctx context.Context) (err error) {
 		pending := newPendingAllocResource()
 
 		svc.Lock()
-		gd.scheduler.Lock()
 
 		defer func() {
+			svcStatus := statusServiceUnitMigrated
 			if err == nil {
 				entry.Infof("migrate service done,%v", err)
 				migrate.Status, migrate.LatestError = statusUnitMigrated, ""
 			} else {
 				entry.Errorf("%+v", err)
-				migrate.Status, migrate.LatestError = statusUnitMigrateFailed, err.Error()
+				migrate.Status, migrate.LatestError, svcStatus = statusUnitMigrateFailed, err.Error(), statusServiceUnitMigrateFailed
+
+				entry.Errorf("len(localVolume)=%d", len(pending.localStore))
+				// clean local volumes
+				for _, lv := range pending.localStore {
+					if isSanVG(lv.VGName) {
+						continue
+					}
+
+					entry.Debugf("recycle localVolume,VG=%s,Name=%s", lv.VGName, lv.Name)
+
+					_err := database.DeleteLocalVoume(lv.Name)
+					if _err != nil {
+						entry.Errorf("delete localVolume %s,%+v", lv.Name, _err)
+					}
+				}
 			}
 
-			gd.scheduler.Unlock()
-			if err != nil {
-				entry.Errorf("len(localVolume)=%d", len(pending.localStore))
-				// error handle
-				_err := gd.resourceRecycle([]*pendingAllocResource{pending})
-				if _err != nil {
-					entry.Errorf("defer resourceRecycle:%+v", _err)
-				}
+			_err := svc.statusLock.SetStatus(svcStatus)
+			if _err != nil {
+				entry.Errorf("defer update service status:%+v", _err)
 			}
 
 			svc.Unlock()
@@ -346,16 +381,6 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		swarmID := gd.generateUniqueID()
-		config.SetSwarmID(swarmID)
-		pending.pendingContainer = &pendingContainer{
-			Name:   swarmID,
-			Config: config,
-			Engine: engine,
-		}
-
-		gd.pendingContainers[swarmID] = pending.pendingContainer
-
 		dc, node, err := gd.getNode(engine.ID)
 		if err != nil {
 			return err
@@ -382,6 +407,11 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}
 
 		container, err := engine.CreateContainer(config, swarmID, true, svc.authConfig)
+
+		gd.scheduler.Lock()
+		delete(gd.pendingContainers, swarmID)
+		gd.scheduler.Unlock()
+
 		if err != nil {
 			return err
 		}
@@ -408,7 +438,6 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}(container, engine.IP, networkings, pending.localStore)
 
 		err = startUnit(engine, container.ID, migrate, users, networkings, lvs, false)
-		delete(gd.pendingContainers, swarmID)
 
 		if err != nil {
 			return err
@@ -552,10 +581,7 @@ func startUnit(engine *cluster.Engine, containerID string, u *unit, users []data
 		return nil
 	}
 
-	inspect, err := containerExec(context.Background(), engine, containerID, cmd, false)
-	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s start service cmd:%s exitCode:%d,%v,Error:%v", containerID, cmd, inspect.ExitCode, inspect, err)
-	}
+	_, err = containerExec(context.Background(), engine, containerID, cmd, false)
 
 	return err
 }
@@ -778,7 +804,25 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 
+	done, val, err := svc.statusLock.CAS(statusServiceUnitRebuilding, isStatusNotInProgress)
+	if err != nil {
+		return "", err
+	}
+	if !done {
+		return "", errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
+	}
+
+	entry := logrus.WithField("Service", svc.Name)
+
 	svc.RLock()
+	defer func() {
+		if err != nil {
+			_err := svc.statusLock.SetStatus(statusServiceUnitRebuildFailed)
+			if _err != nil {
+				entry.Errorf("%+v", _err)
+			}
+		}
+	}()
 
 	rebuild, err := svc.getUnit(table.ID)
 	if err != nil {
@@ -799,15 +843,12 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		}
 	}
 
+	entry = entry.WithField("Rebuild", rebuild.Name)
+
 	users, err := svc.getUsers()
 	if err != nil {
 		return "", err
 	}
-
-	entry := logrus.WithFields(logrus.Fields{
-		"Service": svc.Name,
-		"Rebuild": rebuild.Name,
-	})
 
 	oldContainer := rebuild.container
 
@@ -842,6 +883,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		return "", err
 	}
 
+	swarmID := gd.generateUniqueID()
 	gd.scheduler.Lock()
 
 	engine, err := gd.selectEngine(config, module, out, filters)
@@ -850,29 +892,47 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 		return "", err
 	}
+
+	config.SetSwarmID(swarmID)
+	gd.pendingContainers[swarmID] = &pendingContainer{
+		Name:   swarmID,
+		Config: config,
+		Engine: engine,
+	}
+
 	gd.scheduler.Unlock()
 
 	background := func(ctx context.Context) (err error) {
 		pending := newPendingAllocResource()
 
 		svc.Lock()
-		gd.scheduler.Lock()
 
 		defer func() {
+			svcStatus := statusServiceUnitRebuilt
 			if err == nil {
 				rebuild.Status, rebuild.LatestError = statusUnitRebuilt, ""
 			} else {
-				rebuild.Status, rebuild.LatestError = statusUnitRebuildFailed, err.Error()
+				rebuild.Status, rebuild.LatestError, svcStatus = statusUnitRebuildFailed, err.Error(), statusServiceRestoreFailed
+
+				entry.Errorf("len(localVolume)=%d", len(pending.localStore))
+				// clean local volumes
+				for _, lv := range pending.localStore {
+					if isSanVG(lv.VGName) {
+						continue
+					}
+
+					entry.Debugf("recycle localVolume,VG=%s,Name=%s", lv.VGName, lv.Name)
+
+					_err := database.DeleteLocalVoume(lv.Name)
+					if _err != nil {
+						entry.Errorf("delete localVolume %s,%+v", lv.Name, _err)
+					}
+				}
 			}
 
-			gd.scheduler.Unlock()
-			if err != nil {
-				entry.Errorf("Unit rebuild failed,%+v", err)
-				// error handle
-				_err := gd.resourceRecycle([]*pendingAllocResource{pending})
-				if _err != nil {
-					entry.Errorf("Recycle,%+v", _err)
-				}
+			_err := svc.statusLock.SetStatus(svcStatus)
+			if _err != nil {
+				entry.Errorf("%+v", _err)
 			}
 
 			svc.Unlock()
@@ -889,7 +949,7 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		}
 		config.HostConfig.CpusetCpus = cpuset
 
-		oldLVs, lunMap, lunSlice, err := listOldVolumes(rebuild.ID)
+		oldLVs, lunMap, _, err := listOldVolumes(rebuild.ID)
 		if err != nil {
 			return err
 		}
@@ -903,23 +963,11 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			// deactivate
 			// del mapping
 			if len(lunMap) > 0 && dc.store != nil {
-				// TODO:fix host
-				_err := sanDeactivate(dc.store.Vendor(), original.engine.IP, lunMap)
-				if _err != nil {
-					entry.Errorf("san Deactivate and delete Mapping,%+v", _err)
-				}
 
-				entry.Debug("recycle old container volumes resource")
-				// recycle lun
-				for i := range lunSlice {
-					_err := dc.store.DelMapping(lunSlice[i].ID)
-					if err != nil {
-						logrus.Errorf("%s DelMapping %s", dc.store.Vendor(), lunSlice[i].ID)
-					}
-
-					_err = dc.store.Recycle(lunSlice[i].ID, 0)
+				for vg, list := range lunMap {
+					_err := removeVGAndLUN(original.engine.IP, vg, list)
 					if _err != nil {
-						entry.Errorf("Store recycle,%+v", _err)
+						entry.Errorf("san remove VG and LUN,%+v", _err)
 					}
 				}
 			}
@@ -950,16 +998,6 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			return err
 		}
 
-		swarmID := gd.generateUniqueID()
-		config.SetSwarmID(swarmID)
-		pending.pendingContainer = &pendingContainer{
-			Name:   swarmID,
-			Config: config,
-			Engine: engine,
-		}
-
-		gd.pendingContainers[swarmID] = pending.pendingContainer
-
 		err = createServiceResources(gd, []*pendingAllocResource{pending})
 		if err != nil {
 			return err
@@ -975,7 +1013,10 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		entry.WithField("Engine", engine.Addr).Debug("create container")
 
 		container, err := engine.CreateContainer(config, swarmID, true, svc.authConfig)
+
+		gd.scheduler.Lock()
 		delete(gd.pendingContainers, swarmID)
+		gd.scheduler.Unlock()
 
 		if err != nil {
 			return err

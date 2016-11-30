@@ -58,7 +58,7 @@ func (u *unit) factory() error {
 	}
 
 	if u.parent != nil && parser != nil {
-		_, err := parser.ParseData([]byte(u.parent.Content))
+		err := parser.ParseData([]byte(u.parent.Content))
 		if err != nil {
 			logrus.WithField("Unit", u.Name).WithError(err).Errorf("Parser unitConfig content")
 		}
@@ -279,6 +279,11 @@ func extendSanStoreageVG(host string, lun database.LUN) error {
 		return err
 	}
 
+	lun, err = database.GetLUNByID(lun.ID)
+	if err != nil {
+		return err
+	}
+
 	config := sdk.VgConfig{
 		HostLunID: []int{lun.HostLunID},
 		VgName:    lun.VGName,
@@ -286,6 +291,8 @@ func extendSanStoreageVG(host string, lun database.LUN) error {
 	}
 
 	addr := getPluginAddr(host, pluginPort)
+
+	logrus.WithField("Addr", addr).Debugf("extend San Storeage VG,%+v", config)
 
 	return sdk.SanVgExtend(addr, config)
 }
@@ -416,9 +423,9 @@ func (u *unit) restartContainer(ctx context.Context) error {
 		return nil
 	}
 
-	inspect, err := containerExec(ctx, engine, u.ContainerID, cmd, false)
-	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s stop service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
+	_, err = containerExec(ctx, engine, u.ContainerID, cmd, false)
+	if err != nil {
+		logrus.WithField("Unit", u.Name).WithError(err).Warn("stop service")
 	}
 
 	timeout := 5 * time.Second
@@ -498,10 +505,6 @@ func removeNetworkings(host string, networkings []IPInfo) (err error) {
 	return err
 }
 
-func (u *unit) createVolume() (*cluster.Volume, error) {
-	return nil, nil
-}
-
 func updateVolume(host string, lv database.LocalVolume) error {
 	option := sdk.VolumeUpdateOption{
 		VgName: lv.VGName,
@@ -511,6 +514,9 @@ func updateVolume(host string, lv database.LocalVolume) error {
 	}
 
 	addr := getPluginAddr(host, pluginPort)
+
+	logrus.WithField("Addr", addr).Debugf("update volume,%+v", option)
+
 	err := sdk.VolumeUpdate(addr, option)
 	if err != nil {
 		logrus.Errorf("host:%s volume update error:%s", addr, err)
@@ -545,14 +551,13 @@ func (u *unit) deactivateVG(config sdk.DeactivateConfig) error {
 	return err
 }
 
-func removeVGAndLUN(host, vg string) error {
+func removeVGAndLUN(host, vg string, list []database.LUN) error {
 	if !isSanVG(vg) {
 		return nil
 	}
 
-	list, err := database.ListLUNByVgName(vg)
-	if err != nil || len(list) == 0 {
-		return err
+	if len(list) == 0 {
+		return nil
 	}
 
 	store, err := storage.GetStore(list[0].StorageSystemID)
@@ -594,23 +599,18 @@ func removeVGAndLUN(host, vg string) error {
 		}
 	}
 
-	return err
-}
-
-func (u *unit) rmVG(config sdk.RmVGConfig) error {
-	engine, err := u.Engine()
-	if err != nil {
-		return err
+	opt := sdk.RemoveSCSIConfig{
+		Vendor:    store.Vendor(),
+		HostLunId: hostLuns,
 	}
 
-	addr := getPluginAddr(engine.IP, pluginPort)
-	err = sdk.RemoveVG(addr, config)
+	err = sdk.RemoveSCSI(addr, opt)
 
 	return err
 }
 
 func (u *unit) copyConfig(data map[string]interface{}) error {
-	_, err := u.ParseData([]byte(u.parent.Content))
+	err := u.ParseData([]byte(u.parent.Content))
 	if err != nil {
 		return err
 	}
@@ -711,11 +711,7 @@ func (u *unit) initService(args ...string) error {
 		return nil
 	}
 
-	inspect, err := containerExec(context.Background(), u.engine, u.ContainerID, cmd, false)
-	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s init service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
-	}
-
+	_, err := containerExec(context.Background(), u.engine, u.ContainerID, cmd, false)
 	if err == nil {
 		atomic.StoreInt64(&u.Status, statusUnitStarted)
 	} else {
@@ -727,7 +723,7 @@ func (u *unit) initService(args ...string) error {
 }
 
 // StartUnitService start the unit service
-func (gd *Gardener) StartUnitService(nameOrID string) error {
+func (gd *Gardener) StartUnitService(nameOrID string) (err error) {
 	unit, err := database.GetUnit(nameOrID)
 	if err != nil {
 		return err
@@ -738,8 +734,31 @@ func (gd *Gardener) StartUnitService(nameOrID string) error {
 		return err
 	}
 
+	done, val, err := svc.statusLock.CAS(statusServiceStarting, isStatusNotInProgress)
+	if err != nil {
+		return err
+	}
+	if !done {
+		return errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
+	}
+
 	svc.Lock()
-	defer svc.Unlock()
+
+	defer func() {
+		state := statusServiceStarted
+		if err != nil {
+			logrus.WithField("Service", svc.Name).Errorf("%+v", err)
+
+			state = statusServiceStartFailed
+		}
+
+		_err := svc.statusLock.SetStatus(state)
+		if _err != nil {
+			logrus.WithField("Service", svc.Name).Errorf("%+v", _err)
+		}
+
+		svc.Unlock()
+	}()
 
 	u, err := svc.getUnit(unit.ID)
 	if err != nil {
@@ -755,7 +774,7 @@ func (gd *Gardener) StartUnitService(nameOrID string) error {
 }
 
 // StopUnitService stop the unit service & container
-func (gd *Gardener) StopUnitService(nameOrID string, timeout int) error {
+func (gd *Gardener) StopUnitService(nameOrID string, timeout int) (err error) {
 	unit, err := database.GetUnit(nameOrID)
 	if err != nil {
 		return errors.Wrap(err, "not found Unit:"+nameOrID)
@@ -766,8 +785,33 @@ func (gd *Gardener) StopUnitService(nameOrID string, timeout int) error {
 		return err
 	}
 
+	done, val, err := svc.statusLock.CAS(statusServiceStoping, isStatusNotInProgress)
+	if err != nil {
+		return err
+	}
+	if !done {
+		return errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
+	}
+
+	field := logrus.WithField("Service", svc.Name)
+
 	svc.Lock()
-	defer svc.Unlock()
+
+	defer func() {
+		state := statusServiceStoped
+		if err != nil {
+			field.Errorf("%+v", err)
+
+			state = statusServiceStopFailed
+		}
+
+		_err := svc.statusLock.SetStatus(state)
+		if _err != nil {
+			field.Errorf("%+v", _err)
+		}
+
+		svc.Unlock()
+	}()
 
 	u, err := svc.getUnit(unit.ID)
 	if err != nil {
@@ -822,10 +866,7 @@ func (u *unit) startService() (err error) {
 		return nil
 	}
 
-	inspect, err := containerExec(context.Background(), eng, u.ContainerID, cmd, false)
-	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s start service cmd=%s exitCode=%d,%v,Error:%+v", u.Name, cmd, inspect.ExitCode, inspect, err)
-	}
+	_, err = containerExec(context.Background(), eng, u.ContainerID, cmd, false)
 
 	return err
 }
@@ -845,10 +886,7 @@ func (u *unit) forceStopService() error {
 		return nil
 	}
 
-	inspect, err := containerExec(context.Background(), eng, u.ContainerID, cmd, false)
-	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s stop service cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
-	}
+	_, err = containerExec(context.Background(), eng, u.ContainerID, cmd, false)
 
 	return err
 }
@@ -891,10 +929,6 @@ func (u *unit) stopService() error {
 }
 
 func (u *unit) backup(ctx context.Context, args ...string) (err error) {
-	if u.container.State != "running" {
-		return errors.Errorf("Unit %s is busy,container Status=%s", u.Name, u.container.State)
-	}
-
 	err = u.StatusCAS("!=", statusUnitStoping, statusUnitBackuping)
 	if err != nil {
 		return err
@@ -924,10 +958,7 @@ func (u *unit) backup(ctx context.Context, args ...string) (err error) {
 		return nil
 	}
 
-	inspect, err := containerExec(ctx, eng, u.ContainerID, cmd, false)
-	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s backup cmd:%s exitCode:%d,%v,Error:%+v", u.Name, cmd, inspect.ExitCode, inspect, err)
-	}
+	_, err = containerExec(ctx, eng, u.ContainerID, cmd, false)
 
 	return err
 }
@@ -948,10 +979,7 @@ func (u *unit) restore(ctx context.Context, file, backupDir string) error {
 		return nil
 	}
 
-	inspect, err := containerExec(ctx, eng, u.ContainerID, cmd, false)
-	if inspect.ExitCode != 0 {
-		err = errors.Errorf("%s restore cmd:%s exitCode:%d,%v,Error:%v", u.Name, cmd, inspect.ExitCode, inspect, err)
-	}
+	_, err = containerExec(ctx, eng, u.ContainerID, cmd, false)
 
 	return err
 }
@@ -1024,7 +1052,7 @@ func (gd *Gardener) unitContainer(u *unit) *cluster.Container {
 }
 
 // RestoreUnit restore unit volume data from backupfile
-func (gd *Gardener) RestoreUnit(nameOrID, source string) (string, error) {
+func (gd *Gardener) RestoreUnit(nameOrID, source string) (_ string, err error) {
 	sys, err := gd.systemConfig()
 	if err != nil {
 		return "", err
@@ -1035,20 +1063,52 @@ func (gd *Gardener) RestoreUnit(nameOrID, source string) (string, error) {
 		return "", err
 	}
 
-	service, err := gd.GetService(table.ServiceID)
+	svc, err := gd.GetService(table.ServiceID)
 	if err != nil {
 		return "", err
 	}
 
-	service.RLock()
-	unit, err := service.getUnit(table.ID)
-	service.RUnlock()
+	done, val, err := svc.statusLock.CAS(statusServiceRestoring, isStatusNotInProgress)
+	if err != nil {
+		return "", err
+	}
+	if !done {
+		return "", errors.Errorf("Service %s status conflict,got (%x)", svc.Name, val)
+	}
 
+	svc.RLock()
+
+	defer func() {
+		if err != nil {
+			_err := svc.statusLock.SetStatus(statusServiceRestoreFailed)
+			if _err != nil {
+				err = errors.Errorf("%+v\n%+v", err, _err)
+			}
+		}
+		svc.RUnlock()
+	}()
+
+	unit, err := svc.getUnit(table.ID)
 	if err != nil {
 		return "", err
 	}
 
-	background := func(ctx context.Context) error {
+	background := func(ctx context.Context) (err error) {
+		defer func() {
+			status := statusServiceRestored
+			if err != nil {
+				status = statusServiceRestoreFailed
+			}
+
+			_err := svc.statusLock.SetStatus(status)
+			if _err != nil {
+				logrus.WithFields(logrus.Fields{
+					"Service": svc.Name,
+					"Unit":    unit.Name,
+				}).Errorf("%+v", _err)
+			}
+		}()
+
 		// restart container
 		err = unit.restartContainer(ctx)
 		if err != nil {

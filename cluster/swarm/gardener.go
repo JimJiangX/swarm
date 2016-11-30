@@ -206,9 +206,26 @@ func (gd *Gardener) reloadServiceByEngine(engineID string) error {
 	}
 
 	for i := range list {
+		var svc *Service
+
+		gd.RLock()
+		for s := range gd.services {
+			if gd.services[s].ID == list[i] {
+				svc = gd.services[i]
+				break
+			}
+		}
+		gd.RUnlock()
+
+		if svc != nil {
+			svc.Lock()
+		}
 		_, err := gd.reloadService(list[i])
 		if err != nil {
 			logrus.WithField("Service", list[i]).WithError(err).Error("reload service")
+		}
+		if svc != nil {
+			svc.Unlock()
 		}
 	}
 

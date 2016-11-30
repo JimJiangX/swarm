@@ -86,6 +86,11 @@ type VolumeFileConfig struct {
 	Mode      string `json:"mode"`
 }
 
+type RemoveSCSIConfig struct {
+	Vendor    string `json:"Vendor"`
+	HostLunId []int  `json:"HostLunId"`
+}
+
 // GetVgList returns remote host VG list
 // addr is the remote host server agent bind address
 func GetVgList(addr string) ([]VgInfo, error) {
@@ -224,5 +229,15 @@ func CopyFileToVolume(addr string, opt VolumeFileConfig) error {
 	}
 
 	uri := "http://" + addr + "/volume/file/cp"
+	return postHTTP(uri, body)
+}
+
+func RemoveSCSI(addr string, opt RemoveSCSIConfig) error {
+	body, err := encodeBody(&opt)
+	if err != nil {
+		return errors.Wrap(err, addr+": remove SCSI")
+	}
+
+	uri := "http://" + addr + "/san/remove"
 	return postHTTP(uri, body)
 }

@@ -152,6 +152,76 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 	return lun, lv, nil
 }
 
+func (h *huaweiStore) Extend(name string, size int) (database.LUN, database.LocalVolume, error) {
+	lun := database.LUN{}
+	lv, err := database.GetLocalVolume(name)
+	if err != nil {
+		return lun, lv, err
+	}
+
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	out, err := h.Size()
+	if err != nil {
+		return lun, lv, err
+	}
+	for key := range out {
+		if !key.Enabled {
+			delete(out, key)
+		}
+	}
+
+	rg := maxIdleSizeRG(out)
+	if out[rg].Free < size {
+		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
+	}
+
+	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "create_lun.sh")
+	if err != nil {
+		return lun, lv, errors.Wrap(err, h.Vendor()+" store alloc")
+	}
+	// size:byte-->MB
+	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password,
+		strconv.Itoa(rg.StorageRGID), name, strconv.Itoa(size>>20 + 100)}
+
+	cmd, err := utils.ExecScript(param...)
+	if err != nil {
+		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
+	}
+
+	output, err := cmd.Output()
+	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
+	if err != nil {
+		return lun, lv, errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+	}
+
+	storageLunID, err := strconv.Atoi(string(output))
+	if err != nil {
+		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
+	}
+
+	lun = database.LUN{
+		ID:              utils.Generate64UUID(),
+		Name:            name,
+		VGName:          lv.VGName,
+		RaidGroupID:     rg.ID,
+		StorageSystemID: h.ID(),
+		SizeByte:        size,
+		StorageLunID:    storageLunID,
+		CreatedAt:       time.Now(),
+	}
+
+	lv.Size += size
+
+	err = database.TxInsertLunUpdateVolume(lun, lv)
+	if err != nil {
+		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
+	}
+
+	return lun, lv, nil
+}
+
 func (h *huaweiStore) Recycle(id string, lun int) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()

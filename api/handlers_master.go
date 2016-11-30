@@ -664,6 +664,8 @@ type dbaasServiceResp struct {
 
 	CpusetCpus string // "upsql_cpusetCpus": "??",
 	Memory     int64  // "upsql_memory": "??",
+	DatSizze   int
+	BackupSize int
 
 	ManageStatus  int64  `json:"manage_status"`  //"manage_status": "??",
 	RunningStatus string `json:"running_status"` //"running_status": "??",
@@ -671,7 +673,9 @@ type dbaasServiceResp struct {
 	CreatedAt     string `json:"created_at"` // "created_at": "??"
 }
 
-func getServiceStatusFromSWM(units []database.Unit) string {
+func getServiceStatusFromSWM(units []database.Unit, result chan<- string) {
+	defer close(result)
+
 	var (
 		found bool
 		addr  string
@@ -687,7 +691,8 @@ func getServiceStatusFromSWM(units []database.Unit) string {
 	}
 
 	if !found {
-		return ""
+		result <- ""
+		return
 	}
 
 	found = false
@@ -707,7 +712,8 @@ func getServiceStatusFromSWM(units []database.Unit) string {
 	}
 
 	if !found {
-		return ""
+		result <- ""
+		return
 	}
 
 	found = false
@@ -721,57 +727,48 @@ func getServiceStatusFromSWM(units []database.Unit) string {
 	}
 
 	if !found {
-		return ""
+		result <- ""
+		return
 	}
 
-	ch := make(chan string, 1)
-
-	go func(name, addr string, port int, r chan<- string) {
-		status, err := smlib.GetServiceStatus(addr, port)
-		if err != nil {
-			logrus.WithError(err).Warnf("%s cannot get ServiceStatus,addr=%s:%d", name, addr, port)
-		}
-
-		r <- status
-		close(r)
-
-	}(swm.Name, addr, port, ch)
-
-	select {
-	case <-time.After(time.Second):
-		go func(ch chan string) {
-			for range ch {
-			}
-		}(ch)
-
-		return ""
-
-	case status := <-ch:
-		return status
+	status, err := smlib.GetServiceStatus(addr, port)
+	if err != nil {
+		logrus.WithError(err).Warnf("%s cannot get ServiceStatus,addr=%s:%d", swm.Name, addr, port)
 	}
 
-	return ""
-
+	result <- status
 }
 
 func serviceFromDBAAS(svc database.Service, containers cluster.Containers, checks map[string]consulapi.HealthCheck, ch chan dbaasServiceResp) {
+	units, err := database.ListUnitByServiceID(svc.ID)
+	if err != nil {
+		logrus.WithError(err).Error("List Unit By ServiceID")
+	}
+
+	r := make(chan string, 1)
+	if len(units) > 0 {
+		go getServiceStatusFromSWM(units, r)
+	}
+
 	desc := structs.PostServiceRequest{}
-	err := json.NewDecoder(bytes.NewBufferString(svc.Desc)).Decode(&desc)
+	err = json.NewDecoder(bytes.NewBufferString(svc.Desc)).Decode(&desc)
 	if err != nil {
 		logrus.WithError(err).Warningf("JSON Decode Serivce.Desc %s,%s", svc.Name, svc.Desc)
 	}
 
-	sql := structs.Module{}
+	sql, datSize := structs.Module{}, 0
+
 	for _, m := range desc.Modules {
 		if m.Type == "upsql" {
 			sql = m
+			for n := range m.Stores {
+				if m.Stores[n].Name == "DAT" {
+					datSize = m.Stores[n].Size
+					break
+				}
+			}
 			break
 		}
-	}
-
-	units, err := database.ListUnitByServiceID(svc.ID)
-	if err != nil {
-		logrus.WithError(err).Error("List Unit By ServiceID")
 	}
 
 	resp := dbaasServiceResp{
@@ -783,10 +780,25 @@ func serviceFromDBAAS(svc database.Service, containers cluster.Containers, check
 		Arch:          sql.Arch,
 		Memory:        sql.HostConfig.Memory,
 		CpusetCpus:    sql.HostConfig.CpusetCpus,
+		DatSizze:      datSize,
+		BackupSize:    svc.BackupMaxSizeByte,
 		ManageStatus:  svc.Status,
 		RunningStatus: getServiceRunningStatus(svc.ID, units, containers, checks),
-		ServiceStatus: getServiceStatusFromSWM(units),
+		ServiceStatus: "",
 		CreatedAt:     utils.TimeToString(svc.CreatedAt),
+	}
+
+	if len(units) > 0 {
+		select {
+		case <-time.After(time.Second):
+			ch <- resp
+
+			for range r {
+			}
+			return
+		case status := <-r:
+			resp.ServiceStatus = status
+		}
 	}
 
 	ch <- resp
@@ -1188,14 +1200,14 @@ func getServiceServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.R
 
 			continue
 		}
-		configer, err := parser.ParseData([]byte(configs[i].Config.Content))
+		err = parser.ParseData([]byte(configs[i].Config.Content))
 		if err != nil {
 			logrus.Error("ParseData error", err, configs[i].Config.Content)
 			continue
 		}
 
 		for key, val := range keysetsMap {
-			value := configer.String(key)
+			value := parser.String(key)
 			resp[i].Config = append(resp[i].Config, structs.ValueAndKeyset{
 				Value:        value,
 				KeysetParams: val,
@@ -2012,35 +2024,35 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 }
 
 // POST /services/{name:.*}/service-config/update
-func postServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-	req := structs.UpdateServiceConfigRequest{}
+//func postServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+//	name := mux.Vars(r)["name"]
+//	req := structs.UpdateServiceConfigRequest{}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError2(w, err, http.StatusBadRequest)
-		return
-	}
+//	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+//		httpError2(w, err, http.StatusBadRequest)
+//		return
+//	}
 
-	ok, _, gd := fromContext(ctx, _Gardener)
-	if !ok && gd == nil {
-		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
-		return
-	}
+//	ok, _, gd := fromContext(ctx, _Gardener)
+//	if !ok && gd == nil {
+//		httpError2(w, errUnsupportGardener, http.StatusInternalServerError)
+//		return
+//	}
 
-	service, err := gd.GetService(name)
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//	service, err := gd.GetService(name)
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	err = service.UpdateUnitConfig(req.Type, req.Pairs)
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//	err = service.UpdateUnitConfig(req.Type, req.Pairs)
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	w.WriteHeader(http.StatusOK)
-}
+//	w.WriteHeader(http.StatusOK)
+//}
 
 // POST /services/{name:.*}/service_config/modify
 func postServiceConfigModify(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {

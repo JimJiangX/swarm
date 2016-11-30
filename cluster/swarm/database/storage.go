@@ -27,6 +27,36 @@ func (l LUN) tableName() string {
 	return "tbl_dbaas_lun"
 }
 
+func txInsertLun(tx *sqlx.Tx, lun LUN) error {
+	_, err := tx.NamedExec(insertLUNQuery, &lun)
+
+	return errors.Wrap(err, "Tx insert LUN")
+}
+
+func TxInsertLunUpdateVolume(lun LUN, lv LocalVolume) error {
+	tx, err := GetTX()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = txInsertLun(tx, lun)
+	if err != nil {
+		return err
+	}
+
+	const query = "UPDATE tbl_dbaas_volumes SET size=? WHERE id=?"
+
+	_, err = tx.Exec(query, lv.Size, lv.ID)
+	if err != nil {
+		return err
+	}
+
+	err = tx.Commit()
+
+	return errors.Wrap(err, "Tx insert LUN and update Volume")
+}
+
 // TxInsertLUNAndVolume insert LUN and LocalVolume in a Tx,
 // the LUN is to creating a Volume
 func TxInsertLUNAndVolume(lun LUN, lv LocalVolume) error {
@@ -36,9 +66,9 @@ func TxInsertLUNAndVolume(lun LUN, lv LocalVolume) error {
 	}
 	defer tx.Rollback()
 
-	_, err = tx.NamedExec(insertLUNQuery, &lun)
+	err = txInsertLun(tx, lun)
 	if err != nil {
-		return errors.Wrap(err, "Tx insert LUN")
+		return err
 	}
 
 	_, err = tx.NamedExec(insertLocalVolumeQuery, &lv)
@@ -225,29 +255,6 @@ func DelLUN(id string) error {
 	_, err = db.Exec(query, id)
 
 	return errors.Wrap(err, "delete LUN by ID")
-}
-
-// TxReleaseLun Delete LUN and LocalVolume by Name or VGName
-func TxReleaseLun(name string) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	_, err = tx.Exec("DELETE FROM tbl_dbaas_lun WHERE name OR vg_name=?", name, name)
-	if err != nil {
-		return errors.Wrap(err, "Tx delete LUN")
-	}
-
-	_, err = tx.Exec("DELETE FROM tbl_dbaas_volumes WHERE name OR VGname=?", name, name)
-	if err != nil {
-		return errors.Wrap(err, "Tx delete LocalVolume")
-	}
-
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx delete LUN and LocalVolume")
 }
 
 // ListHostLunIDByMapping returns []int select HostLunID by MappingTo
@@ -617,7 +624,7 @@ func TxUpdateMultiLocalVolume(lvs []LocalVolume) error {
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.Preparex("UPDATE tbl_dbaas_volumes SET size=? WHERE id=? OR name=?")
+	stmt, err := tx.Preparex("UPDATE tbl_dbaas_volumes SET size=? WHERE id=?")
 	if err != nil {
 		return errors.Wrap(err, "Tx prepare update local Volume")
 	}

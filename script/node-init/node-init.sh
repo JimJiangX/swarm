@@ -296,7 +296,7 @@ EOF
 ## ServiceRestart : consul
 
 #
-CONSUL_OPTS="agent -config-dir=/etc/consul.d -bind=${adm_ip}"
+CONSUL_OPTS="agent -protocol=3 -log-level=debug -config-dir=/etc/consul.d -bind=${adm_ip}"
 
 EOF
 
@@ -478,7 +478,7 @@ init_docker() {
 
 # install docker plugin
 install_docker_plugin() {
-	local version=1.7.13
+	local version=1.7.16
 	local script_dir=/usr/local/local_volume_plugin/scripts
 	mkdir -p ${script_dir}
 

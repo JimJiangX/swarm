@@ -196,7 +196,7 @@ func TestParseUintList(t *testing.T) {
 		"1-10,,10",
 		"10-1",
 		"-1",
-		"-1,0",
+		"-1,0,",
 	}
 	for _, v := range invalids {
 		if out, err := ParseUintList(v); err == nil {
