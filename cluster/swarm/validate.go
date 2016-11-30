@@ -330,7 +330,6 @@ func validServiceScale(svc *Service, scale structs.PostServiceScaledRequest) err
 			if scale.Extensions[ext].Name == des.Modules[m].Stores[ds].Name {
 				// Completion Store Type
 				scale.Extensions[ext].Type = des.Modules[m].Stores[ds].Type
-				des.Modules[m].Stores[ds].Size += scale.Extensions[ext].Size
 				found = true
 				break
 			}
