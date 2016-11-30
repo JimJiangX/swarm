@@ -615,8 +615,8 @@ func (gd *Gardener) GetService(nameOrID string) (*Service, error) {
 func (gd *Gardener) reloadService(nameOrID string) (*Service, error) {
 	service, err := database.GetService(nameOrID)
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
 
+		if errors.Cause(err) == sql.ErrNoRows {
 			return nil, errors.Wrap(errServiceNotFound, "reload Service:"+nameOrID)
 		}
 

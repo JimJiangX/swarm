@@ -1,13 +1,10 @@
 package swarm
 
 import (
-	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,10 +15,8 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/database"
 	"github.com/docker/swarm/cluster/swarm/storage"
+	"github.com/docker/swarm/scplib"
 	"github.com/docker/swarm/utils"
-	"github.com/hashicorp/terraform/communicator/remote"
-	"github.com/hashicorp/terraform/communicator/ssh"
-	"github.com/hashicorp/terraform/terraform"
 	"github.com/pkg/errors"
 )
 
@@ -1074,18 +1069,6 @@ func (node *Node) distribute() (err error) {
 		}
 	}()
 
-	r := &terraform.InstanceState{
-		Ephemeral: terraform.EphemeralState{
-			ConnInfo: map[string]string{
-				"type":     "ssh",
-				"user":     node.user,
-				"password": node.password,
-				"host":     node.Addr,
-				"port":     strconv.Itoa(node.port),
-			},
-		},
-	}
-
 	config, script, err := node.modifyProfile()
 	if err != nil {
 		entry.WithError(err).Error("modify profile")
@@ -1098,28 +1081,20 @@ func (node *Node) distribute() (err error) {
 		"destination": config.Destination,
 	})
 
-	c, err := ssh.New(r)
+	c, err := scplib.NewClient(node.Addr, node.user, node.password)
 	if err != nil {
 		entry.WithError(err).Errorf("new SSH communicator")
+		nodeState = statusNodeSSHLoginFailed
 
 		return errors.Wrap(err, "create SSH client")
 	}
-
-	err = c.Connect(nil)
-	if err != nil {
-		entry.WithError(err).Error("communicator connection")
-		nodeState = statusNodeSSHLoginFailed
-
-		return errors.Wrap(err, "SSH connect")
-	}
-	defer c.Disconnect()
+	defer c.Close()
 
 	if err := c.UploadDir(config.Destination, config.SourceDir); err != nil {
 		entry.WithError(err).Error("SSH upload dir:" + config.SourceDir)
 
 		if err := c.UploadDir(config.Destination, config.SourceDir); err != nil {
-			err = errors.Wrap(err, "SSH upload dir twice:"+config.SourceDir)
-			entry.Error(err)
+			entry.WithError(err).Error("SSH upload dir twice:" + config.SourceDir)
 
 			nodeState = statusNodeSCPFailed
 			return err
@@ -1128,109 +1103,32 @@ func (node *Node) distribute() (err error) {
 
 	logrus.Infof("Registry.CA_CRT:%d %s", len(config.Registry.CA_CRT), config.Registry.CA_CRT)
 
-	caBuf := bytes.NewBufferString(config.Registry.CA_CRT)
 	_, filename, _ := config.DestPath()
 
-	if err := c.Upload(filename, caBuf); err != nil {
+	if err := c.Upload(config.Registry.CA_CRT, filename, 0644); err != nil {
 		entry.WithError(err).Error("SSH upload file:" + filename)
 
-		if err := c.Upload(filename, caBuf); err != nil {
-			err = errors.Wrap(err, "SSH upload file twice:"+filename)
-			entry.Error(err)
+		if err := c.Upload(config.Registry.CA_CRT, filename, 0644); err != nil {
+			entry.WithError(err).Error("SSH upload file twice:" + filename)
 
 			nodeState = statusNodeSCPFailed
 			return err
 		}
 	}
 
-	buffer := new(bytes.Buffer)
-	cmd := remote.Cmd{
-		Command: script,
-		Stdout:  buffer,
-		Stderr:  buffer,
-	}
+	out, err := c.Exec(script)
+	if err != nil {
+		entry.WithError(err).Errorf("exec remote command:'%s',output:%s", script, out)
 
-	err = c.Start(&cmd)
-	cmd.Wait()
-	if err != nil || cmd.ExitStatus != 0 {
-		entry.WithError(err).Errorf("Executing remote command:'%s',exited:%d,output:%s", cmd.Command, cmd.ExitStatus, buffer.Bytes())
-
-		cp := remote.Cmd{
-			Command: script,
-			Stdout:  buffer,
-			Stderr:  buffer,
-		}
-		err = c.Start(&cp)
-		cp.Wait()
-		if err != nil || cp.ExitStatus != 0 {
-			err = errors.Errorf("Executing remote command twice:'%s',exited:%d,output:%s,%v", cmd.Command, cmd.ExitStatus, buffer.Bytes(), err)
-			entry.Error(err)
+		if out, err = c.Exec(script); err != nil {
+			entry.WithError(err).Errorf("exec remote command twice:'%s',output:%s", script, out)
 
 			nodeState = statusNodeSSHExecFailed
-
 			return err
 		}
 	}
 
-	entry.Info("SSH remote PKG install successed! output:\n", buffer.String())
-
-	return nil
-}
-
-func runSSHCommand(host, user, password, shell string, output io.Writer) error {
-	r := &terraform.InstanceState{
-		Ephemeral: terraform.EphemeralState{
-			ConnInfo: map[string]string{
-				"type":     "ssh",
-				"user":     user,
-				"password": password,
-				"host":     host,
-			},
-		},
-	}
-
-	c, err := ssh.New(r)
-	if err != nil {
-		logrus.Errorf("error creating communicator: %s", err)
-
-		return errors.Wrap(err, "create SSH client")
-	}
-	err = c.Connect(nil)
-	if err != nil {
-		logrus.Errorf("communicator connection error: %s", err)
-
-		return errors.Wrap(err, "SSH connect")
-	}
-	defer c.Disconnect()
-
-	cmd := remote.Cmd{
-		Command: shell,
-		Stdout:  output,
-		Stderr:  output,
-	}
-
-	err = c.Start(&cmd)
-	cmd.Wait()
-	if err != nil || cmd.ExitStatus != 0 {
-		logrus.Errorf("Executing Remote Command: %s,Exited:%d,%v", cmd.Command, cmd.ExitStatus, err)
-
-		cp := remote.Cmd{
-			Command: shell,
-			Stdout:  output,
-			Stderr:  output,
-		}
-		err = c.Start(&cp)
-		cp.Wait()
-		if err != nil || cp.ExitStatus != 0 {
-
-			err = errors.Errorf("Executing remote command twice: %s,Exited:%d,%v", cp.Command, cp.ExitStatus, err)
-			logrus.Error(err)
-
-			return err
-		}
-	}
-
-	logrus.Info("SSH Remote Execute Successed!")
+	entry.Infof("SSH remote PKG install successed! output:\n%s", out)
 
 	return nil
 }
@@ -1428,22 +1326,6 @@ func nodeClean(node, addr, user, password string) error {
 		return errors.Wrap(err, "get absolute path")
 	}
 
-	file, err := os.Open(srcFile)
-	if err != nil {
-		return errors.Wrap(err, "open file:"+srcFile)
-	}
-
-	r := &terraform.InstanceState{
-		Ephemeral: terraform.EphemeralState{
-			ConnInfo: map[string]string{
-				"type":     "ssh",
-				"user":     user,
-				"password": password,
-				"host":     addr,
-			},
-		},
-	}
-
 	entry := logrus.WithFields(logrus.Fields{
 		"host":        addr,
 		"user":        user,
@@ -1451,28 +1333,19 @@ func nodeClean(node, addr, user, password string) error {
 		"destination": destName,
 	})
 
-	c, err := ssh.New(r)
+	c, err := scplib.NewClient(addr, user, password)
 	if err != nil {
-		entry.Errorf("error creating communicator: %s", err)
-
-		return errors.Wrap(err, "create SSH client")
+		return err
 	}
+	defer c.Close()
 
-	err = c.Connect(nil)
-	if err != nil {
-		entry.Errorf("communicator connection error: %s", err)
+	if err := c.UploadFile(destName, srcFile); err != nil {
+		entry.Errorf("SSH UploadFile %s Error,%s", srcFile, err)
 
-		return errors.Wrap(err, "SSH connect")
-	}
-	defer c.Disconnect()
+		if err := c.UploadFile(destName, srcFile); err != nil {
+			entry.Errorf("SSH UploadFile %s Error Twice,%s", srcFile, err)
 
-	if err := c.Upload(destName, file); err != nil {
-		entry.Errorf("SSH UploadFile %s Error,%s", destName, err)
-
-		if err := c.Upload(destName, file); err != nil {
-			entry.Errorf("SSH UploadFile %s Error Twice,%s", destName, err)
-
-			return errors.Wrapf(err, "SSH UploadFile %s Error Twice", destName)
+			return err
 		}
 	}
 
@@ -1489,33 +1362,18 @@ func nodeClean(node, addr, user, password string) error {
 		destName, destName, addr, config.ConsulPort, node,
 		horusIP, horusPort, config.NFSOption.MountDir)
 
-	buffer := new(bytes.Buffer)
-	cmd := remote.Cmd{
-		Command: script,
-		Stdout:  buffer,
-		Stderr:  buffer,
-	}
+	out, err := c.Exec(script)
+	if err != nil {
+		entry.Errorf("exec remote command: %s,%v,Output:%s", script, err, out)
 
-	err = c.Start(&cmd)
-	cmd.Wait()
-	if err != nil || cmd.ExitStatus != 0 {
-		entry.Errorf("Executing Remote Command: %s,Exited:%d,%v,Output:%s", cmd.Command, cmd.ExitStatus, err, buffer.String())
-
-		cp := remote.Cmd{
-			Command: script,
-			Stdout:  buffer,
-			Stderr:  buffer,
-		}
-		err = c.Start(&cp)
-		cp.Wait()
-		if err != nil || cp.ExitStatus != 0 {
-			err = errors.Errorf("Twice Executing Remote Command: %s,Exited:%d,%v,Output:%s", cp.Command, cp.ExitStatus, err, buffer.String())
-
+		out, err := c.Exec(script)
+		if err != nil {
+			entry.Errorf("exec remote command twice: %s,%v,Output:%s", script, err, out)
 			return err
 		}
 	}
 
-	entry.Info("SSH Remote Exec Successed! Output:\n", buffer.String())
+	entry.Infof("SSH Remote Exec Successed! Output:\n%s", out)
 
 	return nil
 }

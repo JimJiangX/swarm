@@ -127,8 +127,8 @@ func getDB(ping bool) (*sqlx.DB, error) {
 	return db, err
 }
 
-// GetTX begin a new Tx.
-func GetTX() (*sqlx.Tx, error) {
+// getTx begin a new Tx.
+func getTx() (*sqlx.Tx, error) {
 	db, err := getDB(false)
 	if err != nil {
 		return nil, err
@@ -136,5 +136,29 @@ func GetTX() (*sqlx.Tx, error) {
 
 	tx, err := db.Beginx()
 
-	return tx, errors.Wrap(err, "TX begin")
+	return tx, err
 }
+
+func txFrame(do func(tx *sqlx.Tx) error) error {
+	db, err := getDB(false)
+	if err != nil {
+		return err
+	}
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return errors.Wrap(err, "Tx begin")
+	}
+
+	defer tx.Rollback()
+
+	err = do(tx)
+	if err == nil {
+		err = errors.Wrap(tx.Commit(), "Tx commit")
+	}
+
+	return err
+}
+
+// TxFrame is a frame for Tx functions.
+var TxFrame = txFrame

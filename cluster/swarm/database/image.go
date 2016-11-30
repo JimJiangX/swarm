@@ -11,9 +11,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-const insertImageQuery = "INSERT INTO tbl_dbaas_image (enabled,id,name,version,docker_image_id,label,size,template_config_id,config_keysets,upload_at) VALUES (:enabled,:id,:name,:version,:docker_image_id,:label,:size,:template_config_id,:config_keysets,:upload_at)"
+const insertImageQuery = "INSERT INTO tb_image (enabled,id,name,version,docker_image_id,label,size,template_config_id,config_keysets,upload_at) VALUES (:enabled,:id,:name,:version,:docker_image_id,:label,:size,:template_config_id,:config_keysets,:upload_at)"
 
-// Image table tbl_dbaas_image structure,correspod with docker image.
+// Image table tb_image structure,correspod with docker image.
 type Image struct {
 	Enabled bool   `db:"enabled"`
 	ID      string `db:"id"`
@@ -30,32 +30,25 @@ type Image struct {
 }
 
 func (Image) tableName() string {
-	return "tbl_dbaas_image"
+	return "tb_image"
 }
 
 // TxInsertImage insert Image and UnitConfig in Tx
 func TxInsertImage(image Image, config UnitConfig) error {
-	tx, err := GetTX()
-	if err != nil {
+	do := func(tx *sqlx.Tx) (err error) {
+		image.ConfigKeySets, err = unitConfigEncode(config.KeySets)
+
+		_, err = tx.NamedExec(insertImageQuery, &image)
+		if err != nil {
+			return errors.Wrap(err, "TX insert Image")
+		}
+
+		err = TXInsertUnitConfig(tx, &config)
+
 		return err
 	}
-	defer tx.Rollback()
 
-	image.ConfigKeySets, err = unitConfigEncode(config.KeySets)
-
-	_, err = tx.NamedExec(insertImageQuery, &image)
-	if err != nil {
-		return errors.Wrap(err, "TX insert Image")
-	}
-
-	err = TXInsertUnitConfig(tx, &config)
-	if err != nil {
-		return errors.Wrap(err, "Tx insert UnitConfig")
-	}
-
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx insert image & UnitConfig")
+	return txFrame(do)
 }
 
 // ListImages returns Image slice select for DB.
@@ -66,17 +59,7 @@ func ListImages() ([]Image, error) {
 	}
 
 	var images []Image
-	const query = "SELECT * FROM tbl_dbaas_image"
-
-	err = db.Select(&images, query)
-	if err == nil {
-		return images, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
+	const query = "SELECT * FROM tb_image"
 
 	err = db.Select(&images, query)
 
@@ -91,17 +74,7 @@ func GetImage(name, version string) (Image, error) {
 	}
 
 	image := Image{}
-	const query = "SELECT * FROM tbl_dbaas_image WHERE name=? AND version=?"
-
-	err = db.Get(&image, query, name, version)
-	if err == nil {
-		return image, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return Image{}, err
-	}
+	const query = "SELECT * FROM tb_image WHERE name=? AND version=?"
 
 	err = db.Get(&image, query, name, version)
 
@@ -110,7 +83,7 @@ func GetImage(name, version string) (Image, error) {
 
 // txGetImage returns Image select by ID or ImageID in Tx.
 func txGetImage(tx *sqlx.Tx, ID string) (image Image, err error) {
-	err = tx.Get(&image, "SELECT * FROM tbl_dbaas_image WHERE id=? OR docker_image_id=?", ID, ID)
+	err = tx.Get(&image, "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?", ID, ID)
 
 	return image, errors.Wrap(err, "Tx get Image by ID")
 }
@@ -121,17 +94,17 @@ func GetImageAndUnitConfig(ID string) (Image, UnitConfig, error) {
 	image := Image{}
 	config := UnitConfig{}
 
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return image, config, err
 	}
 
-	err = db.Get(&image, "SELECT * FROM tbl_dbaas_image WHERE id=? OR docker_image_id=?", ID, ID)
+	err = db.Get(&image, "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?", ID, ID)
 	if err != nil {
 		return image, config, errors.Wrap(err, "get Image by ID")
 	}
 
-	err = db.Get(&config, "SELECT * FROM tbl_dbaas_unit_config WHERE id=?", image.TemplateConfigID)
+	err = db.Get(&config, "SELECT * FROM tb_unit_config WHERE id=?", image.TemplateConfigID)
 	if err != nil {
 		return image, config, errors.Wrap(err, "get UnitConfig by ID")
 	}
@@ -149,17 +122,7 @@ func GetImageByID(ID string) (Image, error) {
 	}
 
 	image := Image{}
-	const query = "SELECT * FROM tbl_dbaas_image WHERE id=? OR docker_image_id=?"
-
-	err = db.Get(&image, query, ID, ID)
-	if err == nil {
-		return image, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return Image{}, err
-	}
+	const query = "SELECT * FROM tb_image WHERE id=? OR docker_image_id=?"
 
 	err = db.Get(&image, query, ID, ID)
 
@@ -173,17 +136,7 @@ func UpdateImageStatus(ID string, enable bool) error {
 		return err
 	}
 
-	const query = "UPDATE tbl_dbaas_image SET enabled=? WHERE id=? OR docker_image_id=?"
-	_, err = db.Exec(query, enable, ID, ID)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
-
+	const query = "UPDATE tb_image SET enabled=? WHERE id=? OR docker_image_id=?"
 	_, err = db.Exec(query, enable, ID, ID)
 
 	return errors.Wrap(err, "update Image by ID")
@@ -191,7 +144,7 @@ func UpdateImageStatus(ID string, enable bool) error {
 
 func isImageUsed(tx *sqlx.Tx, image string) (bool, error) {
 	var out []string
-	const query = "SELECT unit_id FROM tbl_dbaas_unit_config WHERE image_id=?"
+	const query = "SELECT unit_id FROM tb_unit_config WHERE image_id=?"
 
 	err := tx.Select(&out, query, image)
 	if err != nil {
@@ -211,45 +164,39 @@ func isImageUsed(tx *sqlx.Tx, image string) (bool, error) {
 
 // TxDeleteImage delete Image and UnitConfig by ID in Tx.
 func TxDeleteImage(ID string) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 
-	image, err := txGetImage(tx, ID)
-	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
-			return nil
+	do := func(tx *sqlx.Tx) error {
+		image, err := txGetImage(tx, ID)
+		if err != nil {
+			if errors.Cause(err) == sql.ErrNoRows {
+				return nil
+			}
+
+			return err
 		}
 
-		return err
-	}
+		ok, err := isImageUsed(tx, image.ID)
+		if err != nil {
+			return err
+		}
+		if ok {
+			return errors.Errorf("Image %s is using", ID)
+		}
 
-	ok, err := isImageUsed(tx, image.ID)
-	if err != nil {
-		return err
-	}
-	if ok {
-		return errors.Errorf("Image %s is using", ID)
-	}
+		_, err = tx.Exec("DELETE FROM tb_image WHERE id=? OR docker_image_id=?", ID, ID)
+		if err != nil {
+			return err
+		}
 
-	_, err = tx.Exec("DELETE FROM tbl_dbaas_image WHERE id=? OR docker_image_id=?", ID, ID)
-	if err != nil {
-		return err
-	}
+		_, err = tx.Exec("DELETE FROM tb_unit_config WHERE image_id=?", image.ID)
 
-	_, err = tx.Exec("DELETE FROM tbl_dbaas_unit_config WHERE image_id=?", image.ID)
-	if err != nil {
 		return errors.Wrapf(err, "Tx delete UnitConfig by ImageID:%s", image.ID)
 	}
 
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx delete Image by ID")
+	return txFrame(do)
 }
 
-const insertUnitConfigQuery = "INSERT INTO tbl_dbaas_unit_config (id,image_id,unit_id,config_file_path,version,parent_id,content,created_at) VALUES (:id,:image_id,:unit_id,:config_file_path,:version,:parent_id,:content,:created_at)"
+const insertUnitConfigQuery = "INSERT INTO tb_unit_config (id,image_id,unit_id,config_file_path,version,parent_id,content,created_at) VALUES (:id,:image_id,:unit_id,:config_file_path,:version,:parent_id,:content,:created_at)"
 
 // UnitConfig is assciated to Image and Unit,correspod with application config file
 type UnitConfig struct {
@@ -273,7 +220,7 @@ type KeysetParams struct {
 }
 
 func (u UnitConfig) tableName() string {
-	return "tbl_dbaas_unit_config"
+	return "tb_unit_config"
 }
 
 func unitConfigEncode(keysets map[string]KeysetParams) (string, error) {
@@ -299,19 +246,19 @@ func unitConfigDecode(src string) (map[string]KeysetParams, error) {
 
 // GetUnitConfigByID returns *UnitConfig select by ID
 func GetUnitConfigByID(ID string) (*UnitConfig, error) {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
 
 	config := &UnitConfig{}
-	err = db.Get(config, "SELECT * FROM tbl_dbaas_unit_config WHERE id=?", ID)
+	err = db.Get(config, "SELECT * FROM tb_unit_config WHERE id=?", ID)
 	if err != nil {
 		return nil, errors.Wrap(err, "get UnitConfig")
 	}
 
 	var keysets string
-	err = db.Get(&keysets, "SELECT config_keysets FROM tbl_dbaas_image WHERE id=?", config.ImageID)
+	err = db.Get(&keysets, "SELECT config_keysets FROM tb_image WHERE id=?", config.ImageID)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Get Image.ConfigKeysets by id='%s'", config.ImageID)
 	}
@@ -329,13 +276,13 @@ type UnitWithConfig struct {
 
 // ListUnitConfigByService returns []UnitWithConfig belongs to service.
 func ListUnitConfigByService(service string) ([]UnitWithConfig, error) {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
 
 	var units []Unit
-	err = db.Select(&units, "SELECT * FROM tbl_dbaas_unit WHERE service_id=?", service)
+	err = db.Select(&units, "SELECT * FROM tb_unit WHERE service_id=?", service)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Select []Unit by service_id='%s'", service)
 	}
@@ -349,7 +296,7 @@ func ListUnitConfigByService(service string) ([]UnitWithConfig, error) {
 		ids[i] = units[i].ConfigID
 	}
 
-	query, args, err := sqlx.In("SELECT * FROM tbl_dbaas_unit_config WHERE id IN (?);", ids)
+	query, args, err := sqlx.In("SELECT * FROM tb_unit_config WHERE id IN (?);", ids)
 	if err != nil {
 		return nil, errors.Wrap(err, "select UnitConfig by ID IN Service Units ID")
 	}
@@ -368,7 +315,7 @@ func ListUnitConfigByService(service string) ([]UnitWithConfig, error) {
 		ID      string `db:"id"`
 		KeySets string `db:"config_keysets"`
 	}
-	err = db.Select(&result, "SELECT id,config_keysets FROM tbl_dbaas_image")
+	err = db.Select(&result, "SELECT id,config_keysets FROM tb_image")
 	if err != nil {
 		return nil, errors.Wrap(err, "Select []Image")
 	}
@@ -416,39 +363,32 @@ func TXInsertUnitConfig(tx *sqlx.Tx, config *UnitConfig) error {
 
 // TxUpdateImageTemplateConfig update Image.TemplateConfigID and insert UnitConfig in Tx.
 func TxUpdateImageTemplateConfig(image string, config UnitConfig) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
 
-	err = TXInsertUnitConfig(tx, &config)
-	if err != nil {
-		return err
-	}
-
-	if keysets := ""; len(config.KeySets) == 0 {
-		_, err = tx.Exec("UPDATE tbl_dbaas_image SET template_config_id=? WHERE id=?", config.ID, image)
-	} else {
-		keysets, err = unitConfigEncode(config.KeySets)
+	do := func(tx *sqlx.Tx) error {
+		err := TXInsertUnitConfig(tx, &config)
 		if err != nil {
 			return err
 		}
 
-		_, err = tx.Exec("UPDATE tbl_dbaas_image SET template_config_id=?,config_keysets=? WHERE id=?", config.ID, keysets, image)
-	}
+		if keysets := ""; len(config.KeySets) == 0 {
+			_, err = tx.Exec("UPDATE tb_image SET template_config_id=? WHERE id=?", config.ID, image)
+		} else {
+			keysets, err = unitConfigEncode(config.KeySets)
+			if err != nil {
+				return err
+			}
 
-	if err != nil {
+			_, err = tx.Exec("UPDATE tb_image SET template_config_id=?,config_keysets=? WHERE id=?", config.ID, keysets, image)
+		}
+
 		return errors.Wrap(err, "Tx update Image")
 	}
 
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx update Image Template Config")
+	return txFrame(do)
 }
 
 func txDeleteUnitConfigByUnit(tx *sqlx.Tx, unitID string) error {
-	_, err := tx.Exec("DELETE FROM tbl_dbaas_unit_config WHERE unit_id=?", unitID)
+	_, err := tx.Exec("DELETE FROM tb_unit_config WHERE unit_id=?", unitID)
 
 	return errors.Wrap(err, "Tx delete UnitConfig by unit ID")
 }

@@ -10,9 +10,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-const insertTaskQuery = "INSERT INTO tbl_dbaas_task (id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
+const insertTaskQuery = "INSERT INTO tb_task (id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
 
-// Task is table tbl_dbaas_task structure,record tasks status
+// Task is table tb_task structure,record tasks status
 type Task struct {
 	ID          string    `db:"id"`
 	Name        string    `db:"name"` //Related-Object
@@ -29,12 +29,12 @@ type Task struct {
 }
 
 func (t Task) tableName() string {
-	return "tbl_dbaas_task"
+	return "tb_task"
 }
 
-const insertBackupFileQuery = "INSERT INTO tbl_dbaas_backup_files (id,task_id,strategy_id,unit_id,type,path,size,retention,created_at,finished_at) VALUES (:id,:task_id,:strategy_id,:unit_id,:type,:path,:size,:retention,:created_at,:finished_at)"
+const insertBackupFileQuery = "INSERT INTO tb_backup_files (id,task_id,strategy_id,unit_id,type,path,size,retention,created_at,finished_at) VALUES (:id,:task_id,:strategy_id,:unit_id,:type,:path,:size,:retention,:created_at,:finished_at)"
 
-// BackupFile is table tbl_dbaas_backup_files structure,correspod with backup files
+// BackupFile is table tb_backup_files structure,correspod with backup files
 type BackupFile struct {
 	ID         string    `db:"id"`
 	TaskID     string    `db:"task_id"`
@@ -49,24 +49,24 @@ type BackupFile struct {
 }
 
 func (bf BackupFile) tableName() string {
-	return "tbl_dbaas_backup_files"
+	return "tb_backup_files"
 }
 
 // ListBackupFilesByService returns Service and []BackupFile select by name or ID
 func ListBackupFilesByService(nameOrID string) (Service, []BackupFile, error) {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return Service{}, nil, err
 	}
 
 	service := Service{}
-	err = db.Get(&service, "SELECT * FROM tbl_dbaas_service WHERE id=? OR name=?", nameOrID, nameOrID)
+	err = db.Get(&service, "SELECT * FROM tb_service WHERE id=? OR name=?", nameOrID, nameOrID)
 	if err != nil {
 		return service, nil, errors.Wrapf(err, "not found Service by '%s'", nameOrID)
 	}
 
 	var units []string
-	err = db.Select(&units, "SELECT id FROM tbl_dbaas_unit WHERE service_id=?", service.ID)
+	err = db.Select(&units, "SELECT id FROM tb_unit WHERE service_id=?", service.ID)
 	if err != nil {
 		return service, nil, errors.Wrapf(err, "not found Units by service_id='%s'", service.ID)
 	}
@@ -75,7 +75,7 @@ func ListBackupFilesByService(nameOrID string) (Service, []BackupFile, error) {
 		return service, []BackupFile{}, nil
 	}
 
-	query, args, err := sqlx.In("SELECT * FROM tbl_dbaas_backup_files WHERE unit_id IN (?);", units)
+	query, args, err := sqlx.In("SELECT * FROM tb_backup_files WHERE unit_id IN (?);", units)
 	if err != nil {
 		return service, nil, errors.Wrap(err, "select BackupFile by UnitIDs")
 	}
@@ -97,17 +97,7 @@ func GetBackupFile(id string) (BackupFile, error) {
 	}
 
 	row := BackupFile{}
-	const query = "SELECT * FROM tbl_dbaas_backup_files WHERE id=?"
-
-	err = db.Get(&row, query, id)
-	if err == nil {
-		return row, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return BackupFile{}, err
-	}
+	const query = "SELECT * FROM tb_backup_files WHERE id=?"
 
 	err = db.Get(&row, query, id)
 
@@ -143,16 +133,6 @@ func (t Task) Insert() error {
 	}
 
 	t.Timestamp = t.CreatedAt.Unix()
-
-	_, err = db.NamedExec(insertTaskQuery, &t)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
 
 	_, err = db.NamedExec(insertTaskQuery, &t)
 
@@ -196,10 +176,10 @@ func TxInsertMultiTask(tx *sqlx.Tx, tasks []*Task) error {
 }
 
 func txUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int64, finish time.Time, msg string) error {
-	query := "UPDATE tbl_dbaas_task SET status=?,finished_at=?,errors=? WHERE id=?"
+	query := "UPDATE tb_task SET status=?,finished_at=?,errors=? WHERE id=?"
 
 	if finish.IsZero() {
-		query = "UPDATE tbl_dbaas_task SET status=?,errors=? WHERE id=?"
+		query = "UPDATE tb_task SET status=?,errors=? WHERE id=?"
 
 		_, err := tx.Exec(query, state, msg, t.ID)
 		if err != nil {
@@ -224,38 +204,31 @@ func txUpdateTaskStatus(tx *sqlx.Tx, t *Task, state int64, finish time.Time, msg
 
 // TxBackupTaskDone insert BackupFile and update Task status in Tx
 func TxBackupTaskDone(task *Task, state int64, backupFile BackupFile) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	do := func(tx *sqlx.Tx) error {
+		err := txInsertBackupFile(tx, backupFile)
+		if err != nil {
+			return err
+		}
 
-	err = txInsertBackupFile(tx, backupFile)
-	if err != nil {
-		return err
-	}
+		err = txUpdateTaskStatus(tx, task, state, time.Now(), "")
 
-	err = txUpdateTaskStatus(tx, task, state, time.Now(), "")
-	if err != nil {
 		return err
 	}
 
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx insert BackupFile and update Task status")
+	return txFrame(do)
 }
 
 // UpdateTaskStatus update Task status
 func UpdateTaskStatus(task *Task, state int64, finishAt time.Time, msg string) error {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return err
 	}
 
-	query := "UPDATE tbl_dbaas_task SET status=?,finished_at=?,errors=? WHERE id=?"
+	query := "UPDATE tb_task SET status=?,finished_at=?,errors=? WHERE id=?"
 
 	if finishAt.IsZero() {
-		query = "UPDATE tbl_dbaas_task SET status=?,errors=? WHERE id=?"
+		query = "UPDATE tb_task SET status=?,errors=? WHERE id=?"
 
 		_, err := db.Exec(query, state, msg, task.ID)
 		if err != nil {
@@ -286,20 +259,7 @@ func (t *Task) UpdateStatus(status int, msg string) error {
 	}
 
 	now := time.Now()
-	const query = "UPDATE tbl_dbaas_task SET status=?,finished_at=?,errors=? WHERE id=?"
-
-	_, err = db.Exec(query, status, now, msg, t.ID)
-	if err == nil {
-		atomic.StoreInt64(&t.Status, int64(status))
-		t.FinishedAt = now
-
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
+	const query = "UPDATE tb_task SET status=?,finished_at=?,errors=? WHERE id=?"
 
 	_, err = db.Exec(query, status, now, msg, t.ID)
 	if err == nil {
@@ -320,17 +280,7 @@ func GetTask(id string) (Task, error) {
 	}
 
 	task := Task{}
-	const query = "SELECT * FROM tbl_dbaas_task WHERE id=?"
-
-	err = db.Get(&task, query, id)
-	if err == nil {
-		return task, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return task, err
-	}
+	const query = "SELECT * FROM tb_task WHERE id=?"
 
 	err = db.Get(&task, query, id)
 
@@ -345,17 +295,7 @@ func ListTask() ([]Task, error) {
 	}
 
 	var list []Task
-	const query = "SELECT * FROM tbl_dbaas_task"
-
-	err = db.Select(&list, query)
-	if err == nil {
-		return list, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
+	const query = "SELECT * FROM tb_task"
 
 	err = db.Select(&list, query)
 
@@ -370,17 +310,7 @@ func ListTaskByStatus(status int) ([]Task, error) {
 	}
 
 	var list []Task
-	const query = "SELECT * FROM tbl_dbaas_task WHERE status=?"
-
-	err = db.Select(&list, query, status)
-	if err == nil {
-		return list, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
+	const query = "SELECT * FROM tb_task WHERE status=?"
 
 	err = db.Select(&list, query, status)
 
@@ -395,17 +325,7 @@ func ListTaskByRelated(related string) ([]Task, error) {
 	}
 
 	var list []Task
-	const query = "SELECT * FROM tbl_dbaas_task WHERE related=?"
-
-	err = db.Select(&list, query, related)
-	if err == nil {
-		return list, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
+	const query = "SELECT * FROM tb_task WHERE related=?"
 
 	err = db.Select(&list, query, related)
 
@@ -419,7 +339,7 @@ func ListTaskByTimestamp(begin, end time.Time) ([]Task, error) {
 		begin, end = end, begin
 	}
 
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return nil, err
 	}
@@ -428,22 +348,22 @@ func ListTaskByTimestamp(begin, end time.Time) ([]Task, error) {
 		list  []Task
 		min   = begin.Unix()
 		max   = end.Unix()
-		query = "SELECT * FROM tbl_dbaas_task"
+		query = "SELECT * FROM tb_task"
 	)
 
 	if begin.IsZero() && !end.IsZero() {
 
-		query = "SELECT * FROM tbl_dbaas_task WHERE timestamp<=?" //max
+		query = "SELECT * FROM tb_task WHERE timestamp<=?" //max
 		err = db.Select(&list, query, max)
 
 	} else if !begin.IsZero() && end.IsZero() {
 
-		query = "SELECT * FROM tbl_dbaas_task WHERE timestamp>=?" //min
+		query = "SELECT * FROM tb_task WHERE timestamp>=?" //min
 		err = db.Select(&list, query, min)
 
 	} else if !begin.IsZero() && !end.IsZero() {
 
-		query = "SELECT * FROM tbl_dbaas_task WHERE timestamp>=? AND timestamp<=?" //max
+		query = "SELECT * FROM tb_task WHERE timestamp>=? AND timestamp<=?" //max
 		err = db.Select(&list, query, min, max)
 
 	} else {
@@ -464,26 +384,16 @@ func DeleteTask(ID string) error {
 		return err
 	}
 
-	const query = "DELETE FROM tbl_dbaas_task WHERE id=?"
-
-	_, err = db.Exec(query, ID)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
+	const query = "DELETE FROM tb_task WHERE id=?"
 
 	_, err = db.Exec(query, ID)
 
 	return errors.Wrap(err, "delete Task by ID")
 }
 
-const insertBackupStrategyQuery = "INSERT INTO tbl_dbaas_backup_strategy (id,name,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:name,:type,:service_id,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
+const insertBackupStrategyQuery = "INSERT INTO tb_backup_strategy (id,name,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at) VALUES (:id,:name,:type,:service_id,:spec,:next,:valid,:enabled,:backup_dir,:timeout,:created_at)"
 
-// BackupStrategy is table tbl_dbaas_backup_Strategy,
+// BackupStrategy is table tb_backup_Strategy,
 // correspod with Service BackupStrategy
 type BackupStrategy struct {
 	ID        string    `db:"id"`
@@ -500,7 +410,7 @@ type BackupStrategy struct {
 }
 
 func (bs BackupStrategy) tableName() string {
-	return "tbl_dbaas_backup_strategy"
+	return "tb_backup_strategy"
 }
 
 // GetBackupStrategy returns *BackupStrategy select by name or ID
@@ -511,24 +421,11 @@ func GetBackupStrategy(nameOrID string) (*BackupStrategy, error) {
 	}
 
 	var strategy *BackupStrategy
-	const query = "SELECT * FROM tbl_dbaas_backup_strategy WHERE id=? OR name=?"
+	const query = "SELECT * FROM tb_backup_strategy WHERE id=? OR name=?"
 
 	err = db.Get(&strategy, query, nameOrID, nameOrID)
-	if err == nil {
-		return strategy, nil
-	}
 
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.Get(&strategy, query, nameOrID, nameOrID)
-	if err == nil {
-		return strategy, nil
-	}
-
-	return nil, errors.Wrap(err, "get BackupStrategy by nameOrID:"+nameOrID)
+	return strategy, errors.Wrap(err, "get BackupStrategy by nameOrID:"+nameOrID)
 }
 
 // ListBackupStrategyByServiceID returns []BackupStrategy select by serviceID
@@ -539,17 +436,7 @@ func ListBackupStrategyByServiceID(serviceID string) ([]BackupStrategy, error) {
 	}
 
 	var strategies []BackupStrategy
-	const query = "SELECT * FROM tbl_dbaas_backup_strategy WHERE service_id=?"
-
-	err = db.Select(&strategies, query, serviceID)
-	if err == nil {
-		return strategies, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return nil, err
-	}
+	const query = "SELECT * FROM tb_backup_strategy WHERE service_id=?"
 
 	err = db.Select(&strategies, query, serviceID)
 
@@ -563,17 +450,7 @@ func UpdateBackupStrategyStatus(id string, enable bool) error {
 		return err
 	}
 
-	const query = "UPDATE tbl_dbaas_backup_strategy SET enabled=? WHERE id=?"
-
-	_, err = db.Exec(query, enable, id)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
+	const query = "UPDATE tb_backup_strategy SET enabled=? WHERE id=?"
 
 	_, err = db.Exec(query, enable, id)
 
@@ -587,20 +464,7 @@ func (bs *BackupStrategy) UpdateNext(next time.Time, enable bool) error {
 		return err
 	}
 
-	const query = "UPDATE tbl_dbaas_backup_strategy SET next=?,enabled=? WHERE id=?"
-
-	_, err = db.Exec(query, next, enable, bs.ID)
-	if err == nil {
-		bs.Next = next
-		bs.Enabled = enable
-
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
+	const query = "UPDATE tb_backup_strategy SET next=?,enabled=? WHERE id=?"
 
 	_, err = db.Exec(query, next, enable, bs.ID)
 	if err == nil {
@@ -620,17 +484,7 @@ func DeleteBackupStrategy(ID string) error {
 		return err
 	}
 
-	const query = "DELETE FROM tbl_dbaas_backup_strategy WHERE id=?"
-
-	_, err = db.Exec(query, ID)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
+	const query = "DELETE FROM tb_backup_strategy WHERE id=?"
 
 	_, err = db.Exec(query, ID)
 
@@ -638,7 +492,7 @@ func DeleteBackupStrategy(ID string) error {
 }
 
 func txDeleteBackupStrategy(tx *sqlx.Tx, id string) error {
-	_, err := tx.Exec("DELETE FROM tbl_dbaas_backup_strategy WHERE id=? OR service_id=?", id, id)
+	_, err := tx.Exec("DELETE FROM tb_backup_strategy WHERE id=? OR service_id=?", id, id)
 
 	return errors.Wrap(err, "Tx delete BackupStrategy by ID")
 }
@@ -652,40 +506,23 @@ func TxInsertBackupStrategy(tx *sqlx.Tx, strategy BackupStrategy) error {
 
 // TxInsertBackupStrategyAndTask insert BackupStrategy and Task in a Tx
 func TxInsertBackupStrategyAndTask(strategy BackupStrategy, task Task) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	do := func(tx *sqlx.Tx) error {
+		err := TxInsertBackupStrategy(tx, strategy)
+		if err != nil {
+			return err
+		}
 
-	err = TxInsertBackupStrategy(tx, strategy)
-	if err != nil {
-		return err
-	}
+		err = TxInsertTask(tx, task)
 
-	err = TxInsertTask(tx, task)
-	if err != nil {
 		return err
 	}
 
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx insert BackupStrategy and Task")
+	return txFrame(do)
 }
 
 // InsertBackupStrategy insert BackupStrategy
 func InsertBackupStrategy(strategy BackupStrategy) error {
 	db, err := getDB(false)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.NamedExec(insertBackupStrategyQuery, &strategy)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
 	if err != nil {
 		return err
 	}
@@ -702,17 +539,7 @@ func UpdateBackupStrategy(strategy BackupStrategy) error {
 		return err
 	}
 
-	const query = "UPDATE tbl_dbaas_backup_strategy SET name=:name,type=:type,service_id=:service_id,spec=:spec,next=:next,valid=:valid,enabled=:enabled,backup_dir=:backup_dir,timeout=:timeout,created_at=:created_at WHERE id=:id"
-
-	_, err = db.NamedExec(query, &strategy)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return err
-	}
+	const query = "UPDATE tb_backup_strategy SET name=:name,type=:type,service_id=:service_id,spec=:spec,next=:next,valid=:valid,enabled=:enabled,backup_dir=:backup_dir,timeout=:timeout,created_at=:created_at WHERE id=:id"
 
 	_, err = db.NamedExec(query, &strategy)
 
@@ -722,32 +549,32 @@ func UpdateBackupStrategy(strategy BackupStrategy) error {
 // BackupTaskValidate valid taskID\strategyID\unitID if all exist,
 // if true,returns the Task
 func BackupTaskValidate(taskID, strategyID, unitID string) (Task, int, error) {
-	db, err := getDB(true)
+	db, err := getDB(false)
 	if err != nil {
 		return Task{}, 0, err
 	}
 
 	task := Task{}
-	err = db.Get(&task, "SELECT * FROM tbl_dbaas_task WHERE id=?", taskID)
+	err = db.Get(&task, "SELECT * FROM tb_task WHERE id=?", taskID)
 
 	if err != nil {
 		return task, 0, errors.Wrap(err, "BackupTaskValidate: get Task by ID:"+taskID)
 	}
 
 	service := ""
-	err = db.Get(&service, "SELECT service_id FROM tbl_dbaas_backup_strategy WHERE id=?", strategyID)
+	err = db.Get(&service, "SELECT service_id FROM tb_backup_strategy WHERE id=?", strategyID)
 	if err != nil {
 		return task, 0, errors.Wrap(err, "BackupTaskValidate: get BackupStrategy by ID:"+strategyID)
 	}
 
 	unit := Unit{}
-	err = db.Get(&unit, "SELECT * FROM tbl_dbaas_unit WHERE id=?", unitID)
+	err = db.Get(&unit, "SELECT * FROM tb_unit WHERE id=?", unitID)
 	if err != nil {
 		return task, 0, errors.Wrap(err, "BackupTaskValidate: get Unit by ID:"+unitID)
 	}
 
 	rent := 0
-	err = db.Get(&rent, "SELECT backup_files_retention FROM tbl_dbaas_service WHERE id=?", service)
+	err = db.Get(&rent, "SELECT backup_files_retention FROM tb_service WHERE id=?", service)
 	if err != nil {
 		return task, 0, errors.Wrap(err, "BackupTaskValidate: get Service by ID:"+service)
 	}

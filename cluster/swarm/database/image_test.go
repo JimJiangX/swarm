@@ -13,7 +13,7 @@ func DeleteUnitConfig(id string) error {
 		return err
 	}
 
-	query := "DELETE FROM tbl_dbaas_unit_config WHERE id=?"
+	query := "DELETE FROM tb_unit_config WHERE id=?"
 	_, err = db.Exec(query, id)
 	if err == nil {
 		return nil
@@ -33,7 +33,7 @@ func DeleteUnitConfig(id string) error {
 }
 
 func TestTXInsertUnitConfig(t *testing.T) {
-	tx, err := GetTX()
+	tx, err := getTX()
 	if err != nil {
 		t.Fatal(err)
 	}

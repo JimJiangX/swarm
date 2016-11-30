@@ -23,6 +23,7 @@ EOF
 
 
 loop=0
+
 while(( $loop<=20 ))
 do
 	sleep 3
@@ -33,6 +34,7 @@ do
 	fi
 	
 	let "loop++"
+
 done
 
 # if timeout over exit 1

@@ -34,6 +34,7 @@ do
 EOF
 	fi
 done < $output
+
 rm -f $output
 
 loop=0

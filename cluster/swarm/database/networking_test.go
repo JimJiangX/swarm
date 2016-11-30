@@ -22,7 +22,7 @@ func NewPort(port int, name, unitID, unitName, proto string, allocated bool) Por
 }
 
 func delMultiPorts(tx *sqlx.Tx, ports []Port) error {
-	query := "DELETE FROM tbl_dbaas_port WHERE port=?"
+	query := "DELETE FROM tb_port WHERE port=?"
 
 	stmt, err := tx.Preparex(query)
 	if err != nil {
@@ -50,7 +50,7 @@ func TestPort(t *testing.T) {
 	}
 
 	defer func() {
-		tx, err := GetTX()
+		tx, err := getTX()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -64,15 +64,7 @@ func TestPort(t *testing.T) {
 		}
 	}()
 
-	tx, err := GetTX()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = txInsertPorts(tx, ports)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = tx.Commit()
+	err := txInsertPorts(ports)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +80,7 @@ func TestPort(t *testing.T) {
 	_p3 := NewPort(3, "port3b", "unit3b", "unitName3b", "udp", false)
 	p3 := []Port{_p3}
 
-	tx, err = GetTX()
+	tx, err := getTX()
 	err = TxUpdatePorts(tx, p3)
 	if err != nil {
 		t.Fatal(err)
@@ -108,7 +100,7 @@ func TestPort(t *testing.T) {
 
 	n, err := TxImportPort(5, 10, 7, 8)
 	defer func() {
-		tx, err := GetTX()
+		tx, err := getTX()
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -20,3 +20,25 @@ func TestParseSpace(t *testing.T) {
 		t.Log(spaces)
 	}
 }
+
+func TestFindIdleNum(t *testing.T) {
+	ok, n := findIdleNum(1000, 2000, nil)
+	if !ok || n != 1000 {
+		t.Errorf("Unexpected,%t,%d", ok, n)
+	}
+
+	ok, n = findIdleNum(1000, 2000, []int{1006, 1999, 10010, 1000, 1001, 1002, 1003, 1005})
+	if !ok || n != 1004 {
+		t.Errorf("Unexpected,%t,%d", ok, n)
+	}
+
+	ok, n = findIdleNum(1000, 1006, []int{1005, 1006, 1002, 1004, 1007, 1008, 1003, 1000, 1001})
+	if ok || n != 0 {
+		t.Errorf("Unexpected,%t,%d", ok, n)
+	}
+
+	ok, n = findIdleNum(1000, 1009, []int{1005, 1006, 1002, 1004, 1007, 1008, 1003, 1000, 1001})
+	if !ok || n != 1009 {
+		t.Errorf("Unexpected,%t,%d", ok, n)
+	}
+}

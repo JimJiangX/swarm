@@ -22,7 +22,9 @@ expect << EOF
 EOF
 
 loop=0
+
 while(( $loop<=4 ))
+
 do
 	auluref -unit ${admin_unit} -g -lu ${lun_id}
 	if [ $? -ne 0 ]; then
@@ -31,6 +33,7 @@ do
 	fi
 	
 	let "loop++"
+
 	sleep 1
 done
 

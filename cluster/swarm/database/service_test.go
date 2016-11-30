@@ -2,13 +2,10 @@ package database
 
 import (
 	"encoding/json"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/docker/swarm/utils"
-	"github.com/jmoiron/sqlx"
-	"github.com/pkg/errors"
 )
 
 func TestUnit(t *testing.T) {
@@ -73,7 +70,7 @@ func TestUnit(t *testing.T) {
 	}
 
 	defer func() {
-		tx, err := GetTX()
+		tx, err := getTX()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -99,7 +96,7 @@ func TestUnit(t *testing.T) {
 		}
 	}()
 
-	tx, err := GetTX()
+	tx, err := getTX()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +114,7 @@ func TestUnit(t *testing.T) {
 		unit3,
 	}
 
-	tx, err = GetTX()
+	tx, err = getTX()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,6 +141,7 @@ func TestService(t *testing.T) {
 		Architecture:         "serviceArchitecture001",
 		AutoHealing:          true,
 		AutoScaling:          true,
+		HighAvailable:        true,
 		Status:               1,
 		BackupMaxSizeByte:    79294802,
 		BackupFilesRetention: 3258011085015,
@@ -217,7 +215,8 @@ func TestService(t *testing.T) {
 		service.AutoScaling != service1.AutoScaling ||
 		service.BackupFilesRetention != service1.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service1.BackupMaxSizeByte ||
-		service.Desc != service1.Desc {
+		service.Desc != service1.Desc ||
+		service.HighAvailable != service1.HighAvailable {
 		t.Fatal("GetService not equal", string(b), string(b1))
 	}
 
@@ -243,7 +242,8 @@ func TestService(t *testing.T) {
 		service.AutoScaling != service2.AutoScaling ||
 		service.BackupFilesRetention != service2.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service2.BackupMaxSizeByte ||
-		service.Desc != service2.Desc {
+		service.Desc != service2.Desc ||
+		service.HighAvailable != service2.HighAvailable {
 		t.Fatal("SetServiceStatus not equal", string(b), string(b2))
 	}
 
@@ -271,7 +271,8 @@ func TestService(t *testing.T) {
 		service.AutoScaling != service3.AutoScaling ||
 		service.BackupFilesRetention != service3.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service3.BackupMaxSizeByte ||
-		service.Desc != service3.Desc {
+		service.Desc != service3.Desc ||
+		service.HighAvailable != service3.HighAvailable {
 		t.Fatal("TxSetServiceStatus not equal", string(b), string(b3))
 	}
 	task1, err := GetTask(task.ID)
@@ -306,7 +307,8 @@ func TestService(t *testing.T) {
 		service.AutoScaling != service4.AutoScaling ||
 		service.BackupFilesRetention != service4.BackupFilesRetention ||
 		service.BackupMaxSizeByte != service4.BackupMaxSizeByte ||
-		service.Desc != service4.Desc {
+		service.Desc != service4.Desc ||
+		service.HighAvailable != service4.HighAvailable {
 		t.Fatal("TxSetServiceStatus not equal", string(b), string(b5))
 	}
 	task2, err := GetTask(task.ID)
@@ -324,81 +326,4 @@ func TestService(t *testing.T) {
 		task.Timeout != task2.Timeout {
 		t.Fatal("TxSetServiceStatus not equal", string(b), string(b6))
 	}
-}
-
-// TxInsertUnitWithPorts insert Unit and update []Port in a Tx
-func TxInsertUnitWithPorts(u *Unit, ports []Port) error {
-	tx, err := GetTX()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if u != nil {
-		err = txInsertUnit(tx, *u)
-		if err != nil {
-			return err
-		}
-	}
-
-	err = TxUpdatePorts(tx, ports)
-	if err != nil {
-		return err
-	}
-
-	err = tx.Commit()
-
-	return errors.Wrap(err, "Tx insert Unit and []Port")
-}
-
-// TxInsertMultiUnit insert []Unit in Tx
-func TxInsertMultiUnit(tx *sqlx.Tx, units []*Unit) error {
-	stmt, err := tx.PrepareNamed(insertUnitQuery)
-	if err != nil {
-		return errors.Wrap(err, "Tx prepare insert Unit")
-	}
-
-	for i := range units {
-		if units[i] == nil {
-			continue
-		}
-
-		_, err = stmt.Exec(units[i])
-		if err != nil {
-			stmt.Close()
-
-			return errors.Wrap(err, "Tx Insert Unit")
-		}
-	}
-
-	return stmt.Close()
-}
-
-// SetServiceStatus update Service Status
-func (svc *Service) SetServiceStatus(state int64, finish time.Time) error {
-	db, err := getDB(true)
-	if err != nil {
-		return err
-	}
-
-	if finish.IsZero() {
-		_, err = db.Exec("UPDATE tbl_dbaas_service SET status=? WHERE id=?", state, svc.ID)
-		if err != nil {
-			return errors.Wrap(err, "update Service Status")
-		}
-
-		atomic.StoreInt64(&svc.Status, state)
-
-		return nil
-	}
-
-	_, err = db.Exec("UPDATE tbl_dbaas_service SET status=?,finished_at=? WHERE id=?", state, finish, svc.ID)
-	if err != nil {
-		return errors.Wrap(err, "update Service Status & FinishedAt")
-	}
-
-	atomic.StoreInt64(&svc.Status, state)
-	svc.FinishedAt = finish
-
-	return nil
 }

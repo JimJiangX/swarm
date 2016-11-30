@@ -201,6 +201,7 @@ func createVolumes(engine *cluster.Engine, lvs []database.LocalVolume) ([]*types
 		vglist[lvs[i].VGName] = struct{}{}
 	}
 	for vg := range vglist {
+
 		// if volume create on san storage,should created VG before create Volume
 		if isSanVG(vg) {
 			err := createSanStoreageVG(engine.IP, vg)
@@ -209,6 +210,7 @@ func createVolumes(engine *cluster.Engine, lvs []database.LocalVolume) ([]*types
 			}
 		}
 	}
+
 	for i := range lvs {
 		volume, err := createVolume(engine, lvs[i])
 		if err != nil {

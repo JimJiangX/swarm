@@ -423,6 +423,7 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 	defer h.lock.Unlock()
 
 	param := []string{path, h.hs.AdminUnit, name}
+
 	// param = append(param, wwwn...)
 
 	cmd, err := utils.ExecScript(param...)

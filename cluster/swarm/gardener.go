@@ -189,43 +189,15 @@ func (gd *Gardener) reloadServiceByEngine(engineID string) error {
 		return err
 	}
 
-	list := make([]string, 0, len(units))
-
+	m := make(map[string]struct{}, len(units))
 	for i := range units {
-		exist := false
-		for j := range list {
-			if list[j] == units[i].ServiceID {
-				exist = true
-				break
-			}
-		}
-
-		if !exist {
-			list = append(list, units[i].ServiceID)
-		}
+		m[units[i].ServiceID] = struct{}{}
 	}
 
-	for i := range list {
-		var svc *Service
-
-		gd.RLock()
-		for s := range gd.services {
-			if gd.services[s].ID == list[i] {
-				svc = gd.services[i]
-				break
-			}
-		}
-		gd.RUnlock()
-
-		if svc != nil {
-			svc.Lock()
-		}
-		_, err := gd.reloadService(list[i])
+	for id := range m {
+		_, err := gd.reloadService(id)
 		if err != nil {
-			logrus.WithField("Service", list[i]).WithError(err).Error("reload service")
-		}
-		if svc != nil {
-			svc.Unlock()
+			logrus.WithField("Service", id).WithError(err).Error("reload service")
 		}
 	}
 

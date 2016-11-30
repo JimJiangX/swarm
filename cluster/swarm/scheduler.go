@@ -32,8 +32,6 @@ func (gd *Gardener) serviceScheduler(svc *Service, task *database.Task) (err err
 			return
 		}
 
-		entry.WithError(err).Errorf("scheduler failed")
-
 		if err != nil && len(resourceAlloc) > 0 {
 
 			// scheduler failed
