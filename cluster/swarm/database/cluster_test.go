@@ -125,7 +125,7 @@ func ListNode(status int) ([]Node, error) {
 	}
 
 	nodes := make([]Node, 0, 50)
-	err = db.Select(&nodes, "SELECT * FROM tb_node WHERE status=?", status)
+	err = db.Select(&nodes, "SELECT * FROM tbl_dbaas_node WHERE status=?", status)
 
 	return nodes, err
 }

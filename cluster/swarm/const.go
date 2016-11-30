@@ -188,6 +188,7 @@ const (
 )
 
 const (
+	_RedisType         = "redis"
 	_MysqlType         = "upsql" // cluster_type,networking_type
 	_UpsqlType         = "upsql"
 	_ProxyType         = "proxy"          // cluster_type,networking_type
@@ -196,9 +197,9 @@ const (
 	_ImageUpsql         = "upsql"
 	_ImageProxy         = "upproxy"
 	_ImageSwitchManager = "switch_manager"
+	_ImageRedis         = "redis"
 
-	_UnitRole_Master        = "master"
-	_UnitRole_SwitchManager = "switch_manager"
+	_UnitRole_Master = "master"
 
 	manuallyBackupStrategy = "manually"
 
@@ -231,7 +232,7 @@ const (
 )
 
 var (
-	supportedServiceTypes = []string{_MysqlType, _UpsqlType, _ProxyType, _SwitchManagerType}
+	supportedServiceTypes = []string{_MysqlType, _UpsqlType, _ProxyType, _SwitchManagerType, _RedisType}
 	supportedStoreTypes   = []string{storage.LocalStorePrefix, storage.LocalStorePrefix + ":SSD", storage.LocalStorePrefix + ":HDD", storage.SANStore, storage.HITACHI, storage.HUAWEI, "nfs", "NFS"}
 	supportedStoreNames   = []string{"DAT", "LOG", "CNF", "BACKUP"}
 )

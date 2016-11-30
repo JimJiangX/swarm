@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	stderrors "errors"
 	"fmt"
 	"net"
 	"strings"
@@ -14,8 +15,8 @@ import (
 )
 
 var (
-	errNotFoundIP         = errors.New("IP not found")
-	errNotFoundNetworking = errors.New("Networking not found")
+	errNotFoundIP         = stderrors.New("IP not found")
+	errNotFoundNetworking = stderrors.New("Networking not found")
 )
 
 // Networking is exported

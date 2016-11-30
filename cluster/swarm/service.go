@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -24,7 +25,10 @@ import (
 	"golang.org/x/net/context"
 )
 
-var errServiceNotFound = errors.New("service not found")
+var (
+	errServiceNotFound           = stderrors.New("service not found")
+	ErrSwitchManagerUnitNotFound = stderrors.New("unit not found,type:" + _SwitchManagerType)
+)
 
 // Service a set of units
 type Service struct {
@@ -1486,12 +1490,12 @@ func swmInitTopology(svc *Service, swm *unit, users []database.User) error {
 }
 
 func (svc *Service) initTopology() error {
-	users, err := svc.getUsers()
+	swm, err := svc.getSwithManagerUnit()
 	if err != nil {
 		return err
 	}
 
-	swm, err := svc.getSwithManagerUnit()
+	users, err := svc.getUsers()
 	if err != nil {
 		return err
 	}
@@ -1576,11 +1580,15 @@ func (svc *Service) getUnitByType(_type string) ([]*unit, error) {
 		return units, nil
 	}
 
+	if _type == _SwitchManagerType {
+		return nil, errors.Wrap(ErrSwitchManagerUnitNotFound, "Service "+svc.Name)
+	}
+
 	return nil, errors.Errorf("Service:%s,not found any unit by type '%s'", svc.Name, _type)
 }
 
 func (svc *Service) getSwithManagerUnit() (*unit, error) {
-	units, err := svc.getUnitByType(_UnitRole_SwitchManager)
+	units, err := svc.getUnitByType(_SwitchManagerType)
 	if err != nil {
 		return nil, err
 	}
@@ -2332,8 +2340,8 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 }
 
 var (
-	errContainerNotFound   = errors.New("no such container")
-	errContainerNotRunning = errors.New("container not running")
+	errContainerNotFound   = stderrors.New("no such container")
+	errContainerNotRunning = stderrors.New("container not running")
 )
 
 func checkContainerError(err error) error {

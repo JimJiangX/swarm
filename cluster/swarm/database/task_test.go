@@ -107,7 +107,7 @@ func deleteBackupFile(ID string) error {
 		return err
 	}
 
-	_, err = db.Exec("DELETE FROM tb_backup_files WHERE id=?", ID)
+	_, err = db.Exec("DELETE FROM tbl_dbaas_backup_files WHERE id=?", ID)
 
 	return err
 }

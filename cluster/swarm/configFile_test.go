@@ -148,7 +148,7 @@ func TestMysqlConfig(t *testing.T) {
 	}
 	_ = content
 
-	// t.Log("config ini:\n", string(content))
+	t.Log("config ini:\n", string(content))
 }
 
 var defaultSWMConfig = `
@@ -236,5 +236,99 @@ func TestSwitchManagerConfig(t *testing.T) {
 
 	_ = content
 
-	// 	t.Log("config ini:\n", string(content))
+	t.Log("config ini:\n", string(content))
+}
+
+var defaultRedisContent = `
+lua-time-limit 5000
+latency-monitor-threshold 0
+timeout 60
+pidfile /DBAASDAT/redis.pid
+loglevel notice
+aof-rewrite-incremental-fsync yes
+slave-priority 100
+appendonly yes
+hz 10
+rdbchecksum yes
+dir /DBAASDAT
+maxclients 10000
+maxmemory <mem size bytes>
+maxmemory-policy noeviction
+port <prot>
+tcp-keepalive 0
+daemonize yes
+list-max-ziplist-size -2
+list-compress-depth 0
+appendfilename "appendonly.aof"
+aof-load-truncated yes
+slowlog-log-slower-than 10000
+set-max-intset-entries 512
+zset-max-ziplist-entries 128
+rdbcompression yes
+repl-diskless-sync-delay 5
+slowlog-max-len 1000
+hash-max-ziplist-entries 512
+protected-mode yes
+databases 16
+auto-aof-rewrite-min-size 64mb
+slave-serve-stale-data yes
+repl-disable-tcp-nodelay no
+requirepass foobared
+notify-keyspace-events ""
+hash-max-ziplist-value 64
+bind <ip addr>
+tcp-backlog 511
+save 60 10000
+appendfsync everysec
+no-appendfsync-on-rewrite yes
+auto-aof-rewrite-percentage 100
+hll-sparse-max-bytes 3000
+activerehashing yes
+supervised no
+dbfilename dump.rdb
+slave-read-only yes
+client-output-buffer-limit pubsub 32mb 8mb 60
+zset-max-ziplist-value 64
+logfile "/DBAASLOG/redis.log"
+stop-writes-on-bgsave-error yes
+repl-diskless-sync no
+`
+
+func TestRedisConfig(t *testing.T) {
+	config := new(redisConfig)
+
+	data, err := config.defaultUserConfig(nil, nil)
+	if err != nil {
+		t.Logf("Expected Error:%s", err)
+
+		data = make(map[string]interface{}, 10)
+	}
+
+	data["bind"] = "127.0.0.1"
+	data["port"] = 6379
+	data["maxmemory"] = 100 << 30 // 100GB
+
+	err = config.ParseData([]byte(defaultRedisContent))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = config.Validate(data)
+	if err != nil {
+		t.Error(err)
+	}
+
+	for key, val := range data {
+		if err := config.Set(key, val); err != nil {
+			t.Error(err)
+		}
+	}
+
+	content, err := config.Marshal()
+	if err != nil {
+		t.Error(err)
+	}
+	_ = content
+
+	t.Log("config:\n", string(content))
 }
