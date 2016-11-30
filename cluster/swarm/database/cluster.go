@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -569,30 +570,28 @@ func ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, 
 		return nil, err
 	}
 
-	var clist []string
-	err = db.Select(&clist, "SELECT id FROM tbl_dbaas_cluster WHERE type=? AND enabled=?", _type, enable)
-	if err != nil {
-		return nil, errors.Wrapf(err, "list Cluster by type='%s',enabled=%t", _type, enable)
+	list := make([]string, 0, len(clusters))
+	for _, c := range clusters {
+		if len(c) == 0 || strings.TrimSpace(c) == "" {
+			continue
+		}
+		list = append(list, c)
 	}
 
-	list := make([]string, 0, len(clusters))
-	for i := range clusters {
-		for j := range clist {
-			if clusters[i] == clist[j] {
-				list = append(list, clusters[i])
-				break
-			}
+	clusters = list
+
+	if len(clusters) == 0 {
+		err = db.Select(&clusters, "SELECT id FROM tbl_dbaas_cluster WHERE type=? AND enabled=?", _type, enable)
+		if err != nil {
+			return nil, errors.Wrapf(err, "list Cluster by type='%s',enabled=%t", _type, enable)
 		}
 	}
 
-	if len(list) == 0 && len(clist) > 0 {
-		list = clist
-	}
-	if len(list) == 0 {
+	if len(clusters) == 0 {
 		return []Node{}, nil
 	}
 
-	query, args, err := sqlx.In("SELECT * FROM tbl_dbaas_node WHERE cluster_id IN (?);", list)
+	query, args, err := sqlx.In("SELECT * FROM tbl_dbaas_node WHERE cluster_id IN (?);", clusters)
 	if err != nil {
 		return nil, errors.Wrap(err, "select []Node IN clusterIDs")
 	}
