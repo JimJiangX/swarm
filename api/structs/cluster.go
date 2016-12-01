@@ -1,6 +1,6 @@
 package structs
 
-import "github.com/docker/engine-api/types"
+import "github.com/docker/docker/api/types"
 
 type PostClusterRequest struct {
 	Name string `json:"name"`

@@ -5,9 +5,9 @@ import (
 	"os"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/docker/engine-api/client"
-	"github.com/docker/engine-api/types"
 	"github.com/docker/swarm/cluster"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -128,7 +128,7 @@ func getExecExitCode(ctx context.Context, cli client.ContainerAPIClient, execID 
 	resp, err := cli.ContainerExecInspect(ctx, execID)
 	if err != nil {
 		// If we can't connect, then the daemon probably died.
-		if err != client.ErrConnectionFailed {
+		if client.IsErrConnectionFailed(err) {
 			return types.ContainerExecInspect{}, -1, errors.Wrap(err, "Container exec inspect")
 		}
 		return types.ContainerExecInspect{}, -1, nil

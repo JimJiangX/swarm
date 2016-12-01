@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/engine-api/client"
-	"github.com/docker/engine-api/types"
-	"github.com/docker/engine-api/types/container"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/volume"
+	"github.com/docker/docker/client"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
@@ -223,7 +224,7 @@ func pullImage(engine *cluster.Engine, image string, authConfig *types.AuthConfi
 func createVolume(eng *cluster.Engine, lv database.LocalVolume) (*types.Volume, error) {
 	logrus.Debugf("Engine %s create Volume %s", eng.Addr, lv.Name)
 
-	req := &types.VolumeCreateRequest{
+	req := &volume.VolumesCreateBody{
 		Name:       lv.Name,
 		Driver:     lv.Driver,
 		DriverOpts: map[string]string{"size": strconv.Itoa(lv.Size), "fstype": lv.Filesystem, "vgname": lv.VGName},
@@ -244,8 +245,12 @@ func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
 		return err
 	}
 
-	err = client.ContainerUpdate(context.Background(), u.container.ID, updateConfig)
+	body, err := client.ContainerUpdate(context.Background(), u.container.ID, updateConfig)
 	engine.CheckConnectionErr(err)
+
+	if len(body.Warnings) > 0 {
+		logrus.WithField("Container", u.Name).Warnf("%s", body.Warnings)
+	}
 
 	return errors.Wrap(err, "container update")
 }

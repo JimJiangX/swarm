@@ -17,12 +17,14 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/docker/pkg/version"
-	engineapi "github.com/docker/engine-api/client"
-	"github.com/docker/engine-api/types"
-	"github.com/docker/engine-api/types/events"
-	"github.com/docker/engine-api/types/filters"
-	networktypes "github.com/docker/engine-api/types/network"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/events"
+	"github.com/docker/docker/api/types/filters"
+	networktypes "github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/versions"
+	"github.com/docker/docker/api/types/volume"
+	engineapi "github.com/docker/docker/client"
 	engineapinop "github.com/docker/swarm/api/nopclient"
 	"github.com/docker/swarm/swarmclient"
 	"github.com/samalba/dockerclient"
@@ -38,7 +40,7 @@ const (
 	thresholdTime = 2 * time.Second
 
 	// Minimum docker engine version supported by swarm.
-	minSupportedVersion = version.Version("1.8.0")
+	minSupportedVersion = "1.8.0"
 )
 
 type engineState int
@@ -190,9 +192,12 @@ func (e *Engine) Connect(config *tls.Config) error {
 	e.url = url
 
 	// Use HTTP Client created above to create a dockerclient client
-	c := dockerclient.NewDockerClientFromHTTP(url, httpClient, config)
+	c, err := dockerclient.NewDockerClient(url.String(), config)
+	if err != nil {
+		return err
+	}
 
-	// Use HTTP Client used by dockerclient to create engine-api client
+	// Use HTTP Client used by dockerclient to create docker/api client
 	apiClient, err := engineapi.NewClient("tcp://"+e.Addr, "", c.HTTPClient, nil)
 	if err != nil {
 		return err
@@ -423,11 +428,12 @@ func (e *Engine) CheckConnectionErr(err error) {
 	// dockerclient defines ErrConnectionRefused error. but if http client is from swarm, it's not using
 	// dockerclient. We need string matching for these cases. Remove the first character to deal with
 	// case sensitive issue.
-	// engine-api returns ErrConnectionFailed error, so we check for that as long as dockerclient exists
+	// docker/api returns ErrConnectionFailed error, so we check for that as long as dockerclient exists
 	if err == dockerclient.ErrConnectionRefused ||
-		err == engineapi.ErrConnectionFailed ||
+		engineapi.IsErrConnectionFailed(err) ||
 		strings.Contains(err.Error(), "onnection refused") ||
-		strings.Contains(err.Error(), "annot connect to the docker engine endpoint") {
+		strings.Contains(err.Error(), "annot connect to the docker engine endpoint") ||
+		strings.Contains(err.Error(), "annot connect to the Docker daemon") {
 		// each connection refused instance may increase failure count so
 		// engine can fail fast. Short engine freeze or network failure may result
 		// in engine marked as unhealthy. If this causes unnecessary failure, engine
@@ -444,15 +450,14 @@ func (e *Engine) CheckConnectionErr(err error) {
 // Update API Version in apiClient
 func (e *Engine) updateClientVersionFromServer(serverVersion string) {
 	// v will be >= 1.8, since this is checked earlier
-	v := version.Version(serverVersion)
 	switch {
-	case v.LessThan(version.Version("1.9")):
+	case versions.LessThan(serverVersion, "1.9"):
 		e.apiClient.UpdateClientVersion("1.20")
-	case v.LessThan(version.Version("1.10")):
+	case versions.LessThan(serverVersion, "1.10"):
 		e.apiClient.UpdateClientVersion("1.21")
-	case v.LessThan(version.Version("1.11")):
+	case versions.LessThan(serverVersion, "1.11"):
 		e.apiClient.UpdateClientVersion("1.22")
-	case v.LessThan(version.Version("1.12")):
+	case versions.LessThan(serverVersion, "1.12"):
 		e.apiClient.UpdateClientVersion("1.23")
 	default:
 		e.apiClient.UpdateClientVersion("1.24")
@@ -477,17 +482,15 @@ func (e *Engine) updateSpecs() error {
 		return err
 	}
 
-	engineVersion := version.Version(v.Version)
-
 	// Older versions of Docker don't expose the ID field, Labels and are not supported
 	// by Swarm.  Catch the error ASAP and refuse to connect.
-	if engineVersion.LessThan(minSupportedVersion) {
+	if versions.LessThan(v.Version, minSupportedVersion) {
 		err = fmt.Errorf("engine %s is running an unsupported version of Docker Engine. Please upgrade to at least %s", e.Addr, minSupportedVersion)
 		return err
 	}
 	// update server version
 	e.Version = v.Version
-	// update client version. engine-api handles backward compatibility where needed
+	// update client version. docker/api handles backward compatibility where needed
 	e.updateClientVersionFromServer(v.Version)
 
 	e.Lock()
@@ -536,9 +539,6 @@ func (e *Engine) updateSpecs() error {
 	e.Labels = map[string]string{}
 	if info.Driver != "" {
 		e.Labels["storagedriver"] = info.Driver
-	}
-	if info.ExecutionDriver != "" {
-		e.Labels["executiondriver"] = info.ExecutionDriver
 	}
 	if info.KernelVersion != "" {
 		e.Labels["kernelversion"] = info.KernelVersion
@@ -617,7 +617,7 @@ func (e *Engine) AddNetwork(network *Network) {
 
 // RemoveVolume deletes a volume from the engine.
 func (e *Engine) RemoveVolume(name string) error {
-	err := e.apiClient.VolumeRemove(context.Background(), name)
+	err := e.apiClient.VolumeRemove(context.Background(), name, false)
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
@@ -643,7 +643,7 @@ func (e *Engine) RefreshImages() error {
 	e.Lock()
 	e.images = nil
 	for _, image := range images {
-		e.images = append(e.images, &Image{Image: image, Engine: e})
+		e.images = append(e.images, &Image{ImageSummary: image, Engine: e})
 	}
 	e.Unlock()
 	return nil
@@ -761,9 +761,9 @@ func (e *Engine) refreshContainer(ID string, full bool) (*Container, error) {
 	filterArgs := filters.NewArgs()
 	filterArgs.Add("id", ID)
 	opts := types.ContainerListOptions{
-		All:    true,
-		Size:   false,
-		Filter: filterArgs,
+		All:     true,
+		Size:    false,
+		Filters: filterArgs,
 	}
 	containers, err := e.apiClient.ContainerList(context.Background(), opts)
 	e.CheckConnectionErr(err)
@@ -970,7 +970,7 @@ func (e *Engine) TotalCpus() int64 {
 func (e *Engine) CreateContainer(config *ContainerConfig, name string, pullImage bool, authConfig *types.AuthConfig) (*Container, error) {
 	var (
 		err        error
-		createResp types.ContainerCreateResponse
+		createResp container.ContainerCreateCreatedBody
 	)
 
 	// Convert our internal ContainerConfig into something Docker will
@@ -1051,7 +1051,7 @@ func (e *Engine) CreateNetwork(name string, request *types.NetworkCreate) (*type
 }
 
 // CreateVolume creates a volume in the engine
-func (e *Engine) CreateVolume(request *types.VolumeCreateRequest) (*types.Volume, error) {
+func (e *Engine) CreateVolume(request *volume.VolumesCreateBody) (*types.Volume, error) {
 	volume, err := e.apiClient.VolumeCreate(context.Background(), *request)
 	e.CheckConnectionErr(err)
 	if err != nil {
