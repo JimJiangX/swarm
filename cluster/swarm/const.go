@@ -1,7 +1,6 @@
 package swarm
 
 import (
-	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/yiduoyunQ/sm/sm-svr/consts"
 )
 
@@ -233,7 +232,7 @@ const (
 
 var (
 	supportedServiceTypes = []string{_MysqlType, _UpsqlType, _ProxyType, _SwitchManagerType, _RedisType}
-	supportedStoreTypes   = []string{storage.LocalStorePrefix, storage.LocalStorePrefix + ":SSD", storage.LocalStorePrefix + ":HDD", storage.SANStore, storage.HITACHI, storage.HUAWEI, "nfs", "NFS"}
+	supportedStoreTypes   = []string{LocalStorePrefix, LocalStorePrefix + ":SSD", LocalStorePrefix + ":HDD", "nfs", "NFS"}
 	supportedStoreNames   = []string{"DAT", "LOG", "CNF", "BACKUP"}
 )
 
@@ -251,4 +250,15 @@ const (
 	_DB_Type_M       = consts.Type_M
 	_DB_Type_M_SB    = consts.Type_M_SB
 	_DB_Type_M_SB_SL = consts.Type_M_SB_SL
+)
+
+const (
+	// DefaultFilesystemType default filesystem type
+	DefaultFilesystemType = "xfs"
+
+	// LocalStorePrefix prefix of local store
+	LocalStorePrefix = "local"
+
+	// LocalStoreDriver local store Driver
+	LocalStoreDriver = "lvm"
 )

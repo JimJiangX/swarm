@@ -1998,20 +1998,6 @@ func (gd *Gardener) serviceScale(svc *Service,
 	}
 
 	for _, pending := range storePendings {
-		for i := range pending.sanStore {
-			eng, err := pending.unit.Engine()
-			if err != nil {
-				return err
-			}
-			err = extendSanStoreageVG(eng.IP, pending.sanStore[i])
-			if err != nil {
-				return err
-			}
-			pending.created = true
-		}
-	}
-
-	for _, pending := range storePendings {
 		for _, lv := range pending.localStore {
 			err = localVolumeExtend(pending.unit.engine.IP, lv)
 			if err != nil {
@@ -2300,25 +2286,15 @@ func (svc *Service) delete(gd *Gardener, force, rmVolumes, recycle bool, timeout
 			}
 		}
 
-		if recycle {
-			for i := range lvs {
+		//		if recycle {
+		//			for i := range lvs {
 
-				luns, err := database.ListLUNByVgName(lvs[i].VGName)
-				if err != nil {
-					return err
-				}
-
-				err = removeVGAndLUN(u.engine.IP, lvs[i].VGName, luns)
-				if err != nil {
-					entry.WithFields(logrus.Fields{
-						"Unit": u.Name,
-						"VG":   lvs[i].VGName,
-					}).WithError(err).Error("recycle VG & LUN")
-
-					return err
-				}
-			}
-		}
+		//				luns, err := database.ListLUNByVgName(lvs[i].VGName)
+		//				if err != nil {
+		//					return err
+		//				}
+		//			}
+		//		}
 	}
 
 	err = svc.deregisterInHorus()

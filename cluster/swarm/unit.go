@@ -15,7 +15,6 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm/agent"
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -237,65 +236,6 @@ func createVolume(eng *cluster.Engine, lv database.LocalVolume) (*types.Volume, 
 	}
 
 	return v, nil
-}
-
-func createSanStoreageVG(host, name string) error {
-	logrus.Debugf("Engine %s create San Storeage VG,name=%s", host, name)
-
-	list, err := database.ListLUNByVgName(name)
-	if err != nil {
-		return err
-	}
-	if len(list) == 0 {
-		return nil
-	}
-
-	store, err := storage.GetStore(list[0].StorageSystemID)
-	if err != nil {
-		return err
-	}
-
-	l, size := make([]int, len(list)), 0
-
-	for i := range list {
-		l[i] = list[i].HostLunID
-		size += list[i].SizeByte
-	}
-
-	config := sdk.VgConfig{
-		HostLunID: l,
-		VgName:    list[0].VGName,
-		Type:      store.Vendor(),
-	}
-
-	addr := getPluginAddr(host, pluginPort)
-
-	return sdk.SanVgCreate(addr, config)
-
-}
-
-func extendSanStoreageVG(host string, lun database.LUN) error {
-	store, err := storage.GetStore(lun.StorageSystemID)
-	if err != nil {
-		return err
-	}
-
-	lun, err = database.GetLUNByID(lun.ID)
-	if err != nil {
-		return err
-	}
-
-	config := sdk.VgConfig{
-		HostLunID: []int{lun.HostLunID},
-		VgName:    lun.VGName,
-		Type:      store.Vendor(),
-	}
-
-	addr := getPluginAddr(host, pluginPort)
-
-	logrus.WithField("Addr", addr).Debugf("extend San Storeage VG,%+v", config)
-
-	return sdk.SanVgExtend(addr, config)
 }
 
 func (u *unit) updateContainer(updateConfig container.UpdateConfig) error {
@@ -522,90 +462,6 @@ func updateVolume(host string, lv database.LocalVolume) error {
 	if err != nil {
 		logrus.Errorf("host:%s volume update error:%s", addr, err)
 	}
-
-	return err
-}
-
-func (u *unit) activateVG(config sdk.ActiveConfig) error {
-	engine, err := u.Engine()
-	if err != nil {
-		return err
-	}
-
-	addr := getPluginAddr(engine.IP, pluginPort)
-	err = sdk.SanActivate(addr, config)
-	if err != nil {
-		logrus.Errorf("%s SanDeActivate error:%s", u.Name, err)
-	}
-	return nil
-}
-
-func (u *unit) deactivateVG(config sdk.DeactivateConfig) error {
-	engine, err := u.Engine()
-	if err != nil {
-		return err
-	}
-
-	addr := getPluginAddr(engine.IP, pluginPort)
-	err = sdk.SanDeActivate(addr, config)
-
-	return err
-}
-
-func removeVGAndLUN(host, vg string, list []database.LUN) error {
-	if !isSanVG(vg) {
-		return nil
-	}
-
-	if len(list) == 0 {
-		return nil
-	}
-
-	store, err := storage.GetStore(list[0].StorageSystemID)
-	if err != nil {
-		return err
-	}
-
-	names := make([]string, len(list))
-	hostLuns := make([]int, len(list))
-	for i := range list {
-		names[i] = list[i].Name
-		hostLuns[i] = list[i].HostLunID
-	}
-	config := sdk.DeactivateConfig{
-		VgName:    vg,
-		Lvname:    names,
-		HostLunID: hostLuns,
-		Vendor:    store.Vendor(),
-	}
-	// san volumes
-	addr := getPluginAddr(host, pluginPort)
-	err = sdk.SanDeActivate(addr, config)
-	if err != nil {
-		logrus.Errorf("%s SanDeActivate error:%s", host, err)
-		return err
-	}
-
-	for i := range list {
-		err := store.DelMapping(list[i].ID)
-		if err != nil {
-			logrus.Errorf("DelMapping,lun:%s,%+v", list[i].Name, err)
-			return err
-		}
-
-		err = store.Recycle(list[i].ID, 0)
-		if err != nil {
-			logrus.Errorf("Recycle lun:%s,%+v", list[i].Name, err)
-			return err
-		}
-	}
-
-	opt := sdk.RemoveSCSIConfig{
-		Vendor:    store.Vendor(),
-		HostLunId: hostLuns,
-	}
-
-	err = sdk.RemoveSCSI(addr, opt)
 
 	return err
 }

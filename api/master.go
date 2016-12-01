@@ -71,8 +71,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/services/{name}/service_config":  getServiceServiceConfig,
 		"/services/{name}/backup_strategy": getServiceBackupStrategy,
 		"/services/{name}/backup_files":    getServiceBackupFiles,
-		"/storage/san":                     getSANStoragesInfo,
-		"/storage/san/{name:.*}":           getSANStorageInfo,
+		//"/storage/san":                     getSANStoragesInfo,
+		//"/storage/san/{name:.*}":           getSANStorageInfo,
 	},
 	"POST": {
 		"/datacenter":                    postDatacenter,
@@ -122,10 +122,10 @@ var masterRoutes = map[string]map[string]ctxHandler{
 
 		"/tasks/backup/callback": postBackupCallback,
 
-		"/storage/san":                                       postSanStorage,
-		"/storage/san/{name}/raid_group":                     postRGToSanStorage,
-		"/storage/san/{name}/raid_group/{rg:[0-9]+}/enable":  postEnableRaidGroup,
-		"/storage/san/{name}/raid_group/{rg:[0-9]+}/disable": postDisableRaidGroup,
+		//"/storage/san":                                       postSanStorage,
+		//"/storage/san/{name}/raid_group":                     postRGToSanStorage,
+		//"/storage/san/{name}/raid_group/{rg:[0-9]+}/enable":  postEnableRaidGroup,
+		//"/storage/san/{name}/raid_group/{rg:[0-9]+}/disable": postDisableRaidGroup,
 	},
 	"DELETE": {
 		"/services/{name}":                    deleteService,
@@ -138,8 +138,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/networkings/{name:.*}": deleteNetworking,
 		"/ports/{port:[0-9]+}":   deletePort,
 
-		"/storage/san/{name}":                        deleteStorage,
-		"/storage/san/{name}/raid_group/{rg:[0-9]+}": deleteRaidGroup,
+		//"/storage/san/{name}":                        deleteStorage,
+		//"/storage/san/{name}/raid_group/{rg:[0-9]+}": deleteRaidGroup,
 
 		"/image/{image:.*}": deleteImage,
 	},

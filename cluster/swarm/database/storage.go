@@ -1,366 +1,364 @@
 package database
 
 import (
-	"time"
-
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
 
-const insertLUNQuery = "INSERT INTO tbl_dbaas_lun (id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at) VALUES (:id,:name,:vg_name,:raid_group_id,:storage_system_id,:mapping_hostname,:size,:host_lun_id,:storage_lun_id,:created_at)"
-
-// LUN is table tbl_dbaas_lun structure,correspod with SAN storage LUN.
-type LUN struct {
-	ID              string    `db:"id"`
-	Name            string    `db:"name"`
-	VGName          string    `db:"vg_name"`
-	RaidGroupID     string    `db:"raid_group_id"`
-	StorageSystemID string    `db:"storage_system_id"`
-	MappingTo       string    `db:"mapping_hostname"`
-	SizeByte        int       `db:"size"`
-	HostLunID       int       `db:"host_lun_id"`
-	StorageLunID    int       `db:"storage_lun_id"`
-	CreatedAt       time.Time `db:"created_at"`
-}
-
-func (l LUN) tableName() string {
-	return "tbl_dbaas_lun"
-}
+//const insertLUNQuery = "INSERT INTO tbl_dbaas_lun (id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at) VALUES (:id,:name,:vg_name,:raid_group_id,:storage_system_id,:mapping_hostname,:size,:host_lun_id,:storage_lun_id,:created_at)"
+
+//// LUN is table tbl_dbaas_lun structure,correspod with SAN storage LUN.
+//type LUN struct {
+//	ID              string    `db:"id"`
+//	Name            string    `db:"name"`
+//	VGName          string    `db:"vg_name"`
+//	RaidGroupID     string    `db:"raid_group_id"`
+//	StorageSystemID string    `db:"storage_system_id"`
+//	MappingTo       string    `db:"mapping_hostname"`
+//	SizeByte        int       `db:"size"`
+//	HostLunID       int       `db:"host_lun_id"`
+//	StorageLunID    int       `db:"storage_lun_id"`
+//	CreatedAt       time.Time `db:"created_at"`
+//}
+
+//func (l LUN) tableName() string {
+//	return "tbl_dbaas_lun"
+//}
 
-// TxInsertLUNAndVolume insert LUN and LocalVolume in a Tx,
-// the LUN is to creating a Volume
-func TxInsertLUNAndVolume(lun LUN, lv LocalVolume) error {
-	do := func(tx *sqlx.Tx) error {
-		_, err := tx.NamedExec(insertLUNQuery, &lun)
-		if err != nil {
-			return errors.Wrap(err, "Tx insert LUN")
-		}
-
-		_, err = tx.NamedExec(insertLocalVolumeQuery, &lv)
-
-		return errors.Wrap(err, "Tx insert LocalVolume")
-	}
-
-	return txFrame(do)
-}
+//// TxInsertLUNAndVolume insert LUN and LocalVolume in a Tx,
+//// the LUN is to creating a Volume
+//func TxInsertLUNAndVolume(lun LUN, lv LocalVolume) error {
+//	do := func(tx *sqlx.Tx) error {
+//		_, err := tx.NamedExec(insertLUNQuery, &lun)
+//		if err != nil {
+//			return errors.Wrap(err, "Tx insert LUN")
+//		}
+
+//		_, err = tx.NamedExec(insertLocalVolumeQuery, &lv)
+
+//		return errors.Wrap(err, "Tx insert LocalVolume")
+//	}
+
+//	return txFrame(do)
+//}
 
-func txInsertLun(tx *sqlx.Tx, lun LUN) error {
-	_, err := tx.NamedExec(insertLUNQuery, &lun)
+//func txInsertLun(tx *sqlx.Tx, lun LUN) error {
+//	_, err := tx.NamedExec(insertLUNQuery, &lun)
 
-	return errors.Wrap(err, "Tx insert LUN")
-}
-
-func TxInsertLunUpdateVolume(lun LUN, lv LocalVolume) error {
-	do := func(tx *sqlx.Tx) error {
-		err := txInsertLun(tx, lun)
-		if err != nil {
-			return err
-		}
+//	return errors.Wrap(err, "Tx insert LUN")
+//}
+
+//func TxInsertLunUpdateVolume(lun LUN, lv LocalVolume) error {
+//	do := func(tx *sqlx.Tx) error {
+//		err := txInsertLun(tx, lun)
+//		if err != nil {
+//			return err
+//		}
 
-		const query = "UPDATE tbl_dbaas_volumes SET size=? WHERE id=?"
+//		const query = "UPDATE tbl_dbaas_volumes SET size=? WHERE id=?"
 
-		_, err = tx.Exec(query, lv.Size, lv.ID)
+//		_, err = tx.Exec(query, lv.Size, lv.ID)
 
-		return errors.Wrap(err, "Tx insert LUN and update Volume")
-	}
+//		return errors.Wrap(err, "Tx insert LUN and update Volume")
+//	}
 
-	return txFrame(do)
-}
+//	return txFrame(do)
+//}
 
-// DelLunMapping delete a mapping record,set LUN VGName、MappingTo and HostLunID to be null
-var DelLunMapping = LunMapping
+//// DelLunMapping delete a mapping record,set LUN VGName、MappingTo and HostLunID to be null
+//var DelLunMapping = LunMapping
 
-// LunMapping sets LUN VGName、MappingTo、HostLunID value
-func LunMapping(lun, host, vgName string, hlun int) error {
-	db, err := getDB(false)
-	if err != nil {
-		return err
-	}
+//// LunMapping sets LUN VGName、MappingTo、HostLunID value
+//func LunMapping(lun, host, vgName string, hlun int) error {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return err
+//	}
 
-	const query = "UPDATE tbl_dbaas_lun SET vg_name=?,mapping_hostname=?,host_lun_id=? WHERE id=?"
+//	const query = "UPDATE tbl_dbaas_lun SET vg_name=?,mapping_hostname=?,host_lun_id=? WHERE id=?"
 
-	_, err = db.Exec(query, vgName, host, hlun, lun)
+//	_, err = db.Exec(query, vgName, host, hlun, lun)
 
-	return errors.Wrap(err, "update LUN Mapping")
-}
+//	return errors.Wrap(err, "update LUN Mapping")
+//}
 
-// GetLUNByID returns LUN,select tbl_dbaas_lun by ID
-func GetLUNByID(id string) (LUN, error) {
-	db, err := getDB(false)
-	if err != nil {
-		return LUN{}, err
-	}
+//// GetLUNByID returns LUN,select tbl_dbaas_lun by ID
+//func GetLUNByID(id string) (LUN, error) {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return LUN{}, err
+//	}
 
-	lun := LUN{}
-	const query = "SELECT * FROM tbl_dbaas_lun WHERE id=? LIMIT 1"
+//	lun := LUN{}
+//	const query = "SELECT * FROM tbl_dbaas_lun WHERE id=? LIMIT 1"
 
-	err = db.Get(&lun, query, id)
+//	err = db.Get(&lun, query, id)
 
-	return lun, errors.Wrap(err, "get LUN ny ID")
-}
+//	return lun, errors.Wrap(err, "get LUN ny ID")
+//}
 
-// ListLUNByName returns []LUN select by Name
-func ListLUNByName(name string) ([]LUN, error) {
-	db, err := getDB(false)
-	if err != nil {
-		return nil, err
-	}
+//// ListLUNByName returns []LUN select by Name
+//func ListLUNByName(name string) ([]LUN, error) {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return nil, err
+//	}
 
-	var list []LUN
-	const query = "SELECT * FROM tbl_dbaas_lun WHERE name=?"
+//	var list []LUN
+//	const query = "SELECT * FROM tbl_dbaas_lun WHERE name=?"
 
-	err = db.Select(&list, query, name)
+//	err = db.Select(&list, query, name)
 
-	return list, errors.Wrap(err, "list []LUN by Name")
-}
+//	return list, errors.Wrap(err, "list []LUN by Name")
+//}
 
-// ListLUNByVgName returns []LUN select by VGName
-func ListLUNByVgName(name string) ([]LUN, error) {
-	db, err := getDB(false)
-	if err != nil {
-		return nil, err
-	}
+//// ListLUNByVgName returns []LUN select by VGName
+//func ListLUNByVgName(name string) ([]LUN, error) {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return nil, err
+//	}
 
-	var list []LUN
-	const query = "SELECT * FROM tbl_dbaas_lun WHERE vg_name=?"
+//	var list []LUN
+//	const query = "SELECT * FROM tbl_dbaas_lun WHERE vg_name=?"
 
-	err = db.Select(&list, query, name)
+//	err = db.Select(&list, query, name)
 
-	return list, errors.Wrap(err, "list []LUN by VGName")
-}
+//	return list, errors.Wrap(err, "list []LUN by VGName")
+//}
 
-// GetLUNByLunID returns a LUN select by StorageLunID and StorageSystemID
-func GetLUNByLunID(systemID string, id int) (LUN, error) {
-	db, err := getDB(false)
-	if err != nil {
-		return LUN{}, err
-	}
+//// GetLUNByLunID returns a LUN select by StorageLunID and StorageSystemID
+//func GetLUNByLunID(systemID string, id int) (LUN, error) {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return LUN{}, err
+//	}
 
-	lun := LUN{}
-	const query = "SELECT * FROM tbl_dbaas_lun WHERE storage_system_id=? AND storage_lun_id=?"
+//	lun := LUN{}
+//	const query = "SELECT * FROM tbl_dbaas_lun WHERE storage_system_id=? AND storage_lun_id=?"
 
-	err = db.Get(&lun, query, systemID, id)
+//	err = db.Get(&lun, query, systemID, id)
 
-	return lun, errors.Wrap(err, "get LUN by StorageSystemID and StorageLunID")
-}
+//	return lun, errors.Wrap(err, "get LUN by StorageSystemID and StorageLunID")
+//}
 
-// CountLUNByRaidGroupID returns number of result select tbl_dbaas_lun by RaidGroup
-func CountLUNByRaidGroupID(rg string) (int, error) {
-	db, err := getDB(false)
-	if err != nil {
-		return 0, err
-	}
+//// CountLUNByRaidGroupID returns number of result select tbl_dbaas_lun by RaidGroup
+//func CountLUNByRaidGroupID(rg string) (int, error) {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return 0, err
+//	}
 
-	count := 0
-	const query = "SELECT COUNT(id) from tbl_dbaas_lun WHERE raid_group_id=?"
+//	count := 0
+//	const query = "SELECT COUNT(id) from tbl_dbaas_lun WHERE raid_group_id=?"
 
-	err = db.Get(&count, query, rg)
+//	err = db.Get(&count, query, rg)
 
-	return count, errors.Wrap(err, "count LUN by RaidGroupID")
-}
+//	return count, errors.Wrap(err, "count LUN by RaidGroupID")
+//}
 
-// DelLUN delete LUN by ID
-func DelLUN(id string) error {
-	db, err := getDB(false)
-	if err != nil {
-		return err
-	}
+//// DelLUN delete LUN by ID
+//func DelLUN(id string) error {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return err
+//	}
 
-	const query = "DELETE FROM tbl_dbaas_lun WHERE id=?"
+//	const query = "DELETE FROM tbl_dbaas_lun WHERE id=?"
 
-	_, err = db.Exec(query, id)
+//	_, err = db.Exec(query, id)
 
-	return errors.Wrap(err, "delete LUN by ID")
-}
+//	return errors.Wrap(err, "delete LUN by ID")
+//}
 
-// ListHostLunIDByMapping returns []int select HostLunID by MappingTo
-func ListHostLunIDByMapping(host string) ([]int, error) {
-	db, err := getDB(false)
-	if err != nil {
-		return nil, err
-	}
+//// ListHostLunIDByMapping returns []int select HostLunID by MappingTo
+//func ListHostLunIDByMapping(host string) ([]int, error) {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return nil, err
+//	}
 
-	var out []int
-	const query = "SELECT host_lun_id FROM tbl_dbaas_lun WHERE mapping_hostname=?"
+//	var out []int
+//	const query = "SELECT host_lun_id FROM tbl_dbaas_lun WHERE mapping_hostname=?"
 
-	err = db.Select(&out, query, host)
+//	err = db.Select(&out, query, host)
 
-	return out, errors.Wrap(err, "list []LUN HostLunID by MappingTo")
-}
+//	return out, errors.Wrap(err, "list []LUN HostLunID by MappingTo")
+//}
 
-// ListLunIDBySystemID returns []int select StorageLunID by StorageSystemID
-func ListLunIDBySystemID(id string) ([]int, error) {
-	db, err := getDB(false)
-	if err != nil {
-		return nil, err
-	}
+//// ListLunIDBySystemID returns []int select StorageLunID by StorageSystemID
+//func ListLunIDBySystemID(id string) ([]int, error) {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return nil, err
+//	}
 
-	var out []int
-	const query = "SELECT storage_lun_id FROM tbl_dbaas_lun WHERE storage_system_id=?"
+//	var out []int
+//	const query = "SELECT storage_lun_id FROM tbl_dbaas_lun WHERE storage_system_id=?"
 
-	err = db.Select(&out, query, id)
+//	err = db.Select(&out, query, id)
 
-	return out, errors.Wrap(err, "list LUN StorageLunID by StorageSystemID")
-}
+//	return out, errors.Wrap(err, "list LUN StorageLunID by StorageSystemID")
+//}
 
-const insertRaidGroupQuery = "INSERT INTO tbl_dbaas_raid_group (id,storage_system_id,storage_rg_id,enabled) VALUES (:id,:storage_system_id,:storage_rg_id,:enabled)"
+//const insertRaidGroupQuery = "INSERT INTO tbl_dbaas_raid_group (id,storage_system_id,storage_rg_id,enabled) VALUES (:id,:storage_system_id,:storage_rg_id,:enabled)"
 
-// RaidGroup is table tbl_dbaas_raid_group structure,correspod with SNA RaidGroup,
-// RG is short of RaidGroup
-type RaidGroup struct {
-	ID          string `db:"id"`
-	StorageID   string `db:"storage_system_id"`
-	StorageRGID int    `db:"storage_rg_id"`
-	Enabled     bool   `db:"enabled"`
-}
+//// RaidGroup is table tbl_dbaas_raid_group structure,correspod with SNA RaidGroup,
+//// RG is short of RaidGroup
+//type RaidGroup struct {
+//	ID          string `db:"id"`
+//	StorageID   string `db:"storage_system_id"`
+//	StorageRGID int    `db:"storage_rg_id"`
+//	Enabled     bool   `db:"enabled"`
+//}
 
-func (r RaidGroup) tableName() string {
-	return "tbl_dbaas_raid_group"
-}
+//func (r RaidGroup) tableName() string {
+//	return "tbl_dbaas_raid_group"
+//}
 
-// Insert insert a new RaidGroup
-func (r RaidGroup) Insert() error {
-	db, err := getDB(false)
-	if err != nil {
-		return err
-	}
+//// Insert insert a new RaidGroup
+//func (r RaidGroup) Insert() error {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return err
+//	}
 
-	_, err = db.NamedExec(insertRaidGroupQuery, &r)
+//	_, err = db.NamedExec(insertRaidGroupQuery, &r)
 
-	return errors.Wrap(err, "Insert RaidGroup")
-}
+//	return errors.Wrap(err, "Insert RaidGroup")
+//}
 
-// UpdateRaidGroupStatus update Enabled select by StorageSystemID and StorageRGID
-func UpdateRaidGroupStatus(ssid string, rgid int, state bool) error {
-	db, err := getDB(false)
-	if err != nil {
-		return err
-	}
+//// UpdateRaidGroupStatus update Enabled select by StorageSystemID and StorageRGID
+//func UpdateRaidGroupStatus(ssid string, rgid int, state bool) error {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return err
+//	}
 
-	const query = "UPDATE tbl_dbaas_raid_group SET enabled=? WHERE storage_system_id=? AND storage_rg_id=?"
+//	const query = "UPDATE tbl_dbaas_raid_group SET enabled=? WHERE storage_system_id=? AND storage_rg_id=?"
 
-	_, err = db.Exec(query, state, ssid, rgid)
+//	_, err = db.Exec(query, state, ssid, rgid)
 
-	return errors.Wrap(err, "update RaidGroup.Enabled")
-}
+//	return errors.Wrap(err, "update RaidGroup.Enabled")
+//}
 
-// UpdateRGStatusByID update Enabled select by ID
-func UpdateRGStatusByID(id string, state bool) error {
-	db, err := getDB(false)
-	if err != nil {
-		return err
-	}
+//// UpdateRGStatusByID update Enabled select by ID
+//func UpdateRGStatusByID(id string, state bool) error {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return err
+//	}
 
-	const query = "UPDATE tbl_dbaas_raid_group SET enabled=? WHERE id=?"
+//	const query = "UPDATE tbl_dbaas_raid_group SET enabled=? WHERE id=?"
 
-	_, err = db.Exec(query, state, id)
+//	_, err = db.Exec(query, state, id)
 
-	return errors.Wrap(err, "update RaidGroup.Enabled")
-}
+//	return errors.Wrap(err, "update RaidGroup.Enabled")
+//}
 
-// ListRGByStorageID returns []RaidGroup select by StorageSystemID
-func ListRGByStorageID(id string) ([]RaidGroup, error) {
-	db, err := getDB(false)
-	if err != nil {
-		return nil, err
-	}
+//// ListRGByStorageID returns []RaidGroup select by StorageSystemID
+//func ListRGByStorageID(id string) ([]RaidGroup, error) {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return nil, err
+//	}
 
-	var out []RaidGroup
-	const query = "SELECT * FROM tbl_dbaas_raid_group WHERE storage_system_id=?"
+//	var out []RaidGroup
+//	const query = "SELECT * FROM tbl_dbaas_raid_group WHERE storage_system_id=?"
 
-	err = db.Select(&out, query, id)
+//	err = db.Select(&out, query, id)
 
-	return out, errors.Wrap(err, "list []RaidGroup by StorageSystemID")
-}
+//	return out, errors.Wrap(err, "list []RaidGroup by StorageSystemID")
+//}
 
-// GetRaidGroup returns RaidGroup select by StorageSystemID and StorageRGID.
-func GetRaidGroup(id string, rg int) (RaidGroup, error) {
-	db, err := getDB(false)
-	if err != nil {
-		return RaidGroup{}, err
-	}
+//// GetRaidGroup returns RaidGroup select by StorageSystemID and StorageRGID.
+//func GetRaidGroup(id string, rg int) (RaidGroup, error) {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return RaidGroup{}, err
+//	}
 
-	out := RaidGroup{}
-	const query = "SELECT * FROM tbl_dbaas_raid_group WHERE storage_system_id=? AND storage_rg_id=? LIMIT 1"
+//	out := RaidGroup{}
+//	const query = "SELECT * FROM tbl_dbaas_raid_group WHERE storage_system_id=? AND storage_rg_id=? LIMIT 1"
 
-	err = db.Get(&out, query, id, rg)
+//	err = db.Get(&out, query, id, rg)
 
-	return out, errors.Wrap(err, "get RaidGroup")
-}
+//	return out, errors.Wrap(err, "get RaidGroup")
+//}
 
-// DeleteRaidGroup delete RaidGroup by StorageSystemID and StorageRGID
-func DeleteRaidGroup(id string, rg int) error {
-	db, err := getDB(false)
-	if err != nil {
-		return err
-	}
+//// DeleteRaidGroup delete RaidGroup by StorageSystemID and StorageRGID
+//func DeleteRaidGroup(id string, rg int) error {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return err
+//	}
 
-	const query = "DELETE FROM tbl_dbaas_raid_group WHERE storage_system_id=? AND storage_rg_id=?"
+//	const query = "DELETE FROM tbl_dbaas_raid_group WHERE storage_system_id=? AND storage_rg_id=?"
 
-	_, err = db.Exec(query, id, rg)
+//	_, err = db.Exec(query, id, rg)
 
-	return errors.Wrap(err, "Delete RaidGroup")
-}
+//	return errors.Wrap(err, "Delete RaidGroup")
+//}
 
-const insertHitachiStorageQuery = "INSERT INTO tbl_dbaas_storage_HITACHI (id,vendor,admin_unit,lun_start,lun_end,hlu_start,hlu_end) VALUES (:id,:vendor,:admin_unit,:lun_start,:lun_end,:hlu_start,:hlu_end)"
+//const insertHitachiStorageQuery = "INSERT INTO tbl_dbaas_storage_HITACHI (id,vendor,admin_unit,lun_start,lun_end,hlu_start,hlu_end) VALUES (:id,:vendor,:admin_unit,:lun_start,:lun_end,:hlu_start,:hlu_end)"
 
-// HitachiStorage is table tbl_dbaas_storage_HITACHI structure,
-// correspod with HITACHI storage
-type HitachiStorage struct {
-	ID        string `db:"id"`
-	Vendor    string `db:"vendor"`
-	AdminUnit string `db:"admin_unit"`
-	LunStart  int    `db:"lun_start"`
-	LunEnd    int    `db:"lun_end"`
-	HluStart  int    `db:"hlu_start"`
-	HluEnd    int    `db:"hlu_end"`
-}
+//// HitachiStorage is table tbl_dbaas_storage_HITACHI structure,
+//// correspod with HITACHI storage
+//type HitachiStorage struct {
+//	ID        string `db:"id"`
+//	Vendor    string `db:"vendor"`
+//	AdminUnit string `db:"admin_unit"`
+//	LunStart  int    `db:"lun_start"`
+//	LunEnd    int    `db:"lun_end"`
+//	HluStart  int    `db:"hlu_start"`
+//	HluEnd    int    `db:"hlu_end"`
+//}
 
-func (HitachiStorage) tableName() string {
-	return "tbl_dbaas_storage_HITACHI"
-}
+//func (HitachiStorage) tableName() string {
+//	return "tbl_dbaas_storage_HITACHI"
+//}
 
-// Insert inserts a new HitachiStorage
-func (hs HitachiStorage) Insert() error {
-	db, err := getDB(false)
-	if err != nil {
-		return err
-	}
+//// Insert inserts a new HitachiStorage
+//func (hs HitachiStorage) Insert() error {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return err
+//	}
 
-	_, err = db.NamedExec(insertHitachiStorageQuery, &hs)
+//	_, err = db.NamedExec(insertHitachiStorageQuery, &hs)
 
-	return errors.Wrap(err, "insert HITACHI Storage")
-}
+//	return errors.Wrap(err, "insert HITACHI Storage")
+//}
 
-const insertHuaweiStorageQuery = "INSERT INTO tbl_dbaas_storage_HUAWEI (id,vendor,ip_addr,username,password,hlu_start,hlu_end) VALUES (:id,:vendor,:ip_addr,:username,:password,:hlu_start,:hlu_end)"
+//const insertHuaweiStorageQuery = "INSERT INTO tbl_dbaas_storage_HUAWEI (id,vendor,ip_addr,username,password,hlu_start,hlu_end) VALUES (:id,:vendor,:ip_addr,:username,:password,:hlu_start,:hlu_end)"
 
-// HuaweiStorage is table tbl_dbaas_storage_HUAWEI structure,
-// correspod with HUAWEI storage
-type HuaweiStorage struct {
-	ID       string `db:"id"`
-	Vendor   string `db:"vendor"`
-	IPAddr   string `db:"ip_addr"`
-	Username string `db:"username"`
-	Password string `db:"password"`
-	HluStart int    `db:"hlu_start"`
-	HluEnd   int    `db:"hlu_end"`
-}
+//// HuaweiStorage is table tbl_dbaas_storage_HUAWEI structure,
+//// correspod with HUAWEI storage
+//type HuaweiStorage struct {
+//	ID       string `db:"id"`
+//	Vendor   string `db:"vendor"`
+//	IPAddr   string `db:"ip_addr"`
+//	Username string `db:"username"`
+//	Password string `db:"password"`
+//	HluStart int    `db:"hlu_start"`
+//	HluEnd   int    `db:"hlu_end"`
+//}
 
-func (HuaweiStorage) tableName() string {
-	return "tbl_dbaas_storage_HUAWEI"
-}
+//func (HuaweiStorage) tableName() string {
+//	return "tbl_dbaas_storage_HUAWEI"
+//}
 
-// Insert inserts a new HuaweiStorage
-func (hs HuaweiStorage) Insert() error {
-	db, err := getDB(false)
-	if err != nil {
-		return err
-	}
+//// Insert inserts a new HuaweiStorage
+//func (hs HuaweiStorage) Insert() error {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return err
+//	}
 
-	_, err = db.NamedExec(insertHuaweiStorageQuery, &hs)
+//	_, err = db.NamedExec(insertHuaweiStorageQuery, &hs)
 
-	return errors.Wrap(err, "insert HUAWEI Storage")
-}
+//	return errors.Wrap(err, "insert HUAWEI Storage")
+//}
 
 const insertLocalVolumeQuery = "INSERT INTO tbl_dbaas_volumes (id,name,unit_id,size,VGname,driver,fstype) VALUES (:id,:name,:unit_id,:size,:VGname,:driver,:fstype)"
 
@@ -523,71 +521,71 @@ func ListVolumesByUnitID(id string) ([]LocalVolume, error) {
 	return lvs, errors.Wrap(err, "list []LocalVolume by UnitID")
 }
 
-// GetStorageByID returns *HitachiStorage or *HuaweiStorage,select by ID
-func GetStorageByID(id string) (*HitachiStorage, *HuaweiStorage, error) {
-	db, err := getDB(false)
-	if err != nil {
-		return nil, nil, err
-	}
+//// GetStorageByID returns *HitachiStorage or *HuaweiStorage,select by ID
+//func GetStorageByID(id string) (*HitachiStorage, *HuaweiStorage, error) {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return nil, nil, err
+//	}
 
-	hitachi, huawei := &HitachiStorage{}, &HuaweiStorage{}
+//	hitachi, huawei := &HitachiStorage{}, &HuaweiStorage{}
 
-	err = db.Get(hitachi, "SELECT * FROM tbl_dbaas_storage_HITACHI WHERE id=?", id)
-	if err == nil {
-		return hitachi, nil, nil
-	}
+//	err = db.Get(hitachi, "SELECT * FROM tbl_dbaas_storage_HITACHI WHERE id=?", id)
+//	if err == nil {
+//		return hitachi, nil, nil
+//	}
 
-	err = db.Get(huawei, "SELECT * FROM tbl_dbaas_storage_HUAWEI WHERE id=?", id)
-	if err == nil {
-		return nil, huawei, nil
-	}
+//	err = db.Get(huawei, "SELECT * FROM tbl_dbaas_storage_HUAWEI WHERE id=?", id)
+//	if err == nil {
+//		return nil, huawei, nil
+//	}
 
-	return nil, nil, errors.Wrap(err, "not Ffound Storage by ID")
-}
+//	return nil, nil, errors.Wrap(err, "not Ffound Storage by ID")
+//}
 
-// ListStorageID returns all StorageSystemID
-func ListStorageID() ([]string, error) {
-	db, err := getDB(false)
-	if err != nil {
-		return nil, err
-	}
+//// ListStorageID returns all StorageSystemID
+//func ListStorageID() ([]string, error) {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return nil, err
+//	}
 
-	var hitachi []string
-	err = db.Select(&hitachi, "SELECT id FROM tbl_dbaas_storage_HITACHI")
-	if err != nil {
-		return nil, errors.Wrap(err, "select []HitachiStorage")
-	}
+//	var hitachi []string
+//	err = db.Select(&hitachi, "SELECT id FROM tbl_dbaas_storage_HITACHI")
+//	if err != nil {
+//		return nil, errors.Wrap(err, "select []HitachiStorage")
+//	}
 
-	var huawei []string
-	err = db.Select(&huawei, "SELECT id FROM tbl_dbaas_storage_HUAWEI")
-	if err != nil {
-		return nil, errors.Wrap(err, "select []HuaweiStorage")
-	}
+//	var huawei []string
+//	err = db.Select(&huawei, "SELECT id FROM tbl_dbaas_storage_HUAWEI")
+//	if err != nil {
+//		return nil, errors.Wrap(err, "select []HuaweiStorage")
+//	}
 
-	out := make([]string, len(hitachi)+len(huawei))
+//	out := make([]string, len(hitachi)+len(huawei))
 
-	length := copy(out, hitachi)
-	copy(out[length:], huawei)
+//	length := copy(out, hitachi)
+//	copy(out[length:], huawei)
 
-	return out, nil
-}
+//	return out, nil
+//}
 
-// DeleteStorageByID delete storage system by ID
-func DeleteStorageByID(id string) error {
-	db, err := getDB(false)
-	if err != nil {
-		return err
-	}
+//// DeleteStorageByID delete storage system by ID
+//func DeleteStorageByID(id string) error {
+//	db, err := getDB(false)
+//	if err != nil {
+//		return err
+//	}
 
-	r, err := db.Exec("DELETE FROM tbl_dbaas_storage_HITACHI WHERE id=?", id)
-	if err == nil {
-		num, err := r.RowsAffected()
-		if num > 0 && err == nil {
-			return nil
-		}
-	}
+//	r, err := db.Exec("DELETE FROM tbl_dbaas_storage_HITACHI WHERE id=?", id)
+//	if err == nil {
+//		num, err := r.RowsAffected()
+//		if num > 0 && err == nil {
+//			return nil
+//		}
+//	}
 
-	_, err = db.Exec("DELETE FROM tbl_dbaas_storage_HUAWEI WHERE id=?", id)
+//	_, err = db.Exec("DELETE FROM tbl_dbaas_storage_HUAWEI WHERE id=?", id)
 
-	return errors.Wrap(err, "delete Storage by ID")
-}
+//	return errors.Wrap(err, "delete Storage by ID")
+//}

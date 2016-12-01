@@ -19,7 +19,6 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/swarm"
 	"github.com/docker/swarm/cluster/swarm/database"
-	"github.com/docker/swarm/cluster/swarm/storage"
 	"github.com/docker/swarm/utils"
 	"github.com/gorilla/mux"
 	consulapi "github.com/hashicorp/consul/api"
@@ -1292,78 +1291,42 @@ func getServiceBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(sortByTime)
 }
 
-// GET /storage/san
-func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	names, err := database.ListStorageID()
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//// GET /storage/san
+//func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+//	names, err := database.ListStorageID()
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	resp := make([]structs.SANStorageResponse, len(names))
-	for i := range names {
-		resp[i], err = getSanStoreInfo(names[i])
-		if err != nil {
-			httpError2(w, err, http.StatusInternalServerError)
-			return
-		}
-	}
+//	resp := make([]structs.SANStorageResponse, len(names))
+//	for i := range names {
+//		resp[i], err = getSanStoreInfo(names[i])
+//		if err != nil {
+//			httpError2(w, err, http.StatusInternalServerError)
+//			return
+//		}
+//	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
-}
+//	w.Header().Set("Content-Type", "application/json")
+//	w.WriteHeader(http.StatusOK)
+//	json.NewEncoder(w).Encode(resp)
+//}
 
-// GET /storage/san/{name:.*}
-func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
+//// GET /storage/san/{name:.*}
+//func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+//	name := mux.Vars(r)["name"]
 
-	resp, err := getSanStoreInfo(name)
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//	resp, err := getSanStoreInfo(name)
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
-}
-
-func getSanStoreInfo(id string) (structs.SANStorageResponse, error) {
-	store, err := storage.GetStore(id)
-	if err != nil {
-		return structs.SANStorageResponse{}, err
-	}
-
-	info, err := store.Info()
-	if err != nil {
-		return structs.SANStorageResponse{}, err
-	}
-
-	i := 0
-	spaces := make([]structs.Space, len(info.List))
-	for _, val := range info.List {
-		spaces[i] = structs.Space{
-			Enable: val.Enable,
-			ID:     val.ID,
-			Total:  val.Total,
-			Free:   val.Free,
-			LunNum: val.LunNum,
-			State:  val.State,
-		}
-		i++
-	}
-
-	return structs.SANStorageResponse{
-		ID:     info.ID,
-		Vendor: info.Vendor,
-		Driver: info.Driver,
-		Total:  info.Total,
-		Free:   info.Free,
-		Used:   info.Total - info.Free,
-		Spaces: spaces,
-	}, nil
-}
+//	w.Header().Set("Content-Type", "application/json")
+//	w.WriteHeader(http.StatusOK)
+//	json.NewEncoder(w).Encode(resp)
+//}
 
 // GET /tasks
 func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1586,10 +1549,7 @@ func postDatacenter(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 // POST /clusters
 func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	var (
-		req   = structs.PostClusterRequest{}
-		store storage.Store
-	)
+	var req = structs.PostClusterRequest{}
 
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -1608,14 +1568,6 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.StorageType != "local" && req.StorageID != "" {
-		store, err = storage.GetStore(req.StorageID)
-		if err != nil {
-			httpError2(w, err, http.StatusInternalServerError)
-			return
-		}
-	}
-
 	if req.Type == "proxy" && req.NetworkingID != "" {
 		_, _, err := database.GetNetworkingByID(req.NetworkingID)
 		if err != nil {
@@ -1630,7 +1582,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gd.AddDatacenter(cluster, store)
+	gd.AddDatacenter(cluster)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -2636,101 +2588,101 @@ func iniParse(content string, keysetsMap map[string]database.KeysetParams) ([]st
 	return kvs, nil
 }
 
-// POST /storage/san
-func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	req := structs.PostSANStoreRequest{}
+//// POST /storage/san
+//func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+//	req := structs.PostSANStoreRequest{}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError2(w, err, http.StatusBadRequest)
-		return
-	}
+//	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+//		httpError2(w, err, http.StatusBadRequest)
+//		return
+//	}
 
-	store, err := storage.RegisterStore(req.Vendor, req.Addr,
-		req.Username, req.Password, req.Admin,
-		req.LunStart, req.LunEnd, req.HostLunStart, req.HostLunEnd)
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//	store, err := storage.RegisterStore(req.Vendor, req.Addr,
+//		req.Username, req.Password, req.Admin,
+//		req.LunStart, req.LunEnd, req.HostLunStart, req.HostLunEnd)
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "ID", store.ID())
-}
+//	w.Header().Set("Content-Type", "application/json")
+//	w.WriteHeader(http.StatusCreated)
+//	fmt.Fprintf(w, "{%q:%q}", "ID", store.ID())
+//}
 
-// POST /storage/san/{name}/raidgroup
-func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	req := structs.PostRaidGroupRequest{}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError2(w, err, http.StatusBadRequest)
-		return
-	}
-	name := mux.Vars(r)["name"]
+//// POST /storage/san/{name}/raidgroup
+//func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+//	req := structs.PostRaidGroupRequest{}
+//	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+//		httpError2(w, err, http.StatusBadRequest)
+//		return
+//	}
+//	name := mux.Vars(r)["name"]
 
-	store, err := storage.GetStore(name)
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//	store, err := storage.GetStore(name)
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	space, err := store.AddSpace(req.ID)
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//	space, err := store.AddSpace(req.ID)
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%d}", "Size", space.Total)
-}
+//	w.Header().Set("Content-Type", "application/json")
+//	w.WriteHeader(http.StatusCreated)
+//	fmt.Fprintf(w, "{%q:%d}", "Size", space.Total)
+//}
 
-// POST /storage/san/{name}/raid_group/{rg:[0-9]+}/enable
-func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	san := mux.Vars(r)["name"]
-	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//// POST /storage/san/{name}/raid_group/{rg:[0-9]+}/enable
+//func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+//	san := mux.Vars(r)["name"]
+//	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	store, err := storage.GetStore(san)
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//	store, err := storage.GetStore(san)
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	err = store.EnableSpace(rg)
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//	err = store.EnableSpace(rg)
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	w.WriteHeader(http.StatusOK)
-}
+//	w.WriteHeader(http.StatusOK)
+//}
 
-// POST /storage/san/{name}/raid_group/{rg:[0-9]+}/disable
-func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	san := mux.Vars(r)["name"]
-	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//// POST /storage/san/{name}/raid_group/{rg:[0-9]+}/disable
+//func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+//	san := mux.Vars(r)["name"]
+//	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	store, err := storage.GetStore(san)
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//	store, err := storage.GetStore(san)
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	err = store.DisableSpace(rg)
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//	err = store.DisableSpace(rg)
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	w.WriteHeader(http.StatusOK)
-}
+//	w.WriteHeader(http.StatusOK)
+//}
 
 // DELETE /services/{name}
 // TODO:Not Done Yet
@@ -2905,37 +2857,37 @@ func deletePort(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// DELETE /storage/san/{name}
-func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
+//// DELETE /storage/san/{name}
+//func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+//	name := mux.Vars(r)["name"]
 
-	err := storage.RemoveStore(name)
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//	err := storage.RemoveStore(name)
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	w.WriteHeader(http.StatusNoContent)
-}
+//	w.WriteHeader(http.StatusNoContent)
+//}
 
-// DELETE /storage/san/{name}/raid_group/{rg:[0-9]+}
-func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	san := mux.Vars(r)["name"]
+//// DELETE /storage/san/{name}/raid_group/{rg:[0-9]+}
+//func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+//	san := mux.Vars(r)["name"]
 
-	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	err = storage.RemoveStoreSpace(san, rg)
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+//	err = storage.RemoveStoreSpace(san, rg)
+//	if err != nil {
+//		httpError2(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	w.WriteHeader(http.StatusNoContent)
-}
+//	w.WriteHeader(http.StatusNoContent)
+//}
 
 // DELETE /image/{image:.*}
 func deleteImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
