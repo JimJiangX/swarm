@@ -9,27 +9,57 @@ fi
 INSTANCE=$1
 USER=$2
 PASSWD=$3
-
 SLAVEFILE=/tmp/${INSTANCE}_file_slave.data
+
+mhost=''
+mport=''
+mID=''
+slaveIO=''
+slaveSQL=''
+seconds_behind_master=''
+relay_Log_File=''
+relay_Log_Pos=''
+master_Log_File=''
+read_Master_Log_Pos=''
+
+outprint() {
+	set +o nounset
+	# upsql.replication.status
+	replication="${mhost}#${mport}#${rwmode}#${mID}#${slaveIO}#${slaveSQL}#${seconds_behind_master}#${relay_Log_File}#${relay_Log_Pos}#${master_Log_File}#${read_Master_Log_Pos}#${host}#${port}"
+	echo "$replication:$slaveIO:$slaveSQL"
+	set -o nounset
+}
+
+rmtempfile() {
+	if [ -e ${SLAVEFILE} ]; then
+		rm -f ${SLAVEFILE}
+	fi
+
+}
 
 running_status=`docker inspect -f "{{.State.Running}}" ${INSTANCE}`
 if [ "${running_status}" != "true" ]; then
-	exit 4
+	outprint
+	rmtempfile
+	exit
 fi
 
 EXEC_BIN=`which mysql 2>/dev/null`
 if [ "${EXEC_BIN}" == '' ]; then
-	echo "not find mysql"
-	exit 4
+	outprint
+	rmtempfile
+	exit
 fi
 
-${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e"show slave status \G;" >$SLAVEFILE  2>/dev/null
+${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e"show slave status \G;" >${SLAVEFILE}  2>/dev/null
 if [ $? -ne 0 ]; then
-	echo "get variabes err"
-	rm  $STATUSFILE
-	exit 2
+	outprint
+	rmtempfile
+	exit
 fi
 
+host=`awk -F= '/bind_address=/{print $2}' /${INSTANCE}_DAT_LV/my.cnf 2>/dev/null`
+port=`awk -F= '/port=/{print $2}' /${INSTANCE}_DAT_LV/my.cnf 2>/dev/null`
 rwmode=`${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e"show variables like 'read_only';" 2>/dev/null |tail -n 1 | awk '{print $2}'`
 
 while read LINE 
@@ -68,15 +98,8 @@ do
 	Read_Master_Log_Pos:)
 		read_Master_Log_Pos=$value
 	esac
-done <$SLAVEFILE
+done <${SLAVEFILE}
 
-host=`awk -F= '/bind_address=/{print $2}' /${INSTANCE}_DAT_LV/my.cnf`
-port=`awk -F= '/port=/{print $2}' /${INSTANCE}_DAT_LV/my.cnf`
-
-set +o nounset
-# upsql.replication.status
-replication=${mhost}#${mport}#${rwmode}#${mID}#${slaveIO}#${slaveSQL}#${seconds_behind_master}#${relay_Log_File}#${relay_Log_Pos}#${master_Log_File}#${read_Master_Log_Pos}#${host}#${port}
-echo "$replication:$slaveIO:$slaveSQL"
-set -o nounset
-
-rm -f $SLAVEFILE
+outprint
+rmtempfile
+exit
