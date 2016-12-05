@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
@@ -91,28 +93,31 @@ func (nt *nodeWithTask) distribute(ctx context.Context, ormer database.ClusterOr
 		"host": nt.Node.Addr,
 	})
 
-	nodeState, taskState := int64(statusNodeInstalling), int64(statusTaskRunning)
+	nodeState := int64(statusNodeInstalling)
 
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.Errorf("Recover from Panic:%v", r)
 		}
 
-		var msg string
 		if err == nil {
-			nodeState = statusNodeInstalled
+			nt.Node.Status = statusNodeInstalled
+			nt.Task.Status = statusTaskRunning
 		} else {
 			if nodeState == statusNodeInstalling {
-				nodeState = statusNodeInstallFailed
+				nt.Node.Status = statusNodeInstallFailed
+			} else {
+				nt.Node.Status = nodeState
 			}
-			taskState = statusTaskFailed
-			msg = err.Error()
+
+			nt.Task.Status = statusTaskFailed
+			nt.Task.Errors = err.Error()
+			nt.Task.FinishedAt = time.Now()
 		}
 
-		//			r := database.TxUpdateNodeStatus(node.Node, node.task,
-		//				nodeState, taskState, msg)
+		_err := ormer.RegisterNode(nt.Node, nt.Task)
 		if err != nil {
-			entry.Error(msg)
+			entry.Errorf("%+v", _err)
 		}
 	}()
 
@@ -146,8 +151,6 @@ func (nt *nodeWithTask) distribute(ctx context.Context, ormer database.ClusterOr
 			return err
 		}
 	}
-
-	logrus.Infof("Registry.CA_CRT:%d %s", len(config.Registry.CA_CRT), config.Registry.CA_CRT)
 
 	_, filename, _ := config.DestPath()
 
@@ -192,6 +195,7 @@ func (node *nodeWithTask) modifyProfile(config database.SysConfig) (string, erro
 	//		return nil, "", err
 	//	}
 
+	// TODO:
 	horus := "horus address"
 
 	horusIP, horusPort, err := net.SplitHostPort(horus)
@@ -263,3 +267,207 @@ func (node *nodeWithTask) modifyProfile(config database.SysConfig) (string, erro
 
 	return script, nil
 }
+
+// registerNodes register Nodes
+func (dc *Datacenter) registerNodes(ctx context.Context, nodes []nodeWithTask, config database.SysConfig) {
+	d := 30 * time.Second
+	timer := time.NewTimer(d)
+
+	defer func(t *time.Timer) {
+		if !timer.Stop() {
+			<-t.C
+		}
+	}(timer)
+
+	for {
+		select {
+		case <-timer.C:
+			timer.Reset(d)
+
+		case <-ctx.Done():
+			err := dc.registerNodesTimeout(nodes, ctx.Err())
+			logrus.Errorf("%+v", err)
+
+			return
+		}
+
+		count := 0
+		for i := range nodes {
+			fields := logrus.WithFields(logrus.Fields{
+				"Node": nodes[i].Node.Name,
+				"addr": nodes[i].Node.Addr,
+			})
+
+			n, err := dc.dco.GetNode(nodes[i].Node.ID)
+			if err != nil {
+				fields.Warnf("%+v", err)
+				continue
+			}
+
+			if n.Status != statusNodeInstalled {
+				if n.Status > statusNodeInstalled {
+					count++
+					if count >= len(nodes) {
+						return
+					}
+				}
+
+				fields.Warnf("status not match,%d!=%d", n.Status, statusNodeInstalled)
+				continue
+			}
+
+			addr := n.Addr + ":" + strconv.Itoa(config.DockerPort)
+			eng := dc.clsuter.EngineByAddr(addr)
+			if eng == nil || !eng.IsHealthy() {
+				fields.Error(err)
+
+				continue
+			}
+
+			n.EngineID = eng.ID
+			n.Status = statusNodeEnable
+			n.RegisterAt = time.Now()
+
+			t := nodes[i].Task
+			t.Status = statusTaskDone
+			t.FinishedAt = n.RegisterAt
+			t.Errors = ""
+
+			err = dc.dco.RegisterNode(n, t)
+			if err != nil {
+				fields.Errorf("%+v", err)
+			}
+		}
+	}
+}
+
+func (dc *Datacenter) registerNodesTimeout(nodes []nodeWithTask, er error) error {
+	if len(nodes) == 0 {
+		return nil
+	}
+
+	cID, in := "", make([]string, 0, len(nodes))
+
+	for i := range nodes {
+		if nodes[i].Node.ID != "" {
+			in = append(in, nodes[i].Node.ID)
+			if cID == "" {
+				cID = nodes[i].Node.ClusterID
+			}
+		}
+	}
+
+	list, err := dc.dco.ListNodeByCluster(cID)
+	if err != nil {
+		return err
+	}
+
+	for n := range nodes {
+		for i := range list {
+			if list[i].ID == nodes[n].Node.ID {
+				nodes[n].Node = list[i]
+				break
+			}
+		}
+	}
+
+	for i := range nodes {
+		n, t := nodes[i].Node, nodes[i].Task
+		if n.Status >= statusNodeEnable {
+			continue
+		}
+
+		if n.Status != statusNodeInstalled {
+			n.Status = statusNodeRegisterTimeout
+			n.RegisterAt = time.Now()
+
+			t.Status = statusTaskFailed
+			t.FinishedAt = n.RegisterAt
+			t.Errors = er.Error()
+		}
+
+		err = dc.dco.RegisterNode(n, t)
+		if err != nil {
+			logrus.WithField("Node", n.Name).WithError(err).Error("Node register timeout")
+		}
+	}
+
+	return nil
+}
+
+//func nodeClean(node, addr, user, password string) error {
+//	config, err := database.GetSystemConfig()
+//	if err != nil {
+//		return err
+//	}
+
+//	horus, err := getHorusFromConsul()
+//	if err != nil {
+//		return err
+//	}
+
+//	horusIP, horusPort, err := net.SplitHostPort(horus)
+//	if err != nil {
+//		return errors.Wrap(err, "check Horus Addr:"+horus)
+//	}
+
+//	_, _, destName := config.DestPath()
+
+//	srcFile, err := utils.GetAbsolutePath(false, config.SourceDir, config.CleanScriptName)
+//	if err != nil {
+//		logrus.Errorf("%s %s", srcFile, err)
+
+//		return errors.Wrap(err, "get absolute path")
+//	}
+
+//	entry := logrus.WithFields(logrus.Fields{
+//		"host":        addr,
+//		"user":        user,
+//		"source":      srcFile,
+//		"destination": destName,
+//	})
+
+//	c, err := scplib.NewClient(addr, user, password)
+//	if err != nil {
+//		return err
+//	}
+//	defer c.Close()
+
+//	if err := c.UploadFile(destName, srcFile); err != nil {
+//		entry.Errorf("SSH UploadFile %s Error,%s", srcFile, err)
+
+//		if err := c.UploadFile(destName, srcFile); err != nil {
+//			entry.Errorf("SSH UploadFile %s Error Twice,%s", srcFile, err)
+
+//			return err
+//		}
+//	}
+
+//	/*
+//		adm_ip=$1
+//		consul_port=${2}
+//		node_id=${3}
+//		horus_server_ip=${4}
+//		horus_server_port=${5}
+//		backup_dir = ${6}
+//	*/
+
+//	script := fmt.Sprintf("chmod 755 %s && %s %s %d %s %s %s %s",
+//		destName, destName, addr, config.ConsulPort, node,
+//		horusIP, horusPort, config.NFSOption.MountDir)
+
+//	out, err := c.Exec(script)
+//	if err != nil {
+//		entry.Errorf("exec remote command: %s,%v,Output:%s", script, err, out)
+
+//		out, err := c.Exec(script)
+//		if err != nil {
+//			entry.Errorf("exec remote command twice: %s,%v,Output:%s", script, err, out)
+//			return err
+//		}
+//	}
+
+//	entry.Infof("SSH Remote Exec Successed! Output:\n%s", out)
+
+//	return nil
+//}

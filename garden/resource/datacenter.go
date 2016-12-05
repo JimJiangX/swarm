@@ -134,5 +134,7 @@ func (dc *Datacenter) InstallNodes(ctx context.Context, list []nodeWithTask) err
 		}
 	}
 
+	go dc.registerNodes(ctx, list, config)
+
 	return nil
 }

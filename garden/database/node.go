@@ -20,6 +20,8 @@ type NodeOrmer interface {
 
 	ListNodeByCluster(cluster string) ([]Node, error)
 
+	RegisterNode(n Node, t Task) error
+
 	DeleteNode(nameOrID string) error
 }
 
@@ -47,7 +49,7 @@ func (db dbBase) nodeTable() string {
 func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 	do := func(tx *sqlx.Tx) error {
 
-		query := "INSERT INTO " + db.nodeTable() + "(id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
+		query := "INSERT INTO " + db.nodeTable() + " (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
 
 		if len(nodes) == 1 {
 			_, err := tx.Exec(query, nodes[0])
@@ -81,51 +83,24 @@ func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 	return db.txFrame(do)
 }
 
-//// TxUpdateNodeStatus returns error when Node UPDATE status.
-//func TxUpdateNodeStatus(n *Node, task *Task, nstate, tstate int64, msg string) error {
-//	do := func(tx *sqlx.Tx) error {
-//		_, err := tx.Exec("UPDATE tbl_dbaas_node SET status=? WHERE id=?", nstate, n.ID)
-//		if err != nil {
-//			return errors.Wrap(err, "Tx update Node status")
-//		}
+// RegisterNode returns error when Node UPDATE infomation.
+func (db dbBase) RegisterNode(n Node, t Task) error {
+	do := func(tx *sqlx.Tx) (err error) {
+		query := "UPDATE " + db.nodeTable() + " SET engine_id=?,status=?,register_at=? WHERE id=?"
+		_, err = tx.Exec(query, n.EngineID, n.Status, n.RegisterAt, n.ID)
+		if err != nil {
+			return errors.Wrap(err, "Tx update Node status")
+		}
 
-//		err = txUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
+		err = db.txUpdateTask(tx, t)
 
-//		return err
-//	}
+		return err
+	}
 
-//	err := txFrame(do)
-//	if err == nil {
-//		n.Status = nstate
-//	}
+	err := db.txFrame(do)
 
-//	return err
-//}
-
-//// TxUpdateNodeRegister returns error when Node UPDATE infomation.
-//func TxUpdateNodeRegister(n *Node, task *Task, nstate, tstate int64, eng, msg string) error {
-//	do := func(tx *sqlx.Tx) (err error) {
-//		if eng != "" {
-//			_, err = tx.Exec("UPDATE tbl_dbaas_node SET engine_id=?,status=?,register_at=? WHERE id=?", eng, nstate, time.Now(), n.ID)
-//		} else {
-//			_, err = tx.Exec("UPDATE tbl_dbaas_node SET status=?,register_at=? WHERE id=?", nstate, time.Now(), n.ID)
-//		}
-//		if err != nil {
-//			return errors.Wrap(err, "Tx update Node status")
-//		}
-
-//		err = txUpdateTaskStatus(tx, task, tstate, time.Now(), msg)
-
-//		return err
-//	}
-
-//	err := txFrame(do)
-//	if err == nil {
-//		atomic.StoreInt64(&n.Status, nstate)
-//	}
-
-//	return err
-//}
+	return err
+}
 
 // GetNode get Node by nameOrID.
 func (db dbBase) GetNode(nameOrID string) (Node, error) {
