@@ -180,12 +180,8 @@ func NewNodeWithTaskList(len int) []nodeWithTask {
 
 // InstallNodes install new nodes,list should has same ClusterID
 func (dc *Datacenter) InstallNodes(ctx context.Context, list []nodeWithTask) error {
-	if _, ok := ctx.Deadline(); !ok {
-
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 250*time.Second+time.Duration(len(list)*30)*time.Second)
-		defer cancel()
-	}
+	d := 250*time.Second + time.Duration(len(list)*30)*time.Second
+	ctx, _ = context.WithTimeout(ctx, d)
 
 	for i := range list {
 		_, err := dc.getCluster(list[i].Node.ClusterID)
