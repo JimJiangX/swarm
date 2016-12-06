@@ -76,24 +76,19 @@ func (db dbBase) ListClusters() ([]Cluster, error) {
 }
 
 // UpdateClusterStatus update Cluster.enabled by ID
-func (db dbBase) UpdateClusterStatus(c *Cluster, state bool) error {
+func (db dbBase) UpdateClusterStatus(c Cluster, state bool) error {
 	query := "UPDATE " + db.clusterTable() + " SET enabled=? WHERE id=?"
 
 	_, err := db.Exec(query, state, c.ID)
-	if err == nil {
-		c.Enabled = state
-
-		return nil
-	}
 
 	return errors.Wrap(err, "update Cluster.Enabled by ID:"+c.ID)
 }
 
 // UpdateClusterParams updates MaxNode\UsageLimit
 func (db dbBase) UpdateClusterParams(c Cluster) error {
-	query := "UPDATE " + db.clusterTable() + " SET max_node=:max_node,usage_limit=:usage_limit WHERE id=:id OR name=:name"
+	query := "UPDATE " + db.clusterTable() + " SET max_node=?,usage_limit=? WHERE id=?"
 
-	_, err := db.NamedExec(query, &c)
+	_, err := db.Exec(query, c.MaxNode, c.UsageLimit, c.ID)
 
 	return errors.Wrap(err, "update Cluster MaxNode or UsageLimit")
 }

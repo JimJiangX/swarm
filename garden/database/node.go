@@ -14,11 +14,11 @@ type NodeOrmer interface {
 
 	GetNode(nameOrID string) (Node, error)
 
-	GetNodeByAddr(addr string) (Node, error)
-
 	ListNodes() ([]Node, error)
 
 	ListNodeByCluster(cluster string) ([]Node, error)
+
+	UpdateParams(n Node) error
 
 	RegisterNode(n Node, t Task) error
 
@@ -35,7 +35,7 @@ type Node struct {
 	Room         string `db:"room"`
 	Seat         string `db:"seat"`
 	MaxContainer int    `db:"max_container"`
-	Status       int64  `db:"status"`
+	Status       int    `db:"status"`
 
 	RegisterAt   time.Time `db:"register_at"`
 	DeregisterAt time.Time `db:"deregister_at"`
@@ -81,6 +81,15 @@ func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 	}
 
 	return db.txFrame(do)
+}
+
+// UpdateParams returns error when Node update status and max_container.
+func (db dbBase) UpdateParams(n Node) error {
+	query := "UPDATE " + db.nodeTable() + " SET status=?,max_container=? WHERE id=?"
+
+	_, err := db.Exec(query, n.Status, n.MaxContainer, n.ID)
+
+	return errors.Wrap(err, "update Node Params by ID")
 }
 
 // RegisterNode returns error when Node UPDATE infomation.

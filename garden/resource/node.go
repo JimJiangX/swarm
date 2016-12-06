@@ -59,6 +59,97 @@ func newNode(n database.Node, eng *cluster.Engine) Node {
 	}
 }
 
+func (dc *Datacenter) getNode(nameOrID string) (Node, error) {
+	n, err := dc.dco.GetNode(nameOrID)
+	if err != nil {
+		return Node{}, err
+	}
+
+	if n.EngineID == "" {
+		return Node{node: n}, nil
+	}
+
+	eng := dc.clsuter.Engine(n.EngineID)
+
+	return newNode(n, eng), nil
+}
+
+func (dc *Datacenter) updateNode(nameOrID string, status, maxContainer int) (database.Node, error) {
+	n, err := dc.getNode(nameOrID)
+	if err != nil {
+		return database.Node{}, err
+	}
+
+	if status != 0 {
+		n.node.Status = status
+	}
+	if maxContainer != 0 {
+		n.node.MaxContainer = maxContainer
+	}
+
+	err = dc.dco.UpdateParams(n.node)
+	if err != nil {
+		return n.node, err
+	}
+
+	return n.node, nil
+}
+
+func (dc *Datacenter) removeNode(ID string) error {
+	err := dc.dco.DeleteNode(ID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (dc *Datacenter) RemoveNode(ctx context.Context, nameOrID, user, password string, force bool) error {
+	node, err := dc.getNode(nameOrID)
+	if err != nil {
+		if database.IsNotFound(err) {
+			return nil
+		}
+
+		return err
+	}
+
+	if !force {
+		if err := node.removeCondition(); err != nil {
+			return err
+		}
+	}
+
+	select {
+	default:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	config, err := dc.dco.GetSysConfig()
+	if err != nil {
+		return err
+	}
+
+	client, err := scplib.NewScpClient(node.node.Addr, user, password)
+	if err != nil {
+		return err
+	}
+
+	err = node.nodeClean(ctx, client, "horus", config)
+	if err != nil {
+		return err
+	}
+
+	err = dc.removeNode(node.node.ID)
+
+	return err
+}
+
+func (n *Node) removeCondition() error {
+	return nil
+}
+
 type nodeWithTask struct {
 	hdd    []string
 	ssd    []string
@@ -87,13 +178,62 @@ func NewNodeWithTaskList(len int) []nodeWithTask {
 	return make([]nodeWithTask, len)
 }
 
+// InstallNodes install new nodes,list should has same ClusterID
+func (dc *Datacenter) InstallNodes(ctx context.Context, list []nodeWithTask) error {
+	if _, ok := ctx.Deadline(); !ok {
+
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 250*time.Second+time.Duration(len(list)*30)*time.Second)
+		defer cancel()
+	}
+
+	for i := range list {
+		_, err := dc.getCluster(list[i].Node.ClusterID)
+		if err != nil {
+			return err
+		}
+	}
+
+	nodes := make([]database.Node, len(list))
+	tasks := make([]database.Task, len(list))
+
+	for i := range list {
+		nodes[i] = list[i].Node
+		tasks[i] = list[i].Task
+	}
+
+	select {
+	default:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	err := dc.dco.InsertNodesAndTask(nodes, tasks)
+	if err != nil {
+		return err
+	}
+
+	config, err := dc.dco.GetSysConfig()
+	if err != nil {
+		return err
+	}
+
+	for i := range list {
+		go list[i].distribute(ctx, dc.dco, config)
+	}
+
+	go dc.registerNodes(ctx, list, config)
+
+	return nil
+}
+
 func (nt *nodeWithTask) distribute(ctx context.Context, ormer database.ClusterOrmer, config database.SysConfig) (err error) {
 	entry := logrus.WithFields(logrus.Fields{
 		"Node": nt.Node.Name,
 		"host": nt.Node.Addr,
 	})
 
-	nodeState := int64(statusNodeInstalling)
+	nodeState := statusNodeInstalling
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -116,8 +256,8 @@ func (nt *nodeWithTask) distribute(ctx context.Context, ormer database.ClusterOr
 		}
 
 		_err := ormer.RegisterNode(nt.Node, nt.Task)
-		if err != nil {
-			entry.Errorf("%+v", _err)
+		if _err != nil {
+			entry.Errorf("%+v,%+v", err, _err)
 		}
 	}()
 
@@ -270,11 +410,23 @@ func (node *nodeWithTask) modifyProfile(config database.SysConfig) (string, erro
 
 // registerNodes register Nodes
 func (dc *Datacenter) registerNodes(ctx context.Context, nodes []nodeWithTask, config database.SysConfig) {
-	d := 30 * time.Second
-	timer := time.NewTimer(d)
+	cID := ""
+	for i := range nodes {
+		if nodes[i].Node.ClusterID != "" {
+			cID = nodes[i].Node.ClusterID
+			break
+		}
+	}
+	if cID == "" {
+		logrus.Error("ClusterID is required")
+		return
+	}
+
+	field := logrus.WithField("Cluster", cID)
+	timer := time.NewTimer(time.Minute * 2)
 
 	defer func(t *time.Timer) {
-		if !timer.Stop() {
+		if !t.Stop() {
 			<-t.C
 		}
 	}(timer)
@@ -282,27 +434,37 @@ func (dc *Datacenter) registerNodes(ctx context.Context, nodes []nodeWithTask, c
 	for {
 		select {
 		case <-timer.C:
-			timer.Reset(d)
+			timer.Reset(30 * time.Second)
 
 		case <-ctx.Done():
 			err := dc.registerNodesTimeout(nodes, ctx.Err())
-			logrus.Errorf("%+v", err)
+			field.Errorf("%+v", err)
 
 			return
 		}
 
+		list, err := dc.dco.ListNodeByCluster(cID)
+		if err != nil {
+			field.Errorf("%+v", err)
+			continue
+		}
+
+		for i := range nodes {
+			for l := range list {
+				if list[l].ID == nodes[i].Node.ID {
+					nodes[i].Node = list[l]
+					break
+				}
+			}
+		}
+
 		count := 0
 		for i := range nodes {
-			fields := logrus.WithFields(logrus.Fields{
-				"Node": nodes[i].Node.Name,
-				"addr": nodes[i].Node.Addr,
+			n := nodes[i].Node
+			fields := field.WithFields(logrus.Fields{
+				"Node": n.Name,
+				"addr": n.Addr,
 			})
-
-			n, err := dc.dco.GetNode(nodes[i].Node.ID)
-			if err != nil {
-				fields.Warnf("%+v", err)
-				continue
-			}
 
 			if n.Status != statusNodeInstalled {
 				if n.Status > statusNodeInstalled {
@@ -310,6 +472,7 @@ func (dc *Datacenter) registerNodes(ctx context.Context, nodes []nodeWithTask, c
 					if count >= len(nodes) {
 						return
 					}
+					continue
 				}
 
 				fields.Warnf("status not match,%d!=%d", n.Status, statusNodeInstalled)
@@ -395,79 +558,76 @@ func (dc *Datacenter) registerNodesTimeout(nodes []nodeWithTask, er error) error
 	return nil
 }
 
-//func nodeClean(node, addr, user, password string) error {
-//	config, err := database.GetSystemConfig()
-//	if err != nil {
-//		return err
-//	}
+func (n *Node) nodeClean(ctx context.Context, client scplib.ScpClient, horus string, config database.SysConfig) error {
+	horusIP, horusPort, err := net.SplitHostPort(horus)
+	if err != nil {
+		return errors.Wrap(err, "check Horus Addr:"+horus)
+	}
 
-//	horus, err := getHorusFromConsul()
-//	if err != nil {
-//		return err
-//	}
+	_, _, destName := config.DestPath()
 
-//	horusIP, horusPort, err := net.SplitHostPort(horus)
-//	if err != nil {
-//		return errors.Wrap(err, "check Horus Addr:"+horus)
-//	}
+	srcFile, err := utils.GetAbsolutePath(false, config.SourceDir, config.CleanScriptName)
+	if err != nil {
+		logrus.Errorf("%s %s", srcFile, err)
 
-//	_, _, destName := config.DestPath()
+		return errors.Wrap(err, "get absolute path")
+	}
 
-//	srcFile, err := utils.GetAbsolutePath(false, config.SourceDir, config.CleanScriptName)
-//	if err != nil {
-//		logrus.Errorf("%s %s", srcFile, err)
+	entry := logrus.WithFields(logrus.Fields{
+		"host":        n.node.Addr,
+		"source":      srcFile,
+		"destination": destName,
+	})
 
-//		return errors.Wrap(err, "get absolute path")
-//	}
+	select {
+	default:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 
-//	entry := logrus.WithFields(logrus.Fields{
-//		"host":        addr,
-//		"user":        user,
-//		"source":      srcFile,
-//		"destination": destName,
-//	})
+	defer client.Close()
 
-//	c, err := scplib.NewClient(addr, user, password)
-//	if err != nil {
-//		return err
-//	}
-//	defer c.Close()
+	if err := client.UploadFile(destName, srcFile); err != nil {
+		entry.Errorf("SSH UploadFile %s Error,%s", srcFile, err)
 
-//	if err := c.UploadFile(destName, srcFile); err != nil {
-//		entry.Errorf("SSH UploadFile %s Error,%s", srcFile, err)
+		if err := client.UploadFile(destName, srcFile); err != nil {
+			entry.Errorf("SSH UploadFile %s Error Twice,%s", srcFile, err)
 
-//		if err := c.UploadFile(destName, srcFile); err != nil {
-//			entry.Errorf("SSH UploadFile %s Error Twice,%s", srcFile, err)
+			return err
+		}
+	}
 
-//			return err
-//		}
-//	}
+	/*
+		adm_ip=$1
+		consul_port=${2}
+		node_id=${3}
+		horus_server_ip=${4}
+		horus_server_port=${5}
+		backup_dir = ${6}
+	*/
 
-//	/*
-//		adm_ip=$1
-//		consul_port=${2}
-//		node_id=${3}
-//		horus_server_ip=${4}
-//		horus_server_port=${5}
-//		backup_dir = ${6}
-//	*/
+	select {
+	default:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 
-//	script := fmt.Sprintf("chmod 755 %s && %s %s %d %s %s %s %s",
-//		destName, destName, addr, config.ConsulPort, node,
-//		horusIP, horusPort, config.NFSOption.MountDir)
+	script := fmt.Sprintf("chmod 755 %s && %s %s %d %s %s %s %s",
+		destName, destName, n.node.Addr, config.ConsulPort, n.node.ID,
+		horusIP, horusPort, config.NFSOption.MountDir)
 
-//	out, err := c.Exec(script)
-//	if err != nil {
-//		entry.Errorf("exec remote command: %s,%v,Output:%s", script, err, out)
+	out, err := client.Exec(script)
+	if err != nil {
+		entry.Errorf("exec remote command: %s,%v,Output:%s", script, err, out)
 
-//		out, err := c.Exec(script)
-//		if err != nil {
-//			entry.Errorf("exec remote command twice: %s,%v,Output:%s", script, err, out)
-//			return err
-//		}
-//	}
+		out, err := client.Exec(script)
+		if err != nil {
+			entry.Errorf("exec remote command twice: %s,%v,Output:%s", script, err, out)
+			return err
+		}
+	}
 
-//	entry.Infof("SSH Remote Exec Successed! Output:\n%s", out)
+	entry.Infof("SSH Remote Exec Successed! Output:\n%s", out)
 
-//	return nil
-//}
+	return nil
+}
