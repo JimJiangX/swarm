@@ -115,7 +115,7 @@ func (db dbBase) RegisterNode(n Node, t Task) error {
 func (db dbBase) GetNode(nameOrID string) (Node, error) {
 	var (
 		node  Node
-		query = "SELECT * FROM " + db.nodeTable() + " WHERE id=? OR name=? OR engine_id=?"
+		query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM " + db.nodeTable() + " WHERE id=? OR name=? OR engine_id=?"
 	)
 
 	err := db.Get(&node, query, nameOrID, nameOrID, nameOrID)
@@ -133,7 +133,7 @@ func (db dbBase) GetNode(nameOrID string) (Node, error) {
 func (db dbBase) GetNodeByAddr(addr string) (Node, error) {
 	var (
 		node  Node
-		query = "SELECT * FROM " + db.nodeTable() + " WHERE admin_ip=?"
+		query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM " + db.nodeTable() + " WHERE admin_ip=?"
 	)
 
 	err := db.Get(&node, query, addr)
@@ -151,7 +151,7 @@ func (db dbBase) GetNodeByAddr(addr string) (Node, error) {
 func (db dbBase) ListNodes() ([]Node, error) {
 	var (
 		nodes []Node
-		query = "SELECT * FROM " + db.nodeTable()
+		query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM " + db.nodeTable()
 	)
 
 	err := db.Select(&nodes, query)
@@ -163,7 +163,7 @@ func (db dbBase) ListNodes() ([]Node, error) {
 func (db dbBase) ListNodeByCluster(cluster string) ([]Node, error) {
 	var (
 		nodes []Node
-		query = "SELECT * FROM " + db.nodeTable() + " WHERE cluster_id=?"
+		query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM " + db.nodeTable() + " WHERE cluster_id=?"
 	)
 
 	err := db.Select(&nodes, query, cluster)
@@ -191,7 +191,7 @@ func (db dbBase) ListNodesByEngines(names []string) ([]Node, error) {
 
 	var (
 		nodes []Node
-		query = "SELECT * FROM " + db.nodeTable() + " WHERE engine_id IN (?);"
+		query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM " + db.nodeTable() + " WHERE engine_id IN (?);"
 	)
 
 	query, args, err := sqlx.In(query, names)
@@ -212,7 +212,7 @@ func (db dbBase) ListNodesByIDs(in []string, cluster string) ([]Node, error) {
 
 	var (
 		nodes []Node
-		query = "SELECT * FROM " + db.nodeTable() + " WHERE id IN (?);"
+		query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM " + db.nodeTable() + " WHERE id IN (?);"
 	)
 
 	query, args, err := sqlx.In(query, in)
@@ -249,7 +249,8 @@ func (db dbBase) ListNodesByClusters(clusters []string, _type string, enable boo
 		return []Node{}, nil
 	}
 
-	query, args, err := sqlx.In("SELECT * FROM "+db.clusterTable()+" WHERE cluster_id IN (?);", clusters)
+	query := "SELECT id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit FROM " + db.clusterTable() + " WHERE cluster_id IN (?);"
+	query, args, err := sqlx.In(query, clusters)
 	if err != nil {
 		return nil, errors.Wrap(err, "select []Node IN clusterIDs")
 	}
