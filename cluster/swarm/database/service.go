@@ -99,7 +99,7 @@ func GetUnit(nameOrID string) (Unit, error) {
 		return u, err
 	}
 
-	const query = "SELECT * FROM tbl_dbaas_unit WHERE id=? OR name=? OR container_id=?"
+	const query = "SELECT id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at FROM tbl_dbaas_unit WHERE id=? OR name=? OR container_id=?"
 
 	err = db.Get(&u, query, nameOrID, nameOrID, nameOrID)
 	if err == nil {
@@ -296,7 +296,7 @@ func ListUnitByServiceID(id string) ([]Unit, error) {
 	}
 
 	var out []Unit
-	const query = "SELECT * FROM tbl_dbaas_unit WHERE service_id=?"
+	const query = "SELECT id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at FROM tbl_dbaas_unit WHERE service_id=?"
 
 	err = db.Select(&out, query, id)
 	if err == nil {
@@ -321,7 +321,7 @@ func ListUnitByEngine(id string) ([]Unit, error) {
 	}
 
 	var out []Unit
-	const query = "SELECT * FROM tbl_dbaas_unit WHERE node_id=?"
+	const query = "SELECT id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at FROM tbl_dbaas_unit WHERE node_id=?"
 
 	err = db.Select(&out, query, id)
 	if err == nil {
@@ -451,7 +451,7 @@ func ListServices() ([]Service, error) {
 	}
 
 	var out []Service
-	const query = "SELECT * FROM tbl_dbaas_service"
+	const query = "SELECT id,name,description,architecture,business_code,auto_healing,auto_scaling,status,backup_max_size,backup_files_retention,created_at,finished_at FROM tbl_dbaas_service"
 
 	err = db.Select(&out, query)
 	if err == nil {
@@ -476,7 +476,7 @@ func GetService(nameOrID string) (Service, error) {
 	}
 
 	s := Service{}
-	const query = "SELECT * FROM tbl_dbaas_service WHERE id=? OR name=?"
+	const query = "SELECT id,name,description,architecture,business_code,auto_healing,auto_scaling,status,backup_max_size,backup_files_retention,created_at,finished_at FROM tbl_dbaas_service WHERE id=? OR name=?"
 
 	err = db.Get(&s, query, nameOrID, nameOrID)
 	if err == nil {
@@ -561,7 +561,7 @@ func TxGetServiceByUnit(unit string) (Service, error) {
 
 	const (
 		queryUnit    = "SELECT service_id FROM tbl_dbaas_unit WHERE id=? OR name=?"
-		queryService = "SELECT * FROM tbl_dbaas_service WHERE id=?"
+		queryService = "SELECT id,name,description,architecture,business_code,auto_healing,auto_scaling,status,backup_max_size,backup_files_retention,created_at,finished_at FROM tbl_dbaas_service WHERE id=?"
 	)
 
 	var (
@@ -731,9 +731,9 @@ func ListUsersByService(service, _type string) ([]User, error) {
 
 	var users []User
 	if _type == "" {
-		err = db.Select(&users, "SELECT * FROM tbl_dbaas_users WHERE service_id=?", service)
+		err = db.Select(&users, "SELECT id,service_id,type,username,password,role,read_only,blacklist,whitelist,created_at FROM tbl_dbaas_users WHERE service_id=?", service)
 	} else {
-		err = db.Select(&users, "SELECT * FROM tbl_dbaas_users WHERE service_id=? AND type=?", service, _type)
+		err = db.Select(&users, "SELECT id,service_id,type,username,password,role,read_only,blacklist,whitelist,created_at FROM tbl_dbaas_users WHERE service_id=? AND type=?", service, _type)
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "list []User by serviceID")

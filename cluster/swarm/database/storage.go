@@ -116,7 +116,7 @@ func GetLUNByID(id string) (LUN, error) {
 	}
 
 	lun := LUN{}
-	const query = "SELECT * FROM tbl_dbaas_lun WHERE id=? LIMIT 1"
+	const query = "SELECT id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at FROM tbl_dbaas_lun WHERE id=? LIMIT 1"
 
 	err = db.Get(&lun, query, id)
 	if err == nil {
@@ -141,7 +141,7 @@ func ListLUNByName(name string) ([]LUN, error) {
 	}
 
 	var list []LUN
-	const query = "SELECT * FROM tbl_dbaas_lun WHERE name=?"
+	const query = "SELECT id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at FROM tbl_dbaas_lun WHERE name=?"
 
 	err = db.Select(&list, query, name)
 	if err == nil {
@@ -166,7 +166,7 @@ func ListLUNByVgName(name string) ([]LUN, error) {
 	}
 
 	var list []LUN
-	const query = "SELECT * FROM tbl_dbaas_lun WHERE vg_name=?"
+	const query = "SELECT id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at FROM tbl_dbaas_lun WHERE vg_name=?"
 
 	err = db.Select(&list, query, name)
 	if err == nil {
@@ -191,7 +191,7 @@ func GetLUNByLunID(systemID string, id int) (LUN, error) {
 	}
 
 	lun := LUN{}
-	const query = "SELECT * FROM tbl_dbaas_lun WHERE storage_system_id=? AND storage_lun_id=?"
+	const query = "SELECT id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at FROM tbl_dbaas_lun WHERE storage_system_id=? AND storage_lun_id=?"
 
 	err = db.Get(&lun, query, systemID, id)
 	if err == nil {
@@ -403,7 +403,7 @@ func ListRGByStorageID(id string) ([]RaidGroup, error) {
 	}
 
 	var out []RaidGroup
-	const query = "SELECT * FROM tbl_dbaas_raid_group WHERE storage_system_id=?"
+	const query = "SELECT id,storage_system_id,storage_rg_id,enabled FROM tbl_dbaas_raid_group WHERE storage_system_id=?"
 
 	err = db.Select(&out, query, id)
 	if err == nil {
@@ -428,7 +428,7 @@ func GetRaidGroup(id string, rg int) (RaidGroup, error) {
 	}
 
 	out := RaidGroup{}
-	const query = "SELECT * FROM tbl_dbaas_raid_group WHERE storage_system_id=? AND storage_rg_id=? LIMIT 1"
+	const query = "SELECT id,storage_system_id,storage_rg_id,enabled FROM tbl_dbaas_raid_group WHERE storage_system_id=? AND storage_rg_id=? LIMIT 1"
 
 	err = db.Get(&out, query, id, rg)
 	if err == nil {
@@ -715,7 +715,7 @@ func GetLocalVolume(nameOrID string) (LocalVolume, error) {
 		return lv, err
 	}
 
-	const query = "SELECT * FROM tbl_dbaas_volumes WHERE id=? OR name=?"
+	const query = "SELECT id,name,unit_id,size,VGname,driver,fstype FROM tbl_dbaas_volumes WHERE id=? OR name=?"
 
 	err = db.Get(&lv, query, nameOrID, nameOrID)
 	if err == nil {
@@ -740,7 +740,7 @@ func ListVolumeByVG(name string) ([]LocalVolume, error) {
 	}
 
 	var lvs []LocalVolume
-	const query = "SELECT * FROM tbl_dbaas_volumes WHERE VGname=?"
+	const query = "SELECT id,name,unit_id,size,VGname,driver,fstype FROM tbl_dbaas_volumes WHERE VGname=?"
 
 	err = db.Select(&lvs, query, name)
 	if err == nil {
@@ -765,7 +765,7 @@ func ListVolumesByUnitID(id string) ([]LocalVolume, error) {
 	}
 
 	var lvs []LocalVolume
-	const query = "SELECT * FROM tbl_dbaas_volumes WHERE unit_id=?"
+	const query = "SELECT id,name,unit_id,size,VGname,driver,fstype FROM tbl_dbaas_volumes WHERE unit_id=?"
 
 	err = db.Select(&lvs, query, id)
 	if err == nil {
@@ -791,12 +791,12 @@ func GetStorageByID(id string) (*HitachiStorage, *HuaweiStorage, error) {
 
 	hitachi, huawei := &HitachiStorage{}, &HuaweiStorage{}
 
-	err = db.Get(hitachi, "SELECT * FROM tbl_dbaas_storage_HITACHI WHERE id=?", id)
+	err = db.Get(hitachi, "SELECT id,vendor,admin_unit,lun_start,lun_end,hlu_start,hlu_end FROM tbl_dbaas_storage_HITACHI WHERE id=?", id)
 	if err == nil {
 		return hitachi, nil, nil
 	}
 
-	err = db.Get(huawei, "SELECT * FROM tbl_dbaas_storage_HUAWEI WHERE id=?", id)
+	err = db.Get(huawei, "SELECT id,vendor,ip_addr,username,password,hlu_start,hlu_end FROM tbl_dbaas_storage_HUAWEI WHERE id=?", id)
 	if err == nil {
 		return nil, huawei, nil
 	}

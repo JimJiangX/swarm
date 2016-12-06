@@ -88,7 +88,7 @@ func ListAvailablePorts(num int) ([]Port, error) {
 
 	var (
 		ports []Port
-		query = fmt.Sprintf("SELECT * FROM tbl_dbaas_port WHERE allocated=? LIMIT %d", num)
+		query = fmt.Sprintf("SELECT port,name,unit_id,unit_name,proto,allocated FROM tbl_dbaas_port WHERE allocated=? LIMIT %d", num)
 	)
 
 	err = db.Select(&ports, query, false)
@@ -217,7 +217,7 @@ func ListPortsByUnit(nameOrID string) ([]Port, error) {
 	}
 
 	var ports []Port
-	const query = "SELECT * FROM tbl_dbaas_port WHERE unit_id=? OR unit_name=?"
+	const query = "SELECT port,name,unit_id,unit_name,proto,allocated FROM tbl_dbaas_port WHERE unit_id=? OR unit_name=?"
 
 	err = db.Select(&ports, query, nameOrID, nameOrID)
 	if err == nil {
@@ -245,19 +245,19 @@ func ListPorts(start, end, limit int) ([]Port, error) {
 
 	switch {
 	case start == 0 && end == 0:
-		query := fmt.Sprintf("SELECT * FROM tbl_dbaas_port LIMIT %d", limit)
+		query := fmt.Sprintf("SELECT port,name,unit_id,unit_name,proto,allocated FROM tbl_dbaas_port LIMIT %d", limit)
 		err = db.Select(&ports, query)
 
 	case start > 0 && end > 0:
-		query := fmt.Sprintf("SELECT * FROM tbl_dbaas_port WHERE port>=? AND port<=? LIMIT %d", limit)
+		query := fmt.Sprintf("SELECT port,name,unit_id,unit_name,proto,allocated FROM tbl_dbaas_port WHERE port>=? AND port<=? LIMIT %d", limit)
 		err = db.Select(&ports, query, start, end)
 
 	case end == 0:
-		query := fmt.Sprintf("SELECT * FROM tbl_dbaas_port WHERE port>=? LIMIT %d", limit)
+		query := fmt.Sprintf("SELECT port,name,unit_id,unit_name,proto,allocated FROM tbl_dbaas_port WHERE port>=? LIMIT %d", limit)
 		err = db.Select(&ports, query, start)
 
 	case start == 0:
-		query := fmt.Sprintf("SELECT * FROM tbl_dbaas_port WHERE port<=? LIMIT %d", limit)
+		query := fmt.Sprintf("SELECT port,name,unit_id,unit_name,proto,allocated FROM tbl_dbaas_port WHERE port<=? LIMIT %d", limit)
 		err = db.Select(&ports, query, end)
 
 	default:
@@ -276,7 +276,7 @@ func GetNetworkingByID(ID string) (Networking, int, error) {
 
 	net := Networking{}
 
-	err = db.Get(&net, "SELECT * FROM tbl_dbaas_networking WHERE id=?", ID)
+	err = db.Get(&net, "SELECT id,type,gateway,enabled FROM tbl_dbaas_networking WHERE id=?", ID)
 	if err != nil {
 		return net, 0, errors.Wrap(err, "get Networking by ID:"+ID)
 	}
@@ -298,7 +298,7 @@ func ListIPByUnitID(unit string) ([]IP, error) {
 	}
 
 	var out []IP
-	const query = "SELECT * from tbl_dbaas_ip WHERE unit_id=?"
+	const query = "SELECT ip_addr,prefix,networking_id,unit_id,allocated from tbl_dbaas_ip WHERE unit_id=?"
 
 	err = db.Select(&out, query, unit)
 	if err == nil {
@@ -323,7 +323,7 @@ func ListNetworkingByType(_type string) ([]Networking, error) {
 	}
 
 	var list []Networking
-	const query = "SELECT * FROM tbl_dbaas_networking WHERE type=?"
+	const query = "SELECT id,type,gateway,enabled FROM tbl_dbaas_networking WHERE type=?"
 
 	err = db.Select(&list, query, _type)
 	if err == nil {
@@ -348,7 +348,7 @@ func ListNetworking() ([]Networking, error) {
 	}
 
 	var list []Networking
-	const query = "SELECT * FROM tbl_dbaas_networking"
+	const query = "SELECT id,type,gateway,enabled FROM tbl_dbaas_networking"
 
 	err = db.Select(&list, query)
 	if err == nil {
@@ -373,7 +373,7 @@ func ListIPByNetworking(networkingID string) ([]IP, error) {
 	}
 
 	var list []IP
-	const query = "SELECT * FROM tbl_dbaas_ip WHERE networking_id=?"
+	const query = "SELECT ip_addr,prefix,networking_id,unit_id,allocated FROM tbl_dbaas_ip WHERE networking_id=?"
 
 	err = db.Select(&list, query, networkingID)
 	if err == nil {
@@ -522,8 +522,8 @@ func IsNetwrokingUsed(networking string) (bool, error) {
 
 	count := 0
 	const (
-		queryIP      = "SELECT COUNT(*) from tbl_dbaas_ip WHERE networking_id=? AND allocated=?"
-		queryCluster = "SELECT COUNT(*) from tbl_dbaas_cluster WHERE networking_id=?"
+		queryIP      = "SELECT COUNT(ip_addr) from tbl_dbaas_ip WHERE networking_id=? AND allocated=?"
+		queryCluster = "SELECT COUNT(id) from tbl_dbaas_cluster WHERE networking_id=?"
 	)
 
 	err = db.Get(&count, queryIP, networking, true)
@@ -551,7 +551,7 @@ func ListIPWithCondition(networking string, allocation bool, num int) ([]IP, err
 	}
 
 	var out []IP
-	query := fmt.Sprintf("SELECT * from tbl_dbaas_ip WHERE networking_id=? AND allocated=? LIMIT %d", num)
+	query := fmt.Sprintf("SELECT ip_addr,prefix,networking_id,unit_id,allocated from tbl_dbaas_ip WHERE networking_id=? AND allocated=? LIMIT %d", num)
 
 	err = db.Select(&out, query, networking, allocation)
 	if err == nil {
@@ -577,7 +577,7 @@ func TxAllocIPByNetworking(id, unit string) (IP, error) {
 	defer tx.Rollback()
 
 	out := IP{}
-	query := tx.Rebind(fmt.Sprintf("SELECT * FROM tbl_dbaas_ip WHERE networking_id=? AND allocated=? LIMIT 1 FOR UPDATE;"))
+	query := tx.Rebind(fmt.Sprintf("SELECT ip_addr,prefix,networking_id,unit_id,allocated FROM tbl_dbaas_ip WHERE networking_id=? AND allocated=? LIMIT 1 FOR UPDATE;"))
 
 	err = tx.Get(&out, query, id, false)
 	if err != nil {
