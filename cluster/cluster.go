@@ -103,4 +103,5 @@ type Cluster interface {
 
 	// Get Engine by addr
 	EngineByAddr(addr string) *Engine
+	Engine(IDOrName string) *Engine
 }
