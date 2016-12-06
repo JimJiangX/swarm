@@ -484,7 +484,7 @@ func GetLocalVolume(nameOrID string) (LocalVolume, error) {
 		return lv, err
 	}
 
-	const query = "SELECT * FROM tbl_dbaas_volumes WHERE id=? OR name=?"
+	const query = "SELECT id,name,unit_id,size,VGname,driver,fstype FROM tbl_dbaas_volumes WHERE id=? OR name=?"
 
 	err = db.Get(&lv, query, nameOrID, nameOrID)
 
@@ -499,7 +499,7 @@ func ListVolumeByVG(name string) ([]LocalVolume, error) {
 	}
 
 	var lvs []LocalVolume
-	const query = "SELECT * FROM tbl_dbaas_volumes WHERE VGname=?"
+	const query = "SELECT id,name,unit_id,size,VGname,driver,fstype FROM tbl_dbaas_volumes WHERE VGname=?"
 
 	err = db.Select(&lvs, query, name)
 
@@ -514,7 +514,7 @@ func ListVolumesByUnitID(id string) ([]LocalVolume, error) {
 	}
 
 	var lvs []LocalVolume
-	const query = "SELECT * FROM tbl_dbaas_volumes WHERE unit_id=?"
+	const query = "SELECT id,name,unit_id,size,VGname,driver,fstype FROM tbl_dbaas_volumes WHERE unit_id=?"
 
 	err = db.Select(&lvs, query, id)
 

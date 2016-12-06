@@ -59,7 +59,7 @@ func ListImages() ([]Image, error) {
 	}
 
 	var images []Image
-	const query = "SELECT * FROM tbl_dbaas_image"
+	const query = "SELECT enabled,id,name,version,docker_image_id,label,size,template_config_id,config_keysets,upload_at FROM tbl_dbaas_image"
 
 	err = db.Select(&images, query)
 
@@ -74,7 +74,7 @@ func GetImage(name, version string) (Image, error) {
 	}
 
 	image := Image{}
-	const query = "SELECT * FROM tbl_dbaas_image WHERE name=? AND version=?"
+	const query = "SELECT enabled,id,name,version,docker_image_id,label,size,template_config_id,config_keysets,upload_at FROM tbl_dbaas_image WHERE name=? AND version=?"
 
 	err = db.Get(&image, query, name, version)
 
@@ -83,7 +83,7 @@ func GetImage(name, version string) (Image, error) {
 
 // txGetImage returns Image select by ID or ImageID in Tx.
 func txGetImage(tx *sqlx.Tx, ID string) (image Image, err error) {
-	err = tx.Get(&image, "SELECT * FROM tbl_dbaas_image WHERE id=? OR docker_image_id=?", ID, ID)
+	err = tx.Get(&image, "SELECT enabled,id,name,version,docker_image_id,label,size,template_config_id,config_keysets,upload_at FROM tbl_dbaas_image WHERE id=? OR docker_image_id=?", ID, ID)
 
 	return image, errors.Wrap(err, "Tx get Image by ID")
 }
@@ -99,12 +99,12 @@ func GetImageAndUnitConfig(ID string) (Image, UnitConfig, error) {
 		return image, config, err
 	}
 
-	err = db.Get(&image, "SELECT * FROM tbl_dbaas_image WHERE id=? OR docker_image_id=?", ID, ID)
+	err = db.Get(&image, "SELECT enabled,id,name,version,docker_image_id,label,size,template_config_id,config_keysets,upload_at FROM tbl_dbaas_image WHERE id=? OR docker_image_id=?", ID, ID)
 	if err != nil {
 		return image, config, errors.Wrap(err, "get Image by ID")
 	}
 
-	err = db.Get(&config, "SELECT * FROM tbl_dbaas_unit_config WHERE id=?", image.TemplateConfigID)
+	err = db.Get(&config, "SELECT id,image_id,unit_id,config_file_path,version,parent_id,content,created_at FROM tbl_dbaas_unit_config WHERE id=?", image.TemplateConfigID)
 	if err != nil {
 		return image, config, errors.Wrap(err, "get UnitConfig by ID")
 	}
@@ -122,7 +122,7 @@ func GetImageByID(ID string) (Image, error) {
 	}
 
 	image := Image{}
-	const query = "SELECT * FROM tbl_dbaas_image WHERE id=? OR docker_image_id=?"
+	const query = "SELECT enabled,id,name,version,docker_image_id,label,size,template_config_id,config_keysets,upload_at FROM tbl_dbaas_image WHERE id=? OR docker_image_id=?"
 
 	err = db.Get(&image, query, ID, ID)
 
@@ -252,7 +252,7 @@ func GetUnitConfigByID(ID string) (*UnitConfig, error) {
 	}
 
 	config := &UnitConfig{}
-	err = db.Get(config, "SELECT * FROM tbl_dbaas_unit_config WHERE id=?", ID)
+	err = db.Get(config, "SELECT id,image_id,unit_id,config_file_path,version,parent_id,content,created_at FROM tbl_dbaas_unit_config WHERE id=?", ID)
 	if err != nil {
 		return nil, errors.Wrap(err, "get UnitConfig")
 	}
@@ -282,7 +282,7 @@ func ListUnitConfigByService(service string) ([]UnitWithConfig, error) {
 	}
 
 	var units []Unit
-	err = db.Select(&units, "SELECT * FROM tbl_dbaas_unit WHERE service_id=?", service)
+	err = db.Select(&units, "SELECT id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at FROM tbl_dbaas_unit WHERE service_id=?", service)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Select []Unit by service_id='%s'", service)
 	}
@@ -296,7 +296,7 @@ func ListUnitConfigByService(service string) ([]UnitWithConfig, error) {
 		ids[i] = units[i].ConfigID
 	}
 
-	query, args, err := sqlx.In("SELECT * FROM tbl_dbaas_unit_config WHERE id IN (?);", ids)
+	query, args, err := sqlx.In("SELECT id,image_id,unit_id,config_file_path,version,parent_id,content,created_at FROM tbl_dbaas_unit_config WHERE id IN (?);", ids)
 	if err != nil {
 		return nil, errors.Wrap(err, "select UnitConfig by ID IN Service Units ID")
 	}
