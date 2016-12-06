@@ -24,7 +24,7 @@ type Task struct {
 	Description string    `db:"description"`
 	Labels      string    `db:"labels"`
 	Errors      string    `db:"errors"`
-	Status      int64     `db:"status"`
+	Status      int       `db:"status"`
 	Timeout     int       `db:"timeout"`   // s
 	Timestamp   int64     `db:"timestamp"` // time.Time.Unix()
 	CreatedAt   time.Time `db:"created_at"`
