@@ -50,7 +50,7 @@ func (db dbBase) InsertCluster(c Cluster) error {
 func (db dbBase) GetCluster(nameOrID string) (Cluster, error) {
 	var (
 		c     Cluster
-		query = "SELECT * FROM " + db.clusterTable() + " WHERE id=? OR name=?"
+		query = "SELECT id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit FROM " + db.clusterTable() + " WHERE id=? OR name=?"
 	)
 
 	err := db.Get(&c, query, nameOrID, nameOrID)
@@ -67,7 +67,7 @@ func (db dbBase) GetCluster(nameOrID string) (Cluster, error) {
 func (db dbBase) ListClusters() ([]Cluster, error) {
 	var (
 		clusters []Cluster
-		query    = "SELECT * FROM " + db.clusterTable()
+		query    = "SELECT id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit FROM " + db.clusterTable()
 	)
 
 	err := db.Select(&clusters, query)
