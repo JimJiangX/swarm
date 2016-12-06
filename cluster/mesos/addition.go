@@ -7,3 +7,7 @@ import (
 func (c *Cluster) EngineByAddr(addr string) *cluster.Engine {
 	return nil
 }
+
+func (c *Cluster) Engine(IDOrName string) *cluster.Engine {
+	return nil
+}
