@@ -12,29 +12,17 @@ import (
 
 var errUnavailableKVClient = stderrors.New("non-available consul client")
 
-type consulClient interface {
-	getStatus(port string) (string, []string, error)
-
-	getKV(key string, q *api.QueryOptions) (*api.KVPair, *api.QueryMeta, error)
-	putKV(p *api.KVPair, q *api.WriteOptions) (*api.WriteMeta, error)
-	deleteKVTree(prefix string, w *api.WriteOptions) (*api.WriteMeta, error)
-
-	healthChecks(service string, q *api.QueryOptions) ([]*api.HealthCheck, *api.QueryMeta, error)
-	serviceRegister(service *api.AgentServiceRegistration) error
-	serviceDeregister(service string) error
-}
-
-type consulapi struct {
+type consulClient struct {
 	client *api.Client
 }
 
-func newConsulAPI(config *api.Config) (consulClient, error) {
+func newConsulClient(config *api.Config) (kvClientAPI, error) {
 	client, err := api.NewClient(config)
 
-	return consulapi{client}, err
+	return consulClient{client}, err
 }
 
-func (client consulapi) getStatus(port string) (string, []string, error) {
+func (client consulClient) getStatus(port string) (string, []string, error) {
 	if client.client == nil {
 		return "", nil, stderrors.New("consul API Client is required")
 	}
@@ -70,7 +58,7 @@ func (client consulapi) getStatus(port string) (string, []string, error) {
 	return leader, addrs, nil
 }
 
-func (c consulapi) getKV(key string, q *api.QueryOptions) (*api.KVPair, *api.QueryMeta, error) {
+func (c consulClient) getKV(key string, q *api.QueryOptions) (*api.KVPair, *api.QueryMeta, error) {
 	if c.client != nil {
 		return c.client.KV().Get(key, q)
 	}
@@ -78,7 +66,7 @@ func (c consulapi) getKV(key string, q *api.QueryOptions) (*api.KVPair, *api.Que
 	return nil, nil, stderrors.New("consul API Client is required")
 }
 
-func (c consulapi) putKV(p *api.KVPair, q *api.WriteOptions) (*api.WriteMeta, error) {
+func (c consulClient) putKV(p *api.KVPair, q *api.WriteOptions) (*api.WriteMeta, error) {
 	if c.client != nil {
 		return c.client.KV().Put(p, q)
 	}
@@ -86,7 +74,7 @@ func (c consulapi) putKV(p *api.KVPair, q *api.WriteOptions) (*api.WriteMeta, er
 	return nil, stderrors.New("consul API Client is required")
 }
 
-func (c consulapi) deleteKVTree(prefix string, w *api.WriteOptions) (*api.WriteMeta, error) {
+func (c consulClient) deleteKVTree(prefix string, w *api.WriteOptions) (*api.WriteMeta, error) {
 	if c.client != nil {
 		return c.client.KV().DeleteTree(prefix, w)
 	}
@@ -94,7 +82,7 @@ func (c consulapi) deleteKVTree(prefix string, w *api.WriteOptions) (*api.WriteM
 	return nil, stderrors.New("consul API Client is required")
 }
 
-func (c consulapi) healthChecks(service string, q *api.QueryOptions) ([]*api.HealthCheck, *api.QueryMeta, error) {
+func (c consulClient) healthChecks(service string, q *api.QueryOptions) ([]*api.HealthCheck, *api.QueryMeta, error) {
 	if c.client != nil {
 		return c.client.Health().Checks(service, q)
 	}
@@ -102,7 +90,7 @@ func (c consulapi) healthChecks(service string, q *api.QueryOptions) ([]*api.Hea
 	return nil, nil, stderrors.New("consul API Client is required")
 }
 
-func (c consulapi) serviceRegister(service *api.AgentServiceRegistration) error {
+func (c consulClient) serviceRegister(service *api.AgentServiceRegistration) error {
 	if c.client != nil {
 		return c.client.Agent().ServiceRegister(service)
 	}
@@ -110,7 +98,7 @@ func (c consulapi) serviceRegister(service *api.AgentServiceRegistration) error 
 	return stderrors.New("consul API Client is required")
 }
 
-func (c consulapi) serviceDeregister(service string) error {
+func (c consulClient) serviceDeregister(service string) error {
 	if c.client != nil {
 		return c.client.Agent().ServiceDeregister(service)
 	}
