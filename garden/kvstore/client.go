@@ -10,17 +10,13 @@ import (
 
 const defaultConsulAddr = "127.0.0.1:8500"
 
-type Client interface {
-	GetHorusAddr() (string, error)
-}
-
 func NewClient(config api.Config) (Client, error) {
 	_, port, err := net.SplitHostPort(config.Address)
 	if err != nil {
 		return nil, errors.Wrap(err, "split host port:"+config.Address)
 	}
 
-	c, err := newConsulAPI(&config)
+	c, err := newConsulClient(&config)
 	if err != nil {
 		return nil, errors.Wrap(err, "new consul api Client")
 	}
@@ -36,7 +32,7 @@ func NewClient(config api.Config) (Client, error) {
 		leader: leader,
 		peers:  peers,
 		config: config,
-		agents: make(map[string]consulClient, 10),
+		agents: make(map[string]kvClientAPI, 10),
 	}
 
 	kvc.agents[config.Address] = c
@@ -50,7 +46,7 @@ type kvClient struct {
 	port   string
 	leader string
 	peers  []string
-	agents map[string]consulClient
+	agents map[string]kvClientAPI
 	config api.Config
 }
 
@@ -79,7 +75,7 @@ func (c *kvClient) getLeader() string {
 			config := c.config
 			config.Address = addr
 
-			client, err := newConsulAPI(&config)
+			client, err := newConsulClient(&config)
 			if err != nil {
 				delete(c.agents, addr)
 				continue
@@ -102,7 +98,7 @@ func (c *kvClient) getLeader() string {
 	return c.leader
 }
 
-func (c *kvClient) getClient(addr string) (string, consulClient, error) {
+func (c *kvClient) getClient(addr string) (string, kvClientAPI, error) {
 	if addr == "" {
 		// get kv leader client
 		c.lock.RLock()
@@ -145,7 +141,7 @@ func (c *kvClient) getClient(addr string) (string, consulClient, error) {
 	config := c.config
 	config.Address = addr
 
-	client, err := newConsulAPI(&config)
+	client, err := newConsulClient(&config)
 	if err != nil {
 		return "", nil, errors.Wrap(err, "new consul api Client")
 	}
