@@ -120,12 +120,6 @@ func (dc *Datacenter) RemoveNode(ctx context.Context, nameOrID, user, password s
 		}
 	}
 
-	select {
-	default:
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-
 	config, err := dc.dco.GetSysConfig()
 	if err != nil {
 		return err
@@ -135,8 +129,20 @@ func (dc *Datacenter) RemoveNode(ctx context.Context, nameOrID, user, password s
 	if err != nil {
 		return err
 	}
+	defer client.Close()
 
-	err = node.nodeClean(ctx, client, "horus", config)
+	horus, err := dc.kvClient.GetHorusAddr()
+	if err != nil {
+		return err
+	}
+
+	select {
+	default:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	err = node.nodeClean(ctx, client, horus, config)
 	if err != nil {
 		return err
 	}
@@ -214,8 +220,13 @@ func (dc *Datacenter) InstallNodes(ctx context.Context, list []nodeWithTask) err
 		return err
 	}
 
+	horus, err := dc.kvClient.GetHorusAddr()
+	if err != nil {
+		return err
+	}
+
 	for i := range list {
-		go list[i].distribute(ctx, dc.dco, config)
+		go list[i].distribute(ctx, horus, dc.dco, config)
 	}
 
 	go dc.registerNodes(ctx, list, config)
@@ -223,7 +234,7 @@ func (dc *Datacenter) InstallNodes(ctx context.Context, list []nodeWithTask) err
 	return nil
 }
 
-func (nt *nodeWithTask) distribute(ctx context.Context, ormer database.ClusterOrmer, config database.SysConfig) (err error) {
+func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer database.ClusterOrmer, config database.SysConfig) (err error) {
 	entry := logrus.WithFields(logrus.Fields{
 		"Node": nt.Node.Name,
 		"host": nt.Node.Addr,
@@ -257,7 +268,7 @@ func (nt *nodeWithTask) distribute(ctx context.Context, ormer database.ClusterOr
 		}
 	}()
 
-	script, err := nt.modifyProfile(config)
+	script, err := nt.modifyProfile(horus, config)
 	if err != nil {
 		entry.WithError(err).Error("modify profile")
 
@@ -325,15 +336,7 @@ func (nt *nodeWithTask) distribute(ctx context.Context, ormer database.ClusterOr
 }
 
 // CA,script,error
-func (node *nodeWithTask) modifyProfile(config database.SysConfig) (string, error) {
-	//	horus, err := getHorusFromConsul()
-	//	if err != nil {
-	//		return nil, "", err
-	//	}
-
-	// TODO:
-	horus := "horus address"
-
+func (node *nodeWithTask) modifyProfile(horus string, config database.SysConfig) (string, error) {
 	horusIP, horusPort, err := net.SplitHostPort(horus)
 	if err != nil {
 		return "", errors.Wrap(err, "Horus addr:"+horus)
@@ -580,8 +583,6 @@ func (n *Node) nodeClean(ctx context.Context, client scplib.ScpClient, horus str
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-
-	defer client.Close()
 
 	if err := client.UploadFile(destName, srcFile); err != nil {
 		entry.Errorf("SSH UploadFile %s Error,%s", srcFile, err)
