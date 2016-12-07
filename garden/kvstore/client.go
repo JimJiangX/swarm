@@ -1,7 +1,6 @@
 package kvstore
 
 import (
-	stderrors "errors"
 	"net"
 	"sync"
 
@@ -10,8 +9,6 @@ import (
 )
 
 const defaultConsulAddr = "127.0.0.1:8500"
-
-var errUnavailableKVClient = stderrors.New("non-available consul client")
 
 type Client interface {
 	GetHorusAddr() (string, error)
@@ -23,12 +20,12 @@ func NewClient(config api.Config) (Client, error) {
 		return nil, errors.Wrap(err, "split host port:"+config.Address)
 	}
 
-	c, err := api.NewClient(&config)
+	c, err := newConsulAPI(&config)
 	if err != nil {
 		return nil, errors.Wrap(err, "new consul api Client")
 	}
 
-	leader, peers, err := getStatus(c, port)
+	leader, peers, err := c.getStatus(port)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +36,7 @@ func NewClient(config api.Config) (Client, error) {
 		leader: leader,
 		peers:  peers,
 		config: config,
-		agents: make(map[string]*api.Client, 10),
+		agents: make(map[string]consulClient, 10),
 	}
 
 	kvc.agents[config.Address] = c
@@ -48,42 +45,12 @@ func NewClient(config api.Config) (Client, error) {
 	return kvc, nil
 }
 
-func getStatus(client *api.Client, port string) (string, []string, error) {
-	leader, err := client.Status().Leader()
-	if err != nil {
-		return "", nil, errors.Wrap(err, "get consul leader")
-	}
-
-	host, _, err := net.SplitHostPort(leader)
-	if err != nil {
-		return "", nil, errors.Wrap(err, "split host port:"+leader)
-	}
-	leader = net.JoinHostPort(host, port)
-
-	peers, err := client.Status().Peers()
-	if err != nil {
-		return "", nil, errors.Wrap(err, "get consul peers")
-	}
-
-	addrs := make([]string, 0, len(peers))
-	for _, peer := range peers {
-		host, _, err := net.SplitHostPort(peer)
-		if err != nil {
-			continue
-		}
-
-		addrs = append(addrs, net.JoinHostPort(host, port))
-	}
-
-	return leader, addrs, nil
-}
-
 type kvClient struct {
 	lock   *sync.RWMutex
 	port   string
 	leader string
 	peers  []string
-	agents map[string]*api.Client
+	agents map[string]consulClient
 	config api.Config
 }
 
@@ -92,7 +59,7 @@ func (c *kvClient) getLeader() string {
 	defer c.lock.Unlock()
 
 	for addr, client := range c.agents {
-		leader, peers, err := getStatus(client, c.port)
+		leader, peers, err := client.getStatus(c.port)
 		if err != nil {
 			delete(c.agents, addr)
 			continue
@@ -112,13 +79,13 @@ func (c *kvClient) getLeader() string {
 			config := c.config
 			config.Address = addr
 
-			client, err := api.NewClient(&config)
+			client, err := newConsulAPI(&config)
 			if err != nil {
 				delete(c.agents, addr)
 				continue
 			}
 
-			leader, peers, err := getStatus(client, c.port)
+			leader, peers, err := client.getStatus(c.port)
 			if err != nil {
 				delete(c.agents, addr)
 				continue
@@ -135,7 +102,7 @@ func (c *kvClient) getLeader() string {
 	return c.leader
 }
 
-func (c *kvClient) getClient(addr string) (string, *api.Client, error) {
+func (c *kvClient) getClient(addr string) (string, consulClient, error) {
 	if addr == "" {
 		// get kv leader client
 		c.lock.RLock()
@@ -178,7 +145,7 @@ func (c *kvClient) getClient(addr string) (string, *api.Client, error) {
 	config := c.config
 	config.Address = addr
 
-	client, err := api.NewClient(&config)
+	client, err := newConsulAPI(&config)
 	if err != nil {
 		return "", nil, errors.Wrap(err, "new consul api Client")
 	}

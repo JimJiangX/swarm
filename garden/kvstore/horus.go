@@ -164,7 +164,7 @@ func (c *kvClient) GetHorusAddr() (string, error) {
 		return "", err
 	}
 
-	checks, _, err := client.Health().State("passing", nil)
+	checks, _, err := client.healthChecks("passing", nil)
 	c.checkConnectError(addr, err)
 	if err != nil {
 		return "", errors.Wrap(err, "passing health checks")

@@ -2,13 +2,121 @@ package kvstore
 
 import (
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
+	"net"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 )
 
-const _ContainerKVKeyPrefix = "container"
+var errUnavailableKVClient = stderrors.New("non-available consul client")
+
+type consulClient interface {
+	getStatus(port string) (string, []string, error)
+
+	getKV(key string, q *api.QueryOptions) (*api.KVPair, *api.QueryMeta, error)
+	putKV(p *api.KVPair, q *api.WriteOptions) (*api.WriteMeta, error)
+	deleteKVTree(prefix string, w *api.WriteOptions) (*api.WriteMeta, error)
+
+	healthChecks(service string, q *api.QueryOptions) ([]*api.HealthCheck, *api.QueryMeta, error)
+	serviceRegister(service *api.AgentServiceRegistration) error
+	serviceDeregister(service string) error
+}
+
+type consulapi struct {
+	client *api.Client
+}
+
+func newConsulAPI(config *api.Config) (consulClient, error) {
+	client, err := api.NewClient(config)
+
+	return consulapi{client}, err
+}
+
+func (client consulapi) getStatus(port string) (string, []string, error) {
+	if client.client == nil {
+		return "", nil, stderrors.New("consul API Client is required")
+	}
+
+	status := client.client.Status()
+
+	leader, err := status.Leader()
+	if err != nil {
+		return "", nil, errors.Wrap(err, "get consul leader")
+	}
+
+	host, _, err := net.SplitHostPort(leader)
+	if err != nil {
+		return "", nil, errors.Wrap(err, "split host port:"+leader)
+	}
+	leader = net.JoinHostPort(host, port)
+
+	peers, err := status.Peers()
+	if err != nil {
+		return "", nil, errors.Wrap(err, "get consul peers")
+	}
+
+	addrs := make([]string, 0, len(peers))
+	for _, peer := range peers {
+		host, _, err := net.SplitHostPort(peer)
+		if err != nil {
+			continue
+		}
+
+		addrs = append(addrs, net.JoinHostPort(host, port))
+	}
+
+	return leader, addrs, nil
+}
+
+func (c consulapi) getKV(key string, q *api.QueryOptions) (*api.KVPair, *api.QueryMeta, error) {
+	if c.client != nil {
+		return c.client.KV().Get(key, q)
+	}
+
+	return nil, nil, stderrors.New("consul API Client is required")
+}
+
+func (c consulapi) putKV(p *api.KVPair, q *api.WriteOptions) (*api.WriteMeta, error) {
+	if c.client != nil {
+		return c.client.KV().Put(p, q)
+	}
+
+	return nil, stderrors.New("consul API Client is required")
+}
+
+func (c consulapi) deleteKVTree(prefix string, w *api.WriteOptions) (*api.WriteMeta, error) {
+	if c.client != nil {
+		return c.client.KV().DeleteTree(prefix, w)
+	}
+
+	return nil, stderrors.New("consul API Client is required")
+}
+
+func (c consulapi) healthChecks(service string, q *api.QueryOptions) ([]*api.HealthCheck, *api.QueryMeta, error) {
+	if c.client != nil {
+		return c.client.Health().Checks(service, q)
+	}
+
+	return nil, nil, stderrors.New("consul API Client is required")
+}
+
+func (c consulapi) serviceRegister(service *api.AgentServiceRegistration) error {
+	if c.client != nil {
+		return c.client.Agent().ServiceRegister(service)
+	}
+
+	return stderrors.New("consul API Client is required")
+}
+
+func (c consulapi) serviceDeregister(service string) error {
+	if c.client != nil {
+		return c.client.Agent().ServiceDeregister(service)
+	}
+
+	return stderrors.New("consul API Client is required")
+}
 
 // HealthChecksFromConsul is used to retrieve all the checks in a given state.
 // The wildcard "any" state can also be used for all checks.
@@ -18,7 +126,7 @@ func (c *kvClient) HealthChecks(state string, q *api.QueryOptions) (map[string]a
 		return nil, err
 	}
 
-	checks, _, err := client.Health().State(state, q)
+	checks, _, err := client.healthChecks(state, q)
 	c.checkConnectError(addr, err)
 	if err != nil {
 		return nil, err
@@ -38,7 +146,7 @@ func (c *kvClient) registerHealthCheck(host string, config api.AgentServiceRegis
 		return err
 	}
 
-	err = client.Agent().ServiceRegister(&config)
+	err = client.serviceRegister(&config)
 	c.checkConnectError(addr, err)
 
 	return errors.Wrap(err, "register unit service")
@@ -50,7 +158,7 @@ func (c *kvClient) deregisterHealthCheck(host, ID string) error {
 		return err
 	}
 
-	err = client.Agent().ServiceDeregister(ID)
+	err = client.serviceDeregister(ID)
 	c.checkConnectError(addr, err)
 
 	return errors.Wrap(err, "deregister healthCheck")
@@ -67,7 +175,7 @@ func (c *kvClient) PutKV(key string, val []byte) error {
 		return err
 	}
 
-	_, err = client.KV().Put(pair, nil)
+	_, err = client.putKV(pair, nil)
 	c.checkConnectError(addr, err)
 
 	return errors.Wrap(err, "put KV")
@@ -79,7 +187,7 @@ func (c *kvClient) DeleteKVTree(key string) error {
 		return err
 	}
 
-	_, err = client.KV().DeleteTree(key, nil)
+	_, err = client.deleteKVTree(key, nil)
 	c.checkConnectError(addr, err)
 
 	return errors.Wrap(err, "delete KV Tree:"+key)
@@ -92,7 +200,7 @@ func (c *kvClient) GetKV(key string) (*api.KVPair, error) {
 		return nil, err
 	}
 
-	val, _, err := client.KV().Get(key, nil)
+	val, _, err := client.getKV(key, nil)
 	c.checkConnectError(addr, err)
 
 	if err == nil {
