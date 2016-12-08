@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/garden/utils"
 )
 
 // Node is an abstract type used by the scheduler.
@@ -55,8 +56,19 @@ func (n *Node) Container(IDOrName string) *cluster.Container {
 // AddContainer injects a container into the internal state.
 func (n *Node) AddContainer(container *cluster.Container) error {
 	if container.Config != nil {
+		var cpus int64
 		memory := container.Config.HostConfig.Memory
-		cpus := container.Config.HostConfig.CPUShares
+
+		if container.Config.HostConfig.CpusetCpus == "" {
+			cpus = container.Config.HostConfig.CPUShares
+		} else {
+			n, err := utils.CountCPU(container.Config.HostConfig.CpusetCpus)
+			if err != nil {
+				return err
+			}
+			cpus = n
+		}
+
 		if n.TotalMemory-memory < 0 || n.TotalCpus-cpus < 0 {
 			return errors.New("not enough resources")
 		}
