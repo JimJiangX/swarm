@@ -36,6 +36,7 @@ func (db dbBase) taskTable() string {
 }
 
 func (db dbBase) txInsertTask(tx *sqlx.Tx, t Task) error {
+
 	query := "INSERT INTO " + db.taskTable() + " (id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
 
 	_, err := tx.Exec(query, t)
@@ -76,6 +77,7 @@ func (db dbBase) InsertTasks(tx *sqlx.Tx, tasks []Task) error {
 }
 
 func (db dbBase) txUpdateTask(tx *sqlx.Tx, t Task) error {
+
 	query := "UPDATE " + db.taskTable() + " SET status=?,finished_at=?,errors=? WHERE id=?"
 
 	_, err := tx.Exec(query, t.Status, t.FinishedAt, t.Errors, t.ID)

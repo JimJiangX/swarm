@@ -85,6 +85,7 @@ func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 
 // UpdateParams returns error when Node update status and max_container.
 func (db dbBase) UpdateParams(n Node) error {
+
 	query := "UPDATE " + db.nodeTable() + " SET status=?,max_container=? WHERE id=?"
 
 	_, err := db.Exec(query, n.Status, n.MaxContainer, n.ID)
@@ -95,7 +96,9 @@ func (db dbBase) UpdateParams(n Node) error {
 // RegisterNode returns error when Node UPDATE infomation.
 func (db dbBase) RegisterNode(n Node, t Task) error {
 	do := func(tx *sqlx.Tx) (err error) {
+
 		query := "UPDATE " + db.nodeTable() + " SET engine_id=?,status=?,register_at=? WHERE id=?"
+
 		_, err = tx.Exec(query, n.EngineID, n.Status, n.RegisterAt, n.ID)
 		if err != nil {
 			return errors.Wrap(err, "Tx update Node status")
@@ -228,6 +231,7 @@ func (db dbBase) ListNodesByIDs(in []string, cluster string) ([]Node, error) {
 // ListNodesByClusters returns nodes,select by clusters\type\enabled.
 func (db dbBase) ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, error) {
 	list := make([]string, 0, len(clusters))
+
 	for _, c := range clusters {
 		if len(c) == 0 || strings.TrimSpace(c) == "" {
 			continue

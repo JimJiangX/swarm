@@ -36,11 +36,10 @@ func (db dbBase) clusterTable() string {
 	return db.prefix + "_cluster"
 }
 
-// InsertCluster insert a new record to tbl_dbaas_cluster.
+// InsertCluster insert a new record.
 func (db dbBase) InsertCluster(c Cluster) error {
 	query := "INSERT INTO " + db.clusterTable() + " (id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit) VALUES (:id,:name,:type,:storage_id,:storage_type,:networking_id,:enabled,:max_node,:usage_limit)"
 
-	// insert into database
 	_, err := db.NamedExec(query, &c)
 
 	return errors.Wrap(err, "insert Cluster")
@@ -56,6 +55,7 @@ func (db dbBase) GetCluster(nameOrID string) (Cluster, error) {
 	err := db.Get(&c, query, nameOrID, nameOrID)
 	if err == nil {
 		return c, nil
+
 	} else if err == sql.ErrNoRows {
 		return c, errors.Wrap(err, "not found Cluster:"+nameOrID)
 	}
@@ -63,7 +63,7 @@ func (db dbBase) GetCluster(nameOrID string) (Cluster, error) {
 	return c, errors.Wrap(err, "get Cluster")
 }
 
-// ListClusters select tbl_dbaas_cluster
+// ListClusters select Cluster
 func (db dbBase) ListClusters() ([]Cluster, error) {
 	var (
 		clusters []Cluster
@@ -77,6 +77,7 @@ func (db dbBase) ListClusters() ([]Cluster, error) {
 
 // UpdateClusterStatus update Cluster.enabled by ID
 func (db dbBase) UpdateClusterStatus(c Cluster, state bool) error {
+
 	query := "UPDATE " + db.clusterTable() + " SET enabled=? WHERE id=?"
 
 	_, err := db.Exec(query, state, c.ID)
@@ -86,6 +87,7 @@ func (db dbBase) UpdateClusterStatus(c Cluster, state bool) error {
 
 // UpdateClusterParams updates MaxNode\UsageLimit
 func (db dbBase) UpdateClusterParams(c Cluster) error {
+
 	query := "UPDATE " + db.clusterTable() + " SET max_node=?,usage_limit=? WHERE id=?"
 
 	_, err := db.Exec(query, c.MaxNode, c.UsageLimit, c.ID)
@@ -93,8 +95,9 @@ func (db dbBase) UpdateClusterParams(c Cluster) error {
 	return errors.Wrap(err, "update Cluster MaxNode or UsageLimit")
 }
 
-// DeleteCluster delete a record of tbl_dbaas_cluster by nameOrID
+// DeleteCluster delete a record of Cluster by nameOrID
 func (db dbBase) DeleteCluster(nameOrID string) error {
+
 	query := "DELETE FROM " + db.clusterTable() + " WHERE id=? OR name=?"
 
 	_, err := db.Exec(query, nameOrID, nameOrID)
