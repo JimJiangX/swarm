@@ -3,7 +3,6 @@ package database
 import (
 	"fmt"
 
-	"github.com/docker/swarm/garden/utils"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
@@ -28,7 +27,7 @@ type NetworkingOrmer interface {
 	DeletePort(port int, allocated bool) error
 
 	// Networking
-	InsertNetworking(start, end, gateway, _type string, prefix int) (Networking, []IP, error)
+	InsertNetworking(Networking, []IP) error
 	UpdateNetworkingStatus(ID string, enable bool) error
 
 	GetNetworkingByID(ID string) (Networking, int, error)
@@ -373,47 +372,6 @@ func (db dbBase) ListNetworking() ([]Networking, error) {
 	return list, errors.Wrap(err, "list all []Networking")
 }
 
-// TxInsertNetworking insert Networking in Tx and []IP,and returns them
-func (db dbBase) InsertNetworking(start, end, gateway, _type string, prefix int) (Networking, []IP, error) {
-	startU32 := utils.IPToUint32(start)
-	endU32 := utils.IPToUint32(end)
-
-	if move := uint(32 - prefix); (startU32 >> move) != (endU32 >> move) {
-		return Networking{}, nil, errors.Errorf("%s-%s is different network segments", start, end)
-	}
-	if startU32 > endU32 {
-		startU32, endU32 = endU32, startU32
-	}
-
-	net := Networking{
-		ID:      utils.Generate64UUID(),
-		Type:    _type,
-		Gateway: gateway,
-		Enabled: true,
-	}
-
-	num := int(endU32 - startU32 + 1)
-	ips := make([]IP, num)
-	for i := range ips {
-		ips[i] = IP{
-			IPAddr:       startU32,
-			Prefix:       prefix,
-			NetworkingID: net.ID,
-			Allocated:    false,
-		}
-
-		startU32++
-	}
-
-	// insert to database
-	err := db.txInsertNetworking(net, ips)
-	if err != nil {
-		return Networking{}, nil, err
-	}
-
-	return net, ips, nil
-}
-
 // UpdateNetworkingStatus upate Networking Enabled by ID
 func (db dbBase) UpdateNetworkingStatus(ID string, enable bool) error {
 
@@ -424,7 +382,7 @@ func (db dbBase) UpdateNetworkingStatus(ID string, enable bool) error {
 	return errors.Wrap(err, "update Networking.Enabled")
 }
 
-func (db dbBase) txInsertNetworking(net Networking, ips []IP) error {
+func (db dbBase) InsertNetworking(net Networking, ips []IP) error {
 	do := func(tx *sqlx.Tx) error {
 
 		query := "INSERT INTO " + db.ipTable() + " (ip_addr,prefix,networking_id,unit_id,allocated) VALUES (:ip_addr,:prefix,:networking_id,:unit_id,:allocated)"

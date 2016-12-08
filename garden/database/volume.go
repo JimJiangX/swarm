@@ -7,7 +7,8 @@ import (
 
 type VolumeOrmer interface {
 	GetVolume(nameOrID string) (Volume, error)
-	ListVolumeByVG(name string) ([]Volume, error)
+	ListVolumeByVG(vg string) ([]Volume, error)
+	ListVolumeByNode(nodeID string) ([]Volume, error)
 	ListVolumesByUnitID(id string) ([]Volume, error)
 
 	InsertVolume(lv Volume) error
@@ -25,6 +26,7 @@ type Volume struct {
 	Name       string `db:"name"`
 	UnitID     string `db:"unit_id"`
 	VGName     string `db:"VGname"`
+	NodeID     string `db:"node_id` // TODO:add later
 	Driver     string `db:"driver"`
 	Filesystem string `db:"fstype"`
 }
@@ -36,7 +38,7 @@ func (db dbBase) volumeTable() string {
 // InsertVolume insert a new InsertVolume
 func (db dbBase) InsertVolume(lv Volume) error {
 
-	query := "INSERT INTO " + db.volumeTable() + " (id,name,unit_id,size,VGname,driver,fstype) VALUES (:id,:name,:unit_id,:size,:VGname,:driver,:fstype)"
+	query := "INSERT INTO " + db.volumeTable() + " (id,name,unit_id,size,VGname,node_id,driver,fstype) VALUES (:id,:name,:unit_id,:size,:VGname,:node_id,:driver,:fstype)"
 
 	_, err := db.NamedExec(query, &lv)
 
@@ -119,7 +121,7 @@ func (db dbBase) DeleteVolumes(lvs []Volume) error {
 func (db dbBase) GetVolume(nameOrID string) (Volume, error) {
 	lv := Volume{}
 
-	query := "SELECT id,name,unit_id,size,VGname,driver,fstype FROM " + db.volumeTable() + " WHERE id=? OR name=?"
+	query := "SELECT id,name,unit_id,size,VGname,node_id,driver,fstype FROM " + db.volumeTable() + " WHERE id=? OR name=?"
 
 	err := db.Get(&lv, query, nameOrID, nameOrID)
 
@@ -130,7 +132,7 @@ func (db dbBase) GetVolume(nameOrID string) (Volume, error) {
 func (db dbBase) ListVolumeByVG(name string) ([]Volume, error) {
 	var (
 		lvs   []Volume
-		query = "SELECT id,name,unit_id,size,VGname,driver,fstype FROM " + db.volumeTable() + " WHERE VGname=?"
+		query = "SELECT id,name,unit_id,size,VGname,node_id,driver,fstype FROM " + db.volumeTable() + " WHERE VGname=?"
 	)
 
 	err := db.Select(&lvs, query, name)
@@ -138,11 +140,23 @@ func (db dbBase) ListVolumeByVG(name string) ([]Volume, error) {
 	return lvs, errors.Wrap(err, "list []Volume by VGName")
 }
 
+// ListVolumeByNode returns []Volume select by VGName
+func (db dbBase) ListVolumeByNode(nodeID string) ([]Volume, error) {
+	var (
+		lvs   []Volume
+		query = "SELECT id,name,unit_id,size,VGname,node_id,driver,fstype FROM " + db.volumeTable() + " WHERE node_id=?"
+	)
+
+	err := db.Select(&lvs, query, nodeID)
+
+	return lvs, errors.Wrap(err, "list []Volume by nodeID")
+}
+
 // ListVolumesByUnitID returns []Volume select by UnitID
 func (db dbBase) ListVolumesByUnitID(id string) ([]Volume, error) {
 	var (
 		lvs   []Volume
-		query = "SELECT id,name,unit_id,size,VGname,driver,fstype FROM " + db.volumeTable() + " WHERE unit_id=?"
+		query = "SELECT id,name,unit_id,size,VGname,node_id,driver,fstype FROM " + db.volumeTable() + " WHERE unit_id=?"
 	)
 
 	err := db.Select(&lvs, query, id)
