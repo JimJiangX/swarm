@@ -186,8 +186,6 @@ func NewNodeWithTaskList(len int) []nodeWithTask {
 
 // InstallNodes install new nodes,list should has same ClusterID
 func (dc *Datacenter) InstallNodes(ctx context.Context, list []nodeWithTask) error {
-	d := 250*time.Second + time.Duration(len(list)*30)*time.Second
-	ctx, _ = context.WithTimeout(ctx, d)
 
 	for i := range list {
 		_, err := dc.getCluster(list[i].Node.ClusterID)
@@ -225,11 +223,14 @@ func (dc *Datacenter) InstallNodes(ctx context.Context, list []nodeWithTask) err
 		return err
 	}
 
+	d := 250*time.Second + time.Duration(len(list)*30)*time.Second
+	ctx, cancel := context.WithTimeout(ctx, d)
+
 	for i := range list {
 		go list[i].distribute(ctx, horus, dc.dco, config)
 	}
 
-	go dc.registerNodes(ctx, list, config)
+	go dc.registerNodes(ctx, cancel, list, config)
 
 	return nil
 }
@@ -408,7 +409,16 @@ func (node *nodeWithTask) modifyProfile(horus string, config database.SysConfig)
 }
 
 // registerNodes register Nodes
-func (dc *Datacenter) registerNodes(ctx context.Context, nodes []nodeWithTask, config database.SysConfig) {
+func (dc *Datacenter) registerNodes(ctx context.Context, cancel context.CancelFunc, nodes []nodeWithTask, config database.SysConfig) {
+	timer := time.NewTimer(time.Minute * 2)
+
+	defer func(t *time.Timer, cancel context.CancelFunc) {
+		cancel()
+		if !t.Stop() {
+			<-t.C
+		}
+	}(timer, cancel)
+
 	cID := ""
 	for i := range nodes {
 		if nodes[i].Node.ClusterID != "" {
@@ -422,13 +432,6 @@ func (dc *Datacenter) registerNodes(ctx context.Context, nodes []nodeWithTask, c
 	}
 
 	field := logrus.WithField("Cluster", cID)
-	timer := time.NewTimer(time.Minute * 2)
-
-	defer func(t *time.Timer) {
-		if !t.Stop() {
-			<-t.C
-		}
-	}(timer)
 
 	for {
 		select {
