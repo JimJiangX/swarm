@@ -45,18 +45,33 @@ const (
 	statusNodeDeregisted
 )
 
-var dockerNodesKVPath = "docker/nodes/KVPath"
+const (
+	_VG_Label         = "VG_Name"
+	dockerNodesKVPath = "docker/nodes/KVPath"
+)
 
 type Node struct {
-	node database.Node
-	eng  *cluster.Engine
+	vgName string
+	node   database.Node
+	eng    *cluster.Engine
+	vo     database.VolumeOrmer
 }
 
-func newNode(n database.Node, eng *cluster.Engine) Node {
-	return Node{
+func newNode(n database.Node, eng *cluster.Engine, vo database.VolumeOrmer) Node {
+	node := Node{
 		node: n,
 		eng:  eng,
+		vo:   vo,
 	}
+
+	if eng != nil {
+		vg, ok := eng.Labels[_VG_Label]
+		if ok {
+			node.vgName = vg
+		}
+	}
+
+	return node
 }
 
 func (dc *Datacenter) getNode(nameOrID string) (Node, error) {
@@ -71,7 +86,7 @@ func (dc *Datacenter) getNode(nameOrID string) (Node, error) {
 
 	eng := dc.clsuter.Engine(n.EngineID)
 
-	return newNode(n, eng), nil
+	return newNode(n, eng, dc.dco), nil
 }
 
 func (dc *Datacenter) updateNode(nameOrID string, status, maxContainer int) (database.Node, error) {

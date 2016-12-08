@@ -8,6 +8,7 @@ import (
 
 type ClusterOrmer interface {
 	NodeOrmer
+	VolumeOrmer
 	SysConfigOrmer
 
 	InsertCluster(c Cluster) error
