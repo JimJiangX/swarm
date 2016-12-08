@@ -101,7 +101,7 @@ type Cluster interface {
 	// Tag an image
 	TagImage(IDOrName string, ref string, force bool) error
 
-	// Get Engine by addr
-	EngineByAddr(addr string) *Engine
+	// Get Engine
 	Engine(IDOrName string) *Engine
+	EngineByAddr(addr string) *Engine
 }

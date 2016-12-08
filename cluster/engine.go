@@ -941,16 +941,16 @@ func (e *Engine) UsedMemory() int64 {
 	return r
 }
 
-// UsedCpus returns the sum of CPUs reserved by containers.
-func (e *Engine) UsedCpus() int64 {
-	var r int64
-	e.RLock()
-	for _, c := range e.containers {
-		r += c.Config.HostConfig.CPUShares
-	}
-	e.RUnlock()
-	return r
-}
+//// UsedCpus returns the sum of CPUs reserved by containers.
+//func (e *Engine) UsedCpus() int64 {
+//	var r int64
+//	e.RLock()
+//	for _, c := range e.containers {
+//		r += c.Config.HostConfig.CPUShares
+//	}
+//	e.RUnlock()
+//	return r
+//}
 
 // TotalMemory returns the total memory + overcommit
 func (e *Engine) TotalMemory() int64 {
