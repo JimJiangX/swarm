@@ -246,6 +246,10 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 				entry.Infof("migrate service done,%v", err)
 				migrate.Status, migrate.LatestError = statusUnitMigrated, ""
 			} else {
+				gd.scheduler.Lock()
+				delete(gd.pendingContainers, swarmID)
+				gd.scheduler.Unlock()
+
 				entry.Errorf("%+v", err)
 				migrate.Status, migrate.LatestError, svcStatus = statusUnitMigrateFailed, err.Error(), statusServiceUnitMigrateFailed
 
@@ -912,6 +916,10 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 			if err == nil {
 				rebuild.Status, rebuild.LatestError = statusUnitRebuilt, ""
 			} else {
+				gd.scheduler.Lock()
+				delete(gd.pendingContainers, swarmID)
+				gd.scheduler.Unlock()
+
 				rebuild.Status, rebuild.LatestError, svcStatus = statusUnitRebuildFailed, err.Error(), statusServiceRestoreFailed
 
 				entry.Errorf("len(localVolume)=%d", len(pending.localStore))
