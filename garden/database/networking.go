@@ -177,31 +177,27 @@ func (db dbBase) ListAvailablePorts(num int) ([]Port, error) {
 }
 
 // TxUpdatePorts update []Port Name\UnitID\UnitName\Proto\Allocated in Tx
-func (db dbBase) UpdatePorts(ports []Port) error {
-	do := func(tx *sqlx.Tx) error {
+func (db dbBase) txUpdatePorts(tx *sqlx.Tx, ports []Port) error {
 
-		query := "UPDATE " + db.portTable() + " SET name=:name,unit_id=:unit_id,unit_name=:unit_name,proto=:proto,allocated=:allocated WHERE port=:port"
+	query := "UPDATE " + db.portTable() + " SET name=:name,unit_id=:unit_id,unit_name=:unit_name,proto=:proto,allocated=:allocated WHERE port=:port"
 
-		stmt, err := tx.PrepareNamed(query)
-		if err != nil {
-			return errors.Wrap(err, "Tx prepare update []Port")
-		}
-
-		for i := range ports {
-			_, err = stmt.Exec(&ports[i])
-			if err != nil {
-				stmt.Close()
-
-				return errors.Wrap(err, "Tx update Port")
-			}
-		}
-
-		err = stmt.Close()
-
-		return errors.Wrap(err, "tx update []Port")
+	stmt, err := tx.PrepareNamed(query)
+	if err != nil {
+		return errors.Wrap(err, "Tx prepare update []Port")
 	}
 
-	return db.txFrame(do)
+	for i := range ports {
+		_, err = stmt.Exec(&ports[i])
+		if err != nil {
+			stmt.Close()
+
+			return errors.Wrap(err, "Tx update Port")
+		}
+	}
+
+	err = stmt.Close()
+
+	return errors.Wrap(err, "tx update []Port")
 }
 
 // TxImportPort import Port from [start:end],returns number of insert ports.
