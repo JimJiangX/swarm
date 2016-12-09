@@ -81,6 +81,16 @@ func (db dbBase) UpdateVolumes(lvs []Volume) error {
 	return db.txFrame(do)
 }
 
+// txDeleteVolume delete Volume by name or ID
+func (db dbBase) txDeleteVolume(tx *sqlx.Tx, nameOrID string) error {
+
+	query := "DELETE FROM " + db.volumeTable() + " WHERE id=? OR name=?"
+
+	_, err := tx.Exec(query, nameOrID, nameOrID)
+
+	return errors.Wrap(err, "tx delete Volume by nameOrID")
+}
+
 // DeleteVolume delete Volume by name or ID
 func (db dbBase) DeleteVolume(nameOrID string) error {
 
@@ -89,6 +99,16 @@ func (db dbBase) DeleteVolume(nameOrID string) error {
 	_, err := db.Exec(query, nameOrID, nameOrID)
 
 	return errors.Wrap(err, "delete Volume by nameOrID")
+}
+
+// DeleteVolume delete Volume by name or ID
+func (db dbBase) DeleteVolumeByUnit(tx *sqlx.Tx, unitID string) error {
+
+	query := "DELETE FROM " + db.volumeTable() + " WHERE unit_id=?"
+
+	_, err := tx.Exec(query, unitID)
+
+	return errors.Wrap(err, "delete Volume by unitID")
 }
 
 // DeleteVolumes delete []LocalVolume in a Tx.
