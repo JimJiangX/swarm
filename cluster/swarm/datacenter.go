@@ -834,20 +834,25 @@ loop:
 
 		dc.Unlock()
 
+		stores := make(map[string]int, len(module.Stores))
 		for _, v := range module.Stores {
+			stores[v.Type] = stores[v.Type] + v.Size
+		}
 
-			if storage.IsLocalStore(v.Type) {
+		for _type, size := range stores {
 
-				if !node.isIdleStoreEnough(v.Type, v.Size) {
-					logrus.Debugf("%s local store shortage:%d", node.Name, v.Size)
+			if storage.IsLocalStore(_type) {
+
+				if !node.isIdleStoreEnough(_type, size) {
+					logrus.Debugf("%s local store shortage:%d", node.Name, size)
 
 					continue loop
 				}
 
-			} else if v.Type == storage.SANStore {
+			} else if _type == storage.SANStore {
 				// when storage is HITACHI or HUAWEI
-				if !dc.isIdleStoreEnough(num/2, v.Size) {
-					logrus.Debugf("%s san store shortage:%d", dc.Name, v.Size)
+				if !dc.isIdleStoreEnough(num/2, size) {
+					logrus.Debugf("%s san store shortage:%d", dc.Name, size)
 
 					continue loop
 				}
