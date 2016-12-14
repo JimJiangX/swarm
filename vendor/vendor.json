@@ -33,10 +33,10 @@
 			"revisionTime": "2016-09-20T22:53:08Z"
 		},
 		{
-			"checksumSHA1": "5I0G+0o3xHUQ53jlq70Ujrw0d2A=",
+			"checksumSHA1": "scVQ1hqzjFQX+LhztTSa0B+QSAg=",
 			"path": "github.com/jmoiron/sqlx",
-			"revision": "7396209bbeada6a4fcc28aa9408f89b2e71cac39",
-			"revisionTime": "2016-07-29T03:07:26Z"
+			"revision": "43975e693e7ab5df0ba436482a697b7c2bf6a87e",
+			"revisionTime": "2016-12-02T06:20:19Z"
 		},
 		{
 			"checksumSHA1": "NJHTyLwheqVk7+syzj9UN7p1dKs=",

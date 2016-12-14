@@ -97,7 +97,7 @@ func GetCluster(nameOrID string) (Cluster, error) {
 		return c, err
 	}
 
-	const query = "SELECT * FROM tbl_dbaas_cluster WHERE id=? OR name=?"
+	const query = "SELECT id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit FROM tbl_dbaas_cluster WHERE id=? OR name=?"
 
 	err = db.Get(&c, query, nameOrID, nameOrID)
 	if err == nil {
@@ -117,7 +117,7 @@ func ListClusters() ([]Cluster, error) {
 	}
 
 	var clusters []Cluster
-	const query = "SELECT * FROM tbl_dbaas_cluster"
+	const query = "SELECT id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit FROM tbl_dbaas_cluster"
 
 	err = db.Select(&clusters, query)
 
@@ -280,7 +280,7 @@ func GetNode(nameOrID string) (Node, error) {
 	}
 
 	node := Node{}
-	const query = "SELECT * FROM tbl_dbaas_node WHERE id=? OR name=? OR engine_id=?"
+	const query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM tbl_dbaas_node WHERE id=? OR name=? OR engine_id=?"
 
 	err = db.Get(&node, query, nameOrID, nameOrID, nameOrID)
 	if err == nil {
@@ -301,7 +301,7 @@ func GetNodeByAddr(addr string) (Node, error) {
 	}
 
 	node := Node{}
-	const query = "SELECT * FROM tbl_dbaas_node WHERE admin_ip=?"
+	const query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM tbl_dbaas_node WHERE admin_ip=?"
 
 	err = db.Get(&node, query, addr)
 	if err == nil {
@@ -322,7 +322,7 @@ func GetAllNodes() ([]Node, error) {
 	}
 
 	var nodes []Node
-	const query = "SELECT * FROM tbl_dbaas_node"
+	const query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM tbl_dbaas_node"
 
 	err = db.Select(&nodes, query)
 
@@ -337,7 +337,7 @@ func ListNodeByCluster(cluster string) ([]Node, error) {
 	}
 
 	var nodes []Node
-	const query = "SELECT * FROM tbl_dbaas_node WHERE cluster_id=?"
+	const query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM tbl_dbaas_node WHERE cluster_id=?"
 
 	err = db.Select(&nodes, query, cluster)
 
@@ -369,7 +369,7 @@ func ListNodesByEngines(names []string) ([]Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	query, args, err := sqlx.In("SELECT * FROM tbl_dbaas_node WHERE engine_id IN (?);", names)
+	query, args, err := sqlx.In("SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM tbl_dbaas_node WHERE engine_id IN (?);", names)
 	if err != nil {
 		return nil, errors.Wrap(err, "select []Node IN engines")
 	}
@@ -390,7 +390,7 @@ func ListNodesByIDs(in []string, cluster string) ([]Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	query, args, err := sqlx.In("SELECT * FROM tbl_dbaas_node WHERE id IN (?);", in)
+	query, args, err := sqlx.In("SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM tbl_dbaas_node WHERE id IN (?);", in)
 	if err != nil {
 		return nil, errors.Wrap(err, "select []Node IN IDs")
 	}
@@ -429,7 +429,7 @@ func ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, 
 		return []Node{}, nil
 	}
 
-	query, args, err := sqlx.In("SELECT * FROM tbl_dbaas_node WHERE cluster_id IN (?);", clusters)
+	query, args, err := sqlx.In("SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM tbl_dbaas_node WHERE cluster_id IN (?);", clusters)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "select []Node IN clusterIDs")

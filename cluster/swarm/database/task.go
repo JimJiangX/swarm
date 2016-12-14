@@ -60,7 +60,7 @@ func ListBackupFilesByService(nameOrID string) (Service, []BackupFile, error) {
 	}
 
 	service := Service{}
-	err = db.Get(&service, "SELECT * FROM tbl_dbaas_service WHERE id=? OR name=?", nameOrID, nameOrID)
+	err = db.Get(&service, "SELECT id,name,description,architecture,business_code,auto_healing,auto_scaling,status,backup_max_size,backup_files_retention,created_at,finished_at FROM tbl_dbaas_service WHERE id=? OR name=?", nameOrID, nameOrID)
 	if err != nil {
 		return service, nil, errors.Wrapf(err, "not found Service by '%s'", nameOrID)
 	}
@@ -75,7 +75,7 @@ func ListBackupFilesByService(nameOrID string) (Service, []BackupFile, error) {
 		return service, []BackupFile{}, nil
 	}
 
-	query, args, err := sqlx.In("SELECT * FROM tbl_dbaas_backup_files WHERE unit_id IN (?);", units)
+	query, args, err := sqlx.In("SELECT id,task_id,strategy_id,unit_id,type,path,size,retention,created_at,finished_at FROM tbl_dbaas_backup_files WHERE unit_id IN (?);", units)
 	if err != nil {
 		return service, nil, errors.Wrap(err, "select BackupFile by UnitIDs")
 	}
@@ -97,7 +97,7 @@ func GetBackupFile(id string) (BackupFile, error) {
 	}
 
 	row := BackupFile{}
-	const query = "SELECT * FROM tbl_dbaas_backup_files WHERE id=?"
+	const query = "SELECT id,task_id,strategy_id,unit_id,type,path,size,retention,created_at,finished_at FROM tbl_dbaas_backup_files WHERE id=?"
 
 	err = db.Get(&row, query, id)
 
@@ -280,7 +280,7 @@ func GetTask(id string) (Task, error) {
 	}
 
 	task := Task{}
-	const query = "SELECT * FROM tbl_dbaas_task WHERE id=?"
+	const query = "SELECT id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM tbl_dbaas_task WHERE id=?"
 
 	err = db.Get(&task, query, id)
 
@@ -295,7 +295,7 @@ func ListTask() ([]Task, error) {
 	}
 
 	var list []Task
-	const query = "SELECT * FROM tbl_dbaas_task"
+	const query = "SELECT id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM tbl_dbaas_task"
 
 	err = db.Select(&list, query)
 
@@ -310,7 +310,7 @@ func ListTaskByStatus(status int) ([]Task, error) {
 	}
 
 	var list []Task
-	const query = "SELECT * FROM tbl_dbaas_task WHERE status=?"
+	const query = "SELECT id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM tbl_dbaas_task WHERE status=?"
 
 	err = db.Select(&list, query, status)
 
@@ -325,7 +325,7 @@ func ListTaskByRelated(related string) ([]Task, error) {
 	}
 
 	var list []Task
-	const query = "SELECT * FROM tbl_dbaas_task WHERE related=?"
+	const query = "SELECT id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM tbl_dbaas_task WHERE related=?"
 
 	err = db.Select(&list, query, related)
 
@@ -348,22 +348,22 @@ func ListTaskByTimestamp(begin, end time.Time) ([]Task, error) {
 		list  []Task
 		min   = begin.Unix()
 		max   = end.Unix()
-		query = "SELECT * FROM tbl_dbaas_task"
+		query = "SELECT id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM tbl_dbaas_task"
 	)
 
 	if begin.IsZero() && !end.IsZero() {
 
-		query = "SELECT * FROM tbl_dbaas_task WHERE timestamp<=?" //max
+		query = "SELECT id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM tbl_dbaas_task WHERE timestamp<=?" //max
 		err = db.Select(&list, query, max)
 
 	} else if !begin.IsZero() && end.IsZero() {
 
-		query = "SELECT * FROM tbl_dbaas_task WHERE timestamp>=?" //min
+		query = "SELECT id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM tbl_dbaas_task WHERE timestamp>=?" //min
 		err = db.Select(&list, query, min)
 
 	} else if !begin.IsZero() && !end.IsZero() {
 
-		query = "SELECT * FROM tbl_dbaas_task WHERE timestamp>=? AND timestamp<=?" //max
+		query = "SELECT id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM tbl_dbaas_task WHERE timestamp>=? AND timestamp<=?" //max
 		err = db.Select(&list, query, min, max)
 
 	} else {
@@ -421,7 +421,7 @@ func GetBackupStrategy(nameOrID string) (*BackupStrategy, error) {
 	}
 
 	var strategy *BackupStrategy
-	const query = "SELECT * FROM tbl_dbaas_backup_strategy WHERE id=? OR name=?"
+	const query = "SELECT id,name,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at FROM tbl_dbaas_backup_strategy WHERE id=? OR name=?"
 
 	err = db.Get(&strategy, query, nameOrID, nameOrID)
 
@@ -436,7 +436,7 @@ func ListBackupStrategyByServiceID(serviceID string) ([]BackupStrategy, error) {
 	}
 
 	var strategies []BackupStrategy
-	const query = "SELECT * FROM tbl_dbaas_backup_strategy WHERE service_id=?"
+	const query = "SELECT id,name,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at FROM tbl_dbaas_backup_strategy WHERE service_id=?"
 
 	err = db.Select(&strategies, query, serviceID)
 
@@ -555,7 +555,7 @@ func BackupTaskValidate(taskID, strategyID, unitID string) (Task, int, error) {
 	}
 
 	task := Task{}
-	err = db.Get(&task, "SELECT * FROM tbl_dbaas_task WHERE id=?", taskID)
+	err = db.Get(&task, "SELECT id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM tbl_dbaas_task WHERE id=?", taskID)
 
 	if err != nil {
 		return task, 0, errors.Wrap(err, "BackupTaskValidate: get Task by ID:"+taskID)
@@ -568,7 +568,7 @@ func BackupTaskValidate(taskID, strategyID, unitID string) (Task, int, error) {
 	}
 
 	unit := Unit{}
-	err = db.Get(&unit, "SELECT * FROM tbl_dbaas_unit WHERE id=?", unitID)
+	err = db.Get(&unit, "SELECT id,name,type,image_id,image_name,service_id,node_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at FROM tbl_dbaas_unit WHERE id=?", unitID)
 	if err != nil {
 		return task, 0, errors.Wrap(err, "BackupTaskValidate: get Unit by ID:"+unitID)
 	}
