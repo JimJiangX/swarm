@@ -85,6 +85,10 @@ func (l LocalStore) IdleSize() (map[string]int, error) {
 			free -= lvs[i].Size
 		}
 
+		if free > l.list[i].VgFree {
+			free = l.list[i].VgFree
+		}
+
 		out[l.list[i].VgName] = free
 	}
 
