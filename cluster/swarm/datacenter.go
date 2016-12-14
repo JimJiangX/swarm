@@ -891,6 +891,8 @@ func (node *Node) isIdleStoreEnough(_type string, size int) bool {
 		return false
 	}
 
+	logrus.Debugf("%s VG %s:%v %s:%d", node.Name, vgName, idle[vgName], _type, size)
+
 	if idle[vgName] < size {
 		logrus.Debugf("%s VG %s shortage:%v %d", node.Name, vgName, idle[vgName], size)
 
