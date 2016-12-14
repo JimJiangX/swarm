@@ -177,7 +177,11 @@ func initialize(name, version string) (parser configParser, cmder containerCmd, 
 		parser = &switchManagerConfig{}
 		cmder = &switchManagerCmd{}
 
-	case _ImageUpsql == name && strings.HasPrefix(version, "5.6."):
+	case _ImageUpsql == name && strings.HasPrefix(version, "5.6"):
+		parser = &mysqlConfig{}
+		cmder = &mysqlCmd{}
+
+	case _ImageUpsql == name && strings.HasPrefix(version, "1."):
 		parser = &mysqlConfig{}
 		cmder = &mysqlCmd{}
 
@@ -277,6 +281,7 @@ func (c mysqlConfig) defaultUserConfig(args ...interface{}) (_ map[string]interf
 	m["mysqld::log_bin"] = fmt.Sprintf("/DBAASLOG/BIN/%s-binlog", u.Name)
 	m["mysqld::innodb_buffer_pool_size"] = int(float64(u.config.HostConfig.Memory) * 0.75)
 	m["mysqld::relay_log"] = fmt.Sprintf("/DBAASLOG/REL/%s-relay", u.Name)
+	m["mysqld::slave_skip_errors"] = 1236
 
 	return m, nil
 }
