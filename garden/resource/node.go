@@ -74,8 +74,8 @@ func newNode(n database.Node, eng *cluster.Engine, vo database.VolumeOrmer) Node
 	return node
 }
 
-func (dc *Datacenter) getNode(nameOrID string) (Node, error) {
-	n, err := dc.dco.GetNode(nameOrID)
+func (ns *nodes) getNode(nameOrID string) (Node, error) {
+	n, err := ns.dco.GetNode(nameOrID)
 	if err != nil {
 		return Node{}, err
 	}
@@ -84,13 +84,13 @@ func (dc *Datacenter) getNode(nameOrID string) (Node, error) {
 		return Node{node: n}, nil
 	}
 
-	eng := dc.clsuter.Engine(n.EngineID)
+	eng := ns.clsuter.Engine(n.EngineID)
 
-	return newNode(n, eng, dc.dco), nil
+	return newNode(n, eng, ns.dco), nil
 }
 
-func (dc *Datacenter) updateNode(nameOrID string, status, maxContainer int) (database.Node, error) {
-	n, err := dc.getNode(nameOrID)
+func (ns *nodes) updateNode(nameOrID string, status, maxContainer int) (database.Node, error) {
+	n, err := ns.getNode(nameOrID)
 	if err != nil {
 		return database.Node{}, err
 	}
@@ -102,7 +102,7 @@ func (dc *Datacenter) updateNode(nameOrID string, status, maxContainer int) (dat
 		n.node.MaxContainer = maxContainer
 	}
 
-	err = dc.dco.UpdateParams(n.node)
+	err = ns.dco.UpdateParams(n.node)
 	if err != nil {
 		return n.node, err
 	}
@@ -110,8 +110,8 @@ func (dc *Datacenter) updateNode(nameOrID string, status, maxContainer int) (dat
 	return n.node, nil
 }
 
-func (dc *Datacenter) removeNode(ID string) error {
-	err := dc.dco.DeleteNode(ID)
+func (ns *nodes) removeNode(ID string) error {
+	err := ns.dco.DeleteNode(ID)
 	if err != nil {
 		return err
 	}
@@ -119,8 +119,8 @@ func (dc *Datacenter) removeNode(ID string) error {
 	return nil
 }
 
-func (dc *Datacenter) RemoveNode(ctx context.Context, nameOrID, user, password string, force bool) error {
-	node, err := dc.getNode(nameOrID)
+func (ns *nodes) RemoveNode(ctx context.Context, nameOrID, user, password string, force bool) error {
+	node, err := ns.getNode(nameOrID)
 	if err != nil {
 		if database.IsNotFound(err) {
 			return nil
@@ -135,7 +135,7 @@ func (dc *Datacenter) RemoveNode(ctx context.Context, nameOrID, user, password s
 		}
 	}
 
-	config, err := dc.dco.GetSysConfig()
+	config, err := ns.dco.GetSysConfig()
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (dc *Datacenter) RemoveNode(ctx context.Context, nameOrID, user, password s
 	}
 	defer client.Close()
 
-	horus, err := dc.kvClient.GetHorusAddr()
+	horus, err := ns.kvClient.GetHorusAddr()
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func (dc *Datacenter) RemoveNode(ctx context.Context, nameOrID, user, password s
 		return err
 	}
 
-	err = dc.removeNode(node.node.ID)
+	err = ns.removeNode(node.node.ID)
 
 	return err
 }
@@ -200,10 +200,10 @@ func NewNodeWithTaskList(len int) []nodeWithTask {
 }
 
 // InstallNodes install new nodes,list should has same ClusterID
-func (dc *Datacenter) InstallNodes(ctx context.Context, list []nodeWithTask) error {
+func (ns *nodes) InstallNodes(ctx context.Context, list []nodeWithTask) error {
 
 	for i := range list {
-		_, err := dc.getCluster(list[i].Node.ClusterID)
+		_, err := ns.getCluster(list[i].Node.ClusterID)
 		if err != nil {
 			return err
 		}
@@ -223,17 +223,17 @@ func (dc *Datacenter) InstallNodes(ctx context.Context, list []nodeWithTask) err
 		return ctx.Err()
 	}
 
-	err := dc.dco.InsertNodesAndTask(nodes, tasks)
+	err := ns.dco.InsertNodesAndTask(nodes, tasks)
 	if err != nil {
 		return err
 	}
 
-	config, err := dc.dco.GetSysConfig()
+	config, err := ns.dco.GetSysConfig()
 	if err != nil {
 		return err
 	}
 
-	horus, err := dc.kvClient.GetHorusAddr()
+	horus, err := ns.kvClient.GetHorusAddr()
 	if err != nil {
 		return err
 	}
@@ -242,10 +242,10 @@ func (dc *Datacenter) InstallNodes(ctx context.Context, list []nodeWithTask) err
 	ctx, cancel := context.WithTimeout(ctx, d)
 
 	for i := range list {
-		go list[i].distribute(ctx, horus, dc.dco, config)
+		go list[i].distribute(ctx, horus, ns.dco, config)
 	}
 
-	go dc.registerNodes(ctx, cancel, list, config)
+	go ns.registerNodes(ctx, cancel, list, config)
 
 	return nil
 }
@@ -374,7 +374,7 @@ func (node *nodeWithTask) modifyProfile(horus string, config database.SysConfig)
 		#!/bin/bash
 		swarm_key=$1
 		adm_ip=$2
-		cs_datacenter=$3
+		cs_nodes=$3
 		cs_list=$4
 		registry_domain=$5
 		registry_ip=$6
@@ -424,7 +424,7 @@ func (node *nodeWithTask) modifyProfile(horus string, config database.SysConfig)
 }
 
 // registerNodes register Nodes
-func (dc *Datacenter) registerNodes(ctx context.Context, cancel context.CancelFunc, nodes []nodeWithTask, config database.SysConfig) {
+func (ns *nodes) registerNodes(ctx context.Context, cancel context.CancelFunc, nodes []nodeWithTask, config database.SysConfig) {
 	timer := time.NewTimer(time.Minute * 2)
 
 	defer func(t *time.Timer, cancel context.CancelFunc) {
@@ -454,13 +454,13 @@ func (dc *Datacenter) registerNodes(ctx context.Context, cancel context.CancelFu
 			timer.Reset(30 * time.Second)
 
 		case <-ctx.Done():
-			err := dc.registerNodesTimeout(nodes, ctx.Err())
+			err := ns.registerNodesTimeout(nodes, ctx.Err())
 			field.Errorf("%+v", err)
 
 			return
 		}
 
-		list, err := dc.dco.ListNodeByCluster(cID)
+		list, err := ns.dco.ListNodeByCluster(cID)
 		if err != nil {
 			field.Errorf("%+v", err)
 			continue
@@ -497,7 +497,7 @@ func (dc *Datacenter) registerNodes(ctx context.Context, cancel context.CancelFu
 			}
 
 			addr := n.Addr + ":" + strconv.Itoa(config.DockerPort)
-			eng := dc.clsuter.EngineByAddr(addr)
+			eng := ns.clsuter.EngineByAddr(addr)
 			if eng == nil || !eng.IsHealthy() {
 				fields.Error(err)
 
@@ -513,7 +513,7 @@ func (dc *Datacenter) registerNodes(ctx context.Context, cancel context.CancelFu
 			t.FinishedAt = n.RegisterAt
 			t.Errors = ""
 
-			err = dc.dco.RegisterNode(n, t)
+			err = ns.dco.RegisterNode(n, t)
 			if err != nil {
 				fields.Errorf("%+v", err)
 			}
@@ -521,7 +521,7 @@ func (dc *Datacenter) registerNodes(ctx context.Context, cancel context.CancelFu
 	}
 }
 
-func (dc *Datacenter) registerNodesTimeout(nodes []nodeWithTask, er error) error {
+func (ns *nodes) registerNodesTimeout(nodes []nodeWithTask, er error) error {
 	if len(nodes) == 0 {
 		return nil
 	}
@@ -537,7 +537,7 @@ func (dc *Datacenter) registerNodesTimeout(nodes []nodeWithTask, er error) error
 		}
 	}
 
-	list, err := dc.dco.ListNodeByCluster(cID)
+	list, err := ns.dco.ListNodeByCluster(cID)
 	if err != nil {
 		return err
 	}
@@ -566,7 +566,7 @@ func (dc *Datacenter) registerNodesTimeout(nodes []nodeWithTask, er error) error
 			t.Errors = er.Error()
 		}
 
-		err = dc.dco.RegisterNode(n, t)
+		err = ns.dco.RegisterNode(n, t)
 		if err != nil {
 			logrus.WithField("Node", n.Name).WithError(err).Error("Node register timeout")
 		}

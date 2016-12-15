@@ -8,6 +8,10 @@ import (
 )
 
 type ServiceOrmer interface {
+	UnitOrmer
+
+	InsertService(svc Service, t *Task, users []User) error
+
 	GetService(nameOrID string) (Service, error)
 	GetServiceStatus(nameOrID string) (int, error)
 	GetServiceByUnit(nameOrID string) (Service, error)
@@ -17,9 +21,9 @@ type ServiceOrmer interface {
 	UpdateServiceStatus(nameOrID string, val int, finish time.Time) error
 	UpdateServcieDesc(id, desc string, size int) error
 	ServiceStatusCAS(nameOrID string, val int, finish time.Time, f func(val int) bool) (bool, int, error)
-	SaveService(svc Service, t *Task, users []User) error
-	SetServiceStatus(svc *Service, state int64, finish time.Time) error
-	UpdateServiceWithTask(svc *Service, t Task, state int64, finish time.Time) error
+	SetServiceStatus(svc *Service, state int, finish time.Time) error
+	UpdateServiceWithTask(svc *Service, t Task, state int, finish time.Time) error
+
 	DeteleServiceRelation(serviceID string, rmVolumes bool) error
 }
 
@@ -32,7 +36,7 @@ type Service struct {
 	BusinessCode      string `db:"business_code"`
 	AutoHealing       bool   `db:"auto_healing"`
 	AutoScaling       bool   `db:"auto_scaling"`
-	Status            int64  `db:"status"`
+	Status            int    `db:"status"`
 	BackupMaxSizeByte int    `db:"backup_max_size"`
 	// count by Day,used in swarm.BackupTaskCallback(),calculate BackupFile.Retention
 	BackupFilesRetention int       `db:"backup_files_retention"`
@@ -151,6 +155,7 @@ func (db dbBase) ServiceStatusCAS(nameOrID string, val int, finish time.Time, f 
 		}
 
 		done = true
+		status = val
 
 		return nil
 	}
@@ -161,7 +166,7 @@ func (db dbBase) ServiceStatusCAS(nameOrID string, val int, finish time.Time, f 
 }
 
 // TxSaveService insert Service & Task & []User in Tx.
-func (db dbBase) SaveService(svc Service, t *Task, users []User) error {
+func (db dbBase) InsertService(svc Service, t *Task, users []User) error {
 	do := func(tx *sqlx.Tx) error {
 
 		err := db.txInsertSerivce(tx, svc)
@@ -196,7 +201,7 @@ func (db dbBase) txInsertSerivce(tx *sqlx.Tx, svc Service) error {
 }
 
 // SetServiceStatus update Service Status
-func (db dbBase) SetServiceStatus(svc *Service, state int64, finish time.Time) error {
+func (db dbBase) SetServiceStatus(svc *Service, state int, finish time.Time) error {
 	if finish.IsZero() {
 
 		query := "UPDATE " + db.serviceTable() + " SET status=? WHERE id=?"
@@ -223,7 +228,7 @@ func (db dbBase) SetServiceStatus(svc *Service, state int64, finish time.Time) e
 }
 
 // TxSetServiceStatus update Service Status and Task Status in Tx.
-func (db dbBase) UpdateServiceWithTask(svc *Service, t Task, state int64, finish time.Time) error {
+func (db dbBase) UpdateServiceWithTask(svc *Service, t Task, state int, finish time.Time) error {
 	do := func(tx *sqlx.Tx) (err error) {
 
 		if finish.IsZero() {

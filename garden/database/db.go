@@ -77,6 +77,8 @@ import (
 //}
 
 type Ormer interface {
+	ServiceOrmer
+
 	TxFrame(do func(tx *sqlx.Tx) error) error
 }
 

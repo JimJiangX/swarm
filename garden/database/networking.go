@@ -18,7 +18,6 @@ type NetworkingOrmer interface {
 
 	// Port
 	ImportPort(start, end int, filter ...int) (int, error)
-	UpdatePorts(ports []Port) error
 
 	ListAvailablePorts(num int) ([]Port, error)
 	ListPortsByUnit(nameOrID string) ([]Port, error)

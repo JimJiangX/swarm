@@ -37,6 +37,8 @@ func (db dbBase) taskTable() string {
 
 func (db dbBase) txInsertTask(tx *sqlx.Tx, t Task) error {
 
+	t.Timestamp = t.CreatedAt.Unix()
+
 	query := "INSERT INTO " + db.taskTable() + " (id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
 
 	_, err := tx.Exec(query, t)

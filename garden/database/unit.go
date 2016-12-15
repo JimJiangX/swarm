@@ -10,6 +10,9 @@ import (
 )
 
 type UnitOrmer interface {
+	VolumeOrmer
+	NetworkingOrmer
+
 	GetUnit(nameOrID string) (Unit, error)
 	ListUnitByServiceID(id string) ([]Unit, error)
 	ListUnitByEngine(id string) ([]Unit, error)

@@ -6,31 +6,31 @@ import (
 	"github.com/docker/swarm/garden/kvstore"
 )
 
-type Datacenter struct {
+type nodes struct {
 	clsuter  cluster.Cluster
 	dco      database.ClusterOrmer
 	kvClient kvstore.Client
 }
 
-func NewDatacenter(dco database.ClusterOrmer, c cluster.Cluster, client kvstore.Client) *Datacenter {
-	return &Datacenter{
+func NewNodes(dco database.ClusterOrmer, c cluster.Cluster, client kvstore.Client) *nodes {
+	return &nodes{
 		dco:      dco,
 		clsuter:  c,
 		kvClient: client,
 	}
 }
 
-func (dc *Datacenter) AddCluster(c database.Cluster) error {
+func (ns *nodes) AddCluster(c database.Cluster) error {
 	if c.ID == "" {
 		return nil
 	}
 
-	_, err := dc.getCluster(c.ID)
+	_, err := ns.getCluster(c.ID)
 	if err == nil {
 		return nil
 	}
 
-	err = dc.dco.InsertCluster(c)
+	err = ns.dco.InsertCluster(c)
 	if err != nil {
 		return err
 	}
@@ -38,18 +38,18 @@ func (dc *Datacenter) AddCluster(c database.Cluster) error {
 	return nil
 }
 
-func (dc *Datacenter) getCluster(nameOrID string) (database.Cluster, error) {
+func (ns *nodes) getCluster(nameOrID string) (database.Cluster, error) {
 
-	return dc.dco.GetCluster(nameOrID)
+	return ns.dco.GetCluster(nameOrID)
 }
 
-func (dc *Datacenter) RemoveCluster(nameOrID string) error {
-	cl, err := dc.getCluster(nameOrID)
+func (ns *nodes) RemoveCluster(nameOrID string) error {
+	cl, err := ns.getCluster(nameOrID)
 	if err != nil && database.IsNotFound(err) {
 		return nil
 	}
 
-	err = dc.dco.DeleteCluster(cl.ID)
+	err = ns.dco.DeleteCluster(cl.ID)
 	if err != nil {
 		return err
 	}
