@@ -53,20 +53,20 @@
 		{
 			"checksumSHA1": "+b9NJNfumAKBaBcKTwdD/vVmfqo=",
 			"path": "github.com/yiduoyunQ/sm/sm-svr/consts",
-			"revision": "71aee00332cf6dbfc4a0160a1bc2fd88286e48e8",
-			"revisionTime": "2016-11-09T06:46:26Z"
+			"revision": "fe428330130e7a68de2948eab84100071e8b22da",
+			"revisionTime": "2016-11-25T07:54:43Z"
 		},
 		{
-			"checksumSHA1": "LK5MqAoYvbbQXf8z2ZPGPk5/2Rg=",
+			"checksumSHA1": "zFYs1JTe+CZNCahMzqvQohmyUtQ=",
 			"path": "github.com/yiduoyunQ/sm/sm-svr/structs",
-			"revision": "71aee00332cf6dbfc4a0160a1bc2fd88286e48e8",
-			"revisionTime": "2016-11-09T06:46:26Z"
+			"revision": "fe428330130e7a68de2948eab84100071e8b22da",
+			"revisionTime": "2016-11-25T07:54:43Z"
 		},
 		{
-			"checksumSHA1": "E4/m3GiDYb3SYnEGUWwsD6LPalY=",
+			"checksumSHA1": "ZoPCmxNgaUAoAqhiSmAKrm1vpOc=",
 			"path": "github.com/yiduoyunQ/smlib",
-			"revision": "f66c25f0f60179337a203d8746e576f018d13445",
-			"revisionTime": "2016-11-15T05:24:02Z"
+			"revision": "973a59f463a184a0fcacb5311ddf13a1f9df1c0d",
+			"revisionTime": "2016-12-15T09:02:56Z"
 		},
 		{
 			"checksumSHA1": "tK8eFmQ0JeKpR3P0TjiGobzlIh0=",
