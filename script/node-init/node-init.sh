@@ -45,7 +45,11 @@ rpm_install() {
 
 nfs_mount() {
 	local dir=/etc/fstab
-	umount -f ${nfs_mount_dir} > /dev/null 2>&1
+	umount ${nfs_mount_dir} > /dev/null 2>&1
+	if [ $? -ne 0 ]; then
+                echo "nfs unmount failed"
+                exit 2
+        fi
 	rm -rf ${nfs_mount_dir}
 	mkdir ${nfs_mount_dir}
 	mount -t nfs -o ${nfs_mount_opts} ${nfs_ip}:${nfs_dir} ${nfs_mount_dir} 
