@@ -985,7 +985,7 @@ func getServiceResponse(service database.Service, containers cluster.Containers)
 			roles := topology.DataNodeGroup["default"]
 
 			for i := range list {
-				val, ok := roles[list[i].ID]
+				val, ok := roles[list[i].Name]
 				if ok {
 					list[i].Role = fmt.Sprintf("%s(%s)", val.Type, val.Status)
 				}
