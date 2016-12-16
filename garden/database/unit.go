@@ -9,10 +9,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type UnitOrmer interface {
-	VolumeOrmer
-	NetworkingOrmer
-
+type UnitInterface interface {
 	GetUnit(nameOrID string) (Unit, error)
 	ListUnitByServiceID(id string) ([]Unit, error)
 	ListUnitByEngine(id string) ([]Unit, error)
@@ -32,6 +29,14 @@ type UnitOrmer interface {
 	UpdateMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error
 
 	DeleteUnit(tx *sqlx.Tx, nameOrID string) error
+}
+
+type UnitOrmer interface {
+	UnitInterface
+
+	VolumeOrmer
+
+	NetworkingOrmer
 }
 
 // Unit is table structure
