@@ -1,6 +1,7 @@
 package smlib
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -100,5 +101,15 @@ func get(ip string, port int, method, arg string) (*http.Response, error) {
 		uri = uri + "/" + arg
 	}
 
-	return http.Get(uri)
+	req, err := http.NewRequest("GET", uri, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	req = req.WithContext(ctx)
+
+	return http.DefaultClient.Do(req)
 }

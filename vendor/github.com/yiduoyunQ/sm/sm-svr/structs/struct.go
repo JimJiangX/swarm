@@ -42,7 +42,7 @@ type Topology struct {
 type ProxyModeInfo struct {
 	IsShard   bool   `json:"is_shard,omitempty"`
 	IsRwSplit bool   `json:"is_rw_split,omitempty"`
-	IsOnly    bool   `json:"is_only,omitempty"`
+	IsOnly    bool   `json:"is_readonly,omitempty"`
 	Datanode  string `json:"datanode,omitempty"`
 }
 type DatabaseAuth struct {

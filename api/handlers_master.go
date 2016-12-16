@@ -23,6 +23,7 @@ import (
 	"github.com/docker/swarm/utils"
 	"github.com/gorilla/mux"
 	consulapi "github.com/hashicorp/consul/api"
+	swm_structs "github.com/yiduoyunQ/sm/sm-svr/structs"
 	"github.com/yiduoyunQ/smlib"
 	goctx "golang.org/x/net/context"
 )
@@ -673,15 +674,9 @@ type dbaasServiceResp struct {
 	CreatedAt     string `json:"created_at"` // "created_at": "??"
 }
 
-func getServiceStatusFromSWM(units []database.Unit, result chan<- string) {
-	defer close(result)
+func getSWMAddr(units []database.Unit) (addr string, port int, found bool) {
+	var swm database.Unit
 
-	var (
-		found bool
-		addr  string
-		port  int
-		swm   database.Unit
-	)
 	for i := range units {
 		if units[i].Type == "switch_manager" {
 			swm = units[i]
@@ -691,7 +686,6 @@ func getServiceStatusFromSWM(units []database.Unit, result chan<- string) {
 	}
 
 	if !found {
-		result <- ""
 		return
 	}
 
@@ -712,7 +706,6 @@ func getServiceStatusFromSWM(units []database.Unit, result chan<- string) {
 	}
 
 	if !found {
-		result <- ""
 		return
 	}
 
@@ -726,6 +719,14 @@ func getServiceStatusFromSWM(units []database.Unit, result chan<- string) {
 		}
 	}
 
+	return
+}
+
+func getServiceStatusFromSWM(units []database.Unit, result chan<- string) {
+	defer close(result)
+
+	addr, port, found := getSWMAddr(units)
+
 	if !found {
 		result <- ""
 		return
@@ -733,10 +734,28 @@ func getServiceStatusFromSWM(units []database.Unit, result chan<- string) {
 
 	status, err := smlib.GetServiceStatus(addr, port)
 	if err != nil {
-		logrus.WithError(err).Warnf("%s cannot get ServiceStatus,addr=%s:%d", swm.Name, addr, port)
+		logrus.WithError(err).Warnf("cannot get ServiceStatus,addr=%s:%d", addr, port)
 	}
 
 	result <- status
+}
+
+func getServiceTopologyFromSWM(units []database.Unit, result chan<- *swm_structs.Topology) {
+	defer close(result)
+
+	addr, port, found := getSWMAddr(units)
+
+	if !found {
+		result <- nil
+		return
+	}
+
+	topology, err := smlib.GetTopology(addr, port)
+	if err != nil {
+		logrus.WithError(err).Warnf("cannot get Service topology,addr=%s:%d", addr, port)
+	}
+
+	result <- topology
 }
 
 func serviceFromDBAAS(svc database.Service, containers cluster.Containers, checks map[string]consulapi.HealthCheck, ch chan dbaasServiceResp) {
@@ -878,17 +897,22 @@ func getServiceResponse(service database.Service, containers cluster.Containers)
 		logrus.Error("ListUnitByServiceID", err)
 	}
 
-	roles := make(map[string]string)
-	for i := range units {
-		if units[i].Type == "switch_manager" {
-			roles, err = swarm.GetUnitRoleFromConsul(service.ID + "/" + units[i].Name)
-			if err == nil {
-				break
-			} else {
-				logrus.WithError(err).Warn("Get Unit Role From Consul")
-			}
-		}
+	r := make(chan *swm_structs.Topology, 1)
+	if len(units) > 0 {
+		go getServiceTopologyFromSWM(units, r)
 	}
+
+	//	roles := make(map[string]string)
+	//	for i := range units {
+	//		if units[i].Type == "switch_manager" {
+	//			roles, err = swarm.GetUnitRoleFromConsul(service.ID + "/" + units[i].Name)
+	//			if err == nil {
+	//				break
+	//			} else {
+	//				logrus.WithError(err).Warn("Get Unit Role From Consul")
+	//			}
+	//		}
+	//	}
 
 	checks, err := swarm.HealthChecksFromConsul("any", nil)
 	if err != nil {
@@ -926,16 +950,16 @@ func getServiceResponse(service database.Service, containers cluster.Containers)
 			ClusterID:   node.ClusterID,
 			Networkings: networkings,
 			Ports:       ports,
-			Role:        roles[units[i].Name],
-			Status:      checks[units[i].ID].Status,
-			TaskStatus:  units[i].Status,
-			LatestMsg:   units[i].LatestError,
-			CreatedAt:   utils.TimeToString(units[i].CreatedAt),
+			//	Role:        roles[units[i].Name],
+			Status:     checks[units[i].ID].Status,
+			TaskStatus: units[i].Status,
+			LatestMsg:  units[i].LatestError,
+			CreatedAt:  utils.TimeToString(units[i].CreatedAt),
 		}
 
-		if list[i].Role == "" && list[i].Type == "upsql" {
-			list[i].Role = "unknown"
-		}
+		//		if list[i].Role == "" && list[i].Type == "upsql" {
+		//			list[i].Role = "unknown"
+		//		}
 
 		container := containers.Get(units[i].ContainerID)
 		if container != nil {
@@ -946,6 +970,28 @@ func getServiceResponse(service database.Service, containers cluster.Containers)
 		} else {
 			list[i].Status = serviceCritical
 		}
+	}
+
+	if len(units) > 0 {
+
+		select {
+		case <-time.After(time.Second):
+
+		case topology, ok := <-r:
+			if !ok || topology == nil {
+				break
+			}
+
+			roles := topology.DataNodeGroup["default"]
+
+			for i := range list {
+				val, ok := roles[list[i].Name]
+				if ok {
+					list[i].Role = fmt.Sprintf("%s(%s)", val.Type, val.Status)
+				}
+			}
+		}
+
 	}
 
 	return structs.ServiceResponse{
