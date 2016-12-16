@@ -104,4 +104,7 @@ type Cluster interface {
 	// Get Engine
 	Engine(IDOrName string) *Engine
 	EngineByAddr(addr string) *Engine
+
+	AddPendingContainer(name, swarmID, engineID string, config *ContainerConfig) error
+	RemovePendingContainer(swarmID string)
 }
