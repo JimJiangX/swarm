@@ -7,9 +7,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type ServiceOrmer interface {
-	UnitOrmer
-
+type ServiceInterface interface {
 	InsertService(svc Service, t *Task, users []User) error
 
 	GetService(nameOrID string) (Service, error)
@@ -25,6 +23,14 @@ type ServiceOrmer interface {
 	UpdateServiceWithTask(svc *Service, t Task, state int, finish time.Time) error
 
 	DeteleServiceRelation(serviceID string, rmVolumes bool) error
+}
+
+type ServiceOrmer interface {
+	UnitInterface
+
+	UserOrmer
+
+	ServiceInterface
 }
 
 // Service if table structure

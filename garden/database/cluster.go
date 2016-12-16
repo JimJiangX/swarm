@@ -6,11 +6,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type ClusterOrmer interface {
-	NodeOrmer
-	VolumeOrmer
-	SysConfigOrmer
-
+type ClusterInterface interface {
 	InsertCluster(c Cluster) error
 
 	GetCluster(nameOrID string) (Cluster, error)
@@ -18,6 +14,13 @@ type ClusterOrmer interface {
 	ListClusters() ([]Cluster, error)
 
 	DeleteCluster(nameOrID string) error
+}
+
+type ClusterOrmer interface {
+	ClusterInterface
+	NodeOrmer
+	VolumeOrmer
+	SysConfigOrmer
 }
 
 // Cluster table  structure,correspod with a group of computers

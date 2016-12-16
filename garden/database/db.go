@@ -77,7 +77,16 @@ import (
 //}
 
 type Ormer interface {
-	ServiceOrmer
+	ServiceInterface
+	ClusterInterface
+	UnitInterface
+
+	SysConfigOrmer
+	NetworkingOrmer
+	NodeOrmer
+	TaskOrmer
+	UserOrmer
+	VolumeOrmer
 
 	TxFrame(do func(tx *sqlx.Tx) error) error
 }
