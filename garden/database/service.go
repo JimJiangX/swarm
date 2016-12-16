@@ -8,7 +8,7 @@ import (
 )
 
 type ServiceInterface interface {
-	InsertService(svc Service, t *Task, users []User) error
+	InsertService(svc Service, units []Unit, t *Task, users []User) error
 
 	GetService(nameOrID string) (Service, error)
 	GetServiceStatus(nameOrID string) (int, error)
@@ -26,7 +26,7 @@ type ServiceInterface interface {
 }
 
 type ServiceOrmer interface {
-	UnitInterface
+	UnitOrmer
 
 	UserOrmer
 
@@ -172,12 +172,19 @@ func (db dbBase) ServiceStatusCAS(nameOrID string, val int, finish time.Time, f 
 }
 
 // TxSaveService insert Service & Task & []User in Tx.
-func (db dbBase) InsertService(svc Service, t *Task, users []User) error {
+func (db dbBase) InsertService(svc Service, units []Unit, t *Task, users []User) error {
 	do := func(tx *sqlx.Tx) error {
 
 		err := db.txInsertSerivce(tx, svc)
 		if err != nil {
 			return err
+		}
+
+		if len(units) > 0 {
+			err = db.txInsertUnits(tx, units)
+			if err != nil {
+				return err
+			}
 		}
 
 		if t != nil {

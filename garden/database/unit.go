@@ -18,8 +18,6 @@ type UnitInterface interface {
 	CountUnitsInEngines(engines []string) (int, error)
 
 	InsertUnit(u Unit) error
-	InsertUnits(tx *sqlx.Tx, units []*Unit) error
-	InsertUnitWithPorts(u *Unit, ports []Port) error
 
 	UpdateUnitInfo(u Unit) error
 	UnitStatusCAS(u *Unit, old, value int64, operator string) error
@@ -94,8 +92,8 @@ func (db dbBase) txInsertUnit(tx *sqlx.Tx, u Unit) error {
 	return errors.Wrap(err, "Tx insert Unit")
 }
 
-// TxInsertMultiUnit insert []Unit in Tx
-func (db dbBase) InsertUnits(tx *sqlx.Tx, units []*Unit) error {
+// txInsertUnits insert []Unit in Tx
+func (db dbBase) txInsertUnits(tx *sqlx.Tx, units []Unit) error {
 
 	query := "INSERT INTO " + db.unitTable() + " (id,name,type,image_id,image_name,service_id,engine_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:engine_id,:container_id,:unit_config_id,:network_mode,:status,:latest_error,:check_interval,:created_at)"
 
@@ -105,7 +103,7 @@ func (db dbBase) InsertUnits(tx *sqlx.Tx, units []*Unit) error {
 	}
 
 	for i := range units {
-		if units[i] == nil {
+		if units[i].ID == "" {
 			continue
 		}
 
