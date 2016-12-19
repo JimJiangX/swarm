@@ -35,6 +35,7 @@ func init() {
 		&AffinityFilter{},
 		&ConstraintFilter{},
 		&WhitelistFilter{},
+		&ResourceFilter{},
 	}
 }
 
