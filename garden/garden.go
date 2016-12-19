@@ -17,7 +17,7 @@ import (
 )
 
 type Allocator interface {
-	ListCandidates(config *cluster.ContainerConfig, scheduler *scheduler.Scheduler, clusters []string, _type string) ([]*node.Node, error)
+	ListCandidates(clusters, filters []string, _type string) ([]database.Node, error)
 
 	AlloctMemoryCPU(node *node.Node, cpu, memory int) (string, error)
 
@@ -77,33 +77,52 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 	return s, nil
 }
 
-func (gd *Garden) schedule(config *cluster.ContainerConfig) ([]*node.Node, error) {
-	clusterType := "cluster type"
+type scheduleOption struct {
+	nodes struct {
+		clusterType string
+		clusters    []string
+		filters     []string
+	}
 
-	clusters := []string{"clsuter1", "cluster2"}
+	scheduler struct {
+		strategy string
+		filters  []string
+	}
+}
 
-	filters := []string{}
+func (gd *Garden) schedule(config *cluster.ContainerConfig, opts scheduleOption) ([]*node.Node, error) {
+	_scheduler := gd.scheduler
 
-	schedl := gd.scheduler
+	if opts.scheduler.strategy != "" && len(opts.scheduler.filters) > 0 {
+		strategy, _ := strategy.New(opts.scheduler.strategy)
+		filters, _ := filter.New(opts.scheduler.filters)
+		_scheduler = scheduler.New(strategy, filters)
+	}
 
-	{
-		sche := struct {
-			Filters  []string
-			Strategy string
-		}{}
+	if len(opts.nodes.filters) > 0 {
+		config.AddConstraint("node!=" + strings.Join(opts.nodes.filters, "|"))
+	}
 
-		if sche.Strategy != "" && len(sche.Filters) > 0 {
-			strategy, _ := strategy.New(sche.Strategy)
-			filters, _ := filter.New(sche.Filters)
-			schedl = scheduler.New(strategy, filters)
+	out, err := gd.allocator.ListCandidates(opts.nodes.clusters, opts.nodes.filters, opts.nodes.clusterType)
+	if err != nil {
+		return nil, err
+	}
+
+	engines := make([]string, 0, len(out))
+	for i := range out {
+		if out[i].EngineID != "" {
+			engines = append(engines, out[i].EngineID)
 		}
 	}
 
-	if len(filters) > 0 {
-		config.AddConstraint("node!=" + strings.Join(filters, "|"))
+	list := gd.cluster.ListEngines(engines...)
+	nodes := make([]*node.Node, 0, len(list))
+	for i := range list {
+		n := node.NewNode(list[i])
+		nodes = append(nodes, n)
 	}
 
-	nodes, err := gd.allocator.ListCandidates(config, schedl, clusters, clusterType)
+	nodes, err = _scheduler.SelectNodesForContainer(nodes, config)
 
 	return nodes, err
 }
@@ -125,7 +144,7 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 	gd.Lock()
 	defer gd.Unlock()
 
-	nodes, err := gd.schedule(config)
+	nodes, err := gd.schedule(config, scheduleOption{})
 	if err != nil {
 		return nil, err
 	}
