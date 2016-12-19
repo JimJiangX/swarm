@@ -33,14 +33,33 @@ adm_nic=bond1
 int_nic=bond1
 ext_nic=bond2
 
-rpm_install() {
-	zypper --no-gpg-checks --non-interactive install sysstat mariadb-client ${cur_dir}/tools/percona-toolkit-2.2.19-1.noarch.rpm
-	if [ $? -ne 0 ]; then
-		echo "zypper install faild"
-		exit 2
-	fi	
-	
+PT=${cur_dir}/tools/percona-toolkit-2.2.20-1.noarch.rpm
 
+find_release_and_kernel () {
+	local platform="$(uname -s)"
+	local release=""
+	if [ "${platform}" = "Linux" ]; then
+		kernel="$(uname -r)"
+		release="$($CMD_LSB_RELEASE -is)"
+	fi
+	RELEASE=$release
+}
+
+rpm_install() {
+	find_release_and_kernel
+	if [ $RELEASE == "SUSE LINUX" ]; then
+		zypper --no-gpg-checks --non-interactive install curl sysstat mariadb-client ${PT}
+		if [ $? -ne 0 ]; then
+			echo "rpm install faild"
+			exit 2
+		fi
+	elif [ $RELEASE == "RedHatEnterpriseServer" || $RELEASE == "CentOS" ]; then
+		yum --nogpgcheck -y install curl sysstat ${PT}
+		if [ $? -ne 0 ]; then
+			echo "rpm install faild"
+			exit 2
+		fi
+	fi	
 }
 
 nfs_mount() {
