@@ -19,7 +19,7 @@ import (
 type Allocator interface {
 	ListCandidates(clusters, filters []string, _type string) ([]database.Node, error)
 
-	AlloctCPUMemory(node *node.Node, cpu, memory int) (string, error)
+	AlloctCPUMemory(node *node.Node, cpu, memory int, reserved []string) (string, error)
 
 	AlloctVolumes(string, *node.Node) ([]volume.VolumesCreateBody, error)
 
@@ -182,7 +182,7 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 			volumes:     make([]volume.VolumesCreateBody, 0, len(units)),
 		}
 
-		cpuset, err := gd.allocator.AlloctCPUMemory(nodes[n], ncpu, memory)
+		cpuset, err := gd.allocator.AlloctCPUMemory(nodes[n], ncpu, memory, nil)
 		if err != nil {
 			continue
 		}
