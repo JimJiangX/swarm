@@ -19,7 +19,7 @@ import (
 type Allocator interface {
 	ListCandidates(clusters, filters []string, _type string) ([]database.Node, error)
 
-	AlloctMemoryCPU(node *node.Node, cpu, memory int) (string, error)
+	AlloctCPUMemory(node *node.Node, cpu, memory int) (string, error)
 
 	AlloctVolumes(string, *node.Node) ([]volume.VolumesCreateBody, error)
 
@@ -36,11 +36,11 @@ type Garden struct {
 	cluster     cluster.Cluster
 	scheduler   *scheduler.Scheduler
 	authConfig  *types.AuthConfig
-	eventHander eventHander
+	eventHander cluster.EventHandler
 }
 
 func NewGarden(cluster cluster.Cluster, scheduler *scheduler.Scheduler, ormer database.Ormer, allocator Allocator, authConfig *types.AuthConfig) *Garden {
-	return &Garden{
+	gd := &Garden{
 		// Mutex:       &scheduler.Mutex,
 		allocator:   allocator,
 		cluster:     cluster,
@@ -48,6 +48,12 @@ func NewGarden(cluster cluster.Cluster, scheduler *scheduler.Scheduler, ormer da
 		authConfig:  authConfig,
 		eventHander: eventHander{ormer},
 	}
+
+	err := cluster.RegisterEventHandler(gd.eventHander)
+	if err != nil {
+	}
+
+	return gd
 }
 
 func (gd *Garden) BuildService() (*Service, error) {
@@ -169,13 +175,14 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 
 	for n := range nodes {
 		pending := pendingUnit{
+			swarmID:     units[count-1].ID,
 			Unit:        units[count-1],
 			config:      resetContainerConfig(config),
 			networkings: make([]string, 0, len(units)),
 			volumes:     make([]volume.VolumesCreateBody, 0, len(units)),
 		}
 
-		cpuset, err := gd.allocator.AlloctMemoryCPU(nodes[n], ncpu, memory)
+		cpuset, err := gd.allocator.AlloctCPUMemory(nodes[n], ncpu, memory)
 		if err != nil {
 			continue
 		}
@@ -198,7 +205,6 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 			continue
 		}
 
-		pending.swarmID = "random ID"
 		pending.config.SetSwarmID(pending.swarmID)
 		pending.Unit.EngineID = nodes[n].ID
 

@@ -9,6 +9,6 @@ type eventHander struct {
 	ormer database.Ormer
 }
 
-func (eh *eventHander) Handle(*cluster.Event) error {
+func (eh eventHander) Handle(*cluster.Event) error {
 	return nil
 }
