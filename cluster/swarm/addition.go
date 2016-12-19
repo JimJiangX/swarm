@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/docker/swarm/cluster"
-	"github.com/docker/swarm/scheduler/node"
 )
 
 func (c *Cluster) EngineByAddr(addr string) *cluster.Engine {
@@ -30,9 +29,10 @@ func (c *Cluster) Engine(IDOrName string) *cluster.Engine {
 	return nil
 }
 
-// ListNodes returns all validated engines in the cluster, excluding pendingEngines.
-// list all engines when len(list) == 0.
-func (c *Cluster) ListNodes(list ...string) []*node.Node {
+// ListEngines returns all the engines in the cluster.
+// This is for reporting, scheduling, hence pendingEngines are included.
+// containers in pendingContainers are include.
+func (c *Cluster) ListEngines(list ...string) []*cluster.Engine {
 	c.RLock()
 	defer c.RUnlock()
 
@@ -41,25 +41,44 @@ func (c *Cluster) ListNodes(list ...string) []*node.Node {
 		all = false
 	}
 
-	out := make([]*node.Node, 0, len(c.engines))
-loop:
-	for _, e := range c.engines {
+	out := make([]*cluster.Engine, 0, len(c.engines)+len(c.pendingEngines))
 
+engines:
+	for _, n := range c.engines {
 		if !all {
 			for i := range list {
-				if list[i] == e.ID || list[i] == e.Name {
-					continue loop
+				if list[i] == n.ID || list[i] == n.Name {
+					continue engines
 				}
 			}
 		}
 
-		node := node.NewNode(e)
 		for _, pc := range c.pendingContainers {
-			if pc.Engine.ID == e.ID && node.Container(pc.Config.SwarmID()) == nil {
-				node.AddContainer(pc.ToContainer())
+			if pc.Engine.ID == n.ID && n.Containers().Get(pc.Config.SwarmID()) == nil {
+				n.AddContainer(pc.ToContainer())
 			}
 		}
-		out = append(out, node)
+
+		out = append(out, n)
+	}
+
+pendingEngines:
+	for _, n := range c.pendingEngines {
+		if !all {
+			for i := range list {
+				if list[i] == n.ID || list[i] == n.Name {
+					continue pendingEngines
+				}
+			}
+		}
+
+		for _, pc := range c.pendingContainers {
+			if pc.Engine.ID == n.ID && n.Containers().Get(pc.Config.SwarmID()) == nil {
+				n.AddContainer(pc.ToContainer())
+			}
+		}
+
+		out = append(out, n)
 	}
 
 	return out
