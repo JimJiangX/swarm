@@ -20,6 +20,10 @@ remove_vg() {
 }
 
 umount_backup_dir() {
+	#clean /etc/fstab
+	local i=${backup_dir//'/'/'\/'}
+	sed -i "${i}/d" /etc/fstab
+
 	umount -f $backup_dir
 }
 
