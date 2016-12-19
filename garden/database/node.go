@@ -17,6 +17,7 @@ type NodeOrmer interface {
 	ListNodes() ([]Node, error)
 
 	ListNodeByCluster(cluster string) ([]Node, error)
+	ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, error)
 
 	UpdateParams(n Node) error
 
