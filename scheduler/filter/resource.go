@@ -17,21 +17,11 @@ func (f *ResourceFilter) Name() string {
 
 // Filter is exported
 func (f *ResourceFilter) Filter(config *cluster.ContainerConfig, nodes []*node.Node, soft bool) ([]*node.Node, error) {
-	var ncpu int64
-
-	if ncpu = config.HostConfig.CPUShares; (ncpu <= 0 || ncpu > 100) &&
-		config.HostConfig.CpusetCpus != "" {
-
-		n, err := strconv.ParseInt(config.HostConfig.CpusetCpus, 10, 64)
-		if err != nil {
-			return nodes, nil
-		}
-
-		ncpu = n
-	}
-
-	memory := config.HostConfig.Memory
-	out := make([]*node.Node, 0, len(nodes))
+	var (
+		ncpu   = requireOfCPU(config)
+		memory = config.HostConfig.Memory
+		out    = make([]*node.Node, 0, len(nodes))
+	)
 
 	for _, n := range nodes {
 		if n.TotalCpus-n.UsedCpus < ncpu {
@@ -51,4 +41,16 @@ func (f *ResourceFilter) Filter(config *cluster.ContainerConfig, nodes []*node.N
 // GetFilters returns
 func (f *ResourceFilter) GetFilters(config *cluster.ContainerConfig) ([]string, error) {
 	return nil, nil
+}
+
+func requireOfCPU(c *cluster.ContainerConfig) int64 {
+	if c.HostConfig.CpusetCpus != "" {
+
+		n, err := strconv.ParseInt(c.HostConfig.CpusetCpus, 10, 64)
+		if err == nil && n > 0 {
+			return n
+		}
+	}
+
+	return c.HostConfig.CPUShares
 }
