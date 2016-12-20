@@ -48,13 +48,13 @@ find_release_and_kernel () {
 rpm_install() {
 	find_release_and_kernel
 	if [ $RELEASE == "SUSE LINUX" ]; then
-		zypper --no-gpg-checks --non-interactive install curl sysstat mariadb-client ${PT}
+		zypper --no-gpg-checks --non-interactive install nfs-utils curl sysstat mariadb-client ${PT}
 		if [ $? -ne 0 ]; then
 			echo "rpm install faild"
 			exit 2
 		fi
 	elif [ $RELEASE == "RedHatEnterpriseServer" || $RELEASE == "CentOS" ]; then
-		yum --nogpgcheck -y install curl sysstat ${PT}
+		yum --nogpgcheck -y install nfs-utils curl sysstat ${PT}
 		if [ $? -ne 0 ]; then
 			echo "rpm install faild"
 			exit 2
