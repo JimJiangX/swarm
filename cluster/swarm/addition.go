@@ -103,10 +103,12 @@ func (c *Cluster) AddPendingContainer(name, swarmID, engineID string, config *cl
 	return nil
 }
 
-func (c *Cluster) RemovePendingContainer(swarmID string) {
+func (c *Cluster) RemovePendingContainer(swarmID ...string) {
 	c.scheduler.Lock()
 
-	delete(c.pendingContainers, swarmID)
+	for i := range swarmID {
+		delete(c.pendingContainers, swarmID[i])
+	}
 
 	c.scheduler.Unlock()
 }
