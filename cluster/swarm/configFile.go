@@ -282,6 +282,30 @@ func (c mysqlConfig) defaultUserConfig(args ...interface{}) (_ map[string]interf
 	m["mysqld::innodb_buffer_pool_size"] = int(float64(u.config.HostConfig.Memory) * 0.75)
 	m["mysqld::relay_log"] = fmt.Sprintf("/DBAASLOG/REL/%s-relay", u.Name)
 
+	m["client::socket"] = "DBAASDAT/upsql.sock"
+	m["client::host"] = "localhost"
+	m["client::user"] = ""
+	m["client::password"] = ""
+
+	users, err := svc.getUsers()
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"Service": svc.Name,
+			"Unit":    u.Name,
+		}).Errorf("get Service users,%+v", err)
+
+	} else {
+
+		for i := range users {
+			if users[i].Role == _User_DBA_Role {
+				m["client::user"] = users[i].Username
+				m["client::password"] = users[i].Password
+
+				break
+			}
+		}
+	}
+
 	return m, nil
 }
 
