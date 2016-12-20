@@ -8,7 +8,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
-	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -23,7 +22,7 @@ func (e *Engine) UsedCpus() int64 {
 			r += c.Config.HostConfig.CPUShares
 		} else {
 
-			n, err := utils.CountCPU(c.Config.HostConfig.CpusetCpus)
+			n, err := c.Config.CountCPU()
 			if err != nil {
 				// TODO:
 			}
