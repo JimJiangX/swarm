@@ -250,15 +250,7 @@ func CountCPU(val string) (int64, error) {
 		return 0, err
 	}
 
-	ncpu := int64(0)
-
-	for _, v := range cpus {
-		if v {
-			ncpu++
-		}
-	}
-
-	return ncpu, nil
+	return int64(len(cpus)), nil
 }
 
 // ParseUintList parses and validates the specified string as the value
