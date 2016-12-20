@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/go-connections/nat"
 	"github.com/docker/swarm/garden/utils"
 )
 
@@ -256,4 +257,68 @@ func (c ContainerConfig) GetCPU() (map[int]bool, error) {
 
 func (c ContainerConfig) CountCPU() (int64, error) {
 	return utils.CountCPU(c.HostConfig.CpusetCpus)
+}
+
+func (c *ContainerConfig) DeepCopy() *ContainerConfig {
+	clone := *c
+
+	clone.ExposedPorts = make(map[nat.Port]struct{})
+	clone.Cmd = make([]string, 0, 5)
+	clone.Env = make([]string, 0, 5)
+	clone.Labels = make(map[string]string, 5)
+	clone.HostConfig.Binds = make([]string, 0, 5)
+	clone.Volumes = make(map[string]struct{})
+	clone.Entrypoint = make([]string, 0)
+	clone.OnBuild = make([]string, 0)
+
+	if len(c.Cmd) > 0 {
+		clone.Cmd = append(clone.Cmd, c.Cmd...)
+	}
+	if len(c.Env) > 0 {
+		clone.Env = append(clone.Env, c.Env...)
+	}
+	if len(c.HostConfig.Binds) > 0 {
+		clone.HostConfig.Binds = append(clone.HostConfig.Binds, c.HostConfig.Binds...)
+	}
+
+	if len(c.ExposedPorts) > 0 {
+		for key, value := range c.ExposedPorts {
+			clone.ExposedPorts[key] = value
+		}
+	}
+
+	if len(c.Labels) > 0 {
+		for key, value := range c.Labels {
+			clone.Labels[key] = value
+		}
+	}
+
+	return &clone
+}
+
+func defaultContainerConfig() *ContainerConfig {
+	// TODO: make sure later
+	return &ContainerConfig{
+		Config: container.Config{
+			AttachStdin:  true,
+			AttachStdout: true,
+			AttachStderr: true,
+			Tty:          true,
+			OpenStdin:    true,
+			StdinOnce:    true,
+			ExposedPorts: make(map[nat.Port]struct{}),
+			Cmd:          make([]string, 0, 5),
+			Env:          make([]string, 0, 5),
+			Labels:       make(map[string]string, 5),
+		},
+
+		HostConfig: container.HostConfig{
+			Binds:       make([]string, 0, 5),
+			NetworkMode: "none",
+			RestartPolicy: container.RestartPolicy{
+				Name:              "no",
+				MaximumRetryCount: 0,
+			},
+		},
+	}
 }
