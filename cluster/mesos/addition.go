@@ -18,4 +18,4 @@ func (c *Cluster) AddPendingContainer(name, swarmID, engineID string, config *cl
 	return nil
 }
 
-func (c *Cluster) RemovePendingContainer(swarmID string) {}
+func (c *Cluster) RemovePendingContainer(swarmID ...string) {}

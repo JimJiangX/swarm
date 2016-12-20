@@ -56,9 +56,11 @@ func (svc *Service) getUnits() ([]*unit, error) {
 
 func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.AuthConfig) error {
 	defer func() {
+		ids := make([]string, len(pendings))
 		for i := range pendings {
-			svc.cluster.RemovePendingContainer(pendings[i].swarmID)
+			ids[i] = pendings[i].swarmID
 		}
+		svc.cluster.RemovePendingContainer(ids...)
 	}()
 
 	ok, val, err := svc.sl.CAS(0, isInProgress)

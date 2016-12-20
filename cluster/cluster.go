@@ -107,5 +107,5 @@ type Cluster interface {
 	ListEngines(list ...string) []*Engine
 
 	AddPendingContainer(name, swarmID, engineID string, config *ContainerConfig) error
-	RemovePendingContainer(swarmID string)
+	RemovePendingContainer(swarmID ...string)
 }

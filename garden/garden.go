@@ -167,9 +167,11 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 				// TODO:
 			}
 
+			ids := make([]string, len(bad))
 			for i := range bad {
-				gd.cluster.RemovePendingContainer(bad[i].swarmID)
+				ids[i] = bad[i].swarmID
 			}
+			gd.cluster.RemovePendingContainer(ids...)
 		}
 	}()
 
@@ -177,7 +179,7 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 		pending := pendingUnit{
 			swarmID:     units[count-1].ID,
 			Unit:        units[count-1],
-			config:      resetContainerConfig(config),
+			config:      config.DeepCopy(),
 			networkings: make([]string, 0, len(units)),
 			volumes:     make([]volume.VolumesCreateBody, 0, len(units)),
 		}
@@ -224,9 +226,4 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 	}
 
 	return ready, err
-}
-
-func resetContainerConfig(config *cluster.ContainerConfig) *cluster.ContainerConfig {
-	// TODO:clone
-	return config
 }
