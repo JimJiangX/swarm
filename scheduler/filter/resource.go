@@ -1,8 +1,9 @@
 package filter
 
 import (
+	"strconv"
+
 	"github.com/docker/swarm/cluster"
-	"github.com/docker/swarm/garden/utils"
 	"github.com/docker/swarm/scheduler/node"
 )
 
@@ -16,9 +17,17 @@ func (f *ResourceFilter) Name() string {
 
 // Filter is exported
 func (f *ResourceFilter) Filter(config *cluster.ContainerConfig, nodes []*node.Node, soft bool) ([]*node.Node, error) {
-	ncpu, err := utils.CountCPU(config.HostConfig.CpusetCpus)
-	if err != nil {
-		return nil, err
+	var ncpu int64
+
+	if ncpu = config.HostConfig.CPUShares; (ncpu <= 0 || ncpu > 100) &&
+		config.HostConfig.CpusetCpus != "" {
+
+		n, err := strconv.ParseInt(config.HostConfig.CpusetCpus, 10, 64)
+		if err != nil {
+			return nodes, nil
+		}
+
+		ncpu = n
 	}
 
 	memory := config.HostConfig.Memory

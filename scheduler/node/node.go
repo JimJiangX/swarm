@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/docker/swarm/cluster"
-	"github.com/docker/swarm/garden/utils"
 )
 
 // Node is an abstract type used by the scheduler.
@@ -62,7 +61,7 @@ func (n *Node) AddContainer(container *cluster.Container) error {
 		if container.Config.HostConfig.CpusetCpus == "" {
 			cpus = container.Config.HostConfig.CPUShares
 		} else {
-			n, err := utils.CountCPU(container.Config.HostConfig.CpusetCpus)
+			n, err := container.Config.CountCPU()
 			if err != nil {
 				return err
 			}
