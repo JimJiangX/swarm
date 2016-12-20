@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/swarm/garden/utils"
 )
 
 // SwarmLabelNamespace defines the key prefix in all custom labels
@@ -295,4 +296,12 @@ func (c *ContainerConfig) Validate() error {
 	}
 
 	return nil
+}
+
+func (c ContainerConfig) GetCPU() (map[int]bool, error) {
+	return utils.ParseUintList(c.HostConfig.CpusetCpus)
+}
+
+func (c ContainerConfig) CountCPU() (int64, error) {
+	return utils.CountCPU(c.HostConfig.CpusetCpus)
 }
