@@ -6,18 +6,28 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types/volume"
+	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/pkg/errors"
 )
 
 type allocator struct {
-	co database.ClusterOrmer
+	ormer   database.Ormer
+	cluster cluster.Cluster
 }
 
-func (at allocator) ListCandidates(clusters, filters []string, _type string) ([]database.Node, error) {
-	nodes, err := at.co.ListNodesByClusters(clusters, _type, true)
+func NewAllocator(ormer database.Ormer, cluster cluster.Cluster) allocator {
+	return allocator{
+		ormer:   ormer,
+		cluster: cluster,
+	}
+}
+
+func (at allocator) ListCandidates(clusters, filters []string, _type string, stores []structs.VolumeRequire) ([]database.Node, error) {
+	nodes, err := at.ormer.ListNodesByClusters(clusters, _type, true)
 	if err != nil {
 		return nil, err
 	}
@@ -36,10 +46,58 @@ nodes:
 			}
 		}
 
+		ok, err := at.isNodeStoreEnough(nodes[i].EngineID, stores)
+		if !ok || err != nil {
+			continue
+		}
+
 		out = append(out, nodes[i])
 	}
 
 	return out, nil
+}
+
+func (at allocator) isNodeStoreEnough(engineID string, stores []structs.VolumeRequire) (bool, error) {
+	engine := at.cluster.Engine(engineID)
+	if engine == nil {
+		return false, nil
+	}
+
+	drivers, err := at.engineVolumeDrivers(engine)
+	if err != nil {
+		return false, err
+	}
+
+	is := drivers.isSpaceEnough(stores)
+
+	return is, nil
+}
+
+func (at allocator) engineVolumeDrivers(e *cluster.Engine) (volumeDrivers, error) {
+	//	e.RLock()
+	//	defer e.RUnlock()
+	// TODO:
+	drivers := []volumeDriver{}
+
+	for i := range drivers {
+
+		lvs, err := at.ormer.ListVolumeByVG(drivers[i].VG)
+		if err != nil {
+			return nil, err
+		}
+
+		var used int64
+		for i := range lvs {
+			used += lvs[i].Size
+		}
+
+		if free := drivers[i].Total - used; free < drivers[i].Free {
+			drivers[i].Free = free
+			drivers[i].Used = used
+		}
+	}
+
+	return drivers, nil
 }
 
 func (at allocator) AlloctCPUMemory(node *node.Node, cpu, memory int, reserved []string) (string, error) {
@@ -61,8 +119,59 @@ func (at allocator) AlloctCPUMemory(node *node.Node, cpu, memory int, reserved [
 	return findIdleCPUs(used, int(node.TotalCpus), cpu)
 }
 
-func (at allocator) AlloctVolumes(string, *node.Node) ([]volume.VolumesCreateBody, error) {
-	return nil, nil
+func (at allocator) AlloctVolumes(uid string, n *node.Node, stores []structs.VolumeRequire) ([]volume.VolumesCreateBody, error) {
+	engine := at.cluster.Engine(n.ID)
+	if engine == nil {
+		return nil, errors.Errorf("")
+	}
+
+	drivers, err := at.engineVolumeDrivers(engine)
+	if err != nil {
+		return nil, err
+	}
+
+	is := drivers.isSpaceEnough(stores)
+	if !is {
+		return nil, errors.Errorf("")
+	}
+
+	lvs := make([]database.Volume, len(stores))
+	for i := range stores {
+
+		driver := drivers.get(stores[i].Type)
+
+		lvs[i] = database.Volume{
+			Size:       stores[i].Size,
+			ID:         "",
+			Name:       "",
+			UnitID:     uid,
+			VGName:     driver.VG,
+			Driver:     driver.Name,
+			Filesystem: driver.Fstype,
+		}
+	}
+
+	err = at.ormer.InsertVolumes(lvs)
+	if err != nil {
+		return nil, errors.Errorf("")
+	}
+
+	volumes := make([]volume.VolumesCreateBody, len(lvs))
+
+	for i := range lvs {
+		volumes[i] = volume.VolumesCreateBody{
+			Name:   lvs[i].Name,
+			Driver: lvs[i].Driver,
+			Labels: nil,
+			DriverOpts: map[string]string{
+				"size":   strconv.Itoa(int(lvs[i].Size)),
+				"fstype": lvs[i].Filesystem,
+				"vgname": lvs[i].VGName,
+			},
+		}
+	}
+
+	return volumes, nil
 }
 
 func (at allocator) AlloctNetworking(id, _type string, num int) (string, error) {
@@ -142,4 +251,47 @@ func parseUintList(list []string) (map[int]bool, error) {
 	}
 
 	return ints, nil
+}
+
+type volumeDriver struct {
+	Total  int64
+	Free   int64
+	Used   int64
+	Name   string
+	Type   string
+	VG     string
+	Fstype string
+}
+
+type volumeDrivers []volumeDriver
+
+func (d volumeDrivers) get(_type string) *volumeDriver {
+	for i := range d {
+		if d[i].Type == _type {
+			return &d[i]
+		}
+	}
+
+	return nil
+}
+
+func (ds volumeDrivers) isSpaceEnough(stores []structs.VolumeRequire) bool {
+	need := make(map[string]int64, len(stores))
+
+	for i := range stores {
+		need[stores[i].Type] += stores[i].Size
+	}
+
+	for typ, size := range need {
+		driver := ds.get(typ)
+		if driver == nil {
+			return false
+		}
+
+		if driver.Free < size {
+			return false
+		}
+	}
+
+	return true
 }
