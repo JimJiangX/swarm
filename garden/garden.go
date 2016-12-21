@@ -10,18 +10,20 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/resource"
+	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/filter"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/scheduler/strategy"
 )
 
-type Allocator interface {
-	ListCandidates(clusters, filters []string, _type string) ([]database.Node, error)
+type allocator interface {
+	ListCandidates(clusters, filters []string, _type string, stores []structs.VolumeRequire) ([]database.Node, error)
 
 	AlloctCPUMemory(node *node.Node, cpu, memory int, reserved []string) (string, error)
 
-	AlloctVolumes(string, *node.Node) ([]volume.VolumesCreateBody, error)
+	AlloctVolumes(id string, n *node.Node, stores []structs.VolumeRequire) ([]volume.VolumesCreateBody, error)
 
 	AlloctNetworking(id, _type string, num int) (string, error)
 
@@ -32,17 +34,17 @@ type Garden struct {
 	sync.Mutex
 	ormer database.Ormer
 
-	allocator   Allocator
+	allocator   allocator
 	cluster     cluster.Cluster
 	scheduler   *scheduler.Scheduler
 	authConfig  *types.AuthConfig
 	eventHander cluster.EventHandler
 }
 
-func NewGarden(cluster cluster.Cluster, scheduler *scheduler.Scheduler, ormer database.Ormer, allocator Allocator, authConfig *types.AuthConfig) *Garden {
+func NewGarden(cluster cluster.Cluster, scheduler *scheduler.Scheduler, ormer database.Ormer, authConfig *types.AuthConfig) *Garden {
 	gd := &Garden{
 		// Mutex:       &scheduler.Mutex,
-		allocator:   allocator,
+		allocator:   resource.NewAllocator(ormer, cluster),
 		cluster:     cluster,
 		ormer:       ormer,
 		authConfig:  authConfig,
@@ -96,7 +98,7 @@ type scheduleOption struct {
 	}
 }
 
-func (gd *Garden) schedule(config *cluster.ContainerConfig, opts scheduleOption) ([]*node.Node, error) {
+func (gd *Garden) schedule(config *cluster.ContainerConfig, opts scheduleOption, stores []structs.VolumeRequire) ([]*node.Node, error) {
 	_scheduler := gd.scheduler
 
 	if opts.scheduler.strategy != "" && len(opts.scheduler.filters) > 0 {
@@ -109,7 +111,7 @@ func (gd *Garden) schedule(config *cluster.ContainerConfig, opts scheduleOption)
 		config.AddConstraint("node!=" + strings.Join(opts.nodes.filters, "|"))
 	}
 
-	out, err := gd.allocator.ListCandidates(opts.nodes.clusters, opts.nodes.filters, opts.nodes.clusterType)
+	out, err := gd.allocator.ListCandidates(opts.nodes.clusters, opts.nodes.filters, opts.nodes.clusterType, stores)
 	if err != nil {
 		return nil, err
 	}
@@ -144,13 +146,13 @@ type pendingUnit struct {
 
 func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 	config := cluster.BuildContainerConfig(container.Config{}, container.HostConfig{}, network.NetworkingConfig{})
-
+	stores := []structs.VolumeRequire{}
 	ncpu, memory := 1, 2<<20
 
 	gd.Lock()
 	defer gd.Unlock()
 
-	nodes, err := gd.schedule(config, scheduleOption{})
+	nodes, err := gd.schedule(config, scheduleOption{}, stores)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +178,7 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 	}()
 
 	for n := range nodes {
-		pending := pendingUnit{
+		pu := pendingUnit{
 			swarmID:     units[count-1].ID,
 			Unit:        units[count-1],
 			config:      config.DeepCopy(),
@@ -189,33 +191,33 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 			continue
 		}
 
-		volumes, err := gd.allocator.AlloctVolumes(pending.Unit.ID, nodes[n])
+		volumes, err := gd.allocator.AlloctVolumes(pu.Unit.ID, nodes[n], stores)
 		if len(volumes) > 0 {
-			pending.volumes = append(pending.volumes, volumes...)
+			pu.volumes = append(pu.volumes, volumes...)
 		}
 		if err != nil {
-			bad = append(bad, pending)
+			bad = append(bad, pu)
 			continue
 		}
 
-		id, err := gd.allocator.AlloctNetworking(pending.Unit.ID, "networkingType", 1)
+		id, err := gd.allocator.AlloctNetworking(pu.Unit.ID, "networkingType", 1)
 		if len(id) > 0 {
-			pending.networkings = append(pending.networkings, id)
+			pu.networkings = append(pu.networkings, id)
 		}
 		if err != nil {
-			bad = append(bad, pending)
+			bad = append(bad, pu)
 			continue
 		}
 
-		pending.config.SetSwarmID(pending.swarmID)
-		pending.Unit.EngineID = nodes[n].ID
+		pu.config.SetSwarmID(pu.swarmID)
+		pu.Unit.EngineID = nodes[n].ID
 
-		pending.config.HostConfig.Resources.CpusetCpus = cpuset
-		pending.config.HostConfig.Resources.Memory = int64(memory)
+		pu.config.HostConfig.Resources.CpusetCpus = cpuset
+		pu.config.HostConfig.Resources.Memory = int64(memory)
 
-		gd.cluster.AddPendingContainer(pending.Name, pending.swarmID, nodes[n].ID, pending.config)
+		gd.cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[n].ID, pu.config)
 
-		ready = append(ready, pending)
+		ready = append(ready, pu)
 		if count--; count == 0 {
 			break
 		}

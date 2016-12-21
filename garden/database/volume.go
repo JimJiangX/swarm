@@ -11,6 +11,8 @@ type VolumeOrmer interface {
 	ListVolumesByUnitID(id string) ([]Volume, error)
 
 	InsertVolume(lv Volume) error
+	InsertVolumes(lvs []Volume) error
+
 	UpdateVolume(nameOrID string, size int) error
 	UpdateVolumes(lvs []Volume) error
 
@@ -33,7 +35,7 @@ func (db dbBase) volumeTable() string {
 	return db.prefix + "_volumes"
 }
 
-// InsertVolume insert a new InsertVolume
+// InsertVolume insert a new Volume
 func (db dbBase) InsertVolume(lv Volume) error {
 
 	query := "INSERT INTO " + db.volumeTable() + " (id,name,unit_id,size,VGname,driver,fstype) VALUES (:id,:name,:unit_id,:size,:VGname,:driver,:fstype)"
@@ -41,6 +43,34 @@ func (db dbBase) InsertVolume(lv Volume) error {
 	_, err := db.NamedExec(query, &lv)
 
 	return errors.Wrap(err, "insert Volume")
+}
+
+// InsertVolumes insert new Volumes
+func (db dbBase) InsertVolumes(lvs []Volume) error {
+
+	do := func(tx *sqlx.Tx) error {
+		query := "INSERT INTO " + db.volumeTable() + " (id,name,unit_id,size,VGname,driver,fstype) VALUES (:id,:name,:unit_id,:size,:VGname,:driver,:fstype)"
+
+		stmt, err := tx.PrepareNamed(query)
+		if err != nil {
+			return errors.Wrap(err, "tx prepare insert Volume")
+		}
+
+		for i := range lvs {
+			_, err := stmt.Exec(&lvs[i])
+			if err != nil {
+				stmt.Close()
+
+				return errors.Wrap(err, "tx insert Volume")
+			}
+		}
+
+		stmt.Close()
+
+		return nil
+	}
+
+	return db.txFrame(do)
 }
 
 // UpdateVolume update size of Volume by name or ID
