@@ -19,9 +19,8 @@ do
         sleep 6
 	check
 	mdev_name=`lsscsi -i *:*:*:${HLUN_ID} | awk '{print $7}' | uniq`
-	#wc -L print the length of the longest line
-	name_char_count=`cat ${mdev_name} | wc -L`
-	if [ "${mdev_name}" != '' && ${name_char_count} -eq 33 ]; then 
+	name_char_count=`echo -n ${mdev_name} | wc -m`
+	if [ "${mdev_name}" != '' ] && [ ${name_char_count} -eq 33 ]; then 
 		echo /dev/mapper/${mdev_name}
 		exit 0
 	fi
