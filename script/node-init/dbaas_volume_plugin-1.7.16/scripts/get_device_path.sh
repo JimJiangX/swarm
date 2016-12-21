@@ -12,11 +12,10 @@ check() {
 	fi
 }
 
-#timeout 10*6=60(sec)=1(min)
+#timeout 20*3=60(sec)=1(min)
 loop=0
-while(( $loop<=9 ))
+while(( $loop<=19 ))
 do
-        sleep 6
 	check
 	mdev_name=`lsscsi -i *:*:*:${HLUN_ID} | awk '{print $7}' | uniq`
 	name_char_count=`echo -n ${mdev_name} | wc -m`
@@ -25,6 +24,7 @@ do
 		exit 0
 	fi
         let "loop++"
+        sleep 3
 done
 
 echo "can't find device !"
