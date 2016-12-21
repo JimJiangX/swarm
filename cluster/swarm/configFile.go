@@ -282,8 +282,6 @@ func (c mysqlConfig) defaultUserConfig(args ...interface{}) (_ map[string]interf
 	m["mysqld::innodb_buffer_pool_size"] = int(float64(u.config.HostConfig.Memory) * 0.75)
 	m["mysqld::relay_log"] = fmt.Sprintf("/DBAASLOG/REL/%s-relay", u.Name)
 
-	m["client::socket"] = "DBAASDAT/upsql.sock"
-	m["client::host"] = "localhost"
 	m["client::user"] = ""
 	m["client::password"] = ""
 
