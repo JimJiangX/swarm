@@ -776,16 +776,20 @@ loop:
 
 		dc.Unlock()
 
+		stores := make(map[string]int, len(module.Stores))
 		for _, v := range module.Stores {
+			stores[v.Type] = stores[v.Type] + v.Size
+		}
 
-			if IsLocalStore(v.Type) {
+		for _type, size := range stores {
 
-				if !node.isIdleStoreEnough(v.Type, v.Size) {
-					logrus.Debugf("%s local store shortage:%d", node.Name, v.Size)
+			if IsLocalStore(_type) {
+
+				if !node.isIdleStoreEnough(_type, size) {
+					logrus.Debugf("%s local store shortage:%d", node.Name, size)
 
 					continue loop
 				}
-
 			}
 		}
 
