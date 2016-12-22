@@ -3,6 +3,7 @@ package scplib
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -170,12 +171,19 @@ func TestUploadDir(t *testing.T) {
 		t.Skip(err)
 	}
 
-	remote := "/tmp"
+	dir = filepath.Dir(dir)
+	remote := "/tmp/"
 
 	err = c.UploadDir(remote, dir)
 	if err != nil {
 		t.Errorf("upload dir:%s to %s,%+v", dir, remote, err)
 	}
+
+	err = c.UploadDir(filepath.Clean(remote), dir)
+	if err != nil {
+		t.Errorf("upload dir:%s to %s,%+v", dir, remote, err)
+	}
+
 }
 
 func TestUpload(t *testing.T) {
