@@ -33,27 +33,26 @@ adm_nic=bond1
 int_nic=bond1
 ext_nic=bond2
 
-PT=${cur_dir}/tools/percona-toolkit-2.2.20-1.noarch.rpm
+PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
 
-find_release_and_kernel () {
-	local platform="$(uname -s)"
-	local release=""
-	if [ "${platform}" = "Linux" ]; then
-		kernel="$(uname -r)"
-		release="$($CMD_LSB_RELEASE -is)"
-	fi
-	RELEASE=$release
-}
+platform="$(uname -s)"
+release=""
+if [ "${platform}" = "Linux" ]; then
+	kernel="$(uname -r)"
+	release="$(lsb_release -is)"
+else
+	echo "only support linux platform"
+	exit 3
+fi
 
 rpm_install() {
-	find_release_and_kernel
-	if [ $RELEASE == "SUSE LINUX" ]; then
+	if [ "${release}" == "SUSE LINUX" ]; then
 		zypper --no-gpg-checks --non-interactive install nfs-utils curl sysstat mariadb-client ${PT}
 		if [ $? -ne 0 ]; then
 			echo "rpm install faild"
 			exit 2
 		fi
-	elif [ $RELEASE == "RedHatEnterpriseServer" || $RELEASE == "CentOS" ]; then
+	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ $RELEASE == "CentOS" ]; then
 		yum --nogpgcheck -y install nfs-utils curl sysstat ${PT}
 		if [ $? -ne 0 ]; then
 			echo "rpm install faild"
@@ -113,7 +112,7 @@ else
 fi
 EOF
 	
-        cp ${cur_dir}/tools/check_db ${dir}/
+        cp ${cur_dir}/check_upsql ${dir}/
 	cat << EOF > ${dir}/check_db.sh
 #!/bin/bash
 set -o nounset
@@ -134,13 +133,13 @@ if [ "\${running_status}" != "true" ]; then
 	exit 3
 fi
 
-\${dir}/check_db --default-file /\${container_name}_DAT_LV/my.cnf --user \$username --password \$password
+\${dir}/check_upsql --default-file /\${container_name}_DAT_LV/my.cnf --user \$username --password \$password
 if [ \$? -ne 0 ]; then
 	 exit 4
 fi
 EOF
 
-        cp ${cur_dir}/tools/check_proxy ${dir}/
+        cp ${cur_dir}/check_upproxy ${dir}/
 	cat << EOF > ${dir}/check_proxy.sh
 #!/bin/bash
 set -o nounset
@@ -159,7 +158,7 @@ if [ "\${running_status}" != "true" ]; then
 	exit 3
 fi
 
-\${dir}/check_proxy --default-file /\${container_name}_CNF_LV/upsql-proxy.conf
+\${dir}/check_upproxy --default-file /\${container_name}_CNF_LV/upsql-proxy.conf
 if [ \$? -ne 0 ]; then
 	 exit 4
 fi
@@ -367,7 +366,8 @@ EOF
 
 # install docker
 install_docker() {
-	local version=1.11.2
+	docker_version=$1
+
 	# scan wwn 
 	wwn=""
 	for fc_host in `ls /sys/class/fc_host/`
@@ -397,16 +397,71 @@ install_docker() {
 		ext_nic=""
 	fi
 
-	# stop docker
-	pkill -9 docker >/dev/null 2>&1
-	pkill -9 docker-contarinerd >/dev/null 2>&1
+	if [ "${release}" == "SUSE LINUX" ]; then
+		if [ "${docker_version}" == "1.11.2" ]; then
+			local docker_rpm=${cur_dir}/rpm/docker-${docker_version}.sles.rpm
+			local containerd_rpm=${cur_dir}/rpm/containerd-0.2.2-4.1.x86_64.rpm
+			local runc_rpm=${cur_dir}/rpm/runc-0.1.1-4.1.x86_64.rpm
+		fi
 
-	# copy the binary & set the permissions
-	cp ${cur_dir}/docker-${version}-release/bin/docker* /usr/bin/; chmod +x /usr/bin/docker*
-	
+		zypper --no-gpg-checks --non-interactive install ${runc_rpm} ${containerd_rpm} ${docker_rpm}
+		if [ $? -ne 0 ]; then
+			echo "docker rpm install faild"
+			exit 2
+		fi
+		cat << EOF > /etc/sysconfig/docker
+## Path           : System/Management
+## Description    : Extra cli switches for docker daemon
+## Type           : string
+## Default        : ""
+## ServiceRestart : docker
 
-	# create the systemd files
-	cat << EOF > /etc/sysconfig/docker
+#
+DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label ADM_NIC=${adm_nic} --label INT_NIC=${int_nic} --label EXT_NIC=${ext_nic}
+
+DOCKER_NETWORK_OPTIONS=""
+
+EOF
+
+		cat << EOF > /usr/lib/systemd/system/docker.service
+[Unit]
+Description=Docker Application Container Engine
+Documentation=https://docs.docker.com
+After=network.target docker.socket containerd.socket
+Requires=docker.socket containerd.socket
+
+[Service]
+EnvironmentFile=/etc/sysconfig/docker
+ExecStart=/usr/bin/docker daemon -H fd:// --containerd /run/containerd/containerd.sock \$DOCKER_NETWORK_OPTIONS \$DOCKER_OPTS
+ExecReload=/bin/kill -s HUP \$MAINPID
+# Having non-zero Limit*s causes performance problems due to accounting overhead
+# in the kernel. We recommend using cgroups to do container-local accounting.
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+# Uncomment TasksMax if your systemd version supports it.
+# Only systemd 226 and above support this property.
+#TasksMax=infinity
+# Set delegate yes so that systemd does not reset the cgroups of docker containers
+# Only systemd 218 and above support this property.
+#Delegate=yes
+# KillMode=process is not necessary because of how we set up containerd.
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+
+	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ $RELEASE == "CentOS" ]; then
+		local docker_rpm=${cur_dir}/rpm/docker-${docker_version}.rhel.centos.rpm
+		local docker_selinux_rpm=${cur_dir}/rpm/docker-selinux-${docker_version}.rhel.centos.rpm
+		
+		yum --nogpgcheck -y install ${docker_selinux_rpm} ${docker_rpm}
+		if [ $? -ne 0 ]; then
+			echo "docker rpm install faild"
+			exit 2
+		fi
+		cat << EOF > /etc/sysconfig/docker
 ## Path           : System/Management
 ## Description    : Extra cli switches for docker daemon
 ## Type           : string
@@ -418,7 +473,7 @@ DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --lab
 
 EOF
 
-	cat << EOF > /usr/lib/systemd/system/docker.service
+		cat << EOF > /usr/lib/systemd/system/docker.service
 [Unit]
 Description=Docker Application Container Engine
 Documentation=https://docs.docker.com
@@ -426,45 +481,27 @@ After=network.target docker.socket
 Requires=docker.socket
 
 [Service]
+Type=notify
 # the default is not to use systemd for cgroups because the delegate issues still
 # exists and systemd currently does not support the cgroup feature set required
 # for containers run by docker
-Type=notify
 EnvironmentFile=/etc/sysconfig/docker
 ExecStart=/usr/bin/docker daemon -H fd:// \$DOCKER_OPTS
 ExecReload=/bin/kill -s HUP \$MAINPID
+MountFlags=slave
 LimitNOFILE=1048576
 LimitNPROC=1048576
 LimitCORE=infinity
 TimeoutStartSec=0
-## man systemd.resource-control check support
-## systemd-210 unsupport
 # set delegate yes so that systemd does not reset the cgroups of docker containers
-#Delegate=yes
+Delegate=yes
 
 [Install]
 WantedBy=multi-user.target
 
 EOF
 
-	cat << EOF > /usr/lib/systemd/system/docker.socket
-[Unit]
-Description=Docker Socket for the API
-PartOf=docker.service
-
-[Socket]
-ListenStream=/var/run/docker.sock
-SocketMode=0660
-SocketUser=root
-SocketGroup=docker
-
-[Install]
-WantedBy=sockets.target
-EOF
-
-	chmod 644 /etc/sysconfig/docker
-	chmod 644 /usr/lib/systemd/system/docker.service
-	chmod 644 /usr/lib/systemd/system/docker.socket
+	fi
 
 	# reload
 	systemctl daemon-reload
@@ -680,7 +717,7 @@ install_consul
 install_docker_plugin
 reg_to_consul DockerPlugin ${docker_plugin_port}
 reg_to_horus_server DockerPlugin 
-install_docker
+install_docker 1.11.2
 init_docker
 reg_to_consul Docker ${docker_port}
 reg_to_horus_server Docker
