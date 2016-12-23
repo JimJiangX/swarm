@@ -63,7 +63,7 @@ func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.Au
 		svc.cluster.RemovePendingContainer(ids...)
 	}()
 
-	ok, val, err := svc.sl.CAS(0, isInProgress)
+	ok, val, err := svc.sl.CAS(statusServiceContainerCreating, isInProgress)
 	if err != nil {
 		return err
 	}
@@ -75,9 +75,9 @@ func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.Au
 	}
 
 	defer func() {
-		status := 0
+		status := statusServiceContainerCreated
 		if err != nil {
-			status = 1
+			status = statusServiceContainerCreateFailed
 		}
 
 		err := svc.sl.SetStatus(status)
@@ -112,7 +112,7 @@ func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.Au
 }
 
 func (svc *Service) InitStart(ctx context.Context) error {
-	ok, val, err := svc.sl.CAS(0, isInProgress)
+	ok, val, err := svc.sl.CAS(statusServiceStarting, isInProgress)
 	if err != nil {
 		return err
 	}
@@ -124,9 +124,9 @@ func (svc *Service) InitStart(ctx context.Context) error {
 	}
 
 	defer func() {
-		status := 0
+		status := statusServiceStarted
 		if err != nil {
-			status = 1
+			status = statusServiceStartFailed
 		}
 
 		err := svc.sl.SetStatus(status)
@@ -141,7 +141,7 @@ func (svc *Service) InitStart(ctx context.Context) error {
 	}
 
 	for i := range units {
-		err := units[i].startContainer()
+		err := units[i].startContainer(ctx)
 		if err != nil {
 			return err
 		}
@@ -161,7 +161,7 @@ func (svc *Service) InitStart(ctx context.Context) error {
 }
 
 func (svc *Service) Start(ctx context.Context) error {
-	ok, val, err := svc.sl.CAS(0, isInProgress)
+	ok, val, err := svc.sl.CAS(statusServiceStarting, isInProgress)
 	if err != nil {
 		return err
 	}
@@ -173,9 +173,9 @@ func (svc *Service) Start(ctx context.Context) error {
 	}
 
 	defer func() {
-		status := 0
+		status := statusServiceStarted
 		if err != nil {
-			status = 1
+			status = statusServiceStartFailed
 		}
 
 		err := svc.sl.SetStatus(status)
@@ -190,7 +190,7 @@ func (svc *Service) Start(ctx context.Context) error {
 	}
 
 	for i := range units {
-		err := units[i].startContainer()
+		err := units[i].startContainer(ctx)
 		if err != nil {
 			return err
 		}
@@ -209,7 +209,7 @@ func (svc *Service) Start(ctx context.Context) error {
 }
 
 func (svc *Service) Stop(ctx context.Context) error {
-	ok, val, err := svc.sl.CAS(0, isInProgress)
+	ok, val, err := svc.sl.CAS(statusServiceStoping, isInProgress)
 	if err != nil {
 		return err
 	}
@@ -221,9 +221,9 @@ func (svc *Service) Stop(ctx context.Context) error {
 	}
 
 	defer func() {
-		status := 0
+		status := statusServiceStoped
 		if err != nil {
-			status = 1
+			status = statusServiceStopFailed
 		}
 
 		err := svc.sl.SetStatus(status)
@@ -232,6 +232,10 @@ func (svc *Service) Stop(ctx context.Context) error {
 		}
 	}()
 
+	return svc.stop(ctx)
+}
+
+func (svc *Service) stop(ctx context.Context) error {
 	units, err := svc.getUnits()
 	if err != nil {
 		return err
@@ -247,25 +251,13 @@ func (svc *Service) Stop(ctx context.Context) error {
 	}
 
 	for i := range units {
-		engine := units[i].getEngine()
-		if engine == nil {
-			return nil
-		}
-		client := engine.ContainerAPIClient()
-		if client == nil {
-			return nil
-		}
-
-		timeout := 10 * time.Second
-		err := client.ContainerStop(ctx, units[i].u.Name, &timeout)
-		engine.CheckConnectionErr(err)
+		err := units[i].stopContainer(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
-
 }
 
 func (svc *Service) Scale() error {
@@ -280,10 +272,111 @@ func (svc *Service) UpdateConfig() error {
 	return nil
 }
 
-func (svc *Service) Exec() error {
+func (svc *Service) Exec(ctx context.Context, nameOrID string, cmd []string) (types.ContainerExecInspect, error) {
+	u, err := svc.getUnit(nameOrID)
+	if err != nil {
+		return types.ContainerExecInspect{}, err
+	}
+
+	return u.containerExec(ctx, cmd)
+}
+
+func (svc *Service) Remove(ctx context.Context) error {
+	ok, val, err := svc.sl.CAS(statusServiceDeleting, isInProgress)
+	if err != nil {
+		return err
+	}
+
+	svc.svc.Status = val
+
+	if !ok {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			err := svc.sl.SetStatus(statusServiceDeleteFailed)
+			if err != nil {
+
+			}
+		}
+	}()
+
+	err = svc.deleteCondition()
+	if err != nil {
+		return err
+	}
+
+	err = svc.removeContainers(ctx, true, false)
+	if err != nil {
+		return err
+	}
+
+	err = svc.removeVolumes(ctx)
+	if err != nil {
+		return err
+	}
+
+	// TODO:remove data from database
+
 	return nil
 }
 
-func (svc *Service) Remove() error {
+func (svc *Service) removeContainers(ctx context.Context, force, rmVolumes bool) error {
+	units, err := svc.getUnits()
+	if err != nil {
+		return err
+	}
+
+	for _, u := range units {
+		engine := u.getEngine()
+		if engine == nil {
+			return nil
+		}
+
+		client := engine.ContainerAPIClient()
+		if client == nil {
+			return nil
+		}
+
+		timeout := 30 * time.Second
+		err := client.ContainerStop(ctx, u.u.Name, &timeout)
+		engine.CheckConnectionErr(err)
+		if err != nil {
+			return err
+		}
+
+		options := types.ContainerRemoveOptions{
+			RemoveVolumes: rmVolumes,
+			RemoveLinks:   false,
+			Force:         force,
+		}
+		err = client.ContainerRemove(ctx, u.u.Name, options)
+		engine.CheckConnectionErr(err)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (svc *Service) removeVolumes(ctx context.Context) error {
+	units, err := svc.getUnits()
+	if err != nil {
+		return err
+	}
+
+	for _, u := range units {
+		err := u.removeVolumes(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (svc *Service) deleteCondition() error {
 	return nil
 }
