@@ -425,14 +425,7 @@ func (node *nodeWithTask) modifyProfile(horus string, config database.SysConfig)
 
 // registerNodes register Nodes
 func (ns *nodes) registerNodes(ctx context.Context, cancel context.CancelFunc, nodes []nodeWithTask, config database.SysConfig) {
-	timer := time.NewTimer(time.Minute * 2)
-
-	defer func(t *time.Timer, cancel context.CancelFunc) {
-		cancel()
-		if !t.Stop() {
-			<-t.C
-		}
-	}(timer, cancel)
+	defer cancel()
 
 	cID := ""
 	for i := range nodes {
@@ -447,11 +440,18 @@ func (ns *nodes) registerNodes(ctx context.Context, cancel context.CancelFunc, n
 	}
 
 	field := logrus.WithField("Cluster", cID)
+	t := time.NewTimer(time.Minute * 2)
 
 	for {
+		if !t.Stop() {
+			select {
+			default:
+			case <-t.C:
+			}
+		}
 		select {
-		case <-timer.C:
-			timer.Reset(30 * time.Second)
+		case <-t.C:
+			continue
 
 		case <-ctx.Done():
 			err := ns.registerNodesTimeout(nodes, ctx.Err())
