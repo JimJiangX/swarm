@@ -10,7 +10,6 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
-	"github.com/docker/swarm/garden/resource"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/filter"
@@ -41,10 +40,10 @@ type Garden struct {
 	eventHander cluster.EventHandler
 }
 
-func NewGarden(cluster cluster.Cluster, scheduler *scheduler.Scheduler, ormer database.Ormer, authConfig *types.AuthConfig) *Garden {
+func NewGarden(cluster cluster.Cluster, scheduler *scheduler.Scheduler, ormer database.Ormer, allocator allocator, authConfig *types.AuthConfig) *Garden {
 	gd := &Garden{
 		// Mutex:       &scheduler.Mutex,
-		allocator:   resource.NewAllocator(ormer, cluster),
+		allocator:   allocator,
 		cluster:     cluster,
 		ormer:       ormer,
 		authConfig:  authConfig,
