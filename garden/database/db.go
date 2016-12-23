@@ -80,6 +80,7 @@ type Ormer interface {
 	ServiceInterface
 	ClusterInterface
 	UnitInterface
+	ContainerInterface
 
 	SysConfigOrmer
 	NetworkingOrmer
