@@ -43,11 +43,14 @@ type Garden struct {
 func NewGarden(cluster cluster.Cluster, scheduler *scheduler.Scheduler, ormer database.Ormer, allocator allocator, authConfig *types.AuthConfig) *Garden {
 	gd := &Garden{
 		// Mutex:       &scheduler.Mutex,
-		allocator:   allocator,
-		cluster:     cluster,
-		ormer:       ormer,
-		authConfig:  authConfig,
-		eventHander: eventHander{ormer},
+		allocator:  allocator,
+		cluster:    cluster,
+		ormer:      ormer,
+		authConfig: authConfig,
+		eventHander: eventHander{
+			ci:      ormer,
+			cluster: cluster,
+		},
 	}
 
 	err := cluster.RegisterEventHandler(gd.eventHander)
