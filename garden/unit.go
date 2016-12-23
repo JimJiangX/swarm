@@ -7,6 +7,51 @@ import (
 	"golang.org/x/net/context"
 )
 
+const (
+	statusUnitNoContent = iota
+
+	statusUnitAllocting
+	statusUnitAllocted
+	statusUnitAlloctionFailed
+
+	statusUnitCreating
+	statusUnitCreated
+	statusUnitCreateFailed
+
+	statusUnitStarting // start contaier and start service
+	statusUnitStarted
+	statusUnitStartFailed
+
+	statusUnitStoping
+	statusUnitStoped
+	statusUnitStopFailed
+
+	statusUnitMigrating
+	statusUnitMigrated
+	statusUnitMigrateFailed
+
+	statusUnitRebuilding
+	statusUnitRebuilt
+	statusUnitRebuildFailed
+
+	statusUnitDeleting
+
+	statusUnitBackuping
+	statusUnitBackuped
+	statusUnitBackupFailed
+
+	statusUnitRestoring
+	statusUnitRestored
+	statusUnitRestoreFailed
+
+	statusContainerCreated
+	statusContainerRunning
+	statusContainerPaused
+	statusContainerRestarted
+	statusContainerDead
+	statusContainerExited
+)
+
 type unit struct {
 	u       database.Unit
 	uo      database.UnitOrmer
