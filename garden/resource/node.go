@@ -45,6 +45,31 @@ const (
 	statusNodeDeregisted
 )
 
+// parseNodeStatus returns the meaning of the number corresponding
+func parseNodeStatus(status int) string {
+	switch status {
+	case statusNodeImport:
+		return "importing"
+	case statusNodeInstalling:
+		return "installing"
+	case statusNodeInstalled:
+		return "install failed"
+	case statusNodeTesting:
+		return "testing"
+	case statusNodeFailedTest:
+		return "test failed"
+	case statusNodeEnable:
+		return "enable"
+	case statusNodeDisable:
+		return "disable"
+	case statusNodeDeregisted:
+		return "deregister"
+	default:
+	}
+
+	return "unknown"
+}
+
 const (
 	_VG_Label         = "VG_Name"
 	dockerNodesKVPath = "docker/nodes/KVPath"
