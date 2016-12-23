@@ -1,13 +1,14 @@
 package garden
 
 import (
+	"strings"
+
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 )
 
 type eventHander struct {
-	ci      database.ContainerInterface
-	cluster cluster.Cluster
+	ci database.ContainerInterface
 }
 
 func (eh eventHander) Handle(event *cluster.Event) error {
@@ -16,41 +17,61 @@ func (eh eventHander) Handle(event *cluster.Event) error {
 
 	switch msg.Type {
 	case "container":
-		return eh.handleContainer(msg.Action, msg.ID)
+		action := msg.Action
+		// healthcheck events are like 'health_status: unhealthy'
+		if strings.HasPrefix(action, "health_status") {
+			action = "health_status"
+		}
+
+		switch action {
+		case "create":
+			engine := event.Engine
+			c := engine.Containers().Get(msg.ID)
+			if c != nil {
+				return eh.ci.UnitContainerCreated(c.Info.Name, c.ID, engine.ID, c.HostConfig.NetworkMode, statusContainerCreated)
+			}
+		default:
+			return handleContainerEvent(eh.ci, action, msg.ID)
+		}
 
 	case "":
 		// docker < 1.10
-		return eh.handleContainer(msg.Status, msg.ID)
+		switch msg.Status {
+		case "create":
+			engine := event.Engine
+
+			c := engine.Containers().Get(msg.ID)
+			if c != nil {
+				return eh.ci.UnitContainerCreated(c.Info.Name, c.ID, engine.ID, c.HostConfig.NetworkMode, statusContainerCreated)
+			}
+
+		default:
+			return handleContainerEvent(eh.ci, msg.Status, msg.ID)
+		}
 	}
 
 	return nil
 }
 
-func (eh eventHander) handleContainer(action, ID string) error {
+func handleContainerEvent(ci database.ContainerInterface, action, ID string) error {
 	switch action {
 	//case "die", "kill", "oom", "pause", "start", "restart", "stop", "unpause", "rename", "update", "health_status":
 	//e.refreshContainer(msg.ID, true)
 
-	case "create":
-		c := eh.cluster.Container(ID)
-		if c != nil {
-			return eh.ci.UnitContainerCreated(c.Info.Name, c.ID, c.Engine.ID, c.HostConfig.NetworkMode, statusContainerCreated)
-		}
-
 	case "start", "unpause":
-		return eh.ci.UpdateUnitByContainer(ID, statusContainerRunning)
+		return ci.UpdateUnitByContainer(ID, statusContainerRunning)
 
 	case "pause":
-		return eh.ci.UpdateUnitByContainer(ID, statusContainerPaused)
+		return ci.UpdateUnitByContainer(ID, statusContainerPaused)
 
 	case "stop", "kill", "oom":
-		return eh.ci.UpdateUnitByContainer(ID, statusContainerExited)
+		return ci.UpdateUnitByContainer(ID, statusContainerExited)
 
 	case "restart":
-		return eh.ci.UpdateUnitByContainer(ID, statusContainerRestarted)
+		return ci.UpdateUnitByContainer(ID, statusContainerRestarted)
 
 	case "die":
-		return eh.ci.UpdateUnitByContainer(ID, statusContainerDead)
+		return ci.UpdateUnitByContainer(ID, statusContainerDead)
 
 	default:
 		//e.refreshContainer(msg.ID, false)
