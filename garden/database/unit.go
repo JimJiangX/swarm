@@ -29,8 +29,15 @@ type UnitInterface interface {
 	DeleteUnit(tx *sqlx.Tx, nameOrID string) error
 }
 
+type ContainerInterface interface {
+	UnitContainerCreated(name, containerID, engineID, mode string, state int) error
+
+	UpdateUnitByContainer(containerID string, state int) error
+}
+
 type UnitOrmer interface {
 	UnitInterface
+	ContainerInterface
 
 	VolumeOrmer
 
@@ -118,6 +125,20 @@ func (db dbBase) txInsertUnits(tx *sqlx.Tx, units []Unit) error {
 	err = stmt.Close()
 
 	return errors.Wrap(err, "insert []*Unit")
+}
+
+func (db dbBase) UnitContainerCreated(name, containerID, engineID, mode string, state int) error {
+	query := "UPDATE " + db.unitTable() + " SET engine_id=?,container_id=?,network_mode=?,status=?,latest_error=? WHERE name=?"
+	_, err := db.Exec(query, engineID, containerID, mode, state, "", name)
+
+	return err
+}
+
+func (db dbBase) UpdateUnitByContainer(containerID string, state int) error {
+	query := "UPDATE " + db.unitTable() + " SET status=?,latest_error=? WHERE container_id=?"
+	_, err := db.Exec(query, state, "", containerID)
+
+	return err
 }
 
 // UpdateUnitInfo could update params of unit
