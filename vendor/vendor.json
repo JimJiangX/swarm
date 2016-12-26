@@ -27,6 +27,12 @@
 			"revisionTime": "2016-08-02T11:38:42Z"
 		},
 		{
+			"checksumSHA1": "U66mKrwyNPrRU3YrNWXwIN+WugI=",
+			"path": "github.com/hnakamur/go-scp",
+			"revision": "c724d2156ecd20fbfb94260c652d2c1adf41d106",
+			"revisionTime": "2016-12-22T14:41:00Z"
+		},
+		{
 			"checksumSHA1": "scVQ1hqzjFQX+LhztTSa0B+QSAg=",
 			"path": "github.com/jmoiron/sqlx",
 			"revision": "43975e693e7ab5df0ba436482a697b7c2bf6a87e",
