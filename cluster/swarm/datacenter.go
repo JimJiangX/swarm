@@ -687,11 +687,7 @@ func getVGname(engine *cluster.Engine, _type string) (string, error) {
 	return vgName, nil
 }
 
-func (gd *Gardener) GetVGUsage(nameOrID string, engine *cluster.Engine) (map[string]storage.VGUsage, error) {
-	if engine == nil || engine.Labels == nil {
-		return map[string]storage.VGUsage{}, nil
-	}
-
+func (gd *Gardener) GetVGUsage(nameOrID string) (map[string]storage.VGUsage, error) {
 	_, node, err := gd.getNode(nameOrID)
 	if err != nil {
 		return nil, err
@@ -702,11 +698,16 @@ func (gd *Gardener) GetVGUsage(nameOrID string, engine *cluster.Engine) (map[str
 		return nil, errors.Errorf("%s Local Store is nil", node.Name)
 	}
 
+	if node.engine == nil {
+		return nil, errors.Wrap(errEngineIsNil, "get VG usage")
+	}
+
 	vgs, err := node.localStore.IdleSize()
 	if err != nil {
 		return vgs, err
 	}
 
+	engine := node.engine
 	engine.RLock()
 	hddVG, ok := engine.Labels[_HDD_VG_Label]
 	if ok {
