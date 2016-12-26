@@ -1,0 +1,37 @@
+{
+	"comment": "",
+	"ignore": "",
+	"package": [
+		{
+			"checksumSHA1": "5qQFf0NtvrJmIGyYH0WKoVIspfs=",
+			"path": "github.com/hnakamur/go-scp",
+			"revision": "c724d2156ecd20fbfb94260c652d2c1adf41d106",
+			"revisionTime": "2016-12-22T14:41:00Z"
+		},
+		{
+			"checksumSHA1": "LzlSlifCUTtWAJHqQJPRSsjaeTQ=",
+			"path": "golang.org/x/crypto/curve25519",
+			"revision": "f6b343c37ca80bfa8ea539da67a0b621f84fab1d",
+			"revisionTime": "2016-12-21T04:54:10Z"
+		},
+		{
+			"checksumSHA1": "AqB/FsMmLYYpa6dOh4MXWbd3fm8=",
+			"path": "golang.org/x/crypto/ed25519",
+			"revision": "f6b343c37ca80bfa8ea539da67a0b621f84fab1d",
+			"revisionTime": "2016-12-21T04:54:10Z"
+		},
+		{
+			"checksumSHA1": "LXFcVx8I587SnWmKycSDEq9yvK8=",
+			"path": "golang.org/x/crypto/ed25519/internal/edwards25519",
+			"revision": "f6b343c37ca80bfa8ea539da67a0b621f84fab1d",
+			"revisionTime": "2016-12-21T04:54:10Z"
+		},
+		{
+			"checksumSHA1": "mL4nYbensq90iCGnvVdb0WuUSEk=",
+			"path": "golang.org/x/crypto/ssh",
+			"revision": "f6b343c37ca80bfa8ea539da67a0b621f84fab1d",
+			"revisionTime": "2016-12-21T04:54:10Z"
+		}
+	],
+	"rootPath": "github.com/docker/swarm"
+}
