@@ -10,7 +10,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-var defaultTTL = time.Minute * 10
+var defaultTTL = time.Minute * 2
+
+type VGUsage struct {
+	Name  string
+	Total int
+	Free  int
+}
 
 // LocalStore host local storage,HDD or SSD
 type LocalStore struct {
@@ -57,7 +63,7 @@ func (l LocalStore) ID() string { return l.node.ID }
 func (LocalStore) Driver() string { return LocalStoreDriver }
 
 // IdleSize returns local store idle size,include HDD,and SSD maybe
-func (l LocalStore) IdleSize() (map[string]int, error) {
+func (l LocalStore) IdleSize() (map[string]VGUsage, error) {
 	if time.Now().After(l.expired) {
 		// api get local disk size
 		list, err := sdk.GetVgList(l.addr)
@@ -69,7 +75,7 @@ func (l LocalStore) IdleSize() (map[string]int, error) {
 		l.expired = time.Now().Add(l.ttl)
 	}
 
-	out := make(map[string]int, len(l.list))
+	out := make(map[string]VGUsage, len(l.list))
 
 	for i := range l.list {
 		free := l.list[i].VgSize
@@ -89,7 +95,11 @@ func (l LocalStore) IdleSize() (map[string]int, error) {
 			free = l.list[i].VgFree
 		}
 
-		out[l.list[i].VgName] = free
+		out[l.list[i].VgName] = VGUsage{
+			Name:  l.list[i].VgName,
+			Total: l.list[i].VgSize,
+			Free:  free,
+		}
 	}
 
 	return out, nil
@@ -103,13 +113,13 @@ func (l LocalStore) Alloc(name, unit, vg string, size int) (database.LocalVolume
 		return lv, errors.Wrap(err, l.node.Name+" store alloc")
 	}
 
-	vgsize, ok := idles[vg]
+	usage, ok := idles[vg]
 	if !ok {
 		return lv, errors.Errorf("%s:doesn't get VG %s", l.node.Name, vg)
 	}
 
-	if vgsize < size {
-		return lv, errors.Errorf("%s:VG %s is shortage,%d<%d", l.node.Name, vg, vgsize, size)
+	if usage.Free < size {
+		return lv, errors.Errorf("%s:VG %s is shortage,%d<%d", l.node.Name, vg, usage.Free, size)
 	}
 
 	lv = database.LocalVolume{
@@ -142,13 +152,13 @@ func (l *LocalStore) Extend(vg, name string, size int) (database.LocalVolume, er
 		return lv, errors.Wrap(err, l.node.Name+" VG extend")
 	}
 
-	vgsize, ok := idles[vg]
+	usage, ok := idles[vg]
 	if !ok {
 		return lv, errors.Errorf("%s doesn't get VG %s", l.node.Name, vg)
 	}
 
-	if vgsize < size {
-		return lv, errors.Errorf("%s:VG %s is shortage,%d<%d", l.node.Name, vg, vgsize, size)
+	if usage.Free < size {
+		return lv, errors.Errorf("%s:VG %s is shortage,%d<%d", l.node.Name, vg, usage.Free, size)
 	}
 	lv.Size += size
 
@@ -168,20 +178,4 @@ func (l LocalStore) Recycle(id string) error {
 	}
 
 	return nil
-}
-
-// GetVGUsedSize returns VG used size
-func GetVGUsedSize(vg string) (int, error) {
-	vgs, err := database.ListVolumeByVG(vg)
-	if err != nil {
-		return 0, errors.Wrap(err, "get VG used size")
-	}
-
-	used := 0
-
-	for i := range vgs {
-		used += vgs[i].Size
-	}
-
-	return used, nil
 }
