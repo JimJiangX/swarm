@@ -49,7 +49,7 @@ func getNodeInspect(gd *swarm.Gardener, node database.Node) structs.NodeInspect 
 			usedMemory = int(eng.UsedMemory())
 			dockerStatus = eng.Status()
 
-			usage, err := gd.GetVGUsage(node.ID)
+			usage, err := gd.GetVGUsage(node.ID, eng)
 			if err != nil {
 				logrus.WithField("Node", node.Name).Warnf("vgs error,%+v", err)
 			} else {
@@ -334,24 +334,22 @@ func getClusterResource(gd *swarm.Gardener, cl database.Cluster, detail bool) (s
 		usedCPUs += _CPUs
 		usedMemory += _Memory
 
-		usage, err := gd.GetVGUsage(nodes[i].ID)
-		if err != nil {
+		usage, err := gd.GetVGUsage(nodes[i].ID, eng)
+		if err == nil {
 			logrus.WithField("Node", nodes[i].Name).Warnf("vgs error,%+v", err)
-		} else {
-			ssd := usage["SSD"]
-			hdd := usage["HDD"]
-
-			totalSSDSize += ssd.Total
-			usedSSDSize += ssd.Total - ssd.Free
-			totalHDDSize += hdd.Total
-			usedHDDSize += hdd.Total - hdd.Free
+			continue
 		}
+		ssd := usage["SSD"]
+		hdd := usage["HDD"]
+
+		totalSSDSize += ssd.Total
+		usedSSDSize += ssd.Total - ssd.Free
+		totalHDDSize += hdd.Total
+		usedHDDSize += hdd.Total - hdd.Free
+
 		if !detail {
 			continue
 		}
-
-		ssd := usage["SSD"]
-		hdd := usage["HDD"]
 
 		inspect := structs.NodeResource{
 			ID:       nodes[i].ID,
