@@ -687,40 +687,71 @@ func getVGname(engine *cluster.Engine, _type string) (string, error) {
 	return vgName, nil
 }
 
-func (gd *Gardener) GetVGUsage(nameOrID string, engine *cluster.Engine) (map[string]storage.VGUsage, error) {
+type vgUsage struct {
+	Name  string
+	Total int
+	Used  int
+}
+
+// GetLocalVGUsage returns the Engine local volumes infomation
+func GetLocalVGUsage(engine *cluster.Engine) map[string]vgUsage {
 	if engine == nil || engine.Labels == nil {
-		return map[string]storage.VGUsage{}, nil
+		return map[string]vgUsage{}
 	}
 
-	_, node, err := gd.getNode(nameOrID)
-	if err != nil {
-		return nil, err
-	}
+	out := make(map[string]vgUsage, 2)
 
-	if node.localStore == nil {
-
-		return nil, errors.Errorf("%s Local Store is nil", node.Name)
-	}
-
-	vgs, err := node.localStore.IdleSize()
-	if err != nil {
-		return vgs, err
-	}
-
+	// HDD
 	engine.RLock()
-	hddVG, ok := engine.Labels[_HDD_VG_Label]
-	if ok {
-		vgs[_HDD] = vgs[hddVG]
-	}
-
-	ssdVG, ok := engine.Labels[_SSD_VG_Label]
-	if ok {
-		vgs[_SSD] = vgs[ssdVG]
-	}
-
+	hdd, ok := engine.Labels[_HDD_VG_Size_Label]
 	engine.RUnlock()
 
-	return vgs, err
+	if ok {
+		total, err := strconv.Atoi(hdd)
+		if err == nil {
+			engine.RLock()
+			vgName, ok := engine.Labels[_HDD_VG_Label]
+			engine.RUnlock()
+
+			if ok {
+				used, err := storage.GetVGUsedSize(vgName)
+				if err == nil {
+					out[_HDD] = vgUsage{
+						Name:  vgName,
+						Total: total,
+						Used:  used,
+					}
+				}
+			}
+		}
+	}
+
+	// SSD
+	engine.RLock()
+	ssd, ok := engine.Labels[_SSD_VG_Size_Label]
+	engine.RUnlock()
+
+	if ok {
+		total, err := strconv.Atoi(ssd)
+		if err == nil {
+			engine.RLock()
+			vgName, ok := engine.Labels[_SSD_VG_Label]
+			engine.RUnlock()
+
+			if ok {
+				used, err := storage.GetVGUsedSize(vgName)
+				if err == nil {
+					out[_SSD] = vgUsage{
+						Name:  vgName,
+						Total: total,
+						Used:  used,
+					}
+				}
+			}
+		}
+	}
+
+	return out
 }
 
 func (gd *Gardener) resourceFilter(list []database.Node, module structs.Module, num int) ([]database.Node, error) {
@@ -860,8 +891,8 @@ func (node *Node) isIdleStoreEnough(_type string, size int) bool {
 		return false
 	}
 
-	if idle[vgName].Free < size {
-		logrus.Debugf("%s VG %s shortage:%v %d", node.Name, vgName, idle[vgName].Free, size)
+	if idle[vgName] < size {
+		logrus.Debugf("%s VG %s shortage:%v %d", node.Name, vgName, idle[vgName], size)
 
 		return false
 	}
