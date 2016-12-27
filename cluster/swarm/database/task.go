@@ -510,12 +510,12 @@ func GetBackupStrategy(nameOrID string) (*BackupStrategy, error) {
 		return nil, err
 	}
 
-	var strategy *BackupStrategy
+	var strategy BackupStrategy
 	const query = "SELECT id,name,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at FROM tbl_dbaas_backup_strategy WHERE id=? OR name=?"
 
 	err = db.Get(&strategy, query, nameOrID, nameOrID)
 	if err == nil {
-		return strategy, nil
+		return &strategy, nil
 	}
 
 	db, err = getDB(true)
@@ -525,7 +525,7 @@ func GetBackupStrategy(nameOrID string) (*BackupStrategy, error) {
 
 	err = db.Get(&strategy, query, nameOrID, nameOrID)
 	if err == nil {
-		return strategy, nil
+		return &strategy, nil
 	}
 
 	return nil, errors.Wrap(err, "get BackupStrategy by nameOrID:"+nameOrID)

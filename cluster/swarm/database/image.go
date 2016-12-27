@@ -304,8 +304,8 @@ func GetUnitConfigByID(ID string) (*UnitConfig, error) {
 		return nil, err
 	}
 
-	config := &UnitConfig{}
-	err = db.Get(config, "SELECT id,image_id,unit_id,config_file_path,version,parent_id,content,created_at FROM tbl_dbaas_unit_config WHERE id=?", ID)
+	config := UnitConfig{}
+	err = db.Get(&config, "SELECT id,image_id,unit_id,config_file_path,version,parent_id,content,created_at FROM tbl_dbaas_unit_config WHERE id=?", ID)
 	if err != nil {
 		return nil, errors.Wrap(err, "get UnitConfig")
 	}
@@ -318,7 +318,7 @@ func GetUnitConfigByID(ID string) (*UnitConfig, error) {
 
 	config.KeySets, err = unitConfigDecode(keysets)
 
-	return config, err
+	return &config, err
 }
 
 // UnitWithConfig contains Unit and UnitConfig
