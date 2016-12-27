@@ -2,6 +2,7 @@ package swarm
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -246,10 +247,21 @@ func checkBackupFiles(nameOrID string) (bool, error) {
 		}
 	}
 
-	if len(expired) > 0 {
-		logrus.Infof("Backup files expired:%v", expired)
-		// TODO:remove expired files and delete backupfile record
+	for i := range expired {
+		logrus.Infof("Backup files expired:%v", expired[i].Path)
+
+		err := os.RemoveAll(expired[i].Path)
+		if err != nil {
+			logrus.Errorf("RemoveAll expired backup file %s,%s", expired[i].Path, err)
+			continue
+		}
+
+		err = database.DelBackupFile(expired[i].ID)
+		if err != nil {
+			logrus.Errorf("del expired backup file,%+v", err)
+		}
 	}
+
 	sub := 0
 	for i := range valid {
 		sub += valid[i].SizeByte

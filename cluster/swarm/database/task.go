@@ -120,6 +120,17 @@ func txInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
 	return errors.Wrap(err, "Tx insert BackupFile")
 }
 
+func DelBackupFile(ID string) error {
+	db, err := getDB(false)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("DELETE FROM tbl_dbaas_backup_files WHERE id=?", ID)
+
+	return errors.Wrap(err, "del backup file")
+}
+
 // NewTask new a Task
 func NewTask(object, relate, linkto, des string, labels []string, timeout int) Task {
 	return Task{

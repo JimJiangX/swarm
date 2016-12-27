@@ -101,17 +101,6 @@ func TestTxInsertMultiTask(t *testing.T) {
 	}
 }
 
-func deleteBackupFile(ID string) error {
-	db, err := getDB(false)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec("DELETE FROM tbl_dbaas_backup_files WHERE id=?", ID)
-
-	return err
-}
-
 func TestTxBackupTaskDone(t *testing.T) {
 	task := NewTask(utils.Generate64UUID(), "TaskRelated001", "TaskLinkto001", "TaskDescription001", []string{"TaskLabels011", "TaskLabels011"}, 1011)
 	err := task.Insert()
