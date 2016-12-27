@@ -383,7 +383,7 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) error {
 	}
 
 	// TODO:remove data from database
-	err = svc.so.DeteleServiceRelation(svc.svc.ID, true)
+	err = svc.so.DelServiceRelation(svc.svc.ID, true)
 
 	return err
 }

@@ -14,7 +14,6 @@ type NetworkingOrmer interface {
 	ListIPWithCondition(networking string, allocation bool, num int) ([]IP, error)
 
 	AllocIPByNetworking(id, unit string) (IP, error)
-	UpdateIPs(tx *sqlx.Tx, val []IP) error
 
 	// Port
 	ImportPort(start, end int, filter ...int) (int, error)
@@ -23,17 +22,17 @@ type NetworkingOrmer interface {
 	ListPortsByUnit(nameOrID string) ([]Port, error)
 	ListPorts(start, end, limit int) ([]Port, error)
 
-	DeletePort(port int, allocated bool) error
+	DelPort(port int, allocated bool) error
 
 	// Networking
 	InsertNetworking(Networking, []IP) error
-	UpdateNetworkingStatus(ID string, enable bool) error
+	SetNetworkingStatus(ID string, enable bool) error
 
 	GetNetworkingByID(ID string) (Networking, int, error)
 	ListNetworking() ([]Networking, error)
 	ListNetworkingByType(_type string) ([]Networking, error)
 
-	DeleteNetworking(ID string) error
+	DelNetworking(ID string) error
 	IsNetwrokingUsed(networking string) (bool, error)
 }
 
@@ -115,8 +114,8 @@ func (db dbBase) AllocIPByNetworking(id, unit string) (IP, error) {
 	return *out, errors.Wrap(err, "tx update IP")
 }
 
-// TxUpdateIPs update []IP in Tx
-func (db dbBase) UpdateIPs(tx *sqlx.Tx, val []IP) error {
+// txSetIPs update []IP in Tx
+func (db dbBase) txSetIPs(tx *sqlx.Tx, val []IP) error {
 	query := "UPDATE " + db.ipTable() + " SET unit_id=:unit_id,allocated=:allocated WHERE ip_addr=:ip_addr AND prefix=:prefix"
 
 	stmt, err := tx.PrepareNamed(query)
@@ -175,8 +174,8 @@ func (db dbBase) ListAvailablePorts(num int) ([]Port, error) {
 	return ports, nil
 }
 
-// TxUpdatePorts update []Port Name\UnitID\UnitName\Proto\Allocated in Tx
-func (db dbBase) txUpdatePorts(tx *sqlx.Tx, ports []Port) error {
+// txSetPorts update []Port Name\UnitID\UnitName\Proto\Allocated in Tx
+func (db dbBase) txSetPorts(tx *sqlx.Tx, ports []Port) error {
 
 	query := "UPDATE " + db.portTable() + " SET name=:name,unit_id=:unit_id,unit_name=:unit_name,proto=:proto,allocated=:allocated WHERE port=:port"
 
@@ -199,7 +198,7 @@ func (db dbBase) txUpdatePorts(tx *sqlx.Tx, ports []Port) error {
 	return errors.Wrap(err, "tx update []Port")
 }
 
-// TxImportPort import Port from [start:end],returns number of insert ports.
+// ImportPort import Port from [start:end],returns number of insert ports.
 func (db dbBase) ImportPort(start, end int, filter ...int) (int, error) {
 	ports := make([]Port, 0, end-start+1)
 
@@ -295,8 +294,8 @@ func (db dbBase) ListPorts(start, end, limit int) ([]Port, error) {
 	return ports, errors.Wrap(err, "list []Port")
 }
 
-// DeletePort delete by port,only if Port.Allocated==allocated
-func (db dbBase) DeletePort(port int, allocated bool) error {
+// DelPort delete by port,only if Port.Allocated==allocated
+func (db dbBase) DelPort(port int, allocated bool) error {
 	using := false
 
 	err := db.Get(&using, "SELECT allocated FROM "+db.portTable()+" WHERE port=?", port)
@@ -367,8 +366,8 @@ func (db dbBase) ListNetworking() ([]Networking, error) {
 	return list, errors.Wrap(err, "list all []Networking")
 }
 
-// UpdateNetworkingStatus upate Networking Enabled by ID
-func (db dbBase) UpdateNetworkingStatus(ID string, enable bool) error {
+// SetNetworkingStatus upate Networking Enabled by ID
+func (db dbBase) SetNetworkingStatus(ID string, enable bool) error {
 
 	query := "UPDATE " + db.networkingTable() + " SET enabled=? WHERE id=?"
 
@@ -408,8 +407,8 @@ func (db dbBase) InsertNetworking(net Networking, ips []IP) error {
 	return db.txFrame(do)
 }
 
-// TxDeleteNetworking delete Networking and []IP in Tx
-func (db dbBase) DeleteNetworking(ID string) error {
+// TxDelNetworking delete Networking and []IP in Tx
+func (db dbBase) DelNetworking(ID string) error {
 	do := func(tx *sqlx.Tx) error {
 
 		_, err := tx.Exec("DELETE FROM "+db.networkingTable()+" WHERE id=?", ID)

@@ -49,7 +49,7 @@ func (ns *nodes) RemoveCluster(nameOrID string) error {
 		return nil
 	}
 
-	err = ns.dco.DeleteCluster(cl.ID)
+	err = ns.dco.DelCluster(cl.ID)
 	if err != nil {
 		return err
 	}

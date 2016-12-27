@@ -14,9 +14,9 @@ type UserOrmer interface {
 
 	ListUsersByService(service, _type string) ([]User, error)
 
-	UpdateUsers(addition, update []User) error
+	SetUsers(addition, update []User) error
 
-	DeleteUsers(users []User) error
+	DelUsers(users []User) error
 }
 
 // User is for DB and Proxy
@@ -126,9 +126,9 @@ func (u *User) jsonEncode() error {
 	return nil
 }
 
-// TxUpdateUsers update []User in Tx,
+// SetUsers update []User in Tx,
 // If User is exist,exec update,if not exec insert.
-func (db dbBase) UpdateUsers(addition, update []User) error {
+func (db dbBase) SetUsers(addition, update []User) error {
 	do := func(tx *sqlx.Tx) error {
 
 		if len(addition) > 0 {
@@ -171,7 +171,7 @@ func (db dbBase) UpdateUsers(addition, update []User) error {
 	return db.txFrame(do)
 }
 
-// TxInsertUsers insert []User in Tx
+// InsertUsers insert []User in Tx
 func (db dbBase) InsertUsers(users []User) error {
 	return db.txFrame(
 		func(tx *sqlx.Tx) (err error) {
@@ -212,7 +212,7 @@ func (db dbBase) txInsertUsers(tx *sqlx.Tx, users []User) error {
 	return errors.Wrap(err, "Tx insert []User")
 }
 
-func (db dbBase) txDeleteUsers(tx *sqlx.Tx, id string) error {
+func (db dbBase) txDelUsers(tx *sqlx.Tx, id string) error {
 
 	query := "DELETE FROM " + db.userTable() + " WHERE id=? OR service_id=?"
 	_, err := tx.Exec(query, id, id)
@@ -220,8 +220,8 @@ func (db dbBase) txDeleteUsers(tx *sqlx.Tx, id string) error {
 	return errors.Wrap(err, "Tx delete User by ID or ServiceID")
 }
 
-// TxDeleteUsers delete []User in Tx
-func (db dbBase) DeleteUsers(users []User) error {
+// DelUsers delete []User in Tx
+func (db dbBase) DelUsers(users []User) error {
 	do := func(tx *sqlx.Tx) error {
 
 		query := "DELETE FROM " + db.userTable() + " WHERE id=?"

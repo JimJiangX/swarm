@@ -59,19 +59,19 @@ func handleContainerEvent(ci database.ContainerInterface, action, ID string) err
 	//e.refreshContainer(msg.ID, true)
 
 	case "start", "unpause":
-		return ci.UpdateUnitByContainer(ID, statusContainerRunning)
+		return ci.SetUnitByContainer(ID, statusContainerRunning)
 
 	case "pause":
-		return ci.UpdateUnitByContainer(ID, statusContainerPaused)
+		return ci.SetUnitByContainer(ID, statusContainerPaused)
 
 	case "stop", "kill", "oom":
-		return ci.UpdateUnitByContainer(ID, statusContainerExited)
+		return ci.SetUnitByContainer(ID, statusContainerExited)
 
 	case "restart":
-		return ci.UpdateUnitByContainer(ID, statusContainerRestarted)
+		return ci.SetUnitByContainer(ID, statusContainerRestarted)
 
 	case "die":
-		return ci.UpdateUnitByContainer(ID, statusContainerDead)
+		return ci.SetUnitByContainer(ID, statusContainerDead)
 
 	default:
 		//e.refreshContainer(msg.ID, false)

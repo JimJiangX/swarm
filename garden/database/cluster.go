@@ -13,7 +13,9 @@ type ClusterInterface interface {
 
 	ListClusters() ([]Cluster, error)
 
-	DeleteCluster(nameOrID string) error
+	SetClusterStatus(nameOrID string, state bool) error
+
+	DelCluster(nameOrID string) error
 }
 
 type ClusterOrmer interface {
@@ -79,18 +81,18 @@ func (db dbBase) ListClusters() ([]Cluster, error) {
 	return clusters, errors.Wrap(err, "list Clusters")
 }
 
-// UpdateClusterStatus update Cluster.enabled by ID
-func (db dbBase) UpdateClusterStatus(c Cluster, state bool) error {
+// SetClusterStatus update Cluster.enabled by ID
+func (db dbBase) SetClusterStatus(nameOrID string, state bool) error {
 
-	query := "UPDATE " + db.clusterTable() + " SET enabled=? WHERE id=?"
+	query := "UPDATE " + db.clusterTable() + " SET enabled=? WHERE id=? OR name=?"
 
-	_, err := db.Exec(query, state, c.ID)
+	_, err := db.Exec(query, state, nameOrID, nameOrID)
 
-	return errors.Wrap(err, "update Cluster.Enabled by ID:"+c.ID)
+	return errors.Wrap(err, "update Cluster.Enabled by nameOrID:"+nameOrID)
 }
 
-// UpdateClusterParams updates MaxNode\UsageLimit
-func (db dbBase) UpdateClusterParams(c Cluster) error {
+// SetClusterParams updates MaxNode\UsageLimit
+func (db dbBase) SetClusterParams(c Cluster) error {
 
 	query := "UPDATE " + db.clusterTable() + " SET max_node=?,usage_limit=? WHERE id=?"
 
@@ -99,8 +101,8 @@ func (db dbBase) UpdateClusterParams(c Cluster) error {
 	return errors.Wrap(err, "update Cluster MaxNode or UsageLimit")
 }
 
-// DeleteCluster delete a record of Cluster by nameOrID
-func (db dbBase) DeleteCluster(nameOrID string) error {
+// DelCluster delete a record of Cluster by nameOrID
+func (db dbBase) DelCluster(nameOrID string) error {
 
 	query := "DELETE FROM " + db.clusterTable() + " WHERE id=? OR name=?"
 

@@ -16,13 +16,12 @@ type ServiceInterface interface {
 
 	ListService() ([]Service, error)
 
-	UpdateServiceStatus(nameOrID string, val int, finish time.Time) error
-	UpdateServcieDesc(id, desc string, size int) error
+	SetServiceStatus(nameOrID string, val int, finish time.Time) error
+	SetServcieDesc(id, desc string, size int) error
 	ServiceStatusCAS(nameOrID string, val int, finish time.Time, f func(val int) bool) (bool, int, error)
-	SetServiceStatus(svc *Service, state int, finish time.Time) error
-	UpdateServiceWithTask(svc *Service, t Task, state int, finish time.Time) error
+	SetServiceWithTask(svc *Service, t Task, state int, finish time.Time) error
 
-	DeteleServiceRelation(serviceID string, rmVolumes bool) error
+	DelServiceRelation(serviceID string, rmVolumes bool) error
 }
 
 type ServiceOrmer interface {
@@ -114,18 +113,8 @@ func (db dbBase) GetServiceByUnit(nameOrID string) (Service, error) {
 	return service, errors.Wrap(err, "get Service by unit")
 }
 
-// UpdateServcieDesc update Service Description
-func (db dbBase) UpdateServiceStatus(nameOrID string, val int, finish time.Time) error {
-
-	query := "UPDATE " + db.serviceTable() + " SET status=?,finished_at=? WHERE id=? OR name=?"
-
-	_, err := db.Exec(query, val, finish, nameOrID, nameOrID)
-
-	return errors.Wrap(err, "update Service Status")
-}
-
-// UpdateServcieDesc update Service Description
-func (db dbBase) UpdateServcieDesc(id, desc string, size int) error {
+// SetServcieDesc update Service Description
+func (db dbBase) SetServcieDesc(id, desc string, size int) error {
 
 	query := "UPDATE " + db.serviceTable() + " SET backup_max_size=?,description=? WHERE id=?"
 
@@ -214,34 +203,23 @@ func (db dbBase) txInsertSerivce(tx *sqlx.Tx, svc Service) error {
 }
 
 // SetServiceStatus update Service Status
-func (db dbBase) SetServiceStatus(svc *Service, state int, finish time.Time) error {
+func (db dbBase) SetServiceStatus(nameOrID string, state int, finish time.Time) error {
 	if finish.IsZero() {
 
-		query := "UPDATE " + db.serviceTable() + " SET status=? WHERE id=?"
-		_, err := db.Exec(query, state, svc.ID)
-		if err != nil {
-			return errors.Wrap(err, "update Service Status")
-		}
+		query := "UPDATE " + db.serviceTable() + " SET status=? WHERE id=? OR name=?"
+		_, err := db.Exec(query, state, nameOrID, nameOrID)
 
-		svc.Status = state
-
-		return nil
+		return errors.Wrap(err, "update Service Status")
 	}
 
-	query := "UPDATE " + db.serviceTable() + " SET status=?,finished_at=? WHERE id=?"
-	_, err := db.Exec(query, state, finish, svc.ID)
-	if err != nil {
-		return errors.Wrap(err, "update Service Status & FinishedAt")
-	}
+	query := "UPDATE " + db.serviceTable() + " SET status=?,finished_at=? WHERE id=? OR name=?"
+	_, err := db.Exec(query, state, finish, nameOrID, nameOrID)
 
-	svc.Status = state
-	svc.FinishedAt = finish
-
-	return nil
+	return errors.Wrap(err, "update Service Status & FinishedAt")
 }
 
-// TxSetServiceStatus update Service Status and Task Status in Tx.
-func (db dbBase) UpdateServiceWithTask(svc *Service, t Task, state int, finish time.Time) error {
+// SetServiceWithTask update Service Status and Task Status in Tx.
+func (db dbBase) SetServiceWithTask(svc *Service, t Task, state int, finish time.Time) error {
 	do := func(tx *sqlx.Tx) (err error) {
 
 		if finish.IsZero() {
@@ -259,7 +237,7 @@ func (db dbBase) UpdateServiceWithTask(svc *Service, t Task, state int, finish t
 			return errors.Wrap(err, "Tx update Service status")
 		}
 
-		err = db.txUpdateTask(tx, t)
+		err = db.txSetTask(tx, t)
 
 		return err
 	}
@@ -275,7 +253,7 @@ func (db dbBase) UpdateServiceWithTask(svc *Service, t Task, state int, finish t
 	return err
 }
 
-func (db dbBase) txDeleteService(tx *sqlx.Tx, nameOrID string) error {
+func (db dbBase) txDelService(tx *sqlx.Tx, nameOrID string) error {
 
 	query := "DELETE FROM " + db.serviceTable() + " WHERE id=? OR name=?"
 	_, err := tx.Exec(query, nameOrID, nameOrID)
@@ -283,10 +261,10 @@ func (db dbBase) txDeleteService(tx *sqlx.Tx, nameOrID string) error {
 	return err
 }
 
-// DeteleServiceRelation delelte related record about Service,
+// DelServiceRelation delelte related record about Service,
 // include Service,Unit,BackupStrategy,IP,Port,LocalVolume,UnitConfig.
 // delete in a Tx
-func (db dbBase) DeteleServiceRelation(serviceID string, rmVolumes bool) error {
+func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 	units, err := db.ListUnitByServiceID(serviceID)
 	if err != nil {
 		return err
@@ -331,46 +309,46 @@ func (db dbBase) DeteleServiceRelation(serviceID string, rmVolumes bool) error {
 
 	do := func(tx *sqlx.Tx) error {
 
-		err := db.UpdateIPs(tx, ips)
+		err := db.txSetIPs(tx, ips)
 		if err != nil {
 			return err
 		}
 
-		err = db.txUpdatePorts(tx, ports)
+		err = db.txSetPorts(tx, ports)
 		if err != nil {
 			return err
 		}
 
 		for i := range units {
 			if rmVolumes {
-				err = db.DeleteVolumeByUnit(tx, units[i].ID)
+				err = db.txDelVolumeByUnit(tx, units[i].ID)
 				if err != nil {
 					return err
 				}
 			}
 
-			//			err = db.txDeleteUnitConfigByUnit(tx, units[i].ID)
+			//			err = db.txDelUnitConfigByUnit(tx, units[i].ID)
 			//			if err != nil {
 			//				return err
 			//			}
 		}
 
-		//		err = db.txDeleteBackupStrategy(tx, serviceID)
+		//		err = db.txDelBackupStrategy(tx, serviceID)
 		//		if err != nil {
 		//			return err
 		//		}
 
-		err = db.txDeleteUsers(tx, serviceID)
+		err = db.txDelUsers(tx, serviceID)
 		if err != nil {
 			return err
 		}
 
-		err = db.DeleteUnit(tx, serviceID)
+		err = db.txDelUnit(tx, serviceID)
 		if err != nil {
 			return err
 		}
 
-		err = db.txDeleteService(tx, serviceID)
+		err = db.txDelService(tx, serviceID)
 
 		return err
 	}

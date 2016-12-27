@@ -19,11 +19,11 @@ type NodeOrmer interface {
 	ListNodeByCluster(cluster string) ([]Node, error)
 	ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, error)
 
-	UpdateParams(n Node) error
+	SetNodeParams(n Node) error
 
 	RegisterNode(n Node, t Task) error
 
-	DeleteNode(nameOrID string) error
+	DelNode(nameOrID string) error
 }
 
 // Node table structure,correspod with mainframe computer.
@@ -84,8 +84,8 @@ func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 	return db.txFrame(do)
 }
 
-// UpdateParams returns error when Node update status and max_container.
-func (db dbBase) UpdateParams(n Node) error {
+// SetNodeParams returns error when Node update status and max_container.
+func (db dbBase) SetNodeParams(n Node) error {
 
 	query := "UPDATE " + db.nodeTable() + " SET status=?,max_container=? WHERE id=?"
 
@@ -105,7 +105,7 @@ func (db dbBase) RegisterNode(n Node, t Task) error {
 			return errors.Wrap(err, "Tx update Node status")
 		}
 
-		err = db.txUpdateTask(tx, t)
+		err = db.txSetTask(tx, t)
 
 		return err
 	}
@@ -266,8 +266,8 @@ func (db dbBase) ListNodesByClusters(clusters []string, _type string, enable boo
 	return nodes, errors.Wrap(err, "list Nodes by clusters")
 }
 
-// DeleteNode delete node by name or ID
-func (db dbBase) DeleteNode(nameOrID string) error {
+// DelNode delete node by name or ID
+func (db dbBase) DelNode(nameOrID string) error {
 
 	query := "DELETE FROM " + db.nodeTable() + " WHERE id=? OR name=?"
 
