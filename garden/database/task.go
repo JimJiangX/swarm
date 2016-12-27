@@ -78,7 +78,7 @@ func (db dbBase) InsertTasks(tx *sqlx.Tx, tasks []Task) error {
 	return errors.Wrap(err, "Tx insert []Task")
 }
 
-func (db dbBase) txUpdateTask(tx *sqlx.Tx, t Task) error {
+func (db dbBase) txSetTask(tx *sqlx.Tx, t Task) error {
 
 	query := "UPDATE " + db.taskTable() + " SET status=?,finished_at=?,errors=? WHERE id=?"
 

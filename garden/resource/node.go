@@ -127,7 +127,7 @@ func (ns *nodes) updateNode(nameOrID string, status, maxContainer int) (database
 		n.node.MaxContainer = maxContainer
 	}
 
-	err = ns.dco.UpdateParams(n.node)
+	err = ns.dco.SetNodeParams(n.node)
 	if err != nil {
 		return n.node, err
 	}
@@ -136,7 +136,7 @@ func (ns *nodes) updateNode(nameOrID string, status, maxContainer int) (database
 }
 
 func (ns *nodes) removeNode(ID string) error {
-	err := ns.dco.DeleteNode(ID)
+	err := ns.dco.DelNode(ID)
 	if err != nil {
 		return err
 	}

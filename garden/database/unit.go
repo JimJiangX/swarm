@@ -19,20 +19,18 @@ type UnitInterface interface {
 
 	InsertUnit(u Unit) error
 
-	UpdateUnitInfo(u Unit) error
+	SetUnitInfo(u Unit) error
 	UnitStatusCAS(u *Unit, old, value int64, operator string) error
-	UpdateUnitWithInsertTask(u *Unit, task Task) error
-	UpdateUnitStatus(u *Unit, status int64, msg string) error
-	UpdateUnitAndTask(u *Unit, t *Task, msg string) error
-	UpdateMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error
-
-	DeleteUnit(tx *sqlx.Tx, nameOrID string) error
+	SetUnitWithInsertTask(u *Unit, task Task) error
+	SetUnitStatus(u *Unit, status int64, msg string) error
+	SetUnitAndTask(u *Unit, t *Task, msg string) error
+	// SetMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error
 }
 
 type ContainerInterface interface {
 	UnitContainerCreated(name, containerID, engineID, mode string, state int) error
 
-	UpdateUnitByContainer(containerID string, state int) error
+	SetUnitByContainer(containerID string, state int) error
 }
 
 type UnitOrmer interface {
@@ -134,15 +132,15 @@ func (db dbBase) UnitContainerCreated(name, containerID, engineID, mode string, 
 	return err
 }
 
-func (db dbBase) UpdateUnitByContainer(containerID string, state int) error {
+func (db dbBase) SetUnitByContainer(containerID string, state int) error {
 	query := "UPDATE " + db.unitTable() + " SET status=?,latest_error=? WHERE container_id=?"
 	_, err := db.Exec(query, state, "", containerID)
 
 	return err
 }
 
-// UpdateUnitInfo could update params of unit
-func (db dbBase) UpdateUnitInfo(u Unit) error {
+// SetUnitInfo could update params of unit
+func (db dbBase) SetUnitInfo(u Unit) error {
 
 	query := "UPDATE " + db.unitTable() + " SET name=:name,type=:type,image_id=:image_id,image_name=:image_name,service_id=:service_id,engine_id=:engine_id,container_id=:container_id,unit_config_id=:unit_config_id,network_mode=:network_mode,status=:status,latest_error=:latest_error,check_interval=:check_interval,created_at=:created_at WHERE id=:id"
 
@@ -151,8 +149,8 @@ func (db dbBase) UpdateUnitInfo(u Unit) error {
 	return errors.Wrap(err, "update Unit params")
 }
 
-// txUpdateUnit upate unit params in tx
-func (db dbBase) txUpdateUnit(tx *sqlx.Tx, u Unit) error {
+// txSetUnit upate unit params in tx
+func (db dbBase) txSetUnit(tx *sqlx.Tx, u Unit) error {
 
 	query := "UPDATE " + db.unitTable() + " SET engine_id=:engine_id,container_id=:container_id,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
 
@@ -197,10 +195,10 @@ func (db dbBase) UnitStatusCAS(u *Unit, old, value int64, operator string) error
 	return nil
 }
 
-// UpdateUnitWithInsertTask update Unit Status & LatestError and insert Task in Tx
-func (db dbBase) UpdateUnitWithInsertTask(u *Unit, task Task) error {
+// SetUnitWithInsertTask update Unit Status & LatestError and insert Task in Tx
+func (db dbBase) SetUnitWithInsertTask(u *Unit, task Task) error {
 	do := func(tx *sqlx.Tx) error {
-		err := db.txUpdateUnitStatus(tx, u, u.Status, u.LatestError)
+		err := db.txSetUnitStatus(tx, u, u.Status, u.LatestError)
 		if err != nil {
 			return err
 		}
@@ -213,18 +211,18 @@ func (db dbBase) UpdateUnitWithInsertTask(u *Unit, task Task) error {
 	return db.txFrame(do)
 }
 
-// TxUpdateUnitStatus update Unit Status & LatestError in Tx
-func (db dbBase) UpdateUnitStatus(u *Unit, status int64, msg string) error {
+// SetUnitStatus update Unit Status & LatestError in Tx
+func (db dbBase) SetUnitStatus(u *Unit, status int64, msg string) error {
 	return db.txFrame(
 		func(tx *sqlx.Tx) error {
-			return db.txUpdateUnitStatus(tx, u, status, msg)
+			return db.txSetUnitStatus(tx, u, status, msg)
 		})
 }
 
-// UpdateUnitAndTask update Unit and Task in Tx
-func (db dbBase) UpdateUnitAndTask(u *Unit, t *Task, msg string) error {
+// SetUnitAndTask update Unit and Task in Tx
+func (db dbBase) SetUnitAndTask(u *Unit, t *Task, msg string) error {
 	do := func(tx *sqlx.Tx) error {
-		err := db.txUpdateUnitStatus(tx, u, u.Status, u.LatestError)
+		err := db.txSetUnitStatus(tx, u, u.Status, u.LatestError)
 		if err != nil {
 			return err
 		}
@@ -233,7 +231,7 @@ func (db dbBase) UpdateUnitAndTask(u *Unit, t *Task, msg string) error {
 		task.Errors = msg
 		task.FinishedAt = time.Now()
 
-		err = db.txUpdateTask(tx, task)
+		err = db.txSetTask(tx, task)
 
 		return err
 	}
@@ -247,7 +245,7 @@ func (db dbBase) UpdateUnitAndTask(u *Unit, t *Task, msg string) error {
 	return err
 }
 
-func (db dbBase) txUpdateUnitStatus(tx *sqlx.Tx, u *Unit, status int64, msg string) error {
+func (db dbBase) txSetUnitStatus(tx *sqlx.Tx, u *Unit, status int64, msg string) error {
 
 	query := "UPDATE " + db.unitTable() + " SET status=?,latest_error=? WHERE id=?"
 
@@ -262,8 +260,8 @@ func (db dbBase) txUpdateUnitStatus(tx *sqlx.Tx, u *Unit, status int64, msg stri
 	return nil
 }
 
-// TxDeleteUnit delete Unit by name or ID or ServiceID in Tx
-func (db dbBase) DeleteUnit(tx *sqlx.Tx, nameOrID string) error {
+// txDelUnit delete Unit by name or ID or ServiceID in Tx
+func (db dbBase) txDelUnit(tx *sqlx.Tx, nameOrID string) error {
 
 	query := "DELETE FROM " + db.unitTable() + " WHERE id=? OR name=? OR service_id=?"
 
@@ -337,7 +335,7 @@ func (db dbBase) InsertUnitWithPorts(u *Unit, ports []Port) error {
 			}
 		}
 
-		err = db.txUpdatePorts(tx, ports)
+		err = db.txSetPorts(tx, ports)
 
 		return err
 	}
@@ -345,9 +343,9 @@ func (db dbBase) InsertUnitWithPorts(u *Unit, ports []Port) error {
 	return db.txFrame(do)
 }
 
-// TxUpdateMigrateUnit update Unit and delete old LocalVolumes in a Tx
-func (db dbBase) UpdateMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error {
-	// update database :tbl_dbaas_unit
+// SetMigrateUnit update Unit and delete old LocalVolumes in a Tx
+func (db dbBase) SetMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error {
+	// update database Unit
 	// delete old localVolumes
 	do := func(tx *sqlx.Tx) error {
 		for i := range lvs {
@@ -355,13 +353,13 @@ func (db dbBase) UpdateMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error 
 				continue
 			}
 
-			err := db.txDeleteVolume(tx, lvs[i].ID)
+			err := db.txDelVolume(tx, lvs[i].ID)
 			if err != nil {
 				return err
 			}
 		}
 
-		return db.txUpdateUnit(tx, u)
+		return db.txSetUnit(tx, u)
 	}
 
 	return db.txFrame(do)

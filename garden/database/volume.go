@@ -13,11 +13,11 @@ type VolumeOrmer interface {
 	InsertVolume(lv Volume) error
 	InsertVolumes(lvs []Volume) error
 
-	UpdateVolume(nameOrID string, size int) error
-	UpdateVolumes(lvs []Volume) error
+	SetVolume(nameOrID string, size int) error
+	SetVolumes(lvs []Volume) error
 
-	DeleteVolume(nameOrID string) error
-	DeleteVolumes(lvs []Volume) error
+	DelVolume(nameOrID string) error
+	DelVolumes(lvs []Volume) error
 }
 
 // Volume is table structure,correspod with host LV
@@ -73,8 +73,8 @@ func (db dbBase) InsertVolumes(lvs []Volume) error {
 	return db.txFrame(do)
 }
 
-// UpdateVolume update size of Volume by name or ID
-func (db dbBase) UpdateVolume(nameOrID string, size int) error {
+// SetVolume update size of Volume by name or ID
+func (db dbBase) SetVolume(nameOrID string, size int) error {
 
 	query := "UPDATE " + db.volumeTable() + " SET size=? WHERE id=? OR name=?"
 
@@ -83,8 +83,8 @@ func (db dbBase) UpdateVolume(nameOrID string, size int) error {
 	return errors.Wrap(err, "update Volume size")
 }
 
-// UpdateVolumes update Size of Volume by name or ID in a Tx
-func (db dbBase) UpdateVolumes(lvs []Volume) error {
+// SetVolumes update Size of Volume by name or ID in a Tx
+func (db dbBase) SetVolumes(lvs []Volume) error {
 	do := func(tx *sqlx.Tx) error {
 
 		stmt, err := tx.Preparex("UPDATE " + db.volumeTable() + " SET size=? WHERE id=?")
@@ -109,8 +109,8 @@ func (db dbBase) UpdateVolumes(lvs []Volume) error {
 	return db.txFrame(do)
 }
 
-// txDeleteVolume delete Volume by name or ID
-func (db dbBase) txDeleteVolume(tx *sqlx.Tx, nameOrID string) error {
+// txDelVolume delete Volume by name or ID
+func (db dbBase) txDelVolume(tx *sqlx.Tx, nameOrID string) error {
 
 	query := "DELETE FROM " + db.volumeTable() + " WHERE id=? OR name=?"
 
@@ -119,8 +119,8 @@ func (db dbBase) txDeleteVolume(tx *sqlx.Tx, nameOrID string) error {
 	return errors.Wrap(err, "tx delete Volume by nameOrID")
 }
 
-// DeleteVolume delete Volume by name or ID
-func (db dbBase) DeleteVolume(nameOrID string) error {
+// DelVolume delete Volume by name or ID
+func (db dbBase) DelVolume(nameOrID string) error {
 
 	query := "DELETE FROM " + db.volumeTable() + " WHERE id=? OR name=?"
 
@@ -129,8 +129,8 @@ func (db dbBase) DeleteVolume(nameOrID string) error {
 	return errors.Wrap(err, "delete Volume by nameOrID")
 }
 
-// DeleteVolume delete Volume by name or ID
-func (db dbBase) DeleteVolumeByUnit(tx *sqlx.Tx, unitID string) error {
+// txDelVolumeByUnit delete Volume by name or ID
+func (db dbBase) txDelVolumeByUnit(tx *sqlx.Tx, unitID string) error {
 
 	query := "DELETE FROM " + db.volumeTable() + " WHERE unit_id=?"
 
@@ -139,8 +139,8 @@ func (db dbBase) DeleteVolumeByUnit(tx *sqlx.Tx, unitID string) error {
 	return errors.Wrap(err, "delete Volume by unitID")
 }
 
-// DeleteVolumes delete []LocalVolume in a Tx.
-func (db dbBase) DeleteVolumes(lvs []Volume) error {
+// DelVolumes delete []LocalVolume in a Tx.
+func (db dbBase) DelVolumes(lvs []Volume) error {
 	do := func(tx *sqlx.Tx) error {
 
 		stmt, err := tx.Preparex("DELETE FROM " + db.volumeTable() + " WHERE id=?")

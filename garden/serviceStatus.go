@@ -183,7 +183,7 @@ func newStatusLock(key string, ormer database.ServiceOrmer) statusLock {
 		waitTime: time.Second * 2,
 
 		load: ormer.GetServiceStatus,
-		set:  ormer.UpdateServiceStatus,
+		set:  ormer.SetServiceStatus,
 		cas:  ormer.ServiceStatusCAS,
 	}
 }
