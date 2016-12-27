@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/filter"
@@ -31,7 +32,8 @@ type allocator interface {
 
 type Garden struct {
 	sync.Mutex
-	ormer database.Ormer
+	ormer    database.Ormer
+	kvClient kvstore.Client
 
 	allocator   allocator
 	cluster     cluster.Cluster
@@ -40,9 +42,10 @@ type Garden struct {
 	eventHander cluster.EventHandler
 }
 
-func NewGarden(cluster cluster.Cluster, scheduler *scheduler.Scheduler, ormer database.Ormer, allocator allocator, authConfig *types.AuthConfig) *Garden {
+func NewGarden(kvc kvstore.Client, cluster cluster.Cluster, scheduler *scheduler.Scheduler, ormer database.Ormer, allocator allocator, authConfig *types.AuthConfig) *Garden {
 	gd := &Garden{
 		// Mutex:       &scheduler.Mutex,
+		kvClient:    kvc,
 		allocator:   allocator,
 		cluster:     cluster,
 		ormer:       ormer,
@@ -85,6 +88,8 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 }
 
 type scheduleOption struct {
+	highAvailable bool
+
 	nodes struct {
 		clusterType string
 		clusters    []string
@@ -126,6 +131,18 @@ func (gd *Garden) schedule(config *cluster.ContainerConfig, opts scheduleOption,
 	nodes := make([]*node.Node, 0, len(list))
 	for i := range list {
 		n := node.NewNode(list[i])
+
+		for o := range out {
+			if out[o].EngineID == n.ID {
+				if n.Labels == nil {
+					n.Labels = make(map[string]string, 5)
+				}
+
+				n.Labels["Cluster"] = out[o].ClusterID
+				break
+			}
+		}
+
 		nodes = append(nodes, n)
 	}
 
