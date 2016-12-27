@@ -169,40 +169,29 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, force bool, endpoints 
 	return nil
 }
 
-// registerToServers register service to consul and Horus
-func (c *kvClient) registerToServers(ctx context.Context, host string, config api.AgentServiceRegistration, obj RegisterHorusService) []error {
-	errs := make([]error, 0, 2)
-
+// RegisterService register service to consul and Horus
+func (c *kvClient) RegisterService(ctx context.Context, host string, config api.AgentServiceRegistration, obj RegisterHorusService) error {
 	err := c.registerHealthCheck(host, config)
 	if err != nil {
-		errs = append(errs, err)
+		return err
 	}
 
 	select {
 	default:
+		err = c.registerToHorus(ctx, obj)
+
 	case <-ctx.Done():
-		errs = append(errs, ctx.Err())
-		return errs
+		return ctx.Err()
 	}
 
-	err = c.registerToHorus(ctx, obj)
-	if err != nil {
-		errs = append(errs, err)
-	}
-
-	if len(errs) == 0 {
-		return nil
-	}
-
-	return errs
+	return err
 }
 
-// deregister service to consul and Horus
-func (c *kvClient) deregisterToServices(ctx context.Context, addr, ID string) error {
-	err := c.deregisterToHorus(ctx, false, ID)
+// DeregisterService service to consul and Horus
+func (c *kvClient) DeregisterService(ctx context.Context, addr, key string) error {
+	err := c.deregisterToHorus(ctx, false, key)
 	if err != nil {
-
-		err = c.deregisterToHorus(ctx, true, ID)
+		err = c.deregisterToHorus(ctx, true, key)
 	}
 
 	if err != nil {
@@ -211,7 +200,7 @@ func (c *kvClient) deregisterToServices(ctx context.Context, addr, ID string) er
 
 	select {
 	default:
-		err = c.deregisterHealthCheck(addr, ID)
+		err = c.deregisterHealthCheck(addr, key)
 	case <-ctx.Done():
 		return ctx.Err()
 	}
