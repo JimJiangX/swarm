@@ -1,6 +1,10 @@
 package kvstore
 
-import "github.com/hashicorp/consul/api"
+import (
+	"context"
+
+	"github.com/hashicorp/consul/api"
+)
 
 type kvClientAPI interface {
 	getStatus(port string) (string, []string, error)
@@ -15,5 +19,19 @@ type kvClientAPI interface {
 }
 
 type Client interface {
+	Register
+
 	GetHorusAddr() (string, error)
+
+	GetKV(key string) (*api.KVPair, error)
+	PutKV(key string, val []byte) error
+	DeleteKVTree(key string) error
+}
+
+type Register interface {
+	HealthChecks(state string, q *api.QueryOptions) (map[string]api.HealthCheck, error)
+
+	RegisterService(ctx context.Context, host string, config api.AgentServiceRegistration, obj RegisterHorusService) error
+
+	DeregisterService(ctx context.Context, addr, key string) error
 }
