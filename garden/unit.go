@@ -54,6 +54,13 @@ const (
 	statusContainerExited
 )
 
+const (
+	initServiceCmd  = "init_service_cmd"
+	startServiceCmd = "start_service_cmd"
+	stopServiceCmd  = "stop_service_cmd"
+	healthCheckCmd  = "health_check_cmd"
+)
+
 type unit struct {
 	u       database.Unit
 	uo      database.UnitOrmer
@@ -186,4 +193,9 @@ func (u unit) containerExec(ctx context.Context, cmd []string) (types.ContainerE
 	}
 
 	return c.Exec(ctx, cmd)
+}
+
+func (u unit) updateServiceConfig(ctx context.Context, path, context string) error {
+
+	return nil
 }
