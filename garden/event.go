@@ -54,28 +54,30 @@ func (eh eventHander) Handle(event *cluster.Event) error {
 }
 
 func handleContainerEvent(ci database.ContainerInterface, action, ID string) error {
+	state := 0
+
 	switch action {
 	//case "die", "kill", "oom", "pause", "start", "restart", "stop", "unpause", "rename", "update", "health_status":
 	//e.refreshContainer(msg.ID, true)
 
 	case "start", "unpause":
-		return ci.SetUnitByContainer(ID, statusContainerRunning)
+		state = statusContainerRunning
 
 	case "pause":
-		return ci.SetUnitByContainer(ID, statusContainerPaused)
+		state = statusContainerPaused
 
 	case "stop", "kill", "oom":
-		return ci.SetUnitByContainer(ID, statusContainerExited)
+		state = statusContainerExited
 
 	case "restart":
-		return ci.SetUnitByContainer(ID, statusContainerRestarted)
+		state = statusContainerRestarted
 
 	case "die":
-		return ci.SetUnitByContainer(ID, statusContainerDead)
+		state = statusContainerDead
 
 	default:
-		//e.refreshContainer(msg.ID, false)
+		return nil
 	}
 
-	return nil
+	return ci.SetUnitByContainer(ID, state)
 }

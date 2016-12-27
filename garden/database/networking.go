@@ -407,7 +407,7 @@ func (db dbBase) InsertNetworking(net Networking, ips []IP) error {
 	return db.txFrame(do)
 }
 
-// TxDelNetworking delete Networking and []IP in Tx
+// DelNetworking delete Networking and []IP in Tx
 func (db dbBase) DelNetworking(ID string) error {
 	do := func(tx *sqlx.Tx) error {
 
