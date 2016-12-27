@@ -32,6 +32,7 @@ func newBackupJob(svc *Service) *serviceBackup {
 func (bs *serviceBackup) Run() {
 	strategy, err := database.GetBackupStrategy(bs.strategy.ID)
 	if err != nil {
+		logrus.Warnf("BackupJob Run,%+v", err)
 		return
 	}
 
@@ -41,7 +42,7 @@ func (bs *serviceBackup) Run() {
 
 	ok, err := checkBackupFiles(strategy.ServiceID)
 	if !ok || err != nil {
-		logrus.Info("Backup Task Canceled")
+		logrus.Infof("Backup Task Canceled,%+v", err)
 		return
 	}
 
@@ -51,6 +52,7 @@ func (bs *serviceBackup) Run() {
 	task.Status = statusTaskCreate
 	err = task.Insert()
 	if err != nil {
+		logrus.Warnf("BackupJob Run,%+v", err)
 		return
 	}
 
@@ -66,12 +68,14 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 
 	strategy, err := database.GetBackupStrategy(bs.strategy.ID)
 	if err != nil {
+		logrus.Warnf("BackupJob Next,%+v", err)
 		return next
 	}
 
 	if bs.schedule == nil {
 		bs.schedule, err = crontab.Parse(bs.strategy.Spec)
 		if err != nil {
+			logrus.Warnf("BackupJob Next,Parse %s,%+v", bs.strategy.Spec, err)
 			return next
 		}
 	}
@@ -79,7 +83,10 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 	next = bs.schedule.Next(time.Now())
 
 	if next.IsZero() || next.After(strategy.Valid) {
-		strategy.UpdateNext(next, false)
+		err := strategy.UpdateNext(next, false)
+		if err != nil {
+			logrus.Warnf("BackupJob Next,%+v", err)
+		}
 		bs.strategy = strategy
 
 		return time.Time{}
@@ -87,6 +94,7 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 
 	err = strategy.UpdateNext(next, true)
 	if err != nil {
+		logrus.Warnf("BackupJob Next,%+v", err)
 		return next
 	}
 
