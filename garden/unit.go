@@ -54,13 +54,6 @@ const (
 	statusContainerExited
 )
 
-const (
-	initServiceCmd  = "init_service_cmd"
-	startServiceCmd = "start_service_cmd"
-	stopServiceCmd  = "stop_service_cmd"
-	healthCheckCmd  = "health_check_cmd"
-)
-
 type unit struct {
 	u       database.Unit
 	uo      database.UnitOrmer
