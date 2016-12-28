@@ -39,7 +39,11 @@ func NewScpClient(addr, user, password string) (ScpClient, error) {
 
 	config := &ssh.ClientConfig{
 		User: user,
-		Auth: []ssh.AuthMethod{ssh.Password(password)},
+		Auth: []ssh.AuthMethod{
+			ssh.Password(password),
+			ssh.KeyboardInteractive(
+				passwordKeyboardInteractive(password)),
+		},
 	}
 
 	c, err := ssh.Dial("tcp", addr, config)
@@ -48,6 +52,20 @@ func NewScpClient(addr, user, password string) (ScpClient, error) {
 	}
 
 	return &client{c}, nil
+}
+
+// An implementation of ssh.KeyboardInteractiveChallenge that simply sends
+// back the password for all questions. The questions are logged.
+func passwordKeyboardInteractive(password string) ssh.KeyboardInteractiveChallenge {
+	return func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+		// Just send the password back for all questions
+		answers := make([]string, len(questions))
+		for i := range answers {
+			answers[i] = password
+		}
+
+		return answers, nil
+	}
 }
 
 // UploadDir copies files and directories under the local dir
