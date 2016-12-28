@@ -116,7 +116,7 @@ func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.Au
 	return nil
 }
 
-func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client) error {
+func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs map[string]configCmd) error {
 	ok, val, err := svc.sl.CAS(statusServiceStarting, isInProgress)
 	if err != nil {
 		return err
@@ -152,9 +152,11 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client) error {
 		}
 	}
 
-	configs, err := svc.generateUnitsConfigs(ctx, nil)
-	if err != nil {
-		return err
+	if len(configs) == 0 {
+		configs, err = svc.generateUnitsConfigs(ctx, nil)
+		if err != nil {
+			return err
+		}
 	}
 
 	for i := range units {
@@ -471,6 +473,7 @@ func (svc *Service) deregisterSerivces(ctx context.Context, r kvstore.Register) 
 }
 
 type configCmd struct {
+	Update  bool
 	ID      string
 	Path    string
 	Context string

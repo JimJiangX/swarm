@@ -18,6 +18,8 @@ import (
 	"github.com/docker/swarm/scheduler/strategy"
 )
 
+const clusterLabel = "Cluster"
+
 type allocator interface {
 	ListCandidates(clusters, filters []string, _type string, stores []structs.VolumeRequire) ([]database.Node, error)
 
@@ -138,7 +140,7 @@ func (gd *Garden) schedule(config *cluster.ContainerConfig, opts scheduleOption,
 					n.Labels = make(map[string]string, 5)
 				}
 
-				n.Labels["Cluster"] = out[o].ClusterID
+				n.Labels[clusterLabel] = out[o].ClusterID
 				break
 			}
 		}
@@ -164,18 +166,22 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 	config := cluster.BuildContainerConfig(container.Config{}, container.HostConfig{}, network.NetworkingConfig{})
 	stores := []structs.VolumeRequire{}
 	ncpu, memory := 1, 2<<20
+	option := scheduleOption{}
 
 	gd.Lock()
 	defer gd.Unlock()
 
-	nodes, err := gd.schedule(config, scheduleOption{}, stores)
+	nodes, err := gd.schedule(config, option, stores)
 	if err != nil {
 		return nil, err
 	}
 
-	count := len(units)
-
-	ready, bad := make([]pendingUnit, 0, count), make([]pendingUnit, 0, count)
+	var (
+		count = len(units)
+		ready = make([]pendingUnit, 0, count)
+		bad   = make([]pendingUnit, 0, count)
+		used  = make([]*node.Node, count)
+	)
 
 	defer func() {
 		// cancel allocation
@@ -194,6 +200,10 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 	}()
 
 	for n := range nodes {
+		if !selectNodeInDifferentCluster(option.highAvailable, len(units), nodes[n], used) {
+			continue
+		}
+
 		pu := pendingUnit{
 			swarmID:     units[count-1].ID,
 			Unit:        units[count-1],
@@ -234,6 +244,8 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 		gd.cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[n].ID, pu.config)
 
 		ready = append(ready, pu)
+		used = append(used, nodes[n])
+
 		if count--; count == 0 {
 			break
 		}
@@ -244,4 +256,32 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 	}
 
 	return ready, err
+}
+
+func selectNodeInDifferentCluster(highAvailable bool, num int, n *node.Node, used []*node.Node) bool {
+	if !highAvailable {
+		return true
+	}
+
+	if len(used)*2 < num {
+		return true
+	}
+
+	clusters := make(map[string]int, len(used))
+	for i := range used {
+		name := used[i].Labels[clusterLabel]
+		clusters[name] += 1
+	}
+
+	name := n.Labels[clusterLabel]
+	sum := clusters[name]
+	if sum*2 < num {
+		return true
+	}
+
+	if len(clusters) > 1 && sum*2 <= num {
+		return true
+	}
+
+	return false
 }
