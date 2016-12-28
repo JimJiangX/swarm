@@ -543,9 +543,15 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	default:
 		logrus.Debugf("From %s", "default")
 
-		list := make([]structs.ServiceResponse, len(services))
+		length := len(services)
+		list := make([]structs.ServiceResponse, length)
+		ch := make(chan structs.ServiceResponse, length)
 		for i := range services {
-			list[i] = getServiceResponse(services[i], containers)
+			go getServiceResponse(services[i], containers, ch)
+		}
+
+		for i := 0; i < length; i++ {
+			list[i] = <-ch
 		}
 
 		buffer := bytes.NewBuffer(nil)
@@ -868,14 +874,14 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	resp := getServiceResponse(service, gd.Containers())
+	resp := getServiceResponse(service, gd.Containers(), nil)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }
 
-func getServiceResponse(service database.Service, containers cluster.Containers) structs.ServiceResponse {
+func getServiceResponse(service database.Service, containers cluster.Containers, ch chan<- structs.ServiceResponse) structs.ServiceResponse {
 	desc := structs.PostServiceRequest{}
 	err := json.NewDecoder(bytes.NewBufferString(service.Desc)).Decode(&desc)
 	if err != nil {
@@ -991,10 +997,9 @@ func getServiceResponse(service database.Service, containers cluster.Containers)
 				}
 			}
 		}
-
 	}
 
-	return structs.ServiceResponse{
+	resp := structs.ServiceResponse{
 		ID:           service.ID,
 		Name:         service.Name,
 		Architecture: service.Architecture,
@@ -1009,6 +1014,12 @@ func getServiceResponse(service database.Service, containers cluster.Containers)
 		FinishedAt:           utils.TimeToString(service.FinishedAt),
 		Containers:           list,
 	}
+
+	if ch != nil {
+		ch <- resp
+	}
+
+	return resp
 }
 
 func getUnitNetworking(ID string) ([]struct {
