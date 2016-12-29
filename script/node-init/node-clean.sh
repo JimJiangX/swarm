@@ -10,6 +10,15 @@ backup_dir=$6
 hdd_vgname=${HOSTNAME}_HDD_VG
 ssd_vgname=${HOSTNAME}_SSD_VG
 
+platform="$(uname -s)"
+release=""
+if [ "${platform}" = "Linux" ]; then
+        kernel="$(uname -r)"
+        release="$(lsb_release -is)"
+else
+        echo "only support linux platform"
+        exit 3
+fi
 
 remove_vg() {
 	local vg_name=$1
@@ -81,12 +90,10 @@ remove_docker() {
 			btrfs subvolume delete ${dir}/${fs}
 		done
 	fi
-
-	rm -rf /usr/bin/docker /usr/bin/docker-containerd /usr/bin/docker-containerd-shim /usr/bin/docker-containerd-ctr /usr/bin/docker-runc
+	
+	rpm -e containerd runc docker
 	rm -rf /etc/sysconfig/docker
 	rm -rf /etc/systemd/system/multi-user.target.wants/docker.service
-	rm -rf /usr/lib/systemd/system/docker.service
-	rm -rf /usr/lib/systemd/system/docker.socket
 	rm -rf /etc/docker/
 	rm -rf /var/lib/docker
 	rm -rf /run/docker/
