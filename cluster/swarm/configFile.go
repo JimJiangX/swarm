@@ -170,11 +170,11 @@ func initialize(name, version string) (parser configParser, cmder containerCmd, 
 		cmder = &switchManagerCmd{}
 
 	case _ImageProxy == name:
-		parser = &proxyConfig{}
+		parser = &proxyConfigV110{}
 		cmder = &proxyCmd{}
 
 	case _ImageSwitchManager == name:
-		parser = &switchManagerConfig{}
+		parser = &switchManagerConfigV1123{}
 		cmder = &switchManagerCmd{}
 
 	case _ImageUpsql == name && strings.HasPrefix(version, "5.6"):
