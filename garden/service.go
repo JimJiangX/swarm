@@ -8,8 +8,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
-	"github.com/docker/swarm/garden/parser"
-	"github.com/hashicorp/consul/api"
+	"github.com/docker/swarm/garden/structs"
 	"golang.org/x/net/context"
 )
 
@@ -117,7 +116,7 @@ func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.Au
 	return nil
 }
 
-func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs parser.ConfigsMap) error {
+func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap) error {
 	ok, val, err := svc.sl.CAS(statusServiceStarting, isInProgress)
 	if err != nil {
 		return err
@@ -171,7 +170,7 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs p
 			return err
 		}
 
-		cmd := config.GetCmd(parser.InitServiceCmd)
+		cmd := config.GetCmd(structs.InitServiceCmd)
 
 		_, err = units[i].containerExec(ctx, cmd)
 		if err != nil {
@@ -202,9 +201,8 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs p
 			// TODO:
 		}
 
-		_ = config.HealthCheck
-
-		err = kvc.RegisterService(ctx, host, api.AgentServiceRegistration{}, kvstore.RegisterHorusService{})
+		r := config.GetServiceRegistration(units[i].u.ID)
+		err = kvc.RegisterService(ctx, host, r.Consul, r.Horus)
 		if err != nil {
 			return err
 		}
@@ -256,7 +254,7 @@ func (svc *Service) Start(ctx context.Context) error {
 
 	// get init cmd
 	for i := range units {
-		cmd := cmds.GetCmd(units[i].u.ID, parser.StartServiceCmd)
+		cmd := cmds.GetCmd(units[i].u.ID, structs.StartServiceCmd)
 
 		_, err = units[i].containerExec(ctx, cmd)
 		if err != nil {
@@ -306,7 +304,7 @@ func (svc *Service) stop(ctx context.Context) error {
 	}
 
 	for i := range units {
-		cmd := cmds.GetCmd(units[i].u.ID, parser.StopServiceCmd)
+		cmd := cmds.GetCmd(units[i].u.ID, structs.StopServiceCmd)
 
 		_, err = units[i].containerExec(ctx, cmd)
 		if err != nil {
@@ -486,14 +484,14 @@ func (svc *Service) deregisterSerivces(ctx context.Context, r kvstore.Register) 
 	return nil
 }
 
-func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]string) (parser.ConfigsMap, error) {
-	return parser.ConfigsMap{}, nil
+func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]string) (structs.ConfigsMap, error) {
+	return structs.ConfigsMap{}, nil
 }
 
-func (svc *Service) generateUnitConfig(ctx context.Context, nameOrID string, args map[string]string) (parser.ConfigCmds, error) {
-	return parser.ConfigCmds{}, nil
+func (svc *Service) generateUnitConfig(ctx context.Context, nameOrID string, args map[string]string) (structs.ConfigCmds, error) {
+	return structs.ConfigCmds{}, nil
 }
 
-func (svc *Service) generateUnitsCmd(ctx context.Context) (parser.Commands, error) {
-	return parser.Commands{}, nil
+func (svc *Service) generateUnitsCmd(ctx context.Context) (structs.Commands, error) {
+	return structs.Commands{}, nil
 }
