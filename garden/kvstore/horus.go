@@ -13,32 +13,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/swarm/garden/structs"
 	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 	"github.com/tatsushid/go-fastping"
 )
-
-type RegisterHorusService struct {
-	Endpoint      string
-	CollectorName string   `json:"collectorname,omitempty"`
-	User          string   `json:"user,omitempty"`
-	Password      string   `json:"pwd,omitempty"`
-	Type          string   `json:"type"`
-	CollectorIP   string   `json:"colletorip"`   // spell error
-	CollectorPort int      `json:"colletorport"` // spell error
-	MetricTags    string   `json:"metrictags"`
-	Network       []string `json:"network,omitempty"`
-	Status        string   `json:"status"`
-	Table         string   `json:"table"`
-	CheckType     string   `json:"checktype"`
-}
 
 type result struct {
 	val string
 	err error
 }
 
-func (c *kvClient) registerToHorus(ctx context.Context, obj ...RegisterHorusService) error {
+func (c *kvClient) registerToHorus(ctx context.Context, obj ...structs.HorusRegistration) error {
 	var addr string
 	ch := make(chan result, 1)
 	go func(ch chan<- result) {
@@ -170,7 +156,7 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, force bool, endpoints 
 }
 
 // RegisterService register service to consul and Horus
-func (c *kvClient) RegisterService(ctx context.Context, host string, config api.AgentServiceRegistration, obj RegisterHorusService) error {
+func (c *kvClient) RegisterService(ctx context.Context, host string, config api.AgentServiceRegistration, obj structs.HorusRegistration) error {
 	err := c.registerHealthCheck(host, config)
 	if err != nil {
 		return err

@@ -3,6 +3,7 @@ package kvstore
 import (
 	"context"
 
+	"github.com/docker/swarm/garden/structs"
 	"github.com/hashicorp/consul/api"
 )
 
@@ -31,7 +32,7 @@ type Client interface {
 type Register interface {
 	HealthChecks(state string, q *api.QueryOptions) (map[string]api.HealthCheck, error)
 
-	RegisterService(ctx context.Context, host string, config api.AgentServiceRegistration, obj RegisterHorusService) error
+	RegisterService(ctx context.Context, host string, config api.AgentServiceRegistration, obj structs.HorusRegistration) error
 
 	DeregisterService(ctx context.Context, addr, key string) error
 }
