@@ -330,6 +330,13 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 					return err
 				}
 			}
+
+			if !force {
+				err = removeSCSI(dc.store.Vendor(), original.engine.IP, lunMap)
+				if err != nil {
+					return err
+				}
+			}
 		}
 
 		defer func() {
@@ -636,6 +643,30 @@ func sanDeactivate(vendor, host string, lunMap map[string][]database.LUN) error 
 		err := sdk.SanDeActivate(addr, config)
 		if err != nil {
 			logrus.Errorf("%s SanDeActivate error:%s", host, err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func removeSCSI(vendor, host string, lunMap map[string][]database.LUN) error {
+	for _, list := range lunMap {
+		hostLuns := make([]int, len(list))
+		for i := range list {
+			hostLuns[i] = list[i].HostLunID
+		}
+
+		addr := getPluginAddr(host, pluginPort)
+
+		opt := sdk.RemoveSCSIConfig{
+			Vendor:    vendor,
+			HostLunId: hostLuns,
+		}
+
+		err := sdk.RemoveSCSI(addr, opt)
+		if err != nil {
+			logrus.Errorf("%s RemoveSCSI error:%s", host, err)
 			return err
 		}
 	}
