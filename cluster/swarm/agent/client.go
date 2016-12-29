@@ -6,8 +6,10 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 var (
@@ -29,7 +31,18 @@ func getIPAddr() string {
 
 // postHTTP post a requst,returns response error
 func postHTTP(uri string, body io.Reader) error {
-	resp, err := http.Post(uri, "application/json", body)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+	defer cancel()
+
+	req, err := http.NewRequest("POST", uri, body)
+	if err != nil {
+		return errors.Wrap(err, "POST:"+uri)
+	}
+
+	req = req.WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return errors.Wrap(err, "POST:"+uri)
 	}

@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 // commonResonse common http requet response body msg
@@ -94,8 +96,19 @@ type RemoveSCSIConfig struct {
 // GetVgList returns remote host VG list
 // addr is the remote host server agent bind address
 func GetVgList(addr string) ([]VgInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
 	uri := "http://" + addr + "/san/vglist"
-	resp, err := http.Get(uri)
+	req, err := http.NewRequest("GET", uri, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "GET:"+uri)
+	}
+
+	req = req.WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "GET:"+uri)
 	}
