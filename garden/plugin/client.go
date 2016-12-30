@@ -231,12 +231,12 @@ func defaultPooledClient(timeout time.Duration) *http.Client {
 }
 
 // decodeBody is used to JSON decode a body
-func decodeJSON(resp *http.Response, out interface{}) error {
+func decodeBody(resp *http.Response, out interface{}) error {
 	dec := json.NewDecoder(resp.Body)
 	return dec.Decode(out)
 }
 
-// encodeBody is used to encode a request body
+// encodeJSON is used to encode a request body
 func encodeJSON(obj interface{}) (io.Reader, error) {
 	buf := bytes.NewBuffer(nil)
 	enc := json.NewEncoder(buf)
