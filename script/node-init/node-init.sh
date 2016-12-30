@@ -404,6 +404,16 @@ install_docker() {
 			local runc_rpm=${cur_dir}/rpm/runc-0.1.1-4.1.x86_64.rpm
 		fi
 
+		if [ "${wwn}" != '' ]; then
+			systemctl enable multipathd.service
+			systemctl start multipathd.service
+			systemctl status multipathd.service
+			if [ $? -ne 0 ]; then
+				echo "start multipathd failed!"
+				exit 2
+			fi
+		fi
+
 		zypper --no-gpg-checks --non-interactive install ${runc_rpm} ${containerd_rpm} ${docker_rpm}
 		if [ $? -ne 0 ]; then
 			echo "docker rpm install faild"
@@ -455,6 +465,16 @@ EOF
 	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ $RELEASE == "CentOS" ]; then
 		local docker_rpm=${cur_dir}/rpm/docker-${docker_version}.rhel.centos.rpm
 		local docker_selinux_rpm=${cur_dir}/rpm/docker-selinux-${docker_version}.rhel.centos.rpm
+
+		if [ "${wwn}" != '' ]; then
+			systemctl enable multipathd.service
+			systemctl start multipathd.service
+			systemctl status multipathd.service
+			if [ $? -ne 0 ]; then
+				echo "start multipathd failed!"
+				exit 2
+			fi
+		fi
 		
 		yum --nogpgcheck -y install ${docker_selinux_rpm} ${docker_rpm}
 		if [ $? -ne 0 ]; then
