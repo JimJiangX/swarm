@@ -23,7 +23,7 @@ func (p plugin) GenerateServiceConfig(ctx context.Context, spec interface{}) (st
 	}
 	defer resp.Body.Close()
 
-	err = decodeJSON(resp, &m)
+	err = decodeBody(resp, &m)
 
 	return m, err
 }
@@ -37,7 +37,7 @@ func (p plugin) GenerateUnitConfig(ctx context.Context, nameOrID string, args ma
 	}
 	defer resp.Body.Close()
 
-	err = decodeJSON(resp, &m)
+	err = decodeBody(resp, &m)
 
 	return m, err
 }
@@ -51,7 +51,7 @@ func (p plugin) GenerateUnitsCmd(ctx context.Context) (structs.Commands, error) 
 	}
 	defer resp.Body.Close()
 
-	err = decodeJSON(resp, &m)
+	err = decodeBody(resp, &m)
 
 	return m, err
 }
