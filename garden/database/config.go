@@ -5,12 +5,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/docker/docker/api/types"
 	"github.com/pkg/errors"
 )
 
 type SysConfigOrmer interface {
 	InsertSysConfig(c SysConfig) error
 	GetSysConfig() (SysConfig, error)
+	GetAuthConfig() (*types.AuthConfig, error)
 }
 
 // SysConfig is the application config file
@@ -144,4 +146,31 @@ func (db dbBase) GetSysConfig() (SysConfig, error) {
 	err := db.Get(c, query)
 
 	return c, errors.Wrap(err, "get SystemConfig")
+}
+
+func (db dbBase) GetAuthConfig() (*types.AuthConfig, error) {
+	var (
+		r     Registry
+		query = "SELECT registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt FROM " + db.sysConfigTable() + " LIMIT 1"
+	)
+
+	err := db.Get(&r, query)
+	if err != nil {
+		return nil, errors.Wrap(err, "get SysConfig.Registry")
+	}
+
+	return r.GetAuthConfig(), nil
+}
+
+func (r Registry) GetAuthConfig() *types.AuthConfig {
+	return newAuthConfig(r.Username, r.Password, r.Email, r.Token)
+}
+
+func newAuthConfig(username, password, email, token string) *types.AuthConfig {
+	return &types.AuthConfig{
+		Username:      username,
+		Password:      password,
+		Email:         email,
+		RegistryToken: token,
+	}
 }
