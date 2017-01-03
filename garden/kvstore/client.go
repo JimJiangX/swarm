@@ -10,15 +10,15 @@ import (
 
 const defaultConsulAddr = "127.0.0.1:8500"
 
-func NewClient(config api.Config) (Client, error) {
+func NewClient(config *api.Config) (Client, error) {
+	c, err := newConsulClient(config)
+	if err != nil {
+		return nil, errors.Wrap(err, "new consul api Client")
+	}
+
 	_, port, err := net.SplitHostPort(config.Address)
 	if err != nil {
 		return nil, errors.Wrap(err, "split host port:"+config.Address)
-	}
-
-	c, err := newConsulClient(&config)
-	if err != nil {
-		return nil, errors.Wrap(err, "new consul api Client")
 	}
 
 	leader, peers, err := c.getStatus(port)
@@ -31,7 +31,7 @@ func NewClient(config api.Config) (Client, error) {
 		port:   port,
 		leader: leader,
 		peers:  peers,
-		config: config,
+		config: *config,
 		agents: make(map[string]kvClientAPI, 10),
 	}
 
