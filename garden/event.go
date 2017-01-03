@@ -11,6 +11,12 @@ type eventHander struct {
 	ci database.ContainerInterface
 }
 
+func NewEventHandler(ormer database.Ormer) *eventHander {
+	return &eventHander{
+		ci: ormer,
+	}
+}
+
 func (eh eventHander) Handle(event *cluster.Event) error {
 	// Something changed - refresh our internal state.
 	msg := event.Message

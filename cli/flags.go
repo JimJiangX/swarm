@@ -151,4 +151,45 @@ var (
 		Value: "20s",
 		Usage: "Leader lock release time on failure",
 	}
+
+	// flDBDriver DB driver
+	flDBDriver = cli.StringFlag{
+		Name:  "dbDriver",
+		Value: "mysql",
+		Usage: "database driver name",
+	}
+	// flDBName DB name
+	flDBName = cli.StringFlag{
+		Name:  "dbName",
+		Usage: "database name",
+	}
+	// flDBAuth DB auth for db login
+	flDBAuth = cli.StringFlag{
+		Name:  "dbAuth",
+		Usage: "auth for login database",
+	}
+	// flDBHost DB host address
+	flDBHost = cli.StringFlag{
+		Name:  "dbHost",
+		Value: "127.0.0.1",
+		Usage: "connection to database host addr",
+	}
+	// flDBPort DB port
+	flDBPort = cli.IntFlag{
+		Name:  "dbPort",
+		Value: 3306,
+		Usage: "connection to database port",
+	}
+	// flDBMaxIdle DB max idle conns
+	flDBMaxIdle = cli.IntFlag{
+		Name:  "dbMaxIdle",
+		Value: 20,
+		Usage: "max idle connection of DB,<= 0 means unlimited",
+	}
+
+	flDBTablePrefix = cli.StringFlag{
+		Name:  "dbTablePrefix",
+		Value: "tb",
+		Usage: "prefix of database table name",
+	}
 )

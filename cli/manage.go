@@ -18,9 +18,15 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/cluster/mesos"
 	"github.com/docker/swarm/cluster/swarm"
+	"github.com/docker/swarm/garden"
+	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/kvstore"
+	"github.com/docker/swarm/garden/resource"
+	"github.com/docker/swarm/garden/utils"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/filter"
 	"github.com/docker/swarm/scheduler/strategy"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 )
 
@@ -132,6 +138,29 @@ func getDiscoveryOpt(c *cli.Context) map[string]string {
 	return options
 }
 
+func getOrmer(c *cli.Context) (database.Ormer, error) {
+	auth := c.String("dbAuth")
+	user, password, err := utils.Base64Decode(auth)
+	if err != nil {
+		return nil, err
+	}
+
+	driver := c.String("dbDriver")
+	name := c.String("dbName")
+
+	host := c.String("dbHost")
+	port := c.Int("dbPort")
+	maxIdle := c.Int("dbMaxIdle")
+	prefix := c.String("dbTablePrefix")
+
+	source := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&charset=utf8&loc=Asia%%2FShanghai&sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'",
+		user, password, host, port, name)
+
+	o, err := database.NewOrmer(driver, source, prefix, maxIdle)
+
+	return o, err
+}
+
 func getCandidateAndFollower(discovery discovery.Backend, addr string, leaderTTL time.Duration) (*leadership.Candidate, *leadership.Follower) {
 	kvDiscovery, ok := discovery.(*kvdiscovery.Discovery)
 	if !ok {
@@ -145,13 +174,13 @@ func getCandidateAndFollower(discovery discovery.Backend, addr string, leaderTTL
 	return candidate, follower
 }
 
-func setupReplication(c *cli.Context, cluster cluster.Cluster, server *api.Server, candidate *leadership.Candidate, follower *leadership.Follower, addr string, tlsConfig *tls.Config) {
+func setupReplication(c *cli.Context, cluster cluster.Cluster, server *api.Server, candidate *leadership.Candidate, follower *leadership.Follower, addr string, tlsConfig *tls.Config, ormer database.Ormer) {
 	primary := api.NewPrimary(cluster, tlsConfig, &statusHandler{cluster, candidate, follower}, c.GlobalBool("debug"), c.Bool("cors"))
 	replica := api.NewReplica(primary, tlsConfig)
 
 	go func() {
 		for {
-			run(cluster, candidate, server, primary, replica)
+			run(cluster, candidate, server, primary, replica, ormer)
 			time.Sleep(defaultRecoverTime)
 		}
 	}()
@@ -166,19 +195,27 @@ func setupReplication(c *cli.Context, cluster cluster.Cluster, server *api.Serve
 	server.SetHandler(primary)
 }
 
-func run(cl cluster.Cluster, candidate *leadership.Candidate, server *api.Server, primary *mux.Router, replica *api.Replica) {
+func run(cl cluster.Cluster, candidate *leadership.Candidate, server *api.Server, primary *mux.Router, replica *api.Replica, ormer database.Ormer) {
 	electedCh, errCh := candidate.RunForElection()
-	var watchdog *cluster.Watchdog
+	var (
+		watchdog *cluster.Watchdog
+		eh       cluster.EventHandler
+	)
+
 	for {
 		select {
 		case isElected := <-electedCh:
 			if isElected {
 				log.Info("Leader Election: Cluster leadership acquired")
 				watchdog = cluster.NewWatchdog(cl)
+				eh = garden.NewEventHandler(ormer)
+				cl.RegisterEventHandler(eh)
+
 				server.SetHandler(primary)
 			} else {
 				log.Info("Leader Election: Cluster leadership lost")
 				cl.UnregisterEventHandler(watchdog)
+				cl.UnregisterEventHandler(eh)
 				server.SetHandler(replica)
 			}
 
@@ -284,6 +321,7 @@ func manage(c *cli.Context) {
 		log.Fatal(err)
 	}
 
+	var ormer database.Ormer
 	sched := scheduler.New(s, fs)
 	var cl cluster.Cluster
 	switch c.String("cluster-driver") {
@@ -292,6 +330,26 @@ func manage(c *cli.Context) {
 		cl, err = mesos.NewCluster(sched, tlsConfig, uri, c.StringSlice("cluster-opt"), engineOpts)
 	case "swarm":
 		cl, err = swarm.NewCluster(sched, tlsConfig, discovery, c.StringSlice("cluster-opt"), engineOpts)
+	case "garden":
+		cl, err = swarm.NewCluster(sched, tlsConfig, discovery, c.StringSlice("cluster-opt"), engineOpts)
+		if err != nil {
+			break
+		}
+
+		ormer, err = getOrmer(c)
+		if err != nil {
+			break
+		}
+
+		kvc, err := kvstore.NewClient(nil)
+		if err != nil {
+			break
+		}
+
+		allocator := resource.NewAllocator(ormer, cl)
+
+		cl = garden.NewGarden(kvc, cl, sched, ormer, allocator, tlsConfig)
+
 	default:
 		log.Fatalf("unsupported cluster %q", c.String("cluster-driver"))
 	}
@@ -327,7 +385,7 @@ func manage(c *cli.Context) {
 		// if necessary.
 		defer candidate.Resign()
 
-		setupReplication(c, cl, server, candidate, follower, addr, tlsConfig)
+		setupReplication(c, cl, server, candidate, follower, addr, tlsConfig, ormer)
 	} else {
 		server.SetHandler(api.NewPrimary(cl, tlsConfig, &statusHandler{cl, nil, nil}, c.GlobalBool("debug"), c.Bool("cors")))
 		cluster.NewWatchdog(cl)

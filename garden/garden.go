@@ -1,6 +1,7 @@
 package garden
 
 import (
+	"crypto/tls"
 	"strings"
 	"sync"
 
@@ -37,29 +38,26 @@ type Garden struct {
 	ormer    database.Ormer
 	kvClient kvstore.Client
 
-	allocator   allocator
-	cluster     cluster.Cluster
-	scheduler   *scheduler.Scheduler
-	authConfig  *types.AuthConfig
-	eventHander cluster.EventHandler
+	allocator allocator
+	cluster.Cluster
+	scheduler  *scheduler.Scheduler
+	TLSConfig  *tls.Config
+	authConfig *types.AuthConfig
 }
 
-func NewGarden(kvc kvstore.Client, cluster cluster.Cluster, scheduler *scheduler.Scheduler, ormer database.Ormer, allocator allocator, authConfig *types.AuthConfig) *Garden {
-	gd := &Garden{
+func NewGarden(kvc kvstore.Client, cl cluster.Cluster, scheduler *scheduler.Scheduler, ormer database.Ormer, allocator allocator, tlsConfig *tls.Config) *Garden {
+	return &Garden{
 		// Mutex:       &scheduler.Mutex,
-		kvClient:    kvc,
-		allocator:   allocator,
-		cluster:     cluster,
-		ormer:       ormer,
-		authConfig:  authConfig,
-		eventHander: eventHander{ci: ormer},
+		kvClient:  kvc,
+		allocator: allocator,
+		Cluster:   cl,
+		ormer:     ormer,
+		TLSConfig: tlsConfig,
 	}
+}
 
-	err := cluster.RegisterEventHandler(gd.eventHander)
-	if err != nil {
-	}
-
-	return gd
+func (gd *Garden) AuthConfig() (*types.AuthConfig, error) {
+	return gd.ormer.GetAuthConfig()
 }
 
 func (gd *Garden) BuildService() (*Service, error) {
@@ -72,7 +70,7 @@ func (gd *Garden) BuildService() (*Service, error) {
 		return nil, err
 	}
 
-	service := newService(svc, gd.ormer, gd.cluster)
+	service := newService(svc, gd.ormer, gd.Cluster)
 	service.units = units
 
 	return service, nil
@@ -84,7 +82,7 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 		return nil, err
 	}
 
-	s := newService(svc, gd.ormer, gd.cluster)
+	s := newService(svc, gd.ormer, gd.Cluster)
 
 	return s, nil
 }
@@ -129,7 +127,7 @@ func (gd *Garden) schedule(config *cluster.ContainerConfig, opts scheduleOption,
 		}
 	}
 
-	list := gd.cluster.ListEngines(engines...)
+	list := gd.Cluster.ListEngines(engines...)
 	nodes := make([]*node.Node, 0, len(list))
 	for i := range list {
 		n := node.NewNode(list[i])
@@ -195,7 +193,7 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 			for i := range bad {
 				ids[i] = bad[i].swarmID
 			}
-			gd.cluster.RemovePendingContainer(ids...)
+			gd.Cluster.RemovePendingContainer(ids...)
 		}
 	}()
 
@@ -241,7 +239,7 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 		pu.config.HostConfig.Resources.CpusetCpus = cpuset
 		pu.config.HostConfig.Resources.Memory = int64(memory)
 
-		gd.cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[n].ID, pu.config)
+		gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[n].ID, pu.config)
 
 		ready = append(ready, pu)
 		used = append(used, nodes[n])
