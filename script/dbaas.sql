@@ -18,6 +18,13 @@ SET @MYSQLDUMP_TEMP_LOG_BIN = @@SESSION.SQL_LOG_BIN;
 SET @@SESSION.SQL_LOG_BIN= 0;
 
 --
+-- GTID state at the beginning of the backup 
+--
+
+SET @@GLOBAL.GTID_PURGED='7ed61159-7fc9-11e6-9423-008cfae833f0:1-153,
+99210b42-7fc9-11e6-9423-008cfaecf318:1-12';
+
+--
 -- Table structure for table `tbl_dbaas_backup_files`
 --
 
@@ -38,7 +45,7 @@ CREATE TABLE `tbl_dbaas_backup_files` (
   `finished_at` datetime DEFAULT NULL COMMENT '完成时间',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=39 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=61 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -63,7 +70,7 @@ CREATE TABLE `tbl_dbaas_backup_strategy` (
   `created_at` datetime DEFAULT NULL COMMENT '创建时间',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=38 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=32 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -111,7 +118,7 @@ CREATE TABLE `tbl_dbaas_image` (
   `upload_at` datetime NOT NULL COMMENT '上传日期',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=57 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -154,7 +161,7 @@ CREATE TABLE `tbl_dbaas_lun` (
   `created_at` datetime NOT NULL COMMENT '创建日期',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=191 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -199,7 +206,7 @@ CREATE TABLE `tbl_dbaas_node` (
   UNIQUE KEY `id_UNIQUE` (`id`),
   UNIQUE KEY `name_UNIQUE` (`name`),
   UNIQUE KEY `admin_ip_UNIQUE` (`admin_ip`)
-) ENGINE=InnoDB AUTO_INCREMENT=86 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=114 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -219,7 +226,7 @@ CREATE TABLE `tbl_dbaas_port` (
   `allocated` tinyint(1) unsigned NOT NULL DEFAULT '0' COMMENT '是否被分配\n0:未分配\n1:已分配',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `port_UNIQUE` (`port`)
-) ENGINE=InnoDB AUTO_INCREMENT=202 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=405 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -264,7 +271,7 @@ CREATE TABLE `tbl_dbaas_service` (
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`),
   UNIQUE KEY `name_UNIQUE` (`name`)
-) ENGINE=InnoDB AUTO_INCREMENT=81 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=279 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -388,7 +395,7 @@ CREATE TABLE `tbl_dbaas_task` (
   `timestamp` bigint(128) DEFAULT NULL COMMENT '时间戳',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=344 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=841 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -416,7 +423,7 @@ CREATE TABLE `tbl_dbaas_unit` (
   `latest_error` longtext COMMENT '最新错误信息',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=385 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1139 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -438,7 +445,7 @@ CREATE TABLE `tbl_dbaas_unit_config` (
   `unit_id` varchar(128) DEFAULT NULL,
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=352 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=901 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -459,10 +466,12 @@ CREATE TABLE `tbl_dbaas_users` (
   `blacklist` varchar(1024) DEFAULT NULL COMMENT '黑名单',
   `whitelist` varchar(1024) DEFAULT NULL COMMENT '白名单',
   `created_at` datetime NOT NULL,
-  `read_only` tinyint(3) DEFAULT '0' COMMENT '只读权限',
+  `read_only` tinyint(3) DEFAULT '0' COMMENT '只读',
+  `rw_split` tinyint(3) DEFAULT '0' COMMENT '读写分离',
+  `shard` tinyint(3) DEFAULT '0' COMMENT '分库分表',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=561 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1950 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -483,7 +492,7 @@ CREATE TABLE `tbl_dbaas_volumes` (
   `unit_id` varchar(128) NOT NULL COMMENT '所属Unit ID',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=922 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=2442 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -496,4 +505,4 @@ SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2016-12-20 11:37:18
+-- Dump completed on 2017-01-04 14:43:25
