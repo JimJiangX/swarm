@@ -698,10 +698,12 @@ func txDeleteService(tx *sqlx.Tx, nameOrID string) error {
 	return err
 }
 
-const insertUserQuery = "INSERT INTO tbl_dbaas_users (id,service_id,type,username,password,role,read_only,blacklist,whitelist,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:read_only,:blacklist,:whitelist,:created_at)"
+const insertUserQuery = "INSERT INTO tbl_dbaas_users (id,service_id,type,username,password,role,read_only,rw_split,shard,blacklist,whitelist,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:read_only,:rw_split,:shard,:blacklist,:whitelist,:created_at)"
 
 // User is for DB and Proxy
 type User struct {
+	RWSplit   bool   `db:"rw_split" json:"rw_split"`
+	Shard     bool   `db:"shard" json:"shard"`
 	ReadOnly  bool   `db:"read_only" json:"read_only"`
 	ID        string `db:"id"`
 	ServiceID string `db:"service_id" json:"service_id"`
@@ -731,9 +733,9 @@ func ListUsersByService(service, _type string) ([]User, error) {
 
 	var users []User
 	if _type == "" {
-		err = db.Select(&users, "SELECT id,service_id,type,username,password,role,read_only,blacklist,whitelist,created_at FROM tbl_dbaas_users WHERE service_id=?", service)
+		err = db.Select(&users, "SELECT id,service_id,type,username,password,role,read_only,rw_split,shard,blacklist,whitelist,created_at FROM tbl_dbaas_users WHERE service_id=?", service)
 	} else {
-		err = db.Select(&users, "SELECT id,service_id,type,username,password,role,read_only,blacklist,whitelist,created_at FROM tbl_dbaas_users WHERE service_id=? AND type=?", service, _type)
+		err = db.Select(&users, "SELECT id,service_id,type,username,password,role,read_only,rw_split,shard,blacklist,whitelist,created_at FROM tbl_dbaas_users WHERE service_id=? AND type=?", service, _type)
 	}
 	if err != nil {
 		return nil, errors.Wrap(err, "list []User by serviceID")
@@ -824,7 +826,7 @@ func TxUpdateUsers(addition, update []User) error {
 		return errors.Wrap(err, "Tx update []User")
 	}
 
-	const query = "UPDATE tbl_dbaas_users SET type=:type,password=:password,role=:role,read_only=:read_only,blacklist=:blacklist,whitelist=:whitelist WHERE id=:id OR username=:username"
+	const query = "UPDATE tbl_dbaas_users SET type=:type,password=:password,role=:role,read_only=:read_only,rw_split=:rw_split,shard=:shard,blacklist=:blacklist,whitelist=:whitelist WHERE id=:id OR username=:username"
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
 		return errors.Wrap(err, "Tx prepare update User")

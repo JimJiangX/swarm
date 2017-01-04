@@ -344,6 +344,8 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 			Password:  sys.CheckPassword,
 			Role:      _User_Check_Role,
 			ReadOnly:  false,
+			RWSplit:   false,
+			Shard:     false,
 			CreatedAt: now,
 		},
 		database.User{
@@ -354,6 +356,8 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 			Password:  sys.MonitorPassword,
 			Role:      _User_Monitor_Role,
 			ReadOnly:  false,
+			RWSplit:   false,
+			Shard:     false,
 			CreatedAt: now,
 		},
 		database.User{
@@ -364,6 +368,8 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 			Password:  utils.Generate8UUID() + "_@",
 			Role:      _User_Application_Role,
 			ReadOnly:  false,
+			RWSplit:   false,
+			Shard:     false,
 			CreatedAt: now,
 		},
 		database.User{
@@ -374,6 +380,8 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 			Password:  sys.DBAPassword,
 			Role:      _User_DBA_Role,
 			ReadOnly:  false,
+			RWSplit:   false,
+			Shard:     false,
 			CreatedAt: now,
 		},
 		database.User{
@@ -384,6 +392,8 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 			Password:  utils.Generate8UUID() + "_@",
 			Role:      _User_DB_Role,
 			ReadOnly:  false,
+			RWSplit:   false,
+			Shard:     false,
 			CreatedAt: now,
 		},
 		database.User{
@@ -394,6 +404,8 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 			Password:  sys.ReplicationPassword,
 			Role:      _User_Replication_Role,
 			ReadOnly:  false,
+			RWSplit:   false,
+			Shard:     false,
 			CreatedAt: now,
 		},
 	}
@@ -451,6 +463,8 @@ func converteToUsers(service string, users []structs.User) []database.User {
 			Password:  users[i].Password,
 			Role:      users[i].Role,
 			ReadOnly:  users[i].ReadOnly,
+			RWSplit:   users[i].RWSplit,
+			Shard:     users[i].Shard,
 			Blacklist: users[i].Blacklist,
 			Whitelist: users[i].Whitelist,
 			CreatedAt: now,
@@ -507,6 +521,8 @@ func converteToSWM_Users(users []database.User) []swm_structs.User {
 			BlackList: users[i].Blacklist,
 			WhiteList: users[i].Whitelist,
 			ReadOnly:  users[i].ReadOnly,
+			RwSplit:   users[i].RWSplit,
+			Shard:     users[i].Shard,
 		})
 	}
 

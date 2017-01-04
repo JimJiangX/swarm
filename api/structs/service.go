@@ -24,6 +24,8 @@ type PostServiceRequest struct {
 }
 
 type User struct {
+	RWSplit  bool   `json:"rw_split"`
+	Shard    bool   `json:"shard"`
 	ReadOnly bool   `json:"read_only"`
 	Type     string // db/proxy
 	Username string

@@ -20,6 +20,8 @@ type User struct {
 	WhiteList []string
 	BlackList []string
 	ReadOnly  bool
+	RwSplit   bool
+	Shard     bool
 }
 
 type ProxyInfo struct {
