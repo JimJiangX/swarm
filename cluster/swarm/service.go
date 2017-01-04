@@ -910,12 +910,12 @@ func (svc *Service) startContainers() error {
 }
 
 func (svc *Service) copyServiceConfig() error {
-	var inc, offset int
 	units, err := svc.getUnitByType(_UpsqlType)
 	if err != nil {
 		logrus.WithField("Service", svc.Name).Warnf("not found %s,%+v", _UpsqlType, err)
 	}
-	inc = len(units)
+
+	inc, offset := len(units), 1
 
 	for _, u := range svc.units {
 		forbid, can := u.CanModify(u.configures)
