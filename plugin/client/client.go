@@ -1,4 +1,4 @@
-package plugin
+package client
 
 import (
 	"bytes"
@@ -29,7 +29,23 @@ type client struct {
 	enc     *encoder
 }
 
-func NewClient(addr string, timeout time.Duration, tlsConfig *tls.Config) *client {
+type Client interface {
+	Do(ctx context.Context, method, url string, obj interface{}) (*http.Response, error)
+
+	Get(ctx context.Context, url string) (*http.Response, error)
+
+	Head(ctx context.Context, url string) (*http.Response, error)
+
+	Post(ctx context.Context, url string, body interface{}) (*http.Response, error)
+
+	Put(ctx context.Context, url string, body interface{}) (*http.Response, error)
+
+	Delete(ctx context.Context, url string) (*http.Response, error)
+
+	RequireOK(resp *http.Response, e error) (*http.Response, error)
+}
+
+func NewClient(addr string, timeout time.Duration, tlsConfig *tls.Config) Client {
 	scheme := "http"
 	if timeout == 0 {
 		timeout = defaultTimeout
@@ -184,6 +200,25 @@ func (c *client) newRequest(ctx context.Context, method, url string, obj interfa
 	return req, nil
 }
 
+// RequireOK is used to wrap doRequest and check for a 200
+func (c client) RequireOK(resp *http.Response, e error) (*http.Response, error) {
+	if e != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return nil, e
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		buf := bytes.NewBuffer(nil)
+		io.Copy(buf, resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("Unexpected response code: %d (%s)", resp.StatusCode, buf.Bytes())
+	}
+
+	return resp, nil
+}
+
 // defaultTransport returns a new http.Transport with the same default values
 // as http.DefaultTransport, but with idle connections and keepalives disabled.
 func defaultTransport(timeout time.Duration) *http.Transport {
@@ -244,22 +279,4 @@ func encodeJSON(obj interface{}) (io.Reader, error) {
 		return nil, err
 	}
 	return buf, nil
-}
-
-// requireOK is used to wrap doRequest and check for a 200
-func requireOK(resp *http.Response, e error) (*http.Response, error) {
-	if e != nil {
-		if resp != nil {
-			resp.Body.Close()
-		}
-		return nil, e
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		buf := bytes.NewBuffer(nil)
-		io.Copy(buf, resp.Body)
-		resp.Body.Close()
-		return nil, fmt.Errorf("Unexpected response code: %d (%s)", resp.StatusCode, buf.Bytes())
-	}
-
-	return resp, nil
 }
