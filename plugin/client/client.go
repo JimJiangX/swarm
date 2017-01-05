@@ -41,8 +41,6 @@ type Client interface {
 	Put(ctx context.Context, url string, body interface{}) (*http.Response, error)
 
 	Delete(ctx context.Context, url string) (*http.Response, error)
-
-	RequireOK(resp *http.Response, e error) (*http.Response, error)
 }
 
 func NewClient(addr string, timeout time.Duration, tlsConfig *tls.Config) Client {
@@ -201,7 +199,7 @@ func (c *client) newRequest(ctx context.Context, method, url string, obj interfa
 }
 
 // RequireOK is used to wrap doRequest and check for a 200
-func (c client) RequireOK(resp *http.Response, e error) (*http.Response, error) {
+func RequireOK(resp *http.Response, e error) (*http.Response, error) {
 	if e != nil {
 		if resp != nil {
 			resp.Body.Close()

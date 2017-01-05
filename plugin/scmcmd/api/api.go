@@ -22,7 +22,7 @@ func NewPlugin(cli client.Client) plugin {
 func (p plugin) GenerateServiceConfig(ctx context.Context, spec interface{}) (structs.ConfigsMap, error) {
 	var m structs.ConfigsMap
 
-	resp, err := p.c.RequireOK(p.c.Post(ctx, "/path", spec))
+	resp, err := client.RequireOK(p.c.Post(ctx, "/path", spec))
 	if err != nil {
 		return m, err
 	}
@@ -36,7 +36,7 @@ func (p plugin) GenerateServiceConfig(ctx context.Context, spec interface{}) (st
 func (p plugin) GenerateUnitConfig(ctx context.Context, nameOrID string, args map[string]string) (structs.ConfigCmds, error) {
 	var m structs.ConfigCmds
 
-	resp, err := p.c.RequireOK(p.c.Post(ctx, "/path", args))
+	resp, err := client.RequireOK(p.c.Post(ctx, "/path", args))
 	if err != nil {
 		return m, err
 	}
@@ -50,7 +50,7 @@ func (p plugin) GenerateUnitConfig(ctx context.Context, nameOrID string, args ma
 func (p plugin) GenerateUnitsCmd(ctx context.Context) (structs.Commands, error) {
 	var m structs.Commands
 
-	resp, err := p.c.RequireOK(p.c.Post(ctx, "/path", nil))
+	resp, err := client.RequireOK(p.c.Post(ctx, "/path", nil))
 	if err != nil {
 		return m, err
 	}
