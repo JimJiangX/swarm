@@ -445,6 +445,39 @@ func GetRaidGroup(id string, rg int) (RaidGroup, error) {
 	return out, errors.Wrap(err, "get RaidGroup")
 }
 
+// DelRGCondition count Clusters by storageID.
+func DelRGCondition(storageID string) error {
+	db, err := getDB(false)
+	if err != nil {
+		return err
+	}
+
+	count := 0
+	query := "SELECT COUNT(id) from tbl_dbaas_cluster WHERE storage_id=?"
+
+	err = db.Get(&count, query, storageID)
+	if err != nil {
+		return errors.Wrap(err, "count Cluster by storage_id")
+	}
+
+	if count > 0 {
+		return errors.Errorf("storage is using by %d clusters", count)
+	}
+
+	query = "SELECT COUNT(id) from tbl_dbaas_raid_group WHERE storage_system_id=?"
+
+	err = db.Get(&count, query, storageID)
+	if err != nil {
+		return errors.Wrap(err, "count RaidGroup by storage_system_id")
+	}
+
+	if count > 0 {
+		return errors.Errorf("storage is using by %d RaidGroup", count)
+	}
+
+	return nil
+}
+
 // DeleteRaidGroup delete RaidGroup by StorageSystemID and StorageRGID
 func DeleteRaidGroup(id string, rg int) error {
 	db, err := getDB(false)

@@ -137,13 +137,9 @@ func GetStore(ID string) (Store, error) {
 // RemoveStore removes the assigned store,
 // if store is using,cannot be remove
 func RemoveStore(ID string) error {
-	count, err := database.CountClusterByStorage(ID)
+	err := database.DelRGCondition(ID)
 	if err != nil {
 		return err
-	}
-
-	if count > 0 {
-		return errors.Errorf("Store %s is using,cannot be removed", ID)
 	}
 
 	return removeStore(ID)

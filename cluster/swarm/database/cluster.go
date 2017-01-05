@@ -185,31 +185,6 @@ func ListClusters() ([]Cluster, error) {
 	return clusters, errors.Wrap(err, "list Clusters")
 }
 
-// CountClusterByStorage count Clusters by storageID.
-func CountClusterByStorage(storageID string) (int, error) {
-	db, err := getDB(false)
-	if err != nil {
-		return 0, err
-	}
-
-	count := 0
-	const query = "SELECT COUNT(id) from tbl_dbaas_cluster WHERE storage_id=?"
-
-	err = db.Get(&count, query, storageID)
-	if err == nil {
-		return count, nil
-	}
-
-	db, err = getDB(true)
-	if err != nil {
-		return 0, err
-	}
-
-	err = db.Get(&count, query, storageID)
-
-	return count, errors.Wrap(err, "count Cluster by storage_id")
-}
-
 const insertNodeQuery = "INSERT INTO tbl_dbaas_node (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
 
 // Node table tbl_dbaas_node structure,correspod with mainframe computer.
