@@ -41,5 +41,12 @@ var (
 			Flags:     []cli.Flag{flJoinAdvertise, flHeartBeat, flTTL, flJoinRandomDelay, flDiscoveryOpt},
 			Action:    join,
 		},
+		{
+			Name:      "configuration",
+			ShortName: "cfg",
+			Usage:     "Configuration Center Server",
+			Flags:     []cli.Flag{flHosts, flTLS, flTLSCaCert, flTLSCert, flTLSKey, flTLSVerify},
+			Action:    configruation,
+		},
 	}
 )
