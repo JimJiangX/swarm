@@ -30,13 +30,62 @@ type serviceRegistration struct {
 }
 
 type ConfigCmds struct {
-	Update  bool
-	ID      string
-	Path    string
-	Context string
-	Cmds    CmdsMap
+	Update    bool
+	ID        string
+	Path      string
+	Context   string
+	Cmds      CmdsMap
+	Timestamp int64
 
 	Registrations map[string]serviceRegistration
+}
+
+type UnitResources struct {
+	Require, Limit struct {
+		CPU    string
+		Memory int64
+	}
+
+	Engine struct {
+		ID   string
+		Name string
+		IP   string
+	}
+
+	Networking struct {
+		Type    string
+		Devices string
+		Mask    int
+		IPs     []struct {
+			Name  string
+			IP    string
+			Proto string
+		}
+		Ports []struct {
+			Name string
+			Port int
+		}
+	}
+
+	Volumes []struct {
+		Type    string
+		Driver  string
+		Size    int
+		Options map[string]interface{}
+	}
+}
+
+type ServiceDesc struct {
+	ID      string
+	Name    string
+	Arch    string
+	Image   string
+	Version string
+
+	HighAvailable bool
+
+	Dependent []*ServiceDesc
+	Units     []UnitResources
 }
 
 type CmdsMap map[string][]string
