@@ -1,12 +1,18 @@
 package structs
 
-import "github.com/hashicorp/consul/api"
+import (
+	"github.com/docker/swarm/garden/database"
+	"github.com/hashicorp/consul/api"
+)
 
 const (
-	InitServiceCmd  = "init_service_cmd"
-	StartServiceCmd = "start_service_cmd"
-	StopServiceCmd  = "stop_service_cmd"
-	HealthCheckCmd  = "health_check_cmd"
+	StartContainerCmd = "start_container_cmd"
+	InitServiceCmd    = "init_service_cmd"
+	StartServiceCmd   = "start_service_cmd"
+	StopServiceCmd    = "stop_service_cmd"
+	RestoreCmd        = "restore_cmd"
+	BackupCmd         = "backup_cmd"
+	HealthCheckCmd    = "health_check_cmd"
 )
 
 type HorusRegistration struct {
@@ -24,20 +30,50 @@ type HorusRegistration struct {
 	CheckType     string   `json:"checktype"`
 }
 
-type serviceRegistration struct {
-	Consul api.AgentServiceRegistration
+type ServiceRegistration struct {
+	Consul AgentServiceRegistration
 	Horus  HorusRegistration
 }
 
+type AgentServiceRegistration api.AgentServiceRegistration
+
 type ConfigCmds struct {
-	Update    bool
 	ID        string
 	Path      string
 	Context   string
 	Cmds      CmdsMap
 	Timestamp int64
 
-	Registrations map[string]serviceRegistration
+	Registrations map[string]ServiceRegistration
+}
+
+type Keyset struct {
+	Key    string
+	CanSet bool
+	Desc   string
+}
+
+type RequireResource struct {
+	IPs []struct {
+		Name  string
+		IP    string
+		Proto string
+	}
+	Ports []struct {
+		Name string
+		Port int
+	}
+}
+
+type ConfigTemplate struct {
+	Name      string
+	Version   string
+	Path      string
+	Context   string
+	Keysets   []Keyset
+	Timestamp int64
+
+	Require RequireResource
 }
 
 type UnitResources struct {
@@ -82,10 +118,13 @@ type ServiceDesc struct {
 	Image   string
 	Version string
 
-	HighAvailable bool
+	Options map[string]interface{}
+
+	Users []database.User
+
+	Units []UnitResources
 
 	Dependent []*ServiceDesc
-	Units     []UnitResources
 }
 
 type CmdsMap map[string][]string
@@ -110,7 +149,7 @@ func (c ConfigCmds) GetCmd(typ string) []string {
 	return c.Cmds.Get(typ)
 }
 
-func (c ConfigCmds) GetServiceRegistration(key string) serviceRegistration {
+func (c ConfigCmds) GetServiceRegistration(key string) ServiceRegistration {
 	return c.Registrations[key]
 }
 

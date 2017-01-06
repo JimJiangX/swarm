@@ -29,6 +29,8 @@ type ServiceOrmer interface {
 
 	UserOrmer
 
+	ImageOrmer
+
 	ServiceInterface
 }
 
@@ -36,6 +38,7 @@ type ServiceOrmer interface {
 type Service struct {
 	ID                string `db:"id"`
 	Name              string `db:"name"`
+	Image             string `db:"image"`       // imageName:imageVersion
 	Desc              string `db:"description"` // short for Description
 	Architecture      string `db:"architecture"`
 	BusinessCode      string `db:"business_code"`

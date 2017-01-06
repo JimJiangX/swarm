@@ -9,6 +9,7 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
+	consulapi "github.com/hashicorp/consul/api"
 	"golang.org/x/net/context"
 )
 
@@ -202,7 +203,9 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 		}
 
 		r := config.GetServiceRegistration(units[i].u.ID)
-		err = kvc.RegisterService(ctx, host, r.Consul, r.Horus)
+		_consul := consulapi.AgentServiceRegistration(r.Consul)
+
+		err = kvc.RegisterService(ctx, host, _consul, r.Horus)
 		if err != nil {
 			return err
 		}
@@ -482,6 +485,16 @@ func (svc *Service) deregisterSerivces(ctx context.Context, r kvstore.Register) 
 	}
 
 	return nil
+}
+
+func (svc *Service) Image() (database.Image, error) {
+	return database.Image{}, nil
+}
+
+func (svc *Service) Requires(ctx context.Context) (structs.RequireResource, error) {
+	// imageName imageVersion
+
+	return structs.RequireResource{}, nil
 }
 
 func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]string) (structs.ConfigsMap, error) {
