@@ -1046,7 +1046,7 @@ func (svc *Service) stopContainers(timeout int) error {
 	return nil
 }
 
-// StopService stop the Service,only stop the upsql type unit service
+// StopService stop the Service,stop units service and containers.
 func (svc *Service) StopService() (err error) {
 	done, val, err := svc.statusLock.CAS(statusServiceStoping, isStatusNotInProgress)
 	if err != nil {
@@ -1122,7 +1122,7 @@ func (svc *Service) StopService() (err error) {
 		}
 	}
 
-	return err
+	return svc.stopContainers(10)
 }
 
 func (svc *Service) stopService() error {
