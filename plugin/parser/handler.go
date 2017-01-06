@@ -28,6 +28,10 @@ func NewRouter() *mux.Router {
 	return r
 }
 
+func getImageRequirement(w http.ResponseWriter, r *http.Request) {
+
+}
+
 func getConfigs(w http.ResponseWriter, r *http.Request) {
 
 }
