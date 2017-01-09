@@ -213,7 +213,9 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 	dc, original, err := gd.getNode(migrate.EngineID)
 	if err != nil || dc == nil || (san && dc.store == nil) {
-		return "", errors.Errorf("getNode error:%s,dc=%p,dc.store==nil:%t", err, dc, dc.store == nil)
+		if !force || dc == nil {
+			return "", errors.Errorf("getNode error:%s,dc=%p,dc.store==nil:%t", err, dc, dc.store == nil)
+		}
 	}
 
 	out, err := dc.listCandidates(candidates)
