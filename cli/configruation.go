@@ -6,6 +6,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 	"github.com/docker/swarm/api"
+	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/plugin/parser"
 )
 
@@ -39,6 +40,16 @@ func configruation(c *cli.Context) {
 		}
 	}
 
+	uri := getDiscovery(c)
+	if uri == "" {
+		log.Fatalf("discovery required to manage a cluster. See '%s manage --help'.", c.App.Name)
+	}
+
+	kvClient, err := kvstore.NewClient(uri)
+	if err != nil {
+		log.Fatalf("")
+	}
+
 	// see https://github.com/codegangsta/cli/issues/160
 	hosts := c.StringSlice("host")
 	if c.IsSet("host") || c.IsSet("H") {
@@ -47,7 +58,7 @@ func configruation(c *cli.Context) {
 
 	server := api.NewServer(hosts, tlsConfig)
 
-	server.SetHandler(parser.NewRouter())
+	server.SetHandler(parser.NewRouter(kvClient))
 
 	log.Fatal(server.ListenAndServe())
 }

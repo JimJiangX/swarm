@@ -341,7 +341,7 @@ func manage(c *cli.Context) {
 			break
 		}
 
-		kvc, err := kvstore.NewClient(nil)
+		kvc, err := kvstore.NewClient(uri)
 		if err != nil {
 			break
 		}
