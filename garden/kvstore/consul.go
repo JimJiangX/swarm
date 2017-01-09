@@ -153,16 +153,15 @@ func (c *kvClient) deregisterHealthCheck(host, ID string) error {
 }
 
 func (c *kvClient) PutKV(key string, val []byte) error {
-	pair := &api.KVPair{
-		Key:   key,
-		Value: val,
-	}
-
 	addr, client, err := c.getClient("")
 	if err != nil {
 		return err
 	}
 
+	pair := &api.KVPair{
+		Key:   c.key(key),
+		Value: val,
+	}
 	_, err = client.putKV(pair, nil)
 	c.checkConnectError(addr, err)
 
@@ -174,6 +173,8 @@ func (c *kvClient) DeleteKVTree(key string) error {
 	if err != nil {
 		return err
 	}
+
+	key = c.key(key)
 
 	_, err = client.deleteKVTree(key, nil)
 	c.checkConnectError(addr, err)
@@ -187,6 +188,8 @@ func (c *kvClient) GetKV(key string) (*api.KVPair, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	key = c.key(key)
 
 	val, _, err := client.getKV(key, nil)
 	c.checkConnectError(addr, err)

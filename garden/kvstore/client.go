@@ -2,6 +2,7 @@ package kvstore
 
 import (
 	"net"
+	"strings"
 	"sync"
 
 	"github.com/hashicorp/consul/api"
@@ -10,15 +11,35 @@ import (
 
 const defaultConsulAddr = "127.0.0.1:8500"
 
-func NewClient(config *api.Config) (Client, error) {
+func NewClient(uri string) (Client, error) {
+	if uri == "" {
+		uri = defaultConsulAddr
+	}
+
+	var (
+		prefix  = ""
+		_, uris = parse(uri)
+		parts   = strings.SplitN(uris, "/", 2)
+		addrs   = strings.Split(parts[0], ",")
+	)
+
+	// A custom prefix to the path can be optionally used.
+	if len(parts) == 2 {
+		prefix = parts[1]
+	}
+
+	_, port, err := net.SplitHostPort(addrs[0])
+	if err != nil {
+		return nil, errors.Wrap(err, "split host port:"+addrs[0])
+	}
+
+	config := &api.Config{
+		Address: addrs[0],
+	}
+
 	c, err := newConsulClient(config)
 	if err != nil {
 		return nil, errors.Wrap(err, "new consul api Client")
-	}
-
-	_, port, err := net.SplitHostPort(config.Address)
-	if err != nil {
-		return nil, errors.Wrap(err, "split host port:"+config.Address)
 	}
 
 	leader, peers, err := c.getStatus(port)
@@ -29,6 +50,7 @@ func NewClient(config *api.Config) (Client, error) {
 	kvc := &kvClient{
 		lock:   new(sync.RWMutex),
 		port:   port,
+		prefix: prefix,
 		leader: leader,
 		peers:  peers,
 		config: *config,
@@ -41,13 +63,28 @@ func NewClient(config *api.Config) (Client, error) {
 	return kvc, nil
 }
 
+func parse(rawurl string) (string, string) {
+	parts := strings.SplitN(rawurl, "://", 2)
+
+	// nodes:port,node2:port => nodes://node1:port,node2:port
+	if len(parts) == 1 {
+		return "nodes", parts[0]
+	}
+	return parts[0], parts[1]
+}
+
 type kvClient struct {
 	lock   *sync.RWMutex
+	prefix string
 	port   string
 	leader string
 	peers  []string
 	agents map[string]kvClientAPI
 	config api.Config
+}
+
+func (c kvClient) key(key string) string {
+	return c.prefix + key
 }
 
 func (c *kvClient) getLeader() string {
