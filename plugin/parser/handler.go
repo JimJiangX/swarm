@@ -1,18 +1,28 @@
 package parser
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/garden/kvstore"
 	"github.com/gorilla/mux"
 )
 
-func NewRouter() *mux.Router {
-	type handler func(w http.ResponseWriter, r *http.Request)
+type _Context struct {
+	apiVersion string
+	client     kvstore.Client
+	context    context.Context
+}
+
+func NewRouter(c kvstore.Client) *mux.Router {
+	type handler func(ctx *_Context, w http.ResponseWriter, r *http.Request)
+
+	ctx := &_Context{client: c}
 
 	var routes = map[string]map[string]handler{
 		"GET": {
-			"/_ping": nil,
+			"/image/requirement": getImageRequirement,
 		},
 	}
 
@@ -20,38 +30,52 @@ func NewRouter() *mux.Router {
 	for method, mappings := range routes {
 		for route, fct := range mappings {
 			logrus.WithFields(logrus.Fields{"method": method, "route": route}).Debug("Registering HTTP route")
-			r.Path("/v{version:[0-9]+.[0-9]+}" + route).Methods(method).HandlerFunc(fct)
-			r.Path(route).Methods(method).HandlerFunc(fct)
+
+			localRoute := route
+			localFct := fct
+
+			wrap := func(w http.ResponseWriter, r *http.Request) {
+				logrus.WithFields(logrus.Fields{"method": r.Method, "uri": r.RequestURI}).Debug("HTTP request received")
+
+				ctx.context = r.Context()
+				ctx.apiVersion = mux.Vars(r)["version"]
+
+				localFct(ctx, w, r)
+			}
+			localMethod := method
+
+			r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(wrap)
+			r.Path(localRoute).Methods(localMethod).HandlerFunc(wrap)
 		}
 	}
 
 	return r
 }
 
-func getImageRequirement(w http.ResponseWriter, r *http.Request) {
+func getImageRequirement(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 }
 
-func getConfigs(w http.ResponseWriter, r *http.Request) {
+func getConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 }
 
-func getConfig(w http.ResponseWriter, r *http.Request) {
+func getConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 }
 
-func getCommand(w http.ResponseWriter, r *http.Request) {
+func getCommand(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 }
 
-func postTemplate(w http.ResponseWriter, r *http.Request) {
+func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 }
 
-func generateConfigs(w http.ResponseWriter, r *http.Request) {
+func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 }
 
-func generateCommands(w http.ResponseWriter, r *http.Request) {
+func generateCommands(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 }
