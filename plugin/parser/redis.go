@@ -55,11 +55,19 @@ func (c *redisConfig) ParseData(data []byte) error {
 	return nil
 }
 
-func (redisConfig) GenerateConfig(id string, desc structs.ServiceDesc) (map[string]interface{}, error) {
-	var (
-		m = make(map[string]interface{}, 10)
-		//		port = 0
-	)
+func (c redisConfig) GenerateConfig(id string, desc structs.ServiceDesc) error {
+	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
+
+	m := make(map[string]interface{}, 10)
+
+	for key, val := range desc.Options {
+		_ = key
+		_ = val
+	}
+
 	////	for i := range u.ports {
 	////		if u.ports[i].Name == "port" {
 	////			port = u.ports[i].Port
@@ -74,7 +82,11 @@ func (redisConfig) GenerateConfig(id string, desc structs.ServiceDesc) (map[stri
 
 	//	m["maxmemory"] = u.config.HostConfig.Resources.Memory
 
-	return m, nil
+	for key, val := range m {
+		err = c.Set(key, val)
+	}
+
+	return err
 }
 
 func (redisConfig) GenerateCommands(id string, desc structs.ServiceDesc) (structs.CmdsMap, error) {
@@ -140,7 +152,7 @@ func (redisConfig) Requirement() structs.RequireResource {
 	return structs.RequireResource{}
 }
 
-func (c redisConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.AgentServiceRegistration, error) {
+func (c redisConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.ServiceRegistration, error) {
 	//	if c.config == nil {
 	//		return healthCheck{}, errors.New("params not ready")
 	//	}
@@ -162,5 +174,5 @@ func (c redisConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.A
 	//		TCP:      addr + ":" + c.config["port"],
 	//	}, nil
 
-	return structs.AgentServiceRegistration{}, nil
+	return structs.ServiceRegistration{}, nil
 }

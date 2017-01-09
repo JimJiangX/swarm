@@ -31,9 +31,18 @@ func (c *mysqlConfig) Set(key string, val interface{}) error {
 	return c.config.Set(strings.ToLower(key), fmt.Sprintf("%v", val))
 }
 
-func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceDesc) (map[string]interface{}, error) {
+func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceDesc) error {
+	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
 
 	m := make(map[string]interface{}, 10)
+
+	for key, val := range desc.Options {
+		_ = key
+		_ = val
+	}
 
 	//	if len(u.networkings) == 1 {
 	//		m["mysqld::bind_address"] = u.networkings[0].IP.String()
@@ -79,7 +88,11 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceDesc) (map[st
 	//		}
 	//	}
 
-	return m, nil
+	for key, val := range m {
+		err = c.Set(key, val)
+	}
+
+	return err
 }
 
 func (c mysqlConfig) GenerateCommands(id string, desc structs.ServiceDesc) (structs.CmdsMap, error) {
@@ -165,7 +178,7 @@ func (mysqlConfig) Requirement() structs.RequireResource {
 	return structs.RequireResource{}
 }
 
-func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.AgentServiceRegistration, error) {
+func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.ServiceRegistration, error) {
 	//	if c.config == nil || len(args) < 3 {
 	//		return healthCheck{}, errors.New("params not ready")
 	//	}
@@ -185,5 +198,5 @@ func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.A
 	//		Tags: nil,
 	//	}, nil
 
-	return structs.AgentServiceRegistration{}, nil
+	return structs.ServiceRegistration{}, nil
 }

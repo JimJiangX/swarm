@@ -85,7 +85,7 @@ func (switchManagerConfig) Requirement() structs.RequireResource {
 	return structs.RequireResource{}
 }
 
-func (c switchManagerConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.AgentServiceRegistration, error) {
+func (c switchManagerConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.ServiceRegistration, error) {
 	//	if c.config == nil || len(args) == 0 {
 	//		return healthCheck{}, errors.New("params not ready")
 	//	}
@@ -105,12 +105,22 @@ func (c switchManagerConfig) HealthCheck(id string, desc structs.ServiceDesc) (s
 	//		Tags:     nil,
 	//	}, nil
 
-	return structs.AgentServiceRegistration{}, nil
+	return structs.ServiceRegistration{}, nil
 }
 
-func (c switchManagerConfig) GenerateConfig(id string, desc structs.ServiceDesc) (map[string]interface{}, error) {
+func (c switchManagerConfig) GenerateConfig(id string, desc structs.ServiceDesc) error {
+	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
 
 	m := make(map[string]interface{}, 10)
+
+	for key, val := range desc.Options {
+		_ = key
+		_ = val
+	}
+
 	//	m["domain"] = svc.ID
 	//	m["name"] = u.Name
 	//	port, proxyPort := 0, 0
@@ -136,7 +146,11 @@ func (c switchManagerConfig) GenerateConfig(id string, desc structs.ServiceDesc)
 	//	m["swarmhealthcheckuser"] = user.Username
 	//	m["swarmhealthcheckpassword"] = user.Password
 
-	return m, nil
+	for key, val := range m {
+		err = c.Set(key, val)
+	}
+
+	return err
 }
 
 func (c switchManagerConfig) GenerateCommands(id string, desc structs.ServiceDesc) (structs.CmdsMap, error) {
@@ -161,9 +175,19 @@ type switchManagerConfigV1123 struct {
 	switchManagerConfig
 }
 
-func (c switchManagerConfigV1123) GenerateConfig(id string, desc structs.ServiceDesc) (map[string]interface{}, error) {
+func (c switchManagerConfigV1123) GenerateConfig(id string, desc structs.ServiceDesc) error {
+
+	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
 
 	m := make(map[string]interface{}, 10)
+
+	for key, val := range desc.Options {
+		_ = key
+		_ = val
+	}
 	//	m["domain"] = svc.ID
 	//	m["name"] = u.Name
 	//	port, proxyPort := 0, 0
@@ -189,5 +213,9 @@ func (c switchManagerConfigV1123) GenerateConfig(id string, desc structs.Service
 	//	m["swarmhealthcheckuser"] = user.Username
 	//	m["swarmhealthcheckpassword"] = user.Password
 
-	return m, nil
+	for key, val := range m {
+		err = c.Set(key, val)
+	}
+
+	return err
 }

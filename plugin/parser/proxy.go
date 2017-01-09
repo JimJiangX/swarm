@@ -89,7 +89,7 @@ func (proxyConfig) Requirement() structs.RequireResource {
 	return structs.RequireResource{}
 }
 
-func (c proxyConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.AgentServiceRegistration, error) {
+func (c proxyConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.ServiceRegistration, error) {
 	//	if c.config == nil || len(args) == 0 {
 	//		return healthCheck{}, errors.New("params not ready")
 	//	}
@@ -110,12 +110,21 @@ func (c proxyConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.A
 	//		Tags:     nil,
 	//	}, nil
 
-	return structs.AgentServiceRegistration{}, nil
+	return structs.ServiceRegistration{}, nil
 }
 
-func (c proxyConfig) GenerateConfig(id string, desc structs.ServiceDesc) (map[string]interface{}, error) {
+func (c proxyConfig) GenerateConfig(id string, desc structs.ServiceDesc) error {
+	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
 
 	m := make(map[string]interface{}, 10)
+
+	for key, val := range desc.Options {
+		_ = key
+		_ = val
+	}
 
 	//	m["upsql-proxy::proxy-domain"] = svc.ID
 	//	m["upsql-proxy::proxy-name"] = u.Name
@@ -164,7 +173,11 @@ func (c proxyConfig) GenerateConfig(id string, desc structs.ServiceDesc) (map[st
 	//		}
 	//	}
 
-	return m, nil
+	for key, val := range m {
+		err = c.Set(key, val)
+	}
+
+	return err
 }
 
 func (c proxyConfig) GenerateCommands(id string, desc structs.ServiceDesc) (structs.CmdsMap, error) {
@@ -186,10 +199,18 @@ type proxyConfigV110 struct {
 	proxyConfig
 }
 
-func (c proxyConfigV110) GenerateConfig(id string, desc structs.ServiceDesc) (map[string]interface{}, error) {
+func (c proxyConfigV110) GenerateConfig(id string, desc structs.ServiceDesc) error {
+	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
 
 	m := make(map[string]interface{}, 10)
 
+	for key, val := range desc.Options {
+		_ = key
+		_ = val
+	}
 	//	m["upsql-proxy::proxy-domain"] = svc.ID
 	//	m["upsql-proxy::proxy-name"] = u.Name
 	//	if len(u.networkings) == 2 && len(u.ports) >= 2 {
@@ -238,5 +259,9 @@ func (c proxyConfigV110) GenerateConfig(id string, desc structs.ServiceDesc) (ma
 	//		}
 	//	}
 
-	return m, nil
+	for key, val := range m {
+		err = c.Set(key, val)
+	}
+
+	return err
 }
