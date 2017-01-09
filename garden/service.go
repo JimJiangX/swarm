@@ -202,7 +202,7 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 			// TODO:
 		}
 
-		r := config.GetServiceRegistration(units[i].u.ID)
+		r := config.GetServiceRegistration()
 		_consul := consulapi.AgentServiceRegistration(r.Consul)
 
 		err = kvc.RegisterService(ctx, host, _consul, r.Horus)

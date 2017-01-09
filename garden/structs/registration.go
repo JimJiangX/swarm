@@ -44,7 +44,7 @@ type ConfigCmds struct {
 	Cmds      CmdsMap
 	Timestamp int64
 
-	Registrations map[string]ServiceRegistration
+	Registration ServiceRegistration
 }
 
 type Keyset struct {
@@ -69,14 +69,14 @@ type ConfigTemplate struct {
 	Name      string
 	Version   string
 	Path      string
-	Context   string
+	Context   []byte
 	Keysets   []Keyset
 	Timestamp int64
-
-	Require RequireResource
 }
 
 type UnitResources struct {
+	ID, Name string
+
 	Require, Limit struct {
 		CPU    string
 		Memory int64
@@ -149,8 +149,8 @@ func (c ConfigCmds) GetCmd(typ string) []string {
 	return c.Cmds.Get(typ)
 }
 
-func (c ConfigCmds) GetServiceRegistration(key string) ServiceRegistration {
-	return c.Registrations[key]
+func (c ConfigCmds) GetServiceRegistration() ServiceRegistration {
+	return c.Registration
 }
 
 func (c Commands) GetCmd(key, typ string) []string {
