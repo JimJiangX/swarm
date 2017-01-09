@@ -3,6 +3,7 @@ package parser
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/garden/kvstore"
@@ -39,6 +40,18 @@ func NewRouter(c kvstore.Client) *mux.Router {
 
 				ctx.context = r.Context()
 				ctx.apiVersion = mux.Vars(r)["version"]
+				timeout := mux.Vars(r)["timeout"]
+
+				if timeout != "" {
+					d, err := time.ParseDuration(timeout)
+					if err != nil {
+						logrus.WithError(err).Warnf("invalid timeout:%s", timeout)
+					} else {
+						_ctx, cancel := context.WithTimeout(ctx.context, d)
+						ctx.context = _ctx
+						defer cancel()
+					}
+				}
 
 				localFct(ctx, w, r)
 			}
