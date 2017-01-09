@@ -235,6 +235,26 @@ func saveContainerToConsul(container *cluster.Container) error {
 	return errors.Wrap(err, "put KV")
 }
 
+func getContainerFromConsul(containerID string) (*cluster.Container, error) {
+	client, err := getConsulClient(true)
+	if err != nil {
+		return nil, err
+	}
+	key := _ContainerKVKeyPrefix + containerID
+	val, _, err := client.KV().Get(key, nil)
+	if err != nil {
+		return nil, errors.Wrapf(err, "get KV from key:"+key)
+	}
+
+	c := cluster.Container{}
+	err = json.Unmarshal(val.Value, &c)
+	if err != nil {
+		return nil, errors.Wrapf(err, "json decode error,value:\n%s", string(val.Value))
+	}
+
+	return &c, nil
+}
+
 func deleteConsulKVTree(key string) error {
 	client, err := getConsulClient(true)
 	if err != nil {

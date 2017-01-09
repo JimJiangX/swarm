@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -140,6 +141,9 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 
 	svc.RLock()
 	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
 		if err != nil {
 			_err := svc.statusLock.SetStatus(statusServiceUnitMigrateFailed)
 			if _err != nil {
@@ -171,6 +175,13 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 	users, err := svc.getUsers()
 	if err != nil {
 		return "", err
+	}
+
+	if migrate.container == nil {
+		migrate.container, err = getContainerFromConsul(migrate.ContainerID)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	oldContainer := migrate.container
@@ -241,6 +252,9 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		svc.Lock()
 
 		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("%v", r)
+			}
 			svcStatus := statusServiceUnitMigrated
 			if err == nil {
 				entry.Infof("migrate service done,%v", err)
@@ -851,6 +865,9 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 
 	svc.RLock()
 	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
 		if err != nil {
 			_err := svc.statusLock.SetStatus(statusServiceUnitRebuildFailed)
 			if _err != nil {
@@ -883,6 +900,13 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 	users, err := svc.getUsers()
 	if err != nil {
 		return "", err
+	}
+
+	if rebuild.container == nil {
+		rebuild.container, err = getContainerFromConsul(rebuild.ContainerID)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	oldContainer := rebuild.container
@@ -943,6 +967,9 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 		svc.Lock()
 
 		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("%v", r)
+			}
 			svcStatus := statusServiceUnitRebuilt
 			if err == nil {
 				rebuild.Status, rebuild.LatestError = statusUnitRebuilt, ""
