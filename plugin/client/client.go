@@ -207,7 +207,7 @@ func RequireOK(resp *http.Response, e error) (*http.Response, error) {
 		return nil, e
 	}
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
 		buf := bytes.NewBuffer(nil)
 		io.Copy(buf, resp.Body)
 		resp.Body.Close()

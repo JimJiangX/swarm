@@ -32,7 +32,14 @@ func NewRouter(c kvstore.Client) *mux.Router {
 			"/image/requirement":              getImageRequirement,
 			"/configs/{service:.*}":           getConfigs,
 			"/configs/{service:.*}/{unit:.*}": getConfig,
-			"commands/{service:.*}":           getCommands,
+			"/commands/{service:.*}":          getCommands,
+		},
+		"POST": {
+			"/configs":        generateConfigs,
+			"/image/template": postTemplate,
+		},
+		"PUT": {
+			"/configs/{service:.*}": updateConfigs,
 		},
 	}
 
