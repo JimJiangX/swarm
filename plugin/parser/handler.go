@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/gorilla/mux"
+	"github.com/hashicorp/consul/api"
 )
 
 type _Context struct {
@@ -28,7 +29,10 @@ func NewRouter(c kvstore.Client) *mux.Router {
 
 	var routes = map[string]map[string]handler{
 		"GET": {
-			"/image/requirement": getImageRequirement,
+			"/image/requirement":              getImageRequirement,
+			"/configs/{service:.*}":           getConfigs,
+			"/configs/{service:.*}/{unit:.*}": getConfig,
+			"commands/{service:.*}":           getCommands,
 		},
 	}
 
@@ -86,19 +90,80 @@ func getImageRequirement(ctx *_Context, w http.ResponseWriter, r *http.Request) 
 }
 
 func getConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	service := mux.Vars(r)["service"]
+	key := strings.Join([]string{configKey, service}, "/")
+
+	pairs, err := ctx.client.ListKV(key)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	cm, err := parseListToConfigs(pairs)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(cm)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	return
 
 }
 
 func getConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	service := mux.Vars(r)["service"]
+	unit := mux.Vars(r)["unit"]
+	key := strings.Join([]string{configKey, service, unit}, "/")
 
+	val, err := ctx.client.GetKV(key)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(val.Value)
+
+	return
 }
 
-func getCommand(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+func getCommands(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	service := mux.Vars(r)["service"]
+	key := strings.Join([]string{configKey, service}, "/")
 
-}
+	pairs, err := ctx.client.ListKV(key)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
 
-func generateCommands(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	cm, err := parseListToConfigs(pairs)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
 
+	resp := make(structs.Commands, len(cm))
+
+	for _, c := range cm {
+		resp[c.ID] = c.Cmds
+	}
+
+	err = json.NewEncoder(w).Encode(resp)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	return
 }
 
 func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
@@ -128,7 +193,7 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key := filepath.Join(imageKey, req.Name, req.Version)
+	key := strings.Join([]string{imageKey, req.Name, req.Version}, "/")
 	err = ctx.client.PutKV(key, value)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
@@ -147,7 +212,7 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key := filepath.Join(imageKey, req.Name, req.Version)
+	key := strings.Join([]string{imageKey, req.Name, req.Version}, "/")
 	pair, err := ctx.client.GetKV(key)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
@@ -218,7 +283,7 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		key := filepath.Join(configKey, req.ID, id)
+		key := strings.Join([]string{configKey, req.ID, id}, "/")
 
 		err = ctx.client.PutKV(key, buf.Bytes())
 		if err != nil {
@@ -251,4 +316,20 @@ func httpError(w http.ResponseWriter, err error, status int) {
 	}
 
 	http.Error(w, "", status)
+}
+
+func parseListToConfigs(pairs api.KVPairs) (structs.ConfigsMap, error) {
+	cm := make(structs.ConfigsMap, len(pairs))
+
+	for i := range pairs {
+		c := structs.ConfigCmds{}
+		err := json.Unmarshal(pairs[i].Value, &c)
+		if err != nil {
+			return nil, err
+		}
+
+		cm[c.ID] = c
+	}
+
+	return cm, nil
 }
