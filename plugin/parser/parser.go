@@ -42,10 +42,10 @@ func register(name, version string, _ parser) error {
 	return nil
 }
 
-func factory(name, version string) parser {
+func factory(name, version string) (parser, error) {
 	switch {
 	default:
 	}
 
-	return nil
+	return nil, fmt.Errorf("Unsupported image %s:%s yet.", name, version)
 }

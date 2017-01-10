@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/plugin/client"
@@ -59,6 +60,29 @@ func (p plugin) GenerateUnitsCmd(ctx context.Context) (structs.Commands, error) 
 	err = decodeBody(resp, &m)
 
 	return m, err
+}
+
+func (p plugin) GetImageRequirement(ctx context.Context, name, version string) (structs.RequireResource, error) {
+	params := make(url.Values)
+	params.Set("name", name)
+	params.Set("version", version)
+
+	url := url.URL{
+		Path:     "",
+		RawQuery: params.Encode(),
+	}
+
+	var obj structs.RequireResource
+
+	resp, err := client.RequireOK(p.c.Get(ctx, url.RequestURI()))
+	if err != nil {
+		return obj, err
+	}
+	defer resp.Body.Close()
+
+	err = decodeBody(resp, &obj)
+
+	return obj, err
 }
 
 // decodeBody is used to JSON decode a body

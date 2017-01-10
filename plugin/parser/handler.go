@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
@@ -72,7 +71,30 @@ func NewRouter(c kvstore.Client) *mux.Router {
 }
 
 func getImageRequirement(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
 
+	name := r.FormValue("name")
+	version := r.FormValue("version")
+
+	parser, err := factory(name, version)
+	if err != nil {
+		httpError(w, err, http.StatusNotImplemented)
+		return
+	}
+
+	resp := parser.Requirement()
+
+	err = json.NewEncoder(w).Encode(resp)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	return
 }
 
 func getConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
@@ -84,6 +106,10 @@ func getConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func getCommand(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+
+}
+
+func generateCommands(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 }
 
@@ -102,9 +128,9 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parser := factory(req.Name, req.Version)
-	if parser == nil {
-		httpError(w, fmt.Errorf(""), http.StatusNotImplemented)
+	parser, err := factory(req.Name, req.Version)
+	if err != nil {
+		httpError(w, err, http.StatusNotImplemented)
 		return
 	}
 
@@ -150,9 +176,9 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	resp := make(structs.ConfigsMap, len(req.Units))
 
 	for i := range req.Units {
-		parser := factory(req.Name, req.Version)
-		if parser == nil {
-			httpError(w, fmt.Errorf(""), http.StatusNotImplemented)
+		parser, err := factory(req.Name, req.Version)
+		if err != nil {
+			httpError(w, err, http.StatusNotImplemented)
 			return
 		}
 
@@ -162,7 +188,7 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err := parser.GenerateConfig(req.Units[i].ID, req)
+		err = parser.GenerateConfig(req.Units[i].ID, req)
 		if err != nil {
 			httpError(w, err, http.StatusInternalServerError)
 			return
@@ -225,10 +251,6 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
-
-}
-
-func generateCommands(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 }
 
