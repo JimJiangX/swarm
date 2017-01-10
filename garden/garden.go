@@ -1,6 +1,7 @@
 package garden
 
 import (
+	"context"
 	"crypto/tls"
 	"strings"
 	"sync"
@@ -160,7 +161,7 @@ type pendingUnit struct {
 	volumes     []volume.VolumesCreateBody
 }
 
-func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
+func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
 	config := cluster.BuildContainerConfig(container.Config{}, container.HostConfig{}, network.NetworkingConfig{})
 	stores := []structs.VolumeRequire{}
 	ncpu, memory := 1, 2<<20
@@ -175,7 +176,7 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 	}
 
 	var (
-		count = len(units)
+		count = len(svc.units)
 		ready = make([]pendingUnit, 0, count)
 		bad   = make([]pendingUnit, 0, count)
 		used  = make([]*node.Node, count)
@@ -197,17 +198,22 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 		}
 	}()
 
+	req, err := svc.Requires(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
 	for n := range nodes {
-		if !selectNodeInDifferentCluster(option.highAvailable, len(units), nodes[n], used) {
+		if !selectNodeInDifferentCluster(option.highAvailable, len(svc.units), nodes[n], used) {
 			continue
 		}
 
 		pu := pendingUnit{
-			swarmID:     units[count-1].ID,
-			Unit:        units[count-1],
+			swarmID:     svc.units[count-1].ID,
+			Unit:        svc.units[count-1],
 			config:      config.DeepCopy(),
-			networkings: make([]string, 0, len(units)),
-			volumes:     make([]volume.VolumesCreateBody, 0, len(units)),
+			networkings: make([]string, 0, len(svc.units)),
+			volumes:     make([]volume.VolumesCreateBody, 0, len(svc.units)),
 		}
 
 		cpuset, err := gd.allocator.AlloctCPUMemory(nodes[n], ncpu, memory, nil)
@@ -223,6 +229,9 @@ func (gd *Garden) Allocation(units []database.Unit) ([]pendingUnit, error) {
 			bad = append(bad, pu)
 			continue
 		}
+
+		// TODO: networking required
+		_ = req
 
 		id, err := gd.allocator.AlloctNetworking(pu.Unit.ID, "networkingType", 1)
 		if len(id) > 0 {

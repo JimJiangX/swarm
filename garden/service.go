@@ -2,6 +2,7 @@ package garden
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -81,6 +82,9 @@ func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.Au
 	}
 
 	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
 		status := statusServiceContainerCreated
 		if err != nil {
 			status = statusServiceContainerCreateFailed
@@ -130,6 +134,9 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 	}
 
 	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
 		status := statusServiceStarted
 		if err != nil {
 			status = statusServiceStartFailed
@@ -227,6 +234,9 @@ func (svc *Service) Start(ctx context.Context) error {
 	}
 
 	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
 		status := statusServiceStarted
 		if err != nil {
 			status = statusServiceStartFailed
@@ -281,6 +291,9 @@ func (svc *Service) Stop(ctx context.Context) error {
 	}
 
 	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
 		status := statusServiceStoped
 		if err != nil {
 			status = statusServiceStopFailed
@@ -371,6 +384,9 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) error {
 	}
 
 	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
 		if err != nil {
 			err := svc.sl.SetStatus(statusServiceDeleteFailed)
 			if err != nil {
