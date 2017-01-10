@@ -11,6 +11,7 @@ type kvClientAPI interface {
 	getStatus(port string) (string, []string, error)
 
 	getKV(key string, q *api.QueryOptions) (*api.KVPair, *api.QueryMeta, error)
+	listKV(prefix string, q *api.QueryOptions) (api.KVPairs, *api.QueryMeta, error)
 	putKV(p *api.KVPair, q *api.WriteOptions) (*api.WriteMeta, error)
 	deleteKVTree(prefix string, w *api.WriteOptions) (*api.WriteMeta, error)
 
@@ -25,6 +26,7 @@ type Client interface {
 	GetHorusAddr() (string, error)
 
 	GetKV(key string) (*api.KVPair, error)
+	ListKV(key string) (api.KVPairs, error)
 	PutKV(key string, val []byte) error
 	DeleteKVTree(key string) error
 }

@@ -66,6 +66,14 @@ func (c consulClient) getKV(key string, q *api.QueryOptions) (*api.KVPair, *api.
 	return nil, nil, stderrors.New("consul API Client is required")
 }
 
+func (c consulClient) listKV(prefix string, q *api.QueryOptions) (api.KVPairs, *api.QueryMeta, error) {
+	if c.client != nil {
+		return c.client.KV().List(prefix, q)
+	}
+
+	return nil, nil, stderrors.New("consul API Client is required")
+}
+
 func (c consulClient) putKV(p *api.KVPair, q *api.WriteOptions) (*api.WriteMeta, error) {
 	if c.client != nil {
 		return c.client.KV().Put(p, q)
@@ -152,6 +160,43 @@ func (c *kvClient) deregisterHealthCheck(host, ID string) error {
 	return errors.Wrap(err, "deregister healthCheck")
 }
 
+// GetKV lookup a single key of KV store
+func (c *kvClient) GetKV(key string) (*api.KVPair, error) {
+	addr, client, err := c.getClient("")
+	if err != nil {
+		return nil, err
+	}
+
+	key = c.key(key)
+
+	val, _, err := client.getKV(key, nil)
+	c.checkConnectError(addr, err)
+
+	if err == nil {
+		return val, nil
+	}
+
+	return nil, errors.Wrap(err, "get KVPair:"+key)
+}
+
+func (c *kvClient) ListKV(key string) (api.KVPairs, error) {
+	addr, client, err := c.getClient("")
+	if err != nil {
+		return nil, err
+	}
+
+	key = c.key(key)
+
+	val, _, err := client.listKV(key, nil)
+	c.checkConnectError(addr, err)
+
+	if err == nil {
+		return val, nil
+	}
+
+	return nil, errors.Wrap(err, "list KVPairs:"+key)
+}
+
 func (c *kvClient) PutKV(key string, val []byte) error {
 	addr, client, err := c.getClient("")
 	if err != nil {
@@ -180,25 +225,6 @@ func (c *kvClient) DeleteKVTree(key string) error {
 	c.checkConnectError(addr, err)
 
 	return errors.Wrap(err, "delete KV Tree:"+key)
-}
-
-// GetKV lookup a single key of KV store
-func (c *kvClient) GetKV(key string) (*api.KVPair, error) {
-	addr, client, err := c.getClient("")
-	if err != nil {
-		return nil, err
-	}
-
-	key = c.key(key)
-
-	val, _, err := client.getKV(key, nil)
-	c.checkConnectError(addr, err)
-
-	if err == nil {
-		return val, nil
-	}
-
-	return nil, errors.Wrap(err, "get KVPair:"+key)
 }
 
 func rolesJSONUnmarshal(data []byte) (map[string]string, error) {
