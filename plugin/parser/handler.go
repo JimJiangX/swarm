@@ -286,23 +286,10 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	buf := bytes.NewBuffer(nil)
-	for id, val := range resp {
-		buf.Reset()
-
-		err := json.NewEncoder(buf).Encode(val)
-		if err != nil {
-			httpError(w, err, http.StatusInternalServerError)
-			return
-		}
-
-		key := strings.Join([]string{configKey, req.ID, id}, "/")
-
-		err = ctx.client.PutKV(key, buf.Bytes())
-		if err != nil {
-			httpError(w, err, http.StatusInternalServerError)
-			return
-		}
+	err = putConfigsToKV(ctx.client, req.ID, resp)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
 	}
 
 	err = json.NewEncoder(w).Encode(resp)
@@ -399,23 +386,10 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		out[id] = c
 	}
 
-	buf := bytes.NewBuffer(nil)
-	for id, val := range out {
-		buf.Reset()
-
-		err := json.NewEncoder(buf).Encode(val)
-		if err != nil {
-			httpError(w, err, http.StatusInternalServerError)
-			return
-		}
-
-		key := strings.Join([]string{configKey, service, id}, "/")
-
-		err = ctx.client.PutKV(key, buf.Bytes())
-		if err != nil {
-			httpError(w, err, http.StatusInternalServerError)
-			return
-		}
+	err = putConfigsToKV(ctx.client, service, out)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -447,4 +421,25 @@ func parseListToConfigs(pairs api.KVPairs) (structs.ConfigsMap, error) {
 	}
 
 	return cm, nil
+}
+
+func putConfigsToKV(client kvstore.Client, prefix string, configs structs.ConfigsMap) error {
+	buf := bytes.NewBuffer(nil)
+
+	for id, val := range configs {
+		buf.Reset()
+
+		err := json.NewEncoder(buf).Encode(val)
+		if err != nil {
+			return err
+		}
+
+		key := strings.Join([]string{configKey, prefix, id}, "/")
+		err = client.PutKV(key, buf.Bytes())
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
