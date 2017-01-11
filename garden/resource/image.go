@@ -13,19 +13,17 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/scplib"
 	"github.com/docker/swarm/garden/structs"
-	"github.com/docker/swarm/plugin/client"
-	"github.com/docker/swarm/plugin/parser/api"
+	pluginapi "github.com/docker/swarm/plugin/parser/api"
 	"github.com/pkg/errors"
 )
 
 // LoadImage load a new Image
-func LoadImage(ctx context.Context, ormer database.Ormer, c client.Client, req structs.PostLoadImageRequest) (string, error) {
+func LoadImage(ctx context.Context, ormer database.Ormer, pc pluginapi.PluginAPI, req structs.PostLoadImageRequest) (string, error) {
 	text, err := ioutil.ReadFile(req.ConfigFilePath)
 	if err != nil {
 		return "", errors.Wrap(err, "ReadAll from configFile:"+req.ConfigFilePath)
 	}
 
-	pc := api.NewPlugin(c)
 	template := structs.ConfigTemplate{
 		Name:    req.Name,
 		Version: req.Version,
