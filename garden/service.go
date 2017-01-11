@@ -10,6 +10,7 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
+	pluginapi "github.com/docker/swarm/plugin/parser/api"
 	consulapi "github.com/hashicorp/consul/api"
 	"golang.org/x/net/context"
 )
@@ -17,19 +18,25 @@ import (
 var containerKV = "swarm/containers/"
 
 type Service struct {
-	sl      statusLock
-	svc     database.Service
-	so      database.ServiceOrmer
-	cluster cluster.Cluster
-	units   []database.Unit
+	sl           statusLock
+	svc          database.Service
+	so           database.ServiceOrmer
+	cluster      cluster.Cluster
+	pluginClient pluginapi.PluginAPI
+
+	imageName    string
+	imageVersion string
+
+	units []database.Unit
 }
 
-func newService(svc database.Service, so database.ServiceOrmer, cluster cluster.Cluster) *Service {
+func newService(svc database.Service, so database.ServiceOrmer, cluster cluster.Cluster, pc pluginapi.PluginAPI) *Service {
 	return &Service{
-		svc:     svc,
-		so:      so,
-		cluster: cluster,
-		sl:      newStatusLock(svc.ID, so),
+		svc:          svc,
+		so:           so,
+		cluster:      cluster,
+		pluginClient: pc,
+		sl:           newStatusLock(svc.ID, so),
 	}
 }
 
@@ -509,13 +516,21 @@ func (svc *Service) Image() (database.Image, error) {
 }
 
 func (svc *Service) Requires(ctx context.Context) (structs.RequireResource, error) {
-	// imageName imageVersion
 
-	return structs.RequireResource{}, nil
+	return svc.pluginClient.GetImageRequirement(ctx, svc.imageName, svc.imageVersion)
 }
 
-func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]string) (structs.ConfigsMap, error) {
-	return structs.ConfigsMap{}, nil
+func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]interface{}) (structs.ConfigsMap, error) {
+	desc := structs.ServiceDesc{
+		ID:      svc.svc.ID,
+		Name:    svc.svc.Name,
+		Arch:    "",
+		Image:   svc.imageName,
+		Version: svc.imageVersion,
+		Options: args,
+	}
+
+	return svc.pluginClient.GenerateServiceConfig(ctx, desc)
 }
 
 func (svc *Service) generateUnitConfig(ctx context.Context, nameOrID string, args map[string]string) (structs.ConfigCmds, error) {
@@ -523,5 +538,5 @@ func (svc *Service) generateUnitConfig(ctx context.Context, nameOrID string, arg
 }
 
 func (svc *Service) generateUnitsCmd(ctx context.Context) (structs.Commands, error) {
-	return structs.Commands{}, nil
+	return svc.pluginClient.GetCommands(ctx, svc.svc.ID)
 }

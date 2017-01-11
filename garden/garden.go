@@ -14,6 +14,7 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
+	pluginapi "github.com/docker/swarm/plugin/parser/api"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/filter"
 	"github.com/docker/swarm/scheduler/node"
@@ -36,8 +37,9 @@ type allocator interface {
 
 type Garden struct {
 	sync.Mutex
-	ormer    database.Ormer
-	kvClient kvstore.Client
+	ormer        database.Ormer
+	kvClient     kvstore.Client
+	pluginClient pluginapi.PluginAPI
 
 	allocator allocator
 	cluster.Cluster
@@ -71,7 +73,7 @@ func (gd *Garden) BuildService() (*Service, error) {
 		return nil, err
 	}
 
-	service := newService(svc, gd.ormer, gd.Cluster)
+	service := newService(svc, gd.ormer, gd.Cluster, gd.pluginClient)
 	service.units = units
 
 	return service, nil
@@ -83,7 +85,7 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 		return nil, err
 	}
 
-	s := newService(svc, gd.ormer, gd.Cluster)
+	s := newService(svc, gd.ormer, gd.Cluster, gd.pluginClient)
 
 	return s, nil
 }
