@@ -40,6 +40,8 @@ type AgentServiceRegistration api.AgentServiceRegistration
 type ConfigCmds struct {
 	ID        string
 	Path      string
+	Name      string
+	Version   string
 	Context   string
 	Cmds      CmdsMap
 	Timestamp int64

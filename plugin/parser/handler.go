@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -168,6 +169,7 @@ func getCommands(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		httpError(w, err, http.StatusInternalServerError)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	return
@@ -274,6 +276,8 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 		resp[req.Units[i].ID] = structs.ConfigCmds{
 			ID:           req.Units[i].ID,
+			Name:         req.Name,
+			Version:      req.Version,
 			Path:         t.Path,
 			Context:      string(context),
 			Cmds:         cmds,
@@ -284,6 +288,8 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 	buf := bytes.NewBuffer(nil)
 	for id, val := range resp {
+		buf.Reset()
+
 		err := json.NewEncoder(buf).Encode(val)
 		if err != nil {
 			httpError(w, err, http.StatusInternalServerError)
@@ -311,7 +317,109 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	var (
+		req     structs.ConfigsMap
+		service = mux.Vars(r)["service"]
+	)
 
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	pairs := make(api.KVPairs, len(req))
+
+	switch len(req) {
+	case 0:
+		httpError(w, fmt.Errorf(""), http.StatusBadRequest)
+		return
+	case 1:
+		for _, c := range req {
+			key := strings.Join([]string{configKey, service, c.ID}, "/")
+			pair, err := ctx.client.GetKV(key)
+			if err != nil {
+				httpError(w, err, http.StatusInternalServerError)
+				return
+			}
+			pairs[0] = pair
+		}
+	default:
+		key := strings.Join([]string{configKey, service}, "/")
+		pairs, err = ctx.client.ListKV(key)
+		if err != nil {
+			httpError(w, err, http.StatusInternalServerError)
+			return
+		}
+	}
+
+	configs, err := parseListToConfigs(pairs)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	out := make(structs.ConfigsMap, len(configs))
+
+	for id, u := range req {
+		c, exist := configs[id]
+		if !exist {
+			if err != nil {
+				httpError(w, fmt.Errorf(""), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		if u.ID != "" && c.ID != u.ID {
+			c.ID = u.ID
+		}
+
+		if u.Path != "" && c.Path != u.Path {
+			c.Path = u.Path
+		}
+
+		if u.Context != "" && c.Context != u.Context {
+			parser, err := factory(c.Name, c.Version)
+			if err != nil {
+				httpError(w, err, http.StatusInternalServerError)
+				return
+			}
+
+			err = parser.ParseData([]byte(u.Context))
+			if err != nil {
+				httpError(w, err, http.StatusInternalServerError)
+				return
+			}
+
+			c.Context = u.Context
+		}
+
+		c.Timestamp = time.Now().Unix()
+
+		out[id] = c
+	}
+
+	buf := bytes.NewBuffer(nil)
+	for id, val := range out {
+		buf.Reset()
+
+		err := json.NewEncoder(buf).Encode(val)
+		if err != nil {
+			httpError(w, err, http.StatusInternalServerError)
+			return
+		}
+
+		key := strings.Join([]string{configKey, service, id}, "/")
+
+		err = ctx.client.PutKV(key, buf.Bytes())
+		if err != nil {
+			httpError(w, err, http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	return
 }
 
 // Emit an HTTP error and log it.
