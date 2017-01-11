@@ -11,12 +11,10 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/docker/swarm/garden/structs"
 	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
-	"github.com/tatsushid/go-fastping"
 )
 
 type result struct {
@@ -200,7 +198,7 @@ func (c *kvClient) GetHorusAddr() (string, error) {
 		return "", err
 	}
 
-	checks, _, err := client.healthChecks("passing", nil)
+	checks, _, err := client.Health().Checks("passing", nil)
 	c.checkConnectError(addr, err)
 	if err != nil {
 		return "", errors.Wrap(err, "passing health checks")
@@ -245,6 +243,7 @@ func parseIPFromHealthCheck(serviceID, output string) string {
 	return ""
 }
 
+/*
 // fastPing sends an ICMP packet and wait a response,
 // when udp is true,use non-privileged datagram-oriented UDP as ICMP endpoints
 func fastPing(hostname string, count int, udp bool) (bool, error) {
@@ -312,6 +311,7 @@ func fastPing(hostname string, count int, udp bool) (bool, error) {
 
 	return false, errors.New(hostname + ":unreachable")
 }
+*/
 
 func ensureReaderClosed(resp *http.Response) {
 	if resp != nil && resp.Body != nil {

@@ -37,12 +37,12 @@ func NewClient(uri string) (Client, error) {
 		Address: addrs[0],
 	}
 
-	c, err := newConsulClient(config)
+	c, err := api.NewClient(config)
 	if err != nil {
 		return nil, errors.Wrap(err, "new consul api Client")
 	}
 
-	leader, peers, err := c.getStatus(port)
+	leader, peers, err := getStatus(c, port)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func NewClient(uri string) (Client, error) {
 		leader: leader,
 		peers:  peers,
 		config: *config,
-		agents: make(map[string]kvClientAPI, 10),
+		agents: make(map[string]*api.Client, 10),
 	}
 
 	kvc.agents[config.Address] = c
@@ -79,7 +79,7 @@ type kvClient struct {
 	port   string
 	leader string
 	peers  []string
-	agents map[string]kvClientAPI
+	agents map[string]*api.Client
 	config api.Config
 }
 
@@ -92,7 +92,7 @@ func (c *kvClient) getLeader() string {
 	defer c.lock.Unlock()
 
 	for addr, client := range c.agents {
-		leader, peers, err := client.getStatus(c.port)
+		leader, peers, err := getStatus(client, c.port)
 		if err != nil {
 			delete(c.agents, addr)
 			continue
@@ -112,13 +112,13 @@ func (c *kvClient) getLeader() string {
 			config := c.config
 			config.Address = addr
 
-			client, err := newConsulClient(&config)
+			client, err := api.NewClient(&config)
 			if err != nil {
 				delete(c.agents, addr)
 				continue
 			}
 
-			leader, peers, err := client.getStatus(c.port)
+			leader, peers, err := getStatus(client, c.port)
 			if err != nil {
 				delete(c.agents, addr)
 				continue
@@ -135,7 +135,7 @@ func (c *kvClient) getLeader() string {
 	return c.leader
 }
 
-func (c *kvClient) getClient(addr string) (string, kvClientAPI, error) {
+func (c *kvClient) getClient(addr string) (string, *api.Client, error) {
 	if addr == "" {
 		// get kv leader client
 		c.lock.RLock()
@@ -178,7 +178,7 @@ func (c *kvClient) getClient(addr string) (string, kvClientAPI, error) {
 	config := c.config
 	config.Address = addr
 
-	client, err := newConsulClient(&config)
+	client, err := api.NewClient(&config)
 	if err != nil {
 		return "", nil, errors.Wrap(err, "new consul api Client")
 	}
