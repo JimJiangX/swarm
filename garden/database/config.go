@@ -12,6 +12,7 @@ import (
 type SysConfigOrmer interface {
 	InsertSysConfig(c SysConfig) error
 	GetSysConfig() (SysConfig, error)
+	GetRegistry() (Registry, error)
 	GetAuthConfig() (*types.AuthConfig, error)
 }
 
@@ -149,6 +150,15 @@ func (db dbBase) GetSysConfig() (SysConfig, error) {
 }
 
 func (db dbBase) GetAuthConfig() (*types.AuthConfig, error) {
+	r, err := db.GetRegistry()
+	if err != nil {
+		return nil, err
+	}
+
+	return r.GetAuthConfig(), nil
+}
+
+func (db dbBase) GetRegistry() (Registry, error) {
 	var (
 		r     Registry
 		query = "SELECT registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt FROM " + db.sysConfigTable() + " LIMIT 1"
@@ -156,10 +166,10 @@ func (db dbBase) GetAuthConfig() (*types.AuthConfig, error) {
 
 	err := db.Get(&r, query)
 	if err != nil {
-		return nil, errors.Wrap(err, "get SysConfig.Registry")
+		return r, errors.Wrap(err, "get SysConfig.Registry")
 	}
 
-	return r.GetAuthConfig(), nil
+	return r, nil
 }
 
 func (r Registry) GetAuthConfig() *types.AuthConfig {
