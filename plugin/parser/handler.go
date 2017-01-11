@@ -30,7 +30,7 @@ func NewRouter(c kvstore.Client) *mux.Router {
 
 	var routes = map[string]map[string]handler{
 		"GET": {
-			"/image/support":                  isImageSupport,
+
 			"/image/requirement":              getImageRequirement,
 			"/configs/{service:.*}":           getConfigs,
 			"/configs/{service:.*}/{unit:.*}": getConfig,
@@ -38,6 +38,7 @@ func NewRouter(c kvstore.Client) *mux.Router {
 		},
 		"POST": {
 			"/configs":        generateConfigs,
+			"/image/check":    checkImage,
 			"/image/template": postTemplate,
 		},
 		"PUT": {
@@ -69,24 +70,6 @@ func NewRouter(c kvstore.Client) *mux.Router {
 	}
 
 	return r
-}
-
-func isImageSupport(ctx *_Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		httpError(w, err, http.StatusBadRequest)
-		return
-	}
-
-	name := r.FormValue("name")
-	version := r.FormValue("version")
-
-	_, err := factory(name, version)
-	if err != nil {
-		httpError(w, err, http.StatusNotImplemented)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
 }
 
 func getImageRequirement(ctx *_Context, w http.ResponseWriter, r *http.Request) {
@@ -194,6 +177,30 @@ func getCommands(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+func checkImage(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	t := structs.ConfigTemplate{}
+
+	err := json.NewDecoder(r.Body).Decode(&t)
+	if err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	parser, err := factory(t.Name, t.Version)
+	if err != nil {
+		httpError(w, err, http.StatusNotImplemented)
+		return
+	}
+
+	err = parser.ParseData(t.Content)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.ConfigTemplate{}
 
@@ -215,7 +222,7 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = parser.ParseData(req.Context)
+	err = parser.ParseData(req.Content)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -263,7 +270,7 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = parser.ParseData(t.Context)
+		err = parser.ParseData(t.Content)
 		if err != nil {
 			httpError(w, err, http.StatusInternalServerError)
 			return
@@ -275,7 +282,7 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		context, err := parser.Marshal()
+		text, err := parser.Marshal()
 		if err != nil {
 			httpError(w, err, http.StatusInternalServerError)
 			return
@@ -297,8 +304,8 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 			ID:           req.Units[i].ID,
 			Name:         req.Name,
 			Version:      req.Version,
-			Path:         t.Path,
-			Context:      string(context),
+			Mount:        t.Mount,
+			Content:      string(text),
 			Cmds:         cmds,
 			Timestamp:    time.Now().Unix(),
 			Registration: r,
@@ -380,24 +387,24 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 			c.ID = u.ID
 		}
 
-		if u.Path != "" && c.Path != u.Path {
-			c.Path = u.Path
+		if u.Mount != "" && c.Mount != u.Mount {
+			c.Mount = u.Mount
 		}
 
-		if u.Context != "" && c.Context != u.Context {
+		if u.Content != "" && c.Content != u.Content {
 			parser, err := factory(c.Name, c.Version)
 			if err != nil {
 				httpError(w, err, http.StatusInternalServerError)
 				return
 			}
 
-			err = parser.ParseData([]byte(u.Context))
+			err = parser.ParseData([]byte(u.Content))
 			if err != nil {
 				httpError(w, err, http.StatusInternalServerError)
 				return
 			}
 
-			c.Context = u.Context
+			c.Content = u.Content
 		}
 
 		c.Timestamp = time.Now().Unix()

@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 
@@ -66,27 +64,6 @@ func (p plugin) GetCommands(ctx context.Context, service string) (structs.Comman
 	return m, err
 }
 
-func (p plugin) IsImageSupport(ctx context.Context, name, version string) (bool, error) {
-	params := make(url.Values)
-	params.Set("name", name)
-	params.Set("version", version)
-
-	url := url.URL{
-		Path:     "/image/support",
-		RawQuery: params.Encode(),
-	}
-
-	resp, err := client.RequireOK(p.c.Get(ctx, url.RequestURI()))
-	if err != nil {
-		return false, err
-	}
-	if resp.Body != nil {
-		defer resp.Body.Close()
-	}
-
-	return true, err
-}
-
 func (p plugin) GetImageRequirement(ctx context.Context, name, version string) (structs.RequireResource, error) {
 	params := make(url.Values)
 	params.Set("name", name)
@@ -110,14 +87,24 @@ func (p plugin) GetImageRequirement(ctx context.Context, name, version string) (
 	return obj, err
 }
 
+func (p plugin) ImageCheck(ctx context.Context, ct structs.ConfigTemplate) error {
+	resp, err := client.RequireOK(p.c.Post(ctx, "/image/check", ct))
+	if err != nil {
+		return err
+	}
+
+	client.EnsureBodyClose(resp)
+
+	return nil
+}
+
 func (p plugin) PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate) error {
 	resp, err := client.RequireOK(p.c.Post(ctx, "/image/template", ct))
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	io.CopyN(ioutil.Discard, resp.Body, 512)
+	client.EnsureBodyClose(resp)
 
 	return nil
 }
@@ -127,9 +114,8 @@ func (p plugin) UpdateConfigs(ctx context.Context, service string, configs struc
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
 
-	io.CopyN(ioutil.Discard, resp.Body, 512)
+	client.EnsureBodyClose(resp)
 
 	return nil
 }

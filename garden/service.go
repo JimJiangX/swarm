@@ -173,7 +173,7 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 			// TODO: return nil
 		}
 
-		err := units[i].updateServiceConfig(ctx, config.Path, config.Context)
+		err := units[i].updateServiceConfig(ctx, config.Mount, config.Content)
 		if err != nil {
 			return err
 		}
@@ -357,7 +357,7 @@ func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[
 		return err
 	}
 
-	err = u.updateServiceConfig(ctx, config.Path, config.Context)
+	err = u.updateServiceConfig(ctx, config.Mount, config.Content)
 
 	return err
 }

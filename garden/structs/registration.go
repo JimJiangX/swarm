@@ -39,20 +39,14 @@ type AgentServiceRegistration api.AgentServiceRegistration
 
 type ConfigCmds struct {
 	ID        string
-	Path      string
 	Name      string
 	Version   string
-	Context   string
+	Content   string
+	Mount     string
 	Cmds      CmdsMap
 	Timestamp int64
 
 	Registration ServiceRegistration
-}
-
-type Keyset struct {
-	Key    string
-	CanSet bool
-	Desc   string
 }
 
 type RequireResource struct {
@@ -65,15 +59,6 @@ type RequireResource struct {
 		Name string
 		Port int
 	}
-}
-
-type ConfigTemplate struct {
-	Name      string
-	Version   string
-	Path      string
-	Context   []byte
-	Keysets   []Keyset
-	Timestamp int64
 }
 
 type UnitResources struct {

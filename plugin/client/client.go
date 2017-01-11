@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -217,6 +218,15 @@ func RequireOK(resp *http.Response, e error) (*http.Response, error) {
 	}
 
 	return resp, nil
+}
+
+// EnsureBodyClose close *http.Response
+func EnsureBodyClose(resp *http.Response) {
+	if resp.Body != nil {
+		io.CopyN(ioutil.Discard, resp.Body, 512)
+
+		resp.Body.Close()
+	}
 }
 
 // defaultTransport returns a new http.Transport with the same default values
