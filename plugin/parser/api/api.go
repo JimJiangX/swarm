@@ -11,11 +11,23 @@ import (
 	"github.com/docker/swarm/plugin/client"
 )
 
+type PluginAPI interface {
+	GenerateServiceConfig(ctx context.Context, desc structs.ServiceDesc) (structs.ConfigsMap, error)
+	GetUnitConfig(ctx context.Context, service, unit string) (structs.ConfigCmds, error)
+	GetCommands(ctx context.Context, service string) (structs.Commands, error)
+
+	GetImageRequirement(ctx context.Context, name, version string) (structs.RequireResource, error)
+	ImageCheck(ctx context.Context, ct structs.ConfigTemplate) error
+	PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate) error
+
+	UpdateConfigs(ctx context.Context, service string, configs structs.ConfigsMap) error
+}
+
 type plugin struct {
 	c client.Client
 }
 
-func NewPlugin(cli client.Client) plugin {
+func NewPlugin(cli client.Client) PluginAPI {
 	return plugin{
 		c: cli,
 	}
