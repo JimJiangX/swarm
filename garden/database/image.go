@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -9,8 +10,7 @@ import (
 )
 
 type ImageOrmer interface {
-	GetImage(name, version string) (Image, error)
-	GetImageByID(ID string) (Image, error)
+	GetImage(nameOrID string) (Image, error)
 	ListImages() ([]Image, error)
 
 	InsertImage(image Image) error
@@ -56,27 +56,22 @@ func (db dbBase) ListImages() ([]Image, error) {
 }
 
 // GetImage returns Image select by name and version.
-func (db dbBase) GetImage(name, version string) (Image, error) {
+func (db dbBase) GetImage(nameOrID string) (Image, error) {
 	var (
-		image = Image{}
-		query = "SELECT enabled,id,name,version,label,size,upload_at FROM " + db.imageTable() + " WHERE name=? AND version=?"
+		image Image
+		err   error
 	)
 
-	err := db.Get(&image, query, name, version)
+	parts := strings.Split(nameOrID, ":")
+	if len(parts) == 2 {
+		query := "SELECT enabled,id,name,version,label,size,upload_at FROM " + db.imageTable() + " WHERE name=? AND version=?"
+		err = db.Get(&image, query, parts[0], parts[0])
+	} else {
+		query := "SELECT enabled,id,name,version,label,size,upload_at FROM " + db.imageTable() + " WHERE id=?"
+		err = db.Get(&image, query, nameOrID)
+	}
 
 	return image, errors.Wrap(err, "get Image")
-}
-
-// GetImageByID returns Image select by ID or ImageID
-func (db dbBase) GetImageByID(ID string) (Image, error) {
-	var (
-		image = Image{}
-		query = "SELECT enabled,id,name,version,label,size,upload_at FROM " + db.imageTable() + " WHERE id=?"
-	)
-
-	err := db.Get(&image, query, ID)
-
-	return image, errors.Wrap(err, "get Image by ID")
 }
 
 // SetImageStatus update Image.Enabled by ID or ImageID.

@@ -504,7 +504,8 @@ func (svc *Service) deregisterSerivces(ctx context.Context, r kvstore.Register) 
 }
 
 func (svc *Service) Image() (database.Image, error) {
-	return database.Image{}, nil
+
+	return svc.so.GetImage(svc.svc.Image)
 }
 
 func (svc *Service) Requires(ctx context.Context) (structs.RequireResource, error) {
