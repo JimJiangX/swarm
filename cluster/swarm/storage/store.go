@@ -41,7 +41,7 @@ type Info struct {
 	Driver string
 	Total  int
 	Free   int
-	List   map[int]Space
+	List   map[string]Space
 }
 
 // Store is remote storage system
@@ -65,9 +65,9 @@ type Store interface {
 	Mapping(host, vgName, lun string) error
 	DelMapping(lun string) error
 
-	AddSpace(id int) (Space, error)
-	EnableSpace(id int) error
-	DisableSpace(id int) error
+	AddSpace(id string) (Space, error)
+	EnableSpace(id string) error
+	DisableSpace(id string) error
 }
 
 // RegisterStore register a new remote storage system
@@ -155,7 +155,7 @@ func removeStore(ID string) error {
 
 // RemoveStoreSpace removes a Space of store,
 // if Space is using,cannot be removed
-func RemoveStoreSpace(ID string, space int) error {
+func RemoveStoreSpace(ID, space string) error {
 	store, err := GetStore(ID)
 	if err != nil {
 		return err

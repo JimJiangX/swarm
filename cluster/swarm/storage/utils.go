@@ -61,7 +61,7 @@ func maxIdleSizeRG(m map[database.RaidGroup]Space) database.RaidGroup {
 // Space ---> RG
 type Space struct {
 	Enable bool
-	ID     int
+	ID     string
 	Total  int
 	Free   int
 	State  string
@@ -85,10 +85,8 @@ func parseSpace(r io.Reader) []Space {
 				space = Space{}
 				err   error
 			)
-			space.ID, err = strconv.Atoi(string(parts[0]))
-			if err != nil {
-				continue
-			}
+			space.ID = string(parts[0])
+
 			space.Total, err = strconv.Atoi(string(parts[1]))
 			if err != nil {
 				continue

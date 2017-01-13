@@ -314,7 +314,7 @@ const insertRaidGroupQuery = "INSERT INTO tbl_dbaas_raid_group (id,storage_syste
 type RaidGroup struct {
 	ID          string `db:"id"`
 	StorageID   string `db:"storage_system_id"`
-	StorageRGID int    `db:"storage_rg_id"`
+	StorageRGID string `db:"storage_rg_id"`
 	Enabled     bool   `db:"enabled"`
 }
 
@@ -348,7 +348,7 @@ func (r RaidGroup) Insert() error {
 }
 
 // UpdateRaidGroupStatus update Enabled select by StorageSystemID and StorageRGID
-func UpdateRaidGroupStatus(ssid string, rgid int, state bool) error {
+func UpdateRaidGroupStatus(ssid, rgid string, state bool) error {
 	db, err := getDB(false)
 	if err != nil {
 		return err
@@ -421,7 +421,7 @@ func ListRGByStorageID(id string) ([]RaidGroup, error) {
 }
 
 // GetRaidGroup returns RaidGroup select by StorageSystemID and StorageRGID.
-func GetRaidGroup(id string, rg int) (RaidGroup, error) {
+func GetRaidGroup(id, rg string) (RaidGroup, error) {
 	db, err := getDB(false)
 	if err != nil {
 		return RaidGroup{}, err
@@ -479,7 +479,7 @@ func DelRGCondition(storageID string) error {
 }
 
 // DeleteRaidGroup delete RaidGroup by StorageSystemID and StorageRGID
-func DeleteRaidGroup(id string, rg int) error {
+func DeleteRaidGroup(id, rg string) error {
 	db, err := getDB(false)
 	if err != nil {
 		return err

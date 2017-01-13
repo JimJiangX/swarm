@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -124,7 +125,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 	}
 	// size:byte-->MB
 	param := []string{path, h.hs.AdminUnit,
-		strconv.Itoa(rg.StorageRGID), strconv.Itoa(id), strconv.Itoa(size>>20 + 100)}
+		rg.StorageRGID, strconv.Itoa(id), strconv.Itoa(size>>20 + 100)}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
@@ -207,7 +208,7 @@ func (h *hitachiStore) Extend(name string, size int) (database.LUN, database.Loc
 	}
 	// size:byte-->MB
 	param := []string{path, h.hs.AdminUnit,
-		strconv.Itoa(rg.StorageRGID), strconv.Itoa(id), strconv.Itoa(size>>20 + 100)}
+		rg.StorageRGID, strconv.Itoa(id), strconv.Itoa(size>>20 + 100)}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
@@ -289,7 +290,7 @@ func (h hitachiStore) Size() (map[database.RaidGroup]Space, error) {
 		return nil, errors.Wrap(err, h.Vendor()+" size")
 	}
 
-	rg := make([]int, len(out))
+	rg := make([]string, len(out))
 
 	for i, val := range out {
 		rg[i] = val.StorageRGID
@@ -321,15 +322,15 @@ func (h hitachiStore) Size() (map[database.RaidGroup]Space, error) {
 }
 
 // list store RGs info,calls listrg.sh
-func (h *hitachiStore) list(rg ...int) ([]Space, error) {
+func (h *hitachiStore) list(rg ...string) ([]Space, error) {
 	list := ""
 	if len(rg) == 0 {
 		return nil, nil
 
 	} else if len(rg) == 1 {
-		list = strconv.Itoa(rg[0])
+		list = rg[0]
 	} else {
-		list = intSliceToString(rg, " ")
+		list = strings.Join(rg, " ")
 	}
 
 	path, err := utils.GetAbsolutePath(false, scriptPath, HITACHI, "listrg.sh")
@@ -520,7 +521,7 @@ func (h *hitachiStore) DelMapping(lun string) error {
 }
 
 // AddSpace add a new RG already existed in the store,
-func (h *hitachiStore) AddSpace(id int) (Space, error) {
+func (h *hitachiStore) AddSpace(id string) (Space, error) {
 	_, err := database.GetRaidGroup(h.ID(), id)
 	if err == nil {
 		return Space{}, errors.Errorf("RaidGroup %d is exist in %s", id, h.ID())
@@ -562,7 +563,7 @@ func (h *hitachiStore) AddSpace(id int) (Space, error) {
 }
 
 // EnableSpace signed RG enabled
-func (h *hitachiStore) EnableSpace(id int) error {
+func (h *hitachiStore) EnableSpace(id string) error {
 	h.lock.Lock()
 	err := database.UpdateRaidGroupStatus(h.ID(), id, true)
 	h.lock.Unlock()
@@ -575,7 +576,7 @@ func (h *hitachiStore) EnableSpace(id int) error {
 }
 
 // DisableSpace signed RG disabled
-func (h *hitachiStore) DisableSpace(id int) error {
+func (h *hitachiStore) DisableSpace(id string) error {
 	h.lock.Lock()
 	err := database.UpdateRaidGroupStatus(h.ID(), id, false)
 	h.lock.Unlock()
@@ -597,7 +598,7 @@ func (h hitachiStore) Info() (Info, error) {
 		ID:     h.ID(),
 		Vendor: h.Vendor(),
 		Driver: h.Driver(),
-		List:   make(map[int]Space, len(list)),
+		List:   make(map[string]Space, len(list)),
 	}
 
 	for rg, val := range list {

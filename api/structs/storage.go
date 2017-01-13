@@ -13,7 +13,7 @@ type PostSANStoreRequest struct {
 }
 
 type PostRaidGroupRequest struct {
-	ID int
+	ID string
 }
 
 type SANStorageResponse struct {
@@ -28,7 +28,7 @@ type SANStorageResponse struct {
 
 type Space struct {
 	Enable bool
-	ID     int
+	ID     string
 	Total  int
 	Free   int
 	LunNum int

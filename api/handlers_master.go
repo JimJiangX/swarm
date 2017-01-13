@@ -2746,11 +2746,7 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 // POST /storage/san/{name}/raid_group/{rg:[0-9]+}/enable
 func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	san := mux.Vars(r)["name"]
-	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+	rg := mux.Vars(r)["rg"]
 
 	store, err := storage.GetStore(san)
 	if err != nil {
@@ -2770,11 +2766,7 @@ func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 // POST /storage/san/{name}/raid_group/{rg:[0-9]+}/disable
 func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	san := mux.Vars(r)["name"]
-	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
+	rg := mux.Vars(r)["rg"]
 
 	store, err := storage.GetStore(san)
 	if err != nil {
@@ -2980,14 +2972,9 @@ func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // DELETE /storage/san/{name}/raid_group/{rg:[0-9]+}
 func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	san := mux.Vars(r)["name"]
+	rg := mux.Vars(r)["rg"]
 
-	rg, err := strconv.Atoi(mux.Vars(r)["rg"])
-	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
-		return
-	}
-
-	err = storage.RemoveStoreSpace(san, rg)
+	err := storage.RemoveStoreSpace(san, rg)
 	if err != nil {
 		httpError2(w, err, http.StatusInternalServerError)
 		return

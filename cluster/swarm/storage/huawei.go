@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -105,7 +106,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 	}
 	// size:byte-->MB
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password,
-		strconv.Itoa(rg.StorageRGID), name, strconv.Itoa(size>>20 + 100)}
+		rg.StorageRGID, name, strconv.Itoa(size>>20 + 100)}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
@@ -183,7 +184,7 @@ func (h *huaweiStore) Extend(name string, size int) (database.LUN, database.Loca
 	}
 	// size:byte-->MB
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password,
-		strconv.Itoa(rg.StorageRGID), name, strconv.Itoa(size>>20 + 100)}
+		rg.StorageRGID, name, strconv.Itoa(size>>20 + 100)}
 
 	cmd, err := utils.ExecScript(param...)
 	if err != nil {
@@ -414,7 +415,7 @@ func (h *huaweiStore) DelMapping(lun string) error {
 	return nil
 }
 
-func (h *huaweiStore) AddSpace(id int) (Space, error) {
+func (h *huaweiStore) AddSpace(id string) (Space, error) {
 	_, err := database.GetRaidGroup(h.ID(), id)
 	if err == nil {
 		return Space{}, errors.Errorf("RaidGroup %d is exist in %s", id, h.ID())
@@ -455,15 +456,15 @@ func (h *huaweiStore) AddSpace(id int) (Space, error) {
 	return Space{}, errors.Errorf("%s:Space %d is not exist", h.ID(), id)
 }
 
-func (h *huaweiStore) list(rg ...int) ([]Space, error) {
+func (h *huaweiStore) list(rg ...string) ([]Space, error) {
 	list := ""
 	if len(rg) == 0 {
 		return nil, nil
 
 	} else if len(rg) == 1 {
-		list = strconv.Itoa(rg[0])
+		list = rg[0]
 	} else {
-		list = intSliceToString(rg, " ")
+		list = strings.Join(rg, " ")
 	}
 
 	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "listrg.sh")
@@ -500,7 +501,7 @@ func (h *huaweiStore) list(rg ...int) ([]Space, error) {
 	return spaces, nil
 }
 
-func (h *huaweiStore) EnableSpace(id int) error {
+func (h *huaweiStore) EnableSpace(id string) error {
 	h.lock.Lock()
 	err := database.UpdateRaidGroupStatus(h.ID(), id, true)
 	h.lock.Unlock()
@@ -512,7 +513,7 @@ func (h *huaweiStore) EnableSpace(id int) error {
 	return nil
 }
 
-func (h *huaweiStore) DisableSpace(id int) error {
+func (h *huaweiStore) DisableSpace(id string) error {
 	h.lock.Lock()
 	err := database.UpdateRaidGroupStatus(h.ID(), id, false)
 	h.lock.Unlock()
@@ -530,7 +531,7 @@ func (h huaweiStore) Size() (map[database.RaidGroup]Space, error) {
 		return nil, errors.Wrap(err, h.Vendor()+" size")
 	}
 
-	rg := make([]int, len(out))
+	rg := make([]string, len(out))
 
 	for i, val := range out {
 		rg[i] = val.StorageRGID
@@ -570,7 +571,7 @@ func (h huaweiStore) Info() (Info, error) {
 		ID:     h.ID(),
 		Vendor: h.Vendor(),
 		Driver: h.Driver(),
-		List:   make(map[int]Space, len(list)),
+		List:   make(map[string]Space, len(list)),
 	}
 
 	for rg, val := range list {
