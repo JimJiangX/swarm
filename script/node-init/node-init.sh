@@ -53,7 +53,7 @@ rpm_install() {
 			exit 2
 		fi
 	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ $RELEASE == "CentOS" ]; then
-		yum --nogpgcheck -y install nfs-utils curl sysstat ${PT}
+		yum --nogpgcheck -y install nfs-utils curl sysstat mariadb ${PT}
 		if [ $? -ne 0 ]; then
 			echo "rpm install faild"
 			exit 2
