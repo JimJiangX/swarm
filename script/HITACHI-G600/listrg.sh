@@ -12,8 +12,8 @@ do
 	fi
 	total_gb=`echo ${output} | awk -F: '{print $2}'`
 	total_mb=`echo "scale=2;${total_gb}*1024" | bc`
-	free_percent=`echo $output | awk -F: '{print $3}'`
-	free_mb=`echo "scale=2;${total_mb}*${free_percent}" | bc`
+	used_percent=`echo $output | awk -F: '{print $3}'`
+	free_mb=`echo "scale=2;${total_mb}*(100-${used_percent})/100" | bc`
 	stat=NML
         lun_num=`echo ${output} | awk -F: '{print $4}'`
 	if [ ! -n "${free_mb}" ] || [ ! -n "${total_mb}" ]; then
