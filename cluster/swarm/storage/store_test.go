@@ -57,7 +57,7 @@ func TestHITACHIStore(t *testing.T) {
 		t.Errorf("Unexpected,want %s got %s", SANStoreDriver, store.Driver())
 	}
 
-	size, err := store.AddSpace(0)
+	size, err := store.AddSpace("0")
 	if err != nil {
 		t.Error(err, size)
 	}

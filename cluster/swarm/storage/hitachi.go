@@ -524,7 +524,7 @@ func (h *hitachiStore) DelMapping(lun string) error {
 func (h *hitachiStore) AddSpace(id string) (Space, error) {
 	_, err := database.GetRaidGroup(h.ID(), id)
 	if err == nil {
-		return Space{}, errors.Errorf("RaidGroup %d is exist in %s", id, h.ID())
+		return Space{}, errors.Errorf("RaidGroup %s is exist in %s", id, h.ID())
 	}
 
 	insert := func() error {
@@ -559,7 +559,7 @@ func (h *hitachiStore) AddSpace(id string) (Space, error) {
 		}
 	}
 
-	return Space{}, errors.Errorf("%s:Space %d is not exist", h.ID(), id)
+	return Space{}, errors.Errorf("%s:Space %s is not exist", h.ID(), id)
 }
 
 // EnableSpace signed RG enabled

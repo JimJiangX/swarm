@@ -172,7 +172,7 @@ func RemoveStoreSpace(ID, space string) error {
 	}
 
 	if count > 0 {
-		return errors.Errorf("Store %s RaidGroup %d is using,cannot be removed", store.ID(), space)
+		return errors.Errorf("Store %s RaidGroup %s is using,cannot be removed", store.ID(), space)
 	}
 
 	return database.DeleteRaidGroup(store.ID(), space)
