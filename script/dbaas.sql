@@ -21,8 +21,6 @@ SET @@SESSION.SQL_LOG_BIN= 0;
 -- GTID state at the beginning of the backup 
 --
 
-SET @@GLOBAL.GTID_PURGED='7ed61159-7fc9-11e6-9423-008cfae833f0:1-153,
-99210b42-7fc9-11e6-9423-008cfaecf318:1-12';
 
 --
 -- Table structure for table `tbl_dbaas_backup_files`
