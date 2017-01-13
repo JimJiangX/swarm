@@ -91,7 +91,14 @@ remove_docker() {
 		done
 	fi
 	
-	rpm -e containerd runc docker
+	if [ "${release}" == "SUSE LINUX" ]; then
+		rpm -e containerd runc docker
+	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ $RELEASE == "CentOS" ]; then
+		rpm -e docker-engine docker-engine-selinux
+	else
+		echo "only support SUSE LINUX and RedHatEnterpriseServer and CentOS"
+		exit 2
+	fi
 	rm -rf /etc/sysconfig/docker
 	rm -rf /etc/systemd/system/multi-user.target.wants/docker.service
 	rm -rf /etc/docker/
