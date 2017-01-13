@@ -177,7 +177,7 @@ if [ \$? -ne 0 ]; then
 fi
 
 ip_addr=\`cat \$output | grep IPADDR | awk -F= '{print \$2}' | sed 's/",//g'\`
-port=\`cat \$output | grep PORT | awk -F= '{print \$2}' | sed 's/",//g'\`
+port=\`cat \$output | grep PORT | awk -F= '{print \$2}' | sed 's/",//g' | awk -F, '{print \$1}'\`
 
 rm -f \$output
 
