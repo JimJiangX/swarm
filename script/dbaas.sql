@@ -239,7 +239,7 @@ DROP TABLE IF EXISTS `tbl_dbaas_raid_group`;
 CREATE TABLE `tbl_dbaas_raid_group` (
   `ai` int(24) NOT NULL AUTO_INCREMENT COMMENT '自增字段,与业务无关',
   `id` varchar(128) NOT NULL COMMENT '存储RAID ID',
-  `storage_rg_id` int(11) NOT NULL COMMENT '在存储系统上的Raid group ID',
+  `storage_rg_id` varchar(11) NOT NULL COMMENT '在存储系统上的Raid group ID',
   `storage_system_id` varchar(128) NOT NULL COMMENT 'RAID GROUP 所属存储系统ID',
   `enabled` tinyint(1) unsigned NOT NULL DEFAULT '1' COMMENT '是否启用\n0:停用\n1:启用',
   PRIMARY KEY (`ai`),
