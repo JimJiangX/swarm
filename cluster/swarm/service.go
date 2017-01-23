@@ -2063,6 +2063,12 @@ func (p *pendingContainerUpdate) containerUpdate() error {
 	if err != nil {
 		return err
 	}
+	if p.config.CpusetCpus != "" {
+		p.unit.config.HostConfig.CpusetCpus = p.config.CpusetCpus
+	}
+	if p.config.Memory != 0 {
+		p.unit.config.HostConfig.Memory = p.config.Memory
+	}
 
 	defConfig, err := p.unit.defaultUserConfig(p.svc, p.unit)
 	if err != nil {
