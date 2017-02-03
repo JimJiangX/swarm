@@ -37,7 +37,7 @@ const (
 	// Timeout for requests sent out to the engine.
 	requestTimeout = 10 * time.Second
 
-	// Threshold of delta duaration between swarm manager and engine's systime
+	// Threshold of delta duration between swarm manager and engine's systime
 	thresholdTime = 2 * time.Second
 
 	// Minimum docker engine version supported by swarm.
@@ -178,7 +178,7 @@ func (e *Engine) Connect(config *tls.Config) error {
 		return err
 	}
 
-	addr, err := net.ResolveIPAddr("ip4", host)
+	addr, err := net.ResolveIPAddr("ip", host)
 	if err != nil {
 		return err
 	}
@@ -214,6 +214,7 @@ func (e *Engine) StartMonitorEvents() {
 
 	go func() {
 		if err := <-ec; err != nil {
+			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).WithError(err).Error("error monitoring events, will restart")
 			if !strings.Contains(err.Error(), "EOF") {
 				// failing node reconnect should use back-off strategy
 				<-e.refreshDelayer.Wait(e.getFailureCount())
@@ -248,7 +249,7 @@ func (e *Engine) ConnectWithClient(client dockerclient.Client, apiClient swarmcl
 		return err
 	}
 
-	// Do not check error as older daemon does't support this call.
+	// Do not check error as older daemon doesn't support this call.
 	e.RefreshVolumes()
 	e.RefreshNetworks()
 
@@ -890,11 +891,6 @@ func (e *Engine) refreshLoop() {
 			lastSpecUpdatedAt = time.Now()
 		}
 
-		if !healthy {
-			e.eventsMonitor.Stop()
-			e.StartMonitorEvents()
-		}
-
 		err = e.RefreshContainers(false)
 		if err == nil {
 			// Do not check error as older daemon doesn't support this call
@@ -1254,8 +1250,13 @@ func (e *Engine) handler(msg events.Message) error {
 			action = "health_status"
 		}
 		switch action {
+		case "commit":
+			// commit a container will generate a new image
+			e.RefreshImages()
 		case "die", "kill", "oom", "pause", "start", "restart", "stop", "unpause", "rename", "update", "health_status":
 			e.refreshContainer(msg.ID, true)
+		case "top", "resize", "export", "exec_create", "exec_start", "exec_detach", "attach", "detach", "extract-to-dir", "copy", "archive-path":
+			// no action needed
 		default:
 			e.refreshContainer(msg.ID, false)
 		}
@@ -1279,6 +1280,8 @@ func (e *Engine) handler(msg events.Message) error {
 			e.refreshContainer(msg.ID, true)
 			e.RefreshVolumes()
 			e.RefreshNetworks()
+		case "top", "resize", "export", "exec_create", "exec_start", "attach", "extract-to-dir", "copy", "archive-path":
+			// no action needed
 		default:
 			// Otherwise, do a "soft" refresh of the container.
 			e.refreshContainer(msg.ID, false)
@@ -1341,21 +1344,34 @@ func (e *Engine) cleanupContainers() {
 }
 
 // StartContainer starts a container
-func (e *Engine) StartContainer(id string, hostConfig *dockerclient.HostConfig) error {
+func (e *Engine) StartContainer(container *Container, hostConfig *dockerclient.HostConfig) error {
 	var err error
 	if hostConfig != nil {
-		err = e.client.StartContainer(id, hostConfig)
+		err = e.client.StartContainer(container.ID, hostConfig)
 	} else {
 		// TODO(nishanttotla): Should ContainerStartOptions be provided?
-		err = e.apiClient.ContainerStart(context.Background(), id, types.ContainerStartOptions{})
+		err = e.apiClient.ContainerStart(context.Background(), container.ID, types.ContainerStartOptions{})
 	}
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
 	}
 
-	// refresh container
-	_, err = e.refreshContainer(id, true)
+	// refresh the container in the cache
+	_, err = e.refreshContainer(container.ID, true)
+
+	// If we could not inspect the container that was just started,
+	// this indicates that it's been already removed by the daemon.
+	// This is expected to occur in API versions 1.25 or higher if
+	// the HostConfig.AutoRemove field is set to true. This could also occur
+	// during race conditions where a third-party client removes the container
+	// immmediately after it's started.
+	if container.Info.HostConfig.AutoRemove && engineapi.IsErrContainerNotFound(err) {
+		delete(e.containers, container.ID)
+		log.Debugf("container %s was not detected shortly after ContainerStart, indicating a daemon-side removal", container.ID)
+		return nil
+	}
+
 	return err
 }
 
@@ -1397,8 +1413,8 @@ func (e *Engine) TagImage(IDOrName string, ref string, force bool) error {
 }
 
 // NetworkDisconnect disconnects a container from a network
-func (e *Engine) NetworkDisconnect(container *Container, network *Network, force bool) error {
-	err := e.apiClient.NetworkDisconnect(context.Background(), network.ID, container.ID, force)
+func (e *Engine) NetworkDisconnect(container *Container, network string, force bool) error {
+	err := e.apiClient.NetworkDisconnect(context.Background(), network, container.ID, force)
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
@@ -1407,6 +1423,7 @@ func (e *Engine) NetworkDisconnect(container *Container, network *Network, force
 	return e.RefreshNetworks()
 }
 
+//IsConnectionError returns true when err is connection problem
 func IsConnectionError(err error) bool {
 	// dockerclient defines ErrConnectionRefused error. but if http client is from swarm, it's not using
 	// dockerclient. We need string matching for these cases. Remove the first character to deal with
@@ -1417,4 +1434,11 @@ func IsConnectionError(err error) bool {
 		strings.Contains(err.Error(), "onnection refused") ||
 		strings.Contains(err.Error(), "annot connect to the docker engine endpoint") ||
 		strings.Contains(err.Error(), "annot connect to the Docker daemon")
+}
+
+func (e *Engine) RefreshEngine(hostname string) error {
+	if hostname != e.Name {
+		return fmt.Errorf("invalid engine name during refresh: %s vs %s", hostname, e.Name)
+	}
+	return e.RefreshContainers(true)
 }

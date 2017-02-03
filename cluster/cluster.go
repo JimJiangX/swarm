@@ -108,4 +108,10 @@ type Cluster interface {
 
 	AddPendingContainer(name, swarmID, engineID string, config *ContainerConfig) error
 	RemovePendingContainer(swarmID ...string)
+
+	// Refresh a single cluster engine
+	RefreshEngine(hostname string) error
+
+	// Refresh all engines in the cluster
+	RefreshEngines() error
 }
