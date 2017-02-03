@@ -141,7 +141,7 @@ func (c *Cluster) generateUniqueID() string {
 
 // StartContainer starts a container
 func (c *Cluster) StartContainer(container *cluster.Container, hostConfig *dockerclient.HostConfig) error {
-	return container.Engine.StartContainer(container.ID, hostConfig)
+	return container.Engine.StartContainer(container, hostConfig)
 }
 
 // CreateContainer aka schedule a brand new container into the cluster.
@@ -966,6 +966,31 @@ func (c *Cluster) BuildImage(buildContext io.Reader, buildImage *types.ImageBuil
 
 	c.engines[n.ID].RefreshImages()
 	return nil
+}
+
+// RefreshEngines refreshes all containers in the cluster
+func (c *Cluster) RefreshEngines() error {
+	for _, e := range c.engines {
+		err := e.RefreshContainers(true)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RefreshEngine refreshes all containers in a specific engine
+func (c *Cluster) RefreshEngine(hostname string) error {
+	for _, e := range c.engines {
+		if e.Name == hostname {
+			err := e.RefreshContainers(true)
+			if err != nil {
+				return err
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("no engine found with hostname %s", hostname)
 }
 
 // TagImage tags an image

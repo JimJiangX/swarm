@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"runtime"
@@ -30,6 +31,11 @@ import (
 
 // APIVERSION is the API version supported by swarm manager
 const APIVERSION = "1.22"
+
+var (
+	ShouldRefreshOnNodeFilter  = false
+	ContainerNameRefreshFilter = ""
+)
 
 // GET /info
 func getInfo(c *context, w http.ResponseWriter, r *http.Request) {
@@ -277,7 +283,7 @@ func getNetworks(c *context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	out := []*apitypes.NetworkResource{}
-	networks := c.cluster.Networks().Filter(filters.Get("name"), filters.Get("id"), types)
+	networks := c.cluster.Networks().Filter(filters)
 	for _, network := range networks {
 		tmp := (*network).NetworkResource
 		if tmp.Scope == "local" {
@@ -318,7 +324,29 @@ func getVolume(c *context, w http.ResponseWriter, r *http.Request) {
 func getVolumes(c *context, w http.ResponseWriter, r *http.Request) {
 	volumesListResponse := volumetypes.VolumesListOKBody{}
 
+	// Parse filters
+	filters, err := dockerfilters.FromParam(r.URL.Query().Get("filters"))
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	names := filters.Get("name")
 	for _, volume := range c.cluster.Volumes() {
+		// Check if the volume matches any name filters
+		found := false
+		for _, name := range names {
+			if strings.Contains(volume.Name, name) {
+				found = true
+				break
+			}
+		}
+		if len(names) > 0 && !found {
+			// Do not include this volume in the response if it doesn't match
+			// a name filter, if any exist.
+			continue
+		}
+
 		tmp := (*volume).Volume
 		if tmp.Driver == "local" {
 			tmp.Name = volume.Engine.Name + "/" + volume.Name
@@ -370,6 +398,28 @@ func getContainersJSON(c *context, w http.ResponseWriter, r *http.Request) {
 	for _, value := range filters.Get("status") {
 		if value == "exited" {
 			all = true
+		}
+	}
+
+	if ShouldRefreshOnNodeFilter {
+		nodes := filters.Get("node")
+		for _, node := range nodes {
+			err := c.cluster.RefreshEngine(node)
+			if err != nil {
+				log.Debugf("could not match node filter for %s: %s", node, err)
+			}
+		}
+	}
+	if ContainerNameRefreshFilter != "" {
+		names := filters.Get("name")
+		for _, name := range names {
+			if name == ContainerNameRefreshFilter {
+				err := c.cluster.RefreshEngines()
+				if err != nil {
+					log.Debugf("names filter detected but unable to refresh all engines: %s", err)
+				}
+				break
+			}
 		}
 	}
 
@@ -477,7 +527,7 @@ func getContainersJSON(c *context, w http.ResponseWriter, r *http.Request) {
 		tmp.Ports = make([]apitypes.Port, len(container.Ports))
 		for i, port := range container.Ports {
 			tmp.Ports[i] = port
-			if port.IP == "0.0.0.0" {
+			if ip := net.ParseIP(port.IP); ip != nil && ip.IsUnspecified() {
 				tmp.Ports[i].IP = container.Engine.IP
 			}
 		}
@@ -536,10 +586,19 @@ func getContainerJSON(c *context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// insert Node field
-	data = bytes.Replace(data, []byte("\"Name\":\"/"), []byte(fmt.Sprintf("\"Node\":%s,\"Name\":\"/", n)), -1)
+	data = bytes.Replace(data, []byte(`"Name":"/`), []byte(fmt.Sprintf(`"Node":%s,"Name":"/`, n)), -1)
 
 	// insert node IP
-	data = bytes.Replace(data, []byte("\"HostIp\":\"0.0.0.0\""), []byte(fmt.Sprintf("\"HostIp\":%q", container.Engine.IP)), -1)
+	if engineIP := net.ParseIP(container.Engine.IP); engineIP != nil {
+		var orig string
+		if engineIP.To4() != nil {
+			orig = fmt.Sprintf(`"HostIp":"%s"`, net.IPv4zero.String())
+		} else {
+			orig = fmt.Sprintf(`"HostIp":"%s"`, net.IPv6zero.String())
+		}
+		replace := fmt.Sprintf(`"HostIp":"%s"`, container.Engine.IP)
+		data = bytes.Replace(data, []byte(orig), []byte(replace), -1)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(data)
@@ -787,14 +846,12 @@ func getEvents(c *context, w http.ResponseWriter, r *http.Request) {
 		until = u
 	}
 
-	c.eventsHandler.Add(r.RemoteAddr, w)
-
 	w.Header().Set("Content-Type", "application/json")
-
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
 	}
 
+	c.eventsHandler.Add(r.RemoteAddr, w)
 	c.eventsHandler.Wait(r.RemoteAddr, until)
 }
 
@@ -977,6 +1034,13 @@ func networkDisconnect(c *context, w http.ResponseWriter, r *http.Request) {
 		httpError(w, fmt.Sprintf("No such network: %s", networkid), http.StatusNotFound)
 		return
 	}
+	// If the incoming request used the network's name instead of the ID,
+	// make the request to the daemon with the network's name as well.
+	if strings.Contains(networkid, network.Name) {
+		networkid = network.Name
+	} else {
+		networkid = network.ID
+	}
 
 	// make a copy of r.Body
 	buf, _ := ioutil.ReadAll(r.Body)
@@ -1003,7 +1067,7 @@ func networkDisconnect(c *context, w http.ResponseWriter, r *http.Request) {
 	// then try a random engine if we can't connect to that engine. We
 	// try the associated engine first because on 1.12+ clusters, the
 	// network may not be known on all nodes.
-	err := engine.NetworkDisconnect(container, network, disconnect.Force)
+	err := engine.NetworkDisconnect(container, networkid, disconnect.Force)
 	if err != nil {
 		if cluster.IsConnectionError(err) && disconnect.Force && network.Scope == "global" {
 			log.Warnf("Could not connect to engine %s: %s, trying to disconnect %s from %s on a random engine", engine.Name, err, disconnect.Container, network.Name)
@@ -1013,7 +1077,7 @@ func networkDisconnect(c *context, w http.ResponseWriter, r *http.Request) {
 				httpError(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			err = randomEngine.NetworkDisconnect(container, network, disconnect.Force)
+			err = randomEngine.NetworkDisconnect(container, networkid, disconnect.Force)
 			if err != nil {
 				httpError(w, err.Error(), http.StatusInternalServerError)
 			}

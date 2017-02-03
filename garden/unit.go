@@ -112,10 +112,21 @@ func (u unit) startContainer(ctx context.Context) error {
 	}
 
 	if u.u.ContainerID != "" {
-		return engine.StartContainer(u.u.ContainerID, nil)
+		c := engine.Containers().Get(u.u.ContainerID)
+		if c != nil {
+			return engine.StartContainer(c, nil)
+		}
 	}
 
-	return engine.StartContainer(u.u.Name, nil)
+	if u.u.Name != "" {
+		c := engine.Containers().Get(u.u.Name)
+		if c != nil {
+			return engine.StartContainer(c, nil)
+		}
+	}
+
+	// TODO:errContainerNotFound
+	return nil
 }
 
 func (u unit) stopContainer(ctx context.Context) error {

@@ -151,7 +151,14 @@ var (
 		Value: "20s",
 		Usage: "Leader lock release time on failure",
 	}
-
+	flRefreshOnNodeFilter = cli.BoolFlag{
+		Name:  "refresh-on-node-filter",
+		Usage: "If true, refresh the cache when a ContainerList call comes in with a node filter",
+	}
+	flContainerNameRefreshFilter = cli.StringFlag{
+		Name:  "container-name-refresh-filter",
+		Usage: "If set, refresh the cache when a ContainerList call comes in with a name filter set to this value",
+	}
 	// flDBDriver DB driver
 	flDBDriver = cli.StringFlag{
 		Name:  "dbDriver",
