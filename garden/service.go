@@ -31,17 +31,29 @@ type Service struct {
 	units []database.Unit
 }
 
-func newService(svc database.Service, so database.ServiceOrmer, cluster cluster.Cluster, pc pluginapi.PluginAPI) *Service {
-	image, version := svc.ParseImage()
+func newService(spec structs.ServiceSpec, so database.ServiceOrmer, cluster cluster.Cluster, pc pluginapi.PluginAPI) *Service {
+	image, version := spec.ParseImage()
 
 	return &Service{
-		spec: structs.ServiceSpec{
-			Service: svc,
-		},
+		spec:         spec,
 		so:           so,
 		cluster:      cluster,
 		pluginClient: pc,
-		sl:           newStatusLock(svc.ID, so),
+		sl:           newStatusLock(spec.ID, so),
+		imageName:    image,
+		imageVersion: version,
+	}
+}
+
+func (gd *Garden) NewService(spec structs.ServiceSpec) *Service {
+	image, version := spec.ParseImage()
+
+	return &Service{
+		spec:         spec,
+		so:           gd.ormer,
+		cluster:      gd.Cluster,
+		pluginClient: gd.pluginClient,
+		sl:           newStatusLock(spec.ID, gd.ormer),
 		imageName:    image,
 		imageVersion: version,
 	}
@@ -530,6 +542,10 @@ func (svc *Service) Requires(ctx context.Context) (structs.RequireResource, erro
 func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]interface{}) (structs.ConfigsMap, error) {
 
 	return svc.pluginClient.GenerateServiceConfig(ctx, svc.spec)
+}
+
+func (svc *Service) GenerateUnitsConfigs(ctx context.Context, args map[string]interface{}) (structs.ConfigsMap, error) {
+	return svc.generateUnitsConfigs(ctx, args)
 }
 
 func (svc *Service) generateUnitConfig(ctx context.Context, nameOrID string, args map[string]string) (structs.ConfigCmds, error) {

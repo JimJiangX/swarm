@@ -111,7 +111,7 @@ type ServiceSpec struct {
 
 	Units []UnitResources
 
-	Dependencies []*ServiceSpec
+	Deps []*ServiceSpec
 }
 
 type ContainerSpec struct {

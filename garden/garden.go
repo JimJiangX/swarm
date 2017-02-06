@@ -63,11 +63,15 @@ func NewGarden(kvc kvstore.Client, cl cluster.Cluster, scheduler *scheduler.Sche
 	}
 }
 
+func (gd *Garden) KVClient() kvstore.Client {
+	return gd.kvClient
+}
+
 func (gd *Garden) AuthConfig() (*types.AuthConfig, error) {
 	return gd.ormer.GetAuthConfig()
 }
 
-func (gd *Garden) ListServices() ([]structs.ServiceSpec, error) {
+func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, error) {
 	// TODO:list services
 	return []structs.ServiceSpec{}, nil
 }
@@ -100,15 +104,15 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, error) {
 		return nil, err
 	}
 
-	service := newService(spec.Service, gd.ormer, gd.Cluster, gd.pluginClient)
+	service := gd.NewService(spec)
 	service.units = units
 
-	option := scheduleOption{
+	service.options = scheduleOption{
 		highAvailable: spec.Replicas > 0,
 		ContainerSpec: spec.ContainerSpec,
 		Options:       spec.Options,
 	}
-	option.nodes.constraint = spec.Constraint
+	service.options.nodes.constraint = spec.Constraint
 
 	return service, nil
 }
@@ -119,7 +123,12 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 		return nil, err
 	}
 
-	s := newService(svc, gd.ormer, gd.Cluster, gd.pluginClient)
+	spec := structs.ServiceSpec{
+		Service: svc,
+		// TODO: other params
+	}
+
+	s := gd.NewService(spec)
 
 	return s, nil
 }
