@@ -279,8 +279,15 @@ func (c mysqlConfig) defaultUserConfig(args ...interface{}) (_ map[string]interf
 	}
 
 	m["mysqld::log_bin"] = fmt.Sprintf("/DBAASLOG/BIN/%s-binlog", u.Name)
-	m["mysqld::innodb_buffer_pool_size"] = int(float64(u.config.HostConfig.Memory) * 0.75)
 	m["mysqld::relay_log"] = fmt.Sprintf("/DBAASLOG/REL/%s-relay", u.Name)
+
+	switch u.config.HostConfig.Memory>>23 > 0 {
+	case true:
+		m["mysqld::innodb_buffer_pool_size"] = int(float64(u.config.HostConfig.Memory) * 0.70)
+
+	default:
+		m["mysqld::innodb_buffer_pool_size"] = int(float64(u.config.HostConfig.Memory) * 0.5)
+	}
 
 	m["client::user"] = ""
 	m["client::password"] = ""
