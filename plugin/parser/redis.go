@@ -55,7 +55,7 @@ func (c *redisConfig) ParseData(data []byte) error {
 	return nil
 }
 
-func (c redisConfig) GenerateConfig(id string, desc structs.ServiceDesc) error {
+func (c redisConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	err := c.Validate(desc.Options)
 	if err != nil {
 		return err
@@ -89,7 +89,7 @@ func (c redisConfig) GenerateConfig(id string, desc structs.ServiceDesc) error {
 	return err
 }
 
-func (redisConfig) GenerateCommands(id string, desc structs.ServiceDesc) (structs.CmdsMap, error) {
+func (redisConfig) GenerateCommands(id string, desc structs.ServiceSpec) (structs.CmdsMap, error) {
 	cmds := make(structs.CmdsMap, 4)
 
 	cmds[structs.StartContainerCmd] = []string{"bin/bash"}
@@ -152,7 +152,7 @@ func (redisConfig) Requirement() structs.RequireResource {
 	return structs.RequireResource{}
 }
 
-func (c redisConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.ServiceRegistration, error) {
+func (c redisConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
 	//	if c.config == nil {
 	//		return healthCheck{}, errors.New("params not ready")
 	//	}

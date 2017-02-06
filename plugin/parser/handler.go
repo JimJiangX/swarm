@@ -239,7 +239,7 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
-	req := structs.ServiceDesc{}
+	req := structs.ServiceSpec{}
 
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -247,7 +247,9 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key := strings.Join([]string{imageKey, req.Name, req.Version}, "/")
+	image, version := req.ParseImage()
+
+	key := strings.Join([]string{imageKey, image, version}, "/")
 	pair, err := ctx.client.GetKV(key)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
@@ -264,7 +266,7 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	resp := make(structs.ConfigsMap, len(req.Units))
 
 	for i := range req.Units {
-		parser, err := factory(req.Name, req.Version)
+		parser, err := factory(image, version)
 		if err != nil {
 			httpError(w, err, http.StatusNotImplemented)
 			return
@@ -302,8 +304,8 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 		resp[req.Units[i].ID] = structs.ConfigCmds{
 			ID:           req.Units[i].ID,
-			Name:         req.Name,
-			Version:      req.Version,
+			Name:         image,
+			Version:      version,
 			Mount:        t.Mount,
 			Content:      string(text),
 			Cmds:         cmds,

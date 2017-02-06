@@ -89,7 +89,7 @@ func (proxyConfig) Requirement() structs.RequireResource {
 	return structs.RequireResource{}
 }
 
-func (c proxyConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.ServiceRegistration, error) {
+func (c proxyConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
 	//	if c.config == nil || len(args) == 0 {
 	//		return healthCheck{}, errors.New("params not ready")
 	//	}
@@ -113,7 +113,7 @@ func (c proxyConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.S
 	return structs.ServiceRegistration{}, nil
 }
 
-func (c proxyConfig) GenerateConfig(id string, desc structs.ServiceDesc) error {
+func (c proxyConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	err := c.Validate(desc.Options)
 	if err != nil {
 		return err
@@ -180,7 +180,7 @@ func (c proxyConfig) GenerateConfig(id string, desc structs.ServiceDesc) error {
 	return err
 }
 
-func (c proxyConfig) GenerateCommands(id string, desc structs.ServiceDesc) (structs.CmdsMap, error) {
+func (c proxyConfig) GenerateCommands(id string, desc structs.ServiceSpec) (structs.CmdsMap, error) {
 	cmds := make(structs.CmdsMap, 4)
 
 	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
@@ -199,7 +199,7 @@ type proxyConfigV110 struct {
 	proxyConfig
 }
 
-func (c proxyConfigV110) GenerateConfig(id string, desc structs.ServiceDesc) error {
+func (c proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	err := c.Validate(desc.Options)
 	if err != nil {
 		return err

@@ -18,11 +18,11 @@ type parser interface {
 
 	ParseData(data []byte) error
 
-	GenerateConfig(id string, desc structs.ServiceDesc) error
+	GenerateConfig(id string, desc structs.ServiceSpec) error
 
-	GenerateCommands(id string, desc structs.ServiceDesc) (structs.CmdsMap, error)
+	GenerateCommands(id string, desc structs.ServiceSpec) (structs.CmdsMap, error)
 
-	HealthCheck(id string, desc structs.ServiceDesc) (structs.ServiceRegistration, error)
+	HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error)
 
 	Marshal() ([]byte, error)
 

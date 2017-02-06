@@ -31,7 +31,7 @@ func (c *mysqlConfig) Set(key string, val interface{}) error {
 	return c.config.Set(strings.ToLower(key), fmt.Sprintf("%v", val))
 }
 
-func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceDesc) error {
+func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	err := c.Validate(desc.Options)
 	if err != nil {
 		return err
@@ -95,7 +95,7 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceDesc) error {
 	return err
 }
 
-func (c mysqlConfig) GenerateCommands(id string, desc structs.ServiceDesc) (structs.CmdsMap, error) {
+func (c mysqlConfig) GenerateCommands(id string, desc structs.ServiceSpec) (structs.CmdsMap, error) {
 	cmds := make(structs.CmdsMap, 6)
 
 	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
@@ -178,7 +178,7 @@ func (mysqlConfig) Requirement() structs.RequireResource {
 	return structs.RequireResource{}
 }
 
-func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.ServiceRegistration, error) {
+func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
 	//	if c.config == nil || len(args) < 3 {
 	//		return healthCheck{}, errors.New("params not ready")
 	//	}

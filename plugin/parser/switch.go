@@ -85,7 +85,7 @@ func (switchManagerConfig) Requirement() structs.RequireResource {
 	return structs.RequireResource{}
 }
 
-func (c switchManagerConfig) HealthCheck(id string, desc structs.ServiceDesc) (structs.ServiceRegistration, error) {
+func (c switchManagerConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
 	//	if c.config == nil || len(args) == 0 {
 	//		return healthCheck{}, errors.New("params not ready")
 	//	}
@@ -108,7 +108,7 @@ func (c switchManagerConfig) HealthCheck(id string, desc structs.ServiceDesc) (s
 	return structs.ServiceRegistration{}, nil
 }
 
-func (c switchManagerConfig) GenerateConfig(id string, desc structs.ServiceDesc) error {
+func (c switchManagerConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	err := c.Validate(desc.Options)
 	if err != nil {
 		return err
@@ -153,7 +153,7 @@ func (c switchManagerConfig) GenerateConfig(id string, desc structs.ServiceDesc)
 	return err
 }
 
-func (c switchManagerConfig) GenerateCommands(id string, desc structs.ServiceDesc) (structs.CmdsMap, error) {
+func (c switchManagerConfig) GenerateCommands(id string, desc structs.ServiceSpec) (structs.CmdsMap, error) {
 	cmds := make(structs.CmdsMap, 4)
 
 	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
@@ -175,7 +175,7 @@ type switchManagerConfigV1123 struct {
 	switchManagerConfig
 }
 
-func (c switchManagerConfigV1123) GenerateConfig(id string, desc structs.ServiceDesc) error {
+func (c switchManagerConfigV1123) GenerateConfig(id string, desc structs.ServiceSpec) error {
 
 	err := c.Validate(desc.Options)
 	if err != nil {
