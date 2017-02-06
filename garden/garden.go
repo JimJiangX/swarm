@@ -3,8 +3,11 @@ package garden
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -14,6 +17,7 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/garden/utils"
 	pluginapi "github.com/docker/swarm/plugin/parser/api"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/filter"
@@ -63,18 +67,48 @@ func (gd *Garden) AuthConfig() (*types.AuthConfig, error) {
 	return gd.ormer.GetAuthConfig()
 }
 
-func (gd *Garden) BuildService() (*Service, error) {
-	svc := database.Service{}
+func (gd *Garden) ListServices() ([]structs.ServiceSpec, error) {
+	// TODO:list services
+	return []structs.ServiceSpec{}, nil
+}
 
-	units := []database.Unit{}
+func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, error) {
+	units := make([]database.Unit, spec.Replicas)
+	for i := range units {
+		uid := utils.Generate32UUID()
 
-	err := gd.ormer.InsertService(svc, units, nil, nil)
+		units[i] = database.Unit{
+			ID:            uid,
+			Name:          fmt.Sprintf("%s_%s", uid[:8], spec.Name), // <unit_id_8bit>_<service_name>
+			Type:          "",
+			ImageID:       "",
+			ImageName:     spec.Image,
+			ServiceID:     spec.ID,
+			NetworkMode:   "none",
+			Status:        0,
+			CheckInterval: 10,
+			CreatedAt:     time.Now(),
+		}
+	}
+
+	if spec.ID == "" {
+		spec.ID = utils.Generate32UUID()
+	}
+
+	err := gd.ormer.InsertService(spec.Service, units, nil, spec.Users)
 	if err != nil {
 		return nil, err
 	}
 
-	service := newService(svc, gd.ormer, gd.Cluster, gd.pluginClient)
+	service := newService(spec.Service, gd.ormer, gd.Cluster, gd.pluginClient)
 	service.units = units
+
+	option := scheduleOption{
+		highAvailable: spec.Replicas > 0,
+		ContainerSpec: spec.ContainerSpec,
+		Options:       spec.Options,
+	}
+	option.nodes.constraint = spec.Constraint
 
 	return service, nil
 }
@@ -93,10 +127,15 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 type scheduleOption struct {
 	highAvailable bool
 
+	ContainerSpec structs.ContainerSpec
+
+	Options map[string]interface{}
+
 	nodes struct {
 		clusterType string
 		clusters    []string
 		filters     []string
+		constraint  []string
 	}
 
 	scheduler struct {
@@ -163,16 +202,34 @@ type pendingUnit struct {
 	volumes     []volume.VolumesCreateBody
 }
 
+func (pu pendingUnit) convertToResource() structs.UnitResources {
+	return structs.UnitResources{}
+}
 func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
-	config := cluster.BuildContainerConfig(container.Config{}, container.HostConfig{}, network.NetworkingConfig{})
-	stores := []structs.VolumeRequire{}
-	ncpu, memory := 1, 2<<20
-	option := scheduleOption{}
+	config := cluster.BuildContainerConfig(container.Config{}, container.HostConfig{
+		Resources: container.Resources{
+			CpusetCpus: svc.options.ContainerSpec.Require.CPU,
+			Memory:     svc.options.ContainerSpec.Require.Memory,
+		},
+	}, network.NetworkingConfig{})
+
+	if len(svc.options.nodes.constraint) > 0 {
+		for i := range svc.options.nodes.constraint {
+			config.AddConstraint(svc.options.nodes.constraint[i])
+		}
+	}
+
+	stores := svc.options.ContainerSpec.Volumes
+
+	ncpu, err := strconv.Atoi(config.HostConfig.CpusetCpus)
+	if err != nil {
+		return nil, err
+	}
 
 	gd.Lock()
 	defer gd.Unlock()
 
-	nodes, err := gd.schedule(config, option, stores)
+	nodes, err := gd.schedule(config, svc.options, stores)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +263,7 @@ func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
 	}
 
 	for n := range nodes {
-		if !selectNodeInDifferentCluster(option.highAvailable, len(svc.units), nodes[n], used) {
+		if !selectNodeInDifferentCluster(svc.options.highAvailable, len(svc.units), nodes[n], used) {
 			continue
 		}
 
@@ -218,7 +275,7 @@ func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
 			volumes:     make([]volume.VolumesCreateBody, 0, len(svc.units)),
 		}
 
-		cpuset, err := gd.allocator.AlloctCPUMemory(nodes[n], ncpu, memory, nil)
+		cpuset, err := gd.allocator.AlloctCPUMemory(nodes[n], ncpu, int(config.HostConfig.Memory), nil)
 		if err != nil {
 			continue
 		}
@@ -248,7 +305,7 @@ func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
 		pu.Unit.EngineID = nodes[n].ID
 
 		pu.config.HostConfig.Resources.CpusetCpus = cpuset
-		pu.config.HostConfig.Resources.Memory = int64(memory)
+		pu.config.HostConfig.Resources.Memory = config.HostConfig.Memory
 
 		gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[n].ID, pu.config)
 
@@ -263,6 +320,13 @@ func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
 	if count > 0 {
 		bad = append(bad, ready...)
 	}
+
+	urs := make([]structs.UnitResources, len(ready))
+	for i := range ready {
+		urs[i] = ready[i].convertToResource()
+	}
+
+	svc.spec.Units = urs
 
 	return ready, err
 }

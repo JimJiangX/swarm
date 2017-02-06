@@ -1,6 +1,7 @@
 package database
 
 import (
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -50,6 +51,15 @@ type Service struct {
 	BackupFilesRetention int       `db:"backup_files_retention"`
 	CreatedAt            time.Time `db:"created_at"`
 	FinishedAt           time.Time `db:"finished_at"`
+}
+
+func (s Service) ParseImage() (string, string) {
+	parts := strings.SplitN(s.Image, ":", 2)
+	if len(parts) == 2 {
+		return parts[0], parts[1]
+	}
+
+	return s.Image, ""
 }
 
 func (db dbBase) serviceTable() string {

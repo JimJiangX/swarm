@@ -98,20 +98,29 @@ type UnitResources struct {
 	}
 }
 
-type ServiceDesc struct {
-	ID      string
-	Name    string
-	Arch    string
-	Image   string
-	Version string
+type ServiceSpec struct {
+	Priority int
+	Replicas int
+	database.Service
+	ContainerSpec ContainerSpec
 
-	Options map[string]interface{}
+	Constraint []string
+	Options    map[string]interface{}
 
 	Users []database.User
 
 	Units []UnitResources
 
-	Dependent []*ServiceDesc
+	Dependencies []*ServiceSpec
+}
+
+type ContainerSpec struct {
+	Require, Limit struct {
+		CPU    string
+		Memory int64
+	}
+
+	Volumes []VolumeRequire
 }
 
 type CmdsMap map[string][]string

@@ -19,10 +19,11 @@ var containerKV = "swarm/containers/"
 
 type Service struct {
 	sl           statusLock
-	svc          database.Service
 	so           database.ServiceOrmer
+	spec         structs.ServiceSpec
 	cluster      cluster.Cluster
 	pluginClient pluginapi.PluginAPI
+	options      scheduleOption
 
 	imageName    string
 	imageVersion string
@@ -31,12 +32,18 @@ type Service struct {
 }
 
 func newService(svc database.Service, so database.ServiceOrmer, cluster cluster.Cluster, pc pluginapi.PluginAPI) *Service {
+	image, version := svc.ParseImage()
+
 	return &Service{
-		svc:          svc,
+		spec: structs.ServiceSpec{
+			Service: svc,
+		},
 		so:           so,
 		cluster:      cluster,
 		pluginClient: pc,
 		sl:           newStatusLock(svc.ID, so),
+		imageName:    image,
+		imageVersion: version,
 	}
 }
 
@@ -46,7 +53,7 @@ func (svc *Service) getUnit(nameOrID string) (*unit, error) {
 		return nil, err
 	}
 
-	if u.ServiceID != svc.svc.ID {
+	if u.ServiceID != svc.spec.ID {
 		return nil, nil
 	}
 
@@ -54,7 +61,7 @@ func (svc *Service) getUnit(nameOrID string) (*unit, error) {
 }
 
 func (svc *Service) getUnits() ([]*unit, error) {
-	list, err := svc.so.ListUnitByServiceID(svc.svc.ID)
+	list, err := svc.so.ListUnitByServiceID(svc.spec.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +89,7 @@ func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.Au
 		return err
 	}
 
-	svc.svc.Status = val
+	svc.spec.Status = val
 
 	if !ok {
 		return err
@@ -134,7 +141,7 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 		return err
 	}
 
-	svc.svc.Status = val
+	svc.spec.Status = val
 
 	if !ok {
 		return err
@@ -234,7 +241,7 @@ func (svc *Service) Start(ctx context.Context) error {
 		return err
 	}
 
-	svc.svc.Status = val
+	svc.spec.Status = val
 
 	if !ok {
 		return err
@@ -291,7 +298,7 @@ func (svc *Service) Stop(ctx context.Context) error {
 		return err
 	}
 
-	svc.svc.Status = val
+	svc.spec.Status = val
 
 	if !ok {
 		return err
@@ -384,7 +391,7 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) error {
 		return err
 	}
 
-	svc.svc.Status = val
+	svc.spec.Status = val
 
 	if !ok {
 		return err
@@ -423,7 +430,7 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) error {
 	}
 
 	// TODO:remove data from database
-	err = svc.so.DelServiceRelation(svc.svc.ID, true)
+	err = svc.so.DelServiceRelation(svc.spec.ID, true)
 
 	return err
 }
@@ -512,7 +519,7 @@ func (svc *Service) deregisterSerivces(ctx context.Context, r kvstore.Register) 
 
 func (svc *Service) Image() (database.Image, error) {
 
-	return svc.so.GetImage(svc.svc.Image)
+	return svc.so.GetImage(svc.spec.Image)
 }
 
 func (svc *Service) Requires(ctx context.Context) (structs.RequireResource, error) {
@@ -521,16 +528,8 @@ func (svc *Service) Requires(ctx context.Context) (structs.RequireResource, erro
 }
 
 func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]interface{}) (structs.ConfigsMap, error) {
-	desc := structs.ServiceDesc{
-		ID:      svc.svc.ID,
-		Name:    svc.svc.Name,
-		Arch:    "",
-		Image:   svc.imageName,
-		Version: svc.imageVersion,
-		Options: args,
-	}
 
-	return svc.pluginClient.GenerateServiceConfig(ctx, desc)
+	return svc.pluginClient.GenerateServiceConfig(ctx, svc.spec)
 }
 
 func (svc *Service) generateUnitConfig(ctx context.Context, nameOrID string, args map[string]string) (structs.ConfigCmds, error) {
@@ -538,5 +537,5 @@ func (svc *Service) generateUnitConfig(ctx context.Context, nameOrID string, arg
 }
 
 func (svc *Service) generateUnitsCmd(ctx context.Context) (structs.Commands, error) {
-	return svc.pluginClient.GetCommands(ctx, svc.svc.ID)
+	return svc.pluginClient.GetCommands(ctx, svc.spec.ID)
 }

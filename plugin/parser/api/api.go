@@ -12,7 +12,7 @@ import (
 )
 
 type PluginAPI interface {
-	GenerateServiceConfig(ctx context.Context, desc structs.ServiceDesc) (structs.ConfigsMap, error)
+	GenerateServiceConfig(ctx context.Context, desc structs.ServiceSpec) (structs.ConfigsMap, error)
 	GetUnitConfig(ctx context.Context, service, unit string) (structs.ConfigCmds, error)
 	GetCommands(ctx context.Context, service string) (structs.Commands, error)
 
@@ -33,7 +33,7 @@ func NewPlugin(cli client.Client) PluginAPI {
 	}
 }
 
-func (p plugin) GenerateServiceConfig(ctx context.Context, desc structs.ServiceDesc) (structs.ConfigsMap, error) {
+func (p plugin) GenerateServiceConfig(ctx context.Context, desc structs.ServiceSpec) (structs.ConfigsMap, error) {
 	var m structs.ConfigsMap
 
 	resp, err := client.RequireOK(p.c.Post(ctx, "/configs", desc))
