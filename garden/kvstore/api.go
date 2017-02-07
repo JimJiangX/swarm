@@ -21,7 +21,7 @@ type Client interface {
 type Register interface {
 	HealthChecks(state string, q *api.QueryOptions) (map[string]api.HealthCheck, error)
 
-	RegisterService(ctx context.Context, host string, config api.AgentServiceRegistration, obj structs.HorusRegistration) error
+	RegisterService(ctx context.Context, host string, config structs.ServiceRegistration) error
 
 	DeregisterService(ctx context.Context, addr, key string) error
 }

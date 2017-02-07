@@ -11,7 +11,6 @@ import (
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
 	pluginapi "github.com/docker/swarm/plugin/parser/api"
-	consulapi "github.com/hashicorp/consul/api"
 	"golang.org/x/net/context"
 )
 
@@ -46,17 +45,7 @@ func newService(spec structs.ServiceSpec, so database.ServiceOrmer, cluster clus
 }
 
 func (gd *Garden) NewService(spec structs.ServiceSpec) *Service {
-	image, version := spec.ParseImage()
-
-	return &Service{
-		spec:         spec,
-		so:           gd.ormer,
-		cluster:      gd.Cluster,
-		pluginClient: gd.pluginClient,
-		sl:           newStatusLock(spec.ID, gd.ormer),
-		imageName:    image,
-		imageVersion: version,
-	}
+	return newService(spec, gd.ormer, gd.Cluster, gd.pluginClient)
 }
 
 func (svc *Service) getUnit(nameOrID string) (*unit, error) {
@@ -236,9 +225,8 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 		}
 
 		r := config.GetServiceRegistration()
-		_consul := consulapi.AgentServiceRegistration(r.Consul)
 
-		err = kvc.RegisterService(ctx, host, _consul, r.Horus)
+		err = kvc.RegisterService(ctx, host, r)
 		if err != nil {
 			return err
 		}

@@ -31,11 +31,9 @@ type HorusRegistration struct {
 }
 
 type ServiceRegistration struct {
-	Consul AgentServiceRegistration
+	Consul api.AgentServiceRegistration
 	Horus  HorusRegistration
 }
-
-type AgentServiceRegistration api.AgentServiceRegistration
 
 type ConfigCmds struct {
 	ID        string

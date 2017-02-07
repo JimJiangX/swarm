@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/docker/swarm/garden/structs"
-	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 )
 
@@ -154,15 +153,15 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, force bool, endpoints 
 }
 
 // RegisterService register service to consul and Horus
-func (c *kvClient) RegisterService(ctx context.Context, host string, config api.AgentServiceRegistration, obj structs.HorusRegistration) error {
-	err := c.registerHealthCheck(host, config)
+func (c *kvClient) RegisterService(ctx context.Context, host string, config structs.ServiceRegistration) error {
+	err := c.registerHealthCheck(host, config.Consul)
 	if err != nil {
 		return err
 	}
 
 	select {
 	default:
-		err = c.registerToHorus(ctx, obj)
+		err = c.registerToHorus(ctx, config.Horus)
 
 	case <-ctx.Done():
 		return ctx.Err()
