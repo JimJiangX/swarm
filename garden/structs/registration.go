@@ -59,8 +59,8 @@ type RequireResource struct {
 	}
 }
 
-type UnitResources struct {
-	ID, Name string
+type UnitSpec struct {
+	database.Unit
 
 	Require, Limit struct {
 		CPU    string
@@ -107,7 +107,7 @@ type ServiceSpec struct {
 
 	Users []database.User
 
-	Units []UnitResources
+	Units []UnitSpec
 
 	Deps []*ServiceSpec
 }

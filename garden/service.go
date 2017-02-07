@@ -26,8 +26,6 @@ type Service struct {
 
 	imageName    string
 	imageVersion string
-
-	units []database.Unit
 }
 
 func newService(spec structs.ServiceSpec, so database.ServiceOrmer, cluster cluster.Cluster, pc pluginapi.PluginAPI) *Service {

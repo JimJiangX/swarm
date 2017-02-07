@@ -91,7 +91,10 @@ func (s *Stack) DeployServices(ctx context.Context) error {
 		if _, ok := existing[s.services[i].Name]; ok {
 			err = svc.Start(ctx)
 		} else {
-			err = svc.InitStart(ctx, s.gd.KVClient(), nil)
+			if kvc := s.gd.KVClient(); kvc != nil {
+				err = svc.InitStart(ctx, kvc, nil)
+			}
+			//TODO: KV Client is nil
 		}
 
 		if err != nil {
