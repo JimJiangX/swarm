@@ -26,6 +26,34 @@ func (sp servicesByPriority) Swap(i, j int) {
 	sp[i], sp[j] = sp[j], sp[i]
 }
 
+func initServicesPriority(services []structs.ServiceSpec) servicesByPriority {
+	priority := make(map[string]int, len(services))
+
+	for i := range services {
+		max := 0
+		for _, d := range services[i].Deps {
+			if d != nil {
+				if d.Priority > 0 {
+					priority[d.Name] = d.Priority
+				}
+				if priority[d.Name] > max {
+					max = priority[d.Name]
+				}
+			}
+		}
+
+		if len(services[i].Deps) > 0 {
+			priority[services[i].Name] = max + 1
+		}
+	}
+
+	for i := range services {
+		services[i].Priority = priority[services[i].Name]
+	}
+
+	return servicesByPriority(services)
+}
+
 type Stack struct {
 	gd       *garden.Garden
 	services []structs.ServiceSpec
@@ -49,7 +77,7 @@ func (s *Stack) DeployServices(ctx context.Context) error {
 		existing[service.Name] = service
 	}
 
-	sorted := servicesByPriority(s.services)
+	sorted := initServicesPriority(s.services)
 	sort.Sort(sorted)
 
 	s.services = sorted
@@ -116,7 +144,7 @@ func (s *Stack) freshServices(ctx context.Context) error {
 		existing[list[i].Name] = list[i]
 	}
 
-	sorted := servicesByPriority(s.services)
+	sorted := initServicesPriority(s.services)
 	sort.Sort(sorted)
 
 	for i := range sorted {
