@@ -48,9 +48,9 @@ type Gardener struct {
 	registry_authConfig *types.AuthConfig
 	cronJobs            map[crontab.EntryID]*serviceBackup
 
-	datacenters []*Datacenter
+	// datacenters []*Datacenter
 	networkings []*Networking
-	services    []*Service
+	//	services    []*Service
 }
 
 // NewGardener is exported
@@ -65,12 +65,12 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	}
 
 	gd := &Gardener{
-		Cluster:     cluster,
-		cron:        crontab.New(),
-		cronJobs:    make(map[crontab.EntryID]*serviceBackup),
-		datacenters: make([]*Datacenter, 0, 50),
+		Cluster:  cluster,
+		cron:     crontab.New(),
+		cronJobs: make(map[crontab.EntryID]*serviceBackup),
+		//		datacenters: make([]*Datacenter, 0, 50),
 		networkings: make([]*Networking, 0, 50),
-		services:    make([]*Service, 0, 100),
+		//	services:    make([]*Service, 0, 100),
 	}
 
 	for _, host := range hosts {
@@ -103,7 +103,7 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	}
 
 	gd.cron.Start()
-	go gd.syncNodeWithEngine()
+	// go gd.syncNodeWithEngine()
 
 	return gd, nil
 }
@@ -137,24 +137,23 @@ func (gd *Gardener) syncNodeWithEngine() {
 			}
 		}
 
-		var dc *Datacenter
+		//		var dc *Datacenter
 
-		gd.RLock()
-		for i := range gd.datacenters {
-			if gd.datacenters[i].ID == nodeTab.ClusterID {
-				dc = gd.datacenters[i]
-				break
-			}
-		}
-		gd.RUnlock()
+		//		gd.RLock()
+		//		for i := range gd.datacenters {
+		//			if gd.datacenters[i].ID == nodeTab.ClusterID {
+		//				dc = gd.datacenters[i]
+		//				break
+		//			}
+		//		}
+		//		gd.RUnlock()
 
-		if dc == nil {
-			dc, err = gd.Datacenter(nodeTab.ClusterID)
-			if err != nil {
-				logrus.WithField("Engine", engine.Addr).Warn(err)
-			}
-			continue
+		//		if dc == nil {
+		dc, err := gd.Datacenter(nodeTab.ClusterID)
+		if err != nil {
+			logrus.WithField("Engine", engine.Addr).Warn(err)
 		}
+		continue
 
 		node, err := dc.GetNode(nodeTab.ID)
 		if err == nil {
@@ -176,61 +175,61 @@ func (gd *Gardener) syncNodeWithEngine() {
 			}
 		}
 
-		err = gd.reloadServiceByEngine(engine.ID)
-		if err != nil {
-			logrus.WithField("Engine", engine.Addr).WithError(err).Warn("sync Node with Engine,reload Services on engine")
-		}
+		//		err = gd.reloadServiceByEngine(engine.ID)
+		//		if err != nil {
+		//			logrus.WithField("Engine", engine.Addr).WithError(err).Warn("sync Node with Engine,reload Services on engine")
+		//		}
 	}
 }
 
-func (gd *Gardener) reloadServiceByEngine(engineID string) error {
-	units, err := database.ListUnitByEngine(engineID)
-	if err != nil {
-		return err
-	}
+//func (gd *Gardener) reloadServiceByEngine(engineID string) error {
+//	units, err := database.ListUnitByEngine(engineID)
+//	if err != nil {
+//		return err
+//	}
 
-	list := make([]string, 0, len(units))
+//	list := make([]string, 0, len(units))
 
-	for i := range units {
-		exist := false
-		for j := range list {
-			if list[j] == units[i].ServiceID {
-				exist = true
-				break
-			}
-		}
+//	for i := range units {
+//		exist := false
+//		for j := range list {
+//			if list[j] == units[i].ServiceID {
+//				exist = true
+//				break
+//			}
+//		}
 
-		if !exist {
-			list = append(list, units[i].ServiceID)
-		}
-	}
+//		if !exist {
+//			list = append(list, units[i].ServiceID)
+//		}
+//	}
 
-	for i := range list {
-		var svc *Service
+//	for i := range list {
+//		var svc *Service
 
-		gd.RLock()
-		for s := range gd.services {
-			if gd.services[s].ID == list[i] {
-				svc = gd.services[i]
-				break
-			}
-		}
-		gd.RUnlock()
+//		gd.RLock()
+//		for s := range gd.services {
+//			if gd.services[s].ID == list[i] {
+//				svc = gd.services[i]
+//				break
+//			}
+//		}
+//		gd.RUnlock()
 
-		if svc != nil {
-			svc.Lock()
-		}
-		_, err := gd.reloadService(list[i])
-		if err != nil {
-			logrus.WithField("Service", list[i]).WithError(err).Error("reload service")
-		}
-		if svc != nil {
-			svc.Unlock()
-		}
-	}
+//		if svc != nil {
+//			svc.Lock()
+//		}
+//		_, err := gd.reloadService(list[i])
+//		if err != nil {
+//			logrus.WithField("Service", list[i]).WithError(err).Error("reload service")
+//		}
+//		if svc != nil {
+//			svc.Unlock()
+//		}
+//	}
 
-	return nil
-}
+//	return nil
+//}
 
 func (gd *Gardener) generateUUID(length int) string {
 	for {

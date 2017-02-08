@@ -593,41 +593,41 @@ func (svc *Service) getUnit(nameOrID string) (*unit, error) {
 	return nil, errors.Errorf("not found Unit '%s'", nameOrID)
 }
 
-func (gd *Gardener) addService(svc *Service) error {
-	if svc == nil {
-		return errors.New("Service cannot be nil pointer")
-	}
+//func (gd *Gardener) addService(svc *Service) error {
+//	if svc == nil {
+//		return errors.New("Service cannot be nil pointer")
+//	}
 
-	gd.RLock()
-	for i := range gd.services {
-		if gd.services[i].ID == svc.ID || gd.services[i].Name == svc.Name {
-			gd.RUnlock()
+//	gd.RLock()
+//	for i := range gd.services {
+//		if gd.services[i].ID == svc.ID || gd.services[i].Name == svc.Name {
+//			gd.RUnlock()
 
-			return errors.Errorf("Service %s existed", svc.Name)
-		}
-	}
-	gd.RUnlock()
+//			return errors.Errorf("Service %s existed", svc.Name)
+//		}
+//	}
+//	gd.RUnlock()
 
-	gd.Lock()
-	gd.services = append(gd.services, svc)
-	gd.Unlock()
+//	gd.Lock()
+//	gd.services = append(gd.services, svc)
+//	gd.Unlock()
 
-	return nil
-}
+//	return nil
+//}
 
 // GetService returns Service of the Gardener
 func (gd *Gardener) GetService(nameOrID string) (*Service, error) {
-	gd.RLock()
+	//	gd.RLock()
 
-	for i := range gd.services {
-		if gd.services[i].ID == nameOrID || gd.services[i].Name == nameOrID {
-			gd.RUnlock()
+	//	for i := range gd.services {
+	//		if gd.services[i].ID == nameOrID || gd.services[i].Name == nameOrID {
+	//			gd.RUnlock()
 
-			return gd.services[i], nil
-		}
-	}
+	//			return gd.services[i], nil
+	//		}
+	//	}
 
-	gd.RUnlock()
+	//	gd.RUnlock()
 
 	return gd.reloadService(nameOrID)
 }
@@ -698,19 +698,19 @@ func (gd *Gardener) reloadService(nameOrID string) (*Service, error) {
 
 	entry.Debug("reload Service")
 
-	exist := false
-	gd.Lock()
-	for i := range gd.services {
-		if gd.services[i].ID == svc.ID {
-			gd.services[i] = svc
-			exist = true
-			break
-		}
-	}
-	if !exist {
-		gd.services = append(gd.services, svc)
-	}
-	gd.Unlock()
+	//	exist := false
+	//	gd.Lock()
+	//	for i := range gd.services {
+	//		if gd.services[i].ID == svc.ID {
+	//			gd.services[i] = svc
+	//			exist = true
+	//			break
+	//		}
+	//	}
+	//	if !exist {
+	//		gd.services = append(gd.services, svc)
+	//	}
+	//	gd.Unlock()
 
 	return svc, nil
 }
@@ -746,12 +746,12 @@ func (gd *Gardener) CreateService(req structs.PostServiceRequest) (*Service, str
 		"Servcie": svc.Name,
 	}).Info("Service saved into database")
 
-	err = gd.addService(svc)
-	if err != nil {
-		logrus.WithField("Service", svc.Name).WithError(err).Error("Service add to Gardener")
+	//	err = gd.addService(svc)
+	//	if err != nil {
+	//		logrus.WithField("Service", svc.Name).WithError(err).Error("Service add to Gardener")
 
-		return svc, strategyID, task.ID, err
-	}
+	//		return svc, strategyID, task.ID, err
+	//	}
 
 	background := func(context.Context) error {
 		ok, val, err := svc.statusLock.CAS(statusServiceAllocating, func(val int) bool {
@@ -2197,14 +2197,14 @@ func (gd *Gardener) RemoveService(nameOrID string, force, volumes bool, timeout 
 
 	entry.Debug("Remove Service From Gardener...")
 
-	gd.Lock()
-	for i := range gd.services {
-		if gd.services[i].ID == nameOrID || gd.services[i].Name == nameOrID {
-			gd.services = append(gd.services[:i], gd.services[i+1:]...)
-			break
-		}
-	}
-	gd.Unlock()
+	//	gd.Lock()
+	//	for i := range gd.services {
+	//		if gd.services[i].ID == nameOrID || gd.services[i].Name == nameOrID {
+	//			gd.services = append(gd.services[:i], gd.services[i+1:]...)
+	//			break
+	//		}
+	//	}
+	//	gd.Unlock()
 
 	if svc.backup != nil {
 		err = gd.removeCronJob(svc.backup.ID)

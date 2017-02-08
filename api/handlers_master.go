@@ -1644,8 +1644,8 @@ func postDatacenter(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // POST /clusters
 func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	var (
-		req   = structs.PostClusterRequest{}
-		store storage.Store
+		req = structs.PostClusterRequest{}
+	//	store storage.Store
 	)
 
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -1666,7 +1666,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.StorageType != "local" && req.StorageID != "" {
-		store, err = storage.GetStore(req.StorageID)
+		_, err = storage.GetStore(req.StorageID)
 		if err != nil {
 			httpError2(w, err, http.StatusInternalServerError)
 			return
@@ -1687,7 +1687,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gd.AddDatacenter(cluster, store)
+	//	gd.AddDatacenter(cluster, store)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

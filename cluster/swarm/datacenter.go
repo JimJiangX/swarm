@@ -120,47 +120,47 @@ func SaveMultiNodesToDB(nodes []*Node) error {
 
 // Datacenter returns Datacenter store in Gardener,if not found try in database and reload the Datacenter
 func (gd *Gardener) Datacenter(nameOrID string) (*Datacenter, error) {
-	gd.RLock()
-	for i := range gd.datacenters {
-		if gd.datacenters[i].ID == nameOrID || gd.datacenters[i].Name == nameOrID {
-			gd.RUnlock()
+	//	gd.RLock()
+	//	for i := range gd.datacenters {
+	//		if gd.datacenters[i].ID == nameOrID || gd.datacenters[i].Name == nameOrID {
+	//			gd.RUnlock()
 
-			return gd.datacenters[i], nil
-		}
-	}
+	//			return gd.datacenters[i], nil
+	//		}
+	//	}
 
-	gd.RUnlock()
+	//	gd.RUnlock()
 
 	// if not found
-	dc, err := gd.reloadDatacenter(nameOrID)
-	if err != nil {
-		return nil, err
-	}
+	//	dc, err := gd.reloadDatacenter(nameOrID)
+	//	if err != nil {
+	//		return nil, err
+	//	}
 
-	gd.Lock()
-	gd.datacenters = append(gd.datacenters, dc)
-	gd.Unlock()
+	//	gd.Lock()
+	//	gd.datacenters = append(gd.datacenters, dc)
+	//	gd.Unlock()
 
-	return dc, nil
+	return gd.reloadDatacenter(nameOrID)
 }
 
 // AddDatacenter add a Datacenter with Store
-func (gd *Gardener) AddDatacenter(cl database.Cluster, store storage.Store) {
-	dc := &Datacenter{
-		RWMutex: sync.RWMutex{},
-		Cluster: &cl,
-		store:   store,
-		nodes:   make([]*Node, 0, 100),
-	}
+//func (gd *Gardener) AddDatacenter(cl database.Cluster, store storage.Store) {
+//	dc := &Datacenter{
+//		RWMutex: sync.RWMutex{},
+//		Cluster: &cl,
+//		store:   store,
+//		nodes:   make([]*Node, 0, 100),
+//	}
 
-	gd.Lock()
-	gd.datacenters = append(gd.datacenters, dc)
-	gd.Unlock()
+//	gd.Lock()
+//	gd.datacenters = append(gd.datacenters, dc)
+//	gd.Unlock()
 
-	logrus.WithFields(logrus.Fields{
-		"DC": cl.Name,
-	}).Info("Datacenter Initializied")
-}
+//	logrus.WithFields(logrus.Fields{
+//		"DC": cl.Name,
+//	}).Info("Datacenter Initializied")
+//}
 
 // UpdateDatacenterParams update Datacenter settings
 func (gd *Gardener) UpdateDatacenterParams(nameOrID string, max int, limit float32) error {
@@ -512,20 +512,20 @@ func (gd *Gardener) RemoveDatacenter(nameOrID string) error {
 	}
 
 	err = database.DeleteCluster(nameOrID)
-	if err != nil {
-		return err
-	}
+	//	if err != nil {
+	//		return err
+	//	}
 
-	gd.Lock()
-	for i := range gd.datacenters {
-		if gd.datacenters[i].ID == cl.ID {
-			gd.datacenters = append(gd.datacenters[:i], gd.datacenters[i+1:]...)
-			break
-		}
-	}
-	gd.Unlock()
+	//	gd.Lock()
+	//	for i := range gd.datacenters {
+	//		if gd.datacenters[i].ID == cl.ID {
+	//			gd.datacenters = append(gd.datacenters[:i], gd.datacenters[i+1:]...)
+	//			break
+	//		}
+	//	}
+	//	gd.Unlock()
 
-	return nil
+	return err
 }
 
 func (dc *Datacenter) isIdleStoreEnough(num, size int) bool {
@@ -550,30 +550,30 @@ func (dc *Datacenter) isIdleStoreEnough(num, size int) bool {
 	return enough > num
 }
 
-func (gd *Gardener) reloadDatacenters() error {
-	logrus.Debug("reload Datacenters")
+//func (gd *Gardener) reloadDatacenters() error {
+//	logrus.Debug("reload Datacenters")
 
-	list, err := database.ListClusters()
-	if err != nil {
-		return err
-	}
-	gd.Lock()
-	gd.datacenters = make([]*Datacenter, 0, len(list))
-	gd.Unlock()
+//	list, err := database.ListClusters()
+//	if err != nil {
+//		return err
+//	}
+//	gd.Lock()
+//	gd.datacenters = make([]*Datacenter, 0, len(list))
+//	gd.Unlock()
 
-	for i := range list {
-		dc, err := gd.reloadDatacenter(list[i].ID)
-		if err != nil {
-			continue
-		}
+//	for i := range list {
+//		dc, err := gd.reloadDatacenter(list[i].ID)
+//		if err != nil {
+//			continue
+//		}
 
-		gd.Lock()
-		gd.datacenters = append(gd.datacenters, dc)
-		gd.Unlock()
-	}
+//		gd.Lock()
+//		gd.datacenters = append(gd.datacenters, dc)
+//		gd.Unlock()
+//  }
 
-	return nil
-}
+//	return nil
+//}
 
 func (gd *Gardener) reloadDatacenter(nameOrID string) (*Datacenter, error) {
 	logrus.WithField("DC", nameOrID).Debug("reload Datacenter")
@@ -757,16 +757,16 @@ func (gd *Gardener) resourceFilter(list []database.Node, module structs.Module, 
 		return nil, err
 	}
 
-	gd.RLock()
-	length := len(gd.datacenters)
-	gd.RUnlock()
+	//	gd.RLock()
+	//	length := len(gd.datacenters)
+	//	gd.RUnlock()
 
-	if length == 0 {
-		err := gd.reloadDatacenters()
-		if err != nil {
-			return nil, err
-		}
-	}
+	//	if length == 0 {
+	//		err := gd.reloadDatacenters()
+	//		if err != nil {
+	//			return nil, err
+	//		}
+	//	}
 
 	out := make([]database.Node, 0, 100)
 
