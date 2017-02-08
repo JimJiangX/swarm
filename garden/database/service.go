@@ -384,6 +384,7 @@ type ServiceInfo struct {
 
 type UnitInfo struct {
 	Unit        Unit
+	Engine      Node
 	Volumes     []Volume
 	Networkings []IP
 }
@@ -416,6 +417,11 @@ func (db dbBase) GetServiceInfo(nameOrID string) (info ServiceInfo, err error) {
 			return info, err
 		}
 
+		node, err := db.GetNode(units[i].EngineID)
+		if err != nil {
+			return info, err
+		}
+
 		ips, err := db.ListIPByUnitID(units[i].ID)
 		if err != nil {
 			return info, err
@@ -423,6 +429,7 @@ func (db dbBase) GetServiceInfo(nameOrID string) (info ServiceInfo, err error) {
 
 		list[i] = UnitInfo{
 			Unit:        units[i],
+			Engine:      node,
 			Volumes:     lvs,
 			Networkings: ips,
 		}
@@ -435,6 +442,11 @@ func (db dbBase) GetServiceInfo(nameOrID string) (info ServiceInfo, err error) {
 
 func (db dbBase) ListServicesInfo() ([]ServiceInfo, error) {
 	services, err := db.ListServices()
+	if err != nil {
+		return nil, err
+	}
+
+	nodes, err := db.ListNodes()
 	if err != nil {
 		return nil, err
 	}
@@ -475,6 +487,15 @@ func (db dbBase) ListServicesInfo() ([]ServiceInfo, error) {
 				continue
 			}
 
+			node := Node{}
+			if units[u].EngineID != "" {
+				for n := range nodes {
+					if nodes[n].EngineID == units[u].EngineID {
+						node = nodes[n]
+					}
+				}
+			}
+
 			lvs := make([]Volume, 0, 2)
 			for v := range volumes {
 				if volumes[v].UnitID == units[u].ID {
@@ -491,6 +512,7 @@ func (db dbBase) ListServicesInfo() ([]ServiceInfo, error) {
 
 			unitsInfo = append(unitsInfo, UnitInfo{
 				Unit:        units[u],
+				Engine:      node,
 				Volumes:     lvs,
 				Networkings: nets,
 			})

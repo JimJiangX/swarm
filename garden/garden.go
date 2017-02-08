@@ -72,8 +72,71 @@ func (gd *Garden) AuthConfig() (*types.AuthConfig, error) {
 }
 
 func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, error) {
-	// TODO:list services
-	return []structs.ServiceSpec{}, nil
+	list, err := gd.ormer.ListServicesInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	services := make([]structs.ServiceSpec, len(list))
+	for i := range list {
+		units := make([]structs.UnitSpec, 0, len(list[i].Units))
+
+		for u := range list[i].Units {
+			unit := list[i].Units[u]
+
+			// TODO:convert to structs.UnitSpec
+
+			units = append(units, structs.UnitSpec{
+				Unit: unit.Unit,
+
+				//	Require, Limit struct {
+				//		CPU    string
+				//		Memory int64
+				//	}
+
+				Engine: struct {
+					ID   string
+					Name string
+					IP   string
+				}{
+					ID:   unit.Engine.EngineID,
+					Name: unit.Engine.Name,
+					IP:   unit.Engine.Addr,
+				},
+
+				//	Networking struct {
+				//		Type    string
+				//		Devices string
+				//		Mask    int
+				//		IPs     []struct {
+				//			Name  string
+				//			IP    string
+				//			Proto string
+				//		}
+				//		Ports []struct {
+				//			Name string
+				//			Port int
+				//		}
+				//	}
+
+				//	Volumes []struct {
+				//		Type    string
+				//		Driver  string
+				//		Size    int
+				//		Options map[string]interface{}
+				//	}
+			})
+		}
+
+		services = append(services, structs.ServiceSpec{
+			Replicas: len(list[i].Units),
+			Service:  list[i].Service,
+			Users:    list[i].Users,
+			Units:    units,
+		})
+	}
+
+	return services, nil
 }
 
 func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, error) {
