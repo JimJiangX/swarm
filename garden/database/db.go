@@ -78,6 +78,7 @@ import (
 
 type Ormer interface {
 	ServiceInterface
+	ServiceInfoInterface
 	ClusterInterface
 	UnitInterface
 	ContainerInterface

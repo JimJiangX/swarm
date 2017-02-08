@@ -270,6 +270,17 @@ func (db dbBase) txDelUnit(tx *sqlx.Tx, nameOrID string) error {
 	return errors.Wrap(err, "Tx delete Unit by nameOrID or ServiceID")
 }
 
+func (db dbBase) listUnits() ([]Unit, error) {
+	var (
+		out   []Unit
+		query = "SELECT id,name,type,image_id,image_name,service_id,engine_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at FROM " + db.unitTable()
+	)
+
+	err := db.Select(&out, query)
+
+	return out, errors.Wrap(err, "list []Unit")
+}
+
 // ListUnitByServiceID returns []Unit select by ServiceID
 func (db dbBase) ListUnitByServiceID(id string) ([]Unit, error) {
 	var (

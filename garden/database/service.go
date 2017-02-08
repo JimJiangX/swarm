@@ -15,7 +15,7 @@ type ServiceInterface interface {
 	GetServiceStatus(nameOrID string) (int, error)
 	GetServiceByUnit(nameOrID string) (Service, error)
 
-	ListService() ([]Service, error)
+	ListServices() ([]Service, error)
 
 	SetServiceStatus(nameOrID string, val int, finish time.Time) error
 	SetServcieDesc(id, desc string, size int) error
@@ -23,6 +23,11 @@ type ServiceInterface interface {
 	SetServiceWithTask(svc *Service, t Task, state int, finish time.Time) error
 
 	DelServiceRelation(serviceID string, rmVolumes bool) error
+}
+
+type ServiceInfoInterface interface {
+	GetServiceInfo(nameOrID string) (ServiceInfo, error)
+	ListServicesInfo() ([]ServiceInfo, error)
 }
 
 type ServiceOrmer interface {
@@ -33,6 +38,8 @@ type ServiceOrmer interface {
 	ImageOrmer
 
 	ServiceInterface
+
+	ServiceInfoInterface
 }
 
 // Service if table structure
@@ -66,8 +73,8 @@ func (db dbBase) serviceTable() string {
 	return db.prefix + "_service"
 }
 
-// ListService returns all []Service
-func (db dbBase) ListService() ([]Service, error) {
+// ListServices returns all []Service
+func (db dbBase) ListServices() ([]Service, error) {
 	var (
 		out   []Service
 		query = "SELECT id,name,description,architecture,business_code,auto_healing,auto_scaling,status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable() + ""
@@ -367,4 +374,134 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 	}
 
 	return db.txFrame(do)
+}
+
+type ServiceInfo struct {
+	Service Service
+	Users   []User
+	Units   []UnitInfo
+}
+
+type UnitInfo struct {
+	Unit        Unit
+	Volumes     []Volume
+	Networkings []IP
+}
+
+func (db dbBase) GetServiceInfo(nameOrID string) (info ServiceInfo, err error) {
+	svc, err := db.GetService(nameOrID)
+	if err != nil {
+		return
+	}
+
+	info.Service = svc
+
+	users, err := db.ListUsersByService(svc.ID, "")
+	if err != nil {
+		return
+	}
+
+	info.Users = users
+
+	units, err := db.ListUnitByServiceID(svc.ID)
+	if err != nil {
+		return
+	}
+
+	list := make([]UnitInfo, len(units))
+
+	for i := range units {
+		lvs, err := db.ListVolumesByUnitID(units[i].ID)
+		if err != nil {
+			return info, err
+		}
+
+		ips, err := db.ListIPByUnitID(units[i].ID)
+		if err != nil {
+			return info, err
+		}
+
+		list[i] = UnitInfo{
+			Unit:        units[i],
+			Volumes:     lvs,
+			Networkings: ips,
+		}
+	}
+
+	info.Units = list
+
+	return info, nil
+}
+
+func (db dbBase) ListServicesInfo() ([]ServiceInfo, error) {
+	services, err := db.ListServices()
+	if err != nil {
+		return nil, err
+	}
+
+	units, err := db.listUnits()
+	if err != nil {
+		return nil, err
+	}
+
+	users, err := db.listUsers()
+	if err != nil {
+		return nil, err
+	}
+
+	volumes, err := db.listVolumes()
+	if err != nil {
+		return nil, err
+	}
+
+	ips, err := db.listIPsByAllocated(true, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	list := make([]ServiceInfo, 0, len(services))
+	for i := range services {
+		us := make([]User, 0, 5)
+		unitsInfo := make([]UnitInfo, 0, 5)
+
+		for u := range users {
+			if users[u].ServiceID == services[i].ID {
+				us = append(us, users[u])
+			}
+		}
+
+		for u := range units {
+			if units[u].ServiceID != services[i].ID {
+				continue
+			}
+
+			lvs := make([]Volume, 0, 2)
+			for v := range volumes {
+				if volumes[v].UnitID == units[u].ID {
+					lvs = append(lvs, volumes[v])
+				}
+			}
+
+			nets := make([]IP, 0, 2)
+			for n := range ips {
+				if ips[n].Allocated && ips[n].UnitID == units[u].ID {
+					nets = append(nets, ips[n])
+				}
+			}
+
+			unitsInfo = append(unitsInfo, UnitInfo{
+				Unit:        units[u],
+				Volumes:     lvs,
+				Networkings: nets,
+			})
+		}
+
+		list = append(list, ServiceInfo{
+			Service: services[i],
+			Users:   us,
+			Units:   unitsInfo,
+		})
+	}
+
+	return list, nil
 }

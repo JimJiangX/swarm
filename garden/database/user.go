@@ -41,6 +41,25 @@ func (db dbBase) userTable() string {
 	return db.prefix + "_users"
 }
 
+func (db dbBase) listUsers() ([]User, error) {
+	var users []User
+	query := "SELECT id,service_id,type,username,password,role,read_only,blacklist,whitelist,created_at FROM " + db.userTable()
+	err := db.Select(&users, query)
+	if err != nil {
+		return nil, errors.Wrap(err, "list []User")
+	}
+
+	for i := range users {
+		err = users[i].jsonDecode()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return users, nil
+
+}
+
 // ListUsersByService returns []User select by serviceID and User type if assigned
 func (db dbBase) ListUsersByService(service, _type string) ([]User, error) {
 	var (

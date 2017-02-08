@@ -188,6 +188,17 @@ func (db dbBase) ListVolumeByVG(name string) ([]Volume, error) {
 	return lvs, errors.Wrap(err, "list []Volume by VGName")
 }
 
+func (db dbBase) listVolumes() ([]Volume, error) {
+	var (
+		lvs   []Volume
+		query = "SELECT id,name,unit_id,size,VGname,driver,fstype FROM " + db.volumeTable()
+	)
+
+	err := db.Select(&lvs, query)
+
+	return lvs, errors.Wrap(err, "list []Volume")
+}
+
 // ListVolumesByUnitID returns []Volume select by UnitID
 func (db dbBase) ListVolumesByUnitID(id string) ([]Volume, error) {
 	var (

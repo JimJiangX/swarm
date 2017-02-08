@@ -61,6 +61,24 @@ func (db dbBase) ListIPByNetworking(networkingID string) ([]IP, error) {
 	return list, errors.Wrap(err, "list []IP by networking")
 }
 
+// ListIPWithCondition returns []IP select by  Allocated==allocated
+func (db dbBase) listIPsByAllocated(allocation bool, num int) ([]IP, error) {
+	var (
+		out   []IP
+		query string
+	)
+
+	if num > 0 {
+		query = fmt.Sprintf("SELECT ip_addr,prefix,networking_id,unit_id,allocated from %s WHERE allocated=? LIMIT %d", db.ipTable(), num)
+	} else {
+		query = fmt.Sprintf("SELECT ip_addr,prefix,networking_id,unit_id,allocated from %s WHERE allocated=?", db.ipTable())
+	}
+
+	err := db.Select(&out, query, allocation)
+
+	return out, errors.Wrap(err, "list []IP by allocated")
+}
+
 // ListIPByUnitID returns []IP select by UnitID
 func (db dbBase) ListIPByUnitID(unit string) ([]IP, error) {
 	var (
