@@ -21,13 +21,13 @@ type ServiceInterface interface {
 	SetServcieDesc(id, desc string, size int) error
 	ServiceStatusCAS(nameOrID string, val int, finish time.Time, f func(val int) bool) (bool, int, error)
 	SetServiceWithTask(svc *Service, t Task, state int, finish time.Time) error
-
-	DelServiceRelation(serviceID string, rmVolumes bool) error
 }
 
 type ServiceInfoInterface interface {
 	GetServiceInfo(nameOrID string) (ServiceInfo, error)
 	ListServicesInfo() ([]ServiceInfo, error)
+
+	DelServiceRelation(serviceID string, rmVolumes bool) error
 }
 
 type ServiceOrmer interface {
