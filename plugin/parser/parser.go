@@ -34,7 +34,7 @@ var images = make(map[string]bool, 10)
 func register(name, version string, _ parser) error {
 	key := name + ":" + version
 	if _, exist := images[key]; exist {
-		return fmt.Errorf("image:%s:%s exist", key)
+		return fmt.Errorf("image:%s exist", key)
 	}
 
 	images[key] = true
