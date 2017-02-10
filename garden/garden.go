@@ -139,7 +139,21 @@ func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, erro
 	return services, nil
 }
 
+func (gd *Garden) validServiceSpec(spec structs.ServiceSpec) error {
+	return nil
+}
+
 func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, error) {
+	err := gd.validServiceSpec(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	image, err := gd.ormer.GetImage(spec.Image)
+	if err != nil {
+		return nil, err
+	}
+
 	if spec.ID == "" {
 		spec.ID = utils.Generate32UUID()
 	}
@@ -154,7 +168,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, error) {
 			ID:            uid,
 			Name:          fmt.Sprintf("%s_%s", uid[:8], spec.Name), // <unit_id_8bit>_<service_name>
 			Type:          "",
-			ImageID:       "",
+			ImageID:       image.ID,
 			ImageName:     spec.Image,
 			ServiceID:     spec.ID,
 			NetworkMode:   "none",
@@ -168,7 +182,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, error) {
 
 	spec.Units = units
 
-	err := gd.ormer.InsertService(spec.Service, us, nil, spec.Users)
+	err = gd.ormer.InsertService(spec.Service, us, nil, spec.Users)
 	if err != nil {
 		return nil, err
 	}

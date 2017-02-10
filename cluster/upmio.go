@@ -44,7 +44,10 @@ func (c Container) Exec(ctx context.Context, cmd []string) (types.ContainerExecI
 	}
 
 	return c.Engine.containerExec(ctx, c.ID, cmd, false)
+}
 
+func (c Container) IsRunning() bool {
+	return c.State == "running"
 }
 
 // checkTtyInput checks if we are trying to attach to a container tty

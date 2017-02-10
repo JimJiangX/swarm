@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
@@ -317,15 +318,15 @@ func (svc *Service) Stop(ctx context.Context) error {
 		}
 	}()
 
-	return svc.stop(ctx)
-}
-
-func (svc *Service) stop(ctx context.Context) error {
 	units, err := svc.getUnits()
 	if err != nil {
 		return err
 	}
 
+	return svc.stop(ctx, units)
+}
+
+func (svc *Service) stop(ctx context.Context, units []*unit) error {
 	cmds, err := svc.generateUnitsCmd(ctx)
 	if err != nil {
 		return err
@@ -350,11 +351,7 @@ func (svc *Service) stop(ctx context.Context) error {
 	return nil
 }
 
-func (svc *Service) Scale() error {
-	return nil
-}
-
-func (svc *Service) Update() error {
+func (svc *Service) Update(updateConfig *container.UpdateConfig) error {
 	return nil
 }
 
@@ -412,17 +409,22 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) error {
 		return err
 	}
 
-	err = svc.deregisterSerivces(ctx, r)
+	units, err := svc.getUnits()
 	if err != nil {
 		return err
 	}
 
-	err = svc.removeContainers(ctx, true, false)
+	err = svc.deregisterSerivces(ctx, r, units)
 	if err != nil {
 		return err
 	}
 
-	err = svc.removeVolumes(ctx)
+	err = svc.removeContainers(ctx, units, true, false)
+	if err != nil {
+		return err
+	}
+
+	err = svc.removeVolumes(ctx, units)
 	if err != nil {
 		return err
 	}
@@ -433,11 +435,7 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) error {
 	return err
 }
 
-func (svc *Service) removeContainers(ctx context.Context, force, rmVolumes bool) error {
-	units, err := svc.getUnits()
-	if err != nil {
-		return err
-	}
+func (svc *Service) removeContainers(ctx context.Context, units []*unit, force, rmVolumes bool) error {
 
 	for _, u := range units {
 		engine := u.getEngine()
@@ -472,11 +470,7 @@ func (svc *Service) removeContainers(ctx context.Context, force, rmVolumes bool)
 	return nil
 }
 
-func (svc *Service) removeVolumes(ctx context.Context) error {
-	units, err := svc.getUnits()
-	if err != nil {
-		return err
-	}
+func (svc *Service) removeVolumes(ctx context.Context, units []*unit) error {
 
 	for _, u := range units {
 		err := u.removeVolumes(ctx)
@@ -492,11 +486,7 @@ func (svc *Service) deleteCondition() error {
 	return nil
 }
 
-func (svc *Service) deregisterSerivces(ctx context.Context, r kvstore.Register) error {
-	units, err := svc.getUnits()
-	if err != nil {
-		return err
-	}
+func (svc *Service) deregisterSerivces(ctx context.Context, r kvstore.Register, units []*unit) error {
 
 	for i := range units {
 		host := ""
@@ -506,7 +496,7 @@ func (svc *Service) deregisterSerivces(ctx context.Context, r kvstore.Register) 
 		if host == "" {
 			// TODO: get node IP
 		}
-		err = r.DeregisterService(ctx, host, units[i].u.ID)
+		err := r.DeregisterService(ctx, host, units[i].u.ID)
 		if err != nil {
 			return err
 		}
