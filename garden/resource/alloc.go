@@ -14,6 +14,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+// volumeDrivers labels
+const (
+	_SSD               = "local:SSD"
+	_HDD               = "local:HDD"
+	_HDD_VG_Label      = "HDD_VG"
+	_SSD_VG_Label      = "SSD_VG"
+	_HDD_VG_Size_Label = "HDD_VG_SIZE"
+	_SSD_VG_Size_Label = "SSD_VG_SIZE"
+	defaultFileSystem  = "xfs"
+)
+
 type allocator struct {
 	ormer   database.Ormer
 	cluster cluster.Cluster
@@ -73,11 +84,64 @@ func (at allocator) isNodeStoreEnough(engineID string, stores []structs.VolumeRe
 	return is, nil
 }
 
+func volumeDriverFromEngine(e *cluster.Engine, label string) (volumeDriver, error) {
+	var vgType, sizeLabel string
+
+	switch label {
+	case _HDD_VG_Label:
+		vgType = _HDD
+		sizeLabel = _HDD_VG_Size_Label
+
+	case _SSD_VG_Label:
+		vgType = _SSD
+		sizeLabel = _SSD_VG_Size_Label
+
+	default:
+	}
+
+	e.RLock()
+
+	vg, ok := e.Labels[label]
+	if !ok {
+		e.RUnlock()
+
+		return volumeDriver{}, errors.New("not found label by key:" + label)
+	}
+
+	size, ok := e.Labels[sizeLabel]
+	if ok {
+		e.RUnlock()
+
+		return volumeDriver{}, errors.New("not found label by key:" + sizeLabel)
+	}
+
+	e.RUnlock()
+
+	total, err := strconv.ParseInt(size, 10, 64)
+	if err != nil {
+		return volumeDriver{}, errors.Wrapf(err, "parse VG %s:%s", sizeLabel, size)
+	}
+
+	return volumeDriver{
+		Total:  total,
+		Type:   vgType,
+		VG:     vg,
+		Fstype: defaultFileSystem,
+	}, nil
+}
+
 func (at allocator) engineVolumeDrivers(e *cluster.Engine) (volumeDrivers, error) {
-	//	e.RLock()
-	//	defer e.RUnlock()
-	// TODO:
-	drivers := []volumeDriver{}
+	drivers := make([]volumeDriver, 0, 2)
+
+	vd, err := volumeDriverFromEngine(e, _HDD_VG_Label)
+	if err == nil {
+		drivers = append(drivers, vd)
+	}
+
+	vd, err = volumeDriverFromEngine(e, _SSD_VG_Label)
+	if err == nil {
+		drivers = append(drivers, vd)
+	}
 
 	for i := range drivers {
 
