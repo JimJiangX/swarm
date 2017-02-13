@@ -826,7 +826,7 @@ func TxUpdateUsers(addition, update []User) error {
 		return errors.Wrap(err, "Tx update []User")
 	}
 
-	const query = "UPDATE tbl_dbaas_users SET type=:type,password=:password,role=:role,read_only=:read_only,rw_split=:rw_split,shard=:shard,blacklist=:blacklist,whitelist=:whitelist WHERE id=:id OR username=:username"
+	const query = "UPDATE tbl_dbaas_users SET type=:type,password=:password,role=:role,read_only=:read_only,rw_split=:rw_split,shard=:shard,blacklist=:blacklist,whitelist=:whitelist WHERE id=:id"
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
 		return errors.Wrap(err, "Tx prepare update User")
