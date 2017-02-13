@@ -249,7 +249,7 @@ init_hdd_vg() {
 
 # init VG
 init_ssd_vg() {
-	local hdd_dev_list=''
+	local ssd_dev_list=''
 	if [ "${ssd_dev}" == "null" ]; then
 		ssd_dev=''
 		ssd_vgname=''
