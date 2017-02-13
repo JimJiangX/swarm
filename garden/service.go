@@ -200,34 +200,38 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 		}
 	}
 
-	for i := range units {
-		host := ""
-		c := units[i].getContainer()
-		if c != nil {
-			host = c.Engine.IP
-		}
-		if host == "" {
-			// TODO: get node IP
-		}
-		val, err := json.Marshal(c)
-		if err != nil {
-			// TODO: json marshal error
-		}
-		err = kvc.PutKV(containerKV+c.ID, val)
-		if err != nil {
-			return err
-		}
+	if kvc != nil {
+		// register to kv store and third-part services
+		for i := range units {
+			host := ""
+			c := units[i].getContainer()
+			if c != nil {
+				host = c.Engine.IP
+			}
+			if host == "" {
+				// TODO: get node IP
+			}
+			val, err := json.Marshal(c)
+			if err != nil {
+				// TODO: json marshal error
+			}
 
-		config, ok := configs.Get(units[i].u.ID)
-		if !ok {
-			// TODO:
-		}
+			err = kvc.PutKV(containerKV+c.ID, val)
+			if err != nil {
+				return err
+			}
 
-		r := config.GetServiceRegistration()
+			config, ok := configs.Get(units[i].u.ID)
+			if !ok {
+				// TODO:
+			}
 
-		err = kvc.RegisterService(ctx, host, r)
-		if err != nil {
-			return err
+			r := config.GetServiceRegistration()
+
+			err = kvc.RegisterService(ctx, host, r)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
