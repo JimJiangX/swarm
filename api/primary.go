@@ -129,6 +129,7 @@ func NewPrimary(cluster cluster.Cluster, tlsConfig *tls.Config, status StatusHan
 
 	r := mux.NewRouter()
 	setupPrimaryRouter(r, context, enableCors)
+	setupMasterRouter(r, context, enableCors)
 
 	if debug {
 		profilerSetup(r, "/debug/")
