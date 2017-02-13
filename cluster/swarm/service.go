@@ -408,6 +408,18 @@ func defaultServiceUsers(service string, sys database.Configurations) []database
 			Shard:     false,
 			CreatedAt: now,
 		},
+		database.User{
+			ID:        utils.Generate32UUID(),
+			ServiceID: service,
+			Type:      User_Type_DB,
+			Username:  sys.ReadOnlyUsername,
+			Password:  sys.ReadOnlyPassword + "_@",
+			Role:      _User_APP_RO_Role,
+			ReadOnly:  true,
+			RWSplit:   false,
+			Shard:     false,
+			CreatedAt: now,
+		},
 	}
 }
 
@@ -441,6 +453,7 @@ func converteToUsers(service string, users []structs.User) []database.User {
 		case users[i].Role == _User_DBA_Role:
 		case users[i].Role == _User_Monitor_Role:
 		case users[i].Role == _User_Replication_Role:
+		case users[i].Role == _User_APP_RO_Role:
 
 		case strings.ToLower(users[i].Role) == strings.ToLower(_User_DB_Role):
 
@@ -449,6 +462,10 @@ func converteToUsers(service string, users []structs.User) []database.User {
 		case strings.ToLower(users[i].Role) == strings.ToLower(_User_Application_Role):
 
 			users[i].Role = _User_Application_Role
+
+		case strings.ToLower(users[i].Role) == strings.ToLower(_User_APP_RO_Role):
+
+			users[i].Role = _User_APP_RO_Role
 
 		default:
 			logrus.WithField("Service", service).Warnf("skip:%s Role='%s'", users[i].Username, users[i].Role)
@@ -498,6 +515,7 @@ func converteToSWM_Users(users []database.User) []swm_structs.User {
 		switch {
 		case users[i].Role == _User_DB_Role:
 		case users[i].Role == _User_Application_Role:
+		case users[i].Role == _User_APP_RO_Role:
 
 		case strings.ToLower(users[i].Role) == strings.ToLower(_User_DB_Role):
 
@@ -506,6 +524,10 @@ func converteToSWM_Users(users []database.User) []swm_structs.User {
 		case strings.ToLower(users[i].Role) == strings.ToLower(_User_Application_Role):
 
 			users[i].Role = _User_Application_Role
+
+		case strings.ToLower(users[i].Role) == strings.ToLower(_User_APP_RO_Role):
+
+			users[i].Role = _User_APP_RO_Role
 
 		default:
 			logrus.WithField("Service", users[i].ServiceID).Warnf("skip:%s Role='%s'", users[i].Username, users[i].Role)

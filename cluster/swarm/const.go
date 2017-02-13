@@ -244,6 +244,7 @@ const (
 	_User_Monitor_Role     = "mon"
 	_User_Replication_Role = "repl"
 	_User_Check_Role       = "check"
+	_User_APP_RO_Role      = "ap_ro"
 
 	User_Type_DB    = consts.Type_Db
 	User_Type_Proxy = consts.Type_Proxy
