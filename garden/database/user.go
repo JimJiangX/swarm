@@ -21,6 +21,8 @@ type UserOrmer interface {
 
 // User is for DB and Proxy
 type User struct {
+	RWSplit   bool   `db:"rw_split" json:"rw_split"`
+	Shard     bool   `db:"shard" json:"shard"`
 	ReadOnly  bool   `db:"read_only" json:"read_only"`
 	ID        string `db:"id"`
 	ServiceID string `db:"service_id" json:"service_id"`
@@ -43,7 +45,7 @@ func (db dbBase) userTable() string {
 
 func (db dbBase) listUsers() ([]User, error) {
 	var users []User
-	query := "SELECT id,service_id,type,username,password,role,read_only,blacklist,whitelist,created_at FROM " + db.userTable()
+	query := "SELECT id,service_id,type,username,password,role,read_only,rw_split,shard,blacklist,whitelist,created_at FROM " + db.userTable()
 	err := db.Select(&users, query)
 	if err != nil {
 		return nil, errors.Wrap(err, "list []User")
@@ -69,12 +71,12 @@ func (db dbBase) ListUsersByService(service, _type string) ([]User, error) {
 
 	if _type == "" {
 
-		query := "SELECT id,service_id,type,username,password,role,read_only,blacklist,whitelist,created_at FROM " + db.userTable() + " WHERE service_id=?"
+		query := "SELECT id,service_id,type,username,password,role,read_only,rw_split,shard,blacklist,whitelist,created_at FROM " + db.userTable() + " WHERE service_id=?"
 		err = db.Select(&users, query, service)
 
 	} else {
 
-		query := "SELECT id,service_id,type,username,password,role,read_only,blacklist,whitelist,created_at FROM " + db.userTable() + " WHERE service_id=? AND type=?"
+		query := "SELECT id,service_id,type,username,password,role,read_only,rw_split,shard,blacklist,whitelist,created_at FROM " + db.userTable() + " WHERE service_id=? AND type=?"
 		err = db.Select(&users, query, service, _type)
 
 	}
@@ -161,7 +163,7 @@ func (db dbBase) SetUsers(addition, update []User) error {
 			return nil
 		}
 
-		query := "UPDATE " + db.userTable() + " SET type=:type,password=:password,role=:role,read_only=:read_only,blacklist=:blacklist,whitelist=:whitelist WHERE id=:id OR username=:username"
+		query := "UPDATE " + db.userTable() + " SET type=:type,password=:password,role=:role,read_only=:read_only,rw_split=:rw_split,shard=:shard,blacklist=:blacklist,whitelist=:whitelist WHERE id=:id"
 		stmt, err := tx.PrepareNamed(query)
 		if err != nil {
 			return errors.Wrap(err, "Tx prepare update User")
@@ -200,7 +202,7 @@ func (db dbBase) InsertUsers(users []User) error {
 
 func (db dbBase) txInsertUsers(tx *sqlx.Tx, users []User) error {
 
-	query := "INSERT INTO " + db.userTable() + " (id,service_id,type,username,password,role,read_only,blacklist,whitelist,created_at) VALUES (:id,:service_id,:type,:username,:password,:role,:read_only,:blacklist,:whitelist,:created_at)"
+	query := "INSERT INTO " + db.userTable() + " ( id,service_id,type,username,password,role,read_only,rw_split,shard,blacklist,whitelist,created_at ) VALUES ( :id,:service_id,:type,:username,:password,:role,:read_only,:rw_split,:shard,:blacklist,:whitelist,:created_at )"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
