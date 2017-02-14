@@ -37,6 +37,10 @@ func NewClient(uri string) (Client, error) {
 		Address: addrs[0],
 	}
 
+	return MakeClient(config, prefix, port)
+}
+
+func MakeClient(config *api.Config, prefix, port string) (*kvClient, error) {
 	c, err := api.NewClient(config)
 	if err != nil {
 		return nil, errors.Wrap(err, "new consul api Client")
