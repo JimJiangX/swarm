@@ -36,7 +36,7 @@ type Garden struct {
 	allocator allocator
 	cluster.Cluster
 	scheduler  *scheduler.Scheduler
-	TLSConfig  *tls.Config
+	tlsConfig  *tls.Config
 	authConfig *types.AuthConfig
 }
 
@@ -47,7 +47,7 @@ func NewGarden(kvc kvstore.Client, cl cluster.Cluster, scheduler *scheduler.Sche
 		allocator: allocator,
 		Cluster:   cl,
 		ormer:     ormer,
-		TLSConfig: tlsConfig,
+		tlsConfig: tlsConfig,
 	}
 }
 
@@ -57,4 +57,12 @@ func (gd *Garden) KVClient() kvstore.Client {
 
 func (gd *Garden) AuthConfig() (*types.AuthConfig, error) {
 	return gd.ormer.GetAuthConfig()
+}
+
+func (gd *Garden) Ormer() database.Ormer {
+	return gd.ormer
+}
+
+func (gd *Garden) TLSConfig() *tls.Config {
+	return gd.tlsConfig
 }
