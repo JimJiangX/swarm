@@ -155,7 +155,7 @@ func (db dbBase) GetAuthConfig() (*types.AuthConfig, error) {
 		return nil, err
 	}
 
-	return r.GetAuthConfig(), nil
+	return r.AuthConfig(), nil
 }
 
 func (db dbBase) GetRegistry() (Registry, error) {
@@ -172,7 +172,7 @@ func (db dbBase) GetRegistry() (Registry, error) {
 	return r, nil
 }
 
-func (r Registry) GetAuthConfig() *types.AuthConfig {
+func (r Registry) AuthConfig() *types.AuthConfig {
 	return newAuthConfig(r.Username, r.Password, r.Email, r.Token)
 }
 
