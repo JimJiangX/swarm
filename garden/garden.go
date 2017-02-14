@@ -1,9 +1,17 @@
 package garden
 
 import (
+	"bytes"
 	"crypto/tls"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"strconv"
+	"strings"
 	"sync"
+	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/swarm/cluster"
@@ -13,6 +21,8 @@ import (
 	pluginapi "github.com/docker/swarm/plugin/parser/api"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/node"
+	consulapi "github.com/hashicorp/consul/api"
+	"github.com/pkg/errors"
 )
 
 type allocator interface {
@@ -65,4 +75,201 @@ func (gd *Garden) Ormer() database.Ormer {
 
 func (gd *Garden) TLSConfig() *tls.Config {
 	return gd.tlsConfig
+}
+
+// Register set Garden,returns a error if has registered in database
+func (gd *Garden) Register(req structs.RegisterDC) error {
+	sys, err := gd.ormer.GetSysConfig()
+	if err == nil {
+		return errors.Errorf("DC has registered,dc=%d", sys.ID)
+	}
+
+	//	err = validGardenRegister(&req)
+	//	if err != nil {
+	//		return err
+	//	}
+
+	config := database.SysConfig{
+		ID:         req.ID,
+		DockerPort: req.DockerPort,
+		PluginPort: req.PluginPort,
+		BackupDir:  req.BackupDir,
+		Retry:      req.Retry,
+		NFSOption: database.NFSOption{
+			Addr:         req.NFS.Addr,
+			Dir:          req.NFS.Dir,
+			MountDir:     req.NFS.MountDir,
+			MountOptions: req.NFS.MountOptions,
+		},
+		ConsulConfig: database.ConsulConfig{
+			ConsulIPs:        req.Consul.ConsulIPs,
+			ConsulPort:       req.Consul.ConsulPort,
+			ConsulDatacenter: req.Consul.ConsulDatacenter,
+			ConsulToken:      req.Consul.ConsulToken,
+			ConsulWaitTime:   req.Consul.ConsulWaitTime,
+		},
+		HorusConfig: database.HorusConfig{
+			HorusAgentPort: req.Horus.HorusAgentPort,
+		},
+		Registry: database.Registry{
+			OsUsername: req.Registry.OsUsername,
+			OsPassword: req.Registry.OsPassword,
+			Domain:     req.Registry.Domain,
+			Address:    req.Registry.Address,
+			Port:       req.Registry.Port,
+			Username:   req.Registry.Username,
+			Password:   req.Registry.Password,
+			Email:      req.Registry.Email,
+			Token:      req.Registry.Token,
+			CA_CRT:     req.Registry.CA_CRT,
+		},
+		SSHDeliver: database.SSHDeliver{
+			SourceDir:       req.SSHDeliver.SourceDir,
+			CA_CRT_Name:     req.SSHDeliver.CA_CRT_Name,
+			Destination:     req.SSHDeliver.Destination,
+			InitScriptName:  req.SSHDeliver.InitScriptName,
+			CleanScriptName: req.SSHDeliver.CleanScriptName,
+		},
+		Users: database.Users{
+			MonitorUsername:     req.Users.MonitorUsername,
+			MonitorPassword:     req.Users.MonitorPassword,
+			ReplicationUsername: req.Users.ReplicationUsername,
+			ReplicationPassword: req.Users.ReplicationPassword,
+			ApplicationUsername: req.Users.ApplicationUsername,
+			ApplicationPassword: req.Users.ApplicationPassword,
+			DBAUsername:         req.Users.DBAUsername,
+			DBAPassword:         req.Users.DBAPassword,
+			DBUsername:          req.Users.DBUsername,
+			DBPassword:          req.Users.DBPassword,
+		},
+	}
+
+	kvc := gd.KVClient()
+	if kvc == nil {
+		ips, dc, token, wt := config.GetConsulConfig()
+		cfg := &consulapi.Config{
+			Address:    ips[0],
+			Datacenter: dc,
+			WaitTime:   time.Second * time.Duration(wt),
+			Token:      token,
+		}
+
+		kvc, err = kvstore.MakeClient(cfg, "garden", strconv.Itoa(config.ConsulPort))
+		if err != nil {
+			return err
+		}
+
+		gd.Lock()
+		gd.kvClient = kvc
+		gd.Unlock()
+	}
+
+	err = pingHorus(kvc)
+	if err != nil {
+		logrus.Warnf("%+v", err)
+	}
+
+	//	err = nfsSetting(config.NFSOption)
+	//	if err != nil {
+	//		logrus.Errorf("%+v", err)
+
+	//		return err
+	//	}
+
+	err = gd.ormer.InsertSysConfig(config)
+
+	return err
+}
+
+func pingHorus(kvc kvstore.Client) error {
+	addr, err := kvc.GetHorusAddr()
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.Post("http://"+addr+"/v1/ping", "", nil)
+	if err == nil {
+		if resp != nil && resp.Body != nil {
+			io.CopyN(ioutil.Discard, resp.Body, 512)
+
+			resp.Body.Close()
+		}
+
+		return nil
+	}
+
+	return errors.Wrap(err, "ping Horus")
+}
+
+func validGardenRegister(req *structs.RegisterDC) error {
+	buf := bytes.NewBuffer(nil)
+
+	s := strings.TrimSpace(req.Users.ApplicationUsername)
+	if len(s) > 0 {
+		req.Users.ApplicationUsername = s
+	} else {
+		buf.WriteString("Users:Application Username is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.ApplicationPassword)
+	if len(s) > 0 {
+		req.Users.ApplicationPassword = s
+	} else {
+		buf.WriteString("Users:Application Password is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.DBAUsername)
+	if len(s) > 0 {
+		req.Users.DBAUsername = s
+	} else {
+		buf.WriteString("Users:DBA Username is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.DBAPassword)
+	if len(s) > 0 {
+		req.Users.DBAPassword = s
+	} else {
+		buf.WriteString("Users:DBA Password is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.DBUsername)
+	if len(s) > 0 {
+		req.Users.DBUsername = s
+	} else {
+		buf.WriteString("Users:DB Username is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.MonitorUsername)
+	if len(s) > 0 {
+		req.Users.MonitorUsername = s
+	} else {
+		buf.WriteString("Users:Monitor Username is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.MonitorPassword)
+	if len(s) > 0 {
+		req.Users.MonitorPassword = s
+	} else {
+		buf.WriteString("Users:Monitor Password is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.ReplicationUsername)
+	if len(s) > 0 {
+		req.Users.ReplicationUsername = s
+	} else {
+		buf.WriteString("Users:Replication Username is nil\n")
+	}
+
+	s = strings.TrimSpace(req.Users.ReplicationPassword)
+	if len(s) > 0 {
+		req.Users.ReplicationPassword = s
+	} else {
+		buf.WriteString("Users:Replication Password is nil\n")
+	}
+
+	if buf.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(buf.String())
 }
