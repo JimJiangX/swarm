@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden"
 	"github.com/gorilla/mux"
 	goctx "golang.org/x/net/context"
@@ -12,20 +13,20 @@ import (
 
 const (
 	_Garden  = "garden"
-	_Context = "context"
+	_Cluster = "cluster"
 )
 
-func fromContext(ctx goctx.Context, key string) (bool, *context, *garden.Garden) {
-	c, ok := ctx.Value(_Garden).(*context)
+func fromContext(ctx goctx.Context, key string) (bool, cluster.Cluster, *garden.Garden) {
+	c, ok := ctx.Value(_Garden).(cluster.Cluster)
 	if !ok {
 		return false, nil, nil
 	}
 
-	if key == _Context {
+	if key == _Cluster {
 		return true, c, nil
 	}
 
-	gd, ok := c.cluster.(*garden.Garden)
+	gd, ok := c.(*garden.Garden)
 	if !ok {
 		return false, c, nil
 	}
