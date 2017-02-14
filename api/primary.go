@@ -7,7 +7,6 @@ import (
 	"net/http/pprof"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/docker/swarm/api/master"
 	"github.com/docker/swarm/cluster"
 	"github.com/gorilla/mux"
 )
@@ -130,7 +129,7 @@ func NewPrimary(cluster cluster.Cluster, tlsConfig *tls.Config, status StatusHan
 
 	r := mux.NewRouter()
 	setupPrimaryRouter(r, context, enableCors)
-	api.SetupMasterRouter(r, cluster, enableCors)
+	setupMasterRouter(r, context, enableCors)
 
 	if debug {
 		profilerSetup(r, "/debug/")

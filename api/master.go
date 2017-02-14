@@ -5,28 +5,27 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden"
 	"github.com/gorilla/mux"
-	"golang.org/x/net/context"
+	goctx "golang.org/x/net/context"
 )
 
 const (
 	_Garden  = "garden"
-	_Cluster = "context"
+	_Context = "context"
 )
 
-func fromContext(ctx context.Context, key string) (bool, cluster.Cluster, *garden.Garden) {
-	c, ok := ctx.Value(_Garden).(cluster.Cluster)
+func fromContext(ctx goctx.Context, key string) (bool, *context, *garden.Garden) {
+	c, ok := ctx.Value(_Garden).(*context)
 	if !ok {
 		return false, nil, nil
 	}
 
-	if key == _Cluster {
+	if key == _Context {
 		return true, c, nil
 	}
 
-	gd, ok := c.(*garden.Garden)
+	gd, ok := c.cluster.(*garden.Garden)
 	if !ok {
 		return false, c, nil
 	}
@@ -34,9 +33,9 @@ func fromContext(ctx context.Context, key string) (bool, cluster.Cluster, *garde
 	return true, c, gd
 }
 
-type handler func(ctx context.Context, w http.ResponseWriter, r *http.Request)
+type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
-var routes = map[string]map[string]handler{
+var masterRoutes = map[string]map[string]ctxHandler{
 	"GET": {
 	//		"/clusters":                        getClusters,
 	//		"/clusters/{name}":                 getClustersByNameOrID,
@@ -131,9 +130,9 @@ var routes = map[string]map[string]handler{
 	},
 }
 
-func SetupMasterRouter(r *mux.Router, c cluster.Cluster, enableCors bool) {
+func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 
-	for method, mappings := range routes {
+	for method, mappings := range masterRoutes {
 		for route, fct := range mappings {
 			logrus.WithFields(logrus.Fields{"method": method, "route": route}).Debug("Registering HTTP route")
 
@@ -147,7 +146,8 @@ func SetupMasterRouter(r *mux.Router, c cluster.Cluster, enableCors bool) {
 					writeCorsHeaders(w, r)
 				}
 
-				ctx := context.WithValue(context.Background(), _Garden, c)
+				context.apiVersion = mux.Vars(r)["version"]
+				ctx := goctx.WithValue(goctx.Background(), _Garden, context)
 				localFct(ctx, w, r)
 
 				logrus.WithFields(logrus.Fields{"method": r.Method,
@@ -157,8 +157,7 @@ func SetupMasterRouter(r *mux.Router, c cluster.Cluster, enableCors bool) {
 			localMethod := method
 
 			r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(wrap)
-			r.Path(localRoute).Methods(localMethod).
-				HandlerFunc(DebugRequestMiddleware(wrap))
+			r.Path(localRoute).Methods(localMethod).HandlerFunc(DebugRequestMiddleware(wrap))
 
 			if enableCors {
 				optionsMethod := "OPTIONS"
@@ -170,8 +169,8 @@ func SetupMasterRouter(r *mux.Router, c cluster.Cluster, enableCors bool) {
 					if enableCors {
 						writeCorsHeaders(w, r)
 					}
-
-					optionsFct(w, r)
+					context.apiVersion = mux.Vars(r)["version"]
+					optionsFct(context, w, r)
 				}
 
 				r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).
@@ -179,16 +178,7 @@ func SetupMasterRouter(r *mux.Router, c cluster.Cluster, enableCors bool) {
 				r.Path(localRoute).Methods(optionsMethod).
 					HandlerFunc(wrap)
 			}
+
 		}
 	}
-}
-
-func optionsHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-}
-
-func writeCorsHeaders(w http.ResponseWriter, r *http.Request) {
-	w.Header().Add("Access-Control-Allow-Origin", "*")
-	w.Header().Add("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept")
-	w.Header().Add("Access-Control-Allow-Methods", "GET, POST, DELETE, PUT, OPTIONS, HEAD")
 }
