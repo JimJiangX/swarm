@@ -206,7 +206,7 @@ type nodeWithTask struct {
 	Task   database.Task
 }
 
-func NewNodeWithTask(user, password string, hdd []string, n database.Node) (nodeWithTask, error) {
+func NewNodeWithTask(user, password string, hdd, ssd []string, n database.Node) (nodeWithTask, error) {
 	c, err := scplib.NewScpClient(n.Addr, user, password)
 	if err != nil {
 		return nodeWithTask{}, err
@@ -216,6 +216,7 @@ func NewNodeWithTask(user, password string, hdd []string, n database.Node) (node
 
 	return nodeWithTask{
 		hdd:    hdd,
+		ssd:    ssd,
 		client: c,
 		Node:   n,
 		Task:   t,
@@ -228,14 +229,6 @@ func NewNodeWithTaskList(len int) []nodeWithTask {
 
 // InstallNodes install new nodes,list should has same ClusterID
 func (ns *nodes) InstallNodes(ctx context.Context, horus string, list []nodeWithTask) error {
-
-	for i := range list {
-		_, err := ns.getCluster(list[i].Node.ClusterID)
-		if err != nil {
-			return err
-		}
-	}
-
 	nodes := make([]database.Node, len(list))
 	tasks := make([]database.Task, len(list))
 
@@ -260,8 +253,8 @@ func (ns *nodes) InstallNodes(ctx context.Context, horus string, list []nodeWith
 		return err
 	}
 
-	d := 250*time.Second + time.Duration(len(list)*30)*time.Second
-	ctx, cancel := context.WithTimeout(ctx, d)
+	timeout := 250*time.Second + time.Duration(len(list)*30)*time.Second
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 
 	for i := range list {
 		go list[i].distribute(ctx, horus, ns.dco, config)

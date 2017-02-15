@@ -62,11 +62,11 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	},
 	"POST": {
 		"/datacenter": postRegisterDC,
-		//		"/clusters":                      postCluster,
+		"/clusters":   postCluster,
 		//		"/clusters/{name}/update":        postUpdateClusterParams,
 		//		"/clusters/{name}/enable":        postEnableCluster,
 		//		"/clusters/{name}/disable":       postDisableCluster,
-		//		"/clusters/{name}/nodes":         postNodes,
+		"/clusters/{name}/nodes": postNodes,
 		//		"/clusters/nodes/{node}/enable":  postEnableNode,
 		//		"/clusters/nodes/{node}/disable": postDisableNode,
 		//		"/clusters/nodes/{node}/update":  updateNode,
