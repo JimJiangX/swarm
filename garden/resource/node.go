@@ -106,8 +106,8 @@ func (n Node) removeCondition() error {
 	return nil
 }
 
-func (ns *nodes) getNode(nameOrID string) (Node, error) {
-	n, err := ns.dco.GetNode(nameOrID)
+func (m master) getNode(nameOrID string) (Node, error) {
+	n, err := m.dco.GetNode(nameOrID)
 	if err != nil {
 		return Node{}, err
 	}
@@ -116,13 +116,13 @@ func (ns *nodes) getNode(nameOrID string) (Node, error) {
 		return Node{node: n}, nil
 	}
 
-	eng := ns.clsuter.Engine(n.EngineID)
+	eng := m.clsuter.Engine(n.EngineID)
 
-	return newNode(n, eng, ns.dco), nil
+	return newNode(n, eng, m.dco), nil
 }
 
-func (ns *nodes) updateNode(nameOrID string, status, maxContainer int) (database.Node, error) {
-	n, err := ns.getNode(nameOrID)
+func (m master) updateNode(nameOrID string, status, maxContainer int) (database.Node, error) {
+	n, err := m.getNode(nameOrID)
 	if err != nil {
 		return database.Node{}, err
 	}
@@ -134,68 +134,12 @@ func (ns *nodes) updateNode(nameOrID string, status, maxContainer int) (database
 		n.node.MaxContainer = maxContainer
 	}
 
-	err = ns.dco.SetNodeParams(n.node)
+	err = m.dco.SetNodeParams(n.node)
 	if err != nil {
 		return n.node, err
 	}
 
 	return n.node, nil
-}
-
-func (ns *nodes) removeNode(ID string) error {
-
-	return ns.dco.DelNode(ID)
-}
-
-func (ns *nodes) RemoveNode(ctx context.Context, horus, nameOrID, user, password string, force bool) error {
-	node, err := ns.getNode(nameOrID)
-	if err != nil {
-		if database.IsNotFound(err) {
-			return nil
-		}
-
-		return err
-	}
-
-	if !force {
-		if err := node.removeCondition(); err != nil {
-			return err
-		}
-	}
-
-	copy := node.node
-	copy.Status = statusNodeDisable
-
-	err = node.no.SetNodeParams(copy)
-	if err != nil {
-		return err
-	}
-
-	config, err := ns.dco.GetSysConfig()
-	if err != nil {
-		return err
-	}
-
-	client, err := scplib.NewScpClient(node.node.Addr, user, password)
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	select {
-	default:
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-
-	err = node.nodeClean(ctx, client, horus, config)
-	if err != nil {
-		return err
-	}
-
-	err = ns.removeNode(node.node.ID)
-
-	return err
 }
 
 type nodeWithTask struct {
@@ -228,7 +172,7 @@ func NewNodeWithTaskList(len int) []nodeWithTask {
 }
 
 // InstallNodes install new nodes,list should has same ClusterID
-func (ns *nodes) InstallNodes(ctx context.Context, horus string, list []nodeWithTask) error {
+func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithTask) error {
 	nodes := make([]database.Node, len(list))
 	tasks := make([]database.Task, len(list))
 
@@ -243,12 +187,12 @@ func (ns *nodes) InstallNodes(ctx context.Context, horus string, list []nodeWith
 		return ctx.Err()
 	}
 
-	err := ns.dco.InsertNodesAndTask(nodes, tasks)
+	err := m.dco.InsertNodesAndTask(nodes, tasks)
 	if err != nil {
 		return err
 	}
 
-	config, err := ns.dco.GetSysConfig()
+	config, err := m.dco.GetSysConfig()
 	if err != nil {
 		return err
 	}
@@ -257,10 +201,10 @@ func (ns *nodes) InstallNodes(ctx context.Context, horus string, list []nodeWith
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 
 	for i := range list {
-		go list[i].distribute(ctx, horus, ns.dco, config)
+		go list[i].distribute(ctx, horus, m.dco, config)
 	}
 
-	go ns.registerNodes(ctx, cancel, list, config)
+	go m.registerNodes(ctx, cancel, list, config)
 
 	return nil
 }
@@ -439,7 +383,7 @@ func (node *nodeWithTask) modifyProfile(horus string, config database.SysConfig)
 }
 
 // registerNodes register Nodes
-func (ns *nodes) registerNodes(ctx context.Context, cancel context.CancelFunc, nodes []nodeWithTask, config database.SysConfig) {
+func (m master) registerNodes(ctx context.Context, cancel context.CancelFunc, nodes []nodeWithTask, config database.SysConfig) {
 	defer cancel()
 
 	cID := ""
@@ -469,13 +413,13 @@ func (ns *nodes) registerNodes(ctx context.Context, cancel context.CancelFunc, n
 			continue
 
 		case <-ctx.Done():
-			err := ns.registerNodesTimeout(nodes, ctx.Err())
+			err := m.registerNodesTimeout(nodes, ctx.Err())
 			field.Errorf("%+v", err)
 
 			return
 		}
 
-		list, err := ns.dco.ListNodeByCluster(cID)
+		list, err := m.dco.ListNodeByCluster(cID)
 		if err != nil {
 			field.Errorf("%+v", err)
 			continue
@@ -512,7 +456,7 @@ func (ns *nodes) registerNodes(ctx context.Context, cancel context.CancelFunc, n
 			}
 
 			addr := n.Addr + ":" + strconv.Itoa(config.DockerPort)
-			eng := ns.clsuter.EngineByAddr(addr)
+			eng := m.clsuter.EngineByAddr(addr)
 			if eng == nil || !eng.IsHealthy() {
 				fields.Error(err)
 
@@ -528,7 +472,7 @@ func (ns *nodes) registerNodes(ctx context.Context, cancel context.CancelFunc, n
 			t.FinishedAt = n.RegisterAt
 			t.Errors = ""
 
-			err = ns.dco.RegisterNode(n, t)
+			err = m.dco.RegisterNode(n, t)
 			if err != nil {
 				fields.Errorf("%+v", err)
 			}
@@ -536,7 +480,7 @@ func (ns *nodes) registerNodes(ctx context.Context, cancel context.CancelFunc, n
 	}
 }
 
-func (ns *nodes) registerNodesTimeout(nodes []nodeWithTask, er error) error {
+func (m master) registerNodesTimeout(nodes []nodeWithTask, er error) error {
 	if len(nodes) == 0 {
 		return nil
 	}
@@ -552,7 +496,7 @@ func (ns *nodes) registerNodesTimeout(nodes []nodeWithTask, er error) error {
 		}
 	}
 
-	list, err := ns.dco.ListNodeByCluster(cID)
+	list, err := m.dco.ListNodeByCluster(cID)
 	if err != nil {
 		return err
 	}
@@ -581,13 +525,69 @@ func (ns *nodes) registerNodesTimeout(nodes []nodeWithTask, er error) error {
 			t.Errors = er.Error()
 		}
 
-		err = ns.dco.RegisterNode(n, t)
+		err = m.dco.RegisterNode(n, t)
 		if err != nil {
 			logrus.WithField("Node", n.Name).WithError(err).Error("Node register timeout")
 		}
 	}
 
 	return nil
+}
+
+func (m master) removeNode(ID string) error {
+
+	return m.dco.DelNode(ID)
+}
+
+func (m master) RemoveNode(ctx context.Context, horus, nameOrID, user, password string, force bool) error {
+	node, err := m.getNode(nameOrID)
+	if err != nil {
+		if database.IsNotFound(err) {
+			return nil
+		}
+
+		return err
+	}
+
+	if !force {
+		if err := node.removeCondition(); err != nil {
+			return err
+		}
+	}
+
+	copy := node.node
+	copy.Status = statusNodeDisable
+
+	err = node.no.SetNodeParams(copy)
+	if err != nil {
+		return err
+	}
+
+	config, err := m.dco.GetSysConfig()
+	if err != nil {
+		return err
+	}
+
+	client, err := scplib.NewScpClient(node.node.Addr, user, password)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	select {
+	default:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	err = node.nodeClean(ctx, client, horus, config)
+	if err != nil {
+		return err
+	}
+
+	err = m.removeNode(node.node.ID)
+
+	return err
 }
 
 func (n *Node) nodeClean(ctx context.Context, client scplib.ScpClient, horus string, config database.SysConfig) error {

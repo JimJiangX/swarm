@@ -5,38 +5,38 @@ import (
 	"github.com/docker/swarm/garden/database"
 )
 
-type nodes struct {
+type master struct {
 	clsuter cluster.Cluster
 	dco     database.NodeOrmer
 }
 
-func NewNodes(dco database.NodeOrmer, c cluster.Cluster) *nodes {
-	return &nodes{
+func NewMaster(dco database.NodeOrmer, c cluster.Cluster) master {
+	return master{
 		dco:     dco,
 		clsuter: c,
 	}
 }
 
-func (ns *nodes) AddCluster(c database.Cluster) error {
+func (m master) AddCluster(c database.Cluster) error {
 	if c.ID == "" {
 		return nil
 	}
 
-	return ns.dco.InsertCluster(c)
+	return m.dco.InsertCluster(c)
 }
 
-func (ns *nodes) getCluster(nameOrID string) (database.Cluster, error) {
+func (m master) getCluster(nameOrID string) (database.Cluster, error) {
 
-	return ns.dco.GetCluster(nameOrID)
+	return m.dco.GetCluster(nameOrID)
 }
 
-func (ns *nodes) RemoveCluster(nameOrID string) error {
-	cl, err := ns.getCluster(nameOrID)
+func (m master) RemoveCluster(nameOrID string) error {
+	cl, err := m.getCluster(nameOrID)
 	if err != nil && database.IsNotFound(err) {
 		return nil
 	}
 
-	err = ns.dco.DelCluster(cl.ID)
+	err = m.dco.DelCluster(cl.ID)
 	if err != nil {
 		return err
 	}
