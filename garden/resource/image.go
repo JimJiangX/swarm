@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strconv"
 	"time"
 
@@ -18,18 +19,30 @@ import (
 )
 
 // LoadImage load a new Image
-func LoadImage(ctx context.Context, ormer database.Ormer, pc pluginapi.PluginAPI, req structs.PostLoadImageRequest) (string, error) {
+func LoadImage(ctx context.Context, ormer database.ImageOrmer, pc pluginapi.PluginAPI, req structs.PostLoadImageRequest) (string, error) {
 	text, err := ioutil.ReadFile(req.ConfigFilePath)
 	if err != nil {
 		return "", errors.Wrap(err, "ReadAll from configFile:"+req.ConfigFilePath)
 	}
 
+	file, err := os.Open(req.KeysetsFile)
+	if err != nil {
+		return "", errors.Wrap(err, "open KeysetsFile:"+req.KeysetsFile)
+	}
+
+	cf := structs.ConfigTemplate{}
+
+	err = json.NewDecoder(file).Decode(&cf)
+	if err != nil {
+		return "", errors.Wrapf(err, "JSON decode file:%s", req.KeysetsFile)
+	}
+
 	template := structs.ConfigTemplate{
 		Name:    req.Name,
 		Version: req.Version,
-		Mount:   req.ConfigMountPath,
+		Mount:   cf.Mount,
 		Content: text,
-		Keysets: req.KeySets,
+		Keysets: cf.Keysets,
 	}
 	err = pc.ImageCheck(ctx, template)
 	if err != nil {

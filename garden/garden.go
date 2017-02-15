@@ -73,6 +73,10 @@ func (gd *Garden) Ormer() database.Ormer {
 	return gd.ormer
 }
 
+func (gd *Garden) PluginClient() pluginapi.PluginAPI {
+	return gd.pluginClient
+}
+
 func (gd *Garden) TLSConfig() *tls.Config {
 	return gd.tlsConfig
 }

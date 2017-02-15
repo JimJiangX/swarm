@@ -1,18 +1,13 @@
 package structs
 
 type PostLoadImageRequest struct {
-	Name    string
-	Version string
-	Path    string
-	Labels  map[string]string
-
-	ImageConfig
-}
-
-type ImageConfig struct {
-	ConfigMountPath string   `json:"config_mount_path"`
-	ConfigFilePath  string   `json:"config_file_path"`
-	KeySets         []Keyset `json:"config_keyset"`
+	Timeout        int
+	Name           string
+	Version        string
+	Path           string
+	ConfigFilePath string `json:"config_file_path"`
+	KeysetsFile    string `json:"config_keyset"`
+	Labels         map[string]string
 }
 
 type Keyset struct {
@@ -20,6 +15,7 @@ type Keyset struct {
 	MustRestart bool `json:"must_restart"`
 	Key         string
 	Desc        string
+	Range       string
 }
 
 type ConfigTemplate struct {

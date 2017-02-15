@@ -82,8 +82,8 @@ type Ormer interface {
 	ClusterInterface
 	UnitInterface
 	ContainerInterface
+	ImageInterface
 
-	ImageOrmer
 	SysConfigOrmer
 	NetworkingOrmer
 	NodeOrmer

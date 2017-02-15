@@ -61,7 +61,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	//		"/storage/san/{name:.*}":           getSANStorageInfo,
 	},
 	"POST": {
-		"/datacenter": postDC,
+		"/datacenter": postRegisterDC,
 		//		"/clusters":                      postCluster,
 		//		"/clusters/{name}/update":        postUpdateClusterParams,
 		//		"/clusters/{name}/enable":        postEnableCluster,
@@ -101,7 +101,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		//		"/networkings/{name:.*}/enable":  postEnableNetworking,
 		//		"/networkings/{name:.*}/disable": postDisableNetworking,
 
-		//		"/image/load":                postImageLoad,
+		"/image/load": postImageLoad,
 		//		"/image/{image:.*}/enable":   postEnableImage,
 		//		"/image/{image:.*}/disable":  postDisableImage,
 		//		"/image/{image:.*}/template": updateImageTemplateConfig,

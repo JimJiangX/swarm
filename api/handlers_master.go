@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	stderr "errors"
 	"net/http"
+	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/garden/resource"
 	"github.com/docker/swarm/garden/structs"
 	goctx "golang.org/x/net/context"
 )
@@ -44,7 +46,7 @@ func httpSucceed(w http.ResponseWriter, obj interface{}, status int) {
 	w.WriteHeader(status)
 }
 
-func postDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.RegisterDC{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -64,4 +66,35 @@ func postDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpSucceed(w, nil, http.StatusCreated)
+}
+
+func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	req := structs.PostLoadImageRequest{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		httpError2(w, err, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil ||
+		gd.PluginClient() == nil {
+
+		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	if req.Timeout > 0 {
+		var cancel goctx.CancelFunc
+		ctx, cancel = goctx.WithTimeout(ctx, time.Duration(req.Timeout)*time.Second)
+		defer cancel()
+	}
+
+	id, err := resource.LoadImage(ctx, gd.Ormer(), gd.PluginClient(), req)
+	if err != nil {
+		httpError2(w, err, http.StatusInternalServerError)
+	}
+
+	httpSucceed(w, id, http.StatusCreated)
 }

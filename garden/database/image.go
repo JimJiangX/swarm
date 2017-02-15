@@ -10,6 +10,11 @@ import (
 )
 
 type ImageOrmer interface {
+	SysConfigOrmer
+	ImageInterface
+}
+
+type ImageInterface interface {
 	GetImage(nameOrID string) (Image, error)
 	ListImages() ([]Image, error)
 
