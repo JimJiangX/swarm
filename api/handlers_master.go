@@ -189,7 +189,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	master := resource.NewNodes(ormer, gd.Cluster)
+	master := resource.NewMaster(ormer, gd.Cluster)
 	err = master.InstallNodes(ctx, horus, nodes)
 	if err != nil {
 		httpError2(w, err, http.StatusInternalServerError)
@@ -207,4 +207,49 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpSucceed(w, response, http.StatusCreated)
+}
+
+// DELETE /clusters/nodes/{node:.*}
+//
+// 204 删除成功
+// 400 request header 读取失败
+// 412 因未满足条件（主机还有未删除的容器）取消出库操作
+// 500 数据库读写错误
+// 503 向 Horus 注销主机失败
+// 510 SSH 出库脚本执行失败
+func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpError2(w, err, http.StatusBadRequest)
+		return
+	}
+
+	node := mux.Vars(r)["node"]
+	force := boolValue(r, "force")
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil ||
+		gd.KVClient() == nil {
+
+		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	horus, err := gd.KVClient().GetHorusAddr()
+	if err != nil {
+		httpError2(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	m := resource.NewMaster(gd.Ormer(), gd.Cluster)
+
+	err = m.RemoveNode(ctx, horus, node, username, password, force)
+	if err != nil {
+		httpError2(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

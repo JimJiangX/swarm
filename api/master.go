@@ -114,20 +114,20 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		//		"/storage/san/{name}/raid_group/{rg:.*}/disable": postDisableRaidGroup,
 	},
 	"DELETE": {
-	//		"/services/{name}":                    deleteService,
-	//		"/services/{name}/users":              deleteServiceUsers,
-	//		"/services/backup_strategy/{name:.*}": deleteBackupStrategy,
+		//		"/services/{name}":                    deleteService,
+		//		"/services/{name}/users":              deleteServiceUsers,
+		//		"/services/backup_strategy/{name:.*}": deleteBackupStrategy,
 
-	//		"/clusters/{name}":          deleteCluster,
-	//		"/clusters/nodes/{node:.*}": deleteNode,
+		//		"/clusters/{name}":          deleteCluster,
+		"/clusters/nodes/{node:.*}": deleteNode,
 
-	//		"/networkings/{name:.*}": deleteNetworking,
-	//		"/ports/{port:[0-9]+}":   deletePort,
+		//		"/networkings/{name:.*}": deleteNetworking,
+		//		"/ports/{port:[0-9]+}":   deletePort,
 
-	//		"/storage/san/{name}":                    deleteStorage,
-	//		"/storage/san/{name}/raid_group/{rg:.*}": deleteRaidGroup,
+		//		"/storage/san/{name}":                    deleteStorage,
+		//		"/storage/san/{name}/raid_group/{rg:.*}": deleteRaidGroup,
 
-	//		"/image/{image:.*}": deleteImage,
+		//		"/image/{image:.*}": deleteImage,
 	},
 }
 
