@@ -11,31 +11,64 @@ import (
 
 // volumeDrivers labels
 const (
-	_SSD               = "local:SSD"
-	_HDD               = "local:HDD"
-	_HDD_VG_Label      = "HDD_VG"
-	_SSD_VG_Label      = "SSD_VG"
-	_HDD_VG_Size_Label = "HDD_VG_SIZE"
-	_SSD_VG_Size_Label = "SSD_VG_SIZE"
-	defaultFileSystem  = "xfs"
+	_SSD                     = "local:SSD"
+	_HDD                     = "local:HDD"
+	_HDD_VG_Label            = "HDD_VG"
+	_SSD_VG_Label            = "SSD_VG"
+	_HDD_VG_Size_Label       = "HDD_VG_SIZE"
+	_SSD_VG_Size_Label       = "SSD_VG_SIZE"
+	defaultFileSystem        = "xfs"
+	defaultLocalVolumeDriver = "lvm"
 )
 
-type volumeDriver struct {
+type space struct {
+	VG     string
 	Total  int64
 	Free   int64
-	Used   int64
-	Name   string
-	Type   string
-	VG     string
 	Fstype string
+}
+
+func (s space) Used() int64 {
+	return s.Total - s.Free
+}
+
+type volumeDriver interface {
+	Driver() string
+	Name() string
+	Type() string
+	Space() space
+	// Alloc(uid string, size int64) (database.Volume, error)
+}
+
+type localVolume struct {
+	driver string
+	_type  string
+	space  space
+	vo     database.VolumeOrmer
+}
+
+func (lv localVolume) Name() string {
+	return lv.space.VG
+}
+
+func (lv localVolume) Type() string {
+	return lv._type
+}
+
+func (lv localVolume) Driver() string {
+	return lv.driver
+}
+
+func (lv localVolume) Space() space {
+	return lv.space
 }
 
 type volumeDrivers []volumeDriver
 
-func (d volumeDrivers) get(_type string) *volumeDriver {
-	for i := range d {
-		if d[i].Type == _type {
-			return &d[i]
+func (vds volumeDrivers) get(_type string) volumeDriver {
+	for i := range vds {
+		if vds[i].Type() == _type {
+			return vds[i]
 		}
 	}
 
@@ -55,7 +88,7 @@ func (ds volumeDrivers) isSpaceEnough(stores []structs.VolumeRequire) bool {
 			return false
 		}
 
-		if driver.Free < size {
+		if driver.Space().Free < size {
 			return false
 		}
 	}
@@ -63,7 +96,7 @@ func (ds volumeDrivers) isSpaceEnough(stores []structs.VolumeRequire) bool {
 	return true
 }
 
-func volumeDriverFromEngine(e *cluster.Engine, label string) (volumeDriver, error) {
+func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label string) (volumeDriver, error) {
 	var vgType, sizeLabel string
 
 	switch label {
@@ -84,60 +117,57 @@ func volumeDriverFromEngine(e *cluster.Engine, label string) (volumeDriver, erro
 	if !ok {
 		e.RUnlock()
 
-		return volumeDriver{}, errors.New("not found label by key:" + label)
+		return nil, errors.New("not found label by key:" + label)
 	}
 
 	size, ok := e.Labels[sizeLabel]
 	if ok {
 		e.RUnlock()
 
-		return volumeDriver{}, errors.New("not found label by key:" + sizeLabel)
+		return nil, errors.New("not found label by key:" + sizeLabel)
 	}
 
 	e.RUnlock()
 
 	total, err := strconv.ParseInt(size, 10, 64)
 	if err != nil {
-		return volumeDriver{}, errors.Wrapf(err, "parse VG %s:%s", sizeLabel, size)
+		return localVolume{}, errors.Wrapf(err, "parse VG %s:%s", sizeLabel, size)
 	}
 
-	return volumeDriver{
-		Total:  total,
-		Type:   vgType,
-		VG:     vg,
-		Fstype: defaultFileSystem,
+	lvs, err := vo.ListVolumeByVG(vg)
+	if err != nil {
+		return nil, err
+	}
+
+	var used int64
+	for i := range lvs {
+		used += lvs[i].Size
+	}
+
+	return localVolume{
+		vo:     vo,
+		_type:  vgType,
+		driver: defaultLocalVolumeDriver,
+		space: space{
+			Total:  total,
+			Free:   total - used,
+			VG:     vg,
+			Fstype: defaultFileSystem,
+		},
 	}, nil
 }
 
 func engineVolumeDrivers(e *cluster.Engine, vo database.VolumeOrmer) (volumeDrivers, error) {
-	drivers := make([]volumeDriver, 0, 2)
+	drivers := make([]volumeDriver, 0, 4)
 
-	vd, err := volumeDriverFromEngine(e, _HDD_VG_Label)
+	vd, err := volumeDriverFromEngine(vo, e, _HDD_VG_Label)
 	if err == nil {
 		drivers = append(drivers, vd)
 	}
 
-	vd, err = volumeDriverFromEngine(e, _SSD_VG_Label)
+	vd, err = volumeDriverFromEngine(vo, e, _SSD_VG_Label)
 	if err == nil {
 		drivers = append(drivers, vd)
-	}
-
-	for i := range drivers {
-
-		lvs, err := vo.ListVolumeByVG(drivers[i].VG)
-		if err != nil {
-			return nil, err
-		}
-
-		var used int64
-		for i := range lvs {
-			used += lvs[i].Size
-		}
-
-		if free := drivers[i].Total - used; free < drivers[i].Free {
-			drivers[i].Free = free
-			drivers[i].Used = used
-		}
 	}
 
 	return drivers, nil

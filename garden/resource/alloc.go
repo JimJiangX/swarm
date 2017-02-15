@@ -73,32 +73,27 @@ func (at allocator) isNodeStoreEnough(engineID string, stores []structs.VolumeRe
 	return is, nil
 }
 
-func (at allocator) AlloctCPUMemory(node *node.Node, cpu, memory int, reserved []string) (string, error) {
-	if node.TotalCpus-node.UsedCpus < int64(cpu) {
-		return "", errors.New("")
+func (at allocator) findNodeVolumeDrivers(n *node.Node) (volumeDrivers, error) {
+	var (
+		err     error
+		drivers volumeDrivers
+	)
+
+	engine := at.cluster.Engine(n.ID)
+	if engine != nil {
+		drivers, err = engineVolumeDrivers(engine, at.ormer)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	if node.TotalMemory-node.UsedMemory < int64(memory) {
-		return "", errors.New("")
-	}
+	// TODO:third-part volumeDrivers
 
-	containers := node.Containers
-	used := make([]string, 0, len(containers)+len(reserved))
-	used = append(used, reserved...)
-	for i := range containers {
-		used = append(used, containers[i].Config.HostConfig.CpusetCpus)
-	}
-
-	return findIdleCPUs(used, int(node.TotalCpus), cpu)
+	return drivers, nil
 }
 
 func (at allocator) AlloctVolumes(uid string, n *node.Node, stores []structs.VolumeRequire) ([]volume.VolumesCreateBody, error) {
-	engine := at.cluster.Engine(n.ID)
-	if engine == nil {
-		return nil, errors.Errorf("")
-	}
-
-	drivers, err := engineVolumeDrivers(engine, at.ormer)
+	drivers, err := at.findNodeVolumeDrivers(n)
 	if err != nil {
 		return nil, err
 	}
@@ -112,15 +107,16 @@ func (at allocator) AlloctVolumes(uid string, n *node.Node, stores []structs.Vol
 	for i := range stores {
 
 		driver := drivers.get(stores[i].Type)
+		space := driver.Space()
 
 		lvs[i] = database.Volume{
 			Size:       stores[i].Size,
 			ID:         "",
 			Name:       "",
 			UnitID:     uid,
-			VGName:     driver.VG,
-			Driver:     driver.Name,
-			Filesystem: driver.Fstype,
+			VGName:     space.VG,
+			Driver:     driver.Driver(),
+			Filesystem: space.Fstype,
 		}
 	}
 
@@ -149,6 +145,25 @@ func (at allocator) AlloctVolumes(uid string, n *node.Node, stores []structs.Vol
 
 func (at allocator) AlloctNetworking(id, _type string, num int) (string, error) {
 	return "", nil
+}
+
+func (at allocator) AlloctCPUMemory(node *node.Node, cpu, memory int, reserved []string) (string, error) {
+	if node.TotalCpus-node.UsedCpus < int64(cpu) {
+		return "", errors.New("")
+	}
+
+	if node.TotalMemory-node.UsedMemory < int64(memory) {
+		return "", errors.New("")
+	}
+
+	containers := node.Containers
+	used := make([]string, 0, len(containers)+len(reserved))
+	used = append(used, reserved...)
+	for i := range containers {
+		used = append(used, containers[i].Config.HostConfig.CpusetCpus)
+	}
+
+	return findIdleCPUs(used, int(node.TotalCpus), cpu)
 }
 
 func (at allocator) RecycleResource() error {
