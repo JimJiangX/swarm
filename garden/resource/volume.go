@@ -75,7 +75,7 @@ func (vds volumeDrivers) get(_type string) volumeDriver {
 	return nil
 }
 
-func (ds volumeDrivers) isSpaceEnough(stores []structs.VolumeRequire) bool {
+func (ds volumeDrivers) isSpaceEnough(stores []structs.VolumeRequire) error {
 	need := make(map[string]int64, len(stores))
 
 	for i := range stores {
@@ -85,15 +85,15 @@ func (ds volumeDrivers) isSpaceEnough(stores []structs.VolumeRequire) bool {
 	for typ, size := range need {
 		driver := ds.get(typ)
 		if driver == nil {
-			return false
+			return errors.New("not found volumeDriver by type:" + typ)
 		}
 
-		if driver.Space().Free < size {
-			return false
+		if free := driver.Space().Free; free < size {
+			return errors.Errorf("volumeDriver %s:%s is not enough free space %d<%d", driver.Name(), typ, free, size)
 		}
 	}
 
-	return true
+	return nil
 }
 
 func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label string) (volumeDriver, error) {
@@ -157,7 +157,7 @@ func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label st
 	}, nil
 }
 
-func engineVolumeDrivers(e *cluster.Engine, vo database.VolumeOrmer) (volumeDrivers, error) {
+func localVolumeDrivers(e *cluster.Engine, vo database.VolumeOrmer) (volumeDrivers, error) {
 	drivers := make([]volumeDriver, 0, 4)
 
 	vd, err := volumeDriverFromEngine(vo, e, _HDD_VG_Label)

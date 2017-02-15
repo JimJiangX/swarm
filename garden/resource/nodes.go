@@ -3,20 +3,17 @@ package resource
 import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
-	"github.com/docker/swarm/garden/kvstore"
 )
 
 type nodes struct {
-	clsuter  cluster.Cluster
-	dco      database.ClusterOrmer
-	kvClient kvstore.Client
+	clsuter cluster.Cluster
+	dco     database.NodeOrmer
 }
 
-func NewNodes(dco database.ClusterOrmer, c cluster.Cluster, client kvstore.Client) *nodes {
+func NewNodes(dco database.NodeOrmer, c cluster.Cluster) *nodes {
 	return &nodes{
-		dco:      dco,
-		clsuter:  c,
-		kvClient: client,
+		dco:     dco,
+		clsuter: c,
 	}
 }
 
@@ -25,17 +22,7 @@ func (ns *nodes) AddCluster(c database.Cluster) error {
 		return nil
 	}
 
-	_, err := ns.getCluster(c.ID)
-	if err == nil {
-		return nil
-	}
-
-	err = ns.dco.InsertCluster(c)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return ns.dco.InsertCluster(c)
 }
 
 func (ns *nodes) getCluster(nameOrID string) (database.Cluster, error) {

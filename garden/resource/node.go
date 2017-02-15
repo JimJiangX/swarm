@@ -71,32 +71,39 @@ func parseNodeStatus(status int) string {
 }
 
 const (
-	_VG_Label         = "VG_Name"
 	dockerNodesKVPath = "docker/nodes/KVPath"
 )
 
 type Node struct {
-	vgName string
 	node   database.Node
+	belong *database.Cluster
 	eng    *cluster.Engine
-	vo     database.VolumeOrmer
+	no     database.NodeOrmer
 }
 
-func newNode(n database.Node, eng *cluster.Engine, vo database.VolumeOrmer) Node {
-	node := Node{
+func newNode(n database.Node, eng *cluster.Engine, no database.NodeOrmer) Node {
+	return Node{
 		node: n,
 		eng:  eng,
-		vo:   vo,
+		no:   no,
+	}
+}
+
+func (n Node) getCluster() (*database.Cluster, error) {
+	if n.belong != nil {
+		return n.belong, nil
 	}
 
-	if eng != nil {
-		vg, ok := eng.Labels[_VG_Label]
-		if ok {
-			node.vgName = vg
-		}
+	c, err := n.no.GetCluster(n.node.ClusterID)
+	if err == nil {
+		n.belong = &c
 	}
 
-	return node
+	return n.belong, err
+}
+
+func (n Node) removeCondition() error {
+	return nil
 }
 
 func (ns *nodes) getNode(nameOrID string) (Node, error) {
@@ -136,15 +143,11 @@ func (ns *nodes) updateNode(nameOrID string, status, maxContainer int) (database
 }
 
 func (ns *nodes) removeNode(ID string) error {
-	err := ns.dco.DelNode(ID)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return ns.dco.DelNode(ID)
 }
 
-func (ns *nodes) RemoveNode(ctx context.Context, nameOrID, user, password string, force bool) error {
+func (ns *nodes) RemoveNode(ctx context.Context, horus, nameOrID, user, password string, force bool) error {
 	node, err := ns.getNode(nameOrID)
 	if err != nil {
 		if database.IsNotFound(err) {
@@ -160,6 +163,14 @@ func (ns *nodes) RemoveNode(ctx context.Context, nameOrID, user, password string
 		}
 	}
 
+	copy := node.node
+	copy.Status = statusNodeDisable
+
+	err = node.no.SetNodeParams(copy)
+	if err != nil {
+		return err
+	}
+
 	config, err := ns.dco.GetSysConfig()
 	if err != nil {
 		return err
@@ -170,11 +181,6 @@ func (ns *nodes) RemoveNode(ctx context.Context, nameOrID, user, password string
 		return err
 	}
 	defer client.Close()
-
-	horus, err := ns.kvClient.GetHorusAddr()
-	if err != nil {
-		return err
-	}
 
 	select {
 	default:
@@ -190,10 +196,6 @@ func (ns *nodes) RemoveNode(ctx context.Context, nameOrID, user, password string
 	err = ns.removeNode(node.node.ID)
 
 	return err
-}
-
-func (n *Node) removeCondition() error {
-	return nil
 }
 
 type nodeWithTask struct {
@@ -225,7 +227,7 @@ func NewNodeWithTaskList(len int) []nodeWithTask {
 }
 
 // InstallNodes install new nodes,list should has same ClusterID
-func (ns *nodes) InstallNodes(ctx context.Context, list []nodeWithTask) error {
+func (ns *nodes) InstallNodes(ctx context.Context, horus string, list []nodeWithTask) error {
 
 	for i := range list {
 		_, err := ns.getCluster(list[i].Node.ClusterID)
@@ -254,11 +256,6 @@ func (ns *nodes) InstallNodes(ctx context.Context, list []nodeWithTask) error {
 	}
 
 	config, err := ns.dco.GetSysConfig()
-	if err != nil {
-		return err
-	}
-
-	horus, err := ns.kvClient.GetHorusAddr()
 	if err != nil {
 		return err
 	}

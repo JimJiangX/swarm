@@ -58,30 +58,25 @@ nodes:
 }
 
 func (at allocator) isNodeStoreEnough(engineID string, stores []structs.VolumeRequire) (bool, error) {
-	engine := at.cluster.Engine(engineID)
-	if engine == nil {
-		return false, nil
-	}
-
-	drivers, err := engineVolumeDrivers(engine, at.ormer)
+	drivers, err := at.findNodeVolumeDrivers(engineID)
 	if err != nil {
 		return false, err
 	}
 
-	is := drivers.isSpaceEnough(stores)
+	err = drivers.isSpaceEnough(stores)
 
-	return is, nil
+	return err == nil, err
 }
 
-func (at allocator) findNodeVolumeDrivers(n *node.Node) (volumeDrivers, error) {
+func (at allocator) findNodeVolumeDrivers(engineID string) (volumeDrivers, error) {
 	var (
 		err     error
 		drivers volumeDrivers
 	)
 
-	engine := at.cluster.Engine(n.ID)
+	engine := at.cluster.Engine(engineID)
 	if engine != nil {
-		drivers, err = engineVolumeDrivers(engine, at.ormer)
+		drivers, err = localVolumeDrivers(engine, at.ormer)
 		if err != nil {
 			return nil, err
 		}
@@ -93,14 +88,14 @@ func (at allocator) findNodeVolumeDrivers(n *node.Node) (volumeDrivers, error) {
 }
 
 func (at allocator) AlloctVolumes(uid string, n *node.Node, stores []structs.VolumeRequire) ([]volume.VolumesCreateBody, error) {
-	drivers, err := at.findNodeVolumeDrivers(n)
+	drivers, err := at.findNodeVolumeDrivers(n.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	is := drivers.isSpaceEnough(stores)
-	if !is {
-		return nil, errors.Errorf("")
+	err = drivers.isSpaceEnough(stores)
+	if err != nil {
+		return nil, err
 	}
 
 	lvs := make([]database.Volume, len(stores))

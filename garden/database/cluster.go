@@ -20,8 +20,7 @@ type ClusterInterface interface {
 
 type ClusterOrmer interface {
 	ClusterInterface
-	NodeOrmer
-	VolumeOrmer
+	NodeInterface
 	SysConfigOrmer
 }
 

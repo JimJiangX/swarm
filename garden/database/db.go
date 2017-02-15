@@ -83,10 +83,10 @@ type Ormer interface {
 	UnitInterface
 	ContainerInterface
 	ImageInterface
+	NodeInterface
 
 	SysConfigOrmer
 	NetworkingOrmer
-	NodeOrmer
 	TaskOrmer
 	UserOrmer
 	VolumeOrmer
