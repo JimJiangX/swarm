@@ -297,12 +297,18 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	list, err := stack.DeployServices(ctx)
 	// TODO:convert to structs.PostServiceResponse
 
+	out := make([]database.Service, 0, len(list))
+
+	for _, l := range list {
+		out = append(out, l.Spec().Service)
+	}
+
 	resp := structs.CommonResponse{
 		ResponseHead: structs.ResponseHead{
 			Result: true,
 			Code:   http.StatusCreated,
 		},
-		Object: list,
+		Object: out,
 	}
 
 	if err != nil {
