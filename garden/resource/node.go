@@ -410,11 +410,10 @@ func (m master) registerNodes(ctx context.Context, cancel context.CancelFunc, no
 		}
 		select {
 		case <-t.C:
-			continue
 
 		case <-ctx.Done():
 			err := m.registerNodesTimeout(nodes, ctx.Err())
-			field.Errorf("%+v", err)
+			field.Errorf("deal with Nodes timeout%+v", err)
 
 			return
 		}
