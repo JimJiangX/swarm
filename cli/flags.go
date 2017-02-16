@@ -199,4 +199,10 @@ var (
 		Value: "tb",
 		Usage: "prefix of database table name",
 	}
+
+	flConfigurePluginAddr = cli.StringFlag{
+		Name:  "configureAddr",
+		Value: "127.0.0.1:3375",
+		Usage: "address of configure plugin server",
+	}
 )

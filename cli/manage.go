@@ -23,6 +23,8 @@ import (
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/resource"
 	"github.com/docker/swarm/garden/utils"
+	"github.com/docker/swarm/plugin/client"
+	pluginapi "github.com/docker/swarm/plugin/parser/api"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/filter"
 	"github.com/docker/swarm/scheduler/strategy"
@@ -346,9 +348,10 @@ func manage(c *cli.Context) {
 			break
 		}
 
+		pClient := pluginapi.NewPlugin(client.NewClient(c.String("configureAddr"), 0, tlsConfig))
 		allocator := resource.NewAllocator(ormer, cl)
 
-		cl = garden.NewGarden(kvc, cl, sched, ormer, allocator, tlsConfig)
+		cl = garden.NewGarden(kvc, cl, sched, ormer, allocator, pClient, tlsConfig)
 
 	default:
 		log.Fatalf("unsupported cluster %q", c.String("cluster-driver"))

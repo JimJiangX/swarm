@@ -29,6 +29,7 @@ var (
 				flRefreshIntervalMin, flRefreshIntervalMax, flFailureRetry, flRefreshRetry,
 				flHeartBeat,
 				flEnableCors,
+				flConfigurePluginAddr,
 				flDBDriver, flDBName, flDBAuth, flDBHost, flDBPort, flDBMaxIdle, flDBTablePrefix,
 				flCluster, flDiscoveryOpt, flClusterOpt, flRefreshOnNodeFilter, flContainerNameRefreshFilter},
 			Action: manage,

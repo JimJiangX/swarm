@@ -50,14 +50,17 @@ type Garden struct {
 	authConfig *types.AuthConfig
 }
 
-func NewGarden(kvc kvstore.Client, cl cluster.Cluster, scheduler *scheduler.Scheduler, ormer database.Ormer, allocator allocator, tlsConfig *tls.Config) *Garden {
+func NewGarden(kvc kvstore.Client, cl cluster.Cluster,
+	scheduler *scheduler.Scheduler, ormer database.Ormer,
+	allocator allocator, pClient pluginapi.PluginAPI, tlsConfig *tls.Config) *Garden {
 	return &Garden{
 		// Mutex:       &scheduler.Mutex,
-		kvClient:  kvc,
-		allocator: allocator,
-		Cluster:   cl,
-		ormer:     ormer,
-		tlsConfig: tlsConfig,
+		kvClient:     kvc,
+		allocator:    allocator,
+		Cluster:      cl,
+		ormer:        ormer,
+		pluginClient: pClient,
+		tlsConfig:    tlsConfig,
 	}
 }
 
