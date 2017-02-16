@@ -3,6 +3,19 @@
 	"ignore": "",
 	"package": [
 		{
+			"checksumSHA1": "rj+nTpXoIHt7Lgkj0L7MZJMsdp8=",
+			"path": "github.com/hashicorp/consul/api",
+			"revision": "9103e77f574254016406ee512d601ad6de6e1efd",
+			"revisionTime": "2017-02-15T15:00:51Z"
+		},
+		{
+			"checksumSHA1": "b8F628srIitj5p7Y130xc9k0QWs=",
+			"origin": "github.com/docker/swarm/vendor/github.com/hashicorp/go-cleanhttp",
+			"path": "github.com/hashicorp/go-cleanhttp",
+			"revision": "3573b8b52aa7b37b9358d966a898feb387f62437",
+			"revisionTime": "2017-02-11T01:34:15Z"
+		},
+		{
 			"checksumSHA1": "fhZiFE/6IYggJDTQJQXwuUVOI1I=",
 			"path": "github.com/hnakamur/go-scp",
 			"revision": "62da9ce7ef065469325e72bc76b00deadd3503df",
