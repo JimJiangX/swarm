@@ -108,6 +108,11 @@ func (s *Stack) DeployServices(ctx context.Context) error {
 		}
 	}
 
+	kvc := s.gd.KVClient()
+	if kvc == nil {
+		//TODO: KV Client is nil
+	}
+
 	err = s.freshServices(ctx)
 	if err != nil {
 		return err
@@ -117,12 +122,9 @@ func (s *Stack) DeployServices(ctx context.Context) error {
 		svc := s.gd.NewService(s.services[i])
 
 		if _, ok := existing[s.services[i].Name]; ok {
-			err = svc.Start(ctx)
+			err = svc.UpdateUnitsConfigs(ctx, nil)
 		} else {
-			if kvc := s.gd.KVClient(); kvc != nil {
-				err = svc.InitStart(ctx, kvc, nil)
-			}
-			//TODO: KV Client is nil
+			err = svc.InitStart(ctx, kvc, nil)
 		}
 
 		if err != nil {

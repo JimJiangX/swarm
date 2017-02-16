@@ -167,13 +167,6 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 		return err
 	}
 
-	for i := range units {
-		err := units[i].startContainer(ctx)
-		if err != nil {
-			return err
-		}
-	}
-
 	if configs == nil {
 		configs, err = svc.generateUnitsConfigs(ctx, nil)
 		if err != nil {
@@ -181,18 +174,14 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 		}
 	}
 
+	// start containers and update configs
+	err = svc.updateConfigs(ctx, units, configs)
+	if err != nil {
+		return err
+	}
+
 	for i := range units {
-		config, ok := configs.Get(units[i].u.ID)
-		if !ok {
-			// TODO: return nil
-		}
-
-		err := units[i].updateServiceConfig(ctx, config.Mount, config.Content)
-		if err != nil {
-			return err
-		}
-
-		cmd := config.GetCmd(structs.InitServiceCmd)
+		cmd := configs.GetCmd(units[i].u.ID, structs.InitServiceCmd)
 
 		_, err = units[i].containerExec(ctx, cmd)
 		if err != nil {
@@ -238,7 +227,7 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 	return nil
 }
 
-func (svc *Service) Start(ctx context.Context) error {
+func (svc *Service) Start(ctx context.Context, cmds structs.Commands) error {
 	ok, val, err := svc.sl.CAS(statusServiceStarting, isInProgress)
 	if err != nil {
 		return err
@@ -270,16 +259,18 @@ func (svc *Service) Start(ctx context.Context) error {
 		return err
 	}
 
-	for i := range units {
-		err = units[i].startContainer(ctx)
+	if len(cmds) == 0 {
+		cmds, err = svc.generateUnitsCmd(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
-	cmds, err := svc.generateUnitsCmd(ctx)
-	if err != nil {
-		return err
+	for i := range units {
+		err = units[i].startContainer(ctx)
+		if err != nil {
+			return err
+		}
 	}
 
 	// get init cmd
@@ -293,6 +284,90 @@ func (svc *Service) Start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.ConfigsMap) error {
+	ok, val, err := svc.sl.CAS(statusServiceConfigUpdating, isInProgress)
+	if err != nil {
+		return err
+	}
+
+	svc.spec.Status = val
+
+	if !ok {
+		return err
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+		status := statusServiceConfigUpdated
+		if err != nil {
+			status = statusServiceConfigUpdateFailed
+		}
+
+		err := svc.sl.SetStatus(status)
+		if err != nil {
+
+		}
+	}()
+
+	units, err := svc.getUnits()
+	if err != nil {
+		return err
+	}
+
+	return svc.updateConfigs(ctx, units, configs)
+}
+
+// updateConfigs update units configurationFile,
+// generate units configs if configs is nil,
+// start units containers before update container configurationFile.
+func (svc *Service) updateConfigs(ctx context.Context, units []*unit, configs structs.ConfigsMap) (err error) {
+	if configs == nil {
+		configs, err = svc.generateUnitsConfigs(ctx, nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	for i := range units {
+		err := units[i].startContainer(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	for i := range units {
+		config, ok := configs.Get(units[i].u.ID)
+		if !ok {
+			// TODO: return nil
+		}
+
+		err := units[i].updateServiceConfig(ctx, config.Mount, config.Content)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[string]string) error {
+	u, err := svc.getUnit(nameOrID)
+	if err != nil {
+		return err
+	}
+
+	config, err := svc.generateUnitConfig(ctx, u.u.ID, args)
+	if err != nil {
+		return err
+	}
+
+	err = u.updateServiceConfig(ctx, config.Mount, config.Content)
+
+	return err
 }
 
 func (svc *Service) Stop(ctx context.Context) error {
@@ -357,22 +432,6 @@ func (svc *Service) stop(ctx context.Context, units []*unit) error {
 
 func (svc *Service) Update(updateConfig *container.UpdateConfig) error {
 	return nil
-}
-
-func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[string]string) error {
-	u, err := svc.getUnit(nameOrID)
-	if err != nil {
-		return err
-	}
-
-	config, err := svc.generateUnitConfig(ctx, u.u.ID, args)
-	if err != nil {
-		return err
-	}
-
-	err = u.updateServiceConfig(ctx, config.Mount, config.Content)
-
-	return err
 }
 
 func (svc *Service) Exec(ctx context.Context, nameOrID string, cmd []string) (types.ContainerExecInspect, error) {
