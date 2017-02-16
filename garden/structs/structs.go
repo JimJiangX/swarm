@@ -6,7 +6,7 @@ type ResponseHead struct {
 	Message string `json:"msg"`
 }
 
-type CommandResponse struct {
+type CommonResponse struct {
 	ResponseHead
 	Object interface{} `json:"data"`
 }

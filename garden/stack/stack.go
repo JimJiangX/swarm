@@ -4,7 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"sort"
+	"sync"
 
+	"github.com/Sirupsen/logrus"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/garden"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/pkg/errors"
@@ -55,21 +58,23 @@ func initServicesPriority(services []structs.ServiceSpec) servicesByPriority {
 }
 
 type Stack struct {
+	wg       *sync.WaitGroup
 	gd       *garden.Garden
 	services []structs.ServiceSpec
 }
 
-func NewStack(gd *garden.Garden, services []structs.ServiceSpec) *Stack {
+func New(gd *garden.Garden, services []structs.ServiceSpec) *Stack {
 	return &Stack{
+		wg:       new(sync.WaitGroup),
 		gd:       gd,
 		services: services,
 	}
 }
 
-func (s *Stack) DeployServices(ctx context.Context) error {
+func (s *Stack) DeployServices(ctx context.Context) ([]*garden.Service, error) {
 	list, err := s.gd.ListServices(ctx)
 	if err != nil && errors.Cause(err) != sql.ErrNoRows {
-		return err
+		return nil, err
 	}
 
 	existing := make(map[string]structs.ServiceSpec, len(list))
@@ -84,8 +89,10 @@ func (s *Stack) DeployServices(ctx context.Context) error {
 
 	auth, err := s.gd.AuthConfig()
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	servicesList := make([]*garden.Service, 0, len(s.services))
 
 	for _, spec := range sorted {
 		if _, exist := existing[spec.Name]; exist {
@@ -94,26 +101,43 @@ func (s *Stack) DeployServices(ctx context.Context) error {
 
 		service, err := s.gd.BuildService(spec)
 		if err != nil {
-			return err
+			return servicesList, err
 		}
 
-		pendings, err := s.gd.Allocation(service)
-		if err != nil {
-			return err
-		}
+		servicesList = append(servicesList, service)
 
-		err = service.CreateContainer(pendings, auth)
-		if err != nil {
-			return err
-		}
+		s.wg.Add(1)
+
+		go func(s *Stack, service *garden.Service, auth *types.AuthConfig) {
+			defer s.wg.Done()
+
+			pendings, err := s.gd.Allocation(service)
+			if err != nil {
+				logrus.WithField("Service", service).Errorf("Service allocation error %+v", err)
+				return
+			}
+
+			err = service.CreateContainer(pendings, auth)
+			if err != nil {
+				logrus.WithField("Service", service).Errorf("Service create containers error %+v", err)
+			}
+		}(s, service, auth)
 	}
+
+	go s.linkAndStart(ctx, existing)
+
+	return servicesList, nil
+}
+
+func (s *Stack) linkAndStart(ctx context.Context, existing map[string]structs.ServiceSpec) error {
+	s.wg.Wait()
 
 	kvc := s.gd.KVClient()
 	if kvc == nil {
 		//TODO: KV Client is nil
 	}
 
-	err = s.freshServices(ctx)
+	err := s.freshServices(ctx)
 	if err != nil {
 		return err
 	}
@@ -122,9 +146,13 @@ func (s *Stack) DeployServices(ctx context.Context) error {
 		svc := s.gd.NewService(s.services[i])
 
 		if _, ok := existing[s.services[i].Name]; ok {
+
 			err = svc.UpdateUnitsConfigs(ctx, nil)
+
 		} else {
+
 			err = svc.InitStart(ctx, kvc, nil)
+
 		}
 
 		if err != nil {

@@ -75,6 +75,10 @@ func (svc *Service) getUnits() ([]*unit, error) {
 	return units, nil
 }
 
+func (svc Service) Spec() structs.ServiceSpec {
+	return svc.spec
+}
+
 func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.AuthConfig) error {
 	defer func() {
 		ids := make([]string, len(pendings))

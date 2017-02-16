@@ -22,6 +22,22 @@ import (
 
 const clusterLabel = "Cluster"
 
+func (gd *Garden) Service(nameOrID string) (*Service, error) {
+	info, err := gd.ormer.GetServiceInfo(nameOrID)
+	if err != nil {
+		return nil, err
+	}
+
+	spec := structs.ServiceSpec{
+		Service: info.Service,
+		// TODO: other params
+	}
+
+	s := gd.NewService(spec)
+
+	return s, nil
+}
+
 func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, error) {
 	list, err := gd.ormer.ListServicesInfo()
 	if err != nil {
@@ -117,7 +133,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, error) {
 		uid := utils.Generate32UUID()
 		us[i] = database.Unit{
 			ID:            uid,
-			Name:          fmt.Sprintf("%s_%s", uid[:8], spec.Name), // <unit_id_8bit>_<service_name>
+			Name:          fmt.Sprintf("%s_%s", spec.Name, uid[:8]), // <service_name>_<unit_id_8bit>
 			Type:          "",
 			ImageID:       image.ID,
 			ImageName:     spec.Image,
@@ -148,22 +164,6 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, error) {
 	service.options.nodes.constraint = spec.Constraint
 
 	return service, nil
-}
-
-func (gd *Garden) Service(nameOrID string) (*Service, error) {
-	svc, err := gd.ormer.GetService(nameOrID)
-	if err != nil {
-		return nil, err
-	}
-
-	spec := structs.ServiceSpec{
-		Service: svc,
-		// TODO: other params
-	}
-
-	s := gd.NewService(spec)
-
-	return s, nil
 }
 
 type scheduleOption struct {

@@ -86,3 +86,5 @@ type RequireResource struct {
 		Port int
 	}
 }
+
+type PostServiceResponse []database.Service
