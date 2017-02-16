@@ -1,7 +1,9 @@
 package kvstore
 
 import (
+	"crypto/tls"
 	"net"
+	"os"
 	"strings"
 	"sync"
 
@@ -11,7 +13,7 @@ import (
 
 const defaultConsulAddr = "127.0.0.1:8500"
 
-func NewClient(uri string) (Client, error) {
+func NewClient(uri string, tlsConfig *tls.Config) (Client, error) {
 	if uri == "" {
 		uri = defaultConsulAddr
 	}
@@ -37,10 +39,18 @@ func NewClient(uri string) (Client, error) {
 		Address: addrs[0],
 	}
 
-	return MakeClient(config, prefix, port)
+	return MakeClient(config, prefix, port, tlsConfig)
 }
 
-func MakeClient(config *api.Config, prefix, port string) (*kvClient, error) {
+func MakeClient(config *api.Config, prefix, port string, tlsConfig *tls.Config) (*kvClient, error) {
+	if tlsConfig != nil {
+		os.Setenv(api.HTTPSSLEnvName, "true")
+		defer os.Setenv(api.HTTPSSLEnvName, "false")
+
+		if tlsConfig.InsecureSkipVerify {
+			os.Setenv(api.HTTPSSLVerifyEnvName, "false")
+		}
+	}
 	c, err := api.NewClient(config)
 	if err != nil {
 		return nil, errors.Wrap(err, "new consul api Client")

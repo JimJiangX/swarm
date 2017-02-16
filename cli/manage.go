@@ -343,7 +343,7 @@ func manage(c *cli.Context) {
 			break
 		}
 
-		kvc, err := kvstore.NewClient(uri)
+		kvc, err := kvstore.NewClient(uri, tlsConfig)
 		if err != nil {
 			break
 		}

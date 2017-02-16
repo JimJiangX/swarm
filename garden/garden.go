@@ -161,7 +161,7 @@ func (gd *Garden) Register(req structs.RegisterDC) error {
 			Token:      token,
 		}
 
-		kvc, err = kvstore.MakeClient(cfg, "garden", strconv.Itoa(config.ConsulPort))
+		kvc, err = kvstore.MakeClient(cfg, "garden", strconv.Itoa(config.ConsulPort), gd.tlsConfig)
 		if err != nil {
 			return err
 		}
