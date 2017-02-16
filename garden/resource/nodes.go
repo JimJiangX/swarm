@@ -17,13 +17,13 @@ func NewMaster(dco database.NodeOrmer, c cluster.Cluster) master {
 	}
 }
 
-func (m master) AddCluster(c database.Cluster) error {
-	if c.ID == "" {
-		return nil
-	}
+//func (m master) AddCluster(c database.Cluster) error {
+//	if c.ID == "" {
+//		return nil
+//	}
 
-	return m.dco.InsertCluster(c)
-}
+//	return m.dco.InsertCluster(c)
+//}
 
 func (m master) getCluster(nameOrID string) (database.Cluster, error) {
 
