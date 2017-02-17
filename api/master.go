@@ -1,7 +1,6 @@
 package api
 
 import (
-	goctx "context"
 	"net/http"
 	"time"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden"
 	"github.com/gorilla/mux"
+	goctx "golang.org/x/net/context"
 )
 
 const (

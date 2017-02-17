@@ -1,12 +1,12 @@
 package garden
 
 import (
-	"context"
 	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"golang.org/x/net/context"
 )
 
 const (

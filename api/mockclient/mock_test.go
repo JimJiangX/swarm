@@ -1,9 +1,10 @@
 package mockclient
 
 import (
-	"context"
 	"reflect"
 	"testing"
+
+	"golang.org/x/net/context"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/swarmclient"

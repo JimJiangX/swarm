@@ -1,11 +1,10 @@
 package cluster
 
 import (
-	"context"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/swarm/swarmclient"
+	"golang.org/x/net/context"
 )
 
 //EventsMonitor monitors events

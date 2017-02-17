@@ -1,7 +1,6 @@
 package garden
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
 	pluginapi "github.com/docker/swarm/plugin/parser/api"
+	"golang.org/x/net/context"
 )
 
 var containerKV = "swarm/containers/"
