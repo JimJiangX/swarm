@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"io"
 	"os"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
 // UsedCpus returns the sum of CPUs reserved by containers.

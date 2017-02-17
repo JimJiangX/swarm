@@ -1,12 +1,12 @@
 package garden
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/kvstore"
-	"golang.org/x/net/context"
 )
 
 func (svc *Service) Scale(ctx context.Context, r kvstore.Register, replicas int) error {

@@ -1,6 +1,7 @@
 package api
 
 import (
+	goctx "context"
 	"encoding/json"
 	stderr "errors"
 	"net/http"
@@ -13,7 +14,6 @@ import (
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/gorilla/mux"
-	goctx "golang.org/x/net/context"
 )
 
 var errUnsupportGarden = stderr.New("unsupport Garden yet")

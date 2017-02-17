@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -15,8 +16,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/net/context"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"

@@ -1,6 +1,7 @@
 package mockclient
 
 import (
+	"context"
 	"io"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/stretchr/testify/mock"
-	"golang.org/x/net/context"
 )
 
 // MockClient is a mock API Client based on docker/api
