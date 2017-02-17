@@ -243,7 +243,7 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 		}
 	}()
 
-	script, err := nt.modifyProfile(horus, config)
+	script, err := nt.modifyProfile(horus, &config)
 	if err != nil {
 		entry.WithError(err).Error("modify profile")
 
@@ -311,7 +311,7 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 }
 
 // CA,script,error
-func (node *nodeWithTask) modifyProfile(horus string, config database.SysConfig) (string, error) {
+func (node *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) (string, error) {
 	horusIP, horusPort, err := net.SplitHostPort(horus)
 	if err != nil {
 		return "", errors.Wrap(err, "Horus addr:"+horus)
