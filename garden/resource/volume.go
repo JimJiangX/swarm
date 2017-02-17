@@ -37,7 +37,7 @@ type volumeDriver interface {
 	Name() string
 	Type() string
 	Space() space
-	// Alloc(uid string, size int64) (database.Volume, error)
+	Alloc(uid string, require structs.VolumeRequire) (*database.Volume, error)
 }
 
 type localVolume struct {
@@ -63,6 +63,29 @@ func (lv localVolume) Space() space {
 	return lv.space
 }
 
+func (lv *localVolume) Alloc(uid string, require structs.VolumeRequire) (*database.Volume, error) {
+	space := lv.Space()
+
+	volume := database.Volume{
+		Size:       require.Size,
+		ID:         "",
+		Name:       "",
+		UnitID:     uid,
+		VGName:     space.VG,
+		Driver:     lv.Driver(),
+		Filesystem: space.Fstype,
+	}
+
+	err := lv.vo.InsertVolume(volume)
+	if err != nil {
+		return nil, err
+	}
+
+	lv.space.Free -= require.Size
+
+	return &volume, nil
+}
+
 type volumeDrivers []volumeDriver
 
 func (vds volumeDrivers) get(_type string) volumeDriver {
@@ -75,7 +98,7 @@ func (vds volumeDrivers) get(_type string) volumeDriver {
 	return nil
 }
 
-func (ds volumeDrivers) isSpaceEnough(stores []structs.VolumeRequire) error {
+func (vds volumeDrivers) isSpaceEnough(stores []structs.VolumeRequire) error {
 	need := make(map[string]int64, len(stores))
 
 	for i := range stores {
@@ -83,7 +106,7 @@ func (ds volumeDrivers) isSpaceEnough(stores []structs.VolumeRequire) error {
 	}
 
 	for typ, size := range need {
-		driver := ds.get(typ)
+		driver := vds.get(typ)
 		if driver == nil {
 			return errors.New("not found volumeDriver by type:" + typ)
 		}
@@ -94,6 +117,27 @@ func (ds volumeDrivers) isSpaceEnough(stores []structs.VolumeRequire) error {
 	}
 
 	return nil
+}
+
+func (vds volumeDrivers) AllocVolumes(uid string, stores []structs.VolumeRequire) ([]*database.Volume, error) {
+	volumes := make([]*database.Volume, 0, len(stores))
+
+	for i := range stores {
+		driver := vds.get(stores[i].Type)
+		if driver == nil {
+			return volumes, errors.Errorf("")
+		}
+
+		v, err := driver.Alloc(uid, stores[i])
+		if v != nil {
+			volumes = append(volumes, v)
+		}
+		if err != nil {
+			return volumes, err
+		}
+	}
+
+	return volumes, nil
 }
 
 func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label string) (volumeDriver, error) {
@@ -131,7 +175,7 @@ func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label st
 
 	total, err := strconv.ParseInt(size, 10, 64)
 	if err != nil {
-		return localVolume{}, errors.Wrapf(err, "parse VG %s:%s", sizeLabel, size)
+		return &localVolume{}, errors.Wrapf(err, "parse VG %s:%s", sizeLabel, size)
 	}
 
 	lvs, err := vo.ListVolumeByVG(vg)
@@ -144,7 +188,7 @@ func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label st
 		used += lvs[i].Size
 	}
 
-	return localVolume{
+	return &localVolume{
 		vo:     vo,
 		_type:  vgType,
 		driver: defaultLocalVolumeDriver,

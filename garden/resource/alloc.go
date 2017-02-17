@@ -98,26 +98,9 @@ func (at allocator) AlloctVolumes(uid string, n *node.Node, stores []structs.Vol
 		return nil, err
 	}
 
-	lvs := make([]database.Volume, len(stores))
-	for i := range stores {
-
-		driver := drivers.get(stores[i].Type)
-		space := driver.Space()
-
-		lvs[i] = database.Volume{
-			Size:       stores[i].Size,
-			ID:         "",
-			Name:       "",
-			UnitID:     uid,
-			VGName:     space.VG,
-			Driver:     driver.Driver(),
-			Filesystem: space.Fstype,
-		}
-	}
-
-	err = at.ormer.InsertVolumes(lvs)
+	lvs, err := drivers.AllocVolumes(uid, stores)
 	if err != nil {
-		return nil, errors.Errorf("")
+		return nil, err
 	}
 
 	volumes := make([]volume.VolumesCreateBody, len(lvs))
