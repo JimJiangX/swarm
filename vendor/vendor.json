@@ -3,8 +3,13 @@
 	"ignore": "",
 	"package": [
 		{
+			"checksumSHA1": "1pOp8Cyc6fpq8RtiakE3gLSPj4Q=",
+			"path": "github.com/astaxie/beego/config",
+			"revision": "1d49a4bcbd3a9df2eaffefc42843a383c5c1251d",
+			"revisionTime": "2017-02-13T04:37:17Z"
+		},
+		{
 			"checksumSHA1": "VhMKLZ8ZiW48kC1PQp3iowtwBe8=",
-			"origin": "github.com/docker/swarm/vendor/github.com/gorilla/mux",
 			"path": "github.com/gorilla/mux",
 			"revision": "392c28fe23e1c45ddba891b0320b3b5df220beea",
 			"revisionTime": "2017-01-18T13:43:44Z"
