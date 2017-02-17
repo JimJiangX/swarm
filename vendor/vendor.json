@@ -45,6 +45,18 @@
 			"revisionTime": "2017-01-04T09:20:34Z"
 		},
 		{
+			"checksumSHA1": "DcQryB2vX8O61hsQ477I2Xboc9s=",
+			"path": "github.com/jmoiron/sqlx",
+			"revision": "f980a91bdc37abef88269b8f122d7de6352102f5",
+			"revisionTime": "2017-01-21T10:35:19Z"
+		},
+		{
+			"checksumSHA1": "XpXIoKr9mdaog+CuDmSgVZk6LdY=",
+			"path": "github.com/jmoiron/sqlx/reflectx",
+			"revision": "f980a91bdc37abef88269b8f122d7de6352102f5",
+			"revisionTime": "2017-01-21T10:35:19Z"
+		},
+		{
 			"checksumSHA1": "LzlSlifCUTtWAJHqQJPRSsjaeTQ=",
 			"path": "golang.org/x/crypto/curve25519",
 			"revision": "f6b343c37ca80bfa8ea539da67a0b621f84fab1d",
