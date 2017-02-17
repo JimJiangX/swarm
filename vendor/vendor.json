@@ -9,6 +9,12 @@
 			"revisionTime": "2017-02-13T04:37:17Z"
 		},
 		{
+			"checksumSHA1": "EOOLFGVvVsTSa1gg9ELdZ/yzN2A=",
+			"path": "github.com/docker/docker/pkg/stdcopy",
+			"revision": "946787e85e7c747c78354c5ca8d7a512b8766969",
+			"revisionTime": "2017-02-15T13:41:42Z"
+		},
+		{
 			"checksumSHA1": "LoYojhUneS1nEBnYaw5pl7f+h3g=",
 			"path": "github.com/go-sql-driver/mysql",
 			"revision": "2e00b5cd70399450106cec6431c2e2ce3cae5034",
