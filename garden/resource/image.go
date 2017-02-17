@@ -2,7 +2,6 @@ package resource
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -16,6 +15,7 @@ import (
 	"github.com/docker/swarm/garden/structs"
 	pluginapi "github.com/docker/swarm/plugin/parser/api"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 // LoadImage load a new Image

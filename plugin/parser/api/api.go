@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/plugin/client"
+	"golang.org/x/net/context"
 )
 
 type PluginAPI interface {

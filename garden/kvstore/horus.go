@@ -2,7 +2,6 @@ package kvstore
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/docker/swarm/garden/structs"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 type result struct {

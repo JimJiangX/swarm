@@ -1,7 +1,6 @@
 package stack
 
 import (
-	"context"
 	"database/sql"
 	"sort"
 	"sync"
@@ -11,6 +10,7 @@ import (
 	"github.com/docker/swarm/garden"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 type servicesByPriority []structs.ServiceSpec

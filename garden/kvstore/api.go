@@ -1,10 +1,9 @@
 package kvstore
 
 import (
-	"context"
-
 	"github.com/docker/swarm/garden/structs"
 	"github.com/hashicorp/consul/api"
+	"golang.org/x/net/context"
 )
 
 type Client interface {

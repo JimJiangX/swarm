@@ -1,7 +1,6 @@
 package resource
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -15,6 +14,7 @@ import (
 	"github.com/docker/swarm/garden/scplib"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 const (

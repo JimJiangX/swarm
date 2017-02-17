@@ -2,7 +2,6 @@ package parser
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -15,6 +14,7 @@ import (
 	"github.com/docker/swarm/garden/structs"
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/consul/api"
+	"golang.org/x/net/context"
 )
 
 type _Context struct {
