@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	"golang.org/x/net/context/ctxhttp"
 )
 
 const defaultTimeout = 30 * time.Second
@@ -25,6 +26,7 @@ type encoder struct {
 }
 
 type client struct {
+	timeout time.Duration
 	scheme  string
 	address string
 	client  *http.Client
@@ -72,6 +74,7 @@ func NewClient(addr string, timeout time.Duration, tlsConfig *tls.Config) Client
 	}
 
 	c := &client{
+		timeout: timeout,
 		scheme:  scheme,
 		address: addr,
 		enc:     enc,
@@ -92,48 +95,34 @@ func (c *client) SetEncoder(bodyType string, enc func(obj interface{}) (io.Reade
 }
 
 func (c *client) Do(ctx context.Context, method, url string, obj interface{}) (*http.Response, error) {
-	req, err := c.newRequest(ctx, method, url, obj)
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.Background(), c.timeout)
+		defer cancel()
+	}
+
+	req, err := c.newRequest(method, url, obj)
 	if err != nil {
 		return nil, err
 	}
 
-	return c.client.Do(req)
+	return ctxhttp.Do(ctx, c.client, req)
 }
 
 func (c *client) Get(ctx context.Context, url string) (*http.Response, error) {
-	req, err := c.newRequest(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return c.client.Do(req)
+	return c.Do(ctx, http.MethodGet, url, nil)
 }
 
 func (c *client) Head(ctx context.Context, url string) (*http.Response, error) {
-	req, err := c.newRequest(ctx, "HEAD", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return c.client.Do(req)
+	return c.Do(ctx, http.MethodHead, url, nil)
 }
 
 func (c *client) Post(ctx context.Context, url string, body interface{}) (*http.Response, error) {
-	req, err := c.newRequest(ctx, "POST", url, body)
-	if err != nil {
-		return nil, err
-	}
-
-	return c.client.Do(req)
+	return c.Do(ctx, http.MethodGet, url, body)
 }
 
 func (c *client) Put(ctx context.Context, url string, body interface{}) (*http.Response, error) {
-	req, err := c.newRequest(ctx, "PUT", url, body)
-	if err != nil {
-		return nil, err
-	}
-
-	return c.client.Do(req)
+	return c.Do(ctx, http.MethodPut, url, body)
 }
 
 func (c *client) postForm(ctx context.Context, uri string, data url.Values) (*http.Response, error) {
@@ -159,16 +148,11 @@ func (c *client) postForm(ctx context.Context, uri string, data url.Values) (*ht
 }
 
 func (c *client) Delete(ctx context.Context, url string) (*http.Response, error) {
-	req, err := c.newRequest(ctx, "DELETE", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return c.client.Do(req)
+	return c.Do(ctx, http.MethodDelete, url, nil)
 }
 
 // uri encoded by url.URL.RequestURI()
-func (c *client) newRequest(ctx context.Context, method, url string, obj interface{}) (*http.Request, error) {
+func (c *client) newRequest(method, url string, obj interface{}) (*http.Request, error) {
 	var (
 		err  error
 		body io.Reader
@@ -182,12 +166,6 @@ func (c *client) newRequest(ctx context.Context, method, url string, obj interfa
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
-	}
-
-	if ctx != nil {
-		if dead, ok := ctx.Deadline(); ok && time.Now().Before(dead) {
-			req = req.WithContext(ctx)
-		}
 	}
 
 	req.URL.Host = c.address
