@@ -79,6 +79,19 @@
 			"path": "golang.org/x/crypto/ssh",
 			"revision": "f6b343c37ca80bfa8ea539da67a0b621f84fab1d",
 			"revisionTime": "2016-12-21T04:54:10Z"
+		},
+		{
+			"checksumSHA1": "ujkdYz/AOSZ4dVskaUGW9g/V/dM=",
+			"origin": "github.com/docker/swarm/vendor/golang.org/x/net/context",
+			"path": "golang.org/x/net/context",
+			"revision": "6b27048ae5e6ad1ef927e72e437531493de612fe",
+			"revisionTime": "2017-02-17T08:49:01Z"
+		},
+		{
+			"checksumSHA1": "EFv2fHTe/0194O+Zs+z8wp+GQLk=",
+			"path": "golang.org/x/net/context/ctxhttp",
+			"revision": "6b27048ae5e6ad1ef927e72e437531493de612fe",
+			"revisionTime": "2017-02-17T08:49:01Z"
 		}
 	],
 	"rootPath": "github.com/docker/swarm"
