@@ -6,12 +6,16 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 )
 
-const defaultConsulAddr = "127.0.0.1:8500"
+const (
+	defaultConsulAddr = "127.0.0.1:8500"
+	defaultTimeout    = 30 * time.Second
+)
 
 func NewClient(uri string, tlsConfig *tls.Config) (Client, error) {
 	if uri == "" {
@@ -36,7 +40,8 @@ func NewClient(uri string, tlsConfig *tls.Config) (Client, error) {
 	}
 
 	config := &api.Config{
-		Address: addrs[0],
+		Address:  addrs[0],
+		WaitTime: defaultTimeout,
 	}
 
 	return MakeClient(config, prefix, port, tlsConfig)

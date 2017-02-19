@@ -14,6 +14,7 @@ import (
 	"github.com/docker/swarm/garden/structs"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
+	"golang.org/x/net/context/ctxhttp"
 )
 
 type result struct {
@@ -22,6 +23,11 @@ type result struct {
 }
 
 func (c *kvClient) registerToHorus(ctx context.Context, obj ...structs.HorusRegistration) error {
+	if ctx == nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.Background(), defaultTimeout)
+		defer cancel()
+	}
 	var addr string
 	ch := make(chan result, 1)
 	go func(ch chan<- result) {
@@ -50,14 +56,7 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj ...structs.HorusRegi
 	}
 
 	uri := fmt.Sprintf("http://%s/v1/agent/register", addr)
-	req, err := http.NewRequest("POST", uri, body)
-	if err != nil {
-		return errors.Wrap(err, "post agent register to Horus")
-	}
-	req = req.WithContext(ctx)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := ctxhttp.Post(ctx, nil, uri, "application/json", body)
 	if err != nil {
 		return errors.Wrap(err, "register to Horus response")
 	}
