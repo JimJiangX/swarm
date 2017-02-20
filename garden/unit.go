@@ -1,8 +1,10 @@
 package garden
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
@@ -201,6 +203,12 @@ func (u unit) containerExec(ctx context.Context, cmd []string, detach bool) (typ
 }
 
 func (u unit) updateServiceConfig(ctx context.Context, path, context string) error {
+	cmd := []string{"/bin/sh", "-c", fmt.Sprintf(`"echo '%s'> %s && chmod 644 %s"`, context, path, path)}
 
-	return nil
+	inspect, err := u.containerExec(ctx, cmd, false)
+	if err != nil {
+		logrus.WithField("Container", u.u.Name).Errorf("update config file %s,%#v,%+v", path, inspect, err)
+	}
+
+	return err
 }
