@@ -133,9 +133,6 @@ func (s *Stack) linkAndStart(ctx context.Context, existing map[string]structs.Se
 	s.wg.Wait()
 
 	kvc := s.gd.KVClient()
-	if kvc == nil {
-		//TODO: KV Client is nil
-	}
 
 	err := s.freshServices(ctx)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/swarm/cluster"
@@ -12,6 +13,7 @@ import (
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
 	pluginapi "github.com/docker/swarm/plugin/parser/api"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -195,18 +197,17 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 
 	if kvc != nil {
 		// register to kv store and third-part services
-		for i := range units {
-			host := ""
-			c := units[i].getContainer()
-			if c != nil {
-				host = c.Engine.IP
+		for _, u := range units {
+			host, err := u.getHostIP()
+			if err != nil {
+				return err
 			}
-			if host == "" {
-				// TODO: get node IP
-			}
+
+			c := u.getContainer()
+
 			val, err := json.Marshal(c)
 			if err != nil {
-				// TODO: json marshal error
+				return errors.Wrapf(err, "JSON marshal Container %s", u.u.Name)
 			}
 
 			err = kvc.PutKV(containerKV+c.ID, val)
@@ -214,9 +215,9 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 				return err
 			}
 
-			config, ok := configs.Get(units[i].u.ID)
+			config, ok := configs.Get(u.u.ID)
 			if !ok {
-				// TODO:
+				return errors.Errorf("unit %s config is required", u.u.Name)
 			}
 
 			r := config.GetServiceRegistration()
@@ -346,7 +347,7 @@ func (svc *Service) updateConfigs(ctx context.Context, units []*unit, configs st
 	for i := range units {
 		config, ok := configs.Get(units[i].u.ID)
 		if !ok {
-			// TODO: return nil
+			continue
 		}
 
 		err := units[i].updateServiceConfig(ctx, config.Mount, config.Content)
@@ -388,7 +389,7 @@ func (svc *Service) Stop(ctx context.Context) error {
 
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
+			err = fmt.Errorf("panic:%v", r)
 		}
 		status := statusServiceStoped
 		if err != nil {
@@ -461,12 +462,12 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) error {
 
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
+			err = fmt.Errorf("panic:%v", r)
 		}
 		if err != nil {
 			err := svc.sl.SetStatus(statusServiceDeleteFailed)
 			if err != nil {
-				// TODO:logrus
+				logrus.WithField("Service", svc.spec.Name).Errorf("set Service.Status statusServiceDeleteFailed,%+v", err)
 			}
 		}
 	}()
@@ -496,7 +497,6 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) error {
 		return err
 	}
 
-	// TODO:remove data from database
 	err = svc.so.DelServiceRelation(svc.spec.ID, true)
 
 	return err
@@ -555,16 +555,14 @@ func (svc *Service) deleteCondition() error {
 }
 
 func (svc *Service) deregisterSerivces(ctx context.Context, r kvstore.Register, units []*unit) error {
-
 	for i := range units {
-		host := ""
-		if e := units[i].getEngine(); e != nil {
-			host = e.IP
+
+		host, err := units[i].getHostIP()
+		if err != nil {
+			return err
 		}
-		if host == "" {
-			// TODO: get node IP
-		}
-		err := r.DeregisterService(ctx, host, units[i].u.ID)
+
+		err = r.DeregisterService(ctx, host, units[i].u.ID)
 		if err != nil {
 			return err
 		}

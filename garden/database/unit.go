@@ -35,7 +35,10 @@ type ContainerInterface interface {
 
 type UnitOrmer interface {
 	UnitInterface
+
 	ContainerInterface
+
+	NodeInterface
 
 	VolumeOrmer
 

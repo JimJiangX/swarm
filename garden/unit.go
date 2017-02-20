@@ -2,12 +2,14 @@ package garden
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -56,6 +58,22 @@ const (
 	statusContainerExited
 )
 
+type errContainer struct {
+	name   string
+	action string
+}
+
+func (ec errContainer) Error() string {
+	return fmt.Sprintf("Container %s %s", ec.name, ec.action)
+}
+
+func newContainerError(name, action string) errContainer {
+	return errContainer{
+		name:   name,
+		action: action,
+	}
+}
+
 type unit struct {
 	u       database.Unit
 	uo      database.UnitOrmer
@@ -94,17 +112,37 @@ func (u unit) getEngine() *cluster.Engine {
 	}
 
 	c := u.getContainer()
-	if c != nil {
+	if c != nil && c.Engine != nil {
 		return c.Engine
 	}
 
 	return nil
 }
 
+func (u unit) getHostIP() (string, error) {
+	engine := u.getEngine()
+	if engine != nil {
+		return engine.IP, nil
+	}
+
+	if u.u.EngineID != "" {
+		n, err := u.uo.GetNode(u.u.EngineID)
+		if err != nil {
+			return "", err
+		}
+
+		parts := strings.SplitN(n.Addr, ":", 2)
+
+		return parts[0], nil
+	}
+
+	return "", errors.Wrap(newContainerError(u.u.Name, "host IP is required"), "get host IP by unit")
+}
+
 func (u unit) startContainer(ctx context.Context) error {
 	engine := u.getEngine()
 	if engine == nil {
-		return nil
+		return errors.New("Engine not found")
 	}
 
 	select {
@@ -127,8 +165,7 @@ func (u unit) startContainer(ctx context.Context) error {
 		}
 	}
 
-	// TODO:errContainerNotFound
-	return nil
+	return errors.Wrap(newContainerError(u.u.Name, "not found"), "container start")
 }
 
 func (u unit) stopContainer(ctx context.Context) error {
@@ -189,14 +226,13 @@ func (u unit) removeVolumes(ctx context.Context) error {
 }
 
 func (u unit) containerExec(ctx context.Context, cmd []string, detach bool) (types.ContainerExecInspect, error) {
-	// TODO:defind errors
 	c := u.getContainer()
-	if c != nil {
-		return types.ContainerExecInspect{}, nil
+	if c == nil {
+		return types.ContainerExecInspect{}, errors.Wrap(newContainerError(u.u.Name, "not found"), "container exec")
 	}
 
 	if !c.Info.State.Running {
-		return types.ContainerExecInspect{}, nil
+		return types.ContainerExecInspect{}, errors.Wrap(newContainerError(u.u.Name, "is not running"), "container exec")
 	}
 
 	return c.Exec(ctx, cmd, detach)
