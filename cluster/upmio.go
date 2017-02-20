@@ -24,7 +24,11 @@ func (e *Engine) UsedCpus() int64 {
 
 			n, err := c.Config.CountCPU()
 			if err != nil {
-				// TODO:
+				logrus.WithFields(logrus.Fields{
+					"Host":      e.Name,
+					"Engine":    e.Addr,
+					"Container": c.Names,
+				}).Errorf("parser Config.HostConfig.CpusetCpus:%s error:%s", c.Config.HostConfig.CpusetCpus, err)
 			}
 
 			r += n
@@ -38,12 +42,12 @@ func (e *Engine) ContainerAPIClient() client.ContainerAPIClient {
 	return e.apiClient
 }
 
-func (c Container) Exec(ctx context.Context, cmd []string) (types.ContainerExecInspect, error) {
-	if c.Engine == nil || c.Info.State == nil || !c.Info.State.Running {
-		return types.ContainerExecInspect{}, nil
+func (c Container) Exec(ctx context.Context, cmd []string, detach bool) (types.ContainerExecInspect, error) {
+	if c.Engine == nil {
+		return types.ContainerExecInspect{}, errors.Errorf("Engine of Container:%s is required", c.Names)
 	}
 
-	return c.Engine.containerExec(ctx, c.ID, cmd, false)
+	return c.Engine.containerExec(ctx, c.ID, cmd, detach)
 }
 
 // checkTtyInput checks if we are trying to attach to a container tty
@@ -86,6 +90,7 @@ func (engine *Engine) containerExec(ctx context.Context, containerID string, cmd
 		"Container": containerID,
 		"Engine":    engine.Addr,
 		"ExecID":    exec.ID,
+		"Detach":    execConfig.Detach,
 	}).Infof("start exec:%s", cmd)
 
 	if execConfig.Detach {

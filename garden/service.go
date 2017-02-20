@@ -187,7 +187,7 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 	for i := range units {
 		cmd := configs.GetCmd(units[i].u.ID, structs.InitServiceCmd)
 
-		_, err = units[i].containerExec(ctx, cmd)
+		_, err = units[i].containerExec(ctx, cmd, false)
 		if err != nil {
 			return err
 		}
@@ -281,7 +281,7 @@ func (svc *Service) Start(ctx context.Context, cmds structs.Commands) error {
 	for i := range units {
 		cmd := cmds.GetCmd(units[i].u.ID, structs.StartServiceCmd)
 
-		_, err = units[i].containerExec(ctx, cmd)
+		_, err = units[i].containerExec(ctx, cmd, false)
 		if err != nil {
 			return err
 		}
@@ -418,7 +418,7 @@ func (svc *Service) stop(ctx context.Context, units []*unit) error {
 	for i := range units {
 		cmd := cmds.GetCmd(units[i].u.ID, structs.StopServiceCmd)
 
-		_, err = units[i].containerExec(ctx, cmd)
+		_, err = units[i].containerExec(ctx, cmd, false)
 		if err != nil {
 			return err
 		}
@@ -438,13 +438,13 @@ func (svc *Service) Update(updateConfig *container.UpdateConfig) error {
 	return nil
 }
 
-func (svc *Service) Exec(ctx context.Context, nameOrID string, cmd []string) (types.ContainerExecInspect, error) {
+func (svc *Service) Exec(ctx context.Context, nameOrID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
 	u, err := svc.getUnit(nameOrID)
 	if err != nil {
 		return types.ContainerExecInspect{}, err
 	}
 
-	return u.containerExec(ctx, cmd)
+	return u.containerExec(ctx, cmd, detach)
 }
 
 func (svc *Service) Remove(ctx context.Context, r kvstore.Register) error {
@@ -514,12 +514,13 @@ func (svc *Service) removeContainers(ctx context.Context, units []*unit, force, 
 		if client == nil {
 			return nil
 		}
-
-		timeout := 30 * time.Second
-		err := client.ContainerStop(ctx, u.u.Name, &timeout)
-		engine.CheckConnectionErr(err)
-		if err != nil {
-			return err
+		if !force {
+			timeout := 30 * time.Second
+			err := client.ContainerStop(ctx, u.u.Name, &timeout)
+			engine.CheckConnectionErr(err)
+			if err != nil {
+				return err
+			}
 		}
 
 		options := types.ContainerRemoveOptions{
@@ -527,7 +528,7 @@ func (svc *Service) removeContainers(ctx context.Context, units []*unit, force, 
 			RemoveLinks:   false,
 			Force:         force,
 		}
-		err = client.ContainerRemove(ctx, u.u.Name, options)
+		err := client.ContainerRemove(ctx, u.u.Name, options)
 		engine.CheckConnectionErr(err)
 		if err != nil {
 			return err

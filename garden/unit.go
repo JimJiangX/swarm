@@ -186,7 +186,8 @@ func (u unit) removeVolumes(ctx context.Context) error {
 	return nil
 }
 
-func (u unit) containerExec(ctx context.Context, cmd []string) (types.ContainerExecInspect, error) {
+func (u unit) containerExec(ctx context.Context, cmd []string, detach bool) (types.ContainerExecInspect, error) {
+	// TODO:defind errors
 	c := u.getContainer()
 	if c != nil {
 		return types.ContainerExecInspect{}, nil
@@ -196,7 +197,7 @@ func (u unit) containerExec(ctx context.Context, cmd []string) (types.ContainerE
 		return types.ContainerExecInspect{}, nil
 	}
 
-	return c.Exec(ctx, cmd)
+	return c.Exec(ctx, cmd, detach)
 }
 
 func (u unit) updateServiceConfig(ctx context.Context, path, context string) error {
