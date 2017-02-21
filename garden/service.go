@@ -2,7 +2,6 @@ package garden
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -81,7 +80,7 @@ func (svc Service) Spec() structs.ServiceSpec {
 	return svc.spec
 }
 
-func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.AuthConfig) error {
+func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.AuthConfig) (err error) {
 	defer func() {
 		ids := make([]string, len(pendings))
 		for i := range pendings {
@@ -103,16 +102,16 @@ func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.Au
 
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
+			err = errors.Errorf("panic:%v", r)
 		}
 		status := statusServiceContainerCreated
 		if err != nil {
 			status = statusServiceContainerCreateFailed
 		}
 
-		err := svc.sl.SetStatus(status)
-		if err != nil {
-
+		_err := svc.sl.SetStatus(status)
+		if _err != nil {
+			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", status, _err)
 		}
 	}()
 
@@ -141,7 +140,7 @@ func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.Au
 	return nil
 }
 
-func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap) error {
+func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap) (err error) {
 	ok, val, err := svc.sl.CAS(statusServiceStarting, isInProgress)
 	if err != nil {
 		return err
@@ -155,16 +154,16 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
+			err = errors.Errorf("panic:%v", r)
 		}
 		status := statusServiceStarted
 		if err != nil {
 			status = statusServiceStartFailed
 		}
 
-		err := svc.sl.SetStatus(status)
-		if err != nil {
-
+		_err := svc.sl.SetStatus(status)
+		if _err != nil {
+			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", status, _err)
 		}
 	}()
 
@@ -232,7 +231,7 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 	return nil
 }
 
-func (svc *Service) Start(ctx context.Context, cmds structs.Commands) error {
+func (svc *Service) Start(ctx context.Context, cmds structs.Commands) (err error) {
 	ok, val, err := svc.sl.CAS(statusServiceStarting, isInProgress)
 	if err != nil {
 		return err
@@ -246,16 +245,16 @@ func (svc *Service) Start(ctx context.Context, cmds structs.Commands) error {
 
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
+			err = errors.Errorf("panic:%v", r)
 		}
 		status := statusServiceStarted
 		if err != nil {
 			status = statusServiceStartFailed
 		}
 
-		err := svc.sl.SetStatus(status)
-		if err != nil {
-
+		_err := svc.sl.SetStatus(status)
+		if _err != nil {
+			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", status, _err)
 		}
 	}()
 
@@ -291,7 +290,7 @@ func (svc *Service) Start(ctx context.Context, cmds structs.Commands) error {
 	return nil
 }
 
-func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.ConfigsMap) error {
+func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.ConfigsMap) (err error) {
 	ok, val, err := svc.sl.CAS(statusServiceConfigUpdating, isInProgress)
 	if err != nil {
 		return err
@@ -305,16 +304,16 @@ func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.Conf
 
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
+			err = errors.Errorf("panic:%v", r)
 		}
 		status := statusServiceConfigUpdated
 		if err != nil {
 			status = statusServiceConfigUpdateFailed
 		}
 
-		err := svc.sl.SetStatus(status)
-		if err != nil {
-
+		_err := svc.sl.SetStatus(status)
+		if _err != nil {
+			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", status, _err)
 		}
 	}()
 
@@ -375,7 +374,7 @@ func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[
 	return err
 }
 
-func (svc *Service) Stop(ctx context.Context) error {
+func (svc *Service) Stop(ctx context.Context) (err error) {
 	ok, val, err := svc.sl.CAS(statusServiceStoping, isInProgress)
 	if err != nil {
 		return err
@@ -389,16 +388,16 @@ func (svc *Service) Stop(ctx context.Context) error {
 
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("panic:%v", r)
+			err = errors.Errorf("panic:%v", r)
 		}
 		status := statusServiceStoped
 		if err != nil {
 			status = statusServiceStopFailed
 		}
 
-		err := svc.sl.SetStatus(status)
-		if err != nil {
-
+		_err := svc.sl.SetStatus(status)
+		if _err != nil {
+			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", status, _err)
 		}
 	}()
 
@@ -448,7 +447,7 @@ func (svc *Service) Exec(ctx context.Context, nameOrID string, cmd []string, det
 	return u.containerExec(ctx, cmd, detach)
 }
 
-func (svc *Service) Remove(ctx context.Context, r kvstore.Register) error {
+func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) {
 	ok, val, err := svc.sl.CAS(statusServiceDeleting, isInProgress)
 	if err != nil {
 		return err
@@ -462,12 +461,12 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) error {
 
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("panic:%v", r)
+			err = errors.Errorf("panic:%v", r)
 		}
 		if err != nil {
-			err := svc.sl.SetStatus(statusServiceDeleteFailed)
-			if err != nil {
-				logrus.WithField("Service", svc.spec.Name).Errorf("set Service.Status statusServiceDeleteFailed,%+v", err)
+			_err := svc.sl.SetStatus(statusServiceDeleteFailed)
+			if _err != nil {
+				logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", statusServiceDeleteFailed, _err)
 			}
 		}
 	}()

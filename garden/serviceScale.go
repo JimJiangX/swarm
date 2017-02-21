@@ -1,16 +1,16 @@
 package garden
 
 import (
-	"fmt"
 	"sort"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
-func (svc *Service) Scale(ctx context.Context, r kvstore.Register, replicas int) error {
+func (svc *Service) Scale(ctx context.Context, r kvstore.Register, replicas int) (err error) {
 	units, err := svc.getUnits()
 	if err != nil {
 		return err
@@ -33,16 +33,16 @@ func (svc *Service) Scale(ctx context.Context, r kvstore.Register, replicas int)
 
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
+			err = errors.Errorf("panic:%v", r)
 		}
 		status := statusServiceScaled
 		if err != nil {
 			status = statusServiceScaleFailed
 		}
 
-		err := svc.sl.SetStatus(status)
-		if err != nil {
-
+		_err := svc.sl.SetStatus(status)
+		if _err != nil {
+			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", status, _err)
 		}
 	}()
 

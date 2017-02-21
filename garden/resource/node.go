@@ -219,7 +219,7 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors.Errorf("Recover from Panic:%v", r)
+			err = errors.Errorf("panic:%v", r)
 		}
 
 		if err == nil {
