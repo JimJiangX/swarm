@@ -399,15 +399,10 @@ func (m master) registerNodes(ctx context.Context, cancel context.CancelFunc, no
 	}
 
 	field := logrus.WithField("Cluster", cID)
-	t := time.NewTimer(time.Minute * 2)
+	t := time.NewTicker(time.Minute * 2)
+	defer t.Stop()
 
 	for {
-		if !t.Stop() {
-			select {
-			default:
-			case <-t.C:
-			}
-		}
 		select {
 		case <-t.C:
 
