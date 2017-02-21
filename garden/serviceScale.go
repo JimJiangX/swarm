@@ -6,6 +6,7 @@ import (
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/kvstore"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -27,7 +28,7 @@ func (svc *Service) Scale(ctx context.Context, r kvstore.Register, replicas int)
 	svc.spec.Status = val
 
 	if !ok {
-		return err
+		return errors.Wrap(newStatusError(statusServiceScaling, val), "Service scale")
 	}
 
 	defer func() {

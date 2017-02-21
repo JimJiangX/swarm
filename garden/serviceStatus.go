@@ -1,6 +1,7 @@
 package garden
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/docker/swarm/garden/database"
@@ -187,5 +188,21 @@ func newStatusLock(key string, ormer database.ServiceOrmer) statusLock {
 		load: ormer.GetServiceStatus,
 		set:  ormer.SetServiceStatus,
 		cas:  ormer.ServiceStatusCAS,
+	}
+}
+
+type statusError struct {
+	got    int
+	expect int
+}
+
+func (se statusError) Error() string {
+	return fmt.Sprintf("expected %d bug got %d", se.expect, se.got)
+}
+
+func newStatusError(expect, got int) error {
+	return statusError{
+		got:    got,
+		expect: expect,
 	}
 }

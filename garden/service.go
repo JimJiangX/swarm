@@ -98,7 +98,7 @@ func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.Au
 	svc.spec.Status = val
 
 	if !ok {
-		return err
+		return errors.Wrap(newStatusError(statusServiceContainerCreating, val), "Service create containers")
 	}
 
 	defer func() {
@@ -150,7 +150,7 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 	svc.spec.Status = val
 
 	if !ok {
-		return err
+		return errors.Wrap(newStatusError(statusServiceStarting, val), "Service init start")
 	}
 
 	defer func() {
@@ -241,7 +241,7 @@ func (svc *Service) Start(ctx context.Context, cmds structs.Commands) error {
 	svc.spec.Status = val
 
 	if !ok {
-		return err
+		return errors.Wrap(newStatusError(statusServiceStarting, val), "Service start")
 	}
 
 	defer func() {
@@ -300,7 +300,7 @@ func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.Conf
 	svc.spec.Status = val
 
 	if !ok {
-		return err
+		return errors.Wrap(newStatusError(statusServiceConfigUpdating, val), "Service update units configs")
 	}
 
 	defer func() {
@@ -384,7 +384,7 @@ func (svc *Service) Stop(ctx context.Context) error {
 	svc.spec.Status = val
 
 	if !ok {
-		return err
+		return errors.Wrap(newStatusError(statusServiceStoping, val), "Service stop")
 	}
 
 	defer func() {
@@ -457,7 +457,7 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) error {
 	svc.spec.Status = val
 
 	if !ok {
-		return err
+		return errors.Wrap(newStatusError(statusServiceDeleting, val), "Service delete")
 	}
 
 	defer func() {
