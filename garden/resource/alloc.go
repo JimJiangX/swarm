@@ -46,7 +46,12 @@ nodes:
 			}
 		}
 
-		ok, err := at.isNodeStoreEnough(nodes[i].EngineID, stores)
+		engine := at.cluster.Engine(nodes[i].EngineID)
+		if engine == nil || !engine.IsHealthy() {
+			continue nodes
+		}
+
+		ok, err := at.isNodeStoreEnough(engine, stores)
 		if !ok || err != nil {
 			continue
 		}
@@ -57,8 +62,8 @@ nodes:
 	return out, nil
 }
 
-func (at allocator) isNodeStoreEnough(engineID string, stores []structs.VolumeRequire) (bool, error) {
-	drivers, err := at.findNodeVolumeDrivers(engineID)
+func (at allocator) isNodeStoreEnough(engine *cluster.Engine, stores []structs.VolumeRequire) (bool, error) {
+	drivers, err := at.findNodeVolumeDrivers(engine)
 	if err != nil {
 		return false, err
 	}
@@ -68,18 +73,14 @@ func (at allocator) isNodeStoreEnough(engineID string, stores []structs.VolumeRe
 	return err == nil, err
 }
 
-func (at allocator) findNodeVolumeDrivers(engineID string) (volumeDrivers, error) {
-	var (
-		err     error
-		drivers volumeDrivers
-	)
+func (at allocator) findNodeVolumeDrivers(engine *cluster.Engine) (volumeDrivers, error) {
+	if engine == nil {
+		return nil, errors.New("Engine is required")
+	}
 
-	engine := at.cluster.Engine(engineID)
-	if engine != nil {
-		drivers, err = localVolumeDrivers(engine, at.ormer)
-		if err != nil {
-			return nil, err
-		}
+	drivers, err := localVolumeDrivers(engine, at.ormer)
+	if err != nil {
+		return nil, err
 	}
 
 	// TODO:third-part volumeDrivers
@@ -88,7 +89,12 @@ func (at allocator) findNodeVolumeDrivers(engineID string) (volumeDrivers, error
 }
 
 func (at allocator) AlloctVolumes(uid string, n *node.Node, stores []structs.VolumeRequire) ([]volume.VolumesCreateBody, error) {
-	drivers, err := at.findNodeVolumeDrivers(n.ID)
+	engine := at.cluster.EngineByAddr(n.Addr)
+	if engine == nil {
+		return nil, errors.Errorf("not found EngineByAddr:%s from cluster", n.Addr)
+	}
+
+	drivers, err := at.findNodeVolumeDrivers(engine)
 	if err != nil {
 		return nil, err
 	}
@@ -119,10 +125,6 @@ func (at allocator) AlloctVolumes(uid string, n *node.Node, stores []structs.Vol
 	}
 
 	return volumes, nil
-}
-
-func (at allocator) AlloctNetworking(id, _type string, num int) (string, error) {
-	return "", nil
 }
 
 func (at allocator) AlloctCPUMemory(node *node.Node, cpu, memory int, reserved []string) (string, error) {
@@ -217,4 +219,8 @@ func parseUintList(list []string) (map[int]bool, error) {
 	}
 
 	return ints, nil
+}
+
+func (at allocator) AlloctNetworking(id, _type string, num int) (string, error) {
+	return "", nil
 }
