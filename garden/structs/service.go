@@ -73,18 +73,17 @@ type ContainerSpec struct {
 	}
 
 	Volumes []VolumeRequire
+
+	Networkings []NetDeviceRequire
 }
 
-type RequireResource struct {
-	IPs []struct {
-		Name  string
-		IP    string
-		Proto string
-	}
-	Ports []struct {
-		Name string
-		Port int
-	}
+type NetDeviceRequire struct {
+	Device     int
+	Bandwidth  int // M/s
+	Networking string
+	Type       string
 }
 
 type PostServiceResponse []database.Service
+
+type RequireResource struct{}

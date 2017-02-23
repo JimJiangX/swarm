@@ -41,6 +41,7 @@ type volumeDriver interface {
 }
 
 type localVolume struct {
+	engine *cluster.Engine
 	driver string
 	_type  string
 	space  space
@@ -189,6 +190,7 @@ func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label st
 	}
 
 	return &localVolume{
+		engine: e,
 		vo:     vo,
 		_type:  vgType,
 		driver: defaultLocalVolumeDriver,

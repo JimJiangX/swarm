@@ -7,7 +7,17 @@ import (
 	"github.com/pkg/errors"
 )
 
-// TODO: combine Networking and IP
+type NetDeviceRequire struct {
+	Device     int
+	Bandwidth  int // M/s
+	Networking string
+	Type       string
+}
+
+type Networking struct {
+	IP     IP
+	Device NetDevice
+}
 
 type NetworkingOrmer interface {
 	// IP
@@ -15,7 +25,7 @@ type NetworkingOrmer interface {
 	ListIPByUnitID(unit string) ([]IP, error)
 	ListIPWithCondition(networking string, allocation bool, num int) ([]IP, error)
 
-	AllocIPByNetworking(networkingID, _type, unit string) (IP, error)
+	AllocNetworking(require []NetDeviceRequire, engineID, unit string) ([]Networking, error)
 
 	// Networking
 	InsertNetworking([]IP) error
@@ -38,6 +48,8 @@ type NetworkingOrmer interface {
 	//	ListNetworking() ([]Networking, error)
 	//	ListNetworkingByType(_type string) ([]Networking, error)
 }
+
+type NetDevice struct{}
 
 // IP is table structure, associate to Networking
 type IP struct {
@@ -109,7 +121,12 @@ func (db dbBase) ListIPWithCondition(networking string, allocation bool, num int
 	return out, errors.Wrap(err, "list []IP with condition")
 }
 
-// TxAllocIPByNetworking update IP UnitID in Tx
+func (db dbBase) AllocNetworking(require []NetDeviceRequire, engineID, unit string) ([]Networking, error) {
+
+	return nil, nil
+}
+
+// AllocIPByNetworking update IP UnitID in Tx
 func (db dbBase) AllocIPByNetworking(networking, _type, unit string) (IP, error) {
 	out := &IP{}
 

@@ -142,7 +142,7 @@ func (u unit) getHostIP() (string, error) {
 func (u unit) startContainer(ctx context.Context) error {
 	engine := u.getEngine()
 	if engine == nil {
-		return errors.New("Engine not found")
+		return errors.New(newNotFound("Engine", u.u.EngineID).Error())
 	}
 
 	select {

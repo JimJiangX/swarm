@@ -22,6 +22,18 @@ import (
 
 const clusterLabel = "Cluster"
 
+type allocator interface {
+	ListCandidates(clusters, filters []string, _type string, stores []structs.VolumeRequire) ([]database.Node, error)
+
+	AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, cpu, memory int, reserved []string) (string, error)
+
+	AlloctVolumes(config *cluster.ContainerConfig, id string, n *node.Node, stores []structs.VolumeRequire) ([]volume.VolumesCreateBody, error)
+
+	AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string, requires []structs.NetDeviceRequire) ([]database.Networking, error)
+
+	RecycleResource() error
+}
+
 func (gd *Garden) Service(nameOrID string) (*Service, error) {
 	info, err := gd.ormer.GetServiceInfo(nameOrID)
 	if err != nil {
@@ -240,7 +252,7 @@ type pendingUnit struct {
 	swarmID string
 
 	config      *cluster.ContainerConfig
-	networkings []string
+	networkings []database.Networking
 	volumes     []volume.VolumesCreateBody
 }
 
@@ -255,13 +267,13 @@ func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
 		},
 	}, network.NetworkingConfig{})
 
-	if len(svc.options.nodes.constraint) > 0 {
-		for i := range svc.options.nodes.constraint {
-			config.AddConstraint(svc.options.nodes.constraint[i])
+	opts := svc.options
+
+	if len(opts.nodes.constraint) > 0 {
+		for i := range opts.nodes.constraint {
+			config.AddConstraint(opts.nodes.constraint[i])
 		}
 	}
-
-	stores := svc.options.ContainerSpec.Volumes
 
 	ncpu, err := strconv.Atoi(config.HostConfig.CpusetCpus)
 	if err != nil {
@@ -274,7 +286,8 @@ func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
 	gd.scheduler.Lock()
 	defer gd.scheduler.Unlock()
 
-	nodes, err := gd.schedule(config, svc.options, stores)
+	stores := opts.ContainerSpec.Volumes
+	nodes, err := gd.schedule(config, opts, stores)
 	if err != nil {
 		return nil, err
 	}
@@ -302,14 +315,9 @@ func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
 		}
 	}()
 
-	req, err := svc.Requires(context.Background())
-	if err != nil {
-		return nil, err
-	}
-
 	for n := range nodes {
 		units := svc.spec.Units
-		if !selectNodeInDifferentCluster(svc.options.highAvailable, len(units), nodes[n], used) {
+		if !selectNodeInDifferentCluster(opts.highAvailable, len(units), nodes[n], used) {
 			continue
 		}
 
@@ -317,16 +325,16 @@ func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
 			swarmID:     units[count-1].ID,
 			Unit:        units[count-1].Unit,
 			config:      config.DeepCopy(),
-			networkings: make([]string, 0, len(units)),
+			networkings: make([]database.Networking, 0, len(units)),
 			volumes:     make([]volume.VolumesCreateBody, 0, len(units)),
 		}
 
-		cpuset, err := gd.allocator.AlloctCPUMemory(nodes[n], ncpu, int(config.HostConfig.Memory), nil)
+		cpuset, err := gd.allocator.AlloctCPUMemory(pu.config, nodes[n], ncpu, int(config.HostConfig.Memory), nil)
 		if err != nil {
 			continue
 		}
 
-		volumes, err := gd.allocator.AlloctVolumes(pu.Unit.ID, nodes[n], stores)
+		volumes, err := gd.allocator.AlloctVolumes(pu.config, pu.Unit.ID, nodes[n], stores)
 		if len(volumes) > 0 {
 			pu.volumes = append(pu.volumes, volumes...)
 		}
@@ -335,12 +343,9 @@ func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
 			continue
 		}
 
-		// TODO: networking required
-		_ = req
-
-		id, err := gd.allocator.AlloctNetworking(pu.Unit.ID, "networkingType", 1)
-		if len(id) > 0 {
-			pu.networkings = append(pu.networkings, id)
+		networkings, err := gd.allocator.AlloctNetworking(pu.config, nodes[n].ID, pu.Unit.ID, opts.ContainerSpec.Networkings)
+		if len(networkings) > 0 {
+			pu.networkings = append(pu.networkings, networkings...)
 		}
 		if err != nil {
 			bad = append(bad, pu)

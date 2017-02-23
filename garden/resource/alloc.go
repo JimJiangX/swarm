@@ -88,10 +88,10 @@ func (at allocator) findNodeVolumeDrivers(engine *cluster.Engine) (volumeDrivers
 	return drivers, nil
 }
 
-func (at allocator) AlloctVolumes(uid string, n *node.Node, stores []structs.VolumeRequire) ([]volume.VolumesCreateBody, error) {
-	engine := at.cluster.EngineByAddr(n.Addr)
+func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n *node.Node, stores []structs.VolumeRequire) ([]volume.VolumesCreateBody, error) {
+	engine := at.cluster.Engine(n.ID)
 	if engine == nil {
-		return nil, errors.Errorf("not found EngineByAddr:%s from cluster", n.Addr)
+		return nil, errors.Errorf("not found Engine by ID:%s from cluster", n.Addr)
 	}
 
 	drivers, err := at.findNodeVolumeDrivers(engine)
@@ -127,7 +127,7 @@ func (at allocator) AlloctVolumes(uid string, n *node.Node, stores []structs.Vol
 	return volumes, nil
 }
 
-func (at allocator) AlloctCPUMemory(node *node.Node, cpu, memory int, reserved []string) (string, error) {
+func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, cpu, memory int, reserved []string) (string, error) {
 	if node.TotalCpus-node.UsedCpus < int64(cpu) {
 		return "", errors.New("")
 	}
@@ -221,6 +221,25 @@ func parseUintList(list []string) (map[int]bool, error) {
 	return ints, nil
 }
 
-func (at allocator) AlloctNetworking(id, _type string, num int) (string, error) {
-	return "", nil
+func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string,
+	requires []structs.NetDeviceRequire) ([]database.Networking, error) {
+
+	engine := at.cluster.Engine(engineID)
+	if engine == nil {
+		return nil, errors.New("Engine not found")
+	}
+
+	in := make([]database.NetDeviceRequire, len(requires))
+	for i := range requires {
+		in[i] = database.NetDeviceRequire(requires[i])
+	}
+
+	networkings, err := at.ormer.AllocNetworking(in, engineID, unitID)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO:set config labels
+
+	return networkings, nil
 }

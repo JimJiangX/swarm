@@ -3,6 +3,7 @@ package garden
 import (
 	"bytes"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -13,28 +14,34 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
 	pluginapi "github.com/docker/swarm/plugin/parser/api"
 	"github.com/docker/swarm/scheduler"
-	"github.com/docker/swarm/scheduler/node"
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 )
 
-type allocator interface {
-	ListCandidates(clusters, filters []string, _type string, stores []structs.VolumeRequire) ([]database.Node, error)
+type notFound struct {
+	key  string
+	elem string
+}
 
-	AlloctCPUMemory(node *node.Node, cpu, memory int, reserved []string) (string, error)
+func (nf notFound) Error() string {
+	if nf.key != "" {
+		return fmt.Sprintf("%s not found %s", nf.elem, nf.key)
+	}
 
-	AlloctVolumes(id string, n *node.Node, stores []structs.VolumeRequire) ([]volume.VolumesCreateBody, error)
+	return fmt.Sprintf("%s not found", nf.elem)
+}
 
-	AlloctNetworking(id, _type string, num int) (string, error)
-
-	RecycleResource() error
+func newNotFound(elem, key string) notFound {
+	return notFound{
+		elem: elem,
+		key:  key,
+	}
 }
 
 type Garden struct {
