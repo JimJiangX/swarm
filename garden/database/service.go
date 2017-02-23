@@ -316,7 +316,6 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 	}
 
 	for i := range ips {
-		ips[i].Allocated = false
 		ips[i].UnitID = ""
 	}
 
@@ -506,7 +505,7 @@ func (db dbBase) ListServicesInfo() ([]ServiceInfo, error) {
 
 			nets := make([]IP, 0, 2)
 			for n := range ips {
-				if ips[n].Allocated && ips[n].UnitID == units[u].ID {
+				if ips[n].UnitID == units[u].ID {
 					nets = append(nets, ips[n])
 				}
 			}

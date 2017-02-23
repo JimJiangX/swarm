@@ -222,19 +222,30 @@ func parseUintList(list []string) (map[int]bool, error) {
 }
 
 func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string,
-	requires []structs.NetDeviceRequire) ([]database.Networking, error) {
+	requires []structs.NetDeviceRequire) ([]database.IP, error) {
 
 	engine := at.cluster.Engine(engineID)
 	if engine == nil {
 		return nil, errors.New("Engine not found")
 	}
 
-	in := make([]database.NetDeviceRequire, len(requires))
-	for i := range requires {
-		in[i] = database.NetDeviceRequire(requires[i])
+	index := 0
+	in := make([]database.NetworkingRequire, 0, len(requires))
+	nm := make(map[string]int, len(requires))
+	for _, req := range requires {
+		if v, exist := nm[req.Networking]; exist && index > v {
+			in[v].Num++
+		} else {
+			nm[req.Networking] = index
+			in = append(in, database.NetworkingRequire{
+				Networking: req.Networking,
+				Num:        1,
+			})
+			index++
+		}
 	}
 
-	networkings, err := at.ormer.AllocNetworking(in, engineID, unitID)
+	networkings, err := at.ormer.AllocNetworking(in, unitID)
 	if err != nil {
 		return nil, err
 	}

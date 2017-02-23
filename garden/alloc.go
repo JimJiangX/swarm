@@ -29,7 +29,7 @@ type allocator interface {
 
 	AlloctVolumes(config *cluster.ContainerConfig, id string, n *node.Node, stores []structs.VolumeRequire) ([]volume.VolumesCreateBody, error)
 
-	AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string, requires []structs.NetDeviceRequire) ([]database.Networking, error)
+	AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string, requires []structs.NetDeviceRequire) ([]database.IP, error)
 
 	RecycleResource() error
 }
@@ -252,7 +252,7 @@ type pendingUnit struct {
 	swarmID string
 
 	config      *cluster.ContainerConfig
-	networkings []database.Networking
+	networkings []database.IP
 	volumes     []volume.VolumesCreateBody
 }
 
@@ -325,7 +325,7 @@ func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
 			swarmID:     units[count-1].ID,
 			Unit:        units[count-1].Unit,
 			config:      config.DeepCopy(),
-			networkings: make([]database.Networking, 0, len(units)),
+			networkings: make([]database.IP, 0, len(units)),
 			volumes:     make([]volume.VolumesCreateBody, 0, len(units)),
 		}
 

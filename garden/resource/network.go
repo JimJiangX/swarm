@@ -16,7 +16,7 @@ func NewNetworks(nwo database.NetworkingOrmer) Networking {
 	}
 }
 
-func (nw Networking) AddNetworking(start, end, gateway, networkingID, _type string, prefix int) (int, error) {
+func (nw Networking) AddNetworking(start, end, gateway, networkingID, vlan string, prefix int) (int, error) {
 	startU32 := utils.IPToUint32(start)
 	endU32 := utils.IPToUint32(end)
 
@@ -31,13 +31,12 @@ func (nw Networking) AddNetworking(start, end, gateway, networkingID, _type stri
 	ips := make([]database.IP, num)
 	for i := range ips {
 		ips[i] = database.IP{
-			ID:           utils.Generate32UUID(),
-			IPAddr:       startU32,
-			Prefix:       prefix,
-			NetworkingID: networkingID,
-			Type:         _type,
-			Gateway:      gateway,
-			Allocated:    false,
+			IPAddr:     startU32,
+			Prefix:     prefix,
+			Networking: networkingID,
+			VLAN:       vlan,
+			Gateway:    gateway,
+			Enabled:    true,
 		}
 
 		startU32++
