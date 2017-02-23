@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -221,6 +222,120 @@ func parseUintList(list []string) (map[int]bool, error) {
 	return ints, nil
 }
 
+const (
+	_PF_Device_Label = "pf_dev" // "pf_dev":"dev1,10G"
+
+	// "vp_dev_0":"bond0,mac_xxxx,10M,192.168.1.1,255.255.255.0,192.168.3.0,vlan_xxxx"
+	_VP_Devices_Prefix = "vp_dev"
+)
+
+type netDevice struct {
+	bond      string
+	mac       string
+	bandwidth int // M/s
+	ip        string
+	mask      string
+	gateway   string
+	vlan      string
+}
+
+// "vp_dev_0":"bond0,mac_xxxx,10M,192.168.1.1,255.255.255.0,192.168.3.0,vlan_xxxx"
+func (dev netDevice) String() string {
+	return fmt.Sprintf("%s,%s,%dM,%s,%s,%s,%s", dev.bond, dev.mac, dev.bandwidth,
+		dev.ip, dev.mask, dev.gateway, dev.vlan)
+}
+
+func parseBandwidth(width string) (int, error) {
+	if len(width) < 2 {
+		return 0, errors.Errorf("illegal args '%s'", width)
+	}
+
+	n := 1
+	switch width[len(width)-1] {
+	case 'G', 'g':
+		n = 1024
+	case 'M', 'm':
+		n = 1
+	default:
+		return 0, errors.Errorf("parse bandwidth '%s' error", width)
+	}
+
+	num, err := strconv.Atoi(strings.TrimSpace(string(width[:len(width)-1])))
+	if err != nil {
+		return 0, errors.Wrapf(err, "parse bandwidth '%s'", width)
+	}
+
+	return num * n, nil
+}
+
+func parseNetDevice(e *cluster.Engine) (map[string]netDevice, int, error) {
+
+	if e == nil || len(e.Labels) == 0 {
+		return nil, 0, nil
+	}
+
+	devm := make(map[string]netDevice, len(e.Labels))
+	total := 0
+
+	for key, val := range e.Labels {
+		if key == _PF_Device_Label {
+			i := strings.LastIndexByte(val, ',')
+			n, err := parseBandwidth(string(val[i+1:]))
+			if err != nil {
+				return nil, 0, err
+			}
+
+			total = n
+
+		} else if strings.HasPrefix(key, _VP_Devices_Prefix) {
+			parts := strings.Split(val, ",")
+			if len(parts) >= 2 {
+				devm[parts[0]] = netDevice{
+					bond: parts[0],
+					mac:  parts[1],
+				}
+			}
+		}
+	}
+
+	for _, c := range e.Containers() {
+
+		for key, val := range c.Labels {
+			if !strings.HasPrefix(key, _VP_Devices_Prefix) {
+				continue
+			}
+
+			parts := strings.Split(val, ",")
+			if len(parts) < 7 {
+				continue
+			}
+
+			_, exist := devm[parts[0]]
+			if !exist {
+				continue
+			}
+
+			n, err := parseBandwidth(parts[2])
+			if err != nil {
+				delete(devm, parts[0])
+				continue
+			}
+
+			devm[parts[0]] = netDevice{
+				bond:      parts[0],
+				mac:       parts[1],
+				bandwidth: n,
+				ip:        parts[3],
+				mask:      parts[4],
+				gateway:   parts[5],
+				vlan:      parts[6],
+			}
+		}
+	}
+
+	return devm, total, nil
+}
+
 func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string,
 	requires []structs.NetDeviceRequire) ([]database.IP, error) {
 
@@ -229,10 +344,26 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 		return nil, errors.New("Engine not found")
 	}
 
-	index := 0
+	devm, width, err := parseNetDevice(engine)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, dev := range devm {
+		if dev.bandwidth > 0 {
+			width = width - dev.bandwidth
+		}
+	}
+
+	index, nic := 0, 0
 	in := make([]database.NetworkingRequire, 0, len(requires))
 	nm := make(map[string]int, len(requires))
 	for _, req := range requires {
+		if req.Bandwidth > 0 {
+			width = width - req.Bandwidth
+			nic++
+		}
+
 		if v, exist := nm[req.Networking]; exist && index > v {
 			in[v].Num++
 		} else {
@@ -245,12 +376,55 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 		}
 	}
 
+	ready := make([]netDevice, 0, nic)
+	for _, dev := range devm {
+		if dev.ip == "" {
+			nic--
+			ready = append(ready, dev)
+		}
+		if nic == 0 {
+			break
+		}
+	}
+
+	// check network device bandwidth and band
+	if width <= 0 || nic > 0 {
+		return nil, errors.Errorf("Engine:%s not enough Bandwidth for require", engine.Addr)
+	}
+
 	networkings, err := at.ormer.AllocNetworking(in, unitID)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO:set config labels
+	used := make(map[uint32]struct{}, len(requires))
+	for i, req := range requires {
+
+	ips:
+		for n := range networkings {
+			if _, exist := used[networkings[n].IPAddr]; exist {
+				continue ips
+			}
+			if req.Networking == networkings[n].Networking {
+				ready[i] = netDevice{
+					bond:      ready[i].bond,
+					mac:       ready[i].mac,
+					bandwidth: req.Bandwidth,
+					ip:        utils.Uint32ToIP(networkings[n].IPAddr).String(),
+					mask:      strconv.Itoa(networkings[n].Prefix),
+					gateway:   networkings[n].Gateway,
+					vlan:      networkings[n].VLAN,
+				}
+
+				used[networkings[n].IPAddr] = struct{}{}
+			}
+		}
+	}
+
+	for i := range ready {
+		key := fmt.Sprintf("%s_0%d", _VP_Devices_Prefix, i)
+		config.Config.Labels[key] = ready[i].String()
+	}
 
 	return networkings, nil
 }
