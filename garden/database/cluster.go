@@ -26,15 +26,10 @@ type ClusterOrmer interface {
 
 // Cluster table  structure,correspod with a group of computers
 type Cluster struct {
-	ID           string  `db:"id"`
-	Name         string  `db:"name"`
-	Type         string  `db:"type"`
-	StorageType  string  `db:"storage_type"`
-	StorageID    string  `db:"storage_id"`
-	NetworkingID string  `db:"networking_id"`
-	Enabled      bool    `db:"enabled"`
-	MaxNode      int     `db:"max_node"`
-	UsageLimit   float32 `db:"usage_limit"`
+	ID         string  `db:"id"`
+	Type       string  `db:"type"`
+	MaxNode    int     `db:"max_node"`
+	UsageLimit float32 `db:"usage_limit"`
 }
 
 func (db dbBase) clusterTable() string {

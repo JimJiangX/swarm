@@ -165,7 +165,9 @@ func (u unit) startContainer(ctx context.Context) error {
 		}
 	}
 
-	return errors.Wrap(newContainerError(u.u.Name, "not found"), "container start")
+	// TODO:setup networking
+
+	return errors.Wrap(newNotFound("Container", u.u.Name), "container start")
 }
 
 func (u unit) stopContainer(ctx context.Context) error {
