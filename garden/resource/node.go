@@ -211,7 +211,7 @@ func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithT
 
 func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer database.ClusterOrmer, config database.SysConfig) (err error) {
 	entry := logrus.WithFields(logrus.Fields{
-		"Node": nt.Node.Name,
+		//	"Node": nt.Node.Name,
 		"host": nt.Node.Addr,
 	})
 
@@ -432,7 +432,7 @@ func (m master) registerNodes(ctx context.Context, cancel context.CancelFunc, no
 		for i := range nodes {
 			n := nodes[i].Node
 			fields := field.WithFields(logrus.Fields{
-				"Node": n.Name,
+				//	"Node": n.Name,
 				"addr": n.Addr,
 			})
 
@@ -521,7 +521,7 @@ func (m master) registerNodesTimeout(nodes []nodeWithTask, er error) error {
 
 		err = m.dco.RegisterNode(n, t)
 		if err != nil {
-			logrus.WithField("Node", n.Name).WithError(err).Error("Node register timeout")
+			logrus.WithField("Addr", n.Addr).WithError(err).Error("Node register timeout")
 		}
 	}
 

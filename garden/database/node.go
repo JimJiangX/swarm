@@ -35,8 +35,8 @@ type NodeInterface interface {
 
 // Node table structure,correspod with mainframe computer.
 type Node struct {
-	ID           string `db:"id"`
-	Name         string `db:"name"`
+	ID string `db:"id"`
+	//	Name         string `db:"name"`
 	ClusterID    string `db:"cluster_id"`
 	Addr         string `db:"admin_ip"`
 	EngineID     string `db:"engine_id"`
@@ -44,13 +44,14 @@ type Node struct {
 	Seat         string `db:"seat"`
 	MaxContainer int    `db:"max_container"`
 	Status       int    `db:"status"`
+	Enabled      bool   `db:"enabled"`
 
 	RegisterAt   time.Time `db:"register_at"`
 	DeregisterAt time.Time `db:"deregister_at"`
 }
 
 func (db dbBase) nodeTable() string {
-	return db.prefix + "_node"
+	return db.prefix + "_host"
 }
 
 // InsertNodesAndTask insert nodes and tasks in a Tx

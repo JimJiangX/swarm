@@ -182,8 +182,8 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		nodes[i], err = resource.NewNodeWithTask(n.Username, n.Password,
 			n.HDD, n.SSD,
 			database.Node{
-				ID:           utils.Generate32UUID(),
-				Name:         n.Name,
+				ID: utils.Generate32UUID(),
+				//	Name:         n.Name,
 				ClusterID:    c.ID,
 				Addr:         n.Address,
 				EngineID:     "",
@@ -210,7 +210,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	for i := range nodes {
 		response[i] = structs.PostNodeResponse{
 			ID:     nodes[i].Node.ID,
-			Name:   nodes[i].Node.Name,
+			Addr:   nodes[i].Node.Addr,
 			TaskID: nodes[i].Task.ID,
 		}
 	}

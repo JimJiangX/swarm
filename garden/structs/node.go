@@ -33,6 +33,6 @@ type PostNodesRequest []Node
 
 type PostNodeResponse struct {
 	ID     string
-	Name   string
+	Addr   string
 	TaskID string
 }

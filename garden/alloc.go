@@ -78,9 +78,9 @@ func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, erro
 					Name string
 					IP   string
 				}{
-					ID:   unit.Engine.EngineID,
-					Name: unit.Engine.Name,
-					IP:   unit.Engine.Addr,
+					ID: unit.Engine.EngineID,
+					//	Name: unit.Engine.Name,
+					IP: unit.Engine.Addr,
 				},
 
 				//	Networking struct {
