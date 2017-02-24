@@ -19,6 +19,7 @@ type UserOrmer interface {
 	DelUsers(users []User) error
 }
 
+// TODO:remove
 // User is for DB and Proxy
 type User struct {
 	RWSplit   bool   `db:"rw_split" json:"rw_split"`

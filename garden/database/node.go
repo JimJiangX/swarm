@@ -46,8 +46,8 @@ type Node struct {
 	Status       int    `db:"status"`
 	Enabled      bool   `db:"enabled"`
 
-	RegisterAt   time.Time `db:"register_at"`
-	DeregisterAt time.Time `db:"deregister_at"`
+	RegisterAt time.Time `db:"register_at"`
+	//	DeregisterAt time.Time `db:"deregister_at"`
 }
 
 func (db dbBase) nodeTable() string {

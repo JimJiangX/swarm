@@ -50,18 +50,15 @@ type Unit struct {
 	ID          string `db:"id"`
 	Name        string `db:"name"` // <unit_id_8bit>_<service_name>
 	Type        string `db:"type"` // switch_manager/upproxy/upsql
-	ImageID     string `db:"image_id"`
-	ImageName   string `db:"image_name"` //<image_name>:<image_version>
 	ServiceID   string `db:"service_id"`
 	EngineID    string `db:"engine_id"` // engine.ID
 	ContainerID string `db:"container_id"`
-	ConfigID    string `db:"unit_config_id"`
 	NetworkMode string `db:"network_mode"`
+	Networks    string `db:"networks_desc"`
 	LatestError string `db:"latest_error"`
 
-	Status        int64     `db:"status"`
-	CheckInterval int       `db:"check_interval"`
-	CreatedAt     time.Time `db:"created_at"`
+	Status    int64     `db:"status"`
+	CreatedAt time.Time `db:"created_at"`
 }
 
 func (db dbBase) unitTable() string {
@@ -363,7 +360,7 @@ func (db dbBase) SetMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error {
 	// delete old localVolumes
 	do := func(tx *sqlx.Tx) error {
 		for i := range lvs {
-			if reserveSAN && strings.HasSuffix(lvs[i].VGName, "_SAN_VG") {
+			if reserveSAN && strings.HasSuffix(lvs[i].VG, "_SAN_VG") {
 				continue
 			}
 

@@ -91,7 +91,6 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, pc pluginapi.Plug
 	}
 
 	image := database.Image{
-		Enabled:  true,
 		ID:       imageID,
 		Name:     req.Name,
 		Version:  req.Version,

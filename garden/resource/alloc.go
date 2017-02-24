@@ -120,7 +120,7 @@ func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n
 			DriverOpts: map[string]string{
 				"size":   strconv.Itoa(int(lvs[i].Size)),
 				"fstype": lvs[i].Filesystem,
-				"vgname": lvs[i].VGName,
+				"vgname": lvs[i].VG,
 			},
 		}
 	}

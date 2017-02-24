@@ -46,13 +46,13 @@ type ServiceOrmer interface {
 type Service struct {
 	ID                string `db:"id"`
 	Name              string `db:"name"`
-	Image             string `db:"image"`       // imageName:imageVersion
+	Image             string `db:"image_id"`    // imageName:imageVersion
 	Desc              string `db:"description"` // short for Description
 	Architecture      string `db:"architecture"`
-	BusinessCode      string `db:"business_code"`
 	Tag               string `db:"tag"`
 	AutoHealing       bool   `db:"auto_healing"`
 	AutoScaling       bool   `db:"auto_scaling"`
+	HighAvailable     bool   `db:"high_available"`
 	Status            int    `db:"status"`
 	BackupMaxSizeByte int    `db:"backup_max_size"`
 	// count by Day,used in swarm.BackupTaskCallback(),calculate BackupFile.Retention

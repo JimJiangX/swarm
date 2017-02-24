@@ -128,10 +128,10 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, error) {
 		return nil, err
 	}
 
-	image, err := gd.ormer.GetImage(spec.Image)
-	if err != nil {
-		return nil, err
-	}
+	//	image, err := gd.ormer.GetImage(spec.Image)
+	//	if err != nil {
+	//		return nil, err
+	//	}
 
 	if spec.ID == "" {
 		spec.ID = utils.Generate32UUID()
@@ -144,16 +144,13 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, error) {
 
 		uid := utils.Generate32UUID()
 		us[i] = database.Unit{
-			ID:            uid,
-			Name:          fmt.Sprintf("%s_%s", spec.Name, uid[:8]), // <service_name>_<unit_id_8bit>
-			Type:          "",
-			ImageID:       image.ID,
-			ImageName:     spec.Image,
-			ServiceID:     spec.ID,
-			NetworkMode:   "none",
-			Status:        0,
-			CheckInterval: 10,
-			CreatedAt:     time.Now(),
+			ID:          uid,
+			Name:        fmt.Sprintf("%s_%s", spec.Name, uid[:8]), // <service_name>_<unit_id_8bit>
+			Type:        "",
+			ServiceID:   spec.ID,
+			NetworkMode: "none",
+			Status:      0,
+			CreatedAt:   time.Now(),
 		}
 
 		units[i].Unit = us[i]

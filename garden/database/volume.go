@@ -26,7 +26,7 @@ type Volume struct {
 	ID         string `db:"id"`
 	Name       string `db:"name"`
 	UnitID     string `db:"unit_id"`
-	VGName     string `db:"VGname"`
+	VG         string `db:"vg"`
 	Driver     string `db:"driver"`
 	Filesystem string `db:"fstype"`
 }

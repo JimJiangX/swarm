@@ -72,7 +72,7 @@ func (lv *localVolume) Alloc(uid string, require structs.VolumeRequire) (*databa
 		ID:         "",
 		Name:       "",
 		UnitID:     uid,
-		VGName:     space.VG,
+		VG:         space.VG,
 		Driver:     lv.Driver(),
 		Filesystem: space.Fstype,
 	}

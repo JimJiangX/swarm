@@ -26,7 +26,6 @@ type ImageInterface interface {
 
 // Image table structure,correspod with docker image.
 type Image struct {
-	Enabled  bool      `db:"enabled"`
 	ID       string    `db:"id"`
 	Name     string    `db:"name"`
 	Version  string    `db:"version"`
