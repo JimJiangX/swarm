@@ -123,9 +123,9 @@ func (db dbBase) ListIPWithCondition(networking string, allocated bool, num int)
 	return out, errors.Wrap(err, "list []IP with condition")
 }
 
-// AllocNetworking update IP UnitID in Tx
+// AllocNetworking alloc IPs with UnitID in Tx
 func (db dbBase) AllocNetworking(requires []NetworkingRequire, unit string) ([]IP, error) {
-	out := make([]IP, 0, 2)
+	out := make([]IP, 0, 2*len(requires))
 
 	do := func(tx *sqlx.Tx) error {
 
@@ -135,7 +135,7 @@ func (db dbBase) AllocNetworking(requires []NetworkingRequire, unit string) ([]I
 			query = tx.Rebind(query)
 
 			var list []IP
-			err := tx.Get(&list, query, req.Networking, true)
+			err := tx.Select(&list, query, req.Networking, true)
 			if err != nil {
 				return errors.Wrap(err, "Tx get available IP")
 			}
@@ -143,30 +143,16 @@ func (db dbBase) AllocNetworking(requires []NetworkingRequire, unit string) ([]I
 			out = append(out, list...)
 		}
 
-		query := "UPDATE " + db.ipTable() + " SET unit_id=? WHERE ip_addr=?"
-		stmt, err := tx.Prepare(query)
-		if err != nil {
-			return errors.Wrap(err, "tx prepare")
-		}
-
 		for i := range out {
 			out[i].UnitID = unit
-
-			_, err = stmt.Exec(query, unit, out[i].IPAddr)
-			if err != nil {
-				stmt.Close()
-				return errors.Wrap(err, "tx update IP")
-			}
 		}
 
-		stmt.Close()
-
-		return errors.Wrap(err, "tx update IP")
+		return db.txSetIPs(tx, out)
 	}
 
 	err := db.txFrame(do)
 
-	return out, errors.Wrap(err, "tx update IP")
+	return out, err
 }
 
 // txSetIPs update []IP in Tx
@@ -203,6 +189,7 @@ func (db dbBase) InsertNetworking(ips []IP) error {
 		}
 
 		for i := range ips {
+
 			_, err = stmt.Exec(&ips[i])
 			if err != nil {
 				stmt.Close()
@@ -232,14 +219,14 @@ func (db dbBase) DelNetworking(networking string) error {
 }
 
 // IsNetwrokingUsed returns true on below conditions:
-// one more IP belongs to networking has allocated
+// one or more IP belongs to networking has allocated
 func (db dbBase) IsNetwrokingUsed(networking string) (bool, error) {
 	var (
 		count = 0
 		query = "SELECT COUNT(id) FROM " + db.ipTable() + " WHERE networking_id=? AND unit_id IS NOT NULL"
 	)
 
-	err := db.Get(&count, query, networking, true)
+	err := db.Get(&count, query, networking)
 	if err != nil {
 		return false, errors.Wrap(err, "count []IP by NetworkingID")
 	}
