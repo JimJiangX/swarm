@@ -48,7 +48,7 @@ type UnitOrmer interface {
 // Unit is table structure
 type Unit struct {
 	ID          string `db:"id"`
-	Name        string `db:"name"` // <unit_id_8bit>_<service_name>
+	Name        string `db:"name"` // containerName <unit_id_8bit>_<service_name>
 	Type        string `db:"type"` // switch_manager/upproxy/upsql
 	ServiceID   string `db:"service_id"`
 	EngineID    string `db:"engine_id"` // engine.ID
