@@ -57,6 +57,13 @@
 			"revisionTime": "2017-01-21T10:35:19Z"
 		},
 		{
+			"checksumSHA1": "btuIVd4+XdXRmK3OiIdmKpzEl+s=",
+			"origin": "github.com/docker/swarm/vendor/github.com/pkg/errors",
+			"path": "github.com/pkg/errors",
+			"revision": "248dadf4e9068a0b3e79f02ed0a610d935de5302",
+			"revisionTime": "2016-10-29T09:36:37Z"
+		},
+		{
 			"checksumSHA1": "LzlSlifCUTtWAJHqQJPRSsjaeTQ=",
 			"path": "golang.org/x/crypto/curve25519",
 			"revision": "f6b343c37ca80bfa8ea539da67a0b621f84fab1d",
@@ -82,7 +89,6 @@
 		},
 		{
 			"checksumSHA1": "ujkdYz/AOSZ4dVskaUGW9g/V/dM=",
-			"origin": "github.com/docker/swarm/vendor/golang.org/x/net/context",
 			"path": "golang.org/x/net/context",
 			"revision": "6b27048ae5e6ad1ef927e72e437531493de612fe",
 			"revisionTime": "2017-02-17T08:49:01Z"
