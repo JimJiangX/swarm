@@ -47,18 +47,18 @@ type UnitOrmer interface {
 
 // Unit is table structure
 type Unit struct {
-	ID          string `db:"id"`
-	Name        string `db:"name"` // containerName <unit_id_8bit>_<service_name>
-	Type        string `db:"type"` // switch_manager/upproxy/upsql
-	ServiceID   string `db:"service_id"`
-	EngineID    string `db:"engine_id"` // engine.ID
-	ContainerID string `db:"container_id"`
-	NetworkMode string `db:"network_mode"`
-	Networks    string `db:"networks_desc"`
-	LatestError string `db:"latest_error"`
+	ID          string `db:"id" json:"id"`
+	Name        string `db:"name" json:"name"` // containerName <unit_id_8bit>_<service_name>
+	Type        string `db:"type" json:"type"` // switch_manager/upproxy/upsql
+	ServiceID   string `db:"service_id" json:"service_id"`
+	EngineID    string `db:"engine_id" json:"engine_id"` // engine.ID
+	ContainerID string `db:"container_id" json:"container_id"`
+	NetworkMode string `db:"network_mode" json:"network_mode"`
+	Networks    string `db:"networks_desc" json:"networks_desc"`
+	LatestError string `db:"latest_error" json:"latest_error"`
 
-	Status    int64     `db:"status"`
-	CreatedAt time.Time `db:"created_at"`
+	Status    int64     `db:"status" json:"status"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
 func (db dbBase) unitTable() string {

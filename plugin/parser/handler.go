@@ -247,7 +247,13 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	image, version := req.ParseImage()
+	var image, version string
+	parts := strings.SplitN(req.Service.Image, ":", 2)
+	if len(parts) == 2 {
+		image, version = parts[0], parts[1]
+	} else {
+		image = parts[0]
+	}
 
 	key := strings.Join([]string{imageKey, image, version}, "/")
 	pair, err := ctx.client.GetKV(key)

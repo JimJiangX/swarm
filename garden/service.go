@@ -31,7 +31,7 @@ type Service struct {
 }
 
 func newService(spec structs.ServiceSpec, so database.ServiceOrmer, cluster cluster.Cluster, pc pluginapi.PluginAPI) *Service {
-	image, version := spec.ParseImage()
+	image, version := (database.Service)(spec.Service).ParseImage()
 
 	return &Service{
 		spec:         spec,

@@ -298,7 +298,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	out := make([]database.Service, 0, len(list))
 
 	for _, l := range list {
-		out = append(out, l.Spec().Service)
+		out = append(out, database.Service(l.Spec().Service))
 	}
 
 	resp := structs.CommonResponse{

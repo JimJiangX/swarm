@@ -44,21 +44,21 @@ type ServiceOrmer interface {
 
 // Service if table structure
 type Service struct {
-	ID                string `db:"id"`
-	Name              string `db:"name"`
-	Image             string `db:"image_id"`    // imageName:imageVersion
-	Desc              string `db:"description"` // short for Description
-	Architecture      string `db:"architecture"`
-	Tag               string `db:"tag"` // part of business
-	AutoHealing       bool   `db:"auto_healing"`
-	AutoScaling       bool   `db:"auto_scaling"`
-	HighAvailable     bool   `db:"high_available"`
-	Status            int    `db:"status"`
-	BackupMaxSizeByte int    `db:"backup_max_size"`
+	ID                string `db:"id" json:"id"`
+	Name              string `db:"name" json:"name"`
+	Image             string `db:"image_id" json:"image_id"`       // imageName:imageVersion
+	Desc              string `db:"description" json:"description"` // short for Description
+	Architecture      string `db:"architecture" json:"architecture"`
+	Tag               string `db:"tag" json:"tag"` // part of business
+	AutoHealing       bool   `db:"auto_healing" json:"auto_healing"`
+	AutoScaling       bool   `db:"auto_scaling" json:"auto_scaling"`
+	HighAvailable     bool   `db:"high_available" json:"high_available"`
+	Status            int    `db:"status" json:"status"`
+	BackupMaxSizeByte int    `db:"backup_max_size" json:"backup_max_size"`
 	// count by Day,used in swarm.BackupTaskCallback(),calculate BackupFile.Retention
-	BackupFilesRetention int       `db:"backup_files_retention"`
-	CreatedAt            time.Time `db:"created_at"`
-	FinishedAt           time.Time `db:"finished_at"`
+	BackupFilesRetention int       `db:"backup_files_retention" json:"backup_files_retention"`
+	CreatedAt            time.Time `db:"created_at" json:"created_at"`
+	FinishedAt           time.Time `db:"finished_at" json:"finished_at"`
 }
 
 func (s Service) ParseImage() (string, string) {

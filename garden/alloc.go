@@ -41,7 +41,7 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 	}
 
 	spec := structs.ServiceSpec{
-		Service: info.Service,
+		Service: structs.Service(info.Service),
 		// TODO: other params
 	}
 
@@ -66,7 +66,7 @@ func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, erro
 			// TODO:convert to structs.UnitSpec
 
 			units = append(units, structs.UnitSpec{
-				Unit: unit.Unit,
+				Unit: structs.Unit(unit.Unit),
 
 				//	Require, Limit struct {
 				//		CPU    string
@@ -109,9 +109,9 @@ func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, erro
 
 		services = append(services, structs.ServiceSpec{
 			Replicas: len(list[i].Units),
-			Service:  list[i].Service,
-			Users:    list[i].Users,
-			Units:    units,
+			Service:  structs.Service(list[i].Service),
+			//	Users:    list[i].Users,
+			Units: units,
 		})
 	}
 
@@ -153,12 +153,12 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, error) {
 			CreatedAt:   time.Now(),
 		}
 
-		units[i].Unit = us[i]
+		units[i].Unit = structs.Unit(us[i])
 	}
 
 	spec.Units = units
 
-	err = gd.ormer.InsertService(spec.Service, us, nil, spec.Users)
+	err = gd.ormer.InsertService(database.Service(spec.Service), us, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +320,7 @@ func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
 
 		pu := pendingUnit{
 			swarmID:     units[count-1].ID,
-			Unit:        units[count-1].Unit,
+			Unit:        database.Unit(units[count-1].Unit),
 			config:      config.DeepCopy(),
 			networkings: make([]database.IP, 0, len(units)),
 			volumes:     make([]volume.VolumesCreateBody, 0, len(units)),

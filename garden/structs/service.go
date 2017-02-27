@@ -1,8 +1,25 @@
 package structs
 
-import (
-	"github.com/docker/swarm/garden/database"
-)
+import "time"
+
+// Service if table structure
+type Service struct {
+	ID                string `db:"id" json:"id"`
+	Name              string `db:"name" json:"name"`
+	Image             string `db:"image_id" json:"image_id"`       // imageName:imageVersion
+	Desc              string `db:"description" json:"description"` // short for Description
+	Architecture      string `db:"architecture" json:"architecture"`
+	Tag               string `db:"tag" json:"tag"` // part of business
+	AutoHealing       bool   `db:"auto_healing" json:"auto_healing"`
+	AutoScaling       bool   `db:"auto_scaling" json:"auto_scaling"`
+	HighAvailable     bool   `db:"high_available" json:"high_available"`
+	Status            int    `db:"status" json:"status"`
+	BackupMaxSizeByte int    `db:"backup_max_size" json:"backup_max_size"`
+	// count by Day,used in swarm.BackupTaskCallback(),calculate BackupFile.Retention
+	BackupFilesRetention int       `db:"backup_files_retention" json:"backup_files_retention"`
+	CreatedAt            time.Time `db:"created_at" json:"created_at"`
+	FinishedAt           time.Time `db:"finished_at" json:"finished_at"`
+}
 
 type VolumeRequire struct {
 	From    string
@@ -13,8 +30,23 @@ type VolumeRequire struct {
 	Options map[string]interface{}
 }
 
+type Unit struct {
+	ID          string `db:"id" json:"id"`
+	Name        string `db:"name" json:"name"` // containerName <unit_id_8bit>_<service_name>
+	Type        string `db:"type" json:"type"` // switch_manager/upproxy/upsql
+	ServiceID   string `db:"service_id" json:"service_id"`
+	EngineID    string `db:"engine_id" json:"engine_id"` // engine.ID
+	ContainerID string `db:"container_id" json:"container_id"`
+	NetworkMode string `db:"network_mode" json:"network_mode"`
+	Networks    string `db:"networks_desc" json:"networks_desc"`
+	LatestError string `db:"latest_error" json:"latest_error"`
+
+	Status    int64     `db:"status" json:"status"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+}
+
 type UnitSpec struct {
-	database.Unit
+	Unit
 
 	Require, Limit struct {
 		CPU    string
@@ -53,13 +85,11 @@ type UnitSpec struct {
 type ServiceSpec struct {
 	Priority int
 	Replicas int
-	database.Service
+	Service
 	ContainerSpec ContainerSpec
 
 	Constraint []string
 	Options    map[string]interface{}
-
-	Users []database.User
 
 	Units []UnitSpec
 
@@ -84,6 +114,6 @@ type NetDeviceRequire struct {
 	Type       string
 }
 
-type PostServiceResponse []database.Service
+type PostServiceResponse Service
 
 type RequireResource struct{}
