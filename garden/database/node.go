@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"net"
 	"strings"
 	"time"
 
@@ -24,7 +25,7 @@ type NodeInterface interface {
 	ListNodes() ([]Node, error)
 
 	ListNodeByCluster(cluster string) ([]Node, error)
-	ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, error)
+	ListNodesByClusters(clusters []string, enable bool) ([]Node, error)
 
 	SetNodeParams(n Node) error
 
@@ -35,8 +36,7 @@ type NodeInterface interface {
 
 // Node table structure,correspod with mainframe computer.
 type Node struct {
-	ID string `db:"id"`
-	//	Name         string `db:"name"`
+	ID           string `db:"id"`
 	ClusterID    string `db:"cluster_id"`
 	Addr         string `db:"admin_ip"`
 	EngineID     string `db:"engine_id"`
@@ -47,7 +47,6 @@ type Node struct {
 	Enabled      bool   `db:"enabled"`
 
 	RegisterAt time.Time `db:"register_at"`
-	//	DeregisterAt time.Time `db:"deregister_at"`
 }
 
 func (db dbBase) nodeTable() string {
@@ -58,7 +57,7 @@ func (db dbBase) nodeTable() string {
 func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 	do := func(tx *sqlx.Tx) error {
 
-		query := "INSERT INTO " + db.nodeTable() + " (id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at) VALUES (:id,:name,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:register_at,:deregister_at)"
+		query := "INSERT INTO " + db.nodeTable() + " (id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at) VALUES (:id,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:enabled,:register_at)"
 
 		if len(nodes) == 1 {
 			_, err := tx.Exec(query, nodes[0])
@@ -95,9 +94,9 @@ func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 // SetNodeParams returns error when Node update status and max_container.
 func (db dbBase) SetNodeParams(n Node) error {
 
-	query := "UPDATE " + db.nodeTable() + " SET status=?,max_container=? WHERE id=?"
+	query := "UPDATE " + db.nodeTable() + " SET enabled=?,max_container=? WHERE id=?"
 
-	_, err := db.Exec(query, n.Status, n.MaxContainer, n.ID)
+	_, err := db.Exec(query, n.Enabled, n.MaxContainer, n.ID)
 
 	return errors.Wrap(err, "update Node Params by ID")
 }
@@ -106,9 +105,9 @@ func (db dbBase) SetNodeParams(n Node) error {
 func (db dbBase) RegisterNode(n Node, t Task) error {
 	do := func(tx *sqlx.Tx) (err error) {
 
-		query := "UPDATE " + db.nodeTable() + " SET engine_id=?,status=?,register_at=? WHERE id=?"
+		query := "UPDATE " + db.nodeTable() + " SET engine_id=?,status=?,enabled=?,register_at=? WHERE id=?"
 
-		_, err = tx.Exec(query, n.EngineID, n.Status, n.RegisterAt, n.ID)
+		_, err = tx.Exec(query, n.EngineID, n.Status, n.Enabled, n.RegisterAt, n.ID)
 		if err != nil {
 			return errors.Wrap(err, "Tx update Node status")
 		}
@@ -127,10 +126,10 @@ func (db dbBase) RegisterNode(n Node, t Task) error {
 func (db dbBase) GetNode(nameOrID string) (Node, error) {
 	var (
 		node  Node
-		query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM " + db.nodeTable() + " WHERE id=? OR name=? OR engine_id=?"
+		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at FROM " + db.nodeTable() + " WHERE id=? OR engine_id=?"
 	)
 
-	err := db.Get(&node, query, nameOrID, nameOrID, nameOrID)
+	err := db.Get(&node, query, nameOrID, nameOrID)
 	if err == nil {
 		return node, nil
 	}
@@ -145,10 +144,15 @@ func (db dbBase) GetNode(nameOrID string) (Node, error) {
 func (db dbBase) GetNodeByAddr(addr string) (Node, error) {
 	var (
 		node  Node
-		query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM " + db.nodeTable() + " WHERE admin_ip=?"
+		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at FROM " + db.nodeTable() + " WHERE admin_ip=?"
 	)
 
-	err := db.Get(&node, query, addr)
+	addr, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return node, errors.WithStack(err)
+	}
+
+	err = db.Get(&node, query, addr)
 	if err == nil {
 		return node, nil
 	}
@@ -163,7 +167,7 @@ func (db dbBase) GetNodeByAddr(addr string) (Node, error) {
 func (db dbBase) ListNodes() ([]Node, error) {
 	var (
 		nodes []Node
-		query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM " + db.nodeTable()
+		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at FROM " + db.nodeTable()
 	)
 
 	err := db.Select(&nodes, query)
@@ -175,7 +179,7 @@ func (db dbBase) ListNodes() ([]Node, error) {
 func (db dbBase) ListNodeByCluster(cluster string) ([]Node, error) {
 	var (
 		nodes []Node
-		query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM " + db.nodeTable() + " WHERE cluster_id=?"
+		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at FROM " + db.nodeTable() + " WHERE cluster_id=?"
 	)
 
 	err := db.Select(&nodes, query, cluster)
@@ -203,7 +207,7 @@ func (db dbBase) ListNodesByEngines(names []string) ([]Node, error) {
 
 	var (
 		nodes []Node
-		query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM " + db.nodeTable() + " WHERE engine_id IN (?);"
+		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at FROM " + db.nodeTable() + " WHERE engine_id IN (?);"
 	)
 
 	query, args, err := sqlx.In(query, names)
@@ -224,7 +228,7 @@ func (db dbBase) ListNodesByIDs(in []string, cluster string) ([]Node, error) {
 
 	var (
 		nodes []Node
-		query = "SELECT id,name,cluster_id,admin_ip,engine_id,room,seat,max_container,status,register_at,deregister_at FROM " + db.nodeTable() + " WHERE id IN (?);"
+		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at FROM " + db.nodeTable() + " WHERE id IN (?);"
 	)
 
 	query, args, err := sqlx.In(query, in)
@@ -238,7 +242,7 @@ func (db dbBase) ListNodesByIDs(in []string, cluster string) ([]Node, error) {
 }
 
 // ListNodesByClusters returns nodes,select by clusters\type\enabled.
-func (db dbBase) ListNodesByClusters(clusters []string, _type string, enable bool) ([]Node, error) {
+func (db dbBase) ListNodesByClusters(clusters []string, enable bool) ([]Node, error) {
 	list := make([]string, 0, len(clusters))
 
 	for _, c := range clusters {
@@ -251,19 +255,11 @@ func (db dbBase) ListNodesByClusters(clusters []string, _type string, enable boo
 	clusters = list
 
 	if len(clusters) == 0 {
-		query := "SELECT id FROM " + db.clusterTable() + " WHERE type=? AND enabled=?"
-		err := db.Select(&clusters, query, _type, enable)
-		if err != nil {
-			return nil, errors.Wrapf(err, "list Cluster by type='%s',enabled=%t", _type, enable)
-		}
-	}
-
-	if len(clusters) == 0 {
 		return []Node{}, nil
 	}
 
-	query := "SELECT id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit FROM " + db.clusterTable() + " WHERE cluster_id IN (?);"
-	query, args, err := sqlx.In(query, clusters)
+	query := "SELECT id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at FROM " + db.nodeTable() + " WHERE cluster_id IN (?) AND enabled=?;"
+	query, args, err := sqlx.In(query, clusters, enable)
 	if err != nil {
 		return nil, errors.Wrap(err, "select []Node IN clusterIDs")
 	}
@@ -274,12 +270,12 @@ func (db dbBase) ListNodesByClusters(clusters []string, _type string, enable boo
 	return nodes, errors.Wrap(err, "list Nodes by clusters")
 }
 
-// DelNode delete node by name or ID
-func (db dbBase) DelNode(nameOrID string) error {
+// DelNode delete node by ID
+func (db dbBase) DelNode(ID string) error {
 
-	query := "DELETE FROM " + db.nodeTable() + " WHERE id=? OR name=?"
+	query := "DELETE FROM " + db.nodeTable() + " WHERE id=?"
 
-	_, err := db.Exec(query, nameOrID, nameOrID)
+	_, err := db.Exec(query, ID)
 
-	return errors.Wrap(err, "delete Node by nameOrID")
+	return errors.Wrap(err, "delete Node by ID")
 }

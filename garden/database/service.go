@@ -492,6 +492,7 @@ func (db dbBase) ListServicesInfo() ([]ServiceInfo, error) {
 				for n := range nodes {
 					if nodes[n].EngineID == units[u].EngineID {
 						node = nodes[n]
+						break
 					}
 				}
 			}

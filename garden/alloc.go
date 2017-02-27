@@ -23,7 +23,7 @@ import (
 const clusterLabel = "Cluster"
 
 type allocator interface {
-	ListCandidates(clusters, filters []string, _type string, stores []structs.VolumeRequire) ([]database.Node, error)
+	ListCandidates(clusters, filters []string, stores []structs.VolumeRequire) ([]database.Node, error)
 
 	AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, cpu, memory int, reserved []string) (string, error)
 
@@ -183,10 +183,10 @@ type scheduleOption struct {
 	Options map[string]interface{}
 
 	nodes struct {
-		clusterType string
-		clusters    []string
-		filters     []string
-		constraint  []string
+		// clusterType string
+		clusters   []string
+		filters    []string
+		constraint []string
 	}
 
 	scheduler struct {
@@ -208,7 +208,7 @@ func (gd *Garden) schedule(config *cluster.ContainerConfig, opts scheduleOption,
 		config.AddConstraint("node!=" + strings.Join(opts.nodes.filters, "|"))
 	}
 
-	out, err := gd.allocator.ListCandidates(opts.nodes.clusters, opts.nodes.filters, opts.nodes.clusterType, stores)
+	out, err := gd.allocator.ListCandidates(opts.nodes.clusters, opts.nodes.filters, stores)
 	if err != nil {
 		return nil, err
 	}

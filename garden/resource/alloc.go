@@ -27,8 +27,8 @@ func NewAllocator(ormer database.Ormer, cluster cluster.Cluster) allocator {
 	}
 }
 
-func (at allocator) ListCandidates(clusters, filters []string, _type string, stores []structs.VolumeRequire) ([]database.Node, error) {
-	nodes, err := at.ormer.ListNodesByClusters(clusters, _type, true)
+func (at allocator) ListCandidates(clusters, filters []string, stores []structs.VolumeRequire) ([]database.Node, error) {
+	nodes, err := at.ormer.ListNodesByClusters(clusters, true)
 	if err != nil {
 		return nil, err
 	}

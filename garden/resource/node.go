@@ -113,7 +113,7 @@ func (m master) getNode(nameOrID string) (Node, error) {
 	}
 
 	if n.EngineID == "" {
-		return Node{node: n}, nil
+		return newNode(n, nil, m.dco), nil
 	}
 
 	eng := m.clsuter.Engine(n.EngineID)
@@ -121,15 +121,14 @@ func (m master) getNode(nameOrID string) (Node, error) {
 	return newNode(n, eng, m.dco), nil
 }
 
-func (m master) updateNode(nameOrID string, status, maxContainer int) (database.Node, error) {
+func (m master) updateNode(nameOrID string, enable bool, maxContainer int) (database.Node, error) {
 	n, err := m.getNode(nameOrID)
 	if err != nil {
 		return database.Node{}, err
 	}
 
-	if status != 0 {
-		n.node.Status = status
-	}
+	n.node.Enabled = enable
+
 	if maxContainer != 0 {
 		n.node.MaxContainer = maxContainer
 	}
@@ -204,7 +203,7 @@ func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithT
 		go list[i].distribute(ctx, horus, m.dco, config)
 	}
 
-	go m.registerNodes(ctx, cancel, list, config)
+	go m.registerNodesLoop(ctx, cancel, list, config)
 
 	return nil
 }
@@ -383,7 +382,7 @@ func (node *nodeWithTask) modifyProfile(horus string, config *database.SysConfig
 }
 
 // registerNodes register Nodes
-func (m master) registerNodes(ctx context.Context, cancel context.CancelFunc, nodes []nodeWithTask, config database.SysConfig) {
+func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc, nodes []nodeWithTask, config database.SysConfig) {
 	defer cancel()
 
 	cID := ""
@@ -398,8 +397,7 @@ func (m master) registerNodes(ctx context.Context, cancel context.CancelFunc, no
 		return
 	}
 
-	field := logrus.WithField("Cluster", cID)
-	t := time.NewTicker(time.Minute * 2)
+	t := time.NewTicker(time.Minute)
 	defer t.Stop()
 
 	for {
@@ -407,71 +405,90 @@ func (m master) registerNodes(ctx context.Context, cancel context.CancelFunc, no
 		case <-t.C:
 
 		case <-ctx.Done():
-			err := m.registerNodesTimeout(nodes, ctx.Err())
-			field.Errorf("deal with Nodes timeout%+v", err)
+			// try again
+			err := m.registerNodes(ctx, cID, nodes, config)
+			if err != nil {
+				logrus.WithField("Cluster", cID).Errorf("reigster nodes error,%+v", err)
+			}
+
+			err = m.registerNodesTimeout(nodes, ctx.Err())
+			logrus.WithField("Cluster", cID).Errorf("deal with Nodes timeout%+v", err)
 
 			return
 		}
 
-		list, err := m.dco.ListNodeByCluster(cID)
+		err := m.registerNodes(ctx, cID, nodes, config)
 		if err != nil {
-			field.Errorf("%+v", err)
-			continue
+			logrus.WithField("Cluster", cID).Errorf("reigster nodes error,%+v", err)
 		}
+	}
+}
 
-		for i := range nodes {
-			for l := range list {
-				if list[l].ID == nodes[i].Node.ID {
-					nodes[i].Node = list[l]
-					break
-				}
-			}
-		}
+func (m master) registerNodes(ctx context.Context, cID string, nodes []nodeWithTask, config database.SysConfig) error {
+	var (
+		_err  error
+		field = logrus.WithField("Cluster", cID)
+	)
 
-		count := 0
-		for i := range nodes {
-			n := nodes[i].Node
-			fields := field.WithFields(logrus.Fields{
-				//	"Node": n.Name,
-				"addr": n.Addr,
-			})
+	list, err := m.dco.ListNodeByCluster(cID)
+	if err != nil {
+		field.Errorf("%+v", err)
+		return err
+	}
 
-			if n.Status != statusNodeInstalled {
-				if n.Status > statusNodeInstalled {
-					count++
-					if count >= len(nodes) {
-						return
-					}
-					continue
-				}
-
-				fields.Warnf("status not match,%d!=%d", n.Status, statusNodeInstalled)
-				continue
-			}
-
-			addr := n.Addr + ":" + strconv.Itoa(config.DockerPort)
-			eng := m.clsuter.EngineByAddr(addr)
-			if eng == nil || !eng.IsHealthy() {
-				fields.Error(err)
-
-				continue
-			}
-
-			n.EngineID = eng.ID
-			n.Status = statusNodeEnable
-			n.RegisterAt = time.Now()
-
-			t := nodes[i].Task
-			t.Status = statusTaskDone
-			t.FinishedAt = n.RegisterAt
-			t.Errors = ""
-
-			err = m.dco.RegisterNode(n, t)
-			if err != nil {
-				fields.Errorf("%+v", err)
+	for i := range nodes {
+		for l := range list {
+			if list[l].ID == nodes[i].Node.ID {
+				nodes[i].Node = list[l]
+				break
 			}
 		}
 	}
+
+	count := 0
+	for i := range nodes {
+
+		n := nodes[i].Node
+		fields := field.WithField("Addr", n.Addr)
+
+		if n.Status != statusNodeInstalled {
+			if n.Status > statusNodeInstalled {
+				count++
+				if count >= len(nodes) {
+					return nil
+				}
+				continue
+			}
+
+			fields.Warnf("status not match,%d!=%d", n.Status, statusNodeInstalled)
+			continue
+		}
+
+		addr := n.Addr + ":" + strconv.Itoa(config.DockerPort)
+		eng := m.clsuter.EngineByAddr(addr)
+		if eng == nil || !eng.IsHealthy() {
+			fields.Errorf("engine is null or unhealthy")
+
+			continue
+		}
+
+		n.EngineID = eng.ID
+		n.Status = statusNodeEnable
+		n.RegisterAt = time.Now()
+
+		t := nodes[i].Task
+		t.Status = statusTaskDone
+		t.FinishedAt = n.RegisterAt
+		t.Errors = ""
+
+		err = m.dco.RegisterNode(n, t)
+		if err != nil {
+			_err = err
+			fields.Errorf("%+v", err)
+		}
+	}
+
+	return _err
 }
 
 func (m master) registerNodesTimeout(nodes []nodeWithTask, er error) error {

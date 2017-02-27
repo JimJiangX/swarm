@@ -25,13 +25,13 @@ func NewMaster(dco database.NodeOrmer, c cluster.Cluster) master {
 //	return m.dco.InsertCluster(c)
 //}
 
-func (m master) getCluster(nameOrID string) (database.Cluster, error) {
+func (m master) getCluster(ID string) (database.Cluster, error) {
 
-	return m.dco.GetCluster(nameOrID)
+	return m.dco.GetCluster(ID)
 }
 
-func (m master) RemoveCluster(nameOrID string) error {
-	cl, err := m.getCluster(nameOrID)
+func (m master) RemoveCluster(ID string) error {
+	cl, err := m.getCluster(ID)
 	if err != nil && database.IsNotFound(err) {
 		return nil
 	}

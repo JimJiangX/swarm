@@ -9,13 +9,13 @@ import (
 type ClusterInterface interface {
 	InsertCluster(c Cluster) error
 
-	GetCluster(nameOrID string) (Cluster, error)
+	GetCluster(ID string) (Cluster, error)
 
 	ListClusters() ([]Cluster, error)
 
-	SetClusterStatus(nameOrID string, state bool) error
+	SetClusterParams(c Cluster) error
 
-	DelCluster(nameOrID string) error
+	DelCluster(ID string) error
 }
 
 type ClusterOrmer interface {
@@ -38,7 +38,7 @@ func (db dbBase) clusterTable() string {
 
 // InsertCluster insert a new record.
 func (db dbBase) InsertCluster(c Cluster) error {
-	query := "INSERT INTO " + db.clusterTable() + " (id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit) VALUES (:id,:name,:type,:storage_id,:storage_type,:networking_id,:enabled,:max_node,:usage_limit)"
+	query := "INSERT INTO " + db.clusterTable() + " (id,type,max_node,usage_limit) VALUES (:id,:type,:max_node,:usage_limit)"
 
 	_, err := db.NamedExec(query, &c)
 
@@ -46,18 +46,18 @@ func (db dbBase) InsertCluster(c Cluster) error {
 }
 
 // GetCluster get Cluster by nameOrID.
-func (db dbBase) GetCluster(nameOrID string) (Cluster, error) {
+func (db dbBase) GetCluster(ID string) (Cluster, error) {
 	var (
 		c     Cluster
-		query = "SELECT id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit FROM " + db.clusterTable() + " WHERE id=? OR name=?"
+		query = "SELECT id,type,max_node,usage_limit FROM " + db.clusterTable() + " WHERE id=?"
 	)
 
-	err := db.Get(&c, query, nameOrID, nameOrID)
+	err := db.Get(&c, query, ID)
 	if err == nil {
 		return c, nil
 
 	} else if err == sql.ErrNoRows {
-		return c, errors.Wrap(err, "not found Cluster:"+nameOrID)
+		return c, errors.Wrap(err, "not found Cluster:"+ID)
 	}
 
 	return c, errors.Wrap(err, "get Cluster")
@@ -67,22 +67,12 @@ func (db dbBase) GetCluster(nameOrID string) (Cluster, error) {
 func (db dbBase) ListClusters() ([]Cluster, error) {
 	var (
 		clusters []Cluster
-		query    = "SELECT id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit FROM " + db.clusterTable()
+		query    = "SELECT id,type,max_node,usage_limit FROM " + db.clusterTable()
 	)
 
 	err := db.Select(&clusters, query)
 
 	return clusters, errors.Wrap(err, "list Clusters")
-}
-
-// SetClusterStatus update Cluster.enabled by ID
-func (db dbBase) SetClusterStatus(nameOrID string, state bool) error {
-
-	query := "UPDATE " + db.clusterTable() + " SET enabled=? WHERE id=? OR name=?"
-
-	_, err := db.Exec(query, state, nameOrID, nameOrID)
-
-	return errors.Wrap(err, "update Cluster.Enabled by nameOrID:"+nameOrID)
 }
 
 // SetClusterParams updates MaxNode\UsageLimit
@@ -95,12 +85,12 @@ func (db dbBase) SetClusterParams(c Cluster) error {
 	return errors.Wrap(err, "update Cluster MaxNode or UsageLimit")
 }
 
-// DelCluster delete a record of Cluster by nameOrID
-func (db dbBase) DelCluster(nameOrID string) error {
+// DelCluster delete a record of Cluster by ID
+func (db dbBase) DelCluster(ID string) error {
 
-	query := "DELETE FROM " + db.clusterTable() + " WHERE id=? OR name=?"
+	query := "DELETE FROM " + db.clusterTable() + " WHERE id=?"
 
-	_, err := db.Exec(query, nameOrID, nameOrID)
+	_, err := db.Exec(query, ID)
 
 	return errors.Wrap(err, "delete Cluster")
 }

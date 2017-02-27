@@ -182,8 +182,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		nodes[i], err = resource.NewNodeWithTask(n.Username, n.Password,
 			n.HDD, n.SSD,
 			database.Node{
-				ID: utils.Generate32UUID(),
-				//	Name:         n.Name,
+				ID:           utils.Generate32UUID(),
 				ClusterID:    c.ID,
 				Addr:         n.Address,
 				EngineID:     "",
@@ -191,6 +190,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 				Seat:         n.Seat,
 				MaxContainer: n.MaxContainer,
 				Status:       0,
+				Enabled:      false,
 			})
 		if err != nil {
 			httpError2(w, err, http.StatusInternalServerError)
