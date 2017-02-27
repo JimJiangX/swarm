@@ -210,7 +210,6 @@ func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithT
 
 func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer database.ClusterOrmer, config database.SysConfig) (err error) {
 	entry := logrus.WithFields(logrus.Fields{
-		//	"Node": nt.Node.Name,
 		"host": nt.Node.Addr,
 	})
 
@@ -451,7 +450,7 @@ func (m master) registerNodes(ctx context.Context, cID string, nodes []nodeWithT
 	for i := range nodes {
 
 		n := nodes[i].Node
-		fields := field.WithField("Addr", n.Addr)
+		fields := field.WithField("host", n.Addr)
 
 		if n.Status != statusNodeInstalled {
 			if n.Status > statusNodeInstalled {
@@ -476,6 +475,7 @@ func (m master) registerNodes(ctx context.Context, cID string, nodes []nodeWithT
 
 		n.EngineID = eng.ID
 		n.Status = statusNodeEnable
+		n.Enabled = true
 		n.RegisterAt = time.Now()
 
 		t := nodes[i].Task
@@ -531,6 +531,7 @@ func (m master) registerNodesTimeout(nodes []nodeWithTask, er error) error {
 
 		if n.Status != statusNodeInstalled {
 			n.Status = statusNodeRegisterTimeout
+			n.Enabled = false
 			n.RegisterAt = time.Now()
 
 			t.Status = statusTaskFailed
