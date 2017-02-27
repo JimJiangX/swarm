@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"database/sql"
 	"strconv"
 
 	"github.com/docker/swarm/cluster"
@@ -38,6 +39,8 @@ type volumeDriver interface {
 	Type() string
 	Space() space
 	Alloc(uid string, require structs.VolumeRequire) (*database.Volume, error)
+
+	Recycle(database.Volume) error
 }
 
 type localVolume struct {
@@ -85,6 +88,33 @@ func (lv *localVolume) Alloc(uid string, require structs.VolumeRequire) (*databa
 	lv.space.Free -= require.Size
 
 	return &volume, nil
+}
+
+func (lv *localVolume) Recycle(v database.Volume) (err error) {
+	nameOrID := v.ID
+	if nameOrID == "" {
+		nameOrID = v.Name
+	}
+	if nameOrID == "" {
+		return nil
+	}
+
+	if v.Size <= 0 {
+		v, err = lv.vo.GetVolume(nameOrID)
+		if err != nil {
+			if errors.Cause(err) == sql.ErrNoRows {
+				return nil
+			}
+			return err
+		}
+	}
+
+	err = lv.vo.DelVolume(nameOrID)
+	if err == nil {
+		lv.space.Free += v.Size
+	}
+
+	return err
 }
 
 type volumeDrivers []volumeDriver
