@@ -397,6 +397,8 @@ func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc
 		return
 	}
 
+	port := strconv.Itoa(config.DockerPort)
+
 	t := time.NewTicker(time.Minute)
 	defer t.Stop()
 
@@ -406,7 +408,7 @@ func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc
 
 		case <-ctx.Done():
 			// try again
-			err := m.registerNodes(ctx, cID, nodes, config)
+			err := m.registerNodes(ctx, cID, nodes, port)
 			if err != nil {
 				logrus.WithField("Cluster", cID).Errorf("reigster nodes error,%+v", err)
 			}
@@ -417,14 +419,14 @@ func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc
 			return
 		}
 
-		err := m.registerNodes(ctx, cID, nodes, config)
+		err := m.registerNodes(ctx, cID, nodes, port)
 		if err != nil {
 			logrus.WithField("Cluster", cID).Errorf("reigster nodes error,%+v", err)
 		}
 	}
 }
 
-func (m master) registerNodes(ctx context.Context, cID string, nodes []nodeWithTask, config database.SysConfig) error {
+func (m master) registerNodes(ctx context.Context, cID string, nodes []nodeWithTask, port string) error {
 	var (
 		_err  error
 		field = logrus.WithField("Cluster", cID)
@@ -464,7 +466,7 @@ func (m master) registerNodes(ctx context.Context, cID string, nodes []nodeWithT
 			continue
 		}
 
-		addr := n.Addr + ":" + strconv.Itoa(config.DockerPort)
+		addr := net.JoinHostPort(n.Addr, port)
 		eng := m.clsuter.EngineByAddr(addr)
 		if eng == nil || !eng.IsHealthy() {
 			fields.Errorf("engine is null or unhealthy")
