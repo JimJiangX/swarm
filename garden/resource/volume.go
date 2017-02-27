@@ -156,7 +156,7 @@ func (vds volumeDrivers) AllocVolumes(uid string, stores []structs.VolumeRequire
 	for i := range stores {
 		driver := vds.get(stores[i].Type)
 		if driver == nil {
-			return volumes, errors.Errorf("")
+			return volumes, errors.New("not found the assigned volumeDriver:" + stores[i].Type)
 		}
 
 		v, err := driver.Alloc(uid, stores[i])

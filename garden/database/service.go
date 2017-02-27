@@ -49,7 +49,7 @@ type Service struct {
 	Image             string `db:"image_id"`    // imageName:imageVersion
 	Desc              string `db:"description"` // short for Description
 	Architecture      string `db:"architecture"`
-	Tag               string `db:"tag"`
+	Tag               string `db:"tag"` // part of business
 	AutoHealing       bool   `db:"auto_healing"`
 	AutoScaling       bool   `db:"auto_scaling"`
 	HighAvailable     bool   `db:"high_available"`
@@ -78,7 +78,7 @@ func (db dbBase) serviceTable() string {
 func (db dbBase) ListServices() ([]Service, error) {
 	var (
 		out   []Service
-		query = "SELECT id,name,description,architecture,business_code,tag,auto_healing,auto_scaling,status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable() + ""
+		query = "SELECT id,name,image_id,description,architecture,tag,auto_healing,auto_scaling,high_available,status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable()
 	)
 
 	err := db.Select(&out, query)
@@ -90,7 +90,7 @@ func (db dbBase) ListServices() ([]Service, error) {
 func (db dbBase) GetService(nameOrID string) (Service, error) {
 	var (
 		s     = Service{}
-		query = "SELECT id,name,description,architecture,business_code,tag,auto_healing,auto_scaling,status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable() + " WHERE id=? OR name=?"
+		query = "SELECT id,name,image_id,description,architecture,tag,auto_healing,auto_scaling,high_available,status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable() + " WHERE id=? OR name=?"
 	)
 
 	err := db.Get(&s, query, nameOrID, nameOrID)
@@ -115,7 +115,7 @@ func (db dbBase) GetServiceByUnit(nameOrID string) (Service, error) {
 
 	var (
 		queryUnit    = "SELECT service_id FROM " + db.unitTable() + " WHERE id=? OR name=?"
-		queryService = "SELECT id,name,description,architecture,business_code,tag,auto_healing,auto_scaling,status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable() + " WHERE id=?"
+		queryService = "SELECT id,name,image_id,description,architecture,tag,auto_healing,auto_scaling,high_available,status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable() + " WHERE id=?"
 
 		id      string
 		service Service
@@ -135,11 +135,22 @@ func (db dbBase) GetServiceByUnit(nameOrID string) (Service, error) {
 }
 
 // SetServcieDesc update Service Description
-func (db dbBase) SetServcieDesc(id, desc string, size int) error {
+func (db dbBase) SetServcieDesc(id, desc string, size int) (err error) {
+	switch {
 
-	query := "UPDATE " + db.serviceTable() + " SET backup_max_size=?,description=? WHERE id=?"
+	case size > 0 && desc != "":
+		query := "UPDATE " + db.serviceTable() + " SET backup_max_size=?,description=? WHERE id=?"
+		_, err = db.Exec(query, size, desc, id)
 
-	_, err := db.Exec(query, size, desc, id)
+	case size > 0:
+		query := "UPDATE " + db.serviceTable() + " SET backup_max_size=? WHERE id=?"
+		_, err = db.Exec(query, size, id)
+
+	case desc != "":
+		query := "UPDATE " + db.serviceTable() + " SET description=? WHERE id=?"
+		_, err = db.Exec(query, desc, id)
+
+	}
 
 	return errors.Wrap(err, "update Service.Desc")
 }
@@ -216,7 +227,7 @@ func (db dbBase) InsertService(svc Service, units []Unit, t *Task, users []User)
 
 func (db dbBase) txInsertSerivce(tx *sqlx.Tx, svc Service) error {
 
-	query := "INSERT INTO " + db.serviceTable() + " (id,name,description,architecture,business_code,tag,auto_healing,auto_scaling,status,backup_max_size,backup_files_retention,created_at,finished_at) VALUES (:id,:name,:description,:architecture,:business_code,:tag,:auto_healing,:auto_scaling,:status,:backup_max_size,:backup_files_retention,:created_at,:finished_at)"
+	query := "INSERT INTO " + db.serviceTable() + " ( id,name,image_id,description,architecture,tag,auto_healing,auto_scaling,high_available,status,backup_max_size,backup_files_retention,created_at,finished_at ) VALUES ( :id,:name,:image_id,:description,:architecture,:tag,:auto_healing,:auto_scaling,:high_available,:status,:backup_max_size,:backup_files_retention,:created_at,:finished_at )"
 
 	_, err := tx.NamedExec(query, &svc)
 
