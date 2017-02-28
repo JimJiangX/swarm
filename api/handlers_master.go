@@ -114,13 +114,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	found := false
-	for i := range supports {
-		version, err := structs.ParseImage(supports[i])
-		if err != nil {
-			logrus.Errorf("%+v", err)
-			continue
-		}
-
+	for _, version := range supports {
 		if version.Name == req.Name &&
 			version.Major == req.Major &&
 			version.Minor == req.Minor {
