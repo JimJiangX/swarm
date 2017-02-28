@@ -20,9 +20,9 @@ type UnitInterface interface {
 	InsertUnit(u Unit) error
 
 	SetUnitInfo(u Unit) error
-	UnitStatusCAS(u *Unit, old, value int64, operator string) error
+	UnitStatusCAS(u *Unit, old, value int, operator string) error
 	SetUnitWithInsertTask(u *Unit, task Task) error
-	SetUnitStatus(u *Unit, status int64, msg string) error
+	SetUnitStatus(u *Unit, status int, msg string) error
 	SetUnitAndTask(u *Unit, t *Task, msg string) error
 	// SetMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error
 }
@@ -57,7 +57,7 @@ type Unit struct {
 	Networks    string `db:"networks_desc" json:"networks_desc"`
 	LatestError string `db:"latest_error" json:"latest_error"`
 
-	Status    int64     `db:"status" json:"status"`
+	Status    int       `db:"status" json:"status"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
@@ -69,7 +69,7 @@ func (db dbBase) unitTable() string {
 func (db dbBase) GetUnit(nameOrID string) (Unit, error) {
 	var (
 		u     = Unit{}
-		query = "SELECT id,name,type,image_id,image_name,service_id,engine_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at FROM " + db.unitTable() + " WHERE id=? OR name=? OR container_id=?"
+		query = "SELECT id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at FROM " + db.unitTable() + " WHERE id=? OR name=? OR container_id=?"
 	)
 
 	err := db.Get(&u, query, nameOrID, nameOrID, nameOrID)
@@ -80,7 +80,7 @@ func (db dbBase) GetUnit(nameOrID string) (Unit, error) {
 // InsertUnit insert Unit
 func (db dbBase) InsertUnit(u Unit) error {
 
-	query := "INSERT INTO " + db.unitTable() + " (id,name,type,image_id,image_name,service_id,engine_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:engine_id,:container_id,:unit_config_id,:network_mode,:status,:latest_error,:check_interval,:created_at)"
+	query := "INSERT INTO " + db.unitTable() + " (id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at) VALUES (:id,:name,:type,:service_id,:engine_id,:container_id,:network_mode,:networks_desc,:latest_error,:status,:created_at)"
 
 	_, err := db.NamedExec(query, &u)
 
@@ -90,7 +90,7 @@ func (db dbBase) InsertUnit(u Unit) error {
 // txInsertUnit insert Unit in Tx
 func (db dbBase) txInsertUnit(tx *sqlx.Tx, u Unit) error {
 
-	query := "INSERT INTO " + db.unitTable() + " (id,name,type,image_id,image_name,service_id,engine_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:engine_id,:container_id,:unit_config_id,:network_mode,:status,:latest_error,:check_interval,:created_at)"
+	query := "INSERT INTO " + db.unitTable() + " (id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at) VALUES (:id,:name,:type,:service_id,:engine_id,:container_id,:network_mode,:networks_desc,:latest_error,:status,:created_at)"
 
 	_, err := tx.NamedExec(query, &u)
 
@@ -100,7 +100,7 @@ func (db dbBase) txInsertUnit(tx *sqlx.Tx, u Unit) error {
 // txInsertUnits insert []Unit in Tx
 func (db dbBase) txInsertUnits(tx *sqlx.Tx, units []Unit) error {
 
-	query := "INSERT INTO " + db.unitTable() + " (id,name,type,image_id,image_name,service_id,engine_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at) VALUES (:id,:name,:type,:image_id,:image_name,:service_id,:engine_id,:container_id,:unit_config_id,:network_mode,:status,:latest_error,:check_interval,:created_at)"
+	query := "INSERT INTO " + db.unitTable() + " (id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at) VALUES (:id,:name,:type,:service_id,:engine_id,:container_id,:network_mode,:networks_desc,:latest_error,:status,:created_at)"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
@@ -142,28 +142,28 @@ func (db dbBase) SetUnitByContainer(containerID string, state int) error {
 // SetUnitInfo could update params of unit
 func (db dbBase) SetUnitInfo(u Unit) error {
 
-	query := "UPDATE " + db.unitTable() + " SET name=:name,type=:type,image_id=:image_id,image_name=:image_name,service_id=:service_id,engine_id=:engine_id,container_id=:container_id,unit_config_id=:unit_config_id,network_mode=:network_mode,status=:status,latest_error=:latest_error,check_interval=:check_interval,created_at=:created_at WHERE id=:id"
+	query := "UPDATE " + db.unitTable() + " SET name=:name,type=:type,service_id=:service_id,engine_id=:engine_id,container_id=:container_id,network_mode=:network_mode,networks_desc=:networks_desc,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
 
 	_, err := db.NamedExec(query, &u)
 
-	return errors.Wrap(err, "update Unit params")
+	return errors.Wrap(err, "update Unit info")
 }
 
 // txSetUnit upate unit params in tx
 func (db dbBase) txSetUnit(tx *sqlx.Tx, u Unit) error {
 
-	query := "UPDATE " + db.unitTable() + " SET engine_id=:engine_id,container_id=:container_id,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
+	query := "UPDATE " + db.unitTable() + " SET engine_id=:engine_id,container_id=:container_id,network_mode=:network_mode,networks_desc=:networks_desc,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
 
-	_, err := tx.NamedExec(query, u)
+	_, err := tx.NamedExec(query, &u)
 
 	return errors.Wrap(err, "Tx update Unit")
 }
 
 // UnitStatusCAS update Unit Status with conditions,
 // Unit status==old or status!=old,update Unit Status to be value if true,else return error
-func (db dbBase) UnitStatusCAS(u *Unit, old, value int64, operator string) error {
+func (db dbBase) UnitStatusCAS(u *Unit, old, value int, operator string) error {
 	var (
-		status int64
+		status int
 		query  = "SELECT status FROM " + db.unitTable() + " WHERE id=?"
 	)
 
@@ -198,7 +198,7 @@ func (db dbBase) UnitStatusCAS(u *Unit, old, value int64, operator string) error
 // SetUnitWithInsertTask update Unit Status & LatestError and insert Task in Tx
 func (db dbBase) SetUnitWithInsertTask(u *Unit, task Task) error {
 	do := func(tx *sqlx.Tx) error {
-		err := db.txSetUnitStatus(tx, u, u.Status, u.LatestError)
+		err := db.txSetUnitStatus(tx, u, u.LatestError, u.Status)
 		if err != nil {
 			return err
 		}
@@ -212,17 +212,17 @@ func (db dbBase) SetUnitWithInsertTask(u *Unit, task Task) error {
 }
 
 // SetUnitStatus update Unit Status & LatestError in Tx
-func (db dbBase) SetUnitStatus(u *Unit, status int64, msg string) error {
+func (db dbBase) SetUnitStatus(u *Unit, status int, msg string) error {
 	return db.txFrame(
 		func(tx *sqlx.Tx) error {
-			return db.txSetUnitStatus(tx, u, status, msg)
+			return db.txSetUnitStatus(tx, u, msg, status)
 		})
 }
 
 // SetUnitAndTask update Unit and Task in Tx
 func (db dbBase) SetUnitAndTask(u *Unit, t *Task, msg string) error {
 	do := func(tx *sqlx.Tx) error {
-		err := db.txSetUnitStatus(tx, u, u.Status, u.LatestError)
+		err := db.txSetUnitStatus(tx, u, msg, u.Status)
 		if err != nil {
 			return err
 		}
@@ -238,6 +238,7 @@ func (db dbBase) SetUnitAndTask(u *Unit, t *Task, msg string) error {
 
 	err := db.txFrame(do)
 	if err == nil {
+		u.LatestError = msg
 		t.Errors = msg
 		t.FinishedAt = time.Now()
 	}
@@ -245,7 +246,7 @@ func (db dbBase) SetUnitAndTask(u *Unit, t *Task, msg string) error {
 	return err
 }
 
-func (db dbBase) txSetUnitStatus(tx *sqlx.Tx, u *Unit, status int64, msg string) error {
+func (db dbBase) txSetUnitStatus(tx *sqlx.Tx, u *Unit, msg string, status int) error {
 
 	query := "UPDATE " + db.unitTable() + " SET status=?,latest_error=? WHERE id=?"
 
@@ -273,7 +274,7 @@ func (db dbBase) txDelUnit(tx *sqlx.Tx, nameOrID string) error {
 func (db dbBase) listUnits() ([]Unit, error) {
 	var (
 		out   []Unit
-		query = "SELECT id,name,type,image_id,image_name,service_id,engine_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at FROM " + db.unitTable()
+		query = "SELECT id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at FROM " + db.unitTable()
 	)
 
 	err := db.Select(&out, query)
@@ -285,7 +286,7 @@ func (db dbBase) listUnits() ([]Unit, error) {
 func (db dbBase) ListUnitByServiceID(id string) ([]Unit, error) {
 	var (
 		out   []Unit
-		query = "SELECT id,name,type,image_id,image_name,service_id,engine_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at FROM " + db.unitTable() + " WHERE service_id=?"
+		query = "SELECT id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at FROM " + db.unitTable() + " WHERE service_id=?"
 	)
 
 	err := db.Select(&out, query, id)
@@ -297,7 +298,7 @@ func (db dbBase) ListUnitByServiceID(id string) ([]Unit, error) {
 func (db dbBase) ListUnitByEngine(id string) ([]Unit, error) {
 	var (
 		out   []Unit
-		query = "SELECT id,name,type,image_id,image_name,service_id,engine_id,container_id,unit_config_id,network_mode,status,latest_error,check_interval,created_at FROM " + db.unitTable() + " WHERE engine_id=?"
+		query = "SELECT id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at FROM " + db.unitTable() + " WHERE engine_id=?"
 	)
 
 	err := db.Select(&out, query, id)
@@ -334,24 +335,6 @@ func (db dbBase) CountUnitsInEngines(engines []string) (int, error) {
 	err = db.Get(&count, query, args...)
 
 	return count, errors.Wrap(err, "cound Units by engines")
-}
-
-// TxInsertUnitWithPorts insert Unit and update []Port in a Tx
-func (db dbBase) InsertUnitWithPorts(u *Unit, ports []Port) error {
-	do := func(tx *sqlx.Tx) (err error) {
-		if u != nil {
-			err = db.txInsertUnit(tx, *u)
-			if err != nil {
-				return err
-			}
-		}
-
-		err = db.txSetPorts(tx, ports)
-
-		return err
-	}
-
-	return db.txFrame(do)
 }
 
 // SetMigrateUnit update Unit and delete old LocalVolumes in a Tx
@@ -402,4 +385,22 @@ func (db dbBase) SetMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error {
 //	}
 
 //	return err
+//}
+
+//// TxInsertUnitWithPorts insert Unit and update []Port in a Tx
+//func (db dbBase) InsertUnitWithPorts(u *Unit, ports []Port) error {
+//	do := func(tx *sqlx.Tx) (err error) {
+//		if u != nil {
+//			err = db.txInsertUnit(tx, *u)
+//			if err != nil {
+//				return err
+//			}
+//		}
+
+//		err = db.txSetPorts(tx, ports)
+
+//		return err
+//	}
+
+//	return db.txFrame(do)
 //}

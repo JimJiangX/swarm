@@ -41,7 +41,7 @@ type Unit struct {
 	Networks    string `db:"networks_desc" json:"networks_desc"`
 	LatestError string `db:"latest_error" json:"latest_error"`
 
-	Status    int64     `db:"status" json:"status"`
+	Status    int       `db:"status" json:"status"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
