@@ -32,7 +32,7 @@ type Volume struct {
 }
 
 func (db dbBase) volumeTable() string {
-	return db.prefix + "_volumes"
+	return db.prefix + "_service_unit_volume"
 }
 
 // InsertVolume insert a new Volume

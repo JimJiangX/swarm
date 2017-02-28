@@ -571,8 +571,12 @@ func (svc *Service) deregisterSerivces(ctx context.Context, r kvstore.Register, 
 }
 
 func (svc *Service) Image() (database.Image, error) {
+	img, err := structs.ParseImage(svc.spec.Image)
+	if err != nil {
+		return database.Image{}, err
+	}
 
-	return svc.so.GetImage(svc.spec.Image)
+	return svc.so.GetImage(img.Name, img.Major, img.Minor, img.Patch)
 }
 
 func (svc *Service) Requires(ctx context.Context) (structs.RequireResource, error) {

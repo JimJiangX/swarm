@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	stderr "errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -105,7 +106,36 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 	}
 
-	id, err := resource.LoadImage(ctx, gd.Ormer(), gd.PluginClient(), req)
+	pc := gd.PluginClient()
+	supports, err := pc.GetImageSupport(ctx)
+	if err != nil {
+		httpError2(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	found := false
+	for i := range supports {
+		version, err := structs.ParseImage(supports[i])
+		if err != nil {
+			logrus.Errorf("%+v", err)
+			continue
+		}
+
+		if version.Name == req.Name &&
+			version.Major == req.Major &&
+			version.Minor == req.Minor {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		httpError2(w, fmt.Errorf("%s unsupported yet", req.Version()), http.StatusInternalServerError)
+		return
+	}
+
+	// database.Image.ID
+	id, err := resource.LoadImage(ctx, gd.Ormer(), req)
 	if err != nil {
 		httpError2(w, err, http.StatusInternalServerError)
 		return

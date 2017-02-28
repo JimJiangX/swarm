@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"strconv"
 	"time"
 
@@ -13,40 +11,21 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/scplib"
 	"github.com/docker/swarm/garden/structs"
-	pluginapi "github.com/docker/swarm/plugin/parser/api"
+	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
 // LoadImage load a new Image
-func LoadImage(ctx context.Context, ormer database.ImageOrmer, pc pluginapi.PluginAPI, req structs.PostLoadImageRequest) (string, error) {
-	text, err := ioutil.ReadFile(req.ConfigFilePath)
-	if err != nil {
-		return "", errors.Wrap(err, "ReadAll from configFile:"+req.ConfigFilePath)
-	}
-
-	file, err := os.Open(req.KeysetsFile)
-	if err != nil {
-		return "", errors.Wrap(err, "open KeysetsFile:"+req.KeysetsFile)
-	}
-
-	cf := structs.ConfigTemplate{}
-
-	err = json.NewDecoder(file).Decode(&cf)
-	if err != nil {
-		return "", errors.Wrapf(err, "JSON decode file:%s", req.KeysetsFile)
-	}
-
-	template := structs.ConfigTemplate{
-		Name:    req.Name,
-		Version: req.Version,
-		Mount:   cf.Mount,
-		Content: text,
-		Keysets: cf.Keysets,
-	}
-	err = pc.ImageCheck(ctx, template)
-	if err != nil {
-		return "", err
+func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostLoadImageRequest) (string, error) {
+	var labels string
+	if len(req.Labels) > 0 {
+		buf := bytes.NewBuffer(nil)
+		err := json.NewEncoder(buf).Encode(req.Labels)
+		if err != nil {
+			return "", errors.Wrapf(err, "parse Labels:%s", req.Labels)
+		}
+		labels = buf.String()
 	}
 
 	registry, err := ormer.GetRegistry()
@@ -54,57 +33,58 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, pc pluginapi.Plug
 		return "", err
 	}
 
-	oldName := fmt.Sprintf("%s:%s", req.Name, req.Version)
-	newName := fmt.Sprintf("%s:%d/%s", registry.Domain, registry.Port, oldName)
-	script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
-
-	scp, err := scplib.NewScpClient(registry.Address, registry.OsUsername, registry.OsPassword)
-	if err != nil {
-		return "", err
-	}
-	defer scp.Close()
-
-	out, err := scp.Exec(script)
-	if err != nil {
-		logrus.Error(err, string(out))
-		return "", err
-	}
-
-	imageID, size, err := parsePushImageOutput(out)
-	if err != nil {
-		return imageID, err
-	}
-
-	template.Image = imageID
-	template.Timestamp = time.Now().Unix()
-
-	pc.PostImageTemplate(ctx, template)
-	if err != nil {
-		return imageID, err
-	}
-
-	var labels string
-	if len(req.Labels) > 0 {
-		buf := bytes.NewBuffer(nil)
-		json.NewEncoder(buf).Encode(req.Labels)
-		labels = buf.String()
-	}
-
 	image := database.Image{
-		ID:       imageID,
+		ID:       utils.Generate32UUID(),
 		Name:     req.Name,
-		Version:  req.Version,
+		Major:    req.Major,
+		Minor:    req.Minor,
+		Patch:    req.Patch,
 		Labels:   labels,
-		Size:     size,
 		UploadAt: time.Now(),
 	}
 
 	err = ormer.InsertImage(image)
 	if err != nil {
-		logrus.Error(err)
+		return "", err
 	}
 
-	return imageID, err
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logrus.WithField("Image", req.Name).Errorf("load image panic:%+v", err)
+			}
+		}()
+
+		oldName := fmt.Sprintf("%s:%s", req.Version())
+		newName := fmt.Sprintf("%s:%d/%s", registry.Domain, registry.Port, oldName)
+		script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
+
+		scp, err := scplib.NewScpClient(registry.Address, registry.OsUsername, registry.OsPassword)
+		if err != nil {
+			logrus.WithField("Image", req.Name).Errorf("Load image,%+v", err)
+			return
+		}
+		defer scp.Close()
+
+		out, err := scp.Exec(script)
+		if err != nil {
+			logrus.WithField("Image", req.Name).Errorf("load image,%+v,output:%s", err, out)
+			return
+		}
+
+		imageID, size, err := parsePushImageOutput(out)
+		if err != nil {
+			logrus.WithField("Image", req.Name).Errorf("parse output,%+v", err)
+			return
+		}
+
+		err = ormer.SetImage(image.ID, imageID, size)
+		if err != nil {
+			logrus.WithField("Image", req.Name).Errorf("set image table,%+v", err)
+		}
+	}()
+
+	return image.ID, err
 }
 
 func parsePushImageOutput(in []byte) (string, int, error) {
