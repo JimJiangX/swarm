@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/docker/swarm/garden/structs"
 )
@@ -29,15 +30,32 @@ type parser interface {
 	Requirement() structs.RequireResource
 }
 
-var images = make(map[string]bool, 10)
+var images = struct {
+	sync.RWMutex
+	m map[string]structs.ImageVersion
+}{
+	m: make(map[string]structs.ImageVersion, 10),
+}
 
 func register(name, version string, _ parser) error {
 	key := name + ":" + version
-	if _, exist := images[key]; exist {
+
+	images.RLock()
+	_, exist := images.m[key]
+	images.RUnlock()
+
+	if exist {
 		return fmt.Errorf("image:%s exist", key)
 	}
 
-	images[key] = true
+	v, err := structs.ParseImage(key)
+	if err != nil {
+		return err
+	}
+
+	images.Lock()
+	images.m[key] = v
+	images.Unlock()
 
 	return nil
 }

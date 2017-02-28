@@ -16,7 +16,7 @@ type PluginAPI interface {
 	GetUnitConfig(ctx context.Context, service, unit string) (structs.ConfigCmds, error)
 	GetCommands(ctx context.Context, service string) (structs.Commands, error)
 
-	GetImageSupport(ctx context.Context) ([]string, error)
+	GetImageSupport(ctx context.Context) ([]structs.ImageVersion, error)
 	GetImageRequirement(ctx context.Context, name, version string) (structs.RequireResource, error)
 
 	ImageCheck(ctx context.Context, ct structs.ConfigTemplate) error
@@ -78,14 +78,14 @@ func (p plugin) GetCommands(ctx context.Context, service string) (structs.Comman
 	return m, err
 }
 
-func (p plugin) GetImageSupport(ctx context.Context) ([]string, error) {
+func (p plugin) GetImageSupport(ctx context.Context) ([]structs.ImageVersion, error) {
 	resp, err := client.RequireOK(p.c.Get(ctx, "/image/support"))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	var obj []string
+	var obj []structs.ImageVersion
 
 	err = decodeBody(resp, &obj)
 

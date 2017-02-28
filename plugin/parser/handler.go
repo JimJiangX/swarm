@@ -30,7 +30,7 @@ func NewRouter(c kvstore.Client) *mux.Router {
 
 	var routes = map[string]map[string]handler{
 		"GET": {
-
+			"/image/support":                  getSupportImageVersion,
 			"/image/requirement":              getImageRequirement,
 			"/configs/{service:.*}":           getConfigs,
 			"/configs/{service:.*}/{unit:.*}": getConfig,
@@ -70,6 +70,25 @@ func NewRouter(c kvstore.Client) *mux.Router {
 	}
 
 	return r
+}
+
+func getSupportImageVersion(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	out := make([]structs.ImageVersion, 0, 10)
+	
+	images.RLock()
+	for _,v:=range images.m{
+		out=append(out,v)
+	}
+	images.RUnlock()
+	
+	err := json.NewEncoder(w).Encode(out)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	return
 }
 
 func getImageRequirement(ctx *_Context, w http.ResponseWriter, r *http.Request) {
