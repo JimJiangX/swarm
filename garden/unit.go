@@ -226,6 +226,9 @@ func (u unit) removeVolumes(ctx context.Context) error {
 }
 
 func (u unit) containerExec(ctx context.Context, cmd []string, detach bool) (types.ContainerExecInspect, error) {
+	if len(cmd) == 0 {
+		return types.ContainerExecInspect{}, nil
+	}
 	c := u.getContainer()
 	if c == nil {
 		return types.ContainerExecInspect{}, errors.Wrap(newContainerError(u.u.Name, "not found"), "container exec")

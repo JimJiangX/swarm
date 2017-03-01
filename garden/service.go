@@ -374,7 +374,7 @@ func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[
 	return err
 }
 
-func (svc *Service) Stop(ctx context.Context) (err error) {
+func (svc *Service) Stop(ctx context.Context, containers bool) (err error) {
 	ok, val, err := svc.sl.CAS(statusServiceStoping, isInProgress)
 	if err != nil {
 		return err
@@ -406,10 +406,10 @@ func (svc *Service) Stop(ctx context.Context) (err error) {
 		return err
 	}
 
-	return svc.stop(ctx, units)
+	return svc.stop(ctx, units, containers)
 }
 
-func (svc *Service) stop(ctx context.Context, units []*unit) error {
+func (svc *Service) stop(ctx context.Context, units []*unit, containers bool) error {
 	cmds, err := svc.generateUnitsCmd(ctx)
 	if err != nil {
 		return err
@@ -422,6 +422,10 @@ func (svc *Service) stop(ctx context.Context, units []*unit) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	if !containers {
+		return nil
 	}
 
 	for i := range units {
