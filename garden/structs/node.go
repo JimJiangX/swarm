@@ -13,8 +13,8 @@ type GetClusterResponse struct {
 }
 
 type Node struct {
-	Name    string
-	Address string
+	Cluster string `json:"cluster_id"`
+	Address string `json:"addr"`
 
 	SSHConfig
 
@@ -36,7 +36,6 @@ type SSHConfig struct {
 type PostNodesRequest []Node
 
 type PostNodeResponse struct {
-	ID     string
-	Addr   string
-	TaskID string
+	ID   string
+	Addr string
 }
