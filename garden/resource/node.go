@@ -384,18 +384,6 @@ func (node *nodeWithTask) modifyProfile(horus string, config *database.SysConfig
 func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc, nodes []nodeWithTask, config database.SysConfig) {
 	defer cancel()
 
-	cID := ""
-	for i := range nodes {
-		if nodes[i].Node.ClusterID != "" {
-			cID = nodes[i].Node.ClusterID
-			break
-		}
-	}
-	if cID == "" {
-		logrus.Error("ClusterID is required")
-		return
-	}
-
 	port := strconv.Itoa(config.DockerPort)
 
 	t := time.NewTicker(time.Minute)
@@ -407,50 +395,37 @@ func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc
 
 		case <-ctx.Done():
 			// try again
-			err := m.registerNodes(ctx, cID, nodes, port)
+			err := m.registerNodes(ctx, nodes, port)
 			if err != nil {
-				logrus.WithField("Cluster", cID).Errorf("reigster nodes error,%+v", err)
+				logrus.Errorf("reigster nodes error,%+v", err)
 			}
 
 			err = m.registerNodesTimeout(nodes, ctx.Err())
-			logrus.WithField("Cluster", cID).Errorf("deal with Nodes timeout%+v", err)
+			logrus.Errorf("deal with Nodes timeout%+v", err)
 
 			return
 		}
 
-		err := m.registerNodes(ctx, cID, nodes, port)
+		err := m.registerNodes(ctx, nodes, port)
 		if err != nil {
-			logrus.WithField("Cluster", cID).Errorf("reigster nodes error,%+v", err)
+			logrus.Errorf("reigster nodes error,%+v", err)
 		}
 	}
 }
 
-func (m master) registerNodes(ctx context.Context, cID string, nodes []nodeWithTask, port string) error {
-	var (
-		_err  error
-		field = logrus.WithField("Cluster", cID)
-	)
-
-	list, err := m.dco.ListNodeByCluster(cID)
-	if err != nil {
-		field.Errorf("%+v", err)
-		return err
-	}
-
-	for i := range nodes {
-		for l := range list {
-			if list[l].ID == nodes[i].Node.ID {
-				nodes[i].Node = list[l]
-				break
-			}
-		}
-	}
-
+func (m master) registerNodes(ctx context.Context, nodes []nodeWithTask, port string) error {
+	var _err error
 	count := 0
 	for i := range nodes {
 
-		n := nodes[i].Node
-		fields := field.WithField("host", n.Addr)
+		n, err := m.dco.GetNode(nodes[i].Node.ID)
+		if err != nil {
+			return err
+		}
+
+		nodes[i].Node = n
+
+		field := logrus.WithField("host", n.Addr)
 
 		if n.Status != statusNodeInstalled {
 			if n.Status > statusNodeInstalled {
@@ -461,15 +436,14 @@ func (m master) registerNodes(ctx context.Context, cID string, nodes []nodeWithT
 				continue
 			}
 
-			fields.Warnf("status not match,%d!=%d", n.Status, statusNodeInstalled)
+			field.Warnf("status not match,%d!=%d", n.Status, statusNodeInstalled)
 			continue
 		}
 
 		addr := net.JoinHostPort(n.Addr, port)
 		eng := m.clsuter.EngineByAddr(addr)
 		if eng == nil || !eng.IsHealthy() {
-			fields.Errorf("engine is null or unhealthy")
-
+			field.Errorf("engine is null or unhealthy")
 			continue
 		}
 
@@ -486,7 +460,7 @@ func (m master) registerNodes(ctx context.Context, cID string, nodes []nodeWithT
 		err = m.dco.RegisterNode(n, t)
 		if err != nil {
 			_err = err
-			fields.Errorf("%+v", err)
+			field.Errorf("%+v", err)
 		}
 	}
 
@@ -498,36 +472,20 @@ func (m master) registerNodesTimeout(nodes []nodeWithTask, er error) error {
 		return nil
 	}
 
-	cID, in := "", make([]string, 0, len(nodes))
-
 	for i := range nodes {
-		if nodes[i].Node.ID != "" {
-			in = append(in, nodes[i].Node.ID)
-			if cID == "" {
-				cID = nodes[i].Node.ClusterID
-			}
+		n, err := m.dco.GetNode(nodes[i].Node.ID)
+		if err != nil {
+			logrus.WithField("host", nodes[i].Node.Addr).Errorf("%+v", err)
+			continue
 		}
-	}
 
-	list, err := m.dco.ListNodeByCluster(cID)
-	if err != nil {
-		return err
-	}
+		nodes[i].Node = n
 
-	for n := range nodes {
-		for i := range list {
-			if list[i].ID == nodes[n].Node.ID {
-				nodes[n].Node = list[i]
-				break
-			}
-		}
-	}
-
-	for i := range nodes {
-		n, t := nodes[i].Node, nodes[i].Task
 		if n.Status >= statusNodeEnable {
 			continue
 		}
+
+		t := nodes[i].Task
 
 		if n.Status != statusNodeInstalled {
 			n.Status = statusNodeRegisterTimeout

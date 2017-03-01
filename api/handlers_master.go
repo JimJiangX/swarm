@@ -311,8 +311,6 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cl := make([]string, 0, len(list))
-
 	for i := range list {
 		if list[i].Cluster == "" {
 			httpJSONError(w, fmt.Errorf("host:%s ClusterID is required", list[i].Address), http.StatusInternalServerError)
@@ -329,19 +327,6 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		if !exist {
 			httpJSONError(w, fmt.Errorf("host:%s unknown ClusterID:%s", list[i].Address, list[i].Cluster), http.StatusInternalServerError)
 			return
-		}
-
-		exist = false
-
-		for c := range cl {
-			if cl[c] == list[i].Cluster {
-				exist = true
-				break
-			}
-		}
-
-		if !exist {
-			cl = append(cl, list[i].Cluster)
 		}
 	}
 
@@ -372,23 +357,11 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for i := range cl {
-		index := 0
-		nl := resource.NewNodeWithTaskList(len(list))
-
-		for n := range nodes {
-			if nodes[n].Node.ClusterID == cl[i] {
-				nl[index] = nodes[n]
-				index++
-			}
-		}
-
-		master := resource.NewMaster(orm, gd.Cluster)
-		err = master.InstallNodes(ctx, horus, nl)
-		if err != nil {
-			httpJSONError(w, err, http.StatusInternalServerError)
-			return
-		}
+	master := resource.NewMaster(orm, gd.Cluster)
+	err = master.InstallNodes(ctx, horus, nodes)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
 	}
 
 	out := make([]structs.PostNodeResponse, len(list))
