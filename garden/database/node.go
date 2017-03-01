@@ -27,6 +27,8 @@ type NodeInterface interface {
 	ListNodeByCluster(cluster string) ([]Node, error)
 	ListNodesByClusters(clusters []string, enable bool) ([]Node, error)
 
+	CountNodeByCluster(cluster string) (int, error)
+
 	SetNodeParams(n Node) error
 
 	RegisterNode(n Node, t Task) error

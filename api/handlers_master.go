@@ -138,6 +138,74 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	httpSucceed(w, id, http.StatusCreated)
 }
 
+func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil || gd.Ormer() == nil {
+
+		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	orm := gd.Ormer()
+	c, err := orm.GetCluster(name)
+	if err != nil {
+		httpError2(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	n, err := orm.CountNodeByCluster(c.ID)
+	if err != nil {
+		httpError2(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	resp := structs.GetClusterResponse{
+		ID:         c.ID,
+		MaxNode:    c.MaxNode,
+		UsageLimit: c.UsageLimit,
+		NodeNum:    n,
+	}
+
+	httpSucceed(w, resp, http.StatusOK)
+}
+
+func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil || gd.Ormer() == nil {
+
+		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	orm := gd.Ormer()
+
+	list, err := orm.ListClusters()
+	if err != nil {
+		httpError2(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	out := make([]structs.GetClusterResponse, len(list))
+	for i := range list {
+		n, err := orm.CountNodeByCluster(list[i].ID)
+		if err != nil {
+			httpError2(w, err, http.StatusInternalServerError)
+			return
+		}
+
+		out[i] = structs.GetClusterResponse{
+			ID:         list[i].ID,
+			MaxNode:    list[i].MaxNode,
+			UsageLimit: list[i].UsageLimit,
+			NodeNum:    n,
+		}
+	}
+
+	httpSucceed(w, out, http.StatusOK)
+}
+
 func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostClusterRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -156,7 +224,6 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	c := database.Cluster{
 		ID:         utils.Generate32UUID(),
-		Type:       req.Type,
 		MaxNode:    req.MaxNode,
 		UsageLimit: req.UsageLimit,
 	}
@@ -168,6 +235,59 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	httpSucceed(w, c, http.StatusCreated)
+}
+
+func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	req := structs.PostClusterRequest{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		httpError2(w, err, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	c := database.Cluster{
+		ID:         name,
+		MaxNode:    req.MaxNode,
+		UsageLimit: req.UsageLimit,
+	}
+
+	err = gd.Ormer().SetClusterParams(c)
+	if err != nil {
+		httpError2(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	httpSucceed(w, nil, http.StatusOK)
+}
+
+func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	master := resource.NewMaster(gd.Ormer(), gd.Cluster)
+	err := master.RemoveCluster(name)
+	if err != nil {
+		httpError2(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	httpSucceed(w, nil, http.StatusNoContent)
 }
 
 func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {

@@ -8,5 +8,5 @@ type ResponseHead struct {
 
 type CommonResponse struct {
 	ResponseHead
-	Object interface{} `json:"object"`
+	Object interface{} `json:"data"`
 }

@@ -37,36 +37,35 @@ func fromContext(ctx goctx.Context, key string) (bool, cluster.Cluster, *garden.
 type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 var masterRoutes = map[string]map[string]ctxHandler{
-	"GET": {
-	//		"/clusters":                        getClusters,
-	//		"/clusters/{name}":                 getClustersByNameOrID,
-	//		"/nodes":                           getAllNodes,
-	//		"/nodes/{name:.*}":                 getNode,
-	//		"/resources":                       getClustersResource,
-	//		"/resources/{cluster:.*}":          getNodesResourceByCluster,
-	//		"/tasks":                           getTasks,
-	//		"/tasks/{name:.*}":                 getTask,
-	//		"/ports":                           getPorts,
-	//		"/networkings":                     getNetworkings,
-	//		"/image/{name:.*}":                 getImage,
-	//		"/services":                        getServices,
-	//		"/services/{name}":                 getServicesByNameOrID,
-	//		"/services/{name}/users":           getServiceUsers,
-	//		"/services/{name}/topology":        hijackTopology,
-	//		"/services/{name}/proxys":          hijackProxys,
-	//		"/services/{name}/service_config":  getServiceServiceConfig,
-	//		"/services/{name}/backup_strategy": getServiceBackupStrategy,
-	//		"/services/{name}/backup_files":    getServiceBackupFiles,
-	//		"/storage/san":                     getSANStoragesInfo,
-	//		"/storage/san/{name:.*}":           getSANStorageInfo,
+	http.MethodGet: {
+		"/clusters":        getClusters,
+		"/clusters/{name}": getClustersByID,
+		//		"/nodes":                           getAllNodes,
+		//		"/nodes/{name:.*}":                 getNode,
+		//		"/resources":                       getClustersResource,
+		//		"/resources/{cluster:.*}":          getNodesResourceByCluster,
+		//		"/tasks":                           getTasks,
+		//		"/tasks/{name:.*}":                 getTask,
+		//		"/ports":                           getPorts,
+		//		"/networkings":                     getNetworkings,
+		//		"/image/{name:.*}":                 getImage,
+		//		"/services":                        getServices,
+		//		"/services/{name}":                 getServicesByNameOrID,
+		//		"/services/{name}/users":           getServiceUsers,
+		//		"/services/{name}/topology":        hijackTopology,
+		//		"/services/{name}/proxys":          hijackProxys,
+		//		"/services/{name}/service_config":  getServiceServiceConfig,
+		//		"/services/{name}/backup_strategy": getServiceBackupStrategy,
+		//		"/services/{name}/backup_files":    getServiceBackupFiles,
+		//		"/storage/san":                     getSANStoragesInfo,
+		//		"/storage/san/{name:.*}":           getSANStorageInfo,
 	},
-	"POST": {
-		"/datacenter": postRegisterDC,
-		"/clusters":   postCluster,
-		//		"/clusters/{name}/update":        postUpdateClusterParams,
+	http.MethodPost: {
+		// "/datacenter": postRegisterDC,
+		"/clusters": postCluster,
 		//		"/clusters/{name}/enable":        postEnableCluster,
 		//		"/clusters/{name}/disable":       postDisableCluster,
-		"/clusters/{name}/nodes": postNodes,
+		"/hosts": postNodes,
 		//		"/clusters/nodes/{node}/enable":  postEnableNode,
 		//		"/clusters/nodes/{node}/disable": postDisableNode,
 		//		"/clusters/nodes/{node}/update":  updateNode,
@@ -101,7 +100,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		//		"/networkings/{name:.*}/enable":  postEnableNetworking,
 		//		"/networkings/{name:.*}/disable": postDisableNetworking,
 
-		"/image/load": postImageLoad,
+		"/softwares/images": postImageLoad,
 		//		"/image/{image:.*}/enable":   postEnableImage,
 		//		"/image/{image:.*}/disable":  postDisableImage,
 		//		"/image/{image:.*}/template": updateImageTemplateConfig,
@@ -113,13 +112,18 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		//		"/storage/san/{name}/raid_group/{rg:.*}/enable":  postEnableRaidGroup,
 		//		"/storage/san/{name}/raid_group/{rg:.*}/disable": postDisableRaidGroup,
 	},
-	"DELETE": {
+
+	http.MethodPut: {
+		"/clusters/{name}": putClusterParams,
+	},
+
+	http.MethodDelete: {
 		//		"/services/{name}":                    deleteService,
 		//		"/services/{name}/users":              deleteServiceUsers,
 		//		"/services/backup_strategy/{name:.*}": deleteBackupStrategy,
 
-		//		"/clusters/{name}":          deleteCluster,
-		"/clusters/nodes/{node:.*}": deleteNode,
+		"/clusters/{name}": deleteCluster,
+		"/hosts/{node:.*}": deleteNode,
 
 		//		"/networkings/{name:.*}": deleteNetworking,
 		//		"/ports/{port:[0-9]+}":   deletePort,

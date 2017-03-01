@@ -81,7 +81,7 @@ func defaultPooledTransport(timeout time.Duration) *http.Transport {
 	return transport
 }
 
-// EnsureBodyClose close *http.Response
+// ensureBodyClose close *http.Response
 func ensureBodyClose(resp *http.Response) {
 	if resp.Body != nil {
 		io.CopyN(ioutil.Discard, resp.Body, 512)

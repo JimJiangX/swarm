@@ -1,10 +1,14 @@
 package structs
 
 type PostClusterRequest struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
-
 	MaxNode    int     `json:"max_node"`
+	UsageLimit float32 `json:"usage_limit"`
+}
+
+type GetClusterResponse struct {
+	ID         string
+	MaxNode    int     `json:"max_node"`
+	NodeNum    int     `json:"node_num"`
 	UsageLimit float32 `json:"usage_limit"`
 }
 
