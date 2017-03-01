@@ -129,7 +129,9 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, id, http.StatusCreated)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "Id", id)
 }
 
 func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -228,7 +230,9 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, c, http.StatusCreated)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "Id", c.ID)
 }
 
 func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -260,7 +264,7 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	writeJSON(w, nil, http.StatusOK)
+	w.WriteHeader(http.StatusOK)
 }
 
 func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -281,12 +285,10 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, nil, http.StatusNoContent)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-
 	list := structs.PostNodesRequest{}
 	err := json.NewDecoder(r.Body).Decode(&list)
 	if err != nil {
@@ -298,21 +300,49 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil ||
 		gd.KVClient() == nil {
-
 		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
 		return
 	}
 
-	ormer := gd.Ormer()
-	c, err := ormer.GetCluster(name)
+	orm := gd.Ormer()
+	clusters, err := orm.ListClusters()
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
-	horus, err := gd.KVClient().GetHorusAddr()
-	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
-		return
+
+	cl := make([]string, 0, len(list))
+
+	for i := range list {
+		if list[i].Cluster == "" {
+			httpJSONError(w, fmt.Errorf("host:%s ClusterID is required", list[i].Address), http.StatusInternalServerError)
+			return
+		}
+
+		exist := false
+		for c := range clusters {
+			if clusters[c].ID == list[i].Cluster {
+				exist = true
+				break
+			}
+		}
+		if !exist {
+			httpJSONError(w, fmt.Errorf("host:%s unknown ClusterID:%s", list[i].Address, list[i].Cluster), http.StatusInternalServerError)
+			return
+		}
+
+		exist = false
+
+		for c := range cl {
+			if cl[c] == list[i].Cluster {
+				exist = true
+				break
+			}
+		}
+
+		if !exist {
+			cl = append(cl, list[i].Cluster)
+		}
 	}
 
 	nodes := resource.NewNodeWithTaskList(len(list))
@@ -321,7 +351,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			n.HDD, n.SSD,
 			database.Node{
 				ID:           utils.Generate32UUID(),
-				ClusterID:    c.ID,
+				ClusterID:    n.Cluster,
 				Addr:         n.Address,
 				EngineID:     "",
 				Room:         n.Room,
@@ -336,23 +366,41 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	master := resource.NewMaster(ormer, gd.Cluster)
-	err = master.InstallNodes(ctx, horus, nodes)
+	horus, err := gd.KVClient().GetHorusAddr()
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	response := make([]structs.PostNodeResponse, len(list))
+	for i := range cl {
+		index := 0
+		nl := resource.NewNodeWithTaskList(len(list))
+
+		for n := range nodes {
+			if nodes[n].Node.ClusterID == cl[i] {
+				nl[index] = nodes[n]
+				index++
+			}
+		}
+
+		master := resource.NewMaster(orm, gd.Cluster)
+		err = master.InstallNodes(ctx, horus, nl)
+		if err != nil {
+			httpJSONError(w, err, http.StatusInternalServerError)
+			return
+		}
+	}
+
+	out := make([]structs.PostNodeResponse, len(list))
 
 	for i := range nodes {
-		response[i] = structs.PostNodeResponse{
+		out[i] = structs.PostNodeResponse{
 			ID:   nodes[i].Node.ID,
 			Addr: nodes[i].Node.Addr,
 		}
 	}
 
-	writeJSON(w, response, http.StatusCreated)
+	writeJSON(w, out, http.StatusCreated)
 }
 
 // DELETE /clusters/nodes/{node:.*}
@@ -397,7 +445,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, nil, http.StatusNoContent)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -438,30 +486,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		out = append(out, database.Service(l.Spec().Service))
 	}
 
-	resp := structs.CommonResponse{
-		ResponseHead: structs.ResponseHead{
-			Result: true,
-			Code:   http.StatusCreated,
-		},
-		Object: out,
-	}
-
-	if err != nil {
-		resp.ResponseHead = structs.ResponseHead{
-			Result:  false,
-			Code:    http.StatusInternalServerError,
-			Message: err.Error(),
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	err = json.NewEncoder(w).Encode(resp)
-	if err != nil {
-		logrus.WithField("status", resp.Code).Errorf("JSON Encode error: %+v", err)
-	}
-
-	w.WriteHeader(resp.Code)
+	writeJSON(w, out, http.StatusCreated)
 }
 
 func putServicesLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
