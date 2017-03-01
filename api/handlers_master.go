@@ -20,7 +20,7 @@ import (
 var errUnsupportGarden = stderr.New("unsupport Garden yet")
 
 // Emit an HTTP error and log it.
-func httpError2(w http.ResponseWriter, err error, status int) {
+func httpJSONError(w http.ResponseWriter, err error, status int) {
 	field := logrus.WithField("status", status)
 
 	if err != nil {
@@ -42,20 +42,14 @@ func httpError2(w http.ResponseWriter, err error, status int) {
 	field.Errorf("HTTP error: %+v", err)
 }
 
-func httpSucceed(w http.ResponseWriter, obj interface{}, status int) {
-	resp := structs.CommonResponse{
-		ResponseHead: structs.ResponseHead{
-			Result: true,
-			Code:   status,
-		},
-		Object: obj,
-	}
+func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
+	if obj != nil {
+		w.Header().Set("Content-Type", "application/json")
 
-	w.Header().Set("Content-Type", "application/json")
-
-	err := json.NewEncoder(w).Encode(resp)
-	if err != nil {
-		logrus.WithField("status", status).Errorf("JSON Encode error: %+v", err)
+		err := json.NewEncoder(w).Encode(obj)
+		if err != nil {
+			logrus.WithField("status", status).Errorf("JSON Encode error: %+v", err)
+		}
 	}
 
 	w.WriteHeader(status)
@@ -65,29 +59,29 @@ func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.RegisterDC{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		httpError2(w, err, http.StatusBadRequest)
+		httpJSONError(w, err, http.StatusBadRequest)
 		return
 	}
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil {
-		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
 		return
 	}
 
 	err = gd.Register(req)
 	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	httpSucceed(w, nil, http.StatusCreated)
+	writeJSON(w, nil, http.StatusCreated)
 }
 
 func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostLoadImageRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		httpError2(w, err, http.StatusBadRequest)
+		httpJSONError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -96,7 +90,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		gd.Ormer() == nil ||
 		gd.PluginClient() == nil {
 
-		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
 		return
 	}
 
@@ -109,7 +103,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	pc := gd.PluginClient()
 	supports, err := pc.GetImageSupport(ctx)
 	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -124,18 +118,18 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
-		httpError2(w, fmt.Errorf("%s unsupported yet", req.Version()), http.StatusInternalServerError)
+		httpJSONError(w, fmt.Errorf("%s unsupported yet", req.Version()), http.StatusInternalServerError)
 		return
 	}
 
 	// database.Image.ID
 	id, err := resource.LoadImage(ctx, gd.Ormer(), req)
 	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	httpSucceed(w, id, http.StatusCreated)
+	writeJSON(w, id, http.StatusCreated)
 }
 
 func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -144,20 +138,20 @@ func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil || gd.Ormer() == nil {
 
-		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
 		return
 	}
 
 	orm := gd.Ormer()
 	c, err := orm.GetCluster(name)
 	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	n, err := orm.CountNodeByCluster(c.ID)
 	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -168,14 +162,14 @@ func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		NodeNum:    n,
 	}
 
-	httpSucceed(w, resp, http.StatusOK)
+	writeJSON(w, resp, http.StatusOK)
 }
 
 func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil || gd.Ormer() == nil {
 
-		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
 		return
 	}
 
@@ -183,7 +177,7 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	list, err := orm.ListClusters()
 	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -191,7 +185,7 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	for i := range list {
 		n, err := orm.CountNodeByCluster(list[i].ID)
 		if err != nil {
-			httpError2(w, err, http.StatusInternalServerError)
+			httpJSONError(w, err, http.StatusInternalServerError)
 			return
 		}
 
@@ -203,14 +197,14 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	httpSucceed(w, out, http.StatusOK)
+	writeJSON(w, out, http.StatusOK)
 }
 
 func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostClusterRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		httpError2(w, err, http.StatusBadRequest)
+		httpJSONError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -218,7 +212,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
 		return
 	}
 
@@ -230,11 +224,11 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err = gd.Ormer().InsertCluster(c)
 	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	httpSucceed(w, c, http.StatusCreated)
+	writeJSON(w, c, http.StatusCreated)
 }
 
 func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -242,7 +236,7 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	req := structs.PostClusterRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		httpError2(w, err, http.StatusBadRequest)
+		httpJSONError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -250,7 +244,7 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
 		return
 	}
 
@@ -262,11 +256,11 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	err = gd.Ormer().SetClusterParams(c)
 	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	httpSucceed(w, nil, http.StatusOK)
+	writeJSON(w, nil, http.StatusOK)
 }
 
 func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -276,18 +270,18 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
 		return
 	}
 
 	master := resource.NewMaster(gd.Ormer(), gd.Cluster)
 	err := master.RemoveCluster(name)
 	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	httpSucceed(w, nil, http.StatusNoContent)
+	writeJSON(w, nil, http.StatusNoContent)
 }
 
 func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -296,7 +290,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	list := structs.PostNodesRequest{}
 	err := json.NewDecoder(r.Body).Decode(&list)
 	if err != nil {
-		httpError2(w, err, http.StatusBadRequest)
+		httpJSONError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -305,19 +299,19 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		gd.Ormer() == nil ||
 		gd.KVClient() == nil {
 
-		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
 		return
 	}
 
 	ormer := gd.Ormer()
 	c, err := ormer.GetCluster(name)
 	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 	horus, err := gd.KVClient().GetHorusAddr()
 	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -337,7 +331,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 				Enabled:      false,
 			})
 		if err != nil {
-			httpError2(w, err, http.StatusInternalServerError)
+			httpJSONError(w, err, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -345,7 +339,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	master := resource.NewMaster(ormer, gd.Cluster)
 	err = master.InstallNodes(ctx, horus, nodes)
 	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -353,13 +347,12 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	for i := range nodes {
 		response[i] = structs.PostNodeResponse{
-			ID:     nodes[i].Node.ID,
-			Addr:   nodes[i].Node.Addr,
-			TaskID: nodes[i].Task.ID,
+			ID:   nodes[i].Node.ID,
+			Addr: nodes[i].Node.Addr,
 		}
 	}
 
-	httpSucceed(w, response, http.StatusCreated)
+	writeJSON(w, response, http.StatusCreated)
 }
 
 // DELETE /clusters/nodes/{node:.*}
@@ -372,7 +365,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // 510 SSH 出库脚本执行失败
 func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpError2(w, err, http.StatusBadRequest)
+		httpJSONError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -386,13 +379,13 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		gd.Ormer() == nil ||
 		gd.KVClient() == nil {
 
-		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
 		return
 	}
 
 	horus, err := gd.KVClient().GetHorusAddr()
 	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -400,16 +393,16 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err = m.RemoveNode(ctx, horus, node, username, password, force)
 	if err != nil {
-		httpError2(w, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	httpSucceed(w, nil, http.StatusNoContent)
+	writeJSON(w, nil, http.StatusNoContent)
 }
 
 func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpError2(w, err, http.StatusBadRequest)
+		httpJSONError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -421,7 +414,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	services := []structs.ServiceSpec{}
 	err := json.NewDecoder(r.Body).Decode(&services)
 	if err != nil {
-		httpError2(w, err, http.StatusBadRequest)
+		httpJSONError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -431,7 +424,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		gd.KVClient() == nil ||
 		gd.PluginClient() == nil {
 
-		httpError2(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
 		return
 	}
 
