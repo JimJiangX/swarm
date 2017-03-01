@@ -1,6 +1,7 @@
 package garden
 
 import (
+	"crypto/tls"
 	"fmt"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/resource/nic"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -75,16 +77,18 @@ func newContainerError(name, action string) errContainer {
 }
 
 type unit struct {
-	u       database.Unit
-	uo      database.UnitOrmer
-	cluster cluster.Cluster
+	u            database.Unit
+	uo           database.UnitOrmer
+	cluster      cluster.Cluster
+	startNetwork func(ctx context.Context, c *cluster.Container, tlsConfig *tls.Config) error
 }
 
 func newUnit(u database.Unit, uo database.UnitOrmer, cluster cluster.Cluster) *unit {
 	return &unit{
-		u:       u,
-		uo:      uo,
-		cluster: cluster,
+		u:            u,
+		uo:           uo,
+		cluster:      cluster,
+		startNetwork: nic.CreateNetworkDevice,
 	}
 }
 
@@ -140,9 +144,9 @@ func (u unit) getHostIP() (string, error) {
 }
 
 func (u unit) startContainer(ctx context.Context) error {
-	engine := u.getEngine()
-	if engine == nil {
-		return errors.New(newNotFound("Engine", u.u.EngineID).Error())
+	c := u.getContainer()
+	if c == nil {
+		return errors.Wrap(newNotFound("Container", u.u.Name), "container start")
 	}
 
 	select {
@@ -151,23 +155,17 @@ func (u unit) startContainer(ctx context.Context) error {
 		return ctx.Err()
 	}
 
-	if u.u.ContainerID != "" {
-		c := engine.Containers().Get(u.u.ContainerID)
-		if c != nil {
-			return engine.StartContainer(c, nil)
-		}
+	err := c.Engine.StartContainer(c, nil)
+	if err != nil {
+		return errors.Wrap(err, "start container:"+u.u.Name)
 	}
 
-	if u.u.Name != "" {
-		c := engine.Containers().Get(u.u.Name)
-		if c != nil {
-			return engine.StartContainer(c, nil)
-		}
+	// start networking
+	if u.startNetwork != nil {
+		err = u.startNetwork(ctx, c, nil)
 	}
 
-	// TODO:setup networking
-
-	return errors.Wrap(newNotFound("Container", u.u.Name), "container start")
+	return err
 }
 
 func (u unit) stopContainer(ctx context.Context) error {
