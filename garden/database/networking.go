@@ -51,7 +51,7 @@ type IP struct {
 	Networking string `db:"networking_id"`
 	UnitID     string `db:"unit_id"`
 	Gateway    string `db:"gateway"`
-	VLAN       string `db:"vlan_id"`
+	VLAN       int    `db:"vlan_id"`
 }
 
 // ip_addr,prefix,networking_id,unit_id,gateway,vlan_id,enabled

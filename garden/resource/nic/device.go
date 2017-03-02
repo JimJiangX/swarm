@@ -23,7 +23,7 @@ type Device struct {
 	IP        string
 	Mask      string
 	Gateway   string
-	VLAN      string
+	VLAN      int
 	err       error
 }
 
@@ -32,7 +32,7 @@ func (d Device) String() string {
 	if d.err != nil {
 		return d.err.Error()
 	}
-	return fmt.Sprintf("%s,%s,%dM,%s,%s,%s,%s", d.Bond, d.MAC, d.Bandwidth,
+	return fmt.Sprintf("%s,%s,%dM,%s,%s,%s,%d", d.Bond, d.MAC, d.Bandwidth,
 		d.IP, d.Mask, d.Gateway, d.VLAN)
 }
 
@@ -70,13 +70,19 @@ func parseDevice(dev string) Device {
 		return Device{err: errors.Errorf("illegal device:'%s'", dev)}
 	}
 
+	n, err := strconv.Atoi(strings.TrimSpace(parts[6]))
+	if err != nil {
+		err = errors.Wrapf(err, "illegal VLAN %s,%s", parts[6], dev)
+		return Device{err: err}
+	}
+
 	d := Device{
 		Bond:    parts[0],
 		MAC:     parts[1],
 		IP:      parts[3],
 		Mask:    parts[4],
 		Gateway: parts[5],
-		VLAN:    parts[6],
+		VLAN:    n,
 	}
 
 	d.Bandwidth, d.err = parseBandwidth(parts[2])

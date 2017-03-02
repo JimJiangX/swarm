@@ -16,7 +16,7 @@ func NewNetworks(nwo database.NetworkingOrmer) Networking {
 	}
 }
 
-func (nw Networking) AddNetworking(start, end, gateway, networkingID, vlan string, prefix int) (int, error) {
+func (nw Networking) AddNetworking(start, end, gateway, networkingID string, vlan, prefix int) (int, error) {
 	startU32 := utils.IPToUint32(start)
 	endU32 := utils.IPToUint32(end)
 

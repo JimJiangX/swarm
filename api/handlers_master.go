@@ -530,7 +530,7 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	nw := resource.NewNetworks(gd.Ormer())
-	n, err := nw.AddNetworking(req.Start, req.End, req.Gatewary, name, req.VLAN, req.Prefix)
+	n, err := nw.AddNetworking(req.Start, req.End, req.Gatewary, name, int(req.VLAN), req.Prefix)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
