@@ -27,15 +27,18 @@ type Device struct {
 	err       error
 }
 
-// "vp_dev_0":"bond0,mac_xxxx,10M,192.168.1.1,255.255.255.0,192.168.3.0,vlan_xxxx"
+// "VF_DEV_0":"bond0,mac_xxxx,10M,192.168.1.1,255.255.255.0,192.168.3.0,vlan_xxxx"
 func (d Device) String() string {
+	if d.err != nil {
+		return d.err.Error()
+	}
 	return fmt.Sprintf("%s,%s,%dM,%s,%s,%s,%s", d.Bond, d.MAC, d.Bandwidth,
 		d.IP, d.Mask, d.Gateway, d.VLAN)
 }
 
 func parseBandwidth(width string) (int, error) {
-	if len(width) < 2 {
-		return 0, errors.Errorf("illegal args '%s'", width)
+	if len(width) == 0 {
+		return 0, nil
 	}
 
 	n := 1
@@ -48,7 +51,12 @@ func parseBandwidth(width string) (int, error) {
 		return 0, errors.Errorf("parse bandwidth '%s' error", width)
 	}
 
-	num, err := strconv.Atoi(strings.TrimSpace(string(width[:len(width)-1])))
+	w := strings.TrimSpace(width[:len(width)-1])
+	if len(w) < 1 {
+		return 0, nil
+	}
+
+	num, err := strconv.Atoi(w)
 	if err != nil {
 		return 0, errors.Wrapf(err, "parse bandwidth '%s' error", width)
 	}
@@ -59,7 +67,7 @@ func parseBandwidth(width string) (int, error) {
 func parseDevice(dev string) Device {
 	parts := strings.Split(dev, ",")
 	if len(parts) < 7 {
-		return Device{}
+		return Device{err: errors.Errorf("illegal device:'%s'", dev)}
 	}
 
 	d := Device{
