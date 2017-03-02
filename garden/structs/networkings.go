@@ -8,7 +8,3 @@ type PostNetworkingRequest struct {
 	Gatewary   string
 	Networking string `json:"networking_id"`
 }
-
-type PutNetworkingRequest struct {
-	Filters []string
-}

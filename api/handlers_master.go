@@ -543,14 +543,19 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
+	all := boolValue(r, "all")
 
-	var req structs.PutNetworkingRequest
+	var (
+		err  error
+		body []string
+	)
 
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		logrus.Warnf("JSON Decode: %s", err)
+	if !all {
+		err := json.NewDecoder(r.Body).Decode(&body)
+		if err != nil {
+			logrus.Warnf("JSON Decode: %s", err)
+		}
 	}
-
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
@@ -560,17 +565,17 @@ func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 	}
 
 	orm := gd.Ormer()
-	filters := make([]uint32, 0, len(req.Filters))
+	filters := make([]uint32, 0, len(body))
 
-	if len(req.Filters) > 0 {
+	if !all && len(body) > 0 {
 		list, err := orm.ListIPByNetworking(name)
 		if err != nil {
 			httpJSONError(w, err, http.StatusInternalServerError)
 			return
 		}
 
-		for i := range req.Filters {
-			n := utils.IPToUint32(req.Filters[i])
+		for i := range body {
+			n := utils.IPToUint32(body[i])
 			if n > 0 {
 				filters = append(filters, n)
 			}
@@ -583,7 +588,7 @@ func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 				}
 			}
 			if !exist {
-				httpJSONError(w, fmt.Errorf("IP %s is not in networking %s", req.Filters[i], name), http.StatusInternalServerError)
+				httpJSONError(w, fmt.Errorf("IP %s is not in networking %s", body[i], name), http.StatusInternalServerError)
 				return
 			}
 		}
@@ -604,14 +609,19 @@ func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 
 func putNetworkingDisable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
+	all := boolValue(r, "all")
 
-	var req structs.PutNetworkingRequest
+	var (
+		err  error
+		body []string
+	)
 
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		logrus.Warnf("JSON Decode: %s", err)
+	if !all {
+		err := json.NewDecoder(r.Body).Decode(&body)
+		if err != nil {
+			logrus.Warnf("JSON Decode: %s", err)
+		}
 	}
-
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
@@ -621,17 +631,17 @@ func putNetworkingDisable(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 	}
 
 	orm := gd.Ormer()
-	filters := make([]uint32, 0, len(req.Filters))
+	filters := make([]uint32, 0, len(body))
 
-	if len(req.Filters) > 0 {
+	if !all && len(body) > 0 {
 		list, err := orm.ListIPByNetworking(name)
 		if err != nil {
 			httpJSONError(w, err, http.StatusInternalServerError)
 			return
 		}
 
-		for i := range req.Filters {
-			n := utils.IPToUint32(req.Filters[i])
+		for i := range body {
+			n := utils.IPToUint32(body[i])
 			if n > 0 {
 				filters = append(filters, n)
 			}
@@ -644,7 +654,7 @@ func putNetworkingDisable(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 				}
 			}
 			if !exist {
-				httpJSONError(w, fmt.Errorf("IP %s is not in networking %s", req.Filters[i], name), http.StatusInternalServerError)
+				httpJSONError(w, fmt.Errorf("IP %s is not in networking %s", body[i], name), http.StatusInternalServerError)
 				return
 			}
 		}
