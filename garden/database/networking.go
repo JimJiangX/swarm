@@ -35,7 +35,8 @@ type NetworkingOrmer interface {
 
 	// Networking
 
-	//	SetNetworkingStatus(ID string, enable bool) error
+	SetNetworkingEnable(ID string, enable bool) error
+	SetIPEnable([]uint32, string, bool) error
 
 	//	GetNetworkingByID(ID string) (Networking, int, error)
 	//	ListNetworking() ([]Networking, error)
@@ -232,4 +233,42 @@ func (db dbBase) IsNetwrokingUsed(networking string) (bool, error) {
 	}
 
 	return count > 0, nil
+}
+
+func (db dbBase) SetNetworkingEnable(networking string, enable bool) error {
+	do := func(tx *sqlx.Tx) error {
+
+		_, err := tx.Exec("UPDATE "+db.ipTable()+" SET enable=? WHERE networking_id=?", enable, networking)
+
+		return errors.Wrap(err, "Tx delete []IP by NetworkingID")
+	}
+
+	return db.txFrame(do)
+}
+
+func (db dbBase) SetIPEnable(in []uint32, networking string, enable bool) error {
+	do := func(tx *sqlx.Tx) error {
+
+		stmt, err := tx.Prepare("UPDATE " + db.ipTable() + " SET enable=? WHERE ip_addr=? AND networking_id=?")
+		if err != nil {
+			return errors.Wrap(err, "tx prepare update []IP")
+		}
+
+		for i := range in {
+
+			_, err = stmt.Exec(enable, in[i], networking)
+			if err != nil {
+				stmt.Close()
+
+				return errors.Wrap(err, "tx prepare update []IP")
+			}
+
+		}
+
+		stmt.Close()
+
+		return errors.Wrap(err, "Tx update []IP")
+	}
+
+	return db.txFrame(do)
 }

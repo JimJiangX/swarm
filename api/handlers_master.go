@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	stderr "errors"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -489,6 +490,177 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	var req structs.PostNetworkingRequest
+
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if req.Prefix < 0 || req.Prefix > 32 {
+		httpJSONError(w, fmt.Errorf("illegal Prefix:%d not in 1~32", req.Prefix), http.StatusBadRequest)
+		return
+	}
+
+	if ip := net.ParseIP(req.Start); ip == nil {
+		httpJSONError(w, fmt.Errorf("illegal IP:'%s' error", req.Start), http.StatusBadRequest)
+		return
+	}
+	if ip := net.ParseIP(req.End); ip == nil {
+		httpJSONError(w, fmt.Errorf("illegal IP:'%s' error", req.End), http.StatusBadRequest)
+		return
+	}
+	if ip := net.ParseIP(req.Gatewary); ip == nil {
+		httpJSONError(w, fmt.Errorf("illegal Gateway:'%s' error", req.Gatewary), http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	nw := resource.NewNetworks(gd.Ormer())
+	n, err := nw.AddNetworking(req.Start, req.End, req.Gatewary, name, req.VLAN, req.Prefix)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%d}", "num", n)
+}
+
+func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	var req structs.PutNetworkingRequest
+
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		logrus.Warnf("JSON Decode: %s", err)
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	orm := gd.Ormer()
+	filters := make([]uint32, 0, len(req.Filters))
+
+	if len(req.Filters) > 0 {
+		list, err := orm.ListIPByNetworking(name)
+		if err != nil {
+			httpJSONError(w, err, http.StatusInternalServerError)
+			return
+		}
+
+		for i := range req.Filters {
+			n := utils.IPToUint32(req.Filters[i])
+			if n > 0 {
+				filters = append(filters, n)
+			}
+
+			exist := false
+			for i := range list {
+				if list[i].IPAddr == n {
+					exist = true
+					break
+				}
+			}
+			if !exist {
+				httpJSONError(w, fmt.Errorf("IP %s is not in networking %s", req.Filters[i], name), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	if len(filters) == 0 {
+		err = orm.SetNetworkingEnable(name, true)
+	} else {
+		err = orm.SetIPEnable(filters, name, true)
+	}
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func putNetworkingDisable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	var req structs.PutNetworkingRequest
+
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		logrus.Warnf("JSON Decode: %s", err)
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	orm := gd.Ormer()
+	filters := make([]uint32, 0, len(req.Filters))
+
+	if len(req.Filters) > 0 {
+		list, err := orm.ListIPByNetworking(name)
+		if err != nil {
+			httpJSONError(w, err, http.StatusInternalServerError)
+			return
+		}
+
+		for i := range req.Filters {
+			n := utils.IPToUint32(req.Filters[i])
+			if n > 0 {
+				filters = append(filters, n)
+			}
+
+			exist := false
+			for i := range list {
+				if list[i].IPAddr == n {
+					exist = true
+					break
+				}
+			}
+			if !exist {
+				httpJSONError(w, fmt.Errorf("IP %s is not in networking %s", req.Filters[i], name), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	if len(filters) == 0 {
+		err = orm.SetNetworkingEnable(name, false)
+	} else {
+		err = orm.SetIPEnable(filters, name, false)
+	}
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
