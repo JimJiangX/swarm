@@ -17,7 +17,7 @@ import (
 // closed, you can pass the result of ioutil.NopCloser(r).
 func (s *SCP) Send(info *FileInfo, r io.ReadCloser, destFile string) error {
 	destFile = filepath.Clean(destFile)
-	destFile = filepath.Dir(destFile)
+	destFile = realPath(filepath.Dir(destFile))
 
 	return runSourceSession(s.client, destFile, false, "", false, true, func(s *sourceSession) error {
 		err := s.WriteFile(info, r)
@@ -32,7 +32,7 @@ func (s *SCP) Send(info *FileInfo, r io.ReadCloser, destFile string) error {
 // The time and permission will be set with the value of the source file.
 func (s *SCP) SendFile(srcFile, destFile string) error {
 	srcFile = filepath.Clean(srcFile)
-	destFile = filepath.Clean(destFile)
+	destFile = realPath(filepath.Clean(destFile))
 
 	return runSourceSession(s.client, destFile, false, "", false, true, func(s *sourceSession) error {
 		osFileInfo, err := os.Stat(srcFile)
@@ -73,12 +73,14 @@ func acceptAny(parentDir string, info os.FileInfo) (bool, error) {
 // The time and permission will be set to the same value of the source file or directory.
 func (s *SCP) SendDir(srcDir, destDir string, acceptFn AcceptFunc) error {
 	srcDir = filepath.Clean(srcDir)
-	destDir = filepath.Clean(destDir)
+	destDir = realPath(filepath.Clean(destDir))
 	if acceptFn == nil {
 		acceptFn = acceptAny
 	}
 
 	return runSourceSession(s.client, destDir, false, "", true, true, func(s *sourceSession) error {
+		prevDirSkipped := false
+
 		endDirectories := func(prevDir, dir string) error {
 			rel, err := filepath.Rel(prevDir, dir)
 			if err != nil {
@@ -86,9 +88,13 @@ func (s *SCP) SendDir(srcDir, destDir string, acceptFn AcceptFunc) error {
 			}
 			for _, comp := range strings.Split(rel, string([]rune{filepath.Separator})) {
 				if comp == ".." {
-					err := s.EndDirectory()
-					if err != nil {
-						return err
+					if prevDirSkipped {
+						prevDirSkipped = false
+					} else {
+						err := s.EndDirectory()
+						if err != nil {
+							return err
+						}
 					}
 				}
 			}
@@ -121,6 +127,7 @@ func (s *SCP) SendDir(srcDir, destDir string, acceptFn AcceptFunc) error {
 
 			if isDir {
 				if !accepted {
+					prevDirSkipped = true
 					return filepath.SkipDir
 				}
 

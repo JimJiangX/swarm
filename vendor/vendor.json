@@ -39,16 +39,16 @@
 			"revisionTime": "2017-02-11T01:34:15Z"
 		},
 		{
-			"checksumSHA1": "fhZiFE/6IYggJDTQJQXwuUVOI1I=",
+			"checksumSHA1": "XW9eq4+WIPQd3bRsX9wfO3rmrWM=",
 			"path": "github.com/hnakamur/go-scp",
-			"revision": "62da9ce7ef065469325e72bc76b00deadd3503df",
-			"revisionTime": "2017-01-04T09:20:34Z"
+			"revision": "7e443c37b32d5e6f132d529f778fd327eb79987c",
+			"revisionTime": "2017-03-01T10:06:11Z"
 		},
 		{
-			"checksumSHA1": "DcQryB2vX8O61hsQ477I2Xboc9s=",
+			"checksumSHA1": "E+9sVfX/j5igRjdP71q9eGeKRvk=",
 			"path": "github.com/jmoiron/sqlx",
-			"revision": "f980a91bdc37abef88269b8f122d7de6352102f5",
-			"revisionTime": "2017-01-21T10:35:19Z"
+			"revision": "f4076845477b10ac2453a16377a8383467aafe72",
+			"revisionTime": "2017-02-21T04:34:47Z"
 		},
 		{
 			"checksumSHA1": "XpXIoKr9mdaog+CuDmSgVZk6LdY=",
@@ -58,7 +58,6 @@
 		},
 		{
 			"checksumSHA1": "btuIVd4+XdXRmK3OiIdmKpzEl+s=",
-			"origin": "github.com/docker/swarm/vendor/github.com/pkg/errors",
 			"path": "github.com/pkg/errors",
 			"revision": "248dadf4e9068a0b3e79f02ed0a610d935de5302",
 			"revisionTime": "2016-10-29T09:36:37Z"
