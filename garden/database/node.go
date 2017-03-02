@@ -29,7 +29,8 @@ type NodeInterface interface {
 
 	CountNodeByCluster(cluster string) (int, error)
 
-	SetNodeParams(n Node) error
+	SetNodeEnable(string, bool) error
+	SetNodeParam(string, int) error
 
 	RegisterNode(n Node, t Task) error
 
@@ -94,13 +95,23 @@ func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 }
 
 // SetNodeParams returns error when Node update status and max_container.
-func (db dbBase) SetNodeParams(n Node) error {
+func (db dbBase) SetNodeParam(ID string, max int) error {
 
-	query := "UPDATE " + db.nodeTable() + " SET enabled=?,max_container=? WHERE id=?"
+	query := "UPDATE " + db.nodeTable() + " SET max_container=? WHERE id=?"
 
-	_, err := db.Exec(query, n.Enabled, n.MaxContainer, n.ID)
+	_, err := db.Exec(query, max, ID)
 
-	return errors.Wrap(err, "update Node Params by ID")
+	return errors.Wrap(err, "update Node.MaxContainer by ID")
+}
+
+// SetNodeParams returns error when Node update enabled.
+func (db dbBase) SetNodeEnable(ID string, enabled bool) error {
+
+	query := "UPDATE " + db.nodeTable() + " SET enabled=? WHERE id=?"
+
+	_, err := db.Exec(query, enabled, ID)
+
+	return errors.Wrap(err, "update Node.Enabled by ID")
 }
 
 // RegisterNode returns error when Node UPDATE infomation.

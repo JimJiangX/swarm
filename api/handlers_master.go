@@ -376,6 +376,76 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusCreated)
 }
 
+func putNodeEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.Ormer().SetNodeEnable(name, true)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func putNodeDisable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.Ormer().SetNodeEnable(name, false)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	var max = struct {
+		N int `json:"max_container"`
+	}{}
+
+	err := json.NewDecoder(r.Body).Decode(&max)
+	if err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	err = gd.Ormer().SetNodeParam(name, max.N)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // DELETE /clusters/nodes/{node:.*}
 //
 // 204 删除成功

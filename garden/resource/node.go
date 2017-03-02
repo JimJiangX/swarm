@@ -121,26 +121,6 @@ func (m master) getNode(nameOrID string) (Node, error) {
 	return newNode(n, eng, m.dco), nil
 }
 
-func (m master) updateNode(nameOrID string, enable bool, maxContainer int) (database.Node, error) {
-	n, err := m.getNode(nameOrID)
-	if err != nil {
-		return database.Node{}, err
-	}
-
-	n.node.Enabled = enable
-
-	if maxContainer != 0 {
-		n.node.MaxContainer = maxContainer
-	}
-
-	err = m.dco.SetNodeParams(n.node)
-	if err != nil {
-		return n.node, err
-	}
-
-	return n.node, nil
-}
-
 type nodeWithTask struct {
 	hdd    []string
 	ssd    []string
@@ -226,6 +206,7 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 		} else {
 			if nodeState == statusNodeInstalling {
 				nt.Node.Status = statusNodeInstallFailed
+				nt.Node.Enabled = false
 			} else {
 				nt.Node.Status = nodeState
 			}
@@ -527,10 +508,7 @@ func (m master) RemoveNode(ctx context.Context, horus, nameOrID, user, password 
 		}
 	}
 
-	copy := node.node
-	copy.Status = statusNodeDisable
-
-	err = node.no.SetNodeParams(copy)
+	err = node.no.SetNodeEnable(node.node.ID, false)
 	if err != nil {
 		return err
 	}

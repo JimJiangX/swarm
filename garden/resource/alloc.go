@@ -37,7 +37,7 @@ func (at allocator) ListCandidates(clusters, filters []string, stores []structs.
 
 nodes:
 	for i := range nodes {
-		if nodes[i].Status != statusNodeEnable || nodes[i].EngineID == "" {
+		if !nodes[i].Enabled || nodes[i].EngineID == "" {
 			continue
 		}
 
