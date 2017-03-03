@@ -356,7 +356,7 @@ func (node *nodeWithTask) modifyProfile(horus string, config *database.SysConfig
 		config.Registry.Username, config.Registry.Password, caFile,
 		config.DockerPort, hdd, ssd, config.HorusAgentPort, config.ConsulPort,
 		node.Node.ID, horusIP, horusPort, config.PluginPort,
-		config.NFSOption.Addr, config.NFSOption.Dir, config.MountDir, config.MountOptions)
+		node.Node.NFS.Addr, node.Node.NFS.Dir, node.Node.NFS.MountDir, node.Node.NFS.Options)
 
 	return script, nil
 }
@@ -594,7 +594,7 @@ func (n *Node) nodeClean(ctx context.Context, client scplib.ScpClient, horus str
 
 	script := fmt.Sprintf("chmod 755 %s && %s %s %d %s %s %s %s",
 		destName, destName, n.node.Addr, config.ConsulPort, n.node.ID,
-		horusIP, horusPort, config.NFSOption.MountDir)
+		horusIP, horusPort, n.node.NFS.MountDir)
 
 	out, err := client.Exec(script)
 	if err != nil {

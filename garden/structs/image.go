@@ -79,7 +79,7 @@ func (iv ImageVersion) LessThan(v ImageVersion) (bool, error) {
 
 type PostLoadImageRequest struct {
 	ImageVersion
-	Path    string
+	Path    string `json:"image_path"`
 	Timeout int
 	Labels  map[string]string
 }

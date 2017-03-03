@@ -109,12 +109,6 @@ func (gd *Garden) Register(req structs.RegisterDC) error {
 		PluginPort: req.PluginPort,
 		BackupDir:  req.BackupDir,
 		Retry:      req.Retry,
-		NFSOption: database.NFSOption{
-			Addr:         req.NFS.Addr,
-			Dir:          req.NFS.Dir,
-			MountDir:     req.NFS.MountDir,
-			MountOptions: req.NFS.MountOptions,
-		},
 		ConsulConfig: database.ConsulConfig{
 			ConsulIPs:        req.Consul.ConsulIPs,
 			ConsulPort:       req.Consul.ConsulPort,

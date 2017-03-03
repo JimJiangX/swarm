@@ -14,9 +14,10 @@ type GetClusterResponse struct {
 
 type Node struct {
 	Cluster string `json:"cluster_id"`
-	Address string `json:"addr"`
+	Addr    string `json:"addr"`
 
 	SSHConfig
+	NFS NFS
 
 	HDD []string `json:"hdd"`
 	SSD []string `json:"ssd"`
@@ -25,6 +26,13 @@ type Node struct {
 
 	Room string `json:",omitempty"`
 	Seat string `json:",omitempty"`
+}
+
+type NFS struct {
+	Addr     string `json:"nfs_ip"`
+	Dir      string `json:"nfs_dir"`
+	MountDir string `json:"nfs_mount_dir"`
+	Options  string `json:"nfs_mount_opts"`
 }
 
 type SSHConfig struct {

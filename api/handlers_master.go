@@ -314,7 +314,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	for i := range list {
 		if list[i].Cluster == "" {
-			httpJSONError(w, fmt.Errorf("host:%s ClusterID is required", list[i].Address), http.StatusInternalServerError)
+			httpJSONError(w, fmt.Errorf("host:%s ClusterID is required", list[i].Addr), http.StatusInternalServerError)
 			return
 		}
 
@@ -326,7 +326,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if !exist {
-			httpJSONError(w, fmt.Errorf("host:%s unknown ClusterID:%s", list[i].Address, list[i].Cluster), http.StatusInternalServerError)
+			httpJSONError(w, fmt.Errorf("host:%s unknown ClusterID:%s", list[i].Addr, list[i].Cluster), http.StatusInternalServerError)
 			return
 		}
 	}
@@ -338,13 +338,19 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			database.Node{
 				ID:           utils.Generate32UUID(),
 				ClusterID:    n.Cluster,
-				Addr:         n.Address,
+				Addr:         n.Addr,
 				EngineID:     "",
 				Room:         n.Room,
 				Seat:         n.Seat,
 				MaxContainer: n.MaxContainer,
 				Status:       0,
 				Enabled:      false,
+				NFS: database.NFS{
+					Addr:     n.NFS.Addr,
+					Dir:      n.NFS.Dir,
+					MountDir: n.NFS.MountDir,
+					Options:  n.NFS.Options,
+				},
 			})
 		if err != nil {
 			httpJSONError(w, err, http.StatusInternalServerError)
