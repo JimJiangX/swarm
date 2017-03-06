@@ -189,7 +189,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "Id", id)
+	fmt.Fprintf(w, "{%q:%q}", "id", id)
 }
 
 func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -290,7 +290,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "Id", c.ID)
+	fmt.Fprintf(w, "{%q:%q}", "id", c.ID)
 }
 
 func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
