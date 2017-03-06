@@ -6,7 +6,7 @@ type PostClusterRequest struct {
 }
 
 type GetClusterResponse struct {
-	ID         string
+	ID         string  `json:"id"`
 	MaxNode    int     `json:"max_host"`
 	NodeNum    int     `json:"host_num"`
 	UsageLimit float32 `json:"usage_limit"`
