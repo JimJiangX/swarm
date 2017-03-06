@@ -526,6 +526,9 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		httpJSONError(w, fmt.Errorf("illegal Gateway:'%s' error", req.Gateway), http.StatusBadRequest)
 		return
 	}
+	if name == "" && req.Networking != "" {
+		name = req.Networking
+	}
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
@@ -548,6 +551,10 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
 	name := mux.Vars(r)["name"]
 	all := boolValue(r, "all")
 
@@ -614,6 +621,11 @@ func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 }
 
 func putNetworkingDisable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
 	name := mux.Vars(r)["name"]
 	all := boolValue(r, "all")
 

@@ -112,7 +112,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		//		"/units/{name:.*}/switchback": postUnitSwitchback,
 
 		//		"/ports":                         postImportPort,
-		"/networkings/{networking_id}/ips": postNetworking,
+		"/networkings/{name}/ips": postNetworking,
 		//		"/networkings/{name:.*}/enable":  postEnableNetworking,
 		//		"/networkings/{name:.*}/disable": postDisableNetworking,
 
@@ -136,8 +136,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/hosts/{name}/enable":  putNodeEnable,
 		"/hosts/{name}/disable": putNodeDisable,
 
-		"/networkings/{networking_id}/ips/enable":  putNetworkingEnable,
-		"/networkings/{networking_id}/ips/disable": putNetworkingDisable,
+		"/networkings/{name}/ips/enable":  putNetworkingEnable,
+		"/networkings/{name}/ips/disable": putNetworkingDisable,
 	},
 
 	http.MethodDelete: {
