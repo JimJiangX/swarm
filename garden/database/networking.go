@@ -23,7 +23,7 @@ type NetworkingOrmer interface {
 	// Networking
 	InsertNetworking([]IP) error
 	DelNetworking(ID string) error
-	IsNetwrokingUsed(networking string) (bool, error)
+
 	// Port
 	//	ImportPort(start, end int, filter ...int) (int, error)
 
@@ -209,30 +209,27 @@ func (db dbBase) InsertNetworking(ips []IP) error {
 
 // DelNetworking delete Networking and []IP in Tx
 func (db dbBase) DelNetworking(networking string) error {
+
 	do := func(tx *sqlx.Tx) error {
 
-		_, err := tx.Exec("DELETE FROM "+db.ipTable()+" WHERE networking_id=?", networking)
+		count := 0
+		query := "SELECT COUNT(id) FROM " + db.ipTable() + " WHERE networking_id=? AND unit_id IS NOT NULL"
+
+		err := tx.Get(&count, query, networking)
+		if err != nil {
+			return errors.Wrap(err, "count networking used")
+		}
+
+		if count > 0 {
+			return errors.Errorf("Networking %s has used:%d", count)
+		}
+
+		_, err = tx.Exec("DELETE FROM "+db.ipTable()+" WHERE networking_id=?", networking)
 
 		return errors.Wrap(err, "Tx delete []IP by NetworkingID")
 	}
 
 	return db.txFrame(do)
-}
-
-// IsNetwrokingUsed returns true on below conditions:
-// one or more IP belongs to networking has allocated
-func (db dbBase) IsNetwrokingUsed(networking string) (bool, error) {
-	var (
-		count = 0
-		query = "SELECT COUNT(id) FROM " + db.ipTable() + " WHERE networking_id=? AND unit_id IS NOT NULL"
-	)
-
-	err := db.Get(&count, query, networking)
-	if err != nil {
-		return false, errors.Wrap(err, "count []IP by NetworkingID")
-	}
-
-	return count > 0, nil
 }
 
 func (db dbBase) SetNetworkingEnable(networking string, enable bool) error {
