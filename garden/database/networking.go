@@ -213,15 +213,15 @@ func (db dbBase) DelNetworking(networking string) error {
 	do := func(tx *sqlx.Tx) error {
 
 		count := 0
-		query := "SELECT COUNT(ip_addr) FROM " + db.ipTable() + " WHERE networking_id=? AND unit_id IS NOT NULL"
+		query := "SELECT COUNT(ip_addr) FROM " + db.ipTable() + " WHERE networking_id=? AND unit_id =?"
 
-		err := tx.Get(&count, query, networking)
+		err := tx.Get(&count, query, networking, "")
 		if err != nil {
 			return errors.Wrap(err, "count networking used")
 		}
 
 		if count > 0 {
-			return errors.Errorf("Networking %s has used:%d", count)
+			return errors.Errorf("Networking %s has used:%d", networking, count)
 		}
 
 		_, err = tx.Exec("DELETE FROM "+db.ipTable()+" WHERE networking_id=?", networking)
