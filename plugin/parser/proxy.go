@@ -12,9 +12,9 @@ import (
 )
 
 func init() {
-	register("proxy", "v1.0", &proxyConfig{})
-	register("proxy", "v1.0.2", &proxyConfigV102{})
-	register("proxy", "v1.1.0", &proxyConfigV110{})
+	register("proxy", "1.0", &proxyConfig{})
+	register("proxy", "1.0.2", &proxyConfigV102{})
+	register("proxy", "1.1.0", &proxyConfigV110{})
 }
 
 type proxyConfig struct {

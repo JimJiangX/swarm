@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	register("redis", "v3.5", &redisConfig{})
+	register("redis", "3.2", &redisConfig{})
 }
 
 type redisConfig struct {

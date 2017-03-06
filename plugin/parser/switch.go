@@ -12,9 +12,9 @@ import (
 )
 
 func init() {
-	register("switch_manager", "v1.0", &switchManagerConfig{})
-	register("switch_manager", "v1.1.19", &switchManagerConfigV1119{})
-	register("switch_manager", "v1.1.23", &switchManagerConfigV1123{})
+	register("switch_manager", "1.0", &switchManagerConfig{})
+	register("switch_manager", "1.1.19", &switchManagerConfigV1119{})
+	register("switch_manager", "1.1.23", &switchManagerConfigV1123{})
 }
 
 type switchManagerConfig struct {
