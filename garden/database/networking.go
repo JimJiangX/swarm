@@ -78,18 +78,18 @@ func (db dbBase) listIPsByAllocated(allocated bool, num int) ([]IP, error) {
 		query string
 	)
 
-	condition := "IS NOT NULL"
+	opt := "<>"
 	if !allocated {
-		condition = "IS NULL"
+		opt = "="
 	}
 
 	if num > 0 {
-		query = fmt.Sprintf("SELECT ip_addr,prefix,networking_id,unit_id,gateway,vlan_id,enabled FROM %s WHERE unit_id %s LIMIT %d", db.ipTable(), condition, num)
+		query = fmt.Sprintf("SELECT ip_addr,prefix,networking_id,unit_id,gateway,vlan_id,enabled FROM %s WHERE unit_id%s? LIMIT %d", db.ipTable(), opt, num)
 	} else {
-		query = fmt.Sprintf("SELECT ip_addr,prefix,networking_id,unit_id,gateway,vlan_id,enabled FROM %s WHERE unit_id %s", db.ipTable(), condition)
+		query = fmt.Sprintf("SELECT ip_addr,prefix,networking_id,unit_id,gateway,vlan_id,enabled FROM %s WHERE unit_id%s?", db.ipTable(), opt)
 	}
 
-	err := db.Select(&out, query)
+	err := db.Select(&out, query, "")
 
 	return out, errors.Wrap(err, "list []IP by allocated")
 }
@@ -109,17 +109,17 @@ func (db dbBase) ListIPByUnitID(unit string) ([]IP, error) {
 // ListIPWithCondition returns []IP select by NetworkingID and Allocated==allocated
 func (db dbBase) ListIPWithCondition(networking string, allocated bool, num int) ([]IP, error) {
 	var (
-		out       []IP
-		condition = "IS NOT NULL"
+		out []IP
+		opt = "<>"
 	)
 
 	if !allocated {
-		condition = "IS NULL"
+		condition = "="
 	}
 
-	query := fmt.Sprintf("SELECT ip_addr,prefix,networking_id,unit_id,gateway,vlan_id,enabled FROM %s WHERE networking_id=? AND unit_id %s LIMIT %d", db.ipTable(), condition, num)
+	query := fmt.Sprintf("SELECT ip_addr,prefix,networking_id,unit_id,gateway,vlan_id,enabled FROM %s WHERE networking_id=? AND unit_id%s? LIMIT %d", db.ipTable(), opt, num)
 
-	err := db.Select(&out, query, networking)
+	err := db.Select(&out, query, networking, "")
 
 	return out, errors.Wrap(err, "list []IP with condition")
 }
@@ -132,11 +132,11 @@ func (db dbBase) AllocNetworking(requires []NetworkingRequire, unit string) ([]I
 
 		for _, req := range requires {
 
-			query := fmt.Sprintf("SELECT ip_addr,prefix,gateway,vlan_id,networking_id FROM %s WHERE networking_id=? AND enabled=? AND unit_id IS NULL LIMIT %d FOR UPDATE;", db.ipTable(), req.Num)
+			query := fmt.Sprintf("SELECT ip_addr,prefix,gateway,vlan_id,networking_id FROM %s WHERE networking_id=? AND enabled=? AND unit_id=? %d FOR UPDATE;", db.ipTable(), req.Num)
 			query = tx.Rebind(query)
 
 			var list []IP
-			err := tx.Select(&list, query, req.Networking, true)
+			err := tx.Select(&list, query, req.Networking, true, "")
 			if err != nil {
 				return errors.Wrap(err, "Tx get available IP")
 			}
