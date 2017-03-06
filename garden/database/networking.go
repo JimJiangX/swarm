@@ -114,7 +114,7 @@ func (db dbBase) ListIPWithCondition(networking string, allocated bool, num int)
 	)
 
 	if !allocated {
-		condition = "="
+		opt = "="
 	}
 
 	query := fmt.Sprintf("SELECT ip_addr,prefix,networking_id,unit_id,gateway,vlan_id,enabled FROM %s WHERE networking_id=? AND unit_id%s? LIMIT %d", db.ipTable(), opt, num)
