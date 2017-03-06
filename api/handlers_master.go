@@ -56,6 +56,63 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 	w.WriteHeader(status)
 }
 
+func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	name := mux.Vars(r)["name"]
+
+	t, err := gd.Ormer().GetTask(name)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, t, http.StatusOK)
+}
+
+func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	var (
+		err error
+		out []database.Task
+	)
+
+	all := boolValue(r, "all")
+	if all {
+		out, err = gd.Ormer().ListTasks("", 0)
+	} else {
+		status := intValueOrZero(r, "status")
+		link := r.FormValue("link")
+
+		out, err = gd.Ormer().ListTasks(link, status)
+	}
+
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, out, http.StatusOK)
+}
+
 func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.RegisterDC{}
 	err := json.NewDecoder(r.Body).Decode(&req)

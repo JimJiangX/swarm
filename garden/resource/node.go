@@ -18,16 +18,6 @@ import (
 )
 
 const (
-	statusTaskCreate = iota
-	statusTaskRunning
-	statusTaskStop
-	statusTaskCancel
-	statusTaskDone
-	statusTaskTimeout
-	statusTaskFailed
-)
-
-const (
 	statusNodeImport = iota
 	statusNodeInstalling
 	statusNodeInstalled
@@ -135,7 +125,7 @@ func NewNodeWithTask(user, password string, hdd, ssd []string, n database.Node) 
 		return nodeWithTask{}, err
 	}
 
-	t := database.NewTask()
+	t := database.NewTask(n.Addr, "", n.ID, "", "", 300)
 
 	return nodeWithTask{
 		hdd:    hdd,
@@ -154,10 +144,12 @@ func NewNodeWithTaskList(len int) []nodeWithTask {
 func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithTask) error {
 	nodes := make([]database.Node, len(list))
 	tasks := make([]database.Task, len(list))
+	timeout := 250*time.Second + time.Duration(len(list)*30)*time.Second
 
 	for i := range list {
 		nodes[i] = list[i].Node
 		tasks[i] = list[i].Task
+		tasks[i].Timeout = timeout
 	}
 
 	select {
@@ -176,7 +168,6 @@ func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithT
 		return err
 	}
 
-	timeout := 250*time.Second + time.Duration(len(list)*30)*time.Second
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 
 	for i := range list {
@@ -202,7 +193,7 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 
 		if err == nil {
 			nt.Node.Status = statusNodeInstalled
-			nt.Task.Status = statusTaskRunning
+			nt.Task.Status = database.TaskRunningStatus
 		} else {
 			if nodeState == statusNodeInstalling {
 				nt.Node.Status = statusNodeInstallFailed
@@ -211,7 +202,7 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 				nt.Node.Status = nodeState
 			}
 
-			nt.Task.Status = statusTaskFailed
+			nt.Task.Status = database.TaskFailedStatus
 			nt.Task.Errors = err.Error()
 			nt.Task.FinishedAt = time.Now()
 		}
@@ -434,7 +425,7 @@ func (m master) registerNodes(ctx context.Context, nodes []nodeWithTask, port st
 		n.RegisterAt = time.Now()
 
 		t := nodes[i].Task
-		t.Status = statusTaskDone
+		t.Status = database.TaskDoneStatus
 		t.FinishedAt = n.RegisterAt
 		t.Errors = ""
 
@@ -473,7 +464,7 @@ func (m master) registerNodesTimeout(nodes []nodeWithTask, er error) error {
 			n.Enabled = false
 			n.RegisterAt = time.Now()
 
-			t.Status = statusTaskFailed
+			t.Status = database.TaskFailedStatus
 			t.FinishedAt = n.RegisterAt
 			t.Errors = er.Error()
 		}
