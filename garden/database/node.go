@@ -96,6 +96,10 @@ func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 			stmt.Close()
 		}
 
+		for i := range tasks {
+			tasks[i].LinkTable = db.nodeTable()
+		}
+
 		err := db.InsertTasks(tx, tasks)
 
 		return err

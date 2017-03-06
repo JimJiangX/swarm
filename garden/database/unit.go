@@ -196,14 +196,15 @@ func (db dbBase) UnitStatusCAS(u *Unit, old, value int, operator string) error {
 }
 
 // SetUnitWithInsertTask update Unit Status & LatestError and insert Task in Tx
-func (db dbBase) SetUnitWithInsertTask(u *Unit, task Task) error {
+func (db dbBase) SetUnitWithInsertTask(u *Unit, t Task) error {
 	do := func(tx *sqlx.Tx) error {
 		err := db.txSetUnitStatus(tx, u, u.LatestError, u.Status)
 		if err != nil {
 			return err
 		}
 
-		err = db.txInsertTask(tx, task)
+		t.LinkTable = db.unitTable()
+		err = db.txInsertTask(tx, t)
 
 		return err
 	}

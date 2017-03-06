@@ -17,18 +17,19 @@ func NewTask() Task {
 
 // Task is table structure,record tasks status
 type Task struct {
-	ID          string    `db:"id"`
-	Name        string    `db:"name"` //Related-Object
-	Related     string    `db:"related"`
-	Linkto      string    `db:"link_to"`
-	Description string    `db:"description"`
-	Labels      string    `db:"labels"`
-	Errors      string    `db:"errors"`
-	Status      int       `db:"status"`
-	Timeout     int       `db:"timeout"`   // s
-	Timestamp   int64     `db:"timestamp"` // time.Time.Unix()
-	CreatedAt   time.Time `db:"created_at"`
-	FinishedAt  time.Time `db:"finished_at"`
+	ID         string    `db:"id" json:"id"`
+	Name       string    `db:"name" json:"name"` //Related-Object
+	Related    string    `db:"related" json:"related"`
+	Linkto     string    `db:"link_to" json:"link_to"`
+	LinkTable  string    `db:"link_table" json:"-"`
+	Desc       string    `db:"description" json:"description"`
+	Labels     string    `db:"labels" json:"labels"`
+	Errors     string    `db:"errors" json:"errors"`
+	Status     int       `db:"status" json:"status"`
+	Timeout    int       `db:"timeout" json:"timeout"`     // s
+	Timestamp  int64     `db:"timestamp" json:"timestamp"` // time.Time.Unix()
+	CreatedAt  time.Time `db:"created_at" json:"created_at"`
+	FinishedAt time.Time `db:"finished_at" json:"finished_at"`
 }
 
 func (db dbBase) taskTable() string {
@@ -39,7 +40,7 @@ func (db dbBase) txInsertTask(tx *sqlx.Tx, t Task) error {
 
 	t.Timestamp = t.CreatedAt.Unix()
 
-	query := "INSERT INTO " + db.taskTable() + " (id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
+	query := "INSERT INTO " + db.taskTable() + " (id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:link_table,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
 
 	_, err := tx.Exec(query, t)
 
@@ -51,7 +52,7 @@ func (db dbBase) InsertTasks(tx *sqlx.Tx, tasks []Task) error {
 		return db.txInsertTask(tx, tasks[0])
 	}
 
-	query := "INSERT INTO " + db.taskTable() + " (id,name,related,link_to,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
+	query := "INSERT INTO " + db.taskTable() + " (id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:link_table,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
