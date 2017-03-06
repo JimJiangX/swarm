@@ -5,6 +5,6 @@ type PostNetworkingRequest struct {
 	VLAN       byte
 	Start      string
 	End        string
-	Gatewary   string
+	Gateway    string
 	Networking string `json:"networking_id"`
 }

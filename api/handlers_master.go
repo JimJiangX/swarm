@@ -522,8 +522,8 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		httpJSONError(w, fmt.Errorf("illegal IP:'%s' error", req.End), http.StatusBadRequest)
 		return
 	}
-	if ip := net.ParseIP(req.Gatewary); ip == nil {
-		httpJSONError(w, fmt.Errorf("illegal Gateway:'%s' error", req.Gatewary), http.StatusBadRequest)
+	if ip := net.ParseIP(req.Gateway); ip == nil {
+		httpJSONError(w, fmt.Errorf("illegal Gateway:'%s' error", req.Gateway), http.StatusBadRequest)
 		return
 	}
 
@@ -536,7 +536,7 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	nw := resource.NewNetworks(gd.Ormer())
-	n, err := nw.AddNetworking(req.Start, req.End, req.Gatewary, name, int(req.VLAN), req.Prefix)
+	n, err := nw.AddNetworking(req.Start, req.End, req.Gateway, name, int(req.VLAN), req.Prefix)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
