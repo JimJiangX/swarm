@@ -7,8 +7,8 @@ type PostClusterRequest struct {
 
 type GetClusterResponse struct {
 	ID         string
-	MaxNode    int     `json:"max_node"`
-	NodeNum    int     `json:"node_num"`
+	MaxNode    int     `json:"max_host"`
+	NodeNum    int     `json:"host_num"`
 	UsageLimit float32 `json:"usage_limit"`
 }
 
@@ -24,8 +24,8 @@ type Node struct {
 
 	MaxContainer int `json:"max_container"`
 
-	Room string `json:",omitempty"`
-	Seat string `json:",omitempty"`
+	Room string `json:"room,omitempty"`
+	Seat string `json:"seat,omitempty"`
 }
 
 type NFS struct {
@@ -36,14 +36,15 @@ type NFS struct {
 }
 
 type SSHConfig struct {
-	Username string
-	Password string
-	Port     int `json:",omitempty"` // ssh port
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Port     int    `json:"port,omitempty"` // ssh port
 }
 
 type PostNodesRequest []Node
 
 type PostNodeResponse struct {
-	ID   string
-	Addr string
+	ID   string `json:"id"`
+	Addr string `json:"addr"`
+	Task string `json:"task_id"`
 }

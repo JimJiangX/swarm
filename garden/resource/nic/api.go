@@ -46,7 +46,7 @@ func CreateNetworkDevice(ctx context.Context, c *cluster.Container, tlsConfig *t
 		client.Transport = trans
 	}
 
-	url := fmt.Sprint("%s://%s/%s", scheme, addr, createDevURL)
+	url := fmt.Sprintf("%s://%s/%s", scheme, addr, createDevURL)
 
 	resp, err := ctxhttp.Post(ctx, client, url, "application/json", body)
 	if err != nil {

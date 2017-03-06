@@ -13,7 +13,7 @@ const (
 )
 
 type HorusRegistration struct {
-	Endpoint      string
+	Endpoint      string   `json:"endpoint"`
 	CollectorName string   `json:"collectorname,omitempty"`
 	User          string   `json:"user,omitempty"`
 	Password      string   `json:"pwd,omitempty"`

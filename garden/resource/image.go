@@ -55,7 +55,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 			}
 		}()
 
-		oldName := fmt.Sprintf("%s:%s", req.Version())
+		oldName := req.Version()
 		newName := fmt.Sprintf("%s:%d/%s", registry.Domain, registry.Port, oldName)
 		script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
 

@@ -9,10 +9,10 @@ import (
 )
 
 type ImageVersion struct {
-	Name  string
-	Major int
-	Minor int
-	Patch int
+	Name  string `json:"name"`
+	Major int    `json:"major_version"`
+	Minor int    `json:"minor_version"`
+	Patch int    `json:"patch_version"`
 }
 
 func (iv ImageVersion) Version() string {
@@ -79,9 +79,9 @@ func (iv ImageVersion) LessThan(v ImageVersion) (bool, error) {
 
 type PostLoadImageRequest struct {
 	ImageVersion
-	Path    string `json:"image_path"`
-	Timeout int
-	Labels  map[string]string
+	Path    string            `json:"image_path"`
+	Timeout int               `json:"timeout"`
+	Labels  map[string]string `json:"labels"`
 }
 
 type Keyset struct {

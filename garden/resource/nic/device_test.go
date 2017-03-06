@@ -74,7 +74,7 @@ func TestParseContainerDevice(t *testing.T) {
 
 	devices := parseContainerDevice(&c)
 	if len(devices) != 3 {
-		t.Error("got %d:", len(devices))
+		t.Errorf("got %d:", len(devices))
 	}
 
 	for i := range devices {
