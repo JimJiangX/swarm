@@ -1,7 +1,7 @@
 package structs
 
 type PostClusterRequest struct {
-	MaxNode    int     `json:"max_node"`
+	Max        int     `json:"max_host"`
 	UsageLimit float32 `json:"usage_limit"`
 }
 

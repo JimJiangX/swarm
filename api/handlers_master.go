@@ -278,7 +278,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	c := database.Cluster{
 		ID:         utils.Generate32UUID(),
-		MaxNode:    req.MaxNode,
+		MaxNode:    req.Max,
 		UsageLimit: req.UsageLimit,
 	}
 
@@ -312,7 +312,7 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	c := database.Cluster{
 		ID:         name,
-		MaxNode:    req.MaxNode,
+		MaxNode:    req.Max,
 		UsageLimit: req.UsageLimit,
 	}
 

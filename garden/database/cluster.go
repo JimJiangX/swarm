@@ -27,7 +27,7 @@ type ClusterOrmer interface {
 // Cluster table  structure,correspod with a group of computers
 type Cluster struct {
 	ID         string  `db:"id"`
-	MaxNode    int     `db:"max_node"`
+	MaxNode    int     `db:"max_host"`
 	UsageLimit float32 `db:"usage_limit"`
 }
 
@@ -37,7 +37,7 @@ func (db dbBase) clusterTable() string {
 
 // InsertCluster insert a new record.
 func (db dbBase) InsertCluster(c Cluster) error {
-	query := "INSERT INTO " + db.clusterTable() + " (id,max_node,usage_limit) VALUES (:id,:max_node,:usage_limit)"
+	query := "INSERT INTO " + db.clusterTable() + " (id,max_host,usage_limit) VALUES (:id,:max_host,:usage_limit)"
 
 	_, err := db.NamedExec(query, &c)
 
@@ -48,7 +48,7 @@ func (db dbBase) InsertCluster(c Cluster) error {
 func (db dbBase) GetCluster(ID string) (Cluster, error) {
 	var (
 		c     Cluster
-		query = "SELECT id,max_node,usage_limit FROM " + db.clusterTable() + " WHERE id=?"
+		query = "SELECT id,max_host,usage_limit FROM " + db.clusterTable() + " WHERE id=?"
 	)
 
 	err := db.Get(&c, query, ID)
@@ -66,7 +66,7 @@ func (db dbBase) GetCluster(ID string) (Cluster, error) {
 func (db dbBase) ListClusters() ([]Cluster, error) {
 	var (
 		clusters []Cluster
-		query    = "SELECT id,max_node,usage_limit FROM " + db.clusterTable()
+		query    = "SELECT id,max_host,usage_limit FROM " + db.clusterTable()
 	)
 
 	err := db.Select(&clusters, query)
@@ -77,7 +77,7 @@ func (db dbBase) ListClusters() ([]Cluster, error) {
 // SetClusterParams updates MaxNode\UsageLimit
 func (db dbBase) SetClusterParams(c Cluster) error {
 
-	query := "UPDATE " + db.clusterTable() + " SET max_node=?,usage_limit=? WHERE id=?"
+	query := "UPDATE " + db.clusterTable() + " SET max_host=?,usage_limit=? WHERE id=?"
 
 	_, err := db.Exec(query, c.MaxNode, c.UsageLimit, c.ID)
 
