@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/tls"
 	"net/http"
 	"time"
 
@@ -12,26 +13,41 @@ import (
 )
 
 const (
-	_Garden  = "garden"
-	_Cluster = "cluster"
+	_Garden    = "garden"
+	_Cluster   = "cluster"
+	_tlsConfig = "tls"
 )
 
+func tlsFromContext(ctx goctx.Context, key string) (bool, *tls.Config) {
+	if key != _tlsConfig {
+		return false, nil
+	}
+
+	c, ok := ctx.Value(_Garden).(*context)
+	if !ok || c == nil {
+		return false, nil
+	}
+
+	return true, c.tlsConfig
+}
+
 func fromContext(ctx goctx.Context, key string) (bool, cluster.Cluster, *garden.Garden) {
-	c, ok := ctx.Value(_Garden).(cluster.Cluster)
-	if !ok {
+	c, ok := ctx.Value(_Garden).(*context)
+	if !ok || c == nil {
 		return false, nil, nil
 	}
 
-	if key == _Cluster {
-		return true, c, nil
+	if key == _Garden && c.cluster != nil {
+
+		gd, ok := c.cluster.(*garden.Garden)
+		if ok {
+			return true, c.cluster, gd
+		} else {
+			return false, c.cluster, nil
+		}
 	}
 
-	gd, ok := c.(*garden.Garden)
-	if !ok {
-		return false, c, nil
-	}
-
-	return true, c, gd
+	return true, c.cluster, nil
 }
 
 type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
@@ -160,12 +176,14 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 
 				context.apiVersion = mux.Vars(r)["version"]
 				ctx := goctx.WithValue(goctx.Background(), _Garden, context)
+
 				localFct(ctx, w, r)
 
 				logrus.WithFields(logrus.Fields{"method": r.Method,
 					"uri":   r.RequestURI,
 					"since": time.Since(start).String()}).Debug("HTTP request received")
 			}
+
 			localMethod := method
 
 			r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(wrap)
