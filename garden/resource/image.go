@@ -75,6 +75,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 
 		scp, err := scplib.NewScpClient(registry.Address, registry.OsUsername, registry.OsPassword)
 		if err != nil {
+			logrus.WithField("Image", req.Name).Errorf("load image,'%s@%s',exec:'%s'", registry.OsUsername, registry.Address, script)
 			return err
 		}
 		defer scp.Close()

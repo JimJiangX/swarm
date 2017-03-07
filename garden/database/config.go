@@ -152,7 +152,7 @@ func (db dbBase) GetAuthConfig() (*types.AuthConfig, error) {
 func (db dbBase) GetRegistry() (Registry, error) {
 	var (
 		r     Registry
-		query = "SELECT registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt FROM " + db.sysConfigTable() + " LIMIT 1"
+		query = "SELECT registry_os_username,registry_os_password,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt FROM " + db.sysConfigTable() + " LIMIT 1"
 	)
 
 	err := db.Get(&r, query)
