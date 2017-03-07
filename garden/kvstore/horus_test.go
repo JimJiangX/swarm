@@ -1,6 +1,45 @@
 package kvstore
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/hashicorp/consul/api"
+)
+
+func TestGetHorusAddr(t *testing.T) {
+	c, err := MakeClient(&api.Config{
+		Address: "192.168.4.131:8500",
+	}, "prefix", "8500", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	leader := c.getLeader()
+	if leader == "" {
+		t.Error("Unexpected")
+	} else {
+		t.Log("leader:", leader)
+	}
+
+	addr, err := c.GetHorusAddr()
+	if err != nil {
+		t.Error(err)
+	}
+
+	t.Log("horus:", addr)
+}
+
+func TestParseIPFromHealthCheck(t *testing.T) {
+	output := "TCP connect 192.168.4.123:8000: Success"
+	id := "HS-192.168.4.123"
+
+	addr := parseIPFromHealthCheck(id, output)
+	if addr == "" {
+		t.Error("Unexpected")
+	}
+
+	t.Logf("'%s'", addr)
+}
 
 /*
 // node

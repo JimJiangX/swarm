@@ -196,14 +196,14 @@ func (c *kvClient) GetHorusAddr() (string, error) {
 		return "", err
 	}
 
-	checks, _, err := client.Health().Checks("passing", nil)
+	checks, _, err := client.Health().State("passing", nil)
 	c.checkConnectError(addr, err)
 	if err != nil {
 		return "", errors.Wrap(err, "passing health checks")
 	}
 
 	for i := range checks {
-		addr := parseIPFromHealthCheck(checks[i].ServiceID, checks[i].Output)
+		addr := parseIPFromHealthCheck(checks[i].ServiceName, checks[i].Output)
 		if addr != "" {
 			return addr, nil
 		}
@@ -220,7 +220,7 @@ func parseIPFromHealthCheck(serviceID, output string) string {
 	}
 
 	index := strings.Index(serviceID, key)
-	addr := string(serviceID[index+len(key):])
+	addr := serviceID[index+len(key):]
 
 	if net.ParseIP(addr) == nil {
 		return ""
