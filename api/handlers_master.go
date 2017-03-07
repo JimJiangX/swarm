@@ -56,6 +56,7 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 	w.WriteHeader(status)
 }
 
+// -----------------/tasks handlers-----------------
 func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
@@ -113,6 +114,7 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusOK)
 }
 
+// -----------------/datacenter handler-----------------
 func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.RegisterDC{}
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -135,6 +137,7 @@ func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, nil, http.StatusCreated)
 }
 
+// -----------------/softwares/images handlers-----------------
 func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostLoadImageRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -192,6 +195,26 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%q}", "id", id)
 }
 
+func deleteImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	img := mux.Vars(r)["image"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil || gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	err := gd.Ormer().DelImage(img)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// -----------------/clusters handlers-----------------
 func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -346,6 +369,7 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// -----------------/hosts handlers-----------------
 func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	list := structs.PostNodesRequest{}
 	err := json.NewDecoder(r.Body).Decode(&list)
@@ -555,6 +579,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// -----------------/networkings handlers-----------------
 func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -767,6 +792,7 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// -----------------/services handlers-----------------
 func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpJSONError(w, err, http.StatusBadRequest)

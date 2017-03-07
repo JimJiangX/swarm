@@ -154,7 +154,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		//		"/storage/san/{name}":                    deleteStorage,
 		//		"/storage/san/{name}/raid_group/{rg:.*}": deleteRaidGroup,
 
-		//		"/image/{image:.*}": deleteImage,
+		"/softwares/images/{image}": deleteImage,
 	},
 }
 

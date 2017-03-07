@@ -99,29 +99,20 @@ func (db dbBase) SetImageAndTask(img Image, t Task) error {
 func (db dbBase) DelImage(ID string) error {
 
 	do := func(tx *sqlx.Tx) error {
-		//		var (
-		//			image = Image{}
-		//			query = "SELECT id,software_name,docker_image_id,major_version,minor_version,patch_version,size,label,upload_at FROM " + db.imageTable() + " WHERE id=?"
-		//		)
 
-		//		err := tx.Get(&image, query, ID)
-		//		if err != nil {
-		//			if errors.Cause(err) == sql.ErrNoRows {
-		//				return nil
-		//			}
+		n := 0
+		query := "SELECT COUNT(id) FROM " + db.serviceTable() + " WHERE image_id=?"
 
-		//			return err
-		//		}
+		err := tx.Get(&n, query, ID)
+		if err != nil {
+			return errors.Wrap(err, "Count Service filter by image_id")
+		}
 
-		//		ok, err := isImageUsed(tx, image.ID)
-		//		if err != nil {
-		//			return err
-		//		}
-		//		if ok {
-		//			return errors.Errorf("Image %s is using", ID)
-		//		}
+		if n > 0 {
+			return errors.Errorf("image:%s is used %d", ID, n)
+		}
 
-		_, err := tx.Exec("DELETE FROM "+db.imageTable()+" WHERE id=?", ID)
+		_, err = tx.Exec("DELETE FROM "+db.imageTable()+" WHERE id=?", ID)
 
 		return errors.Wrapf(err, "Tx delete Imgage by ID:%s", ID)
 	}
