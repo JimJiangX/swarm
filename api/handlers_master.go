@@ -57,6 +57,68 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 	}
 }
 
+// -----------------/nfs_backups handlers-----------------
+func parseNFSSpace(out []byte) (int, int, error) {
+
+	// TODO: add parse logic
+
+	return 0, 0, nil
+}
+
+func execNFScmd(ip, dir, mount, opts string) ([]byte, error) {
+	if true {
+		// TODO:remove when done
+		return nil, nil
+	}
+
+	const sh = "./script/get_NFS_space.sh"
+
+	path, err := utils.GetAbsolutePath(false, sh)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd, err := utils.ExecScript(path, ip, dir, mount, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return out, err
+	}
+
+	return out, nil
+}
+
+func getNFS_SPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	ip := r.FormValue("nfs_ip")
+	dir := r.FormValue("nfs_dir")
+	mount := r.FormValue("nfs_mount_dir")
+	opts := r.FormValue("nfs_mount_opts")
+
+	out, err := execNFScmd(ip, dir, mount, opts)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	total, free, err := parseNFSSpace(out)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `{"total_space": %d,"free_space": %d}`, total, free)
+}
+
 // -----------------/tasks handlers-----------------
 func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	ok, _, gd := fromContext(ctx, _Garden)
@@ -240,7 +302,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// database.Image.ID
-	id, err := resource.LoadImage(ctx, gd.Ormer(), req)
+	id, taskID, err := resource.LoadImage(ctx, gd.Ormer(), req)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -248,7 +310,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "id", id)
+	fmt.Fprintf(w, `{"%q":%q,"%q":%q}`, "id", id, "task_id", taskID)
 }
 
 func deleteImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {

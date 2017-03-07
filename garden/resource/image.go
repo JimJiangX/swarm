@@ -17,20 +17,20 @@ import (
 )
 
 // LoadImage load a new Image
-func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostLoadImageRequest) (string, error) {
+func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostLoadImageRequest) (string, string, error) {
 	var labels string
 	if len(req.Labels) > 0 {
 		buf := bytes.NewBuffer(nil)
 		err := json.NewEncoder(buf).Encode(req.Labels)
 		if err != nil {
-			return "", errors.Wrapf(err, "parse Labels:%s", req.Labels)
+			return "", "", errors.Wrapf(err, "parse Labels:%s", req.Labels)
 		}
 		labels = buf.String()
 	}
 
 	registry, err := ormer.GetRegistry()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	image := database.Image{
@@ -46,7 +46,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 
 	err = ormer.InsertImageWithTask(image, task)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	go func() (err error) {
@@ -105,7 +105,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 		return err
 	}()
 
-	return image.ID, err
+	return image.ID, task.ID, err
 }
 
 func parsePushImageOutput(in []byte) (string, int, error) {
