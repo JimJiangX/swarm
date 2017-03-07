@@ -1,11 +1,15 @@
 package api
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	stderr "errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -15,6 +19,7 @@ import (
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 	goctx "golang.org/x/net/context"
 )
 
@@ -58,20 +63,50 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 }
 
 // -----------------/nfs_backups handlers-----------------
-func parseNFSSpace(out []byte) (int, int, error) {
+func parseNFSSpace(in []byte) (int, int, error) {
+	total, free := 0, 0
+	br := bufio.NewReader(bytes.NewReader(in))
 
-	// TODO: add parse logic
+	atoi := func(line, key []byte) (int, error) {
 
-	return 0, 0, nil
+		if i := bytes.Index(line, key); i != -1 {
+			return strconv.Atoi(string(line[i+len(key):]))
+		}
+
+		return 0, stderr.New("key not exist")
+	}
+
+	for {
+		if total > 0 && free > 0 {
+			return total, free, nil
+		}
+
+		line, _, err := br.ReadLine()
+		if err != nil {
+			if err == io.EOF {
+				return total, free, nil
+			}
+
+			return total, free, err
+		}
+
+		n, err := atoi(line, []byte("total_space:"))
+		if err == nil {
+			total = n
+			continue
+		}
+
+		n, err = atoi(line, []byte("free_space:"))
+		if err == nil {
+			free = n
+		}
+	}
+
+	return 0, 0, errors.Errorf("parse nfs output error,input:'%s'", in)
 }
 
 func execNFScmd(ip, dir, mount, opts string) ([]byte, error) {
-	if true {
-		// TODO:remove when done
-		return nil, nil
-	}
-
-	const sh = "./script/get_NFS_space.sh"
+	const sh = "./script/nfs/get_NFS_space.sh"
 
 	path, err := utils.GetAbsolutePath(false, sh)
 	if err != nil {
