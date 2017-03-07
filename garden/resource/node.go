@@ -174,7 +174,7 @@ func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithT
 		go list[i].distribute(ctx, horus, m.dco, config)
 	}
 
-	go m.registerNodesLoop(ctx, cancel, list, config)
+	go m.registerNodesLoop(ctx, cancel, list, strconv.Itoa(config.DockerPort))
 
 	return nil
 }
@@ -353,10 +353,8 @@ func (node *nodeWithTask) modifyProfile(horus string, config *database.SysConfig
 }
 
 // registerNodes register Nodes
-func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc, nodes []nodeWithTask, config database.SysConfig) {
+func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc, nodes []nodeWithTask, port string) {
 	defer cancel()
-
-	port := strconv.Itoa(config.DockerPort)
 
 	t := time.NewTicker(time.Second * 30)
 	defer t.Stop()
@@ -415,7 +413,7 @@ func (m master) registerNodes(ctx context.Context, nodes []nodeWithTask, port st
 		addr := net.JoinHostPort(n.Addr, port)
 		eng := m.clsuter.EngineByAddr(addr)
 		if eng == nil || !eng.IsHealthy() {
-			field.Errorf("engine is null or unhealthy")
+			field.Errorf("engine:%s is nil or unhealthy,engine=%v", addr, eng)
 			continue
 		}
 
