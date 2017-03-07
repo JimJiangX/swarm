@@ -135,7 +135,7 @@ func (db dbBase) GetSysConfig() (SysConfig, error) {
 		query = "SELECT dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,horus_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password,check_username,check_password,backup_dir FROM " + db.sysConfigTable() + " LIMIT 1"
 	)
 
-	err := db.Get(c, query)
+	err := db.Get(&c, query)
 
 	return c, errors.Wrap(err, "get SystemConfig")
 }
