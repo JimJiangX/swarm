@@ -275,7 +275,7 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 		}
 	}
 
-	entry.Infof("SSH remote PKG install successed! output:\n%s")
+	entry.Infof("SSH remote PKG install successed! output:\n%s", out)
 
 	return nil
 }
@@ -459,7 +459,7 @@ func (m master) registerNodesTimeout(nodes []nodeWithTask, er error) error {
 
 		t := nodes[i].Task
 
-		if n.Status != statusNodeInstalled {
+		if n.Status == statusNodeInstalled {
 			n.Status = statusNodeRegisterTimeout
 			n.Enabled = false
 			n.RegisterAt = time.Now()
