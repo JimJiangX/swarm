@@ -482,7 +482,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 				Status:       0,
 				Enabled:      false,
 				NFS: database.NFS{
-					Addr:     n.NFS.Addr,
+					Addr:     n.NFS.Address,
 					Dir:      n.NFS.Dir,
 					MountDir: n.NFS.MountDir,
 					Options:  n.NFS.Options,

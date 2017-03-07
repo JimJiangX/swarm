@@ -56,8 +56,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	http.MethodGet: {
 		"/clusters":        getClusters,
 		"/clusters/{name}": getClustersByID,
-		//		"/nodes":                           getAllNodes,
-		//		"/nodes/{name:.*}":                 getNode,
+		//		"/hosts":                           getAllNodes,
+		//		"/hosts/{name:.*}":                 getNode,
 		//		"/resources":                       getClustersResource,
 		//		"/resources/{cluster:.*}":          getNodesResourceByCluster,
 		"/tasks":        getTasks,
