@@ -101,3 +101,12 @@ type ConfigTemplate struct {
 	Keysets   []Keyset
 	Timestamp int64
 }
+
+type GetImageResponse struct {
+	ImageVersion
+	Size     int    `json:"size"`
+	ID       string `json:"id"`
+	ImageID  string `json:"docker_image_id"`
+	Labels   string `json:"label"`
+	UploadAt string `json:"upload_at"`
+}

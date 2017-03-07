@@ -138,6 +138,61 @@ func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // -----------------/softwares/images handlers-----------------
+func listImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	images, err := gd.Ormer().ListImages()
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	out := make([]structs.GetImageResponse, len(images))
+
+	for i := range images {
+		out[i] = structs.GetImageResponse{
+			ImageVersion: structs.ImageVersion{
+				Name:  images[i].Name,
+				Major: images[i].Major,
+				Minor: images[i].Minor,
+				Patch: images[i].Patch,
+			},
+			Size:     images[i].Size,
+			ID:       images[i].ID,
+			ImageID:  images[i].ImageID,
+			Labels:   images[i].Labels,
+			UploadAt: utils.TimeToString(images[i].UploadAt),
+		}
+	}
+
+	writeJSON(w, out, http.StatusOK)
+}
+
+func getSupportImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.PluginClient() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	pc := gd.PluginClient()
+	out, err := pc.GetImageSupport(ctx)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, out, http.StatusOK)
+}
+
 func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostLoadImageRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
