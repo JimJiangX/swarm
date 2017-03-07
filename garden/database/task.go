@@ -25,6 +25,8 @@ type TaskOrmer interface {
 	GetTask(ID string) (Task, error)
 
 	ListTasks(link string, status int) ([]Task, error)
+
+	SetTask(t Task) error
 }
 
 func NewTask(name, related, linkto, desc, labels string, timeout int) Task {
@@ -110,6 +112,21 @@ func (db dbBase) txSetTask(tx *sqlx.Tx, t Task) error {
 	query := "UPDATE " + db.taskTable() + " SET status=?,finished_at=?,errors=? WHERE id=?"
 
 	_, err := tx.Exec(query, t.Status, t.FinishedAt, t.Errors, t.ID)
+	if err != nil {
+		return errors.Wrap(err, "Tx update Task status & errors")
+	}
+
+	return nil
+}
+
+func (db dbBase) SetTask(t Task) error {
+	if t.FinishedAt.IsZero() {
+		t.FinishedAt = time.Now()
+	}
+
+	query := "UPDATE " + db.taskTable() + " SET status=?,finished_at=?,errors=? WHERE id=?"
+
+	_, err := db.Exec(query, t.Status, t.FinishedAt, t.Errors, t.ID)
 	if err != nil {
 		return errors.Wrap(err, "Tx update Task status & errors")
 	}

@@ -42,16 +42,30 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 		Labels:   labels,
 		UploadAt: time.Now(),
 	}
+	task := database.NewTask("", "", "", "", "", 300)
 
-	err = ormer.InsertImage(image)
+	err = ormer.InsertImageWithTask(image, task)
 	if err != nil {
 		return "", err
 	}
 
-	go func() {
+	go func() (err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				logrus.WithField("Image", req.Name).Errorf("load image panic:%+v", err)
+				err = fmt.Errorf("load image panic::%+v", r)
+			}
+
+			if err != nil {
+				logrus.WithField("Image", req.Name).Errorf("load image:%+v", err)
+
+				task.FinishedAt = time.Now()
+				task.Status = database.TaskFailedStatus
+				task.Errors = err.Error()
+
+				err := ormer.SetTask(task)
+				if err != nil {
+					logrus.WithField("Image", req.Name).Errorf("update image task:%+v", err)
+				}
 			}
 		}()
 
@@ -61,27 +75,33 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 
 		scp, err := scplib.NewScpClient(registry.Address, registry.OsUsername, registry.OsPassword)
 		if err != nil {
-			logrus.WithField("Image", req.Name).Errorf("Load image,%+v", err)
-			return
+			return err
 		}
 		defer scp.Close()
 
 		out, err := scp.Exec(script)
 		if err != nil {
-			logrus.WithField("Image", req.Name).Errorf("load image,%+v,output:%s", err, out)
-			return
+			logrus.WithField("Image", req.Name).Errorf("load image,exec:'%s',output:%s", script, out)
+			return err
 		}
 
 		imageID, size, err := parsePushImageOutput(out)
 		if err != nil {
-			logrus.WithField("Image", req.Name).Errorf("parse output,%+v", err)
-			return
+			logrus.WithField("Image", req.Name).Errorf("parse output:%s", out)
+			return err
 		}
 
-		err = ormer.SetImage(image.ID, imageID, size)
-		if err != nil {
-			logrus.WithField("Image", req.Name).Errorf("set image table,%+v", err)
-		}
+		image.ImageID = imageID
+		image.Size = size
+		image.UploadAt = time.Now()
+
+		task.FinishedAt = image.UploadAt
+		task.Status = database.TaskDoneStatus
+		task.Errors = ""
+
+		err = ormer.SetImageAndTask(image, task)
+
+		return err
 	}()
 
 	return image.ID, err

@@ -10,14 +10,15 @@ import (
 type ImageOrmer interface {
 	SysConfigOrmer
 	ImageInterface
+	TaskOrmer
 }
 
 type ImageInterface interface {
 	GetImage(name string, major, minor, patch int) (Image, error)
 	ListImages() ([]Image, error)
 
-	InsertImage(image Image) error
-	SetImage(ID, imageID string, size int) error
+	InsertImageWithTask(img Image, t Task) error
+	SetImageAndTask(img Image, t Task) error
 
 	DelImage(ID string) error
 }
@@ -40,12 +41,21 @@ func (db dbBase) imageTable() string {
 }
 
 // InsertImage insert Image
-func (db dbBase) InsertImage(image Image) error {
-	query := "INSERT INTO " + db.imageTable() + " (id,software_name,docker_image_id,major_version,minor_version,patch_version,size,label,upload_at) VALUES (:id,:software_name,:docker_image_id,:major_version,:minor_version,:patch_version,:size,:label,:upload_at)"
+func (db dbBase) InsertImageWithTask(img Image, t Task) error {
+	do := func(tx *sqlx.Tx) error {
+		query := "INSERT INTO " + db.imageTable() + " (id,software_name,docker_image_id,major_version,minor_version,patch_version,size,label,upload_at) VALUES (:id,:software_name,:docker_image_id,:major_version,:minor_version,:patch_version,:size,:label,:upload_at)"
 
-	_, err := db.NamedExec(query, &image)
+		_, err := tx.NamedExec(query, &img)
+		if err != nil {
+			return errors.Wrap(err, "insert Image")
+		}
 
-	return errors.Wrap(err, "insert Image")
+		t.LinkTable = db.imageTable()
+
+		return db.txInsertTask(tx, t)
+	}
+
+	return db.txFrame(do)
 }
 
 // ListImages returns Image slice select for DB.
@@ -70,13 +80,19 @@ func (db dbBase) GetImage(name string, major, minor, patch int) (Image, error) {
 }
 
 // SetImageStatus update Image.ImageID&Size by ID.
-func (db dbBase) SetImage(ID, imageID string, size int) error {
+func (db dbBase) SetImageAndTask(img Image, t Task) error {
+	do := func(tx *sqlx.Tx) error {
+		query := "UPDATE " + db.imageTable() + " SET docker_image_id=?,size=?,upload_at=? WHERE id=?"
 
-	query := "UPDATE " + db.imageTable() + " SET docker_image_id=?,size=? WHERE id=?"
+		_, err := db.Exec(query, img.ImageID, img.Size, img.UploadAt, img.ID)
+		if err != nil {
+			return errors.Wrap(err, "update Image by ID")
+		}
 
-	_, err := db.Exec(query, imageID, size, ID)
+		return db.txSetTask(tx, t)
+	}
 
-	return errors.Wrap(err, "update Image by ID")
+	return db.txFrame(do)
 }
 
 // DelImage delete Image by ID in Tx.
