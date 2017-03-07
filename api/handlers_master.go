@@ -24,6 +24,8 @@ var errUnsupportGarden = stderr.New("unsupport Garden yet")
 func httpJSONError(w http.ResponseWriter, err error, status int) {
 	field := logrus.WithField("status", status)
 
+	w.WriteHeader(status)
+
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -33,17 +35,18 @@ func httpJSONError(w http.ResponseWriter, err error, status int) {
 			Message: err.Error(),
 		})
 
+		field.Errorf("HTTP error: %+v", err)
+
 		if _err != nil {
 			field.Errorf("JSON Encode error: %+v", err)
 		}
 	}
-
-	w.WriteHeader(status)
-
-	field.Errorf("HTTP error: %+v", err)
 }
 
 func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
+
+	w.WriteHeader(status)
+
 	if obj != nil {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -52,8 +55,6 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 			logrus.WithField("status", status).Errorf("JSON Encode error: %+v", err)
 		}
 	}
-
-	w.WriteHeader(status)
 }
 
 // -----------------/tasks handlers-----------------
