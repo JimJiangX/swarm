@@ -203,8 +203,7 @@ func (db dbBase) SetUnitWithInsertTask(u *Unit, t Task) error {
 			return err
 		}
 
-		t.LinkTable = db.unitTable()
-		err = db.txInsertTask(tx, t)
+		err = db.txInsertTask(tx, t, db.unitTable())
 
 		return err
 	}

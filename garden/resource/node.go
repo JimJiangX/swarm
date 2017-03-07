@@ -125,7 +125,7 @@ func NewNodeWithTask(user, password string, hdd, ssd []string, n database.Node) 
 		return nodeWithTask{}, err
 	}
 
-	t := database.NewTask(n.Addr, "", n.ID, "", "", 300)
+	t := database.NewTask(n.Addr, database.NodeInstall, n.ID, "install softwares on host", "", 300)
 
 	return nodeWithTask{
 		hdd:    hdd,

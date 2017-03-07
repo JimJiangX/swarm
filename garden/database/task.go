@@ -9,18 +9,38 @@ import (
 )
 
 const (
-	_ = iota
-	TaskCreateStatus
-	TaskRunningStatus
-	TaskStopStatus
-	TaskCancelStatus
-	TaskDoneStatus
-	TaskTimeoutStatus
-	TaskFailedStatus
+	_                 = iota // 0
+	TaskCreateStatus         // 1
+	TaskRunningStatus        // 2
+	TaskStopStatus           // 3
+	TaskCancelStatus         // 4
+	TaskDoneStatus           // 5
+	TaskTimeoutStatus        // 6
+	TaskFailedStatus         // 7
+)
+
+const (
+	// node distribution task
+	NodeInstall = "host_install"
+
+	// load image task
+	ImageLoadTask = "image_load"
+
+	// create and run service task
+	ServiceCreateTask = "service_create"
+
+	// unit tasks
+	UnitMigrateTask = "unit_migrate"
+	UnitRebuildTask = "unit_rebuild"
+	UnitRestoreTask = "unit_restore"
+
+	// backup tasks
+	BackupAutoTask   = "backup_auto"
+	BackupManualTask = "backup_manual"
 )
 
 type TaskOrmer interface {
-	InsertTasks(tx *sqlx.Tx, tasks []Task) error
+	InsertTasks(tx *sqlx.Tx, tasks []Task, linkTable string) error
 
 	GetTask(ID string) (Task, error)
 
@@ -29,11 +49,12 @@ type TaskOrmer interface {
 	SetTask(t Task) error
 }
 
-func NewTask(name, related, linkto, desc, labels string, timeout int) Task {
+// NewTask new a Task
+func NewTask(object, relate, linkto, desc, labels string, timeout int) Task {
 	return Task{
 		ID:        utils.Generate32UUID(),
-		Name:      name,
-		Related:   related,
+		Name:      relate + "-" + object,
+		Related:   relate,
 		Linkto:    linkto,
 		Desc:      desc,
 		Labels:    labels,
@@ -64,8 +85,10 @@ func (db dbBase) taskTable() string {
 	return db.prefix + "_task"
 }
 
-func (db dbBase) txInsertTask(tx *sqlx.Tx, t Task) error {
-
+func (db dbBase) txInsertTask(tx *sqlx.Tx, t Task, linkTable string) error {
+	if t.LinkTable == "" {
+		t.LinkTable = linkTable
+	}
 	t.Timestamp = t.CreatedAt.Unix()
 
 	query := "INSERT INTO " + db.taskTable() + " (id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:link_table,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
@@ -75,9 +98,9 @@ func (db dbBase) txInsertTask(tx *sqlx.Tx, t Task) error {
 	return errors.Wrap(err, "Tx insert Task")
 }
 
-func (db dbBase) InsertTasks(tx *sqlx.Tx, tasks []Task) error {
+func (db dbBase) InsertTasks(tx *sqlx.Tx, tasks []Task, linkTable string) error {
 	if len(tasks) == 1 {
-		return db.txInsertTask(tx, tasks[0])
+		return db.txInsertTask(tx, tasks[0], linkTable)
 	}
 
 	query := "INSERT INTO " + db.taskTable() + " (id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:link_table,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
@@ -91,7 +114,9 @@ func (db dbBase) InsertTasks(tx *sqlx.Tx, tasks []Task) error {
 		if tasks[i].ID == "" {
 			continue
 		}
-
+		if tasks[i].LinkTable == "" {
+			tasks[i].LinkTable = linkTable
+		}
 		tasks[i].Timestamp = tasks[i].CreatedAt.Unix()
 
 		_, err = stmt.Exec(&tasks[i])

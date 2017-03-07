@@ -209,9 +209,7 @@ func (db dbBase) InsertService(svc Service, units []Unit, t *Task, users []User)
 		}
 
 		if t != nil {
-			t.LinkTable = db.serviceTable()
-
-			err = db.txInsertTask(tx, *t)
+			err = db.txInsertTask(tx, *t, db.serviceTable())
 			if err != nil {
 				return err
 			}

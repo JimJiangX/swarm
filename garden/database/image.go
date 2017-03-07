@@ -50,9 +50,7 @@ func (db dbBase) InsertImageWithTask(img Image, t Task) error {
 			return errors.Wrap(err, "insert Image")
 		}
 
-		t.LinkTable = db.imageTable()
-
-		return db.txInsertTask(tx, t)
+		return db.txInsertTask(tx, t, db.imageTable())
 	}
 
 	return db.txFrame(do)
