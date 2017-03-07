@@ -358,7 +358,7 @@ func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc
 
 	port := strconv.Itoa(config.DockerPort)
 
-	t := time.NewTicker(time.Minute)
+	t := time.NewTicker(time.Second * 30)
 	defer t.Stop()
 
 	for {

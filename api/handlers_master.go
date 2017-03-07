@@ -513,6 +513,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		out[i] = structs.PostNodeResponse{
 			ID:   nodes[i].Node.ID,
 			Addr: nodes[i].Node.Addr,
+			Task: nodes[i].Task.ID,
 		}
 	}
 
