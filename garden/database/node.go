@@ -73,7 +73,7 @@ func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 		query := "INSERT INTO " + db.nodeTable() + " (id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts) VALUES (:id,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:enabled,:register_at,:nfs_ip,:nfs_dir,:nfs_mount_dir,:nfs_mount_opts)"
 
 		if len(nodes) == 1 {
-			_, err := tx.Exec(query, nodes[0])
+			_, err := tx.Exec(query, &nodes[0])
 			if err != nil {
 				return errors.Wrap(err, "Tx insert Node")
 			}
@@ -86,7 +86,7 @@ func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 			}
 
 			for i := range nodes {
-				_, err = stmt.Exec(nodes[i])
+				_, err = stmt.Exec(&nodes[i])
 				if err != nil {
 					stmt.Close()
 

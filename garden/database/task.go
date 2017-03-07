@@ -70,7 +70,7 @@ func (db dbBase) txInsertTask(tx *sqlx.Tx, t Task) error {
 
 	query := "INSERT INTO " + db.taskTable() + " (id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:link_table,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
 
-	_, err := tx.Exec(query, t)
+	_, err := tx.Exec(query, &t)
 
 	return errors.Wrap(err, "Tx insert Task")
 }
@@ -94,7 +94,7 @@ func (db dbBase) InsertTasks(tx *sqlx.Tx, tasks []Task) error {
 
 		tasks[i].Timestamp = tasks[i].CreatedAt.Unix()
 
-		_, err = stmt.Exec(tasks[i])
+		_, err = stmt.Exec(&tasks[i])
 		if err != nil {
 			stmt.Close()
 

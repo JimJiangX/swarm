@@ -112,7 +112,7 @@ func (db dbBase) txInsertUnits(tx *sqlx.Tx, units []Unit) error {
 			continue
 		}
 
-		_, err = stmt.Exec(units[i])
+		_, err = stmt.Exec(&units[i])
 		if err != nil {
 			stmt.Close()
 
