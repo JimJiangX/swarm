@@ -14,6 +14,11 @@ import (
 	"golang.org/x/net/context"
 )
 
+type serviceWithTask struct {
+	spec structs.ServiceSpec
+	task database.Task
+}
+
 type servicesByPriority []structs.ServiceSpec
 
 func (sp servicesByPriority) Less(i, j int) bool {
@@ -58,11 +63,6 @@ func initServicesPriority(services []structs.ServiceSpec) servicesByPriority {
 	return servicesByPriority(services)
 }
 
-type serviceWithTask struct {
-	spec structs.ServiceSpec
-	task database.Task
-}
-
 type Stack struct {
 	wg       *sync.WaitGroup
 	gd       *garden.Garden
@@ -99,41 +99,26 @@ func (s *Stack) DeployServices(ctx context.Context) ([]structs.PostServiceRespon
 	}
 
 	out := make([]structs.PostServiceResponse, 0, len(s.services))
-	servicesList := make([]*garden.Service, 0, len(s.services))
 
 	for _, spec := range sorted {
 		if _, exist := existing[spec.Name]; exist {
 			continue
 		}
 
-		service, t, err := s.gd.BuildService(spec)
+		service, task, err := s.gd.BuildService(spec)
 		if err != nil {
 			return out, err
 		}
 
-		servicesList = append(servicesList, service)
 		out = append(out, structs.PostServiceResponse{
 			ID:     service.Spec().ID,
 			Name:   service.Spec().Name,
-			TaskID: t.ID,
+			TaskID: task.ID,
 		})
 
 		s.wg.Add(1)
 
-		go func(s *Stack, service *garden.Service, auth *types.AuthConfig) {
-			defer s.wg.Done()
-
-			pendings, err := s.gd.Allocation(service)
-			if err != nil {
-				logrus.WithField("Service", service).Errorf("Service allocation error %+v", err)
-				return
-			}
-
-			err = service.CreateContainer(pendings, auth)
-			if err != nil {
-				logrus.WithField("Service", service).Errorf("Service create containers error %+v", err)
-			}
-		}(s, service, auth)
+		go s.deploy(service, *task, auth)
 	}
 
 	go s.linkAndStart(ctx, existing)
@@ -141,12 +126,60 @@ func (s *Stack) DeployServices(ctx context.Context) ([]structs.PostServiceRespon
 	return out, nil
 }
 
-func (s *Stack) linkAndStart(ctx context.Context, existing map[string]structs.ServiceSpec) error {
+func (s *Stack) deploy(service *garden.Service, t database.Task, auth *types.AuthConfig) (err error) {
+	defer func() {
+		s.wg.Done()
+
+		if r := recover(); r != nil {
+			err = errors.Errorf("panic:%v", r)
+		}
+
+		if err == nil {
+			t.Errors = ""
+			t.Status = database.TaskDoneStatus
+		} else {
+			t.Errors = err.Error()
+			t.Status = database.TaskFailedStatus
+		}
+
+		_err := s.gd.Ormer().SetTask(t)
+		if _err != nil {
+			logrus.WithField("Service", service.Spec().Name).Errorf("%+v,error=%+v", _err, err)
+		}
+	}()
+
+	pendings, err := s.gd.Allocation(service)
+	if err != nil {
+		logrus.WithField("Service", service.Spec().Name).Errorf("Service allocation error %+v", err)
+		return err
+	}
+
+	err = service.CreateContainer(pendings, auth)
+	if err != nil {
+		logrus.WithField("Service", service.Spec().Name).Errorf("Service create containers error %+v", err)
+	}
+
+	return err
+
+}
+
+func (s *Stack) linkAndStart(ctx context.Context, existing map[string]structs.ServiceSpec) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			logrus.Errorf("stack run,panic:%v", r)
+			return
+		}
+
+		if err != nil {
+			logrus.Errorf("stack run,%+v", err)
+		}
+	}()
+
 	s.wg.Wait()
 
 	kvc := s.gd.KVClient()
 
-	err := s.freshServices(ctx)
+	err = s.freshServices(ctx)
 	if err != nil {
 		return err
 	}
