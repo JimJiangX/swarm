@@ -64,17 +64,21 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 
 // -----------------/nfs_backups handlers-----------------
 func parseNFSSpace(in []byte) (int, int, error) {
-	total, free := 0, 0
-	br := bufio.NewReader(bytes.NewReader(in))
 
 	atoi := func(line, key []byte) (int, error) {
 
 		if i := bytes.Index(line, key); i != -1 {
-			return strconv.Atoi(string(line[i+len(key):]))
+			return strconv.Atoi(string(bytes.TrimSpace(line[i+len(key):])))
 		}
 
 		return 0, stderr.New("key not exist")
 	}
+
+	total, free := 0, 0
+	tkey := []byte("total_space:")
+	fkey := []byte("free_space:")
+
+	br := bufio.NewReader(bytes.NewReader(in))
 
 	for {
 		if total > 0 && free > 0 {
@@ -87,22 +91,20 @@ func parseNFSSpace(in []byte) (int, int, error) {
 				return total, free, nil
 			}
 
-			return total, free, err
+			return total, free, errors.Wrapf(err, "parse nfs output error,input:'%s'", in)
 		}
 
-		n, err := atoi(line, []byte("total_space:"))
+		n, err := atoi(line, tkey)
 		if err == nil {
 			total = n
 			continue
 		}
 
-		n, err = atoi(line, []byte("free_space:"))
+		n, err = atoi(line, fkey)
 		if err == nil {
 			free = n
 		}
 	}
-
-	return 0, 0, errors.Errorf("parse nfs output error,input:'%s'", in)
 }
 
 func execNFScmd(ip, dir, mount, opts string) ([]byte, error) {
