@@ -2,6 +2,7 @@ package cli
 
 import (
 	"crypto/tls"
+	"errors"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
@@ -10,34 +11,39 @@ import (
 	"github.com/docker/swarm/plugin/parser"
 )
 
-func configruation(c *cli.Context) {
-	var (
-		tlsConfig *tls.Config
-		err       error
-	)
-
+func loadTLSConfigFromContext(c *cli.Context) (*tls.Config, error) {
 	// If either --tls or --tlsverify are specified, load the certificates.
 	if c.Bool("tls") || c.Bool("tlsverify") {
 		if !c.IsSet("tlscert") || !c.IsSet("tlskey") {
-			log.Fatal("--tlscert and --tlskey must be provided when using --tls")
+			return nil, errors.New("--tlscert and --tlskey must be provided when using --tls")
 		}
+
 		if c.Bool("tlsverify") && !c.IsSet("tlscacert") {
-			log.Fatal("--tlscacert must be provided when using --tlsverify")
+			return nil, errors.New("--tlscacert must be provided when using --tlsverify")
 		}
-		tlsConfig, err = loadTLSConfig(
+
+		return loadTLSConfig(
 			c.String("tlscacert"),
 			c.String("tlscert"),
 			c.String("tlskey"),
 			c.Bool("tlsverify"))
-		if err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		// Otherwise, if neither --tls nor --tlsverify are specified, abort if
-		// the other flags are passed as they will be ignored.
-		if c.IsSet("tlscert") || c.IsSet("tlskey") || c.IsSet("tlscacert") {
-			log.Fatal("--tlscert, --tlskey and --tlscacert require the use of either --tls or --tlsverify")
-		}
+
+	}
+
+	// Otherwise, if neither --tls nor --tlsverify are specified, abort if
+	// the other flags are passed as they will be ignored.
+	if c.IsSet("tlscert") || c.IsSet("tlskey") || c.IsSet("tlscacert") {
+		return nil, errors.New("--tlscert, --tlskey and --tlscacert require the use of either --tls or --tlsverify")
+	}
+
+	return nil, nil
+}
+
+func configruation(c *cli.Context) {
+
+	tlsConfig, err := loadTLSConfigFromContext(c)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	uri := getDiscovery(c)
@@ -47,7 +53,7 @@ func configruation(c *cli.Context) {
 
 	kvClient, err := kvstore.NewClient(uri, tlsConfig)
 	if err != nil {
-		log.Fatalf("")
+		log.Fatalf("fail to connect to kv store:'%s',%+v", uri, err)
 	}
 
 	// see https://github.com/codegangsta/cli/issues/160
