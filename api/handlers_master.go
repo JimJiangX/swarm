@@ -33,17 +33,18 @@ func httpJSONError(w http.ResponseWriter, err error, status int) {
 	w.WriteHeader(status)
 
 	if err != nil {
-		_err := json.NewEncoder(w).Encode(structs.ResponseHead{
+		data, _err := json.Marshal(structs.ResponseHead{
 			Result:  false,
 			Code:    status,
 			Message: err.Error(),
 		})
-
-		field.Errorf("HTTP error: %+v", err)
-
 		if _err != nil {
 			field.Errorf("JSON Encode error: %+v", err)
 		}
+
+		w.Write(data)
+
+		field.Errorf("HTTP error: %+v", err)
 	}
 }
 
@@ -55,18 +56,19 @@ func httpJSONErrorWithBody(w http.ResponseWriter, obj interface{}, err error, st
 	w.WriteHeader(status)
 
 	if err != nil {
-		_err := json.NewEncoder(w).Encode(structs.ResponseHead{
+		data, _err := json.Marshal(structs.ResponseHead{
 			Result:  false,
 			Code:    status,
 			Message: err.Error(),
 			Object:  obj,
 		})
-
-		field.Errorf("HTTP error: %+v", err)
-
 		if _err != nil {
 			field.Errorf("JSON Encode error: %+v", err)
 		}
+
+		w.Write(data)
+
+		field.Errorf("HTTP error: %+v", err)
 	}
 }
 
@@ -75,10 +77,12 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 	w.WriteHeader(status)
 
 	if obj != nil {
-		err := json.NewEncoder(w).Encode(obj)
-		if err != nil {
-			logrus.WithField("status", status).Errorf("JSON Encode error: %+v", err)
+		data, _err := json.Marshal(obj)
+		if _err != nil {
+			logrus.Errorf("JSON Encode error: %+v", _err)
 		}
+
+		w.Write(data)
 	}
 }
 
