@@ -48,6 +48,30 @@ func httpJSONError(w http.ResponseWriter, err error, status int) {
 	}
 }
 
+// Emit an HTTP error with object and log it.
+func httpJSONErrorWithBody(w http.ResponseWriter, obj interface{}, err error, status int) {
+	field := logrus.WithField("status", status)
+
+	w.WriteHeader(status)
+
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+
+		_err := json.NewEncoder(w).Encode(structs.ResponseHead{
+			Result:  false,
+			Code:    status,
+			Message: err.Error(),
+			Object:  obj,
+		})
+
+		field.Errorf("HTTP error: %+v", err)
+
+		if _err != nil {
+			field.Errorf("JSON Encode error: %+v", err)
+		}
+	}
+}
+
 func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 
 	w.WriteHeader(status)
@@ -974,13 +998,11 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	stack := stack.New(gd, services)
-	list, err := stack.DeployServices(ctx)
-	// TODO:convert to structs.PostServiceResponse
 
-	out := make([]database.Service, 0, len(list))
-
-	for _, l := range list {
-		out = append(out, database.Service(l.Spec().Service))
+	out, err := stack.DeployServices(ctx)
+	if err != nil {
+		httpJSONErrorWithBody(w, out, err, http.StatusInternalServerError)
+		return
 	}
 
 	writeJSON(w, out, http.StatusCreated)

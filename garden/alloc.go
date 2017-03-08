@@ -1,6 +1,8 @@
 package garden
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -122,10 +124,10 @@ func (gd *Garden) validServiceSpec(spec structs.ServiceSpec) error {
 	return nil
 }
 
-func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, error) {
+func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Task, error) {
 	err := gd.validServiceSpec(spec)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	//	image, err := gd.ormer.GetImage(spec.Image)
@@ -136,6 +138,14 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, error) {
 	if spec.ID == "" {
 		spec.ID = utils.Generate32UUID()
 	}
+
+	desc := bytes.NewBuffer(nil)
+	err = json.NewEncoder(desc).Encode(spec)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	spec.Desc = desc.String()
 
 	us := make([]database.Unit, spec.Replicas)
 	units := make([]structs.UnitSpec, spec.Replicas)
@@ -158,9 +168,11 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, error) {
 
 	spec.Units = units
 
-	err = gd.ormer.InsertService(database.Service(spec.Service), us, nil, nil)
+	t := database.NewTask(spec.Name, database.ServiceCreateTask, spec.ID, spec.Desc, "", 300)
+
+	err = gd.ormer.InsertService(database.Service(spec.Service), us, &t, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	service := gd.NewService(spec)
@@ -172,7 +184,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, error) {
 	}
 	service.options.nodes.constraint = spec.Constraint
 
-	return service, nil
+	return service, &t, nil
 }
 
 type scheduleOption struct {

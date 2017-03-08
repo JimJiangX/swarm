@@ -114,6 +114,10 @@ type NetDeviceRequire struct {
 	Type       string
 }
 
-type PostServiceResponse Service
+type PostServiceResponse struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	TaskID string `json:"task_id"`
+}
 
 type RequireResource struct{}

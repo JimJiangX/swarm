@@ -20,6 +20,8 @@ const (
 )
 
 const (
+	// related to Task.Related
+
 	// node distribution task
 	NodeInstall = "host_install"
 

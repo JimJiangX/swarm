@@ -8,6 +8,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/garden"
+	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -57,6 +58,11 @@ func initServicesPriority(services []structs.ServiceSpec) servicesByPriority {
 	return servicesByPriority(services)
 }
 
+type serviceWithTask struct {
+	spec structs.ServiceSpec
+	task database.Task
+}
+
 type Stack struct {
 	wg       *sync.WaitGroup
 	gd       *garden.Garden
@@ -71,7 +77,7 @@ func New(gd *garden.Garden, services []structs.ServiceSpec) *Stack {
 	}
 }
 
-func (s *Stack) DeployServices(ctx context.Context) ([]*garden.Service, error) {
+func (s *Stack) DeployServices(ctx context.Context) ([]structs.PostServiceResponse, error) {
 	list, err := s.gd.ListServices(ctx)
 	if err != nil && errors.Cause(err) != sql.ErrNoRows {
 		return nil, err
@@ -92,6 +98,7 @@ func (s *Stack) DeployServices(ctx context.Context) ([]*garden.Service, error) {
 		return nil, err
 	}
 
+	out := make([]structs.PostServiceResponse, 0, len(s.services))
 	servicesList := make([]*garden.Service, 0, len(s.services))
 
 	for _, spec := range sorted {
@@ -99,12 +106,17 @@ func (s *Stack) DeployServices(ctx context.Context) ([]*garden.Service, error) {
 			continue
 		}
 
-		service, err := s.gd.BuildService(spec)
+		service, t, err := s.gd.BuildService(spec)
 		if err != nil {
-			return servicesList, err
+			return out, err
 		}
 
 		servicesList = append(servicesList, service)
+		out = append(out, structs.PostServiceResponse{
+			ID:     service.Spec().ID,
+			Name:   service.Spec().Name,
+			TaskID: t.ID,
+		})
 
 		s.wg.Add(1)
 
@@ -126,7 +138,7 @@ func (s *Stack) DeployServices(ctx context.Context) ([]*garden.Service, error) {
 
 	go s.linkAndStart(ctx, existing)
 
-	return servicesList, nil
+	return out, nil
 }
 
 func (s *Stack) linkAndStart(ctx context.Context, existing map[string]structs.ServiceSpec) error {
