@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	_PF_DEV_Label = "PF_DEV" // "PF_DEV_":"dev1,10G"
+	_PFDevLabel = "PF_DEV" // "PF_DEV_":"dev1,10G"
 
 	// "VF_DEV_":"bond0,mac_xxxx,10M,192.168.1.1,255.255.255.0,192.168.3.0,vlan_xxxx"
-	_VF_DEV_Prefix = "VF_DEV_"
+	_VFDevPrefix = "VF_DEV_"
 )
 
 type Device struct {
@@ -98,7 +98,7 @@ func parseContainerDevice(c *cluster.Container) []Device {
 	out := make([]Device, 0, 2)
 
 	for key, val := range c.Labels {
-		if !strings.HasPrefix(key, _VF_DEV_Prefix) {
+		if !strings.HasPrefix(key, _VFDevPrefix) {
 			continue
 		}
 
@@ -115,7 +115,7 @@ func parseContainerDevice(c *cluster.Container) []Device {
 				continue
 			}
 
-			if !strings.HasPrefix(key, _VF_DEV_Prefix) {
+			if !strings.HasPrefix(key, _VFDevPrefix) {
 				continue
 			}
 
@@ -138,7 +138,7 @@ func ParseEngineNetDevice(e *cluster.Engine) (map[string]Device, int, error) {
 	total := 0
 
 	for key, val := range e.Labels {
-		if key == _PF_DEV_Label {
+		if key == _PFDevLabel {
 			i := strings.LastIndexByte(val, ',')
 			n, err := parseBandwidth(string(val[i+1:]))
 			if err != nil {
@@ -147,7 +147,7 @@ func ParseEngineNetDevice(e *cluster.Engine) (map[string]Device, int, error) {
 
 			total = n
 
-		} else if strings.HasPrefix(key, _VF_DEV_Prefix) {
+		} else if strings.HasPrefix(key, _VFDevPrefix) {
 			parts := strings.Split(val, ",")
 			if len(parts) >= 2 {
 				devm[parts[0]] = Device{
@@ -186,7 +186,7 @@ func SaveIntoContainerLabel(config *cluster.ContainerConfig, devices []Device) {
 	}
 
 	for i := range devices {
-		key := fmt.Sprintf("%s%d", _VF_DEV_Prefix, i)
+		key := fmt.Sprintf("%s%d", _VFDevPrefix, i)
 		config.Config.Labels[key] = devices[i].String()
 	}
 }

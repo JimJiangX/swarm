@@ -35,7 +35,7 @@ type Users struct {
 
 type SSHDeliver struct {
 	SourceDir       string `json:"source_dir"`
-	CA_CRT_Name     string `json:"ca_crt_name"`
+	CACertName      string `json:"ca_crt_name"`
 	Destination     string `json:"destination_dir"` // must be exist
 	InitScriptName  string `json:"init_script_name"`
 	CleanScriptName string `json:"clean_script_name"`
@@ -67,5 +67,5 @@ type Registry struct {
 	Password   string `json:"registry_password"`
 	Email      string `json:"registry_email"`
 	Token      string `json:"registry_token"`
-	CA_CRT     string `json:"registry_ca_crt"`
+	CACert     string `json:"registry_ca_crt"`
 }

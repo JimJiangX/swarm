@@ -14,10 +14,10 @@ import (
 const (
 	_SSD                     = "local:SSD"
 	_HDD                     = "local:HDD"
-	_HDD_VG_Label            = "HDD_VG"
-	_SSD_VG_Label            = "SSD_VG"
-	_HDD_VG_Size_Label       = "HDD_VG_SIZE"
-	_SSD_VG_Size_Label       = "SSD_VG_SIZE"
+	_HDDVGLabel              = "HDD_VG"
+	_SSDVGLabel              = "SSD_VG"
+	_HDDVGSizeLabel          = "HDD_VG_SIZE"
+	_SSDVGSizeLabel          = "SSD_VG_SIZE"
 	defaultFileSystem        = "xfs"
 	defaultLocalVolumeDriver = "lvm"
 )
@@ -175,13 +175,13 @@ func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label st
 	var vgType, sizeLabel string
 
 	switch label {
-	case _HDD_VG_Label:
+	case _HDDVGLabel:
 		vgType = _HDD
-		sizeLabel = _HDD_VG_Size_Label
+		sizeLabel = _HDDVGSizeLabel
 
-	case _SSD_VG_Label:
+	case _SSDVGLabel:
 		vgType = _SSD
-		sizeLabel = _SSD_VG_Size_Label
+		sizeLabel = _SSDVGSizeLabel
 
 	default:
 	}
@@ -236,12 +236,12 @@ func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label st
 func localVolumeDrivers(e *cluster.Engine, vo database.VolumeOrmer) (volumeDrivers, error) {
 	drivers := make([]volumeDriver, 0, 4)
 
-	vd, err := volumeDriverFromEngine(vo, e, _HDD_VG_Label)
+	vd, err := volumeDriverFromEngine(vo, e, _HDDVGLabel)
 	if err == nil {
 		drivers = append(drivers, vd)
 	}
 
-	vd, err = volumeDriverFromEngine(vo, e, _SSD_VG_Label)
+	vd, err = volumeDriverFromEngine(vo, e, _SSDVGLabel)
 	if err == nil {
 		drivers = append(drivers, vd)
 	}

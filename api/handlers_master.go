@@ -137,7 +137,7 @@ func execNFScmd(ip, dir, mount, opts string) ([]byte, error) {
 	return out, nil
 }
 
-func getNFS_SPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpJSONError(w, err, http.StatusBadRequest)
 		return

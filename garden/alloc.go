@@ -280,6 +280,7 @@ type pendingUnit struct {
 func (pu pendingUnit) convertToSpec() structs.UnitSpec {
 	return structs.UnitSpec{}
 }
+
 func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, error) {
 	config := cluster.BuildContainerConfig(container.Config{}, container.HostConfig{
 		Resources: container.Resources{
@@ -421,7 +422,7 @@ func selectNodeInDifferentCluster(highAvailable bool, num int, n *node.Node, use
 	clusters := make(map[string]int, len(used))
 	for i := range used {
 		name := used[i].Labels[clusterLabel]
-		clusters[name] += 1
+		clusters[name]++
 	}
 
 	name := n.Labels[clusterLabel]

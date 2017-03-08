@@ -40,11 +40,8 @@ func fromContext(ctx goctx.Context, key string) (bool, cluster.Cluster, *garden.
 	if key == _Garden && c.cluster != nil {
 
 		gd, ok := c.cluster.(*garden.Garden)
-		if ok {
-			return true, c.cluster, gd
-		} else {
-			return false, c.cluster, nil
-		}
+
+		return ok, c.cluster, gd
 	}
 
 	return true, c.cluster, nil
@@ -54,7 +51,7 @@ type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 var masterRoutes = map[string]map[string]ctxHandler{
 	http.MethodGet: {
-		"/nfs_backups/space": getNFS_SPace,
+		"/nfs_backups/space": getNFSSPace,
 
 		"/clusters":        getClusters,
 		"/clusters/{name}": getClustersByID,

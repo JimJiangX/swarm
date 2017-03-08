@@ -129,11 +129,11 @@ func (gd *Garden) Register(req structs.RegisterDC) error {
 			Password:   req.Registry.Password,
 			Email:      req.Registry.Email,
 			Token:      req.Registry.Token,
-			CA_CRT:     req.Registry.CA_CRT,
+			CACert:     req.Registry.CACert,
 		},
 		SSHDeliver: database.SSHDeliver{
 			SourceDir:       req.SSHDeliver.SourceDir,
-			CA_CRT_Name:     req.SSHDeliver.CA_CRT_Name,
+			CACertName:      req.SSHDeliver.CACertName,
 			Destination:     req.SSHDeliver.Destination,
 			InitScriptName:  req.SSHDeliver.InitScriptName,
 			CleanScriptName: req.SSHDeliver.CleanScriptName,
