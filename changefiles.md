@@ -1,6 +1,6 @@
 # change files
 
-
+garden server:
 	/api:
 	
 		+++ master.go
@@ -37,4 +37,11 @@
 	
 	/vendor: ---> vendor.json
 			
-		
+
+seed server:
+	/cli:
+	    +++ join_seed.go 
+	    +   commands.go   seedjoin
+		+	flags.go      flSeedAddr args
+	/seed:all
+	
