@@ -1,9 +1,10 @@
 package seed
 
 import (
+	"encoding/json"
 	"net/http"
 
-	"github.com/Sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"golang.org/x/net/context"
 )
@@ -13,27 +14,60 @@ type _Context struct {
 	context    context.Context
 }
 
+type CommonRes struct {
+	Err string `json:"Err"`
+}
+
+func errCommonHanlde(w http.ResponseWriter, req *http.Request, err error) {
+	bts, _ := json.Marshal(CommonRes{Err: err.Error()})
+	// http.Error(w, string(bts), 400)
+	w.Write(bts)
+	log.Printf("the req %s exec error:%s\n", req.Method+":"+req.URL.Path, err.Error())
+}
+
+func GetVersionHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
+	w.Write([]byte("version:" + ctx.apiVersion + "\n"))
+	// log.Info("the req :", req.Method, req.URL.Path)
+}
+
 func NewRouter() *mux.Router {
 	type handler func(ctx *_Context, w http.ResponseWriter, r *http.Request)
 
 	ctx := &_Context{}
 
 	var routes = map[string]map[string]handler{
-		"GET":  {},
-		"POST": {},
-		"PUT":  {},
+		"GET": {
+			"/san/vglist": VgList,
+			"/version":    GetVersionHandle,
+		},
+		"POST": {
+
+			"/ip/create":           IPCreate,
+			"/VolumeDriver.Update": Update,
+			"/volume/file/cp":      VolumeFileCp,
+
+			"/san/vgcreate": VgCreate,
+			"/san/vgextend": VgExtend,
+
+			// "/san/vgblock":  VgBlock,
+			"/san/activate":   Activate,
+			"/san/deactivate": Deactivate,
+
+			"/san/vg/remove": RemoveVG,
+			"/ip/remove":     IpRemove,
+		},
 	}
 
 	r := mux.NewRouter()
 	for method, mappings := range routes {
 		for route, fct := range mappings {
-			logrus.WithFields(logrus.Fields{"method": method, "route": route}).Debug("Registering HTTP route")
+			log.WithFields(log.Fields{"method": method, "route": route}).Debug("Registering HTTP route")
 
 			localRoute := route
 			localFct := fct
 
 			wrap := func(w http.ResponseWriter, r *http.Request) {
-				logrus.WithFields(logrus.Fields{"method": r.Method, "uri": r.RequestURI}).Debug("HTTP request received")
+				log.WithFields(log.Fields{"method": r.Method, "uri": r.RequestURI}).Debug("HTTP request received")
 
 				ctx.context = r.Context()
 				ctx.apiVersion = mux.Vars(r)["version"]
