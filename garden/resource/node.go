@@ -61,9 +61,11 @@ func parseNodeStatus(status int) string {
 	return "unknown"
 }
 
-const (
-	dockerNodesKVPath = "docker/nodes/KVPath"
-)
+var dockerNodesKVPath = "docker/swarm/nodes"
+
+func SetNodesKVPath(path string) {
+	dockerNodesKVPath = path
+}
 
 type Node struct {
 	node   database.Node
