@@ -207,7 +207,7 @@ type scheduleOption struct {
 	}
 }
 
-func (gd *Garden) schedule(config *cluster.ContainerConfig, opts scheduleOption, stores []structs.VolumeRequire) ([]*node.Node, error) {
+func (gd *Garden) schedule(ctx context.Context, config *cluster.ContainerConfig, opts scheduleOption, stores []structs.VolumeRequire) ([]*node.Node, error) {
 	_scheduler := gd.scheduler
 
 	if opts.scheduler.strategy != "" && len(opts.scheduler.filters) > 0 {
@@ -218,6 +218,12 @@ func (gd *Garden) schedule(config *cluster.ContainerConfig, opts scheduleOption,
 
 	if len(opts.nodes.filters) > 0 {
 		config.AddConstraint("node!=" + strings.Join(opts.nodes.filters, "|"))
+	}
+
+	select {
+	default:
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
 
 	out, err := gd.allocator.ListCandidates(opts.nodes.clusters, opts.nodes.filters, stores)
@@ -251,6 +257,12 @@ func (gd *Garden) schedule(config *cluster.ContainerConfig, opts scheduleOption,
 		nodes = append(nodes, n)
 	}
 
+	select {
+	default:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+
 	nodes, err = _scheduler.SelectNodesForContainer(nodes, config)
 
 	return nodes, err
@@ -268,7 +280,7 @@ type pendingUnit struct {
 func (pu pendingUnit) convertToSpec() structs.UnitSpec {
 	return structs.UnitSpec{}
 }
-func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
+func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, error) {
 	config := cluster.BuildContainerConfig(container.Config{}, container.HostConfig{
 		Resources: container.Resources{
 			CpusetCpus: svc.options.ContainerSpec.Require.CPU,
@@ -296,7 +308,7 @@ func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
 	defer gd.scheduler.Unlock()
 
 	stores := opts.ContainerSpec.Volumes
-	nodes, err := gd.schedule(config, opts, stores)
+	nodes, err := gd.schedule(ctx, config, opts, stores)
 	if err != nil {
 		return nil, err
 	}
@@ -323,6 +335,12 @@ func (gd *Garden) Allocation(svc *Service) ([]pendingUnit, error) {
 			gd.Cluster.RemovePendingContainer(ids...)
 		}
 	}()
+
+	select {
+	default:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 
 	for n := range nodes {
 		units := svc.spec.Units

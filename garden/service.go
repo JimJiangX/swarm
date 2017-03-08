@@ -80,7 +80,7 @@ func (svc Service) Spec() structs.ServiceSpec {
 	return svc.spec
 }
 
-func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.AuthConfig) (err error) {
+func (svc *Service) CreateContainer(ctx context.Context, pendings []pendingUnit, authConfig *types.AuthConfig) (err error) {
 	defer func() {
 		ids := make([]string, len(pendings))
 		for i := range pendings {
@@ -114,6 +114,12 @@ func (svc *Service) CreateContainer(pendings []pendingUnit, authConfig *types.Au
 			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", status, _err)
 		}
 	}()
+
+	select {
+	default:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 
 	for _, pu := range pendings {
 		eng := svc.cluster.Engine(pu.Unit.EngineID)

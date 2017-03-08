@@ -118,7 +118,7 @@ func (s *Stack) DeployServices(ctx context.Context) ([]structs.PostServiceRespon
 
 		s.wg.Add(1)
 
-		go s.deploy(service, *task, auth)
+		go s.deploy(ctx, service, *task, auth)
 	}
 
 	go s.linkAndStart(ctx, existing)
@@ -126,7 +126,7 @@ func (s *Stack) DeployServices(ctx context.Context) ([]structs.PostServiceRespon
 	return out, nil
 }
 
-func (s *Stack) deploy(service *garden.Service, t database.Task, auth *types.AuthConfig) (err error) {
+func (s *Stack) deploy(ctx context.Context, service *garden.Service, t database.Task, auth *types.AuthConfig) (err error) {
 	defer func() {
 		s.wg.Done()
 
@@ -148,13 +148,19 @@ func (s *Stack) deploy(service *garden.Service, t database.Task, auth *types.Aut
 		}
 	}()
 
-	pendings, err := s.gd.Allocation(service)
+	select {
+	default:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	pendings, err := s.gd.Allocation(ctx, service)
 	if err != nil {
 		logrus.WithField("Service", service.Spec().Name).Errorf("Service allocation error %+v", err)
 		return err
 	}
 
-	err = service.CreateContainer(pendings, auth)
+	err = service.CreateContainer(ctx, pendings, auth)
 	if err != nil {
 		logrus.WithField("Service", service.Spec().Name).Errorf("Service create containers error %+v", err)
 	}
