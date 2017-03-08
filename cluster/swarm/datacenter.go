@@ -1279,22 +1279,24 @@ func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
 	node.localStore = localStore
 
 	dc.RLock()
-	defer dc.RUnlock()
-
 	if dc.store == nil || dc.store.Driver() != storage.SANStoreDriver {
+		dc.RUnlock()
 		return err
 	}
+
+	store := dc.store
+	dc.RUnlock()
 
 	wwn := eng.Labels[_SAN_HBA_WWN_Lable]
 	if strings.TrimSpace(wwn) != "" {
 
 		list := strings.Split(wwn, ",")
-		err = dc.store.AddHost(node.ID, list...)
+		err = store.AddHost(node.ID, list...)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				"Node":   node.Name,
-				"Store":  dc.store.ID(),
-				"Vendor": dc.store.Vendor(),
+				"Store":  store.ID(),
+				"Vendor": store.Vendor(),
 			}).WithError(err).Warn("add node to store")
 		}
 	} else {
