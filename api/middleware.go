@@ -14,15 +14,19 @@ import (
 
 // DebugRequestMiddleware dumps the request to logger
 func DebugRequestMiddleware(handler func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
+
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" || logrus.GetLevel() != logrus.DebugLevel {
+		if r.Method != http.MethodPost && r.Method != http.MethodPut {
+
 			handler(w, r)
 			return
 		}
+
 		if err := checkForJSON(r); err != nil {
 			handler(w, r)
 			return
 		}
+
 		maxBodySize := 4096 // 4KB
 		if r.ContentLength > int64(maxBodySize) {
 			handler(w, r)

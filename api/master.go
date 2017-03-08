@@ -161,7 +161,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	},
 }
 
-func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
+func setupMasterRouter(r *mux.Router, context *context, debug, enableCors bool) {
 
 	for method, mappings := range masterRoutes {
 		for route, fct := range mappings {
@@ -178,7 +178,13 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 				}
 
 				context.apiVersion = mux.Vars(r)["version"]
-				ctx := goctx.WithValue(goctx.Background(), _Garden, context)
+				ctx := goctx.Background()
+
+				if wait := intValueOrZero(r, "wait"); wait > 0 {
+					ctx, _ = goctx.WithTimeout(ctx, time.Duration(wait)*time.Second)
+				}
+
+				ctx = goctx.WithValue(ctx, _Garden, context)
 
 				localFct(ctx, w, r)
 
@@ -189,8 +195,13 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 
 			localMethod := method
 
-			r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(wrap)
-			r.Path(localRoute).Methods(localMethod).HandlerFunc(DebugRequestMiddleware(wrap))
+			if debug {
+				r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(DebugRequestMiddleware(wrap))
+				r.Path(localRoute).Methods(localMethod).HandlerFunc(DebugRequestMiddleware(wrap))
+			} else {
+				r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(wrap)
+				r.Path(localRoute).Methods(localMethod).HandlerFunc(wrap)
+			}
 
 			if enableCors {
 				optionsMethod := "OPTIONS"
@@ -211,7 +222,6 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 				r.Path(localRoute).Methods(optionsMethod).
 					HandlerFunc(wrap)
 			}
-
 		}
 	}
 }
