@@ -41,6 +41,16 @@ var (
 			Flags:     []cli.Flag{flJoinAdvertise, flHeartBeat, flTTL, flJoinRandomDelay, flDiscoveryOpt},
 			Action:    join,
 		},
+
+		{
+			Name:      "seedjoin",
+			ShortName: "s",
+			Usage:     "Join a docker cluster with seed server",
+			Flags: []cli.Flag{flJoinAdvertise, flHeartBeat, flTTL, flJoinRandomDelay, flDiscoveryOpt,
+				flSeedAddr, flTLS, flTLSCaCert, flTLSCert, flTLSKey, flTLSVerify},
+			Action: seedJoin,
+		},
+
 		{
 			Name:      "configuration",
 			ShortName: "cfg",

@@ -205,4 +205,10 @@ var (
 		Value: "127.0.0.1:3375",
 		Usage: "address of configure plugin server",
 	}
+
+	flSeedAddr = cli.StringFlag{
+		Name:  "seedAddr",
+		Value: "0.0.0.0:5685",
+		Usage: "address of seed server",
+	}
 )
