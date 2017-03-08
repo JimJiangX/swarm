@@ -113,11 +113,12 @@ func (m master) getNode(nameOrID string) (Node, error) {
 }
 
 type nodeWithTask struct {
-	hdd  []string
-	ssd  []string
-	ssh  structs.SSHConfig
-	Node database.Node
-	Task database.Task
+	hdd    []string
+	ssd    []string
+	config structs.SSHConfig
+	client scplib.ScpClient
+	Node   database.Node
+	Task   database.Task
 }
 
 func NewNodeWithTask(n database.Node, hdd, ssd []string, ssh structs.SSHConfig) nodeWithTask {
@@ -125,11 +126,12 @@ func NewNodeWithTask(n database.Node, hdd, ssd []string, ssh structs.SSHConfig) 
 	t := database.NewTask(n.Addr, database.NodeInstall, n.ID, "install softwares on host", "", 300)
 
 	return nodeWithTask{
-		hdd:  hdd,
-		ssd:  ssd,
-		ssh:  ssh,
-		Node: n,
-		Task: t,
+		hdd:    hdd,
+		ssd:    ssd,
+		config: ssh,
+		client: nil,
+		Node:   n,
+		Task:   t,
 	}
 }
 
@@ -222,12 +224,15 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 		"destination": config.Destination,
 	})
 
-	client, err := scplib.NewScpClient(nt.Node.Addr, nt.ssh.Username, nt.ssh.Password)
-	if err != nil {
-		entry.WithError(err).Error("ssh dial error")
-		return err
+	if nt.client == nil {
+		nt.client, err = scplib.NewScpClient(nt.Node.Addr, nt.config.Username, nt.config.Password)
+		if err != nil {
+			entry.WithError(err).Error("ssh dial error")
+
+			return err
+		}
 	}
-	defer client.Close()
+	defer nt.client.Close()
 
 	select {
 	default:
@@ -235,10 +240,10 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 		return ctx.Err()
 	}
 
-	if err := client.UploadDir(config.Destination, config.SourceDir); err != nil {
+	if err := nt.client.UploadDir(config.Destination, config.SourceDir); err != nil {
 		entry.WithError(err).Error("SSH upload dir:" + config.SourceDir)
 
-		if err := client.UploadDir(config.Destination, config.SourceDir); err != nil {
+		if err := nt.client.UploadDir(config.Destination, config.SourceDir); err != nil {
 			entry.WithError(err).Error("SSH upload dir twice:" + config.SourceDir)
 
 			nodeState = statusNodeSCPFailed
@@ -248,10 +253,10 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 
 	_, filename, _ := config.DestPath()
 
-	if err := client.Upload(config.Registry.CA_CRT, filename, 0644); err != nil {
+	if err := nt.client.Upload(config.Registry.CA_CRT, filename, 0644); err != nil {
 		entry.WithError(err).Error("SSH upload file:" + filename)
 
-		if err := client.Upload(config.Registry.CA_CRT, filename, 0644); err != nil {
+		if err := nt.client.Upload(config.Registry.CA_CRT, filename, 0644); err != nil {
 			entry.WithError(err).Error("SSH upload file twice:" + filename)
 
 			nodeState = statusNodeSCPFailed
@@ -265,11 +270,11 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 		return ctx.Err()
 	}
 
-	out, err := client.Exec(script)
+	out, err := nt.client.Exec(script)
 	if err != nil {
 		entry.WithError(err).Errorf("exec remote command:'%s',output:%s", script, out)
 
-		if out, err = client.Exec(script); err != nil {
+		if out, err = nt.client.Exec(script); err != nil {
 			entry.WithError(err).Errorf("exec remote command twice:'%s',output:%s", script, out)
 
 			nodeState = statusNodeSSHExecFailed
