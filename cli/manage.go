@@ -140,6 +140,22 @@ func getDiscoveryOpt(c *cli.Context) map[string]string {
 	return options
 }
 
+func setNodesKVPath(uri string) {
+	var prefix string
+
+	parts := strings.SplitN(uri, "://", 2)
+	if len(parts) == 2 {
+		uri = parts[1]
+	}
+
+	parts = strings.SplitN(uri, "/", 2)
+	if len(parts) == 2 {
+		prefix = parts[1]
+	}
+
+	resource.SetNodesKVPath(prefix)
+}
+
 func getOrmer(c *cli.Context) (database.Ormer, error) {
 	auth := c.String("dbAuth")
 	user, password, err := utils.Base64Decode(auth)
@@ -337,6 +353,8 @@ func manage(c *cli.Context) {
 		if err != nil {
 			break
 		}
+
+		setNodesKVPath(uri)
 
 		ormer, err = getOrmer(c)
 		if err != nil {
