@@ -345,7 +345,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, `{"%q":%q,"%q":%q}`, "id", id, "task_id", taskID)
+	fmt.Fprintf(w, "{%q:%q,%q:%q}", "id", id, "task_id", taskID)
 }
 
 func deleteImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -567,29 +567,25 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	nodes := resource.NewNodeWithTaskList(len(list))
 	for i, n := range list {
-		nodes[i], err = resource.NewNodeWithTask(n.Username, n.Password,
-			n.HDD, n.SSD,
-			database.Node{
-				ID:           utils.Generate32UUID(),
-				ClusterID:    n.Cluster,
-				Addr:         n.Addr,
-				EngineID:     "",
-				Room:         n.Room,
-				Seat:         n.Seat,
-				MaxContainer: n.MaxContainer,
-				Status:       0,
-				Enabled:      false,
-				NFS: database.NFS{
-					Addr:     n.NFS.Address,
-					Dir:      n.NFS.Dir,
-					MountDir: n.NFS.MountDir,
-					Options:  n.NFS.Options,
-				},
-			})
-		if err != nil {
-			httpJSONError(w, err, http.StatusInternalServerError)
-			return
+		node := database.Node{
+			ID:           utils.Generate32UUID(),
+			ClusterID:    n.Cluster,
+			Addr:         n.Addr,
+			EngineID:     "",
+			Room:         n.Room,
+			Seat:         n.Seat,
+			MaxContainer: n.MaxContainer,
+			Status:       0,
+			Enabled:      false,
+			NFS: database.NFS{
+				Addr:     n.NFS.Address,
+				Dir:      n.NFS.Dir,
+				MountDir: n.NFS.MountDir,
+				Options:  n.NFS.Options,
+			},
 		}
+
+		nodes[i] = resource.NewNodeWithTask(node, n.HDD, n.SSD, n.SSHConfig)
 	}
 
 	horus, err := gd.KVClient().GetHorusAddr()
