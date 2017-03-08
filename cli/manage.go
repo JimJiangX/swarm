@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -139,29 +138,6 @@ func getDiscoveryOpt(c *cli.Context) map[string]string {
 		options["kv.path"] = "docker/swarm/nodes"
 	}
 	return options
-}
-
-func setNodesKVPath(path string, opts map[string]string) {
-	var prefix string
-
-	parts := strings.SplitN(path, "://", 2)
-	if len(parts) == 2 {
-		path = parts[1]
-	}
-
-	parts = strings.SplitN(path, "/", 2)
-	if len(parts) == 2 {
-		prefix = parts[1]
-	}
-
-	dpath := "docker/nodes"
-	if opts["kv.path"] != "" {
-		dpath = opts["kv.path"]
-	}
-
-	dpath = filepath.Join(prefix, dpath)
-
-	resource.SetNodesKVPath(dpath)
 }
 
 func getOrmer(c *cli.Context) (database.Ormer, error) {
@@ -361,8 +337,6 @@ func manage(c *cli.Context) {
 		if err != nil {
 			break
 		}
-
-		setNodesKVPath(uri, getDiscoveryOpt(c))
 
 		ormer, err = getOrmer(c)
 		if err != nil {
