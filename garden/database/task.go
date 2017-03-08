@@ -61,7 +61,7 @@ func NewTask(object, relate, linkto, desc, labels string, timeout int) Task {
 		Desc:      desc,
 		Labels:    labels,
 		Timeout:   time.Duration(timeout) * time.Second,
-		Status:    TaskCreateStatus,
+		Status:    TaskRunningStatus,
 		CreatedAt: time.Now(),
 	}
 }

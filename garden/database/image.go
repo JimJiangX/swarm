@@ -99,11 +99,11 @@ func (db dbBase) DelImage(ID string) error {
 	do := func(tx *sqlx.Tx) error {
 
 		n := 0
-		query := "SELECT COUNT(id) FROM " + db.serviceTable() + " WHERE image_id=?"
+		query := "SELECT COUNT(id) FROM " + db.serviceTable() + " WHERE docker_image_id=?"
 
 		err := tx.Get(&n, query, ID)
 		if err != nil {
-			return errors.Wrap(err, "Count Service filter by image_id")
+			return errors.Wrap(err, "Count Service filter by id")
 		}
 
 		if n > 0 {
