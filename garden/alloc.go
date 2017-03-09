@@ -22,7 +22,13 @@ import (
 	"golang.org/x/net/context"
 )
 
-const clusterLabel = "Cluster"
+// add engine labels for schedule
+const (
+	nodeLabel    = "node"
+	roomLabel    = "room"
+	seatLabel    = "seat"
+	clusterLabel = "Cluster"
+)
 
 type allocator interface {
 	ListCandidates(clusters, filters []string, stores []structs.VolumeRequire) ([]database.Node, error)
@@ -182,6 +188,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 		ContainerSpec: spec.ContainerSpec,
 		Options:       spec.Options,
 	}
+	service.options.nodes.clusters = spec.Clusters
 	service.options.nodes.constraint = spec.Constraint
 
 	return service, &t, nil
@@ -216,8 +223,14 @@ func (gd *Garden) schedule(ctx context.Context, config *cluster.ContainerConfig,
 		_scheduler = scheduler.New(strategy, filters)
 	}
 
+	for _, c := range opts.nodes.constraint {
+		config.AddConstraint(c)
+	}
 	if len(opts.nodes.filters) > 0 {
-		config.AddConstraint("node!=" + strings.Join(opts.nodes.filters, "|"))
+		config.AddConstraint(nodeLabel + "!=" + strings.Join(opts.nodes.filters, "|"))
+	}
+	if len(opts.nodes.clusters) > 0 {
+		config.AddConstraint(clusterLabel + "==" + strings.Join(opts.nodes.clusters, "|"))
 	}
 
 	select {
@@ -250,6 +263,9 @@ func (gd *Garden) schedule(ctx context.Context, config *cluster.ContainerConfig,
 				}
 
 				n.Labels[clusterLabel] = out[o].ClusterID
+				n.Labels[nodeLabel] = out[o].ID
+				n.Labels[roomLabel] = out[o].Room
+				n.Labels[seatLabel] = out[o].Seat
 				break
 			}
 		}

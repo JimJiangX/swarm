@@ -88,6 +88,7 @@ type ServiceSpec struct {
 	Service
 	ContainerSpec ContainerSpec
 
+	Clusters   []string
 	Constraint []string
 	Options    map[string]interface{}
 
