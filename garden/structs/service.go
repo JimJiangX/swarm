@@ -1,11 +1,16 @@
 package structs
 
-import "time"
+import (
+	"time"
+
+	"github.com/docker/swarm/cluster"
+)
 
 // Service if table structure
 type Service struct {
-	ID                string `db:"id" json:"id"`
-	Name              string `db:"name" json:"name"`
+	ID   string `db:"id" json:"id"`
+	Name string `db:"name" json:"name"`
+	// TODO:maybe remove
 	Image             string `db:"image_id" json:"image_id"`       // imageName:imageVersion
 	Desc              string `db:"description" json:"description"` // short for Description
 	Architecture      string `db:"architecture" json:"architecture"`
@@ -48,14 +53,11 @@ type Unit struct {
 type UnitSpec struct {
 	Unit
 
-	Require, Limit struct {
-		CPU    string
-		Memory int64
-	}
+	Config *cluster.ContainerConfig
 
 	Engine struct {
-		ID string
-		IP string
+		ID   string
+		Addr string
 	}
 
 	Networking struct {
@@ -82,36 +84,39 @@ type UnitSpec struct {
 }
 
 type ServiceSpec struct {
-	Priority int
-	Replicas int
+	Priority     int    `json:"priority"`
+	Replicas     int    `json:"replicas"`
+	ImageVersion string `json:"image_version"`
+
 	Service
-	ContainerSpec ContainerSpec
 
-	Clusters   []string
-	Constraint []string
-	Options    map[string]interface{}
+	Require UnitRequire `json:"unit_require"`
 
-	Units []UnitSpec
+	Clusters    []string `json:"clusters"`
+	Constraints []string `json:"constraints"`
 
-	Deps []*ServiceSpec
+	Options map[string]interface{} `json:"options"`
+
+	Units []UnitSpec `json:"units"`
+
+	Deps []*ServiceSpec `json:"dependence"`
 }
 
-type ContainerSpec struct {
+type UnitRequire struct {
 	Require, Limit struct {
-		CPU    string
-		Memory int64
+		CPU    int   `json:"ncpu"`
+		Memory int64 `json:"memory"`
 	}
 
-	Volumes []VolumeRequire
+	Volumes []VolumeRequire `json:"volumes"`
 
-	Networkings []NetDeviceRequire
+	Networkings []NetDeviceRequire `json:"networks"`
 }
 
 type NetDeviceRequire struct {
-	Device     int
-	Bandwidth  int // M/s
-	Networking string
-	Type       string
+	Device     int    `json:"device"`
+	Bandwidth  int    `json:"bandwidth"` // M/s
+	Networking string `json:"netwroking"`
 }
 
 type PostServiceResponse struct {

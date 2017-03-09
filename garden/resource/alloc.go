@@ -128,13 +128,13 @@ func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n
 	return volumes, nil
 }
 
-func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, cpu, memory int, reserved []string) (string, error) {
-	if node.TotalCpus-node.UsedCpus < int64(cpu) {
-		return "", errors.New("")
+func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, ncpu, memory int64, reserved []string) (string, error) {
+	if free := node.TotalCpus - node.UsedCpus; free < ncpu {
+		return "", errors.Errorf("Node:%s CPU is unavailable,%d<%d", node.Addr, free, ncpu)
 	}
 
-	if node.TotalMemory-node.UsedMemory < int64(memory) {
-		return "", errors.New("")
+	if free := node.TotalMemory - node.UsedMemory; free < memory {
+		return "", errors.Errorf("Node:%s Memory is unavailable,%d<%d", node.Addr, free, memory)
 	}
 
 	containers := node.Containers
@@ -144,7 +144,7 @@ func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.
 		used = append(used, containers[i].Config.HostConfig.CpusetCpus)
 	}
 
-	return findIdleCPUs(used, int(node.TotalCpus), cpu)
+	return findIdleCPUs(used, int(node.TotalCpus), int(ncpu))
 }
 
 func (at allocator) RecycleResource() error {
