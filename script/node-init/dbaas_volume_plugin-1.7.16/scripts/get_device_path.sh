@@ -5,7 +5,7 @@ VENDOR=$1
 HLUN_ID=$2
 
 check() {
-	n=`lsscsi -i *:*:*:${HLUN_ID} | awk '{print $6}' | uniq | wc -l`	
+	n=`lsscsi -i *:*:*:${HLUN_ID} | awk '{print $NF}' | uniq | wc -l`	
 	if [ ${n} -ne 1 ]; then
 		echo "Please start multipatchd.service and set \"user_friendly_names no\" in /etc/multipath.conf"
 		exit 2
@@ -17,7 +17,7 @@ loop=0
 while(( $loop<=19 ))
 do
 	check
-	mdev_name=`lsscsi -i *:*:*:${HLUN_ID} | awk '{print $6}' | uniq`
+	mdev_name=`lsscsi -i *:*:*:${HLUN_ID} | awk '{print $NF}' | uniq`
 	name_char_count=`echo -n ${mdev_name} | wc -m`
 	if [ "${mdev_name}" != '' ] && [ ${name_char_count} -eq 33 ]; then 
 		echo /dev/mapper/${mdev_name}
