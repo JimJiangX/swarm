@@ -70,7 +70,6 @@ func NewRouter(version string) *mux.Router {
 				log.WithFields(log.Fields{"method": r.Method, "uri": r.RequestURI}).Debug("HTTP request received")
 
 				ctx.context = r.Context()
-				ctx.apiVersion = mux.Vars(r)["version"]
 
 				localFct(ctx, w, r)
 			}
