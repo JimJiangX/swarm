@@ -1,11 +1,16 @@
 package sdk
 
 import (
+	"crypto/tls"
 	"encoding/json"
-	"io/ioutil"
+	"net"
 	"net/http"
+	"strconv"
+	"time"
 
+	httpclient "github.com/docker/swarm/plugin/client"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 // commonResonse common http requet response body msg
@@ -79,33 +84,52 @@ type VolumeFileConfig struct {
 	Mode      string `json:"mode"`
 }
 
+type client struct {
+	c httpclient.Client
+}
+
+func CreateClient(addr string, timeout time.Duration, tlsConfig *tls.Config) (ClientAPI, error) {
+
+	if err := checkAddr(addr); err != nil {
+		return nil, errors.Wrap(err, "CreateClient:checkAddr")
+	}
+
+	cli := httpclient.NewClient(addr, timeout, tlsConfig)
+	c := client{c: cli}
+
+	return c, nil
+}
+
+type ClientAPI interface {
+	GetVgList() ([]VgInfo, error)
+	CreateIP(opt IPDevConfig) error
+	RemoveIP(opt IPDevConfig) error
+	VolumeUpdate(opt VolumeUpdateOption) error
+
+	CopyFileToVolume(opt VolumeFileConfig) error
+
+	SanDeActivate(opt DeactivateConfig) error
+	SanActivate(opt ActiveConfig) error
+	SanVgCreate(opt VgConfig) error
+	SanVgExtend(opt VgConfig) error
+}
+
 // GetVgList returns remote host VG list
 // addr is the remote host server agent bind address
-func GetVgList(addr string) ([]VgInfo, error) {
-	uri := "http://" + addr + "/san/vglist"
-	resp, err := http.Get(uri)
+func (c client) GetVgList() ([]VgInfo, error) {
+
+	var res vgListResonse
+
+	resp, err := httpclient.RequireOK(c.c.Get(nil, "/san/vglist"))
 	if err != nil {
-		return nil, errors.Wrap(err, "GET:"+uri)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := ioutil.ReadAll(resp.Body)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Errorf("GET %s:response code=%d,body=%s,%v", uri, resp.StatusCode, respBody, err)
+		return nil, err
 	}
 
-	if err != nil {
-		return nil, errors.Wrapf(err, "read request POST:"+uri+" body")
-	}
+	defer httpclient.EnsureBodyClose(resp)
 
-	res := vgListResonse{}
-	if err := json.Unmarshal(respBody, &res); err != nil {
-		return nil, errors.Wrapf(err, "JSON unmarshal GET:"+uri+" body:"+string(respBody))
-	}
-
+	err = decodeBody(resp, &res)
 	if len(res.Err) > 0 {
-		return nil, errors.New("GET:" + uri + " error:" + res.Err)
+		return nil, errors.New(res.Err)
 	}
 
 	return res.Vgs, nil
@@ -113,97 +137,97 @@ func GetVgList(addr string) ([]VgInfo, error) {
 
 // CreateIP create a IP on remote host
 // addr is the remote host server agent bind address
-func CreateIP(addr string, opt IPDevConfig) error {
-	body, err := encodeBody(&opt)
-	if err != nil {
-		return errors.Wrap(err, addr+": create IP")
-	}
-
-	uri := "http://" + addr + "/ip/create"
-
-	return postHTTP(uri, body)
+func (c client) CreateIP(opt IPDevConfig) error {
+	return c.postWrap(nil, "/ip/create", opt)
 }
 
 // RemoveIP remove the IP from remote host
 // addr is the remote host server agent bind address
-func RemoveIP(addr string, opt IPDevConfig) error {
-	body, err := encodeBody(&opt)
-	if err != nil {
-		return errors.Wrap(err, addr+": remove IP")
-	}
+func (c client) RemoveIP(opt IPDevConfig) error {
+	return c.postWrap(nil, "/ip/remove", opt)
 
-	uri := "http://" + addr + "/ip/remove"
-	return postHTTP(uri, body)
 }
 
 // VolumeUpdate update volume optinal on remote host
 // addr is the remote host server agent bind address
-func VolumeUpdate(addr string, opt VolumeUpdateOption) error {
-	body, err := encodeBody(&opt)
-	if err != nil {
-		return errors.Wrap(err, addr+": volume update")
-	}
-
-	uri := "http://" + addr + "/VolumeDriver.Update"
-	return postHTTP(uri, body)
+func (c client) VolumeUpdate(opt VolumeUpdateOption) error {
+	return c.postWrap(nil, "/VolumeDriver.Update", opt)
 }
 
 // SanVgCreate create new VG on remote host
 // addr is the remote host server agent bind address
-func SanVgCreate(addr string, opt VgConfig) error {
-	body, err := encodeBody(&opt)
-	if err != nil {
-		return errors.Wrap(err, addr+": SAN VG create")
-	}
-
-	uri := "http://" + addr + "/san/vgcreate"
-	return postHTTP(uri, body)
+func (c client) SanVgCreate(opt VgConfig) error {
+	return c.postWrap(nil, "/san/vgcreate", opt)
 }
 
 // SanVgExtend extense the specified VG Size on remote host
 // addr is the remote host server agent bind address
-func SanVgExtend(addr string, opt VgConfig) error {
-	body, err := encodeBody(&opt)
-	if err != nil {
-		return errors.Wrap(err, addr+": SAN VG extend")
-	}
-
-	uri := "http://" + addr + "/san/vgextend"
-	return postHTTP(uri, body)
+func (c client) SanVgExtend(opt VgConfig) error {
+	return c.postWrap(nil, "/san/vgextend", opt)
 }
 
 // SanActivate activates the specified LV remote host
 // addr is the remote host server agent bind address
-func SanActivate(addr string, opt ActiveConfig) error {
-	body, err := encodeBody(&opt)
-	if err != nil {
-		return errors.Wrap(err, addr+": SAN activate")
-	}
-
-	uri := "http://" + addr + "/san/activate"
-	return postHTTP(uri, body)
+func (c client) SanActivate(opt ActiveConfig) error {
+	return c.postWrap(nil, "/san/activate", opt)
 }
 
 // SanDeActivate Deactivates the specified LV on remote host
 // addr is the remote host server agent bind address
-func SanDeActivate(addr string, opt DeactivateConfig) error {
-	body, err := encodeBody(&opt)
-	if err != nil {
-		return errors.Wrap(err, addr+": SAN deactivate")
-	}
-
-	uri := "http://" + addr + "/san/deactivate"
-	return postHTTP(uri, body)
+func (c client) SanDeActivate(opt DeactivateConfig) error {
+	return c.postWrap(nil, "/san/deactivate", opt)
 }
 
 // CopyFileToVolume Post file to the specified LV on remote host
 // addr is the remote host server agent bind address
-func CopyFileToVolume(addr string, opt VolumeFileConfig) error {
-	body, err := encodeBody(&opt)
+func (c client) CopyFileToVolume(opt VolumeFileConfig) error {
+	return c.postWrap(nil, "/volume/file/cp", opt)
+
+}
+
+// decodeBody is used to JSON decode a body
+func decodeBody(resp *http.Response, out interface{}) error {
+	dec := json.NewDecoder(resp.Body)
+	return dec.Decode(out)
+}
+
+func checkAddr(addr string) error {
+
+	// validate addr is in host:port form. Use net function to handle both IPv4/IPv6 cases.
+	_, port, err := net.SplitHostPort(addr)
 	if err != nil {
-		return errors.Wrap(err, addr+": copy file to volume")
+		return errors.Wrap(err, "please validate addr is in host:port form")
+	}
+	portNum, err := strconv.Atoi(port)
+	if err == nil {
+		return errors.Wrap(err, "strconv.Atoi port fail")
 	}
 
-	uri := "http://" + addr + "/volume/file/cp"
-	return postHTTP(uri, body)
+	if !(portNum > 0 && portNum <= 65535) {
+		return errors.Wrap(err, " port should:  portNum > 0 && portNum <= 65535")
+	}
+
+	return nil
+}
+
+func (c client) postWrap(ctx context.Context, url string, opt interface{}) error {
+	res := commonResonse{}
+
+	resp, err := httpclient.RequireOK(c.c.Post(ctx, url, opt))
+	if err != nil {
+		return err
+	}
+
+	defer httpclient.EnsureBodyClose(resp)
+
+	err = decodeBody(resp, &res)
+	if err != nil {
+		return err
+	}
+
+	if len(res.Err) > 0 {
+		return errors.New(res.Err)
+	}
+
+	return nil
 }

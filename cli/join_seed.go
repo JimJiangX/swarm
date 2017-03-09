@@ -1,10 +1,8 @@
 package cli
 
 import (
-	"crypto/tls"
 	"math/rand"
-	"net"
-	"strconv"
+
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -14,53 +12,20 @@ import (
 	"github.com/docker/swarm/seed"
 )
 
-func checkSeedAddrFormat(addr string) bool {
-	// validate addr is in host:port form. Use net function to handle both IPv4/IPv6 cases.
-	_, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		return false
-	}
-	portNum, err := strconv.Atoi(port)
-	return err == nil && portNum > 0 && portNum <= 65535
-}
-
 func seedServer(c *cli.Context) {
-	var (
-		tlsConfig *tls.Config
-		err       error
-	)
 
 	seedAddr := c.String("seedAddr")
 	if seedAddr == "" {
 		log.Fatal("missing mandatory --seedAddr flag")
 	}
 
-	if !checkSeedAddrFormat(seedAddr) {
+	if !checkAddrFormat(seedAddr) {
 		log.Fatal("seed addr should be of the form ip:port or hostname:port")
 	}
 
-	// If either --tls or --tlsverify are specified, load the certificates.
-	if c.Bool("tls") || c.Bool("tlsverify") {
-		if !c.IsSet("tlscert") || !c.IsSet("tlskey") {
-			log.Fatal("--tlscert and --tlskey must be provided when using --tls")
-		}
-		if c.Bool("tlsverify") && !c.IsSet("tlscacert") {
-			log.Fatal("--tlscacert must be provided when using --tlsverify")
-		}
-		tlsConfig, err = loadTLSConfig(
-			c.String("tlscacert"),
-			c.String("tlscert"),
-			c.String("tlskey"),
-			c.Bool("tlsverify"))
-		if err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		// Otherwise, if neither --tls nor --tlsverify are specified, abort if
-		// the other flags are passed as they will be ignored.
-		if c.IsSet("tlscert") || c.IsSet("tlskey") || c.IsSet("tlscacert") {
-			log.Fatal("--tlscert, --tlskey and --tlscacert require the use of either --tls or --tlsverify")
-		}
+	tlsConfig, err := loadTLSConfigFromContext(c)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	server := api.NewServer([]string{seedAddr}, tlsConfig)
