@@ -118,7 +118,7 @@ func (c *client) Head(ctx context.Context, url string) (*http.Response, error) {
 }
 
 func (c *client) Post(ctx context.Context, url string, body interface{}) (*http.Response, error) {
-	return c.Do(ctx, http.MethodGet, url, body)
+	return c.Do(ctx, http.MethodPost, url, body)
 }
 
 func (c *client) Put(ctx context.Context, url string, body interface{}) (*http.Response, error) {
