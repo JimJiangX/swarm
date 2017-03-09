@@ -227,9 +227,9 @@ init_hdd_vg() {
 		return
 	fi
 
-	hdd_dev_array=( ${hdd_dev/\,/\ } )
+	hdd_dev_array=${hdd_dev//\,/\ }
 		
-	for dev_name in ${hdd_dev_array[@]}
+	for dev_name in ${hdd_dev_array}
 	do
 		pvcreate -ffy /dev/${dev_name}
 		if [ $? -ne 0 ]; then
@@ -257,9 +257,9 @@ init_ssd_vg() {
 		return
 	fi
 
-	ssd_dev_array=( ${ssd_dev/\,/\ } )
+	ssd_dev_array=${ssd_dev//\,/\ }
 		
-	for dev_name in ${ssd_dev_array[@]}
+	for dev_name in ${ssd_dev_array}
 	do
 		pvcreate -ffy /dev/${dev_name}
 		if [ $? -ne 0 ]; then
