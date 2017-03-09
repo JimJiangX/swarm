@@ -30,10 +30,10 @@ func GetVersionHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	// log.Info("the req :", req.Method, req.URL.Path)
 }
 
-func NewRouter() *mux.Router {
+func NewRouter(version string) *mux.Router {
 	type handler func(ctx *_Context, w http.ResponseWriter, r *http.Request)
 
-	ctx := &_Context{}
+	ctx := &_Context{apiVersion: version}
 
 	var routes = map[string]map[string]handler{
 		"GET": {

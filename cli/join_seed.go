@@ -12,6 +12,10 @@ import (
 	"github.com/docker/swarm/seed"
 )
 
+const (
+	Seedversion = "1.0.0"
+)
+
 func seedServer(c *cli.Context) {
 
 	seedAddr := c.String("seedAddr")
@@ -30,13 +34,14 @@ func seedServer(c *cli.Context) {
 
 	server := api.NewServer([]string{seedAddr}, tlsConfig)
 
-	server.SetHandler(seed.NewRouter())
+	server.SetHandler(seed.NewRouter(Seedversion))
 
 	log.Infof("STARTING SEED SERVER ON : %s", seedAddr)
 	log.Fatal(server.ListenAndServe())
 }
 
 func seedJoin(c *cli.Context) {
+	log.Info("seed version:", Seedversion)
 	dflag := getDiscovery(c)
 	if dflag == "" {
 		log.Fatalf("discovery required to join a cluster. See '%s join --help'.", c.App.Name)

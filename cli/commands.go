@@ -45,7 +45,7 @@ var (
 		{
 			Name:      "seedjoin",
 			ShortName: "s",
-			Usage:     "Join a docker cluster with seed server",
+			Usage:     "Join a docker cluster with seed server(version:" + Seedversion + ")",
 			Flags: []cli.Flag{flJoinAdvertise, flHeartBeat, flTTL, flJoinRandomDelay, flDiscoveryOpt,
 				flSeedAddr, flTLS, flTLSCaCert, flTLSCert, flTLSKey, flTLSVerify},
 			Action: seedJoin,
