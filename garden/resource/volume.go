@@ -7,6 +7,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 )
 
@@ -72,8 +73,8 @@ func (lv *localVolume) Alloc(uid string, require structs.VolumeRequire) (*databa
 
 	volume := database.Volume{
 		Size:       require.Size,
-		ID:         "",
-		Name:       "",
+		ID:         utils.Generate32UUID(),
+		Name:       uid[:8] + space.VG + require.Name,
 		UnitID:     uid,
 		VG:         space.VG,
 		Driver:     lv.Driver(),
@@ -137,6 +138,7 @@ func (vds volumeDrivers) isSpaceEnough(stores []structs.VolumeRequire) error {
 	}
 
 	for typ, size := range need {
+
 		driver := vds.get(typ)
 		if driver == nil {
 			return errors.New("not found volumeDriver by type:" + typ)

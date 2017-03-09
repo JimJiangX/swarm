@@ -27,12 +27,13 @@ type Service struct {
 }
 
 type VolumeRequire struct {
-	From    string
-	Name    string
-	Type    string
-	Driver  string
-	Size    int64
-	Options map[string]interface{}
+	From   string `json:"from,omitempty"`
+	Name   string `json:"name"`
+	Type   string `json:"type"`
+	Driver string `json:"driver,omitempty"`
+	Size   int64  `json:"size"`
+
+	Options map[string]interface{} `json:"options"`
 }
 
 type Unit struct {
@@ -45,8 +46,8 @@ type Unit struct {
 	NetworkMode string `db:"network_mode" json:"network_mode"`
 	Networks    string `db:"networks_desc" json:"networks_desc"`
 	LatestError string `db:"latest_error" json:"latest_error"`
+	Status      int    `db:"status" json:"status"`
 
-	Status    int       `db:"status" json:"status"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
@@ -103,18 +104,22 @@ type ServiceSpec struct {
 }
 
 type UnitRequire struct {
-	Require, Limit struct {
+	Require struct {
 		CPU    int   `json:"ncpu"`
 		Memory int64 `json:"memory"`
-	}
+	} `json:"require"`
 
-	Volumes []VolumeRequire `json:"volumes"`
+	Limit *struct {
+		CPU    int   `json:"ncpu"`
+		Memory int64 `json:"memory"`
+	} `json:"limit,omitempty"`
 
+	Volumes     []VolumeRequire    `json:"volumes"`
 	Networkings []NetDeviceRequire `json:"networks"`
 }
 
 type NetDeviceRequire struct {
-	Device     int    `json:"device"`
+	Device     int    `json:"device,omitempty"`
 	Bandwidth  int    `json:"bandwidth"` // M/s
 	Networking string `json:"netwroking"`
 }
