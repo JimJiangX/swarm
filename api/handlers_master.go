@@ -29,22 +29,17 @@ var errUnsupportGarden = stderr.New("unsupport Garden yet")
 func httpJSONError(w http.ResponseWriter, err error, status int) {
 	field := logrus.WithField("status", status)
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-
-		_err := json.NewEncoder(w).Encode(structs.ResponseHead{
+		json.NewEncoder(w).Encode(structs.ResponseHead{
 			Result:  false,
 			Code:    status,
 			Message: err.Error(),
 		})
 
 		field.Errorf("HTTP error: %+v", err)
-
-		if _err != nil {
-			field.Errorf("JSON Encode error: %+v", err)
-		}
 	}
 }
 
@@ -52,12 +47,11 @@ func httpJSONError(w http.ResponseWriter, err error, status int) {
 func httpJSONErrorWithBody(w http.ResponseWriter, obj interface{}, err error, status int) {
 	field := logrus.WithField("status", status)
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-
-		_err := json.NewEncoder(w).Encode(structs.ResponseHead{
+		json.NewEncoder(w).Encode(structs.ResponseHead{
 			Result:  false,
 			Code:    status,
 			Message: err.Error(),
@@ -65,24 +59,15 @@ func httpJSONErrorWithBody(w http.ResponseWriter, obj interface{}, err error, st
 		})
 
 		field.Errorf("HTTP error: %+v", err)
-
-		if _err != nil {
-			field.Errorf("JSON Encode error: %+v", err)
-		}
 	}
 }
 
 func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
-
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 
 	if obj != nil {
-		w.Header().Set("Content-Type", "application/json")
-
-		err := json.NewEncoder(w).Encode(obj)
-		if err != nil {
-			logrus.WithField("status", status).Errorf("JSON Encode error: %+v", err)
-		}
+		json.NewEncoder(w).Encode(obj)
 	}
 }
 
@@ -152,7 +137,7 @@ func execNFScmd(ip, dir, mount, opts string) ([]byte, error) {
 	return out, nil
 }
 
-func getNFS_SPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpJSONError(w, err, http.StatusBadRequest)
 		return
@@ -176,7 +161,6 @@ func getNFS_SPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"total_space": %d,"free_space": %d}`, total, free)
 }
 

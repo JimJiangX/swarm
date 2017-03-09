@@ -65,5 +65,5 @@ func factory(name, version string) (parser, error) {
 	default:
 	}
 
-	return nil, fmt.Errorf("Unsupported image %s:%s yet.", name, version)
+	return nil, fmt.Errorf("Unsupported image %s:%s yet", name, version)
 }

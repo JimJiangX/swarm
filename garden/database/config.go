@@ -49,7 +49,7 @@ type Users struct {
 // SSHDeliver node-init and node-clean settings
 type SSHDeliver struct {
 	SourceDir       string `db:"source_dir"`
-	CA_CRT_Name     string `db:"ca_crt_name"`
+	CACertName      string `db:"ca_crt_name"`
 	Destination     string `db:"destination_dir"` // must be exist
 	InitScriptName  string `db:"init_script_name"`
 	CleanScriptName string `db:"clean_script_name"`
@@ -60,7 +60,7 @@ func (d SSHDeliver) DestPath() (string, string, string) {
 	base := filepath.Base(d.SourceDir)
 
 	return filepath.Join(d.Destination, base, d.InitScriptName),
-		filepath.Join(d.Destination, base, d.CA_CRT_Name),
+		filepath.Join(d.Destination, base, d.CACertName),
 		filepath.Join(d.Destination, d.CleanScriptName)
 }
 
@@ -93,7 +93,7 @@ type Registry struct {
 	Password   string `db:"registry_password"`
 	Email      string `db:"registry_email"`
 	Token      string `db:"registry_token"`
-	CA_CRT     string `db:"registry_ca_crt"`
+	CACert     string `db:"registry_ca_crt"`
 }
 
 func (db dbBase) sysConfigTable() string {

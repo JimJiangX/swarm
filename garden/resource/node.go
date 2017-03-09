@@ -61,9 +61,11 @@ func parseNodeStatus(status int) string {
 	return "unknown"
 }
 
-const (
-	dockerNodesKVPath = "docker/nodes/KVPath"
-)
+var dockerNodesKVPath = ""
+
+func SetNodesKVPath(path string) {
+	dockerNodesKVPath = path
+}
 
 type Node struct {
 	node   database.Node
@@ -253,10 +255,10 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 
 	_, filename, _ := config.DestPath()
 
-	if err := nt.client.Upload(config.Registry.CA_CRT, filename, 0644); err != nil {
+	if err := nt.client.Upload(config.Registry.CACert, filename, 0644); err != nil {
 		entry.WithError(err).Error("SSH upload file:" + filename)
 
-		if err := nt.client.Upload(config.Registry.CA_CRT, filename, 0644); err != nil {
+		if err := nt.client.Upload(config.Registry.CACert, filename, 0644); err != nil {
 			entry.WithError(err).Error("SSH upload file twice:" + filename)
 
 			nodeState = statusNodeSCPFailed
@@ -288,7 +290,7 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 }
 
 // CA,script,error
-func (node *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) (string, error) {
+func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) (string, error) {
 	horusIP, horusPort, err := net.SplitHostPort(horus)
 	if err != nil {
 		return "", errors.Wrap(err, "Horus addr:"+horus)
@@ -341,20 +343,20 @@ func (node *nodeWithTask) modifyProfile(horus string, config *database.SysConfig
 		ext_nic=bond2
 	*/
 	hdd, ssd := "null", "null"
-	if len(node.hdd) > 0 {
-		hdd = strings.Join(node.hdd, ",")
+	if len(nt.hdd) > 0 {
+		hdd = strings.Join(nt.hdd, ",")
 	}
-	if len(node.ssd) > 0 {
-		ssd = strings.Join(node.ssd, ",")
+	if len(nt.ssd) > 0 {
+		ssd = strings.Join(nt.ssd, ",")
 	}
 
 	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %d %s %s %s %d %s %s %s %s",
-		path, path, dockerNodesKVPath, node.Node.Addr, config.ConsulDatacenter, string(buf),
+		path, path, dockerNodesKVPath, nt.Node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile,
 		config.DockerPort, hdd, ssd, config.HorusAgentPort, config.ConsulPort,
-		node.Node.ID, horusIP, horusPort, config.PluginPort,
-		node.Node.NFS.Addr, node.Node.NFS.Dir, node.Node.NFS.MountDir, node.Node.NFS.Options)
+		nt.Node.ID, horusIP, horusPort, config.PluginPort,
+		nt.Node.NFS.Addr, nt.Node.NFS.Dir, nt.Node.NFS.MountDir, nt.Node.NFS.Options)
 
 	return script, nil
 }

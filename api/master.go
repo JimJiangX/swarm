@@ -40,11 +40,8 @@ func fromContext(ctx goctx.Context, key string) (bool, cluster.Cluster, *garden.
 	if key == _Garden && c.cluster != nil {
 
 		gd, ok := c.cluster.(*garden.Garden)
-		if ok {
-			return true, c.cluster, gd
-		} else {
-			return false, c.cluster, nil
-		}
+
+		return ok, c.cluster, gd
 	}
 
 	return true, c.cluster, nil
@@ -54,7 +51,7 @@ type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 var masterRoutes = map[string]map[string]ctxHandler{
 	http.MethodGet: {
-		"/nfs_backups/space": getNFS_SPace,
+		"/nfs_backups/space": getNFSSPace,
 
 		"/clusters":        getClusters,
 		"/clusters/{name}": getClustersByID,
@@ -161,7 +158,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	},
 }
 
-func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
+func setupMasterRouter(r *mux.Router, context *context, debug, enableCors bool) {
 
 	for method, mappings := range masterRoutes {
 		for route, fct := range mappings {
@@ -178,7 +175,13 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 				}
 
 				context.apiVersion = mux.Vars(r)["version"]
-				ctx := goctx.WithValue(goctx.Background(), _Garden, context)
+				ctx := goctx.Background()
+
+				if wait := intValueOrZero(r, "wait"); wait > 0 {
+					ctx, _ = goctx.WithTimeout(ctx, time.Duration(wait)*time.Second)
+				}
+
+				ctx = goctx.WithValue(ctx, _Garden, context)
 
 				localFct(ctx, w, r)
 
@@ -189,8 +192,13 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 
 			localMethod := method
 
-			r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(wrap)
-			r.Path(localRoute).Methods(localMethod).HandlerFunc(DebugRequestMiddleware(wrap))
+			if debug {
+				r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(DebugRequestMiddleware(wrap))
+				r.Path(localRoute).Methods(localMethod).HandlerFunc(DebugRequestMiddleware(wrap))
+			} else {
+				r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(wrap)
+				r.Path(localRoute).Methods(localMethod).HandlerFunc(wrap)
+			}
 
 			if enableCors {
 				optionsMethod := "OPTIONS"
@@ -211,7 +219,6 @@ func setupMasterRouter(r *mux.Router, context *context, enableCors bool) {
 				r.Path(localRoute).Methods(optionsMethod).
 					HandlerFunc(wrap)
 			}
-
 		}
 	}
 }

@@ -103,7 +103,7 @@ func (db dbBase) DelImage(ID string) error {
 
 		err := tx.Get(&n, query, ID)
 		if err != nil {
-			return errors.Wrap(err, "Count Service filter by image_id")
+			return errors.Wrap(err, "Count Service filter by id")
 		}
 
 		if n > 0 {

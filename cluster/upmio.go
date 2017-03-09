@@ -63,7 +63,7 @@ func checkTtyInput(attachStdin, ttyMode bool) error {
 }
 
 // containerExec exec cmd in containeID,It returns ContainerExecInspect.
-func (engine *Engine) containerExec(ctx context.Context, containerID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
+func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
 	inspect := types.ContainerExecInspect{}
 
 	execConfig := types.ExecConfig{
@@ -80,22 +80,22 @@ func (engine *Engine) containerExec(ctx context.Context, containerID string, cmd
 		execConfig.AttachStdout = false
 	}
 
-	exec, err := engine.apiClient.ContainerExecCreate(ctx, containerID, execConfig)
-	engine.CheckConnectionErr(err)
+	exec, err := e.apiClient.ContainerExecCreate(ctx, containerID, execConfig)
+	e.CheckConnectionErr(err)
 	if err != nil {
 		return inspect, errors.Wrapf(err, "Container %s exec create", containerID)
 	}
 
 	logrus.WithFields(logrus.Fields{
 		"Container": containerID,
-		"Engine":    engine.Addr,
+		"Engine":    e.Addr,
 		"ExecID":    exec.ID,
 		"Detach":    execConfig.Detach,
 	}).Infof("start exec:%s", cmd)
 
 	if execConfig.Detach {
-		err := engine.apiClient.ContainerExecStart(ctx, exec.ID, types.ExecStartCheck{Detach: detach})
-		engine.CheckConnectionErr(err)
+		err := e.apiClient.ContainerExecStart(ctx, exec.ID, types.ExecStartCheck{Detach: detach})
+		e.CheckConnectionErr(err)
 		if err != nil {
 			return inspect, errors.Wrapf(err, "Container %s exec start %s", containerID, exec.ID)
 		}
@@ -104,19 +104,19 @@ func (engine *Engine) containerExec(ctx context.Context, containerID string, cmd
 			logrus.Warn(err)
 		}
 
-		err = engine.containerExecAttch(ctx, exec.ID, execConfig)
-		engine.CheckConnectionErr(err)
+		err = e.containerExecAttch(ctx, exec.ID, execConfig)
+		e.CheckConnectionErr(err)
 		if err != nil {
 			return inspect, err
 		}
 
 		status := 0
-		inspect, status, err = engine.getExecExitCode(ctx, exec.ID)
+		inspect, status, err = e.getExecExitCode(ctx, exec.ID)
 		if err != nil {
 			return inspect, err
 		}
 		if status != 0 {
-			err = errors.Errorf("Container %s,Engine %s:%s,ExecID %s,ExitCode:%d,ExecInspect:%v", containerID, engine.Name, engine.Addr, exec.ID, status, inspect)
+			err = errors.Errorf("Container %s,Engine %s:%s,ExecID %s,ExitCode:%d,ExecInspect:%v", containerID, e.Name, e.Addr, exec.ID, status, inspect)
 		}
 	}
 
