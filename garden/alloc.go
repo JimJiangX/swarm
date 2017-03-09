@@ -19,14 +19,15 @@ import (
 	"github.com/docker/swarm/scheduler/filter"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/scheduler/strategy"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
 // add engine labels for schedule
 const (
-	nodeLabel    = "node"
 	roomLabel    = "room"
 	seatLabel    = "seat"
+	nodeLabel    = "node"
 	clusterLabel = "Cluster"
 )
 
@@ -58,6 +59,48 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 	return s, nil
 }
 
+// TODO:convert to structs.UnitSpec
+func convertUnitInfoToSpec(info database.UnitInfo) structs.UnitSpec {
+	return structs.UnitSpec{
+		Unit: structs.Unit(info.Unit),
+
+		//	Require, Limit struct {
+		//		CPU    string
+		//		Memory int64
+		//	}
+
+		Engine: struct {
+			ID string
+			IP string
+		}{
+			ID: info.Engine.EngineID,
+			IP: info.Engine.Addr,
+		},
+
+		//	Networking struct {
+		//		Type    string
+		//		Devices string
+		//		Mask    int
+		//		IPs     []struct {
+		//			Name  string
+		//			IP    string
+		//			Proto string
+		//		}
+		//		Ports []struct {
+		//			Name string
+		//			Port int
+		//		}
+		//	}
+
+		//	Volumes []struct {
+		//		Type    string
+		//		Driver  string
+		//		Size    int
+		//		Options map[string]interface{}
+		//	}
+	}
+}
+
 func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, error) {
 	list, err := gd.ormer.ListServicesInfo()
 	if err != nil {
@@ -69,50 +112,7 @@ func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, erro
 		units := make([]structs.UnitSpec, 0, len(list[i].Units))
 
 		for u := range list[i].Units {
-			unit := list[i].Units[u]
-
-			// TODO:convert to structs.UnitSpec
-
-			units = append(units, structs.UnitSpec{
-				Unit: structs.Unit(unit.Unit),
-
-				//	Require, Limit struct {
-				//		CPU    string
-				//		Memory int64
-				//	}
-
-				Engine: struct {
-					ID   string
-					Name string
-					IP   string
-				}{
-					ID: unit.Engine.EngineID,
-					//	Name: unit.Engine.Name,
-					IP: unit.Engine.Addr,
-				},
-
-				//	Networking struct {
-				//		Type    string
-				//		Devices string
-				//		Mask    int
-				//		IPs     []struct {
-				//			Name  string
-				//			IP    string
-				//			Proto string
-				//		}
-				//		Ports []struct {
-				//			Name string
-				//			Port int
-				//		}
-				//	}
-
-				//	Volumes []struct {
-				//		Type    string
-				//		Driver  string
-				//		Size    int
-				//		Options map[string]interface{}
-				//	}
-			})
+			units = append(units, convertUnitInfoToSpec(list[i].Units[u]))
 		}
 
 		services = append(services, structs.ServiceSpec{
@@ -214,23 +214,16 @@ type scheduleOption struct {
 	}
 }
 
-func (gd *Garden) schedule(ctx context.Context, config *cluster.ContainerConfig, opts scheduleOption, stores []structs.VolumeRequire) ([]*node.Node, error) {
+func (gd *Garden) schedule(ctx context.Context, config *cluster.ContainerConfig, opts scheduleOption) ([]*node.Node, error) {
 	_scheduler := gd.scheduler
 
 	if opts.scheduler.strategy != "" && len(opts.scheduler.filters) > 0 {
 		strategy, _ := strategy.New(opts.scheduler.strategy)
 		filters, _ := filter.New(opts.scheduler.filters)
-		_scheduler = scheduler.New(strategy, filters)
-	}
 
-	for _, c := range opts.nodes.constraint {
-		config.AddConstraint(c)
-	}
-	if len(opts.nodes.filters) > 0 {
-		config.AddConstraint(nodeLabel + "!=" + strings.Join(opts.nodes.filters, "|"))
-	}
-	if len(opts.nodes.clusters) > 0 {
-		config.AddConstraint(clusterLabel + "==" + strings.Join(opts.nodes.clusters, "|"))
+		if strategy != nil && len(filters) > 0 {
+			_scheduler = scheduler.New(strategy, filters)
+		}
 	}
 
 	select {
@@ -239,7 +232,7 @@ func (gd *Garden) schedule(ctx context.Context, config *cluster.ContainerConfig,
 		return nil, ctx.Err()
 	}
 
-	out, err := gd.allocator.ListCandidates(opts.nodes.clusters, opts.nodes.filters, stores)
+	out, err := gd.allocator.ListCandidates(opts.nodes.clusters, opts.nodes.filters, opts.ContainerSpec.Volumes)
 	if err != nil {
 		return nil, err
 	}
@@ -307,10 +300,14 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 
 	opts := svc.options
 
-	if len(opts.nodes.constraint) > 0 {
-		for i := range opts.nodes.constraint {
-			config.AddConstraint(opts.nodes.constraint[i])
-		}
+	for i := range opts.nodes.constraint {
+		config.AddConstraint(opts.nodes.constraint[i])
+	}
+	if len(opts.nodes.filters) > 0 {
+		config.AddConstraint(nodeLabel + "!=" + strings.Join(opts.nodes.filters, "|"))
+	}
+	if len(opts.nodes.clusters) > 0 {
+		config.AddConstraint(clusterLabel + "==" + strings.Join(opts.nodes.clusters, "|"))
 	}
 
 	ncpu, err := strconv.Atoi(config.HostConfig.CpusetCpus)
@@ -324,8 +321,7 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 	gd.scheduler.Lock()
 	defer gd.scheduler.Unlock()
 
-	stores := opts.ContainerSpec.Volumes
-	nodes, err := gd.schedule(ctx, config, opts, stores)
+	nodes, err := gd.schedule(ctx, config, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -338,6 +334,9 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 	)
 
 	defer func() {
+		if r := recover(); r != nil {
+			err = errors.Errorf("panic:%v", r)
+		}
 		// cancel allocation
 		if len(bad) > 0 {
 			err := gd.allocator.RecycleResource()
@@ -378,7 +377,7 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 			continue
 		}
 
-		volumes, err := gd.allocator.AlloctVolumes(pu.config, pu.Unit.ID, nodes[n], stores)
+		volumes, err := gd.allocator.AlloctVolumes(pu.config, pu.Unit.ID, nodes[n], opts.ContainerSpec.Volumes)
 		if len(volumes) > 0 {
 			pu.volumes = append(pu.volumes, volumes...)
 		}

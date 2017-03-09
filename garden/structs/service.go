@@ -54,9 +54,8 @@ type UnitSpec struct {
 	}
 
 	Engine struct {
-		ID   string
-		Name string
-		IP   string
+		ID string
+		IP string
 	}
 
 	Networking struct {

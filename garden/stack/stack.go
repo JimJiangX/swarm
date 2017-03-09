@@ -195,11 +195,11 @@ func (s *Stack) linkAndStart(ctx context.Context, existing map[string]structs.Se
 
 		if _, ok := existing[s.services[i].Name]; ok {
 
-			err = svc.UpdateUnitsConfigs(ctx, nil)
+			err = svc.UpdateUnitsConfigs(ctx, nil, nil)
 
 		} else {
 
-			err = svc.InitStart(ctx, kvc, nil)
+			err = svc.InitStart(ctx, kvc, nil, nil)
 
 		}
 
@@ -231,10 +231,23 @@ func (s *Stack) freshServices(ctx context.Context) error {
 			if d == nil {
 				continue
 			}
-			if spec, ok := existing[d.Name]; ok {
-				deps = append(deps, &spec)
-			} else {
+
+			opts := d.Options
+			if spec, ok := existing[d.Name]; !ok {
 				deps = append(deps, d)
+			} else {
+
+				if len(opts) > 0 {
+					if len(spec.Options) == 0 {
+						spec.Options = opts
+					} else {
+						for key, val := range opts {
+							spec.Options[key] = val
+						}
+					}
+				}
+
+				deps = append(deps, &spec)
 			}
 		}
 

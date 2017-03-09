@@ -146,7 +146,7 @@ func (svc *Service) CreateContainer(ctx context.Context, pendings []pendingUnit,
 	return nil
 }
 
-func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap) (err error) {
+func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, args map[string]interface{}) (err error) {
 	ok, val, err := svc.sl.CAS(statusServiceStarting, isInProgress)
 	if err != nil {
 		return err
@@ -179,14 +179,14 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 	}
 
 	if configs == nil {
-		configs, err = svc.generateUnitsConfigs(ctx, nil)
+		configs, err = svc.generateUnitsConfigs(ctx, args)
 		if err != nil {
 			return err
 		}
 	}
 
 	// start containers and update configs
-	err = svc.updateConfigs(ctx, units, configs)
+	err = svc.updateConfigs(ctx, units, configs, args)
 	if err != nil {
 		return err
 	}
@@ -296,7 +296,7 @@ func (svc *Service) Start(ctx context.Context, cmds structs.Commands) (err error
 	return nil
 }
 
-func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.ConfigsMap) (err error) {
+func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.ConfigsMap, args map[string]interface{}) (err error) {
 	ok, val, err := svc.sl.CAS(statusServiceConfigUpdating, isInProgress)
 	if err != nil {
 		return err
@@ -328,15 +328,15 @@ func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.Conf
 		return err
 	}
 
-	return svc.updateConfigs(ctx, units, configs)
+	return svc.updateConfigs(ctx, units, configs, args)
 }
 
 // updateConfigs update units configurationFile,
 // generate units configs if configs is nil,
 // start units containers before update container configurationFile.
-func (svc *Service) updateConfigs(ctx context.Context, units []*unit, configs structs.ConfigsMap) (err error) {
+func (svc *Service) updateConfigs(ctx context.Context, units []*unit, configs structs.ConfigsMap, args map[string]interface{}) (err error) {
 	if configs == nil {
-		configs, err = svc.generateUnitsConfigs(ctx, nil)
+		configs, err = svc.generateUnitsConfigs(ctx, args)
 		if err != nil {
 			return err
 		}
@@ -595,6 +595,15 @@ func (svc *Service) Requires(ctx context.Context) (structs.RequireResource, erro
 }
 
 func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]interface{}) (structs.ConfigsMap, error) {
+	if len(args) > 0 {
+		if svc.spec.Options == nil {
+			svc.spec.Options = args
+		} else {
+			for key, val := range args {
+				svc.spec.Options[key] = val
+			}
+		}
+	}
 
 	return svc.pluginClient.GenerateServiceConfig(ctx, svc.spec)
 }
