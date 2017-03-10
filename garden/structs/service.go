@@ -19,7 +19,7 @@ type Service struct {
 	AutoScaling       bool   `db:"auto_scaling" json:"auto_scaling"`
 	HighAvailable     bool   `db:"high_available" json:"high_available"`
 	Status            int    `db:"status" json:"status"`
-	BackupMaxSizeByte int    `db:"backup_max_size" json:"backup_max_size"`
+	BackupMaxSizeByte int    `db:"backup_max_size" json:"max_backup_space"`
 	// count by Day,used in swarm.BackupTaskCallback(),calculate BackupFile.Retention
 	BackupFilesRetention int       `db:"backup_files_retention" json:"backup_files_retention"`
 	CreatedAt            time.Time `db:"created_at" json:"created_at"`
@@ -86,21 +86,25 @@ type UnitSpec struct {
 
 type ServiceSpec struct {
 	Priority     int    `json:"priority"`
-	Replicas     int    `json:"replicas"`
+	Replicas     int    `json:"unit_num"`
 	ImageVersion string `json:"image_version"`
 
 	Service
 
 	Require UnitRequire `json:"unit_require"`
 
-	Clusters    []string `json:"clusters"`
+	Clusters []ClusterBindNetworkings `json:"clusters"`
+
 	Constraints []string `json:"constraints"`
 
-	Options map[string]interface{} `json:"options"`
+	Options map[string]interface{} `json:"args"`
 
 	Units []UnitSpec `json:"units"`
+}
 
-	Deps []*ServiceSpec `json:"dependence"`
+type ClusterBindNetworkings struct {
+	Cluster     string   `json:"name"`
+	Networkings []string `json:"networkings_id"`
 }
 
 type UnitRequire struct {
@@ -121,7 +125,7 @@ type UnitRequire struct {
 type NetDeviceRequire struct {
 	Device     int    `json:"device,omitempty"`
 	Bandwidth  int    `json:"bandwidth"` // M/s
-	Networking string `json:"netwroking"`
+	Networking string `json:"networking_id"`
 }
 
 type PostServiceResponse struct {

@@ -3,7 +3,6 @@ package stack
 import (
 	"database/sql"
 	"sort"
-	"sync"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
@@ -38,23 +37,23 @@ func (sp servicesByPriority) Swap(i, j int) {
 func initServicesPriority(services []structs.ServiceSpec) servicesByPriority {
 	priority := make(map[string]int, len(services))
 
-	for i := range services {
-		max := 0
-		for _, d := range services[i].Deps {
-			if d != nil {
-				if d.Priority > 0 {
-					priority[d.Name] = d.Priority
-				}
-				if priority[d.Name] > max {
-					max = priority[d.Name]
-				}
-			}
-		}
+	//	for i := range services {
+	//		max := 0
+	//		for _, d := range services[i].Deps {
+	//			if d != nil {
+	//				if d.Priority > 0 {
+	//					priority[d.Name] = d.Priority
+	//				}
+	//				if priority[d.Name] > max {
+	//					max = priority[d.Name]
+	//				}
+	//			}
+	//		}
 
-		if len(services[i].Deps) > 0 {
-			priority[services[i].Name] = max + 1
-		}
-	}
+	//		if len(services[i].Deps) > 0 {
+	//			priority[services[i].Name] = max + 1
+	//		}
+	//	}
 
 	for i := range services {
 		services[i].Priority = priority[services[i].Name]
@@ -64,14 +63,12 @@ func initServicesPriority(services []structs.ServiceSpec) servicesByPriority {
 }
 
 type Stack struct {
-	wg       *sync.WaitGroup
 	gd       *garden.Garden
 	services []structs.ServiceSpec
 }
 
 func New(gd *garden.Garden, services []structs.ServiceSpec) *Stack {
 	return &Stack{
-		wg:       new(sync.WaitGroup),
 		gd:       gd,
 		services: services,
 	}
@@ -88,10 +85,16 @@ func (s *Stack) DeployServices(ctx context.Context) ([]structs.PostServiceRespon
 		existing[service.Name] = service
 	}
 
-	sorted := initServicesPriority(s.services)
-	sort.Sort(sorted)
+	for i := range s.services {
+		if _, exist := existing[s.services[i].Name]; exist {
+			return nil, errors.Errorf("Duplicate entry '%s' for key 'Service.Name'", s.services[i].Name)
+		}
+	}
 
-	s.services = sorted
+	//	sorted := initServicesPriority(s.services)
+	//	sort.Sort(sorted)
+
+	//	s.services = sorted
 
 	auth, err := s.gd.AuthConfig()
 	if err != nil {
@@ -100,10 +103,7 @@ func (s *Stack) DeployServices(ctx context.Context) ([]structs.PostServiceRespon
 
 	out := make([]structs.PostServiceResponse, 0, len(s.services))
 
-	for _, spec := range sorted {
-		if _, exist := existing[spec.Name]; exist {
-			continue
-		}
+	for _, spec := range s.services {
 
 		service, task, err := s.gd.BuildService(spec)
 		if err != nil {
@@ -116,20 +116,14 @@ func (s *Stack) DeployServices(ctx context.Context) ([]structs.PostServiceRespon
 			TaskID: task.ID,
 		})
 
-		s.wg.Add(1)
-
 		go s.deploy(ctx, service, *task, auth)
 	}
-
-	go s.linkAndStart(ctx, existing)
 
 	return out, nil
 }
 
 func (s *Stack) deploy(ctx context.Context, service *garden.Service, t database.Task, auth *types.AuthConfig) (err error) {
 	defer func() {
-		s.wg.Done()
-
 		if r := recover(); r != nil {
 			err = errors.Errorf("panic:%v", r)
 		}
@@ -181,8 +175,6 @@ func (s *Stack) linkAndStart(ctx context.Context, existing map[string]structs.Se
 		}
 	}()
 
-	s.wg.Wait()
-
 	kvc := s.gd.KVClient()
 
 	err = s.freshServices(ctx)
@@ -226,34 +218,34 @@ func (s *Stack) freshServices(ctx context.Context) error {
 	sort.Sort(sorted)
 
 	for i := range sorted {
-		deps := make([]*structs.ServiceSpec, 0, len(sorted[i].Deps))
-		for _, d := range sorted[i].Deps {
-			if d == nil {
-				continue
-			}
+		//		deps := make([]*structs.ServiceSpec, 0, len(sorted[i].Deps))
+		//		for _, d := range sorted[i].Deps {
+		//			if d == nil {
+		//				continue
+		//			}
 
-			opts := d.Options
-			if spec, ok := existing[d.Name]; !ok {
-				deps = append(deps, d)
-			} else {
+		//			opts := d.Options
+		//			if spec, ok := existing[d.Name]; !ok {
+		//				deps = append(deps, d)
+		//			} else {
 
-				if len(opts) > 0 {
-					if len(spec.Options) == 0 {
-						spec.Options = opts
-					} else {
-						for key, val := range opts {
-							spec.Options[key] = val
-						}
-					}
-				}
+		//				if len(opts) > 0 {
+		//					if len(spec.Options) == 0 {
+		//						spec.Options = opts
+		//					} else {
+		//						for key, val := range opts {
+		//							spec.Options[key] = val
+		//						}
+		//					}
+		//				}
 
-				deps = append(deps, &spec)
-			}
-		}
+		//				deps = append(deps, &spec)
+		//			}
+		//		}
 
 		if spec, ok := existing[sorted[i].Name]; ok {
 			sorted[i] = spec
-			sorted[i].Deps = deps
+			// sorted[i].Deps = deps
 		}
 	}
 

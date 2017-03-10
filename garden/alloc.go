@@ -28,7 +28,7 @@ const (
 	roomLabel    = "room"
 	seatLabel    = "seat"
 	nodeLabel    = "node"
-	clusterLabel = "Cluster"
+	clusterLabel = "cluster"
 )
 
 type allocator interface {
@@ -131,6 +131,19 @@ func (gd *Garden) validServiceSpec(spec structs.ServiceSpec) error {
 }
 
 func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Task, error) {
+	options := scheduleOption{
+		highAvailable: spec.Replicas > 0,
+		require:       spec.Require,
+		args:          spec.Options,
+	}
+
+	options.nodes.constraints = spec.Constraints
+	options.nodes.clusterNetworkings = spec.Clusters
+	out := options.clusters()
+	if len(out) == 0 {
+		return nil, nil, errors.New("ServiceSpec.Clusters is unavailable")
+	}
+
 	err := gd.validServiceSpec(spec)
 	if err != nil {
 		return nil, nil, err
@@ -183,13 +196,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 
 	service := gd.NewService(spec)
 
-	service.options = scheduleOption{
-		highAvailable: spec.Replicas > 0,
-		require:       spec.Require,
-		options:       spec.Options,
-	}
-	service.options.nodes.clusters = spec.Clusters
-	service.options.nodes.constraints = spec.Constraints
+	service.options = options
 
 	return service, &t, nil
 }
@@ -199,10 +206,12 @@ type scheduleOption struct {
 
 	require structs.UnitRequire
 
-	options map[string]interface{}
+	args map[string]interface{}
 
 	nodes struct {
 		// clusterType string
+		clusterNetworkings []structs.ClusterBindNetworkings
+
 		clusters    []string
 		filters     []string
 		constraints []string
@@ -212,6 +221,50 @@ type scheduleOption struct {
 		strategy string
 		filters  []string
 	}
+}
+
+func (so *scheduleOption) clusters() []string {
+	if so.nodes.clusters != nil {
+		return so.nodes.clusters
+	}
+
+	n := len(so.nodes.clusterNetworkings)
+	if n == 0 {
+		return nil
+	}
+
+	out := make([]string, 0, n)
+
+	for i := range so.nodes.clusterNetworkings {
+		exist := true
+
+		for _, nw := range so.require.Networkings {
+			found := false
+
+			for _, n := range so.nodes.clusterNetworkings[i].Networkings {
+				if n == nw.Networking {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				exist = false
+			}
+		}
+
+		if exist {
+			out = append(out, so.nodes.clusterNetworkings[i].Cluster)
+		}
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+
+	so.nodes.clusters = out
+
+	return out
 }
 
 func (gd *Garden) schedule(ctx context.Context, config *cluster.ContainerConfig, opts scheduleOption) ([]*node.Node, error) {
@@ -232,7 +285,7 @@ func (gd *Garden) schedule(ctx context.Context, config *cluster.ContainerConfig,
 		return nil, ctx.Err()
 	}
 
-	out, err := gd.allocator.ListCandidates(opts.nodes.clusters, opts.nodes.filters, opts.require.Volumes)
+	out, err := gd.allocator.ListCandidates(opts.clusters(), opts.nodes.filters, opts.require.Volumes)
 	if err != nil {
 		return nil, err
 	}
@@ -305,8 +358,8 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 	if len(opts.nodes.filters) > 0 {
 		config.AddConstraint(nodeLabel + "!=" + strings.Join(opts.nodes.filters, "|"))
 	}
-	if len(opts.nodes.clusters) > 0 {
-		config.AddConstraint(clusterLabel + "==" + strings.Join(opts.nodes.clusters, "|"))
+	if out := opts.clusters(); len(out) > 0 {
+		config.AddConstraint(clusterLabel + "==" + strings.Join(out, "|"))
 	}
 
 	gd.Lock()
