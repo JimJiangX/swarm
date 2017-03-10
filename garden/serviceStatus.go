@@ -14,20 +14,21 @@ const (
 	statusServiceScheduling                         // 2
 	statusServiceAllocating                         // 3
 	statusServiceContainerCreating                  // 4
-	statusServiceStarting                           // 5,start contaier and start service
-	statusServiceStoping                            // 6
-	statusServiceBackuping                          // 7
-	statusServiceRestoring                          // 8
-	statusServiceUsersUpdating                      // 9
-	statusServiceScaling                            // 10
-	statusServiceConfigUpdating                     // 11
-	statusServiceUnitMigrating                      // 12
-	statusServiceUnitRebuilding                     // 13
-	statusServiceDeleting                           // 14
+	statusInitServiceStarting                       // 5,start contaier and init service
+	statusServiceStarting                           // 6,start contaier and start service
+	statusServiceStoping                            // 7
+	statusServiceBackuping                          // 8
+	statusServiceRestoring                          // 9
+	statusServiceUsersUpdating                      // 10
+	statusServiceScaling                            // 11
+	statusServiceConfigUpdating                     // 12
+	statusServiceUnitMigrating                      // 13
+	statusServiceUnitRebuilding                     // 14
+	statusServiceDeleting                           // 15
 
 	_ing    = 0
-	_done   = 1
-	_failed = 2
+	_failed = 1
+	_done   = 2
 
 	statusServcieBuilt       = statusServcieBuilding + _done
 	statusServcieBuildFailed = statusServcieBuilding + _failed
@@ -40,6 +41,9 @@ const (
 
 	statusServiceContainerCreated      = statusServiceContainerCreating + _done
 	statusServiceContainerCreateFailed = statusServiceContainerCreating + _failed
+
+	statusInitServiceStarted     = statusInitServiceStarting + _done
+	statusInitServiceStartFailed = statusInitServiceStarting + _failed
 
 	statusServiceStarted     = statusServiceStarting + _done
 	statusServiceStartFailed = statusServiceStarting + _failed

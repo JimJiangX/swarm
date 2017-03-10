@@ -20,7 +20,7 @@ func (svc *Service) Scale(ctx context.Context, r kvstore.Register, replicas int)
 		return nil
 	}
 
-	ok, val, err := svc.sl.CAS(statusServiceScaling, isInProgress)
+	ok, val, err := svc.sl.CAS(statusServiceScaling, isnotInProgress)
 	if err != nil {
 		return err
 	}

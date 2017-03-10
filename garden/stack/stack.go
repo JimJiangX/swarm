@@ -163,7 +163,7 @@ func (s *Stack) deploy(ctx context.Context, service *garden.Service, t database.
 
 }
 
-func (s *Stack) linkAndStart(ctx context.Context, existing map[string]structs.ServiceSpec) (err error) {
+func (s *Stack) linkAndStart(ctx context.Context) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			logrus.Errorf("stack run,panic:%v", r)
@@ -185,7 +185,7 @@ func (s *Stack) linkAndStart(ctx context.Context, existing map[string]structs.Se
 	for i := range s.services {
 		svc := s.gd.NewService(s.services[i])
 
-		if _, ok := existing[s.services[i].Name]; ok {
+		if svc.Spec().Status > 34 {
 
 			err = svc.UpdateUnitsConfigs(ctx, nil, nil)
 

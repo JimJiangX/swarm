@@ -89,7 +89,7 @@ func (svc *Service) CreateContainer(ctx context.Context, pendings []pendingUnit,
 		svc.cluster.RemovePendingContainer(ids...)
 	}()
 
-	ok, val, err := svc.sl.CAS(statusServiceContainerCreating, isInProgress)
+	ok, val, err := svc.sl.CAS(statusServiceContainerCreating, isnotInProgress)
 	if err != nil {
 		return err
 	}
@@ -134,20 +134,29 @@ func (svc *Service) CreateContainer(ctx context.Context, pendings []pendingUnit,
 			}
 			pu.config.HostConfig.Binds = append(pu.config.HostConfig.Binds, v.Name)
 		}
-		// TODO: Create Network
 
 		c, err := eng.CreateContainer(pu.config, pu.Unit.Name, true, authConfig)
 		if err != nil {
 			return err
 		}
 		pu.Unit.ContainerID = c.ID
+
+		err = eng.StartContainer(c, nil)
+		if err != nil {
+			return errors.Wrap(err, "start container:"+pu.Unit.Name)
+		}
 	}
 
 	return nil
 }
 
 func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, args map[string]interface{}) (err error) {
-	ok, val, err := svc.sl.CAS(statusServiceStarting, isInProgress)
+	ok, val, err := svc.sl.CAS(statusInitServiceStarting, func(val int) bool {
+		if val == statusContainerCreated || val == statusServiceUnitMigrating {
+			return true
+		}
+		return false
+	})
 	if err != nil {
 		return err
 	}
@@ -155,16 +164,16 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 	svc.spec.Status = val
 
 	if !ok {
-		return errors.Wrap(newStatusError(statusServiceStarting, val), "Service init start")
+		return errors.Wrap(newStatusError(statusInitServiceStarting, val), "Service init start")
 	}
 
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.Errorf("panic:%v", r)
 		}
-		status := statusServiceStarted
+		status := statusInitServiceStarted
 		if err != nil {
-			status = statusServiceStartFailed
+			status = statusInitServiceStartFailed
 		}
 
 		_err := svc.sl.SetStatus(status)
@@ -238,7 +247,7 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 }
 
 func (svc *Service) Start(ctx context.Context, cmds structs.Commands) (err error) {
-	ok, val, err := svc.sl.CAS(statusServiceStarting, isInProgress)
+	ok, val, err := svc.sl.CAS(statusServiceStarting, isnotInProgress)
 	if err != nil {
 		return err
 	}
@@ -297,7 +306,7 @@ func (svc *Service) Start(ctx context.Context, cmds structs.Commands) (err error
 }
 
 func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.ConfigsMap, args map[string]interface{}) (err error) {
-	ok, val, err := svc.sl.CAS(statusServiceConfigUpdating, isInProgress)
+	ok, val, err := svc.sl.CAS(statusServiceConfigUpdating, isnotInProgress)
 	if err != nil {
 		return err
 	}
@@ -381,7 +390,7 @@ func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[
 }
 
 func (svc *Service) Stop(ctx context.Context, containers bool) (err error) {
-	ok, val, err := svc.sl.CAS(statusServiceStoping, isInProgress)
+	ok, val, err := svc.sl.CAS(statusServiceStoping, isnotInProgress)
 	if err != nil {
 		return err
 	}
@@ -458,7 +467,7 @@ func (svc *Service) Exec(ctx context.Context, nameOrID string, cmd []string, det
 }
 
 func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) {
-	ok, val, err := svc.sl.CAS(statusServiceDeleting, isInProgress)
+	ok, val, err := svc.sl.CAS(statusServiceDeleting, isnotInProgress)
 	if err != nil {
 		return err
 	}
