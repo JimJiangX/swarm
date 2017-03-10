@@ -20,16 +20,25 @@ func TestExecCommand(t *testing.T) {
 }
 
 func TestExecShellFile(t *testing.T) {
+	` #!/bin/bash
+     echo "test"
+    `
 	fpath := "/tmp/test.sh"
 	data, err := ExecShellFile(fpath)
 	assert.Nil(t, err)
 	fmt.Println("test data:", data)
 
+	` #!/bin/bash
+     echo "testargs :$1,$@"
+    `
 	fpath = "/tmp/testargs.sh"
 	data, err = ExecShellFile(fpath, "test1", "test2")
 	assert.Nil(t, err)
 	fmt.Println("testargs data:", data)
 
+	` #!/bin/bash
+      sleep 120
+    `
 	fpath = "/tmp/testtimeout.sh"
 	data, err = ExecShellFile(fpath, "test1", "test2")
 	assert.Equal(t, err, errors.New("Timeout"))
