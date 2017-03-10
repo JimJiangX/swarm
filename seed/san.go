@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	//	"log"
+
 	"net/http"
 	"os"
-	"os/exec"
+
 	"strconv"
 	"strings"
 	"time"
@@ -171,9 +171,7 @@ func vgList() ([]VgInfo, error) {
 	vgs := []VgInfo{}
 	vgscript := fmt.Sprintf("vgs --units b | sed '1d' | awk '{print $1,$6,$7}' ")
 
-	command := exec.Command("/bin/bash", "-c", vgscript)
-	out, err := command.Output()
-
+	out, err := ExecCommand(vgscript)
 	log.Printf("%s\n%s\n%v\n", vgscript, string(out), err)
 	if err != nil {
 		errstr := "vglist exeec fail:" + err.Error()
@@ -229,14 +227,12 @@ func scanSanDisk() error {
 		return errors.New("not find the file:" + scriptpath)
 	}
 
-	log.Println(scriptpath)
-	command := exec.Command(scriptpath)
-	out, err := command.Output()
+	out, err := ExecShellFile(scriptpath)
 
 	log.Printf("%s\n%s\n%v\n", scriptpath, string(out), err)
 
 	if err != nil {
-		errstr := "scanSanDisk fail:" + string(out)
+		errstr := "scanSanDisk fail:" + err.Error()
 		log.Println(errstr)
 		return errors.New(errstr)
 	}
@@ -252,17 +248,10 @@ func getDevicePath(id int, santype string) (string, error) {
 		return "", errors.New("not find the file:" + scriptpath)
 	}
 	args := []string{santype, strconv.Itoa(id)}
-	log.Println(scriptpath, "args:", args)
 
-	command := exec.Command(scriptpath, args...)
-	out, err := command.Output()
-
-	log.Printf("%s\n%s\n%v", scriptpath, string(out), err)
-
+	out, err := ExecShellFile(scriptpath, args...)
 	if err != nil {
-		errstr := "getDevicePath fail."
-		log.Println(errstr)
-		return "", errors.New(errstr)
+		return "", err
 	}
 
 	devstr := strings.Replace(string(out), "\n", "", -1)
@@ -278,16 +267,14 @@ func getDevicePath(id int, santype string) (string, error) {
 
 func vgCreate(name, devices string) error {
 	vgcreatesctript := fmt.Sprintf("vgcreate %s  %s ", name, devices)
-	log.Println(vgcreatesctript)
-	command := exec.Command("/bin/bash", "-c", vgcreatesctript)
-	out, err := command.Output()
-
-	log.Printf("%s\n%s\n%v", vgcreatesctript, string(out), err)
+	_, err := ExecCommand(vgcreatesctript)
 
 	if err != nil {
-		errstr := "vgcreate fail:" + err.Error() + ":" + string(out)
-		log.Println(errstr)
-		return errors.New(errstr)
+		log.WithFields(log.Fields{
+			"cript": vgcreatesctript,
+			"err":   err.Error(),
+		}).Error("vgCreate fail")
+		return err
 	}
 
 	return nil
@@ -295,16 +282,14 @@ func vgCreate(name, devices string) error {
 
 func vgExtend(name, devices string) error {
 	extendsctript := fmt.Sprintf("vgextend  -f %s  %s ", name, devices)
-	log.Println(extendsctript)
-	command := exec.Command("/bin/bash", "-c", extendsctript)
-	out, err := command.Output()
-
-	log.Printf("%s\n%s\n%v", extendsctript, string(out), err)
+	_, err := ExecCommand(extendsctript)
 
 	if err != nil {
-		errstr := "vgextend fail: " + err.Error() + ":" + string(out)
-		log.Println(errstr)
-		return errors.New(errstr)
+		log.WithFields(log.Fields{
+			"ctript": extendsctript,
+			"err":    err.Error(),
+		}).Error("vgExtend fail")
+		return err
 	}
 
 	return nil

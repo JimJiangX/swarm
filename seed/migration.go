@@ -7,7 +7,7 @@ import (
 	//	"log"
 	"net/http"
 	"os"
-	"os/exec"
+
 	"strconv"
 	"time"
 
@@ -56,6 +56,11 @@ func Activate(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	log.WithFields(log.Fields{
+		"vgname": opt.VgName,
+		"lvname": opt.Lvname,
+	}).Info("Activate ok")
+
 	res := &CommonRes{
 		Err: "",
 	}
@@ -103,6 +108,10 @@ func Deactivate(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	log.WithFields(log.Fields{
+		"DeactConfig": opt,
+	}).Info("Deactivate ok")
+
 	res := &CommonRes{
 		Err: "",
 	}
@@ -120,10 +129,13 @@ func RemoveVG(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	}
 
 	if isVgExist(opt.VgName) {
-		cmd := exec.Command("vgremove", "-f", opt.VgName)
-		out, err := cmd.Output()
-		log.Printf("exec:%s\n%s\n%s\n", cmd.Args, string(out), err)
+		cmd := fmt.Sprintf("vgremove -f %s", opt.VgName)
+		_, err := ExecCommand(cmd)
 		if err != nil {
+			log.WithFields(log.Fields{
+				"err": err.Error(),
+				"cmd": cmd,
+			}).Error("VgExistexit and vgremove fail")
 			errCommonHanlde(w, req, err)
 			return
 		}
@@ -134,6 +146,9 @@ func RemoveVG(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		errCommonHanlde(w, req, err)
 		return
 	}
+	log.WithFields(log.Fields{
+		"RmVGConfig": opt,
+	}).Info("RemoveVG ok")
 
 	res := &CommonRes{
 		Err: "",
@@ -145,20 +160,27 @@ func RemoveVG(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 
 func isVgExist(vgname string) bool {
 	cmd := fmt.Sprintf("vgs  %s", vgname)
-	out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
-	log.Printf("exec:%s\n%s\n%s\n", cmd, string(out), err)
+	_, err := ExecCommand(cmd)
 	if err != nil {
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+			"cmd": cmd,
+		}).Error("tryImport fail")
 		return false
 	}
+
 	return true
 }
 
 func tryImport(vgname string) {
 	cmd := fmt.Sprintf("vgimport  %s", vgname)
-	log.Println("do this because .export ok ,but can see the vg  :", cmd)
-	out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
-
-	log.Printf("%s\n%s\n%v\n", cmd, string(out), err)
+	_, err := ExecCommand(cmd)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+			"cmd": cmd,
+		}).Error("tryImport fail")
+	}
 }
 
 func checkDeactConfig(opt *DeactConfig) error {
@@ -247,28 +269,28 @@ func DoDeactivate(vgname string, lvs []string) error {
 
 func vgImport(vg string) error {
 	cmd := fmt.Sprintf("vgimport -f %s", vg)
-	log.Println(cmd)
-	out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+	_, err := ExecCommand(cmd)
 	if err != nil {
-		log.Println(string(out))
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+			"cmd": cmd,
+		}).Error("vgImport fail")
 		return err
 	}
-	log.Printf("%s\n%s\n%v\n", cmd, string(out), err)
 	return nil
 }
 
 func vgExport(vg string) error {
 	time.Sleep(2 * time.Second)
 	cmd := fmt.Sprintf("vgexport  %s", vg)
-	log.Println(cmd)
-	out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+	_, err := ExecCommand(cmd)
 	if err != nil {
-		log.Println(string(out))
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+			"cmd": cmd,
+		}).Error("vgExport fail")
 		return err
 	}
-
-	log.Printf("%s\n%s\n%v\n", cmd, string(out), err)
-
 	return nil
 }
 
@@ -284,14 +306,14 @@ func lvsActivate(vg string, lvs []string) error {
 }
 func lvActivate(vg, lv string) error {
 	cmd := fmt.Sprintf("lvchange -ay /dev/%s/%s ", vg, lv)
-	log.Println(cmd)
-	out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+	_, err := ExecCommand(cmd)
 	if err != nil {
-		log.Println(string(out))
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+			"cmd": cmd,
+		}).Error("lvActivate fail")
 		return err
 	}
-
-	log.Printf("%s\n%s\n%v\n", cmd, string(out), err)
 
 	return nil
 }
@@ -308,13 +330,14 @@ func lvsDeActivate(vg string, lvs []string) error {
 
 func lvDeActivate(vg, lv string) error {
 	cmd := fmt.Sprintf("lvchange -an /dev/%s/%s ", vg, lv)
-	log.Println(cmd)
-	out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+	_, err := ExecCommand(cmd)
 	if err != nil {
-		log.Println(string(out))
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+			"cmd": cmd,
+		}).Error("lvDeActivate fail")
 		return err
 	}
-	log.Printf("%s\n%s\n%v\n", cmd, string(out), err)
 
 	return nil
 }
@@ -331,15 +354,14 @@ func SanBlock(vendor string, ids []int) error {
 		args = append(args, strconv.Itoa(id))
 	}
 
-	log.Println(scriptpath, "args:", args)
-
-	command := exec.Command(scriptpath, args...)
-	out, err := command.Output()
-	log.Printf("%s\n%s\n%v\n", scriptpath, out, err)
+	_, err = ExecShellFile(scriptpath, args...)
 	if err != nil {
-		errstr := "sanDeviceBlock fail ." + string(out)
-		log.Println(errstr)
-		return errors.New(errstr)
+		log.WithFields(log.Fields{
+			"args":       args,
+			"scriptpath": scriptpath,
+			"err":        err.Error(),
+		}).Error("SanBlock fail")
+		return err
 	}
 
 	return nil

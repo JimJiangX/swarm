@@ -7,7 +7,6 @@ import (
 	//	"log"
 	"net/http"
 	"os"
-	"os/exec"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -45,14 +44,14 @@ func VolumeFileCp(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 
 		log.Println("try to mount for VolumeFileCp")
 		if err := mount(src, mountpoint); err != nil {
-			errCommonHanlde(w, req, errors.New("mount fail:"+err.Error()))
+			errCommonHanlde(w, req, err)
 			return
 		}
 
 		defer func() {
-			log.Printf("try umount %s after copy complete", mountpoint)
+			log.Info("try umount %s after copy complete", mountpoint)
 			if err := unmount(mountpoint); err != nil {
-				log.Printf("umount fail:%s", err.Error())
+				log.Errorf("umount fail:%s", err.Error())
 			}
 		}()
 	}
@@ -63,6 +62,12 @@ func VolumeFileCp(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		errCommonHanlde(w, req, err)
 		return
 	}
+
+	log.WithFields(log.Fields{
+		"data_len": len(opt.Data),
+		"Mode":     opt.Mode,
+		"filedes":  filedes,
+	}).Info("VolumeFileCp ok")
 
 	res := &CommonRes{
 		Err: "",
@@ -133,29 +138,30 @@ func doFileRepalce(data, mode, filedes, tempfile string) error {
 	}
 
 	if err := WriteToTmpfile(data, tempfile); err != nil {
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+		}).Error("repalce fail : WriteToTmpfile fail")
 		return errors.New("write to tmp file err:" + err.Error())
 	}
 
 	mvcript := fmt.Sprintf("mv -f  %s %s", tempfile, filedes)
-	log.Println(mvcript)
-	command := exec.Command("/bin/bash", "-c", mvcript)
-	out, err := command.Output()
-
-	log.Printf("%s\n%s\n%v\n", mvcript, string(out), err)
+	_, err := ExecCommand(mvcript)
 	if err != nil {
-		log.Println("mv fail: ", string(out))
-		return errors.New("repalce fail : mv fail:" + string(out))
+		log.WithFields(log.Fields{
+			"err":    err.Error(),
+			"script": mvcript,
+		}).Error("repalce fail : mv fail:")
+		return errors.New("repalce fail : mv fail:" + err.Error())
 	}
 
 	chmodscript := fmt.Sprintf("chmod  %s %s", mode, filedes)
-	command = exec.Command("/bin/bash", "-c", chmodscript)
-	out, err = command.Output()
-
-	log.Printf("%s\n%s\n%v\n", chmodscript, string(out), err)
-
+	_, err = ExecCommand(chmodscript)
 	if err != nil {
-		log.Println("chmod fail.", string(out))
-		return errors.New("repalce fail : chmod fail." + string(out))
+		log.WithFields(log.Fields{
+			"err":    err.Error(),
+			"script": chmodscript,
+		}).Error("repalce fail : chmod fail:")
+		return errors.New("repalce fail : chmod fail:" + err.Error())
 	}
 
 	return nil

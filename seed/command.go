@@ -83,6 +83,7 @@ func cmdRunWithTimeout(cmd *exec.Cmd, timeout time.Duration) (error, bool) {
 	done := make(chan error)
 	go func() {
 		done <- cmd.Wait()
+		//		log.Println("test goroute wait out")
 	}()
 
 	var err error
@@ -90,6 +91,7 @@ func cmdRunWithTimeout(cmd *exec.Cmd, timeout time.Duration) (error, bool) {
 	case <-time.After(timeout):
 		go func() {
 			<-done // allow goroutine to exit
+			//			log.Println("test goroute timeout out")
 		}()
 
 		pgid, err := syscall.Getpgid(cmd.Process.Pid)
