@@ -3,10 +3,10 @@
 	"ignore": "",
 	"package": [
 		{
-			"checksumSHA1": "1pOp8Cyc6fpq8RtiakE3gLSPj4Q=",
+			"checksumSHA1": "BnnytsaipFk38uQ5EoNVzxfGQ+8=",
 			"path": "github.com/astaxie/beego/config",
-			"revision": "1d49a4bcbd3a9df2eaffefc42843a383c5c1251d",
-			"revisionTime": "2017-02-13T04:37:17Z"
+			"revision": "323a1c4214101331a4b71922c23d19b7409ac71f",
+			"revisionTime": "2017-03-06T13:59:04Z"
 		},
 		{
 			"checksumSHA1": "EOOLFGVvVsTSa1gg9ELdZ/yzN2A=",
