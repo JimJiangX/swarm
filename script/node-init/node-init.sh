@@ -19,21 +19,25 @@ node_id=${15}
 horus_server_ip=${16}
 horus_server_port=${17}
 docker_plugin_port=${18}
-nfs_ip=${19}
-nfs_dir=${20}
-nfs_mount_dir=${21}
-nfs_mount_opts=${22}
+swarm_agent_port=${19}
+nfs_ip=${20}
+nfs_dir=${21}
+nfs_mount_dir=${22}
+nfs_mount_opts=${23}
 
 cur_dir=`dirname $0`
 
 hdd_vgname=${HOSTNAME}_HDD_VG
 ssd_vgname=${HOSTNAME}_SSD_VG
 
-adm_nic=bond1
-int_nic=bond1
-ext_nic=bond2
+adm_nic=bond0
 
 PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
+
+docker_version=1.12.6
+consul_version=
+swarm_agent_version=
+loacl_volume_plugin_version=
 
 platform="$(uname -s)"
 release=""
@@ -86,7 +90,6 @@ nfs_mount() {
 	fi	
 }
 
-
 reg_to_horus_server() {
 	local component_type=$1
 
@@ -96,114 +99,6 @@ reg_to_horus_server() {
 		exit 2
 	fi
 }
-
-create_check_script() {
-
-	local dir=/opt/DBaaS/script
-	mkdir -p ${dir}
-
-	cat << EOF > ${dir}/check_swarmagent.sh
-#!/bin/bash
-ps -ef | grep -v "grep" | grep "/usr/bin/swarm join"
-if [ \$? -ne 0 ]; then
-	exit 2
-else
-	exit 0
-fi
-EOF
-	
-        cp ${cur_dir}/check_upsql ${dir}/
-	cat << EOF > ${dir}/check_db.sh
-#!/bin/bash
-set -o nounset
-
-container_name=\$1
-username=\$2
-password=\$3
-dir=${dir}
-
-docker inspect \${container_name} > /dev/null 2>&1
-if [ \$? -ne 0 ]; then
-	 exit 2
-fi
-
-running_status=\`docker inspect -f "{{.State.Running}}" \${container_name}\`
-if [ "\${running_status}" != "true" ]; then
-	echo "container \${container_name} is not running !"
-	exit 3
-fi
-
-\${dir}/check_upsql --default-file /\${container_name}_DAT_LV/my.cnf --user \$username --password \$password
-if [ \$? -ne 0 ]; then
-	 exit 4
-fi
-EOF
-
-        cp ${cur_dir}/check_upproxy ${dir}/
-	cat << EOF > ${dir}/check_proxy.sh
-#!/bin/bash
-set -o nounset
-
-container_name=\$1
-dir=${dir}
-
-docker inspect \$container_name > /dev/null 2>&1
-if [ \$? -ne 0 ]; then
-	 exit 2
-fi
-
-running_status=\`docker inspect -f "{{.State.Running}}" \${container_name}\`
-if [ "\${running_status}" != "true" ]; then
-	echo "container \${container_name} is not running !"
-	exit 3
-fi
-
-\${dir}/check_upproxy --default-file /\${container_name}_CNF_LV/upsql-proxy.conf
-if [ \$? -ne 0 ]; then
-	 exit 4
-fi
-EOF
-
-	cat << EOF > ${dir}/check_switchmanager.sh
-#!/bin/bash
-
-container_name=\$1
-output=\`mktemp /tmp/XXXXX\`
-
-docker inspect \$container_name > \$output 2>&1
-if [ \$? -ne 0 ]; then
-	rm -f \$output
-	exit 2
-fi
-
-ip_addr=\`cat \$output | grep IPADDR | awk -F= '{print \$2}' | sed 's/",//g'\`
-port=\`cat \$output | grep PORT | awk -F= '{print \$2}' | sed 's/",//g' | awk -F, '{print \$1}'\`
-
-rm -f \$output
-
-stat_code=\`curl -o /dev/null -s -w %{http_code} -X POST http://\${ip_addr}:\${port}/ping\`
-if [ "\${stat_code}" != "200" ]; then
-	exit 2
-fi
-EOF
-	chmod -R +x ${dir}
-}
-
-
-reg_to_consul_for_swarm() {
-	local component_type=SwarmAgent
-
-	stat_code=`curl -o /dev/null -s -w %{http_code} -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Check": {"Script": "/opt/DBaaS/script/check_swarmagent.sh ", "Interval": "10s" }}' http://${adm_ip}:${consul_port}/v1/agent/service/register`
-
-	if [ "${stat_code}" != "200" ]; then
-		echo "${component_type} register to consul failed"
-		exit 2
-	fi
-}
-
-
-# init VG
-
 
 reg_to_consul() {
 	local component_type=$1
@@ -215,7 +110,6 @@ reg_to_consul() {
 		exit 2
 	fi
 }
-
 
 # init VG
 init_hdd_vg() {
@@ -279,8 +173,6 @@ init_ssd_vg() {
 
 # install consul agent
 install_consul() {
-	local version=0.7.1
-	
 	# stop consul
 	pkill -9 consul >/dev/null 2>&1
 
@@ -311,7 +203,7 @@ install_consul() {
 EOF
 
 	# copy binary file
-	cp ${cur_dir}/consul-agent-${version}-release/bin/consul /usr/bin/consul; chmod 755 /usr/bin/consul
+	cp ${cur_dir}/consul-agent-${consul_version}-release/bin/consul /usr/bin/consul; chmod 755 /usr/bin/consul
 
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/consul
@@ -366,8 +258,6 @@ EOF
 
 # install docker
 install_docker() {
-	docker_version=$1
-
 	# scan wwn 
 	wwn=""
 	for fc_host in `ls /sys/class/fc_host/`
@@ -385,24 +275,10 @@ install_docker() {
 		exit 2
 	fi
 
-	ifconfig $int_nic >/dev/null 2>&1 
-	if [ $? -ne 0 ]; then
-		echo "not find int_nic ${int_nic}"
-		exit 2
-	fi
-
-	ifconfig $ext_nic >/dev/null 2>&1 
-	if [ $? -ne 0 ]; then
-		echo "not find ext_nic ${ext_nic}"
-		ext_nic=""
-	fi
-
 	if [ "${release}" == "SUSE LINUX" ]; then
-		if [ "${docker_version}" == "1.11.2" ]; then
-			local docker_rpm=${cur_dir}/rpm/docker-${docker_version}.sles.rpm
-			local containerd_rpm=${cur_dir}/rpm/containerd-0.2.2-4.1.x86_64.rpm
-			local runc_rpm=${cur_dir}/rpm/runc-0.1.1-4.1.x86_64.rpm
-		fi
+		local docker_rpm=${cur_dir}/rpm/docker-${docker_version}.sles/docker*.rpm
+		local containerd_rpm=${cur_dir}/rpm/docker-${docker_version}.sles/containerd*.rpm
+		local runc_rpm=${cur_dir}/rpm/docker-${docker_version}.sles/runc*.rpm
 
 		if [ "${wwn}" != '' ]; then
 			systemctl enable multipathd.service
@@ -427,7 +303,7 @@ install_docker() {
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label ADM_NIC=${adm_nic} --label INT_NIC=${int_nic} --label EXT_NIC=${ext_nic}
+DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label ADM_NIC=${adm_nic}
 
 DOCKER_NETWORK_OPTIONS=""
 
@@ -463,8 +339,8 @@ WantedBy=multi-user.target
 EOF
 
 	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ $RELEASE == "CentOS" ]; then
-		local docker_rpm=${cur_dir}/rpm/docker-${docker_version}.rhel.centos.rpm
-		local docker_selinux_rpm=${cur_dir}/rpm/docker-selinux-${docker_version}.rhel.centos.rpm
+		local docker_rpm=${cur_dir}/rpm/docker-${docker_version}.el7/docker*.rpm
+		local docker_selinux_rpm=${cur_dir}/rpm/docker-${docker_version}.el7/docker-selinux*.rpm
 
 		if [ "${wwn}" != '' ]; then
 			systemctl enable multipathd.service
@@ -489,7 +365,7 @@ EOF
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label ADM_NIC=${adm_nic} --label INT_NIC=${int_nic} --label EXT_NIC=${ext_nic}
+DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label ADM_NIC=${adm_nic}
 
 EOF
 
@@ -537,8 +413,6 @@ EOF
 
 }
 
-
-
 init_docker() {
 	local cert_file=$regstry_ca_file
 	local cert_dir="/etc/docker/certs.d/${registry_domain}:${registry_port}"
@@ -555,24 +429,20 @@ init_docker() {
                 exit 2
 
         fi
-
 }
-
-# register docker
 
 # install docker plugin
 install_docker_plugin() {
-	local version=1.7.16
 	local script_dir=/usr/local/local_volume_plugin/scripts
 	mkdir -p ${script_dir}
 
 	pkill -9 local-volume-plugin > /dev/null 2>&1
 
 	# copy binary file
-	cp ${cur_dir}/dbaas_volume_plugin-${version}/bin/local_volume_plugin /usr/bin/local_volume_plugin; chmod 755 /usr/bin/local_volume_plugin
+	cp ${cur_dir}/dbaas_volume_plugin-${loacl_volume_plugin_version}/bin/local_volume_plugin /usr/bin/local_volume_plugin; chmod 755 /usr/bin/local_volume_plugin
 
 	# copy script
-	cp ${cur_dir}/dbaas_volume_plugin-${version}/scripts/*.sh ${script_dir}
+	cp ${cur_dir}/dbaas_volume_plugin-${local_volume_plugin_version}/scripts/*.sh ${script_dir}
 	chmod +x ${script_dir}/*.sh
 
 	cat << EOF > /usr/lib/systemd/system/local-volume-plugin.service
@@ -606,16 +476,13 @@ EOF
         fi
 }
 
-# register docker plugin
-
 # install swarm agent
 install_swarm_agent() {
-	local version=1.2.0
 	# stop swarm-agent
 	pkill -9 swarm >/dev/null 2>&1
 
 	# copy binary file
-	cp ${cur_dir}/swarm-agent-${version}-release/bin/swarm /usr/bin/swarm; chmod 755 /usr/bin/swarm
+	cp ${cur_dir}/swarm-agent-${swarm_agent_version}-release/bin/swarm /usr/bin/swarm; chmod 755 /usr/bin/swarm
 
 	#nohup swarm join --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/DBaaS  >> /var/log/swarm.log &
 	# create systemd config file
@@ -663,7 +530,6 @@ EOF
 	fi
 }
 
-
 rpm_install
 create_check_script
 nfs_mount
@@ -673,12 +539,12 @@ install_consul
 install_docker_plugin
 reg_to_consul DockerPlugin ${docker_plugin_port}
 reg_to_horus_server DockerPlugin 
-install_docker 1.11.2
+install_docker ${docker_version}
 init_docker
 reg_to_consul Docker ${docker_port}
 reg_to_horus_server Docker
 install_swarm_agent
-reg_to_consul_for_swarm
+reg_to_consul SwarmAgent ${swarm_agent_port}
 reg_to_horus_server SwarmAgent
 
 exit 0
