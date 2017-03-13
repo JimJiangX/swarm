@@ -14,16 +14,16 @@ regstry_ca_file=${10}
 docker_port=${11}
 hdd_dev=${12}
 ssd_dev=${13}
-horus_agent_port=${14}
-consul_port=${15}
-node_id=${16}
-horus_server_ip=${17}
-horus_server_port=${18}
-docker_plugin_port=${19}
-nfs_ip=${20}
-nfs_dir=${21}
-nfs_mount_dir=${22}
-nfs_mount_opts=${23}
+consul_port=${14}
+node_id=${15}
+horus_server_ip=${16}
+horus_server_port=${17}
+docker_plugin_port=${18}
+nfs_ip=${19}
+nfs_dir=${20}
+nfs_mount_dir=${21}
+nfs_mount_opts=${22}
+
 cur_dir=`dirname $0`
 
 hdd_vgname=${HOSTNAME}_HDD_VG
@@ -663,70 +663,6 @@ EOF
 	fi
 }
 
-# register swarm-agent
-
-# install horus agent
-install_horus_agent() {
-	local version=1.4.3
-	# stop swarm-agent
-	pkill -9 horus-agent >/dev/null 2>&1
-
-
-	# copy binary file
-	mkdir -p /usr/local/horus-agent
-	cp ${cur_dir}/horus-agent-${version}/bin/horus-agent /usr/bin/horus-agent; chmod 755 /usr/bin/horus-agent
-	cp -r ${cur_dir}/horus-agent-${version}/scripts /usr/local/horus-agent/scripts; chmod -R +x /usr/local/horus-agent/scripts/*.sh
-
-	local nets_dev="${adm_nic}#${int_nic}"
-	if [ ! -z "${ext_nic}" ]; then
-		local nets_dev="${nets_dev}#${ext_nic}"
-	fi
-
-	# create systemd config file
-	cat << EOF > /etc/sysconfig/horus-agent
-## Path           : System/Management
-## Description    : horus agent
-## Type           : string
-## Default        : ""
-## ServiceRestart : horus-agent
-
-#
-HORUS_AGENT_OPTS="-loglevel debug -consulip ${adm_ip}:${consul_port} -datacenter ${cs_datacenter} -hsrv ${horus_server_ip}:${horus_server_port} -ip ${adm_ip} -name ${node_id} -nets ${nets_dev} -port ${horus_agent_port} "
-
-EOF
-
-	cat << EOF > /usr/lib/systemd/system/horus-agent.service
-[Unit]
-Description=Horus agent
-Documentation=
-After=network.target
-Requires=consul.service
-
-[Service]
-EnvironmentFile=/etc/sysconfig/horus-agent
-ExecStart=/usr/bin/horus-agent  \$HORUS_AGENT_OPTS
-
-[Install]
-WantedBy=multi-user.target
-
-EOF
-
-	chmod 644 /etc/sysconfig/horus-agent
-	chmod 644 /usr/lib/systemd/system/horus-agent.service
-
-	# reload
-	systemctl daemon-reload
-
-	# Enable & start the service
-	systemctl enable horus-agent.service
-	systemctl restart horus-agent.service
-	systemctl status horus-agent.service
-	if [ $? -ne 0 ]; then
-		echo "start horus-agent failed!"
-		exit 2
-	fi
-
-}
 
 rpm_install
 create_check_script
@@ -744,8 +680,5 @@ reg_to_horus_server Docker
 install_swarm_agent
 reg_to_consul_for_swarm
 reg_to_horus_server SwarmAgent
-install_horus_agent
-reg_to_consul HorusAgent ${horus_agent_port}
-reg_to_horus_server HorusAgent
 
 exit 0
