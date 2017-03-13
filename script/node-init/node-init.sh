@@ -19,10 +19,11 @@ node_id=${15}
 horus_server_ip=${16}
 horus_server_port=${17}
 docker_plugin_port=${18}
-nfs_ip=${19}
-nfs_dir=${20}
-nfs_mount_dir=${21}
-nfs_mount_opts=${22}
+swarm_agent_port=${19}
+nfs_ip=${20}
+nfs_dir=${21}
+nfs_mount_dir=${22}
+nfs_mount_opts=${23}
 
 cur_dir=`dirname $0`
 
@@ -34,6 +35,8 @@ int_nic=bond1
 ext_nic=bond2
 
 PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
+
+docker_version=1.11.2
 
 platform="$(uname -s)"
 release=""
@@ -86,7 +89,6 @@ nfs_mount() {
 	fi	
 }
 
-
 reg_to_horus_server() {
 	local component_type=$1
 
@@ -96,114 +98,6 @@ reg_to_horus_server() {
 		exit 2
 	fi
 }
-
-create_check_script() {
-
-	local dir=/opt/DBaaS/script
-	mkdir -p ${dir}
-
-	cat << EOF > ${dir}/check_swarmagent.sh
-#!/bin/bash
-ps -ef | grep -v "grep" | grep "/usr/bin/swarm join"
-if [ \$? -ne 0 ]; then
-	exit 2
-else
-	exit 0
-fi
-EOF
-	
-        cp ${cur_dir}/check_upsql ${dir}/
-	cat << EOF > ${dir}/check_db.sh
-#!/bin/bash
-set -o nounset
-
-container_name=\$1
-username=\$2
-password=\$3
-dir=${dir}
-
-docker inspect \${container_name} > /dev/null 2>&1
-if [ \$? -ne 0 ]; then
-	 exit 2
-fi
-
-running_status=\`docker inspect -f "{{.State.Running}}" \${container_name}\`
-if [ "\${running_status}" != "true" ]; then
-	echo "container \${container_name} is not running !"
-	exit 3
-fi
-
-\${dir}/check_upsql --default-file /\${container_name}_DAT_LV/my.cnf --user \$username --password \$password
-if [ \$? -ne 0 ]; then
-	 exit 4
-fi
-EOF
-
-        cp ${cur_dir}/check_upproxy ${dir}/
-	cat << EOF > ${dir}/check_proxy.sh
-#!/bin/bash
-set -o nounset
-
-container_name=\$1
-dir=${dir}
-
-docker inspect \$container_name > /dev/null 2>&1
-if [ \$? -ne 0 ]; then
-	 exit 2
-fi
-
-running_status=\`docker inspect -f "{{.State.Running}}" \${container_name}\`
-if [ "\${running_status}" != "true" ]; then
-	echo "container \${container_name} is not running !"
-	exit 3
-fi
-
-\${dir}/check_upproxy --default-file /\${container_name}_CNF_LV/upsql-proxy.conf
-if [ \$? -ne 0 ]; then
-	 exit 4
-fi
-EOF
-
-	cat << EOF > ${dir}/check_switchmanager.sh
-#!/bin/bash
-
-container_name=\$1
-output=\`mktemp /tmp/XXXXX\`
-
-docker inspect \$container_name > \$output 2>&1
-if [ \$? -ne 0 ]; then
-	rm -f \$output
-	exit 2
-fi
-
-ip_addr=\`cat \$output | grep IPADDR | awk -F= '{print \$2}' | sed 's/",//g'\`
-port=\`cat \$output | grep PORT | awk -F= '{print \$2}' | sed 's/",//g' | awk -F, '{print \$1}'\`
-
-rm -f \$output
-
-stat_code=\`curl -o /dev/null -s -w %{http_code} -X POST http://\${ip_addr}:\${port}/ping\`
-if [ "\${stat_code}" != "200" ]; then
-	exit 2
-fi
-EOF
-	chmod -R +x ${dir}
-}
-
-
-reg_to_consul_for_swarm() {
-	local component_type=SwarmAgent
-
-	stat_code=`curl -o /dev/null -s -w %{http_code} -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Check": {"Script": "/opt/DBaaS/script/check_swarmagent.sh ", "Interval": "10s" }}' http://${adm_ip}:${consul_port}/v1/agent/service/register`
-
-	if [ "${stat_code}" != "200" ]; then
-		echo "${component_type} register to consul failed"
-		exit 2
-	fi
-}
-
-
-# init VG
-
 
 reg_to_consul() {
 	local component_type=$1
@@ -215,7 +109,6 @@ reg_to_consul() {
 		exit 2
 	fi
 }
-
 
 # init VG
 init_hdd_vg() {
@@ -366,7 +259,6 @@ EOF
 
 # install docker
 install_docker() {
-	docker_version=$1
 
 	# scan wwn 
 	wwn=""
@@ -537,8 +429,6 @@ EOF
 
 }
 
-
-
 init_docker() {
 	local cert_file=$regstry_ca_file
 	local cert_dir="/etc/docker/certs.d/${registry_domain}:${registry_port}"
@@ -557,8 +447,6 @@ init_docker() {
         fi
 
 }
-
-# register docker
 
 # install docker plugin
 install_docker_plugin() {
@@ -605,8 +493,6 @@ EOF
                 exit 2
         fi
 }
-
-# register docker plugin
 
 # install swarm agent
 install_swarm_agent() {
@@ -663,7 +549,6 @@ EOF
 	fi
 }
 
-
 rpm_install
 create_check_script
 nfs_mount
@@ -673,12 +558,12 @@ install_consul
 install_docker_plugin
 reg_to_consul DockerPlugin ${docker_plugin_port}
 reg_to_horus_server DockerPlugin 
-install_docker 1.11.2
+install_docker ${docker_version}
 init_docker
 reg_to_consul Docker ${docker_port}
 reg_to_horus_server Docker
 install_swarm_agent
-reg_to_consul_for_swarm
+reg_to_consul SwarmAgent ${swarm_agent_port}
 reg_to_horus_server SwarmAgent
 
 exit 0
