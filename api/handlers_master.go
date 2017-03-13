@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource"
 	"github.com/docker/swarm/garden/stack"
@@ -516,7 +517,7 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
-		gd.Ormer() == nil {
+		gd.Ormer() == nil || gd.Cluster == nil {
 
 		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
 		return
@@ -533,6 +534,49 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // -----------------/hosts handlers-----------------
+func getNodeInfo(n database.Node, e *cluster.Engine) structs.NodeInfo {
+	info := structs.NodeInfo{
+		ID:           n.ID,
+		Cluster:      n.ClusterID,
+		Room:         n.Room,
+		Seat:         n.Room,
+		MaxContainer: n.MaxContainer,
+		Enabled:      n.Enabled,
+		RegisterAt:   utils.TimeToString(n.RegisterAt),
+	}
+
+	info.SetByEngine(e)
+
+	return info
+}
+
+func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil || gd.Cluster == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	n, err := gd.Ormer().GetNode(name)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	e := gd.Cluster.Engine(n.EngineID)
+
+	info := getNodeInfo(n, e)
+
+	writeJSON(w, info, http.StatusOK)
+}
+
+func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+
+}
+
 func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	list := structs.PostNodesRequest{}
 	err := json.NewDecoder(r.Body).Decode(&list)
