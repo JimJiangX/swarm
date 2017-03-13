@@ -112,3 +112,19 @@ func (c *Cluster) RemovePendingContainer(swarmID ...string) {
 
 	c.scheduler.Unlock()
 }
+
+// deleteEngine if engine is not healthy
+func (c *Cluster) deleteEngine(addr string) bool {
+	engine := c.getEngineByAddr(addr)
+	if engine == nil {
+		return false
+	}
+
+	// check engine whether healthy
+	err := engine.RefreshNetworks()
+	if err == nil && engine.IsHealthy() {
+		return false
+	}
+
+	return c.removeEngine(addr)
+}
