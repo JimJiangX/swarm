@@ -140,20 +140,11 @@ func getDiscoveryOpt(c *cli.Context) map[string]string {
 	return options
 }
 
-func setNodesKVPath(uri string) {
-	var prefix string
-
-	parts := strings.SplitN(uri, "://", 2)
-	if len(parts) == 2 {
-		uri = parts[1]
+func setNodesKVPath(discovery discovery.Backend) {
+	kvDiscovery, ok := discovery.(*kvdiscovery.Discovery)
+	if ok {
+		resource.SetNodesKVPath(kvDiscovery.Prefix())
 	}
-
-	parts = strings.SplitN(uri, "/", 2)
-	if len(parts) == 2 {
-		prefix = parts[1]
-	}
-
-	resource.SetNodesKVPath(prefix)
 }
 
 func getOrmer(c *cli.Context) (database.Ormer, error) {
@@ -354,7 +345,7 @@ func manage(c *cli.Context) {
 			break
 		}
 
-		setNodesKVPath(uri)
+		setNodesKVPath(discovery)
 
 		ormer, err = getOrmer(c)
 		if err != nil {
