@@ -6,7 +6,7 @@ shift
 #$@ is HLUN_ID
 
 check() {
-	n=`lsscsi -i *:*:*:${HLUN_ID} | awk '{print $7}' | uniq | wc -l`	
+	n=`lsscsi -i *:*:*:${HLUN_ID} | awk '{print $NF}' | uniq | wc -l`	
 	if [ ${n} -ne 1 ]; then
 		echo "Please set "user_friendly_names no" in /etc/multipath.conf"
 		exit 4
@@ -19,7 +19,7 @@ get_devname() {
 	while(( $loop<=9 ))
 	do
 		check
-		local name=`lsscsi -i *:*:*:${HLUN_ID} | awk '{print $7}' | uniq`
+		local name=`lsscsi -i *:*:*:${HLUN_ID} | awk '{print $NF}' | uniq`
 		if [ "${name}" != '' ]; then 
 			dev_name=${name}
 			return

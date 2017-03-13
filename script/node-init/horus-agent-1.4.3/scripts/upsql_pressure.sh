@@ -9,7 +9,7 @@ fi
 INSTANCE=$1
 USER=$2
 PASSWD=$3
-
+interval=30
 STATSFILE=/tmp/${INSTANCE}_pressure_status.data
 
 running_status=`docker inspect -f "{{.State.Running}}" ${INSTANCE}`
@@ -22,13 +22,12 @@ if [ "${EXEC_BIN}" == '' ]; then
 	echo "not find mysql"
 	exit 4
 fi
-
-${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e"show status where Variable_name in ('Com_insert','Com_update','Com_delete','Com_select','open_tables');" >$STATSFILE  2>/dev/null
+get_mysql_stats1(){
+${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e "show global status where Variable_name in ('Com_insert','Com_update','Com_delete','Com_select','open_tables');" >$STATSFILE  2>/dev/null
 if [ $? -ne 0 ];then
 	echo "get data err"
 	exit 2
 fi
- 
  while read LINE 
  do 
  	key=`echo $LINE| awk '{print $1}'`
@@ -55,10 +54,54 @@ fi
 # upsql.innodb_open_table
      tables=$value
     esac
-  
  done <$STATSFILE
+# echo $delete:$insert:$com_select:$update:$tables
+}
 
- echo $delete:$insert:$com_select:$update:$tables
+get_mysql_stats2(){
+${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e "show global status where Variable_name in ('Com_insert','Com_update','Com_delete','Com_select','open_tables');" >$STATSFILE  2>/dev/null
+if [ $? -ne 0 ];then
+        echo "get data err"
+        exit 2
+fi
+ while read LINE 
+ do
+        key=`echo $LINE| awk '{print $1}'`
+        value=`echo $LINE| awk '{print $2}'`
+        case $key in
+        Com_delete)
+
+# upsql.com_delete
+      delete2=$value
+    ;;
+    Com_insert)
+# upsql.com_insert
+      insert2=$value
+    ;;
+    Com_select)
+# upsql.com_select
+      com_select2=$value
+    ;;
+    Com_update)
+# upsql.com_update
+      update2=$value
+    ;;
+    Open_tables)
+# upsql.innodb_open_table
+     tables2=$value
+    esac
+ done <$STATSFILE
+# echo $delete2:$insert2:$com_select2:$update2:$tables2
+}
+
+get_mysql_stats1
+sleep $interval
+get_mysql_stats2
+delcount=`expr $((delete2-delete)) / $interval`
+inscount=`expr $((insert2-insert)) / $interval`
+selcount=`expr $((com_select2-com_select)) / $interval`
+updcount=`expr $((update2-update)) / $interval`
+echo $delcount:$inscount:$selcount:$updcount:$tables2
 
 rm -f $STATSFILE
 
