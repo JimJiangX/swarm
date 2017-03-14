@@ -36,8 +36,8 @@ PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
 
 docker_version=1.12.6
 consul_version=0.7.5
-swarm_agent_version=3.0.0
-logicalVolume_volume_plugin_version=3.0.0.
+swarm_agent_version=1.0.0
+logicalVolume_volume_plugin_version=1.0.0.
 
 platform="$(uname -s)"
 release=""
@@ -483,11 +483,16 @@ EOF
 
 # install swarm agent
 install_swarm_agent() {
+	local script_dir=/usr/local/swarm_agent/scripts
+	mkdir -p ${script_dir}
+	cp -r ${cur_dir}/swarm-agent-${swarm_agent_version}/scripts/* ${script_dir}/
+	chmod +x ${script_dir}/*
+
 	# stop swarm-agent
 	pkill -9 swarm >/dev/null 2>&1
 
 	# copy binary file
-	cp ${cur_dir}/swarm-agent-${swarm_agent_version}-release/bin/swarm /usr/bin/swarm; chmod 755 /usr/bin/swarm
+	cp ${cur_dir}/swarm-agent-${swarm_agent_version}/bin/swarm /usr/bin/swarm; chmod 755 /usr/bin/swarm
 
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/swarm-agent
@@ -498,7 +503,7 @@ install_swarm_agent() {
 ## ServiceRestart : swarm
 
 #
-SWARM_AGENT_OPTS="join --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/${swarm_key}"
+SWARM_AGENT_OPTS="seedjoin --seedAddr ${adm_ip}:${swarm_agent_port} --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/${swarm_key}"
 
 EOF
 
