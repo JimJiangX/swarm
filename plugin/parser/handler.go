@@ -97,10 +97,15 @@ func getImageRequirement(ctx *_Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	name := r.FormValue("name")
-	version := r.FormValue("version")
-
-	parser, err := factory(name, version)
+	image := r.FormValue("image")
+	
+	parts:=strings.SplitN(image,":",2)
+	var v string
+	if len(parts)==2{
+		v = parts[1]
+	}
+	
+	parser, err := factory(parts[0], v)
 	if err != nil {
 		httpError(w, err, http.StatusNotImplemented)
 		return

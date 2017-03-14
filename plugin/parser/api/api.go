@@ -17,7 +17,7 @@ type PluginAPI interface {
 	GetCommands(ctx context.Context, service string) (structs.Commands, error)
 
 	GetImageSupport(ctx context.Context) ([]structs.ImageVersion, error)
-	GetImageRequirement(ctx context.Context, name, version string) (structs.RequireResource, error)
+	GetImageRequirement(ctx context.Context, image string) (structs.RequireResource, error)
 
 	ImageCheck(ctx context.Context, ct structs.ConfigTemplate) error
 	PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate) error
@@ -92,10 +92,9 @@ func (p plugin) GetImageSupport(ctx context.Context) ([]structs.ImageVersion, er
 	return obj, err
 }
 
-func (p plugin) GetImageRequirement(ctx context.Context, name, version string) (structs.RequireResource, error) {
+func (p plugin) GetImageRequirement(ctx context.Context, image string) (structs.RequireResource, error) {
 	params := make(url.Values)
-	params.Set("name", name)
-	params.Set("version", version)
+	params.Set("image", image)
 
 	url := url.URL{
 		Path:     "/image/requirement",
