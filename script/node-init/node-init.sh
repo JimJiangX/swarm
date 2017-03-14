@@ -35,7 +35,7 @@ adm_nic=bond0
 PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
 
 docker_version=1.12.6
-consul_version=
+consul_version=0.7.5
 swarm_agent_version=
 loacl_volume_plugin_version=
 
@@ -67,7 +67,7 @@ rpm_install() {
 
 nfs_mount() {
 	local fstab=/etc/fstab
-        #
+        
         mount | grep "${nfs_ip}:${nfs_dir}"
         if [ $? -eq 0 ]; then
 		umount ${nfs_mount_dir} > /dev/null 2>&1
@@ -489,7 +489,6 @@ install_swarm_agent() {
 	# copy binary file
 	cp ${cur_dir}/swarm-agent-${swarm_agent_version}-release/bin/swarm /usr/bin/swarm; chmod 755 /usr/bin/swarm
 
-	#nohup swarm join --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/DBaaS  >> /var/log/swarm.log &
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/swarm-agent
 ## Path           : System/Management
@@ -547,10 +546,10 @@ reg_to_horus_server DockerPlugin
 
 install_docker ${docker_version}
 reg_to_consul Docker ${docker_port}
-reg_to_horus_server Docker
+#reg_to_horus_server Docker
 
 install_swarm_agent
 reg_to_consul SwarmAgent ${swarm_agent_port}
-reg_to_horus_server SwarmAgent
+#reg_to_horus_server SwarmAgent
 
 exit 0
