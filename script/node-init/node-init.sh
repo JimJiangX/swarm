@@ -203,7 +203,7 @@ install_consul() {
 EOF
 
 	# copy binary file
-	cp ${cur_dir}/consul-agent-${consul_version}-release/bin/consul /usr/bin/consul; chmod 755 /usr/bin/consul
+	cp ${cur_dir}/consul-agent-${consul_version}/bin/consul /usr/bin/consul; chmod 755 /usr/bin/consul
 
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/consul
