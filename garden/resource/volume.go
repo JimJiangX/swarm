@@ -1,7 +1,6 @@
 package resource
 
 import (
-	"database/sql"
 	"strconv"
 
 	"github.com/docker/swarm/cluster"
@@ -103,7 +102,7 @@ func (lv *localVolume) Recycle(v database.Volume) (err error) {
 	if v.Size <= 0 {
 		v, err = lv.vo.GetVolume(nameOrID)
 		if err != nil {
-			if errors.Cause(err) == sql.ErrNoRows {
+			if database.IsNotFound(err) {
 				return nil
 			}
 			return err

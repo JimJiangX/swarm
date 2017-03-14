@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -278,6 +279,9 @@ func (db dbBase) listUnits() ([]Unit, error) {
 	)
 
 	err := db.Select(&out, query)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return out, errors.Wrap(err, "list []Unit")
 }
@@ -290,6 +294,9 @@ func (db dbBase) ListUnitByServiceID(id string) ([]Unit, error) {
 	)
 
 	err := db.Select(&out, query, id)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return out, errors.Wrap(err, "list []Unit by ServiceID")
 }
@@ -302,6 +309,9 @@ func (db dbBase) ListUnitByEngine(id string) ([]Unit, error) {
 	)
 
 	err := db.Select(&out, query, id)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return out, errors.Wrap(err, "list []Unit by EngineID")
 }

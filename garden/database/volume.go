@@ -1,6 +1,8 @@
 package database
 
 import (
+	"database/sql"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
@@ -184,6 +186,9 @@ func (db dbBase) ListVolumeByVG(name string) ([]Volume, error) {
 	)
 
 	err := db.Select(&lvs, query, name)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return lvs, errors.Wrap(err, "list []Volume by VG")
 }
@@ -195,6 +200,9 @@ func (db dbBase) listVolumes() ([]Volume, error) {
 	)
 
 	err := db.Select(&lvs, query)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return lvs, errors.Wrap(err, "list []Volume")
 }
@@ -207,6 +215,9 @@ func (db dbBase) ListVolumesByUnitID(unit string) ([]Volume, error) {
 	)
 
 	err := db.Select(&lvs, query, unit)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return lvs, errors.Wrap(err, "list []Volume by UnitID")
 }

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
@@ -33,7 +34,7 @@ func (db dbBase) ListAvailablePorts(num int) ([]Port, error) {
 	)
 
 	err := db.Select(&ports, query, false)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, errors.Wrap(err, "list []Port")
 	}
 
@@ -129,6 +130,9 @@ func (db dbBase) ListPortsByUnit(nameOrID string) ([]Port, error) {
 	)
 
 	err := db.Select(&ports, query, nameOrID, nameOrID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return ports, errors.Wrap(err, "list []Port")
 }
@@ -159,6 +163,10 @@ func (db dbBase) ListPorts(start, end, limit int) ([]Port, error) {
 
 	default:
 		return nil, errors.Errorf("illegal input,start=%d end=%d limit=%d", start, end, limit)
+	}
+
+	if err == sql.ErrNoRows {
+		return nil, nil
 	}
 
 	return ports, errors.Wrap(err, "list []Port")

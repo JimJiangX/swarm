@@ -88,7 +88,6 @@ type Ormer interface {
 	SysConfigOrmer
 	NetworkingOrmer
 	TaskOrmer
-	UserOrmer
 	VolumeOrmer
 
 	TxFrame(do func(tx *sqlx.Tx) error) error

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
@@ -55,6 +56,9 @@ func (db dbBase) ListIPByNetworking(networking string) ([]IP, error) {
 	)
 
 	err := db.Select(&list, query, networking)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return list, errors.Wrap(err, "list []IP by networking")
 }
@@ -78,6 +82,9 @@ func (db dbBase) listIPsByAllocated(allocated bool, num int) ([]IP, error) {
 	}
 
 	err := db.Select(&out, query, "")
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return out, errors.Wrap(err, "list []IP by allocated")
 }
@@ -90,6 +97,9 @@ func (db dbBase) ListIPByUnitID(unit string) ([]IP, error) {
 	)
 
 	err := db.Select(&out, query, unit)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return out, errors.Wrap(err, "list []IP by UnitID")
 }
@@ -102,6 +112,9 @@ func (db dbBase) ListIPByEngine(ID string) ([]IP, error) {
 	)
 
 	err := db.Select(&out, query, ID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return out, errors.Wrap(err, "list []IP by EngineID")
 }
@@ -120,6 +133,9 @@ func (db dbBase) ListIPWithCondition(networking string, allocated bool, num int)
 	query := fmt.Sprintf("SELECT ip_addr,prefix,networking_id,unit_id,gateway,vlan_id,enabled,engine_id,net_dev,bandwidth FROM %s WHERE networking_id=? AND unit_id%s? LIMIT %d", db.ipTable(), opt, num)
 
 	err := db.Select(&out, query, networking, "")
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return out, errors.Wrap(err, "list []IP with condition")
 }

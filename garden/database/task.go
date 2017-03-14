@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/docker/swarm/garden/utils"
@@ -191,6 +192,10 @@ func (db dbBase) ListTasks(link string, status int) ([]Task, error) {
 	default:
 
 		err = db.Select(&out, query)
+	}
+
+	if err == sql.ErrNoRows {
+		return nil, nil
 	}
 
 	return out, errors.Wrap(err, "list tasks")

@@ -1,7 +1,6 @@
 package stack
 
 import (
-	"database/sql"
 	"sort"
 
 	"github.com/Sirupsen/logrus"
@@ -77,7 +76,7 @@ func New(gd *garden.Garden, services []structs.ServiceSpec) *Stack {
 
 func (s *Stack) DeployServices(ctx context.Context) ([]structs.PostServiceResponse, error) {
 	list, err := s.gd.ListServices(ctx)
-	if err != nil && errors.Cause(err) != sql.ErrNoRows {
+	if err != nil && !database.IsNotFound(err) {
 		return nil, err
 	}
 
@@ -206,7 +205,7 @@ func (s *Stack) linkAndStart(ctx context.Context) (err error) {
 
 func (s *Stack) freshServices(ctx context.Context) error {
 	list, err := s.gd.ListServices(ctx)
-	if err != nil && errors.Cause(err) != sql.ErrNoRows {
+	if err != nil && !database.IsNotFound(err) {
 		return err
 	}
 

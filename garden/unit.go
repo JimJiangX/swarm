@@ -203,6 +203,9 @@ func (u unit) removeVolumes(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if len(lvs) == 0 {
+		return nil
+	}
 
 	engine := u.getEngine()
 	if err != nil {

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -64,6 +65,9 @@ func (db dbBase) ListImages() ([]Image, error) {
 	)
 
 	err := db.Select(&images, query)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return images, errors.Wrap(err, "list []Image")
 }

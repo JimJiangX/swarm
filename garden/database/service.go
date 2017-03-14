@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"strings"
 	"time"
 
@@ -32,8 +33,6 @@ type ServiceInfoInterface interface {
 
 type ServiceOrmer interface {
 	UnitOrmer
-
-	UserOrmer
 
 	ImageOrmer
 
@@ -82,6 +81,9 @@ func (db dbBase) ListServices() ([]Service, error) {
 	)
 
 	err := db.Select(&out, query)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return out, errors.Wrap(err, "list []Service")
 }

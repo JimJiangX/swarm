@@ -29,6 +29,9 @@ func CreateNetworkDevice(ctx context.Context, unitID string, c *cluster.Containe
 	if err != nil {
 		return err
 	}
+	if len(out) == 0 {
+		return nil
+	}
 
 	body := bytes.NewBuffer(nil)
 	err = json.NewEncoder(body).Encode(out)

@@ -36,10 +36,5 @@ func (m master) RemoveCluster(ID string) error {
 		return nil
 	}
 
-	err = m.dco.DelCluster(cl.ID)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return m.dco.DelCluster(cl.ID)
 }

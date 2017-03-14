@@ -24,7 +24,7 @@ type NodeInterface interface {
 
 	ListNodes() ([]Node, error)
 
-	ListNodeByCluster(cluster string) ([]Node, error)
+	//	ListNodeByCluster(cluster string) ([]Node, error)
 	ListNodesByClusters(clusters []string, enable bool) ([]Node, error)
 
 	CountNodeByCluster(cluster string) (int, error)
@@ -194,6 +194,9 @@ func (db dbBase) ListNodes() ([]Node, error) {
 	)
 
 	err := db.Select(&nodes, query)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return nodes, errors.Wrap(err, "get all Nodes")
 }
@@ -206,6 +209,9 @@ func (db dbBase) ListNodeByCluster(cluster string) ([]Node, error) {
 	)
 
 	err := db.Select(&nodes, query, cluster)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return nodes, errors.Wrap(err, "list Node by cluster")
 }
@@ -239,6 +245,9 @@ func (db dbBase) ListNodesByEngines(names []string) ([]Node, error) {
 	}
 
 	err = db.Select(&nodes, query, args...)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return nodes, errors.Wrapf(err, "list Nodes by engines:%s", names)
 }
@@ -260,6 +269,9 @@ func (db dbBase) ListNodesByIDs(in []string, cluster string) ([]Node, error) {
 	}
 
 	err = db.Select(&nodes, query, args...)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return nodes, errors.Wrapf(err, "list Nodes by IDs:%s", in)
 }
@@ -289,6 +301,9 @@ func (db dbBase) ListNodesByClusters(clusters []string, enable bool) ([]Node, er
 
 	var nodes []Node
 	err = db.Select(&nodes, query, args...)
+	if err == sql.ErrNoRows {
+		return []Node{}, nil
+	}
 
 	return nodes, errors.Wrap(err, "list Nodes by clusters")
 }

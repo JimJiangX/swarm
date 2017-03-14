@@ -2,6 +2,7 @@ package database
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"time"
 
@@ -9,17 +10,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-type UserOrmer interface {
-	InsertUsers(users []User) error
-
-	ListUsersByService(service, _type string) ([]User, error)
-
-	SetUsers(addition, update []User) error
-
-	DelUsers(users []User) error
-}
-
-// TODO:remove
 // User is for DB and Proxy
 type User struct {
 	RWSplit   bool   `db:"rw_split" json:"rw_split"`
@@ -49,6 +39,10 @@ func (db dbBase) listUsers() ([]User, error) {
 	query := "SELECT id,service_id,type,username,password,role,read_only,rw_split,shard,blacklist,whitelist,created_at FROM " + db.userTable()
 	err := db.Select(&users, query)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+
 		return nil, errors.Wrap(err, "list []User")
 	}
 
@@ -60,7 +54,6 @@ func (db dbBase) listUsers() ([]User, error) {
 	}
 
 	return users, nil
-
 }
 
 // ListUsersByService returns []User select by serviceID and User type if assigned
@@ -82,6 +75,10 @@ func (db dbBase) ListUsersByService(service, _type string) ([]User, error) {
 
 	}
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+
 		return nil, errors.Wrap(err, "list []User by serviceID")
 	}
 

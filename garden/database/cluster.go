@@ -70,6 +70,9 @@ func (db dbBase) ListClusters() ([]Cluster, error) {
 	)
 
 	err := db.Select(&clusters, query)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return clusters, errors.Wrap(err, "list Clusters")
 }
