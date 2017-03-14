@@ -21,7 +21,8 @@ type serviceWithTask struct {
 type servicesByPriority []structs.ServiceSpec
 
 func (sp servicesByPriority) Less(i, j int) bool {
-	return sp[i].Priority > sp[j].Priority
+	//	return sp[i].Priority > sp[j].Priority
+	return false
 }
 
 // Len is the number of elements in the collection.
@@ -35,7 +36,7 @@ func (sp servicesByPriority) Swap(i, j int) {
 }
 
 func initServicesPriority(services []structs.ServiceSpec) servicesByPriority {
-	priority := make(map[string]int, len(services))
+	// priority := make(map[string]int, len(services))
 
 	//	for i := range services {
 	//		max := 0
@@ -55,9 +56,9 @@ func initServicesPriority(services []structs.ServiceSpec) servicesByPriority {
 	//		}
 	//	}
 
-	for i := range services {
-		services[i].Priority = priority[services[i].Name]
-	}
+	//	for i := range services {
+	//		services[i].Priority = priority[services[i].Name]
+	//	}
 
 	return servicesByPriority(services)
 }

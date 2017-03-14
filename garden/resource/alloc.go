@@ -223,7 +223,7 @@ func parseUintList(list []string) (map[int]bool, error) {
 }
 
 func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string,
-	requires []structs.NetDeviceRequire) ([]database.IP, error) {
+	candidates []string, requires []structs.NetDeviceRequire) ([]database.IP, error) {
 
 	engine := at.cluster.Engine(engineID)
 	if engine == nil {
@@ -241,24 +241,11 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 		}
 	}
 
-	index, vnic := 0, 0
-	in := make([]database.NetworkingRequire, 0, len(requires))
-	nm := make(map[string]int, len(requires))
+	vnic := 0
 	for _, req := range requires {
 		if req.Bandwidth > 0 {
 			width = width - req.Bandwidth
 			vnic++
-		}
-
-		if v, exist := nm[req.Networking]; exist && index > v {
-			in[v].Num++
-		} else {
-			nm[req.Networking] = index
-			in = append(in, database.NetworkingRequire{
-				Networking: req.Networking,
-				Num:        1,
-			})
-			index++
 		}
 	}
 
@@ -278,35 +265,61 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 		return nil, errors.Errorf("Engine:%s not enough Bandwidth for require", engine.Addr)
 	}
 
-	networkings, err := at.ormer.AllocNetworking(in, unitID)
-	if err != nil {
-		return nil, err
+	index := 0
+	in := make([]database.NetworkingRequire, 0, len(requires))
+	for i := range requires {
+		if requires[i].Bandwidth > 0 {
+			in = append(in, database.NetworkingRequire{
+				Bond:      ready[index].Bond,
+				Bandwidth: ready[index].Bandwidth,
+			})
+			index++
+		}
 	}
 
-	used := make(map[uint32]struct{}, len(requires))
-	for i, req := range requires {
+	var out []database.IP
+	for i := range candidates {
+		for l := range in {
+			in[l].Networking = candidates[i]
+		}
+		out, err = at.ormer.AllocNetworking(unitID, engine.ID, in)
+		if err == nil {
+			break
+		}
+	}
 
-	ips:
-		for n := range networkings {
-			if _, exist := used[networkings[n].IPAddr]; exist {
-				continue ips
-			}
-			if req.Networking == networkings[n].Networking {
-				ready[i] = nic.Device{
-					Bond:      ready[i].Bond,
-					Bandwidth: req.Bandwidth,
-					IP:        utils.Uint32ToIP(networkings[n].IPAddr).String(),
-					Mask:      strconv.Itoa(networkings[n].Prefix),
-					Gateway:   networkings[n].Gateway,
-					VLAN:      networkings[n].VLAN,
+	if len(out) != len(in) {
+		n := 0
+	loop:
+		for i := range in {
+			for _, c := range candidates {
+				in[i].Networking = c
+				n++
+
+				if n == len(in) {
+					break loop
 				}
-
-				used[networkings[n].IPAddr] = struct{}{}
 			}
+		}
+
+		out, err = at.ormer.AllocNetworking(unitID, engine.ID, in)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	for i := range out {
+		ready[i] = nic.Device{
+			Bond:      out[i].Bond,
+			Bandwidth: out[i].Bandwidth,
+			IP:        utils.Uint32ToIP(out[i].IPAddr).String(),
+			Mask:      strconv.Itoa(out[i].Bandwidth),
+			Gateway:   out[i].Gateway,
+			VLAN:      out[i].VLAN,
 		}
 	}
 
 	nic.SaveIntoContainerLabel(config, ready)
 
-	return networkings, nil
+	return out, nil
 }

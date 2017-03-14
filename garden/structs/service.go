@@ -8,10 +8,9 @@ import (
 
 // Service if table structure
 type Service struct {
-	ID   string `db:"id" json:"id"`
-	Name string `db:"name" json:"name"`
-	// TODO:maybe remove
-	Image             string `db:"image_id" json:"image_id"`       // imageName:imageVersion
+	ID                string `db:"id" json:"id"`
+	Name              string `db:"name" json:"name"`
+	Image             string `json:"image_version"`
 	Desc              string `db:"description" json:"description"` // short for Description
 	Architecture      string `db:"architecture" json:"architecture"`
 	Tag               string `db:"tag" json:"tag"` // part of business
@@ -85,26 +84,21 @@ type UnitSpec struct {
 }
 
 type ServiceSpec struct {
-	Priority     int    `json:"priority"`
-	Replicas     int    `json:"unit_num"`
-	ImageVersion string `json:"image_version"`
+	Replicas int `json:"unit_num"`
 
 	Service
 
 	Require UnitRequire `json:"unit_require"`
 
-	Clusters []ClusterBindNetworkings `json:"clusters"`
+	Networkings []string `json:"networking_id"`
+
+	Clusters []string `json:"cluster_id"`
 
 	Constraints []string `json:"constraints"`
 
-	Options map[string]interface{} `json:"args"`
-
 	Units []UnitSpec `json:"units"`
-}
 
-type ClusterBindNetworkings struct {
-	Cluster     string   `json:"name"`
-	Networkings []string `json:"networkings_id"`
+	Options map[string]interface{} `json:"args"`
 }
 
 type UnitRequire struct {
@@ -118,14 +112,13 @@ type UnitRequire struct {
 		Memory int64 `json:"memory"`
 	} `json:"limit,omitempty"`
 
-	Volumes     []VolumeRequire    `json:"volumes"`
-	Networkings []NetDeviceRequire `json:"networks"`
+	Volumes  []VolumeRequire    `json:"volumes"`
+	Networks []NetDeviceRequire `json:"networks"`
 }
 
 type NetDeviceRequire struct {
-	Device     int    `json:"device,omitempty"`
-	Bandwidth  int    `json:"bandwidth"` // M/s
-	Networking string `json:"networking_id"`
+	Device    int `json:"device,omitempty"`
+	Bandwidth int `json:"bandwidth"` // M/s
 }
 
 type PostServiceResponse struct {

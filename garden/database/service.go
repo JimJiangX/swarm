@@ -328,6 +328,9 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 
 	for i := range ips {
 		ips[i].UnitID = ""
+		ips[i].Engine = ""
+		ips[i].Bandwidth = 0
+		ips[i].Bond = ""
 	}
 
 	for i := range ports {
