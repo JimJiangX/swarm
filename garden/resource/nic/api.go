@@ -3,6 +3,7 @@ package nic
 import (
 	"bytes"
 	"crypto/tls"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -27,6 +28,9 @@ const (
 func CreateNetworkDevice(ctx context.Context, unitID string, c *cluster.Container, orm database.NetworkingOrmer, tlsConfig *tls.Config) error {
 	out, err := orm.ListIPByUnitID(unitID)
 	if err != nil {
+		if errors.Cause(err) != sql.ErrNoRows {
+			return nil
+		}
 		return err
 	}
 
