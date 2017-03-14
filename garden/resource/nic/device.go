@@ -127,7 +127,7 @@ func parseContainerDevice(c *cluster.Container) []Device {
 	return out
 }
 
-func ParseEngineNetDevice(e *cluster.Engine) (map[string]Device, int, error) {
+func ParseTotalDevice(e *cluster.Engine) (map[string]Device, int, error) {
 	if e == nil || len(e.Labels) == 0 {
 		return nil, 0, nil
 	}
@@ -153,6 +153,20 @@ func ParseEngineNetDevice(e *cluster.Engine) (map[string]Device, int, error) {
 				}
 			}
 		}
+	}
+
+	return devm, total, nil
+
+}
+
+func ParseEngineNetDevice(e *cluster.Engine) (map[string]Device, int, error) {
+	if e == nil || len(e.Labels) == 0 {
+		return nil, 0, nil
+	}
+
+	devm, total, err := ParseTotalDevice(e)
+	if err != nil {
+		return devm, total, err
 	}
 
 	for _, c := range e.Containers() {

@@ -230,14 +230,21 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 		return nil, errors.New("Engine not found")
 	}
 
-	devm, width, err := nic.ParseEngineNetDevice(engine)
+	used, err := at.ormer.ListIPByEngine(engine.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, d := range devm {
-		if d.Bandwidth > 0 {
-			width = width - d.Bandwidth
+	devm, width, err := nic.ParseTotalDevice(engine)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range used {
+		if used[i].Bandwidth > 0 {
+			width = width - used[i].Bandwidth
+
+			delete(devm, used[i].Bond)
 		}
 	}
 
@@ -308,18 +315,18 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 		}
 	}
 
-	for i := range out {
-		ready[i] = nic.Device{
-			Bond:      out[i].Bond,
-			Bandwidth: out[i].Bandwidth,
-			IP:        utils.Uint32ToIP(out[i].IPAddr).String(),
-			Mask:      strconv.Itoa(out[i].Bandwidth),
-			Gateway:   out[i].Gateway,
-			VLAN:      out[i].VLAN,
-		}
-	}
+	//	for i := range out {
+	//		ready[i] = nic.Device{
+	//			Bond:      out[i].Bond,
+	//			Bandwidth: out[i].Bandwidth,
+	//			IP:        utils.Uint32ToIP(out[i].IPAddr).String(),
+	//			Mask:      strconv.Itoa(out[i].Bandwidth),
+	//			Gateway:   out[i].Gateway,
+	//			VLAN:      out[i].VLAN,
+	//		}
+	//	}
 
-	nic.SaveIntoContainerLabel(config, ready)
+	//	nic.SaveIntoContainerLabel(config, ready)
 
 	return out, nil
 }

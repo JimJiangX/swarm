@@ -80,7 +80,7 @@ type unit struct {
 	u            database.Unit
 	uo           database.UnitOrmer
 	cluster      cluster.Cluster
-	startNetwork func(ctx context.Context, c *cluster.Container, tlsConfig *tls.Config) error
+	startNetwork func(ctx context.Context, unitID string, c *cluster.Container, orm database.NetworkingOrmer, tlsConfig *tls.Config) error
 }
 
 func newUnit(u database.Unit, uo database.UnitOrmer, cluster cluster.Cluster) *unit {
@@ -162,7 +162,7 @@ func (u unit) startContainer(ctx context.Context) error {
 
 	// start networking
 	if u.startNetwork != nil {
-		err = u.startNetwork(ctx, c, nil)
+		err = u.startNetwork(ctx, u.u.ID, c, u.uo, nil)
 	}
 
 	return err

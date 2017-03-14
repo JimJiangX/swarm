@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/garden/database"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"golang.org/x/net/context/ctxhttp"
@@ -23,11 +24,14 @@ const (
 	createDevURL      = "device/create"
 )
 
-func CreateNetworkDevice(ctx context.Context, c *cluster.Container, tlsConfig *tls.Config) error {
-	out := parseContainerDevice(c)
+func CreateNetworkDevice(ctx context.Context, unitID string, c *cluster.Container, orm database.NetworkingOrmer, tlsConfig *tls.Config) error {
+	out, err := orm.ListIPByUnitID(unitID)
+	if err != nil {
+		return err
+	}
 
 	body := bytes.NewBuffer(nil)
-	err := json.NewEncoder(body).Encode(out)
+	err = json.NewEncoder(body).Encode(out)
 	if err != nil {
 		return err
 	}

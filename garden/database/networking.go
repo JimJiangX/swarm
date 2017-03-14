@@ -17,31 +17,15 @@ type NetworkingOrmer interface {
 	// IP
 	ListIPByNetworking(networkingID string) ([]IP, error)
 	ListIPByUnitID(unit string) ([]IP, error)
-	// ListIPWithCondition(networking string, allocation bool, num int) ([]IP, error)
+	ListIPByEngine(ID string) ([]IP, error)
 
 	AllocNetworking(unit, engine string, req []NetworkingRequire) ([]IP, error)
 
-	// Networking
 	InsertNetworking([]IP) error
 	DelNetworking(ID string) error
 
-	// Port
-	//	ImportPort(start, end int, filter ...int) (int, error)
-
-	//	ListAvailablePorts(num int) ([]Port, error)
-	//	ListPortsByUnit(nameOrID string) ([]Port, error)
-	//	ListPorts(start, end, limit int) ([]Port, error)
-
-	//	DelPort(port int, allocated bool) error
-
-	// Networking
-
 	SetNetworkingEnable(ID string, enable bool) error
 	SetIPEnable([]uint32, string, bool) error
-
-	//	GetNetworkingByID(ID string) (Networking, int, error)
-	//	ListNetworking() ([]Networking, error)
-	//	ListNetworkingByType(_type string) ([]Networking, error)
 }
 
 // IP is table structure, associate to Networking
@@ -108,6 +92,18 @@ func (db dbBase) ListIPByUnitID(unit string) ([]IP, error) {
 	err := db.Select(&out, query, unit)
 
 	return out, errors.Wrap(err, "list []IP by UnitID")
+}
+
+// ListIPByUnitID returns []IP select by Engine
+func (db dbBase) ListIPByEngine(ID string) ([]IP, error) {
+	var (
+		out   []IP
+		query = "SELECT ip_addr,prefix,networking_id,unit_id,gateway,vlan_id,enabled,engine_id,net_dev,bandwidth FROM " + db.ipTable() + " WHERE engine_id=?"
+	)
+
+	err := db.Select(&out, query, ID)
+
+	return out, errors.Wrap(err, "list []IP by EngineID")
 }
 
 // ListIPWithCondition returns []IP select by NetworkingID and Allocated==allocated
