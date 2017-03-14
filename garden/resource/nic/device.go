@@ -12,13 +12,12 @@ import (
 const (
 	_PFDevLabel = "PF_DEV" // "PF_DEV_":"dev1,10G"
 
-	// "VF_DEV_":"bond0,mac_xxxx,10M,192.168.1.1,255.255.255.0,192.168.3.0,vlan_xxxx"
+	// "VF_DEV_":"bond0,10M,192.168.1.1,255.255.255.0,192.168.3.0,vlan_xxxx"
 	_VFDevPrefix = "VF_DEV_"
 )
 
 type Device struct {
 	Bond      string
-	MAC       string
 	Bandwidth int // M/s
 	IP        string
 	Mask      string
@@ -27,12 +26,12 @@ type Device struct {
 	err       error
 }
 
-// "VF_DEV_0":"bond0,mac_xxxx,10M,192.168.1.1,255.255.255.0,192.168.3.0,vlan_xxxx"
+// "VF_DEV_0":"bond0,10M,192.168.1.1,255.255.255.0,192.168.3.0,vlan_xxxx"
 func (d Device) String() string {
 	if d.err != nil {
 		return d.err.Error()
 	}
-	return fmt.Sprintf("%s,%s,%dM,%s,%s,%s,%d", d.Bond, d.MAC, d.Bandwidth,
+	return fmt.Sprintf("%s,%dM,%s,%s,%s,%d", d.Bond, d.Bandwidth,
 		d.IP, d.Mask, d.Gateway, d.VLAN)
 }
 
@@ -66,26 +65,25 @@ func parseBandwidth(width string) (int, error) {
 
 func parseDevice(dev string) Device {
 	parts := strings.Split(dev, ",")
-	if len(parts) < 7 {
+	if len(parts) < 6 {
 		return Device{err: errors.Errorf("illegal device:'%s'", dev)}
 	}
 
-	n, err := strconv.Atoi(strings.TrimSpace(parts[6]))
+	n, err := strconv.Atoi(strings.TrimSpace(parts[5]))
 	if err != nil {
-		err = errors.Wrapf(err, "illegal VLAN %s,%s", parts[6], dev)
+		err = errors.Wrapf(err, "illegal VLAN %s,%s", parts[5], dev)
 		return Device{err: err}
 	}
 
 	d := Device{
 		Bond:    parts[0],
-		MAC:     parts[1],
-		IP:      parts[3],
-		Mask:    parts[4],
-		Gateway: parts[5],
+		IP:      parts[2],
+		Mask:    parts[3],
+		Gateway: parts[4],
 		VLAN:    n,
 	}
 
-	d.Bandwidth, d.err = parseBandwidth(parts[2])
+	d.Bandwidth, d.err = parseBandwidth(parts[1])
 
 	return d
 }
@@ -152,7 +150,6 @@ func ParseEngineNetDevice(e *cluster.Engine) (map[string]Device, int, error) {
 			if len(parts) >= 2 {
 				devm[parts[0]] = Device{
 					Bond: parts[0],
-					MAC:  parts[1],
 				}
 			}
 		}

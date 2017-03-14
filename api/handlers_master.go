@@ -574,7 +574,38 @@ func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil || gd.Cluster == nil {
 
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	engines := gd.Cluster.ListEngines()
+
+	nodes, err := gd.Ormer().ListNodes()
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	out := make([]structs.NodeInfo, 0, len(nodes))
+
+	for i := range nodes {
+		var engine *cluster.Engine
+
+		for _, e := range engines {
+			if e.IP == nodes[i].Addr {
+				engine = e
+				break
+			}
+		}
+
+		out = append(out, getNodeInfo(nodes[i], engine))
+	}
+
+	writeJSON(w, out, http.StatusOK)
 }
 
 func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
