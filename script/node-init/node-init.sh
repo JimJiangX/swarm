@@ -66,7 +66,7 @@ rpm_install() {
 }
 
 nfs_mount() {
-	local dir=/etc/fstab
+	local fstab=/etc/fstab
         #
         mount | grep "${nfs_ip}:${nfs_dir}"
         if [ $? -eq 0 ]; then
@@ -83,9 +83,9 @@ nfs_mount() {
 		echo "nfs mount failed"
 		exit 2
 	else
-		grep "${nfs_ip}:${nfs_dir}" ${dir} 
+		grep "${nfs_ip}:${nfs_dir}" ${fstab} 
 		if [ $? -ne 0 ]; then
-			echo "${nfs_ip}:${nfs_dir}	${nfs_mount_dir}	nfs	defaults	0 0" >> ${dir}
+			echo "${nfs_ip}:${nfs_dir}	${nfs_mount_dir}	nfs	defaults	0 0" >> ${fst}
 		fi
 	fi	
 }
@@ -268,12 +268,15 @@ install_docker() {
 	
 	wwn=${wwn:1}
 
-	# check nic
+	# check adm_nic
 	ifconfig $adm_nic >/dev/null 2>&1 
 	if [ $? -ne 0 ]; then
 		echo "not find adm_nic ${adm_nic}"
 		exit 2
 	fi
+
+	# check container_nic
+	container_nic=`ifconfig | grep -e 'bond[0-9]\{1,3\}' | grep -v ${adm_nic} | awk '{print $1}' | sed 's/://g' |  tr "\n" "," |sed 's/.$//'` 
 
 	if [ "${release}" == "SUSE LINUX" ]; then
 		local docker_rpm=${cur_dir}/rpm/docker-${docker_version}.sles/docker*.rpm
@@ -303,7 +306,7 @@ install_docker() {
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label ADM_NIC=${adm_nic}
+DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label ADM_NIC=${adm_nic} --label CONTAINER_NIC=${container_nic}
 
 DOCKER_NETWORK_OPTIONS=""
 
@@ -365,7 +368,7 @@ EOF
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label ADM_NIC=${adm_nic}
+DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label ADM_NIC=${adm_nic} CONTAINER_NIC=${container_nic}
 
 EOF
 
@@ -410,6 +413,8 @@ EOF
 		echo "start docker failed!"
 		exit 2
 	fi
+
+	init_docker
 
 }
 
@@ -531,18 +536,19 @@ EOF
 }
 
 rpm_install
-create_check_script
 nfs_mount
 init_hdd_vg
 init_ssd_vg
 install_consul
+
 install_docker_plugin
 reg_to_consul DockerPlugin ${docker_plugin_port}
 reg_to_horus_server DockerPlugin 
+
 install_docker ${docker_version}
-init_docker
 reg_to_consul Docker ${docker_port}
 reg_to_horus_server Docker
+
 install_swarm_agent
 reg_to_consul SwarmAgent ${swarm_agent_port}
 reg_to_horus_server SwarmAgent
