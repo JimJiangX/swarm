@@ -3,7 +3,6 @@ package api
 import (
 	"bufio"
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	stderr "errors"
 	"fmt"
@@ -216,7 +215,7 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		out, err = gd.Ormer().ListTasks(link, status)
 	}
 
-	if err != nil && errors.Cause(err) != sql.ErrNoRows {
+	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -258,7 +257,7 @@ func listImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	images, err := gd.Ormer().ListImages()
-	if err != nil && errors.Cause(err) != sql.ErrNoRows {
+	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -424,7 +423,7 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	orm := gd.Ormer()
 
 	list, err := orm.ListClusters()
-	if err != nil && errors.Cause(err) != sql.ErrNoRows {
+	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -586,7 +585,7 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	engines := gd.Cluster.ListEngines()
 
 	nodes, err := gd.Ormer().ListNodes()
-	if err != nil && errors.Cause(err) != sql.ErrNoRows {
+	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}

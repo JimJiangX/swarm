@@ -1,7 +1,6 @@
 package resource
 
 import (
-	"database/sql"
 	"sort"
 	"strconv"
 	"strings"
@@ -232,7 +231,7 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 	}
 
 	used, err := at.ormer.ListIPByEngine(engine.ID)
-	if err != nil && errors.Cause(err) != sql.ErrNoRows {
+	if err != nil {
 		return nil, err
 	}
 
