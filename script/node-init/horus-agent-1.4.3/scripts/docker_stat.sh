@@ -8,8 +8,7 @@ if [ $# -lt 1 ];then
   	exit 2
 fi
 
-n=`docker inspect -f '{{.HostConfig.CpusetCpus}}' ${container_name} | sed 's/,//g' | wc -m`
-cpu_num=$[n-1]
+cpu_num=`docker inspect -f '{{.HostConfig.CpusetCpus}}' ${container_name} | awk -F, '{print NF}'`
 data=`docker stats --no-stream ${container_name} 2>/dev/null| tail -n 1|awk '{print $2":"$8}' | tr -d % `
 cpu_usage=${data%%:*}
 #cpu=`echo "sclae=4;$cpu_usage/$cpu_num" | bc`
