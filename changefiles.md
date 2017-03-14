@@ -20,10 +20,11 @@
 	
 		+	cluster.go 	L104-111
 		+	config.go	L301-372
-		+-	engine.go	L943-952
+		+-	engine.go	L943-952,L546-551
 		+++ upmio.go
 		+++ /mesos/addition.go
 		+++ /swarm/addition.go
+		+-	/swarm/cluster.go	L403
 		
 	/garden:all
 	

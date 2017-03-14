@@ -111,6 +111,8 @@ func (n *NodeInfo) SetByEngine(e *cluster.Engine) {
 	n.Engine.Version = e.Version
 	n.Engine.Kernel = e.Labels["kernelversion"]
 	n.Engine.OS = e.Labels["operatingsystem"]
+	n.Engine.OSType = e.Labels["ostype"]
+	n.Engine.Architecture = e.Labels["architecture"]
 	n.Engine.CPUs = int(e.Cpus)
 	n.Engine.Memory = int(e.Memory)
 	n.Engine.IsHealthy = e.IsHealthy()
