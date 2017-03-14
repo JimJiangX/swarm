@@ -1,0 +1,17 @@
+{
+  "server": false,
+  "datacenter": "dc1",
+  "data_dir": "/usr/local/consul",
+  "node_name": "PPDBAAS02",
+  "disable_update_check": true,
+  "log_level": "INFO",
+  "addresses": {
+    "http": "146.240.104.24",
+    "rpc": "146.240.104.24"
+  },
+  "start_join": [
+    "146.240.104.27",
+    "146.240.104.26",
+    "146.240.104.25"
+ ]
+}
