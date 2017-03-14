@@ -312,7 +312,7 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 		#!/bin/bash
 		swarm_key=$1
 		adm_ip=$2
-		cs_nodes=$3
+		cs_datacenter=$3
 		cs_list=$4
 		registry_domain=$5
 		registry_ip=$6
@@ -323,24 +323,16 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 		docker_port=${11}
 		hdd_dev=${12}
 		ssd_dev=${13}
-		horus_agent_port=${14}
-		consul_port=${15}
-		node_id=${16}
-		horus_server_ip=${17}
-		horus_server_port=${18}
-		docker_plugin_port=${19}
+		consul_port=${14}
+		node_id=${15}
+		horus_server_ip=${16}
+		horus_server_port=${17}
+		docker_plugin_port=${18}
+		swarm_agent_port=${19}
 		nfs_ip=${20}
 		nfs_dir=${21}
 		nfs_mount_dir=${22}
 		nfs_mount_opts=${23}
-		cur_dir=`dirname $0`
-
-		hdd_vgname=${HOSTNAME}_HDD_VG
-		ssd_vgname=${HOSTNAME}_SSD_VG
-
-		adm_nic=bond0
-		int_nic=bond1
-		ext_nic=bond2
 	*/
 	hdd, ssd := "null", "null"
 	if len(nt.hdd) > 0 {
@@ -350,12 +342,12 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 		ssd = strings.Join(nt.ssd, ",")
 	}
 
-	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %d %s %s %s %d %s %s %s %s",
+	script := fmt.Sprintf(`chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %s %s %s %d %d %s %s %s %s`,
 		path, path, dockerNodesKVPath, nt.Node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile,
-		config.DockerPort, hdd, ssd, config.HorusAgentPort, config.ConsulPort,
-		nt.Node.ID, horusIP, horusPort, config.PluginPort,
+		config.DockerPort, hdd, ssd, config.ConsulPort,
+		nt.Node.ID, horusIP, horusPort, config.PluginPort, config.SwarmAgentPort,
 		nt.Node.NFS.Addr, nt.Node.NFS.Dir, nt.Node.NFS.MountDir, nt.Node.NFS.Options)
 
 	return script, nil
