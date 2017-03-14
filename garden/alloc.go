@@ -43,6 +43,15 @@ type allocator interface {
 	RecycleResource() error
 }
 
+func convertService(svc database.Service) structs.Service {
+	// TODO:convert
+	return structs.Service{}
+}
+
+func convertStructsService(svc structs.Service) database.Service {
+	return database.Service{}
+}
+
 func (gd *Garden) Service(nameOrID string) (*Service, error) {
 	info, err := gd.ormer.GetServiceInfo(nameOrID)
 	if err != nil {
@@ -50,7 +59,7 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 	}
 
 	spec := structs.ServiceSpec{
-		Service: structs.Service(info.Service),
+		Service: convertService(info.Service),
 		// TODO: other params
 	}
 
@@ -117,7 +126,7 @@ func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, erro
 
 		services = append(services, structs.ServiceSpec{
 			Replicas: len(list[i].Units),
-			Service:  structs.Service(list[i].Service),
+			Service:  convertService(list[i].Service),
 			//	Users:    list[i].Users,
 			Units: units,
 		})
@@ -185,7 +194,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 
 	t := database.NewTask(spec.Name, database.ServiceCreateTask, spec.ID, spec.Desc, "", 300)
 
-	err = gd.ormer.InsertService(database.Service(spec.Service), us, &t)
+	err = gd.ormer.InsertService(convertStructsService(spec.Service), us, &t)
 	if err != nil {
 		return nil, nil, err
 	}

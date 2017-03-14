@@ -19,28 +19,23 @@ import (
 var containerKV = "swarm/containers/"
 
 type Service struct {
-	sl           statusLock
-	so           database.ServiceOrmer
-	spec         structs.ServiceSpec
-	cluster      cluster.Cluster
-	pluginClient pluginapi.PluginAPI
-	options      scheduleOption
+	sl      statusLock
+	so      database.ServiceOrmer
+	pc      pluginapi.PluginAPI
+	spec    structs.ServiceSpec
+	cluster cluster.Cluster
 
-	imageName    string
-	imageVersion string
+	options scheduleOption
 }
 
 func newService(spec structs.ServiceSpec, so database.ServiceOrmer, cluster cluster.Cluster, pc pluginapi.PluginAPI) *Service {
-	image, version := (database.Service)(spec.Service).ParseImage()
 
 	return &Service{
-		spec:         spec,
-		so:           so,
-		cluster:      cluster,
-		pluginClient: pc,
-		sl:           newStatusLock(spec.ID, so),
-		imageName:    image,
-		imageVersion: version,
+		spec:    spec,
+		so:      so,
+		cluster: cluster,
+		pc:      pc,
+		sl:      newStatusLock(spec.ID, so),
 	}
 }
 
@@ -600,7 +595,7 @@ func (svc *Service) Image() (database.Image, error) {
 
 func (svc *Service) Requires(ctx context.Context) (structs.RequireResource, error) {
 
-	return svc.pluginClient.GetImageRequirement(ctx, svc.imageName, svc.imageVersion)
+	return svc.pc.GetImageRequirement(ctx, svc.spec.Image)
 }
 
 func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]interface{}) (structs.ConfigsMap, error) {
@@ -614,7 +609,7 @@ func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]in
 		}
 	}
 
-	return svc.pluginClient.GenerateServiceConfig(ctx, svc.spec)
+	return svc.pc.GenerateServiceConfig(ctx, svc.spec)
 }
 
 func (svc *Service) GenerateUnitsConfigs(ctx context.Context, args map[string]interface{}) (structs.ConfigsMap, error) {
@@ -626,5 +621,5 @@ func (svc *Service) generateUnitConfig(ctx context.Context, nameOrID string, arg
 }
 
 func (svc *Service) generateUnitsCmd(ctx context.Context) (structs.Commands, error) {
-	return svc.pluginClient.GetCommands(ctx, svc.spec.ID)
+	return svc.pc.GetCommands(ctx, svc.spec.ID)
 }
