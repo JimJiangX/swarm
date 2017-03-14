@@ -626,7 +626,10 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	orm := gd.Ormer()
 	clusters, err := orm.ListClusters()
-	if err != nil {
+	if n := len(clusters); err != nil || n == 0 {
+		if n == 0 {
+			err = errors.New("clusters is nil")
+		}
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}

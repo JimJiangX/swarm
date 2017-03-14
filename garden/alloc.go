@@ -185,7 +185,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 
 	t := database.NewTask(spec.Name, database.ServiceCreateTask, spec.ID, spec.Desc, "", 300)
 
-	err = gd.ormer.InsertService(database.Service(spec.Service), us, &t, nil)
+	err = gd.ormer.InsertService(database.Service(spec.Service), us, &t)
 	if err != nil {
 		return nil, nil, err
 	}

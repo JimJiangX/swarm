@@ -10,7 +10,7 @@ import (
 )
 
 type ServiceInterface interface {
-	InsertService(svc Service, units []Unit, t *Task, users []User) error
+	InsertService(svc Service, units []Unit, t *Task) error
 
 	GetService(nameOrID string) (Service, error)
 	GetServiceStatus(nameOrID string) (int, error)
@@ -195,7 +195,7 @@ func (db dbBase) ServiceStatusCAS(nameOrID string, val int, finish time.Time, f 
 }
 
 // TxSaveService insert Service & Task & []User in Tx.
-func (db dbBase) InsertService(svc Service, units []Unit, t *Task, users []User) error {
+func (db dbBase) InsertService(svc Service, units []Unit, t *Task) error {
 	do := func(tx *sqlx.Tx) error {
 
 		err := db.txInsertSerivce(tx, svc)
@@ -215,10 +215,6 @@ func (db dbBase) InsertService(svc Service, units []Unit, t *Task, users []User)
 			if err != nil {
 				return err
 			}
-		}
-
-		if len(users) > 0 {
-			err = db.txInsertUsers(tx, users)
 		}
 
 		return err
@@ -304,9 +300,8 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 		return err
 	}
 
-	// recycle networking & ports & volumes
+	// recycle networking & volumes
 	ips := make([]IP, 0, 20)
-	ports := make([]Port, 0, 20)
 	volumes := make([]Volume, 0, 20)
 
 	for i := range units {
@@ -314,11 +309,6 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 		ipl, err := db.ListIPByUnitID(units[i].ID)
 		if err == nil {
 			ips = append(ips, ipl...)
-		}
-
-		pl, err := db.ListPortsByUnit(units[i].ID)
-		if err == nil {
-			ports = append(ports, pl...)
 		}
 
 		vl, err := db.ListVolumesByUnitID(units[i].ID)
@@ -335,22 +325,9 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 		ips[i].Bond = ""
 	}
 
-	for i := range ports {
-		ports[i].Allocated = false
-		ports[i].Name = ""
-		ports[i].UnitID = ""
-		ports[i].UnitName = ""
-		ports[i].Proto = ""
-	}
-
 	do := func(tx *sqlx.Tx) error {
 
 		err := db.txSetIPs(tx, ips)
-		if err != nil {
-			return err
-		}
-
-		err = db.txSetPorts(tx, ports)
 		if err != nil {
 			return err
 		}
@@ -374,11 +351,6 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 		//			return err
 		//		}
 
-		err = db.txDelUsers(tx, serviceID)
-		if err != nil {
-			return err
-		}
-
 		err = db.txDelUnit(tx, serviceID)
 		if err != nil {
 			return err
@@ -394,7 +366,6 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 
 type ServiceInfo struct {
 	Service Service
-	Users   []User
 	Units   []UnitInfo
 }
 
@@ -412,13 +383,6 @@ func (db dbBase) GetServiceInfo(nameOrID string) (info ServiceInfo, err error) {
 	}
 
 	info.Service = svc
-
-	users, err := db.ListUsersByService(svc.ID, "")
-	if err != nil {
-		return
-	}
-
-	info.Users = users
 
 	units, err := db.ListUnitByServiceID(svc.ID)
 	if err != nil {
@@ -472,11 +436,6 @@ func (db dbBase) ListServicesInfo() ([]ServiceInfo, error) {
 		return nil, err
 	}
 
-	users, err := db.listUsers()
-	if err != nil {
-		return nil, err
-	}
-
 	volumes, err := db.listVolumes()
 	if err != nil {
 		return nil, err
@@ -489,14 +448,8 @@ func (db dbBase) ListServicesInfo() ([]ServiceInfo, error) {
 
 	list := make([]ServiceInfo, 0, len(services))
 	for i := range services {
-		us := make([]User, 0, 5)
-		unitsInfo := make([]UnitInfo, 0, 5)
 
-		for u := range users {
-			if users[u].ServiceID == services[i].ID {
-				us = append(us, users[u])
-			}
-		}
+		unitsInfo := make([]UnitInfo, 0, 5)
 
 		for u := range units {
 			if units[u].ServiceID != services[i].ID {
@@ -537,7 +490,6 @@ func (db dbBase) ListServicesInfo() ([]ServiceInfo, error) {
 
 		list = append(list, ServiceInfo{
 			Service: services[i],
-			Users:   us,
 			Units:   unitsInfo,
 		})
 	}
