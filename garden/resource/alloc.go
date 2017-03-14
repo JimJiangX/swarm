@@ -294,7 +294,6 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 			if req.Networking == networkings[n].Networking {
 				ready[i] = nic.Device{
 					Bond:      ready[i].Bond,
-					MAC:       ready[i].MAC,
 					Bandwidth: req.Bandwidth,
 					IP:        utils.Uint32ToIP(networkings[n].IPAddr).String(),
 					Mask:      strconv.Itoa(networkings[n].Prefix),
