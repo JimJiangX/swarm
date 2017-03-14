@@ -36,8 +36,8 @@ PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
 
 docker_version=1.12.6
 consul_version=0.7.5
-swarm_agent_version=
-loacl_volume_plugin_version=
+swarm_agent_version=3.0.0
+logicalVolume_volume_plugin_version=3.0.0.
 
 platform="$(uname -s)"
 release=""
@@ -438,21 +438,21 @@ init_docker() {
 
 # install docker plugin
 install_docker_plugin() {
-	local script_dir=/usr/local/local_volume_plugin/scripts
+	local script_dir=/usr/local/logicalVolume_volume_plugin/scripts
 	mkdir -p ${script_dir}
 
 	pkill -9 local-volume-plugin > /dev/null 2>&1
 
 	# copy binary file
-	cp ${cur_dir}/dbaas_volume_plugin-${loacl_volume_plugin_version}/bin/local_volume_plugin /usr/bin/local_volume_plugin; chmod 755 /usr/bin/local_volume_plugin
+	cp ${cur_dir}/logicalVolume-volume-plugin-${logicalVolume_volume_plugin_version}/bin/logicalVolume_volume_plugin /usr/bin/logicalVolume_volume_plugin; chmod 755 /usr/bin/logicalVolume_volume_plugin
 
 	# copy script
-	cp ${cur_dir}/dbaas_volume_plugin-${local_volume_plugin_version}/scripts/*.sh ${script_dir}
+	cp ${cur_dir}/logicalVolume-volume-plugin-${logicalVolume_volume_plugin_version}/scripts/*.sh ${script_dir}
 	chmod +x ${script_dir}/*.sh
 
-	cat << EOF > /usr/lib/systemd/system/local-volume-plugin.service
+	cat << EOF > /usr/lib/systemd/system/logicalVolume-volume-plugin.service
 [Unit]
-Description=DBaaS local disk volume plugin for docker
+Description=DBaaS logicalVolume volume plugin for docker
 Wants=docker.service
 After=docker.service
 
@@ -460,21 +460,21 @@ After=docker.service
 [Service]
 Restart=on-failure
 RestartSec=30s
-ExecStart=/usr/bin/local_volume_plugin
+ExecStart=/usr/bin/logicalVolume_volume_plugin
 
 [Install]
 WantedBy=multi-user.target
 
 EOF
 
-	chmod 644 /usr/lib/systemd/system/local-volume-plugin.service
+	chmod 644 /usr/lib/systemd/system/logicalVolume-volume-plugin.service
 
 	# reload
 	systemctl daemon-reload
 	# Enable & start the service
-	systemctl enable local-volume-plugin.service
-	systemctl restart local-volume-plugin.service
-	systemctl status local-volume-plugin.service
+	systemctl enable logicalVolume-volume-plugin.service
+	systemctl restart logicalVolume-volume-plugin.service
+	systemctl status logicalVolume-volume-plugin.service
         if [ $? -ne 0 ]; then
                 echo "start docker-plugin failed!"
                 exit 2
