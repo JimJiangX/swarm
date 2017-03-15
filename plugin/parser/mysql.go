@@ -13,6 +13,7 @@ import (
 
 func init() {
 	register("mysql", "5.6", &mysqlConfig{})
+	register("mysql", "5.7", &mysqlConfig{})
 }
 
 type mysqlConfig struct {
