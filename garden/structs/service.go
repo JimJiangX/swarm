@@ -1,6 +1,7 @@
 package structs
 
 import (
+	"sort"
 	"time"
 
 	"github.com/docker/swarm/cluster"
@@ -128,3 +129,66 @@ type PostServiceResponse struct {
 }
 
 type RequireResource struct{}
+
+type User struct {
+	Name      string `json:"name"`
+	Password  string `json:"password"`
+	Privilege string `json:"priviege"`
+}
+
+type ServiceLink struct {
+	priority int
+	ID       string `json:"id"`
+
+	Args map[string]interface{} `json:"args"`
+
+	Users []User   `json:"users"`
+	Deps  []string `json:"deps"`
+}
+
+type PostServiceLink []*ServiceLink
+
+func (sl PostServiceLink) Less(i, j int) bool {
+	return sl[i].priority > sl[j].priority
+}
+
+// Len is the number of elements in the collection.
+func (sl PostServiceLink) Len() int {
+	return len(sl)
+}
+
+// Swap swaps the elements with indexes i and j.
+func (sl PostServiceLink) Swap(i, j int) {
+	sl[i], sl[j] = sl[j], sl[i]
+}
+
+// https://play.golang.org/p/1tkv9z4DtC
+func (sl PostServiceLink) Sort() {
+	deps := make(map[string]int, len(sl))
+
+	for i := range sl {
+		deps[sl[i].ID] = len(sl[i].Deps)
+	}
+
+	for i := len(sl) - 1; i > 0; i-- {
+		for _, s := range sl {
+
+			max := 0
+
+			for _, id := range s.Deps {
+				if n := deps[id]; n > max {
+					max = n + 1
+				}
+			}
+			if max > 0 {
+				deps[s.ID] = max
+			}
+		}
+	}
+
+	for i := range sl {
+		sl[i].priority = deps[sl[i].ID]
+	}
+
+	sort.Sort(sl)
+}
