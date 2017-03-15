@@ -159,7 +159,7 @@ func ParseTotalDevice(e *cluster.Engine) (map[string]Device, int, error) {
 
 }
 
-func ParseEngineNetDevice(e *cluster.Engine) (map[string]Device, int, error) {
+func parseEngineNetDevice(e *cluster.Engine) (map[string]Device, int, error) {
 	if e == nil || len(e.Labels) == 0 {
 		return nil, 0, nil
 	}
@@ -187,7 +187,7 @@ func ParseEngineNetDevice(e *cluster.Engine) (map[string]Device, int, error) {
 	return devm, total, nil
 }
 
-func SaveIntoContainerLabel(config *cluster.ContainerConfig, devices []Device) {
+func saveIntoContainerLabel(config *cluster.ContainerConfig, devices []Device) {
 	if config == nil {
 		return
 	}

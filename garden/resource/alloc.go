@@ -315,18 +315,5 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 		}
 	}
 
-	//	for i := range out {
-	//		ready[i] = nic.Device{
-	//			Bond:      out[i].Bond,
-	//			Bandwidth: out[i].Bandwidth,
-	//			IP:        utils.Uint32ToIP(out[i].IPAddr).String(),
-	//			Mask:      strconv.Itoa(out[i].Bandwidth),
-	//			Gateway:   out[i].Gateway,
-	//			VLAN:      out[i].VLAN,
-	//		}
-	//	}
-
-	//	nic.SaveIntoContainerLabel(config, ready)
-
 	return out, nil
 }

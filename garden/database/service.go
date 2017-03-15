@@ -32,13 +32,25 @@ type ServiceInfoInterface interface {
 }
 
 type ServiceOrmer interface {
-	UnitOrmer
-
-	ImageOrmer
-
 	ServiceInterface
 
 	ServiceInfoInterface
+
+	UnitInterface
+
+	ContainerInterface
+
+	NodeInterface
+
+	VolumeOrmer
+
+	NetworkingOrmer
+
+	ImageInterface
+
+	TaskOrmer
+
+	SysConfigOrmer
 }
 
 type Service struct {

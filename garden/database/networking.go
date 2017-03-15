@@ -164,8 +164,8 @@ func combin(in []NetworkingRequire) [][]NetworkingRequire {
 		}
 
 		if !exist {
-			a := make([]NetworkingRequire, 1, 2)
-			a[0] = in[i]
+			a := make([]NetworkingRequire, 0, 2)
+			a = append(a, in[i])
 			out = append(out, a)
 		}
 	}

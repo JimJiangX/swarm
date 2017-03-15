@@ -44,6 +44,8 @@ type UnitOrmer interface {
 	VolumeOrmer
 
 	NetworkingOrmer
+
+	SysConfigOrmer
 }
 
 // Unit is table structure

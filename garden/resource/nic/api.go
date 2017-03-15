@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -19,22 +18,13 @@ import (
 )
 
 const (
-	defaultPluginPort = "8883"
-	defaultTimeout    = 30 * time.Second
-	createDevURL      = "device/create"
+	defaultTimeout = 30 * time.Second
+	createDevURL   = "device/create"
 )
 
-func CreateNetworkDevice(ctx context.Context, unitID string, c *cluster.Container, orm database.NetworkingOrmer, tlsConfig *tls.Config) error {
-	out, err := orm.ListIPByUnitID(unitID)
-	if err != nil {
-		return err
-	}
-	if len(out) == 0 {
-		return nil
-	}
-
+func CreateNetworkDevice(ctx context.Context, addr string, ips []database.IP, tlsConfig *tls.Config) error {
 	body := bytes.NewBuffer(nil)
-	err = json.NewEncoder(body).Encode(out)
+	err := json.NewEncoder(body).Encode(ips)
 	if err != nil {
 		return err
 	}
@@ -44,7 +34,6 @@ func CreateNetworkDevice(ctx context.Context, unitID string, c *cluster.Containe
 	}
 
 	client, scheme := http.DefaultClient, "http"
-	addr := net.JoinHostPort(c.Engine.IP, defaultPluginPort)
 	if tlsConfig != nil {
 		scheme = "https"
 		trans := defaultPooledTransport(defaultTimeout)

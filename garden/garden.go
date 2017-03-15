@@ -103,12 +103,14 @@ func (gd *Garden) Register(req structs.RegisterDC) error {
 	//	}
 
 	config := database.SysConfig{
-		ID:             req.ID,
-		DockerPort:     req.DockerPort,
-		PluginPort:     req.PluginPort,
-		SwarmAgentPort: req.SwarmAgentPort,
-		BackupDir:      req.BackupDir,
-		Retry:          req.Retry,
+		ID:        req.ID,
+		BackupDir: req.BackupDir,
+		Retry:     req.Retry,
+		Ports: database.Ports{
+			Docker:     req.DockerPort,
+			Plugin:     req.PluginPort,
+			SwarmAgent: req.SwarmAgentPort,
+		},
 		ConsulConfig: database.ConsulConfig{
 			ConsulIPs:        req.Consul.ConsulIPs,
 			ConsulPort:       req.Consul.ConsulPort,

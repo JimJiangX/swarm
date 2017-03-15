@@ -3,6 +3,8 @@ package garden
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -80,7 +82,7 @@ type unit struct {
 	u            database.Unit
 	uo           database.UnitOrmer
 	cluster      cluster.Cluster
-	startNetwork func(ctx context.Context, unitID string, c *cluster.Container, orm database.NetworkingOrmer, tlsConfig *tls.Config) error
+	startNetwork func(ctx context.Context, addr string, ips []database.IP, tlsConfig *tls.Config) error
 }
 
 func newUnit(u database.Unit, uo database.UnitOrmer, cluster cluster.Cluster) *unit {
@@ -162,7 +164,19 @@ func (u unit) startContainer(ctx context.Context) error {
 
 	// start networking
 	if u.startNetwork != nil {
-		err = u.startNetwork(ctx, u.u.ID, c, u.uo, nil)
+		ports, err := u.uo.GetPorts()
+		if err != nil {
+			return err
+		}
+
+		ips, err := u.uo.ListIPByUnitID(u.u.ID)
+		if err != nil {
+			return err
+		}
+		if len(ips) > 0 {
+			addr := net.JoinHostPort(c.Engine.IP, strconv.Itoa(ports.SwarmAgent))
+			err = u.startNetwork(ctx, addr, ips, nil)
+		}
 	}
 
 	return err

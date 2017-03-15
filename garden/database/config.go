@@ -12,23 +12,27 @@ import (
 type SysConfigOrmer interface {
 	InsertSysConfig(c SysConfig) error
 	GetSysConfig() (SysConfig, error)
+	GetPorts() (Ports, error)
 	GetRegistry() (Registry, error)
 	GetAuthConfig() (*types.AuthConfig, error)
 }
 
 // SysConfig is the application config file
 type SysConfig struct {
-	ID             int    `db:"dc_id"`
-	DockerPort     int    `db:"docker_port"`
-	PluginPort     int    `db:"plugin_port"`
-	SwarmAgentPort int    `db:"swarm_agent_port"`
-	Retry          int64  `db:"retry"`
-	BackupDir      string `db:"backup_dir"`
+	ID        int    `db:"dc_id"`
+	Retry     int64  `db:"retry"`
+	BackupDir string `db:"backup_dir"`
+	Ports
 	ConsulConfig
-	HorusConfig
 	Registry
 	SSHDeliver
-	// Users
+}
+
+type Ports struct {
+	Docker     int `db:"docker_port"`
+	Plugin     int `db:"plugin_port"`
+	SwarmAgent int `db:"swarm_agent_port"`
+	// Consul     int `db:"consul_port"`
 }
 
 // Users is users of DB and Proxy
@@ -175,4 +179,15 @@ func newAuthConfig(username, password, email, token string) *types.AuthConfig {
 		Email:         email,
 		RegistryToken: token,
 	}
+}
+
+func (db dbBase) GetPorts() (Ports, error) {
+	var (
+		p     Ports
+		query = "SELECT swarm_agent_port,docker_port,plugin_port FROM " + db.sysConfigTable() + " LIMIT 1"
+	)
+
+	err := db.Get(&p, query)
+
+	return p, errors.Wrap(err, "get sysConfig.Ports")
 }
