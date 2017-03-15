@@ -45,12 +45,13 @@ func ParseImage(name string) (iv ImageVersion, err error) {
 	if len(dots) >= 2 {
 		iv.Major, err = strconv.Atoi(dots[0])
 		if err != nil {
-			return
+			return iv, errors.Wrap(err, "parse image error,image:"+name)
 		}
 
 		iv.Minor, err = strconv.Atoi(dots[1])
 		if err != nil {
-			return
+			return iv, errors.Wrap(err, "parse image error,image:"+name)
+
 		}
 
 		if len(dots) > 2 {
@@ -58,7 +59,7 @@ func ParseImage(name string) (iv ImageVersion, err error) {
 		}
 	}
 
-	return
+	return iv, errors.Wrap(err, "parse image error,image:"+name)
 }
 
 func (iv ImageVersion) LessThan(v ImageVersion) (bool, error) {

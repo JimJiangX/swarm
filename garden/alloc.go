@@ -219,11 +219,10 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 		return nil, nil, err
 	}
 
-	//	image, err := gd.ormer.GetImage(spec.Image)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-
+	im, err := gd.ormer.GetImageVersion(spec.Image)
+	if err != nil {
+		return nil, nil, err
+	}
 	if spec.ID == "" {
 		spec.ID = utils.Generate32UUID()
 	}
@@ -231,6 +230,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 	if err != nil {
 		return nil, nil, err
 	}
+	svc.Desc.ImageID = im.ID
 
 	us := make([]database.Unit, spec.Replicas)
 	units := make([]structs.UnitSpec, spec.Replicas)

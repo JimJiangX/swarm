@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/docker/swarm/garden/structs"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
@@ -15,7 +16,9 @@ type ImageOrmer interface {
 }
 
 type ImageInterface interface {
+	GetImageVersion(name string) (Image, error)
 	GetImage(name string, major, minor, patch int) (Image, error)
+
 	ListImages() ([]Image, error)
 
 	InsertImageWithTask(img Image, t Task) error
@@ -72,6 +75,15 @@ func (db dbBase) ListImages() ([]Image, error) {
 	return images, errors.Wrap(err, "list []Image")
 }
 
+func (db dbBase) GetImageVersion(name string) (Image, error) {
+	im, err := structs.ParseImage(name)
+	if err != nil {
+		return Image{}, err
+	}
+
+	return db.GetImage(im.Name, im.Major, im.Minor, im.Patch)
+}
+
 // GetImage returns Image select by name and version.
 func (db dbBase) GetImage(name string, major, minor, patch int) (Image, error) {
 	image := Image{}
@@ -102,19 +114,19 @@ func (db dbBase) DelImage(ID string) error {
 
 	do := func(tx *sqlx.Tx) error {
 
-		//		n := 0
-		//		query := "SELECT COUNT(id) FROM " + db.serviceTable() + " WHERE image_id=?"
+		n := 0
+		query := "SELECT COUNT(id) FROM " + db.serviceDescTable() + " WHERE image_id=?"
 
-		//		err := tx.Get(&n, query, ID)
-		//		if err != nil {
-		//			return errors.Wrap(err, "Count Service filter by id")
-		//		}
+		err := tx.Get(&n, query, ID)
+		if err != nil {
+			return errors.Wrap(err, "Count Service filter by id")
+		}
 
-		//		if n > 0 {
-		//			return errors.Errorf("image:%s is used %d", ID, n)
-		//		}
+		if n > 0 {
+			return errors.Errorf("image:%s is used %d", ID, n)
+		}
 
-		_, err := tx.Exec("DELETE FROM "+db.imageTable()+" WHERE id=?", ID)
+		_, err = tx.Exec("DELETE FROM "+db.imageTable()+" WHERE id=?", ID)
 
 		return errors.Wrapf(err, "Tx delete Imgage by ID:%s", ID)
 	}
