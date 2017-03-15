@@ -53,13 +53,10 @@ type ServiceOrmer interface {
 	SysConfigOrmer
 }
 
-type Service struct {
-	service
-	Desc *ServiceDesc
-}
-
 // Service if table structure
-type service struct {
+type Service struct {
+	Desc *ServiceDesc
+
 	ID                string `db:"id" json:"id"`
 	Name              string `db:"name" json:"name"`
 	DescID            string `db:"description_id" json:"description_id"` // short for Description
@@ -137,12 +134,14 @@ func (db dbBase) GetService(nameOrID string) (Service, error) {
 		return s, errors.Wrap(err, "get Service by nameOrID")
 	}
 
-	desc, err := db.getServiceDesc(s.DescID)
-	if err != nil {
-		return s, err
-	}
+	if s.DescID != "" {
+		desc, err := db.getServiceDesc(s.DescID)
+		if err != nil {
+			return s, err
+		}
 
-	s.Desc = &desc
+		s.Desc = &desc
+	}
 
 	return s, errors.Wrap(err, "get Service by nameOrID")
 }
@@ -236,7 +235,7 @@ func (db dbBase) InsertService(svc Service, units []Unit, t *Task) error {
 			svc.DescID = svc.Desc.ID
 		}
 
-		err := db.txInsertSerivce(tx, svc.service)
+		err := db.txInsertSerivce(tx, svc)
 		if err != nil {
 			return err
 		}
@@ -261,7 +260,7 @@ func (db dbBase) InsertService(svc Service, units []Unit, t *Task) error {
 	return db.txFrame(do)
 }
 
-func (db dbBase) txInsertSerivce(tx *sqlx.Tx, svc service) error {
+func (db dbBase) txInsertSerivce(tx *sqlx.Tx, svc Service) error {
 
 	query := "INSERT INTO " + db.serviceTable() + " ( id,name,description_id,tag,auto_healing,auto_scaling,high_available,action_status,backup_max_size,backup_files_retention,created_at,finished_at ) VALUES ( :id,:name,:description_id,:tag,:auto_healing,:auto_scaling,:high_available,:action_status,:backup_max_size,:backup_files_retention,:created_at,:finished_at )"
 
@@ -546,7 +545,7 @@ type ServiceDesc struct {
 	Architecture string `db:"architecture"`
 	Replicas     int    `db:"unit_num"`
 	NCPU         int    `db:"cpu_num"`
-	Memory       int    `db:"mem_size"`
+	Memory       int64  `db:"mem_size"`
 	Image        string `db:"image_version"`
 	Volumes      string `db:"volumes"`
 	Networks     string `db:"networks"`

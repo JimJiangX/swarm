@@ -20,9 +20,9 @@ type Service struct {
 	Status            int    `db:"status" json:"status"`
 	BackupMaxSizeByte int    `db:"backup_max_size" json:"max_backup_space"`
 	// count by Day,used in swarm.BackupTaskCallback(),calculate BackupFile.Retention
-	BackupFilesRetention int       `db:"backup_files_retention" json:"backup_files_retention"`
-	CreatedAt            time.Time `db:"created_at" json:"created_at"`
-	FinishedAt           time.Time `db:"finished_at" json:"finished_at"`
+	BackupFilesRetention int    `db:"backup_files_retention" json:"backup_files_retention"`
+	CreatedAt            string `db:"created_at" json:"created_at"`
+	FinishedAt           string `db:"finished_at" json:"finished_at"`
 }
 
 type VolumeRequire struct {

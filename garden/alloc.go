@@ -1,7 +1,6 @@
 package garden
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -44,39 +43,82 @@ type allocator interface {
 }
 
 func convertService(svc database.Service) structs.Service {
-	// TODO:convert
-	return structs.Service{}
+	if svc.Desc == nil {
+		svc.Desc = &database.ServiceDesc{}
+	}
+
+	return structs.Service{
+		ID:                   svc.ID,
+		Name:                 svc.Name,
+		Image:                svc.Desc.Image,
+		Desc:                 svc.DescID,
+		Architecture:         svc.Desc.Architecture,
+		Tag:                  svc.Tag,
+		AutoHealing:          svc.AutoHealing,
+		AutoScaling:          svc.AutoScaling,
+		HighAvailable:        svc.HighAvailable,
+		Status:               svc.Status,
+		BackupMaxSizeByte:    svc.BackupMaxSizeByte,
+		BackupFilesRetention: svc.BackupFilesRetention,
+		CreatedAt:            svc.CreatedAt.String(),
+		FinishedAt:           svc.FinishedAt.String(),
+	}
 }
 
-func convertStructsService(svc structs.Service) database.Service {
-	return database.Service{}
-}
-
-func (gd *Garden) Service(nameOrID string) (*Service, error) {
-	info, err := gd.ormer.GetServiceInfo(nameOrID)
+func convertStructsService(spec structs.ServiceSpec) (database.Service, error) {
+	vb, err := json.Marshal(spec.Require.Volumes)
 	if err != nil {
-		return nil, err
+		return database.Service{}, errors.Wrap(err, "convert structs.Service")
 	}
 
-	spec := structs.ServiceSpec{
-		Service: convertService(info.Service),
-		// TODO: other params
+	var nw = struct {
+		NetworkingIDs []string
+		Require       []structs.NetDeviceRequire
+	}{
+		spec.Networkings,
+		spec.Require.Networks,
 	}
 
-	s := gd.NewService(spec)
+	nwb, err := json.Marshal(nw)
+	if err != nil {
+		return database.Service{}, errors.Wrap(err, "convert structs.Service")
+	}
 
-	return s, nil
+	desc := database.ServiceDesc{
+		ID:           utils.Generate32UUID(),
+		ServiceID:    spec.ID,
+		Architecture: spec.Architecture,
+		Replicas:     spec.Replicas,
+		NCPU:         spec.Require.Require.CPU,
+		Memory:       spec.Require.Require.Memory,
+		Image:        spec.Image,
+		Volumes:      string(vb),
+		Networks:     string(nwb),
+		Clusters:     strings.Join(spec.Clusters, ","),
+		Previous:     "",
+	}
+
+	return database.Service{
+		ID:                   spec.ID,
+		Name:                 spec.Name,
+		DescID:               desc.ID,
+		Tag:                  spec.Tag,
+		AutoHealing:          spec.AutoHealing,
+		AutoScaling:          spec.AutoScaling,
+		HighAvailable:        spec.HighAvailable,
+		Status:               statusServcieBuilding,
+		BackupMaxSizeByte:    spec.BackupMaxSizeByte,
+		BackupFilesRetention: spec.BackupFilesRetention,
+		CreatedAt:            time.Now(),
+
+		Desc: &desc,
+	}, nil
 }
 
 // TODO:convert to structs.UnitSpec
 func convertUnitInfoToSpec(info database.UnitInfo) structs.UnitSpec {
 	return structs.UnitSpec{
 		Unit: structs.Unit(info.Unit),
-
-		//	Require, Limit struct {
-		//		CPU    string
-		//		Memory int64
-		//	}
 
 		Engine: struct {
 			ID   string
@@ -110,29 +152,52 @@ func convertUnitInfoToSpec(info database.UnitInfo) structs.UnitSpec {
 	}
 }
 
+func convertServiceInfo(info database.ServiceInfo) structs.ServiceSpec {
+	units := make([]structs.UnitSpec, 0, len(info.Units))
+
+	for u := range info.Units {
+		units = append(units, convertUnitInfoToSpec(info.Units[u]))
+	}
+
+	n := len(units)
+	if info.Service.Desc != nil {
+		n = info.Service.Desc.Replicas
+	}
+
+	return structs.ServiceSpec{
+		Replicas: n,
+		Service:  convertService(info.Service),
+		Units:    units,
+	}
+}
+
+func (gd *Garden) Service(nameOrID string) (*Service, error) {
+	info, err := gd.ormer.GetServiceInfo(nameOrID)
+	if err != nil {
+		return nil, err
+	}
+
+	spec := convertServiceInfo(info)
+
+	svc := gd.NewService(spec)
+
+	return svc, nil
+}
+
 func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, error) {
 	list, err := gd.ormer.ListServicesInfo()
 	if err != nil {
 		return nil, err
 	}
 
-	services := make([]structs.ServiceSpec, len(list))
+	out := make([]structs.ServiceSpec, len(list))
+
 	for i := range list {
-		units := make([]structs.UnitSpec, 0, len(list[i].Units))
-
-		for u := range list[i].Units {
-			units = append(units, convertUnitInfoToSpec(list[i].Units[u]))
-		}
-
-		services = append(services, structs.ServiceSpec{
-			Replicas: len(list[i].Units),
-			Service:  convertService(list[i].Service),
-			//	Users:    list[i].Users,
-			Units: units,
-		})
+		spec := convertServiceInfo(list[i])
+		out = append(out, spec)
 	}
 
-	return services, nil
+	return out, nil
 }
 
 func (gd *Garden) validServiceSpec(spec structs.ServiceSpec) error {
@@ -162,14 +227,10 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 	if spec.ID == "" {
 		spec.ID = utils.Generate32UUID()
 	}
-
-	desc := bytes.NewBuffer(nil)
-	err = json.NewEncoder(desc).Encode(spec)
+	svc, err := convertStructsService(spec)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	spec.Desc = desc.String()
 
 	us := make([]database.Unit, spec.Replicas)
 	units := make([]structs.UnitSpec, spec.Replicas)
@@ -194,7 +255,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 
 	t := database.NewTask(spec.Name, database.ServiceCreateTask, spec.ID, spec.Desc, "", 300)
 
-	err = gd.ormer.InsertService(convertStructsService(spec.Service), us, &t)
+	err = gd.ormer.InsertService(svc, us, &t)
 	if err != nil {
 		return nil, nil, err
 	}
