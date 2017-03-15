@@ -1042,8 +1042,8 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		ctx, _ = goctx.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 	}
 
-	services := []structs.ServiceSpec{}
-	err := json.NewDecoder(r.Body).Decode(&services)
+	spec := structs.ServiceSpec{}
+	err := json.NewDecoder(r.Body).Decode(&spec)
 	if err != nil {
 		httpJSONError(w, err, http.StatusBadRequest)
 		return
@@ -1059,11 +1059,11 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stack := stack.New(gd, services)
+	stack := stack.New(gd, nil)
 
-	out, err := stack.DeployServices(ctx)
+	out, err := stack.Deploy(ctx, spec)
 	if err != nil {
-		httpJSONErrorWithBody(w, out, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 

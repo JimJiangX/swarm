@@ -74,6 +74,27 @@ func New(gd *garden.Garden, services []structs.ServiceSpec) *Stack {
 	}
 }
 
+func (s *Stack) Deploy(ctx context.Context, spec structs.ServiceSpec) (structs.PostServiceResponse, error) {
+	resp := structs.PostServiceResponse{}
+	auth, err := s.gd.AuthConfig()
+	if err != nil {
+		return resp, err
+	}
+
+	svc, task, err := s.gd.BuildService(spec)
+	if err != nil {
+		return resp, err
+	}
+
+	resp.ID = svc.Spec().ID
+	resp.Name = svc.Spec().Name
+	resp.TaskID = task.ID
+
+	go s.deploy(ctx, svc, *task, auth)
+
+	return resp, nil
+}
+
 func (s *Stack) DeployServices(ctx context.Context) ([]structs.PostServiceResponse, error) {
 	list, err := s.gd.ListServices(ctx)
 	if err != nil && !database.IsNotFound(err) {
@@ -154,13 +175,12 @@ func (s *Stack) deploy(ctx context.Context, service *garden.Service, t database.
 		return err
 	}
 
-	err = service.CreateContainer(ctx, pendings, auth)
+	err = service.RunContainer(ctx, pendings, auth)
 	if err != nil {
 		logrus.WithField("Service", service.Spec().Name).Errorf("Service create containers error %+v", err)
 	}
 
 	return err
-
 }
 
 func (s *Stack) linkAndStart(ctx context.Context) (err error) {

@@ -75,7 +75,7 @@ func (svc Service) Spec() structs.ServiceSpec {
 	return svc.spec
 }
 
-func (svc *Service) CreateContainer(ctx context.Context, pendings []pendingUnit, authConfig *types.AuthConfig) (err error) {
+func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, authConfig *types.AuthConfig) (err error) {
 	defer func() {
 		ids := make([]string, len(pendings))
 		for i := range pendings {
@@ -99,7 +99,7 @@ func (svc *Service) CreateContainer(ctx context.Context, pendings []pendingUnit,
 		if r := recover(); r != nil {
 			err = errors.Errorf("panic:%v", r)
 		}
-		status := statusServiceContainerCreated
+		status := statusServiceContainerRunning
 		if err != nil {
 			status = statusServiceContainerCreateFailed
 		}
