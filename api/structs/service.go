@@ -169,8 +169,10 @@ type ServiceResponse struct {
 
 type UnitInfo struct {
 	ID          string `json:"id"`
-	Name        string `json:"name"`    // <unit_id_8bit>_<service_name>
-	Type        string `json:"type"`    // switch_manager/upproxy/upsql
+	Name        string `json:"name"` // <unit_id_8bit>_<service_name>
+	Type        string `json:"type"` // switch_manager/upproxy/upsql
+	Image       string `json:"image"`
+	ImageID     string `json:"image_id"`
 	NodeID      string `json:"node_id"` // Node.ID
 	NodeAddr    string `json:"node_addr"`
 	ClusterID   string `json:"cluster_id"`
