@@ -96,3 +96,13 @@ func (m ConfigsMap) GetCmd(key, typ string) []string {
 
 	return nil
 }
+
+func (c ConfigsMap) Commands() Commands {
+	cm := make(Commands)
+
+	for key, val := range c {
+		cm[key] = val.Cmds
+	}
+
+	return cm
+}

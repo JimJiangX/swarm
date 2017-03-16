@@ -204,17 +204,8 @@ func (s *Stack) linkAndStart(ctx context.Context) (err error) {
 
 	for i := range s.services {
 		svc := s.gd.NewService(s.services[i])
-
-		if svc.Spec().Status > 34 {
-
-			err = svc.UpdateUnitsConfigs(ctx, nil, nil)
-
-		} else {
-
-			err = svc.InitStart(ctx, kvc, nil, nil)
-
-		}
-
+		// TODO:Args
+		err = svc.InitStart(ctx, kvc, nil, svc.Spec().Options)
 		if err != nil {
 			return err
 		}
