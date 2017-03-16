@@ -9,10 +9,10 @@
 			"revisionTime": "2016-07-16T02:56:31Z"
 		},
 		{
-			"checksumSHA1": "LwEiQ/Hyb7Ul28TSlwowN9cpWDY=",
+			"checksumSHA1": "YNG2jEVIFD/0lKglDH3HkXBA1oo=",
 			"path": "github.com/astaxie/beego/config",
-			"revision": "3672f96a9d832c044565b5c0a92af8bac7fd237c",
-			"revisionTime": "2016-08-17T14:56:21Z"
+			"revision": "323a1c4214101331a4b71922c23d19b7409ac71f",
+			"revisionTime": "2017-03-06T13:59:04Z"
 		},
 		{
 			"checksumSHA1": "YDYbS5U2mDwfcOUJ6M09cP6Bubg=",
@@ -27,10 +27,10 @@
 			"revisionTime": "2016-08-02T11:38:42Z"
 		},
 		{
-			"checksumSHA1": "YBtpfrpjYqiZegMYJEQqlpneQAk=",
+			"checksumSHA1": "pbT2NNf/mK6TyzUdxEFdDrCsKmQ=",
 			"path": "github.com/hnakamur/go-scp",
-			"revision": "62da9ce7ef065469325e72bc76b00deadd3503df",
-			"revisionTime": "2017-01-04T09:20:34Z"
+			"revision": "7e443c37b32d5e6f132d529f778fd327eb79987c",
+			"revisionTime": "2017-03-01T10:06:11Z"
 		},
 		{
 			"checksumSHA1": "scVQ1hqzjFQX+LhztTSa0B+QSAg=",
