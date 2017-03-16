@@ -595,6 +595,7 @@ func startUnit(engine *cluster.Engine, containerID string, u *unit, users []data
 		cmd = u.InitServiceCmd(args...)
 
 		logrus.Debug("copy Service Config")
+		// TODO:update config content after update image
 		err = copyConfigIntoCNFVolume(engine.IP, u.Path(), u.parent.Content, lvs)
 		if err != nil {
 			return err
@@ -844,10 +845,24 @@ func updateUnit(unit database.Unit, lvs []database.LocalVolume, reserveSAN bool)
 }
 
 // UnitRebuild rebuild the unit in another host
-func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
+func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hostConfig *ctypes.HostConfig) (string, error) {
 	table, err := database.GetUnit(nameOrID)
 	if err != nil {
 		return "", err
+	}
+
+	var imageIDLabel string
+	if image != "" {
+
+		parts := strings.SplitN(image, ":", 2)
+		if len(parts) == 2 {
+			image, imageIDLabel, err = gd.getImageName("", parts[0], parts[1])
+		} else {
+			image, imageIDLabel, err = gd.getImageName(image, "", "")
+		}
+		if err != nil {
+			return "", err
+		}
 	}
 
 	svc, err := gd.GetService(table.ServiceID)
@@ -942,6 +957,11 @@ func (gd *Gardener) UnitRebuild(nameOrID string, candidates []string, hostConfig
 	config, err := resetContainerConfig(rebuild.container.Config, hostConfig)
 	if err != nil {
 		return "", err
+	}
+
+	if imageIDLabel != "" {
+		config.Config.Image = image
+		config.Config.Labels[_ImageIDInRegistryLabelKey] = imageIDLabel
 	}
 
 	swarmID := gd.generateUniqueID()

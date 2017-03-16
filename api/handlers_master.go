@@ -2374,7 +2374,7 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	taskID, err := gd.UnitRebuild(name, req.Candidates, req.HostConfig)
+	taskID, err := gd.UnitRebuild(name, req.Image, req.Candidates, req.HostConfig)
 	if err != nil {
 		httpError2(w, err, http.StatusInternalServerError)
 		return

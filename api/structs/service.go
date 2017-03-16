@@ -138,6 +138,7 @@ type StorageExtension struct {
 }
 
 type PostRebuildUnit struct {
+	Image      string
 	Candidates []string
 	HostConfig *container.HostConfig
 }
