@@ -498,10 +498,10 @@ func (proxyConfig) Requirement() require {
 			Type: _ContainersNetworking,
 			num:  1,
 		},
-		netRequire{
-			Type: _ExternalAccessNetworking,
-			num:  1,
-		},
+		//		netRequire{
+		//			Type: _ExternalAccessNetworking,
+		//			num:  1,
+		//		},
 	}
 	return require{
 		ports:       ports,
@@ -558,14 +558,15 @@ func (c proxyConfig) defaultUserConfig(args ...interface{}) (_ map[string]interf
 	m["upsql-proxy::proxy-domain"] = svc.ID
 	m["upsql-proxy::proxy-name"] = u.Name
 	if len(u.networkings) == 2 && len(u.ports) >= 2 {
-		adminAddr, dataAddr := "", ""
+		addr := ""
 		adminPort, dataPort := 0, 0
 		for i := range u.networkings {
 			if u.networkings[i].Type == _ContainersNetworking {
-				adminAddr = u.networkings[i].IP.String()
-			} else if u.networkings[i].Type == _ExternalAccessNetworking {
-				dataAddr = u.networkings[i].IP.String()
+				addr = u.networkings[i].IP.String()
 			}
+			//			else if u.networkings[i].Type == _ExternalAccessNetworking {
+			//				dataAddr = u.networkings[i].IP.String()
+			//			}
 		}
 
 		for i := range u.ports {
@@ -576,8 +577,8 @@ func (c proxyConfig) defaultUserConfig(args ...interface{}) (_ map[string]interf
 				m["adm-cli::proxy_admin_port"] = adminPort
 			}
 		}
-		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", dataAddr, dataPort)
-		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", adminAddr, adminPort)
+		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", addr, dataPort)
+		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", addr, adminPort)
 	}
 
 	ncpu, err := utils.GetCPUNum(u.config.HostConfig.CpusetCpus)
@@ -640,14 +641,15 @@ func (c proxyConfigV110) defaultUserConfig(args ...interface{}) (_ map[string]in
 	m["upsql-proxy::proxy-domain"] = svc.ID
 	m["upsql-proxy::proxy-name"] = u.Name
 	if len(u.networkings) == 2 && len(u.ports) >= 2 {
-		adminAddr, dataAddr := "", ""
+		addr := ""
 		adminPort, dataPort := 0, 0
 		for i := range u.networkings {
 			if u.networkings[i].Type == _ContainersNetworking {
-				adminAddr = u.networkings[i].IP.String()
-			} else if u.networkings[i].Type == _ExternalAccessNetworking {
-				dataAddr = u.networkings[i].IP.String()
+				addr = u.networkings[i].IP.String()
 			}
+			//			else if u.networkings[i].Type == _ExternalAccessNetworking {
+			//				dataAddr = u.networkings[i].IP.String()
+			//			}
 		}
 
 		for i := range u.ports {
@@ -658,9 +660,9 @@ func (c proxyConfigV110) defaultUserConfig(args ...interface{}) (_ map[string]in
 				m["adm-cli::proxy_admin_port"] = adminPort
 			}
 		}
-		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", dataAddr, dataPort)
-		m["supervise::supervise-address"] = fmt.Sprintf("%s:%d", dataAddr, adminPort)
-		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", adminAddr, adminPort)
+		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", addr, dataPort)
+		m["supervise::supervise-address"] = fmt.Sprintf("%s:%d", addr, adminPort)
+		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", addr, adminPort)
 	}
 
 	ncpu, err := utils.GetCPUNum(u.config.HostConfig.CpusetCpus)
