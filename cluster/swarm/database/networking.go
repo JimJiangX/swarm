@@ -23,14 +23,15 @@ func (ip IP) tableName() string {
 	return "tbl_dbaas_ip"
 }
 
-const insertNetworkingQuery = "INSERT INTO tbl_dbaas_networking (id,type,gateway,enabled) VALUES (:id,:type,:gateway,:enabled)"
+const insertNetworkingQuery = "INSERT INTO tbl_dbaas_networking (id,type,gateway,enabled,vlan) VALUES (:id,:type,:gateway,:enabled,:vlan)"
 
 // Networking is table tbl_dbaas_networking structure,a goroup of IP Address
 type Networking struct {
+	Enabled bool   `db:"enabled"`
+	VLAN    int    `db:"vlan"`
 	ID      string `db:"id"`
 	Type    string `db:"type"`
 	Gateway string `db:"gateway"`
-	Enabled bool   `db:"enabled"`
 }
 
 func (net Networking) tableName() string {
@@ -276,7 +277,7 @@ func GetNetworkingByID(ID string) (Networking, int, error) {
 
 	net := Networking{}
 
-	err = db.Get(&net, "SELECT id,type,gateway,enabled FROM tbl_dbaas_networking WHERE id=?", ID)
+	err = db.Get(&net, "SELECT id,type,gateway,enabled,vlan FROM tbl_dbaas_networking WHERE id=?", ID)
 	if err != nil {
 		return net, 0, errors.Wrap(err, "get Networking by ID:"+ID)
 	}
@@ -323,7 +324,7 @@ func ListNetworkingByType(_type string) ([]Networking, error) {
 	}
 
 	var list []Networking
-	const query = "SELECT id,type,gateway,enabled FROM tbl_dbaas_networking WHERE type=?"
+	const query = "SELECT id,type,gateway,enabled,vlan FROM tbl_dbaas_networking WHERE type=?"
 
 	err = db.Select(&list, query, _type)
 	if err == nil {
@@ -348,7 +349,7 @@ func ListNetworking() ([]Networking, error) {
 	}
 
 	var list []Networking
-	const query = "SELECT id,type,gateway,enabled FROM tbl_dbaas_networking"
+	const query = "SELECT id,type,gateway,enabled,vlan FROM tbl_dbaas_networking"
 
 	err = db.Select(&list, query)
 	if err == nil {
@@ -391,7 +392,7 @@ func ListIPByNetworking(networkingID string) ([]IP, error) {
 }
 
 // TxInsertNetworking insert Networking in Tx and []IP,and returns them
-func TxInsertNetworking(start, end, gateway, _type string, prefix int) (Networking, []IP, error) {
+func TxInsertNetworking(start, end, gateway, _type string, prefix, vlan int) (Networking, []IP, error) {
 	startU32 := utils.IPToUint32(start)
 	endU32 := utils.IPToUint32(end)
 	if move := uint(32 - prefix); (startU32 >> move) != (endU32 >> move) {
@@ -405,6 +406,7 @@ func TxInsertNetworking(start, end, gateway, _type string, prefix int) (Networki
 		Type:    _type,
 		Gateway: gateway,
 		Enabled: true,
+		VLAN:    vlan,
 	}
 
 	num := int(endU32 - startU32 + 1)

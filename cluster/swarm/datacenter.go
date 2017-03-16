@@ -36,20 +36,18 @@ func AddNewCluster(req structs.PostClusterRequest) (database.Cluster, error) {
 	if storage.IsLocalStore(req.StorageType) && req.StorageID != "" {
 		req.StorageID = ""
 	}
-	if req.Type != _ProxyType && req.NetworkingID != "" {
-		req.NetworkingID = ""
-	}
 
 	cluster := database.Cluster{
-		ID:           utils.Generate64UUID(),
-		Name:         req.Name,
-		Type:         req.Type,
-		StorageType:  req.StorageType,
-		StorageID:    req.StorageID,
-		NetworkingID: req.NetworkingID,
-		Enabled:      true,
-		MaxNode:      req.MaxNode,
-		UsageLimit:   req.UsageLimit,
+		ID:                 utils.Generate64UUID(),
+		Name:               req.Name,
+		Type:               req.Type,
+		StorageType:        req.StorageType,
+		StorageID:          req.StorageID,
+		InternalNetworking: req.Internal,
+		ExternalNetworking: req.External,
+		Enabled:            true,
+		MaxNode:            req.MaxNode,
+		UsageLimit:         req.UsageLimit,
 	}
 
 	err := database.InsertCluster(cluster)
@@ -1031,13 +1029,36 @@ func (node Node) modifyProfile() (*database.Configurations, string, error) {
 		ssd = strings.Join(node.ssd, ",")
 	}
 
-	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %d %s %s %s %d %s %s %s %s",
+	// TODO:ugly implements
+	internal, external := 0, "null"
+	c, err := database.GetCluster(node.ClusterID)
+	if err != nil {
+		return nil, "", err
+	}
+	if c.InternalNetworking != "" {
+		n, _, err := database.GetNetworkingByID(c.InternalNetworking)
+		if err != nil {
+			return nil, "", err
+		}
+		internal = n.VLAN
+	}
+
+	if c.ExternalNetworking != "" {
+		n, _, err := database.GetNetworkingByID(c.ExternalNetworking)
+		if err != nil {
+			return nil, "", err
+		}
+		external = strconv.Itoa(n.VLAN)
+	}
+
+	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %d %s %s %s %d %s %s %s %s %d %d %s",
 		path, path, dockerNodesKVPath, node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile,
 		config.DockerPort, hdd, ssd, config.HorusAgentPort, config.ConsulPort,
 		node.ID, horusIP, horusPort, config.PluginPort,
-		config.NFSOption.Addr, config.NFSOption.Dir, config.MountDir, config.MountOptions)
+		config.NFSOption.Addr, config.NFSOption.Dir, config.MountDir, config.MountOptions,
+		config.AdminVLAN, internal, external)
 
 	return config, script, nil
 }

@@ -160,17 +160,18 @@ func getClustersByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	resp := structs.PerClusterInfoResponse{
 		ClusterInfoResponse: structs.ClusterInfoResponse{
-			ID:           cl.ID,
-			Name:         cl.Name,
-			Type:         cl.Type,
-			StorageType:  cl.StorageType,
-			StorageID:    cl.StorageID,
-			NetworkingID: cl.NetworkingID,
-			Datacenter:   swarm.DatacenterID,
-			Enabled:      cl.Enabled,
-			MaxNode:      cl.MaxNode,
-			UsageLimit:   cl.UsageLimit,
-			NodeNum:      len(nodes),
+			ID:          cl.ID,
+			Name:        cl.Name,
+			Type:        cl.Type,
+			StorageType: cl.StorageType,
+			StorageID:   cl.StorageID,
+			Internal:    cl.InternalNetworking,
+			External:    cl.ExternalNetworking,
+			Datacenter:  swarm.DatacenterID,
+			Enabled:     cl.Enabled,
+			MaxNode:     cl.MaxNode,
+			UsageLimit:  cl.UsageLimit,
+			NodeNum:     len(nodes),
 		},
 		Nodes: list,
 	}
@@ -200,17 +201,18 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 
 		lists[i] = structs.ClusterInfoResponse{
-			ID:           clusters[i].ID,
-			Name:         clusters[i].Name,
-			Type:         clusters[i].Type,
-			StorageType:  clusters[i].StorageType,
-			StorageID:    clusters[i].StorageID,
-			NetworkingID: clusters[i].NetworkingID,
-			Datacenter:   swarm.DatacenterID,
-			Enabled:      clusters[i].Enabled,
-			MaxNode:      clusters[i].MaxNode,
-			NodeNum:      num,
-			UsageLimit:   clusters[i].UsageLimit,
+			ID:          clusters[i].ID,
+			Name:        clusters[i].Name,
+			Type:        clusters[i].Type,
+			StorageType: clusters[i].StorageType,
+			StorageID:   clusters[i].StorageID,
+			Internal:    clusters[i].InternalNetworking,
+			External:    clusters[i].ExternalNetworking,
+			Datacenter:  swarm.DatacenterID,
+			Enabled:     clusters[i].Enabled,
+			MaxNode:     clusters[i].MaxNode,
+			NodeNum:     num,
+			UsageLimit:  clusters[i].UsageLimit,
 		}
 	}
 
@@ -1673,8 +1675,16 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if req.Type == "proxy" && req.NetworkingID != "" {
-		_, _, err := database.GetNetworkingByID(req.NetworkingID)
+	if req.Internal != "" {
+		_, _, err := database.GetNetworkingByID(req.Internal)
+		if err != nil {
+			httpError2(w, err, http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if req.External != "" {
+		_, _, err := database.GetNetworkingByID(req.External)
 		if err != nil {
 			httpError2(w, err, http.StatusInternalServerError)
 			return
@@ -2460,7 +2470,7 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	net, err := gd.AddNetworking(req.Start, req.End, req.Type, req.Gateway, req.Prefix)
+	net, err := gd.AddNetworking(req.Start, req.End, req.Type, req.Gateway, req.Prefix, req.VLAN)
 	if err != nil {
 		httpError2(w, err, http.StatusInternalServerError)
 		return

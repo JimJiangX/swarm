@@ -10,19 +10,20 @@ import (
 	"github.com/pkg/errors"
 )
 
-const insertClusterQuery = "INSERT INTO tbl_dbaas_cluster (id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit) VALUES (:id,:name,:type,:storage_id,:storage_type,:networking_id,:enabled,:max_node,:usage_limit)"
+const insertClusterQuery = "INSERT INTO tbl_dbaas_cluster (id,name,type,storage_id,storage_type,internal_networking_id,external_networking_id,enabled,max_node,usage_limit) VALUES (:id,:name,:type,:storage_id,:storage_type,:internal_networking_id,:external_networking_id,:enabled,:max_node,:usage_limit)"
 
 // Cluster table tbl_dbaas_cluster structure,correspod with a group of computers
 type Cluster struct {
-	ID           string  `db:"id"`
-	Name         string  `db:"name"`
-	Type         string  `db:"type"`
-	StorageType  string  `db:"storage_type"`
-	StorageID    string  `db:"storage_id"`
-	NetworkingID string  `db:"networking_id"`
-	Enabled      bool    `db:"enabled"`
-	MaxNode      int     `db:"max_node"`
-	UsageLimit   float32 `db:"usage_limit"`
+	ID                 string  `db:"id"`
+	Name               string  `db:"name"`
+	Type               string  `db:"type"`
+	StorageType        string  `db:"storage_type"`
+	StorageID          string  `db:"storage_id"`
+	InternalNetworking string  `db:"internal_networking_id"`
+	ExternalNetworking string  `db:"external_networking_id"`
+	Enabled            bool    `db:"enabled"`
+	MaxNode            int     `db:"max_node"`
+	UsageLimit         float32 `db:"usage_limit"`
 }
 
 func (c Cluster) tableName() string {
@@ -140,7 +141,7 @@ func GetCluster(nameOrID string) (Cluster, error) {
 		return c, err
 	}
 
-	const query = "SELECT id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit FROM tbl_dbaas_cluster WHERE id=? OR name=?"
+	const query = "SELECT id,name,type,storage_id,storage_type,internal_networking_id,external_networking_id,enabled,max_node,usage_limit FROM tbl_dbaas_cluster WHERE id=? OR name=?"
 
 	err = db.Get(&c, query, nameOrID, nameOrID)
 	if err == nil {
@@ -168,7 +169,7 @@ func ListClusters() ([]Cluster, error) {
 	}
 
 	var clusters []Cluster
-	const query = "SELECT id,name,type,storage_id,storage_type,networking_id,enabled,max_node,usage_limit FROM tbl_dbaas_cluster"
+	const query = "SELECT id,name,type,storage_id,storage_type,internal_networking_id,external_networking_id,enabled,max_node,usage_limit FROM tbl_dbaas_cluster"
 
 	err = db.Select(&clusters, query)
 	if err == nil {

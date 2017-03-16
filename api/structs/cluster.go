@@ -9,9 +9,10 @@ type PostClusterRequest struct {
 	MaxNode    int     `json:"max_node"`
 	UsageLimit float32 `json:"usage_limit"`
 
-	StorageType  string `json:"storage_type"`
-	StorageID    string `json:"storage_id,omitempty"`
-	NetworkingID string `json:"networking_id,omitempty"`
+	StorageType string `json:"storage_type"`
+	StorageID   string `json:"storage_id,omitempty"`
+	Internal    string `json:"internal_networking_id"`
+	External    string `json:"external_networking_id"`
 }
 
 type UpdateClusterParamsRequest struct {
@@ -113,12 +114,13 @@ type ClusterInfoResponse struct {
 	NodeNum    int     `json:"node_num"`
 	UsageLimit float32 `json:"usage_limit"`
 
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Type         string `json:"type"`
-	StorageType  string `json:"storage_type"`
-	StorageID    string `json:"storage_id"`
-	NetworkingID string `json:"networking_id"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	StorageType string `json:"storage_type"`
+	StorageID   string `json:"storage_id"`
+	Internal    string `json:"internal_networking_id"`
+	External    string `json:"external_networking_id"`
 }
 
 type PerClusterInfoResponse struct {

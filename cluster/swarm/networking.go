@@ -143,8 +143,8 @@ func (gd *Gardener) SetNetworkingStatus(ID string, enable bool) error {
 }
 
 // AddNetworking add new Networking to Gardener
-func (gd *Gardener) AddNetworking(start, end, _type, gateway string, prefix int) (*Networking, error) {
-	net, ips, err := database.TxInsertNetworking(start, end, gateway, _type, prefix)
+func (gd *Gardener) AddNetworking(start, end, _type, gateway string, prefix, vlan int) (*Networking, error) {
+	net, ips, err := database.TxInsertNetworking(start, end, gateway, _type, prefix, vlan)
 	if err != nil {
 		return nil, err
 	}
@@ -228,11 +228,15 @@ func (gd *Gardener) getNetworkingSetting(engine *cluster.Engine, unit string, re
 	for _, net := range req {
 		networkingID := ""
 
+		dc, err := gd.datacenterByEngine(engine.ID)
+		if err != nil {
+			return nil, err
+		}
+
 		if net.Type == _ExternalAccessNetworking {
-			dc, err := gd.datacenterByEngine(engine.ID)
-			if err == nil {
-				networkingID = strings.TrimSpace(dc.Cluster.NetworkingID)
-			}
+			networkingID = strings.TrimSpace(dc.Cluster.ExternalNetworking)
+		} else {
+			networkingID = strings.TrimSpace(dc.Cluster.InternalNetworking)
 		}
 
 		ipinfo, err := gd.allocIP(networkingID, net.Type, unit)
@@ -348,6 +352,7 @@ func ListNetworkings() ([]structs.ListNetworkingsResponse, error) {
 				Type:    list[i].Type,
 				Gateway: list[i].Gateway,
 				Enabled: list[i].Enabled,
+				VLAN:    list[i].VLAN,
 				Mask:    0,
 				Total:   0,
 				Used:    0,
@@ -361,6 +366,7 @@ func ListNetworkings() ([]structs.ListNetworkingsResponse, error) {
 			Type:    list[i].Type,
 			Gateway: list[i].Gateway,
 			Enabled: list[i].Enabled,
+			VLAN:    list[i].VLAN,
 			Mask:    min.Prefix,
 			Total:   total,
 			Used:    used,

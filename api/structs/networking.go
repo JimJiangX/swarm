@@ -2,6 +2,7 @@ package structs
 
 type PostNetworkingRequest struct {
 	Prefix  int
+	VLAN    int `json:"vlan"`
 	Start   string
 	End     string
 	Type    string
@@ -19,6 +20,7 @@ type ListNetworkingsResponse struct {
 	Type    string `json:"type"`
 	Gateway string `json:"gateway"`
 	Enabled bool   `json:"enabled"`
+	VLAN    int    `json:"vlan"`
 	Mask    int    `json:"mask"`
 	Total   int    `json:"total"`
 	Used    int    `json:"used"`

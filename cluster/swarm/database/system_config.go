@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const insertConfigurateionQuery = "INSERT INTO tbl_dbaas_system_config (dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,horus_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password,check_username,check_password,ro_username,ro_password,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts,backup_dir) VALUES (:dc_id,:consul_ip,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_agent_port,:registry_domain,:registry_ip,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:registry_os_username,:registry_os_password,:mon_username,:mon_password,:repl_username,:repl_password,:cup_dba_username,:cup_dba_password,:db_username,:db_password,:ap_username,:ap_password,:check_username,:check_password,:ro_username,:ro_password,:nfs_ip,:nfs_dir,:nfs_mount_dir,:nfs_mount_opts,:backup_dir)"
+const insertConfigurateionQuery = "INSERT INTO tbl_dbaas_system_config (dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,horus_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password,check_username,check_password,ro_username,ro_password,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts,backup_dir,admin_vlan) VALUES (:dc_id,:consul_ip,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_agent_port,:registry_domain,:registry_ip,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:registry_os_username,:registry_os_password,:mon_username,:mon_password,:repl_username,:repl_password,:cup_dba_username,:cup_dba_password,:db_username,:db_password,:ap_username,:ap_password,:check_username,:check_password,:ro_username,:ro_password,:nfs_ip,:nfs_dir,:nfs_mount_dir,:nfs_mount_opts,:backup_dir,:admin_vlan)"
 
 // Configurations is the application config file
 type Configurations struct {
@@ -17,6 +17,7 @@ type Configurations struct {
 	PluginPort int    `db:"plugin_port"`
 	Retry      int64  `db:"retry"`
 	BackupDir  string `db:"backup_dir"`
+	AdminVLAN  int    `db:"admin_vlan"`
 	NFSOption
 	ConsulConfig
 	HorusConfig
@@ -156,7 +157,7 @@ func GetSystemConfig() (*Configurations, error) {
 	}
 
 	c := &Configurations{}
-	const query = "SELECT dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,horus_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password,check_username,check_password,ro_username,ro_password,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts,backup_dir FROM tbl_dbaas_system_config LIMIT 1"
+	const query = "SELECT dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,horus_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password,check_username,check_password,ro_username,ro_password,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts,backup_dir,admin_vlan FROM tbl_dbaas_system_config LIMIT 1"
 
 	err = db.Get(c, query)
 	if err == nil {
