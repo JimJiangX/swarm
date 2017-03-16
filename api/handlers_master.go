@@ -1089,15 +1089,15 @@ func getServiceEndpoints(serviceID string) []string {
 		networkings, ports := getUnitNetworking(units[i].ID)
 
 		for n := range networkings {
-			if networkings[n].Type == "external_access_networking" {
-				endpoint = networkings[n].Addr
-				index := strings.IndexByte(endpoint, '/')
-				if index > 0 {
-					endpoint = endpoint[:index]
-				}
-				break
+			//	if networkings[n].Type == "external_access_networking" {
+			endpoint = networkings[n].Addr
+			index := strings.IndexByte(endpoint, '/')
+			if index > 0 {
+				endpoint = endpoint[:index]
 			}
+			break
 		}
+		//}
 
 		for p := range ports {
 			if ports[p].Name == "proxy_data_port" {
