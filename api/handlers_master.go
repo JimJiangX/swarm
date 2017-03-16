@@ -1059,7 +1059,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stack := stack.New(gd, nil)
+	stack := stack.New(gd)
 
 	out, err := stack.Deploy(ctx, spec)
 	if err != nil {
@@ -1070,5 +1070,26 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusCreated)
 }
 
-func putServicesLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func putServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	links := structs.PostServiceLink{}
+	err := json.NewDecoder(r.Body).Decode(&links)
+	if err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil ||
+		gd.KVClient() == nil ||
+		gd.PluginClient() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	stack := stack.New(gd)
+
+	stack.LinkAndStart(ctx, links)
+
 }

@@ -148,7 +148,7 @@ func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, au
 func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, args map[string]interface{}) error {
 	val, err := svc.sl.Load()
 	if err == nil {
-		if val > statusInitServiceStartFailed {
+		if val > statusInitServiceStarting {
 			return svc.Start(ctx, configs.Commands())
 		}
 	}

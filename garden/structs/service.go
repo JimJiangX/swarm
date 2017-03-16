@@ -192,3 +192,27 @@ func (sl PostServiceLink) Sort() {
 
 	sort.Sort(sl)
 }
+
+func (sl PostServiceLink) Links() []string {
+	l := make([]string, 0, len(sl))
+	for i := range sl {
+		l = append(l, sl[i].ID)
+		l = append(l, sl[i].Deps...)
+	}
+	ids := make([]string, 0, len(l))
+
+	for i := range l {
+		ok := false
+		for c := range ids {
+			if ids[c] == l[i] {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			ids = append(ids, l[i])
+		}
+	}
+
+	return ids
+}

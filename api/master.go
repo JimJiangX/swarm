@@ -86,7 +86,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		//		"/clusters/nodes/{node}/disable": postDisableNode,
 		//		"/clusters/nodes/{node}/update":  updateNode,
 
-		"/services": postService,
+		"/services/create": postService,
 		//		"/services/{name:.*}/rebuild": postServiceRebuild,
 		//		"/services/{name:.*}/start":   postServiceStart,
 		//		"/services/{name:.*}/stop":    postServiceStop,
@@ -138,6 +138,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 
 		"/networkings/{name}/ips/enable":  putNetworkingEnable,
 		"/networkings/{name}/ips/disable": putNetworkingDisable,
+
+		"/services/link": putServiceLink,
 	},
 
 	http.MethodDelete: {
