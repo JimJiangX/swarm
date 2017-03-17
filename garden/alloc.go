@@ -164,15 +164,12 @@ func convertServiceInfo(info database.ServiceInfo) structs.ServiceSpec {
 		units = append(units, convertUnitInfoToSpec(info.Units[u]))
 	}
 
-	n := len(units)
-	if info.Service.Desc != nil {
-		n = info.Service.Desc.Replicas
-	}
+	arch := structs.Arch{}
+	r := strings.NewReader(info.Service.Desc.Architecture)
+	json.NewDecoder(r).Decode(&arch)
 
 	return structs.ServiceSpec{
-		Arch: structs.Arch{
-			Replicas: n,
-		},
+		Arch:    arch,
 		Service: convertService(info.Service),
 		Units:   units,
 	}
