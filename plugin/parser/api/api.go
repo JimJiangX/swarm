@@ -19,10 +19,11 @@ type PluginAPI interface {
 	GetImageSupport(ctx context.Context) ([]structs.ImageVersion, error)
 	GetImageRequirement(ctx context.Context, image string) (structs.RequireResource, error)
 
-	ImageCheck(ctx context.Context, ct structs.ConfigTemplate) error
 	PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate) error
 
 	UpdateConfigs(ctx context.Context, service string, configs structs.ConfigsMap) error
+	ServiceCompose(ctx context.Context, service, mode string, args map[string]interface{}) error
+	ServicesLink(ctx context.Context, links structs.ServicesLink) error
 }
 
 type plugin struct {
@@ -114,17 +115,6 @@ func (p plugin) GetImageRequirement(ctx context.Context, image string) (structs.
 	return obj, err
 }
 
-func (p plugin) ImageCheck(ctx context.Context, ct structs.ConfigTemplate) error {
-	resp, err := client.RequireOK(p.c.Post(ctx, "/image/check", ct))
-	if err != nil {
-		return err
-	}
-
-	client.EnsureBodyClose(resp)
-
-	return nil
-}
-
 func (p plugin) PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate) error {
 	resp, err := client.RequireOK(p.c.Post(ctx, "/image/template", ct))
 	if err != nil {
@@ -137,7 +127,38 @@ func (p plugin) PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate
 }
 
 func (p plugin) UpdateConfigs(ctx context.Context, service string, configs structs.ConfigsMap) error {
-	resp, err := client.RequireOK(p.c.Post(ctx, "/configs/"+service, configs))
+	resp, err := client.RequireOK(p.c.Put(ctx, "/configs/"+service, configs))
+	if err != nil {
+		return err
+	}
+
+	client.EnsureBodyClose(resp)
+
+	return nil
+}
+
+func (p plugin) ServiceCompose(ctx context.Context, service, mode string, args map[string]interface{}) error {
+	uri := fmt.Sprintf("/services/%s/compose", service)
+	body := struct {
+		Mode string
+		Args map[string]interface{}
+	}{
+		mode,
+		args,
+	}
+
+	resp, err := client.RequireOK(p.c.Put(ctx, uri, body))
+	if err != nil {
+		return err
+	}
+
+	client.EnsureBodyClose(resp)
+
+	return nil
+}
+
+func (p plugin) ServicesLink(ctx context.Context, links structs.ServicesLink) error {
+	resp, err := client.RequireOK(p.c.Put(ctx, "/services/link", links))
 	if err != nil {
 		return err
 	}

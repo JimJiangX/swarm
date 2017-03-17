@@ -183,9 +183,8 @@ func (s *Stack) LinkAndStart(ctx context.Context, links []*structs.ServiceLink) 
 	return task.ID, nil
 }
 
-func (s *Stack) freshServices(links []*structs.ServiceLink) ([]structs.ServiceSpec, error) {
-	ls := structs.PostServiceLink(links)
-	ids := ls.Links()
+func (s *Stack) freshServices(links structs.ServicesLink) ([]structs.ServiceSpec, error) {
+	ids := links.Links()
 
 	switch len(ids) {
 	case 0:
@@ -195,7 +194,7 @@ func (s *Stack) freshServices(links []*structs.ServiceLink) ([]structs.ServiceSp
 	default:
 	}
 
-	ls.Sort()
+	links.Sort()
 
 	return nil, nil
 }

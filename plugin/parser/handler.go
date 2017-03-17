@@ -38,11 +38,12 @@ func NewRouter(c kvstore.Client) *mux.Router {
 		},
 		"POST": {
 			"/configs":        generateConfigs,
-			"/image/check":    checkImage,
 			"/image/template": postTemplate,
 		},
 		"PUT": {
-			"/configs/{service:.*}": updateConfigs,
+			"/configs/{service:.*}":       updateConfigs,
+			"/services/{service}/compose": composeService,
+			"/services/link":              linkServices,
 		},
 	}
 
@@ -74,13 +75,13 @@ func NewRouter(c kvstore.Client) *mux.Router {
 
 func getSupportImageVersion(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	out := make([]structs.ImageVersion, 0, 10)
-	
+
 	images.RLock()
-	for _,v:=range images.m{
-		out=append(out,v)
+	for _, v := range images.m {
+		out = append(out, v)
 	}
 	images.RUnlock()
-	
+
 	err := json.NewEncoder(w).Encode(out)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
@@ -98,13 +99,13 @@ func getImageRequirement(ctx *_Context, w http.ResponseWriter, r *http.Request) 
 	}
 
 	image := r.FormValue("image")
-	
-	parts:=strings.SplitN(image,":",2)
+
+	parts := strings.SplitN(image, ":", 2)
 	var v string
-	if len(parts)==2{
+	if len(parts) == 2 {
 		v = parts[1]
 	}
-	
+
 	parser, err := factory(parts[0], v)
 	if err != nil {
 		httpError(w, err, http.StatusNotImplemented)
@@ -452,6 +453,12 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	return
+}
+
+func composeService(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+}
+
+func linkServices(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // Emit an HTTP error and log it.

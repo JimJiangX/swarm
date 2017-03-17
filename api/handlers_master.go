@@ -1071,7 +1071,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func putServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	links := structs.PostServiceLink{}
+	links := structs.ServicesLink{}
 	err := json.NewDecoder(r.Body).Decode(&links)
 	if err != nil {
 		httpJSONError(w, err, http.StatusBadRequest)

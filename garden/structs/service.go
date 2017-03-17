@@ -146,24 +146,24 @@ type ServiceLink struct {
 	Deps  []string `json:"deps"`
 }
 
-type PostServiceLink []*ServiceLink
+type ServicesLink []*ServiceLink
 
-func (sl PostServiceLink) Less(i, j int) bool {
+func (sl ServicesLink) Less(i, j int) bool {
 	return sl[i].priority > sl[j].priority
 }
 
 // Len is the number of elements in the collection.
-func (sl PostServiceLink) Len() int {
+func (sl ServicesLink) Len() int {
 	return len(sl)
 }
 
 // Swap swaps the elements with indexes i and j.
-func (sl PostServiceLink) Swap(i, j int) {
+func (sl ServicesLink) Swap(i, j int) {
 	sl[i], sl[j] = sl[j], sl[i]
 }
 
 // https://play.golang.org/p/1tkv9z4DtC
-func (sl PostServiceLink) Sort() {
+func (sl ServicesLink) Sort() {
 	deps := make(map[string]int, len(sl))
 
 	for i := range sl {
@@ -193,7 +193,7 @@ func (sl PostServiceLink) Sort() {
 	sort.Sort(sl)
 }
 
-func (sl PostServiceLink) Links() []string {
+func (sl ServicesLink) Links() []string {
 	l := make([]string, 0, len(sl))
 	for i := range sl {
 		l = append(l, sl[i].ID)
