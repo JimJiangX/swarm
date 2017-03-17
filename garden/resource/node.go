@@ -276,12 +276,8 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 	if err != nil {
 		entry.WithError(err).Errorf("exec remote command:'%s',output:%s", script, out)
 
-		if out, err = nt.client.Exec(script); err != nil {
-			entry.WithError(err).Errorf("exec remote command twice:'%s',output:%s", script, out)
-
-			nodeState = statusNodeSSHExecFailed
-			return err
-		}
+		nodeState = statusNodeSSHExecFailed
+		return err
 	}
 
 	entry.Infof("SSH remote PKG install successed! output:\n%s", out)
@@ -590,11 +586,7 @@ func (n *Node) nodeClean(ctx context.Context, client scplib.ScpClient, horus str
 	if err != nil {
 		entry.Errorf("exec remote command: %s,%v,Output:%s", script, err, out)
 
-		out, err := client.Exec(script)
-		if err != nil {
-			entry.Errorf("exec remote command twice: %s,%v,Output:%s", script, err, out)
-			return err
-		}
+		return err
 	}
 
 	entry.Infof("SSH Remote Exec Successed! Output:\n%s", out)
