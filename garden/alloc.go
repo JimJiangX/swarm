@@ -175,6 +175,21 @@ func ConvertServiceInfo(info database.ServiceInfo) structs.ServiceSpec {
 	}
 }
 
+func (gd *Garden) GetService(nameOrID string) (*Service, error) {
+	s, err := gd.ormer.GetService(nameOrID)
+	if err != nil {
+		return nil, err
+	}
+
+	spec := structs.ServiceSpec{
+		Service: convertService(s),
+	}
+
+	svc := gd.NewService(spec)
+
+	return svc, nil
+}
+
 func (gd *Garden) Service(nameOrID string) (*Service, error) {
 	info, err := gd.ormer.GetServiceInfo(nameOrID)
 	if err != nil {
