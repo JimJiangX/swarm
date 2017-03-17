@@ -37,7 +37,7 @@ PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
 docker_version=1.12.6
 consul_version=0.7.5
 swarm_agent_version=1.0.0
-logicalVolume_volume_plugin_version=1.0.0.
+logicalVolume_volume_plugin_version=3.0.0
 
 platform="$(uname -s)"
 release=""
@@ -85,7 +85,7 @@ nfs_mount() {
 	else
 		grep "${nfs_ip}:${nfs_dir}" ${fstab} 
 		if [ $? -ne 0 ]; then
-			echo "${nfs_ip}:${nfs_dir}	${nfs_mount_dir}	nfs	defaults	0 0" >> ${fst}
+			echo "${nfs_ip}:${nfs_dir}	${nfs_mount_dir}	nfs	defaults	0 0" >> ${fstab}
 		fi
 	fi	
 }
@@ -279,10 +279,6 @@ install_docker() {
 	container_nic=`ifconfig | grep -e 'bond[0-9]\{1,3\}' | grep -v ${adm_nic} | awk '{print $1}' | sed 's/://g' |  tr "\n" "," |sed 's/.$//'` 
 
 	if [ "${release}" == "SUSE LINUX" ]; then
-		local docker_rpm=${cur_dir}/rpm/docker-${docker_version}.sles/docker*.rpm
-		local containerd_rpm=${cur_dir}/rpm/docker-${docker_version}.sles/containerd*.rpm
-		local runc_rpm=${cur_dir}/rpm/docker-${docker_version}.sles/runc*.rpm
-
 		if [ "${wwn}" != '' ]; then
 			systemctl enable multipathd.service
 			systemctl start multipathd.service
@@ -293,7 +289,7 @@ install_docker() {
 			fi
 		fi
 
-		zypper --no-gpg-checks --non-interactive install ${runc_rpm} ${containerd_rpm} ${docker_rpm}
+		zypper --no-gpg-checks --non-interactive install ${cur_dir}/rpm/docker-${docker_version}.sles/*.rpm
 		if [ $? -ne 0 ]; then
 			echo "docker rpm install faild"
 			exit 2
@@ -321,7 +317,7 @@ Requires=docker.socket containerd.socket
 
 [Service]
 EnvironmentFile=/etc/sysconfig/docker
-ExecStart=/usr/bin/docker daemon -H fd:// --containerd /run/containerd/containerd.sock \$DOCKER_NETWORK_OPTIONS \$DOCKER_OPTS
+ExecStart=/usr/bin/dockerd --containerd /run/containerd/containerd.sock \$DOCKER_NETWORK_OPTIONS \$DOCKER_OPTS
 ExecReload=/bin/kill -s HUP \$MAINPID
 # Having non-zero Limit*s causes performance problems due to accounting overhead
 # in the kernel. We recommend using cgroups to do container-local accounting.
@@ -342,9 +338,6 @@ WantedBy=multi-user.target
 EOF
 
 	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ $RELEASE == "CentOS" ]; then
-		local docker_rpm=${cur_dir}/rpm/docker-${docker_version}.el7/docker*.rpm
-		local docker_selinux_rpm=${cur_dir}/rpm/docker-${docker_version}.el7/docker-selinux*.rpm
-
 		if [ "${wwn}" != '' ]; then
 			systemctl enable multipathd.service
 			systemctl start multipathd.service
@@ -355,7 +348,7 @@ EOF
 			fi
 		fi
 		
-		yum --nogpgcheck -y install ${docker_selinux_rpm} ${docker_rpm}
+		yum --nogpgcheck -y install ${cur_dir}/rpm/docker-${docker_version}.el7/*.rpm
 		if [ $? -ne 0 ]; then
 			echo "docker rpm install faild"
 			exit 2
@@ -368,7 +361,7 @@ EOF
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label ADM_NIC=${adm_nic} CONTAINER_NIC=${container_nic}
+DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label="NODE_ID=${node_id}" --label="HBA_WWN=${wwn}" --label="HDD_VG=${hdd_vgname}" --label="HDD_VG_SIZE=${hdd_vg_size}" --label="SSD_VG=${ssd_vgname}" --label="SSD_VG_SIZE=${ssd_vg_size}" --label="ADM_NIC=${adm_nic}" --label="CONTAINER_NIC=${container_nic}"
 
 EOF
 
@@ -376,8 +369,7 @@ EOF
 [Unit]
 Description=Docker Application Container Engine
 Documentation=https://docs.docker.com
-After=network.target docker.socket
-Requires=docker.socket
+After=network.target
 
 [Service]
 Type=notify
@@ -385,19 +377,25 @@ Type=notify
 # exists and systemd currently does not support the cgroup feature set required
 # for containers run by docker
 EnvironmentFile=/etc/sysconfig/docker
-ExecStart=/usr/bin/docker daemon -H fd:// \$DOCKER_OPTS
+ExecStart=/usr/bin/dockerd \$DOCKER_OPTS
 ExecReload=/bin/kill -s HUP \$MAINPID
 MountFlags=slave
-LimitNOFILE=1048576
-LimitNPROC=1048576
+# Uncomment TasksMax if your systemd version supports it.
+# Only systemd 226 and above support this version.
+#TasksMax=infinity
+# Having non-zero Limit*s causes performance problems due to accounting overhead
+# in the kernel. We recommend using cgroups to do container-local accounting.
+LimitNOFILE=infinity
+LimitNPROC=infinity
 LimitCORE=infinity
 TimeoutStartSec=0
 # set delegate yes so that systemd does not reset the cgroups of docker containers
 Delegate=yes
+# kill only the docker process, not all processes in the cgroup
+KillMode=process
 
 [Install]
 WantedBy=multi-user.target
-
 EOF
 
 	fi
