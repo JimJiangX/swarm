@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/plugin/client"
@@ -17,7 +16,6 @@ type PluginAPI interface {
 	GetCommands(ctx context.Context, service string) (structs.Commands, error)
 
 	GetImageSupport(ctx context.Context) ([]structs.ImageVersion, error)
-	GetImageRequirement(ctx context.Context, image string) (structs.RequireResource, error)
 
 	PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate) error
 
@@ -93,27 +91,27 @@ func (p plugin) GetImageSupport(ctx context.Context) ([]structs.ImageVersion, er
 	return obj, err
 }
 
-func (p plugin) GetImageRequirement(ctx context.Context, image string) (structs.RequireResource, error) {
-	params := make(url.Values)
-	params.Set("image", image)
+//func (p plugin) GetImageRequirement(ctx context.Context, image string) (structs.RequireResource, error) {
+//	params := make(url.Values)
+//	params.Set("image", image)
 
-	url := url.URL{
-		Path:     "/image/requirement",
-		RawQuery: params.Encode(),
-	}
+//	url := url.URL{
+//		Path:     "/image/requirement",
+//		RawQuery: params.Encode(),
+//	}
 
-	var obj structs.RequireResource
+//	var obj structs.RequireResource
 
-	resp, err := client.RequireOK(p.c.Get(ctx, url.RequestURI()))
-	if err != nil {
-		return obj, err
-	}
-	defer resp.Body.Close()
+//	resp, err := client.RequireOK(p.c.Get(ctx, url.RequestURI()))
+//	if err != nil {
+//		return obj, err
+//	}
+//	defer resp.Body.Close()
 
-	err = decodeBody(resp, &obj)
+//	err = decodeBody(resp, &obj)
 
-	return obj, err
-}
+//	return obj, err
+//}
 
 func (p plugin) PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate) error {
 	resp, err := client.RequireOK(p.c.Post(ctx, "/image/template", ct))

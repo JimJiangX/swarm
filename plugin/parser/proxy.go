@@ -60,34 +60,34 @@ func (c *proxyConfig) Marshal() ([]byte, error) {
 	return data, errors.Wrap(err, "read file")
 }
 
-func (proxyConfig) Requirement() structs.RequireResource {
-	//	ports := []port{
-	//		port{
-	//			proto: "tcp",
-	//			name:  "proxy_data_port",
-	//		},
-	//		port{
-	//			proto: "tcp",
-	//			name:  "proxy_admin_port",
-	//		},
-	//	}
-	//	nets := []netRequire{
-	//		netRequire{
-	//			Type: _ContainersNetworking,
-	//			num:  1,
-	//		},
-	//		netRequire{
-	//			Type: _ExternalAccessNetworking,
-	//			num:  1,
-	//		},
-	//	}
-	//	return require{
-	//		ports:       ports,
-	//		networkings: nets,
-	//	}
+//func (proxyConfig) Requirement() structs.RequireResource {
+//	ports := []port{
+//		port{
+//			proto: "tcp",
+//			name:  "proxy_data_port",
+//		},
+//		port{
+//			proto: "tcp",
+//			name:  "proxy_admin_port",
+//		},
+//	}
+//	nets := []netRequire{
+//		netRequire{
+//			Type: _ContainersNetworking,
+//			num:  1,
+//		},
+//		netRequire{
+//			Type: _ExternalAccessNetworking,
+//			num:  1,
+//		},
+//	}
+//	return require{
+//		ports:       ports,
+//		networkings: nets,
+//	}
 
-	return structs.RequireResource{}
-}
+//	return structs.RequireResource{}
+//}
 
 func (c proxyConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
 	//	if c.config == nil || len(args) == 0 {

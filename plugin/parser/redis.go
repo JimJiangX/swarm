@@ -131,26 +131,26 @@ func (c redisConfig) Marshal() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-func (redisConfig) Requirement() structs.RequireResource {
-	//	ports := []port{
-	//		port{
-	//			proto: "tcp",
-	//			name:  "port",
-	//		},
-	//	}
-	//	nets := []netRequire{
-	//		netRequire{
-	//			Type: _ContainersNetworking,
-	//			num:  1,
-	//		},
-	//	}
-	//	return require{
-	//		ports:       ports,
-	//		networkings: nets,
-	//	}
+//func (redisConfig) Requirement() structs.RequireResource {
+//	ports := []port{
+//		port{
+//			proto: "tcp",
+//			name:  "port",
+//		},
+//	}
+//	nets := []netRequire{
+//		netRequire{
+//			Type: _ContainersNetworking,
+//			num:  1,
+//		},
+//	}
+//	return require{
+//		ports:       ports,
+//		networkings: nets,
+//	}
 
-	return structs.RequireResource{}
-}
+//	return structs.RequireResource{}
+//}
 
 func (c redisConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
 	//	if c.config == nil {

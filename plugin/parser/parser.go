@@ -26,8 +26,6 @@ type parser interface {
 	HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error)
 
 	Marshal() ([]byte, error)
-
-	Requirement() structs.RequireResource
 }
 
 var images = struct {

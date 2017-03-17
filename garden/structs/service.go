@@ -128,8 +128,6 @@ type PostServiceResponse struct {
 	TaskID string `json:"task_id"`
 }
 
-type RequireResource struct{}
-
 type User struct {
 	Name      string `json:"name"`
 	Password  string `json:"password"`

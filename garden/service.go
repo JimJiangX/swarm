@@ -609,11 +609,6 @@ func (svc *Service) Image() (database.Image, error) {
 	return svc.so.GetImage(img.Name, img.Major, img.Minor, img.Patch)
 }
 
-func (svc *Service) Requires(ctx context.Context) (structs.RequireResource, error) {
-
-	return svc.pc.GetImageRequirement(ctx, svc.spec.Image)
-}
-
 func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]interface{}) (structs.ConfigsMap, error) {
 	if len(args) > 0 {
 		if svc.spec.Options == nil {

@@ -30,8 +30,8 @@ func NewRouter(c kvstore.Client) *mux.Router {
 
 	var routes = map[string]map[string]handler{
 		"GET": {
-			"/image/support":                  getSupportImageVersion,
-			"/image/requirement":              getImageRequirement,
+			"/image/support": getSupportImageVersion,
+			//"/image/requirement":              getImageRequirement,
 			"/configs/{service:.*}":           getConfigs,
 			"/configs/{service:.*}/{unit:.*}": getConfig,
 			"/commands/{service:.*}":          getCommands,
@@ -92,37 +92,37 @@ func getSupportImageVersion(ctx *_Context, w http.ResponseWriter, r *http.Reques
 	return
 }
 
-func getImageRequirement(ctx *_Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		httpError(w, err, http.StatusBadRequest)
-		return
-	}
+//func getImageRequirement(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+//	if err := r.ParseForm(); err != nil {
+//		httpError(w, err, http.StatusBadRequest)
+//		return
+//	}
 
-	image := r.FormValue("image")
+//	image := r.FormValue("image")
 
-	parts := strings.SplitN(image, ":", 2)
-	var v string
-	if len(parts) == 2 {
-		v = parts[1]
-	}
+//	parts := strings.SplitN(image, ":", 2)
+//	var v string
+//	if len(parts) == 2 {
+//		v = parts[1]
+//	}
 
-	parser, err := factory(parts[0], v)
-	if err != nil {
-		httpError(w, err, http.StatusNotImplemented)
-		return
-	}
+//	parser, err := factory(parts[0], v)
+//	if err != nil {
+//		httpError(w, err, http.StatusNotImplemented)
+//		return
+//	}
 
-	resp := parser.Requirement()
+//	resp := parser.Requirement()
 
-	err = json.NewEncoder(w).Encode(resp)
-	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	return
-}
+//	err = json.NewEncoder(w).Encode(resp)
+//	if err != nil {
+//		httpError(w, err, http.StatusInternalServerError)
+//		return
+//	}
+//	w.Header().Set("Content-Type", "application/json")
+//	w.WriteHeader(http.StatusOK)
+//	return
+//}
 
 func getConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	service := mux.Vars(r)["service"]
