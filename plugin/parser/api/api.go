@@ -20,7 +20,7 @@ type PluginAPI interface {
 	PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate) error
 
 	UpdateConfigs(ctx context.Context, service string, configs structs.ConfigsMap) error
-	ServiceCompose(ctx context.Context, service, mode string, args map[string]interface{}) error
+	ServiceCompose(ctx context.Context, spec structs.ServiceSpec) error
 	ServicesLink(ctx context.Context, links structs.ServicesLink) error
 }
 
@@ -135,17 +135,10 @@ func (p plugin) UpdateConfigs(ctx context.Context, service string, configs struc
 	return nil
 }
 
-func (p plugin) ServiceCompose(ctx context.Context, service, mode string, args map[string]interface{}) error {
-	uri := fmt.Sprintf("/services/%s/compose", service)
-	body := struct {
-		Mode string
-		Args map[string]interface{}
-	}{
-		mode,
-		args,
-	}
+func (p plugin) ServiceCompose(ctx context.Context, spec structs.ServiceSpec) error {
+	uri := fmt.Sprintf("/services/%s/compose", spec.ID)
 
-	resp, err := client.RequireOK(p.c.Put(ctx, uri, body))
+	resp, err := client.RequireOK(p.c.Put(ctx, uri, spec))
 	if err != nil {
 		return err
 	}

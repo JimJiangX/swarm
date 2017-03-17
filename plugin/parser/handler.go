@@ -202,29 +202,29 @@ func getCommands(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func checkImage(ctx *_Context, w http.ResponseWriter, r *http.Request) {
-	t := structs.ConfigTemplate{}
+//func checkImage(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+//	t := structs.ConfigTemplate{}
 
-	err := json.NewDecoder(r.Body).Decode(&t)
-	if err != nil {
-		httpError(w, err, http.StatusBadRequest)
-		return
-	}
+//	err := json.NewDecoder(r.Body).Decode(&t)
+//	if err != nil {
+//		httpError(w, err, http.StatusBadRequest)
+//		return
+//	}
 
-	parser, err := factory(t.Name, t.Version)
-	if err != nil {
-		httpError(w, err, http.StatusNotImplemented)
-		return
-	}
+//	parser, err := factory(t.Name, t.Version)
+//	if err != nil {
+//		httpError(w, err, http.StatusNotImplemented)
+//		return
+//	}
 
-	err = parser.ParseData(t.Content)
-	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
-	}
+//	err = parser.ParseData(t.Content)
+//	if err != nil {
+//		httpError(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	w.WriteHeader(http.StatusOK)
-}
+//	w.WriteHeader(http.StatusOK)
+//}
 
 func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.ConfigTemplate{}

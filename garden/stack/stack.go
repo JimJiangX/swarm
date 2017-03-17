@@ -5,7 +5,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/garden"
 	"github.com/docker/swarm/garden/database"
-	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -42,9 +41,7 @@ func (s *Stack) Deploy(ctx context.Context, spec structs.ServiceSpec) (structs.P
 	resp.Name = svc.Spec().Name
 	resp.TaskID = task.ID
 
-	kvc := s.gd.KVClient()
-
-	go s.deploy(ctx, svc, *task, kvc, auth)
+	go s.deploy(ctx, svc, *task, auth)
 
 	return resp, nil
 }
@@ -71,7 +68,6 @@ func (s *Stack) DeployServices(ctx context.Context, services []structs.ServiceSp
 		return nil, err
 	}
 
-	kvc := s.gd.KVClient()
 	out := make([]structs.PostServiceResponse, 0, len(services))
 
 	for _, spec := range services {
@@ -87,13 +83,13 @@ func (s *Stack) DeployServices(ctx context.Context, services []structs.ServiceSp
 			TaskID: task.ID,
 		})
 
-		go s.deploy(ctx, service, *task, kvc, auth)
+		go s.deploy(ctx, service, *task, auth)
 	}
 
 	return out, nil
 }
 
-func (s *Stack) deploy(ctx context.Context, service *garden.Service, t database.Task, kvc kvstore.Client, auth *types.AuthConfig) (err error) {
+func (s *Stack) deploy(ctx context.Context, svc *garden.Service, t database.Task, auth *types.AuthConfig) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.Errorf("panic:%v", r)
@@ -106,12 +102,12 @@ func (s *Stack) deploy(ctx context.Context, service *garden.Service, t database.
 			t.Errors = err.Error()
 			t.Status = database.TaskFailedStatus
 
-			logrus.WithField("Service", service.Spec().Name).Errorf("service deploy error %+v", err)
+			logrus.WithField("Service", svc.Spec().Name).Errorf("service deploy error %+v", err)
 		}
 
 		_err := s.gd.Ormer().SetTask(t)
 		if _err != nil {
-			logrus.WithField("Service", service.Spec().Name).Errorf("deploy task error,%+v", _err)
+			logrus.WithField("Service", svc.Spec().Name).Errorf("deploy task error,%+v", _err)
 		}
 	}()
 
@@ -121,17 +117,26 @@ func (s *Stack) deploy(ctx context.Context, service *garden.Service, t database.
 		return ctx.Err()
 	}
 
-	pendings, err := s.gd.Allocation(ctx, service)
+	pendings, err := s.gd.Allocation(ctx, svc)
 	if err != nil {
 		return err
 	}
 
-	err = service.RunContainer(ctx, pendings, auth)
+	err = svc.RunContainer(ctx, pendings, auth)
 	if err != nil {
 		return err
 	}
 
-	err = service.InitStart(ctx, kvc, nil, service.Spec().Options)
+	kvc := s.gd.KVClient()
+
+	err = svc.InitStart(ctx, kvc, nil, svc.Spec().Options)
+	if err != nil {
+		return err
+	}
+
+	pc := s.gd.PluginClient()
+
+	err = pc.ServiceCompose(ctx, svc.Spec())
 
 	return err
 }
