@@ -84,11 +84,16 @@ func convertStructsService(spec structs.ServiceSpec) (database.Service, error) {
 		return database.Service{}, errors.Wrap(err, "convert structs.Service")
 	}
 
+	arch, err := json.Marshal(spec.Arch)
+	if err != nil {
+		return database.Service{}, errors.Wrap(err, "convert structs.Service")
+	}
+
 	desc := database.ServiceDesc{
 		ID:           utils.Generate32UUID(),
 		ServiceID:    spec.ID,
-		Architecture: spec.Architecture,
-		Replicas:     spec.Replicas,
+		Architecture: string(arch),
+		Replicas:     spec.Arch.Replicas,
 		NCPU:         spec.Require.Require.CPU,
 		Memory:       spec.Require.Require.Memory,
 		Image:        spec.Image,
@@ -165,9 +170,11 @@ func convertServiceInfo(info database.ServiceInfo) structs.ServiceSpec {
 	}
 
 	return structs.ServiceSpec{
-		Replicas: n,
-		Service:  convertService(info.Service),
-		Units:    units,
+		Arch: structs.Arch{
+			Replicas: n,
+		},
+		Service: convertService(info.Service),
+		Units:   units,
 	}
 }
 
@@ -206,7 +213,7 @@ func (gd *Garden) validServiceSpec(spec structs.ServiceSpec) error {
 
 func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Task, error) {
 	options := scheduleOption{
-		highAvailable: spec.Replicas > 0,
+		highAvailable: spec.Arch.Replicas > 0,
 		require:       spec.Require,
 	}
 
@@ -232,10 +239,10 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 	}
 	svc.Desc.ImageID = im.ID
 
-	us := make([]database.Unit, spec.Replicas)
-	units := make([]structs.UnitSpec, spec.Replicas)
+	us := make([]database.Unit, spec.Arch.Replicas)
+	units := make([]structs.UnitSpec, spec.Arch.Replicas)
 
-	for i := 0; i < spec.Replicas; i++ {
+	for i := 0; i < spec.Arch.Replicas; i++ {
 
 		uid := utils.Generate32UUID()
 		us[i] = database.Unit{

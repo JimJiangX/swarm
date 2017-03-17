@@ -142,14 +142,14 @@ func (s *Stack) deploy(ctx context.Context, svc *garden.Service, t database.Task
 }
 
 func (s *Stack) LinkAndStart(ctx context.Context, links []*structs.ServiceLink) (string, error) {
-	services, err := s.freshServices(links)
+	err := s.freshServices(links)
 	if err != nil {
 		return "", err
 	}
 
 	task := database.Task{}
 
-	go func(s *Stack, services []structs.ServiceSpec, task database.Task) (err error) {
+	go func() (err error) {
 		defer func() {
 			if r := recover(); r != nil {
 				err = errors.Errorf("stack link,panic:%v", r)
@@ -170,30 +170,20 @@ func (s *Stack) LinkAndStart(ctx context.Context, links []*structs.ServiceLink) 
 			}
 		}()
 
-		kvc := s.gd.KVClient()
+		err = s.gd.PluginClient().ServicesLink(ctx, links)
 
-		for i := range services {
-			svc := s.gd.NewService(services[i])
-
-			err = svc.InitStart(ctx, kvc, nil, svc.Spec().Options)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-
-	}(s, services, task)
+		return err
+	}()
 
 	return task.ID, nil
 }
 
-func (s *Stack) freshServices(links structs.ServicesLink) ([]structs.ServiceSpec, error) {
+func (s *Stack) freshServices(links structs.ServicesLink) error {
 	ids := links.Links()
 
 	switch len(ids) {
 	case 0:
-		return nil, nil
+		return nil
 	case 1:
 
 	default:
@@ -201,5 +191,5 @@ func (s *Stack) freshServices(links structs.ServicesLink) ([]structs.ServiceSpec
 
 	links.Sort()
 
-	return nil, nil
+	return nil
 }

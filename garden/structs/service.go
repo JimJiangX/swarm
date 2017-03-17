@@ -84,10 +84,16 @@ type UnitSpec struct {
 	}
 }
 
-type ServiceSpec struct {
-	Replicas int `json:"unit_num"`
+type Arch struct {
+	Replicas int    `json:"unit_num"`
+	Mode     string `json:"mode"`
+	Code     string `json:"code"`
+}
 
+type ServiceSpec struct {
 	Service
+
+	Arch Arch `json:"architecture"`
 
 	Require UnitRequire `json:"unit_require"`
 
@@ -99,7 +105,9 @@ type ServiceSpec struct {
 
 	Units []UnitSpec `json:"units"`
 
-	Options map[string]interface{} `json:"args"`
+	Users []User `json:"users"`
+
+	Options map[string]interface{} `json:"opts"`
 }
 
 type UnitRequire struct {
@@ -138,10 +146,9 @@ type ServiceLink struct {
 	priority int
 	ID       string `json:"id"`
 
-	Args map[string]interface{} `json:"args"`
+	Spec *ServiceSpec `json:"spec"`
 
-	Users []User   `json:"users"`
-	Deps  []string `json:"deps"`
+	Deps []string `json:"deps"`
 }
 
 type ServicesLink []*ServiceLink
