@@ -152,6 +152,7 @@ type ServiceResponse struct {
 	ID           string             `json:"id"`
 	Name         string             `json:"name"`
 	Architecture string             `json:"architecture"`
+	BusinessCode string             `json:"business_code"`
 	Description  PostServiceRequest `json:"description"`
 	// AutoHealing	bool	`json:"auto_healing"`
 	// AutoScaling	bool	`json:"auto_scaling"`
