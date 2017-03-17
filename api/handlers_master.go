@@ -1090,6 +1090,14 @@ func putServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	stack := stack.New(gd)
 
-	stack.LinkAndStart(ctx, links)
+	// task ID
+	id, err := stack.Link(ctx, links)
+	if err != nil {
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
 }

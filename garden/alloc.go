@@ -157,7 +157,7 @@ func convertUnitInfoToSpec(info database.UnitInfo) structs.UnitSpec {
 	}
 }
 
-func convertServiceInfo(info database.ServiceInfo) structs.ServiceSpec {
+func ConvertServiceInfo(info database.ServiceInfo) structs.ServiceSpec {
 	units := make([]structs.UnitSpec, 0, len(info.Units))
 
 	for u := range info.Units {
@@ -181,7 +181,7 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 		return nil, err
 	}
 
-	spec := convertServiceInfo(info)
+	spec := ConvertServiceInfo(info)
 
 	svc := gd.NewService(spec)
 
@@ -197,7 +197,7 @@ func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, erro
 	out := make([]structs.ServiceSpec, len(list))
 
 	for i := range list {
-		spec := convertServiceInfo(list[i])
+		spec := ConvertServiceInfo(list[i])
 		out = append(out, spec)
 	}
 
@@ -257,7 +257,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 
 	spec.Units = units
 
-	t := database.NewTask(spec.Name, database.ServiceCreateTask, spec.ID, spec.Desc, "", 300)
+	t := database.NewTask(spec.Name, database.ServiceRunTask, spec.ID, spec.Desc, "", 300)
 
 	err = gd.ormer.InsertService(svc, us, &t)
 	if err != nil {

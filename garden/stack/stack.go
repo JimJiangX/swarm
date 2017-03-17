@@ -141,13 +141,14 @@ func (s *Stack) deploy(ctx context.Context, svc *garden.Service, t database.Task
 	return err
 }
 
-func (s *Stack) LinkAndStart(ctx context.Context, links []*structs.ServiceLink) (string, error) {
-	err := s.freshServices(links)
+func (s *Stack) Link(ctx context.Context, links []*structs.ServiceLink) (string, error) {
+	err := s.freshServicesLink(links)
 	if err != nil {
 		return "", err
 	}
 
-	task := database.Task{}
+	// TODO:better task info
+	task := database.NewTask("stack link", database.ServiceLinkTask, "", "", "", 300)
 
 	go func() (err error) {
 		defer func() {
@@ -178,18 +179,60 @@ func (s *Stack) LinkAndStart(ctx context.Context, links []*structs.ServiceLink) 
 	return task.ID, nil
 }
 
-func (s *Stack) freshServices(links structs.ServicesLink) error {
+func (s *Stack) freshServicesLink(links structs.ServicesLink) error {
 	ids := links.Links()
 
 	switch len(ids) {
 	case 0:
 		return nil
 	case 1:
+		svc, err := s.gd.Service(ids[0])
+		if err != nil {
+			return err
+		}
 
-	default:
+		spec := svc.Spec()
+		links[0].Spec = &spec
+
+		return nil
+	}
+
+	out, err := s.gd.Ormer().ListServicesInfo()
+	if err != nil {
+		return err
+	}
+
+	m := make(map[string]database.ServiceInfo, len(ids))
+
+	for i := range ids {
+		for o := range out {
+			if ids[i] == out[o].Service.ID {
+				m[ids[i]] = out[o]
+				break
+			}
+		}
 	}
 
 	links.Sort()
+
+	for l := range links {
+
+		info, ok := m[links[l].ID]
+		if ok {
+			spec := garden.ConvertServiceInfo(info)
+			links[l].Spec = &spec
+		}
+
+		delete(m, links[l].ID)
+	}
+
+	for _, val := range m {
+		spec := garden.ConvertServiceInfo(val)
+		links = append(links, &structs.ServiceLink{
+			ID:   spec.ID,
+			Spec: &spec,
+		})
+	}
 
 	return nil
 }
