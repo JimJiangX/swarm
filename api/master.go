@@ -139,13 +139,15 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/networkings/{name}/ips/enable":  putNetworkingEnable,
 		"/networkings/{name}/ips/disable": putNetworkingDisable,
 
-		"/services/link": putServiceLink,
+		"/services/link":         putServiceLink,
+		"/services/{name}/start": putServiceStart,
+		"/services/{name}/stop":  putServiceStop,
+
+		"/services/{name}/config/update": putServiceUpdateConfigs,
 	},
 
 	http.MethodDelete: {
-		//		"/services/{name}":                    deleteService,
-		//		"/services/{name}/users":              deleteServiceUsers,
-		//		"/services/backup_strategy/{name:.*}": deleteBackupStrategy,
+		"/services/{name}": deleteService,
 
 		"/clusters/{name}": deleteCluster,
 		"/hosts/{node:.*}": deleteNode,

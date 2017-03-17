@@ -199,11 +199,12 @@ func (sl ServicesLink) Sort() {
 }
 
 func (sl ServicesLink) Links() []string {
-	l := make([]string, 0, len(sl))
+	l := make([]string, 0, len(sl)*2)
 	for i := range sl {
 		l = append(l, sl[i].ID)
 		l = append(l, sl[i].Deps...)
 	}
+
 	ids := make([]string, 0, len(l))
 
 	for i := range l {
