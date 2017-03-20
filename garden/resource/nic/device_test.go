@@ -71,18 +71,4 @@ func TestParseContainerDevice(t *testing.T) {
 	for i := len(tests) / 2; i < len(tests); i++ {
 		c.Config.Config.Labels[tests[i].key] = tests[i].src
 	}
-
-	devices := parseContainerDevice(&c)
-	if len(devices) != 3 {
-		t.Errorf("got %d:", len(devices))
-	}
-
-	for i := range devices {
-		if devices[i].err != nil {
-			t.Error(devices[i])
-			continue
-		}
-
-		t.Log(devices[i])
-	}
 }
