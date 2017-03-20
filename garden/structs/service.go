@@ -77,6 +77,8 @@ type UnitSpec struct {
 	}
 
 	Volumes []struct {
+		ID      string
+		Name    string
 		Type    string
 		Driver  string
 		Size    int

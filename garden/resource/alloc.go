@@ -322,5 +322,7 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 		}
 	}
 
+	config.HostConfig.NetworkMode = "none"
+
 	return out, nil
 }
