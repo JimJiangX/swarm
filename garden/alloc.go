@@ -383,6 +383,7 @@ func (pu pendingUnit) convertToSpec() structs.UnitSpec {
 func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, error) {
 	opts := svc.options
 	config := cluster.BuildContainerConfig(container.Config{}, container.HostConfig{
+		Binds: []string{"/etc/localtime:/etc/localtime:ro"},
 		Resources: container.Resources{
 			CpusetCpus: strconv.Itoa(opts.require.Require.CPU),
 			Memory:     opts.require.Require.Memory,

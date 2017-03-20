@@ -3,6 +3,7 @@ package resource
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"strconv"
 
@@ -194,30 +195,34 @@ func (lv localVolume) Space() (space, error) {
 	return lv.space, nil
 }
 
-func (lv *localVolume) Alloc(config *cluster.ContainerConfig, uid string, require structs.VolumeRequire) (*database.Volume, error) {
+func (lv *localVolume) Alloc(config *cluster.ContainerConfig, uid string, req structs.VolumeRequire) (*database.Volume, error) {
 	space, err := lv.Space()
 	if err != nil {
 		return nil, err
 	}
 
-	volume := database.Volume{
-		Size:       require.Size,
+	v := database.Volume{
+		Size:       req.Size,
 		ID:         utils.Generate32UUID(),
-		Name:       uid[:8] + space.VG + require.Name,
+		Name:       fmt.Sprintf("%s_%s_%s_LV", uid[:8], space.VG, req.Name),
 		UnitID:     uid,
 		VG:         space.VG,
 		Driver:     lv.Driver(),
 		Filesystem: space.Fstype,
 	}
 
-	err = lv.vo.InsertVolume(volume)
+	err = lv.vo.InsertVolume(v)
 	if err != nil {
 		return nil, err
 	}
 
-	lv.space.Free -= require.Size
+	lv.space.Free -= req.Size
 
-	return &volume, nil
+	name := fmt.Sprintf("%s:/DBAAS%s", v.Name, req.Name)
+	config.HostConfig.Binds = append(config.HostConfig.Binds, name)
+	config.HostConfig.VolumeDriver = lv.Driver()
+
+	return &v, nil
 }
 
 func (lv *localVolume) Recycle(v database.Volume) (err error) {
