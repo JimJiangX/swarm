@@ -635,8 +635,7 @@ EOF
 [Unit]
 Description=Docker Swarm agent
 Documentation=https://docs.docker.com
-After=network.target
-Requires=consul.service
+After=network.target consul.service
 
 [Service]
 EnvironmentFile=/etc/sysconfig/swarm-agent
@@ -699,8 +698,7 @@ EOF
 [Unit]
 Description=Horus agent
 Documentation=
-After=network.target
-Requires=consul.service
+After=network.target consul.service
 
 [Service]
 EnvironmentFile=/etc/sysconfig/horus-agent
