@@ -89,6 +89,7 @@ type Keyset struct {
 	CanSet      bool `json:"can_set"`
 	MustRestart bool `json:"must_restart"`
 	Key         string
+	Default     string
 	Desc        string
 	Range       string
 }
