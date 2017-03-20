@@ -509,8 +509,7 @@ EOF
 [Unit]
 Description=Docker Swarm agent
 Documentation=https://docs.docker.com
-After=network.target
-Requires=consul.service
+After=network.target consul.service
 
 [Service]
 EnvironmentFile=/etc/sysconfig/swarm-agent
