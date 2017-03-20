@@ -159,12 +159,12 @@ func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithT
 		return ctx.Err()
 	}
 
-	err := m.dco.InsertNodesAndTask(nodes, tasks)
+	config, err := m.dco.GetSysConfig()
 	if err != nil {
 		return err
 	}
 
-	config, err := m.dco.GetSysConfig()
+	err = m.dco.InsertNodesAndTask(nodes, tasks)
 	if err != nil {
 		return err
 	}
