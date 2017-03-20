@@ -24,14 +24,13 @@ nfs_ip=${20}
 nfs_dir=${21}
 nfs_mount_dir=${22}
 nfs_mount_opts=${23}
+adm_vlan=${24}
+int_vlan=${25}
+ext_vlan=${26}
 cur_dir=`dirname $0`
 
 hdd_vgname=${HOSTNAME}_HDD_VG
 ssd_vgname=${HOSTNAME}_SSD_VG
-
-adm_nic=bond1
-int_nic=bond1
-ext_nic=bond2
 
 PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
 
@@ -98,7 +97,6 @@ reg_to_horus_server() {
 }
 
 create_check_script() {
-
 	local dir=/opt/DBaaS/script
 	mkdir -p ${dir}
 
@@ -379,22 +377,31 @@ install_docker() {
 	wwn=${wwn:1}
 
 	# check nic
-	ifconfig $adm_nic >/dev/null 2>&1 
-	if [ $? -ne 0 ]; then
-		echo "not find adm_nic ${adm_nic}"
-		exit 2
+	if [ '${adm_vlan}' != "null"]; then
+		adm_nic=`cat /proc/net/vlan/config | sed '1,2d;s/\ //g' | awk -F'|' '{if($2=='${adm_vlan}')print $1}'`
+		ifconfig $adm_nic >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "not find adm_nic ${adm_nic}"
+			exit 2
+		fi
 	fi
 
-	ifconfig $int_nic >/dev/null 2>&1 
-	if [ $? -ne 0 ]; then
-		echo "not find int_nic ${int_nic}"
-		exit 2
+	if [ '${int_vlan}' != "null"]; then
+		int_nic=`cat /proc/net/vlan/config | sed '1,2d;s/\ //g' | awk -F'|' '{if($2=='${int_vlan}')print $1}'`
+		ifconfig $int_nic>/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "not find int_nic ${int_nic}"
+			exit 2
+		fi
 	fi
 
-	ifconfig $ext_nic >/dev/null 2>&1 
-	if [ $? -ne 0 ]; then
-		echo "not find ext_nic ${ext_nic}"
-		ext_nic=""
+	if [ '${ext_vlan}' != "null"]; then
+		int_nic=`cat /proc/net/vlan/config | sed '1,2d;s/\ //g' | awk -F'|' '{if($2=='${ext_vlan}')print $1}'`
+		ifconfig $ext_nic>/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "not find ext_nic ${ext_nic}"
+			exit 2
+		fi
 	fi
 
 	if [ "${release}" == "SUSE LINUX" ]; then
