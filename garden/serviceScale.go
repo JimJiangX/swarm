@@ -1,16 +1,23 @@
 package garden
 
 import (
+	"encoding/json"
 	"sort"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
 func (svc *Service) Scale(ctx context.Context, r kvstore.Register, replicas int) (err error) {
+	table, err := svc.so.GetService(svc.spec.ID)
+	if err != nil {
+		return err
+	}
+
 	units, err := svc.getUnits()
 	if err != nil {
 		return err
@@ -35,18 +42,19 @@ func (svc *Service) Scale(ctx context.Context, r kvstore.Register, replicas int)
 		if r := recover(); r != nil {
 			err = errors.Errorf("panic:%v", r)
 		}
-		status := statusServiceScaled
+
 		if err != nil {
-			status = statusServiceScaleFailed
+			table.Status = statusServiceScaleFailed
 		}
 
-		_err := svc.sl.SetStatus(status)
+		_err := svc.so.SetServiceScale(table, database.Task{})
 		if _err != nil {
-			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", status, _err)
+			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", table.Status, _err)
 		}
 	}()
 
 	if len(units) > replicas {
+
 		containers := svc.cluster.Containers()
 		out := sortUnitsByContainers(units, containers)
 
@@ -67,8 +75,31 @@ func (svc *Service) Scale(ctx context.Context, r kvstore.Register, replicas int)
 			return err
 		}
 
-		// del data by unit.u.ID
+		units := make([]database.Unit, 0, len(stoped))
+		for i := range stoped {
+			if stoped[i] == nil {
+				continue
+			}
+
+			units = append(units, stoped[i].u)
+		}
+
+		err = svc.so.DelUnitsRelated(units, true)
+		if err != nil {
+			return err
+		}
 	}
+
+	arch := svc.spec.Arch
+	arch.Replicas = replicas
+
+	out, err := json.Marshal(arch)
+	if err == nil {
+		table.Desc.Replicas = replicas
+		table.Desc.Architecture = string(out)
+	}
+
+	table.Status = statusServiceScaled
 
 	return nil
 }

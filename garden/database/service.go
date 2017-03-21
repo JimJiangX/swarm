@@ -22,6 +22,8 @@ type ServiceInterface interface {
 	// SetServcieDesc(id, desc string, size int) error
 	ServiceStatusCAS(nameOrID string, val int, finish time.Time, f func(val int) bool) (bool, int, error)
 	SetServiceWithTask(svc *Service, t Task, state int, finish time.Time) error
+
+	SetServiceScale(svc Service, t Task) error
 }
 
 type ServiceInfoInterface interface {
@@ -285,23 +287,28 @@ func (db dbBase) SetServiceStatus(nameOrID string, state int, finish time.Time) 
 	return errors.Wrap(err, "update Service Status & FinishedAt")
 }
 
+func (db dbBase) txSetServiceStatus(tx *sqlx.Tx, nameOrID string, status int, now time.Time) (err error) {
+	if now.IsZero() {
+
+		query := "UPDATE " + db.serviceTable() + " SET action_status=? WHERE id=? OR name=?"
+		_, err = tx.Exec(query, status, nameOrID, nameOrID)
+
+	} else {
+
+		query := "UPDATE " + db.serviceTable() + " SET action_status=?,finished_at=? WHERE id=? OR name=?"
+		_, err = tx.Exec(query, status, now, nameOrID, nameOrID)
+
+	}
+
+	return errors.Wrap(err, "Tx update Service status")
+}
+
 // SetServiceWithTask update Service Status and Task Status in Tx.
 func (db dbBase) SetServiceWithTask(svc *Service, t Task, state int, finish time.Time) error {
-	do := func(tx *sqlx.Tx) (err error) {
-
-		if finish.IsZero() {
-
-			query := "UPDATE " + db.serviceTable() + " SET action_status=? WHERE id=?"
-			_, err = tx.Exec(query, state, svc.ID)
-
-		} else {
-
-			query := "UPDATE " + db.serviceTable() + " SET action_status=?,finished_at=? WHERE id=?"
-			_, err = tx.Exec(query, state, finish, svc.ID)
-
-		}
-		if err != nil {
-			return errors.Wrap(err, "Tx update Service status")
+	do := func(tx *sqlx.Tx) error {
+		err := db.txSetServiceStatus(tx, svc.ID, state, finish)
+		if err == nil {
+			return err
 		}
 
 		err = db.txSetTask(tx, t)
@@ -318,6 +325,31 @@ func (db dbBase) SetServiceWithTask(svc *Service, t Task, state int, finish time
 	}
 
 	return err
+}
+
+func (db dbBase) SetServiceScale(svc Service, t Task) error {
+	do := func(tx *sqlx.Tx) error {
+
+		now := time.Now()
+		t.FinishedAt = now
+
+		err := db.txSetServiceStatus(tx, svc.ID, svc.Status, now)
+		if err != nil {
+			return err
+		}
+
+		err = db.txSetTask(tx, t)
+		if err != nil {
+			return err
+		}
+
+		query := "UPDATE " + db.serviceDescTable() + " SET architecture=?,unit_num=? WHERE id=?"
+		_, err = tx.Exec(query, svc.Desc.Architecture, svc.Desc.Replicas, svc.Desc.ID)
+
+		return errors.Wrap(err, "tx update serviceDesc replicas")
+	}
+
+	return db.txFrame(do)
 }
 
 func (db dbBase) txDelService(tx *sqlx.Tx, nameOrID string) error {

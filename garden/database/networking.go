@@ -241,6 +241,13 @@ func (db dbBase) txSetIPs(tx *sqlx.Tx, val []IP) error {
 	return errors.Wrap(err, "Tx update []IP")
 }
 
+func (db dbBase) txResetIPByUnit(tx *sqlx.Tx, unit string) error {
+	query := "UPDATE " + db.ipTable() + " SET unit_id=?,engine_id=?,net_dev=?,bandwidth=? WHERE unit_id=?"
+	_, err := tx.Exec(query, "", "", "", 0, unit)
+
+	return errors.Wrap(err, "tx reset IP by unit")
+}
+
 func (db dbBase) InsertNetworking(ips []IP) error {
 	do := func(tx *sqlx.Tx) error {
 

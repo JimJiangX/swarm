@@ -206,7 +206,7 @@ func (s *Stack) freshServicesLink(links structs.ServicesLink) error {
 
 	for i := range ids {
 		for o := range out {
-			if ids[i] == out[o].Service.ID {
+			if ids[i] == out[o].Service.ID || ids[i] == out[o].Service.Name {
 				m[ids[i]] = out[o]
 				break
 			}

@@ -475,6 +475,10 @@ func getNodeInfo(n database.Node, e *cluster.Engine) structs.NodeInfo {
 
 	info.SetByEngine(e)
 
+	if info.Engine.IP == "" {
+		info.Engine.IP = n.Addr
+	}
+
 	return info
 }
 
@@ -998,6 +1002,33 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusCreated)
 }
 
+func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil || gd.KVClient() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	svc, err := gd.Service(name)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	err = svc.Scale(ctx, gd.KVClient(), 1)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	// return Task.ID
+	writeJSON(w, nil, http.StatusOK)
+}
+
 func putServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	links := structs.ServicesLink{}
 	err := json.NewDecoder(r.Body).Decode(&links)
@@ -1041,7 +1072,7 @@ func putServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	svc, err := gd.Service(name)
+	svc, err := gd.GetService(name)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -1078,7 +1109,7 @@ func putServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.R
 		return
 	}
 
-	svc, err := gd.Service(name)
+	svc, err := gd.GetService(name)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -1104,7 +1135,7 @@ func putServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svc, err := gd.Service(name)
+	svc, err := gd.GetService(name)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -1130,7 +1161,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svc, err := gd.Service(name)
+	svc, err := gd.GetService(name)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
