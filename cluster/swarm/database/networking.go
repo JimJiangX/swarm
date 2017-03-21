@@ -525,7 +525,7 @@ func IsNetwrokingUsed(networking string) (bool, error) {
 	count := 0
 	const (
 		queryIP      = "SELECT COUNT(ip_addr) from tbl_dbaas_ip WHERE networking_id=? AND allocated=?"
-		queryCluster = "SELECT COUNT(id) from tbl_dbaas_cluster WHERE networking_id=?"
+		queryCluster = "SELECT COUNT(id) from tbl_dbaas_cluster WHERE internal_networking_id=? OR external_networking_id=?"
 	)
 
 	err = db.Get(&count, queryIP, networking, true)
@@ -537,7 +537,7 @@ func IsNetwrokingUsed(networking string) (bool, error) {
 		return true, nil
 	}
 
-	err = db.Get(&count, queryCluster, networking)
+	err = db.Get(&count, queryCluster, networking, networking)
 	if err != nil {
 		return false, errors.Wrap(err, "count []Cluster by NetworkingID")
 	}
