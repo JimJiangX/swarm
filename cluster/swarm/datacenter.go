@@ -483,6 +483,12 @@ func (gd *Gardener) RemoveNode(nameOrID, user, password string) (int, error) {
 
 	dc.removeNode(nameOrID)
 
+	if node.Status == statusNodeSSHExecFailed ||
+		node.Status == statusNodeSSHLoginFailed ||
+		node.Status == statusNodeSCPFailed {
+		return 0, nil
+	}
+
 	// ssh exec clean script
 	err = nodeClean(node.ID, node.Addr, user, password)
 	if err != nil {
