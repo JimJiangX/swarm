@@ -499,6 +499,13 @@ func (m master) RemoveNode(ctx context.Context, horus, nameOrID, user, password 
 		return err
 	}
 
+	if node.node.Status == statusNodeSCPFailed ||
+		statusNodeSSHLoginFailed ||
+		statusNodeSSHExecFailed {
+
+		return m.removeNode(node.node.ID)
+	}
+
 	config, err := m.dco.GetSysConfig()
 	if err != nil {
 		return err
