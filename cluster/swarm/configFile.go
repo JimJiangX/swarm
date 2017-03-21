@@ -640,7 +640,7 @@ func (c proxyConfigV110) defaultUserConfig(args ...interface{}) (_ map[string]in
 
 	m["upsql-proxy::proxy-domain"] = svc.ID
 	m["upsql-proxy::proxy-name"] = u.Name
-	if len(u.networkings) == 2 && len(u.ports) >= 2 {
+	if len(u.networkings) > 0 && len(u.ports) >= 2 {
 		addr := ""
 		adminPort, dataPort := 0, 0
 		for i := range u.networkings {
