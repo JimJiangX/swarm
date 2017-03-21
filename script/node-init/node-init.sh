@@ -384,6 +384,8 @@ install_docker() {
 			echo "not find adm_nic ${adm_nic}"
 			exit 2
 		fi
+	else
+		adm_nic=''
 	fi
 
 	if [ '${int_vlan}' != "null"]; then
@@ -393,15 +395,19 @@ install_docker() {
 			echo "not find int_nic ${int_nic}"
 			exit 2
 		fi
+	else
+		int_nic=''
 	fi
 
 	if [ '${ext_vlan}' != "null"]; then
-		int_nic=`cat /proc/net/vlan/config | sed '1,2d;s/\ //g' | awk -F'|' '{if($2=='${ext_vlan}')print $1}'`
+		ext_nic=`cat /proc/net/vlan/config | sed '1,2d;s/\ //g' | awk -F'|' '{if($2=='${ext_vlan}')print $1}'`
 		ifconfig $ext_nic>/dev/null 2>&1
 		if [ $? -ne 0 ]; then
 			echo "not find ext_nic ${ext_nic}"
 			exit 2
 		fi
+	else
+		ext_nic=''
 	fi
 
 	if [ "${release}" == "SUSE LINUX" ]; then
