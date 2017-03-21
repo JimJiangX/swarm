@@ -231,6 +231,8 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 		if err != nil {
 			entry.WithError(err).Error("ssh dial error")
 
+			nodeState = statusNodeSSHLoginFailed
+
 			return err
 		}
 	}
