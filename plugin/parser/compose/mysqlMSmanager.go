@@ -13,16 +13,33 @@ type MysqlMSManager struct {
 	MgmPort int
 }
 
+func newMysqlComposer(dbs []Mysql, mgmIp string, mgmPort int) Composer {
+
+	ms := &MysqlMSManager{
+		MgmIp:   mgmIp,
+		MgmPort: mgmPort,
+		Mysqls:  make(map[string]Mysql),
+	}
+
+	for _, db := range dbs {
+		db.MgmIp = mgmIp
+		db.MgmPort = mgmPort
+		ms.Mysqls[db.GetKey()] = db
+	}
+
+	return ms
+
+}
 func (m *MysqlMSManager) ComposeCluster() error {
 	if err := m.ClearCluster(); err != nil {
 		return err
 	}
 
-	if err := m.preopology(); err != nil {
+	if err := m.preCompose(); err != nil {
 		log.WithFields(log.Fields{
 			"error": err.Error(),
-		}).Error("preopology fail")
-		return errors.New("preopology err:" + err.Error())
+		}).Error("preCompose fail")
+		return errors.New("preCompose err:" + err.Error())
 
 	}
 
@@ -79,7 +96,7 @@ func (m *MysqlMSManager) CheckCluster() error {
 	return nil
 }
 
-func (m *MysqlMSManager) preopology() error {
+func (m *MysqlMSManager) preCompose() error {
 	//select master
 	masterkey := m.electMaster()
 	if err := m.setMysqlType(masterkey, MASTER_TYPE); err != nil {

@@ -464,7 +464,7 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 func composeService(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	var req structs.ServiceSpec
-	//	service := mux.Vars(r)["service"]
+
 	mgmip := ctx.mgmIp
 	mgmport := ctx.mgmPort
 
@@ -474,7 +474,7 @@ func composeService(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	composer, err := compose.NewCompserBySpec(req, mgmip, mgmport)
+	composer, err := compose.NewCompserBySpec(&req, mgmip, mgmport)
 	if err != nil {
 		httpError(w, err, http.StatusBadRequest)
 		return

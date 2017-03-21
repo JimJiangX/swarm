@@ -15,6 +15,8 @@ const (
 	MASTER_TYPE MYSQL_TYPE = "MASTER"
 	SLAVE_TYPE  MYSQL_TYPE = "SLAVE"
 
+	BASEDIR string = "/tmp/scripts/"
+
 //	NONE_STATUS MYSQL_STATUS = "WAITING_CHECK"
 )
 
@@ -43,7 +45,7 @@ func (m Mysql) GetKey() string {
 }
 
 func (m Mysql) Clear() error {
-	filepath := ""
+	filepath := BASEDIR + "mysqlclear.sh"
 	timeout := time.Second * 60
 	args := []string{}
 	_, err := ExecShellFileTimeout(filepath, timeout, args...)
@@ -59,7 +61,7 @@ func (m Mysql) ChangeMaster(master Mysql) error {
 		return errors.New(string(m.GetType()) + ":should not call the func")
 	}
 
-	filepath := ""
+	filepath := BASEDIR + "changemaster.sh"
 	timeout := time.Second * 60
 	args := []string{}
 	_, err := ExecShellFileTimeout(filepath, timeout, args...)
@@ -68,7 +70,7 @@ func (m Mysql) ChangeMaster(master Mysql) error {
 }
 
 func (m Mysql) CheckStatus() error {
-	filepath := ""
+	filepath := BASEDIR + "mysqlcheck.sh"
 	timeout := time.Second * 60
 	args := []string{}
 	_, err := ExecShellFileTimeout(filepath, timeout, args...)
