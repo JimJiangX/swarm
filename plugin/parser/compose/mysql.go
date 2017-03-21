@@ -20,20 +20,22 @@ const (
 //	NONE_STATUS MYSQL_STATUS = "WAITING_CHECK"
 )
 
-type Mysql struct {
-	Ip   string
-	Port int
-
-	Instance string
-
-	Weight int //Weight越高，优先变成master，等值随机
-
+type MysqlUser struct {
 	ReplicateUser string
 	Replicatepwd  string
 
 	Rootuser string
 	RootPwd  string
+}
 
+type Mysql struct {
+	Ip       string
+	Port     int
+	Instance string
+
+	MysqlUser
+
+	Weight   int //Weight越高，优先变成master，等值随机
 	RoleType MYSQL_TYPE
 
 	MgmPort int

@@ -117,6 +117,7 @@ func (m *MysqlMSManager) preCompose() error {
 
 	return nil
 }
+
 func (m *MysqlMSManager) getMasterKey() (string, bool) {
 	for _, db := range m.Mysqls {
 		if db.GetType() == MASTER_TYPE {
