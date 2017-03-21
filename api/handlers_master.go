@@ -1003,23 +1003,27 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
 	name := mux.Vars(r)["name"]
+	replicas := intValueOrZero(r, "num")
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
-		gd.Ormer() == nil || gd.KVClient() == nil {
+		gd.Ormer() == nil ||
+		gd.KVClient() == nil ||
+		gd.PluginClient() == nil {
 
 		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
 		return
 	}
 
-	svc, err := gd.Service(name)
-	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
-		return
-	}
+	stack := stack.New(gd)
 
-	err = svc.Scale(ctx, gd.KVClient(), 1)
+	err := stack.ServiceScale(ctx, name, replicas)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return

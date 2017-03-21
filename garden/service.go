@@ -583,7 +583,7 @@ func (svc *Service) deleteCondition() error {
 	return nil
 }
 
-func (svc *Service) deregisterSerivces(ctx context.Context, r kvstore.Register, units []*unit) error {
+func (svc *Service) deregisterSerivces(ctx context.Context, reg kvstore.Register, units []*unit) error {
 	for i := range units {
 
 		host, err := units[i].getHostIP()
@@ -591,7 +591,7 @@ func (svc *Service) deregisterSerivces(ctx context.Context, r kvstore.Register, 
 			return err
 		}
 
-		err = r.DeregisterService(ctx, host, units[i].u.ID)
+		err = reg.DeregisterService(ctx, host, units[i].u.ID)
 		if err != nil {
 			return err
 		}

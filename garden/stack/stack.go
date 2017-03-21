@@ -236,3 +236,35 @@ func (s *Stack) freshServicesLink(links structs.ServicesLink) error {
 
 	return nil
 }
+
+func (s *Stack) ServiceScale(ctx context.Context, nameOrID string, replicas int) error {
+	orm := s.gd.Ormer()
+
+	table, err := orm.GetService(nameOrID)
+	if err != nil {
+		return err
+	}
+
+	units, err := orm.ListUnitByServiceID(table.ID)
+	if err != nil {
+		return err
+	}
+
+	if len(units) == replicas {
+		return nil
+	}
+
+	svc, err := s.gd.GetService(table.ID)
+	if err != nil {
+		return err
+	}
+
+	// spec := svc.Spec()
+	// task := database.NewTask(spec.Name, database.ServiceScaleTask, spec.ID, fmt.Sprintf("replicas=%d", replicas), "", 300)
+
+	if len(units) > replicas {
+		return svc.ScaleDown(ctx, table, s.gd.KVClient(), replicas)
+	}
+
+	return nil
+}

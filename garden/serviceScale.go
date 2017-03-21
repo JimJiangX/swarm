@@ -12,21 +12,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func (svc *Service) Scale(ctx context.Context, r kvstore.Register, replicas int) (err error) {
-	table, err := svc.so.GetService(svc.spec.ID)
-	if err != nil {
-		return err
-	}
-
-	units, err := svc.getUnits()
-	if err != nil {
-		return err
-	}
-
-	if len(units) == replicas {
-		return nil
-	}
-
+func (svc *Service) ScaleDown(ctx context.Context, table database.Service, reg kvstore.Register, replicas int) (err error) {
 	ok, val, err := svc.sl.CAS(statusServiceScaling, isnotInProgress)
 	if err != nil {
 		return err
@@ -47,44 +33,20 @@ func (svc *Service) Scale(ctx context.Context, r kvstore.Register, replicas int)
 			table.Status = statusServiceScaleFailed
 		}
 
+		// TODO:database.NewTask
 		_err := svc.so.SetServiceScale(table, database.Task{})
 		if _err != nil {
 			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", table.Status, _err)
 		}
 	}()
 
+	units, err := svc.getUnits()
+	if err != nil {
+		return err
+	}
+
 	if len(units) > replicas {
-
-		containers := svc.cluster.Containers()
-		out := sortUnitsByContainers(units, containers)
-
-		stoped := out[:len(units)-replicas]
-
-		err = svc.deregisterSerivces(ctx, r, stoped)
-		if err != nil {
-			return err
-		}
-
-		err = svc.removeContainers(ctx, stoped, true, false)
-		if err != nil {
-			return err
-		}
-
-		err = svc.removeVolumes(ctx, stoped)
-		if err != nil {
-			return err
-		}
-
-		units := make([]database.Unit, 0, len(stoped))
-		for i := range stoped {
-			if stoped[i] == nil {
-				continue
-			}
-
-			units = append(units, stoped[i].u)
-		}
-
-		err = svc.so.DelUnitsRelated(units, true)
+		err = svc.scaleDown(ctx, units, replicas, reg)
 		if err != nil {
 			return err
 		}
@@ -102,6 +64,41 @@ func (svc *Service) Scale(ctx context.Context, r kvstore.Register, replicas int)
 	table.Status = statusServiceScaled
 
 	return nil
+}
+
+func (svc *Service) scaleDown(ctx context.Context, units []*unit, replicas int, reg kvstore.Register) error {
+	containers := svc.cluster.Containers()
+	out := sortUnitsByContainers(units, containers)
+
+	stoped := out[:len(units)-replicas]
+
+	err := svc.deregisterSerivces(ctx, reg, stoped)
+	if err != nil {
+		return err
+	}
+
+	err = svc.removeContainers(ctx, stoped, true, false)
+	if err != nil {
+		return err
+	}
+
+	err = svc.removeVolumes(ctx, stoped)
+	if err != nil {
+		return err
+	}
+
+	list := make([]database.Unit, 0, len(stoped))
+	for i := range stoped {
+		if stoped[i] == nil {
+			continue
+		}
+
+		list = append(list, stoped[i].u)
+	}
+
+	err = svc.so.DelUnitsRelated(list, true)
+
+	return err
 }
 
 type unitStatus struct {

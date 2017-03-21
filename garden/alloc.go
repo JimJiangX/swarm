@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
@@ -424,9 +425,10 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 		}
 		// cancel allocation
 		if len(bad) > 0 {
-			err := gd.allocator.RecycleResource()
-			if err != nil {
-				// TODO:
+			_err := gd.allocator.RecycleResource()
+			if _err != nil {
+				logrus.WithField("Service", svc.spec.Name).Errorf("Recycle resources error:%+v", err)
+				err = fmt.Errorf("%+v\n%recycle resources error:+v", err, _err)
 			}
 
 			ids := make([]string, len(bad))
