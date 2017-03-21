@@ -1,12 +1,22 @@
 package compose
 
+import (
+	"errors"
+
+	"github.com/docker/swarm/garden/structs"
+)
+
 type Composer interface {
 	ClearCluster() error
 	CheckCluster() error
 	ComposeCluster() error
 }
 
-func NewMysqlComposer(arch string, dbs []Mysql, mgmIp string, mgmPort int) Composer {
+func NewCompserBySpec(req structs.ServiceSpec, mgmip string, mgmport int) (Composer, error) {
+	return nil, errors.New("don't support")
+}
+
+func newMysqlComposer(arch string, dbs []Mysql, mgmIp string, mgmPort int) (Composer, error) {
 	if arch == "MS" {
 		ms := &MysqlMSManager{
 			MgmIp:   mgmIp,
@@ -20,11 +30,11 @@ func NewMysqlComposer(arch string, dbs []Mysql, mgmIp string, mgmPort int) Compo
 			ms.Mysqls[db.GetKey()] = db
 		}
 
-		return ms
+		return ms, nil
 	} /*else if arch == "MG" {
 
 	}*/
 
-	return nil
+	return nil, errors.New("mysql:don't support arch")
 
 }

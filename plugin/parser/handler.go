@@ -12,6 +12,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/plugin/parser/compose"
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/consul/api"
 	"golang.org/x/net/context"
@@ -21,12 +22,18 @@ type _Context struct {
 	apiVersion string
 	client     kvstore.Client
 	context    context.Context
+
+	mgmIp   string
+	mgmPort int
 }
 
-func NewRouter(c kvstore.Client) *mux.Router {
+func NewRouter(c kvstore.Client, mgmip string, mgmPort int) *mux.Router {
 	type handler func(ctx *_Context, w http.ResponseWriter, r *http.Request)
 
-	ctx := &_Context{client: c}
+	ctx := &_Context{client: c,
+		mgmIp:   mgmip,
+		mgmPort: mgmPort,
+	}
 
 	var routes = map[string]map[string]handler{
 		"GET": {
@@ -456,6 +463,30 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func composeService(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	var req structs.ServiceSpec
+	//	service := mux.Vars(r)["service"]
+	mgmip := ctx.mgmIp
+	mgmport := ctx.mgmPort
+
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	composer, err := compose.NewCompserBySpec(req, mgmip, mgmport)
+	if err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if err := composer.ComposeCluster(); err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
 }
 
 func linkServices(ctx *_Context, w http.ResponseWriter, r *http.Request) {
