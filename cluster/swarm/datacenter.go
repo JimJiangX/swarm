@@ -1111,6 +1111,8 @@ func (node *Node) distribute() (err error) {
 	if err != nil {
 		entry.WithError(err).Errorf("new SSH Client")
 
+		nodeState = statusNodeSSHLoginFailed
+
 		return errors.Wrap(err, "create SSH client")
 	}
 	defer c.Close()
@@ -1146,13 +1148,11 @@ func (node *Node) distribute() (err error) {
 	if err != nil {
 		entry.WithError(err).Errorf("exec remote command:'%s',output:%s", script, out)
 
-		if out, err = c.Exec(script); err != nil {
-			entry.WithError(err).Errorf("exec remote command twice:'%s',output:%s", script, out)
-
-			nodeState = statusNodeSSHExecFailed
-			return err
-		}
+		nodeState = statusNodeSSHExecFailed
+		return err
 	}
+
+	entry.Debugf("cmd:'%s'", script)
 
 	entry.Info("SSH remote PKG install successed! output:\n", string(out))
 
