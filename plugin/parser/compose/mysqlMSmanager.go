@@ -13,7 +13,7 @@ type MysqlMSManager struct {
 	MgmPort int
 }
 
-func newMysqlComposer(dbs []Mysql, mgmIp string, mgmPort int) Composer {
+func newMysqlMSManager(dbs []Mysql, mgmIp string, mgmPort int) Composer {
 
 	ms := &MysqlMSManager{
 		MgmIp:   mgmIp,

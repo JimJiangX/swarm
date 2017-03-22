@@ -15,8 +15,6 @@ const (
 	MASTER_TYPE MYSQL_TYPE = "MASTER"
 	SLAVE_TYPE  MYSQL_TYPE = "SLAVE"
 
-	BASEDIR string = "/tmp/scripts/"
-
 //	NONE_STATUS MYSQL_STATUS = "WAITING_CHECK"
 )
 
