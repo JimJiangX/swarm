@@ -1024,14 +1024,15 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	stack := stack.New(gd)
 
-	err = stack.ServiceScale(ctx, name, arch)
+	id, err := stack.ServiceScale(ctx, name, arch)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	// return Task.ID
-	writeJSON(w, nil, http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
 }
 
 func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1056,6 +1057,36 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	// task ID
 	id, err := stack.Link(ctx, links)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+}
+
+func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	name := mux.Vars(r)["name"]
+	version := r.FormValue("image")
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil || gd.PluginClient() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	s := stack.New(gd)
+
+	id, err := s.ServiceUpdateImage(ctx, name, version)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return

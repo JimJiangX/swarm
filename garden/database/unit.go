@@ -25,6 +25,7 @@ type UnitInterface interface {
 	SetUnitWithInsertTask(u *Unit, task Task) error
 	SetUnitStatus(u *Unit, status int, msg string) error
 	SetUnitAndTask(u *Unit, t *Task, msg string) error
+	SetUnits(units []Unit) error
 	// SetMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error
 
 	DelUnitsRelated(units []Unit, volume bool) error
@@ -249,6 +250,33 @@ func (db dbBase) SetUnitAndTask(u *Unit, t *Task, msg string) error {
 	}
 
 	return err
+}
+
+func (db dbBase) SetUnits(units []Unit) error {
+	do := func(tx *sqlx.Tx) error {
+		query := "UPDATE " + db.unitTable() + " SET engine_id=:engine_id,container_id=:container_id,network_mode=:network_mode,networks_desc=:networks_desc,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
+
+		stmt, err := tx.PrepareNamed(query)
+		if err != nil {
+			return errors.Wrap(err, "tx prepare")
+		}
+
+		for i := range units {
+
+			_, err := stmt.Exec(units[i])
+			if err != nil {
+				stmt.Close()
+
+				return err
+			}
+		}
+
+		stmt.Close()
+
+		return errors.Wrap(err, "Tx update []Unit")
+	}
+
+	return db.txFrame(do)
 }
 
 func (db dbBase) txSetUnitStatus(tx *sqlx.Tx, u *Unit, msg string, status int) error {

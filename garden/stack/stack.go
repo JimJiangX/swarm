@@ -240,26 +240,26 @@ func (s *Stack) freshServicesLink(links structs.ServicesLink) error {
 	return nil
 }
 
-func (s *Stack) ServiceScale(ctx context.Context, nameOrID string, arch structs.Arch) error {
+func (s *Stack) ServiceScale(ctx context.Context, nameOrID string, arch structs.Arch) (string, error) {
 	orm := s.gd.Ormer()
 
 	table, err := orm.GetService(nameOrID)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	units, err := orm.ListUnitByServiceID(table.ID)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if len(units) == arch.Replicas {
-		return nil
+		return "", nil
 	}
 
 	svc, err := s.gd.GetService(table.ID)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// spec := svc.Spec()
@@ -269,7 +269,7 @@ func (s *Stack) ServiceScale(ctx context.Context, nameOrID string, arch structs.
 		err = svc.ScaleDown(ctx, s.gd.KVClient(), arch.Replicas)
 	}
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	desc := *table.Desc
@@ -285,5 +285,41 @@ func (s *Stack) ServiceScale(ctx context.Context, nameOrID string, arch structs.
 
 	err = orm.SetServiceDesc(table)
 
-	return err
+	return "", err
+}
+
+func (s *Stack) ServiceUpdateImage(ctx context.Context, name, version string) (string, error) {
+	orm := s.gd.Ormer()
+
+	im, err := orm.GetImageVersion(version)
+	if err != nil {
+		return "", err
+	}
+
+	svc, err := s.gd.GetService(name)
+	if err != nil {
+		return "", err
+	}
+
+	im1, err := svc.Image()
+	if err != nil {
+		return "", err
+	}
+
+	if im1.Name != im.Name || im1.Major != im.Major {
+		return "", errors.Errorf("Service:%s unsupported image update from %s to %s", name, im1.Version(), im.Version())
+	}
+
+	authConfig, err := s.gd.AuthConfig()
+	if err != nil {
+		return "", err
+	}
+
+	t := database.Task{}
+	// TODO:insert Task
+
+	err = svc.UpdateImage(ctx, s.gd.KVClient(), im, t, authConfig)
+
+	return t.ID, err
+
 }

@@ -24,7 +24,8 @@ const (
 	statusServiceConfigUpdating                     // 12
 	statusServiceUnitMigrating                      // 13
 	statusServiceUnitRebuilding                     // 14
-	statusServiceDeleting                           // 15
+	statusServiceImageUpdating                      // 15
+	statusServiceDeleting                           // 16
 
 	_ing    = 0
 	_failed = 1
@@ -71,6 +72,9 @@ const (
 
 	statusServiceUnitRebuilt       = statusServiceUnitRebuilding + _done
 	statusServiceUnitRebuildFailed = statusServiceUnitRebuilding + _failed
+
+	statusServiceImageUpdated      = statusServiceImageUpdating + _done
+	statusServiceImageUpdateFailed = statusServiceImageUpdating + _failed
 
 	statusServiceDeleteFailed = statusServiceDeleting + _failed
 )
