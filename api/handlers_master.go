@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -65,6 +66,49 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 
 	if obj != nil {
 		json.NewEncoder(w).Encode(obj)
+	}
+}
+
+func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	name := mux.Vars(r)["name"]
+	orm := gd.Ormer()
+
+	u, err := orm.GetUnit(name)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	ips, err := orm.ListIPByUnitID(u.ID)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	if len(ips) == 0 {
+		httpJSONError(w, errors.Errorf("not found Unit %s address", u.Name), http.StatusInternalServerError)
+		return
+	}
+
+	addr := utils.Uint32ToIP(ips[0].IPAddr).String()
+
+	// TODO:get service port
+
+	index := strings.Index(r.URL.Path, "/proxy/")
+	r.URL.Path = r.URL.Path[index+len("/proxy"):]
+
+	err = hijack(nil, addr, w, r)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
 	}
 }
 

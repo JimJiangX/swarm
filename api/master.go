@@ -51,6 +51,8 @@ type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 var masterRoutes = map[string]map[string]ctxHandler{
 	http.MethodGet: {
+		"/units/{name}/proxy/*": proxySpecialLogic,
+
 		"/nfs_backups/space": getNFSSPace,
 
 		"/clusters":        getClusters,
@@ -77,6 +79,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		//		"/storage/san/{name:.*}":           getSANStorageInfo,
 	},
 	http.MethodPost: {
+		"/units/{name}/proxy/*": proxySpecialLogic,
 		// "/datacenter": postRegisterDC,
 		"/clusters": postCluster,
 		//		"/clusters/{name}/enable":        postEnableCluster,
@@ -130,7 +133,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	},
 
 	http.MethodPut: {
-		"/clusters/{name}": putClusterParams,
+		"/units/{name}/proxy/*": proxySpecialLogic,
+		"/clusters/{name}":      putClusterParams,
 
 		"/hosts/{name}":         putNodeParam,
 		"/hosts/{name}/enable":  putNodeEnable,
@@ -146,6 +150,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	},
 
 	http.MethodDelete: {
+		"/units/{name}/proxy/*": proxySpecialLogic,
+
 		"/services/{name}": deleteService,
 
 		"/clusters/{name}": deleteCluster,

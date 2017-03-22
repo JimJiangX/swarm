@@ -277,7 +277,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 		us[i] = database.Unit{
 			ID:          uid,
 			Name:        fmt.Sprintf("%s_%s", spec.Name, uid[:8]), // <service_name>_<unit_id_8bit>
-			Type:        "",
+			Type:        im.Name,
 			ServiceID:   spec.ID,
 			NetworkMode: "none",
 			Status:      0,
