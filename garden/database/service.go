@@ -23,7 +23,9 @@ type ServiceInterface interface {
 	ServiceStatusCAS(nameOrID string, val int, finish time.Time, f func(val int) bool) (bool, int, error)
 	SetServiceWithTask(svc *Service, t Task, state int, finish time.Time) error
 
-	SetServiceScale(svc Service, t Task) error
+	//	SetServiceScale(svc Service, t Task) error
+
+	SetServiceDesc(svc Service) error
 }
 
 type ServiceInfoInterface interface {
@@ -645,4 +647,20 @@ func (db dbBase) txDelDescByService(tx *sqlx.Tx, service string) error {
 	_, err := tx.Exec(query, service)
 
 	return errors.Wrap(err, "tx del ServiceDesc by serviceID")
+}
+
+func (db dbBase) SetServiceDesc(svc Service) error {
+	do := func(tx *sqlx.Tx) error {
+		query := "UPDATE " + db.serviceTable() + " SET description_id=? WHERE id=?"
+
+		_, err := tx.Exec(query, svc.DescID, svc.ID)
+		if err != nil {
+			return errors.Wrap(err, "update Service DescID")
+		}
+
+		return db.txInsertSerivceDesc(tx, svc.Desc)
+	}
+
+	return db.txFrame(do)
+
 }

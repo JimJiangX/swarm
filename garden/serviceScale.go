@@ -1,7 +1,6 @@
 package garden
 
 import (
-	"encoding/json"
 	"sort"
 
 	"github.com/Sirupsen/logrus"
@@ -12,7 +11,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func (svc *Service) ScaleDown(ctx context.Context, table database.Service, reg kvstore.Register, replicas int) (err error) {
+func (svc *Service) ScaleDown(ctx context.Context, reg kvstore.Register, replicas int) (err error) {
 	ok, val, err := svc.sl.CAS(statusServiceScaling, isnotInProgress)
 	if err != nil {
 		return err
@@ -29,14 +28,15 @@ func (svc *Service) ScaleDown(ctx context.Context, table database.Service, reg k
 			err = errors.Errorf("panic:%v", r)
 		}
 
+		status := statusServiceScaled
+
 		if err != nil {
-			table.Status = statusServiceScaleFailed
+			status = statusServiceScaleFailed
 		}
 
-		// TODO:database.NewTask
-		_err := svc.so.SetServiceScale(table, database.Task{})
+		_err := svc.sl.SetStatus(status)
 		if _err != nil {
-			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", table.Status, _err)
+			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", status, _err)
 		}
 	}()
 
@@ -51,17 +51,6 @@ func (svc *Service) ScaleDown(ctx context.Context, table database.Service, reg k
 			return err
 		}
 	}
-
-	arch := svc.spec.Arch
-	arch.Replicas = replicas
-
-	out, err := json.Marshal(arch)
-	if err == nil {
-		table.Desc.Replicas = replicas
-		table.Desc.Architecture = string(out)
-	}
-
-	table.Status = statusServiceScaled
 
 	return nil
 }

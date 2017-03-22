@@ -428,7 +428,7 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 			_err := gd.allocator.RecycleResource()
 			if _err != nil {
 				logrus.WithField("Service", svc.spec.Name).Errorf("Recycle resources error:%+v", err)
-				err = fmt.Errorf("%+v\n%recycle resources error:+v", err, _err)
+				err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
 			}
 
 			ids := make([]string, len(bad))

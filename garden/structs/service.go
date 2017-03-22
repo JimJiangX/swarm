@@ -147,11 +147,10 @@ type User struct {
 
 type ServiceLink struct {
 	priority int
-	ID       string `json:"id"`
+	Spec     *ServiceSpec `json:"-"`
 
-	Spec *ServiceSpec `json:"spec"`
-
-	Deps []string `json:"deps"`
+	ID   string   `json:"from_service_name"`
+	Deps []string `json:"to_services_name"`
 }
 
 type ServicesLink []*ServiceLink

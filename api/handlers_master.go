@@ -1003,13 +1003,14 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
+	name := mux.Vars(r)["name"]
+
+	arch := structs.Arch{}
+	err := json.NewDecoder(r.Body).Decode(&arch)
+	if err != nil {
 		httpJSONError(w, err, http.StatusBadRequest)
 		return
 	}
-
-	name := mux.Vars(r)["name"]
-	replicas := intValueOrZero(r, "num")
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
@@ -1023,7 +1024,7 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	stack := stack.New(gd)
 
-	err := stack.ServiceScale(ctx, name, replicas)
+	err = stack.ServiceScale(ctx, name, arch)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -1033,7 +1034,7 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	writeJSON(w, nil, http.StatusOK)
 }
 
-func putServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	links := structs.ServicesLink{}
 	err := json.NewDecoder(r.Body).Decode(&links)
 	if err != nil {
@@ -1061,7 +1062,7 @@ func putServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
 }
 

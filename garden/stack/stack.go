@@ -1,11 +1,14 @@
 package stack
 
 import (
+	"encoding/json"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/garden"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -237,7 +240,7 @@ func (s *Stack) freshServicesLink(links structs.ServicesLink) error {
 	return nil
 }
 
-func (s *Stack) ServiceScale(ctx context.Context, nameOrID string, replicas int) error {
+func (s *Stack) ServiceScale(ctx context.Context, nameOrID string, arch structs.Arch) error {
 	orm := s.gd.Ormer()
 
 	table, err := orm.GetService(nameOrID)
@@ -250,7 +253,7 @@ func (s *Stack) ServiceScale(ctx context.Context, nameOrID string, replicas int)
 		return err
 	}
 
-	if len(units) == replicas {
+	if len(units) == arch.Replicas {
 		return nil
 	}
 
@@ -262,9 +265,25 @@ func (s *Stack) ServiceScale(ctx context.Context, nameOrID string, replicas int)
 	// spec := svc.Spec()
 	// task := database.NewTask(spec.Name, database.ServiceScaleTask, spec.ID, fmt.Sprintf("replicas=%d", replicas), "", 300)
 
-	if len(units) > replicas {
-		return svc.ScaleDown(ctx, table, s.gd.KVClient(), replicas)
+	if len(units) > arch.Replicas {
+		err = svc.ScaleDown(ctx, s.gd.KVClient(), arch.Replicas)
+	}
+	if err != nil {
+		return err
 	}
 
-	return nil
+	desc := *table.Desc
+	desc.ID = utils.Generate32UUID()
+
+	out, err := json.Marshal(arch)
+	if err == nil {
+		table.DescID = desc.ID
+		table.Desc = &desc
+		desc.Replicas = arch.Replicas
+		desc.Architecture = string(out)
+	}
+
+	err = orm.SetServiceDesc(table)
+
+	return err
 }
