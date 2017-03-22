@@ -10,15 +10,14 @@ import (
 func NewCluster(name, _type, storageType, storageID, networking string,
 	enable bool, num int, limit float32) Cluster {
 	return Cluster{
-		ID:           utils.Generate64UUID(),
-		Name:         name,
-		Type:         _type,
-		StorageType:  storageType,
-		StorageID:    storageID,
-		NetworkingID: networking,
-		Enabled:      enable,
-		MaxNode:      num,
-		UsageLimit:   limit,
+		ID:          utils.Generate64UUID(),
+		Name:        name,
+		Type:        _type,
+		StorageType: storageType,
+		StorageID:   storageID,
+		Enabled:     enable,
+		MaxNode:     num,
+		UsageLimit:  limit,
 	}
 }
 

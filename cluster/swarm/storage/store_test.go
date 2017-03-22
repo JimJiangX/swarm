@@ -72,11 +72,11 @@ func TestHITACHIStore(t *testing.T) {
 		t.Log(key, val)
 	}
 
-	err = store.DisableSpace(0)
+	err = store.DisableSpace("0")
 	if err != nil {
 		t.Error(err)
 	}
-	err = store.EnableSpace(0)
+	err = store.EnableSpace("0")
 	if err != nil {
 		t.Error(err)
 	}

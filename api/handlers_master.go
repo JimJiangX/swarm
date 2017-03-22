@@ -992,6 +992,8 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 				break
 			}
 
+			logrus.WithField("Service", service.Name).Debugf("Topology:%#v", topology)
+
 			roles := topology.DataNodeGroup["default"]
 
 			for i := range list {
