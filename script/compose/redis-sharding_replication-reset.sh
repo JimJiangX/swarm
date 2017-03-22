@@ -29,12 +29,6 @@ fi
 nodes=`echo ${node_list} | sed 's/,/\ /g'`
 for node in ${nodes}
 do
-	${TOOLS_DIR}/redis-trib.rb call ${node} cluster reset 
-	if [ $? != 0 ]; then
-		echo "exec ${TOOLS_DIR}/redis-trib.rb call ${node} cluster reset faild!"
-		exit 3
-	fi
-	
 	${TOOLS_DIR}/redis-trib.rb call ${node} cluster reset soft
 	if [ $? != 0 ]; then
 		echo "exec ${TOOLS_DIR}/redis-trib.rb call ${node} cluster reset soft faild!"
