@@ -319,7 +319,25 @@ func (s *Stack) ServiceUpdateImage(ctx context.Context, name, version string) (s
 	// TODO:insert Task
 
 	err = svc.UpdateImage(ctx, s.gd.KVClient(), im, t, authConfig)
+	if err != nil {
+		return t.ID, err
+	}
+
+	{
+		table, err := orm.GetService(name)
+		if err != nil {
+			return t.ID, err
+		}
+		desc := *table.Desc
+		desc.ID = utils.Generate32UUID()
+		desc.Image = im.Version()
+		desc.ImageID = im.ImageID
+
+		table.DescID = desc.ID
+		table.Desc = &desc
+
+		err = orm.SetServiceDesc(table)
+	}
 
 	return t.ID, err
-
 }
