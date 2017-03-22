@@ -6,31 +6,26 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-//master-slave mysql manager
-type MysqlMSManager struct {
-	Mysqls  map[string]Mysql
-	MgmIp   string
-	MgmPort int
+//master-slave redis manager
+type RedisMSManager struct {
+	RedisMap map[string]Redis
 }
 
-func newMysqlMSManager(dbs []Mysql, mgmIp string, mgmPort int) Composer {
+func newRedisMSManager(dbs []Redis) Composer {
 
-	ms := &MysqlMSManager{
-		MgmIp:   mgmIp,
-		MgmPort: mgmPort,
-		Mysqls:  make(map[string]Mysql),
+	ms := &RedisMSManager{
+		RedisMap: make(map[string]Redis),
 	}
 
 	for _, db := range dbs {
-		db.MgmIp = mgmIp
-		db.MgmPort = mgmPort
-		ms.Mysqls[db.GetKey()] = db
+		ms.RedisMap[db.GetKey()] = db
 	}
 
 	return ms
 
 }
-func (m *MysqlMSManager) ComposeCluster() error {
+
+func (m *RedisMSManager) ComposeCluster() error {
 	if err := m.ClearCluster(); err != nil {
 		return err
 	}
@@ -51,9 +46,9 @@ func (m *MysqlMSManager) ComposeCluster() error {
 		return errors.New("don't find the master")
 	}
 
-	master := m.Mysqls[masterkey]
+	master := m.RedisMap[masterkey]
 
-	for _, db := range m.Mysqls {
+	for _, db := range m.RedisMap {
 		if db.GetType() != MASTER_TYPE {
 			if err := db.ChangeMaster(master); err != nil {
 				log.WithFields(log.Fields{
@@ -69,8 +64,8 @@ func (m *MysqlMSManager) ComposeCluster() error {
 	return nil
 }
 
-func (m *MysqlMSManager) ClearCluster() error {
-	for _, db := range m.Mysqls {
+func (m *RedisMSManager) ClearCluster() error {
+	for _, db := range m.RedisMap {
 		if err := db.Clear(); err != nil {
 			log.WithFields(log.Fields{
 				"db":    db.GetKey(),
@@ -83,8 +78,8 @@ func (m *MysqlMSManager) ClearCluster() error {
 	return nil
 }
 
-func (m *MysqlMSManager) CheckCluster() error {
-	for _, db := range m.Mysqls {
+func (m *RedisMSManager) CheckCluster() error {
+	for _, db := range m.RedisMap {
 		if err := db.CheckStatus(); err != nil {
 			log.WithFields(log.Fields{
 				"db":    db.GetKey(),
@@ -96,14 +91,14 @@ func (m *MysqlMSManager) CheckCluster() error {
 	return nil
 }
 
-func (m *MysqlMSManager) preCompose() error {
+func (m *RedisMSManager) preCompose() error {
 	//select master
 	masterkey := m.electMaster()
 	if err := m.setMysqlType(masterkey, MASTER_TYPE); err != nil {
 		return errors.New("electMaster fail:" + err.Error())
 	}
 
-	for _, db := range m.Mysqls {
+	for _, db := range m.RedisMap {
 		if db.GetKey() != masterkey {
 			if err := m.setMysqlType(db.GetKey(), SLAVE_TYPE); err != nil {
 				log.WithFields(log.Fields{
@@ -118,8 +113,8 @@ func (m *MysqlMSManager) preCompose() error {
 	return nil
 }
 
-func (m *MysqlMSManager) getMasterKey() (string, bool) {
-	for _, db := range m.Mysqls {
+func (m *RedisMSManager) getMasterKey() (string, bool) {
+	for _, db := range m.RedisMap {
 		if db.GetType() == MASTER_TYPE {
 			return db.GetKey(), true
 		}
@@ -128,13 +123,13 @@ func (m *MysqlMSManager) getMasterKey() (string, bool) {
 	return "", false
 }
 
-func (m *MysqlMSManager) electMaster() string {
+func (m *RedisMSManager) electMaster() string {
 
 	curweight := -1
-	var master Mysql
+	var master Redis
 	tmp := false
 
-	for _, db := range m.Mysqls {
+	for _, db := range m.RedisMap {
 		if db.Weight > curweight {
 			tmp = true
 			master = db
@@ -149,15 +144,15 @@ func (m *MysqlMSManager) electMaster() string {
 	return ""
 }
 
-func (m *MysqlMSManager) setMysqlType(dbkey string, Type ROLE_TYPE) error {
+func (m *RedisMSManager) setMysqlType(dbkey string, Type ROLE_TYPE) error {
 
-	tmp, ok := m.Mysqls[dbkey]
+	tmp, ok := m.RedisMap[dbkey]
 	if !ok {
 		return errors.New("don't find the db key")
 	}
 	tmp.RoleType = Type
 
-	m.Mysqls[dbkey] = tmp
+	m.RedisMap[dbkey] = tmp
 	return nil
 
 }

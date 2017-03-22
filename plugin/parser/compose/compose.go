@@ -68,7 +68,7 @@ func NewCompserBySpec(req *structs.ServiceSpec, mgmip string, mgmport int) (Comp
 		}
 
 		master, slave, _ := getmasterAndSlave(req)
-		return newRedisClusterManager(dbs, master, slave), nil
+		return newRedisShadeManager(dbs, master, slave), nil
 
 	case NONE:
 	}

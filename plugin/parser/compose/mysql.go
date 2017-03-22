@@ -8,12 +8,12 @@ import (
 	//	log "github.com/Sirupsen/logrus"
 )
 
-type MYSQL_TYPE string
+type ROLE_TYPE string
 
 const (
-	MGROUP_TYPE MYSQL_TYPE = "MGROUP"
-	MASTER_TYPE MYSQL_TYPE = "MASTER"
-	SLAVE_TYPE  MYSQL_TYPE = "SLAVE"
+	MGROUP_TYPE ROLE_TYPE = "MGROUP"
+	MASTER_TYPE ROLE_TYPE = "MASTER"
+	SLAVE_TYPE  ROLE_TYPE = "SLAVE"
 
 //	NONE_STATUS MYSQL_STATUS = "WAITING_CHECK"
 )
@@ -34,7 +34,7 @@ type Mysql struct {
 	MysqlUser
 
 	Weight   int //Weight越高，优先变成master，等值随机
-	RoleType MYSQL_TYPE
+	RoleType ROLE_TYPE
 
 	MgmPort int
 	MgmIp   string
@@ -52,7 +52,7 @@ func (m Mysql) Clear() error {
 	return err
 }
 
-func (m Mysql) GetType() MYSQL_TYPE {
+func (m Mysql) GetType() ROLE_TYPE {
 	return m.RoleType
 }
 

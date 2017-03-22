@@ -35,10 +35,10 @@ func ExecShellFile(fpath string, args ...string) (string, error) {
 func ExecWithTimeout(_Type ExecType, shell string, timeout time.Duration, args ...string) (string, error) {
 	var cmd *exec.Cmd
 	if _Type == Command {
-		log.Debugln("command:%s", shell)
+		log.Infof("command:%s", shell)
 		cmd = exec.Command("/bin/bash", "-c", shell)
 	} else {
-		log.Debugln("fpath:%s,args:%v", shell, args)
+		log.Infof("fpath:%s,args:%v", shell, args)
 		cmd = exec.Command(shell, args...)
 	}
 
