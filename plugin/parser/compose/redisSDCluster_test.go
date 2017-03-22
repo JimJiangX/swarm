@@ -27,7 +27,7 @@ func getTestRedis() []Redis {
 func TestMysqlMS(t *testing.T) {
 	datas := getTestRedis()
 	master := 1
-	slave := 1
+	slave := 0
 	composer := newRedisShadeManager(datas, master, slave)
 
 	assert.Nil(t, composer.ComposeCluster())

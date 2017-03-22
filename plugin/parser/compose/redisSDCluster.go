@@ -43,8 +43,8 @@ func (r *RedisShadeManager) getRedisAddrs() string {
 func (r *RedisShadeManager) ClearCluster() error {
 	filepath := BASEDIR + "redis-sharding_replication-reset.sh"
 	timeout := time.Second * 120
-
-	args := []string{}
+	addrs := r.getRedisAddrs()
+	args := []string{addrs}
 	_, err := ExecShellFileTimeout(filepath, timeout, args...)
 	return err
 }

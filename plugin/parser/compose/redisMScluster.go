@@ -94,13 +94,13 @@ func (m *RedisMSManager) CheckCluster() error {
 func (m *RedisMSManager) preCompose() error {
 	//select master
 	masterkey := m.electMaster()
-	if err := m.setMysqlType(masterkey, MASTER_TYPE); err != nil {
+	if err := m.setType(masterkey, MASTER_TYPE); err != nil {
 		return errors.New("electMaster fail:" + err.Error())
 	}
 
 	for _, db := range m.RedisMap {
 		if db.GetKey() != masterkey {
-			if err := m.setMysqlType(db.GetKey(), SLAVE_TYPE); err != nil {
+			if err := m.setType(db.GetKey(), SLAVE_TYPE); err != nil {
 				log.WithFields(log.Fields{
 					"err": err,
 					"db":  db.GetKey(),
@@ -144,7 +144,7 @@ func (m *RedisMSManager) electMaster() string {
 	return ""
 }
 
-func (m *RedisMSManager) setMysqlType(dbkey string, Type ROLE_TYPE) error {
+func (m *RedisMSManager) setType(dbkey string, Type ROLE_TYPE) error {
 
 	tmp, ok := m.RedisMap[dbkey]
 	if !ok {
