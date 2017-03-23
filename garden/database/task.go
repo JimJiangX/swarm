@@ -30,9 +30,11 @@ const (
 	ImageLoadTask = "image_load"
 
 	// create and run service task
-	ServiceRunTask   = "service_create"
-	ServiceLinkTask  = "services_link"
-	ServiceScaleTask = "service_scale"
+	ServiceRunTask         = "service_create"
+	ServiceLinkTask        = "services_link"
+	ServiceScaleTask       = "service_scale"
+	ServiceUpdateTask      = "service_update"
+	ServiceUpdateImageTask = "service_update_image"
 
 	// unit tasks
 	UnitMigrateTask = "unit_migrate"

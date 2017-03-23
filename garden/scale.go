@@ -3,12 +3,10 @@ package garden
 import (
 	"sort"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/tasklock"
-	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -129,104 +127,4 @@ func sortUnitsByContainers(units []*unit, containers cluster.Containers) []*unit
 	}
 
 	return out
-}
-
-func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
-	im database.Image, task database.Task,
-	authConfig *types.AuthConfig) error {
-
-	update := func() error {
-		units, err := svc.getUnits()
-		if err != nil {
-			return err
-		}
-
-		_, version, err := getImage(svc.so, im.ID)
-		if err != nil {
-			return err
-		}
-
-		err = svc.stop(ctx, units, true)
-		if err != nil {
-			return err
-		}
-
-		containers := make([]struct {
-			u  database.Unit
-			nc *cluster.Container
-		}, 0, len(units))
-
-		for _, u := range units {
-			c := u.getContainer()
-
-			if c == nil || c.Engine == nil {
-				return errors.Wrap(newContainerError(u.u.Name, "not found"), "rebuild container")
-			}
-			c.Config.Image = version
-
-			nc, err := c.Engine.CreateContainer(c.Config, u.u.Name+"-"+version, true, authConfig)
-			if err != nil {
-				return err
-			}
-
-			containers = append(containers, struct {
-				u  database.Unit
-				nc *cluster.Container
-			}{u.u, nc})
-		}
-
-		for i, c := range containers {
-			origin := svc.cluster.Container(c.u.ContainerID)
-			if origin == nil {
-				continue
-			}
-
-			err := origin.Engine.RemoveContainer(origin, true, false)
-			if err == nil {
-
-				if err = c.nc.Engine.RenameContainer(c.nc, c.u.Name); err == nil {
-					err = c.nc.Engine.StartContainer(c.nc, nil)
-				}
-			}
-			if err != nil {
-				return err
-			}
-
-			c := svc.cluster.Container(c.u.Name)
-			containers[i].nc = c
-			containers[i].u.ContainerID = c.ID
-		}
-
-		{
-			// save new ContainerID
-			in := make([]database.Unit, 0, len(containers))
-			for i := range containers {
-				in = append(in, containers[i].u)
-			}
-
-			err = svc.so.SetUnits(in)
-			if err != nil {
-				return err
-			}
-		}
-
-		{
-			// save new Container to KV
-			for i := range containers {
-				err := saveContainerToKV(kvc, containers[i].nc)
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-		return nil
-	}
-
-	tl := tasklock.NewServiceTask(svc.spec.ID, svc.so, &task,
-		statusServiceImageUpdating,
-		statusServiceImageUpdated,
-		statusServiceImageUpdateFailed)
-
-	return tl.Run(isnotInProgress, update)
 }

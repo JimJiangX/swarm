@@ -1,7 +1,6 @@
 package resource
 
 import (
-	"sort"
 	"strconv"
 	"strings"
 
@@ -144,14 +143,29 @@ func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.
 		return "", errors.Errorf("Node:%s Memory is unavailable,%d<%d", node.Addr, free, memory)
 	}
 
-	containers := node.Containers
-	used := make([]string, 0, len(containers)+len(reserved))
-	used = append(used, reserved...)
-	for i := range containers {
-		used = append(used, containers[i].Config.HostConfig.CpusetCpus)
+	var (
+		cpuset string
+		err    error
+	)
+
+	if ncpu > 0 {
+		containers := node.Containers
+		used := make([]string, 0, len(containers)+len(reserved))
+		used = append(used, reserved...)
+		for i := range containers {
+			used = append(used, containers[i].Config.HostConfig.CpusetCpus)
+		}
+
+		cpuset, err = findIdleCPUs(used, int(node.TotalCpus), int(ncpu))
+		if err != nil {
+			return "", err
+		}
 	}
 
-	return findIdleCPUs(used, int(node.TotalCpus), int(ncpu))
+	config.HostConfig.Resources.CpusetCpus = cpuset
+	config.HostConfig.Resources.Memory = memory
+
+	return cpuset, nil
 }
 
 func (at allocator) RecycleResource() error {
@@ -177,33 +191,6 @@ func findIdleCPUs(used []string, total, ncpu int) (string, error) {
 	}
 
 	return strings.Join(free, ","), nil
-}
-
-func reduceCPUset(cpusetCpus string, need int) (string, error) {
-	cpus, err := utils.ParseUintList(cpusetCpus)
-	if err != nil {
-		return "", errors.Wrap(err, "parse cpusetCpus:"+cpusetCpus)
-	}
-
-	cpuSlice := make([]int, 0, len(cpus))
-	for k, ok := range cpus {
-		if ok {
-			cpuSlice = append(cpuSlice, k)
-		}
-	}
-
-	if len(cpuSlice) < need {
-		return cpusetCpus, errors.Errorf("%s is shortage for need %d", cpusetCpus, need)
-	}
-
-	sort.Ints(cpuSlice)
-
-	cpuString := make([]string, need)
-	for n := 0; n < need; n++ {
-		cpuString[n] = strconv.Itoa(cpuSlice[n])
-	}
-
-	return strings.Join(cpuString, ","), nil
 }
 
 func parseUintList(list []string) (map[int]bool, error) {

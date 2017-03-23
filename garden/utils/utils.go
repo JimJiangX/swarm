@@ -245,6 +245,10 @@ func GetAbsolutePath(isDir bool, path ...string) (string, error) {
 
 // CountCPU returns CPU num,calls ParseUintList
 func CountCPU(val string) (int64, error) {
+	if val == "" {
+		return 0, nil
+	}
+
 	cpus, err := ParseUintList(val)
 	if err != nil {
 		return 0, err

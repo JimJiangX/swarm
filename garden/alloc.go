@@ -321,7 +321,7 @@ type scheduleOption struct {
 	}
 }
 
-func (gd *Garden) schedule(ctx context.Context, config *cluster.ContainerConfig, opts scheduleOption) ([]*node.Node, error) {
+func (gd *Garden) schedule(ctx context.Context, actor allocator, config *cluster.ContainerConfig, opts scheduleOption) ([]*node.Node, error) {
 	_scheduler := gd.scheduler
 
 	if opts.scheduler.strategy != "" && len(opts.scheduler.filters) > 0 {
@@ -339,7 +339,7 @@ func (gd *Garden) schedule(ctx context.Context, config *cluster.ContainerConfig,
 		return nil, ctx.Err()
 	}
 
-	out, err := gd.allocator.ListCandidates(opts.nodes.clusters, opts.nodes.filters, opts.require.Volumes)
+	out, err := actor.ListCandidates(opts.nodes.clusters, opts.nodes.filters, opts.require.Volumes)
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +397,7 @@ func (pu pendingUnit) convertToSpec() structs.UnitSpec {
 	return structs.UnitSpec{}
 }
 
-func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, error) {
+func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service) ([]pendingUnit, error) {
 	_, version, err := getImage(gd.Ormer(), svc.spec.Image)
 	if err != nil {
 		return nil, err
@@ -432,7 +432,7 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 	gd.scheduler.Lock()
 	defer gd.scheduler.Unlock()
 
-	nodes, err := gd.schedule(ctx, config, opts)
+	nodes, err := gd.schedule(ctx, actor, config, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -450,7 +450,7 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 		}
 		// cancel allocation
 		if len(bad) > 0 {
-			_err := gd.allocator.RecycleResource()
+			_err := actor.RecycleResource()
 			if _err != nil {
 				logrus.WithField("Service", svc.spec.Name).Errorf("Recycle resources error:%+v", err)
 				err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
@@ -484,12 +484,12 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 			volumes:     make([]volume.VolumesCreateBody, 0, len(units)),
 		}
 
-		cpuset, err := gd.allocator.AlloctCPUMemory(pu.config, nodes[n], int64(opts.require.Require.CPU), config.HostConfig.Memory, nil)
+		_, err := actor.AlloctCPUMemory(pu.config, nodes[n], int64(opts.require.Require.CPU), config.HostConfig.Memory, nil)
 		if err != nil {
 			continue
 		}
 
-		networkings, err := gd.allocator.AlloctNetworking(pu.config, nodes[n].ID, pu.Unit.ID, opts.nodes.networkings, opts.require.Networks)
+		networkings, err := actor.AlloctNetworking(pu.config, nodes[n].ID, pu.Unit.ID, opts.nodes.networkings, opts.require.Networks)
 		if len(networkings) > 0 {
 			pu.networkings = append(pu.networkings, networkings...)
 		}
@@ -498,7 +498,7 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 			continue
 		}
 
-		volumes, err := gd.allocator.AlloctVolumes(pu.config, pu.Unit.ID, nodes[n], opts.require.Volumes)
+		volumes, err := actor.AlloctVolumes(pu.config, pu.Unit.ID, nodes[n], opts.require.Volumes)
 		if len(volumes) > 0 {
 			pu.volumes = append(pu.volumes, volumes...)
 		}
@@ -509,9 +509,6 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 
 		pu.config.SetSwarmID(pu.swarmID)
 		pu.Unit.EngineID = nodes[n].ID
-
-		pu.config.HostConfig.Resources.CpusetCpus = cpuset
-		pu.config.HostConfig.Resources.Memory = config.HostConfig.Memory
 
 		gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[n].ID, pu.config)
 

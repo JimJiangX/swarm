@@ -7,6 +7,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/garden"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/resource"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
@@ -120,7 +121,8 @@ func (s *Stack) deploy(ctx context.Context, svc *garden.Service, t database.Task
 		return ctx.Err()
 	}
 
-	pendings, err := s.gd.Allocation(ctx, svc)
+	actor := resource.NewAllocator(s.gd.Ormer(), s.gd.Cluster)
+	pendings, err := s.gd.Allocation(ctx, actor, svc)
 	if err != nil {
 		return err
 	}
@@ -272,20 +274,22 @@ func (s *Stack) ServiceScale(ctx context.Context, nameOrID string, arch structs.
 		return "", err
 	}
 
-	desc := *table.Desc
-	desc.ID = utils.Generate32UUID()
+	{
+		desc := *table.Desc
+		desc.ID = utils.Generate32UUID()
 
-	out, err := json.Marshal(arch)
-	if err == nil {
-		table.DescID = desc.ID
-		table.Desc = &desc
-		desc.Replicas = arch.Replicas
-		desc.Architecture = string(out)
+		out, err := json.Marshal(arch)
+		if err == nil {
+			table.DescID = desc.ID
+			table.Desc = &desc
+			desc.Replicas = arch.Replicas
+			desc.Architecture = string(out)
+		}
+
+		err = orm.SetServiceDesc(table)
+
+		return "", err
 	}
-
-	err = orm.SetServiceDesc(table)
-
-	return "", err
 }
 
 func (s *Stack) ServiceUpdateImage(ctx context.Context, name, version string) (string, error) {
@@ -315,28 +319,64 @@ func (s *Stack) ServiceUpdateImage(ctx context.Context, name, version string) (s
 		return "", err
 	}
 
-	t := database.Task{}
+	t := database.NewTask(svc.Spec().Name, database.ServiceUpdateImageTask, svc.Spec().ID, "", "", 300)
 
 	err = svc.UpdateImage(ctx, s.gd.KVClient(), im, t, authConfig)
 	if err != nil {
 		return t.ID, err
 	}
 
-	{
-		table, err := orm.GetService(name)
-		if err != nil {
-			return t.ID, err
+	return t.ID, err
+}
+
+func (s *Stack) ServiceUpdate(ctx context.Context, name string, config structs.UnitRequire) (string, error) {
+	table, err := s.gd.Ormer().GetService(name)
+	if err != nil {
+		return "", err
+	}
+
+	svc, err := s.gd.GetService(table.ID)
+	if err != nil {
+		return "", err
+	}
+
+	out, err := json.Marshal(config)
+	if err != nil {
+		return "", err
+	}
+
+	t := database.NewTask(svc.Spec().Name, database.ServiceUpdateTask, svc.Spec().ID, string(out), "", 300)
+	actor := resource.NewAllocator(s.gd.Ormer(), s.gd.Cluster)
+
+	if (config.Require.CPU > 0 && table.Desc.NCPU != config.Require.CPU) ||
+		(config.Require.Memory > 0 && table.Desc.Memory != config.Require.Memory) {
+
+		ncpu := config.Require.CPU
+		if ncpu == 0 {
+			ncpu = table.Desc.NCPU
 		}
+		memory := config.Require.Memory
+		if memory == 0 {
+			memory = table.Desc.Memory
+		}
+
+		err = func() error {
+			s.gd.Lock()
+			defer s.gd.Unlock()
+
+			return svc.ServiceUpdate(ctx, actor, int64(ncpu), memory, t)
+		}()
+
 		desc := *table.Desc
 		desc.ID = utils.Generate32UUID()
-		desc.Image = im.Version()
-		desc.ImageID = im.ImageID
+		desc.NCPU = ncpu
+		desc.Memory = memory
 
 		table.DescID = desc.ID
 		table.Desc = &desc
-
-		err = orm.SetServiceDesc(table)
 	}
+
+	err = s.gd.Ormer().SetServiceDesc(table)
 
 	return t.ID, err
 }

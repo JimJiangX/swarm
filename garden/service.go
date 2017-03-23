@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
@@ -377,10 +376,6 @@ func (svc *Service) stop(ctx context.Context, units []*unit, containers bool) er
 		}
 	}
 
-	return nil
-}
-
-func (svc *Service) Update(updateConfig *container.UpdateConfig) error {
 	return nil
 }
 

@@ -358,9 +358,8 @@ func manage(c *cli.Context) {
 		}
 
 		pClient := pluginapi.NewPlugin(client.NewClient(c.String("configureAddr"), 0, tlsConfig))
-		allocator := resource.NewAllocator(ormer, cl)
 
-		cl = garden.NewGarden(kvc, cl, sched, ormer, allocator, pClient, tlsConfig)
+		cl = garden.NewGarden(kvc, cl, sched, ormer, pClient, tlsConfig)
 
 	default:
 		log.Fatalf("unsupported cluster %q", c.String("cluster-driver"))

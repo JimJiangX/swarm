@@ -49,7 +49,6 @@ type Garden struct {
 	kvClient     kvstore.Client
 	pluginClient pluginapi.PluginAPI
 
-	allocator allocator
 	cluster.Cluster
 	scheduler  *scheduler.Scheduler
 	tlsConfig  *tls.Config
@@ -58,11 +57,10 @@ type Garden struct {
 
 func NewGarden(kvc kvstore.Client, cl cluster.Cluster,
 	scheduler *scheduler.Scheduler, ormer database.Ormer,
-	allocator allocator, pClient pluginapi.PluginAPI, tlsConfig *tls.Config) *Garden {
+	pClient pluginapi.PluginAPI, tlsConfig *tls.Config) *Garden {
 	return &Garden{
 		// Mutex:       &scheduler.Mutex,
 		kvClient:     kvc,
-		allocator:    allocator,
 		Cluster:      cl,
 		ormer:        ormer,
 		pluginClient: pClient,

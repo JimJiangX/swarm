@@ -1141,6 +1141,44 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
 }
 
+func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	var update structs.UnitRequire
+
+	err := json.NewDecoder(r.Body).Decode(&update)
+	if err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if update.Require.CPU == 0 && update.Require.Memory == 0 && len(update.Volumes) == 0 {
+		httpJSONError(w, fmt.Errorf("no updateConfig required"), http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil || gd.Cluster == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	s := stack.New(gd)
+
+	id, err := s.ServiceUpdate(ctx, name, update)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+
+}
+
 func putServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 

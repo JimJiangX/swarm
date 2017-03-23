@@ -10,6 +10,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/nic"
@@ -267,4 +268,21 @@ func (u unit) updateServiceConfig(ctx context.Context, path, context string) err
 	}
 
 	return err
+}
+
+func (u *unit) update(ctx context.Context, config container.UpdateConfig) error {
+	e := u.getEngine()
+	if e == nil {
+		return errors.Errorf("not found Engine %s", u.u.EngineID)
+	}
+
+	client := e.ContainerAPIClient()
+	if client == nil {
+		return errors.Errorf("unit:%s ContainerAPIClient is required", u.u.Name)
+	}
+
+	body, err := client.ContainerUpdate(ctx, u.u.Name, config)
+	e.CheckConnectionErr(err)
+
+	return errors.Wrapf(err, "unit:%s update container,warnings:%s", u.u.Name, body.Warnings)
 }
