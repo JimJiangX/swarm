@@ -42,11 +42,11 @@ func NewCompserBySpec(req *structs.ServiceSpec, mgmip string, mgmport int) (Comp
 
 	switch arch {
 	case MYSQL_MS, MYSQL_MG:
-		dbs, _ := getMysqls(req)
+		dbs := getMysqls(req)
 		return newMysqlMSManager(dbs, mgmip, mgmport), nil
 
 	case REDIS_CLUSTER:
-		dbs, _ := getRedis(req)
+		dbs := getRedis(req)
 		master, slave, _ := getmasterAndSlave(req)
 		return newRedisShadeManager(dbs, master, slave), nil
 	}
@@ -100,14 +100,13 @@ func valicateCommonSpec(req *structs.ServiceSpec) error {
 }
 
 func valicateMysqlSpec(req *structs.ServiceSpec) error {
-	_, err := getMysqls(req)
+	_, err := getMysqlUser(req)
 	return err
 
 }
 
 func valicateRedisSpec(req *structs.ServiceSpec) error {
-	_, err := getRedis(req)
-	return err
+	return nil
 
 }
 
@@ -174,7 +173,7 @@ func getDbType(req *structs.ServiceSpec) DbArch {
 	return NONE
 }
 
-func getRedis(req *structs.ServiceSpec) ([]Redis, error) {
+func getRedis(req *structs.ServiceSpec) []Redis {
 	redisslice := []Redis{}
 
 	for _, unit := range req.Units {
@@ -190,17 +189,14 @@ func getRedis(req *structs.ServiceSpec) ([]Redis, error) {
 		redisslice = append(redisslice, redis)
 	}
 
-	return redisslice, nil
+	return redisslice
 }
 
-func getMysqls(req *structs.ServiceSpec) ([]Mysql, error) {
+func getMysqls(req *structs.ServiceSpec) []Mysql {
 
 	mysqls := []Mysql{}
 
-	users, err := getMysqlUser(req)
-	if err != nil {
-		return nil, errors.New("get  mysql users fail:" + err.Error())
-	}
+	users, _ := getMysqlUser(req)
 
 	for _, unit := range req.Units {
 		instance := unit.ContainerID
@@ -219,7 +215,7 @@ func getMysqls(req *structs.ServiceSpec) ([]Mysql, error) {
 		mysqls = append(mysqls, mysql)
 	}
 
-	return mysqls, nil
+	return mysqls
 }
 
 func getMysqlUser(req *structs.ServiceSpec) (MysqlUser, error) {
