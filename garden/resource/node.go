@@ -159,12 +159,12 @@ func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithT
 		return ctx.Err()
 	}
 
-	err := m.dco.InsertNodesAndTask(nodes, tasks)
+	config, err := m.dco.GetSysConfig()
 	if err != nil {
 		return err
 	}
 
-	config, err := m.dco.GetSysConfig()
+	err = m.dco.InsertNodesAndTask(nodes, tasks)
 	if err != nil {
 		return err
 	}
@@ -230,6 +230,8 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 		nt.client, err = scplib.NewScpClient(nt.Node.Addr, nt.config.Username, nt.config.Password)
 		if err != nil {
 			entry.WithError(err).Error("ssh dial error")
+
+			nodeState = statusNodeSSHLoginFailed
 
 			return err
 		}
@@ -497,6 +499,13 @@ func (m master) RemoveNode(ctx context.Context, horus, nameOrID, user, password 
 	err = node.no.SetNodeEnable(node.node.ID, false)
 	if err != nil {
 		return err
+	}
+
+	if node.node.Status == statusNodeSCPFailed ||
+		node.node.Status == statusNodeSSHLoginFailed ||
+		node.node.Status == statusNodeSSHExecFailed {
+
+		return m.removeNode(node.node.ID)
 	}
 
 	config, err := m.dco.GetSysConfig()

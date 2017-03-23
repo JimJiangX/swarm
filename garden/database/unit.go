@@ -25,7 +25,10 @@ type UnitInterface interface {
 	SetUnitWithInsertTask(u *Unit, task Task) error
 	SetUnitStatus(u *Unit, status int, msg string) error
 	SetUnitAndTask(u *Unit, t *Task, msg string) error
+	SetUnits(units []Unit) error
 	// SetMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error
+
+	DelUnitsRelated(units []Unit, volume bool) error
 }
 
 type ContainerInterface interface {
@@ -249,6 +252,33 @@ func (db dbBase) SetUnitAndTask(u *Unit, t *Task, msg string) error {
 	return err
 }
 
+func (db dbBase) SetUnits(units []Unit) error {
+	do := func(tx *sqlx.Tx) error {
+		query := "UPDATE " + db.unitTable() + " SET engine_id=:engine_id,container_id=:container_id,network_mode=:network_mode,networks_desc=:networks_desc,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
+
+		stmt, err := tx.PrepareNamed(query)
+		if err != nil {
+			return errors.Wrap(err, "tx prepare")
+		}
+
+		for i := range units {
+
+			_, err := stmt.Exec(units[i])
+			if err != nil {
+				stmt.Close()
+
+				return err
+			}
+		}
+
+		stmt.Close()
+
+		return errors.Wrap(err, "Tx update []Unit")
+	}
+
+	return db.txFrame(do)
+}
+
 func (db dbBase) txSetUnitStatus(tx *sqlx.Tx, u *Unit, msg string, status int) error {
 
 	query := "UPDATE " + db.unitTable() + " SET status=?,latest_error=? WHERE id=?"
@@ -371,48 +401,42 @@ func (db dbBase) SetMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error {
 	return db.txFrame(do)
 }
 
-//// SaveUnitConfig insert UnitConfig and update Unit.ConfigID in Tx
-//func (db dbBase) SaveUnitConfig(unit *Unit, config UnitConfig) error {
-//	do := func(tx *sqlx.Tx) (err error) {
+func (db dbBase) DelUnitsRelated(units []Unit, volume bool) error {
+	do := func(tx *sqlx.Tx) error {
 
-//		if unit != nil && unit.ID != "" {
-//			query := "UPDATE " + db.unitTable() + " SET unit_config_id=? WHERE id=?"
+		for i := range units {
 
-//			_, err = tx.Exec(query, config.ID, unit.ID)
-//			if err != nil {
-//				return errors.Wrap(err, "Tx Update Unit ConfigID")
-//			}
-//		}
+			u := Unit{}
+			query := "SELECT id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at FROM " + db.unitTable() + " WHERE id=? OR name=? OR container_id=?"
 
-//		config.UnitID = unit.ID
+			err := tx.Get(&u, query, units[i].ID, units[i].Name, units[i].ContainerID)
+			if err != nil {
+				if err == sql.ErrNoRows {
+					continue
+				}
+				return errors.Wrap(err, "Get Unit By nameOrID")
+			}
 
-//		err = db.TXInsertUnitConfig(tx, &config)
+			if volume {
+				err := db.txDelVolumeByUnit(tx, u.ID)
+				if err != nil {
+					return err
+				}
+			}
 
-//		return err
-//	}
+			err = db.txResetIPByUnit(tx, u.ID)
+			if err != nil {
+				return err
+			}
 
-//	err := db.txFrame(do)
-//	if err == nil {
-//		unit.ConfigID = config.ID
-//	}
+			err = db.txDelUnit(tx, u.ID)
+			if err != nil {
+				return err
+			}
+		}
 
-//	return err
-//}
+		return nil
+	}
 
-//// TxInsertUnitWithPorts insert Unit and update []Port in a Tx
-//func (db dbBase) InsertUnitWithPorts(u *Unit, ports []Port) error {
-//	do := func(tx *sqlx.Tx) (err error) {
-//		if u != nil {
-//			err = db.txInsertUnit(tx, *u)
-//			if err != nil {
-//				return err
-//			}
-//		}
-
-//		err = db.txSetPorts(tx, ports)
-
-//		return err
-//	}
-
-//	return db.txFrame(do)
-//}
+	return db.txFrame(do)
+}

@@ -228,14 +228,7 @@ func (svc *Service) initStart(ctx context.Context, kvc kvstore.Client, configs s
 				return err
 			}
 
-			c := u.getContainer()
-
-			val, err := json.Marshal(c)
-			if err != nil {
-				return errors.Wrapf(err, "JSON marshal Container %s", u.u.Name)
-			}
-
-			err = kvc.PutKV(containerKV+c.ID, val)
+			err = saveContainerToKV(kvc, u.getContainer())
 			if err != nil {
 				return err
 			}
@@ -255,6 +248,21 @@ func (svc *Service) initStart(ctx context.Context, kvc kvstore.Client, configs s
 	}
 
 	return nil
+}
+
+func saveContainerToKV(kvc kvstore.Client, c *cluster.Container) error {
+	if kvc == nil || c == nil {
+		return nil
+	}
+
+	val, err := json.Marshal(c)
+	if err != nil {
+		return errors.Wrapf(err, "JSON marshal Container %s", c.Info.Name)
+	}
+
+	err = kvc.PutKV(containerKV+c.ID, val)
+
+	return err
 }
 
 func (svc *Service) Start(ctx context.Context, cmds structs.Commands) (err error) {
@@ -583,7 +591,7 @@ func (svc *Service) deleteCondition() error {
 	return nil
 }
 
-func (svc *Service) deregisterSerivces(ctx context.Context, r kvstore.Register, units []*unit) error {
+func (svc *Service) deregisterSerivces(ctx context.Context, reg kvstore.Register, units []*unit) error {
 	for i := range units {
 
 		host, err := units[i].getHostIP()
@@ -591,7 +599,7 @@ func (svc *Service) deregisterSerivces(ctx context.Context, r kvstore.Register, 
 			return err
 		}
 
-		err = r.DeregisterService(ctx, host, units[i].u.ID)
+		err = reg.DeregisterService(ctx, host, units[i].u.ID)
 		if err != nil {
 			return err
 		}

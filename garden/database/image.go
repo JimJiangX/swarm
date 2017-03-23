@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/docker/swarm/garden/structs"
@@ -44,6 +45,10 @@ func (db dbBase) imageTable() string {
 	return db.prefix + "_software_image"
 }
 
+func (im Image) Version() string {
+	return fmt.Sprintf("%s:%d.%d.%d", im.Name, im.Major, im.Minor, im.Patch)
+}
+
 // InsertImage insert Image
 func (db dbBase) InsertImageWithTask(img Image, t Task) error {
 	do := func(tx *sqlx.Tx) error {
@@ -75,13 +80,17 @@ func (db dbBase) ListImages() ([]Image, error) {
 	return images, errors.Wrap(err, "list []Image")
 }
 
-func (db dbBase) GetImageVersion(name string) (Image, error) {
-	im, err := structs.ParseImage(name)
-	if err != nil {
-		return Image{}, err
+func (db dbBase) GetImageVersion(nameOrID string) (Image, error) {
+	im, err := structs.ParseImage(nameOrID)
+	if err == nil {
+		db.GetImage(im.Name, im.Major, im.Minor, im.Patch)
 	}
 
-	return db.GetImage(im.Name, im.Major, im.Minor, im.Patch)
+	image := Image{}
+	query := "SELECT id,software_name,docker_image_id,major_version,minor_version,patch_version,size,label,upload_at FROM " + db.imageTable() + " WHERE id=? OR docker_image_id=?"
+	err = db.Get(&image, query, nameOrID, nameOrID)
+
+	return image, errors.Wrap(err, "get image by id:"+nameOrID)
 }
 
 // GetImage returns Image select by name and version.

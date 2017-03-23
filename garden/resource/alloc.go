@@ -84,6 +84,13 @@ func (at allocator) findNodeVolumeDrivers(engine *cluster.Engine) (volumeDrivers
 		return nil, err
 	}
 
+	nd, err := newNFSDriver(at.ormer, engine.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	drivers = append(drivers, nd)
+
 	// TODO:third-part volumeDrivers
 
 	return drivers, nil
@@ -105,7 +112,7 @@ func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n
 		return nil, err
 	}
 
-	lvs, err := drivers.AllocVolumes(uid, stores)
+	lvs, err := drivers.AllocVolumes(config, uid, stores)
 	if err != nil {
 		return nil, err
 	}
@@ -314,6 +321,8 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 			return nil, err
 		}
 	}
+
+	config.HostConfig.NetworkMode = "none"
 
 	return out, nil
 }

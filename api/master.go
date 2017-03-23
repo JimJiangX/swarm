@@ -51,6 +51,8 @@ type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 var masterRoutes = map[string]map[string]ctxHandler{
 	http.MethodGet: {
+		"/units/{name}/proxy/*": proxySpecialLogic,
+
 		"/nfs_backups/space": getNFSSPace,
 
 		"/clusters":        getClusters,
@@ -77,6 +79,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		//		"/storage/san/{name:.*}":           getSANStorageInfo,
 	},
 	http.MethodPost: {
+		"/units/{name}/proxy/*": proxySpecialLogic,
 		// "/datacenter": postRegisterDC,
 		"/clusters": postCluster,
 		//		"/clusters/{name}/enable":        postEnableCluster,
@@ -86,12 +89,12 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		//		"/clusters/nodes/{node}/disable": postDisableNode,
 		//		"/clusters/nodes/{node}/update":  updateNode,
 
-		"/services/create": postService,
+		"/services":      postService,
+		"/services/link": postServiceLink,
 		//		"/services/{name:.*}/rebuild": postServiceRebuild,
-		//		"/services/{name:.*}/start":   postServiceStart,
-		//		"/services/{name:.*}/stop":    postServiceStop,
 		//		"/services/{name:.*}/backup":  postServiceBackup,
-		//		"/services/{name:.*}/scale":   postServiceScaled,
+		"/services/{name:.*}/scale":        postServiceScaled,
+		"/services/{name:.*}/image/update": postServiceVersionUpdate,
 
 		//		"/services/{name:.*}/users": postServiceUsers,
 		//		// "/services/{name:.*}/service_config/update": postServiceConfig,
@@ -130,7 +133,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	},
 
 	http.MethodPut: {
-		"/clusters/{name}": putClusterParams,
+		"/units/{name}/proxy/*": proxySpecialLogic,
+		"/clusters/{name}":      putClusterParams,
 
 		"/hosts/{name}":         putNodeParam,
 		"/hosts/{name}/enable":  putNodeEnable,
@@ -139,7 +143,6 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/networkings/{name}/ips/enable":  putNetworkingEnable,
 		"/networkings/{name}/ips/disable": putNetworkingDisable,
 
-		"/services/link":         putServiceLink,
 		"/services/{name}/start": putServiceStart,
 		"/services/{name}/stop":  putServiceStop,
 
@@ -147,6 +150,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	},
 
 	http.MethodDelete: {
+		"/units/{name}/proxy/*": proxySpecialLogic,
+
 		"/services/{name}": deleteService,
 
 		"/clusters/{name}": deleteCluster,

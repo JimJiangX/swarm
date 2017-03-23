@@ -1,11 +1,14 @@
 package stack
 
 import (
+	"encoding/json"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/garden"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -206,7 +209,7 @@ func (s *Stack) freshServicesLink(links structs.ServicesLink) error {
 
 	for i := range ids {
 		for o := range out {
-			if ids[i] == out[o].Service.ID {
+			if ids[i] == out[o].Service.ID || ids[i] == out[o].Service.Name {
 				m[ids[i]] = out[o]
 				break
 			}
@@ -235,4 +238,106 @@ func (s *Stack) freshServicesLink(links structs.ServicesLink) error {
 	}
 
 	return nil
+}
+
+func (s *Stack) ServiceScale(ctx context.Context, nameOrID string, arch structs.Arch) (string, error) {
+	orm := s.gd.Ormer()
+
+	table, err := orm.GetService(nameOrID)
+	if err != nil {
+		return "", err
+	}
+
+	units, err := orm.ListUnitByServiceID(table.ID)
+	if err != nil {
+		return "", err
+	}
+
+	if len(units) == arch.Replicas {
+		return "", nil
+	}
+
+	svc, err := s.gd.GetService(table.ID)
+	if err != nil {
+		return "", err
+	}
+
+	// spec := svc.Spec()
+	// task := database.NewTask(spec.Name, database.ServiceScaleTask, spec.ID, fmt.Sprintf("replicas=%d", replicas), "", 300)
+
+	if len(units) > arch.Replicas {
+		err = svc.ScaleDown(ctx, s.gd.KVClient(), arch.Replicas)
+	}
+	if err != nil {
+		return "", err
+	}
+
+	desc := *table.Desc
+	desc.ID = utils.Generate32UUID()
+
+	out, err := json.Marshal(arch)
+	if err == nil {
+		table.DescID = desc.ID
+		table.Desc = &desc
+		desc.Replicas = arch.Replicas
+		desc.Architecture = string(out)
+	}
+
+	err = orm.SetServiceDesc(table)
+
+	return "", err
+}
+
+func (s *Stack) ServiceUpdateImage(ctx context.Context, name, version string) (string, error) {
+	orm := s.gd.Ormer()
+
+	im, err := orm.GetImageVersion(version)
+	if err != nil {
+		return "", err
+	}
+
+	svc, err := s.gd.GetService(name)
+	if err != nil {
+		return "", err
+	}
+
+	im1, err := svc.Image()
+	if err != nil {
+		return "", err
+	}
+
+	if im1.Name != im.Name || im1.Major != im.Major {
+		return "", errors.Errorf("Service:%s unsupported image update from %s to %s", name, im1.Version(), im.Version())
+	}
+
+	authConfig, err := s.gd.AuthConfig()
+	if err != nil {
+		return "", err
+	}
+
+	t := database.Task{}
+	// TODO:insert Task
+
+	err = svc.UpdateImage(ctx, s.gd.KVClient(), im, t, authConfig)
+	if err != nil {
+		return t.ID, err
+	}
+
+	{
+		table, err := orm.GetService(name)
+		if err != nil {
+			return t.ID, err
+		}
+		desc := *table.Desc
+		desc.ID = utils.Generate32UUID()
+		desc.Image = im.Version()
+		desc.ImageID = im.ImageID
+
+		table.DescID = desc.ID
+		table.Desc = &desc
+
+		err = orm.SetServiceDesc(table)
+	}
+
+	return t.ID, err
 }

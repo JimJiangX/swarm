@@ -1,6 +1,10 @@
 package resource
 
 import (
+	"bufio"
+	"bytes"
+	"fmt"
+	"io"
 	"strconv"
 
 	"github.com/docker/swarm/cluster"
@@ -37,10 +41,134 @@ type volumeDriver interface {
 	Driver() string
 	Name() string
 	Type() string
-	Space() space
-	Alloc(uid string, require structs.VolumeRequire) (*database.Volume, error)
+	Space() (space, error)
+	Alloc(config *cluster.ContainerConfig, uid string, req structs.VolumeRequire) (*database.Volume, error)
 
 	Recycle(database.Volume) error
+}
+
+func newNFSDriver(no database.NodeOrmer, engineID string) (volumeDriver, error) {
+	n, err := no.GetNode(engineID)
+	if err != nil {
+		return nil, err
+	}
+
+	sys, err := no.GetSysConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	return NewNFSDriver(n.NFS, sys.BackupDir), nil
+}
+
+type _NFSDriver struct {
+	database.NFS
+	backupDir string
+}
+
+func NewNFSDriver(nfs database.NFS, backup string) _NFSDriver {
+	return _NFSDriver{
+		NFS:       nfs,
+		backupDir: backup,
+	}
+}
+
+func (nd _NFSDriver) Driver() string { return "NFS" }
+func (nd _NFSDriver) Name() string   { return "" }
+func (nd _NFSDriver) Type() string   { return "NFS" }
+
+func (nd _NFSDriver) Space() (space, error) {
+	out, err := execNFScmd(nd.Addr, nd.Dir, nd.MountDir, nd.Options)
+	if err != nil {
+		return space{}, err
+	}
+
+	total, free, err := parseNFSSpace(out)
+	if err != nil {
+		return space{}, err
+	}
+
+	return space{
+		Total: total,
+		Free:  free,
+	}, nil
+}
+
+func (nd _NFSDriver) Alloc(config *cluster.ContainerConfig, uid string, req structs.VolumeRequire) (*database.Volume, error) {
+	if req.Type == "NFS" || req.Type == "nfs" {
+		config.HostConfig.Binds = append(config.HostConfig.Binds, nd.MountDir+":"+nd.backupDir)
+	}
+	return nil, nil
+}
+
+func (nd _NFSDriver) Recycle(database.Volume) error {
+
+	return nil
+}
+
+func parseNFSSpace(in []byte) (int64, int64, error) {
+
+	atoi := func(line, key []byte) (int64, error) {
+
+		if i := bytes.Index(line, key); i != -1 {
+			return strconv.ParseInt(string(bytes.TrimSpace(line[i+len(key):])), 10, 64)
+		}
+
+		return 0, errors.Errorf("key:%s not exist", key)
+	}
+
+	var total, free int64
+	tkey := []byte("total_space:")
+	fkey := []byte("free_space:")
+
+	br := bufio.NewReader(bytes.NewReader(in))
+
+	for {
+		if total > 0 && free > 0 {
+			return total, free, nil
+		}
+
+		line, _, err := br.ReadLine()
+		if err != nil {
+			if err == io.EOF {
+				return total, free, nil
+			}
+
+			return total, free, errors.Wrapf(err, "parse nfs output error,input:'%s'", in)
+		}
+
+		n, err := atoi(line, tkey)
+		if err == nil {
+			total = n
+			continue
+		}
+
+		n, err = atoi(line, fkey)
+		if err == nil {
+			free = n
+		}
+	}
+}
+
+func execNFScmd(ip, dir, mount, opts string) ([]byte, error) {
+	const sh = "./script/nfs/get_NFS_space.sh"
+
+	path, err := utils.GetAbsolutePath(false, sh)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd, err := utils.ExecScript(path, ip, dir, mount, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return out, err
+	}
+
+	return out, nil
 }
 
 type localVolume struct {
@@ -63,31 +191,38 @@ func (lv localVolume) Driver() string {
 	return lv.driver
 }
 
-func (lv localVolume) Space() space {
-	return lv.space
+func (lv localVolume) Space() (space, error) {
+	return lv.space, nil
 }
 
-func (lv *localVolume) Alloc(uid string, require structs.VolumeRequire) (*database.Volume, error) {
-	space := lv.Space()
+func (lv *localVolume) Alloc(config *cluster.ContainerConfig, uid string, req structs.VolumeRequire) (*database.Volume, error) {
+	space, err := lv.Space()
+	if err != nil {
+		return nil, err
+	}
 
-	volume := database.Volume{
-		Size:       require.Size,
+	v := database.Volume{
+		Size:       req.Size,
 		ID:         utils.Generate32UUID(),
-		Name:       uid[:8] + space.VG + require.Name,
+		Name:       fmt.Sprintf("%s_%s_%s_LV", uid[:8], space.VG, req.Name),
 		UnitID:     uid,
 		VG:         space.VG,
 		Driver:     lv.Driver(),
 		Filesystem: space.Fstype,
 	}
 
-	err := lv.vo.InsertVolume(volume)
+	err = lv.vo.InsertVolume(v)
 	if err != nil {
 		return nil, err
 	}
 
-	lv.space.Free -= require.Size
+	lv.space.Free -= req.Size
 
-	return &volume, nil
+	name := fmt.Sprintf("%s:/DBAAS%s", v.Name, req.Name)
+	config.HostConfig.Binds = append(config.HostConfig.Binds, name)
+	config.HostConfig.VolumeDriver = lv.Driver()
+
+	return &v, nil
 }
 
 func (lv *localVolume) Recycle(v database.Volume) (err error) {
@@ -143,15 +278,20 @@ func (vds volumeDrivers) isSpaceEnough(stores []structs.VolumeRequire) error {
 			return errors.New("not found volumeDriver by type:" + typ)
 		}
 
-		if free := driver.Space().Free; free < size {
-			return errors.Errorf("volumeDriver %s:%s is not enough free space %d<%d", driver.Name(), typ, free, size)
+		space, err := driver.Space()
+		if err != nil {
+			return err
+		}
+
+		if space.Free < size {
+			return errors.Errorf("volumeDriver %s:%s is not enough free space %d<%d", driver.Name(), typ, space.Free, size)
 		}
 	}
 
 	return nil
 }
 
-func (vds volumeDrivers) AllocVolumes(uid string, stores []structs.VolumeRequire) ([]*database.Volume, error) {
+func (vds volumeDrivers) AllocVolumes(config *cluster.ContainerConfig, uid string, stores []structs.VolumeRequire) ([]*database.Volume, error) {
 	volumes := make([]*database.Volume, 0, len(stores))
 
 	for i := range stores {
@@ -160,7 +300,7 @@ func (vds volumeDrivers) AllocVolumes(uid string, stores []structs.VolumeRequire
 			return volumes, errors.New("not found the assigned volumeDriver:" + stores[i].Type)
 		}
 
-		v, err := driver.Alloc(uid, stores[i])
+		v, err := driver.Alloc(config, uid, stores[i])
 		if v != nil {
 			volumes = append(volumes, v)
 		}

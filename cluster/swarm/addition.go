@@ -158,9 +158,11 @@ func (c *Cluster) deleteEngine(addr string) bool {
 	}
 
 	// check engine whether healthy
-	err := engine.RefreshNetworks()
-	if err == nil && engine.IsHealthy() {
-		return false
+	if engine.IsHealthy() {
+		err := engine.RefreshContainers(false)
+		if err == nil {
+			return false
+		}
 	}
 
 	return c.removeEngine(addr)

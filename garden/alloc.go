@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
@@ -219,6 +220,22 @@ func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, erro
 	return out, nil
 }
 
+func getImage(orm database.ImageOrmer, version string) (database.Image, string, error) {
+	im, err := orm.GetImageVersion(version)
+	if err != nil {
+		return im, "", err
+	}
+
+	reg, err := orm.GetRegistry()
+	if err != nil {
+		return im, "", err
+	}
+
+	name := fmt.Sprintf("%s:%d/%s", reg.Domain, reg.Port, im.Version())
+
+	return im, name, nil
+}
+
 func (gd *Garden) validServiceSpec(spec structs.ServiceSpec) error {
 	return nil
 }
@@ -260,7 +277,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 		us[i] = database.Unit{
 			ID:          uid,
 			Name:        fmt.Sprintf("%s_%s", spec.Name, uid[:8]), // <service_name>_<unit_id_8bit>
-			Type:        "",
+			Type:        im.Name,
 			ServiceID:   spec.ID,
 			NetworkMode: "none",
 			Status:      0,
@@ -381,22 +398,32 @@ func (pu pendingUnit) convertToSpec() structs.UnitSpec {
 }
 
 func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, error) {
+	_, version, err := getImage(gd.Ormer(), svc.spec.Image)
+	if err != nil {
+		return nil, err
+	}
+
 	opts := svc.options
-	config := cluster.BuildContainerConfig(container.Config{}, container.HostConfig{
+	config := cluster.BuildContainerConfig(container.Config{
+		Image: version,
+	}, container.HostConfig{
+		Binds: []string{"/etc/localtime:/etc/localtime:ro"},
 		Resources: container.Resources{
 			CpusetCpus: strconv.Itoa(opts.require.Require.CPU),
 			Memory:     opts.require.Require.Memory,
 		},
 	}, network.NetworkingConfig{})
 
-	for i := range opts.nodes.constraints {
-		config.AddConstraint(opts.nodes.constraints[i])
-	}
-	if len(opts.nodes.filters) > 0 {
-		config.AddConstraint(nodeLabel + "!=" + strings.Join(opts.nodes.filters, "|"))
-	}
-	if out := opts.nodes.clusters; len(out) > 0 {
-		config.AddConstraint(clusterLabel + "==" + strings.Join(out, "|"))
+	{
+		for i := range opts.nodes.constraints {
+			config.AddConstraint(opts.nodes.constraints[i])
+		}
+		if len(opts.nodes.filters) > 0 {
+			config.AddConstraint(nodeLabel + "!=" + strings.Join(opts.nodes.filters, "|"))
+		}
+		if out := opts.nodes.clusters; len(out) > 0 {
+			config.AddConstraint(clusterLabel + "==" + strings.Join(out, "|"))
+		}
 	}
 
 	gd.Lock()
@@ -423,9 +450,10 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 		}
 		// cancel allocation
 		if len(bad) > 0 {
-			err := gd.allocator.RecycleResource()
-			if err != nil {
-				// TODO:
+			_err := gd.allocator.RecycleResource()
+			if _err != nil {
+				logrus.WithField("Service", svc.spec.Name).Errorf("Recycle resources error:%+v", err)
+				err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
 			}
 
 			ids := make([]string, len(bad))

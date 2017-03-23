@@ -1,15 +1,12 @@
 package api
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/json"
 	stderr "errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -72,97 +69,72 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 	}
 }
 
+func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	name := mux.Vars(r)["name"]
+	orm := gd.Ormer()
+
+	u, err := orm.GetUnit(name)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	ips, err := orm.ListIPByUnitID(u.ID)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	if len(ips) == 0 {
+		httpJSONError(w, errors.Errorf("not found Unit %s address", u.Name), http.StatusInternalServerError)
+		return
+	}
+
+	addr := utils.Uint32ToIP(ips[0].IPAddr).String()
+
+	// TODO:get service port
+
+	index := strings.Index(r.URL.Path, "/proxy/")
+	r.URL.Path = r.URL.Path[index+len("/proxy"):]
+
+	err = hijack(nil, addr, w, r)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+}
+
 // -----------------/nfs_backups handlers-----------------
-func parseNFSSpace(in []byte) (int, int, error) {
-
-	atoi := func(line, key []byte) (int, error) {
-
-		if i := bytes.Index(line, key); i != -1 {
-			return strconv.Atoi(string(bytes.TrimSpace(line[i+len(key):])))
-		}
-
-		return 0, stderr.New("key not exist")
-	}
-
-	total, free := 0, 0
-	tkey := []byte("total_space:")
-	fkey := []byte("free_space:")
-
-	br := bufio.NewReader(bytes.NewReader(in))
-
-	for {
-		if total > 0 && free > 0 {
-			return total, free, nil
-		}
-
-		line, _, err := br.ReadLine()
-		if err != nil {
-			if err == io.EOF {
-				return total, free, nil
-			}
-
-			return total, free, errors.Wrapf(err, "parse nfs output error,input:'%s'", in)
-		}
-
-		n, err := atoi(line, tkey)
-		if err == nil {
-			total = n
-			continue
-		}
-
-		n, err = atoi(line, fkey)
-		if err == nil {
-			free = n
-		}
-	}
-}
-
-func execNFScmd(ip, dir, mount, opts string) ([]byte, error) {
-	const sh = "./script/nfs/get_NFS_space.sh"
-
-	path, err := utils.GetAbsolutePath(false, sh)
-	if err != nil {
-		return nil, err
-	}
-
-	cmd, err := utils.ExecScript(path, ip, dir, mount, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return out, err
-	}
-
-	return out, nil
-}
-
 func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpJSONError(w, err, http.StatusBadRequest)
 		return
 	}
 
-	ip := r.FormValue("nfs_ip")
-	dir := r.FormValue("nfs_dir")
-	mount := r.FormValue("nfs_mount_dir")
-	opts := r.FormValue("nfs_mount_opts")
+	nfs := database.NFS{}
 
-	out, err := execNFScmd(ip, dir, mount, opts)
-	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
-		return
-	}
+	nfs.Addr = r.FormValue("nfs_ip")
+	nfs.Dir = r.FormValue("nfs_dir")
+	nfs.MountDir = r.FormValue("nfs_mount_dir")
+	nfs.Options = r.FormValue("nfs_mount_opts")
 
-	total, free, err := parseNFSSpace(out)
+	d := resource.NewNFSDriver(nfs, "")
+	space, err := d.Space()
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"total_space": %d,"free_space": %d}`, total, free)
+	fmt.Fprintf(w, `{"total_space": %d,"free_space": %d}`, space.Total, space.Free)
 }
 
 // -----------------/tasks handlers-----------------
@@ -546,6 +518,10 @@ func getNodeInfo(n database.Node, e *cluster.Engine) structs.NodeInfo {
 	}
 
 	info.SetByEngine(e)
+
+	if info.Engine.IP == "" {
+		info.Engine.IP = n.Addr
+	}
 
 	return info
 }
@@ -1070,7 +1046,40 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusCreated)
 }
 
-func putServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	arch := structs.Arch{}
+	err := json.NewDecoder(r.Body).Decode(&arch)
+	if err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil ||
+		gd.KVClient() == nil ||
+		gd.PluginClient() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	stack := stack.New(gd)
+
+	id, err := stack.ServiceScale(ctx, name, arch)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+}
+
+func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	links := structs.ServicesLink{}
 	err := json.NewDecoder(r.Body).Decode(&links)
 	if err != nil {
@@ -1098,7 +1107,37 @@ func putServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+}
+
+func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	name := mux.Vars(r)["name"]
+	version := r.FormValue("image")
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil || gd.PluginClient() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	s := stack.New(gd)
+
+	id, err := s.ServiceUpdateImage(ctx, name, version)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
 }
 
@@ -1113,7 +1152,7 @@ func putServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	svc, err := gd.Service(name)
+	svc, err := gd.GetService(name)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -1150,7 +1189,7 @@ func putServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.R
 		return
 	}
 
-	svc, err := gd.Service(name)
+	svc, err := gd.GetService(name)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -1176,7 +1215,7 @@ func putServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svc, err := gd.Service(name)
+	svc, err := gd.GetService(name)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -1202,7 +1241,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svc, err := gd.Service(name)
+	svc, err := gd.GetService(name)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
