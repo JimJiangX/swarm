@@ -2,6 +2,7 @@ package database
 
 import (
 	"errors"
+	"log"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -22,11 +23,15 @@ func init() {
 	dbMaxIdleConns = 8
 	ormer, err = NewOrmer(driverName, dbSource, "tb", dbMaxIdleConns)
 	if err != nil {
-		panic(err)
+		log.Printf("%+v", err)
 	}
 }
 
 func TestTxFrame(t *testing.T) {
+	if ormer == nil {
+		t.Skip("orm:db is required")
+	}
+
 	err := ormer.TxFrame(
 		func(tx *sqlx.Tx) error {
 			return nil
@@ -45,5 +50,4 @@ func TestTxFrame(t *testing.T) {
 	if err != errFake {
 		t.Errorf("Unexpected,want %s but got %v", errFake, err)
 	}
-
 }
