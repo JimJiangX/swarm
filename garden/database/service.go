@@ -20,8 +20,8 @@ type ServiceInterface interface {
 
 	SetServiceStatus(nameOrID string, val int, finish time.Time) error
 	// SetServcieDesc(id, desc string, size int) error
-	ServiceStatusCAS(nameOrID string, val int, finish time.Time, f func(val int) bool) (bool, int, error)
-	SetServiceWithTask(svc *Service, t Task, state int, finish time.Time) error
+	ServiceStatusCAS(nameOrID string, val int, t *Task, f func(val int) bool) (bool, int, error)
+	SetServiceWithTask(nameOrID string, val int, t *Task, finish time.Time) error
 
 	//	SetServiceScale(svc Service, t Task) error
 
@@ -189,7 +189,7 @@ func (db dbBase) SetServiceBackupSize(id string, size int) (err error) {
 	return errors.Wrap(err, "update Service.Desc")
 }
 
-func (db dbBase) ServiceStatusCAS(nameOrID string, val int, finish time.Time, f func(val int) bool) (bool, int, error) {
+func (db dbBase) ServiceStatusCAS(nameOrID string, val int, t *Task, f func(val int) bool) (bool, int, error) {
 	var (
 		status int
 		done   bool
@@ -208,11 +208,18 @@ func (db dbBase) ServiceStatusCAS(nameOrID string, val int, finish time.Time, f 
 			return nil
 		}
 
-		query = "UPDATE " + db.serviceTable() + " SET action_status=?,finished_at=? WHERE id=? OR name=?"
+		query = "UPDATE " + db.serviceTable() + " SET action_status=? WHERE id=? OR name=?"
 
-		_, err = tx.Exec(query, val, finish, nameOrID, nameOrID)
+		_, err = tx.Exec(query, val, nameOrID, nameOrID)
 		if err != nil {
 			return errors.Wrap(err, "Tx update Service status")
+		}
+
+		if t != nil {
+			err = db.txInsertTask(tx, *t, db.serviceTable())
+			if err != nil {
+				return err
+			}
 		}
 
 		done = true
@@ -306,27 +313,21 @@ func (db dbBase) txSetServiceStatus(tx *sqlx.Tx, nameOrID string, status int, no
 }
 
 // SetServiceWithTask update Service Status and Task Status in Tx.
-func (db dbBase) SetServiceWithTask(svc *Service, t Task, state int, finish time.Time) error {
+func (db dbBase) SetServiceWithTask(nameOrID string, val int, t *Task, finish time.Time) error {
 	do := func(tx *sqlx.Tx) error {
-		err := db.txSetServiceStatus(tx, svc.ID, state, finish)
+		err := db.txSetServiceStatus(tx, nameOrID, val, finish)
 		if err == nil {
 			return err
 		}
 
-		err = db.txSetTask(tx, t)
+		if t != nil {
+			err = db.txSetTask(tx, *t)
+		}
 
 		return err
 	}
 
-	err := db.txFrame(do)
-	if err == nil {
-		if !finish.IsZero() {
-			svc.FinishedAt = finish
-		}
-		svc.Status = state
-	}
-
-	return err
+	return db.txFrame(do)
 }
 
 func (db dbBase) SetServiceScale(svc Service, t Task) error {

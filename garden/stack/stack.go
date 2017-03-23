@@ -316,7 +316,6 @@ func (s *Stack) ServiceUpdateImage(ctx context.Context, name, version string) (s
 	}
 
 	t := database.Task{}
-	// TODO:insert Task
 
 	err = svc.UpdateImage(ctx, s.gd.KVClient(), im, t, authConfig)
 	if err != nil {

@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/garden/tasklock"
 	pluginapi "github.com/docker/swarm/plugin/parser/api"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -19,7 +19,6 @@ import (
 var containerKV = "swarm/containers/"
 
 type Service struct {
-	sl      statusLock
 	so      database.ServiceOrmer
 	pc      pluginapi.PluginAPI
 	spec    structs.ServiceSpec
@@ -35,7 +34,6 @@ func newService(spec structs.ServiceSpec, so database.ServiceOrmer, cluster clus
 		so:      so,
 		cluster: cluster,
 		pc:      pc,
-		sl:      newStatusLock(spec.ID, so),
 	}
 }
 
@@ -84,108 +82,72 @@ func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, au
 		svc.cluster.RemovePendingContainer(ids...)
 	}()
 
-	ok, val, err := svc.sl.CAS(statusServiceContainerCreating, isnotInProgress)
-	if err != nil {
-		return err
-	}
-
-	svc.spec.Status = val
-
-	if !ok {
-		return errors.Wrap(newStatusError(statusServiceContainerCreating, val), "Service create containers")
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.Errorf("panic:%v", r)
-		}
-		status := statusServiceContainerRunning
-		if err != nil {
-			status = statusServiceContainerCreateFailed
+	run := func() error {
+		select {
+		default:
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 
-		_err := svc.sl.SetStatus(status)
-		if _err != nil {
-			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", status, _err)
-		}
-	}()
+		for _, pu := range pendings {
+			eng := svc.cluster.Engine(pu.Unit.EngineID)
+			if eng == nil {
+				return nil
+			}
 
-	select {
-	default:
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+			for i := range pu.volumes {
+				v, err := eng.CreateVolume(&pu.volumes[i])
+				if err != nil {
+					return err
+				}
+				pu.config.HostConfig.Binds = append(pu.config.HostConfig.Binds, v.Name)
+			}
 
-	for _, pu := range pendings {
-		eng := svc.cluster.Engine(pu.Unit.EngineID)
-		if eng == nil {
-			return nil
-		}
-
-		for i := range pu.volumes {
-			v, err := eng.CreateVolume(&pu.volumes[i])
+			c, err := eng.CreateContainer(pu.config, pu.Unit.Name, true, authConfig)
 			if err != nil {
 				return err
 			}
-			pu.config.HostConfig.Binds = append(pu.config.HostConfig.Binds, v.Name)
+			pu.Unit.ContainerID = c.ID
+
+			err = eng.StartContainer(c, nil)
+			if err != nil {
+				return errors.Wrap(err, "start container:"+pu.Unit.Name)
+			}
 		}
 
-		c, err := eng.CreateContainer(pu.config, pu.Unit.Name, true, authConfig)
-		if err != nil {
-			return err
-		}
-		pu.Unit.ContainerID = c.ID
-
-		err = eng.StartContainer(c, nil)
-		if err != nil {
-			return errors.Wrap(err, "start container:"+pu.Unit.Name)
-		}
+		return nil
 	}
 
-	return nil
+	sl := tasklock.NewServiceTask(svc.spec.ID, svc.so, nil,
+		statusServiceContainerCreating, statusServiceContainerRunning, statusServiceContainerCreateFailed)
+
+	return sl.Run(isnotInProgress, run)
 }
 
 func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, args map[string]interface{}) error {
-	val, err := svc.sl.Load()
+	sl := tasklock.NewServiceTask(svc.spec.ID, svc.so, nil,
+		statusInitServiceStarting, statusInitServiceStarted, statusInitServiceStartFailed)
+
+	val, err := sl.Load()
 	if err == nil {
 		if val > statusInitServiceStartFailed {
 			return svc.Start(ctx, configs.Commands())
 		}
 	}
-	ok, val, err := svc.sl.CAS(statusInitServiceStarting, func(val int) bool {
+
+	check := func(val int) bool {
 		if val == statusServiceContainerRunning || val == statusServiceUnitMigrating {
 			return true
 		}
 		return false
+	}
+
+	return sl.Run(check, func() error {
+		return svc.initStart(ctx, kvc, configs, args)
 	})
-	if err != nil {
-		return err
-	}
-
-	svc.spec.Status = val
-
-	if !ok {
-		return errors.Wrap(newStatusError(statusInitServiceStarting, val), "Service init start")
-	}
-
-	return svc.initStart(ctx, kvc, configs, args)
 }
 
-func (svc *Service) initStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, args map[string]interface{}) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.Errorf("panic:%v", r)
-		}
-		status := statusInitServiceStarted
-		if err != nil {
-			status = statusInitServiceStartFailed
-		}
-
-		_err := svc.sl.SetStatus(status)
-		if _err != nil {
-			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", status, _err)
-		}
-	}()
+func (svc *Service) initStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, args map[string]interface{}) error {
 
 	units, err := svc.getUnits()
 	if err != nil {
@@ -265,98 +227,62 @@ func saveContainerToKV(kvc kvstore.Client, c *cluster.Container) error {
 	return err
 }
 
-func (svc *Service) Start(ctx context.Context, cmds structs.Commands) (err error) {
-	ok, val, err := svc.sl.CAS(statusServiceStarting, isnotInProgress)
-	if err != nil {
-		return err
-	}
+func (svc *Service) Start(ctx context.Context, cmds structs.Commands) error {
 
-	svc.spec.Status = val
-
-	if !ok {
-		return errors.Wrap(newStatusError(statusServiceStarting, val), "Service start")
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.Errorf("panic:%v", r)
-		}
-		status := statusServiceStarted
-		if err != nil {
-			status = statusServiceStartFailed
-		}
-
-		_err := svc.sl.SetStatus(status)
-		if _err != nil {
-			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", status, _err)
-		}
-	}()
-
-	units, err := svc.getUnits()
-	if err != nil {
-		return err
-	}
-
-	if len(cmds) == 0 {
-		cmds, err = svc.generateUnitsCmd(ctx)
+	start := func() error {
+		units, err := svc.getUnits()
 		if err != nil {
 			return err
 		}
-	}
 
-	for i := range units {
-		err = units[i].startContainer(ctx)
-		if err != nil {
-			return err
+		if len(cmds) == 0 {
+			cmds, err = svc.generateUnitsCmd(ctx)
+			if err != nil {
+				return err
+			}
 		}
-	}
 
-	// get init cmd
-	for i := range units {
-		cmd := cmds.GetCmd(units[i].u.ID, structs.StartServiceCmd)
-
-		_, err = units[i].containerExec(ctx, cmd, false)
-		if err != nil {
-			return err
+		for i := range units {
+			err = units[i].startContainer(ctx)
+			if err != nil {
+				return err
+			}
 		}
+
+		// get init cmd
+		for i := range units {
+			cmd := cmds.GetCmd(units[i].u.ID, structs.StartServiceCmd)
+
+			_, err = units[i].containerExec(ctx, cmd, false)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 
-	return nil
+	sl := tasklock.NewServiceTask(svc.spec.ID, svc.so, nil,
+		statusServiceStarting, statusServiceStarted, statusServiceStartFailed)
+
+	return sl.Run(isnotInProgress, start)
 }
 
 func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.ConfigsMap, args map[string]interface{}) (err error) {
-	ok, val, err := svc.sl.CAS(statusServiceConfigUpdating, isnotInProgress)
-	if err != nil {
-		return err
-	}
 
-	svc.spec.Status = val
-
-	if !ok {
-		return errors.Wrap(newStatusError(statusServiceConfigUpdating, val), "Service update units configs")
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.Errorf("panic:%v", r)
-		}
-		status := statusServiceConfigUpdated
+	update := func() error {
+		units, err := svc.getUnits()
 		if err != nil {
-			status = statusServiceConfigUpdateFailed
+			return err
 		}
 
-		_err := svc.sl.SetStatus(status)
-		if _err != nil {
-			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", status, _err)
-		}
-	}()
-
-	units, err := svc.getUnits()
-	if err != nil {
-		return err
+		return svc.updateConfigs(ctx, units, configs, args)
 	}
 
-	return svc.updateConfigs(ctx, units, configs, args)
+	sl := tasklock.NewServiceTask(svc.spec.ID, svc.so, nil,
+		statusServiceConfigUpdating, statusServiceConfigUpdated, statusServiceConfigUpdateFailed)
+
+	return sl.Run(isnotInProgress, update)
 }
 
 // updateConfigs update units configurationFile,
@@ -408,39 +334,21 @@ func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[
 	return err
 }
 
-func (svc *Service) Stop(ctx context.Context, containers bool) (err error) {
-	ok, val, err := svc.sl.CAS(statusServiceStoping, isnotInProgress)
-	if err != nil {
-		return err
-	}
+func (svc *Service) Stop(ctx context.Context, containers bool) error {
 
-	svc.spec.Status = val
-
-	if !ok {
-		return errors.Wrap(newStatusError(statusServiceStoping, val), "Service stop")
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.Errorf("panic:%v", r)
-		}
-		status := statusServiceStoped
+	stop := func() error {
+		units, err := svc.getUnits()
 		if err != nil {
-			status = statusServiceStopFailed
+			return err
 		}
 
-		_err := svc.sl.SetStatus(status)
-		if _err != nil {
-			logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", status, _err)
-		}
-	}()
-
-	units, err := svc.getUnits()
-	if err != nil {
-		return err
+		return svc.stop(ctx, units, containers)
 	}
 
-	return svc.stop(ctx, units, containers)
+	sl := tasklock.NewServiceTask(svc.spec.ID, svc.so, nil,
+		statusServiceStoping, statusServiceStoped, statusServiceStopFailed)
+
+	return sl.Run(isnotInProgress, stop)
 }
 
 func (svc *Service) stop(ctx context.Context, units []*unit, containers bool) error {
@@ -486,57 +394,55 @@ func (svc *Service) Exec(ctx context.Context, nameOrID string, cmd []string, det
 }
 
 func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) {
-	ok, val, err := svc.sl.CAS(statusServiceDeleting, isnotInProgress)
-	if err != nil {
-		return err
-	}
-
-	svc.spec.Status = val
-
-	if !ok {
-		return errors.Wrap(newStatusError(statusServiceDeleting, val), "Service delete")
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.Errorf("panic:%v", r)
-		}
-		if err != nil {
-			_err := svc.sl.SetStatus(statusServiceDeleteFailed)
-			if _err != nil {
-				logrus.WithField("Service", svc.spec.Name).Errorf("orm:Set Service status:%d,%+v", statusServiceDeleteFailed, _err)
-			}
-		}
-	}()
-
 	err = svc.deleteCondition()
 	if err != nil {
 		return err
 	}
 
-	units, err := svc.getUnits()
-	if err != nil {
+	remove := func() error {
+		units, err := svc.getUnits()
+		if err != nil {
+			return err
+		}
+
+		select {
+		default:
+		case <-ctx.Done():
+			return errors.WithStack(ctx.Err())
+		}
+
+		err = svc.deregisterSerivces(ctx, r, units)
+		if err != nil {
+			return err
+		}
+
+		err = svc.removeContainers(ctx, units, true, false)
+		if err != nil {
+			return err
+		}
+
+		err = svc.removeVolumes(ctx, units)
+		if err != nil {
+			return err
+		}
+
+		err = svc.so.DelServiceRelation(svc.spec.ID, true)
+
 		return err
 	}
 
-	err = svc.deregisterSerivces(ctx, r, units)
-	if err != nil {
-		return err
-	}
+	sl := tasklock.NewServiceTask(svc.spec.ID, svc.so, nil,
+		statusServiceDeleting, 0, statusServiceDeleteFailed)
 
-	err = svc.removeContainers(ctx, units, true, false)
-	if err != nil {
-		return err
-	}
+	sl.SetAfter(func(key string, val int, task *database.Task, t time.Time) error {
+		if task != nil {
+			return svc.so.SetTask(*task)
+		}
 
-	err = svc.removeVolumes(ctx, units)
-	if err != nil {
-		return err
-	}
+		return nil
+	})
 
-	err = svc.so.DelServiceRelation(svc.spec.ID, true)
-
-	return err
+	return sl.Run(isnotInProgress, remove)
 }
 
 func (svc *Service) removeContainers(ctx context.Context, units []*unit, force, rmVolumes bool) error {
