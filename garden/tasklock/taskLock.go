@@ -14,13 +14,13 @@ type goTaskLock struct {
 	expect  int
 	fail    int
 
-	task          database.Task
+	task          *database.Task
 	key           string
 	retries       int
 	waitTime      time.Duration
 	load          func(key string) (int, error)
-	set           func(key string, val int, task database.Task, t time.Time) error
-	casInsertTask func(key string, new int, t time.Time, task database.Task, f func(val int) bool) (bool, int, error)
+	set           func(key string, val int, task *database.Task, t time.Time) error
+	casInsertTask func(key string, new int, t time.Time, task *database.Task, f func(val int) bool) (bool, int, error)
 }
 
 func (tl goTaskLock) Load() (int, error) {
@@ -102,8 +102,24 @@ func (tl goTaskLock) setStatus(val int) error {
 	return err
 }
 
+func (tl goTaskLock) Go(before func(val int) bool, do func() error) error {
+	return tl.run(before, do, false)
+}
+
 func (tl goTaskLock) Run(before func(val int) bool, do func() error) error {
-	go func() (err error) {
+	return tl.run(before, do, true)
+}
+
+func (tl goTaskLock) run(before func(val int) bool, do func() error, sync bool) error {
+	done, val, err := tl._CAS(before)
+	if err != nil {
+		return err
+	}
+	if !done {
+		return errors.WithStack(newStatusError(tl.current, val))
+	}
+
+	action := func() (err error) {
 		defer func() {
 			if r := recover(); r != nil {
 				err = errors.Errorf("panic:%v", r)
@@ -128,13 +144,19 @@ func (tl goTaskLock) Run(before func(val int) bool, do func() error) error {
 		}()
 
 		return do()
-	}()
+	}
+
+	if sync {
+		return action()
+	}
+
+	go action()
 
 	return nil
 }
 
 func NewServiceTask(key string, ormer database.ServiceOrmer,
-	t database.Task, current, expect, fail int) goTaskLock {
+	t *database.Task, current, expect, fail int) goTaskLock {
 
 	return goTaskLock{
 		current: current,
