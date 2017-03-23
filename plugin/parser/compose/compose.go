@@ -33,49 +33,46 @@ type Composer interface {
 }
 
 func NewCompserBySpec(req *structs.ServiceSpec, mgmip string, mgmport int) (Composer, error) {
+
 	if err := valicateServiceSpec(req); err != nil {
 		return nil, errors.New("valicateServiceSpec fail:" + err.Error())
 	}
 
 	arch := getDbType(req)
+
 	switch arch {
-	case MYSQL_MS:
-		dbs, err := getMysqls(req)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"err":  err.Error(),
-				"arch": string(MYSQL_MS),
-			}).Error("getMysqls")
-
-			errstr := string(MYSQL_MS) + " generate dbs info fail:" + err.Error()
-			return nil, errors.New(errstr)
-		}
-
+	case MYSQL_MS, MYSQL_MG:
+		dbs, _ := getMysqls(req)
 		return newMysqlMSManager(dbs, mgmip, mgmport), nil
 
-	case MYSQL_MG:
-
 	case REDIS_CLUSTER:
-		dbs, err := getRedis(req)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"err":  err.Error(),
-				"arch": string(REDIS_CLUSTER),
-			}).Error("getRedis")
-
-			errstr := string(REDIS_CLUSTER) + " generate dbs info fail:" + err.Error()
-			return nil, errors.New(errstr)
-		}
-
+		dbs, _ := getRedis(req)
 		master, slave, _ := getmasterAndSlave(req)
 		return newRedisShadeManager(dbs, master, slave), nil
-
-	case NONE:
 	}
-	return nil, errors.New("don't support")
+
+	return nil, errors.New("should not happen")
 }
 
 func valicateServiceSpec(req *structs.ServiceSpec) error {
+	if err := valicateCommonSpec(req); err != nil {
+		return err
+	}
+
+	arch := getDbType(req)
+	switch arch {
+	case MYSQL_MS, MYSQL_MG:
+		return valicateMysqlSpec(req)
+	case REDIS_CLUSTER, REDIS_MS:
+		return valicateRedisSpec(req)
+	case NONE:
+		return errors.New("not support the arch")
+	}
+
+	return nil
+}
+
+func valicateCommonSpec(req *structs.ServiceSpec) error {
 	//req.Image: "mysql:5.6.7"
 	datas := strings.Split(req.Image, ":")
 	if len(datas) != 2 {
@@ -88,16 +85,30 @@ func valicateServiceSpec(req *structs.ServiceSpec) error {
 		return errors.New("Arch.Code:" + err.Error())
 	}
 
+	if len(req.Units) != req.Arch.Replicas {
+		return errors.New("req.Units nums not equal with req.Arch.Replicas ")
+	}
 	//unit ip
 	for _, unit := range req.Units {
 		if len(unit.Networking.IPs) == 0 || len(unit.Networking.Ports) == 0 {
 			errstr := fmt.Sprintf("the unit %s :addr len equal 0", unit.ContainerID)
 			return errors.New(errstr)
 		}
-
 	}
 
 	return nil
+}
+
+func valicateMysqlSpec(req *structs.ServiceSpec) error {
+	_, err := getMysqls(req)
+	return err
+
+}
+
+func valicateRedisSpec(req *structs.ServiceSpec) error {
+	_, err := getRedis(req)
+	return err
+
 }
 
 //check && get value
@@ -166,10 +177,6 @@ func getDbType(req *structs.ServiceSpec) DbArch {
 func getRedis(req *structs.ServiceSpec) ([]Redis, error) {
 	redisslice := []Redis{}
 
-	if len(req.Units) == req.Arch.Replicas {
-		return nil, errors.New("req.Units not equal with arch.Replicas args")
-	}
-
 	for _, unit := range req.Units {
 
 		ip := unit.Networking.IPs[0].IP
@@ -193,10 +200,6 @@ func getMysqls(req *structs.ServiceSpec) ([]Mysql, error) {
 	users, err := getMysqlUser(req)
 	if err != nil {
 		return nil, errors.New("get  mysql users fail:" + err.Error())
-	}
-
-	if len(req.Units) == req.Arch.Replicas {
-		return nil, errors.New("req.Units not equal with arch.Replicas args")
 	}
 
 	for _, unit := range req.Units {
