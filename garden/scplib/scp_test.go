@@ -133,14 +133,14 @@ func newClient() (ScpClient, error) {
 func TestNewClient(t *testing.T) {
 	_, err := newClient()
 	if err != nil {
-		t.Fatal(err)
+		t.Skip(err)
 	}
 }
 
 func TestExec(t *testing.T) {
 	c, err := newClient()
 	if err != nil {
-		t.Fatal(err, c != nil)
+		t.Skip(err, c != nil)
 	}
 
 	out, err := c.Exec("/usr/bin/whoami")
@@ -161,7 +161,7 @@ func TestExec(t *testing.T) {
 func TestUploadDir(t *testing.T) {
 	c, err := newClient()
 	if err != nil {
-		t.Fatal(err, c != nil)
+		t.Skip(err, c != nil)
 	}
 	defer c.Close()
 
@@ -181,7 +181,7 @@ func TestUploadDir(t *testing.T) {
 func TestUpload(t *testing.T) {
 	c, err := newClient()
 	if err != nil {
-		t.Fatal(err, c != nil)
+		t.Skip(err, c != nil)
 	}
 	defer c.Close()
 
