@@ -14,13 +14,13 @@ type goTaskLock struct {
 	expect  int
 	fail    int
 
-	task          *database.Task
-	key           string
-	retries       int
-	waitTime      time.Duration
-	load          func(key string) (int, error)
-	set           func(key string, val int, task *database.Task, t time.Time) error
-	casInsertTask func(key string, new int, t time.Time, task *database.Task, f func(val int) bool) (bool, int, error)
+	task     *database.Task
+	key      string
+	retries  int
+	waitTime time.Duration
+	load     func(key string) (int, error)
+	after    func(key string, val int, task *database.Task, t time.Time) error
+	before   func(key string, new int, t *database.Task, f func(val int) bool) (bool, int, error)
 }
 
 func (tl goTaskLock) Load() (int, error) {
@@ -32,7 +32,7 @@ func (tl goTaskLock) Load() (int, error) {
 }
 
 func (tl goTaskLock) _CAS(f func(val int) bool) (bool, int, error) {
-	if tl.casInsertTask == nil || f == nil {
+	if tl.before == nil || f == nil {
 		return false, 0, errors.New("cas or f is nil")
 	}
 
@@ -44,13 +44,12 @@ func (tl goTaskLock) _CAS(f func(val int) bool) (bool, int, error) {
 		done  bool
 		err   error
 		value int
-		now   = time.Now()
 		t     = tl.waitTime / time.Duration(tl.retries)
 	)
 
 	for c := tl.retries; c > 0; c-- {
 
-		done, value, err = tl.casInsertTask(tl.key, tl.current, now, tl.task, f)
+		done, value, err = tl.before(tl.key, tl.current, tl.task, f)
 		if done {
 			return done, value, err
 		}
@@ -68,12 +67,12 @@ func (tl goTaskLock) _CAS(f func(val int) bool) (bool, int, error) {
 }
 
 func (tl goTaskLock) setStatus(val int) error {
-	if tl.set == nil {
+	if tl.after == nil {
 		return errors.New("set is nil")
 	}
 
 	now := time.Now()
-	err := tl.set(tl.key, val, tl.task, now)
+	err := tl.after(tl.key, val, tl.task, now)
 	if err == nil {
 		return nil
 	}
@@ -89,7 +88,7 @@ func (tl goTaskLock) setStatus(val int) error {
 			time.Sleep(t)
 		}
 
-		err = tl.set(tl.key, val, tl.task, now)
+		err = tl.after(tl.key, val, tl.task, now)
 		if err == nil {
 			return nil
 		}
@@ -128,6 +127,8 @@ func (tl goTaskLock) run(before func(val int) bool, do func() error, sync bool) 
 			val := tl.expect
 			tl.task.Status = database.TaskDoneStatus
 			tl.task.Errors = ""
+			tl.task.FinishedAt = time.Now()
+
 			if err != nil {
 				val = tl.fail
 				tl.task.Status = database.TaskFailedStatus
@@ -140,7 +141,6 @@ func (tl goTaskLock) run(before func(val int) bool, do func() error, sync bool) 
 			if _err != nil {
 				logrus.WithField("key", tl.key).Errorf("go task lock:setStatus error,%+v", _err)
 			}
-
 		}()
 
 		return do()
@@ -153,6 +153,10 @@ func (tl goTaskLock) run(before func(val int) bool, do func() error, sync bool) 
 	go action()
 
 	return nil
+}
+
+func (tl *goTaskLock) SetAfter(after func(key string, val int, task *database.Task, t time.Time) error) {
+	tl.after = after
 }
 
 func NewServiceTask(key string, ormer database.ServiceOrmer,
@@ -168,9 +172,9 @@ func NewServiceTask(key string, ormer database.ServiceOrmer,
 		retries:  3,
 		waitTime: time.Second * 2,
 
-		//		load:          ormer.GetServiceStatus,
-		//		set:           ormer.SetServiceStatus,
-		//		casInsertTask: ormer.ServiceStatusCAS,
+		load:   ormer.GetServiceStatus,
+		after:  ormer.SetServiceWithTask,
+		before: ormer.ServiceStatusCAS,
 	}
 }
 
