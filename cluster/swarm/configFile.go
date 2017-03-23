@@ -181,7 +181,10 @@ func initialize(name, version string) (parser configParser, cmder containerCmd, 
 		parser = &mysqlConfig{}
 		cmder = &mysqlCmd{}
 
-	case _ImageUpsql == name && strings.HasPrefix(version, "1."):
+	case _ImageUpsql == name &&
+		(strings.HasPrefix(version, "1.") ||
+			strings.HasPrefix(version, "2.") ||
+			strings.HasPrefix(version, "3.")):
 		parser = &mysqlConfig{}
 		cmder = &mysqlCmd{}
 
