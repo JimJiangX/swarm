@@ -1,4 +1,8 @@
 # change files
+
+
+	garden server:
+
     //开发环境：
 	1. go get github/upmio/swarm
     2. 用github/upmio/swarm 替换 github/docker/swarm:
@@ -6,6 +10,7 @@
 	  ln -s G$OPATH/src/github/upmio/swarm  G$OPATH/src/github/docker/swarm
     3.在$GOPATH/src/github/docker/swarm 目录下开发
 	
+
 	/api:
 	
 		+++ master.go
@@ -43,4 +48,11 @@
 	
 	/vendor: ---> vendor.json
 			
-		
+
+	seed server:
+	/cli:
+	    +++ join_seed.go 
+	    +   commands.go   seedjoin
+		+	flags.go      flSeedAddr args
+	/seed:all
+	
