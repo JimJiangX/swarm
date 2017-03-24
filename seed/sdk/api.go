@@ -84,6 +84,21 @@ type VolumeFileConfig struct {
 	Mode      string `json:"mode"`
 }
 
+type NetworkCfg struct {
+	Instance string `json:"instance"`
+
+	HDevice string `json:"hostDevice"`
+
+	CDevice string `json:"containedDevice"`
+
+	IpCIDR  string `json:"IpCIDR"`
+	Gateway string `json:"gateway"`
+
+	VlanId int `json:"vlanId"`
+
+	BandWidth int `json:"bandWidth"`
+}
+
 type client struct {
 	c httpclient.Client
 }
@@ -112,6 +127,12 @@ type ClientAPI interface {
 	SanActivate(opt ActiveConfig) error
 	SanVgCreate(opt VgConfig) error
 	SanVgExtend(opt VgConfig) error
+	CreateNetwork(opt NetworkCfg) error
+}
+
+//create network for contianer(use pipewrok),which network mode is none
+func CreateNetwork(opt NetworkCfg) error {
+	return c.postWrap(nil, "/network/create", opt)
 }
 
 // GetVgList returns remote host VG list

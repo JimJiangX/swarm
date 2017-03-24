@@ -33,7 +33,7 @@ func TestExecShellFile(t *testing.T) {
 	//     echo "testargs :$1,$@"
 	//
 	fpath = "/tmp/testargs.sh"
-	data, err = ExecShellFile(fpath, "test1", "test2")
+	data, err = ExecShellFile(fpath, "-d", "test1", "-f", "test2")
 	assert.Nil(t, err)
 	fmt.Println("testargs data:", data)
 

@@ -15,8 +15,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-const SCRIPT_DIR = "/usr/local/local_volume_plugin/scripts/"
-
 var drivers map[string]string
 
 type VgConfig struct {

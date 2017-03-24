@@ -9,6 +9,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+const SCRIPT_DIR = "/usr/local/local_volume_plugin/scripts/"
+
 type _Context struct {
 	apiVersion string
 	context    context.Context
@@ -42,7 +44,6 @@ func NewRouter(version string) *mux.Router {
 		},
 		"POST": {
 
-			"/ip/create":           IPCreate,
 			"/VolumeDriver.Update": Update,
 			"/volume/file/cp":      VolumeFileCp,
 
@@ -54,7 +55,11 @@ func NewRouter(version string) *mux.Router {
 			"/san/deactivate": Deactivate,
 
 			"/san/vg/remove": RemoveVG,
-			"/ip/remove":     IpRemove,
+
+			"/ip/remove": IpRemove,
+			"/ip/create": IPCreate,
+
+			"/network/create": networkCreate,
 		},
 	}
 
