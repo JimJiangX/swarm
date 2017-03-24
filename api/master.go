@@ -197,7 +197,7 @@ func setupMasterRouter(r *mux.Router, context *context, debug, enableCors bool) 
 
 				logrus.WithFields(logrus.Fields{"method": r.Method,
 					"uri":   r.RequestURI,
-					"since": time.Since(start).String()}).Debug("HTTP request received")
+					"since": time.Since(start).String()}).Info("HTTP request received")
 			}
 
 			localMethod := method

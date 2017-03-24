@@ -1,4 +1,4 @@
-package stack
+package deploy
 
 import (
 	"encoding/json"
@@ -19,24 +19,24 @@ type serviceWithTask struct {
 	task database.Task
 }
 
-type Stack struct {
+type Deployment struct {
 	gd *garden.Garden
 }
 
-func New(gd *garden.Garden) *Stack {
-	return &Stack{
+func New(gd *garden.Garden) *Deployment {
+	return &Deployment{
 		gd: gd,
 	}
 }
 
-func (s *Stack) Deploy(ctx context.Context, spec structs.ServiceSpec) (structs.PostServiceResponse, error) {
+func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec) (structs.PostServiceResponse, error) {
 	resp := structs.PostServiceResponse{}
-	auth, err := s.gd.AuthConfig()
+	auth, err := d.gd.AuthConfig()
 	if err != nil {
 		return resp, err
 	}
 
-	svc, task, err := s.gd.BuildService(spec)
+	svc, task, err := d.gd.BuildService(spec)
 	if err != nil {
 		return resp, err
 	}
@@ -45,13 +45,13 @@ func (s *Stack) Deploy(ctx context.Context, spec structs.ServiceSpec) (structs.P
 	resp.Name = svc.Spec().Name
 	resp.TaskID = task.ID
 
-	go s.deploy(ctx, svc, *task, auth)
+	go d.deploy(ctx, svc, *task, auth)
 
 	return resp, nil
 }
 
-func (s *Stack) DeployServices(ctx context.Context, services []structs.ServiceSpec) ([]structs.PostServiceResponse, error) {
-	list, err := s.gd.ListServices(ctx)
+func (d *Deployment) DeployServices(ctx context.Context, services []structs.ServiceSpec) ([]structs.PostServiceResponse, error) {
+	list, err := d.gd.ListServices(ctx)
 	if err != nil && !database.IsNotFound(err) {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (s *Stack) DeployServices(ctx context.Context, services []structs.ServiceSp
 		}
 	}
 
-	auth, err := s.gd.AuthConfig()
+	auth, err := d.gd.AuthConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (s *Stack) DeployServices(ctx context.Context, services []structs.ServiceSp
 
 	for _, spec := range services {
 
-		service, task, err := s.gd.BuildService(spec)
+		service, task, err := d.gd.BuildService(spec)
 		if err != nil {
 			return out, err
 		}
@@ -87,13 +87,13 @@ func (s *Stack) DeployServices(ctx context.Context, services []structs.ServiceSp
 			TaskID: task.ID,
 		})
 
-		go s.deploy(ctx, service, *task, auth)
+		go d.deploy(ctx, service, *task, auth)
 	}
 
 	return out, nil
 }
 
-func (s *Stack) deploy(ctx context.Context, svc *garden.Service, t database.Task, auth *types.AuthConfig) (err error) {
+func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t database.Task, auth *types.AuthConfig) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.Errorf("panic:%v", r)
@@ -109,7 +109,7 @@ func (s *Stack) deploy(ctx context.Context, svc *garden.Service, t database.Task
 			logrus.WithField("Service", svc.Spec().Name).Errorf("service deploy error %+v", err)
 		}
 
-		_err := s.gd.Ormer().SetTask(t)
+		_err := d.gd.Ormer().SetTask(t)
 		if _err != nil {
 			logrus.WithField("Service", svc.Spec().Name).Errorf("deploy task error,%+v", _err)
 		}
@@ -121,8 +121,8 @@ func (s *Stack) deploy(ctx context.Context, svc *garden.Service, t database.Task
 		return ctx.Err()
 	}
 
-	actor := resource.NewAllocator(s.gd.Ormer(), s.gd.Cluster)
-	pendings, err := s.gd.Allocation(ctx, actor, svc)
+	actor := resource.NewAllocator(d.gd.Ormer(), d.gd.Cluster)
+	pendings, err := d.gd.Allocation(ctx, actor, svc)
 	if err != nil {
 		return err
 	}
@@ -132,22 +132,22 @@ func (s *Stack) deploy(ctx context.Context, svc *garden.Service, t database.Task
 		return err
 	}
 
-	kvc := s.gd.KVClient()
+	kvc := d.gd.KVClient()
 
 	err = svc.InitStart(ctx, kvc, nil, svc.Spec().Options)
 	if err != nil {
 		return err
 	}
 
-	pc := s.gd.PluginClient()
+	pc := d.gd.PluginClient()
 
 	err = pc.ServiceCompose(ctx, svc.Spec())
 
 	return err
 }
 
-func (s *Stack) Link(ctx context.Context, links []*structs.ServiceLink) (string, error) {
-	err := s.freshServicesLink(links)
+func (d *Deployment) Link(ctx context.Context, links []*structs.ServiceLink) (string, error) {
+	err := d.freshServicesLink(links)
 	if err != nil {
 		return "", err
 	}
@@ -170,13 +170,13 @@ func (s *Stack) Link(ctx context.Context, links []*structs.ServiceLink) (string,
 				logrus.Errorf("stack link and start,%+v", err)
 			}
 
-			_err := s.gd.Ormer().SetTask(task)
+			_err := d.gd.Ormer().SetTask(task)
 			if _err != nil {
 				logrus.Errorf("stack link and start,%+v", _err)
 			}
 		}()
 
-		err = s.gd.PluginClient().ServicesLink(ctx, links)
+		err = d.gd.PluginClient().ServicesLink(ctx, links)
 
 		return err
 	}()
@@ -184,14 +184,14 @@ func (s *Stack) Link(ctx context.Context, links []*structs.ServiceLink) (string,
 	return task.ID, nil
 }
 
-func (s *Stack) freshServicesLink(links structs.ServicesLink) error {
+func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
 	ids := links.Links()
 
 	switch len(ids) {
 	case 0:
 		return nil
 	case 1:
-		svc, err := s.gd.Service(ids[0])
+		svc, err := d.gd.Service(ids[0])
 		if err != nil {
 			return err
 		}
@@ -202,7 +202,7 @@ func (s *Stack) freshServicesLink(links structs.ServicesLink) error {
 		return nil
 	}
 
-	out, err := s.gd.Ormer().ListServicesInfo()
+	out, err := d.gd.Ormer().ListServicesInfo()
 	if err != nil {
 		return err
 	}
@@ -242,8 +242,8 @@ func (s *Stack) freshServicesLink(links structs.ServicesLink) error {
 	return nil
 }
 
-func (s *Stack) ServiceScale(ctx context.Context, nameOrID string, arch structs.Arch) (string, error) {
-	orm := s.gd.Ormer()
+func (d *Deployment) ServiceScale(ctx context.Context, nameOrID string, arch structs.Arch) (string, error) {
+	orm := d.gd.Ormer()
 
 	table, err := orm.GetService(nameOrID)
 	if err != nil {
@@ -259,7 +259,7 @@ func (s *Stack) ServiceScale(ctx context.Context, nameOrID string, arch structs.
 		return "", nil
 	}
 
-	svc, err := s.gd.GetService(table.ID)
+	svc, err := d.gd.GetService(table.ID)
 	if err != nil {
 		return "", err
 	}
@@ -268,7 +268,7 @@ func (s *Stack) ServiceScale(ctx context.Context, nameOrID string, arch structs.
 	// task := database.NewTask(spec.Name, database.ServiceScaleTask, spec.ID, fmt.Sprintf("replicas=%d", replicas), "", 300)
 
 	if len(units) > arch.Replicas {
-		err = svc.ScaleDown(ctx, s.gd.KVClient(), arch.Replicas)
+		err = svc.ScaleDown(ctx, d.gd.KVClient(), arch.Replicas)
 	}
 	if err != nil {
 		return "", err
@@ -292,15 +292,15 @@ func (s *Stack) ServiceScale(ctx context.Context, nameOrID string, arch structs.
 	}
 }
 
-func (s *Stack) ServiceUpdateImage(ctx context.Context, name, version string) (string, error) {
-	orm := s.gd.Ormer()
+func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version string) (string, error) {
+	orm := d.gd.Ormer()
 
 	im, err := orm.GetImageVersion(version)
 	if err != nil {
 		return "", err
 	}
 
-	svc, err := s.gd.GetService(name)
+	svc, err := d.gd.GetService(name)
 	if err != nil {
 		return "", err
 	}
@@ -314,14 +314,14 @@ func (s *Stack) ServiceUpdateImage(ctx context.Context, name, version string) (s
 		return "", errors.Errorf("Service:%s unsupported image update from %s to %s", name, im1.Version(), im.Version())
 	}
 
-	authConfig, err := s.gd.AuthConfig()
+	authConfig, err := d.gd.AuthConfig()
 	if err != nil {
 		return "", err
 	}
 
 	t := database.NewTask(svc.Spec().Name, database.ServiceUpdateImageTask, svc.Spec().ID, "", "", 300)
 
-	err = svc.UpdateImage(ctx, s.gd.KVClient(), im, t, authConfig)
+	err = svc.UpdateImage(ctx, d.gd.KVClient(), im, t, authConfig)
 	if err != nil {
 		return t.ID, err
 	}
@@ -329,13 +329,13 @@ func (s *Stack) ServiceUpdateImage(ctx context.Context, name, version string) (s
 	return t.ID, err
 }
 
-func (s *Stack) ServiceUpdate(ctx context.Context, name string, config structs.UnitRequire) (string, error) {
-	table, err := s.gd.Ormer().GetService(name)
+func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config structs.UnitRequire) (string, error) {
+	table, err := d.gd.Ormer().GetService(name)
 	if err != nil {
 		return "", err
 	}
 
-	svc, err := s.gd.GetService(table.ID)
+	svc, err := d.gd.GetService(table.ID)
 	if err != nil {
 		return "", err
 	}
@@ -346,7 +346,7 @@ func (s *Stack) ServiceUpdate(ctx context.Context, name string, config structs.U
 	}
 
 	t := database.NewTask(svc.Spec().Name, database.ServiceUpdateTask, svc.Spec().ID, string(out), "", 300)
-	actor := resource.NewAllocator(s.gd.Ormer(), s.gd.Cluster)
+	actor := resource.NewAllocator(d.gd.Ormer(), d.gd.Cluster)
 
 	if (config.Require.CPU > 0 && table.Desc.NCPU != config.Require.CPU) ||
 		(config.Require.Memory > 0 && table.Desc.Memory != config.Require.Memory) {
@@ -361,8 +361,8 @@ func (s *Stack) ServiceUpdate(ctx context.Context, name string, config structs.U
 		}
 
 		err = func() error {
-			s.gd.Lock()
-			defer s.gd.Unlock()
+			d.gd.Lock()
+			defer d.gd.Unlock()
 
 			return svc.ServiceUpdate(ctx, actor, int64(ncpu), memory, t)
 		}()
@@ -376,7 +376,7 @@ func (s *Stack) ServiceUpdate(ctx context.Context, name string, config structs.U
 		table.Desc = &desc
 	}
 
-	err = s.gd.Ormer().SetServiceDesc(table)
+	err = d.gd.Ormer().SetServiceDesc(table)
 
 	return t.ID, err
 }

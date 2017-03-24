@@ -12,8 +12,8 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/deploy"
 	"github.com/docker/swarm/garden/resource"
-	"github.com/docker/swarm/garden/stack"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/gorilla/mux"
@@ -1035,9 +1035,9 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stack := stack.New(gd)
+	d := deploy.New(gd)
 
-	out, err := stack.Deploy(ctx, spec)
+	out, err := d.Deploy(ctx, spec)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -1066,9 +1066,9 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	stack := stack.New(gd)
+	d := deploy.New(gd)
 
-	id, err := stack.ServiceScale(ctx, name, arch)
+	id, err := d.ServiceScale(ctx, name, arch)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -1097,10 +1097,10 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	stack := stack.New(gd)
+	d := deploy.New(gd)
 
 	// task ID
-	id, err := stack.Link(ctx, links)
+	id, err := d.Link(ctx, links)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -1128,9 +1128,9 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
-	s := stack.New(gd)
+	d := deploy.New(gd)
 
-	id, err := s.ServiceUpdateImage(ctx, name, version)
+	id, err := d.ServiceUpdateImage(ctx, name, version)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -1165,9 +1165,9 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	s := stack.New(gd)
+	d := deploy.New(gd)
 
-	id, err := s.ServiceUpdate(ctx, name, update)
+	id, err := d.ServiceUpdate(ctx, name, update)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
