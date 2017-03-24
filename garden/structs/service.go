@@ -51,6 +51,25 @@ type Unit struct {
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
+type UnitIP struct {
+	Name  string
+	IP    string
+	Proto string
+}
+
+type UnitPort struct {
+	Name string
+	Port int
+}
+
+type UnitNetworking struct {
+	Type    string
+	Devices string
+	Mask    int
+	IPs     []UnitIP
+	Ports   []UnitPort
+}
+
 type UnitSpec struct {
 	Unit
 
@@ -61,20 +80,7 @@ type UnitSpec struct {
 		Addr string
 	}
 
-	Networking struct {
-		Type    string
-		Devices string
-		Mask    int
-		IPs     []struct {
-			Name  string
-			IP    string
-			Proto string
-		}
-		Ports []struct {
-			Name string
-			Port int
-		}
-	}
+	Networking UnitNetworking
 
 	Volumes []struct {
 		ID      string
