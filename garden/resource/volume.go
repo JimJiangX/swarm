@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strconv"
 
 	"github.com/docker/swarm/cluster"
@@ -58,18 +59,20 @@ func newNFSDriver(no database.NodeOrmer, engineID string) (volumeDriver, error) 
 		return nil, err
 	}
 
-	return NewNFSDriver(n.NFS, sys.BackupDir), nil
+	return NewNFSDriver(n.NFS, sys.SourceDir, sys.BackupDir), nil
 }
 
 type _NFSDriver struct {
 	database.NFS
 	backupDir string
+	baseDir   string
 }
 
-func NewNFSDriver(nfs database.NFS, backup string) _NFSDriver {
+func NewNFSDriver(nfs database.NFS, base, backup string) _NFSDriver {
 	return _NFSDriver{
 		NFS:       nfs,
 		backupDir: backup,
+		baseDir:   base,
 	}
 }
 
@@ -78,7 +81,7 @@ func (nd _NFSDriver) Name() string   { return "" }
 func (nd _NFSDriver) Type() string   { return "NFS" }
 
 func (nd _NFSDriver) Space() (space, error) {
-	out, err := execNFScmd(nd.Addr, nd.Dir, nd.MountDir, nd.Options)
+	out, err := execNFScmd(nd.baseDir, nd.Addr, nd.Dir, nd.MountDir, nd.Options)
 	if err != nil {
 		return space{}, err
 	}
@@ -150,18 +153,15 @@ func parseNFSSpace(in []byte) (int64, int64, error) {
 	}
 }
 
-func execNFScmd(ip, dir, mount, opts string) ([]byte, error) {
-	const sh = "./script/nfs/get_NFS_space.sh"
+func execNFScmd(base, ip, dir, mount, opts string) ([]byte, error) {
+	sh := filepath.Join(base, "nfs", "get_NFS_space.sh")
 
 	path, err := utils.GetAbsolutePath(false, sh)
 	if err != nil {
 		return nil, err
 	}
 
-	cmd, err := utils.ExecScript(path, ip, dir, mount, opts)
-	if err != nil {
-		return nil, err
-	}
+	cmd := utils.ExecScript(path, ip, dir, mount, opts)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
