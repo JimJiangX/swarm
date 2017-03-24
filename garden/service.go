@@ -120,7 +120,9 @@ func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, au
 	sl := tasklock.NewServiceTask(svc.spec.ID, svc.so, nil,
 		statusServiceContainerCreating, statusServiceContainerRunning, statusServiceContainerCreateFailed)
 
-	return sl.Run(isnotInProgress, run)
+	return sl.Run(func(val int) bool {
+		return val == statusServcieBuilding
+	}, run)
 }
 
 func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, args map[string]interface{}) error {

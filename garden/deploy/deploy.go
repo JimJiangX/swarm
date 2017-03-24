@@ -45,7 +45,7 @@ func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec) (stru
 	resp.Name = svc.Spec().Name
 	resp.TaskID = task.ID
 
-	go d.deploy(ctx, svc, *task, auth)
+	go d.deploy(ctx, svc, task, auth)
 
 	return resp, nil
 }
@@ -87,13 +87,13 @@ func (d *Deployment) DeployServices(ctx context.Context, services []structs.Serv
 			TaskID: task.ID,
 		})
 
-		go d.deploy(ctx, service, *task, auth)
+		go d.deploy(ctx, service, task, auth)
 	}
 
 	return out, nil
 }
 
-func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t database.Task, auth *types.AuthConfig) (err error) {
+func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *database.Task, auth *types.AuthConfig) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.Errorf("panic:%v", r)
@@ -109,7 +109,7 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t database
 			logrus.WithField("Service", svc.Spec().Name).Errorf("service deploy error %+v", err)
 		}
 
-		_err := d.gd.Ormer().SetTask(t)
+		_err := d.gd.Ormer().SetTask(*t)
 		if _err != nil {
 			logrus.WithField("Service", svc.Spec().Name).Errorf("deploy task error,%+v", _err)
 		}

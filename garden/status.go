@@ -17,7 +17,8 @@ const (
 	statusServiceUnitMigrating                      // 13
 	statusServiceUnitRebuilding                     // 14
 	statusServiceImageUpdating                      // 15
-	statusServiceDeleting                           // 16
+	statusServiceComposing                          // 16
+	statusServiceDeleting                           // 17
 
 	_ing    = 0
 	_failed = 1
