@@ -159,12 +159,12 @@ func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithT
 		return ctx.Err()
 	}
 
-	err := m.dco.InsertNodesAndTask(nodes, tasks)
+	config, err := m.dco.GetSysConfig()
 	if err != nil {
 		return err
 	}
 
-	config, err := m.dco.GetSysConfig()
+	err = m.dco.InsertNodesAndTask(nodes, tasks)
 	if err != nil {
 		return err
 	}
@@ -175,7 +175,7 @@ func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithT
 		go list[i].distribute(ctx, horus, m.dco, config)
 	}
 
-	go m.registerNodesLoop(ctx, cancel, list, strconv.Itoa(config.DockerPort))
+	go m.registerNodesLoop(ctx, cancel, list, strconv.Itoa(config.Ports.Docker))
 
 	return nil
 }
@@ -231,6 +231,8 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 		if err != nil {
 			entry.WithError(err).Error("ssh dial error")
 
+			nodeState = statusNodeSSHLoginFailed
+
 			return err
 		}
 	}
@@ -276,12 +278,8 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 	if err != nil {
 		entry.WithError(err).Errorf("exec remote command:'%s',output:%s", script, out)
 
-		if out, err = nt.client.Exec(script); err != nil {
-			entry.WithError(err).Errorf("exec remote command twice:'%s',output:%s", script, out)
-
-			nodeState = statusNodeSSHExecFailed
-			return err
-		}
+		nodeState = statusNodeSSHExecFailed
+		return err
 	}
 
 	entry.Infof("SSH remote PKG install successed! output:\n%s", out)
@@ -312,7 +310,7 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 		#!/bin/bash
 		swarm_key=$1
 		adm_ip=$2
-		cs_nodes=$3
+		cs_datacenter=$3
 		cs_list=$4
 		registry_domain=$5
 		registry_ip=$6
@@ -323,24 +321,16 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 		docker_port=${11}
 		hdd_dev=${12}
 		ssd_dev=${13}
-		horus_agent_port=${14}
-		consul_port=${15}
-		node_id=${16}
-		horus_server_ip=${17}
-		horus_server_port=${18}
-		docker_plugin_port=${19}
+		consul_port=${14}
+		node_id=${15}
+		horus_server_ip=${16}
+		horus_server_port=${17}
+		docker_plugin_port=${18}
+		swarm_agent_port=${19}
 		nfs_ip=${20}
 		nfs_dir=${21}
 		nfs_mount_dir=${22}
 		nfs_mount_opts=${23}
-		cur_dir=`dirname $0`
-
-		hdd_vgname=${HOSTNAME}_HDD_VG
-		ssd_vgname=${HOSTNAME}_SSD_VG
-
-		adm_nic=bond0
-		int_nic=bond1
-		ext_nic=bond2
 	*/
 	hdd, ssd := "null", "null"
 	if len(nt.hdd) > 0 {
@@ -350,12 +340,12 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 		ssd = strings.Join(nt.ssd, ",")
 	}
 
-	script := fmt.Sprintf("chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %d %s %s %s %d %s %s %s %s",
+	script := fmt.Sprintf(`chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %s %s %s %d %d %s %s %s %s`,
 		path, path, dockerNodesKVPath, nt.Node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile,
-		config.DockerPort, hdd, ssd, config.HorusAgentPort, config.ConsulPort,
-		nt.Node.ID, horusIP, horusPort, config.PluginPort,
+		config.Ports.Docker, hdd, ssd, config.ConsulPort,
+		nt.Node.ID, horusIP, horusPort, config.Ports.Plugin, config.Ports.SwarmAgent,
 		nt.Node.NFS.Addr, nt.Node.NFS.Dir, nt.Node.NFS.MountDir, nt.Node.NFS.Options)
 
 	return script, nil
@@ -511,6 +501,13 @@ func (m master) RemoveNode(ctx context.Context, horus, nameOrID, user, password 
 		return err
 	}
 
+	if node.node.Status == statusNodeSCPFailed ||
+		node.node.Status == statusNodeSSHLoginFailed ||
+		node.node.Status == statusNodeSSHExecFailed {
+
+		return m.removeNode(node.node.ID)
+	}
+
 	config, err := m.dco.GetSysConfig()
 	if err != nil {
 		return err
@@ -598,11 +595,7 @@ func (n *Node) nodeClean(ctx context.Context, client scplib.ScpClient, horus str
 	if err != nil {
 		entry.Errorf("exec remote command: %s,%v,Output:%s", script, err, out)
 
-		out, err := client.Exec(script)
-		if err != nil {
-			entry.Errorf("exec remote command twice: %s,%v,Output:%s", script, err, out)
-			return err
-		}
+		return err
 	}
 
 	entry.Infof("SSH Remote Exec Successed! Output:\n%s", out)

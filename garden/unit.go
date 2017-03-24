@@ -3,11 +3,14 @@ package garden
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/nic"
@@ -80,7 +83,7 @@ type unit struct {
 	u            database.Unit
 	uo           database.UnitOrmer
 	cluster      cluster.Cluster
-	startNetwork func(ctx context.Context, c *cluster.Container, tlsConfig *tls.Config) error
+	startNetwork func(ctx context.Context, addr string, ips []database.IP, tlsConfig *tls.Config) error
 }
 
 func newUnit(u database.Unit, uo database.UnitOrmer, cluster cluster.Cluster) *unit {
@@ -162,7 +165,19 @@ func (u unit) startContainer(ctx context.Context) error {
 
 	// start networking
 	if u.startNetwork != nil {
-		err = u.startNetwork(ctx, c, nil)
+		ports, err := u.uo.GetPorts()
+		if err != nil {
+			return err
+		}
+
+		ips, err := u.uo.ListIPByUnitID(u.u.ID)
+		if err != nil {
+			return err
+		}
+		if len(ips) > 0 {
+			addr := net.JoinHostPort(c.Engine.IP, strconv.Itoa(ports.SwarmAgent))
+			err = u.startNetwork(ctx, addr, ips, nil)
+		}
 	}
 
 	return err
@@ -202,6 +217,9 @@ func (u unit) removeVolumes(ctx context.Context) error {
 	lvs, err := u.getVolumesByUnit()
 	if err != nil {
 		return err
+	}
+	if len(lvs) == 0 {
+		return nil
 	}
 
 	engine := u.getEngine()
@@ -250,4 +268,21 @@ func (u unit) updateServiceConfig(ctx context.Context, path, context string) err
 	}
 
 	return err
+}
+
+func (u *unit) update(ctx context.Context, config container.UpdateConfig) error {
+	e := u.getEngine()
+	if e == nil {
+		return errors.Errorf("not found Engine %s", u.u.EngineID)
+	}
+
+	client := e.ContainerAPIClient()
+	if client == nil {
+		return errors.Errorf("unit:%s ContainerAPIClient is required", u.u.Name)
+	}
+
+	body, err := client.ContainerUpdate(ctx, u.u.Name, config)
+	e.CheckConnectionErr(err)
+
+	return errors.Wrapf(err, "unit:%s update container,warnings:%s", u.u.Name, body.Warnings)
 }

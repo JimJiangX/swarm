@@ -12,6 +12,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/plugin/parser/compose"
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/consul/api"
 	"golang.org/x/net/context"
@@ -21,28 +22,35 @@ type _Context struct {
 	apiVersion string
 	client     kvstore.Client
 	context    context.Context
+
+	mgmIp   string
+	mgmPort int
 }
 
-func NewRouter(c kvstore.Client) *mux.Router {
+func NewRouter(c kvstore.Client, mgmip string, mgmPort int) *mux.Router {
 	type handler func(ctx *_Context, w http.ResponseWriter, r *http.Request)
 
-	ctx := &_Context{client: c}
+	ctx := &_Context{client: c,
+		mgmIp:   mgmip,
+		mgmPort: mgmPort,
+	}
 
 	var routes = map[string]map[string]handler{
 		"GET": {
-			"/image/support":                  getSupportImageVersion,
-			"/image/requirement":              getImageRequirement,
+			"/image/support": getSupportImageVersion,
+			//"/image/requirement":              getImageRequirement,
 			"/configs/{service:.*}":           getConfigs,
 			"/configs/{service:.*}/{unit:.*}": getConfig,
 			"/commands/{service:.*}":          getCommands,
 		},
 		"POST": {
 			"/configs":        generateConfigs,
-			"/image/check":    checkImage,
 			"/image/template": postTemplate,
 		},
 		"PUT": {
-			"/configs/{service:.*}": updateConfigs,
+			"/configs/{service:.*}":       updateConfigs,
+			"/services/{service}/compose": composeService,
+			"/services/link":              linkServices,
 		},
 	}
 
@@ -74,13 +82,13 @@ func NewRouter(c kvstore.Client) *mux.Router {
 
 func getSupportImageVersion(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	out := make([]structs.ImageVersion, 0, 10)
-	
+
 	images.RLock()
-	for _,v:=range images.m{
-		out=append(out,v)
+	for _, v := range images.m {
+		out = append(out, v)
 	}
 	images.RUnlock()
-	
+
 	err := json.NewEncoder(w).Encode(out)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
@@ -91,32 +99,37 @@ func getSupportImageVersion(ctx *_Context, w http.ResponseWriter, r *http.Reques
 	return
 }
 
-func getImageRequirement(ctx *_Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		httpError(w, err, http.StatusBadRequest)
-		return
-	}
+//func getImageRequirement(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+//	if err := r.ParseForm(); err != nil {
+//		httpError(w, err, http.StatusBadRequest)
+//		return
+//	}
 
-	name := r.FormValue("name")
-	version := r.FormValue("version")
+//	image := r.FormValue("image")
 
-	parser, err := factory(name, version)
-	if err != nil {
-		httpError(w, err, http.StatusNotImplemented)
-		return
-	}
+//	parts := strings.SplitN(image, ":", 2)
+//	var v string
+//	if len(parts) == 2 {
+//		v = parts[1]
+//	}
 
-	resp := parser.Requirement()
+//	parser, err := factory(parts[0], v)
+//	if err != nil {
+//		httpError(w, err, http.StatusNotImplemented)
+//		return
+//	}
 
-	err = json.NewEncoder(w).Encode(resp)
-	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	return
-}
+//	resp := parser.Requirement()
+
+//	err = json.NewEncoder(w).Encode(resp)
+//	if err != nil {
+//		httpError(w, err, http.StatusInternalServerError)
+//		return
+//	}
+//	w.Header().Set("Content-Type", "application/json")
+//	w.WriteHeader(http.StatusOK)
+//	return
+//}
 
 func getConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	service := mux.Vars(r)["service"]
@@ -196,29 +209,29 @@ func getCommands(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func checkImage(ctx *_Context, w http.ResponseWriter, r *http.Request) {
-	t := structs.ConfigTemplate{}
+//func checkImage(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+//	t := structs.ConfigTemplate{}
 
-	err := json.NewDecoder(r.Body).Decode(&t)
-	if err != nil {
-		httpError(w, err, http.StatusBadRequest)
-		return
-	}
+//	err := json.NewDecoder(r.Body).Decode(&t)
+//	if err != nil {
+//		httpError(w, err, http.StatusBadRequest)
+//		return
+//	}
 
-	parser, err := factory(t.Name, t.Version)
-	if err != nil {
-		httpError(w, err, http.StatusNotImplemented)
-		return
-	}
+//	parser, err := factory(t.Name, t.Version)
+//	if err != nil {
+//		httpError(w, err, http.StatusNotImplemented)
+//		return
+//	}
 
-	err = parser.ParseData(t.Content)
-	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
-	}
+//	err = parser.ParseData(t.Content)
+//	if err != nil {
+//		httpError(w, err, http.StatusInternalServerError)
+//		return
+//	}
 
-	w.WriteHeader(http.StatusOK)
-}
+//	w.WriteHeader(http.StatusOK)
+//}
 
 func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.ConfigTemplate{}
@@ -447,6 +460,36 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	return
+}
+
+func composeService(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	var req structs.ServiceSpec
+
+	mgmip := ctx.mgmIp
+	mgmport := ctx.mgmPort
+
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	composer, err := compose.NewCompserBySpec(&req, mgmip, mgmport)
+	if err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if err := composer.ComposeCluster(); err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
+}
+
+func linkServices(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // Emit an HTTP error and log it.

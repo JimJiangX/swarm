@@ -1,8 +1,11 @@
 package database
 
 import (
+	"database/sql"
+	"fmt"
 	"time"
 
+	"github.com/docker/swarm/garden/structs"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 )
@@ -14,7 +17,9 @@ type ImageOrmer interface {
 }
 
 type ImageInterface interface {
+	GetImageVersion(name string) (Image, error)
 	GetImage(name string, major, minor, patch int) (Image, error)
+
 	ListImages() ([]Image, error)
 
 	InsertImageWithTask(img Image, t Task) error
@@ -38,6 +43,10 @@ type Image struct {
 
 func (db dbBase) imageTable() string {
 	return db.prefix + "_software_image"
+}
+
+func (im Image) Version() string {
+	return fmt.Sprintf("%s:%d.%d.%d", im.Name, im.Major, im.Minor, im.Patch)
 }
 
 // InsertImage insert Image
@@ -64,8 +73,24 @@ func (db dbBase) ListImages() ([]Image, error) {
 	)
 
 	err := db.Select(&images, query)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 
 	return images, errors.Wrap(err, "list []Image")
+}
+
+func (db dbBase) GetImageVersion(nameOrID string) (Image, error) {
+	im, err := structs.ParseImage(nameOrID)
+	if err == nil {
+		db.GetImage(im.Name, im.Major, im.Minor, im.Patch)
+	}
+
+	image := Image{}
+	query := "SELECT id,software_name,docker_image_id,major_version,minor_version,patch_version,size,label,upload_at FROM " + db.imageTable() + " WHERE id=? OR docker_image_id=?"
+	err = db.Get(&image, query, nameOrID, nameOrID)
+
+	return image, errors.Wrap(err, "get image by id:"+nameOrID)
 }
 
 // GetImage returns Image select by name and version.
@@ -99,7 +124,7 @@ func (db dbBase) DelImage(ID string) error {
 	do := func(tx *sqlx.Tx) error {
 
 		n := 0
-		query := "SELECT COUNT(id) FROM " + db.serviceTable() + " WHERE image_id=?"
+		query := "SELECT COUNT(id) FROM " + db.serviceDescTable() + " WHERE image_id=?"
 
 		err := tx.Get(&n, query, ID)
 		if err != nil {

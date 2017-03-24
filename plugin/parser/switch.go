@@ -60,30 +60,30 @@ func (c *switchManagerConfig) Marshal() ([]byte, error) {
 	return data, errors.Wrap(err, "read file")
 }
 
-func (switchManagerConfig) Requirement() structs.RequireResource {
-	//	ports := []port{
-	//		port{
-	//			proto: "tcp",
-	//			name:  "Port",
-	//		},
-	//		port{
-	//			proto: "tcp",
-	//			name:  "ProxyPort",
-	//		},
-	//	}
-	//	nets := []netRequire{
-	//		netRequire{
-	//			Type: _ContainersNetworking,
-	//			num:  1,
-	//		},
-	//	}
-	//	return require{
-	//		ports:       ports,
-	//		networkings: nets,
-	//	}
+//func (switchManagerConfig) Requirement() structs.RequireResource {
+//	ports := []port{
+//		port{
+//			proto: "tcp",
+//			name:  "Port",
+//		},
+//		port{
+//			proto: "tcp",
+//			name:  "ProxyPort",
+//		},
+//	}
+//	nets := []netRequire{
+//		netRequire{
+//			Type: _ContainersNetworking,
+//			num:  1,
+//		},
+//	}
+//	return require{
+//		ports:       ports,
+//		networkings: nets,
+//	}
 
-	return structs.RequireResource{}
-}
+//	return structs.RequireResource{}
+//}
 
 func (c switchManagerConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
 	//	if c.config == nil || len(args) == 0 {

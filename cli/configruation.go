@@ -46,6 +46,9 @@ func configruation(c *cli.Context) {
 		log.Fatal(err)
 	}
 
+	mgmIp := c.String("mgmIp")
+	mgmPort := c.Int("mgmPort")
+
 	uri := getDiscovery(c)
 	if uri == "" {
 		log.Fatalf("discovery required to manage a cluster. See '%s manage --help'.", c.App.Name)
@@ -64,7 +67,7 @@ func configruation(c *cli.Context) {
 
 	server := api.NewServer(hosts, tlsConfig)
 
-	server.SetHandler(parser.NewRouter(kvClient))
+	server.SetHandler(parser.NewRouter(kvClient, mgmIp, mgmPort))
 
 	log.Fatal(server.ListenAndServe())
 }

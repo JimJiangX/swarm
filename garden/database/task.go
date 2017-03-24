@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/docker/swarm/garden/utils"
@@ -29,7 +30,11 @@ const (
 	ImageLoadTask = "image_load"
 
 	// create and run service task
-	ServiceCreateTask = "service_create"
+	ServiceRunTask         = "service_create"
+	ServiceLinkTask        = "services_link"
+	ServiceScaleTask       = "service_scale"
+	ServiceUpdateTask      = "service_update"
+	ServiceUpdateImageTask = "service_update_image"
 
 	// unit tasks
 	UnitMigrateTask = "unit_migrate"
@@ -191,6 +196,10 @@ func (db dbBase) ListTasks(link string, status int) ([]Task, error) {
 	default:
 
 		err = db.Select(&out, query)
+	}
+
+	if err == sql.ErrNoRows {
+		return nil, nil
 	}
 
 	return out, errors.Wrap(err, "list tasks")

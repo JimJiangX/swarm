@@ -11,18 +11,26 @@ func (c *Cluster) EngineByAddr(addr string) *cluster.Engine {
 }
 
 func (c *Cluster) Engine(IDOrName string) *cluster.Engine {
+	if IDOrName == "" {
+		return nil
+	}
+
 	c.RLock()
 	defer c.RUnlock()
 
-	for _, engine := range c.engines {
-		if engine.ID == IDOrName || engine.Name == IDOrName {
-			return engine
+	if e, ok := c.engines[IDOrName]; ok {
+		return e
+	}
+
+	for _, e := range c.engines {
+		if e.ID == IDOrName || e.Name == IDOrName {
+			return e
 		}
 	}
 
-	for _, engine := range c.pendingEngines {
-		if engine.ID == IDOrName || engine.Name == IDOrName {
-			return engine
+	for _, e := range c.pendingEngines {
+		if e.ID == IDOrName || e.Name == IDOrName {
+			return e
 		}
 	}
 
@@ -43,13 +51,19 @@ func (c *Cluster) ListEngines(list ...string) []*cluster.Engine {
 
 	out := make([]*cluster.Engine, 0, len(c.engines)+len(c.pendingEngines))
 
-engines:
 	for _, n := range c.engines {
 		if !all {
+			found := false
+		engines:
 			for i := range list {
 				if list[i] == n.ID || list[i] == n.Name {
-					continue engines
+					found = true
+					break engines
 				}
+			}
+
+			if !found {
+				continue
 			}
 		}
 
@@ -62,13 +76,19 @@ engines:
 		out = append(out, n)
 	}
 
-pendingEngines:
 	for _, n := range c.pendingEngines {
 		if !all {
+			found := false
+		pendingEngines:
 			for i := range list {
 				if list[i] == n.ID || list[i] == n.Name {
-					continue pendingEngines
+					found = true
+					break pendingEngines
 				}
+			}
+
+			if !found {
+				continue
 			}
 		}
 
@@ -81,7 +101,24 @@ pendingEngines:
 		out = append(out, n)
 	}
 
-	return out
+	engines := make([]*cluster.Engine, 0, len(out))
+
+	for i := range out {
+		exist := false
+
+		for _, e := range engines {
+			if out[i].ID == e.ID {
+				exist = true
+				break
+			}
+		}
+
+		if !exist {
+			engines = append(engines, out[i])
+		}
+	}
+
+	return engines
 }
 
 func (c *Cluster) AddPendingContainer(name, swarmID, engineID string, config *cluster.ContainerConfig) error {
@@ -111,4 +148,22 @@ func (c *Cluster) RemovePendingContainer(swarmID ...string) {
 	}
 
 	c.scheduler.Unlock()
+}
+
+// deleteEngine if engine is not healthy
+func (c *Cluster) deleteEngine(addr string) bool {
+	engine := c.getEngineByAddr(addr)
+	if engine == nil {
+		return false
+	}
+
+	// check engine whether healthy
+	if engine.IsHealthy() {
+		err := engine.RefreshContainers(false)
+		if err == nil {
+			return false
+		}
+	}
+
+	return c.removeEngine(addr)
 }

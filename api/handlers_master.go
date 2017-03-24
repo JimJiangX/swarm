@@ -1,21 +1,19 @@
 package api
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/json"
 	stderr "errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
-	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/deploy"
 	"github.com/docker/swarm/garden/resource"
-	"github.com/docker/swarm/garden/stack"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/gorilla/mux"
@@ -71,97 +69,72 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 	}
 }
 
+func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	name := mux.Vars(r)["name"]
+	orm := gd.Ormer()
+
+	u, err := orm.GetUnit(name)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	ips, err := orm.ListIPByUnitID(u.ID)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	if len(ips) == 0 {
+		httpJSONError(w, errors.Errorf("not found Unit %s address", u.Name), http.StatusInternalServerError)
+		return
+	}
+
+	addr := utils.Uint32ToIP(ips[0].IPAddr).String()
+
+	// TODO:get service port
+
+	index := strings.Index(r.URL.Path, "/proxy/")
+	r.URL.Path = r.URL.Path[index+len("/proxy"):]
+
+	err = hijack(nil, addr, w, r)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+}
+
 // -----------------/nfs_backups handlers-----------------
-func parseNFSSpace(in []byte) (int, int, error) {
-
-	atoi := func(line, key []byte) (int, error) {
-
-		if i := bytes.Index(line, key); i != -1 {
-			return strconv.Atoi(string(bytes.TrimSpace(line[i+len(key):])))
-		}
-
-		return 0, stderr.New("key not exist")
-	}
-
-	total, free := 0, 0
-	tkey := []byte("total_space:")
-	fkey := []byte("free_space:")
-
-	br := bufio.NewReader(bytes.NewReader(in))
-
-	for {
-		if total > 0 && free > 0 {
-			return total, free, nil
-		}
-
-		line, _, err := br.ReadLine()
-		if err != nil {
-			if err == io.EOF {
-				return total, free, nil
-			}
-
-			return total, free, errors.Wrapf(err, "parse nfs output error,input:'%s'", in)
-		}
-
-		n, err := atoi(line, tkey)
-		if err == nil {
-			total = n
-			continue
-		}
-
-		n, err = atoi(line, fkey)
-		if err == nil {
-			free = n
-		}
-	}
-}
-
-func execNFScmd(ip, dir, mount, opts string) ([]byte, error) {
-	const sh = "./script/nfs/get_NFS_space.sh"
-
-	path, err := utils.GetAbsolutePath(false, sh)
-	if err != nil {
-		return nil, err
-	}
-
-	cmd, err := utils.ExecScript(path, ip, dir, mount, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return out, err
-	}
-
-	return out, nil
-}
-
 func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		httpJSONError(w, err, http.StatusBadRequest)
 		return
 	}
 
-	ip := r.FormValue("nfs_ip")
-	dir := r.FormValue("nfs_dir")
-	mount := r.FormValue("nfs_mount_dir")
-	opts := r.FormValue("nfs_mount_opts")
+	nfs := database.NFS{}
 
-	out, err := execNFScmd(ip, dir, mount, opts)
-	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
-		return
-	}
+	nfs.Addr = r.FormValue("nfs_ip")
+	nfs.Dir = r.FormValue("nfs_dir")
+	nfs.MountDir = r.FormValue("nfs_mount_dir")
+	nfs.Options = r.FormValue("nfs_mount_opts")
 
-	total, free, err := parseNFSSpace(out)
+	d := resource.NewNFSDriver(nfs, "")
+	space, err := d.Space()
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"total_space": %d,"free_space": %d}`, total, free)
+	fmt.Fprintf(w, `{"total_space": %d,"free_space": %d}`, space.Total, space.Free)
 }
 
 // -----------------/tasks handlers-----------------
@@ -516,7 +489,7 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
-		gd.Ormer() == nil {
+		gd.Ormer() == nil || gd.Cluster == nil {
 
 		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
 		return
@@ -533,6 +506,84 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // -----------------/hosts handlers-----------------
+func getNodeInfo(n database.Node, e *cluster.Engine) structs.NodeInfo {
+	info := structs.NodeInfo{
+		ID:           n.ID,
+		Cluster:      n.ClusterID,
+		Room:         n.Room,
+		Seat:         n.Room,
+		MaxContainer: n.MaxContainer,
+		Enabled:      n.Enabled,
+		RegisterAt:   utils.TimeToString(n.RegisterAt),
+	}
+
+	info.SetByEngine(e)
+
+	if info.Engine.IP == "" {
+		info.Engine.IP = n.Addr
+	}
+
+	return info
+}
+
+func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil || gd.Cluster == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	n, err := gd.Ormer().GetNode(name)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	e := gd.Cluster.Engine(n.EngineID)
+
+	info := getNodeInfo(n, e)
+
+	writeJSON(w, info, http.StatusOK)
+}
+
+func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil || gd.Cluster == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	engines := gd.Cluster.ListEngines()
+
+	nodes, err := gd.Ormer().ListNodes()
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	out := make([]structs.NodeInfo, 0, len(nodes))
+
+	for i := range nodes {
+		var engine *cluster.Engine
+
+		for _, e := range engines {
+			if e.IP == nodes[i].Addr {
+				engine = e
+				break
+			}
+		}
+
+		out = append(out, getNodeInfo(nodes[i], engine))
+	}
+
+	writeJSON(w, out, http.StatusOK)
+}
+
 func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	list := structs.PostNodesRequest{}
 	err := json.NewDecoder(r.Body).Decode(&list)
@@ -551,7 +602,10 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	orm := gd.Ormer()
 	clusters, err := orm.ListClusters()
-	if err != nil {
+	if n := len(clusters); err != nil || n == 0 {
+		if n == 0 {
+			err = errors.New("clusters is nil")
+		}
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -781,7 +835,7 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	nw := resource.NewNetworks(gd.Ormer())
-	n, err := nw.AddNetworking(req.Start, req.End, req.Gateway, name, int(req.VLAN), req.Prefix)
+	n, err := nw.AddNetworking(req.Start, req.End, req.Gateway, name, req.VLAN, req.Prefix)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -964,8 +1018,8 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		ctx, _ = goctx.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 	}
 
-	services := []structs.ServiceSpec{}
-	err := json.NewDecoder(r.Body).Decode(&services)
+	spec := structs.ServiceSpec{}
+	err := json.NewDecoder(r.Body).Decode(&spec)
 	if err != nil {
 		httpJSONError(w, err, http.StatusBadRequest)
 		return
@@ -981,16 +1035,261 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stack := stack.New(gd, services)
+	d := deploy.New(gd)
 
-	out, err := stack.DeployServices(ctx)
+	out, err := d.Deploy(ctx, spec)
 	if err != nil {
-		httpJSONErrorWithBody(w, out, err, http.StatusInternalServerError)
+		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	writeJSON(w, out, http.StatusCreated)
 }
 
-func putServicesLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	arch := structs.Arch{}
+	err := json.NewDecoder(r.Body).Decode(&arch)
+	if err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil ||
+		gd.KVClient() == nil ||
+		gd.PluginClient() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	d := deploy.New(gd)
+
+	id, err := d.ServiceScale(ctx, name, arch)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+}
+
+func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	links := structs.ServicesLink{}
+	err := json.NewDecoder(r.Body).Decode(&links)
+	if err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil ||
+		gd.KVClient() == nil ||
+		gd.PluginClient() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	d := deploy.New(gd)
+
+	// task ID
+	id, err := d.Link(ctx, links)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+}
+
+func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	name := mux.Vars(r)["name"]
+	version := r.FormValue("image")
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil || gd.PluginClient() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	d := deploy.New(gd)
+
+	id, err := d.ServiceUpdateImage(ctx, name, version)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+}
+
+func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	var update structs.UnitRequire
+
+	err := json.NewDecoder(r.Body).Decode(&update)
+	if err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	if update.Require.CPU == 0 && update.Require.Memory == 0 && len(update.Volumes) == 0 {
+		httpJSONError(w, fmt.Errorf("no updateConfig required"), http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil || gd.Cluster == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	d := deploy.New(gd)
+
+	id, err := d.ServiceUpdate(ctx, name, update)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+
+}
+
+func putServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil || gd.KVClient() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	svc, err := gd.GetService(name)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	err = svc.InitStart(ctx, gd.KVClient(), nil, nil)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func putServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	var req = struct {
+		Configs structs.ConfigsMap
+		Args    map[string]interface{}
+	}{}
+
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	svc, err := gd.GetService(name)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	err = svc.UpdateUnitsConfigs(ctx, req.Configs, req.Args)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func putServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	svc, err := gd.GetService(name)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	err = svc.Stop(ctx, false)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil || gd.KVClient() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	svc, err := gd.GetService(name)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	err = svc.Remove(ctx, gd.KVClient())
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

@@ -1,7 +1,6 @@
 package resource
 
 import (
-	"sort"
 	"strconv"
 	"strings"
 
@@ -84,6 +83,13 @@ func (at allocator) findNodeVolumeDrivers(engine *cluster.Engine) (volumeDrivers
 		return nil, err
 	}
 
+	nd, err := newNFSDriver(at.ormer, engine.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	drivers = append(drivers, nd)
+
 	// TODO:third-part volumeDrivers
 
 	return drivers, nil
@@ -105,7 +111,7 @@ func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n
 		return nil, err
 	}
 
-	lvs, err := drivers.AllocVolumes(uid, stores)
+	lvs, err := drivers.AllocVolumes(config, uid, stores)
 	if err != nil {
 		return nil, err
 	}
@@ -128,23 +134,38 @@ func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n
 	return volumes, nil
 }
 
-func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, cpu, memory int, reserved []string) (string, error) {
-	if node.TotalCpus-node.UsedCpus < int64(cpu) {
-		return "", errors.New("")
+func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, ncpu, memory int64, reserved []string) (string, error) {
+	if free := node.TotalCpus - node.UsedCpus; free < ncpu {
+		return "", errors.Errorf("Node:%s CPU is unavailable,%d<%d", node.Addr, free, ncpu)
 	}
 
-	if node.TotalMemory-node.UsedMemory < int64(memory) {
-		return "", errors.New("")
+	if free := node.TotalMemory - node.UsedMemory; free < memory {
+		return "", errors.Errorf("Node:%s Memory is unavailable,%d<%d", node.Addr, free, memory)
 	}
 
-	containers := node.Containers
-	used := make([]string, 0, len(containers)+len(reserved))
-	used = append(used, reserved...)
-	for i := range containers {
-		used = append(used, containers[i].Config.HostConfig.CpusetCpus)
+	var (
+		cpuset string
+		err    error
+	)
+
+	if ncpu > 0 {
+		containers := node.Containers
+		used := make([]string, 0, len(containers)+len(reserved))
+		used = append(used, reserved...)
+		for i := range containers {
+			used = append(used, containers[i].Config.HostConfig.CpusetCpus)
+		}
+
+		cpuset, err = findIdleCPUs(used, int(node.TotalCpus), int(ncpu))
+		if err != nil {
+			return "", err
+		}
 	}
 
-	return findIdleCPUs(used, int(node.TotalCpus), cpu)
+	config.HostConfig.Resources.CpusetCpus = cpuset
+	config.HostConfig.Resources.Memory = memory
+
+	return cpuset, nil
 }
 
 func (at allocator) RecycleResource() error {
@@ -172,33 +193,6 @@ func findIdleCPUs(used []string, total, ncpu int) (string, error) {
 	return strings.Join(free, ","), nil
 }
 
-func reduceCPUset(cpusetCpus string, need int) (string, error) {
-	cpus, err := utils.ParseUintList(cpusetCpus)
-	if err != nil {
-		return "", errors.Wrap(err, "parse cpusetCpus:"+cpusetCpus)
-	}
-
-	cpuSlice := make([]int, 0, len(cpus))
-	for k, ok := range cpus {
-		if ok {
-			cpuSlice = append(cpuSlice, k)
-		}
-	}
-
-	if len(cpuSlice) < need {
-		return cpusetCpus, errors.Errorf("%s is shortage for need %d", cpusetCpus, need)
-	}
-
-	sort.Ints(cpuSlice)
-
-	cpuString := make([]string, need)
-	for n := 0; n < need; n++ {
-		cpuString[n] = strconv.Itoa(cpuSlice[n])
-	}
-
-	return strings.Join(cpuString, ","), nil
-}
-
 func parseUintList(list []string) (map[int]bool, error) {
 	if len(list) == 0 {
 		return map[int]bool{}, nil
@@ -223,42 +217,36 @@ func parseUintList(list []string) (map[int]bool, error) {
 }
 
 func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string,
-	requires []structs.NetDeviceRequire) ([]database.IP, error) {
+	candidates []string, requires []structs.NetDeviceRequire) ([]database.IP, error) {
 
 	engine := at.cluster.Engine(engineID)
 	if engine == nil {
 		return nil, errors.New("Engine not found")
 	}
 
-	devm, width, err := nic.ParseEngineNetDevice(engine)
+	used, err := at.ormer.ListIPByEngine(engine.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, d := range devm {
-		if d.Bandwidth > 0 {
-			width = width - d.Bandwidth
+	devm, width, err := nic.ParseTotalDevice(engine)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range used {
+		if used[i].Bandwidth > 0 {
+			width = width - used[i].Bandwidth
+
+			delete(devm, used[i].Bond)
 		}
 	}
 
-	index, vnic := 0, 0
-	in := make([]database.NetworkingRequire, 0, len(requires))
-	nm := make(map[string]int, len(requires))
+	vnic := 0
 	for _, req := range requires {
 		if req.Bandwidth > 0 {
 			width = width - req.Bandwidth
 			vnic++
-		}
-
-		if v, exist := nm[req.Networking]; exist && index > v {
-			in[v].Num++
-		} else {
-			nm[req.Networking] = index
-			in = append(in, database.NetworkingRequire{
-				Networking: req.Networking,
-				Num:        1,
-			})
-			index++
 		}
 	}
 
@@ -278,36 +266,50 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 		return nil, errors.Errorf("Engine:%s not enough Bandwidth for require", engine.Addr)
 	}
 
-	networkings, err := at.ormer.AllocNetworking(in, unitID)
-	if err != nil {
-		return nil, err
-	}
-
-	used := make(map[uint32]struct{}, len(requires))
-	for i, req := range requires {
-
-	ips:
-		for n := range networkings {
-			if _, exist := used[networkings[n].IPAddr]; exist {
-				continue ips
-			}
-			if req.Networking == networkings[n].Networking {
-				ready[i] = nic.Device{
-					Bond:      ready[i].Bond,
-					MAC:       ready[i].MAC,
-					Bandwidth: req.Bandwidth,
-					IP:        utils.Uint32ToIP(networkings[n].IPAddr).String(),
-					Mask:      strconv.Itoa(networkings[n].Prefix),
-					Gateway:   networkings[n].Gateway,
-					VLAN:      networkings[n].VLAN,
-				}
-
-				used[networkings[n].IPAddr] = struct{}{}
-			}
+	index := 0
+	in := make([]database.NetworkingRequire, 0, len(requires))
+	for i := range requires {
+		if requires[i].Bandwidth > 0 {
+			in = append(in, database.NetworkingRequire{
+				Bond:      ready[index].Bond,
+				Bandwidth: ready[index].Bandwidth,
+			})
+			index++
 		}
 	}
 
-	nic.SaveIntoContainerLabel(config, ready)
+	var out []database.IP
+	for i := range candidates {
+		for l := range in {
+			in[l].Networking = candidates[i]
+		}
+		out, err = at.ormer.AllocNetworking(unitID, engine.ID, in)
+		if err == nil {
+			break
+		}
+	}
 
-	return networkings, nil
+	if len(out) != len(in) {
+		n := 0
+	loop:
+		for i := range in {
+			for _, c := range candidates {
+				in[i].Networking = c
+				n++
+
+				if n == len(in) {
+					break loop
+				}
+			}
+		}
+
+		out, err = at.ormer.AllocNetworking(unitID, engine.ID, in)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	config.HostConfig.NetworkMode = "none"
+
+	return out, nil
 }

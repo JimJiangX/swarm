@@ -1,13 +1,13 @@
 package garden
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
@@ -19,21 +19,176 @@ import (
 	"github.com/docker/swarm/scheduler/filter"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/docker/swarm/scheduler/strategy"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
-const clusterLabel = "Cluster"
+// add engine labels for schedule
+const (
+	roomLabel    = "room"
+	seatLabel    = "seat"
+	nodeLabel    = "node"
+	clusterLabel = "cluster"
+)
 
 type allocator interface {
 	ListCandidates(clusters, filters []string, stores []structs.VolumeRequire) ([]database.Node, error)
 
-	AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, cpu, memory int, reserved []string) (string, error)
+	AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, ncpu, memory int64, reserved []string) (string, error)
 
 	AlloctVolumes(config *cluster.ContainerConfig, id string, n *node.Node, stores []structs.VolumeRequire) ([]volume.VolumesCreateBody, error)
 
-	AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string, requires []structs.NetDeviceRequire) ([]database.IP, error)
+	AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string, networkings []string, requires []structs.NetDeviceRequire) ([]database.IP, error)
 
 	RecycleResource() error
+}
+
+func convertService(svc database.Service) structs.Service {
+	if svc.Desc == nil {
+		svc.Desc = &database.ServiceDesc{}
+	}
+
+	return structs.Service{
+		ID:                   svc.ID,
+		Name:                 svc.Name,
+		Image:                svc.Desc.Image,
+		Desc:                 svc.DescID,
+		Architecture:         svc.Desc.Architecture,
+		Tag:                  svc.Tag,
+		AutoHealing:          svc.AutoHealing,
+		AutoScaling:          svc.AutoScaling,
+		HighAvailable:        svc.HighAvailable,
+		Status:               svc.Status,
+		BackupMaxSizeByte:    svc.BackupMaxSizeByte,
+		BackupFilesRetention: svc.BackupFilesRetention,
+		CreatedAt:            svc.CreatedAt.String(),
+		FinishedAt:           svc.FinishedAt.String(),
+	}
+}
+
+func convertStructsService(spec structs.ServiceSpec) (database.Service, error) {
+	vb, err := json.Marshal(spec.Require.Volumes)
+	if err != nil {
+		return database.Service{}, errors.Wrap(err, "convert structs.Service")
+	}
+
+	var nw = struct {
+		NetworkingIDs []string
+		Require       []structs.NetDeviceRequire
+	}{
+		spec.Networkings,
+		spec.Require.Networks,
+	}
+
+	nwb, err := json.Marshal(nw)
+	if err != nil {
+		return database.Service{}, errors.Wrap(err, "convert structs.Service")
+	}
+
+	arch, err := json.Marshal(spec.Arch)
+	if err != nil {
+		return database.Service{}, errors.Wrap(err, "convert structs.Service")
+	}
+
+	desc := database.ServiceDesc{
+		ID:           utils.Generate32UUID(),
+		ServiceID:    spec.ID,
+		Architecture: string(arch),
+		Replicas:     spec.Arch.Replicas,
+		NCPU:         spec.Require.Require.CPU,
+		Memory:       spec.Require.Require.Memory,
+		Image:        spec.Image,
+		Volumes:      string(vb),
+		Networks:     string(nwb),
+		Clusters:     strings.Join(spec.Clusters, ","),
+		Previous:     "",
+	}
+
+	return database.Service{
+		ID:                   spec.ID,
+		Name:                 spec.Name,
+		DescID:               desc.ID,
+		Tag:                  spec.Tag,
+		AutoHealing:          spec.AutoHealing,
+		AutoScaling:          spec.AutoScaling,
+		HighAvailable:        spec.HighAvailable,
+		Status:               statusServcieBuilding,
+		BackupMaxSizeByte:    spec.BackupMaxSizeByte,
+		BackupFilesRetention: spec.BackupFilesRetention,
+		CreatedAt:            time.Now(),
+
+		Desc: &desc,
+	}, nil
+}
+
+// TODO:convert to structs.UnitSpec
+func convertUnitInfoToSpec(info database.UnitInfo) structs.UnitSpec {
+	return structs.UnitSpec{
+		Unit: structs.Unit(info.Unit),
+
+		Engine: struct {
+			ID   string
+			Addr string
+		}{
+			ID:   info.Engine.EngineID,
+			Addr: info.Engine.Addr,
+		},
+
+		//	Networking struct {
+		//		Type    string
+		//		Devices string
+		//		Mask    int
+		//		IPs     []struct {
+		//			Name  string
+		//			IP    string
+		//			Proto string
+		//		}
+		//		Ports []struct {
+		//			Name string
+		//			Port int
+		//		}
+		//	}
+
+		//	Volumes []struct {
+		//		Type    string
+		//		Driver  string
+		//		Size    int
+		//		Options map[string]interface{}
+		//	}
+	}
+}
+
+func ConvertServiceInfo(info database.ServiceInfo) structs.ServiceSpec {
+	units := make([]structs.UnitSpec, 0, len(info.Units))
+
+	for u := range info.Units {
+		units = append(units, convertUnitInfoToSpec(info.Units[u]))
+	}
+
+	arch := structs.Arch{}
+	r := strings.NewReader(info.Service.Desc.Architecture)
+	json.NewDecoder(r).Decode(&arch)
+
+	return structs.ServiceSpec{
+		Arch:    arch,
+		Service: convertService(info.Service),
+		Units:   units,
+	}
+}
+
+func (gd *Garden) GetService(nameOrID string) (*Service, error) {
+	s, err := gd.ormer.GetService(nameOrID)
+	if err != nil {
+		return nil, err
+	}
+
+	spec := structs.ServiceSpec{
+		Service: convertService(s),
+	}
+
+	svc := gd.NewService(spec)
+
+	return svc, nil
 }
 
 func (gd *Garden) Service(nameOrID string) (*Service, error) {
@@ -42,14 +197,11 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 		return nil, err
 	}
 
-	spec := structs.ServiceSpec{
-		Service: structs.Service(info.Service),
-		// TODO: other params
-	}
+	spec := ConvertServiceInfo(info)
 
-	s := gd.NewService(spec)
+	svc := gd.NewService(spec)
 
-	return s, nil
+	return svc, nil
 }
 
 func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, error) {
@@ -58,66 +210,30 @@ func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, erro
 		return nil, err
 	}
 
-	services := make([]structs.ServiceSpec, len(list))
+	out := make([]structs.ServiceSpec, len(list))
+
 	for i := range list {
-		units := make([]structs.UnitSpec, 0, len(list[i].Units))
-
-		for u := range list[i].Units {
-			unit := list[i].Units[u]
-
-			// TODO:convert to structs.UnitSpec
-
-			units = append(units, structs.UnitSpec{
-				Unit: structs.Unit(unit.Unit),
-
-				//	Require, Limit struct {
-				//		CPU    string
-				//		Memory int64
-				//	}
-
-				Engine: struct {
-					ID   string
-					Name string
-					IP   string
-				}{
-					ID: unit.Engine.EngineID,
-					//	Name: unit.Engine.Name,
-					IP: unit.Engine.Addr,
-				},
-
-				//	Networking struct {
-				//		Type    string
-				//		Devices string
-				//		Mask    int
-				//		IPs     []struct {
-				//			Name  string
-				//			IP    string
-				//			Proto string
-				//		}
-				//		Ports []struct {
-				//			Name string
-				//			Port int
-				//		}
-				//	}
-
-				//	Volumes []struct {
-				//		Type    string
-				//		Driver  string
-				//		Size    int
-				//		Options map[string]interface{}
-				//	}
-			})
-		}
-
-		services = append(services, structs.ServiceSpec{
-			Replicas: len(list[i].Units),
-			Service:  structs.Service(list[i].Service),
-			//	Users:    list[i].Users,
-			Units: units,
-		})
+		spec := ConvertServiceInfo(list[i])
+		out = append(out, spec)
 	}
 
-	return services, nil
+	return out, nil
+}
+
+func getImage(orm database.ImageOrmer, version string) (database.Image, string, error) {
+	im, err := orm.GetImageVersion(version)
+	if err != nil {
+		return im, "", err
+	}
+
+	reg, err := orm.GetRegistry()
+	if err != nil {
+		return im, "", err
+	}
+
+	name := fmt.Sprintf("%s:%d/%s", reg.Domain, reg.Port, im.Version())
+
+	return im, name, nil
 }
 
 func (gd *Garden) validServiceSpec(spec structs.ServiceSpec) error {
@@ -125,38 +241,43 @@ func (gd *Garden) validServiceSpec(spec structs.ServiceSpec) error {
 }
 
 func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Task, error) {
+	options := scheduleOption{
+		highAvailable: spec.Arch.Replicas > 0,
+		require:       spec.Require,
+	}
+
+	options.nodes.constraints = spec.Constraints
+	options.nodes.networkings = spec.Networkings
+	options.nodes.clusters = spec.Clusters
+
 	err := gd.validServiceSpec(spec)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	//	image, err := gd.ormer.GetImage(spec.Image)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-
-	if spec.ID == "" {
-		spec.ID = utils.Generate32UUID()
-	}
-
-	desc := bytes.NewBuffer(nil)
-	err = json.NewEncoder(desc).Encode(spec)
+	im, err := gd.ormer.GetImageVersion(spec.Image)
 	if err != nil {
 		return nil, nil, err
 	}
+	if spec.ID == "" {
+		spec.ID = utils.Generate32UUID()
+	}
+	svc, err := convertStructsService(spec)
+	if err != nil {
+		return nil, nil, err
+	}
+	svc.Desc.ImageID = im.ID
 
-	spec.Desc = desc.String()
+	us := make([]database.Unit, spec.Arch.Replicas)
+	units := make([]structs.UnitSpec, spec.Arch.Replicas)
 
-	us := make([]database.Unit, spec.Replicas)
-	units := make([]structs.UnitSpec, spec.Replicas)
-
-	for i := 0; i < spec.Replicas; i++ {
+	for i := 0; i < spec.Arch.Replicas; i++ {
 
 		uid := utils.Generate32UUID()
 		us[i] = database.Unit{
 			ID:          uid,
 			Name:        fmt.Sprintf("%s_%s", spec.Name, uid[:8]), // <service_name>_<unit_id_8bit>
-			Type:        "",
+			Type:        im.Name,
 			ServiceID:   spec.ID,
 			NetworkMode: "none",
 			Status:      0,
@@ -168,21 +289,16 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 
 	spec.Units = units
 
-	t := database.NewTask(spec.Name, database.ServiceCreateTask, spec.ID, spec.Desc, "", 300)
+	t := database.NewTask(spec.Name, database.ServiceRunTask, spec.ID, spec.Desc, "", 300)
 
-	err = gd.ormer.InsertService(database.Service(spec.Service), us, &t, nil)
+	err = gd.ormer.InsertService(svc, us, &t)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	service := gd.NewService(spec)
 
-	service.options = scheduleOption{
-		highAvailable: spec.Replicas > 0,
-		ContainerSpec: spec.ContainerSpec,
-		Options:       spec.Options,
-	}
-	service.options.nodes.constraint = spec.Constraint
+	service.options = options
 
 	return service, &t, nil
 }
@@ -190,15 +306,13 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 type scheduleOption struct {
 	highAvailable bool
 
-	ContainerSpec structs.ContainerSpec
-
-	Options map[string]interface{}
+	require structs.UnitRequire
 
 	nodes struct {
-		// clusterType string
-		clusters   []string
-		filters    []string
-		constraint []string
+		networkings []string
+		clusters    []string
+		filters     []string
+		constraints []string
 	}
 
 	scheduler struct {
@@ -207,17 +321,16 @@ type scheduleOption struct {
 	}
 }
 
-func (gd *Garden) schedule(ctx context.Context, config *cluster.ContainerConfig, opts scheduleOption, stores []structs.VolumeRequire) ([]*node.Node, error) {
+func (gd *Garden) schedule(ctx context.Context, actor allocator, config *cluster.ContainerConfig, opts scheduleOption) ([]*node.Node, error) {
 	_scheduler := gd.scheduler
 
 	if opts.scheduler.strategy != "" && len(opts.scheduler.filters) > 0 {
 		strategy, _ := strategy.New(opts.scheduler.strategy)
 		filters, _ := filter.New(opts.scheduler.filters)
-		_scheduler = scheduler.New(strategy, filters)
-	}
 
-	if len(opts.nodes.filters) > 0 {
-		config.AddConstraint("node!=" + strings.Join(opts.nodes.filters, "|"))
+		if strategy != nil && len(filters) > 0 {
+			_scheduler = scheduler.New(strategy, filters)
+		}
 	}
 
 	select {
@@ -226,7 +339,7 @@ func (gd *Garden) schedule(ctx context.Context, config *cluster.ContainerConfig,
 		return nil, ctx.Err()
 	}
 
-	out, err := gd.allocator.ListCandidates(opts.nodes.clusters, opts.nodes.filters, stores)
+	out, err := actor.ListCandidates(opts.nodes.clusters, opts.nodes.filters, opts.require.Volumes)
 	if err != nil {
 		return nil, err
 	}
@@ -250,6 +363,9 @@ func (gd *Garden) schedule(ctx context.Context, config *cluster.ContainerConfig,
 				}
 
 				n.Labels[clusterLabel] = out[o].ClusterID
+				n.Labels[nodeLabel] = out[o].ID
+				n.Labels[roomLabel] = out[o].Room
+				n.Labels[seatLabel] = out[o].Seat
 				break
 			}
 		}
@@ -281,25 +397,33 @@ func (pu pendingUnit) convertToSpec() structs.UnitSpec {
 	return structs.UnitSpec{}
 }
 
-func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, error) {
-	config := cluster.BuildContainerConfig(container.Config{}, container.HostConfig{
+func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service) ([]pendingUnit, error) {
+	_, version, err := getImage(gd.Ormer(), svc.spec.Image)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := svc.options
+	config := cluster.BuildContainerConfig(container.Config{
+		Image: version,
+	}, container.HostConfig{
+		Binds: []string{"/etc/localtime:/etc/localtime:ro"},
 		Resources: container.Resources{
-			CpusetCpus: svc.options.ContainerSpec.Require.CPU,
-			Memory:     svc.options.ContainerSpec.Require.Memory,
+			CpusetCpus: strconv.Itoa(opts.require.Require.CPU),
+			Memory:     opts.require.Require.Memory,
 		},
 	}, network.NetworkingConfig{})
 
-	opts := svc.options
-
-	if len(opts.nodes.constraint) > 0 {
-		for i := range opts.nodes.constraint {
-			config.AddConstraint(opts.nodes.constraint[i])
+	{
+		for i := range opts.nodes.constraints {
+			config.AddConstraint(opts.nodes.constraints[i])
 		}
-	}
-
-	ncpu, err := strconv.Atoi(config.HostConfig.CpusetCpus)
-	if err != nil {
-		return nil, err
+		if len(opts.nodes.filters) > 0 {
+			config.AddConstraint(nodeLabel + "!=" + strings.Join(opts.nodes.filters, "|"))
+		}
+		if out := opts.nodes.clusters; len(out) > 0 {
+			config.AddConstraint(clusterLabel + "==" + strings.Join(out, "|"))
+		}
 	}
 
 	gd.Lock()
@@ -308,8 +432,7 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 	gd.scheduler.Lock()
 	defer gd.scheduler.Unlock()
 
-	stores := opts.ContainerSpec.Volumes
-	nodes, err := gd.schedule(ctx, config, opts, stores)
+	nodes, err := gd.schedule(ctx, actor, config, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -322,11 +445,15 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 	)
 
 	defer func() {
+		if r := recover(); r != nil {
+			err = errors.Errorf("panic:%v", r)
+		}
 		// cancel allocation
 		if len(bad) > 0 {
-			err := gd.allocator.RecycleResource()
-			if err != nil {
-				// TODO:
+			_err := actor.RecycleResource()
+			if _err != nil {
+				logrus.WithField("Service", svc.spec.Name).Errorf("Recycle resources error:%+v", err)
+				err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
 			}
 
 			ids := make([]string, len(bad))
@@ -357,21 +484,12 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 			volumes:     make([]volume.VolumesCreateBody, 0, len(units)),
 		}
 
-		cpuset, err := gd.allocator.AlloctCPUMemory(pu.config, nodes[n], ncpu, int(config.HostConfig.Memory), nil)
+		_, err := actor.AlloctCPUMemory(pu.config, nodes[n], int64(opts.require.Require.CPU), config.HostConfig.Memory, nil)
 		if err != nil {
 			continue
 		}
 
-		volumes, err := gd.allocator.AlloctVolumes(pu.config, pu.Unit.ID, nodes[n], stores)
-		if len(volumes) > 0 {
-			pu.volumes = append(pu.volumes, volumes...)
-		}
-		if err != nil {
-			bad = append(bad, pu)
-			continue
-		}
-
-		networkings, err := gd.allocator.AlloctNetworking(pu.config, nodes[n].ID, pu.Unit.ID, opts.ContainerSpec.Networkings)
+		networkings, err := actor.AlloctNetworking(pu.config, nodes[n].ID, pu.Unit.ID, opts.nodes.networkings, opts.require.Networks)
 		if len(networkings) > 0 {
 			pu.networkings = append(pu.networkings, networkings...)
 		}
@@ -380,11 +498,17 @@ func (gd *Garden) Allocation(ctx context.Context, svc *Service) ([]pendingUnit, 
 			continue
 		}
 
+		volumes, err := actor.AlloctVolumes(pu.config, pu.Unit.ID, nodes[n], opts.require.Volumes)
+		if len(volumes) > 0 {
+			pu.volumes = append(pu.volumes, volumes...)
+		}
+		if err != nil {
+			bad = append(bad, pu)
+			continue
+		}
+
 		pu.config.SetSwarmID(pu.swarmID)
 		pu.Unit.EngineID = nodes[n].ID
-
-		pu.config.HostConfig.Resources.CpusetCpus = cpuset
-		pu.config.HostConfig.Resources.Memory = config.HostConfig.Memory
 
 		gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[n].ID, pu.config)
 

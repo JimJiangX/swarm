@@ -2,7 +2,7 @@ package structs
 
 type PostNetworkingRequest struct {
 	Prefix     int    `json:"prefix"`
-	VLAN       byte   `json:"vlan"`
+	VLAN       int    `json:"vlan_id"`
 	Start      string `json:"start"`
 	End        string `json:"end"`
 	Gateway    string `json:"gateway"`

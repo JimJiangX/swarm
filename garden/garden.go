@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -50,7 +49,6 @@ type Garden struct {
 	kvClient     kvstore.Client
 	pluginClient pluginapi.PluginAPI
 
-	allocator allocator
 	cluster.Cluster
 	scheduler  *scheduler.Scheduler
 	tlsConfig  *tls.Config
@@ -59,11 +57,10 @@ type Garden struct {
 
 func NewGarden(kvc kvstore.Client, cl cluster.Cluster,
 	scheduler *scheduler.Scheduler, ormer database.Ormer,
-	allocator allocator, pClient pluginapi.PluginAPI, tlsConfig *tls.Config) *Garden {
+	pClient pluginapi.PluginAPI, tlsConfig *tls.Config) *Garden {
 	return &Garden{
 		// Mutex:       &scheduler.Mutex,
 		kvClient:     kvc,
-		allocator:    allocator,
 		Cluster:      cl,
 		ormer:        ormer,
 		pluginClient: pClient,
@@ -104,20 +101,20 @@ func (gd *Garden) Register(req structs.RegisterDC) error {
 	//	}
 
 	config := database.SysConfig{
-		ID:         req.ID,
-		DockerPort: req.DockerPort,
-		PluginPort: req.PluginPort,
-		BackupDir:  req.BackupDir,
-		Retry:      req.Retry,
+		ID:        req.ID,
+		BackupDir: req.BackupDir,
+		Retry:     req.Retry,
+		Ports: database.Ports{
+			Docker:     req.DockerPort,
+			Plugin:     req.PluginPort,
+			SwarmAgent: req.SwarmAgentPort,
+		},
 		ConsulConfig: database.ConsulConfig{
 			ConsulIPs:        req.Consul.ConsulIPs,
 			ConsulPort:       req.Consul.ConsulPort,
 			ConsulDatacenter: req.Consul.ConsulDatacenter,
 			ConsulToken:      req.Consul.ConsulToken,
 			ConsulWaitTime:   req.Consul.ConsulWaitTime,
-		},
-		HorusConfig: database.HorusConfig{
-			HorusAgentPort: req.Horus.HorusAgentPort,
 		},
 		Registry: database.Registry{
 			OsUsername: req.Registry.OsUsername,
@@ -138,18 +135,18 @@ func (gd *Garden) Register(req structs.RegisterDC) error {
 			InitScriptName:  req.SSHDeliver.InitScriptName,
 			CleanScriptName: req.SSHDeliver.CleanScriptName,
 		},
-		Users: database.Users{
-			MonitorUsername:     req.Users.MonitorUsername,
-			MonitorPassword:     req.Users.MonitorPassword,
-			ReplicationUsername: req.Users.ReplicationUsername,
-			ReplicationPassword: req.Users.ReplicationPassword,
-			ApplicationUsername: req.Users.ApplicationUsername,
-			ApplicationPassword: req.Users.ApplicationPassword,
-			DBAUsername:         req.Users.DBAUsername,
-			DBAPassword:         req.Users.DBAPassword,
-			DBUsername:          req.Users.DBUsername,
-			DBPassword:          req.Users.DBPassword,
-		},
+		//		Users: database.Users{
+		//			MonitorUsername:     req.Users.MonitorUsername,
+		//			MonitorPassword:     req.Users.MonitorPassword,
+		//			ReplicationUsername: req.Users.ReplicationUsername,
+		//			ReplicationPassword: req.Users.ReplicationPassword,
+		//			ApplicationUsername: req.Users.ApplicationUsername,
+		//			ApplicationPassword: req.Users.ApplicationPassword,
+		//			DBAUsername:         req.Users.DBAUsername,
+		//			DBAPassword:         req.Users.DBAPassword,
+		//			DBUsername:          req.Users.DBUsername,
+		//			DBPassword:          req.Users.DBPassword,
+		//		},
 	}
 
 	kvc := gd.KVClient()
@@ -211,69 +208,6 @@ func pingHorus(kvc kvstore.Client) error {
 
 func validGardenRegister(req *structs.RegisterDC) error {
 	buf := bytes.NewBuffer(nil)
-
-	s := strings.TrimSpace(req.Users.ApplicationUsername)
-	if len(s) > 0 {
-		req.Users.ApplicationUsername = s
-	} else {
-		buf.WriteString("Users:Application Username is nil\n")
-	}
-
-	s = strings.TrimSpace(req.Users.ApplicationPassword)
-	if len(s) > 0 {
-		req.Users.ApplicationPassword = s
-	} else {
-		buf.WriteString("Users:Application Password is nil\n")
-	}
-
-	s = strings.TrimSpace(req.Users.DBAUsername)
-	if len(s) > 0 {
-		req.Users.DBAUsername = s
-	} else {
-		buf.WriteString("Users:DBA Username is nil\n")
-	}
-
-	s = strings.TrimSpace(req.Users.DBAPassword)
-	if len(s) > 0 {
-		req.Users.DBAPassword = s
-	} else {
-		buf.WriteString("Users:DBA Password is nil\n")
-	}
-
-	s = strings.TrimSpace(req.Users.DBUsername)
-	if len(s) > 0 {
-		req.Users.DBUsername = s
-	} else {
-		buf.WriteString("Users:DB Username is nil\n")
-	}
-
-	s = strings.TrimSpace(req.Users.MonitorUsername)
-	if len(s) > 0 {
-		req.Users.MonitorUsername = s
-	} else {
-		buf.WriteString("Users:Monitor Username is nil\n")
-	}
-
-	s = strings.TrimSpace(req.Users.MonitorPassword)
-	if len(s) > 0 {
-		req.Users.MonitorPassword = s
-	} else {
-		buf.WriteString("Users:Monitor Password is nil\n")
-	}
-
-	s = strings.TrimSpace(req.Users.ReplicationUsername)
-	if len(s) > 0 {
-		req.Users.ReplicationUsername = s
-	} else {
-		buf.WriteString("Users:Replication Username is nil\n")
-	}
-
-	s = strings.TrimSpace(req.Users.ReplicationPassword)
-	if len(s) > 0 {
-		req.Users.ReplicationPassword = s
-	} else {
-		buf.WriteString("Users:Replication Password is nil\n")
-	}
 
 	if buf.Len() == 0 {
 		return nil

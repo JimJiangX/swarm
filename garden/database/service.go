@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"strings"
 	"time"
 
@@ -9,7 +10,7 @@ import (
 )
 
 type ServiceInterface interface {
-	InsertService(svc Service, units []Unit, t *Task, users []User) error
+	InsertService(svc Service, units []Unit, t *Task) error
 
 	GetService(nameOrID string) (Service, error)
 	GetServiceStatus(nameOrID string) (int, error)
@@ -18,9 +19,13 @@ type ServiceInterface interface {
 	ListServices() ([]Service, error)
 
 	SetServiceStatus(nameOrID string, val int, finish time.Time) error
-	SetServcieDesc(id, desc string, size int) error
-	ServiceStatusCAS(nameOrID string, val int, finish time.Time, f func(val int) bool) (bool, int, error)
-	SetServiceWithTask(svc *Service, t Task, state int, finish time.Time) error
+	// SetServcieDesc(id, desc string, size int) error
+	ServiceStatusCAS(nameOrID string, val int, t *Task, f func(val int) bool) (bool, int, error)
+	SetServiceWithTask(nameOrID string, val int, t *Task, finish time.Time) error
+
+	//	SetServiceScale(svc Service, t Task) error
+
+	SetServiceDesc(svc Service) error
 }
 
 type ServiceInfoInterface interface {
@@ -31,29 +36,39 @@ type ServiceInfoInterface interface {
 }
 
 type ServiceOrmer interface {
-	UnitOrmer
-
-	UserOrmer
-
-	ImageOrmer
-
 	ServiceInterface
 
 	ServiceInfoInterface
+
+	UnitInterface
+
+	ContainerInterface
+
+	NodeInterface
+
+	VolumeOrmer
+
+	NetworkingOrmer
+
+	ImageInterface
+
+	TaskOrmer
+
+	SysConfigOrmer
 }
 
 // Service if table structure
 type Service struct {
+	Desc *ServiceDesc
+
 	ID                string `db:"id" json:"id"`
 	Name              string `db:"name" json:"name"`
-	Image             string `db:"image_id" json:"image_id"`       // imageName:imageVersion
-	Desc              string `db:"description" json:"description"` // short for Description
-	Architecture      string `db:"architecture" json:"architecture"`
-	Tag               string `db:"tag" json:"tag"` // part of business
+	DescID            string `db:"description_id" json:"description_id"` // short for Description
+	Tag               string `db:"tag" json:"tag"`                       // part of business
 	AutoHealing       bool   `db:"auto_healing" json:"auto_healing"`
 	AutoScaling       bool   `db:"auto_scaling" json:"auto_scaling"`
 	HighAvailable     bool   `db:"high_available" json:"high_available"`
-	Status            int    `db:"status" json:"status"`
+	Status            int    `db:"action_status" json:"action_status"`
 	BackupMaxSizeByte int    `db:"backup_max_size" json:"backup_max_size"`
 	// count by Day,used in swarm.BackupTaskCallback(),calculate BackupFile.Retention
 	BackupFilesRetention int       `db:"backup_files_retention" json:"backup_files_retention"`
@@ -62,12 +77,15 @@ type Service struct {
 }
 
 func (s Service) ParseImage() (string, string) {
-	parts := strings.SplitN(s.Image, ":", 2)
+	if s.Desc == nil {
+		return "", ""
+	}
+	parts := strings.SplitN(s.Desc.Image, ":", 2)
 	if len(parts) == 2 {
 		return parts[0], parts[1]
 	}
 
-	return s.Image, ""
+	return s.Desc.Image, ""
 }
 
 func (db dbBase) serviceTable() string {
@@ -78,10 +96,32 @@ func (db dbBase) serviceTable() string {
 func (db dbBase) ListServices() ([]Service, error) {
 	var (
 		out   []Service
-		query = "SELECT id,name,image_id,description,architecture,tag,auto_healing,auto_scaling,high_available,status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable()
+		query = "SELECT id,name,description_id,tag,auto_healing,auto_scaling,high_available,action_status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable()
 	)
 
 	err := db.Select(&out, query)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return nil, nil
+		}
+
+		return nil, errors.Wrap(err, "list []Service")
+	}
+
+	list, err := db.listServiceDescs()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range out {
+	in:
+		for l := range list {
+			if out[i].DescID == list[l].ID {
+				out[i].Desc = &list[l]
+				break in
+			}
+		}
+	}
 
 	return out, errors.Wrap(err, "list []Service")
 }
@@ -90,10 +130,22 @@ func (db dbBase) ListServices() ([]Service, error) {
 func (db dbBase) GetService(nameOrID string) (Service, error) {
 	var (
 		s     = Service{}
-		query = "SELECT id,name,image_id,description,architecture,tag,auto_healing,auto_scaling,high_available,status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable() + " WHERE id=? OR name=?"
+		query = "SELECT id,name,description_id,tag,auto_healing,auto_scaling,high_available,action_status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable() + " WHERE id=? OR name=?"
 	)
 
 	err := db.Get(&s, query, nameOrID, nameOrID)
+	if err != nil {
+		return s, errors.Wrap(err, "get Service by nameOrID")
+	}
+
+	if s.DescID != "" {
+		desc, err := db.getServiceDesc(s.DescID)
+		if err != nil {
+			return s, err
+		}
+
+		s.Desc = &desc
+	}
 
 	return s, errors.Wrap(err, "get Service by nameOrID")
 }
@@ -102,7 +154,7 @@ func (db dbBase) GetService(nameOrID string) (Service, error) {
 func (db dbBase) GetServiceStatus(nameOrID string) (int, error) {
 	var (
 		n     int
-		query = "SELECT status FROM " + db.serviceTable() + " WHERE id=? OR name=?"
+		query = "SELECT action_status FROM " + db.serviceTable() + " WHERE id=? OR name=?"
 	)
 
 	err := db.Get(&n, query, nameOrID, nameOrID)
@@ -114,48 +166,30 @@ func (db dbBase) GetServiceStatus(nameOrID string) (int, error) {
 func (db dbBase) GetServiceByUnit(nameOrID string) (Service, error) {
 
 	var (
-		queryUnit    = "SELECT service_id FROM " + db.unitTable() + " WHERE id=? OR name=?"
-		queryService = "SELECT id,name,image_id,description,architecture,tag,auto_healing,auto_scaling,high_available,status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable() + " WHERE id=?"
-
-		id      string
-		service Service
+		id    string
+		query = "SELECT service_id FROM " + db.unitTable() + " WHERE id=? OR name=?"
 	)
 
-	err := db.Get(&id, queryUnit, nameOrID, nameOrID)
+	err := db.Get(&id, query, nameOrID, nameOrID)
 	if err != nil {
-		return service, errors.Wrap(err, "get Unit")
+		return Service{}, errors.Wrap(err, "get Unit")
 	}
 
-	err = db.Get(&service, queryService, id)
-	if err != nil {
-		return service, errors.Wrap(err, "get Service")
-	}
+	service, err := db.GetService(id)
 
 	return service, errors.Wrap(err, "get Service by unit")
 }
 
-// SetServcieDesc update Service Description
-func (db dbBase) SetServcieDesc(id, desc string, size int) (err error) {
-	switch {
+// SetServiceBackupSize update Service BackupMaxSizeByte
+func (db dbBase) SetServiceBackupSize(id string, size int) (err error) {
 
-	case size > 0 && desc != "":
-		query := "UPDATE " + db.serviceTable() + " SET backup_max_size=?,description=? WHERE id=?"
-		_, err = db.Exec(query, size, desc, id)
-
-	case size > 0:
-		query := "UPDATE " + db.serviceTable() + " SET backup_max_size=? WHERE id=?"
-		_, err = db.Exec(query, size, id)
-
-	case desc != "":
-		query := "UPDATE " + db.serviceTable() + " SET description=? WHERE id=?"
-		_, err = db.Exec(query, desc, id)
-
-	}
+	query := "UPDATE " + db.serviceTable() + " SET backup_max_size=? WHERE id=?"
+	_, err = db.Exec(query, size, id)
 
 	return errors.Wrap(err, "update Service.Desc")
 }
 
-func (db dbBase) ServiceStatusCAS(nameOrID string, val int, finish time.Time, f func(val int) bool) (bool, int, error) {
+func (db dbBase) ServiceStatusCAS(nameOrID string, val int, t *Task, f func(val int) bool) (bool, int, error) {
 	var (
 		status int
 		done   bool
@@ -163,7 +197,7 @@ func (db dbBase) ServiceStatusCAS(nameOrID string, val int, finish time.Time, f 
 
 	do := func(tx *sqlx.Tx) error {
 
-		query := "SELECT status FROM " + db.serviceTable() + " WHERE id=? OR name=?"
+		query := "SELECT action_status FROM " + db.serviceTable() + " WHERE id=? OR name=?"
 
 		err := tx.Get(&status, query, nameOrID, nameOrID)
 		if err != nil {
@@ -174,11 +208,18 @@ func (db dbBase) ServiceStatusCAS(nameOrID string, val int, finish time.Time, f 
 			return nil
 		}
 
-		query = "UPDATE " + db.serviceTable() + " SET status=?,finished_at=? WHERE id=? OR name=?"
+		query = "UPDATE " + db.serviceTable() + " SET action_status=? WHERE id=? OR name=?"
 
-		_, err = tx.Exec(query, val, finish, nameOrID, nameOrID)
+		_, err = tx.Exec(query, val, nameOrID, nameOrID)
 		if err != nil {
 			return errors.Wrap(err, "Tx update Service status")
+		}
+
+		if t != nil {
+			err = db.txInsertTask(tx, *t, db.serviceTable())
+			if err != nil {
+				return err
+			}
 		}
 
 		done = true
@@ -193,8 +234,17 @@ func (db dbBase) ServiceStatusCAS(nameOrID string, val int, finish time.Time, f 
 }
 
 // TxSaveService insert Service & Task & []User in Tx.
-func (db dbBase) InsertService(svc Service, units []Unit, t *Task, users []User) error {
+func (db dbBase) InsertService(svc Service, units []Unit, t *Task) error {
 	do := func(tx *sqlx.Tx) error {
+
+		if svc.Desc != nil {
+			err := db.txInsertSerivceDesc(tx, svc.Desc)
+			if err != nil {
+				return err
+			}
+
+			svc.DescID = svc.Desc.ID
+		}
 
 		err := db.txInsertSerivce(tx, svc)
 		if err != nil {
@@ -215,10 +265,6 @@ func (db dbBase) InsertService(svc Service, units []Unit, t *Task, users []User)
 			}
 		}
 
-		if len(users) > 0 {
-			err = db.txInsertUsers(tx, users)
-		}
-
 		return err
 	}
 
@@ -227,7 +273,7 @@ func (db dbBase) InsertService(svc Service, units []Unit, t *Task, users []User)
 
 func (db dbBase) txInsertSerivce(tx *sqlx.Tx, svc Service) error {
 
-	query := "INSERT INTO " + db.serviceTable() + " ( id,name,image_id,description,architecture,tag,auto_healing,auto_scaling,high_available,status,backup_max_size,backup_files_retention,created_at,finished_at ) VALUES ( :id,:name,:image_id,:description,:architecture,:tag,:auto_healing,:auto_scaling,:high_available,:status,:backup_max_size,:backup_files_retention,:created_at,:finished_at )"
+	query := "INSERT INTO " + db.serviceTable() + " ( id,name,description_id,tag,auto_healing,auto_scaling,high_available,action_status,backup_max_size,backup_files_retention,created_at,finished_at ) VALUES ( :id,:name,:description_id,:tag,:auto_healing,:auto_scaling,:high_available,:action_status,:backup_max_size,:backup_files_retention,:created_at,:finished_at )"
 
 	_, err := tx.NamedExec(query, &svc)
 
@@ -238,51 +284,75 @@ func (db dbBase) txInsertSerivce(tx *sqlx.Tx, svc Service) error {
 func (db dbBase) SetServiceStatus(nameOrID string, state int, finish time.Time) error {
 	if finish.IsZero() {
 
-		query := "UPDATE " + db.serviceTable() + " SET status=? WHERE id=? OR name=?"
+		query := "UPDATE " + db.serviceTable() + " SET action_status=? WHERE id=? OR name=?"
 		_, err := db.Exec(query, state, nameOrID, nameOrID)
 
 		return errors.Wrap(err, "update Service Status")
 	}
 
-	query := "UPDATE " + db.serviceTable() + " SET status=?,finished_at=? WHERE id=? OR name=?"
+	query := "UPDATE " + db.serviceTable() + " SET action_status=?,finished_at=? WHERE id=? OR name=?"
 	_, err := db.Exec(query, state, finish, nameOrID, nameOrID)
 
 	return errors.Wrap(err, "update Service Status & FinishedAt")
 }
 
+func (db dbBase) txSetServiceStatus(tx *sqlx.Tx, nameOrID string, status int, now time.Time) (err error) {
+	if now.IsZero() {
+
+		query := "UPDATE " + db.serviceTable() + " SET action_status=? WHERE id=? OR name=?"
+		_, err = tx.Exec(query, status, nameOrID, nameOrID)
+
+	} else {
+
+		query := "UPDATE " + db.serviceTable() + " SET action_status=?,finished_at=? WHERE id=? OR name=?"
+		_, err = tx.Exec(query, status, now, nameOrID, nameOrID)
+
+	}
+
+	return errors.Wrap(err, "Tx update Service status")
+}
+
 // SetServiceWithTask update Service Status and Task Status in Tx.
-func (db dbBase) SetServiceWithTask(svc *Service, t Task, state int, finish time.Time) error {
-	do := func(tx *sqlx.Tx) (err error) {
-
-		if finish.IsZero() {
-
-			query := "UPDATE " + db.serviceTable() + " SET status=? WHERE id=?"
-			_, err = tx.Exec(query, state, svc.ID)
-
-		} else {
-
-			query := "UPDATE " + db.serviceTable() + " SET status=?,finished_at=? WHERE id=?"
-			_, err = tx.Exec(query, state, finish, svc.ID)
-
-		}
-		if err != nil {
-			return errors.Wrap(err, "Tx update Service status")
+func (db dbBase) SetServiceWithTask(nameOrID string, val int, t *Task, finish time.Time) error {
+	do := func(tx *sqlx.Tx) error {
+		err := db.txSetServiceStatus(tx, nameOrID, val, finish)
+		if err == nil {
+			return err
 		}
 
-		err = db.txSetTask(tx, t)
+		if t != nil {
+			err = db.txSetTask(tx, *t)
+		}
 
 		return err
 	}
 
-	err := db.txFrame(do)
-	if err == nil {
-		if !finish.IsZero() {
-			svc.FinishedAt = finish
+	return db.txFrame(do)
+}
+
+func (db dbBase) SetServiceScale(svc Service, t Task) error {
+	do := func(tx *sqlx.Tx) error {
+
+		now := time.Now()
+		t.FinishedAt = now
+
+		err := db.txSetServiceStatus(tx, svc.ID, svc.Status, now)
+		if err != nil {
+			return err
 		}
-		svc.Status = state
+
+		err = db.txSetTask(tx, t)
+		if err != nil {
+			return err
+		}
+
+		query := "UPDATE " + db.serviceDescTable() + " SET architecture=?,unit_num=? WHERE id=?"
+		_, err = tx.Exec(query, svc.Desc.Architecture, svc.Desc.Replicas, svc.Desc.ID)
+
+		return errors.Wrap(err, "tx update serviceDesc replicas")
 	}
 
-	return err
+	return db.txFrame(do)
 }
 
 func (db dbBase) txDelService(tx *sqlx.Tx, nameOrID string) error {
@@ -290,7 +360,7 @@ func (db dbBase) txDelService(tx *sqlx.Tx, nameOrID string) error {
 	query := "DELETE FROM " + db.serviceTable() + " WHERE id=? OR name=?"
 	_, err := tx.Exec(query, nameOrID, nameOrID)
 
-	return err
+	return errors.Wrap(err, "tx del Service by nameOrID")
 }
 
 // DelServiceRelation delelte related record about Service,
@@ -302,9 +372,8 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 		return err
 	}
 
-	// recycle networking & ports & volumes
+	// recycle networking & volumes
 	ips := make([]IP, 0, 20)
-	ports := make([]Port, 0, 20)
 	volumes := make([]Volume, 0, 20)
 
 	for i := range units {
@@ -312,11 +381,6 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 		ipl, err := db.ListIPByUnitID(units[i].ID)
 		if err == nil {
 			ips = append(ips, ipl...)
-		}
-
-		pl, err := db.ListPortsByUnit(units[i].ID)
-		if err == nil {
-			ports = append(ports, pl...)
 		}
 
 		vl, err := db.ListVolumesByUnitID(units[i].ID)
@@ -328,24 +392,14 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 
 	for i := range ips {
 		ips[i].UnitID = ""
-	}
-
-	for i := range ports {
-		ports[i].Allocated = false
-		ports[i].Name = ""
-		ports[i].UnitID = ""
-		ports[i].UnitName = ""
-		ports[i].Proto = ""
+		ips[i].Engine = ""
+		ips[i].Bandwidth = 0
+		ips[i].Bond = ""
 	}
 
 	do := func(tx *sqlx.Tx) error {
 
 		err := db.txSetIPs(tx, ips)
-		if err != nil {
-			return err
-		}
-
-		err = db.txSetPorts(tx, ports)
 		if err != nil {
 			return err
 		}
@@ -369,17 +423,17 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 		//			return err
 		//		}
 
-		err = db.txDelUsers(tx, serviceID)
-		if err != nil {
-			return err
-		}
-
 		err = db.txDelUnit(tx, serviceID)
 		if err != nil {
 			return err
 		}
 
 		err = db.txDelService(tx, serviceID)
+		if err != nil {
+			return err
+		}
+
+		err = db.txDelDescByService(tx, serviceID)
 
 		return err
 	}
@@ -389,7 +443,6 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 
 type ServiceInfo struct {
 	Service Service
-	Users   []User
 	Units   []UnitInfo
 }
 
@@ -407,13 +460,6 @@ func (db dbBase) GetServiceInfo(nameOrID string) (info ServiceInfo, err error) {
 	}
 
 	info.Service = svc
-
-	users, err := db.ListUsersByService(svc.ID, "")
-	if err != nil {
-		return
-	}
-
-	info.Users = users
 
 	units, err := db.ListUnitByServiceID(svc.ID)
 	if err != nil {
@@ -467,11 +513,6 @@ func (db dbBase) ListServicesInfo() ([]ServiceInfo, error) {
 		return nil, err
 	}
 
-	users, err := db.listUsers()
-	if err != nil {
-		return nil, err
-	}
-
 	volumes, err := db.listVolumes()
 	if err != nil {
 		return nil, err
@@ -484,14 +525,8 @@ func (db dbBase) ListServicesInfo() ([]ServiceInfo, error) {
 
 	list := make([]ServiceInfo, 0, len(services))
 	for i := range services {
-		us := make([]User, 0, 5)
-		unitsInfo := make([]UnitInfo, 0, 5)
 
-		for u := range users {
-			if users[u].ServiceID == services[i].ID {
-				us = append(us, users[u])
-			}
-		}
+		unitsInfo := make([]UnitInfo, 0, 5)
 
 		for u := range units {
 			if units[u].ServiceID != services[i].ID {
@@ -532,10 +567,101 @@ func (db dbBase) ListServicesInfo() ([]ServiceInfo, error) {
 
 		list = append(list, ServiceInfo{
 			Service: services[i],
-			Users:   us,
 			Units:   unitsInfo,
 		})
 	}
 
 	return list, nil
+}
+
+type ServiceDesc struct {
+	ID           string `db:"id"`
+	ServiceID    string `db:"service_id"`
+	Architecture string `db:"architecture"`
+	Replicas     int    `db:"unit_num"`
+	NCPU         int    `db:"cpu_num"`
+	Memory       int64  `db:"mem_size"`
+	ImageID      string `db:"image_id"`
+	Image        string `db:"image_version"`
+	Volumes      string `db:"volumes"`
+	Networks     string `db:"networks"`
+	Clusters     string `db:"cluster_id"`
+	Previous     string `db:"previous_version"`
+}
+
+func (db dbBase) serviceDescTable() string {
+	return db.prefix + "_service_decription"
+}
+
+func (db dbBase) getServiceDesc(ID string) (ServiceDesc, error) {
+	var (
+		s     = ServiceDesc{}
+		query = "SELECT id,service_id,architecture,unit_num,cpu_num,mem_size,image_id,image_version,volumes,networks,cluster_id,previous_version FROM " + db.serviceDescTable() + " WHERE id=?"
+	)
+
+	err := db.Get(&s, query, ID)
+
+	return s, errors.Wrap(err, "get ServiceDesc by ID")
+}
+
+// listServiceDescs returns all []ServiceDesc
+func (db dbBase) listServiceDescs() ([]ServiceDesc, error) {
+	var (
+		out   []ServiceDesc
+		query = "SELECT id,service_id,architecture,unit_num,cpu_num,mem_size,image_id,image_version,volumes,networks,cluster_id,previous_version FROM " + db.serviceDescTable()
+	)
+
+	err := db.Select(&out, query)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	return out, errors.Wrap(err, "list []ServiceDesc")
+}
+
+// listServiceDescs returns all []ServiceDesc
+func (db dbBase) listDescByService(ID string) ([]ServiceDesc, error) {
+	var (
+		out   []ServiceDesc
+		query = "SELECT id,service_id,architecture,unit_num,cpu_num,mem_size,image_id,image_version,volumes,networks,cluster_id,previous_version FROM " + db.serviceDescTable() + " WHERE service_id=?"
+	)
+
+	err := db.Select(&out, query, ID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	return out, errors.Wrap(err, "list []ServiceDesc by serviceID")
+}
+
+func (db dbBase) txInsertSerivceDesc(tx *sqlx.Tx, desc *ServiceDesc) error {
+
+	query := "INSERT INTO " + db.serviceDescTable() + " ( id,service_id,architecture,unit_num,cpu_num,mem_size,image_id,image_version,volumes,networks,cluster_id,previous_version ) VALUES ( :id,:service_id,:architecture,:unit_num,:cpu_num,:mem_size,:image_id,:image_version,:volumes,:networks,:cluster_id,:previous_version )"
+
+	_, err := tx.NamedExec(query, desc)
+
+	return errors.Wrap(err, "Tx insert ServiceDesc")
+}
+
+func (db dbBase) txDelDescByService(tx *sqlx.Tx, service string) error {
+	query := "DELETE FROM " + db.serviceDescTable() + " WHERE service_id=?"
+	_, err := tx.Exec(query, service)
+
+	return errors.Wrap(err, "tx del ServiceDesc by serviceID")
+}
+
+func (db dbBase) SetServiceDesc(svc Service) error {
+	do := func(tx *sqlx.Tx) error {
+		query := "UPDATE " + db.serviceTable() + " SET description_id=? WHERE id=?"
+
+		_, err := tx.Exec(query, svc.DescID, svc.ID)
+		if err != nil {
+			return errors.Wrap(err, "update Service DescID")
+		}
+
+		return db.txInsertSerivceDesc(tx, svc.Desc)
+	}
+
+	return db.txFrame(do)
+
 }

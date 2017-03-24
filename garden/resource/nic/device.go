@@ -10,15 +10,14 @@ import (
 )
 
 const (
-	_PFDevLabel = "PF_DEV" // "PF_DEV_":"dev1,10G"
+	_PFDevLabel = "PF_DEV_BW" // "PF_DEV_BW":"10G"
 
-	// "VF_DEV_":"bond0,mac_xxxx,10M,192.168.1.1,255.255.255.0,192.168.3.0,vlan_xxxx"
-	_VFDevPrefix = "VF_DEV_"
+	// "CONTAINER_NIC":"bond0,bond1,bond2"
+	_ContainerNIC = "CONTAINER_NIC"
 )
 
 type Device struct {
 	Bond      string
-	MAC       string
 	Bandwidth int // M/s
 	IP        string
 	Mask      string
@@ -27,12 +26,12 @@ type Device struct {
 	err       error
 }
 
-// "VF_DEV_0":"bond0,mac_xxxx,10M,192.168.1.1,255.255.255.0,192.168.3.0,vlan_xxxx"
+// "VF_DEV_0":"bond0,10M,192.168.1.1,255.255.255.0,192.168.3.0,vlan_xxxx"
 func (d Device) String() string {
 	if d.err != nil {
 		return d.err.Error()
 	}
-	return fmt.Sprintf("%s,%s,%dM,%s,%s,%s,%d", d.Bond, d.MAC, d.Bandwidth,
+	return fmt.Sprintf("%s,%dM,%s,%s,%s,%d", d.Bond, d.Bandwidth,
 		d.IP, d.Mask, d.Gateway, d.VLAN)
 }
 
@@ -66,70 +65,30 @@ func parseBandwidth(width string) (int, error) {
 
 func parseDevice(dev string) Device {
 	parts := strings.Split(dev, ",")
-	if len(parts) < 7 {
+	if len(parts) < 6 {
 		return Device{err: errors.Errorf("illegal device:'%s'", dev)}
 	}
 
-	n, err := strconv.Atoi(strings.TrimSpace(parts[6]))
+	n, err := strconv.Atoi(strings.TrimSpace(parts[5]))
 	if err != nil {
-		err = errors.Wrapf(err, "illegal VLAN %s,%s", parts[6], dev)
+		err = errors.Wrapf(err, "illegal VLAN %s,%s", parts[5], dev)
 		return Device{err: err}
 	}
 
 	d := Device{
 		Bond:    parts[0],
-		MAC:     parts[1],
-		IP:      parts[3],
-		Mask:    parts[4],
-		Gateway: parts[5],
+		IP:      parts[2],
+		Mask:    parts[3],
+		Gateway: parts[4],
 		VLAN:    n,
 	}
 
-	d.Bandwidth, d.err = parseBandwidth(parts[2])
+	d.Bandwidth, d.err = parseBandwidth(parts[1])
 
 	return d
 }
 
-func parseContainerDevice(c *cluster.Container) []Device {
-	if c == nil {
-		return nil
-	}
-
-	out := make([]Device, 0, 2)
-
-	for key, val := range c.Labels {
-		if !strings.HasPrefix(key, _VFDevPrefix) {
-			continue
-		}
-
-		d := parseDevice(val)
-		if d.Bond != "" {
-			out = append(out, d)
-		}
-	}
-
-	if c.Config != nil && len(c.Config.Labels) > 0 {
-
-		for key, val := range c.Config.Labels {
-			if c.Labels[key] == c.Config.Labels[key] {
-				continue
-			}
-
-			if !strings.HasPrefix(key, _VFDevPrefix) {
-				continue
-			}
-
-			d := parseDevice(val)
-			if d.Bond != "" {
-				out = append(out, d)
-			}
-		}
-	}
-
-	return out
-}
-
-func ParseEngineNetDevice(e *cluster.Engine) (map[string]Device, int, error) {
+func ParseTotalDevice(e *cluster.Engine) (map[string]Device, int, error) {
 	if e == nil || len(e.Labels) == 0 {
 		return nil, 0, nil
 	}
@@ -139,54 +98,22 @@ func ParseEngineNetDevice(e *cluster.Engine) (map[string]Device, int, error) {
 
 	for key, val := range e.Labels {
 		if key == _PFDevLabel {
-			i := strings.LastIndexByte(val, ',')
-			n, err := parseBandwidth(string(val[i+1:]))
+			n, err := parseBandwidth(val)
 			if err != nil {
 				return nil, 0, err
 			}
 
 			total = n
 
-		} else if strings.HasPrefix(key, _VFDevPrefix) {
-			parts := strings.Split(val, ",")
-			if len(parts) >= 2 {
-				devm[parts[0]] = Device{
-					Bond: parts[0],
-					MAC:  parts[1],
+		} else if key == _ContainerNIC {
+			devs := strings.Split(val, ",")
+			for i := range devs {
+				devm[devs[i]] = Device{
+					Bond: devs[i],
 				}
 			}
 		}
 	}
 
-	for _, c := range e.Containers() {
-
-		out := parseContainerDevice(c)
-
-		for i := range out {
-			if out[i].err != nil {
-				delete(devm, out[i].Bond)
-				continue
-			}
-			if _, exist := devm[out[i].Bond]; exist {
-				devm[out[i].Bond] = out[i]
-			}
-		}
-	}
-
 	return devm, total, nil
-}
-
-func SaveIntoContainerLabel(config *cluster.ContainerConfig, devices []Device) {
-	if config == nil {
-		return
-	}
-
-	if config.Labels == nil {
-		config.Labels = make(map[string]string, 5)
-	}
-
-	for i := range devices {
-		key := fmt.Sprintf("%s%d", _VFDevPrefix, i)
-		config.Config.Labels[key] = devices[i].String()
-	}
 }

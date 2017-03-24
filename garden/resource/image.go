@@ -18,6 +18,12 @@ import (
 
 // LoadImage load a new Image
 func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostLoadImageRequest) (string, string, error) {
+	path, err := utils.GetAbsolutePath(false, req.Path)
+	if err != nil {
+		return "", "", err
+	}
+	req.Path = path
+
 	var labels string
 	if len(req.Labels) > 0 {
 		buf := bytes.NewBuffer(nil)

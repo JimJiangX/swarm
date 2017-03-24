@@ -1,5 +1,7 @@
 package structs
 
+import "github.com/docker/swarm/cluster"
+
 type PostClusterRequest struct {
 	Max        int     `json:"max_host"`
 	UsageLimit float32 `json:"usage_limit"`
@@ -47,4 +49,78 @@ type PostNodeResponse struct {
 	ID   string `json:"id"`
 	Addr string `json:"addr"`
 	Task string `json:"task_id"`
+}
+
+type NodeInfo struct {
+	ID           string `json:"id"`
+	Cluster      string `json:"cluster_id"`
+	Room         string `json:"room"`
+	Seat         string `json:"seat"`
+	MaxContainer int    `json:"max_container"`
+	Enabled      bool   `json:"enabled"`
+	RegisterAt   string `json:"register_at"`
+
+	Engine struct {
+		IsHealthy    bool   `json:"is_healthy"`
+		CPUs         int    `json:"cpus"`
+		Memory       int    `json:"memory"`
+		ID           string `json:"id"`
+		Name         string `json:"name"`
+		IP           string `json:"ip"`
+		Version      string `json:"server_version"`
+		Kernel       string `json:"kernel_version"`
+		OS           string `json:"os"`
+		OSType       string `json:"os_type"`
+		Architecture string `json:"architecture"`
+	}
+
+	Containers []container `json:"container"`
+}
+
+type container struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Image   string `json:"image"`
+	Command string `json:"command"`
+	Created string `json:"created"`
+	Status  string `json:"status"`
+}
+
+func convertToContainer(c *cluster.Container) container {
+	if c == nil {
+		return container{}
+	}
+
+	return container{
+		ID:      c.ID,
+		Name:    c.Info.Name,
+		Image:   c.Image,
+		Command: c.Command,
+		Created: c.Info.Created,
+		Status:  c.Status,
+	}
+}
+
+func (n *NodeInfo) SetByEngine(e *cluster.Engine) {
+	if e == nil {
+		return
+	}
+	n.Engine.ID = e.ID
+	n.Engine.Name = e.Name
+	n.Engine.IP = e.IP
+	n.Engine.Version = e.Version
+	n.Engine.Kernel = e.Labels["kernelversion"]
+	n.Engine.OS = e.Labels["operatingsystem"]
+	n.Engine.OSType = e.Labels["ostype"]
+	n.Engine.Architecture = e.Labels["architecture"]
+	n.Engine.CPUs = int(e.Cpus)
+	n.Engine.Memory = int(e.Memory)
+	n.Engine.IsHealthy = e.IsHealthy()
+
+	containers := e.Containers()
+	n.Containers = make([]container, len(containers))
+
+	for i, c := range containers {
+		n.Containers[i] = convertToContainer(c)
+	}
 }

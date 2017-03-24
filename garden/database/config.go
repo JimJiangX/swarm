@@ -12,39 +12,44 @@ import (
 type SysConfigOrmer interface {
 	InsertSysConfig(c SysConfig) error
 	GetSysConfig() (SysConfig, error)
+	GetPorts() (Ports, error)
 	GetRegistry() (Registry, error)
 	GetAuthConfig() (*types.AuthConfig, error)
 }
 
 // SysConfig is the application config file
 type SysConfig struct {
-	ID         int    `db:"dc_id"`
-	DockerPort int    `db:"docker_port"`
-	PluginPort int    `db:"plugin_port"`
-	Retry      int64  `db:"retry"`
-	BackupDir  string `db:"backup_dir"`
+	ID        int    `db:"dc_id"`
+	Retry     int64  `db:"retry"`
+	BackupDir string `db:"backup_dir"`
+	Ports
 	ConsulConfig
-	HorusConfig
 	Registry
 	SSHDeliver
-	Users
+}
+
+type Ports struct {
+	Docker     int `db:"docker_port"`
+	Plugin     int `db:"plugin_port"`
+	SwarmAgent int `db:"swarm_agent_port"`
+	// Consul     int `db:"consul_port"`
 }
 
 // Users is users of DB and Proxy
-type Users struct {
-	MonitorUsername     string `db:"mon_username"`
-	MonitorPassword     string `db:"mon_password"`
-	ReplicationUsername string `db:"repl_username"`
-	ReplicationPassword string `db:"repl_password"`
-	ApplicationUsername string `db:"ap_username"`
-	ApplicationPassword string `db:"ap_password"`
-	DBAUsername         string `db:"cup_dba_username"`
-	DBAPassword         string `db:"cup_dba_password"`
-	DBUsername          string `db:"db_username"`
-	DBPassword          string `db:"db_password"`
-	CheckUsername       string `db:"check_username"`
-	CheckPassword       string `db:"check_password"`
-}
+//type Users struct {
+//	MonitorUsername     string `db:"mon_username"`
+//	MonitorPassword     string `db:"mon_password"`
+//	ReplicationUsername string `db:"repl_username"`
+//	ReplicationPassword string `db:"repl_password"`
+//	ApplicationUsername string `db:"ap_username"`
+//	ApplicationPassword string `db:"ap_password"`
+//	DBAUsername         string `db:"cup_dba_username"`
+//	DBAPassword         string `db:"cup_dba_password"`
+//	DBUsername          string `db:"db_username"`
+//	DBPassword          string `db:"db_password"`
+//	CheckUsername       string `db:"check_username"`
+//	CheckPassword       string `db:"check_password"`
+//}
 
 // SSHDeliver node-init and node-clean settings
 type SSHDeliver struct {
@@ -77,9 +82,9 @@ type ConsulConfig struct {
 type HorusConfig struct {
 	// HorusServerIP   string `db:"horus_server_ip"`
 	// HorusServerPort int    `db:"horus_server_port"`
-	HorusAgentPort int `db:"horus_agent_port"`
-	//	HorusEventIP   string `db:"horus_event_ip"`
-	//	HorusEventPort int    `db:"horus_event_port"`
+	// HorusAgentPort int `db:"horus_agent_port"`
+	// HorusEventIP   string `db:"horus_event_ip"`
+	// HorusEventPort int    `db:"horus_event_port"`
 }
 
 // Registry connection config
@@ -103,7 +108,7 @@ func (db dbBase) sysConfigTable() string {
 // InsertSysConfig insert a new SysConfig
 func (db dbBase) InsertSysConfig(c SysConfig) error {
 
-	query := "INSERT INTO " + db.sysConfigTable() + " (dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,horus_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password,check_username,check_password,backup_dir) VALUES (:dc_id,:consul_ip,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:horus_agent_port,:registry_domain,:registry_ip,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:registry_os_username,:registry_os_password,:mon_username,:mon_password,:repl_username,:repl_password,:cup_dba_username,:cup_dba_password,:db_username,:db_password,:ap_username,:ap_password,:check_username,:check_password,:backup_dir)"
+	query := "INSERT INTO " + db.sysConfigTable() + " (dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,swarm_agent_port,registry_os_username,registry_os_password,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,backup_dir) VALUES (:dc_id,:consul_ip,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:swarm_agent_port,:registry_os_username,:registry_os_password,:registry_domain,:registry_ip,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:backup_dir)"
 
 	_, err := db.NamedExec(query, &c)
 
@@ -132,7 +137,7 @@ func (c SysConfig) GetConsulAddrs() []string {
 func (db dbBase) GetSysConfig() (SysConfig, error) {
 	var (
 		c     = SysConfig{}
-		query = "SELECT dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,horus_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,mon_username,mon_password,repl_username,repl_password,cup_dba_username,cup_dba_password,db_username,db_password,ap_username,ap_password,check_username,check_password,backup_dir FROM " + db.sysConfigTable() + " LIMIT 1"
+		query = "SELECT dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,swarm_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,backup_dir FROM " + db.sysConfigTable() + " LIMIT 1"
 	)
 
 	err := db.Get(&c, query)
@@ -174,4 +179,15 @@ func newAuthConfig(username, password, email, token string) *types.AuthConfig {
 		Email:         email,
 		RegistryToken: token,
 	}
+}
+
+func (db dbBase) GetPorts() (Ports, error) {
+	var (
+		p     Ports
+		query = "SELECT swarm_agent_port,docker_port,plugin_port FROM " + db.sysConfigTable() + " LIMIT 1"
+	)
+
+	err := db.Get(&p, query)
+
+	return p, errors.Wrap(err, "get sysConfig.Ports")
 }

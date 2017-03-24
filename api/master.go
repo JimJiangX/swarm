@@ -51,12 +51,14 @@ type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 var masterRoutes = map[string]map[string]ctxHandler{
 	http.MethodGet: {
+		"/units/{name}/proxy/*": proxySpecialLogic,
+
 		"/nfs_backups/space": getNFSSPace,
 
 		"/clusters":        getClusters,
 		"/clusters/{name}": getClustersByID,
-		//		"/hosts":                           getAllNodes,
-		//		"/hosts/{name:.*}":                 getNode,
+		"/hosts":           getAllNodes,
+		"/hosts/{name:.*}": getNode,
 		//		"/resources":                       getClustersResource,
 		//		"/resources/{cluster:.*}":          getNodesResourceByCluster,
 		"/tasks":        getTasks,
@@ -77,6 +79,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		//		"/storage/san/{name:.*}":           getSANStorageInfo,
 	},
 	http.MethodPost: {
+		"/units/{name}/proxy/*": proxySpecialLogic,
 		// "/datacenter": postRegisterDC,
 		"/clusters": postCluster,
 		//		"/clusters/{name}/enable":        postEnableCluster,
@@ -86,12 +89,13 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		//		"/clusters/nodes/{node}/disable": postDisableNode,
 		//		"/clusters/nodes/{node}/update":  updateNode,
 
-		"/services": postService,
+		"/services":      postService,
+		"/services/link": postServiceLink,
 		//		"/services/{name:.*}/rebuild": postServiceRebuild,
-		//		"/services/{name:.*}/start":   postServiceStart,
-		//		"/services/{name:.*}/stop":    postServiceStop,
 		//		"/services/{name:.*}/backup":  postServiceBackup,
-		//		"/services/{name:.*}/scale":   postServiceScaled,
+		"/services/{name:.*}/scale":        postServiceScaled,
+		"/services/{name:.*}/update":       postServiceUpdate,
+		"/services/{name:.*}/image/update": postServiceVersionUpdate,
 
 		//		"/services/{name:.*}/users": postServiceUsers,
 		//		// "/services/{name:.*}/service_config/update": postServiceConfig,
@@ -130,7 +134,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	},
 
 	http.MethodPut: {
-		"/clusters/{name}": putClusterParams,
+		"/units/{name}/proxy/*": proxySpecialLogic,
+		"/clusters/{name}":      putClusterParams,
 
 		"/hosts/{name}":         putNodeParam,
 		"/hosts/{name}/enable":  putNodeEnable,
@@ -138,12 +143,17 @@ var masterRoutes = map[string]map[string]ctxHandler{
 
 		"/networkings/{name}/ips/enable":  putNetworkingEnable,
 		"/networkings/{name}/ips/disable": putNetworkingDisable,
+
+		"/services/{name}/start": putServiceStart,
+		"/services/{name}/stop":  putServiceStop,
+
+		"/services/{name}/config/update": putServiceUpdateConfigs,
 	},
 
 	http.MethodDelete: {
-		//		"/services/{name}":                    deleteService,
-		//		"/services/{name}/users":              deleteServiceUsers,
-		//		"/services/backup_strategy/{name:.*}": deleteBackupStrategy,
+		"/units/{name}/proxy/*": proxySpecialLogic,
+
+		"/services/{name}": deleteService,
 
 		"/clusters/{name}": deleteCluster,
 		"/hosts/{node:.*}": deleteNode,
@@ -187,7 +197,7 @@ func setupMasterRouter(r *mux.Router, context *context, debug, enableCors bool) 
 
 				logrus.WithFields(logrus.Fields{"method": r.Method,
 					"uri":   r.RequestURI,
-					"since": time.Since(start).String()}).Debug("HTTP request received")
+					"since": time.Since(start).String()}).Info("HTTP request received")
 			}
 
 			localMethod := method

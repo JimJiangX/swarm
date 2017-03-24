@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/plugin/client"
@@ -17,12 +16,12 @@ type PluginAPI interface {
 	GetCommands(ctx context.Context, service string) (structs.Commands, error)
 
 	GetImageSupport(ctx context.Context) ([]structs.ImageVersion, error)
-	GetImageRequirement(ctx context.Context, name, version string) (structs.RequireResource, error)
 
-	ImageCheck(ctx context.Context, ct structs.ConfigTemplate) error
 	PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate) error
 
 	UpdateConfigs(ctx context.Context, service string, configs structs.ConfigsMap) error
+	ServiceCompose(ctx context.Context, spec structs.ServiceSpec) error
+	ServicesLink(ctx context.Context, links structs.ServicesLink) error
 }
 
 type plugin struct {
@@ -92,39 +91,27 @@ func (p plugin) GetImageSupport(ctx context.Context) ([]structs.ImageVersion, er
 	return obj, err
 }
 
-func (p plugin) GetImageRequirement(ctx context.Context, name, version string) (structs.RequireResource, error) {
-	params := make(url.Values)
-	params.Set("name", name)
-	params.Set("version", version)
+//func (p plugin) GetImageRequirement(ctx context.Context, image string) (structs.RequireResource, error) {
+//	params := make(url.Values)
+//	params.Set("image", image)
 
-	url := url.URL{
-		Path:     "/image/requirement",
-		RawQuery: params.Encode(),
-	}
+//	url := url.URL{
+//		Path:     "/image/requirement",
+//		RawQuery: params.Encode(),
+//	}
 
-	var obj structs.RequireResource
+//	var obj structs.RequireResource
 
-	resp, err := client.RequireOK(p.c.Get(ctx, url.RequestURI()))
-	if err != nil {
-		return obj, err
-	}
-	defer resp.Body.Close()
+//	resp, err := client.RequireOK(p.c.Get(ctx, url.RequestURI()))
+//	if err != nil {
+//		return obj, err
+//	}
+//	defer resp.Body.Close()
 
-	err = decodeBody(resp, &obj)
+//	err = decodeBody(resp, &obj)
 
-	return obj, err
-}
-
-func (p plugin) ImageCheck(ctx context.Context, ct structs.ConfigTemplate) error {
-	resp, err := client.RequireOK(p.c.Post(ctx, "/image/check", ct))
-	if err != nil {
-		return err
-	}
-
-	client.EnsureBodyClose(resp)
-
-	return nil
-}
+//	return obj, err
+//}
 
 func (p plugin) PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate) error {
 	resp, err := client.RequireOK(p.c.Post(ctx, "/image/template", ct))
@@ -138,7 +125,31 @@ func (p plugin) PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate
 }
 
 func (p plugin) UpdateConfigs(ctx context.Context, service string, configs structs.ConfigsMap) error {
-	resp, err := client.RequireOK(p.c.Post(ctx, "/configs/"+service, configs))
+	resp, err := client.RequireOK(p.c.Put(ctx, "/configs/"+service, configs))
+	if err != nil {
+		return err
+	}
+
+	client.EnsureBodyClose(resp)
+
+	return nil
+}
+
+func (p plugin) ServiceCompose(ctx context.Context, spec structs.ServiceSpec) error {
+	uri := fmt.Sprintf("/services/%s/compose", spec.ID)
+
+	resp, err := client.RequireOK(p.c.Put(ctx, uri, spec))
+	if err != nil {
+		return err
+	}
+
+	client.EnsureBodyClose(resp)
+
+	return nil
+}
+
+func (p plugin) ServicesLink(ctx context.Context, links structs.ServicesLink) error {
+	resp, err := client.RequireOK(p.c.Put(ctx, "/services/link", links))
 	if err != nil {
 		return err
 	}

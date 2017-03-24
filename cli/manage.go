@@ -140,20 +140,11 @@ func getDiscoveryOpt(c *cli.Context) map[string]string {
 	return options
 }
 
-func setNodesKVPath(uri string) {
-	var prefix string
-
-	parts := strings.SplitN(uri, "://", 2)
-	if len(parts) == 2 {
-		uri = parts[1]
+func setNodesKVPath(discovery discovery.Backend) {
+	kvDiscovery, ok := discovery.(*kvdiscovery.Discovery)
+	if ok {
+		resource.SetNodesKVPath(kvDiscovery.Prefix())
 	}
-
-	parts = strings.SplitN(uri, "/", 2)
-	if len(parts) == 2 {
-		prefix = parts[1]
-	}
-
-	resource.SetNodesKVPath(prefix)
 }
 
 func getOrmer(c *cli.Context) (database.Ormer, error) {
@@ -354,7 +345,7 @@ func manage(c *cli.Context) {
 			break
 		}
 
-		setNodesKVPath(uri)
+		setNodesKVPath(discovery)
 
 		ormer, err = getOrmer(c)
 		if err != nil {
@@ -367,9 +358,8 @@ func manage(c *cli.Context) {
 		}
 
 		pClient := pluginapi.NewPlugin(client.NewClient(c.String("configureAddr"), 0, tlsConfig))
-		allocator := resource.NewAllocator(ormer, cl)
 
-		cl = garden.NewGarden(kvc, cl, sched, ormer, allocator, pClient, tlsConfig)
+		cl = garden.NewGarden(kvc, cl, sched, ormer, pClient, tlsConfig)
 
 	default:
 		log.Fatalf("unsupported cluster %q", c.String("cluster-driver"))

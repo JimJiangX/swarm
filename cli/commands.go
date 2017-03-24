@@ -55,7 +55,7 @@ var (
 			Name:      "configuration",
 			ShortName: "cfg",
 			Usage:     "Configuration Center Server",
-			Flags:     []cli.Flag{flHosts, flTLS, flTLSCaCert, flTLSCert, flTLSKey, flTLSVerify},
+			Flags:     []cli.Flag{flHosts, flTLS, flTLSCaCert, flTLSCert, flTLSKey, flTLSVerify, flMgmPort, flMgmIp},
 			Action:    configruation,
 		},
 	}

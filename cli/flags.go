@@ -211,4 +211,16 @@ var (
 		Value: "0.0.0.0:5685",
 		Usage: "address of seed server",
 	}
+
+	flMgmIp = cli.StringFlag{
+		Name:  "mgmIp",
+		Value: "127.0.0.1",
+		Usage: "the IP of mgm server",
+	}
+
+	flMgmPort = cli.IntFlag{
+		Name:  "mgmPort",
+		Value: 2307,
+		Usage: "the port of mgm server",
+	}
 )
