@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -78,10 +79,43 @@ func TestBase64Generate(t *testing.T) {
 }
 
 func TestExecScript(t *testing.T) {
-	p, err := ExecScript("echo", "foo", "bar baz")
+	cmd := ExecScript("echo", "foo", "bar baz")
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err, string(out))
 	}
+	if g, e := string(out), "foo bar baz\n"; g != e {
+		t.Errorf("echo: want %q, got %q", e, g)
+	}
+
+	input := "Input string\nLine 2"
+	cmd = ExecScript("cat")
+	cmd.Stdin = strings.NewReader(input)
+
+	out, err = cmd.Output()
+	if err != nil {
+		t.Error(err, string(out))
+	}
+	if s := string(out); s != input {
+		t.Errorf("cat: want %q, got %q", input, s)
+	}
+
+	now := time.Now()
+	cmd = ExecScript("sleep", "10")
+
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Error(err, string(out))
+	}
+
+	if got := time.Since(now); got < 10*time.Second {
+		t.Errorf("want < 10s,but got %s", got)
+	}
+}
+
+func TestExecContext(t *testing.T) {
+	p := ExecContext(context.Background(), "echo", "foo", "bar baz")
+
 	bs, err := p.Output()
 	if err != nil {
 		t.Error(err, string(bs))
@@ -91,10 +125,8 @@ func TestExecScript(t *testing.T) {
 	}
 
 	input := "Input string\nLine 2"
-	p, err = ExecScript("cat")
-	if err != nil {
-		t.Fatal(err)
-	}
+	p = ExecContext(context.Background(), "cat")
+
 	p.Stdin = strings.NewReader(input)
 	bs, err = p.Output()
 	if err != nil {
@@ -103,6 +135,28 @@ func TestExecScript(t *testing.T) {
 	s := string(bs)
 	if s != input {
 		t.Errorf("cat: want %q, got %q", input, s)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	cmd := ExecContext(ctx, "sleep", "10")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Error(err, string(out))
+	}
+
+	now := time.Now()
+	cmd = ExecContext(ctx, "sleep", "10")
+	out, err = cmd.CombinedOutput()
+	if err == nil {
+		t.Error(err, string(out))
+	} else {
+		t.Log(err, string(out))
+	}
+
+	if got := time.Since(now); got > 5*time.Second {
+		t.Errorf("want < 10s,but got %s", got)
 	}
 }
 

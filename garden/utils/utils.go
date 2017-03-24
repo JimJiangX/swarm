@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	crand "crypto/rand"
 	"encoding/base64"
 	"encoding/binary"
@@ -165,7 +166,7 @@ func ParseStringToTime(s string) (time.Time, error) {
 }
 
 // ExecScript returns a command to execute a script
-func ExecScript(script ...string) (*exec.Cmd, error) {
+func ExecScript(script ...string) *exec.Cmd {
 	var shell, flag string
 	if runtime.GOOS == "windows" {
 		shell = "cmd"
@@ -181,7 +182,28 @@ func ExecScript(script ...string) (*exec.Cmd, error) {
 
 	cmd := exec.Command(shell, flag, strings.Join(script, " "))
 
-	return cmd, nil
+	return cmd
+}
+
+func ExecContext(ctx context.Context, script ...string) *exec.Cmd {
+	var shell, flag string
+	if runtime.GOOS == "windows" {
+		shell = "cmd"
+		flag = "/C"
+	} else {
+		shell = "/bin/sh"
+		flag = "-c"
+	}
+
+	if other := os.Getenv("SHELL"); other != "" {
+		shell = other
+	}
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	return exec.CommandContext(ctx, shell, flag, strings.Join(script, " "))
 }
 
 // GetPrivateIP is used to return the first private IP address
