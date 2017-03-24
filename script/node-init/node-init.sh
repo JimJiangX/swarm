@@ -379,52 +379,31 @@ install_docker() {
 	# check nic
 	if [ '${adm_vlan}' != "null" ]; then
 		adm_nic=`cat /proc/net/vlan/config | sed '1,2d;s/\ //g' | awk -F'|' '{if($2=='${adm_vlan}')print $1}'`
-		ifconfig $adm_nic >/dev/null 2>&1
-		if [ $? -ne 0 ]; then
+		[ "$adm_nic" ] || {	
 			echo "not find adm_nic ${adm_nic}"
 			exit 2
-		fi
+		}
 	else
 		adm_nic=''
 	fi
 
 	if [ '${int_vlan}' != "null" ]; then
 		int_nic=`cat /proc/net/vlan/config | sed '1,2d;s/\ //g' | awk -F'|' '{if($2=='${int_vlan}')print $1}'`
-		ifconfig $int_nic>/dev/null 2>&1
-		if [ $? -ne 0 ]; then
+		[ "$int_nic" ] || {	
 			echo "not find int_nic ${int_nic}"
 			exit 2
-		fi
+		}
 	else
 		int_nic=''
 	fi
 
-	if [ '${ext_vlan}' != "null" ]; then
-		ext_nic=`cat /proc/net/vlan/config | sed '1,2d;s/\ //g' | awk -F'|' '{if($2=='${ext_vlan}')print $1}'`
-		ifconfig $ext_nic>/dev/null 2>&1
-		if [ $? -ne 0 ]; then
-			echo "not find ext_nic ${ext_nic}"
-			exit 2
-		fi
-	else
-		ext_nic=''
-	fi
+	ext_nic=`cat /proc/net/vlan/config | sed '1,2d;s/\ //g' | awk -F'|' '{if($2=='${ext_vlan}')print $1}'`
 
 	if [ "${release}" == "SUSE LINUX" ]; then
 		if [ "${docker_version}" == "1.11.2" ]; then
 			local docker_rpm=${cur_dir}/rpm/docker-${docker_version}.sles.rpm
 			local containerd_rpm=${cur_dir}/rpm/containerd-0.2.2-4.1.x86_64.rpm
 			local runc_rpm=${cur_dir}/rpm/runc-0.1.1-4.1.x86_64.rpm
-		fi
-
-		if [ "${wwn}" != '' ]; then
-			systemctl enable multipathd.service
-			systemctl start multipathd.service
-			systemctl status multipathd.service
-			if [ $? -ne 0 ]; then
-				echo "start multipathd failed!"
-				exit 2
-			fi
 		fi
 
 		zypper --no-gpg-checks --non-interactive install ${runc_rpm} ${containerd_rpm} ${docker_rpm}
