@@ -180,7 +180,11 @@ func (svc *Service) ServiceUpdate(ctx context.Context, actor allocator, ncpu, me
 			if err != nil {
 				return err
 			}
-			pu.cpuset = pu.cpuset + "," + cpuset
+			if pu.cpuset == "" {
+				pu.cpuset = cpuset
+			} else {
+				pu.cpuset = pu.cpuset + "," + cpuset
+			}
 		}
 
 		pu.config = container.UpdateConfig{
