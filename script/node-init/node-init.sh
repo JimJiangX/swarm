@@ -377,15 +377,7 @@ install_docker() {
 	wwn=${wwn:1}
 
 	# check nic
-	if [ '${adm_vlan}' != "null" ]; then
-		adm_nic=`cat /proc/net/vlan/config | sed '1,2d;s/\ //g' | awk -F'|' '{if($2=='${adm_vlan}')print $1}'`
-		[ "$adm_nic" ] || {	
-			echo "not find adm_nic ${adm_nic}"
-			exit 2
-		}
-	else
-		adm_nic=''
-	fi
+	adm_nic=''
 
 	if [ '${int_vlan}' != "null" ]; then
 		int_nic=`cat /proc/net/vlan/config | sed '1,2d;s/\ //g' | awk -F'|' '{if($2=='${int_vlan}')print $1}'`
