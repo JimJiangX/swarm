@@ -131,7 +131,7 @@ type ClientAPI interface {
 }
 
 //create network for contianer(use pipewrok),which network mode is none
-func CreateNetwork(opt NetworkCfg) error {
+func (c client) CreateNetwork(opt NetworkCfg) error {
 	return c.postWrap(nil, "/network/create", opt)
 }
 
