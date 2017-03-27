@@ -5,10 +5,10 @@ import (
 	"errors"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/codegangsta/cli"
 	"github.com/docker/swarm/api"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/plugin/parser"
+	"github.com/urfave/cli"
 )
 
 func loadTLSConfigFromContext(c *cli.Context) (*tls.Config, error) {
@@ -27,7 +27,6 @@ func loadTLSConfigFromContext(c *cli.Context) (*tls.Config, error) {
 			c.String("tlscert"),
 			c.String("tlskey"),
 			c.Bool("tlsverify"))
-
 	}
 
 	// Otherwise, if neither --tls nor --tlsverify are specified, abort if

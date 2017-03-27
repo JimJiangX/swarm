@@ -10,7 +10,6 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/codegangsta/cli"
 	"github.com/docker/docker/pkg/discovery"
 	kvdiscovery "github.com/docker/docker/pkg/discovery/kv"
 	"github.com/docker/leadership"
@@ -30,6 +29,7 @@ import (
 	"github.com/docker/swarm/scheduler/strategy"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
+	"github.com/urfave/cli"
 )
 
 const (
@@ -320,7 +320,7 @@ func manage(c *cli.Context) {
 		log.Fatal(err)
 	}
 
-	// see https://github.com/codegangsta/cli/issues/160
+	// see https://github.com/urfave/cli/issues/160
 	names := c.StringSlice("filter")
 	if c.IsSet("filter") || c.IsSet("f") {
 		names = names[DefaultFilterNumber:]
@@ -368,7 +368,7 @@ func manage(c *cli.Context) {
 		log.Fatal(err)
 	}
 
-	// see https://github.com/codegangsta/cli/issues/160
+	// see https://github.com/urfave/cli/issues/160
 	hosts := c.StringSlice("host")
 	if c.IsSet("host") || c.IsSet("H") {
 		hosts = hosts[1:]

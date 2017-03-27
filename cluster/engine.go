@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"bufio"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -495,11 +496,20 @@ func (e *Engine) updateSpecs() error {
 	// Swarm/docker identifies engine by ID. Updating ID but not updating cluster
 	// index will put the cluster into inconsistent state. If this happens, the
 	// engine should be put to pending state for re-validation.
+	var infoID string
+	if info.Swarm.NodeID != "" {
+		// Use the swarm-mode node ID if it's available, since it's
+		// guaranteed to be unique, even if the daemon has a copied
+		// /etc/docker/key.json file from another machine.
+		infoID = info.Swarm.NodeID
+	} else {
+		infoID = info.ID
+	}
 	if e.ID == "" {
-		e.ID = info.ID
-	} else if e.ID != info.ID {
+		e.ID = infoID
+	} else if e.ID != infoID {
 		e.state = statePending
-		message := fmt.Sprintf("Engine (ID: %s, Addr: %s) shows up with another ID:%s. Please remove it from cluster, it can be added back.", e.ID, e.Addr, info.ID)
+		message := fmt.Sprintf("Engine (ID: %s, Addr: %s) shows up with another ID:%s. Please remove it from cluster, it can be added back.", e.ID, e.Addr, infoID)
 		e.lastError = message
 		return errors.New(message)
 	}
@@ -516,7 +526,7 @@ func (e *Engine) updateSpecs() error {
 	}
 
 	// If the servers are sync up on time, this delta might be the source of error
-	// we set a threshhold that to ignore this case.
+	// we set a threshold that to ignore this case.
 	absDelta := delta
 	if delta.Seconds() < 0 {
 		absDelta = time.Duration(-1*delta.Seconds()) * time.Second
@@ -992,7 +1002,7 @@ func (e *Engine) CreateContainer(config *ContainerConfig, name string, pullImage
 			return nil, err
 		}
 		// Otherwise, try to pull the image...
-		if err = e.Pull(config.Image, authConfig); err != nil {
+		if err = e.Pull(config.Image, authConfig, nil); err != nil {
 			return nil, err
 		}
 		// ...And try again.
@@ -1077,7 +1087,7 @@ func encodeAuthToBase64(authConfig *types.AuthConfig) (string, error) {
 }
 
 // Pull an image on the engine
-func (e *Engine) Pull(image string, authConfig *types.AuthConfig) error {
+func (e *Engine) Pull(image string, authConfig *types.AuthConfig, callback func(msg JSONMessage)) error {
 	encodedAuth, err := encodeAuthToBase64(authConfig)
 	if err != nil {
 		return err
@@ -1096,20 +1106,22 @@ func (e *Engine) Pull(image string, authConfig *types.AuthConfig) error {
 
 	defer pullResponseBody.Close()
 
-	// wait until the image download is finished
-	dec := json.NewDecoder(pullResponseBody)
-	m := map[string]interface{}{}
-	for {
-		if err := dec.Decode(&m); err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
+	scanner := bufio.NewScanner(pullResponseBody)
+	for scanner.Scan() {
+		line := scanner.Text()
+		var msg JSONMessage
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			log.Warnf("Malformed progress line during pull of %s: %s - %s", image, line, err)
+			continue
 		}
-	}
-	// if the final stream object contained an error, return it
-	if errMsg, ok := m["error"]; ok {
-		return fmt.Errorf("%v", errMsg)
+
+		if msg.Error != nil {
+			return fmt.Errorf("Failed to load %s: %s", image, msg.Error.Message)
+		}
+
+		if callback != nil {
+			callback(msg)
+		}
 	}
 
 	// force refresh images
@@ -1118,7 +1130,7 @@ func (e *Engine) Pull(image string, authConfig *types.AuthConfig) error {
 }
 
 // Load an image on the engine
-func (e *Engine) Load(reader io.Reader) error {
+func (e *Engine) Load(reader io.Reader, callback func(msg JSONMessage)) error {
 	loadResponse, err := e.apiClient.ImageLoad(context.Background(), reader, false)
 	e.CheckConnectionErr(err)
 	if err != nil {
@@ -1127,21 +1139,22 @@ func (e *Engine) Load(reader io.Reader) error {
 
 	defer loadResponse.Body.Close()
 
-	// wait until the image load is finished
-	dec := json.NewDecoder(loadResponse.Body)
-
-	m := map[string]interface{}{}
-	for {
-		if err := dec.Decode(&m); err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
+	scanner := bufio.NewScanner(loadResponse.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		var msg JSONMessage
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			log.Warnf("Malformed progress line during image load: %s - %s", line, err)
+			continue
 		}
-	}
-	// if the final stream object contained an error, return it
-	if errMsg, ok := m["error"]; ok {
-		return fmt.Errorf("%v", errMsg)
+
+		if msg.Error != nil {
+			return fmt.Errorf("Failed to load image: %s", msg.Error.Message)
+		}
+
+		if callback != nil {
+			callback(msg)
+		}
 	}
 
 	// force fresh images
@@ -1151,7 +1164,7 @@ func (e *Engine) Load(reader io.Reader) error {
 }
 
 // Import image
-func (e *Engine) Import(source string, ref string, tag string, imageReader io.Reader) error {
+func (e *Engine) Import(source string, ref string, tag string, imageReader io.Reader, callback func(msg JSONMessage)) error {
 	importSrc := types.ImageImportSource{
 		Source:     imageReader,
 		SourceName: source,
@@ -1160,10 +1173,30 @@ func (e *Engine) Import(source string, ref string, tag string, imageReader io.Re
 		Tag: tag,
 	}
 
-	_, err := e.apiClient.ImageImport(context.Background(), importSrc, ref, opts)
+	importResponseBody, err := e.apiClient.ImageImport(context.Background(), importSrc, ref, opts)
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
+	}
+
+	defer importResponseBody.Close()
+
+	scanner := bufio.NewScanner(importResponseBody)
+	for scanner.Scan() {
+		line := scanner.Text()
+		var msg JSONMessage
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			log.Warnf("Malformed progress line during import of %s: %s - %s", ref, line, err)
+			continue
+		}
+
+		if msg.Error != nil {
+			return fmt.Errorf("Failed to import %s: %s", ref, msg.Error.Message)
+		}
+
+		if callback != nil {
+			callback(msg)
+		}
 	}
 
 	// force fresh images
@@ -1374,7 +1407,7 @@ func (e *Engine) StartContainer(container *Container, hostConfig *dockerclient.H
 	// This is expected to occur in API versions 1.25 or higher if
 	// the HostConfig.AutoRemove field is set to true. This could also occur
 	// during race conditions where a third-party client removes the container
-	// immmediately after it's started.
+	// immediately after it's started.
 	if container.Info.HostConfig.AutoRemove && engineapi.IsErrContainerNotFound(err) {
 		delete(e.containers, container.ID)
 		log.Debugf("container %s was not detected shortly after ContainerStart, indicating a daemon-side removal", container.ID)

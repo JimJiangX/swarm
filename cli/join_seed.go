@@ -6,10 +6,10 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/codegangsta/cli"
 	"github.com/docker/docker/pkg/discovery"
 	"github.com/docker/swarm/api"
 	"github.com/docker/swarm/seed"
+	"github.com/urfave/cli"
 )
 
 const (
