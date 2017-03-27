@@ -16,45 +16,45 @@ func getRedisSpecTest() *structs.ServiceSpec {
 		},
 
 		Units: []structs.UnitSpec{
-			structs.UnitSpec{
+			{
 				Networking: structs.UnitNetworking{
 					IPs: []structs.UnitIP{
-						structs.UnitIP{
+						{
 							IP: "192.168.4.141",
 						},
 					},
 					Ports: []structs.UnitPort{
-						structs.UnitPort{
+						{
 							Port: 6379,
 						},
 					},
 				},
 			},
 
-			structs.UnitSpec{
+			{
 				Networking: structs.UnitNetworking{
 					IPs: []structs.UnitIP{
-						structs.UnitIP{
+						{
 							IP: "192.168.4.141",
 						},
 					},
 					Ports: []structs.UnitPort{
-						structs.UnitPort{
+						{
 							Port: 6380,
 						},
 					},
 				},
 			},
 
-			structs.UnitSpec{
+			{
 				Networking: structs.UnitNetworking{
 					IPs: []structs.UnitIP{
-						structs.UnitIP{
+						{
 							IP: "192.168.4.141",
 						},
 					},
 					Ports: []structs.UnitPort{
-						structs.UnitPort{
+						{
 							Port: 6381,
 						},
 					},

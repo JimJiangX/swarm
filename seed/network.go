@@ -8,7 +8,6 @@ import (
 	//	"log"
 	"net"
 	"net/http"
-
 	//	log "github.com/Sirupsen/logrus"
 )
 
