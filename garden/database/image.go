@@ -96,7 +96,7 @@ func (db dbBase) GetImageVersion(nameOrID string) (Image, error) {
 // GetImage returns Image select by name and version.
 func (db dbBase) GetImage(name string, major, minor, patch int) (Image, error) {
 	image := Image{}
-	query := "SELECT id,software_name,docker_image_id,major_version,minor_version,patch_version,size,label,upload_at FROM " + db.imageTable() + " WHERE software_name=?,major_version=?,minor_version=?,patch_version=?"
+	query := "SELECT id,software_name,docker_image_id,major_version,minor_version,patch_version,size,label,upload_at FROM " + db.imageTable() + " WHERE software_name=? AND major_version=? AND minor_version=? AND patch_version=?"
 	err := db.Get(&image, query, name, major, minor, patch)
 
 	return image, errors.Wrap(err, "get Image")
