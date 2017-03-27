@@ -204,3 +204,14 @@ func (db dbBase) ListTasks(link string, status int) ([]Task, error) {
 
 	return out, errors.Wrap(err, "list tasks")
 }
+
+func (db dbBase) delTasks(tasks []Task) error {
+	for i := range tasks {
+		_, err := db.Exec("DELETE FROM "+db.taskTable()+" WHERE id=?", tasks[i].ID)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
+
+	return nil
+}

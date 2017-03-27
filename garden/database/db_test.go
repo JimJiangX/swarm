@@ -14,17 +14,21 @@ var (
 	dbSource       string
 	dbMaxIdleConns int
 	ormer          Ormer
+	db             *dbBase
 )
 
 func init() {
-	var err error
-	dbSource = "root:111111@tcp(192.168.2.121:3306)/DBaaS_test?parseTime=true&charset=utf8&loc=Asia%2FShanghai&sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'"
+	dbSource = "root:@tcp(192.168.4.130:3306)/mgm?parseTime=true&charset=utf8&loc=Asia%2FShanghai&sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'"
 	driverName = "mysql"
 	dbMaxIdleConns = 8
-	ormer, err = NewOrmer(driverName, dbSource, "tb", dbMaxIdleConns)
+	orm, err := NewOrmer(driverName, dbSource, "tbl", dbMaxIdleConns)
 	if err != nil {
 		log.Printf("%+v", err)
+		return
 	}
+
+	ormer = orm
+	db = orm.(*dbBase)
 }
 
 func TestTxFrame(t *testing.T) {
