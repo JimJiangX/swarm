@@ -2,7 +2,6 @@ package parser
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/docker/swarm/garden/structs"
 )
@@ -13,6 +12,8 @@ const (
 )
 
 type parser interface {
+	clone() parser
+
 	Validate(data map[string]interface{}) error
 
 	Set(key string, val interface{}) error
@@ -28,40 +29,47 @@ type parser interface {
 	Marshal() ([]byte, error)
 }
 
-var images = struct {
-	sync.RWMutex
-	m map[string]structs.ImageVersion
-}{
-	m: make(map[string]structs.ImageVersion, 10),
-}
+var images = make(map[structs.ImageVersion]parser, 10)
 
-func register(name, version string, _ parser) error {
-	key := name + ":" + version
+func register(name, version string, pr parser) error {
 
-	images.RLock()
-	_, exist := images.m[key]
-	images.RUnlock()
-
-	if exist {
-		return fmt.Errorf("image:%s exist", key)
-	}
-
-	v, err := structs.ParseImage(key)
+	v, err := structs.ParseImage(name + ":" + version)
 	if err != nil {
 		return err
 	}
 
-	images.Lock()
-	images.m[key] = v
-	images.Unlock()
+	images[v] = pr
 
 	return nil
 }
 
-func factory(name, version string) (parser, error) {
-	switch {
-	default:
+func factory(name string) (parser, error) {
+	im, err := structs.ParseImage(name)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, fmt.Errorf("Unsupported image %s:%s yet", name, version)
+	if pr, ok := images[im]; ok && pr != nil {
+		return pr, nil
+	}
+
+	var (
+		temp parser
+		less = 0xFF
+	)
+
+	for iv, pr := range images {
+		if iv.Name == im.Name && iv.Major == im.Major && iv.Minor == im.Minor {
+			if n := im.Patch - iv.Patch; n >= 0 && n < less {
+				temp = pr
+				less = n
+			}
+		}
+	}
+
+	if temp != nil {
+		return temp, nil
+	}
+
+	return nil, fmt.Errorf("Unsupported image %s yet", name)
 }

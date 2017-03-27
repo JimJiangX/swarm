@@ -21,6 +21,10 @@ type switchManagerConfig struct {
 	config config.Configer
 }
 
+func (switchManagerConfig) clone() parser {
+	return &switchManagerConfig{}
+}
+
 func (switchManagerConfig) Validate(data map[string]interface{}) error { return nil }
 
 func (c *switchManagerConfig) ParseData(data []byte) error {
@@ -171,8 +175,16 @@ type switchManagerConfigV1119 struct {
 	switchManagerConfig
 }
 
+func (switchManagerConfigV1119) clone() parser {
+	return &switchManagerConfigV1119{}
+}
+
 type switchManagerConfigV1123 struct {
 	switchManagerConfig
+}
+
+func (switchManagerConfigV1123) clone() parser {
+	return &switchManagerConfigV1123{}
 }
 
 func (c switchManagerConfigV1123) GenerateConfig(id string, desc structs.ServiceSpec) error {

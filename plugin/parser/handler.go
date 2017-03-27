@@ -83,11 +83,9 @@ func NewRouter(c kvstore.Client, mgmip string, mgmPort int) *mux.Router {
 func getSupportImageVersion(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	out := make([]structs.ImageVersion, 0, 10)
 
-	images.RLock()
-	for _, v := range images.m {
-		out = append(out, v)
+	for key := range images {
+		out = append(out, key)
 	}
-	images.RUnlock()
 
 	err := json.NewEncoder(w).Encode(out)
 	if err != nil {
@@ -248,7 +246,7 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parser, err := factory(req.Name, req.Version)
+	parser, err := factory(req.Image)
 	if err != nil {
 		httpError(w, err, http.StatusNotImplemented)
 		return
@@ -260,7 +258,11 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key := strings.Join([]string{imageKey, req.Name, req.Version}, "/")
+	path := make([]string, 1, 3)
+	path[0] = imageKey
+	path = append(path, strings.SplitN(req.Image, ":", 2)...)
+
+	key := strings.Join(path, "/")
 	err = ctx.client.PutKV(key, value)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
@@ -304,7 +306,7 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	resp := make(structs.ConfigsMap, len(req.Units))
 
 	for i := range req.Units {
-		parser, err := factory(image, version)
+		parser, err := factory(req.Service.Image)
 		if err != nil {
 			httpError(w, err, http.StatusNotImplemented)
 			return
@@ -432,7 +434,7 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		}
 
 		if u.Content != "" && c.Content != u.Content {
-			parser, err := factory(c.Name, c.Version)
+			parser, err := factory(c.Name + ":" + c.Version)
 			if err != nil {
 				httpError(w, err, http.StatusInternalServerError)
 				return

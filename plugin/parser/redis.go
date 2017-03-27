@@ -16,6 +16,10 @@ type redisConfig struct {
 	config map[string]string
 }
 
+func (redisConfig) clone() parser {
+	return &redisConfig{}
+}
+
 func (c redisConfig) Validate(data map[string]interface{}) error {
 	return nil
 }

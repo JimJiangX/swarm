@@ -21,6 +21,10 @@ type proxyConfig struct {
 	config config.Configer
 }
 
+func (proxyConfig) clone() parser {
+	return &proxyConfig{}
+}
+
 func (proxyConfig) Validate(data map[string]interface{}) error { return nil }
 
 func (c *proxyConfig) Set(key string, val interface{}) error {
@@ -195,8 +199,16 @@ type proxyConfigV102 struct {
 	proxyConfig
 }
 
+func (proxyConfigV102) clone() parser {
+	return &proxyConfigV102{}
+}
+
 type proxyConfigV110 struct {
 	proxyConfig
+}
+
+func (proxyConfigV110) clone() parser {
+	return &proxyConfigV110{}
 }
 
 func (c proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) error {

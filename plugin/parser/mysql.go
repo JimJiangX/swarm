@@ -20,6 +20,10 @@ type mysqlConfig struct {
 	config config.Configer
 }
 
+func (mysqlConfig) clone() parser {
+	return &mysqlConfig{}
+}
+
 func (mysqlConfig) Validate(data map[string]interface{}) error {
 	return nil
 }

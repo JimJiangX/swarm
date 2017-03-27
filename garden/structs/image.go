@@ -95,8 +95,6 @@ type Keyset struct {
 }
 
 type ConfigTemplate struct {
-	Name      string
-	Version   string
 	Image     string
 	Mount     string
 	Content   []byte
