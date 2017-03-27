@@ -98,6 +98,7 @@ func postRegister(ctx context.Context, uri string, obj interface{}) error {
 	return nil
 }
 
+// typ : hosts / containers / units
 func (c *kvClient) deregisterToHorus(ctx context.Context, typ, key string, force bool) error {
 	var (
 		addr string

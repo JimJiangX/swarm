@@ -506,7 +506,7 @@ func (m master) removeNode(ID string) error {
 	return m.dco.DelNode(ID)
 }
 
-func (m master) RemoveNode(ctx context.Context, horus, nameOrID, user, password string, force bool) error {
+func (m master) RemoveNode(ctx context.Context, horus, nameOrID, user, password string, force bool, reg kvstore.Register) error {
 	node, err := m.getNode(nameOrID)
 	if err != nil {
 		if database.IsNotFound(err) {
@@ -531,7 +531,12 @@ func (m master) RemoveNode(ctx context.Context, horus, nameOrID, user, password 
 		node.node.Status == statusNodeSSHLoginFailed ||
 		node.node.Status == statusNodeSSHExecFailed {
 
-		return m.removeNode(node.node.ID)
+		err := m.removeNode(node.node.ID)
+		if err != nil {
+			return err
+		}
+
+		return reg.DeregisterService(ctx, "hosts", node.node.ID)
 	}
 
 	config, err := m.dco.GetSysConfig()
@@ -557,6 +562,11 @@ func (m master) RemoveNode(ctx context.Context, horus, nameOrID, user, password 
 	}
 
 	err = m.removeNode(node.node.ID)
+	if err != nil {
+		return err
+	}
+
+	err = reg.DeregisterService(ctx, "hosts", node.node.ID)
 
 	return err
 }

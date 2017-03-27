@@ -798,7 +798,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	m := resource.NewMaster(gd.Ormer(), gd.Cluster)
 
-	err = m.RemoveNode(ctx, horus, node, username, password, force)
+	err = m.RemoveNode(ctx, horus, node, username, password, force, gd.KVClient())
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
