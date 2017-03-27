@@ -268,13 +268,6 @@ install_docker() {
 	
 	wwn=${wwn:1}
 
-	# check adm_nic
-	ifconfig $adm_nic >/dev/null 2>&1 
-	if [ $? -ne 0 ]; then
-		echo "not find adm_nic ${adm_nic}"
-		exit 2
-	fi
-
 	# check container_nic
 	container_nic=`ifconfig | grep -e 'bond[0-9]\{1,3\}' | grep -v ${adm_nic} | awk '{print $1}' | sed 's/://g' |  tr "\n" "," |sed 's/.$//'` 
 
