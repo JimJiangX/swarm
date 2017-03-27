@@ -11,7 +11,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"golang.org/x/net/context/ctxhttp"
@@ -19,12 +21,48 @@ import (
 
 const (
 	defaultTimeout = 30 * time.Second
-	createDevURL   = "device/create"
+	createDevURL   = "network/create"
 )
 
-func CreateNetworkDevice(ctx context.Context, addr string, ips []database.IP, tlsConfig *tls.Config) error {
+type createNetworkConfig struct {
+	Container string `json:"containerID"`
+
+	HostDevice      string `json:"hostDevice"`
+	ContainerDevice string `json:"containerDevice"`
+
+	IPCIDR  string `json:"IpCIDR"`
+	Gateway string `json:"gateway"`
+
+	VlanID    int `json:"vlanID"`
+	BandWidth int `json:"bandWidth"`
+}
+
+func CreateNetworkDevice(ctx context.Context, addr string, c *cluster.Container, ips []database.IP, tlsConfig *tls.Config) error {
+	bond := c.Engine.Labels["adm_nic"]
+
+	for i := range ips {
+		config := createNetworkConfig{
+			Container:       c.ID,
+			HostDevice:      bond,
+			ContainerDevice: ips[i].Bond,
+			IPCIDR:          fmt.Sprintf("%s/%d", utils.Uint32ToIP(ips[i].IPAddr), ips[i].Prefix),
+			Gateway:         ips[i].Gateway,
+			VlanID:          ips[i].VLAN,
+			BandWidth:       ips[i].Bandwidth,
+		}
+
+		err := postCreateNetwork(ctx, addr, config, tlsConfig)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
+
+	return nil
+}
+
+func postCreateNetwork(ctx context.Context, addr string, config createNetworkConfig, tlsConfig *tls.Config) error {
 	body := bytes.NewBuffer(nil)
-	err := json.NewEncoder(body).Encode(ips)
+	err := json.NewEncoder(body).Encode(config)
 	if err != nil {
 		return err
 	}
