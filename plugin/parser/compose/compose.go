@@ -14,7 +14,7 @@ import (
 type DbArch string
 
 const (
-	BASEDIR string = "./scripts/plugin/compose/"
+	BASEDIR string = "./script/plugin/compose/"
 
 	NONE  DbArch = "None"
 	CLONE DbArch = "Clone"
