@@ -12,7 +12,7 @@ const (
 	HealthCheckCmd    = "health_check_cmd"
 )
 
-type HorusRegistration struct {
+type HorusRegistration2 struct {
 	Endpoint      string   `json:"endpoint"`
 	CollectorName string   `json:"collectorname,omitempty"`
 	User          string   `json:"user,omitempty"`
@@ -27,9 +27,37 @@ type HorusRegistration struct {
 	CheckType     string   `json:"checktype"`
 }
 
+type HorusRegistration struct {
+	Node struct {
+		Select bool `json:"-"`
+
+		Name       string
+		IPAddr     string `json:"ip_addr"`
+		OSUser     string `json:"os_user"`
+		OSPassword string `json:"os_pwd"`
+		CheckType  string `json:"check_type"`
+		NetDevice  string `json:"net_dev"`
+	}
+
+	Service struct {
+		Select bool `json:"-"`
+
+		Name            string
+		Type            string
+		MonitorUser     string `json:"mon_user"`
+		MonitorPassword string `json:"mon_pwd"`
+		Tag             string
+
+		Container struct {
+			Name     string
+			HostName string `json:"host_name"`
+		} `json:"container"`
+	}
+}
+
 type ServiceRegistration struct {
-	Consul api.AgentServiceRegistration
-	Horus  HorusRegistration
+	Consul *api.AgentServiceRegistration
+	Horus  *HorusRegistration
 }
 
 type ConfigCmds struct {

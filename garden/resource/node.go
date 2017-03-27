@@ -11,6 +11,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/scplib"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
@@ -142,7 +143,7 @@ func NewNodeWithTaskList(len int) []nodeWithTask {
 }
 
 // InstallNodes install new nodes,list should has same ClusterID
-func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithTask) error {
+func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithTask, reg kvstore.Register) error {
 	nodes := make([]database.Node, len(list))
 	tasks := make([]database.Task, len(list))
 	timeout := 250*time.Second + time.Duration(len(list)*30)*time.Second
@@ -175,7 +176,7 @@ func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithT
 		go list[i].distribute(ctx, horus, m.dco, config)
 	}
 
-	go m.registerNodesLoop(ctx, cancel, list, strconv.Itoa(config.Ports.Docker))
+	go m.registerNodesLoop(ctx, cancel, list, strconv.Itoa(config.Ports.Docker), reg)
 
 	return nil
 }
@@ -352,7 +353,9 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 }
 
 // registerNodes register Nodes
-func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc, nodes []nodeWithTask, port string) {
+func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc,
+	nodes []nodeWithTask, port string, reg kvstore.Register) {
+
 	defer cancel()
 
 	t := time.NewTicker(time.Second * 30)
@@ -364,7 +367,7 @@ func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc
 
 		case <-ctx.Done():
 			// try again
-			err := m.registerNodes(ctx, nodes, port)
+			err := m.registerNodes(ctx, nodes, port, reg)
 			if err != nil {
 				logrus.Errorf("reigster nodes error,%+v", err)
 			}
@@ -375,14 +378,14 @@ func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc
 			return
 		}
 
-		err := m.registerNodes(ctx, nodes, port)
+		err := m.registerNodes(ctx, nodes, port, reg)
 		if err != nil {
 			logrus.Errorf("reigster nodes error,%+v", err)
 		}
 	}
 }
 
-func (m master) registerNodes(ctx context.Context, nodes []nodeWithTask, port string) error {
+func (m master) registerNodes(ctx context.Context, nodes []nodeWithTask, port string, reg kvstore.Register) error {
 	var _err error
 	count := 0
 	for i := range nodes {
@@ -431,9 +434,32 @@ func (m master) registerNodes(ctx context.Context, nodes []nodeWithTask, port st
 			_err = err
 			field.Errorf("%+v", err)
 		}
+
+		err = registerHost(ctx, nodes[i], reg, eng.Labels["adm_nic"])
+		if err != nil {
+			_err = err
+			field.Errorf("%+v", err)
+		}
 	}
 
 	return _err
+}
+
+func registerHost(ctx context.Context, node nodeWithTask, reg kvstore.Register, dev string) error {
+	body := structs.HorusRegistration{}
+
+	body.Node.Select = true
+	body.Node.Name = node.Node.ID
+
+	body.Node.IPAddr = node.Node.Addr
+	body.Node.OSUser = node.config.Username
+	body.Node.OSPassword = node.config.Password
+	body.Node.CheckType = "health"
+	body.Node.NetDevice = dev
+
+	err := reg.RegisterService(ctx, "", structs.ServiceRegistration{Horus: &body})
+
+	return err
 }
 
 func (m master) registerNodesTimeout(nodes []nodeWithTask, er error) error {

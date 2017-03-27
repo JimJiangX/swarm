@@ -4,7 +4,7 @@ import "testing"
 
 func TestReduceCPUset(t *testing.T) {
 	want := "0,2,3,4,5"
-	got, err := reduceCPUset(",11,2,6,9,3,4,5,0", 5)
+	got, err := reduceCPUset("11,2,6,9,3,4,5,0", 5)
 	if err != nil {
 		t.Error(err)
 	}

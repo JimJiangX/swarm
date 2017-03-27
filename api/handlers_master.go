@@ -673,7 +673,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	master := resource.NewMaster(orm, gd.Cluster)
-	err = master.InstallNodes(ctx, horus, nodes)
+	err = master.InstallNodes(ctx, horus, nodes, gd.KVClient())
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return

@@ -50,12 +50,33 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj ...structs.HorusRegi
 		return ctx.Err()
 	}
 
+	for i := range obj {
+		if obj[i].Node.Select {
+			uri := fmt.Sprintf("http://%s/v1/hosts", addr)
+			err := postRegister(ctx, uri, obj[i].Node)
+			if err != nil {
+				return err
+			}
+
+		}
+		if obj[i].Service.Select {
+			uri := fmt.Sprintf("http://%s/v1/units", addr)
+			err := postRegister(ctx, uri, obj[i].Service)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func postRegister(ctx context.Context, uri string, obj interface{}) error {
 	body := bytes.NewBuffer(nil)
 	if err := json.NewEncoder(body).Encode(obj); err != nil {
 		return errors.Wrap(err, "encode registerService")
 	}
 
-	uri := fmt.Sprintf("http://%s/v1/agent/register", addr)
 	resp, err := ctxhttp.Post(ctx, nil, uri, "application/json", body)
 	if err != nil {
 		return errors.Wrap(err, "register to Horus response")
@@ -77,14 +98,11 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj ...structs.HorusRegi
 	return nil
 }
 
-func (c *kvClient) deregisterToHorus(ctx context.Context, force bool, endpoints ...string) error {
-	type deregisterService struct {
-		Endpoint string
-	}
-
-	var addr string
-	ch := make(chan result, 1)
-
+func (c *kvClient) deregisterToHorus(ctx context.Context, typ, key string, force bool) error {
+	var (
+		addr string
+		ch   = make(chan result, 1)
+	)
 	go func(ch chan<- result) {
 		addr, err := c.GetHorusAddr()
 		ch <- result{
@@ -105,21 +123,11 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, force bool, endpoints 
 		return ctx.Err()
 	}
 
-	obj := make([]deregisterService, len(endpoints))
-	for i := range obj {
-		obj[i].Endpoint = endpoints[i]
-	}
+	uri := fmt.Sprintf("http://%s/v1/%s/%s", addr, typ, key)
 
-	body := bytes.NewBuffer(nil)
-	if err := json.NewEncoder(body).Encode(obj); err != nil {
-		return errors.Wrap(err, "encode deregister to Horus")
-	}
-
-	uri := fmt.Sprintf("http://%s/v1/agent/deregister", addr)
-
-	req, err := http.NewRequest("POST", uri, body)
+	req, err := http.NewRequest(http.MethodDelete, uri, nil)
 	if err != nil {
-		return errors.Wrap(err, "post agent deregister to Horus")
+		return errors.Wrap(err, "deregister to Horus")
 	}
 	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
@@ -153,41 +161,47 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, force bool, endpoints 
 
 // RegisterService register service to consul and Horus
 func (c *kvClient) RegisterService(ctx context.Context, host string, config structs.ServiceRegistration) error {
-	err := c.registerHealthCheck(host, config.Consul)
-	if err != nil {
-		return err
+	if config.Consul != nil {
+		err := c.registerHealthCheck(host, *config.Consul)
+		if err != nil {
+			return err
+		}
 	}
 
-	select {
-	default:
-		err = c.registerToHorus(ctx, config.Horus)
+	if config.Horus != nil {
+		select {
+		default:
+			return c.registerToHorus(ctx, *config.Horus)
 
-	case <-ctx.Done():
-		return ctx.Err()
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 
-	return err
+	return nil
 }
 
 // DeregisterService service to consul and Horus
-func (c *kvClient) DeregisterService(ctx context.Context, addr, key string) error {
-	err := c.deregisterToHorus(ctx, false, key)
+func (c *kvClient) DeregisterService(ctx context.Context, typ, key string) error {
+	err := c.deregisterToHorus(ctx, typ, key, false)
 	if err != nil {
-		err = c.deregisterToHorus(ctx, true, key)
-	}
-
-	if err != nil {
-		return err
-	}
-
-	select {
-	default:
-		err = c.deregisterHealthCheck(addr, key)
-	case <-ctx.Done():
-		return ctx.Err()
+		err = c.deregisterToHorus(ctx, typ, key, true)
 	}
 
 	return err
+
+	//	if err != nil {
+	//		return err
+	//	}
+
+	//	select {
+	//	default:
+	//		err = c.deregisterHealthCheck(addr, key)
+	//	case <-ctx.Done():
+	//		return ctx.Err()
+	//	}
+
+	//	return err
 }
 
 func (c *kvClient) GetHorusAddr() (string, error) {
