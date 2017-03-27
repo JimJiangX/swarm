@@ -83,7 +83,7 @@ func (db dbBase) ListImages() ([]Image, error) {
 func (db dbBase) GetImageVersion(nameOrID string) (Image, error) {
 	im, err := structs.ParseImage(nameOrID)
 	if err == nil {
-		db.GetImage(im.Name, im.Major, im.Minor, im.Patch)
+		return db.GetImage(im.Name, im.Major, im.Minor, im.Patch)
 	}
 
 	image := Image{}
