@@ -13,16 +13,16 @@ import (
 )
 
 type NetworkCfg struct {
-	Instance string `json:"instance"`
+	ContainerID string `json:"containerID"`
 
-	HDevice string `json:"hostDevice"`
+	HostDevice string `json:"hostDevice"`
 
-	CDevice string `json:"containedDevice"`
+	ContainerDevice string `json:"containerDevice"`
 
-	IpCIDR  string `json:"IpCIDR"`
+	IPCIDR  string `json:"IpCIDR"`
 	Gateway string `json:"gateway"`
 
-	VlanId int `json:"vlanId"`
+	VlanID int `json:"vlanID"`
 
 	BandWidth int `json:"bandWidth"`
 }
@@ -55,28 +55,28 @@ func networkCreate(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 }
 
 func valicateNetworkCfg(cfg *NetworkCfg) error {
-	if cfg.Gateway == "" || cfg.Instance == "" || cfg.CDevice == "" {
+	if cfg.Gateway == "" || cfg.ContainerID == "" || cfg.HostDevice == "" {
 		return errors.New("bad NetworkCfg req")
 	}
 
-	if _, _, err := net.ParseCIDR(cfg.IpCIDR); err != nil {
-		return errors.New("bad NetworkCfg req(IpCIDR)")
+	if _, _, err := net.ParseCIDR(cfg.IPCIDR); err != nil {
+		return errors.New("bad NetworkCfg req(IPCIDR)")
 	}
 
 	return nil
 }
 
 func createNetwork(cfg *NetworkCfg) error {
-	if cfg.CDevice == "" {
-		cfg.CDevice = "eth0"
+	if cfg.ContainerDevice == "" {
+		cfg.ContainerDevice = "eth0"
 	}
 
 	args := []string{
-		"-h", cfg.HDevice,
-		"-i", cfg.CDevice,
-		"-c", cfg.Instance,
-		"-ip", cfg.IpCIDR + "@" + cfg.Gateway,
-		"-v", strconv.Itoa(cfg.VlanId),
+		"-h", cfg.HostDevice,
+		"-i", cfg.ContainerDevice,
+		"-c", cfg.ContainerID,
+		"-ip", cfg.IPCIDR + "@" + cfg.Gateway,
+		"-v", strconv.Itoa(cfg.VlanID),
 		"-d", strconv.Itoa(cfg.BandWidth),
 	}
 

@@ -85,16 +85,16 @@ type VolumeFileConfig struct {
 }
 
 type NetworkCfg struct {
-	Instance string `json:"instance"`
+	ContainerID string `json:"containerID"`
 
-	HDevice string `json:"hostDevice"`
+	HostDevice string `json:"hostDevice"`
 
-	CDevice string `json:"containedDevice"`
+	ContainerDevice string `json:"containerDevice"`
 
-	IpCIDR  string `json:"IpCIDR"`
+	IPCIDR  string `json:"IpCIDR"`
 	Gateway string `json:"gateway"`
 
-	VlanId int `json:"vlanId"`
+	VlanID int `json:"vlanID"`
 
 	BandWidth int `json:"bandWidth"`
 }
