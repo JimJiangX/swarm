@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	//	log "github.com/Sirupsen/logrus"
 )
 
 //master-slave mysql manager

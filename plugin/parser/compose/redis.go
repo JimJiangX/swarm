@@ -2,10 +2,8 @@ package compose
 
 import (
 	"errors"
-
 	"strconv"
 	"time"
-	//	log "github.com/Sirupsen/logrus"
 )
 
 type Redis struct {

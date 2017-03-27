@@ -78,7 +78,7 @@ func TestRedis(t *testing.T) {
 	composer, err := NewCompserBySpec(spec, mgmip, mgmport)
 	//	assert.Nil(t, err)
 	if err != nil {
-		t.Fatalf("get composer fail:%s", err.Error())
+		t.Skipf("get composer fail:%s", err.Error())
 	}
 
 	assert.Nil(t, composer.ComposeCluster())

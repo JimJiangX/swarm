@@ -6,9 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/swarm/garden/structs"
-
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/garden/structs"
 )
 
 type DbArch string
