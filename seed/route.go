@@ -9,7 +9,9 @@ import (
 	"golang.org/x/net/context"
 )
 
-const SCRIPT_DIR = "/usr/local/local_volume_plugin/scripts/"
+const SCRIPT_DIR = "./scripts/seed/"
+
+const NET_SCRIPT_DIR = SCRIPT_DIR + "net/"
 
 type _Context struct {
 	apiVersion string

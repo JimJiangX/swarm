@@ -80,7 +80,7 @@ func createNetwork(cfg *NetworkCfg) error {
 		"-d", strconv.Itoa(cfg.BandWidth),
 	}
 
-	filepath := SCRIPT_DIR + "pipework.sh"
+	filepath := NET_SCRIPT_DIR + "init_nic.sh"
 
 	_, err := ExecShellFile(filepath, args...)
 	return err
