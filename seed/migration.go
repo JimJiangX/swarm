@@ -220,7 +220,7 @@ func checkActConfig(opt *ActConfig) error {
 func DoActivate(vgname string, lvs []string) error {
 
 	if err := vgImport(vgname); err != nil {
-		errstr := fmt.Sprintf("  %s vgimport fail:  ", vgname, err.Error())
+		errstr := fmt.Sprintf("  %s vgimport fail:%v", vgname, err)
 		log.Println(errstr)
 		return errors.New(errstr)
 	}
@@ -253,13 +253,13 @@ func DoDeactivate(vgname string, lvs []string) error {
 	// }
 
 	if err := lvsDeActivate(vgname, lvs); err != nil {
-		errstr := fmt.Sprintf("lvsDeActivate fail: %s", err.Error())
+		errstr := fmt.Sprintf("lvsDeActivate fail: %s", err)
 		log.Println(errstr)
 		return errors.New(errstr)
 	}
 
 	if err := vgExport(vgname); err != nil {
-		errstr := fmt.Sprintf("vgExport %s fail:  ", vgname, err.Error())
+		errstr := fmt.Sprintf("vgExport %s fail: %s", vgname, err)
 		log.Println(errstr)
 		return errors.New(errstr)
 	}

@@ -126,7 +126,7 @@ func WriteToTmpfile(data, tempfile string) error {
 
 	sendlen := len(data)
 	if num != sendlen {
-		return fmt.Errorf("data len :%d ;just write to file: %d ", sendlen)
+		return fmt.Errorf("data len :%d ;just write to file: %d ", sendlen, num)
 
 	}
 	return nil

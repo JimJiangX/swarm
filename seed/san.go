@@ -193,14 +193,14 @@ func vgList() ([]VgInfo, error) {
 		sizeslice := strings.Split(slices[1], ".")
 		size, err := strconv.Atoi(strings.Split(sizeslice[0], "B")[0])
 		if err != nil {
-			log.Printf("[warn]the line %s get the VSize fail: %s", line, size)
+			log.Printf("[warn]the line %s get the VSize fail: %d", line, size)
 			continue
 		}
 
 		freeslice := strings.Split(slices[2], ".")
 		free, err := strconv.Atoi(strings.Split(freeslice[0], "B")[0])
 		if err != nil {
-			log.Printf("[warn]the line %s get the VFree fail: %s", line, free)
+			log.Printf("[warn]the line %s get the VFree fail: %d", line, free)
 			continue
 		}
 

@@ -53,17 +53,20 @@ func (eh *eventsHandler) Wait(remoteAddr string, until int64) {
 	}
 
 	// subscribe to http client close event
+	eh.RLock()
 	w := eh.ws[remoteAddr]
+	ch := eh.cs[remoteAddr]
+	eh.RUnlock()
 	var closeNotify <-chan bool
 	if closeNotifier, ok := w.(http.CloseNotifier); ok {
 		closeNotify = closeNotifier.CloseNotify()
 	}
 
 	select {
-	case <-eh.cs[remoteAddr]:
+	case <-ch:
 	case <-closeNotify:
 	case <-timer.C: // `--until` timeout
-		close(eh.cs[remoteAddr])
+		close(ch)
 	}
 	eh.cleanupHandler(remoteAddr)
 }
@@ -114,7 +117,7 @@ func (eh *eventsHandler) Handle(e *cluster.Event) error {
 
 	var failed []string
 
-	eh.RLock()
+	eh.Lock()
 
 	for key, w := range eh.ws {
 		if _, err := fmt.Fprint(w, string(data)); err != nil {
@@ -127,8 +130,6 @@ func (eh *eventsHandler) Handle(e *cluster.Event) error {
 			f.Flush()
 		}
 	}
-	eh.RUnlock()
-	eh.Lock()
 	if len(failed) > 0 {
 		for _, key := range failed {
 			if ch, ok := eh.cs[key]; ok {
