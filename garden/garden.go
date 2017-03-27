@@ -64,6 +64,7 @@ func NewGarden(kvc kvstore.Client, cl cluster.Cluster,
 		Cluster:      cl,
 		ormer:        ormer,
 		pluginClient: pClient,
+		scheduler:    scheduler,
 		tlsConfig:    tlsConfig,
 	}
 }
