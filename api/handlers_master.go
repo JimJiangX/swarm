@@ -126,7 +126,21 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	nfs.MountDir = r.FormValue("nfs_mount_dir")
 	nfs.Options = r.FormValue("nfs_mount_opts")
 
-	d := resource.NewNFSDriver(nfs, "")
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	sys, err := gd.Ormer().GetSysConfig()
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	d := resource.NewNFSDriver(nfs, sys.SourceDir, "")
 	space, err := d.Space()
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
