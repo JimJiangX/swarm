@@ -124,32 +124,18 @@ remove_swarm_agent() {
 	rm -rf /usr/lib/systemd/system/swarm-agent.service
 }
 
-remove_horus_agent() {
-	# stop swarm-agent
-	systemctl stop horus-agent.service >/dev/null 2>&1
-	pkill -9 horus-agent >/dev/null 2>&1
-	rm -rf /usr/local/horus-agent
-	rm -rf /usr/bin/horus-agent
-	rm -rf /etc/sysconfig/horus-agent
-	rm -rf /usr/lib/systemd/system/horus-agent.service
-}
-
-
 umount_backup_dir
 dereg_to_consul DockerPlugin
-dereg_to_horus_server DockerPlugin 
+#dereg_to_horus_server DockerPlugin 
 dereg_to_consul Docker
-dereg_to_horus_server Docker
+#dereg_to_horus_server Docker
 dereg_to_consul SwarmAgent
-dereg_to_horus_server SwarmAgent
-dereg_to_consul HorusAgent 
-dereg_to_horus_server HorusAgent
+#dereg_to_horus_server SwarmAgent
 
 remove_docker_plugin
 remove_docker
 remove_swarm_agent
 remove_check_script
-remove_horus_agent
 remove_consul
 remove_vg ${hdd_vgname}
 remove_vg ${ssd_vgname}

@@ -537,7 +537,7 @@ install_consul
 
 install_docker_plugin
 reg_to_consul DockerPlugin ${docker_plugin_port}
-reg_to_horus_server DockerPlugin 
+#reg_to_horus_server DockerPlugin 
 
 install_docker ${docker_version}
 reg_to_consul Docker ${docker_port}
