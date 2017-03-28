@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/structs"
@@ -342,7 +343,7 @@ func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label st
 	}
 
 	size, ok := e.Labels[sizeLabel]
-	if ok {
+	if !ok {
 		e.RUnlock()
 
 		return nil, errors.New("not found label by key:" + sizeLabel)
@@ -385,11 +386,15 @@ func localVolumeDrivers(e *cluster.Engine, vo database.VolumeOrmer) (volumeDrive
 	vd, err := volumeDriverFromEngine(vo, e, _HDDVGLabel)
 	if err == nil {
 		drivers = append(drivers, vd)
+	} else {
+		logrus.Debugf("%s %s %+v", e.Name, _HDDVGLabel, err)
 	}
 
 	vd, err = volumeDriverFromEngine(vo, e, _SSDVGLabel)
 	if err == nil {
 		drivers = append(drivers, vd)
+	} else {
+		logrus.Debugf("%s %s %+v", e.Name, _SSDVGLabel, err)
 	}
 
 	return drivers, nil

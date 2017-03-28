@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
@@ -41,7 +42,7 @@ nodes:
 		}
 
 		for f := range filters {
-			if nodes[i].ID == filters[f] {
+			if nodes[i].ID == filters[f] || nodes[i].EngineID == filters[f] {
 				continue nodes
 			}
 		}
@@ -53,6 +54,7 @@ nodes:
 
 		ok, err := at.isNodeStoreEnough(engine, stores)
 		if !ok || err != nil {
+			logrus.Debugf("node %s %t %+v", nodes[i].Addr, ok, err)
 			continue
 		}
 

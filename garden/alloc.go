@@ -346,6 +346,10 @@ func (gd *Garden) schedule(ctx context.Context, actor allocator, config *cluster
 		return nil, err
 	}
 
+	if len(out) == 0 {
+		return nil, errors.New("no one node that satisfies")
+	}
+
 	engines := make([]string, 0, len(out))
 	for i := range out {
 		if out[i].EngineID != "" {
