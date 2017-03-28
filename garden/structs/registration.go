@@ -32,11 +32,11 @@ type HorusRegistration struct {
 		Select bool `json:"-"`
 
 		Name       string
-		IPAddr     string `json:"ip_addr"`
-		OSUser     string `json:"os_user"`
-		OSPassword string `json:"os_pwd"`
-		CheckType  string `json:"check_type"`
-		NetDevice  string `json:"net_dev"`
+		IPAddr     string   `json:"ip_addr"`
+		OSUser     string   `json:"os_user"`
+		OSPassword string   `json:"os_pwd"`
+		CheckType  string   `json:"check_type"`
+		NetDevice  []string `json:"net_dev"`
 	}
 
 	Service struct {
@@ -65,7 +65,8 @@ type ConfigCmds struct {
 	Name      string
 	Version   string
 	Content   string
-	Mount     string
+	LogMount  string
+	DataMount string
 	Cmds      CmdsMap
 	Timestamp int64
 

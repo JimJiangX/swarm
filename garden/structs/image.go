@@ -95,8 +95,10 @@ type Keyset struct {
 }
 
 type ConfigTemplate struct {
-	Image     string
-	Mount     string
+	Image string
+	// Mount     string
+	LogMount  string `json:"log_mount"`
+	DataMount string `json:"data_mount"`
 	Content   []byte
 	Keysets   []Keyset
 	Timestamp int64

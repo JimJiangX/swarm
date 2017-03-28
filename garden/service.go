@@ -310,7 +310,7 @@ func (svc *Service) updateConfigs(ctx context.Context, units []*unit, configs st
 			continue
 		}
 
-		err := units[i].updateServiceConfig(ctx, config.Mount, config.Content)
+		err := units[i].updateServiceConfig(ctx, config.DataMount, config.Content)
 		if err != nil {
 			return err
 		}
@@ -330,7 +330,7 @@ func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[
 		return err
 	}
 
-	err = u.updateServiceConfig(ctx, config.Mount, config.Content)
+	err = u.updateServiceConfig(ctx, config.DataMount, config.Content)
 
 	return err
 }

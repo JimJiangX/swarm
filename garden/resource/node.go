@@ -419,7 +419,7 @@ func (m master) registerNodes(ctx context.Context, nodes []nodeWithTask, port st
 			continue
 		}
 
-		err = registerHost(ctx, nodes[i], reg, eng.Labels["adm_nic"])
+		err = registerHost(ctx, nodes[i], reg, eng.Labels["CONTAINER_NIC"])
 		if err != nil {
 			_err = err
 			field.Errorf("%+v", err)
@@ -456,7 +456,7 @@ func registerHost(ctx context.Context, node nodeWithTask, reg kvstore.Register, 
 	body.Node.OSUser = node.config.Username
 	body.Node.OSPassword = node.config.Password
 	body.Node.CheckType = "health"
-	body.Node.NetDevice = dev
+	body.Node.NetDevice = strings.Split(dev, ",")
 
 	err := reg.RegisterService(ctx, "", structs.ServiceRegistration{Horus: &body})
 

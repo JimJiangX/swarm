@@ -346,7 +346,8 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 			ID:           req.Units[i].ID,
 			Name:         image,
 			Version:      version,
-			Mount:        t.Mount,
+			LogMount:     t.LogMount,
+			DataMount:    t.DataMount,
 			Content:      string(text),
 			Cmds:         cmds,
 			Timestamp:    time.Now().Unix(),
@@ -429,8 +430,11 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 			c.ID = u.ID
 		}
 
-		if u.Mount != "" && c.Mount != u.Mount {
-			c.Mount = u.Mount
+		if u.LogMount != "" && c.LogMount != u.LogMount {
+			c.LogMount = u.LogMount
+		}
+		if u.DataMount != "" && c.DataMount != u.DataMount {
+			c.DataMount = u.DataMount
 		}
 
 		if u.Content != "" && c.Content != u.Content {
