@@ -104,7 +104,7 @@ func (redisConfig) GenerateCommands(id string, desc structs.ServiceSpec) (struct
 
 	cmds[structs.InitServiceCmd] = []string{"/root/redis.service", "start"}
 
-	cmds[structs.StartContainerCmd] = []string{"/root/redis.service", "start"}
+	cmds[structs.StartServiceCmd] = []string{"/root/redis.service", "start"}
 
 	cmds[structs.StopServiceCmd] = []string{"/root/redis.service", "stop"}
 
