@@ -59,7 +59,7 @@ func (svc *Service) getUnits() ([]*unit, error) {
 		return nil, err
 	}
 
-	units := make([]*unit, 0, len(list))
+	units := make([]*unit, len(list))
 
 	for i := range list {
 		units[i] = newUnit(list[i], svc.so, svc.cluster)
