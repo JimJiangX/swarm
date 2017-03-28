@@ -99,7 +99,7 @@ func postRegister(ctx context.Context, uri string, obj interface{}) error {
 }
 
 // typ : hosts / containers / units
-func (c *kvClient) deregisterToHorus(ctx context.Context, typ, key string, user, password string, force bool) error {
+func (c *kvClient) deregisterToHorus(ctx context.Context, typ, key, user, password string, force bool) error {
 	var (
 		addr string
 		ch   = make(chan result, 1)
@@ -133,9 +133,11 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, typ, key string, user,
 	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 
-	if force {
+	if force || user != "" {
 		params := make(url.Values)
-		params.Set("force", "true")
+		if force {
+			params.Set("force", "true")
+		}
 		if user != "" {
 			params.Set("os_user", user)
 			params.Set("os_pwd", password)
