@@ -125,14 +125,20 @@ func (tl goTaskLock) run(before func(val int) bool, do func() error, sync bool) 
 			}
 
 			val := tl.expect
-			tl.task.Status = database.TaskDoneStatus
-			tl.task.Errors = ""
-			tl.task.FinishedAt = time.Now()
+
+			if tl.task != nil {
+				tl.task.Status = database.TaskDoneStatus
+				tl.task.Errors = ""
+				tl.task.FinishedAt = time.Now()
+			}
 
 			if err != nil {
 				val = tl.fail
-				tl.task.Status = database.TaskFailedStatus
-				tl.task.Errors = err.Error()
+
+				if tl.task != nil {
+					tl.task.Status = database.TaskFailedStatus
+					tl.task.Errors = err.Error()
+				}
 
 				logrus.WithField("key", tl.key).Errorf("go task lock:%+v", err)
 			}
