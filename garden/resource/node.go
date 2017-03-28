@@ -419,6 +419,13 @@ func (m master) registerNodes(ctx context.Context, nodes []nodeWithTask, port st
 			continue
 		}
 
+		err = registerHost(ctx, nodes[i], reg, eng.Labels["adm_nic"])
+		if err != nil {
+			_err = err
+			field.Errorf("%+v", err)
+			continue
+		}
+
 		n.EngineID = eng.ID
 		n.Status = statusNodeEnable
 		n.Enabled = true
@@ -430,12 +437,6 @@ func (m master) registerNodes(ctx context.Context, nodes []nodeWithTask, port st
 		t.Errors = ""
 
 		err = m.dco.RegisterNode(n, t)
-		if err != nil {
-			_err = err
-			field.Errorf("%+v", err)
-		}
-
-		err = registerHost(ctx, nodes[i], reg, eng.Labels["adm_nic"])
 		if err != nil {
 			_err = err
 			field.Errorf("%+v", err)
