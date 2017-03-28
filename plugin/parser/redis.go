@@ -3,9 +3,11 @@ package parser
 import (
 	"bytes"
 	"fmt"
-	"strings"
+	"path/filepath"
+	"strconv"
 
 	"github.com/docker/swarm/garden/structs"
+	"github.com/pkg/errors"
 )
 
 func init() {
@@ -13,30 +15,24 @@ func init() {
 }
 
 type redisConfig struct {
-	config map[string]string
+	template *structs.ConfigTemplate
+	config   map[string]string
 }
 
-func (redisConfig) clone() parser {
-	return &redisConfig{}
+func (redisConfig) clone(t *structs.ConfigTemplate) parser {
+	return &redisConfig{
+		template: t,
+		config:   make(map[string]string, 100),
+	}
 }
 
 func (c redisConfig) Validate(data map[string]interface{}) error {
 	return nil
 }
 
-func (c *redisConfig) Set(key string, val interface{}) error {
-	if c.config == nil {
-		c.config = make(map[string]string, 20)
-	}
-
-	c.config[strings.ToLower(key)] = fmt.Sprintf("%v", val)
-
-	return nil
-}
-
 func (c *redisConfig) ParseData(data []byte) error {
 	if c.config == nil {
-		c.config = make(map[string]string, 20)
+		c.config = make(map[string]string, 100)
 	}
 
 	lines := bytes.Split(data, []byte{'\n'})
@@ -52,8 +48,14 @@ func (c *redisConfig) ParseData(data []byte) error {
 
 		parts := bytes.SplitN(line, []byte{' '}, 2)
 		if len(parts) == 2 {
-			c.config[string(parts[0])] = string(parts[1])
+			c.config[string(parts[0])] = string(bytes.TrimSpace(parts[1]))
 		}
+	}
+
+	if c.template != nil {
+		c.config["dir"] = c.template.DataMount
+		c.config["pidfile"] = filepath.Join(c.template.DataMount, "redis.pid")
+		c.config["logfile"] = filepath.Join(c.template.DataMount, "redis.log")
 	}
 
 	return nil
@@ -65,32 +67,34 @@ func (c redisConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 		return err
 	}
 
-	m := make(map[string]interface{}, 10)
+	var spec *structs.UnitSpec
 
-	for key, val := range desc.Options {
-		_ = key
-		_ = val
+	for i := range desc.Units {
+		if id == desc.Units[i].ID {
+			spec = &desc.Units[i]
+			break
+		}
 	}
 
-	////	for i := range u.ports {
-	////		if u.ports[i].Name == "port" {
-	////			port = u.ports[i].Port
-	////			break
-	////		}
-	////	}
-	//	m["port"] = port
-
-	//	if len(u.networkings) == 1 {
-	//		m["bind"] = u.networkings[0].IP.String()
-	//	}
-
-	//	m["maxmemory"] = u.config.HostConfig.Resources.Memory
-
-	for key, val := range m {
-		err = c.Set(key, val)
+	if spec == nil {
+		return errors.Errorf("not found unit '%s' in service '%s'", id, desc.Name)
 	}
 
-	return err
+	if len(spec.Networking.IPs) >= 1 {
+		c.config["bind"] = spec.Networking.IPs[0].IP
+	}
+
+	c.config["port"] = fmt.Sprintf("%v", desc.Options["port"])
+
+	c.config["maxmemory"] = strconv.Itoa(int(float64(spec.Config.HostConfig.Memory) * 0.7))
+
+	if c.template != nil {
+		c.config["dir"] = c.template.DataMount
+		c.config["pidfile"] = filepath.Join(c.template.DataMount, "redis.pid")
+		c.config["logfile"] = filepath.Join(c.template.DataMount, "redis.log")
+	}
+
+	return nil
 }
 
 func (redisConfig) GenerateCommands(id string, desc structs.ServiceSpec) (structs.CmdsMap, error) {
@@ -111,22 +115,7 @@ func (c redisConfig) Marshal() ([]byte, error) {
 	buffer := bytes.NewBuffer(nil)
 
 	for key, val := range c.config {
-		_, err := buffer.WriteString(key)
-		if err != nil {
-			return buffer.Bytes(), err
-		}
-
-		err = buffer.WriteByte(' ')
-		if err != nil {
-			return buffer.Bytes(), err
-		}
-
-		_, err = buffer.WriteString(val)
-		if err != nil {
-			return buffer.Bytes(), err
-		}
-
-		err = buffer.WriteByte('\n')
+		_, err := buffer.WriteString(key + " " + val + "\n")
 		if err != nil {
 			return buffer.Bytes(), err
 		}
@@ -157,26 +146,41 @@ func (c redisConfig) Marshal() ([]byte, error) {
 //}
 
 func (c redisConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
-	//	if c.config == nil {
-	//		return healthCheck{}, errors.New("params not ready")
+	var spec *structs.UnitSpec
+
+	for i := range desc.Units {
+		if id == desc.Units[i].ID {
+			spec = &desc.Units[i]
+			break
+		}
+	}
+
+	if spec == nil {
+		return structs.ServiceRegistration{}, errors.Errorf("not found unit '%s' in service '%s'", id, desc.Name)
+	}
+
+	//	Service struct {
+	//		Select bool `json:"-"`
+
+	//		Name            string
+	//		Type            string
+	//		MonitorUser     string `json:"mon_user"`
+	//		MonitorPassword string `json:"mon_pwd"`
+	//		Tag             string
+
+	//		Container struct {
+	//			Name     string
+	//			HostName string `json:"host_name"`
+	//		} `json:"container"`
 	//	}
 
-	//	addr := c.config["bind"]
-	//	port, err := strconv.Atoi(c.config["port"])
-	//	if err != nil {
-	//		return healthCheck{}, errors.Wrap(err, "get 'Port'")
-	//	}
+	reg := structs.HorusRegistration{}
+	reg.Service.Select = true
+	reg.Service.Name = spec.ID
+	reg.Service.Type = spec.Type
+	reg.Service.Tag = desc.ID
+	reg.Service.Container.Name = spec.Name
+	reg.Service.Container.HostName = spec.Engine.ID
 
-	//	return healthCheck{
-	//		Addr: addr,
-	//		Port: port,
-	//		// Script:   "/opt/DBaaS/script/check_switchmanager.sh " + args[0],
-	//		Shell:    "",
-	//		Interval: "10s",
-	//		TTL:      "",
-	//		Tags:     nil,
-	//		TCP:      addr + ":" + c.config["port"],
-	//	}, nil
-
-	return structs.ServiceRegistration{}, nil
+	return structs.ServiceRegistration{Horus: &reg}, nil
 }

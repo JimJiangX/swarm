@@ -12,11 +12,9 @@ const (
 )
 
 type parser interface {
-	clone() parser
+	clone(*structs.ConfigTemplate) parser
 
 	Validate(data map[string]interface{}) error
-
-	Set(key string, val interface{}) error
 
 	ParseData(data []byte) error
 

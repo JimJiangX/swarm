@@ -12,20 +12,20 @@ const (
 	HealthCheckCmd    = "health_check_cmd"
 )
 
-type HorusRegistration2 struct {
-	Endpoint      string   `json:"endpoint"`
-	CollectorName string   `json:"collectorname,omitempty"`
-	User          string   `json:"user,omitempty"`
-	Password      string   `json:"pwd,omitempty"`
-	Type          string   `json:"type"`
-	CollectorIP   string   `json:"colletorip"`   // spell error
-	CollectorPort int      `json:"colletorport"` // spell error
-	MetricTags    string   `json:"metrictags"`
-	Network       []string `json:"network,omitempty"`
-	Status        string   `json:"status"`
-	Table         string   `json:"table"`
-	CheckType     string   `json:"checktype"`
-}
+//type HorusRegistration2 struct {
+//	Endpoint      string   `json:"endpoint"`
+//	CollectorName string   `json:"collectorname,omitempty"`
+//	User          string   `json:"user,omitempty"`
+//	Password      string   `json:"pwd,omitempty"`
+//	Type          string   `json:"type"`
+//	CollectorIP   string   `json:"colletorip"`   // spell error
+//	CollectorPort int      `json:"colletorport"` // spell error
+//	MetricTags    string   `json:"metrictags"`
+//	Network       []string `json:"network,omitempty"`
+//	Status        string   `json:"status"`
+//	Table         string   `json:"table"`
+//	CheckType     string   `json:"checktype"`
+//}
 
 type HorusRegistration struct {
 	Node struct {

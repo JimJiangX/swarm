@@ -252,6 +252,8 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	parser = parser.clone(&req)
+
 	err = parser.ParseData(req.Content)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
@@ -281,6 +283,12 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	parser, err := factory(req.Service.Image)
+	if err != nil {
+		httpError(w, err, http.StatusNotImplemented)
+		return
+	}
+
 	var image, version string
 	parts := strings.SplitN(req.Service.Image, ":", 2)
 	if len(parts) == 2 {
@@ -306,11 +314,8 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	resp := make(structs.ConfigsMap, len(req.Units))
 
 	for i := range req.Units {
-		parser, err := factory(req.Service.Image)
-		if err != nil {
-			httpError(w, err, http.StatusNotImplemented)
-			return
-		}
+
+		parser = parser.clone(&t)
 
 		err = parser.ParseData(t.Content)
 		if err != nil {
