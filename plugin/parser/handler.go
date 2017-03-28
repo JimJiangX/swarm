@@ -15,6 +15,7 @@ import (
 	"github.com/docker/swarm/plugin/parser/compose"
 	"github.com/gorilla/mux"
 	"github.com/hashicorp/consul/api"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -23,16 +24,17 @@ type _Context struct {
 	client     kvstore.Client
 	context    context.Context
 
-	mgmIp   string
+	mgmIP   string
 	mgmPort int
 }
 
-func NewRouter(c kvstore.Client, mgmip string, mgmPort int) *mux.Router {
+func NewRouter(c kvstore.Client, ip string, port int) *mux.Router {
 	type handler func(ctx *_Context, w http.ResponseWriter, r *http.Request)
 
-	ctx := &_Context{client: c,
-		mgmIp:   mgmip,
-		mgmPort: mgmPort,
+	ctx := &_Context{
+		client:  c,
+		mgmIP:   ip,
+		mgmPort: port,
 	}
 
 	var routes = map[string]map[string]handler{
@@ -161,7 +163,8 @@ func getConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	unit := mux.Vars(r)["unit"]
 	key := strings.Join([]string{configKey, service, unit}, "/")
 
-	val, err := ctx.client.GetKV(key)
+	// structs.ConfigCmds,encode by JSON
+	pair, err := ctx.client.GetKV(key)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -169,7 +172,7 @@ func getConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(val.Value)
+	w.Write(pair.Value)
 
 	return
 }
@@ -252,6 +255,8 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	parser = parser.clone(&req)
+
 	err = parser.ParseData(req.Content)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
@@ -281,6 +286,12 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	parser, err := factory(req.Service.Image)
+	if err != nil {
+		httpError(w, err, http.StatusNotImplemented)
+		return
+	}
+
 	var image, version string
 	parts := strings.SplitN(req.Service.Image, ":", 2)
 	if len(parts) == 2 {
@@ -306,11 +317,8 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	resp := make(structs.ConfigsMap, len(req.Units))
 
 	for i := range req.Units {
-		parser, err := factory(req.Service.Image)
-		if err != nil {
-			httpError(w, err, http.StatusNotImplemented)
-			return
-		}
+
+		parser = parser.clone(&t)
 
 		err = parser.ParseData(t.Content)
 		if err != nil {
@@ -384,11 +392,11 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pairs := make(api.KVPairs, len(req))
+	var pairs api.KVPairs
 
 	switch len(req) {
 	case 0:
-		httpError(w, fmt.Errorf(""), http.StatusBadRequest)
+		httpError(w, errors.New("no data need update"), http.StatusBadRequest)
 		return
 	case 1:
 		for _, c := range req {
@@ -398,7 +406,7 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 				httpError(w, err, http.StatusInternalServerError)
 				return
 			}
-			pairs[0] = pair
+			pairs = api.KVPairs{pair}
 		}
 	default:
 		key := strings.Join([]string{configKey, service}, "/")
@@ -444,6 +452,8 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			parser = parser.clone(nil)
+
 			err = parser.ParseData([]byte(u.Content))
 			if err != nil {
 				httpError(w, err, http.StatusInternalServerError)
@@ -471,8 +481,8 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 func composeService(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	var req structs.ServiceSpec
 
-	mgmip := ctx.mgmIp
-	mgmport := ctx.mgmPort
+	ip := ctx.mgmIP
+	port := ctx.mgmPort
 
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -480,7 +490,7 @@ func composeService(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	composer, err := compose.NewCompserBySpec(&req, mgmip, mgmport)
+	composer, err := compose.NewCompserBySpec(&req, ip, port)
 	if err != nil {
 		httpError(w, err, http.StatusBadRequest)
 		return

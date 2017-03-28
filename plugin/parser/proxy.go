@@ -18,16 +18,17 @@ func init() {
 }
 
 type proxyConfig struct {
-	config config.Configer
+	template *structs.ConfigTemplate
+	config   config.Configer
 }
 
-func (proxyConfig) clone() parser {
-	return &proxyConfig{}
+func (proxyConfig) clone(t *structs.ConfigTemplate) parser {
+	return &proxyConfig{template: t}
 }
 
 func (proxyConfig) Validate(data map[string]interface{}) error { return nil }
 
-func (c *proxyConfig) Set(key string, val interface{}) error {
+func (c *proxyConfig) set(key string, val interface{}) error {
 	if c.config == nil {
 		return errors.New("proxyConfig Configer is nil")
 	}
@@ -94,27 +95,44 @@ func (c *proxyConfig) Marshal() ([]byte, error) {
 //}
 
 func (c proxyConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
-	//	if c.config == nil || len(args) == 0 {
-	//		return healthCheck{}, errors.New("params not ready")
-	//	}
+	var spec *structs.UnitSpec
 
-	//	addr := c.config.String("adm-cli::adm-cli-address")
-	//	port, err := c.config.Int("adm-cli::proxy_admin_port")
-	//	if err != nil {
-	//		return healthCheck{}, errors.Wrap(err, "get 'adm-cli::proxy_admin_port'")
-	//	}
+	for i := range desc.Units {
+		if id == desc.Units[i].ID {
+			spec = &desc.Units[i]
+			break
+		}
+	}
 
-	//	return healthCheck{
-	//		Addr:     addr,
-	//		Port:     port,
-	//		Script:   "/opt/DBaaS/script/check_proxy.sh " + args[0],
-	//		Shell:    "",
-	//		Interval: "10s",
-	//		TTL:      "",
-	//		Tags:     nil,
-	//	}, nil
+	if spec == nil {
+		return structs.ServiceRegistration{}, errors.Errorf("not found unit '%s' in service '%s'", id, desc.Name)
+	}
 
-	return structs.ServiceRegistration{}, nil
+	reg := structs.HorusRegistration{}
+	reg.Service.Select = true
+	reg.Service.Name = spec.ID
+	reg.Service.Type = spec.Type
+	reg.Service.Tag = desc.ID
+	reg.Service.Container.Name = spec.Name
+	reg.Service.Container.HostName = spec.Engine.ID
+
+	var mon *structs.User
+
+	if len(desc.Users) > 0 {
+		for i := range desc.Users {
+			if desc.Users[i].Role == "mon" {
+				mon = &desc.Users[i]
+				break
+			}
+		}
+
+		if mon != nil {
+			reg.Service.MonitorUser = mon.Name
+			reg.Service.MonitorPassword = mon.Password
+		}
+	}
+
+	return structs.ServiceRegistration{Horus: &reg}, nil
 }
 
 func (c proxyConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
@@ -124,11 +142,6 @@ func (c proxyConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	}
 
 	m := make(map[string]interface{}, 10)
-
-	for key, val := range desc.Options {
-		_ = key
-		_ = val
-	}
 
 	//	m["upsql-proxy::proxy-domain"] = svc.ID
 	//	m["upsql-proxy::proxy-name"] = u.Name
@@ -178,7 +191,7 @@ func (c proxyConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	//	}
 
 	for key, val := range m {
-		err = c.Set(key, val)
+		err = c.set(key, val)
 	}
 
 	return err
@@ -199,16 +212,22 @@ type proxyConfigV102 struct {
 	proxyConfig
 }
 
-func (proxyConfigV102) clone() parser {
-	return &proxyConfigV102{}
+func (proxyConfigV102) clone(t *structs.ConfigTemplate) parser {
+	pr := &proxyConfigV102{}
+	pr.template = t
+
+	return pr
 }
 
 type proxyConfigV110 struct {
 	proxyConfig
 }
 
-func (proxyConfigV110) clone() parser {
-	return &proxyConfigV110{}
+func (proxyConfigV110) clone(t *structs.ConfigTemplate) parser {
+	pr := &proxyConfigV102{}
+	pr.template = t
+
+	return pr
 }
 
 func (c proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) error {
@@ -219,10 +238,6 @@ func (c proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) err
 
 	m := make(map[string]interface{}, 10)
 
-	for key, val := range desc.Options {
-		_ = key
-		_ = val
-	}
 	//	m["upsql-proxy::proxy-domain"] = svc.ID
 	//	m["upsql-proxy::proxy-name"] = u.Name
 	//	if len(u.networkings) == 2 && len(u.ports) >= 2 {
@@ -272,7 +287,7 @@ func (c proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) err
 	//	}
 
 	for key, val := range m {
-		err = c.Set(key, val)
+		err = c.set(key, val)
 	}
 
 	return err

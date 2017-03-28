@@ -17,18 +17,21 @@ func init() {
 }
 
 type mysqlConfig struct {
-	config config.Configer
+	template *structs.ConfigTemplate
+	config   config.Configer
 }
 
-func (mysqlConfig) clone() parser {
-	return &mysqlConfig{}
+func (mysqlConfig) clone(t *structs.ConfigTemplate) parser {
+	return &mysqlConfig{
+		template: t,
+	}
 }
 
 func (mysqlConfig) Validate(data map[string]interface{}) error {
 	return nil
 }
 
-func (c *mysqlConfig) Set(key string, val interface{}) error {
+func (c *mysqlConfig) set(key string, val interface{}) error {
 	if c.config == nil {
 		return errors.New("mysqlConfig Configer is nil")
 	}
@@ -42,59 +45,63 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 		return err
 	}
 
-	m := make(map[string]interface{}, 10)
+	var spec *structs.UnitSpec
 
-	for key, val := range desc.Options {
-		_ = key
-		_ = val
+	for i := range desc.Units {
+		if id == desc.Units[i].ID {
+			spec = &desc.Units[i]
+			break
+		}
 	}
 
-	//	if len(u.networkings) == 1 {
-	//		m["mysqld::bind_address"] = u.networkings[0].IP.String()
-	//	} else {
-	//		return nil, errors.New("unexpected IPAddress")
-	//	}
+	if spec == nil {
+		return errors.Errorf("not found unit '%s' in service '%s'", id, desc.Name)
+	}
 
-	//	found := false
-	//	for i := range u.ports {
-	//		if u.ports[i].Name == "mysqld::port" {
-	//			m["mysqld::port"] = u.ports[i].Port
-	//			m["mysqld::server_id"] = u.ports[i].Port
-	//			found = true
-	//		}
-	//	}
-	//	if !found {
-	//		return nil, errors.New("unexpected port allocation")
-	//	}
+	m := make(map[string]interface{}, 20)
 
-	//	m["mysqld::log_bin"] = fmt.Sprintf("/DBAASLOG/BIN/%s-binlog", u.Name)
-	//	m["mysqld::innodb_buffer_pool_size"] = int(float64(u.config.HostConfig.Memory) * 0.75)
-	//	m["mysqld::relay_log"] = fmt.Sprintf("/DBAASLOG/REL/%s-relay", u.Name)
+	if len(spec.Networking.IPs) >= 1 {
+		m["mysqld::bind_address"] = spec.Networking.IPs[0].IP
+	} else {
+		return errors.New("unexpected IPAddress")
+	}
 
-	//	m["client::user"] = ""
-	//	m["client::password"] = ""
+	m["mysqld::port"] = desc.Options["port"]
+	m["mysqld::server_id"] = desc.Options["port"]
 
-	//	users, err := svc.getUsers()
-	//	if err != nil {
-	//		logrus.WithFields(logrus.Fields{
-	//			"Service": svc.Name,
-	//			"Unit":    u.Name,
-	//		}).Errorf("get Service users,%+v", err)
+	if c.template != nil {
+		m["mysqld::log_bin"] = fmt.Sprintf("%s/BIN/%s-binlog", c.template.LogMount, spec.Name)
 
-	//	} else {
+		m["mysqld::relay_log"] = fmt.Sprintf("%s/REL/%s-relay", c.template.LogMount, spec.Name)
+	}
 
-	//		for i := range users {
-	//			if users[i].Role == _User_DBA_Role {
-	//				m["client::user"] = users[i].Username
-	//				m["client::password"] = users[i].Password
+	if n := spec.Config.HostConfig.Memory; n>>33 > 0 {
+		m["mysqld::innodb_buffer_pool_size"] = int(float64(n) * 0.70)
+	} else {
+		m["mysqld::innodb_buffer_pool_size"] = int(float64(n) * 0.5)
+	}
 
-	//				break
-	//			}
-	//		}
-	//	}
+	m["client::user"] = ""
+	m["client::password"] = ""
+
+	var dba *structs.User
+
+	if len(desc.Users) > 0 {
+		for i := range desc.Users {
+			if desc.Users[i].Role == "dba" {
+				dba = &desc.Users[i]
+				break
+			}
+		}
+
+		if dba != nil {
+			m["client::user"] = dba.Name
+			m["client::password"] = dba.Password
+		}
+	}
 
 	for key, val := range m {
-		err = c.Set(key, val)
+		err = c.set(key, val)
 	}
 
 	return err
@@ -145,19 +152,19 @@ func (c *mysqlConfig) ParseData(data []byte) error {
 }
 
 func (c mysqlConfig) Marshal() ([]byte, error) {
-	tmpfile, err := ioutil.TempFile("", "serviceConfig")
+	file, err := ioutil.TempFile("", "serviceConfig")
 	if err != nil {
 		return nil, errors.Wrap(err, "create Tempfile")
 	}
-	tmpfile.Close()
-	defer os.Remove(tmpfile.Name())
+	file.Close()
+	defer os.Remove(file.Name())
 
-	err = c.config.SaveConfigFile(tmpfile.Name())
+	err = c.config.SaveConfigFile(file.Name())
 	if err != nil {
 		return nil, err
 	}
 
-	data, err := ioutil.ReadFile(tmpfile.Name())
+	data, err := ioutil.ReadFile(file.Name())
 
 	return data, errors.Wrap(err, "read file")
 }
@@ -184,24 +191,42 @@ func (c mysqlConfig) Marshal() ([]byte, error) {
 //}
 
 func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
-	//	if c.config == nil || len(args) < 3 {
-	//		return healthCheck{}, errors.New("params not ready")
-	//	}
+	var spec *structs.UnitSpec
 
-	//	addr := c.config.String("mysqld::bind_address")
-	//	port, err := c.config.Int("mysqld::port")
-	//	if err != nil {
-	//		return healthCheck{}, errors.Wrap(err, "get 'mysqld::port'")
-	//	}
-	//	return healthCheck{
-	//		Addr:     addr,
-	//		Port:     port,
-	//		Script:   "/opt/DBaaS/script/check_db.sh " + args[0] + " " + args[1] + " " + args[2],
-	//		Shell:    "",
-	//		Interval: "10s",
-	//		//TTL:      "15s",
-	//		Tags: nil,
-	//	}, nil
+	for i := range desc.Units {
+		if id == desc.Units[i].ID {
+			spec = &desc.Units[i]
+			break
+		}
+	}
 
-	return structs.ServiceRegistration{}, nil
+	if spec == nil {
+		return structs.ServiceRegistration{}, errors.Errorf("not found unit '%s' in service '%s'", id, desc.Name)
+	}
+
+	reg := structs.HorusRegistration{}
+	reg.Service.Select = true
+	reg.Service.Name = spec.ID
+	reg.Service.Type = spec.Type
+	reg.Service.Tag = desc.ID
+	reg.Service.Container.Name = spec.Name
+	reg.Service.Container.HostName = spec.Engine.ID
+
+	var mon *structs.User
+
+	if len(desc.Users) > 0 {
+		for i := range desc.Users {
+			if desc.Users[i].Role == "mon" {
+				mon = &desc.Users[i]
+				break
+			}
+		}
+
+		if mon != nil {
+			reg.Service.MonitorUser = mon.Name
+			reg.Service.MonitorPassword = mon.Password
+		}
+	}
+
+	return structs.ServiceRegistration{Horus: &reg}, nil
 }
