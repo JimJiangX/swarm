@@ -18,11 +18,12 @@ func init() {
 }
 
 type switchManagerConfig struct {
-	config config.Configer
+	template *structs.ConfigTemplate
+	config   config.Configer
 }
 
-func (switchManagerConfig) clone() parser {
-	return &switchManagerConfig{}
+func (switchManagerConfig) clone(t *structs.ConfigTemplate) parser {
+	return &switchManagerConfig{template: t}
 }
 
 func (switchManagerConfig) Validate(data map[string]interface{}) error { return nil }
@@ -38,7 +39,7 @@ func (c *switchManagerConfig) ParseData(data []byte) error {
 	return nil
 }
 
-func (c *switchManagerConfig) Set(key string, val interface{}) error {
+func (c *switchManagerConfig) set(key string, val interface{}) error {
 	if c.config == nil {
 		return errors.New("switchManagerConfig Configer is nil")
 	}
@@ -120,11 +121,6 @@ func (c switchManagerConfig) GenerateConfig(id string, desc structs.ServiceSpec)
 
 	m := make(map[string]interface{}, 10)
 
-	for key, val := range desc.Options {
-		_ = key
-		_ = val
-	}
-
 	//	m["domain"] = svc.ID
 	//	m["name"] = u.Name
 	//	port, proxyPort := 0, 0
@@ -151,7 +147,7 @@ func (c switchManagerConfig) GenerateConfig(id string, desc structs.ServiceSpec)
 	//	m["swarmhealthcheckpassword"] = user.Password
 
 	for key, val := range m {
-		err = c.Set(key, val)
+		err = c.set(key, val)
 	}
 
 	return err
@@ -175,16 +171,22 @@ type switchManagerConfigV1119 struct {
 	switchManagerConfig
 }
 
-func (switchManagerConfigV1119) clone() parser {
-	return &switchManagerConfigV1119{}
+func (switchManagerConfigV1119) clone(t *structs.ConfigTemplate) parser {
+	pr := &switchManagerConfigV1119{}
+	pr.template = t
+
+	return pr
 }
 
 type switchManagerConfigV1123 struct {
 	switchManagerConfig
 }
 
-func (switchManagerConfigV1123) clone() parser {
-	return &switchManagerConfigV1123{}
+func (switchManagerConfigV1123) clone(t *structs.ConfigTemplate) parser {
+	pr := &switchManagerConfigV1123{}
+	pr.template = t
+
+	return pr
 }
 
 func (c switchManagerConfigV1123) GenerateConfig(id string, desc structs.ServiceSpec) error {
@@ -226,7 +228,7 @@ func (c switchManagerConfigV1123) GenerateConfig(id string, desc structs.Service
 	//	m["swarmhealthcheckpassword"] = user.Password
 
 	for key, val := range m {
-		err = c.Set(key, val)
+		err = c.set(key, val)
 	}
 
 	return err
