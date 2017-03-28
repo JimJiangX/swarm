@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -140,7 +141,14 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	d := resource.NewNFSDriver(nfs, sys.SourceDir, "")
+	abs, err := utils.GetAbsolutePath(true, sys.SourceDir)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	d := resource.NewNFSDriver(nfs, filepath.Dir(abs), sys.BackupDir)
+
 	space, err := d.Space()
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
