@@ -121,7 +121,7 @@ func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, au
 		statusServiceContainerCreating, statusServiceContainerRunning, statusServiceContainerCreateFailed)
 
 	return sl.Run(func(val int) bool {
-		return val == statusServcieBuilding
+		return val == statusServiceAllocated
 	}, run)
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/garden/tasklock"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/filter"
@@ -112,7 +113,7 @@ func convertStructsService(spec structs.ServiceSpec) (database.Service, error) {
 		AutoHealing:          spec.AutoHealing,
 		AutoScaling:          spec.AutoScaling,
 		HighAvailable:        spec.HighAvailable,
-		Status:               statusServcieBuilding,
+		Status:               spec.Status,
 		BackupMaxSizeByte:    spec.BackupMaxSizeByte,
 		BackupFilesRetention: spec.BackupFilesRetention,
 		CreatedAt:            time.Now(),
@@ -267,6 +268,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 		return nil, nil, err
 	}
 	svc.Desc.ImageID = im.ID
+	svc.Status = statusServcieBuilding
 
 	us := make([]database.Unit, spec.Arch.Replicas)
 	units := make([]structs.UnitSpec, spec.Arch.Replicas)
@@ -398,138 +400,152 @@ func (pu pendingUnit) convertToSpec() structs.UnitSpec {
 }
 
 func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service) ([]pendingUnit, error) {
-	_, version, err := getImage(gd.Ormer(), svc.spec.Image)
-	if err != nil {
-		return nil, err
+	ready := make([]pendingUnit, 0, len(svc.spec.Units))
+
+	action := func() error {
+		_, version, err := getImage(gd.Ormer(), svc.spec.Image)
+		if err != nil {
+			return err
+		}
+
+		opts := svc.options
+		config := cluster.BuildContainerConfig(container.Config{
+			Image: version,
+		}, container.HostConfig{
+			Binds: []string{"/etc/localtime:/etc/localtime:ro"},
+			Resources: container.Resources{
+				CpusetCpus: strconv.Itoa(opts.require.Require.CPU),
+				Memory:     opts.require.Require.Memory,
+			},
+		}, network.NetworkingConfig{})
+
+		{
+			for i := range opts.nodes.constraints {
+				config.AddConstraint(opts.nodes.constraints[i])
+			}
+			if len(opts.nodes.filters) > 0 {
+				config.AddConstraint(nodeLabel + "!=" + strings.Join(opts.nodes.filters, "|"))
+			}
+			if out := opts.nodes.clusters; len(out) > 0 {
+				config.AddConstraint(clusterLabel + "==" + strings.Join(out, "|"))
+			}
+		}
+
+		gd.Lock()
+		defer gd.Unlock()
+
+		gd.scheduler.Lock()
+		defer gd.scheduler.Unlock()
+
+		nodes, err := gd.schedule(ctx, actor, config, opts)
+		if err != nil {
+			return err
+		}
+
+		var (
+			count = len(svc.spec.Units)
+			bad   = make([]pendingUnit, 0, count)
+			used  = make([]*node.Node, count)
+		)
+
+		defer func() {
+			if r := recover(); r != nil {
+				err = errors.Errorf("panic:%v", r)
+			}
+			// cancel allocation
+			if len(bad) > 0 {
+				_err := actor.RecycleResource()
+				if _err != nil {
+					logrus.WithField("Service", svc.spec.Name).Errorf("Recycle resources error:%+v", err)
+					err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
+				}
+
+				ids := make([]string, len(bad))
+				for i := range bad {
+					ids[i] = bad[i].swarmID
+				}
+				gd.Cluster.RemovePendingContainer(ids...)
+			}
+		}()
+
+		select {
+		default:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+
+		for n := range nodes {
+			units := svc.spec.Units
+			if !selectNodeInDifferentCluster(opts.highAvailable, len(units), nodes[n], used) {
+				continue
+			}
+
+			pu := pendingUnit{
+				swarmID:     units[count-1].ID,
+				Unit:        database.Unit(units[count-1].Unit),
+				config:      config.DeepCopy(),
+				networkings: make([]database.IP, 0, len(units)),
+				volumes:     make([]volume.VolumesCreateBody, 0, len(units)),
+			}
+
+			_, err := actor.AlloctCPUMemory(pu.config, nodes[n], int64(opts.require.Require.CPU), config.HostConfig.Memory, nil)
+			if err != nil {
+				continue
+			}
+
+			networkings, err := actor.AlloctNetworking(pu.config, nodes[n].ID, pu.Unit.ID, opts.nodes.networkings, opts.require.Networks)
+			if len(networkings) > 0 {
+				pu.networkings = append(pu.networkings, networkings...)
+			}
+			if err != nil {
+				bad = append(bad, pu)
+				continue
+			}
+
+			volumes, err := actor.AlloctVolumes(pu.config, pu.Unit.ID, nodes[n], opts.require.Volumes)
+			if len(volumes) > 0 {
+				pu.volumes = append(pu.volumes, volumes...)
+			}
+			if err != nil {
+				bad = append(bad, pu)
+				continue
+			}
+
+			pu.config.SetSwarmID(pu.swarmID)
+			pu.Unit.EngineID = nodes[n].ID
+
+			gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[n].ID, pu.config)
+
+			ready = append(ready, pu)
+			used = append(used, nodes[n])
+
+			if count--; count == 0 {
+				break
+			}
+		}
+
+		if count > 0 {
+			bad = append(bad, ready...)
+		}
+
+		units := make([]structs.UnitSpec, len(ready))
+		for i := range ready {
+			units[i] = ready[i].convertToSpec()
+		}
+
+		svc.spec.Units = units
+
+		return err
 	}
 
-	opts := svc.options
-	config := cluster.BuildContainerConfig(container.Config{
-		Image: version,
-	}, container.HostConfig{
-		Binds: []string{"/etc/localtime:/etc/localtime:ro"},
-		Resources: container.Resources{
-			CpusetCpus: strconv.Itoa(opts.require.Require.CPU),
-			Memory:     opts.require.Require.Memory,
+	sl := tasklock.NewServiceTask(svc.spec.ID, svc.so, nil,
+		statusServiceAllocating, statusServiceAllocated, statusServiceAllocateFailed)
+
+	err := sl.Run(
+		func(val int) bool {
+			return val == statusServcieBuilding
 		},
-	}, network.NetworkingConfig{})
-
-	{
-		for i := range opts.nodes.constraints {
-			config.AddConstraint(opts.nodes.constraints[i])
-		}
-		if len(opts.nodes.filters) > 0 {
-			config.AddConstraint(nodeLabel + "!=" + strings.Join(opts.nodes.filters, "|"))
-		}
-		if out := opts.nodes.clusters; len(out) > 0 {
-			config.AddConstraint(clusterLabel + "==" + strings.Join(out, "|"))
-		}
-	}
-
-	gd.Lock()
-	defer gd.Unlock()
-
-	gd.scheduler.Lock()
-	defer gd.scheduler.Unlock()
-
-	nodes, err := gd.schedule(ctx, actor, config, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	var (
-		count = len(svc.spec.Units)
-		ready = make([]pendingUnit, 0, count)
-		bad   = make([]pendingUnit, 0, count)
-		used  = make([]*node.Node, count)
-	)
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.Errorf("panic:%v", r)
-		}
-		// cancel allocation
-		if len(bad) > 0 {
-			_err := actor.RecycleResource()
-			if _err != nil {
-				logrus.WithField("Service", svc.spec.Name).Errorf("Recycle resources error:%+v", err)
-				err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
-			}
-
-			ids := make([]string, len(bad))
-			for i := range bad {
-				ids[i] = bad[i].swarmID
-			}
-			gd.Cluster.RemovePendingContainer(ids...)
-		}
-	}()
-
-	select {
-	default:
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-
-	for n := range nodes {
-		units := svc.spec.Units
-		if !selectNodeInDifferentCluster(opts.highAvailable, len(units), nodes[n], used) {
-			continue
-		}
-
-		pu := pendingUnit{
-			swarmID:     units[count-1].ID,
-			Unit:        database.Unit(units[count-1].Unit),
-			config:      config.DeepCopy(),
-			networkings: make([]database.IP, 0, len(units)),
-			volumes:     make([]volume.VolumesCreateBody, 0, len(units)),
-		}
-
-		_, err := actor.AlloctCPUMemory(pu.config, nodes[n], int64(opts.require.Require.CPU), config.HostConfig.Memory, nil)
-		if err != nil {
-			continue
-		}
-
-		networkings, err := actor.AlloctNetworking(pu.config, nodes[n].ID, pu.Unit.ID, opts.nodes.networkings, opts.require.Networks)
-		if len(networkings) > 0 {
-			pu.networkings = append(pu.networkings, networkings...)
-		}
-		if err != nil {
-			bad = append(bad, pu)
-			continue
-		}
-
-		volumes, err := actor.AlloctVolumes(pu.config, pu.Unit.ID, nodes[n], opts.require.Volumes)
-		if len(volumes) > 0 {
-			pu.volumes = append(pu.volumes, volumes...)
-		}
-		if err != nil {
-			bad = append(bad, pu)
-			continue
-		}
-
-		pu.config.SetSwarmID(pu.swarmID)
-		pu.Unit.EngineID = nodes[n].ID
-
-		gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[n].ID, pu.config)
-
-		ready = append(ready, pu)
-		used = append(used, nodes[n])
-
-		if count--; count == 0 {
-			break
-		}
-	}
-
-	if count > 0 {
-		bad = append(bad, ready...)
-	}
-
-	units := make([]structs.UnitSpec, len(ready))
-	for i := range ready {
-		units[i] = ready[i].convertToSpec()
-	}
-
-	svc.spec.Units = units
+		action)
 
 	return ready, err
 }
