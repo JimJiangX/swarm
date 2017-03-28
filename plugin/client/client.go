@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -14,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"golang.org/x/net/context/ctxhttp"
 )
@@ -106,7 +105,12 @@ func (c *client) Do(ctx context.Context, method, url string, obj interface{}) (*
 		return nil, err
 	}
 
-	return ctxhttp.Do(ctx, c.client, req)
+	resp, err := ctxhttp.Do(ctx, c.client, req)
+	if err == nil {
+		return resp, nil
+	}
+
+	return resp, errors.WithStack(err)
 }
 
 func (c *client) Get(ctx context.Context, url string) (*http.Response, error) {
@@ -160,12 +164,12 @@ func (c *client) newRequest(method, url string, obj interface{}) (*http.Request,
 	if obj != nil && c.enc != nil {
 		body, err = c.enc.encode(obj)
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 	}
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	req.URL.Host = c.address
@@ -184,7 +188,7 @@ func RequireOK(resp *http.Response, e error) (*http.Response, error) {
 		if resp != nil {
 			resp.Body.Close()
 		}
-		return nil, e
+		return nil, errors.WithStack(e)
 	}
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
@@ -193,7 +197,7 @@ func RequireOK(resp *http.Response, e error) (*http.Response, error) {
 		io.Copy(buf, resp.Body)
 		resp.Body.Close()
 
-		return nil, fmt.Errorf("Unexpected response code: %d (%s)", resp.StatusCode, buf.Bytes())
+		return nil, errors.Errorf("Unexpected response code: %d (%s)", resp.StatusCode, buf.Bytes())
 	}
 
 	return resp, nil

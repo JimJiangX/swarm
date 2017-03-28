@@ -7,6 +7,7 @@ import (
 
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/plugin/client"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -162,5 +163,6 @@ func (p plugin) ServicesLink(ctx context.Context, links structs.ServicesLink) er
 // decodeBody is used to JSON decode a body
 func decodeBody(resp *http.Response, out interface{}) error {
 	dec := json.NewDecoder(resp.Body)
-	return dec.Decode(out)
+
+	return errors.WithStack(dec.Decode(out))
 }

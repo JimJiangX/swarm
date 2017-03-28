@@ -7,6 +7,7 @@ import (
 	"io"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
@@ -336,14 +337,14 @@ func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label st
 	e.RLock()
 
 	vg, ok := e.Labels[label]
-	if !ok {
+	if !ok || strings.TrimSpace(vg) == "" {
 		e.RUnlock()
 
 		return nil, errors.New("not found label by key:" + label)
 	}
 
 	size, ok := e.Labels[sizeLabel]
-	if !ok {
+	if !ok || strings.TrimSpace(size) == "" {
 		e.RUnlock()
 
 		return nil, errors.New("not found label by key:" + sizeLabel)
