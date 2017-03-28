@@ -67,8 +67,13 @@ func ApplyFilters(filters []Filter, config *cluster.ContainerConfig, nodes []*no
 		candidates = nodes
 	)
 
+	log.Debugf("filters=%d nodes=%d soft=%t", len(filters), len(nodes), soft)
+
 	for _, filter := range filters {
 		candidates, err = filter.Filter(config, candidates, soft)
+
+		log.Debugf("%s: candidates=%d\n error=%+v", filter.Name(), len(candidates), err)
+
 		if err != nil {
 			// special case for when no healthy nodes are found
 			if filter.Name() == "health" {
