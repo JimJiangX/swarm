@@ -10,7 +10,7 @@ nfs_mount_opt=$4
 TYPE=nfs4
 
 #check mount
-df $nfs_mount_dir > /dev/null 2>&1 || {
+df --type=$TYPE $nfs_mount_dir > /dev/null 2>&1 || {
 	mount -t $TYPE -o $nfs_mount_opt $nfs_ip:$nfs_dir $nfs_mount_dir || {
 		echo "mount nfs dir fail"
 		exit 2
