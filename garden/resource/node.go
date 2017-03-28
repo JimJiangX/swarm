@@ -531,12 +531,12 @@ func (m master) RemoveNode(ctx context.Context, horus, nameOrID, user, password 
 		node.node.Status == statusNodeSSHLoginFailed ||
 		node.node.Status == statusNodeSSHExecFailed {
 
-		err := m.removeNode(node.node.ID)
-		if err != nil {
-			return err
-		}
+		return m.removeNode(node.node.ID)
+	}
 
-		return reg.DeregisterService(ctx, "hosts", node.node.ID)
+	err = reg.DeregisterService(ctx, "hosts", node.node.ID)
+	if err != nil {
+		return err
 	}
 
 	config, err := m.dco.GetSysConfig()
@@ -562,11 +562,6 @@ func (m master) RemoveNode(ctx context.Context, horus, nameOrID, user, password 
 	}
 
 	err = m.removeNode(node.node.ID)
-	if err != nil {
-		return err
-	}
-
-	err = reg.DeregisterService(ctx, "hosts", node.node.ID)
 
 	return err
 }

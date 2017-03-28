@@ -88,7 +88,7 @@ func postCreateNetwork(ctx context.Context, addr string, config createNetworkCon
 	}
 	defer ensureBodyClose(resp)
 
-	if resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
 		_, err := io.Copy(body, resp.Body)
 
 		return errors.Errorf("url=%s,code=%d,out=%s,%v", url, resp.StatusCode, body.String(), err)

@@ -83,7 +83,7 @@ func postRegister(ctx context.Context, uri string, obj interface{}) error {
 	}
 	defer ensureReaderClosed(resp)
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusCreated {
 		res := struct {
 			Err string
 		}{}
@@ -145,14 +145,14 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, typ, key string, force
 	}
 	defer ensureReaderClosed(resp)
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusNoContent {
 		res := struct {
 			Err string
 		}{}
 
 		err := json.NewDecoder(resp.Body).Decode(&res)
 		if err != nil {
-			return errors.Wrap(err, "decode Horus response body")
+			return errors.Wrap(err, "decode response body")
 		}
 		return errors.Errorf("StatusCode:%d,Error:%s", resp.StatusCode, res.Err)
 	}
