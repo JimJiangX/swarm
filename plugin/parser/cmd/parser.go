@@ -90,6 +90,10 @@ func main() {
 	}
 
 	{
+		if temp.Timestamp == 0 {
+			temp.Timestamp = time.Now().Unix()
+		}
+
 		err := pc.PostImageTemplate(nil, temp)
 		if err != nil {
 			log.Fatalf("post template file error\n%+v", err)
