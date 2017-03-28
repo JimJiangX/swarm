@@ -182,5 +182,21 @@ func (c redisConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 	reg.Service.Container.Name = spec.Name
 	reg.Service.Container.HostName = spec.Engine.ID
 
+	var mon *structs.User
+
+	if len(desc.Users) > 0 {
+		for i := range desc.Users {
+			if desc.Users[i].Role == "mon" {
+				mon = &desc.Users[i]
+				break
+			}
+		}
+
+		if mon != nil {
+			reg.Service.MonitorUser = mon.Name
+			reg.Service.MonitorPassword = mon.Password
+		}
+	}
+
 	return structs.ServiceRegistration{Horus: &reg}, nil
 }
