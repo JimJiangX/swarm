@@ -248,19 +248,7 @@ func GetAbsolutePath(isDir bool, path ...string) (string, error) {
 
 	finfo, err := os.Stat(abs)
 	if os.IsNotExist(err) {
-		// no such file or dir
-		pwd, _err := os.Getwd()
-		if _err != nil {
-			return abs, err
-		}
-
-		dir = filepath.Join(pwd, abs)
-		finfo, err = os.Stat(dir)
-		if err == nil || os.IsExist(err) {
-			abs = dir
-		} else {
-			return abs, err
-		}
+		return abs, err
 	}
 
 	if isDir && !finfo.IsDir() {

@@ -381,7 +381,7 @@ func (gd *Garden) schedule(ctx context.Context, actor allocator, config *cluster
 
 	nodes, err = _scheduler.SelectNodesForContainer(nodes, config)
 
-	return nodes, err
+	return nodes, errors.WithStack(err)
 }
 
 type pendingUnit struct {
