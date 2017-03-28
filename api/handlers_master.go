@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	stderr "errors"
 	"fmt"
@@ -1303,6 +1304,11 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	svc, err := gd.GetService(name)
 	if err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
