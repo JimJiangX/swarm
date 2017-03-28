@@ -99,7 +99,7 @@ func postRegister(ctx context.Context, uri string, obj interface{}) error {
 }
 
 // typ : hosts / containers / units
-func (c *kvClient) deregisterToHorus(ctx context.Context, typ, key string, force bool) error {
+func (c *kvClient) deregisterToHorus(ctx context.Context, typ, key string, user, password string, force bool) error {
 	var (
 		addr string
 		ch   = make(chan result, 1)
@@ -136,6 +136,10 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, typ, key string, force
 	if force {
 		params := make(url.Values)
 		params.Set("force", "true")
+		if user != "" {
+			params.Set("os_user", user)
+			params.Set("os_pwd", password)
+		}
 		req.URL.RawQuery = params.Encode()
 	}
 
@@ -183,10 +187,10 @@ func (c *kvClient) RegisterService(ctx context.Context, host string, config stru
 }
 
 // DeregisterService service to consul and Horus
-func (c *kvClient) DeregisterService(ctx context.Context, typ, key string) error {
-	err := c.deregisterToHorus(ctx, typ, key, false)
+func (c *kvClient) DeregisterService(ctx context.Context, typ, key, user, password string) error {
+	err := c.deregisterToHorus(ctx, typ, key, user, password, false)
 	if err != nil {
-		err = c.deregisterToHorus(ctx, typ, key, true)
+		err = c.deregisterToHorus(ctx, typ, key, user, password, true)
 	}
 
 	return err

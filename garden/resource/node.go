@@ -535,7 +535,7 @@ func (m master) RemoveNode(ctx context.Context, horus, nameOrID, user, password 
 		return m.removeNode(node.node.ID)
 	}
 
-	err = reg.DeregisterService(ctx, "hosts", node.node.ID)
+	err = reg.DeregisterService(ctx, "hosts", node.node.ID, user, password)
 	if err != nil {
 		return err
 	}
