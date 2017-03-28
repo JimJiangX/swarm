@@ -59,7 +59,12 @@ func newNFSDriver(no database.NodeOrmer, engineID string) (volumeDriver, error) 
 		return nil, err
 	}
 
-	return NewNFSDriver(n.NFS, filepath.Dir(sys.SourceDir), sys.BackupDir), nil
+	abs, err := utils.GetAbsolutePath(true, sys.SourceDir)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return NewNFSDriver(n.NFS, filepath.Dir(abs), sys.BackupDir), nil
 }
 
 type _NFSDriver struct {
