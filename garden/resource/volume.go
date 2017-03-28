@@ -59,7 +59,7 @@ func newNFSDriver(no database.NodeOrmer, engineID string) (volumeDriver, error) 
 		return nil, err
 	}
 
-	return NewNFSDriver(n.NFS, sys.SourceDir, sys.BackupDir), nil
+	return NewNFSDriver(n.NFS, filepath.Dir(sys.SourceDir), sys.BackupDir), nil
 }
 
 type _NFSDriver struct {
