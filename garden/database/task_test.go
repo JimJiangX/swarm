@@ -3,7 +3,7 @@ package database
 import (
 	"testing"
 	"time"
-	
+
 	"github.com/jmoiron/sqlx"
 )
 

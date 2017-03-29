@@ -138,6 +138,9 @@ func (db dbBase) txInsertUnits(tx *sqlx.Tx, units []Unit) error {
 }
 
 func (db dbBase) UnitContainerCreated(name, containerID, engineID, mode string, state int) error {
+	if len(name) > 0 && name[0] == '/' {
+		name = name[1:]
+	}
 
 	query := "UPDATE " + db.unitTable() + " SET engine_id=?,container_id=?,network_mode=?,status=?,latest_error=? WHERE name=?"
 	_, err := db.Exec(query, engineID, containerID, mode, state, "", name)

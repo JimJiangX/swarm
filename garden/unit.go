@@ -236,7 +236,7 @@ func (u unit) removeVolumes(ctx context.Context) error {
 				continue
 			}
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 		}
 
@@ -246,7 +246,7 @@ func (u unit) removeVolumes(ctx context.Context) error {
 	for i := range lvs {
 		err := engine.RemoveVolume(lvs[i].Name)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	}
 

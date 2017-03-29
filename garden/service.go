@@ -249,7 +249,7 @@ func (svc *Service) Start(ctx context.Context, cmds structs.Commands) error {
 			}
 		}
 
-		// get init cmd
+		// get start cmd
 		for i := range units {
 			cmd := cmds.GetCmd(units[i].u.ID, structs.StartServiceCmd)
 

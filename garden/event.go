@@ -3,6 +3,7 @@ package garden
 import (
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 )
@@ -17,7 +18,7 @@ func NewEventHandler(ormer database.Ormer) *eventHander {
 	}
 }
 
-func (eh eventHander) Handle(event *cluster.Event) error {
+func (eh eventHander) Handle(event *cluster.Event) (err error) {
 	// Something changed - refresh our internal state.
 	msg := event.Message
 
@@ -34,10 +35,10 @@ func (eh eventHander) Handle(event *cluster.Event) error {
 			engine := event.Engine
 			c := engine.Containers().Get(msg.ID)
 			if c != nil {
-				return eh.ci.UnitContainerCreated(c.Info.Name, c.ID, engine.ID, c.HostConfig.NetworkMode, statusContainerCreated)
+				err = eh.ci.UnitContainerCreated(c.Info.Name, c.ID, engine.ID, c.HostConfig.NetworkMode, statusContainerCreated)
 			}
 		default:
-			return handleContainerEvent(eh.ci, action, msg.ID)
+			err = handleContainerEvent(eh.ci, action, msg.ID)
 		}
 
 	case "":
@@ -48,15 +49,19 @@ func (eh eventHander) Handle(event *cluster.Event) error {
 
 			c := engine.Containers().Get(msg.ID)
 			if c != nil {
-				return eh.ci.UnitContainerCreated(c.Info.Name, c.ID, engine.ID, c.HostConfig.NetworkMode, statusContainerCreated)
+				err = eh.ci.UnitContainerCreated(c.Info.Name, c.ID, engine.ID, c.HostConfig.NetworkMode, statusContainerCreated)
 			}
 
 		default:
-			return handleContainerEvent(eh.ci, msg.Status, msg.ID)
+			err = handleContainerEvent(eh.ci, msg.Status, msg.ID)
 		}
 	}
 
-	return nil
+	if err != nil {
+		logrus.Errorf("%+v\n%#v", err, msg)
+	}
+
+	return err
 }
 
 func handleContainerEvent(ci database.ContainerInterface, action, ID string) error {
