@@ -273,8 +273,8 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 	for i := range requires {
 		if requires[i].Bandwidth > 0 {
 			in = append(in, database.NetworkingRequire{
-				Bond:      requires[i].Bandwidth,
-				Bandwidth: ready[index].Bandwidth,
+				Bond:      ready[index].Bond,
+				Bandwidth: requires[i].Bandwidth,
 			})
 			index++
 		}
