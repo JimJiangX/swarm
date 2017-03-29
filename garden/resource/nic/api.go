@@ -1,9 +1,7 @@
 package nic
 
 import (
-	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,34 +12,16 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/utils"
+	"github.com/docker/swarm/seed/sdk"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
-	"golang.org/x/net/context/ctxhttp"
 )
-
-const (
-	defaultTimeout = 30 * time.Second
-	createDevURL   = "network/create"
-)
-
-type createNetworkConfig struct {
-	Container string `json:"containerID"`
-
-	HostDevice      string `json:"hostDevice"`
-	ContainerDevice string `json:"containerDevice"`
-
-	IPCIDR  string `json:"IpCIDR"`
-	Gateway string `json:"gateway"`
-
-	VlanID    int `json:"vlanID"`
-	BandWidth int `json:"bandWidth"`
-}
 
 func CreateNetworkDevice(ctx context.Context, addr string, c *cluster.Container, ips []database.IP, tlsConfig *tls.Config) error {
-	bond := c.Engine.Labels["adm_nic"]
+	bond := c.Engine.Labels["ADM_NIC"]
 
 	for i := range ips {
-		config := createNetworkConfig{
+		config := sdk.NetworkConfig{
 			Container:       c.ID,
 			HostDevice:      bond,
 			ContainerDevice: ips[i].Bond,
@@ -60,41 +40,13 @@ func CreateNetworkDevice(ctx context.Context, addr string, c *cluster.Container,
 	return nil
 }
 
-func postCreateNetwork(ctx context.Context, addr string, config createNetworkConfig, tlsConfig *tls.Config) error {
-	body := bytes.NewBuffer(nil)
-	err := json.NewEncoder(body).Encode(config)
+func postCreateNetwork(ctx context.Context, addr string, config sdk.NetworkConfig, tlsConfig *tls.Config) error {
+	c, err := sdk.NewClient(addr, 30*time.Second, tlsConfig)
 	if err != nil {
 		return err
 	}
 
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	client, scheme := http.DefaultClient, "http"
-	if tlsConfig != nil {
-		scheme = "https"
-		trans := defaultPooledTransport(defaultTimeout)
-		trans.TLSClientConfig = tlsConfig
-
-		client.Transport = trans
-	}
-
-	url := fmt.Sprintf("%s://%s/%s", scheme, addr, createDevURL)
-
-	resp, err := ctxhttp.Post(ctx, client, url, "application/json", body)
-	if err != nil {
-		errors.Wrapf(err, "CreateNetworkDevice %s error", url)
-	}
-	defer ensureBodyClose(resp)
-
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
-		_, err := io.Copy(body, resp.Body)
-
-		return errors.Errorf("url=%s,code=%d,out=%s,%v", url, resp.StatusCode, body.String(), err)
-	}
-
-	return nil
+	return c.CreateNetwork(ctx, config)
 }
 
 // defaultPooledTransport returns a new http.Transport with similar default

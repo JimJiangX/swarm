@@ -84,8 +84,8 @@ type VolumeFileConfig struct {
 	Mode      string `json:"mode"`
 }
 
-type NetworkCfg struct {
-	ContainerID string `json:"containerID"`
+type NetworkConfig struct {
+	Container string `json:"containerID"`
 
 	HostDevice string `json:"hostDevice"`
 
@@ -103,7 +103,7 @@ type client struct {
 	c httpclient.Client
 }
 
-func CreateClient(addr string, timeout time.Duration, tlsConfig *tls.Config) (ClientAPI, error) {
+func NewClient(addr string, timeout time.Duration, tlsConfig *tls.Config) (ClientAPI, error) {
 
 	if err := checkAddr(addr); err != nil {
 		return nil, errors.Wrap(err, "CreateClient:checkAddr")
@@ -127,12 +127,12 @@ type ClientAPI interface {
 	SanActivate(opt ActiveConfig) error
 	SanVgCreate(opt VgConfig) error
 	SanVgExtend(opt VgConfig) error
-	CreateNetwork(opt NetworkCfg) error
+	CreateNetwork(ctx context.Context, opt NetworkConfig) error
 }
 
 //create network for contianer(use pipewrok),which network mode is none
-func (c client) CreateNetwork(opt NetworkCfg) error {
-	return c.postWrap(nil, "/network/create", opt)
+func (c client) CreateNetwork(ctx context.Context, opt NetworkConfig) error {
+	return c.postWrap(ctx, "/network/create", opt)
 }
 
 // GetVgList returns remote host VG list
