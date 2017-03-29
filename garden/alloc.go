@@ -277,6 +277,11 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 	us := make([]database.Unit, spec.Arch.Replicas)
 	units := make([]structs.UnitSpec, spec.Arch.Replicas)
 
+	netDesc, err := json.Marshal(spec.Require.Networks)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	for i := 0; i < spec.Arch.Replicas; i++ {
 
 		uid := utils.Generate32UUID()
@@ -286,6 +291,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 			Type:        im.Name,
 			ServiceID:   spec.ID,
 			NetworkMode: "none",
+			Networks:    string(netDesc),
 			Status:      0,
 			CreatedAt:   time.Now(),
 		}
