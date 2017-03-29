@@ -9,7 +9,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-const SCRIPT_DIR = "./script/seed/"
+const SCRIPT_DIR = "/usr/local/swarm-agent/scripts/seed/"
 
 const NET_SCRIPT_DIR = SCRIPT_DIR + "net/"
 
