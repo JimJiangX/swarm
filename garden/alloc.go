@@ -243,7 +243,7 @@ func (gd *Garden) validServiceSpec(spec structs.ServiceSpec) error {
 
 func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Task, error) {
 	options := scheduleOption{
-		highAvailable: spec.Arch.Replicas > 0,
+		highAvailable: spec.HighAvailable,
 		require:       spec.Require,
 	}
 
@@ -450,6 +450,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			count = len(svc.spec.Units)
 			bad   = make([]pendingUnit, 0, count)
 			used  = make([]*node.Node, count)
+			field = logrus.WithField("Service", svc.spec.Name)
 		)
 
 		defer func() {
@@ -460,7 +461,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			if len(bad) > 0 {
 				_err := actor.RecycleResource()
 				if _err != nil {
-					logrus.WithField("Service", svc.spec.Name).Errorf("Recycle resources error:%+v", err)
+					field.Errorf("Recycle resources error:%+v", _err)
 					err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
 				}
 
@@ -478,9 +479,10 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			return ctx.Err()
 		}
 
-		for n := range nodes {
+		for n, max := 0, len(nodes); n < max && count != 0; n, count = n+1, count-1 {
 			units := svc.spec.Units
 			if !selectNodeInDifferentCluster(opts.highAvailable, len(units), nodes[n], used) {
+				field.Debugf("highAvailable=%t node=%s,continue", opts.highAvailable, nodes[n].Name)
 				continue
 			}
 
@@ -494,6 +496,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 
 			_, err := actor.AlloctCPUMemory(pu.config, nodes[n], int64(opts.require.Require.CPU), config.HostConfig.Memory, nil)
 			if err != nil {
+				field.Debugf("AlloctCPUMemory:node=%s,continue", nodes[n].Name)
 				continue
 			}
 
@@ -503,6 +506,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			}
 			if err != nil {
 				bad = append(bad, pu)
+				field.Debugf("AlloctNetworking:node=%s,continue", nodes[n].Name)
 				continue
 			}
 
@@ -512,6 +516,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			}
 			if err != nil {
 				bad = append(bad, pu)
+				field.Debugf("AlloctVolumes:node=%s,continue", nodes[n].Name)
 				continue
 			}
 
@@ -522,14 +527,11 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 
 			ready = append(ready, pu)
 			used = append(used, nodes[n])
-
-			if count--; count == 0 {
-				break
-			}
 		}
 
 		if count > 0 {
 			bad = append(bad, ready...)
+			return errors.Errorf("not enough nodes for allocation,%d units waiting", count)
 		}
 
 		units := make([]structs.UnitSpec, len(ready))
