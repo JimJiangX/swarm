@@ -95,11 +95,10 @@ func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, au
 			}
 
 			for i := range pu.volumes {
-				v, err := eng.CreateVolume(&pu.volumes[i])
+				_, err := eng.CreateVolume(&pu.volumes[i])
 				if err != nil {
 					return err
 				}
-				pu.config.HostConfig.Binds = append(pu.config.HostConfig.Binds, v.Name)
 			}
 
 			c, err := eng.CreateContainer(pu.config, pu.Unit.Name, true, authConfig)

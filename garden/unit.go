@@ -222,15 +222,25 @@ func (u unit) removeVolumes(ctx context.Context) error {
 		return nil
 	}
 
-	engine := u.getEngine()
-	if err != nil {
-		return nil
-	}
-
 	select {
 	default:
 	case <-ctx.Done():
 		return ctx.Err()
+	}
+
+	engine := u.getEngine()
+	if engine == nil {
+		for i := range lvs {
+			ok, err := u.cluster.RemoveVolumes(lvs[i].Name)
+			if !ok {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 
 	for i := range lvs {

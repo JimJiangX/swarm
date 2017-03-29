@@ -68,7 +68,7 @@ type Unit struct {
 }
 
 func (db dbBase) unitTable() string {
-	return db.prefix + "_service_unit"
+	return db.prefix + "_unit"
 }
 
 // GetUnit return Unit select by Name or ID or ContainerID
