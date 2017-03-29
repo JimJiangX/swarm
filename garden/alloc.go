@@ -446,12 +446,12 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 		defer gd.Unlock()
 
 		gd.scheduler.Lock()
-		defer gd.scheduler.Unlock()
-
 		nodes, err := gd.schedule(ctx, actor, config, opts)
 		if err != nil {
+			gd.scheduler.Unlock()
 			return err
 		}
+		gd.scheduler.Unlock()
 
 		if len(nodes) < svc.spec.Arch.Replicas {
 			return errors.Errorf("not enough nodes for allocation,%d<%d", len(nodes), svc.spec.Arch.Replicas)
@@ -535,7 +535,11 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			pu.config.SetSwarmID(pu.swarmID)
 			pu.Unit.EngineID = nodes[n].ID
 
-			gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[n].ID, pu.config)
+			err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[n].ID, pu.config)
+			if err != nil {
+				field.Debugf("AddPendingContainer:node=%s,%+v", nodes[n].ID, err)
+				continue
+			}
 
 			ready = append(ready, pu)
 			used = append(used, nodes[n])
