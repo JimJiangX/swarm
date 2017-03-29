@@ -40,6 +40,9 @@ func (db dbBase) InsertCluster(c Cluster) error {
 	query := "INSERT INTO " + db.clusterTable() + " (id,max_host,usage_limit) VALUES (:id,:max_host,:usage_limit)"
 
 	_, err := db.NamedExec(query, &c)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "insert Cluster")
 }
@@ -70,11 +73,13 @@ func (db dbBase) ListClusters() ([]Cluster, error) {
 	)
 
 	err := db.Select(&clusters, query)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return clusters, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return clusters, errors.Wrap(err, "list Clusters")
+	return nil, errors.Wrap(err, "list Clusters")
 }
 
 // SetClusterParams updates MaxNode\UsageLimit
@@ -83,6 +88,9 @@ func (db dbBase) SetClusterParams(c Cluster) error {
 	query := "UPDATE " + db.clusterTable() + " SET max_host=?,usage_limit=? WHERE id=?"
 
 	_, err := db.Exec(query, c.MaxNode, c.UsageLimit, c.ID)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "update Cluster MaxNode or UsageLimit")
 }
@@ -93,6 +101,9 @@ func (db dbBase) DelCluster(ID string) error {
 	query := "DELETE FROM " + db.clusterTable() + " WHERE id=?"
 
 	_, err := db.Exec(query, ID)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "delete Cluster")
 }

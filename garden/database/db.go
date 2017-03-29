@@ -55,7 +55,10 @@ func (db dbBase) txFrame(do func(tx *sqlx.Tx) error) error {
 
 	err = do(tx)
 	if err == nil {
-		err = errors.Wrap(tx.Commit(), "Tx Commit")
+		err = tx.Commit()
+		if err != nil {
+			return errors.Wrap(err, "Tx Commit")
+		}
 	}
 
 	return err

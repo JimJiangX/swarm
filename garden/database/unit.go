@@ -79,6 +79,9 @@ func (db dbBase) GetUnit(nameOrID string) (Unit, error) {
 	)
 
 	err := db.Get(&u, query, nameOrID, nameOrID, nameOrID)
+	if err == nil {
+		return u, nil
+	}
 
 	return u, errors.Wrap(err, "Get Unit By nameOrID")
 }
@@ -89,6 +92,9 @@ func (db dbBase) InsertUnit(u Unit) error {
 	query := "INSERT INTO " + db.unitTable() + " (id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at) VALUES (:id,:name,:type,:service_id,:engine_id,:container_id,:network_mode,:networks_desc,:latest_error,:status,:created_at)"
 
 	_, err := db.NamedExec(query, &u)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "insert Unit")
 }
@@ -99,6 +105,9 @@ func (db dbBase) txInsertUnit(tx *sqlx.Tx, u Unit) error {
 	query := "INSERT INTO " + db.unitTable() + " (id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at) VALUES (:id,:name,:type,:service_id,:engine_id,:container_id,:network_mode,:networks_desc,:latest_error,:status,:created_at)"
 
 	_, err := tx.NamedExec(query, &u)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "Tx insert Unit")
 }
@@ -129,17 +138,25 @@ func (db dbBase) txInsertUnits(tx *sqlx.Tx, units []Unit) error {
 }
 
 func (db dbBase) UnitContainerCreated(name, containerID, engineID, mode string, state int) error {
+
 	query := "UPDATE " + db.unitTable() + " SET engine_id=?,container_id=?,network_mode=?,status=?,latest_error=? WHERE name=?"
 	_, err := db.Exec(query, engineID, containerID, mode, state, "", name)
+	if err == nil {
+		return nil
+	}
 
-	return err
+	return errors.WithStack(err)
 }
 
 func (db dbBase) SetUnitByContainer(containerID string, state int) error {
+
 	query := "UPDATE " + db.unitTable() + " SET status=?,latest_error=? WHERE container_id=?"
 	_, err := db.Exec(query, state, "", containerID)
+	if err == nil {
+		return nil
+	}
 
-	return err
+	return errors.WithStack(err)
 }
 
 // SetUnitInfo could update params of unit
@@ -148,6 +165,9 @@ func (db dbBase) SetUnitInfo(u Unit) error {
 	query := "UPDATE " + db.unitTable() + " SET name=:name,type=:type,service_id=:service_id,engine_id=:engine_id,container_id=:container_id,network_mode=:network_mode,networks_desc=:networks_desc,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
 
 	_, err := db.NamedExec(query, &u)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "update Unit info")
 }
@@ -158,6 +178,9 @@ func (db dbBase) txSetUnit(tx *sqlx.Tx, u Unit) error {
 	query := "UPDATE " + db.unitTable() + " SET engine_id=:engine_id,container_id=:container_id,network_mode=:network_mode,networks_desc=:networks_desc,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
 
 	_, err := tx.NamedExec(query, &u)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "Tx update Unit")
 }
@@ -264,13 +287,13 @@ func (db dbBase) SetUnits(units []Unit) error {
 			if err != nil {
 				stmt.Close()
 
-				return err
+				return errors.Wrap(err, "tx update []Unit")
 			}
 		}
 
 		stmt.Close()
 
-		return errors.Wrap(err, "Tx update []Unit")
+		return nil
 	}
 
 	return db.txFrame(do)
@@ -297,6 +320,9 @@ func (db dbBase) txDelUnit(tx *sqlx.Tx, nameOrID string) error {
 	query := "DELETE FROM " + db.unitTable() + " WHERE id=? OR name=? OR service_id=?"
 
 	_, err := tx.Exec(query, nameOrID, nameOrID, nameOrID)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "Tx delete Unit by nameOrID or ServiceID")
 }
@@ -308,11 +334,13 @@ func (db dbBase) listUnits() ([]Unit, error) {
 	)
 
 	err := db.Select(&out, query)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return out, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return out, errors.Wrap(err, "list []Unit")
+	return nil, errors.Wrap(err, "list []Unit")
 }
 
 // ListUnitByServiceID returns []Unit select by ServiceID
@@ -323,11 +351,13 @@ func (db dbBase) ListUnitByServiceID(id string) ([]Unit, error) {
 	)
 
 	err := db.Select(&out, query, id)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return out, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return out, errors.Wrap(err, "list []Unit by ServiceID")
+	return nil, errors.Wrap(err, "list []Unit by ServiceID")
 }
 
 // ListUnitByEngine returns []Unit select by EngineID
@@ -338,11 +368,13 @@ func (db dbBase) ListUnitByEngine(id string) ([]Unit, error) {
 	)
 
 	err := db.Select(&out, query, id)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return out, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return out, errors.Wrap(err, "list []Unit by EngineID")
+	return nil, errors.Wrap(err, "list []Unit by EngineID")
 }
 
 // CountUnitByEngine returns len of []Unit select Unit by EngineID
@@ -353,6 +385,9 @@ func (db dbBase) CountUnitByEngine(id string) (int, error) {
 	)
 
 	err := db.Get(&count, query, id)
+	if err == nil {
+		return count, nil
+	}
 
 	return count, errors.Wrap(err, "count Unit by EngineID")
 }
@@ -372,6 +407,9 @@ func (db dbBase) CountUnitsInEngines(engines []string) (int, error) {
 
 	count := 0
 	err = db.Get(&count, query, args...)
+	if err == nil {
+		return count, nil
+	}
 
 	return count, errors.Wrap(err, "cound Units by engines")
 }

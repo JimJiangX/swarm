@@ -93,6 +93,7 @@ func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 					return errors.Wrap(err, "tx prepare insert []Node")
 				}
 			}
+
 			stmt.Close()
 		}
 
@@ -110,6 +111,9 @@ func (db dbBase) SetNodeParam(ID string, max int) error {
 	query := "UPDATE " + db.nodeTable() + " SET max_container=? WHERE id=?"
 
 	_, err := db.Exec(query, max, ID)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "update Node.MaxContainer by ID")
 }
@@ -120,6 +124,9 @@ func (db dbBase) SetNodeEnable(ID string, enabled bool) error {
 	query := "UPDATE " + db.nodeTable() + " SET enabled=? WHERE id=?"
 
 	_, err := db.Exec(query, enabled, ID)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "update Node.Enabled by ID")
 }
@@ -140,9 +147,7 @@ func (db dbBase) RegisterNode(n Node, t Task) error {
 		return err
 	}
 
-	err := db.txFrame(do)
-
-	return err
+	return db.txFrame(do)
 }
 
 // GetNode get Node by nameOrID.
@@ -155,9 +160,6 @@ func (db dbBase) GetNode(nameOrID string) (Node, error) {
 	err := db.Get(&node, query, nameOrID, nameOrID)
 	if err == nil {
 		return node, nil
-	}
-	if err == sql.ErrNoRows {
-		return node, errors.Wrap(err, "not found Node by:"+nameOrID)
 	}
 
 	return node, errors.Wrap(err, "get Node by:"+nameOrID)
@@ -179,9 +181,6 @@ func (db dbBase) GetNodeByAddr(addr string) (Node, error) {
 	if err == nil {
 		return node, nil
 	}
-	if err == sql.ErrNoRows {
-		return node, errors.Wrap(err, "not found Node by addr:"+addr)
-	}
 
 	return node, errors.Wrap(err, "get Node by addr")
 }
@@ -194,11 +193,13 @@ func (db dbBase) ListNodes() ([]Node, error) {
 	)
 
 	err := db.Select(&nodes, query)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return nodes, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return nodes, errors.Wrap(err, "get all Nodes")
+	return nil, errors.Wrap(err, "get all Nodes")
 }
 
 // ListNodeByCluster returns nodes,select by cluster
@@ -209,11 +210,13 @@ func (db dbBase) ListNodeByCluster(cluster string) ([]Node, error) {
 	)
 
 	err := db.Select(&nodes, query, cluster)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return nodes, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return nodes, errors.Wrap(err, "list Node by cluster")
+	return nil, errors.Wrap(err, "list Node by cluster")
 }
 
 // CountNodeByCluster returns num of node select by cluster.
@@ -224,6 +227,9 @@ func (db dbBase) CountNodeByCluster(cluster string) (int, error) {
 	)
 
 	err := db.Get(&num, query, cluster)
+	if err == nil {
+		return num, nil
+	}
 
 	return num, errors.Wrap(err, "count Node by cluster")
 }
@@ -245,11 +251,13 @@ func (db dbBase) ListNodesByEngines(names []string) ([]Node, error) {
 	}
 
 	err = db.Select(&nodes, query, args...)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return nodes, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return nodes, errors.Wrapf(err, "list Nodes by engines:%s", names)
+	return nil, errors.Wrapf(err, "list Nodes by engines:%s", names)
 }
 
 // ListNodesByIDs returns nodes,select by ID.
@@ -269,11 +277,13 @@ func (db dbBase) ListNodesByIDs(in []string, cluster string) ([]Node, error) {
 	}
 
 	err = db.Select(&nodes, query, args...)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return nodes, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return nodes, errors.Wrapf(err, "list Nodes by IDs:%s", in)
+	return nil, errors.Wrapf(err, "list Nodes by IDs:%s", in)
 }
 
 // ListNodesByClusters returns nodes,select by clusters\type\enabled.
@@ -301,11 +311,13 @@ func (db dbBase) ListNodesByClusters(clusters []string, enable bool) ([]Node, er
 
 	var nodes []Node
 	err = db.Select(&nodes, query, args...)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return nodes, nil
+	} else if err == sql.ErrNoRows {
 		return []Node{}, nil
 	}
 
-	return nodes, errors.Wrap(err, "list Nodes by clusters")
+	return nil, errors.Wrap(err, "list Nodes by clusters")
 }
 
 // DelNode delete node by ID
@@ -314,6 +326,9 @@ func (db dbBase) DelNode(ID string) error {
 	query := "DELETE FROM " + db.nodeTable() + " WHERE id=?"
 
 	_, err := db.Exec(query, ID)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "delete Node by ID")
 }

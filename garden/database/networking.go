@@ -56,11 +56,13 @@ func (db dbBase) ListIPByNetworking(networking string) ([]IP, error) {
 	)
 
 	err := db.Select(&list, query, networking)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return list, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return list, errors.Wrap(err, "list []IP by networking")
+	return nil, errors.Wrap(err, "list []IP by networking")
 }
 
 // ListIPWithCondition returns []IP select by  unit_id!=""
@@ -82,11 +84,13 @@ func (db dbBase) listIPsByAllocated(allocated bool, num int) ([]IP, error) {
 	}
 
 	err := db.Select(&out, query, "")
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return out, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return out, errors.Wrap(err, "list []IP by allocated")
+	return nil, errors.Wrap(err, "list []IP by allocated")
 }
 
 // ListIPByUnitID returns []IP select by UnitID
@@ -97,11 +101,13 @@ func (db dbBase) ListIPByUnitID(unit string) ([]IP, error) {
 	)
 
 	err := db.Select(&out, query, unit)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return out, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return out, errors.Wrap(err, "list []IP by UnitID")
+	return nil, errors.Wrap(err, "list []IP by UnitID")
 }
 
 // ListIPByUnitID returns []IP select by Engine
@@ -112,11 +118,13 @@ func (db dbBase) ListIPByEngine(ID string) ([]IP, error) {
 	)
 
 	err := db.Select(&out, query, ID)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return out, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return out, errors.Wrap(err, "list []IP by EngineID")
+	return nil, errors.Wrap(err, "list []IP by EngineID")
 }
 
 // ListIPWithCondition returns []IP select by NetworkingID and Allocated==allocated
@@ -133,11 +141,13 @@ func (db dbBase) ListIPWithCondition(networking string, allocated bool, num int)
 	query := fmt.Sprintf("SELECT ip_addr,prefix,networking_id,unit_id,gateway,vlan_id,enabled,engine_id,net_dev,bandwidth FROM %s WHERE networking_id=? AND unit_id%s? LIMIT %d", db.ipTable(), opt, num)
 
 	err := db.Select(&out, query, networking, "")
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return out, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return out, errors.Wrap(err, "list []IP with condition")
+	return nil, errors.Wrap(err, "list []IP with condition")
 }
 
 func combin(in []NetworkingRequire) [][]NetworkingRequire {
@@ -188,7 +198,7 @@ func (db dbBase) AllocNetworking(unit, engine string, requires []NetworkingRequi
 
 			key := list[0].Networking
 
-			query := fmt.Sprintf("SELECT ip_addr,prefix,gateway,vlan_id,networking_id FROM %s WHERE networking_id=? AND enabled=? AND unit_id=? %d FOR UPDATE;", db.ipTable(), len(list))
+			query := fmt.Sprintf("SELECT ip_addr,prefix,gateway,vlan_id,networking_id FROM %s WHERE networking_id=? AND enabled=? AND unit_id=? LIMIT %d FOR UPDATE;", db.ipTable(), len(list))
 			query = tx.Rebind(query)
 
 			var ips []IP
@@ -236,9 +246,9 @@ func (db dbBase) txSetIPs(tx *sqlx.Tx, val []IP) error {
 		}
 	}
 
-	err = stmt.Close()
+	stmt.Close()
 
-	return errors.Wrap(err, "Tx update []IP")
+	return nil
 }
 
 func (db dbBase) txResetIPByUnit(tx *sqlx.Tx, unit string) error {
@@ -270,7 +280,7 @@ func (db dbBase) InsertNetworking(ips []IP) error {
 
 		stmt.Close()
 
-		return errors.Wrap(err, "Tx insert Networking")
+		return nil
 	}
 
 	return db.txFrame(do)
@@ -294,6 +304,9 @@ func (db dbBase) DelNetworking(networking string) error {
 		}
 
 		_, err = tx.Exec("DELETE FROM "+db.ipTable()+" WHERE networking_id=?", networking)
+		if err == nil {
+			return nil
+		}
 
 		return errors.Wrap(err, "Tx delete []IP by NetworkingID")
 	}
@@ -305,6 +318,9 @@ func (db dbBase) SetNetworkingEnable(networking string, enable bool) error {
 	do := func(tx *sqlx.Tx) error {
 
 		_, err := tx.Exec("UPDATE "+db.ipTable()+" SET enable=? WHERE networking_id=?", enable, networking)
+		if err == nil {
+			return nil
+		}
 
 		return errors.Wrap(err, "Tx delete []IP by NetworkingID")
 	}
@@ -333,7 +349,7 @@ func (db dbBase) SetIPEnable(in []uint32, networking string, enable bool) error 
 
 		stmt.Close()
 
-		return errors.Wrap(err, "Tx update []IP")
+		return nil
 	}
 
 	return db.txFrame(do)

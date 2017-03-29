@@ -101,6 +101,9 @@ func (db dbBase) txInsertTask(tx *sqlx.Tx, t Task, linkTable string) error {
 	query := "INSERT INTO " + db.taskTable() + " (id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:link_table,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
 
 	_, err := tx.NamedExec(query, &t)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "Tx insert Task")
 }
@@ -134,9 +137,9 @@ func (db dbBase) InsertTasks(tx *sqlx.Tx, tasks []Task, linkTable string) error 
 		}
 	}
 
-	err = stmt.Close()
+	stmt.Close()
 
-	return errors.Wrap(err, "Tx insert []Task")
+	return nil
 }
 
 func (db dbBase) txSetTask(tx *sqlx.Tx, t Task) error {
@@ -144,11 +147,11 @@ func (db dbBase) txSetTask(tx *sqlx.Tx, t Task) error {
 	query := "UPDATE " + db.taskTable() + " SET status=?,finished_at=?,errors=? WHERE id=?"
 
 	_, err := tx.Exec(query, t.Status, t.FinishedAt, t.Errors, t.ID)
-	if err != nil {
-		return errors.Wrap(err, "Tx update Task status & errors")
+	if err == nil {
+		return nil
 	}
 
-	return nil
+	return errors.Wrap(err, "Tx update Task status & errors")
 }
 
 func (db dbBase) SetTask(t Task) error {
@@ -159,17 +162,20 @@ func (db dbBase) SetTask(t Task) error {
 	query := "UPDATE " + db.taskTable() + " SET status=?,finished_at=?,errors=? WHERE id=?"
 
 	_, err := db.Exec(query, t.Status, t.FinishedAt, t.Errors, t.ID)
-	if err != nil {
-		return errors.Wrap(err, "Tx update Task status & errors")
+	if err == nil {
+		return nil
 	}
 
-	return nil
+	return errors.Wrap(err, "Tx update Task status & errors")
 }
 
 func (db dbBase) GetTask(ID string) (t Task, err error) {
 	query := "SELECT id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM " + db.taskTable() + " WHERE id=?"
 
 	err = db.Get(&t, query, ID)
+	if err == nil {
+		return t, nil
+	}
 
 	return t, errors.Wrap(err, "get task by id:"+ID)
 }
@@ -198,11 +204,13 @@ func (db dbBase) ListTasks(link string, status int) ([]Task, error) {
 		err = db.Select(&out, query)
 	}
 
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return out, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return out, errors.Wrap(err, "list tasks")
+	return nil, errors.Wrap(err, "list tasks")
 }
 
 func (db dbBase) delTasks(tasks []Task) error {

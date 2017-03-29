@@ -141,6 +141,9 @@ func (db dbBase) GetSysConfig() (SysConfig, error) {
 	)
 
 	err := db.Get(&c, query)
+	if err == nil {
+		return c, nil
+	}
 
 	return c, errors.Wrap(err, "get SystemConfig")
 }
@@ -188,6 +191,9 @@ func (db dbBase) GetPorts() (Ports, error) {
 	)
 
 	err := db.Get(&p, query)
+	if err == nil {
+		return p, nil
+	}
 
 	return p, errors.Wrap(err, "get sysConfig.Ports")
 }

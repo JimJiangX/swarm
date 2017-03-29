@@ -43,6 +43,9 @@ func (db dbBase) InsertVolume(lv Volume) error {
 	query := "INSERT INTO " + db.volumeTable() + " (id,name,unit_id,size,vg,driver,fstype) VALUES (:id,:name,:unit_id,:size,:vg,:driver,:fstype)"
 
 	_, err := db.NamedExec(query, &lv)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "insert Volume")
 }
@@ -81,6 +84,9 @@ func (db dbBase) SetVolume(nameOrID string, size int) error {
 	query := "UPDATE " + db.volumeTable() + " SET size=? WHERE id=? OR name=?"
 
 	_, err := db.Exec(query, size, nameOrID, nameOrID)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "update Volume size")
 }
@@ -105,7 +111,7 @@ func (db dbBase) SetVolumes(lvs []Volume) error {
 
 		stmt.Close()
 
-		return errors.Wrap(err, "Tx update Volume size")
+		return nil
 	}
 
 	return db.txFrame(do)
@@ -117,6 +123,9 @@ func (db dbBase) txDelVolume(tx *sqlx.Tx, nameOrID string) error {
 	query := "DELETE FROM " + db.volumeTable() + " WHERE id=? OR name=?"
 
 	_, err := tx.Exec(query, nameOrID, nameOrID)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "tx delete Volume by nameOrID")
 }
@@ -127,6 +136,9 @@ func (db dbBase) DelVolume(nameOrID string) error {
 	query := "DELETE FROM " + db.volumeTable() + " WHERE id=? OR name=?"
 
 	_, err := db.Exec(query, nameOrID, nameOrID)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "delete Volume by nameOrID")
 }
@@ -137,6 +149,9 @@ func (db dbBase) txDelVolumeByUnit(tx *sqlx.Tx, unitID string) error {
 	query := "DELETE FROM " + db.volumeTable() + " WHERE unit_id=?"
 
 	_, err := tx.Exec(query, unitID)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "delete Volume by unitID")
 }
@@ -161,7 +176,7 @@ func (db dbBase) DelVolumes(lvs []Volume) error {
 
 		stmt.Close()
 
-		return errors.Wrap(err, "Tx delete []Volume")
+		return nil
 	}
 
 	return db.txFrame(do)
@@ -174,6 +189,9 @@ func (db dbBase) GetVolume(nameOrID string) (Volume, error) {
 	query := "SELECT id,name,unit_id,size,vg,driver,fstype FROM " + db.volumeTable() + " WHERE id=? OR name=?"
 
 	err := db.Get(&lv, query, nameOrID, nameOrID)
+	if err == nil {
+		return lv, nil
+	}
 
 	return lv, errors.Wrap(err, "get Volume by nameOrID")
 }
@@ -186,11 +204,13 @@ func (db dbBase) ListVolumeByVG(name string) ([]Volume, error) {
 	)
 
 	err := db.Select(&lvs, query, name)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return lvs, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return lvs, errors.Wrap(err, "list []Volume by VG")
+	return nil, errors.Wrap(err, "list []Volume by VG")
 }
 
 func (db dbBase) listVolumes() ([]Volume, error) {
@@ -200,11 +220,13 @@ func (db dbBase) listVolumes() ([]Volume, error) {
 	)
 
 	err := db.Select(&lvs, query)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return lvs, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return lvs, errors.Wrap(err, "list []Volume")
+	return nil, errors.Wrap(err, "list []Volume")
 }
 
 // ListVolumesByUnitID returns []Volume select by UnitID
@@ -215,9 +237,11 @@ func (db dbBase) ListVolumesByUnitID(unit string) ([]Volume, error) {
 	)
 
 	err := db.Select(&lvs, query, unit)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return lvs, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return lvs, errors.Wrap(err, "list []Volume by UnitID")
+	return nil, errors.Wrap(err, "list []Volume by UnitID")
 }

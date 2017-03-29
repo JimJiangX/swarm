@@ -123,7 +123,7 @@ func (db dbBase) ListServices() ([]Service, error) {
 		}
 	}
 
-	return out, errors.Wrap(err, "list []Service")
+	return out, nil
 }
 
 // GetService returns Service select by ID or Name
@@ -147,7 +147,7 @@ func (db dbBase) GetService(nameOrID string) (Service, error) {
 		s.Desc = &desc
 	}
 
-	return s, errors.Wrap(err, "get Service by nameOrID")
+	return s, nil
 }
 
 // GetServiceStatus returns Service Status select by ID or Name
@@ -158,6 +158,9 @@ func (db dbBase) GetServiceStatus(nameOrID string) (int, error) {
 	)
 
 	err := db.Get(&n, query, nameOrID, nameOrID)
+	if err == nil {
+		return n, nil
+	}
 
 	return n, errors.Wrap(err, "get Service.Status by nameOrID")
 }
@@ -175,16 +178,17 @@ func (db dbBase) GetServiceByUnit(nameOrID string) (Service, error) {
 		return Service{}, errors.Wrap(err, "get Unit")
 	}
 
-	service, err := db.GetService(id)
-
-	return service, errors.Wrap(err, "get Service by unit")
+	return db.GetService(id)
 }
 
 // SetServiceBackupSize update Service BackupMaxSizeByte
-func (db dbBase) SetServiceBackupSize(id string, size int) (err error) {
+func (db dbBase) SetServiceBackupSize(id string, size int) error {
 
 	query := "UPDATE " + db.serviceTable() + " SET backup_max_size=? WHERE id=?"
-	_, err = db.Exec(query, size, id)
+	_, err := db.Exec(query, size, id)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "update Service.Desc")
 }
@@ -276,6 +280,9 @@ func (db dbBase) txInsertSerivce(tx *sqlx.Tx, svc Service) error {
 	query := "INSERT INTO " + db.serviceTable() + " ( id,name,description_id,tag,auto_healing,auto_scaling,high_available,action_status,backup_max_size,backup_files_retention,created_at,finished_at ) VALUES ( :id,:name,:description_id,:tag,:auto_healing,:auto_scaling,:high_available,:action_status,:backup_max_size,:backup_files_retention,:created_at,:finished_at )"
 
 	_, err := tx.NamedExec(query, &svc)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "Tx insert Service")
 }
@@ -286,12 +293,18 @@ func (db dbBase) SetServiceStatus(nameOrID string, state int, finish time.Time) 
 
 		query := "UPDATE " + db.serviceTable() + " SET action_status=? WHERE id=? OR name=?"
 		_, err := db.Exec(query, state, nameOrID, nameOrID)
+		if err == nil {
+			return nil
+		}
 
 		return errors.Wrap(err, "update Service Status")
 	}
 
 	query := "UPDATE " + db.serviceTable() + " SET action_status=?,finished_at=? WHERE id=? OR name=?"
 	_, err := db.Exec(query, state, finish, nameOrID, nameOrID)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "update Service Status & FinishedAt")
 }
@@ -301,12 +314,13 @@ func (db dbBase) txSetServiceStatus(tx *sqlx.Tx, nameOrID string, status int, no
 
 		query := "UPDATE " + db.serviceTable() + " SET action_status=? WHERE id=? OR name=?"
 		_, err = tx.Exec(query, status, nameOrID, nameOrID)
-
 	} else {
-
 		query := "UPDATE " + db.serviceTable() + " SET action_status=?,finished_at=? WHERE id=? OR name=?"
 		_, err = tx.Exec(query, status, now, nameOrID, nameOrID)
+	}
 
+	if err == nil {
+		return nil
 	}
 
 	return errors.Wrap(err, "Tx update Service status")
@@ -348,6 +362,9 @@ func (db dbBase) SetServiceScale(svc Service, t Task) error {
 
 		query := "UPDATE " + db.serviceDescTable() + " SET architecture=?,unit_num=? WHERE id=?"
 		_, err = tx.Exec(query, svc.Desc.Architecture, svc.Desc.Replicas, svc.Desc.ID)
+		if err == nil {
+			return nil
+		}
 
 		return errors.Wrap(err, "tx update serviceDesc replicas")
 	}
@@ -359,6 +376,9 @@ func (db dbBase) txDelService(tx *sqlx.Tx, nameOrID string) error {
 
 	query := "DELETE FROM " + db.serviceTable() + " WHERE id=? OR name=?"
 	_, err := tx.Exec(query, nameOrID, nameOrID)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "tx del Service by nameOrID")
 }
@@ -600,6 +620,9 @@ func (db dbBase) getServiceDesc(ID string) (ServiceDesc, error) {
 	)
 
 	err := db.Get(&s, query, ID)
+	if err == nil {
+		return s, nil
+	}
 
 	return s, errors.Wrap(err, "get ServiceDesc by ID")
 }
@@ -612,11 +635,13 @@ func (db dbBase) listServiceDescs() ([]ServiceDesc, error) {
 	)
 
 	err := db.Select(&out, query)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return out, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return out, errors.Wrap(err, "list []ServiceDesc")
+	return nil, errors.Wrap(err, "list []ServiceDesc")
 }
 
 // listServiceDescs returns all []ServiceDesc
@@ -627,11 +652,13 @@ func (db dbBase) listDescByService(ID string) ([]ServiceDesc, error) {
 	)
 
 	err := db.Select(&out, query, ID)
-	if err == sql.ErrNoRows {
+	if err == nil {
+		return out, nil
+	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return out, errors.Wrap(err, "list []ServiceDesc by serviceID")
+	return nil, errors.Wrap(err, "list []ServiceDesc by serviceID")
 }
 
 func (db dbBase) txInsertSerivceDesc(tx *sqlx.Tx, desc *ServiceDesc) error {
@@ -639,6 +666,9 @@ func (db dbBase) txInsertSerivceDesc(tx *sqlx.Tx, desc *ServiceDesc) error {
 	query := "INSERT INTO " + db.serviceDescTable() + " ( id,service_id,architecture,unit_num,cpu_num,mem_size,image_id,image_version,volumes,networks,cluster_id,previous_version ) VALUES ( :id,:service_id,:architecture,:unit_num,:cpu_num,:mem_size,:image_id,:image_version,:volumes,:networks,:cluster_id,:previous_version )"
 
 	_, err := tx.NamedExec(query, desc)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "Tx insert ServiceDesc")
 }
@@ -646,6 +676,9 @@ func (db dbBase) txInsertSerivceDesc(tx *sqlx.Tx, desc *ServiceDesc) error {
 func (db dbBase) txDelDescByService(tx *sqlx.Tx, service string) error {
 	query := "DELETE FROM " + db.serviceDescTable() + " WHERE service_id=?"
 	_, err := tx.Exec(query, service)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "tx del ServiceDesc by serviceID")
 }
@@ -663,5 +696,4 @@ func (db dbBase) SetServiceDesc(svc Service) error {
 	}
 
 	return db.txFrame(do)
-
 }
