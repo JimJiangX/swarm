@@ -421,7 +421,9 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 
 		opts := svc.options
 		config := cluster.BuildContainerConfig(container.Config{
-			Image: version,
+			Tty:       true,
+			OpenStdin: true,
+			Image:     version,
 		}, container.HostConfig{
 			Binds: []string{"/etc/localtime:/etc/localtime:ro"},
 			Resources: container.Resources{
