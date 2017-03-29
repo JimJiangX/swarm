@@ -154,6 +154,14 @@ func (svc *Service) initStart(ctx context.Context, kvc kvstore.Client, configs s
 		return err
 	}
 
+	// TODO:remove later
+	for i := range units {
+		err := units[i].startContainer(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
 	if configs == nil {
 		configs, err = svc.generateUnitsConfigs(ctx, args)
 		if err != nil {

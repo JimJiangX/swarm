@@ -103,7 +103,11 @@ type kvClient struct {
 }
 
 func (c kvClient) key(key string) string {
-	return c.prefix + key
+	if len(key) > 0 && key[0] == '/' {
+		return c.prefix + key
+	}
+
+	return c.prefix + "/" + key
 }
 
 func (c *kvClient) getLeader() string {

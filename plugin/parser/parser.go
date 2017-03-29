@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	imageKey  = "image"
-	configKey = "config"
+	imageKey  = "/images"
+	configKey = "/configs"
 )
 
 type parser interface {
