@@ -475,7 +475,7 @@ EOF
 
 # install swarm agent
 install_swarm_agent() {
-	local base_dir=/usr/local/swarm_agent
+	local base_dir=/usr/local/swarm-agent
 	local script_dir=$base_dir/scripts
 
 	# stop swarm-agent
