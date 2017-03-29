@@ -475,16 +475,19 @@ EOF
 
 # install swarm agent
 install_swarm_agent() {
-	local script_dir=/usr/local/swarm_agent/scripts
-	mkdir -p ${script_dir}
-	cp -r ${cur_dir}/swarm-agent-${swarm_agent_version}/scripts/* ${script_dir}/
-	chmod +x ${script_dir}/*
+	local base_dir=/usr/local/swarm_agent
+	local script_dir=$base_dir/scripts
 
 	# stop swarm-agent
 	pkill -9 swarm >/dev/null 2>&1
 
+	# copy script dir
+	mkdir -p ${script_dir}
+	cp -r ${cur_dir}/swarm-agent-${swarm_agent_version}/scripts/* ${script_dir}/
+	chmod +x ${script_dir}/*
+
 	# copy binary file
-	cp ${cur_dir}/swarm-agent-${swarm_agent_version}/bin/swarm /usr/bin/swarm; chmod 755 /usr/bin/swarm
+	cp ${cur_dir}/swarm-agent-${swarm_agent_version}/bin/swarm $base_dir/swarm; chmod 755 $base_dir/swarm
 
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/swarm-agent
@@ -507,7 +510,7 @@ After=network.target consul.service
 
 [Service]
 EnvironmentFile=/etc/sysconfig/swarm-agent
-ExecStart=/usr/bin/swarm  \$SWARM_AGENT_OPTS
+ExecStart=$base_dir/swarm  \$SWARM_AGENT_OPTS
 
 [Install]
 WantedBy=multi-user.target
