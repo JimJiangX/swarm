@@ -425,7 +425,8 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			OpenStdin: true,
 			Image:     version,
 		}, container.HostConfig{
-			Binds: []string{"/etc/localtime:/etc/localtime:ro"},
+			NetworkMode: "none",
+			Binds:       []string{"/etc/localtime:/etc/localtime:ro"},
 			Resources: container.Resources{
 				CpusetCpus: strconv.Itoa(opts.require.Require.CPU),
 				Memory:     opts.require.Require.Memory,
