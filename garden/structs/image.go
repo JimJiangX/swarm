@@ -99,7 +99,7 @@ type ConfigTemplate struct {
 	// Mount     string
 	LogMount  string `json:"log_mount"`
 	DataMount string `json:"data_mount"`
-	Content   []byte
+	Content   string
 	Keysets   []Keyset
 	Timestamp int64
 }

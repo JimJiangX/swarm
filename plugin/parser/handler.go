@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -89,13 +88,14 @@ func getSupportImageVersion(ctx *_Context, w http.ResponseWriter, r *http.Reques
 		out = append(out, key)
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	err := json.NewEncoder(w).Encode(out)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+
 	return
 }
 
@@ -237,13 +237,7 @@ func getCommands(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.ConfigTemplate{}
 
-	value, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		httpError(w, err, http.StatusBadRequest)
-		return
-	}
-
-	err = json.Unmarshal(value, &req)
+	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		httpError(w, err, http.StatusBadRequest)
 		return
@@ -257,7 +251,13 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 	parser = parser.clone(&req)
 
-	err = parser.ParseData(req.Content)
+	err = parser.ParseData([]byte(req.Content))
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	dat, err := json.Marshal(req)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -268,7 +268,7 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	path = append(path, strings.SplitN(req.Image, ":", 2)...)
 
 	key := strings.Join(path, "/")
-	err = ctx.client.PutKV(key, value)
+	err = ctx.client.PutKV(key, dat)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -320,7 +320,7 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 		parser = parser.clone(&t)
 
-		err = parser.ParseData(t.Content)
+		err = parser.ParseData([]byte(t.Content))
 		if err != nil {
 			httpError(w, err, http.StatusInternalServerError)
 			return

@@ -85,7 +85,8 @@ func main() {
 			if err != nil {
 				log.Fatalf("open template context file:'%s' error\n,%+v", path, err)
 			}
-			temp.Content = dat
+			temp.Content = string(dat)
+			log.Printf("%s context:\n%s", *flContext, dat)
 		}
 	}
 
