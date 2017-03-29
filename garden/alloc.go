@@ -238,6 +238,10 @@ func getImage(orm database.ImageOrmer, version string) (database.Image, string, 
 }
 
 func (gd *Garden) validServiceSpec(spec structs.ServiceSpec) error {
+	if spec.Arch.Replicas == 0 {
+		return errors.Errorf("replicas==0")
+	}
+
 	return nil
 }
 
@@ -386,8 +390,11 @@ func (gd *Garden) schedule(ctx context.Context, actor allocator, config *cluster
 	}
 
 	nodes, err = _scheduler.SelectNodesForContainer(nodes, config)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
 
-	return nodes, errors.WithStack(err)
+	return nodes, nil
 }
 
 type pendingUnit struct {
@@ -404,9 +411,9 @@ func (pu pendingUnit) convertToSpec() structs.UnitSpec {
 }
 
 func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service) ([]pendingUnit, error) {
-	ready := make([]pendingUnit, 0, len(svc.spec.Units))
+	ready := make([]pendingUnit, 0, svc.spec.Arch.Replicas)
 
-	action := func() error {
+	action := func() (err error) {
 		_, version, err := getImage(gd.Ormer(), svc.spec.Image)
 		if err != nil {
 			return err
@@ -446,10 +453,14 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			return err
 		}
 
+		if len(nodes) < svc.spec.Arch.Replicas {
+			return errors.Errorf("not enough nodes for allocation,%d<%d", len(nodes), svc.spec.Arch.Replicas)
+		}
+
 		var (
-			count = len(svc.spec.Units)
+			count = svc.spec.Arch.Replicas
 			bad   = make([]pendingUnit, 0, count)
-			used  = make([]*node.Node, count)
+			used  = make([]*node.Node, 0, count)
 			field = logrus.WithField("Service", svc.spec.Name)
 		)
 
@@ -479,9 +490,10 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			return ctx.Err()
 		}
 
-		for n, max := 0, len(nodes); n < max && count != 0; n, count = n+1, count-1 {
+		for n := range nodes {
 			units := svc.spec.Units
-			if !selectNodeInDifferentCluster(opts.highAvailable, len(units), nodes[n], used) {
+
+			if !selectNodeInDifferentCluster(opts.highAvailable, svc.spec.Arch.Replicas, nodes[n], used) {
 				field.Debugf("highAvailable=%t node=%s,continue", opts.highAvailable, nodes[n].Name)
 				continue
 			}
@@ -496,7 +508,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 
 			_, err := actor.AlloctCPUMemory(pu.config, nodes[n], int64(opts.require.Require.CPU), config.HostConfig.Memory, nil)
 			if err != nil {
-				field.Debugf("AlloctCPUMemory:node=%s,continue", nodes[n].Name)
+				field.Debugf("AlloctCPUMemory:node=%s,%+v", nodes[n].Name, err)
 				continue
 			}
 
@@ -506,7 +518,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			}
 			if err != nil {
 				bad = append(bad, pu)
-				field.Debugf("AlloctNetworking:node=%s,continue", nodes[n].Name)
+				field.Debugf("AlloctNetworking:node=%s,%+v", nodes[n].Name, err)
 				continue
 			}
 
@@ -516,7 +528,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			}
 			if err != nil {
 				bad = append(bad, pu)
-				field.Debugf("AlloctVolumes:node=%s,continue", nodes[n].Name)
+				field.Debugf("AlloctVolumes:node=%s,%+v", nodes[n].Name, err)
 				continue
 			}
 
@@ -527,6 +539,10 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 
 			ready = append(ready, pu)
 			used = append(used, nodes[n])
+
+			if count--; count == 0 {
+				break
+			}
 		}
 
 		if count > 0 {

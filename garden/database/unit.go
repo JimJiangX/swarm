@@ -114,9 +114,6 @@ func (db dbBase) txInsertUnits(tx *sqlx.Tx, units []Unit) error {
 	}
 
 	for i := range units {
-		if units[i].ID == "" {
-			continue
-		}
 
 		_, err = stmt.Exec(&units[i])
 		if err != nil {
@@ -126,9 +123,9 @@ func (db dbBase) txInsertUnits(tx *sqlx.Tx, units []Unit) error {
 		}
 	}
 
-	err = stmt.Close()
+	stmt.Close()
 
-	return errors.Wrap(err, "insert []*Unit")
+	return nil
 }
 
 func (db dbBase) UnitContainerCreated(name, containerID, engineID, mode string, state int) error {
