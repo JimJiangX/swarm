@@ -72,30 +72,7 @@ die () {
   exit "$status"
 }
 
-# First step: determine type of first argument (bridge, physical interface...),
-if [ -d "/sys/class/net/$IFNAME" ]
-then
-  if [ -d "/sys/class/net/$IFNAME/bridge" ]; then
-    die 1 "unsupported for Linux bridge."
-  elif installed ovs-vsctl && ovs-vsctl list-br|grep -q "^${IFNAME}$"; then
-    die 1 "unsupported for ovs."
-  elif [ "$(cat "/sys/class/net/$IFNAME/type")" -eq 32 ]; then # Infiniband IPoIB interface type 32
-    die 1 "unsupported for IPoIB."
-  else IFTYPE=phys
-  fi
-else
-  case "$IFNAME" in
-    br*)
-      die 1 "unsupported for Linux bridge."
-      ;;
-    ovs*)
-      die 1 "unsupported for ovs."
-      ;;
-    *) die 1 "I do not know how to setup interface $IFNAME." ;;
-  esac
-fi
-
-# Second step: find the container and get container pid
+function getContainerPID () {
 if installed docker
 then
   RETRIES=3
@@ -117,7 +94,10 @@ else
   die 1 "Container $CONTAINER not found, and Docker not installed."
 fi
 
-# Check if a subnet mask was provided.
+NSPID=$DOCKERPID
+}
+
+function getIPaddr () {
 case "$IPADDR" in
   */*@*) : ;;
   *)
@@ -136,8 +116,45 @@ case "$IPADDR" in
     die 1 "example: 192.168.2.100/24@192.168.2.1 "
     ;;
 esac
+}
 
-NSPID=$DOCKERPID
+# First step: determine type of first argument (bridge, physical interface...),
+if [ -d "/sys/class/net/$IFNAME" ]
+then
+  if [ -d "/sys/class/net/$IFNAME/bridge" ]; then
+    die 1 "unsupported for Linux bridge."
+  elif installed ovs-vsctl && ovs-vsctl list-br|grep -q "^${IFNAME}$"; then
+    die 1 "unsupported for ovs."
+  elif [ "$(cat "/sys/class/net/$IFNAME/type")" -eq 32 ]; then # Infiniband IPoIB interface type 32
+    die 1 "unsupported for IPoIB."
+  else IFTYPE=phys
+  fi
+else
+  case "$IFNAME" in
+    container*)
+      if installed docker; then
+        getIPaddr
+        IPADDR=${IPADDR%%/*}
+        docker exec $CONTAINER ifconfig $CONTAINER_IFNAME | grep $IPADDR 
+        if [ $? -ne 0 ]; then
+          die 1 "not found host interface $IFNAME"
+        else
+          exit 0
+        fi
+      fi
+      ;;
+    *)
+      die 1 "I do not know how to setup interface $IFNAME."
+      ;;
+  esac
+fi
+
+# Second step: find the container and get container pid
+getContainerPID
+
+# Check if a subnet mask was provided.
+getIPaddr
+
 
 # Check if an incompatible VLAN device already exists
 if [ "$IFTYPE" = phys ] && [ "$VLAN" ] && [ -d "/sys/class/net/$IFNAME.VLAN" ]
