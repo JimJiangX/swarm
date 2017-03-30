@@ -9,6 +9,8 @@ import (
 )
 
 func TestExecCommand(t *testing.T) {
+	t.Skip("disable TestExecCommand")
+
 	script := fmt.Sprintf("df -h %s", "/home")
 	data, err := ExecCommand(script)
 	assert.Nil(t, err)
