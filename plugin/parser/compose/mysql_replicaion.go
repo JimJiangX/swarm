@@ -9,21 +9,21 @@ import (
 //master-slave mysql manager
 type MysqlMSManager struct {
 	Mysqls  map[string]Mysql
-	MgmIp   string
+	MgmIP   string
 	MgmPort int
 }
 
-func newMysqlMSManager(dbs []Mysql, mgmIp string, mgmPort int) Composer {
+func newMysqlMSManager(dbs []Mysql, ip string, port int) Composer {
 
 	ms := &MysqlMSManager{
-		MgmIp:   mgmIp,
-		MgmPort: mgmPort,
+		MgmIP:   ip,
+		MgmPort: port,
 		Mysqls:  make(map[string]Mysql),
 	}
 
 	for _, db := range dbs {
-		db.MgmIp = mgmIp
-		db.MgmPort = mgmPort
+		db.MgmIP = ip
+		db.MgmPort = port
 		ms.Mysqls[db.GetKey()] = db
 	}
 
@@ -61,7 +61,7 @@ func (m *MysqlMSManager) ComposeCluster() error {
 					"master": master.GetKey(),
 					"error":  err.Error(),
 				}).Error("db ChangeMaster fail")
-				return errors.New(db.Ip + ":" + "db ChangeMaster fail")
+				return errors.New(db.IP + ":" + "db ChangeMaster fail")
 			}
 		}
 	}

@@ -212,8 +212,8 @@ var (
 		Usage: "address of seed server",
 	}
 
-	flMgmIp = cli.StringFlag{
-		Name:  "mgmIp",
+	flMgmIP = cli.StringFlag{
+		Name:  "mgmIP",
 		Value: "127.0.0.1",
 		Usage: "the IP of mgm server",
 	}

@@ -17,7 +17,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-var pc pclient.PluginAPI = nil
+var pc pclient.PluginAPI
 
 func init() {
 	kvc := kvclient{make(map[string][]byte)}

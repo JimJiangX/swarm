@@ -529,8 +529,7 @@ func (m master) RemoveNode(ctx context.Context, horus, nameOrID, user, password 
 	}
 
 	if node.node.Status == statusNodeSCPFailed ||
-		node.node.Status == statusNodeSSHLoginFailed ||
-		node.node.Status == statusNodeSSHExecFailed {
+		node.node.Status == statusNodeSSHLoginFailed {
 
 		return m.removeNode(node.node.ID)
 	}

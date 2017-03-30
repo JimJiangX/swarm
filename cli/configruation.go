@@ -45,7 +45,7 @@ func configruation(c *cli.Context) {
 		log.Fatal(err)
 	}
 
-	mgmIp := c.String("mgmIp")
+	mgmIP := c.String("mgmIP")
 	mgmPort := c.Int("mgmPort")
 
 	uri := getDiscovery(c)
@@ -66,7 +66,7 @@ func configruation(c *cli.Context) {
 
 	server := api.NewServer(hosts, tlsConfig)
 
-	server.SetHandler(parser.NewRouter(kvClient, mgmIp, mgmPort))
+	server.SetHandler(parser.NewRouter(kvClient, mgmIP, mgmPort))
 
 	log.Fatal(server.ListenAndServe())
 }
