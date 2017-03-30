@@ -47,7 +47,7 @@ do
     ;;
     *)
     echo "Syntax:"
-    echo "pipework -h <host_interface> -i <container_interface> -c <container> -ip <ip_addr>/<subnet>@<default_gateway> -v <vlan> [-b bandwidth]"
+    echo "init_nic.sh -h <host_interface> -i <container_interface> -c <container> -ip <ip_addr>/<subnet>@<default_gateway> -v <vlan> [-b bandwidth]"
     exit 1
     ;;
   esac
@@ -188,18 +188,21 @@ else
       done
     fi
   fi
-
-  # If it's a physical interface, create a vlan subinterface
-  MTU=$(ip link show "$IFNAME" | awk '{print $5}')
-  [ ! -d "/sys/class/net/${IFNAME}.${VLAN}" ] && {
-    ip link add link "$IFNAME" name "$IFNAME.$VLAN" mtu "$MTU" type vlan id "$VLAN" || {
-      die 1 "create $IFNAME.VLAN faild"
+  if [ $VLAN -ne 0 ]; then
+    # If it's a physical interface, create a vlan subinterface
+    MTU=$(ip link show "$IFNAME" | awk '{print $5}')
+    [ ! -d "/sys/class/net/${IFNAME}.${VLAN}" ] && {
+      ip link add link "$IFNAME" name "$IFNAME.$VLAN" mtu "$MTU" type vlan id "$VLAN" || {
+        die 1 "create $IFNAME.VLAN faild"
+      }
     }
-  }
-  ip link set "$IFNAME" up || {
-    die 1 "$IFNAME.VLAN up faild"
-  }
-  GUEST_IFNAME=$IFNAME.$VLAN
+    ip link set "$IFNAME" up || {
+      die 1 "$IFNAME.VLAN up faild"
+    }
+    GUEST_IFNAME=$IFNAME.$VLAN
+  else
+    GUEST_IFNAME=$IFNAME
+  fi
 fi
 
 # Create netns
