@@ -76,7 +76,7 @@ func createNetwork(cfg *NetworkCfg) error {
 		"-c", cfg.ContainerID,
 		"-ip", cfg.IPCIDR + "@" + cfg.Gateway,
 		"-v", strconv.Itoa(cfg.VlanID),
-		"-d", strconv.Itoa(cfg.BandWidth),
+		"-b", strconv.Itoa(cfg.BandWidth),
 	}
 
 	filepath := NET_SCRIPT_DIR + "init_nic.sh"
