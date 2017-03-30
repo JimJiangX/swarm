@@ -2,7 +2,6 @@ package garden
 
 import (
 	"encoding/json"
-	"path/filepath"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -382,8 +381,7 @@ func (svc *Service) updateConfigs(ctx context.Context, units []*unit, configs st
 			continue
 		}
 
-		path := filepath.Join(config.DataMount, config.ConfigFile)
-		err := units[i].updateServiceConfig(ctx, path, config.Content)
+		err := units[i].updateServiceConfig(ctx, config.ConfigFile, config.Content)
 		if err != nil {
 			return err
 		}

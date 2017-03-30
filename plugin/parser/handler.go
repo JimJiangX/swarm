@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -280,6 +281,7 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 			Version:      version,
 			LogMount:     t.LogMount,
 			DataMount:    t.DataMount,
+			ConfigFile:   filepath.Join(t.DataMount, t.ConfigFile),
 			Content:      string(text),
 			Cmds:         cmds,
 			Timestamp:    time.Now().Unix(),
@@ -359,6 +361,9 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		}
 		if u.DataMount != "" && c.DataMount != u.DataMount {
 			c.DataMount = u.DataMount
+		}
+		if u.ConfigFile != "" && c.ConfigFile != u.ConfigFile {
+			c.ConfigFile = u.ConfigFile
 		}
 
 		if u.Content != "" && c.Content != u.Content {
