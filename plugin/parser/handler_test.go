@@ -284,6 +284,6 @@ func TestGenerateConfigs(t *testing.T) {
 	}
 
 	if len(configs) != len(redisSpec.Units) {
-		t.Error("got configs %d", len(configs))
+		t.Errorf("got configs %d", len(configs))
 	}
 }
