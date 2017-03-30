@@ -122,9 +122,45 @@ func convertStructsService(spec structs.ServiceSpec) (database.Service, error) {
 	}, nil
 }
 
+func covertUnitNetwork(ips []database.IP) []structs.UnitIP {
+	if len(ips) == 0 {
+		return nil
+	}
+
+	out := make([]structs.UnitIP, 0, len(ips))
+
+	for i := range ips {
+		out = append(out, structs.UnitIP{
+			Prefix:     ips[i].Prefix,
+			VLAN:       ips[i].VLAN,
+			Bandwidth:  ips[i].Bandwidth,
+			Device:     ips[i].Bond,
+			IP:         utils.Uint32ToIP(ips[i].IPAddr).String(),
+			Gateway:    ips[i].Gateway,
+			Networking: ips[i].Gateway,
+		})
+	}
+
+	return out
+
+}
+
 // TODO:convert to structs.UnitSpec
-func convertUnitInfoToSpec(info database.UnitInfo) structs.UnitSpec {
-	return structs.UnitSpec{
+func convertUnitInfoToSpec(info database.UnitInfo, container *cluster.Container) structs.UnitSpec {
+	lvs := make([]structs.VolumeSpec, 0, len(info.Volumes))
+
+	for i := range info.Volumes {
+		lvs = append(lvs, structs.VolumeSpec{
+			ID:      info.Volumes[i].ID,
+			Name:    info.Volumes[i].Name,
+			Type:    info.Volumes[i].VG,
+			Driver:  info.Volumes[i].Driver,
+			Size:    int(info.Volumes[i].Size),
+			Options: map[string]interface{}{"fstype": info.Volumes[i].Filesystem},
+		})
+	}
+
+	spec := structs.UnitSpec{
 		Unit: structs.Unit(info.Unit),
 
 		Engine: struct {
@@ -135,35 +171,23 @@ func convertUnitInfoToSpec(info database.UnitInfo) structs.UnitSpec {
 			Addr: info.Engine.Addr,
 		},
 
-		//	Networking struct {
-		//		Type    string
-		//		Devices string
-		//		Mask    int
-		//		IPs     []struct {
-		//			Name  string
-		//			IP    string
-		//			Proto string
-		//		}
-		//		Ports []struct {
-		//			Name string
-		//			Port int
-		//		}
-		//	}
+		Networking: covertUnitNetwork(info.Networkings),
 
-		//	Volumes []struct {
-		//		Type    string
-		//		Driver  string
-		//		Size    int
-		//		Options map[string]interface{}
-		//	}
+		Volumes: lvs,
 	}
+
+	if container != nil {
+		spec.Config = container.Config
+	}
+
+	return spec
 }
 
-func ConvertServiceInfo(info database.ServiceInfo) structs.ServiceSpec {
+func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers) structs.ServiceSpec {
 	units := make([]structs.UnitSpec, 0, len(info.Units))
 
 	for u := range info.Units {
-		units = append(units, convertUnitInfoToSpec(info.Units[u]))
+		units = append(units, convertUnitInfoToSpec(info.Units[u], containers.Get(info.Units[u].Unit.Name)))
 	}
 
 	arch := structs.Arch{}
@@ -198,7 +222,7 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 		return nil, err
 	}
 
-	spec := ConvertServiceInfo(info)
+	spec := ConvertServiceInfo(info, gd.Cluster.Containers())
 
 	svc := gd.NewService(spec)
 
@@ -211,10 +235,12 @@ func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, erro
 		return nil, err
 	}
 
+	containers := gd.Cluster.Containers()
+
 	out := make([]structs.ServiceSpec, len(list))
 
 	for i := range list {
-		spec := ConvertServiceInfo(list[i])
+		spec := ConvertServiceInfo(list[i], containers)
 		out = append(out, spec)
 	}
 

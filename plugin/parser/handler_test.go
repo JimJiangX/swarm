@@ -205,11 +205,9 @@ var redisSpec = structs.ServiceSpec{
 					},
 				},
 			},
-			Networking: structs.UnitNetworking{
-				IPs: []structs.UnitIP{
-					{
-						IP: "192.168.4.141",
-					},
+			Networking: []structs.UnitIP{
+				{
+					IP: "192.168.4.141",
 				},
 			},
 		},
@@ -226,11 +224,9 @@ var redisSpec = structs.ServiceSpec{
 					},
 				},
 			},
-			Networking: structs.UnitNetworking{
-				IPs: []structs.UnitIP{
-					{
-						IP: "192.168.4.142",
-					},
+			Networking: []structs.UnitIP{
+				{
+					IP: "192.168.4.142",
 				},
 			},
 		},
@@ -247,11 +243,9 @@ var redisSpec = structs.ServiceSpec{
 					},
 				},
 			},
-			Networking: structs.UnitNetworking{
-				IPs: []structs.UnitIP{
-					{
-						IP: "192.168.4.143",
-					},
+			Networking: []structs.UnitIP{
+				{
+					IP: "192.168.4.143",
 				},
 			},
 		},

@@ -80,8 +80,8 @@ func (c redisConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 		return errors.Errorf("not found unit '%s' in service '%s'", id, desc.Name)
 	}
 
-	if len(spec.Networking.IPs) >= 1 {
-		c.config["bind"] = spec.Networking.IPs[0].IP
+	if len(spec.Networking) >= 1 {
+		c.config["bind"] = spec.Networking[0].IP
 	}
 
 	c.config["port"] = fmt.Sprintf("%v", desc.Options["port"])

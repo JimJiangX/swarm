@@ -60,8 +60,8 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 
 	m := make(map[string]interface{}, 20)
 
-	if len(spec.Networking.IPs) >= 1 {
-		m["mysqld::bind_address"] = spec.Networking.IPs[0].IP
+	if len(spec.Networking) >= 1 {
+		m["mysqld::bind_address"] = spec.Networking[0].IP
 	} else {
 		return errors.New("unexpected IPAddress")
 	}

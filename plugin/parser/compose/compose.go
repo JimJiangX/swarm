@@ -89,7 +89,7 @@ func valicateCommonSpec(req *structs.ServiceSpec) error {
 	}
 	//unit ip
 	for _, unit := range req.Units {
-		if len(unit.Networking.IPs) == 0 || len(unit.Networking.Ports) == 0 {
+		if len(unit.Networking) == 0 || len(unit.Ports) == 0 {
 			errstr := fmt.Sprintf("the unit %s :addr len equal 0", unit.ContainerID)
 			return errors.New(errstr)
 		}
@@ -177,8 +177,8 @@ func getRedis(req *structs.ServiceSpec) []Redis {
 
 	for _, unit := range req.Units {
 
-		ip := unit.Networking.IPs[0].IP
-		port := unit.Networking.Ports[0].Port
+		ip := unit.Networking[0].IP
+		port := unit.Ports[0].Port
 
 		redis := Redis{
 			Ip:   ip,
@@ -200,8 +200,8 @@ func getMysqls(req *structs.ServiceSpec) []Mysql {
 	for _, unit := range req.Units {
 		instance := unit.ContainerID
 
-		ip := unit.Networking.IPs[0].IP
-		port := unit.Networking.Ports[0].Port
+		ip := unit.Networking[0].IP
+		port := unit.Ports[0].Port
 
 		mysql := Mysql{
 			MysqlUser: users,

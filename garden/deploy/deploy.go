@@ -133,8 +133,14 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *databas
 	}
 
 	kvc := d.gd.KVClient()
+	opts := svc.Spec().Options
 
-	err = svc.InitStart(ctx, kvc, nil, svc.Spec().Options)
+	svc, err = d.gd.Service(svc.Spec().ID)
+	if err != nil {
+		return err
+	}
+
+	err = svc.InitStart(ctx, kvc, nil, opts)
 	if err != nil {
 		return err
 	}
@@ -220,11 +226,13 @@ func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
 
 	links.Sort()
 
+	containers := d.gd.Cluster.Containers()
+
 	for l := range links {
 
 		info, ok := m[links[l].ID]
 		if ok {
-			spec := garden.ConvertServiceInfo(info)
+			spec := garden.ConvertServiceInfo(info, containers)
 			links[l].Spec = &spec
 		}
 
@@ -232,7 +240,7 @@ func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
 	}
 
 	for _, val := range m {
-		spec := garden.ConvertServiceInfo(val)
+		spec := garden.ConvertServiceInfo(val, containers)
 		links = append(links, &structs.ServiceLink{
 			ID:   spec.ID,
 			Spec: &spec,

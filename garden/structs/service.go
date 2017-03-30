@@ -52,9 +52,15 @@ type Unit struct {
 }
 
 type UnitIP struct {
-	Name  string
-	IP    string
-	Proto string
+	Prefix     int
+	VLAN       int
+	Bandwidth  int
+	Device     string
+	Name       string
+	IP         string
+	Proto      string
+	Gateway    string
+	Networking string
 }
 
 type UnitPort struct {
@@ -62,12 +68,13 @@ type UnitPort struct {
 	Port int
 }
 
-type UnitNetworking struct {
+type VolumeSpec struct {
+	ID      string
+	Name    string
 	Type    string
-	Devices string
-	Mask    int
-	IPs     []UnitIP
-	Ports   []UnitPort
+	Driver  string
+	Size    int
+	Options map[string]interface{}
 }
 
 type UnitSpec struct {
@@ -80,16 +87,10 @@ type UnitSpec struct {
 		Addr string
 	}
 
-	Networking UnitNetworking
+	Networking []UnitIP
+	Ports      []UnitPort
 
-	Volumes []struct {
-		ID      string
-		Name    string
-		Type    string
-		Driver  string
-		Size    int
-		Options map[string]interface{}
-	}
+	Volumes []VolumeSpec
 }
 
 type Arch struct {
