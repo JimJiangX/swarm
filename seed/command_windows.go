@@ -1,4 +1,4 @@
-// +build darwin linux
+// +build windows
 
 package seed
 
@@ -7,7 +7,6 @@ import (
 	"errors"
 	"os/exec"
 	"strings"
-	"syscall"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -40,7 +39,7 @@ func ExecWithTimeout(_Type ExecType, shell string, timeout time.Duration, args .
 		cmd = exec.Command(shell, args...)
 	}
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	//	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	var stderr bytes.Buffer
@@ -96,22 +95,22 @@ func cmdRunWithTimeout(cmd *exec.Cmd, timeout time.Duration) (error, bool) {
 			//			log.Println("test goroute timeout out")
 		}()
 
-		pgid, err := syscall.Getpgid(cmd.Process.Pid)
-		if err == nil {
-			if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
-				log.WithFields(log.Fields{
-					"cmd": cmd,
-					"err": err.Error(),
-				}).Warnf(" exec timeout kill fail: syscall.Kill error")
-			}
-		} else {
-			log.WithFields(log.Fields{
-				"cmd": cmd,
-				"err": err.Error(),
-			}).Warnf(" exec timeout kill  process fail")
-		}
+		//		pgid, err := syscall.Getpgid(cmd.Process.Pid)
+		//		if err == nil {
+		//			if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
+		//				log.WithFields(log.Fields{
+		//					"cmd": cmd,
+		//					"err": err.Error(),
+		//				}).Warnf(" exec timeout kill fail: syscall.Kill error")
+		//			}
+		//		} else {
+		//			log.WithFields(log.Fields{
+		//				"cmd": cmd,
+		//				"err": err.Error(),
+		//			}).Warnf(" exec timeout kill  process fail")
+		//		}
 
-		return err, true
+		return errors.New("timeout"), true
 	case err = <-done:
 		return err, false
 	}
