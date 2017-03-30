@@ -106,7 +106,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 		}
 
 		{
-			table, err := svc.so.GetService(svc.spec.ID)
+			table, err := svc.so.GetService(svc.svc.ID)
 			if err != nil {
 				return err
 			}
@@ -119,12 +119,15 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 			table.Desc = &desc
 
 			err = svc.so.SetServiceDesc(table)
+			if err == nil {
+				svc.svc = &table
+			}
 
 			return err
 		}
 	}
 
-	tl := tasklock.NewServiceTask(svc.spec.ID, svc.so, &task,
+	tl := tasklock.NewServiceTask(svc.svc.ID, svc.so, &task,
 		statusServiceImageUpdating,
 		statusServiceImageUpdated,
 		statusServiceImageUpdateFailed)

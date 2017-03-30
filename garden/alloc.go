@@ -187,7 +187,11 @@ func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers
 	units := make([]structs.UnitSpec, 0, len(info.Units))
 
 	for u := range info.Units {
-		units = append(units, convertUnitInfoToSpec(info.Units[u], containers.Get(info.Units[u].Unit.Name)))
+		var c *cluster.Container
+		if containers != nil {
+			c = containers.Get(info.Units[u].Unit.Name)
+		}
+		units = append(units, convertUnitInfoToSpec(info.Units[u], c))
 	}
 
 	arch := structs.Arch{}
@@ -207,11 +211,7 @@ func (gd *Garden) GetService(nameOrID string) (*Service, error) {
 		return nil, err
 	}
 
-	spec := structs.ServiceSpec{
-		Service: convertService(s),
-	}
-
-	svc := gd.NewService(spec)
+	svc := gd.NewService(nil, &s)
 
 	return svc, nil
 }
@@ -224,7 +224,7 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 
 	spec := ConvertServiceInfo(info, gd.Cluster.Containers())
 
-	svc := gd.NewService(spec)
+	svc := gd.NewService(&spec, &info.Service)
 
 	return svc, nil
 }
@@ -327,14 +327,14 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 
 	spec.Units = units
 
-	t := database.NewTask(spec.Name, database.ServiceRunTask, spec.ID, spec.Desc, "", 300)
+	t := database.NewTask(spec.Name, database.ServiceRunTask, spec.ID, svc.Desc.ID, "", 300)
 
 	err = gd.ormer.InsertService(svc, us, &t)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	service := gd.NewService(spec)
+	service := gd.NewService(&spec, &svc)
 
 	service.options = options
 
@@ -443,10 +443,10 @@ func (pu pendingUnit) convertToSpec() structs.UnitSpec {
 }
 
 func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service) ([]pendingUnit, error) {
-	ready := make([]pendingUnit, 0, svc.spec.Arch.Replicas)
+	ready := make([]pendingUnit, 0, svc.svc.Desc.Replicas)
 
 	action := func() (err error) {
-		_, version, err := getImage(gd.Ormer(), svc.spec.Image)
+		_, version, err := getImage(gd.Ormer(), svc.svc.Desc.Image)
 		if err != nil {
 			return err
 		}
@@ -488,15 +488,20 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 		}
 		gd.scheduler.Unlock()
 
-		if len(nodes) < svc.spec.Arch.Replicas {
-			return errors.Errorf("not enough nodes for allocation,%d<%d", len(nodes), svc.spec.Arch.Replicas)
+		if len(nodes) < svc.svc.Desc.Replicas {
+			return errors.Errorf("not enough nodes for allocation,%d<%d", len(nodes), svc.svc.Desc.Replicas)
+		}
+
+		units, err := svc.so.ListUnitByServiceID(svc.svc.ID)
+		if err != nil {
+			return err
 		}
 
 		var (
-			count = svc.spec.Arch.Replicas
+			count = svc.svc.Desc.Replicas
 			bad   = make([]pendingUnit, 0, count)
 			used  = make([]*node.Node, 0, count)
-			field = logrus.WithField("Service", svc.spec.Name)
+			field = logrus.WithField("Service", svc.svc.Name)
 		)
 
 		defer func() {
@@ -526,16 +531,15 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 		}
 
 		for n := range nodes {
-			units := svc.spec.Units
 
-			if !selectNodeInDifferentCluster(opts.highAvailable, svc.spec.Arch.Replicas, nodes[n], used) {
+			if !selectNodeInDifferentCluster(opts.highAvailable, svc.svc.Desc.Replicas, nodes[n], used) {
 				field.Debugf("highAvailable=%t node=%s,continue", opts.highAvailable, nodes[n].Name)
 				continue
 			}
 
 			pu := pendingUnit{
 				swarmID:     units[count-1].ID,
-				Unit:        database.Unit(units[count-1].Unit),
+				Unit:        units[count-1],
 				config:      config.DeepCopy(),
 				networkings: make([]database.IP, 0, len(units)),
 				volumes:     make([]volume.VolumesCreateBody, 0, len(units)),
@@ -589,17 +593,10 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			return errors.Errorf("not enough nodes for allocation,%d units waiting", count)
 		}
 
-		units := make([]structs.UnitSpec, len(ready))
-		for i := range ready {
-			units[i] = ready[i].convertToSpec()
-		}
-
-		svc.spec.Units = units
-
 		return err
 	}
 
-	sl := tasklock.NewServiceTask(svc.spec.ID, svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusServiceAllocating, statusServiceAllocated, statusServiceAllocateFailed)
 
 	err := sl.Run(
