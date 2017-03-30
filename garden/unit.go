@@ -176,11 +176,14 @@ func (u unit) startContainer(ctx context.Context) error {
 		}
 		if len(ips) > 0 {
 			addr := net.JoinHostPort(c.Engine.IP, strconv.Itoa(ports.SwarmAgent))
-			err = u.startNetwork(ctx, addr, c, ips, nil)
+			err := u.startNetwork(ctx, addr, c, ips, nil)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
-	return err
+	return nil
 }
 
 func (u unit) stopContainer(ctx context.Context) error {
