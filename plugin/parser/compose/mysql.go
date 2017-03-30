@@ -25,7 +25,7 @@ type MysqlUser struct {
 }
 
 type Mysql struct {
-	Ip       string
+	IP       string
 	Port     int
 	Instance string
 
@@ -35,11 +35,11 @@ type Mysql struct {
 	RoleType ROLE_TYPE
 
 	MgmPort int
-	MgmIp   string
+	MgmIP   string
 }
 
 func (m Mysql) GetKey() string {
-	return m.Ip + ":" + strconv.Itoa(m.Port)
+	return m.IP + ":" + strconv.Itoa(m.Port)
 }
 
 func (m Mysql) Clear() error {

@@ -17,7 +17,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-var pc pclient.PluginAPI = nil
+var pc pclient.PluginAPI
 
 func init() {
 	kvc := kvclient{make(map[string][]byte)}
@@ -284,6 +284,6 @@ func TestGenerateConfigs(t *testing.T) {
 	}
 
 	if len(configs) != len(redisSpec.Units) {
-		t.Error("got configs %d", len(configs))
+		t.Errorf("got configs %d", len(configs))
 	}
 }

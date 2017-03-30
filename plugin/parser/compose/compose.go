@@ -206,7 +206,7 @@ func getMysqls(req *structs.ServiceSpec) []Mysql {
 		mysql := Mysql{
 			MysqlUser: users,
 
-			Ip:       ip,
+			IP:       ip,
 			Port:     port,
 			Instance: instance,
 		}

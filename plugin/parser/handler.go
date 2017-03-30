@@ -208,6 +208,8 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logrus.Debugf("%+v", req)
+
 	parser, err := factory(req.Service.Image)
 	if err != nil {
 		httpError(w, err, http.StatusNotImplemented)
