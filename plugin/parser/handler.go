@@ -3,7 +3,6 @@ package parser
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -38,8 +37,7 @@ func NewRouter(c kvstore.Client, ip string, port int) *mux.Router {
 
 	var routes = map[string]map[string]handler{
 		"GET": {
-			"/image/support": getSupportImageVersion,
-			//"/image/requirement":              getImageRequirement,
+			"/image/support":                  getSupportImageVersion,
 			"/configs/{service:.*}":           getConfigs,
 			"/configs/{service:.*}/{unit:.*}": getConfig,
 			"/commands/{service:.*}":          getCommands,
@@ -90,46 +88,8 @@ func getSupportImageVersion(ctx *_Context, w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err := json.NewEncoder(w).Encode(out)
-	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
-	}
-
-	return
+	json.NewEncoder(w).Encode(out)
 }
-
-//func getImageRequirement(ctx *_Context, w http.ResponseWriter, r *http.Request) {
-//	if err := r.ParseForm(); err != nil {
-//		httpError(w, err, http.StatusBadRequest)
-//		return
-//	}
-
-//	image := r.FormValue("image")
-
-//	parts := strings.SplitN(image, ":", 2)
-//	var v string
-//	if len(parts) == 2 {
-//		v = parts[1]
-//	}
-
-//	parser, err := factory(parts[0], v)
-//	if err != nil {
-//		httpError(w, err, http.StatusNotImplemented)
-//		return
-//	}
-
-//	resp := parser.Requirement()
-
-//	err = json.NewEncoder(w).Encode(resp)
-//	if err != nil {
-//		httpError(w, err, http.StatusInternalServerError)
-//		return
-//	}
-//	w.Header().Set("Content-Type", "application/json")
-//	w.WriteHeader(http.StatusOK)
-//	return
-//}
 
 func getConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	service := mux.Vars(r)["service"]
@@ -147,15 +107,9 @@ func getConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = json.NewEncoder(w).Encode(cm)
-	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
-	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	return
-
+	json.NewEncoder(w).Encode(cm)
 }
 
 func getConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
@@ -173,8 +127,6 @@ func getConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(pair.Value)
-
-	return
 }
 
 func getCommands(ctx *_Context, w http.ResponseWriter, r *http.Request) {
@@ -199,40 +151,10 @@ func getCommands(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		resp[c.ID] = c.Cmds
 	}
 
-	err = json.NewEncoder(w).Encode(resp)
-	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	return
+	json.NewEncoder(w).Encode(resp)
 }
-
-//func checkImage(ctx *_Context, w http.ResponseWriter, r *http.Request) {
-//	t := structs.ConfigTemplate{}
-
-//	err := json.NewDecoder(r.Body).Decode(&t)
-//	if err != nil {
-//		httpError(w, err, http.StatusBadRequest)
-//		return
-//	}
-
-//	parser, err := factory(t.Name, t.Version)
-//	if err != nil {
-//		httpError(w, err, http.StatusNotImplemented)
-//		return
-//	}
-
-//	err = parser.ParseData(t.Content)
-//	if err != nil {
-//		httpError(w, err, http.StatusInternalServerError)
-//		return
-//	}
-
-//	w.WriteHeader(http.StatusOK)
-//}
 
 func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.ConfigTemplate{}
@@ -369,15 +291,9 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = json.NewEncoder(w).Encode(resp)
-	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
-	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-
-	return
+	json.NewEncoder(w).Encode(resp)
 }
 
 func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
@@ -428,10 +344,8 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	for id, u := range req {
 		c, exist := configs[id]
 		if !exist {
-			if err != nil {
-				httpError(w, fmt.Errorf(""), http.StatusInternalServerError)
-				return
-			}
+			out[id] = c
+			continue
 		}
 
 		if u.ID != "" && c.ID != u.ID {
