@@ -273,7 +273,7 @@ func (u unit) containerExec(ctx context.Context, cmd []string, detach bool) (typ
 }
 
 func (u unit) updateServiceConfig(ctx context.Context, path, context string) error {
-	cmd := []string{"/bin/sh", "-c", fmt.Sprintf(`"echo '%s'> %s && chmod 644 %s"`, context, path, path)}
+	cmd := []string{"/bin/sh", "-c", fmt.Sprintf(`"cat > %s << EOF\n%s\nEOF && chmod 644 %s"`, path, context, path)}
 
 	inspect, err := u.containerExec(ctx, cmd, false)
 	if err != nil {

@@ -225,7 +225,7 @@ func (lv *localVolume) Alloc(config *cluster.ContainerConfig, uid string, req st
 
 	lv.space.Free -= req.Size
 
-	name := fmt.Sprintf("%s:/DBAAS%s", v.Name, req.Name)
+	name := fmt.Sprintf("%s:/UPM/%s", v.Name, req.Name)
 	config.HostConfig.Binds = append(config.HostConfig.Binds, name)
 	config.HostConfig.VolumeDriver = lv.Driver()
 
