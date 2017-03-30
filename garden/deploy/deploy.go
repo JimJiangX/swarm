@@ -41,8 +41,13 @@ func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec) (stru
 		return resp, err
 	}
 
-	resp.ID = svc.Spec().ID
-	resp.Name = svc.Spec().Name
+	t, err := svc.Spec()
+	if err != nil {
+		return resp, err
+	}
+
+	resp.ID = t.ID
+	resp.Name = t.Name
 	resp.TaskID = task.ID
 
 	go d.deploy(ctx, svc, task, auth)
@@ -81,9 +86,14 @@ func (d *Deployment) DeployServices(ctx context.Context, services []structs.Serv
 			return out, err
 		}
 
+		spec, err := service.Spec()
+		if err != nil {
+			return out, err
+		}
+
 		out = append(out, structs.PostServiceResponse{
-			ID:     service.Spec().ID,
-			Name:   service.Spec().Name,
+			ID:     spec.ID,
+			Name:   spec.Name,
 			TaskID: task.ID,
 		})
 
@@ -106,12 +116,12 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *databas
 			t.Errors = err.Error()
 			t.Status = database.TaskFailedStatus
 
-			logrus.WithField("Service", svc.Spec().Name).Errorf("service deploy error %+v", err)
+			logrus.Errorf("service deploy error %+v", err)
 		}
 
 		_err := d.gd.Ormer().SetTask(*t)
 		if _err != nil {
-			logrus.WithField("Service", svc.Spec().Name).Errorf("deploy task error,%+v", _err)
+			logrus.Errorf("deploy task error,%+v", _err)
 		}
 	}()
 
@@ -132,22 +142,12 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *databas
 		return err
 	}
 
-	kvc := d.gd.KVClient()
-	opts := svc.Spec().Options
-
-	svc, err = d.gd.Service(svc.Spec().ID)
+	err = svc.InitStart(ctx, d.gd.KVClient(), nil, nil)
 	if err != nil {
 		return err
 	}
 
-	err = svc.InitStart(ctx, kvc, nil, opts)
-	if err != nil {
-		return err
-	}
-
-	pc := d.gd.PluginClient()
-
-	err = pc.ServiceCompose(ctx, svc.Spec())
+	err = svc.Compose(ctx, d.gd.PluginClient())
 
 	return err
 }
@@ -202,8 +202,12 @@ func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
 			return err
 		}
 
-		spec := svc.Spec()
-		links[0].Spec = &spec
+		spec, err := svc.Spec()
+		if err != nil {
+			return err
+		}
+
+		links[0].Spec = spec
 
 		return nil
 	}
@@ -327,7 +331,12 @@ func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version strin
 		return "", err
 	}
 
-	t := database.NewTask(svc.Spec().Name, database.ServiceUpdateImageTask, svc.Spec().ID, "", "", 300)
+	spec, err := svc.Spec()
+	if err != nil {
+		return "", err
+	}
+
+	t := database.NewTask(spec.Name, database.ServiceUpdateImageTask, spec.ID, "", "", 300)
 
 	err = svc.UpdateImage(ctx, d.gd.KVClient(), im, t, authConfig)
 	if err != nil {
@@ -353,7 +362,7 @@ func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config stru
 		return "", err
 	}
 
-	t := database.NewTask(svc.Spec().Name, database.ServiceUpdateTask, svc.Spec().ID, string(out), "", 300)
+	t := database.NewTask(table.Name, database.ServiceUpdateTask, table.ID, string(out), "", 300)
 	actor := resource.NewAllocator(d.gd.Ormer(), d.gd.Cluster)
 
 	if (config.Require.CPU > 0 && table.Desc.NCPU != config.Require.CPU) ||

@@ -20,24 +20,34 @@ var containerKV = "swarm/containers/"
 type Service struct {
 	so      database.ServiceOrmer
 	pc      pluginapi.PluginAPI
-	spec    structs.ServiceSpec
+	svc     *database.Service
+	spec    *structs.ServiceSpec
 	cluster cluster.Cluster
 
 	options scheduleOption
 }
 
-func newService(spec structs.ServiceSpec, so database.ServiceOrmer, cluster cluster.Cluster, pc pluginapi.PluginAPI) *Service {
+func newService(spec *structs.ServiceSpec,
+	svc *database.Service,
+	so database.ServiceOrmer,
+	cluster cluster.Cluster,
+	pc pluginapi.PluginAPI) *Service {
 
 	return &Service{
 		spec:    spec,
+		svc:     svc,
 		so:      so,
 		cluster: cluster,
 		pc:      pc,
 	}
 }
 
-func (gd *Garden) NewService(spec structs.ServiceSpec) *Service {
-	return newService(spec, gd.ormer, gd.Cluster, gd.pluginClient)
+func (gd *Garden) NewService(spec *structs.ServiceSpec, svc *database.Service) *Service {
+	if spec == nil && svc == nil {
+		return nil
+	}
+
+	return newService(spec, svc, gd.ormer, gd.Cluster, gd.pluginClient)
 }
 
 func (svc *Service) getUnit(nameOrID string) (*unit, error) {
@@ -46,7 +56,7 @@ func (svc *Service) getUnit(nameOrID string) (*unit, error) {
 		return nil, err
 	}
 
-	if u.ServiceID != svc.spec.ID {
+	if u.ServiceID != svc.svc.ID {
 		return nil, nil
 	}
 
@@ -54,7 +64,7 @@ func (svc *Service) getUnit(nameOrID string) (*unit, error) {
 }
 
 func (svc *Service) getUnits() ([]*unit, error) {
-	list, err := svc.so.ListUnitByServiceID(svc.spec.ID)
+	list, err := svc.so.ListUnitByServiceID(svc.svc.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -68,8 +78,62 @@ func (svc *Service) getUnits() ([]*unit, error) {
 	return units, nil
 }
 
-func (svc Service) Spec() structs.ServiceSpec {
-	return svc.spec
+func (svc Service) Spec() (*structs.ServiceSpec, error) {
+	if svc.spec != nil {
+		return svc.spec, nil
+	}
+
+	if svc.svc != nil && svc.so != nil {
+
+		var containers cluster.Containers
+		if svc.cluster != nil {
+			containers = svc.cluster.Containers()
+		}
+
+		info, err := svc.so.GetServiceInfo(svc.svc.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		spec := ConvertServiceInfo(info, containers)
+		svc.spec = &spec
+
+		return svc.spec, nil
+	}
+
+	return nil, errors.New("Service internal error")
+}
+
+func (svc Service) RefreshSpec() (*structs.ServiceSpec, error) {
+	var ID string
+
+	if svc.svc != nil {
+		ID = svc.svc.ID
+	} else if svc.spec != nil {
+		ID = svc.spec.ID
+	} else {
+		return nil, errors.New("Service with non ID")
+	}
+
+	if svc.so == nil {
+		return nil, errors.New("Service internal error")
+	}
+
+	var containers cluster.Containers
+	if svc.cluster != nil {
+		containers = svc.cluster.Containers()
+	}
+
+	info, err := svc.so.GetServiceInfo(ID)
+	if err != nil {
+		return nil, err
+	}
+
+	spec := ConvertServiceInfo(info, containers)
+	svc.spec = &spec
+	svc.svc = &info.Service
+
+	return &spec, nil
 }
 
 func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, authConfig *types.AuthConfig) (err error) {
@@ -116,7 +180,7 @@ func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, au
 		return nil
 	}
 
-	sl := tasklock.NewServiceTask(svc.spec.ID, svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusServiceContainerCreating, statusServiceContainerRunning, statusServiceContainerCreateFailed)
 
 	return sl.Run(func(val int) bool {
@@ -125,7 +189,7 @@ func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, au
 }
 
 func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, args map[string]interface{}) error {
-	sl := tasklock.NewServiceTask(svc.spec.ID, svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusInitServiceStarting, statusInitServiceStarted, statusInitServiceStartFailed)
 
 	val, err := sl.Load()
@@ -270,7 +334,7 @@ func (svc *Service) Start(ctx context.Context, cmds structs.Commands) error {
 		return nil
 	}
 
-	sl := tasklock.NewServiceTask(svc.spec.ID, svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusServiceStarting, statusServiceStarted, statusServiceStartFailed)
 
 	return sl.Run(isnotInProgress, start)
@@ -287,7 +351,7 @@ func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.Conf
 		return svc.updateConfigs(ctx, units, configs, args)
 	}
 
-	sl := tasklock.NewServiceTask(svc.spec.ID, svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusServiceConfigUpdating, statusServiceConfigUpdated, statusServiceConfigUpdateFailed)
 
 	return sl.Run(isnotInProgress, update)
@@ -353,7 +417,7 @@ func (svc *Service) Stop(ctx context.Context, containers bool) error {
 		return svc.stop(ctx, units, containers)
 	}
 
-	sl := tasklock.NewServiceTask(svc.spec.ID, svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusServiceStoping, statusServiceStoped, statusServiceStopFailed)
 
 	return sl.Run(isnotInProgress, stop)
@@ -430,12 +494,12 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) 
 			return err
 		}
 
-		err = svc.so.DelServiceRelation(svc.spec.ID, true)
+		err = svc.so.DelServiceRelation(svc.svc.ID, true)
 
 		return err
 	}
 
-	sl := tasklock.NewServiceTask(svc.spec.ID, svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusServiceDeleting, 0, statusServiceDeleteFailed)
 
 	sl.SetAfter(func(key string, val int, task *database.Task, t time.Time) error {
@@ -447,6 +511,23 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) 
 	})
 
 	return sl.Run(isnotInProgress, remove)
+}
+
+func (svc *Service) Compose(ctx context.Context, pc pluginapi.PluginAPI) error {
+	var opts map[string]interface{}
+
+	if svc.spec != nil {
+		opts = svc.spec.Options
+	}
+
+	spec, err := svc.RefreshSpec()
+	if err != nil {
+		return err
+	}
+
+	spec.Options = opts
+
+	return pc.ServiceCompose(ctx, *spec)
 }
 
 func (svc *Service) removeContainers(ctx context.Context, units []*unit, force, rmVolumes bool) error {
@@ -513,7 +594,7 @@ func (svc *Service) deregisterSerivces(ctx context.Context, reg kvstore.Register
 }
 
 func (svc *Service) Image() (database.Image, error) {
-	img, err := structs.ParseImage(svc.spec.Image)
+	img, err := structs.ParseImage(svc.svc.Desc.Image)
 	if err != nil {
 		return database.Image{}, err
 	}
@@ -522,17 +603,23 @@ func (svc *Service) Image() (database.Image, error) {
 }
 
 func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]interface{}) (structs.ConfigsMap, error) {
-	if len(args) > 0 {
-		if svc.spec.Options == nil {
-			svc.spec.Options = args
-		} else {
-			for key, val := range args {
-				svc.spec.Options[key] = val
-			}
+	if svc.spec != nil && len(svc.spec.Options) > 0 {
+
+		for key, val := range args {
+			svc.spec.Options[key] = val
 		}
+
+		args = svc.spec.Options
 	}
 
-	return svc.pc.GenerateServiceConfig(ctx, svc.spec)
+	spec, err := svc.RefreshSpec()
+	if err != nil {
+		return nil, err
+	}
+
+	spec.Options = args
+
+	return svc.pc.GenerateServiceConfig(ctx, *spec)
 }
 
 func (svc *Service) GenerateUnitsConfigs(ctx context.Context, args map[string]interface{}) (structs.ConfigsMap, error) {
@@ -544,5 +631,5 @@ func (svc *Service) generateUnitConfig(ctx context.Context, nameOrID string, arg
 }
 
 func (svc *Service) generateUnitsCmd(ctx context.Context) (structs.Commands, error) {
-	return svc.pc.GetCommands(ctx, svc.spec.ID)
+	return svc.pc.GetCommands(ctx, svc.svc.ID)
 }
