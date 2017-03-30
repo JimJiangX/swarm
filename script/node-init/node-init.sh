@@ -204,7 +204,8 @@ install_consul() {
 EOF
 
 	# copy binary file
-	cp ${cur_dir}/consul-agent-${consul_version}/bin/consul /usr/bin/consul; chmod 755 /usr/bin/consul
+	cp ${cur_dir}/consul-agent-${consul_version}/bin/consul /usr/bin/consul
+	chmod +x /usr/bin/consul
 
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/consul
@@ -430,13 +431,17 @@ init_docker() {
 
 # install docker plugin
 install_docker_plugin() {
-	local script_dir=/usr/local/logicalVolume_volume_plugin/scripts
+	local base_dir=/usr/local/logicalVolume-volume-plugin
+	local script_dir=$base_dir/scripts
+
+	mkdir -p ${base_dir}/bin
 	mkdir -p ${script_dir}
 
 	pkill -9 local-volume-plugin > /dev/null 2>&1
 
 	# copy binary file
-	cp ${cur_dir}/logicalVolume-volume-plugin-${logicalVolume_volume_plugin_version}/bin/logicalVolume_volume_plugin /usr/bin/logicalVolume_volume_plugin; chmod 755 /usr/bin/logicalVolume_volume_plugin
+	cp ${cur_dir}/logicalVolume-volume-plugin-${logicalVolume_volume_plugin_version}/bin/logicalVolume_volume_plugin $base_dir/bin/logicalVolume_volume_plugin
+	chmod +x /usr/bin/logicalVolume_volume_plugin
 
 	# copy script
 	cp ${cur_dir}/logicalVolume-volume-plugin-${logicalVolume_volume_plugin_version}/scripts/*.sh ${script_dir}
@@ -452,7 +457,7 @@ After=docker.service
 [Service]
 Restart=on-failure
 RestartSec=30s
-ExecStart=/usr/bin/logicalVolume_volume_plugin
+ExecStart=$base_dir/bin/logicalVolume_volume_plugin
 
 [Install]
 WantedBy=multi-user.target
@@ -484,10 +489,11 @@ install_swarm_agent() {
 	# copy script dir
 	mkdir -p ${script_dir}
 	cp -r ${cur_dir}/swarm-agent-${swarm_agent_version}/scripts/* ${script_dir}/
-	chmod +x ${script_dir}/*
+	chmod +x ${script_dir}/seed/net/* ${script_dir}/seed/san/*
 
 	# copy binary file
-	cp ${cur_dir}/swarm-agent-${swarm_agent_version}/bin/swarm $base_dir/swarm; chmod 755 $base_dir/swarm
+	cp ${cur_dir}/swarm-agent-${swarm_agent_version}/bin/swarm $base_dir/swarm 
+	chmod 755 $base_dir/swarm
 
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/swarm-agent

@@ -108,18 +108,17 @@ remove_docker() {
 }
 
 remove_docker_plugin() {
-	systemctl stop local-volume-plugin.service >/dev/null 2>&1
-	pkill -9 local-volume-plugin > /dev/null 2>&1
-	rm -rf /usr/local/local_volume_plugin
-	rm -rf /usr/bin/local_volume_plugin
-	rm -rf /usr/lib/systemd/system/local-volume-plugin.service
+	systemctl stop logicalVolume-volume-plugin.service >/dev/null 2>&1
+	pkill -9 logicalVolume-volume-plugin > /dev/null 2>&1
+	rm -rf /usr/local/logicalVolume-volume-plugin
+	rm -rf /usr/lib/systemd/system/logicalVolume-volume-plugin.service
 }
 
 remove_swarm_agent() {
 	# stop swarm-agent
 	systemctl stop swarm-agent.service >/dev/null 2>&1
 	pkill -9 swarm >/dev/null 2>&1
-	rm -rf /usr/bin/swarm
+	rm -rf /usr/local/swarm-agent
 	rm -rf /etc/sysconfig/swarm-agent
 	rm -rf /usr/lib/systemd/system/swarm-agent.service
 }
