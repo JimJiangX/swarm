@@ -47,7 +47,7 @@ do
     ;;
     *)
     echo "Syntax:"
-    echo "pipework -h <host_interface> -i <container_interface> -c <container> -ip <ip_addr>/<subnet>@<default_gateway> -v <vlan> [-b bandwidth]"
+    echo "init_nic.sh -h <host_interface> -i <container_interface> -c <container> -ip <ip_addr>/<subnet>@<default_gateway> -v <vlan> [-b bandwidth]"
     exit 1
     ;;
   esac
