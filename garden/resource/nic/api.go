@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/docker/swarm/seed/sdk"
@@ -17,18 +16,17 @@ import (
 	"golang.org/x/net/context"
 )
 
-func CreateNetworkDevice(ctx context.Context, addr string, c *cluster.Container, ips []database.IP, tlsConfig *tls.Config) error {
-	bond := c.Engine.Labels["ADM_NIC"]
+func CreateNetworkDevice(ctx context.Context, addr, container string, ips []database.IP, tlsConfig *tls.Config) error {
 
 	for i := range ips {
 		config := sdk.NetworkConfig{
-			Container:       c.ID,
-			HostDevice:      bond,
-			ContainerDevice: ips[i].Bond,
-			IPCIDR:          fmt.Sprintf("%s/%d", utils.Uint32ToIP(ips[i].IPAddr), ips[i].Prefix),
-			Gateway:         ips[i].Gateway,
-			VlanID:          ips[i].VLAN,
-			BandWidth:       ips[i].Bandwidth,
+			Container:  container,
+			HostDevice: ips[i].Bond,
+			// ContainerDevice: ips[i].Bond,
+			IPCIDR:    fmt.Sprintf("%s/%d", utils.Uint32ToIP(ips[i].IPAddr), ips[i].Prefix),
+			Gateway:   ips[i].Gateway,
+			VlanID:    ips[i].VLAN,
+			BandWidth: ips[i].Bandwidth,
 		}
 
 		err := postCreateNetwork(ctx, addr, config, tlsConfig)

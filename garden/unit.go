@@ -83,7 +83,7 @@ type unit struct {
 	u            database.Unit
 	uo           database.UnitOrmer
 	cluster      cluster.Cluster
-	startNetwork func(ctx context.Context, addr string, c *cluster.Container, ips []database.IP, tlsConfig *tls.Config) error
+	startNetwork func(ctx context.Context, addr, container string, ips []database.IP, tlsConfig *tls.Config) error
 }
 
 func newUnit(u database.Unit, uo database.UnitOrmer, cluster cluster.Cluster) *unit {
@@ -176,7 +176,7 @@ func (u unit) startContainer(ctx context.Context) error {
 		}
 		if len(ips) > 0 {
 			addr := net.JoinHostPort(c.Engine.IP, strconv.Itoa(ports.SwarmAgent))
-			err := u.startNetwork(ctx, addr, c, ips, nil)
+			err := u.startNetwork(ctx, addr, c.ID, ips, nil)
 			if err != nil {
 				return err
 			}
