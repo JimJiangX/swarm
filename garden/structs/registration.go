@@ -61,14 +61,15 @@ type ServiceRegistration struct {
 }
 
 type ConfigCmds struct {
-	ID        string
-	Name      string
-	Version   string
-	Content   string
-	LogMount  string
-	DataMount string
-	Cmds      CmdsMap
-	Timestamp int64
+	ID         string
+	Name       string
+	Version    string
+	Content    string
+	LogMount   string
+	DataMount  string
+	ConfigFile string `json:"config_file"`
+	Cmds       CmdsMap
+	Timestamp  int64
 
 	Registration ServiceRegistration
 }

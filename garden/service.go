@@ -2,6 +2,7 @@ package garden
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -14,8 +15,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
-
-var containerKV = "swarm/containers/"
 
 type Service struct {
 	so      database.ServiceOrmer
@@ -294,6 +293,8 @@ func saveContainerToKV(kvc kvstore.Client, c *cluster.Container) error {
 		return errors.Wrapf(err, "JSON marshal Container %s", c.Info.Name)
 	}
 
+	const containerKV = "/containers/"
+
 	err = kvc.PutKV(containerKV+c.ID, val)
 
 	return err
@@ -381,7 +382,8 @@ func (svc *Service) updateConfigs(ctx context.Context, units []*unit, configs st
 			continue
 		}
 
-		err := units[i].updateServiceConfig(ctx, config.DataMount, config.Content)
+		path := filepath.Join(config.DataMount, config.ConfigFile)
+		err := units[i].updateServiceConfig(ctx, path, config.Content)
 		if err != nil {
 			return err
 		}
