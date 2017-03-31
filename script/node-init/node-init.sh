@@ -49,6 +49,13 @@ else
 	exit 3
 fi
 
+# check container_nic
+container_nic=`ifconfig | grep -e 'container[0-9]\{1,3\}' | awk '{print $1}' | sed 's/://g' |  tr "\n" "," |sed 's/.$//'` 
+if [ $container_nic = '' ]; then
+	echo "not found container nic"
+	exit 2
+fi
+
 rpm_install() {
 	if [ "${release}" == "SUSE LINUX" ]; then
 		zypper --no-gpg-checks --non-interactive install nfs-utils curl sysstat mariadb-client ${PT}
@@ -269,8 +276,6 @@ install_docker() {
 	
 	wwn=${wwn:1}
 
-	# check container_nic
-	container_nic=`ifconfig | grep -e 'container[0-9]\{1,3\}' | awk '{print $1}' | sed 's/://g' |  tr "\n" "," |sed 's/.$//'` 
 
 	if [ "${release}" == "SUSE LINUX" ]; then
 		if [ "${wwn}" != '' ]; then
