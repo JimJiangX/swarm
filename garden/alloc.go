@@ -642,7 +642,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 		func(val int) bool {
 			return val == statusServcieBuilding
 		},
-		action)
+		action, false)
 
 	return ready, err
 }

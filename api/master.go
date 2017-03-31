@@ -93,9 +93,12 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/services/link": postServiceLink,
 		//		"/services/{name:.*}/rebuild": postServiceRebuild,
 		//		"/services/{name:.*}/backup":  postServiceBackup,
-		"/services/{name:.*}/scale":        postServiceScaled,
-		"/services/{name:.*}/update":       postServiceUpdate,
-		"/services/{name:.*}/image/update": postServiceVersionUpdate,
+		"/services/{name}/scale":         postServiceScaled,
+		"/services/{name}/update":        postServiceUpdate,
+		"/services/{name}/image/update":  postServiceVersionUpdate,
+		"/services/{name}/start":         postServiceStart,
+		"/services/{name}/stop":          postServiceStop,
+		"/services/{name}/config/update": postServiceUpdateConfigs,
 
 		//		"/services/{name:.*}/users": postServiceUsers,
 		//		// "/services/{name:.*}/service_config/update": postServiceConfig,
@@ -143,11 +146,6 @@ var masterRoutes = map[string]map[string]ctxHandler{
 
 		"/networkings/{name}/ips/enable":  putNetworkingEnable,
 		"/networkings/{name}/ips/disable": putNetworkingDisable,
-
-		"/services/{name}/start": putServiceStart,
-		"/services/{name}/stop":  putServiceStop,
-
-		"/services/{name}/config/update": putServiceUpdateConfigs,
 	},
 
 	http.MethodDelete: {

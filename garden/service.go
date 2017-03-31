@@ -183,17 +183,18 @@ func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, au
 
 	return sl.Run(func(val int) bool {
 		return val == statusServiceAllocated
-	}, run)
+	}, run, false)
 }
 
-func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, args map[string]interface{}) error {
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
+func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, task *database.Task, async bool, args map[string]interface{}) error {
+
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
 		statusInitServiceStarting, statusInitServiceStarted, statusInitServiceStartFailed)
 
 	val, err := sl.Load()
 	if err == nil {
 		if val > statusInitServiceStartFailed {
-			return svc.Start(ctx, configs.Commands())
+			return svc.Start(ctx, task, async, configs.Commands())
 		}
 	}
 
@@ -206,7 +207,7 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 
 	return sl.Run(check, func() error {
 		return svc.initStart(ctx, kvc, configs, args)
-	})
+	}, async)
 }
 
 func (svc *Service) initStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, args map[string]interface{}) error {
@@ -299,7 +300,7 @@ func saveContainerToKV(kvc kvstore.Client, c *cluster.Container) error {
 	return err
 }
 
-func (svc *Service) Start(ctx context.Context, cmds structs.Commands) error {
+func (svc *Service) Start(ctx context.Context, task *database.Task, detach bool, cmds structs.Commands) error {
 
 	start := func() error {
 		units, err := svc.getUnits()
@@ -334,13 +335,13 @@ func (svc *Service) Start(ctx context.Context, cmds structs.Commands) error {
 		return nil
 	}
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
 		statusServiceStarting, statusServiceStarted, statusServiceStartFailed)
 
-	return sl.Run(isnotInProgress, start)
+	return sl.Run(isnotInProgress, start, detach)
 }
 
-func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.ConfigsMap, args map[string]interface{}) (err error) {
+func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.ConfigsMap, args map[string]interface{}, task *database.Task, async bool) (err error) {
 
 	update := func() error {
 		units, err := svc.getUnits()
@@ -351,10 +352,10 @@ func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.Conf
 		return svc.updateConfigs(ctx, units, configs, args)
 	}
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
 		statusServiceConfigUpdating, statusServiceConfigUpdated, statusServiceConfigUpdateFailed)
 
-	return sl.Run(isnotInProgress, update)
+	return sl.Run(isnotInProgress, update, async)
 }
 
 // updateConfigs update units configurationFile,
@@ -406,7 +407,7 @@ func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[
 	return err
 }
 
-func (svc *Service) Stop(ctx context.Context, containers bool) error {
+func (svc *Service) Stop(ctx context.Context, containers, async bool, task *database.Task) error {
 
 	stop := func() error {
 		units, err := svc.getUnits()
@@ -417,10 +418,10 @@ func (svc *Service) Stop(ctx context.Context, containers bool) error {
 		return svc.stop(ctx, units, containers)
 	}
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
 		statusServiceStoping, statusServiceStoped, statusServiceStopFailed)
 
-	return sl.Run(isnotInProgress, stop)
+	return sl.Run(isnotInProgress, stop, async)
 }
 
 func (svc *Service) stop(ctx context.Context, units []*unit, containers bool) error {
@@ -510,7 +511,7 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) 
 		return nil
 	})
 
-	return sl.Run(isnotInProgress, remove)
+	return sl.Run(isnotInProgress, remove, false)
 }
 
 func (svc *Service) Compose(ctx context.Context, pc pluginapi.PluginAPI) error {

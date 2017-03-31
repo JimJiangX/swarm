@@ -142,7 +142,7 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *databas
 		return err
 	}
 
-	err = svc.InitStart(ctx, d.gd.KVClient(), nil, nil)
+	err = svc.InitStart(ctx, d.gd.KVClient(), nil, nil, false, nil)
 	if err != nil {
 		return err
 	}
@@ -306,7 +306,7 @@ func (d *Deployment) ServiceScale(ctx context.Context, nameOrID string, arch str
 	}
 }
 
-func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version string) (string, error) {
+func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version string, async bool) (string, error) {
 	orm := d.gd.Ormer()
 
 	im, err := orm.GetImageVersion(version)
@@ -340,7 +340,7 @@ func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version strin
 
 	t := database.NewTask(spec.Name, database.ServiceUpdateImageTask, spec.ID, "", "", 300)
 
-	err = svc.UpdateImage(ctx, d.gd.KVClient(), im, t, authConfig)
+	err = svc.UpdateImage(ctx, d.gd.KVClient(), im, &t, async, authConfig)
 	if err != nil {
 		return t.ID, err
 	}
@@ -364,6 +364,7 @@ func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config stru
 		return "", err
 	}
 
+	// TODO:save task status
 	t := database.NewTask(table.Name, database.ServiceUpdateTask, table.ID, string(out), "", 300)
 	actor := resource.NewAllocator(d.gd.Ormer(), d.gd.Cluster)
 
@@ -383,7 +384,7 @@ func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config stru
 			d.gd.Lock()
 			defer d.gd.Unlock()
 
-			return svc.ServiceUpdate(ctx, actor, int64(ncpu), memory, t)
+			return svc.ServiceUpdate(ctx, actor, int64(ncpu), memory)
 		}()
 
 		desc := *table.Desc

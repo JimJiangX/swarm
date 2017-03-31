@@ -18,7 +18,7 @@ import (
 )
 
 func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
-	im database.Image, task database.Task, authConfig *types.AuthConfig) error {
+	im database.Image, task *database.Task, async bool, authConfig *types.AuthConfig) error {
 
 	update := func() error {
 		units, err := svc.getUnits()
@@ -128,15 +128,15 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 		}
 	}
 
-	tl := tasklock.NewServiceTask(svc.svc.ID, svc.so, &task,
+	tl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
 		statusServiceImageUpdating,
 		statusServiceImageUpdated,
 		statusServiceImageUpdateFailed)
 
-	return tl.Run(isnotInProgress, update)
+	return tl.Run(isnotInProgress, update, async)
 }
 
-func (svc *Service) ServiceUpdate(ctx context.Context, actor allocator, ncpu, memory int64, task database.Task) error {
+func (svc *Service) ServiceUpdate(ctx context.Context, actor allocator, ncpu, memory int64) error {
 	type pending struct {
 		u      *unit
 		cpuset string

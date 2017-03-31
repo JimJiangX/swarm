@@ -27,7 +27,7 @@ func (svc *Service) ScaleDown(ctx context.Context, reg kvstore.Register, replica
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusServiceScaling, statusServiceScaled, statusServiceScaleFailed)
 
-	return sl.Run(isnotInProgress, scale)
+	return sl.Run(isnotInProgress, scale, false)
 }
 
 func (svc *Service) scaleDown(ctx context.Context, units []*unit, replicas int, reg kvstore.Register) error {

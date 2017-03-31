@@ -1236,7 +1236,7 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	d := deploy.New(gd)
 
-	id, err := d.ServiceUpdateImage(ctx, name, version)
+	id, err := d.ServiceUpdateImage(ctx, name, version, true)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -1285,7 +1285,7 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 }
 
-func putServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
 	ok, _, gd := fromContext(ctx, _Garden)
@@ -1302,16 +1302,26 @@ func putServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	err = svc.InitStart(ctx, gd.KVClient(), nil, nil)
+	spec, err := svc.Spec()
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	task := database.NewTask(spec.Name, database.ServiceStartTask, spec.ID, spec.Desc, "", 300)
+
+	err = svc.InitStart(ctx, gd.KVClient(), nil, &task, true, nil)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
 }
 
-func putServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
 	var req = struct {
@@ -1339,16 +1349,26 @@ func putServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.R
 		return
 	}
 
-	err = svc.UpdateUnitsConfigs(ctx, req.Configs, req.Args)
+	spec, err := svc.Spec()
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	task := database.NewTask(spec.Name, database.ServiceUpdateConfigTask, spec.ID, spec.Desc, "", 300)
+
+	err = svc.UpdateUnitsConfigs(ctx, req.Configs, req.Args, &task, true)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
 }
 
-func putServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
 	ok, _, gd := fromContext(ctx, _Garden)
@@ -1365,13 +1385,23 @@ func putServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = svc.Stop(ctx, false)
+	spec, err := svc.Spec()
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	task := database.NewTask(spec.Name, database.ServiceStopTask, spec.ID, spec.Desc, "", 300)
+
+	err = svc.Stop(ctx, false, true, &task)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
 }
 
 func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {

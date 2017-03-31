@@ -102,14 +102,14 @@ func (tl goTaskLock) setStatus(val int) error {
 }
 
 func (tl goTaskLock) Go(before func(val int) bool, do func() error) error {
-	return tl.run(before, do, false)
-}
-
-func (tl goTaskLock) Run(before func(val int) bool, do func() error) error {
 	return tl.run(before, do, true)
 }
 
-func (tl goTaskLock) run(before func(val int) bool, do func() error, sync bool) error {
+func (tl goTaskLock) Run(before func(val int) bool, do func() error, async bool) error {
+	return tl.run(before, do, async)
+}
+
+func (tl goTaskLock) run(before func(val int) bool, do func() error, async bool) error {
 	done, val, err := tl._CAS(before)
 	if err != nil {
 		return err
@@ -152,7 +152,7 @@ func (tl goTaskLock) run(before func(val int) bool, do func() error, sync bool) 
 		return do()
 	}
 
-	if sync {
+	if !async {
 		return action()
 	}
 
