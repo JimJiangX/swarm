@@ -65,7 +65,7 @@ nodes:
 }
 
 func (at allocator) isNodeStoreEnough(engine *cluster.Engine, stores []structs.VolumeRequire) (bool, error) {
-	drivers, err := at.findNodeVolumeDrivers(engine)
+	drivers, err := at.FindNodeVolumeDrivers(engine)
 	if err != nil {
 		return false, err
 	}
@@ -75,7 +75,7 @@ func (at allocator) isNodeStoreEnough(engine *cluster.Engine, stores []structs.V
 	return err == nil, err
 }
 
-func (at allocator) findNodeVolumeDrivers(engine *cluster.Engine) (volumeDrivers, error) {
+func (at allocator) FindNodeVolumeDrivers(engine *cluster.Engine) (volumeDrivers, error) {
 	if engine == nil {
 		return nil, errors.New("Engine is required")
 	}
@@ -89,8 +89,9 @@ func (at allocator) findNodeVolumeDrivers(engine *cluster.Engine) (volumeDrivers
 	if err != nil {
 		return nil, err
 	}
-
-	drivers = append(drivers, nd)
+	if nd != nil {
+		drivers = append(drivers, nd)
+	}
 
 	// TODO:third-part volumeDrivers
 
@@ -103,7 +104,7 @@ func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n
 		return nil, errors.Errorf("not found Engine by ID:%s from cluster", n.Addr)
 	}
 
-	drivers, err := at.findNodeVolumeDrivers(engine)
+	drivers, err := at.FindNodeVolumeDrivers(engine)
 	if err != nil {
 		return nil, err
 	}

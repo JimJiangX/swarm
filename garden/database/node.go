@@ -24,7 +24,8 @@ type NodeInterface interface {
 
 	ListNodes() ([]Node, error)
 
-	//	ListNodeByCluster(cluster string) ([]Node, error)
+	ListNodesByCluster(cluster string) ([]Node, error)
+
 	ListNodesByClusters(clusters []string, enable bool) ([]Node, error)
 
 	CountNodeByCluster(cluster string) (int, error)
@@ -203,7 +204,7 @@ func (db dbBase) ListNodes() ([]Node, error) {
 }
 
 // ListNodeByCluster returns nodes,select by cluster
-func (db dbBase) ListNodeByCluster(cluster string) ([]Node, error) {
+func (db dbBase) ListNodesByCluster(cluster string) ([]Node, error) {
 	var (
 		nodes []Node
 		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE cluster_id=?"
@@ -263,7 +264,7 @@ func (db dbBase) ListNodesByEngines(names []string) ([]Node, error) {
 // ListNodesByIDs returns nodes,select by ID.
 func (db dbBase) ListNodesByIDs(in []string, cluster string) ([]Node, error) {
 	if len(in) == 0 {
-		return db.ListNodeByCluster(cluster)
+		return db.ListNodesByCluster(cluster)
 	}
 
 	var (

@@ -13,6 +13,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
+	"github.com/docker/swarm/garden"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/deploy"
 	"github.com/docker/swarm/garden/resource"
@@ -529,7 +530,7 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // -----------------/hosts handlers-----------------
-func getNodeInfo(n database.Node, e *cluster.Engine) structs.NodeInfo {
+func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.NodeInfo {
 	info := structs.NodeInfo{
 		ID:           n.ID,
 		Cluster:      n.ClusterID,
@@ -544,6 +545,37 @@ func getNodeInfo(n database.Node, e *cluster.Engine) structs.NodeInfo {
 
 	if info.Engine.IP == "" {
 		info.Engine.IP = n.Addr
+	}
+
+	ator := resource.NewAllocator(gd.Ormer(), gd.Cluster)
+	drivers, err := ator.FindNodeVolumeDrivers(e)
+	if err != nil {
+		logrus.WithField("Node", n.Addr).Errorf("find Node VolumeDrivers error,%+v", err)
+	} else {
+		vds := make([]structs.VolumeDriver, 0, len(drivers))
+
+		for _, d := range drivers {
+			if d == nil {
+				continue
+			}
+
+			space, err := d.Space()
+			if err != nil {
+				logrus.WithField("Node", n.Addr).Errorf("get Node space,%+v", err)
+				continue
+			}
+
+			vds = append(vds, structs.VolumeDriver{
+				Total:  space.Total,
+				Free:   space.Free,
+				Name:   d.Name(),
+				Driver: d.Driver(),
+				Type:   d.Type(),
+				VG:     space.VG,
+			})
+		}
+
+		info.VolumeDrivers = vds
 	}
 
 	return info
@@ -567,12 +599,20 @@ func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	e := gd.Cluster.Engine(n.EngineID)
 
-	info := getNodeInfo(n, e)
+	info := getNodeInfo(gd, n, e)
 
 	writeJSON(w, info, http.StatusOK)
 }
 
 func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	name := r.FormValue("cluster")
+
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
 		gd.Ormer() == nil || gd.Cluster == nil {
@@ -581,9 +621,14 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var nodes []database.Node
 	engines := gd.Cluster.ListEngines()
 
-	nodes, err := gd.Ormer().ListNodes()
+	if name == "" {
+		nodes, err = gd.Ormer().ListNodes()
+	} else {
+		nodes, err = gd.Ormer().ListNodesByCluster(name)
+	}
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
 		return
@@ -601,7 +646,7 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		out = append(out, getNodeInfo(nodes[i], engine))
+		out = append(out, getNodeInfo(gd, nodes[i], engine))
 	}
 
 	writeJSON(w, out, http.StatusOK)

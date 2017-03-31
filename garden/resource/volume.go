@@ -7,7 +7,6 @@ import (
 	"io"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
@@ -54,6 +53,10 @@ func newNFSDriver(no database.NodeOrmer, engineID string) (volumeDriver, error) 
 	n, err := no.GetNode(engineID)
 	if err != nil {
 		return nil, err
+	}
+
+	if n.NFS.Addr == "" {
+		return nil, nil
 	}
 
 	sys, err := no.GetSysConfig()
@@ -337,14 +340,14 @@ func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label st
 	e.RLock()
 
 	vg, ok := e.Labels[label]
-	if !ok || strings.TrimSpace(vg) == "" {
+	if !ok || vg == "" {
 		e.RUnlock()
 
-		return nil, errors.New("not found label by key:" + label)
+		return nil, nil
 	}
 
 	size, ok := e.Labels[sizeLabel]
-	if !ok || strings.TrimSpace(size) == "" {
+	if !ok {
 		e.RUnlock()
 
 		return nil, errors.New("not found label by key:" + sizeLabel)
@@ -352,9 +355,13 @@ func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label st
 
 	e.RUnlock()
 
-	total, err := strconv.ParseInt(size, 10, 64)
-	if err != nil {
-		return &localVolume{}, errors.Wrapf(err, "parse VG %s:%s", sizeLabel, size)
+	var total int64
+	if size != "" {
+		t, err := strconv.ParseInt(size, 10, 64)
+		if err != nil {
+			return &localVolume{}, errors.Wrapf(err, "parse VG %s:%s", sizeLabel, size)
+		}
+		total = t
 	}
 
 	lvs, err := vo.ListVolumeByVG(vg)
@@ -385,14 +392,14 @@ func localVolumeDrivers(e *cluster.Engine, vo database.VolumeOrmer) (volumeDrive
 	drivers := make([]volumeDriver, 0, 4)
 
 	vd, err := volumeDriverFromEngine(vo, e, _HDDVGLabel)
-	if err == nil {
+	if err == nil && vd != nil {
 		drivers = append(drivers, vd)
 	} else {
 		logrus.Debugf("%s %s %+v", e.Name, _HDDVGLabel, err)
 	}
 
 	vd, err = volumeDriverFromEngine(vo, e, _SSDVGLabel)
-	if err == nil {
+	if err == nil && vd != nil {
 		drivers = append(drivers, vd)
 	} else {
 		logrus.Debugf("%s %s %+v", e.Name, _SSDVGLabel, err)
