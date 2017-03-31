@@ -146,7 +146,7 @@ func getmasterAndSlave(req *structs.ServiceSpec) (mnum int, snum int, err error)
 		return 0, 0, errors.New("bad format")
 	}
 	mnum, err = strconv.Atoi(master[1])
-	if err != nil || master[0] != "m" {
+	if err != nil || master[0] != "M" {
 		return 0, 0, errors.New("bad format")
 	}
 
@@ -156,7 +156,7 @@ func getmasterAndSlave(req *structs.ServiceSpec) (mnum int, snum int, err error)
 		return 0, 0, errors.New("bad format")
 	}
 	snum, err = strconv.Atoi(slave[1])
-	if err != nil || slave[0] != "s" {
+	if err != nil || slave[0] != "S" {
 		return 0, 0, errors.New("bad format")
 	}
 
