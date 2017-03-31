@@ -107,7 +107,7 @@ type ServiceSpec struct {
 
 	Arch Arch `json:"architecture"`
 
-	Require UnitRequire `json:"unit_require,omitempty"`
+	Require *UnitRequire `json:"unit_require,omitempty"`
 
 	Networkings []string `json:"networking_id,omitempty"`
 

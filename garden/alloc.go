@@ -147,7 +147,7 @@ func covertUnitNetwork(ips []database.IP) []structs.UnitIP {
 			Device:     ips[i].Bond,
 			IP:         utils.Uint32ToIP(ips[i].IPAddr).String(),
 			Gateway:    ips[i].Gateway,
-			Networking: ips[i].Gateway,
+			Networking: ips[i].Networking,
 		})
 	}
 
@@ -295,26 +295,30 @@ func getImage(orm database.ImageOrmer, version string) (database.Image, string, 
 
 func (gd *Garden) validServiceSpec(spec structs.ServiceSpec) error {
 	if spec.Arch.Replicas == 0 {
-		return errors.Errorf("replicas==0")
+		return errors.New("replicas==0")
+	}
+
+	if spec.Require == nil {
+		return errors.New("require UnitRequire")
 	}
 
 	return nil
 }
 
 func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Task, error) {
+	err := gd.validServiceSpec(spec)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	options := scheduleOption{
 		highAvailable: spec.HighAvailable,
-		require:       spec.Require,
+		require:       *spec.Require,
 	}
 
 	options.nodes.constraints = spec.Constraints
 	options.nodes.networkings = spec.Networkings
 	options.nodes.clusters = spec.Clusters
-
-	err := gd.validServiceSpec(spec)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	im, err := gd.ormer.GetImageVersion(spec.Image)
 	if err != nil {
