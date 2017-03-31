@@ -128,6 +128,10 @@ func getRedisPortBySpec(req *structs.ServiceSpec) (int, error) {
 
 	case int:
 		return value, nil
+	case float64:
+		return int(value), nil
+	case float32:
+		return int(value), nil
 	case int64:
 		return int(value), nil
 	case string:

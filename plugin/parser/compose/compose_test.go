@@ -53,7 +53,7 @@ func getMysqlSpecTest() *structs.ServiceSpec {
 }
 
 func TestOptions(t *testing.T) {
-	spec1 := &structs.ServiceSpec{Options: map[string]interface{}{"port": int64(6379)}}
+	spec1 := &structs.ServiceSpec{Options: map[string]interface{}{"port": float64(6379)}}
 	_, err := getRedisPortBySpec(spec1)
 	assert.Nil(t, err)
 
