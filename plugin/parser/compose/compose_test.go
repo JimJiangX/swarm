@@ -14,6 +14,8 @@ func getRedisSpecTest() *structs.ServiceSpec {
 			Code:     "m:3#s:0",
 		},
 
+		Options: map[string]interface{}{"port": 234},
+
 		Units: []structs.UnitSpec{
 			{
 				Networking: []structs.UnitIP{
@@ -21,11 +23,6 @@ func getRedisSpecTest() *structs.ServiceSpec {
 						IP: "192.168.4.141",
 					},
 				},
-				Ports: []structs.UnitPort{
-					{
-						Port: 6379,
-					},
-				},
 			},
 
 			{
@@ -34,22 +31,12 @@ func getRedisSpecTest() *structs.ServiceSpec {
 						IP: "192.168.4.141",
 					},
 				},
-				Ports: []structs.UnitPort{
-					{
-						Port: 6380,
-					},
-				},
 			},
 
 			{
 				Networking: []structs.UnitIP{
 					{
 						IP: "192.168.4.141",
-					},
-				},
-				Ports: []structs.UnitPort{
-					{
-						Port: 6381,
 					},
 				},
 			},
