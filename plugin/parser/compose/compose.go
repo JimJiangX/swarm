@@ -128,9 +128,12 @@ func getRedisPortBySpec(req *structs.ServiceSpec) (int, error) {
 
 	case int:
 		return value, nil
+	case int64:
+		return int(value), nil
 	case string:
 		return strconv.Atoi(value)
-
+	case int32:
+		return int(value), nil
 	default:
 		return -1, errors.New("unknown type")
 	}
