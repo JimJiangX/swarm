@@ -378,7 +378,7 @@ func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	name := mux.Vars(r)["name"]
 
 	ok, _, gd := fromContext(ctx, _Garden)
-	if !ok || gd == nil || gd.Ormer() == nil {
+	if !ok || gd == nil || gd.Ormer() == nil || gd.Cluster == nil {
 
 		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
 		return
@@ -534,7 +534,7 @@ func getNodeInfo(n database.Node, e *cluster.Engine) structs.NodeInfo {
 		ID:           n.ID,
 		Cluster:      n.ClusterID,
 		Room:         n.Room,
-		Seat:         n.Room,
+		Seat:         n.Seat,
 		MaxContainer: n.MaxContainer,
 		Enabled:      n.Enabled,
 		RegisterAt:   utils.TimeToString(n.RegisterAt),
