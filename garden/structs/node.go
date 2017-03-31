@@ -76,7 +76,18 @@ type NodeInfo struct {
 		Architecture string `json:"architecture"`
 	}
 
-	Containers []container `json:"container"`
+	Containers []container `json:"containers"`
+
+	VolumeDrivers []VolumeDriver `json:"volume_drivers"`
+}
+
+type VolumeDriver struct {
+	Total  int64  `json:"total"`
+	Free   int64  `json:"free"`
+	Name   string `json:"name"`
+	Driver string `json:"driver"`
+	Type   string `json:"type"`
+	VG     string `json:"VG"`
 }
 
 type container struct {
