@@ -160,10 +160,15 @@ func convertUnitInfoToSpec(info database.UnitInfo, container *cluster.Container)
 	lvs := make([]structs.VolumeSpec, 0, len(info.Volumes))
 
 	for i := range info.Volumes {
+		parts := strings.Split(info.Volumes[i].Name, "_")
+		var typ string
+		if len(parts) >= 2 {
+			typ = parts[len(parts)-2]
+		}
 		lvs = append(lvs, structs.VolumeSpec{
 			ID:      info.Volumes[i].ID,
 			Name:    info.Volumes[i].Name,
-			Type:    info.Volumes[i].VG,
+			Type:    typ,
 			Driver:  info.Volumes[i].Driver,
 			Size:    int(info.Volumes[i].Size),
 			Options: map[string]interface{}{"fstype": info.Volumes[i].Filesystem},
