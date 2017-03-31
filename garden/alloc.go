@@ -188,6 +188,7 @@ func convertUnitInfoToSpec(info database.UnitInfo, container *cluster.Container)
 
 	if container != nil {
 		spec.Config = container.Config
+		spec.Container = container.Container
 	}
 
 	return spec
@@ -242,6 +243,17 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 	svc := gd.NewService(&spec, &info.Service)
 
 	return svc, nil
+}
+
+func (gd *Garden) ServiceSpec(nameOrID string) (structs.ServiceSpec, error) {
+	info, err := gd.ormer.GetServiceInfo(nameOrID)
+	if err != nil {
+		return structs.ServiceSpec{}, err
+	}
+
+	spec := ConvertServiceInfo(info, gd.Cluster.Containers())
+
+	return spec, nil
 }
 
 func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, error) {

@@ -4,6 +4,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/cluster"
 )
 
@@ -80,7 +81,8 @@ type VolumeSpec struct {
 type UnitSpec struct {
 	Unit
 
-	Config *cluster.ContainerConfig
+	Container types.Container
+	Config    *cluster.ContainerConfig
 
 	Engine struct {
 		ID   string
