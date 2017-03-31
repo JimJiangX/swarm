@@ -64,6 +64,8 @@ type NodeInfo struct {
 		IsHealthy    bool   `json:"is_healthy"`
 		CPUs         int    `json:"cpus"`
 		Memory       int    `json:"memory"`
+		FreeCPUs     int    `json:"free_cpus"`
+		FreeMemory   int    `json:"free_memory"`
 		ID           string `json:"id"`
 		Name         string `json:"name"`
 		IP           string `json:"ip"`
@@ -117,10 +119,21 @@ func (n *NodeInfo) SetByEngine(e *cluster.Engine) {
 	n.Engine.Memory = int(e.Memory)
 	n.Engine.IsHealthy = e.IsHealthy()
 
+	var ncpu, memory int64
 	containers := e.Containers()
 	n.Containers = make([]container, len(containers))
 
 	for i, c := range containers {
 		n.Containers[i] = convertToContainer(c)
+		if c != nil && c.Config != nil {
+			num, err := c.Config.CountCPU()
+			if err == nil {
+				ncpu += num
+			}
+			memory += c.Config.HostConfig.Memory
+		}
 	}
+
+	n.Engine.FreeMemory = int(e.Memory - memory)
+	n.Engine.FreeCPUs = int(e.Cpus - ncpu)
 }
