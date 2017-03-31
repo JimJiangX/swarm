@@ -53,46 +53,47 @@ type Unit struct {
 }
 
 type UnitIP struct {
-	Prefix     int
-	VLAN       int
-	Bandwidth  int
-	Device     string
-	Name       string
-	IP         string
-	Proto      string
-	Gateway    string
-	Networking string
+	Prefix     int    `json:"prefix"`
+	VLAN       int    `json:"vlan"`
+	Bandwidth  int    `json:"bandwidth"`
+	Device     string `json:"device"`
+	Name       string `json:"name"`
+	IP         string `json:"ip_addr"`
+	Proto      string `json:"proto,omitempty"`
+	Gateway    string `json:"gateway"`
+	Networking string `json:"networking_id"`
 }
 
 type UnitPort struct {
-	Name string
-	Port int
+	Name string `json:"name,omitempty"`
+	Port int    `json:"port"`
 }
 
 type VolumeSpec struct {
-	ID      string
-	Name    string
-	Type    string
-	Driver  string
-	Size    int
-	Options map[string]interface{}
+	ID      string                 `json:"id"`
+	Name    string                 `json:"name"`
+	Type    string                 `json:"type"`
+	Driver  string                 `json:"driver"`
+	Size    int                    `json:"size"`
+	Options map[string]interface{} `json:"options"`
 }
 
 type UnitSpec struct {
-	Unit
+	Unit `json:"unit"`
 
-	Container types.Container
-	Config    *cluster.ContainerConfig
+	Container types.Container          `json:"container"`
+	Config    *cluster.ContainerConfig `json:"container_config,omitempty"`
 
 	Engine struct {
-		ID   string
-		Addr string
-	}
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		Addr string `json:"addr"`
+	} `json:"engine"`
 
-	Networking []UnitIP
-	Ports      []UnitPort
+	Networking []UnitIP   `json:"networkings"`
+	Ports      []UnitPort `json:"ports,omitempty"`
 
-	Volumes []VolumeSpec
+	Volumes []VolumeSpec `json:"volumes"`
 }
 
 type Arch struct {
@@ -106,17 +107,17 @@ type ServiceSpec struct {
 
 	Arch Arch `json:"architecture"`
 
-	Require UnitRequire `json:"unit_require"`
+	Require UnitRequire `json:"unit_require,omitempty"`
 
-	Networkings []string `json:"networking_id"`
+	Networkings []string `json:"networking_id,omitempty"`
 
-	Clusters []string `json:"cluster_id"`
+	Clusters []string `json:"cluster_id,omitempty"`
 
-	Constraints []string `json:"constraints"`
+	Constraints []string `json:"constraints,omitempty"`
 
 	Units []UnitSpec `json:"units"`
 
-	Users []User `json:"users"`
+	Users []User `json:"users,omitempty"`
 
 	Options map[string]interface{} `json:"opts"`
 }

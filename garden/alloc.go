@@ -174,10 +174,12 @@ func convertUnitInfoToSpec(info database.UnitInfo, container *cluster.Container)
 		Unit: structs.Unit(info.Unit),
 
 		Engine: struct {
-			ID   string
-			Addr string
+			ID   string `json:"id"`
+			Name string `json:"name"`
+			Addr string `json:"addr"`
 		}{
 			ID:   info.Engine.EngineID,
+			Name: "",
 			Addr: info.Engine.Addr,
 		},
 
@@ -189,6 +191,7 @@ func convertUnitInfoToSpec(info database.UnitInfo, container *cluster.Container)
 	if container != nil {
 		spec.Config = container.Config
 		spec.Container = container.Container
+		spec.Engine.Name = container.Engine.Name
 	}
 
 	return spec
@@ -264,7 +267,7 @@ func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, erro
 
 	containers := gd.Cluster.Containers()
 
-	out := make([]structs.ServiceSpec, len(list))
+	out := make([]structs.ServiceSpec, 0, len(list))
 
 	for i := range list {
 		spec := ConvertServiceInfo(list[i], containers)

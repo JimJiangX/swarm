@@ -428,17 +428,7 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 					return err
 				}
 			}
-
-			//			err = db.txDelUnitConfigByUnit(tx, units[i].ID)
-			//			if err != nil {
-			//				return err
-			//			}
 		}
-
-		//		err = db.txDelBackupStrategy(tx, serviceID)
-		//		if err != nil {
-		//			return err
-		//		}
 
 		err = db.txDelUnit(tx, serviceID)
 		if err != nil {

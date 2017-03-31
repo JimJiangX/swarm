@@ -62,7 +62,7 @@ func TestTask(t *testing.T) {
 		t.Errorf("%+v", err)
 	}
 
-	if len(out1) == len(out)+10 {
+	if len(out1) != len(out)+10 {
 		t.Errorf("%d", len(out1))
 	}
 
