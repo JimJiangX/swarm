@@ -89,7 +89,7 @@ func valicateCommonSpec(req *structs.ServiceSpec) error {
 	}
 	//unit ip
 	for _, unit := range req.Units {
-		if len(unit.Networking) == 0 || len(unit.Ports) == 0 {
+		if len(unit.Networking) == 0 {
 			errstr := fmt.Sprintf("the unit %s :addr len equal 0", unit.ContainerID)
 			return errors.New(errstr)
 		}
@@ -99,12 +99,35 @@ func valicateCommonSpec(req *structs.ServiceSpec) error {
 }
 
 func valicateMysqlSpec(req *structs.ServiceSpec) error {
+	//mysql user
 	_, err := getMysqlUser(req)
-	return err
+	if err != nil {
+		return err
+	}
+
+	//mysql port
+	port, ok := req.Options["port"]
+	if !ok {
+		return errors.New("bad req:mysql need Options[port]")
+	}
+
+	if _, ok := port.(int); !ok {
+		return errors.New("bad req:mysql Options[port] should  int type")
+	}
+	return nil
 
 }
 
 func valicateRedisSpec(req *structs.ServiceSpec) error {
+	//redis port
+	port, ok := req.Options["port"]
+
+	if !ok {
+		return errors.New("bad req:redis need Options[port]")
+	}
+	if _, ok := port.(int); !ok {
+		return errors.New("bad req:redis Options[port] should  int type")
+	}
 	return nil
 
 }
@@ -178,11 +201,12 @@ func getRedis(req *structs.ServiceSpec) []Redis {
 	for _, unit := range req.Units {
 
 		ip := unit.Networking[0].IP
-		port := unit.Ports[0].Port
+		port, _ := req.Options["port"]
+		intport, _ := port.(int)
 
 		redis := Redis{
 			Ip:   ip,
-			Port: port,
+			Port: intport,
 		}
 
 		redisslice = append(redisslice, redis)
@@ -201,13 +225,14 @@ func getMysqls(req *structs.ServiceSpec) []Mysql {
 		instance := unit.ContainerID
 
 		ip := unit.Networking[0].IP
-		port := unit.Ports[0].Port
+		port, _ := req.Options["port"]
+		intport, _ := port.(int)
 
 		mysql := Mysql{
 			MysqlUser: users,
 
 			IP:       ip,
-			Port:     port,
+			Port:     intport,
 			Instance: instance,
 		}
 
