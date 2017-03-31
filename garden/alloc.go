@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	stderr "errors"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
@@ -30,6 +32,10 @@ const (
 	seatLabel    = "seat"
 	nodeLabel    = "node"
 	clusterLabel = "cluster"
+)
+
+var (
+	errConvertServiceSpec = stderr.New("convert structs.ServiceSpec to database.Service")
 )
 
 type allocator interface {
@@ -70,7 +76,7 @@ func convertService(svc database.Service) structs.Service {
 func convertStructsService(spec structs.ServiceSpec) (database.Service, error) {
 	vb, err := json.Marshal(spec.Require.Volumes)
 	if err != nil {
-		return database.Service{}, errors.Wrap(err, "convert structs.Service")
+		return database.Service{}, errors.WithStack(err)
 	}
 
 	var nw = struct {
@@ -83,12 +89,16 @@ func convertStructsService(spec structs.ServiceSpec) (database.Service, error) {
 
 	nwb, err := json.Marshal(nw)
 	if err != nil {
-		return database.Service{}, errors.Wrap(err, "convert structs.Service")
+		return database.Service{}, errors.WithStack(err)
 	}
 
 	arch, err := json.Marshal(spec.Arch)
 	if err != nil {
-		return database.Service{}, errors.Wrap(err, "convert structs.Service")
+		return database.Service{}, errors.WithStack(err)
+	}
+	opts, err := json.Marshal(spec.Options)
+	if err != nil {
+		return database.Service{}, errors.WithStack(err)
 	}
 
 	desc := database.ServiceDesc{
@@ -102,6 +112,7 @@ func convertStructsService(spec structs.ServiceSpec) (database.Service, error) {
 		Volumes:      string(vb),
 		Networks:     string(nwb),
 		Clusters:     strings.Join(spec.Clusters, ","),
+		Options:      string(opts),
 		Previous:     "",
 	}
 
@@ -117,8 +128,7 @@ func convertStructsService(spec structs.ServiceSpec) (database.Service, error) {
 		BackupMaxSizeByte:    spec.BackupMaxSizeByte,
 		BackupFilesRetention: spec.BackupFilesRetention,
 		CreatedAt:            time.Now(),
-
-		Desc: &desc,
+		Desc:                 &desc,
 	}, nil
 }
 
@@ -198,10 +208,15 @@ func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers
 	r := strings.NewReader(info.Service.Desc.Architecture)
 	json.NewDecoder(r).Decode(&arch)
 
+	var opts map[string]interface{}
+	r1 := strings.NewReader(info.Service.Desc.Options)
+	json.NewDecoder(r1).Decode(&opts)
+
 	return structs.ServiceSpec{
 		Arch:    arch,
 		Service: convertService(info.Service),
 		Units:   units,
+		Options: opts,
 	}
 }
 

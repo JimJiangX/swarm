@@ -289,14 +289,16 @@ func (d *Deployment) ServiceScale(ctx context.Context, nameOrID string, arch str
 	{
 		desc := *table.Desc
 		desc.ID = utils.Generate32UUID()
+		desc.Replicas = arch.Replicas
+		desc.Previous = table.DescID
 
 		out, err := json.Marshal(arch)
 		if err == nil {
-			table.DescID = desc.ID
-			table.Desc = &desc
-			desc.Replicas = arch.Replicas
 			desc.Architecture = string(out)
 		}
+
+		table.DescID = desc.ID
+		table.Desc = &desc
 
 		err = orm.SetServiceDesc(table)
 
@@ -388,6 +390,7 @@ func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config stru
 		desc.ID = utils.Generate32UUID()
 		desc.NCPU = ncpu
 		desc.Memory = memory
+		desc.Previous = table.DescID
 
 		table.DescID = desc.ID
 		table.Desc = &desc

@@ -114,6 +114,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 			desc.ID = utils.Generate32UUID()
 			desc.Image = im.Version()
 			desc.ImageID = im.ImageID
+			desc.Previous = table.DescID
 
 			table.DescID = desc.ID
 			table.Desc = &desc

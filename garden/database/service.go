@@ -19,11 +19,8 @@ type ServiceInterface interface {
 	ListServices() ([]Service, error)
 
 	SetServiceStatus(nameOrID string, val int, finish time.Time) error
-	// SetServcieDesc(id, desc string, size int) error
 	ServiceStatusCAS(nameOrID string, val int, t *Task, f func(val int) bool) (bool, int, error)
 	SetServiceWithTask(nameOrID string, val int, t *Task, finish time.Time) error
-
-	//	SetServiceScale(svc Service, t Task) error
 
 	SetServiceDesc(svc Service) error
 }
@@ -606,6 +603,7 @@ type ServiceDesc struct {
 	Volumes      string `db:"volumes"`
 	Networks     string `db:"networks"`
 	Clusters     string `db:"cluster_id"`
+	Options      string `db:"options"`
 	Previous     string `db:"previous_version"`
 }
 
@@ -616,7 +614,7 @@ func (db dbBase) serviceDescTable() string {
 func (db dbBase) getServiceDesc(ID string) (ServiceDesc, error) {
 	var (
 		s     = ServiceDesc{}
-		query = "SELECT id,service_id,architecture,unit_num,cpu_num,mem_size,image_id,image_version,volumes,networks,cluster_id,previous_version FROM " + db.serviceDescTable() + " WHERE id=?"
+		query = "SELECT id,service_id,architecture,unit_num,cpu_num,mem_size,image_id,image_version,volumes,networks,cluster_id,options,previous_version FROM " + db.serviceDescTable() + " WHERE id=?"
 	)
 
 	err := db.Get(&s, query, ID)
@@ -631,7 +629,7 @@ func (db dbBase) getServiceDesc(ID string) (ServiceDesc, error) {
 func (db dbBase) listServiceDescs() ([]ServiceDesc, error) {
 	var (
 		out   []ServiceDesc
-		query = "SELECT id,service_id,architecture,unit_num,cpu_num,mem_size,image_id,image_version,volumes,networks,cluster_id,previous_version FROM " + db.serviceDescTable()
+		query = "SELECT id,service_id,architecture,unit_num,cpu_num,mem_size,image_id,image_version,volumes,networks,cluster_id,options,previous_version FROM " + db.serviceDescTable()
 	)
 
 	err := db.Select(&out, query)
@@ -648,7 +646,7 @@ func (db dbBase) listServiceDescs() ([]ServiceDesc, error) {
 func (db dbBase) listDescByService(ID string) ([]ServiceDesc, error) {
 	var (
 		out   []ServiceDesc
-		query = "SELECT id,service_id,architecture,unit_num,cpu_num,mem_size,image_id,image_version,volumes,networks,cluster_id,previous_version FROM " + db.serviceDescTable() + " WHERE service_id=?"
+		query = "SELECT id,service_id,architecture,unit_num,cpu_num,mem_size,image_id,image_version,volumes,networks,cluster_id,options,previous_version FROM " + db.serviceDescTable() + " WHERE service_id=?"
 	)
 
 	err := db.Select(&out, query, ID)
@@ -663,7 +661,7 @@ func (db dbBase) listDescByService(ID string) ([]ServiceDesc, error) {
 
 func (db dbBase) txInsertSerivceDesc(tx *sqlx.Tx, desc *ServiceDesc) error {
 
-	query := "INSERT INTO " + db.serviceDescTable() + " ( id,service_id,architecture,unit_num,cpu_num,mem_size,image_id,image_version,volumes,networks,cluster_id,previous_version ) VALUES ( :id,:service_id,:architecture,:unit_num,:cpu_num,:mem_size,:image_id,:image_version,:volumes,:networks,:cluster_id,:previous_version )"
+	query := "INSERT INTO " + db.serviceDescTable() + " ( id,service_id,architecture,unit_num,cpu_num,mem_size,image_id,image_version,volumes,networks,cluster_id,options,previous_version ) VALUES ( :id,:service_id,:architecture,:unit_num,:cpu_num,:mem_size,:image_id,:image_version,:volumes,:networks,:cluster_id,:options,:previous_version )"
 
 	_, err := tx.NamedExec(query, desc)
 	if err == nil {
