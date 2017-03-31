@@ -118,18 +118,29 @@ func valicateMysqlSpec(req *structs.ServiceSpec) error {
 
 }
 
-func valicateRedisSpec(req *structs.ServiceSpec) error {
-	//redis port
+func getRedisPortBySpec(req *structs.ServiceSpec) (int, error) {
 	port, ok := req.Options["port"]
-
 	if !ok {
-		return errors.New("bad req:redis need Options[port]")
+		return -1, errors.New("bad req:redis need Options[port]")
 	}
-	if _, ok := port.(int); !ok {
-		return errors.New("bad req:redis Options[port] should  int type")
-	}
-	return nil
 
+	switch value := port.(type) {
+
+	case int:
+		return value, nil
+	case string:
+		return strconv.Atoi(value)
+
+	default:
+		return -1, errors.New("unknown type")
+	}
+
+	return -1, errors.New("unknown type")
+}
+
+func valicateRedisSpec(req *structs.ServiceSpec) error {
+	_, err := getRedisPortBySpec(req)
+	return err
 }
 
 //check && get value
@@ -201,12 +212,11 @@ func getRedis(req *structs.ServiceSpec) []Redis {
 	for _, unit := range req.Units {
 
 		ip := unit.Networking[0].IP
-		port, _ := req.Options["port"]
-		intport, _ := port.(int)
+		port, _ := getRedisPortBySpec(req)
 
 		redis := Redis{
 			Ip:   ip,
-			Port: intport,
+			Port: port,
 		}
 
 		redisslice = append(redisslice, redis)
