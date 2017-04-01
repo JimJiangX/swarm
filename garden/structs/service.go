@@ -86,6 +86,7 @@ type UnitSpec struct {
 
 	Engine struct {
 		ID   string `json:"id"`
+		Node string `json:"node"`
 		Name string `json:"name"`
 		Addr string `json:"addr"`
 	} `json:"engine"`

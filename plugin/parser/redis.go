@@ -174,29 +174,34 @@ func (c redisConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 	//		} `json:"container"`
 	//	}
 
+	im, err := structs.ParseImage(c.template.Image)
+	if err != nil {
+		return structs.ServiceRegistration{}, err
+	}
+
 	reg := structs.HorusRegistration{}
 	reg.Service.Select = true
 	reg.Service.Name = spec.ID
-	reg.Service.Type = spec.Type
+	reg.Service.Type = "unit_" + im.Name
 	reg.Service.Tag = desc.ID
-	reg.Service.Container.Name = spec.Name
-	reg.Service.Container.HostName = spec.Engine.ID
+	reg.Service.Container.Name = spec.Container.ID
+	reg.Service.Container.HostName = spec.Engine.Node
 
-	var mon *structs.User
+	//	var mon *structs.User
 
-	if len(desc.Users) > 0 {
-		for i := range desc.Users {
-			if desc.Users[i].Role == "mon" {
-				mon = &desc.Users[i]
-				break
-			}
-		}
+	//	if len(desc.Users) > 0 {
+	//		for i := range desc.Users {
+	//			if desc.Users[i].Role == "mon" {
+	//				mon = &desc.Users[i]
+	//				break
+	//			}
+	//		}
 
-		if mon != nil {
-			reg.Service.MonitorUser = mon.Name
-			reg.Service.MonitorPassword = mon.Password
-		}
-	}
+	//		if mon != nil {
+	//			reg.Service.MonitorUser = mon.Name
+	//			reg.Service.MonitorPassword = mon.Password
+	//		}
+	//	}
 
 	return structs.ServiceRegistration{Horus: &reg}, nil
 }

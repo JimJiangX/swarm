@@ -204,13 +204,18 @@ func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 		return structs.ServiceRegistration{}, errors.Errorf("not found unit '%s' in service '%s'", id, desc.Name)
 	}
 
+	im, err := structs.ParseImage(c.template.Image)
+	if err != nil {
+		return structs.ServiceRegistration{}, err
+	}
+
 	reg := structs.HorusRegistration{}
 	reg.Service.Select = true
 	reg.Service.Name = spec.ID
-	reg.Service.Type = spec.Type
+	reg.Service.Type = "unit_" + im.Name
 	reg.Service.Tag = desc.ID
-	reg.Service.Container.Name = spec.Name
-	reg.Service.Container.HostName = spec.Engine.ID
+	reg.Service.Container.Name = spec.Container.ID
+	reg.Service.Container.HostName = spec.Engine.Node
 
 	var mon *structs.User
 

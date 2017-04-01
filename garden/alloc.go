@@ -50,238 +50,6 @@ type allocator interface {
 	RecycleResource() error
 }
 
-func convertService(svc database.Service) structs.Service {
-	if svc.Desc == nil {
-		svc.Desc = &database.ServiceDesc{}
-	}
-
-	return structs.Service{
-		ID:                   svc.ID,
-		Name:                 svc.Name,
-		Image:                svc.Desc.Image,
-		Desc:                 svc.DescID,
-		Architecture:         svc.Desc.Architecture,
-		Tag:                  svc.Tag,
-		AutoHealing:          svc.AutoHealing,
-		AutoScaling:          svc.AutoScaling,
-		HighAvailable:        svc.HighAvailable,
-		Status:               svc.Status,
-		BackupMaxSizeByte:    svc.BackupMaxSizeByte,
-		BackupFilesRetention: svc.BackupFilesRetention,
-		CreatedAt:            svc.CreatedAt.String(),
-		FinishedAt:           svc.FinishedAt.String(),
-	}
-}
-
-func convertStructsService(spec structs.ServiceSpec) (database.Service, error) {
-	vb, err := json.Marshal(spec.Require.Volumes)
-	if err != nil {
-		return database.Service{}, errors.WithStack(err)
-	}
-
-	var nw = struct {
-		NetworkingIDs []string
-		Require       []structs.NetDeviceRequire
-	}{
-		spec.Networkings,
-		spec.Require.Networks,
-	}
-
-	nwb, err := json.Marshal(nw)
-	if err != nil {
-		return database.Service{}, errors.WithStack(err)
-	}
-
-	arch, err := json.Marshal(spec.Arch)
-	if err != nil {
-		return database.Service{}, errors.WithStack(err)
-	}
-	opts, err := json.Marshal(spec.Options)
-	if err != nil {
-		return database.Service{}, errors.WithStack(err)
-	}
-
-	desc := database.ServiceDesc{
-		ID:           utils.Generate32UUID(),
-		ServiceID:    spec.ID,
-		Architecture: string(arch),
-		Replicas:     spec.Arch.Replicas,
-		NCPU:         spec.Require.Require.CPU,
-		Memory:       spec.Require.Require.Memory,
-		Image:        spec.Image,
-		Volumes:      string(vb),
-		Networks:     string(nwb),
-		Clusters:     strings.Join(spec.Clusters, ","),
-		Options:      string(opts),
-		Previous:     "",
-	}
-
-	return database.Service{
-		ID:                   spec.ID,
-		Name:                 spec.Name,
-		DescID:               desc.ID,
-		Tag:                  spec.Tag,
-		AutoHealing:          spec.AutoHealing,
-		AutoScaling:          spec.AutoScaling,
-		HighAvailable:        spec.HighAvailable,
-		Status:               spec.Status,
-		BackupMaxSizeByte:    spec.BackupMaxSizeByte,
-		BackupFilesRetention: spec.BackupFilesRetention,
-		CreatedAt:            time.Now(),
-		Desc:                 &desc,
-	}, nil
-}
-
-func covertUnitNetwork(ips []database.IP) []structs.UnitIP {
-	if len(ips) == 0 {
-		return []structs.UnitIP{}
-	}
-
-	out := make([]structs.UnitIP, 0, len(ips))
-
-	for i := range ips {
-		out = append(out, structs.UnitIP{
-			Prefix:     ips[i].Prefix,
-			VLAN:       ips[i].VLAN,
-			Bandwidth:  ips[i].Bandwidth,
-			Device:     ips[i].Bond,
-			IP:         utils.Uint32ToIP(ips[i].IPAddr).String(),
-			Gateway:    ips[i].Gateway,
-			Networking: ips[i].Networking,
-		})
-	}
-
-	return out
-
-}
-
-// TODO:convert to structs.UnitSpec
-func convertUnitInfoToSpec(info database.UnitInfo, container *cluster.Container) structs.UnitSpec {
-	lvs := make([]structs.VolumeSpec, 0, len(info.Volumes))
-
-	for i := range info.Volumes {
-		parts := strings.Split(info.Volumes[i].Name, "_")
-		var typ string
-		if len(parts) >= 2 {
-			typ = parts[len(parts)-2]
-		}
-		lvs = append(lvs, structs.VolumeSpec{
-			ID:      info.Volumes[i].ID,
-			Name:    info.Volumes[i].Name,
-			Type:    typ,
-			Driver:  info.Volumes[i].Driver,
-			Size:    int(info.Volumes[i].Size),
-			Options: map[string]interface{}{"fstype": info.Volumes[i].Filesystem},
-		})
-	}
-
-	spec := structs.UnitSpec{
-		Unit: structs.Unit(info.Unit),
-
-		Engine: struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
-			Addr string `json:"addr"`
-		}{
-			ID:   info.Engine.EngineID,
-			Name: "",
-			Addr: info.Engine.Addr,
-		},
-
-		Networking: covertUnitNetwork(info.Networkings),
-
-		Volumes: lvs,
-	}
-
-	if container != nil {
-		spec.Config = container.Config
-		spec.Container = container.Container
-		spec.Engine.Name = container.Engine.Name
-	}
-
-	return spec
-}
-
-func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers) structs.ServiceSpec {
-	units := make([]structs.UnitSpec, 0, len(info.Units))
-
-	for u := range info.Units {
-		var c *cluster.Container
-		if containers != nil {
-			c = containers.Get(info.Units[u].Unit.Name)
-		}
-		units = append(units, convertUnitInfoToSpec(info.Units[u], c))
-	}
-
-	arch := structs.Arch{}
-	r := strings.NewReader(info.Service.Desc.Architecture)
-	json.NewDecoder(r).Decode(&arch)
-
-	var opts map[string]interface{}
-	r1 := strings.NewReader(info.Service.Desc.Options)
-	json.NewDecoder(r1).Decode(&opts)
-
-	return structs.ServiceSpec{
-		Arch:    arch,
-		Service: convertService(info.Service),
-		Units:   units,
-		Options: opts,
-	}
-}
-
-func (gd *Garden) GetService(nameOrID string) (*Service, error) {
-	s, err := gd.ormer.GetService(nameOrID)
-	if err != nil {
-		return nil, err
-	}
-
-	svc := gd.NewService(nil, &s)
-
-	return svc, nil
-}
-
-func (gd *Garden) Service(nameOrID string) (*Service, error) {
-	info, err := gd.ormer.GetServiceInfo(nameOrID)
-	if err != nil {
-		return nil, err
-	}
-
-	spec := ConvertServiceInfo(info, gd.Cluster.Containers())
-
-	svc := gd.NewService(&spec, &info.Service)
-
-	return svc, nil
-}
-
-func (gd *Garden) ServiceSpec(nameOrID string) (structs.ServiceSpec, error) {
-	info, err := gd.ormer.GetServiceInfo(nameOrID)
-	if err != nil {
-		return structs.ServiceSpec{}, err
-	}
-
-	spec := ConvertServiceInfo(info, gd.Cluster.Containers())
-
-	return spec, nil
-}
-
-func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, error) {
-	list, err := gd.ormer.ListServicesInfo()
-	if err != nil {
-		return nil, err
-	}
-
-	containers := gd.Cluster.Containers()
-
-	out := make([]structs.ServiceSpec, 0, len(list))
-
-	for i := range list {
-		spec := ConvertServiceInfo(list[i], containers)
-		out = append(out, spec)
-	}
-
-	return out, nil
-}
-
 func getImage(orm database.ImageOrmer, version string) (database.Image, string, error) {
 	im, err := orm.GetImageVersion(version)
 	if err != nil {
@@ -298,7 +66,7 @@ func getImage(orm database.ImageOrmer, version string) (database.Image, string, 
 	return im, name, nil
 }
 
-func (gd *Garden) validServiceSpec(spec structs.ServiceSpec) error {
+func validServiceSpec(spec structs.ServiceSpec) error {
 	if spec.Arch.Replicas == 0 {
 		return errors.New("replicas==0")
 	}
@@ -311,7 +79,7 @@ func (gd *Garden) validServiceSpec(spec structs.ServiceSpec) error {
 }
 
 func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Task, error) {
-	err := gd.validServiceSpec(spec)
+	err := validServiceSpec(spec)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -611,6 +379,8 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			}
 
 			pu.config.SetSwarmID(pu.swarmID)
+			pu.config.Config.Labels[nodeLabel] = nodes[n].Labels[nodeLabel]
+			pu.config.Config.Labels[clusterLabel] = nodes[n].Labels[clusterLabel]
 			pu.Unit.EngineID = nodes[n].ID
 
 			err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[n].ID, pu.config)
