@@ -104,9 +104,14 @@ func convertToContainer(c *cluster.Container) container {
 		return container{}
 	}
 
+	name := c.Info.Name
+	if len(name) > 0 && name[0] == '/' {
+		name = name[1:]
+	}
+
 	return container{
 		ID:      c.ID,
-		Name:    c.Info.Name,
+		Name:    name,
 		Image:   c.Image,
 		Command: c.Command,
 		Created: c.Info.Created,
