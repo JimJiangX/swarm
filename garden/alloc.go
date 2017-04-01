@@ -134,7 +134,7 @@ func convertStructsService(spec structs.ServiceSpec) (database.Service, error) {
 
 func covertUnitNetwork(ips []database.IP) []structs.UnitIP {
 	if len(ips) == 0 {
-		return nil
+		return []structs.UnitIP{}
 	}
 
 	out := make([]structs.UnitIP, 0, len(ips))

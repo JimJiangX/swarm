@@ -128,6 +128,10 @@ func (m ConfigsMap) GetCmd(key, typ string) []string {
 }
 
 func (c ConfigsMap) Commands() Commands {
+	if len(c) == 0 {
+		return nil
+	}
+
 	cm := make(Commands)
 
 	for key, val := range c {

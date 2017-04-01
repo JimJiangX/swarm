@@ -547,6 +547,10 @@ func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.
 		info.Engine.IP = n.Addr
 	}
 
+	if e == nil {
+		return info
+	}
+
 	ator := resource.NewAllocator(gd.Ormer(), gd.Cluster)
 	drivers, err := ator.FindNodeVolumeDrivers(e)
 	if err != nil {

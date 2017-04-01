@@ -327,7 +327,7 @@ func (db dbBase) txSetServiceStatus(tx *sqlx.Tx, nameOrID string, status int, no
 func (db dbBase) SetServiceWithTask(nameOrID string, val int, t *Task, finish time.Time) error {
 	do := func(tx *sqlx.Tx) error {
 		err := db.txSetServiceStatus(tx, nameOrID, val, finish)
-		if err == nil {
+		if err != nil {
 			return err
 		}
 

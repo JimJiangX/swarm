@@ -147,6 +147,8 @@ func (tl goTaskLock) run(before func(val int) bool, do func() error, async bool)
 			if _err != nil {
 				logrus.WithField("key", tl.key).Errorf("go task lock:setStatus error,%+v", _err)
 			}
+
+			logrus.WithField("key", tl.key).Debug("task done!")
 		}()
 
 		return do()
