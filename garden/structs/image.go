@@ -59,6 +59,10 @@ func ParseImage(name string) (iv ImageVersion, err error) {
 		}
 	}
 
+	if err == nil {
+		return iv, nil
+	}
+
 	return iv, errors.Wrap(err, "parse image error,image:"+name)
 }
 

@@ -74,6 +74,9 @@ func (c *client) UploadDir(remote, local string) error {
 	cli := scp.NewSCP(c.c)
 
 	err := cli.SendDir(local, remote, nil)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "upload dir")
 }
@@ -83,6 +86,9 @@ func (c *client) UploadFile(remote, local string) error {
 	cli := scp.NewSCP(c.c)
 
 	err := cli.SendFile(local, remote)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "upload file")
 }
@@ -120,6 +126,9 @@ func (c *client) Exec(cmd string) ([]byte, error) {
 	defer session.Close()
 
 	out, err := session.CombinedOutput(cmd)
+	if err == nil {
+		return out, err
+	}
 
 	return out, errors.Wrap(err, "ssh command run error")
 }
@@ -131,6 +140,9 @@ func (c *client) Close() error {
 	}
 
 	err := c.c.Close()
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "close ssh client error")
 }

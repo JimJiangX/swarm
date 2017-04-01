@@ -106,7 +106,7 @@ type client struct {
 func NewClient(addr string, timeout time.Duration, tlsConfig *tls.Config) (ClientAPI, error) {
 
 	if err := checkAddr(addr); err != nil {
-		return nil, errors.Wrap(err, "CreateClient:checkAddr")
+		return nil, errors.Wrap(err, "checkAddr:"+addr)
 	}
 
 	cli := httpclient.NewClient(addr, timeout, tlsConfig)
@@ -220,11 +220,11 @@ func checkAddr(addr string) error {
 		return errors.Wrap(err, "please validate addr is in host:port form")
 	}
 	portNum, err := strconv.Atoi(port)
-	if err == nil {
+	if err != nil {
 		return errors.Wrap(err, "strconv.Atoi port fail")
 	}
 
-	if !(portNum > 0 && portNum <= 65535) {
+	if portNum <= 0 || portNum > 65535 {
 		return errors.Wrap(err, " port should:  portNum > 0 && portNum <= 65535")
 	}
 

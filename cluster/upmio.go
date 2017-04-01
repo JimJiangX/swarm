@@ -130,7 +130,7 @@ func (e *Engine) containerExecAttch(ctx context.Context, execID string, execConf
 	)
 	resp, err := e.apiClient.ContainerExecAttach(ctx, execID, execConfig)
 	if err != nil {
-		return errors.Wrap(err, "Container exec attch")
+		return errors.WithStack(err)
 	}
 	defer resp.Close()
 
@@ -148,7 +148,7 @@ func (e *Engine) getExecExitCode(ctx context.Context, execID string) (types.Cont
 	if err != nil {
 		// If we can't connect, then the daemon probably died.
 		if client.IsErrConnectionFailed(err) {
-			return types.ContainerExecInspect{}, -1, errors.Wrap(err, "Container exec inspect")
+			return types.ContainerExecInspect{}, -1, errors.WithStack(err)
 		}
 		return types.ContainerExecInspect{}, -1, nil
 	}
@@ -185,16 +185,14 @@ func holdHijackedConnection(ctx context.Context, tty bool, inputStream io.Reader
 	select {
 	case err := <-receiveStdout:
 		if err != nil {
-			logrus.Debugf("Error receiveStdout: %s", err)
-			return errors.Wrap(err, "hijack receiveStdout")
+			return errors.WithStack(err)
 		}
 	case <-stdinDone:
 		if outputStream != nil || errorStream != nil {
 			select {
 			case err := <-receiveStdout:
 				if err != nil {
-					logrus.Debugf("Error receiveStdout: %s", err)
-					return errors.Wrap(err, "hijack receiveStdout")
+					return errors.WithStack(err)
 				}
 			case <-ctx.Done():
 			}

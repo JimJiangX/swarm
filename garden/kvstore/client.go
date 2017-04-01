@@ -58,7 +58,7 @@ func MakeClient(config *api.Config, prefix, port string, tlsConfig *tls.Config) 
 	}
 	c, err := api.NewClient(config)
 	if err != nil {
-		return nil, errors.Wrap(err, "new consul api Client")
+		return nil, errors.WithStack(err)
 	}
 
 	leader, peers, err := getStatus(c, port)
@@ -176,7 +176,7 @@ func (c *kvClient) getClient(addr string) (string, *api.Client, error) {
 
 			addr = c.getLeader()
 			if addr == "" {
-				return "", nil, errors.Wrap(errUnavailableKVClient, "get KV client")
+				return "", nil, errors.WithStack(errUnavailableKVClient)
 			}
 		}
 	}

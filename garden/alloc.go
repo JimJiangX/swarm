@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	stderr "errors"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
@@ -32,10 +30,6 @@ const (
 	seatLabel    = "seat"
 	nodeLabel    = "node"
 	clusterLabel = "cluster"
-)
-
-var (
-	errConvertServiceSpec = stderr.New("convert structs.ServiceSpec to database.Service")
 )
 
 type allocator interface {
@@ -379,8 +373,6 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			}
 
 			pu.config.SetSwarmID(pu.swarmID)
-			pu.config.Config.Labels[nodeLabel] = nodes[n].Labels[nodeLabel]
-			pu.config.Config.Labels[clusterLabel] = nodes[n].Labels[clusterLabel]
 			pu.Unit.EngineID = nodes[n].ID
 
 			err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[n].ID, pu.config)

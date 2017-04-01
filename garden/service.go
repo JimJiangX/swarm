@@ -17,6 +17,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+// var errConvertServiceSpec = stderr.New("convert structs.ServiceSpec to database.Service")
+
 type Service struct {
 	so      database.ServiceOrmer
 	pc      pluginapi.PluginAPI

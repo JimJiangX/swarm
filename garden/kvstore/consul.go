@@ -2,7 +2,7 @@ package kvstore
 
 import (
 	"encoding/json"
-	stderrors "errors"
+	stderr "errors"
 	"fmt"
 	"net"
 
@@ -10,16 +10,16 @@ import (
 	"github.com/pkg/errors"
 )
 
-var errUnavailableKVClient = stderrors.New("non-available consul client")
+var errUnavailableKVClient = stderr.New("non-available consul client")
 
 func getStatus(c *api.Client, port string) (string, []string, error) {
 	if c == nil {
-		return "", nil, stderrors.New("apiClient is required")
+		return "", nil, stderr.New("apiClient is required")
 	}
 
 	leader, err := c.Status().Leader()
 	if err != nil {
-		return "", nil, errors.Wrap(err, "get leader")
+		return "", nil, errors.WithStack(err)
 	}
 
 	host, _, err := net.SplitHostPort(leader)
@@ -30,7 +30,7 @@ func getStatus(c *api.Client, port string) (string, []string, error) {
 
 	peers, err := c.Status().Peers()
 	if err != nil {
-		return "", nil, errors.Wrap(err, "get peers")
+		return "", nil, errors.WithStack(err)
 	}
 
 	addrs := make([]string, 0, len(peers))
@@ -76,8 +76,11 @@ func (c *kvClient) registerHealthCheck(host string, config api.AgentServiceRegis
 
 	err = client.Agent().ServiceRegister(&config)
 	c.checkConnectError(addr, err)
+	if err == nil {
+		return nil
+	}
 
-	return errors.Wrap(err, "register unit service")
+	return errors.WithStack(err)
 }
 
 func (c *kvClient) deregisterHealthCheck(host, ID string) error {
@@ -88,6 +91,9 @@ func (c *kvClient) deregisterHealthCheck(host, ID string) error {
 
 	err = client.Agent().ServiceDeregister(ID)
 	c.checkConnectError(addr, err)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "deregister healthCheck")
 }
@@ -103,7 +109,6 @@ func (c *kvClient) GetKV(key string) (*api.KVPair, error) {
 
 	val, _, err := client.KV().Get(key, nil)
 	c.checkConnectError(addr, err)
-
 	if err == nil {
 		return val, nil
 	}
@@ -121,7 +126,6 @@ func (c *kvClient) ListKV(key string) (api.KVPairs, error) {
 
 	val, _, err := client.KV().List(key, nil)
 	c.checkConnectError(addr, err)
-
 	if err == nil {
 		return val, nil
 	}
@@ -141,8 +145,11 @@ func (c *kvClient) PutKV(key string, val []byte) error {
 	}
 	_, err = client.KV().Put(pair, nil)
 	c.checkConnectError(addr, err)
+	if err == nil {
+		return nil
+	}
 
-	return errors.Wrap(err, "put KV")
+	return errors.WithStack(err)
 }
 
 func (c *kvClient) DeleteKVTree(key string) error {
@@ -155,6 +162,9 @@ func (c *kvClient) DeleteKVTree(key string) error {
 
 	_, err = client.KV().DeleteTree(key, nil)
 	c.checkConnectError(addr, err)
+	if err == nil {
+		return nil
+	}
 
 	return errors.Wrap(err, "delete KV Tree:"+key)
 }

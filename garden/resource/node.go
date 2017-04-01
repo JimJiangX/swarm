@@ -578,7 +578,7 @@ func (n *Node) nodeClean(ctx context.Context, client scplib.ScpClient, horus str
 	if err != nil {
 		logrus.Errorf("%s %s", srcFile, err)
 
-		return errors.Wrap(err, "get absolute path")
+		return errors.WithStack(err)
 	}
 
 	entry := logrus.WithFields(logrus.Fields{

@@ -165,8 +165,11 @@ func (c mysqlConfig) Marshal() ([]byte, error) {
 	}
 
 	data, err := ioutil.ReadFile(file.Name())
+	if err == nil {
+		return data, nil
+	}
 
-	return data, errors.Wrap(err, "read file")
+	return data, errors.WithStack(err)
 }
 
 //func (mysqlConfig) Requirement() structs.RequireResource {

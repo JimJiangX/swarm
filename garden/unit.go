@@ -139,13 +139,13 @@ func (u unit) getHostIP() (string, error) {
 		return parts[0], nil
 	}
 
-	return "", errors.Wrap(newContainerError(u.u.Name, "host IP is required"), "get host IP by unit")
+	return "", errors.WithStack(newContainerError(u.u.Name, "host IP is required"))
 }
 
 func (u unit) startContainer(ctx context.Context) error {
 	c := u.getContainer()
 	if c == nil {
-		return errors.Wrap(newNotFound("Container", u.u.Name), "container start")
+		return errors.WithStack(newNotFound("Container", u.u.Name))
 	}
 
 	select {
@@ -258,11 +258,11 @@ func (u unit) containerExec(ctx context.Context, cmd []string, detach bool) (typ
 	}
 	c := u.getContainer()
 	if c == nil {
-		return types.ContainerExecInspect{}, errors.Wrap(newContainerError(u.u.Name, "not found"), "container exec")
+		return types.ContainerExecInspect{}, errors.WithStack(newContainerError(u.u.Name, "not found"))
 	}
 
 	if !c.Info.State.Running {
-		return types.ContainerExecInspect{}, errors.Wrap(newContainerError(u.u.Name, "is not running"), "container exec")
+		return types.ContainerExecInspect{}, errors.WithStack(newContainerError(u.u.Name, "is not running"))
 	}
 
 	return c.Exec(ctx, cmd, detach)

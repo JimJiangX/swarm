@@ -57,10 +57,13 @@ func (c *switchManagerConfig) Marshal() ([]byte, error) {
 
 	err = c.config.SaveConfigFile(tmpfile.Name())
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	data, err := ioutil.ReadFile(tmpfile.Name())
+	if err == nil {
+		return data, nil
+	}
 
 	return data, errors.Wrap(err, "read file")
 }

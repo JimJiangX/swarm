@@ -45,7 +45,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 			c := u.getContainer()
 
 			if c == nil || c.Engine == nil {
-				return errors.Wrap(newContainerError(u.u.Name, "not found"), "rebuild container")
+				return errors.WithStack(newContainerError(u.u.Name, "not found"))
 			}
 			c.Config.Image = version
 
