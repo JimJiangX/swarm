@@ -29,8 +29,7 @@ const (
 
 type HorusRegistration struct {
 	Node struct {
-		Select bool `json:"-"`
-
+		Select     bool
 		Name       string
 		IPAddr     string   `json:"ip_addr"`
 		OSUser     string   `json:"os_user"`
@@ -40,8 +39,7 @@ type HorusRegistration struct {
 	}
 
 	Service struct {
-		Select bool `json:"-"`
-
+		Select          bool
 		Name            string
 		Type            string
 		MonitorUser     string `json:"mon_user"`

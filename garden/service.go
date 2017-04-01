@@ -211,7 +211,6 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 }
 
 func (svc *Service) initStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, args map[string]interface{}) error {
-
 	units, err := svc.getUnits()
 	if err != nil {
 		return err
@@ -222,12 +221,6 @@ func (svc *Service) initStart(ctx context.Context, kvc kvstore.Client, configs s
 		if err != nil {
 			return err
 		}
-	}
-
-	select {
-	default:
-	case <-ctx.Done():
-		return ctx.Err()
 	}
 
 	// start containers and update configs
@@ -245,30 +238,36 @@ func (svc *Service) initStart(ctx context.Context, kvc kvstore.Client, configs s
 		}
 	}
 
-	if kvc != nil {
-		// register to kv store and third-part services
-		for _, u := range units {
-			host, err := u.getHostIP()
-			if err != nil {
-				return err
-			}
+	return registerUnits(ctx, units, kvc, configs)
+}
 
-			err = saveContainerToKV(kvc, u.getContainer())
-			if err != nil {
-				return err
-			}
+func registerUnits(ctx context.Context, units []*unit, kvc kvstore.Client, configs structs.ConfigsMap) error {
+	if kvc == nil {
+		return nil
+	}
 
-			config, ok := configs.Get(u.u.ID)
-			if !ok {
-				return errors.Errorf("unit %s config is required", u.u.Name)
-			}
+	// register to kv store and third-part services
+	for _, u := range units {
+		host, err := u.getHostIP()
+		if err != nil {
+			return err
+		}
 
-			r := config.GetServiceRegistration()
+		err = saveContainerToKV(kvc, u.getContainer())
+		if err != nil {
+			return err
+		}
 
-			err = kvc.RegisterService(ctx, host, r)
-			if err != nil {
-				return err
-			}
+		config, ok := configs.Get(u.u.ID)
+		if !ok {
+			return errors.Errorf("unit %s config is required", u.u.Name)
+		}
+
+		r := config.GetServiceRegistration()
+
+		err = kvc.RegisterService(ctx, host, r)
+		if err != nil {
+			return err
 		}
 	}
 

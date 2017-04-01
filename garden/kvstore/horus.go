@@ -22,14 +22,17 @@ type result struct {
 	err error
 }
 
-func (c *kvClient) registerToHorus(ctx context.Context, obj ...structs.HorusRegistration) error {
+func (c *kvClient) registerToHorus(ctx context.Context, obj structs.HorusRegistration) error {
 	if ctx == nil {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(context.Background(), defaultTimeout)
 		defer cancel()
 	}
-	var addr string
-	ch := make(chan result, 1)
+
+	var (
+		addr string
+		ch   = make(chan result, 1)
+	)
 	go func(ch chan<- result) {
 		addr, err := c.GetHorusAddr()
 		ch <- result{
@@ -50,21 +53,19 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj ...structs.HorusRegi
 		return ctx.Err()
 	}
 
-	for i := range obj {
-		if obj[i].Node.Select {
-			uri := fmt.Sprintf("http://%s/v1/hosts", addr)
-			err := postRegister(ctx, uri, obj[i].Node)
-			if err != nil {
-				return err
-			}
-
+	if obj.Node.Select {
+		uri := fmt.Sprintf("http://%s/v1/hosts", addr)
+		err := postRegister(ctx, uri, obj.Node)
+		if err != nil {
+			return err
 		}
-		if obj[i].Service.Select {
-			uri := fmt.Sprintf("http://%s/v1/units", addr)
-			err := postRegister(ctx, uri, obj[i].Service)
-			if err != nil {
-				return err
-			}
+	}
+
+	if obj.Service.Select {
+		uri := fmt.Sprintf("http://%s/v1/units", addr)
+		err := postRegister(ctx, uri, obj.Service)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -176,13 +177,7 @@ func (c *kvClient) RegisterService(ctx context.Context, host string, config stru
 	}
 
 	if config.Horus != nil {
-		select {
-		default:
-			return c.registerToHorus(ctx, *config.Horus)
-
-		case <-ctx.Done():
-			return ctx.Err()
-		}
+		return c.registerToHorus(ctx, *config.Horus)
 	}
 
 	return nil
