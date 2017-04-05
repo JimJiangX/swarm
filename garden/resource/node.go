@@ -106,11 +106,11 @@ func (n Node) removeCondition() error {
 
 	if n.eng != nil {
 		if num := len(n.eng.Containers()); num > 0 {
-			errs = append(errs, fmt.Sprintf("%d containers exists in Node", num, n.node.Addr))
+			errs = append(errs, fmt.Sprintf("%d containers exists in Node %s", num, n.node.Addr))
 		}
 
 		if num := len(n.eng.Volumes()); num > 0 {
-			errs = append(errs, fmt.Sprintf("%d volumes exists in Node", num, n.node.Addr))
+			errs = append(errs, fmt.Sprintf("%d volumes exists in Node %s", num, n.node.Addr))
 		}
 	}
 
