@@ -207,6 +207,10 @@ func (db dbBase) AllocNetworking(unit, engine string, requires []NetworkingRequi
 				return errors.Wrap(err, "Tx get available IP")
 			}
 
+			if len(ips) < len(list) {
+				return errors.Errorf("not enough available []IP for allocation in Networking %s,%d<%d", len(ips), len(list), key)
+			}
+
 			for i := range list {
 				ips[i].UnitID = unit
 				ips[i].Engine = engine

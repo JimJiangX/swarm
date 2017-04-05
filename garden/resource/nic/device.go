@@ -88,32 +88,25 @@ func parseDevice(dev string) Device {
 	return d
 }
 
-func ParseTotalDevice(e *cluster.Engine) (map[string]Device, int, error) {
+func ParseEngineDevice(e *cluster.Engine) ([]string, int, error) {
 	if e == nil || len(e.Labels) == 0 {
 		return nil, 0, nil
 	}
 
-	devm := make(map[string]Device, len(e.Labels))
-	total := 0
-
-	for key, val := range e.Labels {
-		if key == _PFDevLabel {
-			n, err := parseBandwidth(val)
-			if err != nil {
-				return nil, 0, err
-			}
-
-			total = n
-
-		} else if key == _ContainerNIC {
-			devs := strings.Split(val, ",")
-			for i := range devs {
-				devm[devs[i]] = Device{
-					Bond: devs[i],
-				}
-			}
-		}
+	val, ok := e.Labels[_PFDevLabel]
+	if !ok {
+		return nil, 0, errors.Errorf("Engine Label:%s is required", _PFDevLabel)
 	}
 
-	return devm, total, nil
+	total, err := parseBandwidth(val)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	val, ok = e.Labels[_ContainerNIC]
+	if !ok {
+		return nil, total, errors.Errorf("Engine Label:%s is required", _ContainerNIC)
+	}
+
+	return strings.Split(val, ","), total, nil
 }

@@ -232,53 +232,45 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 		return nil, err
 	}
 
-	devm, width, err := nic.ParseTotalDevice(engine)
+	devices, width, err := nic.ParseEngineDevice(engine)
 	if err != nil {
 		return nil, err
 	}
 
+	list := make([]string, 0, len(devices))
+	for d := range devices {
+		found := false
+
+		for i := range used {
+			if used[i].Bond == devices[d] {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			list = append(list, devices[d])
+		}
+	}
+
 	for i := range used {
-		if used[i].Bandwidth > 0 {
-			width = width - used[i].Bandwidth
-
-			delete(devm, used[i].Bond)
-		}
+		width = width - used[i].Bandwidth
 	}
-
-	vnic := 0
 	for _, req := range requires {
-		if req.Bandwidth > 0 {
-			width = width - req.Bandwidth
-			vnic++
-		}
-	}
-
-	ready := make([]nic.Device, 0, vnic)
-	for _, dev := range devm {
-		if dev.IP == "" {
-			vnic--
-			ready = append(ready, dev)
-		}
-		if vnic == 0 {
-			break
-		}
+		width = width - req.Bandwidth
 	}
 
 	// check network device bandwidth and band
-	if width <= 0 || vnic > 0 {
+	if width < 0 || len(list) < len(requires) {
 		return nil, errors.Errorf("Engine:%s not enough Bandwidth for require", engine.Addr)
 	}
 
-	index := 0
 	in := make([]database.NetworkingRequire, 0, len(requires))
 	for i := range requires {
-		if requires[i].Bandwidth > 0 {
-			in = append(in, database.NetworkingRequire{
-				Bond:      ready[index].Bond,
-				Bandwidth: requires[i].Bandwidth,
-			})
-			index++
-		}
+		in = append(in, database.NetworkingRequire{
+			Bond:      list[i],
+			Bandwidth: requires[i].Bandwidth,
+		})
 	}
 
 	var out []database.IP
