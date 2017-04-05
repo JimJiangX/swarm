@@ -15,7 +15,6 @@ type UnitInterface interface {
 	ListUnitByServiceID(id string) ([]Unit, error)
 	ListUnitByEngine(id string) ([]Unit, error)
 
-	CountUnitByEngine(id string) (int, error)
 	CountUnitsInEngines(engines []string) (int, error)
 
 	InsertUnit(u Unit) error

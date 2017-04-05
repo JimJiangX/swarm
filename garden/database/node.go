@@ -29,6 +29,7 @@ type NodeInterface interface {
 	ListNodesByClusters(clusters []string, enable bool) ([]Node, error)
 
 	CountNodeByCluster(cluster string) (int, error)
+	CountUnitByEngine(id string) (int, error)
 
 	SetNodeEnable(string, bool) error
 	SetNodeParam(string, int) error

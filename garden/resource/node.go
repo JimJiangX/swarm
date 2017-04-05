@@ -97,6 +97,11 @@ func (n Node) getCluster() (*database.Cluster, error) {
 }
 
 func (n Node) removeCondition() error {
+	count, err := n.no.CountUnitByEngine(n.node.EngineID)
+	if err != nil || count > 0 {
+		return errors.Errorf("Node %s is in using(%d) or error happens,%+v", n.node.Addr, count, err)
+	}
+
 	return nil
 }
 
