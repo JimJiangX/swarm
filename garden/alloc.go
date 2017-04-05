@@ -468,7 +468,7 @@ func sortByCluster(nodes []*node.Node, clusters []string) [][]*node.Node {
 		}
 
 		if !exist {
-			list := make([]*node.Node, 1, len(nodes)-len(nodes)/len(clusters))
+			list := make([]*node.Node, 1, 1+len(nodes)-len(nodes)/len(clusters))
 			list[0] = nodes[i]
 
 			sets = append(sets, set{
