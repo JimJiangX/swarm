@@ -2,10 +2,12 @@ package garden
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
@@ -394,8 +396,20 @@ func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, au
 				return nil
 			}
 
-			for i := range pu.volumes {
-				_, err := eng.CreateVolume(&pu.volumes[i])
+			for _, lv := range pu.volumes {
+
+				v := volume.VolumesCreateBody{
+					Name:   lv.Name,
+					Driver: lv.Driver,
+					Labels: nil,
+					DriverOpts: map[string]string{
+						"size":   strconv.Itoa(int(lv.Size)),
+						"fstype": lv.Filesystem,
+						"vgname": lv.VG,
+					},
+				}
+
+				_, err := eng.CreateVolume(&v)
 				if err != nil {
 					return err
 				}

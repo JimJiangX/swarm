@@ -30,6 +30,7 @@ type ServiceInfoInterface interface {
 	ListServicesInfo() ([]ServiceInfo, error)
 
 	DelServiceRelation(serviceID string, rmVolumes bool) error
+	RecycleResource(ips []IP, lvs []Volume) error
 }
 
 type ServiceOrmer interface {
@@ -443,6 +444,33 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 		err = db.txDelDescByService(tx, serviceID)
 
 		return err
+	}
+
+	return db.txFrame(do)
+}
+
+func (db dbBase) RecycleResource(ips []IP, lvs []Volume) error {
+	for i := range ips {
+		ips[i].UnitID = ""
+		ips[i].Engine = ""
+		ips[i].Bandwidth = 0
+		ips[i].Bond = ""
+	}
+
+	do := func(tx *sqlx.Tx) error {
+		err := db.txSetIPs(tx, ips)
+		if err != nil {
+			return err
+		}
+
+		for i := range lvs {
+			err = db.txDelVolume(tx, lvs[i].ID)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 
 	return db.txFrame(do)

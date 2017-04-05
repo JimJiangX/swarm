@@ -10,7 +10,6 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/structs"
@@ -37,11 +36,11 @@ type allocator interface {
 
 	AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, ncpu, memory int64, reserved []string) (string, error)
 
-	AlloctVolumes(config *cluster.ContainerConfig, id string, n *node.Node, stores []structs.VolumeRequire) ([]volume.VolumesCreateBody, error)
+	AlloctVolumes(config *cluster.ContainerConfig, id string, n *node.Node, stores []structs.VolumeRequire) ([]database.Volume, error)
 
 	AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string, networkings []string, requires []structs.NetDeviceRequire) ([]database.IP, error)
 
-	RecycleResource() error
+	RecycleResource(ips []database.IP, lvs []database.Volume) error
 }
 
 func getImage(orm database.ImageOrmer, version string) (database.Image, string, error) {
@@ -236,11 +235,7 @@ type pendingUnit struct {
 
 	config      *cluster.ContainerConfig
 	networkings []database.IP
-	volumes     []volume.VolumesCreateBody
-}
-
-func (pu pendingUnit) convertToSpec() structs.UnitSpec {
-	return structs.UnitSpec{}
+	volumes     []database.Volume
 }
 
 func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service) (ready []pendingUnit, err error) {
@@ -308,7 +303,13 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			}
 			// cancel allocation
 			if len(bad) > 0 {
-				_err := actor.RecycleResource()
+				ips := make([]database.IP, 0, len(bad))
+				lvs := make([]database.Volume, 0, len(bad)*2)
+				for i := range bad {
+					ips = append(ips, bad[i].networkings...)
+					lvs = append(lvs, bad[i].volumes...)
+				}
+				_err := actor.RecycleResource(ips, lvs)
 				if _err != nil {
 					field.Errorf("Recycle resources error:%+v", _err)
 					err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
@@ -392,7 +393,7 @@ func pendingAlloc(actor allocator, unit database.Unit, node *node.Node, opts sch
 		Unit:        unit,
 		config:      config.DeepCopy(),
 		networkings: make([]database.IP, 0, 2),
-		volumes:     make([]volume.VolumesCreateBody, 0, 3),
+		volumes:     make([]database.Volume, 0, 3),
 	}
 
 	_, err := actor.AlloctCPUMemory(pu.config, node, int64(opts.require.Require.CPU), config.HostConfig.Memory, nil)
@@ -410,9 +411,9 @@ func pendingAlloc(actor allocator, unit database.Unit, node *node.Node, opts sch
 		return pu, err
 	}
 
-	volumes, err := actor.AlloctVolumes(pu.config, pu.Unit.ID, node, opts.require.Volumes)
-	if len(volumes) > 0 {
-		pu.volumes = append(pu.volumes, volumes...)
+	lvs, err := actor.AlloctVolumes(pu.config, pu.Unit.ID, node, opts.require.Volumes)
+	if len(lvs) > 0 {
+		pu.volumes = append(pu.volumes, lvs...)
 	}
 	if err != nil {
 		logrus.Debugf("AlloctVolumes:node=%s,%s", node.Name, err)

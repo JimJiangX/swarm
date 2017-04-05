@@ -301,8 +301,8 @@ func (vds volumeDrivers) isSpaceEnough(stores []structs.VolumeRequire) error {
 	return nil
 }
 
-func (vds volumeDrivers) AllocVolumes(config *cluster.ContainerConfig, uid string, stores []structs.VolumeRequire) ([]*database.Volume, error) {
-	volumes := make([]*database.Volume, 0, len(stores))
+func (vds volumeDrivers) AllocVolumes(config *cluster.ContainerConfig, uid string, stores []structs.VolumeRequire) ([]database.Volume, error) {
+	volumes := make([]database.Volume, 0, len(stores))
 
 	for i := range stores {
 		driver := vds.get(stores[i].Type)
@@ -312,7 +312,7 @@ func (vds volumeDrivers) AllocVolumes(config *cluster.ContainerConfig, uid strin
 
 		v, err := driver.Alloc(config, uid, stores[i])
 		if v != nil {
-			volumes = append(volumes, v)
+			volumes = append(volumes, *v)
 		}
 		if err != nil {
 			return volumes, err

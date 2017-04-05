@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/nic"
@@ -98,7 +97,7 @@ func (at allocator) FindNodeVolumeDrivers(engine *cluster.Engine) (volumeDrivers
 	return drivers, nil
 }
 
-func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n *node.Node, stores []structs.VolumeRequire) ([]volume.VolumesCreateBody, error) {
+func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n *node.Node, stores []structs.VolumeRequire) ([]database.Volume, error) {
 	engine := at.cluster.Engine(n.ID)
 	if engine == nil {
 		return nil, errors.Errorf("not found Engine by ID:%s from cluster", n.Addr)
@@ -115,26 +114,8 @@ func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n
 	}
 
 	lvs, err := drivers.AllocVolumes(config, uid, stores)
-	if err != nil {
-		return nil, err
-	}
 
-	volumes := make([]volume.VolumesCreateBody, len(lvs))
-
-	for i := range lvs {
-		volumes[i] = volume.VolumesCreateBody{
-			Name:   lvs[i].Name,
-			Driver: lvs[i].Driver,
-			Labels: nil,
-			DriverOpts: map[string]string{
-				"size":   strconv.Itoa(int(lvs[i].Size)),
-				"fstype": lvs[i].Filesystem,
-				"vgname": lvs[i].VG,
-			},
-		}
-	}
-
-	return volumes, nil
+	return lvs, err
 }
 
 func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, ncpu, memory int64, reserved []string) (string, error) {
@@ -171,8 +152,9 @@ func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.
 	return cpuset, nil
 }
 
-func (at allocator) RecycleResource() error {
-	return nil
+func (at allocator) RecycleResource(ips []database.IP, lvs []database.Volume) error {
+
+	return at.ormer.RecycleResource(ips, lvs)
 }
 
 func findIdleCPUs(used []string, total, ncpu int) (string, error) {
