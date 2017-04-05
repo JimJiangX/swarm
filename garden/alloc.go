@@ -243,8 +243,7 @@ func (pu pendingUnit) convertToSpec() structs.UnitSpec {
 	return structs.UnitSpec{}
 }
 
-func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service) ([]pendingUnit, error) {
-	ready := make([]pendingUnit, 0, svc.svc.Desc.Replicas)
+func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service) (ready []pendingUnit, err error) {
 
 	action := func() (err error) {
 		_, version, err := getImage(gd.Ormer(), svc.svc.Desc.Image)
@@ -282,15 +281,15 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 		defer gd.Unlock()
 
 		gd.scheduler.Lock()
-		nodes, err := gd.schedule(ctx, actor, config, opts)
+		candidates, err := gd.schedule(ctx, actor, config, opts)
 		if err != nil {
 			gd.scheduler.Unlock()
 			return err
 		}
 		gd.scheduler.Unlock()
 
-		if len(nodes) < svc.svc.Desc.Replicas {
-			return errors.Errorf("not enough nodes for allocation,%d<%d", len(nodes), svc.svc.Desc.Replicas)
+		if len(candidates) < svc.svc.Desc.Replicas {
+			return errors.Errorf("not enough nodes for allocation,%d<%d", len(candidates), svc.svc.Desc.Replicas)
 		}
 
 		units, err := svc.so.ListUnitByServiceID(svc.svc.ID)
@@ -299,9 +298,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 		}
 
 		var (
-			count = svc.svc.Desc.Replicas
-			bad   = make([]pendingUnit, 0, count)
-			used  = make([]*node.Node, 0, count)
+			bad   = make([]pendingUnit, 0, svc.svc.Desc.Replicas)
 			field = logrus.WithField("Service", svc.svc.Name)
 		)
 
@@ -331,82 +328,163 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 			return ctx.Err()
 		}
 
-		for n := range nodes {
+		out := sortByCluster(candidates, opts.nodes.clusters)
 
-			if !selectNodeInDifferentCluster(opts.highAvailable, svc.svc.Desc.Replicas, nodes[n], used) {
-				field.Debugf("highAvailable=%t node=%s,continue", opts.highAvailable, nodes[n].Name)
+		for _, nodes := range out {
+
+			count := svc.svc.Desc.Replicas
+			used := make([]pendingUnit, 0, count)
+
+			if len(nodes) < count {
 				continue
 			}
 
-			pu := pendingUnit{
-				swarmID:     units[count-1].ID,
-				Unit:        units[count-1],
-				config:      config.DeepCopy(),
-				networkings: make([]database.IP, 0, len(units)),
-				volumes:     make([]volume.VolumesCreateBody, 0, len(units)),
-			}
+			for i := range nodes {
 
-			_, err := actor.AlloctCPUMemory(pu.config, nodes[n], int64(opts.require.Require.CPU), config.HostConfig.Memory, nil)
-			if err != nil {
-				field.Debugf("AlloctCPUMemory:node=%s,%+v", nodes[n].Name, err)
-				continue
-			}
+				pu, err := pendingAlloc(actor, units[count-1], nodes[i], opts, config)
+				if err != nil {
+					bad = append(bad, pu)
+					field.Debugf("pending alloc:node=%s,%+v", nodes[i].Name, err)
+					continue
+				}
 
-			networkings, err := actor.AlloctNetworking(pu.config, nodes[n].ID, pu.Unit.ID, opts.nodes.networkings, opts.require.Networks)
-			if len(networkings) > 0 {
-				pu.networkings = append(pu.networkings, networkings...)
-			}
-			if err != nil {
-				bad = append(bad, pu)
-				field.Debugf("AlloctNetworking:node=%s,%+v", nodes[n].Name, err)
-				continue
-			}
+				pu.config.SetSwarmID(pu.swarmID)
+				pu.Unit.EngineID = nodes[i].ID
 
-			volumes, err := actor.AlloctVolumes(pu.config, pu.Unit.ID, nodes[n], opts.require.Volumes)
-			if len(volumes) > 0 {
-				pu.volumes = append(pu.volumes, volumes...)
+				err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[i].ID, pu.config)
+				if err != nil {
+					field.Debugf("AddPendingContainer:node=%s,%+v", nodes[i].Name, err)
+					continue
+				}
+
+				used = append(used, pu)
+
+				if count--; count == 0 {
+					ready = used
+
+					return nil
+				}
 			}
-			if err != nil {
-				bad = append(bad, pu)
-				field.Debugf("AlloctVolumes:node=%s,%+v", nodes[n].Name, err)
-				continue
-			}
-
-			pu.config.SetSwarmID(pu.swarmID)
-			pu.Unit.EngineID = nodes[n].ID
-
-			err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[n].ID, pu.config)
-			if err != nil {
-				field.Debugf("AddPendingContainer:node=%s,%+v", nodes[n].ID, err)
-				continue
-			}
-
-			ready = append(ready, pu)
-			used = append(used, nodes[n])
-
-			if count--; count == 0 {
-				break
+			if count > 0 {
+				bad = append(bad, used...)
 			}
 		}
 
-		if count > 0 {
-			bad = append(bad, ready...)
-			return errors.Errorf("not enough nodes for allocation,%d units waiting", count)
-		}
-
-		return err
+		return errors.Errorf("not enough nodes for allocation,%d units waiting", svc.svc.Desc.Replicas)
 	}
 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusServiceAllocating, statusServiceAllocated, statusServiceAllocateFailed)
 
-	err := sl.Run(
+	err = sl.Run(
 		func(val int) bool {
 			return val == statusServcieBuilding
 		},
 		action, false)
 
-	return ready, err
+	return
+}
+
+func pendingAlloc(actor allocator, unit database.Unit, node *node.Node, opts scheduleOption,
+	config *cluster.ContainerConfig) (pendingUnit, error) {
+	pu := pendingUnit{
+		swarmID:     unit.ID,
+		Unit:        unit,
+		config:      config.DeepCopy(),
+		networkings: make([]database.IP, 0, 2),
+		volumes:     make([]volume.VolumesCreateBody, 0, 3),
+	}
+
+	_, err := actor.AlloctCPUMemory(pu.config, node, int64(opts.require.Require.CPU), config.HostConfig.Memory, nil)
+	if err != nil {
+		logrus.Debugf("AlloctCPUMemory:node=%s,%s", node.Name, err)
+		return pu, err
+	}
+
+	networkings, err := actor.AlloctNetworking(pu.config, node.ID, pu.Unit.ID, opts.nodes.networkings, opts.require.Networks)
+	if len(networkings) > 0 {
+		pu.networkings = append(pu.networkings, networkings...)
+	}
+	if err != nil {
+		logrus.Debugf("AlloctNetworking:node=%s,%s", node.Name, err)
+		return pu, err
+	}
+
+	volumes, err := actor.AlloctVolumes(pu.config, pu.Unit.ID, node, opts.require.Volumes)
+	if len(volumes) > 0 {
+		pu.volumes = append(pu.volumes, volumes...)
+	}
+	if err != nil {
+		logrus.Debugf("AlloctVolumes:node=%s,%s", node.Name, err)
+	}
+
+	return pu, err
+}
+
+func sortByCluster(nodes []*node.Node, clusters []string) [][]*node.Node {
+	if len(nodes) == 0 || len(clusters) == 0 {
+		return nil
+	}
+
+	type set struct {
+		cluster string
+		nodes   []*node.Node
+	}
+
+	sets := make([]set, 0, len(clusters))
+
+	for i := range nodes {
+		if nodes[i] == nil {
+			continue
+		}
+
+		label := nodes[i].Labels[clusterLabel]
+
+		if label == "" {
+			continue
+		}
+
+		exist := false
+
+	cluster:
+		for c := range clusters {
+			if clusters[c] == label {
+				exist = true
+				break cluster
+			}
+		}
+		if !exist {
+			continue
+		}
+
+		exist = false
+	sets:
+		for k := range sets {
+			if sets[k].cluster == label {
+				sets[k].nodes = append(sets[k].nodes, nodes[i])
+				exist = true
+				break sets
+			}
+		}
+
+		if !exist {
+			list := make([]*node.Node, 1, len(nodes)-len(nodes)/len(clusters))
+			list[0] = nodes[i]
+
+			sets = append(sets, set{
+				cluster: label,
+				nodes:   list,
+			})
+		}
+	}
+
+	out := make([][]*node.Node, len(sets))
+
+	for i := range sets {
+		out[i] = sets[i].nodes
+	}
+
+	return out
 }
 
 func selectNodeInDifferentCluster(highAvailable bool, num int, n *node.Node, used []*node.Node) bool {
