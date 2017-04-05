@@ -97,12 +97,28 @@ func (n Node) getCluster() (*database.Cluster, error) {
 }
 
 func (n Node) removeCondition() error {
+	errs := make([]string, 0, 3)
+
 	count, err := n.no.CountUnitByEngine(n.node.EngineID)
 	if err != nil || count > 0 {
-		return errors.Errorf("Node %s is in using(%d) or error happens,%+v", n.node.Addr, count, err)
+		errs = append(errs, fmt.Sprintf("Node %s is in using(%d) or error happens,%+v", n.node.Addr, count, err))
 	}
 
-	return nil
+	if n.eng != nil {
+		if num := len(n.eng.Containers()); num > 0 {
+			errs = append(errs, fmt.Sprintf("%d containers exists in Node", num, n.node.Addr))
+		}
+
+		if num := len(n.eng.Volumes()); num > 0 {
+			errs = append(errs, fmt.Sprintf("%d volumes exists in Node", num, n.node.Addr))
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return errors.Errorf("warnings:%s", errs)
 }
 
 func (m master) getNode(nameOrID string) (Node, error) {
