@@ -48,6 +48,9 @@ func NewCompserBySpec(req *structs.ServiceSpec, mgmip string, mgmport int) (Comp
 		dbs := getRedis(req)
 		master, slave, _ := getmasterAndSlave(req)
 		return newRedisShadeManager(dbs, master, slave), nil
+
+	case CLONE:
+		return newCloneManager(), nil
 	}
 
 	return nil, errors.New("should not happen")
@@ -62,8 +65,13 @@ func valicateServiceSpec(req *structs.ServiceSpec) error {
 	switch arch {
 	case MYSQL_MS, MYSQL_MG:
 		return valicateMysqlSpec(req)
+
 	case REDIS_CLUSTER, REDIS_MS:
 		return valicateRedisSpec(req)
+
+	case CLONE:
+		return nil
+
 	case NONE:
 		return errors.New("not support the arch")
 	}
@@ -200,6 +208,10 @@ func getDbType(req *structs.ServiceSpec) DbArch {
 
 	if db == "mysql" && arch == "group_replication" {
 		return MYSQL_MG
+	}
+
+	if arch == "clone" {
+		return CLONE
 	}
 
 	log.WithFields(log.Fields{

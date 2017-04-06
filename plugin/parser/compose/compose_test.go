@@ -86,3 +86,19 @@ func TestRedis(t *testing.T) {
 	}
 
 }
+
+func TestClone(t *testing.T) {
+	spec := getRedisSpecTest()
+	spec.Arch.Mode = "clone"
+
+	composer, err := NewCompserBySpec(spec, "", 0)
+	//	assert.Nil(t, err)
+	if err != nil {
+		t.Skipf("get composer fail:%s", err.Error())
+	}
+
+	err = composer.ComposeCluster()
+	if err != nil {
+		t.Skipf("redis ComposeCluster:%+v", err)
+	}
+}
