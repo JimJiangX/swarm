@@ -46,14 +46,6 @@ func newService(spec *structs.ServiceSpec,
 	}
 }
 
-func (gd *Garden) NewService(spec *structs.ServiceSpec, svc *database.Service) *Service {
-	if spec == nil && svc == nil {
-		return nil
-	}
-
-	return newService(spec, svc, gd.ormer, gd.Cluster, gd.pluginClient)
-}
-
 func (svc *Service) getUnit(nameOrID string) (*unit, error) {
 	u, err := svc.so.GetUnit(nameOrID)
 	if err != nil {
@@ -319,59 +311,6 @@ func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers
 		Units:   units,
 		Options: opts,
 	}
-}
-
-func (gd *Garden) GetService(nameOrID string) (*Service, error) {
-	s, err := gd.ormer.GetService(nameOrID)
-	if err != nil {
-		return nil, err
-	}
-
-	svc := gd.NewService(nil, &s)
-
-	return svc, nil
-}
-
-func (gd *Garden) Service(nameOrID string) (*Service, error) {
-	info, err := gd.ormer.GetServiceInfo(nameOrID)
-	if err != nil {
-		return nil, err
-	}
-
-	spec := ConvertServiceInfo(info, gd.Cluster.Containers())
-
-	svc := gd.NewService(&spec, &info.Service)
-
-	return svc, nil
-}
-
-func (gd *Garden) ServiceSpec(nameOrID string) (structs.ServiceSpec, error) {
-	info, err := gd.ormer.GetServiceInfo(nameOrID)
-	if err != nil {
-		return structs.ServiceSpec{}, err
-	}
-
-	spec := ConvertServiceInfo(info, gd.Cluster.Containers())
-
-	return spec, nil
-}
-
-func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, error) {
-	list, err := gd.ormer.ListServicesInfo()
-	if err != nil {
-		return nil, err
-	}
-
-	containers := gd.Cluster.Containers()
-
-	out := make([]structs.ServiceSpec, 0, len(list))
-
-	for i := range list {
-		spec := ConvertServiceInfo(list[i], containers)
-		out = append(out, spec)
-	}
-
-	return out, nil
 }
 
 func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, authConfig *types.AuthConfig) (err error) {

@@ -2,6 +2,7 @@ package garden
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -87,6 +88,67 @@ func (gd *Garden) PluginClient() pluginapi.PluginAPI {
 
 func (gd *Garden) TLSConfig() *tls.Config {
 	return gd.tlsConfig
+}
+
+func (gd *Garden) NewService(spec *structs.ServiceSpec, svc *database.Service) *Service {
+	if spec == nil && svc == nil {
+		return nil
+	}
+
+	return newService(spec, svc, gd.ormer, gd.Cluster, gd.pluginClient)
+}
+
+func (gd *Garden) GetService(nameOrID string) (*Service, error) {
+	s, err := gd.ormer.GetService(nameOrID)
+	if err != nil {
+		return nil, err
+	}
+
+	svc := gd.NewService(nil, &s)
+
+	return svc, nil
+}
+
+func (gd *Garden) Service(nameOrID string) (*Service, error) {
+	info, err := gd.ormer.GetServiceInfo(nameOrID)
+	if err != nil {
+		return nil, err
+	}
+
+	spec := ConvertServiceInfo(info, gd.Cluster.Containers())
+
+	svc := gd.NewService(&spec, &info.Service)
+
+	return svc, nil
+}
+
+func (gd *Garden) ServiceSpec(nameOrID string) (structs.ServiceSpec, error) {
+	info, err := gd.ormer.GetServiceInfo(nameOrID)
+	if err != nil {
+		return structs.ServiceSpec{}, err
+	}
+
+	spec := ConvertServiceInfo(info, gd.Cluster.Containers())
+
+	return spec, nil
+}
+
+func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, error) {
+	list, err := gd.ormer.ListServicesInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	containers := gd.Cluster.Containers()
+
+	out := make([]structs.ServiceSpec, 0, len(list))
+
+	for i := range list {
+		spec := ConvertServiceInfo(list[i], containers)
+		out = append(out, spec)
+	}
+
+	return out, nil
 }
 
 // Register set Garden,returns a error if has registered in database
