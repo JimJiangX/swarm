@@ -154,15 +154,12 @@ func (c *Cluster) RemovePendingContainer(swarmID ...string) {
 func (c *Cluster) deleteEngine(addr string) bool {
 	engine := c.getEngineByAddr(addr)
 	if engine == nil {
-		return false
+		return true
 	}
 
 	// check engine whether healthy
-	if engine.IsHealthy() {
-		err := engine.RefreshContainers(false)
-		if err == nil {
-			return false
-		}
+	if engine.IsHealthy() && engine.RefreshContainers(false) == nil {
+		return false
 	}
 
 	return c.removeEngine(addr)
