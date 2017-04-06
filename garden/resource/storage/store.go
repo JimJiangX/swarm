@@ -5,11 +5,12 @@ import (
 	"sync"
 
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 )
 
 const (
-	scriptPath = "./script"
+	defaultScriptPath = "./script"
 	// HITACHI store vendor name
 	HITACHI = "HITACHI"
 	// HUAWEI store vendor name
@@ -74,15 +75,45 @@ type stores struct {
 	stores map[string]Store
 }
 
+func NewStores(script string, orm database.StorageOrmer) *stores {
+	if script == "" {
+		script = defaultScriptPath
+	}
+
+	return &stores{
+		script: script,
+		orm:    orm,
+		stores: make(map[string]Store),
+	}
+}
+
 // RegisterStore register a new remote storage system
 func (s *stores) AddStore(vendor, addr, user, password, admin string,
 	lstart, lend, hstart, hend int) (store Store, err error) {
 
 	switch strings.ToUpper(vendor) {
 	case HUAWEI:
-		store = NewHuaweiStore(s.orm, HUAWEI, addr, user, password, hstart, hend)
+		hs := database.HuaweiStorage{
+			ID:       utils.Generate32UUID(),
+			Vendor:   HUAWEI,
+			IPAddr:   addr,
+			Username: user,
+			Password: password,
+			HluStart: hstart,
+			HluEnd:   hend,
+		}
+		store = NewHuaweiStore(s.orm, s.script, hs)
 	case HITACHI:
-		store = NewHitachiStore(s.orm, HITACHI, admin, lstart, lend, hstart, hend)
+		hs := database.HitachiStorage{
+			ID:        utils.Generate32UUID(),
+			Vendor:    HITACHI,
+			AdminUnit: admin,
+			LunStart:  lstart,
+			LunEnd:    lend,
+			HluStart:  hstart,
+			HluEnd:    hend,
+		}
+		store = NewHitachiStore(s.orm, s.script, hs)
 	default:
 		return nil, errors.Errorf("unsupported Vendor '%s' yet", vendor)
 	}

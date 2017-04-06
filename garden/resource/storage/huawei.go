@@ -21,21 +21,13 @@ type huaweiStore struct {
 }
 
 // NewHuaweiStore returns a new huawei store
-func NewHuaweiStore(orm database.StorageOrmer, vendor, addr, user, password string, start, end int) Store {
+func NewHuaweiStore(orm database.StorageOrmer, script string, hw database.HuaweiStorage) Store {
 	return &huaweiStore{
-		lock: new(sync.RWMutex),
-		orm:  orm,
-		hs: database.HuaweiStorage{
-			ID:       utils.Generate64UUID(),
-			Vendor:   vendor,
-			IPAddr:   addr,
-			Username: user,
-			Password: password,
-			HluStart: start,
-			HluEnd:   end,
-		},
+		lock:   new(sync.RWMutex),
+		orm:    orm,
+		script: script,
+		hs:     hw,
 	}
-
 }
 
 func (h huaweiStore) ID() string {
@@ -51,7 +43,7 @@ func (h huaweiStore) Driver() string {
 }
 
 func (h *huaweiStore) Ping() error {
-	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "connect_test.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HUAWEI, "connect_test.sh")
 	if err != nil {
 		return errors.Wrap(err, "ping store:"+h.Vendor())
 	}
@@ -97,7 +89,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
 	}
 
-	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "create_lun.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HUAWEI, "create_lun.sh")
 	if err != nil {
 		return lun, lv, errors.Wrap(err, h.Vendor()+" store alloc")
 	}
@@ -172,7 +164,7 @@ func (h *huaweiStore) Extend(name string, size int) (database.LUN, database.Volu
 		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
 	}
 
-	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "create_lun.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HUAWEI, "create_lun.sh")
 	if err != nil {
 		return lun, lv, errors.Wrap(err, h.Vendor()+" store alloc")
 	}
@@ -232,7 +224,7 @@ func (h *huaweiStore) Recycle(id string, lun int) error {
 		return err
 	}
 
-	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "del_lun.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HUAWEI, "del_lun.sh")
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" recycle")
 	}
@@ -271,7 +263,7 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "add_host.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HUAWEI, "add_host.sh")
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" add host")
 	}
@@ -295,7 +287,7 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "del_host.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HUAWEI, "del_host.sh")
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" delete host")
 	}
@@ -340,7 +332,7 @@ func (h *huaweiStore) Mapping(host, vg, lun string) error {
 		return err
 	}
 
-	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "create_lunmap.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HUAWEI, "create_lunmap.sh")
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" lun mapping")
 	}
@@ -363,7 +355,7 @@ func (h *huaweiStore) DelMapping(lun string) error {
 		return err
 	}
 
-	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "del_lunmap.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HUAWEI, "del_lunmap.sh")
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" delete mapping")
 	}
@@ -437,7 +429,7 @@ func (h *huaweiStore) list(rg ...string) ([]Space, error) {
 		list = strings.Join(rg, " ")
 	}
 
-	path, err := utils.GetAbsolutePath(false, scriptPath, HUAWEI, "listrg.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HUAWEI, "listrg.sh")
 	if err != nil {
 		return nil, errors.Wrap(err, h.Vendor()+" list")
 	}

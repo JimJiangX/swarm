@@ -22,19 +22,12 @@ type hitachiStore struct {
 }
 
 // NewHitachiStore returns a new Store
-func NewHitachiStore(orm database.StorageOrmer, vendor, admin string, lstart, lend, hstart, hend int) Store {
+func NewHitachiStore(orm database.StorageOrmer, script string, hs database.HitachiStorage) Store {
 	return &hitachiStore{
-		lock: new(sync.RWMutex),
-		orm:  orm,
-		hs: database.HitachiStorage{
-			ID:        utils.Generate64UUID(),
-			Vendor:    vendor,
-			AdminUnit: admin,
-			LunStart:  lstart,
-			LunEnd:    lend,
-			HluStart:  hstart,
-			HluEnd:    hend,
-		},
+		lock:   new(sync.RWMutex),
+		orm:    orm,
+		script: script,
+		hs:     hs,
 	}
 }
 
@@ -55,7 +48,7 @@ func (h hitachiStore) Driver() string {
 
 // Ping connected to store,call connect_test.sh,test whether store available.
 func (h hitachiStore) Ping() error {
-	path, err := utils.GetAbsolutePath(false, scriptPath, HITACHI, "connect_test.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "connect_test.sh")
 	if err != nil {
 		return errors.Wrap(err, "ping hitachi store:"+h.Vendor())
 	}
@@ -116,7 +109,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 		return lun, lv, errors.New("no available LUN ID in store:" + h.Vendor())
 	}
 
-	path, err := utils.GetAbsolutePath(false, scriptPath, HITACHI, "create_lun.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "create_lun.sh")
 	if err != nil {
 		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
 	}
@@ -197,7 +190,7 @@ func (h *hitachiStore) Extend(name string, size int) (database.LUN, database.Vol
 		return lun, lv, errors.New("no available LUN ID in store:" + h.Vendor())
 	}
 
-	path, err := utils.GetAbsolutePath(false, scriptPath, HITACHI, "create_lun.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "create_lun.sh")
 	if err != nil {
 		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
 	}
@@ -249,7 +242,7 @@ func (h *hitachiStore) Recycle(id string, lun int) error {
 		return err
 	}
 
-	path, err := utils.GetAbsolutePath(false, scriptPath, HITACHI, "del_lun.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "del_lun.sh")
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" recycle")
 	}
@@ -317,7 +310,7 @@ func (h *hitachiStore) list(rg ...string) ([]Space, error) {
 		list = strings.Join(rg, " ")
 	}
 
-	path, err := utils.GetAbsolutePath(false, scriptPath, HITACHI, "listrg.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "listrg.sh")
 	if err != nil {
 		return nil, errors.Wrap(err, h.Vendor()+" list")
 	}
@@ -369,7 +362,7 @@ func (h hitachiStore) IdleSize() (map[string]int, error) {
 // AddHost register a host to store,calls add_host.sh,
 // the host able to connect with store and shared store space.
 func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
-	path, err := utils.GetAbsolutePath(false, scriptPath, HITACHI, "add_host.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "add_host.sh")
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" add host")
 	}
@@ -393,7 +386,7 @@ func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
 
 // DelHost deregister host,calls del_host.sh
 func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
-	path, err := utils.GetAbsolutePath(false, scriptPath, HITACHI, "del_host.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "del_host.sh")
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" delete host")
 	}
@@ -439,7 +432,7 @@ func (h *hitachiStore) Mapping(host, vg, lun string) error {
 		return err
 	}
 
-	path, err := utils.GetAbsolutePath(false, scriptPath, HITACHI, "create_lunmap.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "create_lunmap.sh")
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" mapping")
 	}
@@ -463,7 +456,7 @@ func (h *hitachiStore) DelMapping(lun string) error {
 		return err
 	}
 
-	path, err := utils.GetAbsolutePath(false, scriptPath, HITACHI, "del_lunmap.sh")
+	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "del_lunmap.sh")
 	if err != nil {
 		return errors.Wrap(err, h.Vendor()+" delete mapping")
 	}
