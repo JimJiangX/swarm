@@ -7,13 +7,56 @@ import (
 	"github.com/pkg/errors"
 )
 
-// const insertLUNQuery = "INSERT INTO tbl_dbaas_lun (id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at) VALUES (:id,:name,:vg_name,:raid_group_id,:storage_system_id,:mapping_hostname,:size,:host_lun_id,:storage_lun_id,:created_at)"
+type StorageInterface interface {
+	InsertLunSetVolume(lun LUN, lv Volume) error
+	InsertLunVolume(lun LUN, lv Volume) error
+
+	LunMapping(lun, host, vg string, hlun int) error
+	DelLunMapping(lun string) error
+
+	GetLUN(ID string) (LUN, error)
+	GetLunByLunID(systemID string, id int) (LUN, error)
+
+	ListLunByName(name string) ([]LUN, error)
+	ListLunByVG(vg string) ([]LUN, error)
+	CountLunByRaidGroupID(rg string) (int, error)
+
+	DelLUN(id string) error
+
+	ListHostLunIDByMapping(host string) ([]int, error)
+	ListLunIDBySystemID(id string) ([]int, error)
+
+	GetRaidGroup(id, rg string) (RaidGroup, error)
+	ListRGByStorageID(id string) ([]RaidGroup, error)
+
+	InsertRaidGroup(rg RaidGroup) error
+
+	SetRaidGroupStatus(ssid, rgid string, state bool) error
+	SetRGStatusByID(id string, state bool) error
+
+	DelRGCondition(storageID string) error
+	DelRaidGroup(id, rg string) error
+
+	InsertHitachiStorage(hs HitachiStorage) error
+	InsertHuaweiStorage(hs HuaweiStorage) error
+
+	GetStorageByID(id string) (*HitachiStorage, *HuaweiStorage, error)
+	ListStorageID() ([]string, error)
+
+	DelStorageByID(id string) error
+}
+
+type StorageOrmer interface {
+	VolumeOrmer
+
+	StorageInterface
+}
 
 // LUN is table structure,correspod with SAN storage LUN.
 type LUN struct {
 	ID              string    `db:"id"`
 	Name            string    `db:"name"`
-	VGName          string    `db:"vg_name"`
+	VG              string    `db:"vg_name"`
 	RaidGroupID     string    `db:"raid_group_id"`
 	StorageSystemID string    `db:"storage_system_id"`
 	MappingTo       string    `db:"mapping_hostname"`
@@ -37,7 +80,7 @@ func (db dbBase) txInsertLun(tx *sqlx.Tx, lun LUN) error {
 	return errors.Wrap(err, "Tx insert LUN")
 }
 
-func (db dbBase) InsertLunUpdateVolume(lun LUN, lv Volume) error {
+func (db dbBase) InsertLunSetVolume(lun LUN, lv Volume) error {
 	do := func(tx *sqlx.Tx) error {
 
 		err := db.txInsertLun(tx, lun)
@@ -58,9 +101,9 @@ func (db dbBase) InsertLunUpdateVolume(lun LUN, lv Volume) error {
 	return db.txFrame(do)
 }
 
-// InsertLUNAndVolume insert LUN and Volume in a Tx,
+// InsertLunVolume insert LUN and Volume in a Tx,
 // the LUN is to creating a Volume
-func (db dbBase) InsertLUNVolume(lun LUN, lv Volume) error {
+func (db dbBase) InsertLunVolume(lun LUN, lv Volume) error {
 	do := func(tx *sqlx.Tx) error {
 
 		err := db.txInsertLun(tx, lun)
@@ -74,18 +117,18 @@ func (db dbBase) InsertLUNVolume(lun LUN, lv Volume) error {
 	return db.txFrame(do)
 }
 
-// DelLunMapping delete a mapping record,set LUN VGName、MappingTo and HostLunID to be null
-func (db dbBase) DelLunMapping(lun, host, vgName string, hlun int) error {
+// DelLunMapping delete a mapping record,set LUN VG、MappingTo and HostLunID to be null
+func (db dbBase) DelLunMapping(lun string) error {
 
-	return db.LunMapping(lun, host, vgName, hlun)
+	return db.LunMapping(lun, "", "", 0)
 }
 
-// LunMapping sets LUN VGName、MappingTo、HostLunID value
-func (db dbBase) LunMapping(lun, host, vgName string, hlun int) error {
+// LunMapping sets LUN VG、MappingTo、HostLunID value
+func (db dbBase) LunMapping(lun, host, vg string, hlun int) error {
 
 	query := "UPDATE " + db.lunTable() + " SET vg_name=?,mapping_hostname=?,host_lun_id=? WHERE id=?"
 
-	_, err := db.Exec(query, vgName, host, hlun, lun)
+	_, err := db.Exec(query, vg, host, hlun, lun)
 	if err == nil {
 		return nil
 	}
@@ -93,7 +136,7 @@ func (db dbBase) LunMapping(lun, host, vgName string, hlun int) error {
 	return errors.WithStack(err)
 }
 
-// GetLUNByID returns LUN,select by ID
+// GetLUN returns LUN,select by ID
 func (db dbBase) GetLUN(ID string) (LUN, error) {
 	lun := LUN{}
 	query := "SELECT id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at FROM " + db.lunTable() + " WHERE id=?"
@@ -106,8 +149,8 @@ func (db dbBase) GetLUN(ID string) (LUN, error) {
 	return lun, errors.WithStack(err)
 }
 
-// ListLUNByName returns []LUN select by Name
-func (db dbBase) ListLUNByName(name string) ([]LUN, error) {
+// ListLunByName returns []LUN select by Name
+func (db dbBase) ListLunByName(name string) ([]LUN, error) {
 	var (
 		list  []LUN
 		query = "SELECT id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at FROM " + db.lunTable() + " WHERE name=?"
@@ -121,8 +164,8 @@ func (db dbBase) ListLUNByName(name string) ([]LUN, error) {
 	return nil, errors.Wrap(err, "list []LUN by Name")
 }
 
-// ListLUNByVG returns []LUN select by VGName
-func (db dbBase) ListLUNByVG(vg string) ([]LUN, error) {
+// ListLunByVG returns []LUN select by VG
+func (db dbBase) ListLunByVG(vg string) ([]LUN, error) {
 	var (
 		list  []LUN
 		query = "SELECT id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at FROM " + db.lunTable() + " WHERE vg_name=?"
@@ -136,8 +179,8 @@ func (db dbBase) ListLUNByVG(vg string) ([]LUN, error) {
 	return nil, errors.Wrap(err, "list []LUN by VG")
 }
 
-// GetLUNByLunID returns a LUN select by StorageLunID and StorageSystemID
-func (db dbBase) GetLUNByLunID(systemID string, id int) (LUN, error) {
+// GetLunByLunID returns a LUN select by StorageLunID and StorageSystemID
+func (db dbBase) GetLunByLunID(systemID string, id int) (LUN, error) {
 	lun := LUN{}
 	query := "SELECT id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at FROM " + db.lunTable() + " WHERE storage_system_id=? AND storage_lun_id=?"
 
@@ -149,8 +192,8 @@ func (db dbBase) GetLUNByLunID(systemID string, id int) (LUN, error) {
 	return lun, errors.Wrap(err, "get LUN by StorageSystemID and StorageLunID")
 }
 
-// CountLUNByRaidGroupID returns number of result select _lun by RaidGroup
-func (db dbBase) CountLUNByRaidGroupID(rg string) (int, error) {
+// CountLunByRaidGroupID returns number of result select _lun by RaidGroup
+func (db dbBase) CountLunByRaidGroupID(rg string) (int, error) {
 	count := 0
 	query := "SELECT COUNT(id) FROM " + db.lunTable() + " WHERE raid_group_id=?"
 
@@ -204,8 +247,6 @@ func (db dbBase) ListLunIDBySystemID(id string) ([]int, error) {
 
 	return nil, errors.Wrap(err, "list LUN StorageLunID by StorageSystemID")
 }
-
-// const insertRaidGroupQuery = "INSERT INTO tbl_dbaas_raid_group (id,storage_system_id,storage_rg_id,enabled) VALUES (:id,:storage_system_id,:storage_rg_id,:enabled)"
 
 // RaidGroup is table _raid_group structure,correspod with SNA RaidGroup,
 // RG is short of RaidGroup
@@ -327,8 +368,6 @@ func (db dbBase) DelRaidGroup(id, rg string) error {
 	return errors.Wrap(err, "Delete RaidGroup")
 }
 
-// const insertHitachiStorageQuery = "INSERT INTO tbl_dbaas_storage_HITACHI (id,vendor,admin_unit,lun_start,lun_end,hlu_start,hlu_end) VALUES (:id,:vendor,:admin_unit,:lun_start,:lun_end,:hlu_start,:hlu_end)"
-
 // HitachiStorage is table _storage_HITACHI structure,
 // correspod with HITACHI storage
 type HitachiStorage struct {
@@ -358,8 +397,6 @@ func (db dbBase) InsertHitachiStorage(hs HitachiStorage) error {
 	return errors.Wrap(err, "insert HITACHI Storage")
 }
 
-// const insertHuaweiStorageQuery = "INSERT INTO tbl_dbaas_storage_HUAWEI (id,vendor,ip_addr,username,password,hlu_start,hlu_end) VALUES (:id,:vendor,:ip_addr,:username,:password,:hlu_start,:hlu_end)"
-
 // HuaweiStorage is table _storage_HUAWEI structure,
 // correspod with HUAWEI storage
 type HuaweiStorage struct {
@@ -388,236 +425,6 @@ func (db dbBase) InsertHuaweiStorage(hs HuaweiStorage) error {
 
 	return errors.Wrap(err, "insert HUAWEI Storage")
 }
-
-//const insertLocalVolumeQuery = "INSERT INTO tbl_dbaas_volumes (id,name,unit_id,size,VGname,driver,fstype) VALUES (:id,:name,:unit_id,:size,:VGname,:driver,:fstype)"
-
-//// LocalVolume is table tbl_dbaas_volumes structure,
-//// correspod with host LV
-//type LocalVolume struct {
-//	Size       int    `db:"size"`
-//	ID         string `db:"id"`
-//	Name       string `db:"name"`
-//	UnitID     string `db:"unit_id"`
-//	VGName     string `db:"VGname"`
-//	Driver     string `db:"driver"`
-//	Filesystem string `db:"fstype"`
-//}
-
-//func (LocalVolume) tableName() string {
-//	return "tbl_dbaas_volumes"
-//}
-
-//// InsertLocalVolume insert a new LocalVolume
-//func InsertLocalVolume(lv LocalVolume) error {
-//	db, err := getDB(false)
-//	if err != nil {
-//		return err
-//	}
-
-//	_, err = db.NamedExec(insertLocalVolumeQuery, &lv)
-//	if err == nil {
-//		return nil
-//	}
-
-//	db, err = getDB(true)
-//	if err != nil {
-//		return err
-//	}
-
-//	_, err = db.NamedExec(insertLocalVolumeQuery, &lv)
-
-//	return errors.Wrap(err, "insert LocalVolume")
-//}
-
-//// UpdateLocalVolume update size of LocalVolume by name or ID
-//func UpdateLocalVolume(nameOrID string, size int) error {
-//	db, err := getDB(false)
-//	if err != nil {
-//		return err
-//	}
-
-//	const query = "UPDATE tbl_dbaas_volumes SET size=? WHERE id=? OR name=?"
-
-//	_, err = db.Exec(query, size, nameOrID, nameOrID)
-//	if err == nil {
-//		return nil
-//	}
-
-//	db, err = getDB(true)
-//	if err != nil {
-//		return err
-//	}
-
-//	_, err = db.Exec(query, size, nameOrID, nameOrID)
-
-//	return errors.Wrap(err, "update LocalVolume size")
-//}
-
-//// TxUpdateMultiLocalVolume update Size of LocalVolume by name or ID in a Tx
-//func TxUpdateMultiLocalVolume(lvs []LocalVolume) error {
-//	tx, err := GetTX()
-//	if err != nil {
-//		return err
-//	}
-//	defer tx.Rollback()
-
-//	stmt, err := tx.Preparex("UPDATE tbl_dbaas_volumes SET size=? WHERE id=?")
-//	if err != nil {
-//		return errors.Wrap(err, "Tx prepare update local Volume")
-//	}
-
-//	for _, lv := range lvs {
-//		_, err := stmt.Exec(lv.Size, lv.ID)
-//		if err != nil {
-//			stmt.Close()
-
-//			return errors.Wrap(err, "Tx update LocalVolume size")
-//		}
-//	}
-
-//	stmt.Close()
-
-//	err = tx.Commit()
-
-//	return errors.Wrap(err, "Tx update LocalVolume size")
-//}
-
-//// DeleteLocalVoume delete LocalVolume by name or ID
-//func DeleteLocalVoume(nameOrID string) error {
-//	db, err := getDB(false)
-//	if err != nil {
-//		return err
-//	}
-
-//	const query = "DELETE FROM tbl_dbaas_volumes WHERE id=? OR name=?"
-
-//	_, err = db.Exec(query, nameOrID, nameOrID)
-//	if err == nil {
-//		return nil
-//	}
-
-//	db, err = getDB(true)
-//	if err != nil {
-//		return err
-//	}
-
-//	_, err = db.Exec(query, nameOrID, nameOrID)
-
-//	return errors.Wrap(err, "delete LocalVolume by nameOrID")
-//}
-
-//// TxDeleteVolume delete LocalVolume by name or ID or UnitID
-//func TxDeleteVolume(tx *sqlx.Tx, nameOrID string) error {
-//	_, err := tx.Exec("DELETE FROM tbl_dbaas_volumes WHERE id=? OR name=? OR unit_id=?", nameOrID, nameOrID, nameOrID)
-
-//	return errors.Wrap(err, "Tx delete LocalVolume")
-//}
-
-//// TxDeleteVolumes delete []LocalVoume in a Tx.
-//func TxDeleteVolumes(volumes []LocalVolume) error {
-//	tx, err := GetTX()
-//	if err != nil {
-//		return err
-//	}
-
-//	defer tx.Rollback()
-
-//	stmt, err := tx.Preparex("DELETE FROM tbl_dbaas_volumes WHERE id=?")
-//	if err != nil {
-//		return errors.Wrap(err, "Tx prepare delete []LocalVolume")
-//	}
-
-//	for i := range volumes {
-//		_, err = stmt.Exec(volumes[i].ID)
-//		if err != nil {
-//			stmt.Close()
-
-//			return errors.Wrap(err, "Tx delete LocalVolume:"+volumes[i].ID)
-//		}
-//	}
-
-//	stmt.Close()
-
-//	err = tx.Commit()
-
-//	return errors.Wrap(err, "Tx delete []LocalVolume")
-//}
-
-//// GetLocalVolume returns LocalVolume select by name or ID
-//func GetLocalVolume(nameOrID string) (LocalVolume, error) {
-//	lv := LocalVolume{}
-
-//	db, err := getDB(false)
-//	if err != nil {
-//		return lv, err
-//	}
-
-//	const query = "SELECT id,name,unit_id,size,VGname,driver,fstype FROM tbl_dbaas_volumes WHERE id=? OR name=?"
-
-//	err = db.Get(&lv, query, nameOrID, nameOrID)
-//	if err == nil {
-//		return lv, nil
-//	}
-
-//	db, err = getDB(true)
-//	if err != nil {
-//		return lv, err
-//	}
-
-//	err = db.Get(&lv, query, nameOrID, nameOrID)
-
-//	return lv, errors.Wrap(err, "get LocalVolume by nameOrID")
-//}
-
-//// ListVolumeByVG returns []LocalVolume select by VGName
-//func ListVolumeByVG(name string) ([]LocalVolume, error) {
-//	db, err := getDB(false)
-//	if err != nil {
-//		return nil, err
-//	}
-
-//	var lvs []LocalVolume
-//	const query = "SELECT id,name,unit_id,size,VGname,driver,fstype FROM tbl_dbaas_volumes WHERE VGname=?"
-
-//	err = db.Select(&lvs, query, name)
-//	if err == nil {
-//		return lvs, nil
-//	}
-
-//	db, err = getDB(true)
-//	if err != nil {
-//		return nil, err
-//	}
-
-//	err = db.Select(&lvs, query, name)
-
-//	return lvs, errors.Wrap(err, "list []LocalVolume by VGName")
-//}
-
-//// ListVolumesByUnitID returns []LocalVolume select by UnitID
-//func ListVolumesByUnitID(id string) ([]LocalVolume, error) {
-//	db, err := getDB(false)
-//	if err != nil {
-//		return nil, err
-//	}
-
-//	var lvs []LocalVolume
-//	const query = "SELECT id,name,unit_id,size,VGname,driver,fstype FROM tbl_dbaas_volumes WHERE unit_id=?"
-
-//	err = db.Select(&lvs, query, id)
-//	if err == nil {
-//		return lvs, nil
-//	}
-
-//	db, err = getDB(true)
-//	if err != nil {
-//		return nil, err
-//	}
-
-//	err = db.Select(&lvs, query, id)
-
-//	return lvs, errors.Wrap(err, "list []LocalVolume by UnitID")
-//}
 
 // GetStorageByID returns *HitachiStorage or *HuaweiStorage,select by ID
 func (db dbBase) GetStorageByID(id string) (*HitachiStorage, *HuaweiStorage, error) {
