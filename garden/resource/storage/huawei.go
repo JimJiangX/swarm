@@ -21,7 +21,7 @@ type huaweiStore struct {
 }
 
 // NewHuaweiStore returns a new huawei store
-func NewHuaweiStore(orm database.StorageOrmer, script string, hw database.HuaweiStorage) Store {
+func newHuaweiStore(orm database.StorageOrmer, script string, hw database.HuaweiStorage) Store {
 	return &huaweiStore{
 		lock:   new(sync.RWMutex),
 		orm:    orm,

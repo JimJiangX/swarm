@@ -22,7 +22,7 @@ type hitachiStore struct {
 }
 
 // NewHitachiStore returns a new Store
-func NewHitachiStore(orm database.StorageOrmer, script string, hs database.HitachiStorage) Store {
+func newHitachiStore(orm database.StorageOrmer, script string, hs database.HitachiStorage) Store {
 	return &hitachiStore{
 		lock:   new(sync.RWMutex),
 		orm:    orm,

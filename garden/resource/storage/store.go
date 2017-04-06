@@ -102,7 +102,7 @@ func (s *stores) AddStore(vendor, addr, user, password, admin string,
 			HluStart: hstart,
 			HluEnd:   hend,
 		}
-		store = NewHuaweiStore(s.orm, s.script, hs)
+		store = newHuaweiStore(s.orm, s.script, hs)
 	case HITACHI:
 		hs := database.HitachiStorage{
 			ID:        utils.Generate32UUID(),
@@ -113,7 +113,7 @@ func (s *stores) AddStore(vendor, addr, user, password, admin string,
 			HluStart:  hstart,
 			HluEnd:    hend,
 		}
-		store = NewHitachiStore(s.orm, s.script, hs)
+		store = newHitachiStore(s.orm, s.script, hs)
 	default:
 		return nil, errors.Errorf("unsupported Vendor '%s' yet", vendor)
 	}
@@ -149,15 +149,9 @@ func (s *stores) GetStore(ID string) (Store, error) {
 	}
 
 	if hitachi != nil {
-		store = &hitachiStore{
-			lock: new(sync.RWMutex),
-			hs:   *hitachi,
-		}
+		store = newHitachiStore(s.orm, s.script, *hitachi)
 	} else if huawei != nil {
-		store = &huaweiStore{
-			lock: new(sync.RWMutex),
-			hs:   *huawei,
-		}
+		store = newHuaweiStore(s.orm, s.script, *huawei)
 	}
 
 	if store != nil {
@@ -167,6 +161,26 @@ func (s *stores) GetStore(ID string) (Store, error) {
 	}
 
 	return store, nil
+}
+
+func (s *stores) ListStores() ([]Store, error) {
+	ids, err := s.orm.ListStorageID()
+	if err != nil {
+		return nil, err
+	}
+
+	list := make([]Store, 0, len(ids))
+
+	for i := range ids {
+		store, err := s.GetStore(ids[i])
+		if err != nil {
+			return nil, err
+		}
+
+		list = append(list, store)
+	}
+
+	return list, nil
 }
 
 // RemoveStore removes the assigned store,
