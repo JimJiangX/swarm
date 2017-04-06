@@ -208,6 +208,7 @@ func (svc *Service) ServiceUpdate(ctx context.Context, actor allocator, ncpu, me
 			return err
 		}
 	}
+	// TODO:update units config
 
 	return nil
 }
