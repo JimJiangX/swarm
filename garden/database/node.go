@@ -15,6 +15,7 @@ type NodeOrmer interface {
 	NodeInterface
 	SysConfigOrmer
 	VolumeOrmer
+	StorageInterface
 }
 
 type NodeInterface interface {
@@ -47,6 +48,7 @@ type Node struct {
 	EngineID     string `db:"engine_id"`
 	Room         string `db:"room"`
 	Seat         string `db:"seat"`
+	Storage      string `db:"-"`
 	MaxContainer int    `db:"max_container"`
 	Status       int    `db:"status"`
 	Enabled      bool   `db:"enabled"`

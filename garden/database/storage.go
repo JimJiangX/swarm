@@ -14,7 +14,7 @@ type StorageInterface interface {
 	LunMapping(lun, host, vg string, hlun int) error
 	DelLunMapping(lun string) error
 
-	GetLUN(ID string) (LUN, error)
+	GetLUN(nameOrID string) (LUN, error)
 	GetLunByLunID(systemID string, id int) (LUN, error)
 
 	ListLunByName(name string) ([]LUN, error)
@@ -137,11 +137,11 @@ func (db dbBase) LunMapping(lun, host, vg string, hlun int) error {
 }
 
 // GetLUN returns LUN,select by ID
-func (db dbBase) GetLUN(ID string) (LUN, error) {
+func (db dbBase) GetLUN(nameOrID string) (LUN, error) {
 	lun := LUN{}
-	query := "SELECT id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at FROM " + db.lunTable() + " WHERE id=?"
+	query := "SELECT id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at FROM " + db.lunTable() + " WHERE id=? OR name=?"
 
-	err := db.Get(&lun, query, ID)
+	err := db.Get(&lun, query, nameOrID)
 	if err == nil {
 		return lun, nil
 	}
