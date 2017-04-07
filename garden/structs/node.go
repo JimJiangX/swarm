@@ -17,6 +17,7 @@ type GetClusterResponse struct {
 type Node struct {
 	Cluster string `json:"cluster_id"`
 	Addr    string `json:"addr"`
+	Storage string `json:"storage"`
 
 	SSHConfig
 	NFS

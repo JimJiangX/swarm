@@ -15,6 +15,7 @@ type NodeOrmer interface {
 	NodeInterface
 	SysConfigOrmer
 	VolumeOrmer
+	StorageInterface
 }
 
 type NodeInterface interface {
@@ -47,6 +48,7 @@ type Node struct {
 	EngineID     string `db:"engine_id"`
 	Room         string `db:"room"`
 	Seat         string `db:"seat"`
+	Storage      string `db:"storage"`
 	MaxContainer int    `db:"max_container"`
 	Status       int    `db:"status"`
 	Enabled      bool   `db:"enabled"`
@@ -72,7 +74,7 @@ func (db dbBase) nodeTable() string {
 func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 	do := func(tx *sqlx.Tx) error {
 
-		query := "INSERT INTO " + db.nodeTable() + " (id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts) VALUES (:id,:cluster_id,:admin_ip,:engine_id,:room,:seat,:max_container,:status,:enabled,:register_at,:nfs_ip,:nfs_dir,:nfs_mount_dir,:nfs_mount_opts)"
+		query := "INSERT INTO " + db.nodeTable() + " (id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts) VALUES (:id,:cluster_id,:admin_ip,:engine_id,:room,:seat,:storage,:max_container,:status,:enabled,:register_at,:nfs_ip,:nfs_dir,:nfs_mount_dir,:nfs_mount_opts)"
 
 		if len(nodes) == 1 {
 			_, err := tx.NamedExec(query, &nodes[0])
@@ -156,7 +158,7 @@ func (db dbBase) RegisterNode(n Node, t Task) error {
 func (db dbBase) GetNode(nameOrID string) (Node, error) {
 	var (
 		node  Node
-		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE id=? OR engine_id=?"
+		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE id=? OR engine_id=?"
 	)
 
 	err := db.Get(&node, query, nameOrID, nameOrID)
@@ -171,7 +173,7 @@ func (db dbBase) GetNode(nameOrID string) (Node, error) {
 func (db dbBase) GetNodeByAddr(addr string) (Node, error) {
 	var (
 		node  Node
-		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE admin_ip=?"
+		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE admin_ip=?"
 	)
 
 	addr, _, err := net.SplitHostPort(addr)
@@ -191,7 +193,7 @@ func (db dbBase) GetNodeByAddr(addr string) (Node, error) {
 func (db dbBase) ListNodes() ([]Node, error) {
 	var (
 		nodes []Node
-		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable()
+		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable()
 	)
 
 	err := db.Select(&nodes, query)
@@ -208,7 +210,7 @@ func (db dbBase) ListNodes() ([]Node, error) {
 func (db dbBase) ListNodesByCluster(cluster string) ([]Node, error) {
 	var (
 		nodes []Node
-		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE cluster_id=?"
+		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE cluster_id=?"
 	)
 
 	err := db.Select(&nodes, query, cluster)
@@ -244,7 +246,7 @@ func (db dbBase) ListNodesByEngines(names []string) ([]Node, error) {
 
 	var (
 		nodes []Node
-		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE engine_id IN (?);"
+		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE engine_id IN (?);"
 	)
 
 	query, args, err := sqlx.In(query, names)
@@ -270,7 +272,7 @@ func (db dbBase) ListNodesByIDs(in []string, cluster string) ([]Node, error) {
 
 	var (
 		nodes []Node
-		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE id IN (?);"
+		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE id IN (?);"
 	)
 
 	query, args, err := sqlx.In(query, in)
@@ -305,7 +307,7 @@ func (db dbBase) ListNodesByClusters(clusters []string, enable bool) ([]Node, er
 		return []Node{}, nil
 	}
 
-	query := "SELECT id,cluster_id,admin_ip,engine_id,room,seat,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE cluster_id IN (?) AND enabled=?;"
+	query := "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE cluster_id IN (?) AND enabled=?;"
 	query, args, err := sqlx.In(query, clusters, enable)
 	if err != nil {
 		return nil, errors.Wrap(err, "select []Node IN clusterIDs")

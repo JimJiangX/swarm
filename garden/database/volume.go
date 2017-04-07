@@ -50,6 +50,18 @@ func (db dbBase) InsertVolume(lv Volume) error {
 	return errors.Wrap(err, "insert Volume")
 }
 
+func (db dbBase) txInsertVolume(tx *sqlx.Tx, lv Volume) error {
+
+	query := "INSERT INTO " + db.volumeTable() + " (id,name,unit_id,size,vg,driver,fstype) VALUES (:id,:name,:unit_id,:size,:vg,:driver,:fstype)"
+
+	_, err := tx.NamedExec(query, lv)
+	if err == nil {
+		return nil
+	}
+
+	return errors.Wrap(err, "tx insert Volume")
+}
+
 // InsertVolumes insert new Volumes
 func (db dbBase) InsertVolumes(lvs []Volume) error {
 

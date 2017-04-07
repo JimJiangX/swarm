@@ -17,6 +17,7 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/deploy"
 	"github.com/docker/swarm/garden/resource"
+	"github.com/docker/swarm/garden/resource/driver"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/gorilla/mux"
@@ -149,7 +150,7 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	d := resource.NewNFSDriver(nfs, filepath.Dir(abs), sys.BackupDir)
+	d := driver.NewNFSDriver(nfs, filepath.Dir(abs), sys.BackupDir)
 
 	space, err := d.Space()
 	if err != nil {
@@ -551,9 +552,8 @@ func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.
 		return info
 	}
 
-	ator := resource.NewAllocator(gd.Ormer(), gd.Cluster)
-	drivers, err := ator.FindNodeVolumeDrivers(e)
-	if err != nil {
+	drivers, err := driver.FindEngineVolumeDrivers(gd.Ormer(), e)
+	if err != nil && len(drivers) == 0 {
 		logrus.WithField("Node", n.Addr).Errorf("find Node VolumeDrivers error,%+v", err)
 	} else {
 		vds := make([]structs.VolumeDriver, 0, len(drivers))
@@ -697,6 +697,14 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 		if !exist {
 			httpJSONError(w, fmt.Errorf("host:%s unknown ClusterID:%s", list[i].Addr, list[i].Cluster), http.StatusInternalServerError)
+			return
+		}
+
+		if list[i].Storage != "" {
+			_, _, err = orm.GetStorageByID(list[i].Storage)
+		}
+		if err != nil {
+			httpJSONError(w, err, http.StatusInternalServerError)
 			return
 		}
 	}

@@ -15,6 +15,7 @@ type Ormer interface {
 	ContainerInterface
 	ImageInterface
 	NodeInterface
+	StorageInterface
 
 	SysConfigOrmer
 	NetworkingOrmer
