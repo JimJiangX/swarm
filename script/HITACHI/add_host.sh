@@ -6,7 +6,7 @@ hostname=$2
 # support multi wwn
 shift 2
 
-port_list=`sudo raidcom get port -I${Instance_ID} 2> /dev/null | sed '1d' | awk '{print $1}' | uniq`
+port_list=`sudo raidcom get port -I${Instance_ID} 2> /dev/null |grep PtoP| awk '{print $1}' | uniq`
 
 if [ "${port_list}" == ''  ]; then
 	echo "get port failed!"
