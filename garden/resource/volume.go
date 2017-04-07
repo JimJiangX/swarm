@@ -11,6 +11,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/resource/driver"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
@@ -28,28 +29,7 @@ const (
 	defaultLocalVolumeDriver = "lvm"
 )
 
-type space struct {
-	VG     string
-	Total  int64
-	Free   int64
-	Fstype string
-}
-
-func (s space) Used() int64 {
-	return s.Total - s.Free
-}
-
-type volumeDriver interface {
-	Driver() string
-	Name() string
-	Type() string
-	Space() (space, error)
-	Alloc(config *cluster.ContainerConfig, uid string, req structs.VolumeRequire) (*database.Volume, error)
-
-	Recycle(database.Volume) error
-}
-
-func newNFSDriver(no database.NodeOrmer, engineID string) (volumeDriver, error) {
+func newNFSDriver(no database.NodeOrmer, engineID string) (driver.Driver, error) {
 	n, err := no.GetNode(engineID)
 	if err != nil {
 		return nil, err
@@ -90,18 +70,18 @@ func (nd _NFSDriver) Driver() string { return "NFS" }
 func (nd _NFSDriver) Name() string   { return "" }
 func (nd _NFSDriver) Type() string   { return "NFS" }
 
-func (nd _NFSDriver) Space() (space, error) {
+func (nd _NFSDriver) Space() (driver.Space, error) {
 	out, err := execNFScmd(nd.baseDir, nd.Addr, nd.Dir, nd.MountDir, nd.Options)
 	if err != nil {
-		return space{}, err
+		return driver.Space{}, err
 	}
 
 	total, free, err := parseNFSSpace(out)
 	if err != nil {
-		return space{}, err
+		return driver.Space{}, err
 	}
 
-	return space{
+	return driver.Space{
 		Total: total,
 		Free:  free,
 	}, nil
@@ -185,7 +165,7 @@ type localVolume struct {
 	engine *cluster.Engine
 	driver string
 	_type  string
-	space  space
+	space  driver.Space
 	vo     database.VolumeOrmer
 }
 
@@ -201,7 +181,7 @@ func (lv localVolume) Driver() string {
 	return lv.driver
 }
 
-func (lv localVolume) Space() (space, error) {
+func (lv localVolume) Space() (driver.Space, error) {
 	return lv.space, nil
 }
 
@@ -262,9 +242,9 @@ func (lv *localVolume) Recycle(v database.Volume) (err error) {
 	return err
 }
 
-type volumeDrivers []volumeDriver
+type volumeDrivers []driver.Driver
 
-func (vds volumeDrivers) get(_type string) volumeDriver {
+func (vds volumeDrivers) get(_type string) driver.Driver {
 	for i := range vds {
 		if vds[i].Type() == _type {
 			return vds[i]
@@ -322,7 +302,7 @@ func (vds volumeDrivers) AllocVolumes(config *cluster.ContainerConfig, uid strin
 	return volumes, nil
 }
 
-func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label string) (volumeDriver, error) {
+func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label string) (driver.Driver, error) {
 	var vgType, sizeLabel string
 
 	switch label {
@@ -379,7 +359,7 @@ func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label st
 		vo:     vo,
 		_type:  vgType,
 		driver: defaultLocalVolumeDriver,
-		space: space{
+		space: driver.Space{
 			Total:  total,
 			Free:   total - used,
 			VG:     vg,
@@ -389,7 +369,7 @@ func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label st
 }
 
 func localVolumeDrivers(e *cluster.Engine, vo database.VolumeOrmer) (volumeDrivers, error) {
-	drivers := make([]volumeDriver, 0, 4)
+	drivers := make([]driver.Driver, 0, 4)
 
 	vd, err := volumeDriverFromEngine(vo, e, _HDDVGLabel)
 	if err == nil && vd != nil {
