@@ -1,6 +1,8 @@
 package driver
 
 import (
+	"errors"
+
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/structs"
@@ -25,4 +27,27 @@ type Space struct {
 
 func (s Space) Used() int64 {
 	return s.Total - s.Free
+}
+
+func FindNodeVolumeDrivers(no database.NodeOrmer, engine *cluster.Engine) ([]Driver, error) {
+	if engine == nil {
+		return nil, errors.New("Engine is required")
+	}
+
+	drivers, err := localVolumeDrivers(engine, no)
+	if err != nil {
+		return nil, err
+	}
+
+	nd, err := newNFSDriver(no, engine.ID)
+	if err != nil {
+		return nil, err
+	}
+	if nd != nil {
+		drivers = append(drivers, nd)
+	}
+
+	// TODO:third-part volumeDrivers
+
+	return drivers, nil
 }

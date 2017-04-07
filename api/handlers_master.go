@@ -17,6 +17,7 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/deploy"
 	"github.com/docker/swarm/garden/resource"
+	"github.com/docker/swarm/garden/resource/driver"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/gorilla/mux"
@@ -149,7 +150,7 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	d := resource.NewNFSDriver(nfs, filepath.Dir(abs), sys.BackupDir)
+	d := driver.NewNFSDriver(nfs, filepath.Dir(abs), sys.BackupDir)
 
 	space, err := d.Space()
 	if err != nil {
@@ -551,8 +552,7 @@ func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.
 		return info
 	}
 
-	ator := resource.NewAllocator(gd.Ormer(), gd.Cluster)
-	drivers, err := ator.FindNodeVolumeDrivers(e)
+	drivers, err := driver.FindNodeVolumeDrivers(gd.Ormer(), e)
 	if err != nil {
 		logrus.WithField("Node", n.Addr).Errorf("find Node VolumeDrivers error,%+v", err)
 	} else {

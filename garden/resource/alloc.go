@@ -7,6 +7,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/resource/driver"
 	"github.com/docker/swarm/garden/resource/nic"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
@@ -63,57 +64,25 @@ nodes:
 	return out, nil
 }
 
-func (at allocator) isNodeStoreEnough(engine *cluster.Engine, stores []structs.VolumeRequire) (bool, error) {
-	drivers, err := at.FindNodeVolumeDrivers(engine)
-	if err != nil {
-		return false, err
-	}
-
-	err = drivers.isSpaceEnough(stores)
-
-	return err == nil, err
-}
-
-func (at allocator) FindNodeVolumeDrivers(engine *cluster.Engine) (volumeDrivers, error) {
-	if engine == nil {
-		return nil, errors.New("Engine is required")
-	}
-
-	drivers, err := localVolumeDrivers(engine, at.ormer)
-	if err != nil {
-		return nil, err
-	}
-
-	nd, err := newNFSDriver(at.ormer, engine.ID)
-	if err != nil {
-		return nil, err
-	}
-	if nd != nil {
-		drivers = append(drivers, nd)
-	}
-
-	// TODO:third-part volumeDrivers
-
-	return drivers, nil
-}
-
 func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n *node.Node, stores []structs.VolumeRequire) ([]database.Volume, error) {
 	engine := at.cluster.Engine(n.ID)
 	if engine == nil {
 		return nil, errors.Errorf("not found Engine by ID:%s from cluster", n.Addr)
 	}
 
-	drivers, err := at.FindNodeVolumeDrivers(engine)
+	drivers, err := driver.FindNodeVolumeDrivers(at.ormer, engine)
 	if err != nil {
 		return nil, err
 	}
 
-	err = drivers.isSpaceEnough(stores)
+	vds := volumeDrivers(drivers)
+
+	err = vds.isSpaceEnough(stores)
 	if err != nil {
 		return nil, err
 	}
 
-	lvs, err := drivers.AllocVolumes(config, uid, stores)
+	lvs, err := vds.AllocVolumes(config, uid, stores)
 
 	return lvs, err
 }
