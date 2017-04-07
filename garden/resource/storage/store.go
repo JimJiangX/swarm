@@ -18,7 +18,7 @@ const (
 	// LocalStorePrefix prefix of local store
 	LocalStorePrefix = "local"
 	// SANStore type
-	SANStore = "san"
+	SANStore = "SAN"
 
 	// SANStoreDriver SAN store driver
 	SANStoreDriver = "lvm"
@@ -34,8 +34,9 @@ type Info struct {
 	ID     string
 	Vendor string
 	Driver string
-	Total  int
-	Free   int
+	Fstype string
+	Total  int64
+	Free   int64
 	List   map[string]Space
 }
 
@@ -46,7 +47,7 @@ type Store interface {
 	Vendor() string
 	Driver() string
 	Ping() error
-	IdleSize() (map[string]int, error)
+	IdleSize() (map[string]int64, error)
 
 	Insert() error
 

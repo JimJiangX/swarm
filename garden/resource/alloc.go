@@ -70,9 +70,13 @@ func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n
 		return nil, errors.Errorf("not found Engine by ID:%s from cluster", n.Addr)
 	}
 
-	drivers, err := driver.FindNodeVolumeDrivers(at.ormer, engine)
+	drivers, err := driver.FindEngineVolumeDrivers(at.ormer, engine)
 	if err != nil {
-		return nil, err
+		logrus.Warnf("engine:%s find volume drivers,%+v", engine.Name, err)
+
+		if len(drivers) == 0 {
+			return nil, err
+		}
 	}
 
 	vds := volumeDrivers(drivers)

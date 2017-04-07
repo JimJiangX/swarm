@@ -42,7 +42,7 @@ func intSliceToString(input []int, sep string) string {
 func maxIdleSizeRG(m map[database.RaidGroup]Space) database.RaidGroup {
 	var (
 		key database.RaidGroup
-		max int
+		max int64
 	)
 
 	for k, val := range m {
@@ -62,8 +62,8 @@ func maxIdleSizeRG(m map[database.RaidGroup]Space) database.RaidGroup {
 type Space struct {
 	Enable bool
 	ID     string
-	Total  int
-	Free   int
+	Total  int64
+	Free   int64
 	State  string
 	LunNum int
 }
@@ -87,13 +87,13 @@ func parseSpace(r io.Reader) []Space {
 			)
 			space.ID = string(parts[0])
 
-			space.Total, err = strconv.Atoi(string(parts[1]))
+			space.Total, err = strconv.ParseInt(string(parts[1]), 10, 64)
 			if err != nil {
 				continue
 			}
 			space.Total = space.Total << 20
 
-			space.Free, err = strconv.Atoi(string(parts[2]))
+			space.Free, err = strconv.ParseInt(string(parts[2]), 10, 64)
 			if err != nil {
 				continue
 			}

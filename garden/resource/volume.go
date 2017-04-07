@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/driver"
@@ -21,6 +22,10 @@ func (vds volumeDrivers) get(_type string) driver.Driver {
 }
 
 func (vds volumeDrivers) isSpaceEnough(stores []structs.VolumeRequire) error {
+	if len(vds) == 0 {
+		return errors.New("not found volume Driver")
+	}
+
 	need := make(map[string]int64, len(stores))
 
 	for i := range stores {
@@ -69,9 +74,13 @@ func (vds volumeDrivers) AllocVolumes(config *cluster.ContainerConfig, uid strin
 }
 
 func (at allocator) isNodeStoreEnough(engine *cluster.Engine, stores []structs.VolumeRequire) (bool, error) {
-	drivers, err := driver.FindNodeVolumeDrivers(at.ormer, engine)
+	drivers, err := driver.FindEngineVolumeDrivers(at.ormer, engine)
 	if err != nil {
-		return false, err
+		logrus.Warnf("engine:%s find volume drivers,%+v", engine.Name, err)
+
+		if len(drivers) == 0 {
+			return false, err
+		}
 	}
 
 	vds := volumeDrivers(drivers)

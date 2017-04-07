@@ -85,7 +85,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 	}
 
 	rg := maxIdleSizeRG(out)
-	if out[rg].Free < size {
+	if out[rg].Free < int64(size) {
 		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
 	}
 
@@ -160,7 +160,7 @@ func (h *huaweiStore) Extend(name string, size int) (database.LUN, database.Volu
 	}
 
 	rg := maxIdleSizeRG(out)
-	if out[rg].Free < size {
+	if out[rg].Free < int64(size) {
 		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
 	}
 
@@ -242,7 +242,7 @@ func (h *huaweiStore) Recycle(id string, lun int) error {
 	return err
 }
 
-func (h huaweiStore) IdleSize() (map[string]int, error) {
+func (h huaweiStore) IdleSize() (map[string]int64, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
@@ -251,7 +251,7 @@ func (h huaweiStore) IdleSize() (map[string]int, error) {
 		return nil, err
 	}
 
-	out := make(map[string]int, len(rg))
+	out := make(map[string]int64, len(rg))
 	for key, val := range rg {
 		out[key.ID] = val.Free
 	}
@@ -522,6 +522,7 @@ func (h huaweiStore) Info() (Info, error) {
 		ID:     h.ID(),
 		Vendor: h.Vendor(),
 		Driver: h.Driver(),
+		Fstype: DefaultFilesystemType,
 		List:   make(map[string]Space, len(list)),
 	}
 
