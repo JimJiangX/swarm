@@ -851,14 +851,14 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 		return "", err
 	}
 
-	var imageIDLabel string
+	var im Image
 	if image != "" {
 
 		parts := strings.SplitN(image, ":", 2)
 		if len(parts) == 2 {
-			image, imageIDLabel, err = gd.getImageName("", parts[0], parts[1])
+			image, im, err = gd.getImageName("", parts[0], parts[1])
 		} else {
-			image, imageIDLabel, err = gd.getImageName(image, "", "")
+			image, im, err = gd.getImageName(image, "", "")
 		}
 		if err != nil {
 			return "", err
@@ -959,9 +959,13 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 		return "", err
 	}
 
-	if imageIDLabel != "" {
+	if im.ImageID != "" {
+
+		rebuild.Unit.ImageID = im.ImageID
+		rebuild.Unit.ImageName = im.Name + ":" + im.Version
+
 		config.Config.Image = image
-		config.Config.Labels[_ImageIDInRegistryLabelKey] = imageIDLabel
+		config.Config.Labels[_ImageIDInRegistryLabelKey] = im.ImageID
 	}
 
 	swarmID := gd.generateUniqueID()

@@ -132,12 +132,12 @@ func templateConfig(gd *Gardener, module structs.Module) (*cluster.ContainerConf
 		return nil, err
 	}
 
-	image, imageIDLabel, err := gd.getImageName(module.Config.Image, module.Name, module.Version)
+	image, im, err := gd.getImageName(module.Config.Image, module.Name, module.Version)
 	if err != nil {
 		return nil, err
 	}
 	config.Config.Image = image
-	config.Config.Labels[_ImageIDInRegistryLabelKey] = imageIDLabel
+	config.Config.Labels[_ImageIDInRegistryLabelKey] = im.ImageID
 
 	return config, nil
 }

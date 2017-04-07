@@ -274,7 +274,7 @@ func parsePushImageOutput(in string) (string, int, error) {
 }
 
 // getImageName returns required image Name & ImageID
-func (gd *Gardener) getImageName(id, name, version string) (string, string, error) {
+func (gd *Gardener) getImageName(id, name, version string) (string, Image, error) {
 	var (
 		image Image
 		err   error
@@ -291,20 +291,20 @@ func (gd *Gardener) getImageName(id, name, version string) (string, string, erro
 	if err != nil {
 		logrus.WithError(err).Errorf("not found Image %s:%s", name, version)
 
-		return "", "", err
+		return "", image, err
 	}
 
 	if !image.Enabled {
 		logrus.Errorf("Image '%s:%s' is disabled", image.Name, image.Version)
-		return "", "", err
+		return "", image, err
 	}
 
 	config, err := gd.systemConfig()
 	if err != nil {
-		return "", "", err
+		return "", image, err
 	}
 
 	imageName := fmt.Sprintf("%s:%d/%s:%s", config.Registry.Domain, config.Registry.Port, image.Name, image.Version)
 
-	return imageName, image.ImageID, nil
+	return imageName, image, nil
 }

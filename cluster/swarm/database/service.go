@@ -161,7 +161,7 @@ func UpdateUnitInfo(unit Unit) error {
 
 // txUpdateUnit upate unit params in tx
 func txUpdateUnit(tx *sqlx.Tx, unit Unit) error {
-	const query = "UPDATE tbl_dbaas_unit SET node_id=:node_id,container_id=:container_id,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
+	const query = "UPDATE tbl_dbaas_unit SET node_id=:node_id,image_id=:image_id,image_name=:image_name,container_id=:container_id,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
 
 	_, err := tx.NamedExec(query, unit)
 
