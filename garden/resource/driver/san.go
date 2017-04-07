@@ -2,7 +2,6 @@ package driver
 
 import (
 	"fmt"
-	"path/filepath"
 	"strconv"
 
 	"github.com/docker/swarm/cluster"
@@ -28,7 +27,7 @@ func newSanVolumeDriver(e *cluster.Engine, orm database.NodeOrmer, storeID strin
 		return nil, err
 	}
 
-	stores := storage.NewStores(filepath.Dir(sys.SourceDir), orm)
+	stores := storage.DefaultStores()
 	san, err := stores.GetStore(storeID)
 	if err != nil {
 		return nil, err

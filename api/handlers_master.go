@@ -699,6 +699,14 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			httpJSONError(w, fmt.Errorf("host:%s unknown ClusterID:%s", list[i].Addr, list[i].Cluster), http.StatusInternalServerError)
 			return
 		}
+
+		if list[i].Storage != "" {
+			_, _, err = orm.GetStorageByID(list[i].Storage)
+		}
+		if err != nil {
+			httpJSONError(w, err, http.StatusInternalServerError)
+			return
+		}
 	}
 
 	nodes := resource.NewNodeWithTaskList(len(list))

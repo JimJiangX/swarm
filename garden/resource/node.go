@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 	"time"
 
@@ -12,12 +11,15 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
+	"github.com/docker/swarm/garden/resource/storage"
 	"github.com/docker/swarm/garden/scplib"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
+
+const _SAN_HBA_WWN_Lable = "HBA_WWN"
 
 const (
 	statusNodeImport = iota
@@ -197,7 +199,7 @@ func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithT
 		go list[i].distribute(ctx, horus, m.dco, config)
 	}
 
-	go m.registerNodesLoop(ctx, cancel, list, strconv.Itoa(config.Ports.Docker), reg)
+	go m.registerNodesLoop(ctx, cancel, list, config, reg)
 
 	return nil
 }
@@ -375,7 +377,7 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 
 // registerNodes register Nodes
 func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc,
-	nodes []nodeWithTask, port string, reg kvstore.Register) {
+	nodes []nodeWithTask, sys database.SysConfig, reg kvstore.Register) {
 
 	defer cancel()
 
@@ -388,7 +390,7 @@ func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc
 
 		case <-ctx.Done():
 			// try again
-			err := m.registerNodes(ctx, nodes, port, reg)
+			err := m.registerNodes(ctx, nodes, sys, reg)
 			if err != nil {
 				logrus.Errorf("reigster nodes error,%+v", err)
 			}
@@ -399,16 +401,19 @@ func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc
 			return
 		}
 
-		err := m.registerNodes(ctx, nodes, port, reg)
+		err := m.registerNodes(ctx, nodes, sys, reg)
 		if err != nil {
 			logrus.Errorf("reigster nodes error,%+v", err)
 		}
 	}
 }
 
-func (m master) registerNodes(ctx context.Context, nodes []nodeWithTask, port string, reg kvstore.Register) error {
-	var _err error
-	count := 0
+func (m master) registerNodes(ctx context.Context, nodes []nodeWithTask, sys database.SysConfig, reg kvstore.Register) error {
+	var (
+		_err  error
+		count int
+	)
+
 	for i := range nodes {
 
 		n, err := m.dco.GetNode(nodes[i].Node.ID)
@@ -433,11 +438,28 @@ func (m master) registerNodes(ctx context.Context, nodes []nodeWithTask, port st
 			continue
 		}
 
-		addr := net.JoinHostPort(n.Addr, port)
+		addr := fmt.Sprintf("%s:%d", n.Addr, sys.Docker)
 		eng := m.clsuter.EngineByAddr(addr)
 		if eng == nil || !eng.IsHealthy() {
 			field.Errorf("engine:%s is nil or unhealthy,engine=%v", addr, eng)
 			continue
+		}
+
+		// register Node to SAN storage
+		if n.Storage != "" {
+			san, err := storage.DefaultStores().GetStore(n.Storage)
+			if err != nil {
+				continue
+			}
+
+			wwn := eng.Labels[_SAN_HBA_WWN_Lable]
+			list := strings.Split(wwn, ",")
+
+			if err = san.AddHost(eng.ID, list...); err != nil {
+				_err = err
+				field.Errorf("register to SAN,WWN:%s,%+v", wwn, err)
+				continue
+			}
 		}
 
 		err = registerHost(ctx, nodes[i], reg, eng.Labels["CONTAINER_NIC"])

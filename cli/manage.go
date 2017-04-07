@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/resource"
+	"github.com/docker/swarm/garden/resource/storage"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/docker/swarm/plugin/client"
 	pluginapi "github.com/docker/swarm/plugin/parser/api"
@@ -351,6 +353,13 @@ func manage(c *cli.Context) {
 		if err != nil {
 			break
 		}
+
+		sys, err := ormer.GetSysConfig()
+		if err != nil {
+			break
+		}
+
+		storage.SetDefaultStores(filepath.Dir(sys.SourceDir), ormer)
 
 		kvc, err := kvstore.NewClient(uri, tlsConfig)
 		if err != nil {

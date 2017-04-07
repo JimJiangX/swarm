@@ -66,8 +66,10 @@ type Store interface {
 	DisableSpace(id string) error
 }
 
+var defaultStores *stores
+
 type stores struct {
-	lock sync.RWMutex
+	lock *sync.RWMutex
 
 	script string
 
@@ -76,16 +78,21 @@ type stores struct {
 	stores map[string]Store
 }
 
-func NewStores(script string, orm database.StorageOrmer) *stores {
+func SetDefaultStores(script string, orm database.StorageOrmer) {
 	if script == "" {
 		script = defaultScriptPath
 	}
 
-	return &stores{
+	defaultStores = &stores{
 		script: script,
 		orm:    orm,
+		lock:   new(sync.RWMutex),
 		stores: make(map[string]Store),
 	}
+}
+
+func DefaultStores() *stores {
+	return defaultStores
 }
 
 // RegisterStore register a new remote storage system
