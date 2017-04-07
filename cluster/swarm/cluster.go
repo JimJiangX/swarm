@@ -371,7 +371,7 @@ func (c *Cluster) validatePendingEngine(engine *cluster.Engine) bool {
 func (c *Cluster) removeEngine(addr string) bool {
 	engine := c.getEngineByAddr(addr)
 	if engine == nil {
-		return false
+		return true
 	}
 
 	// avoid remove engine cause by swarm-join register failed
@@ -414,7 +414,9 @@ func (c *Cluster) monitorDiscovery(ch <-chan discovery.Entries, errCh <-chan err
 			// if there's already an engine with the same ID.  If an engine
 			// changes address, we have to first remove it then add it back.
 			for _, entry := range removed {
-				c.removeEngine(entry.String())
+				if !c.removeEngine(entry.String()){
+					currentEntries=append(currentEntries,entry)
+				}
 			}
 
 			for _, entry := range added {
