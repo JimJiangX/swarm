@@ -520,7 +520,7 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	master := resource.NewMaster(gd.Ormer(), gd.Cluster)
+	master := resource.NewHostManager(gd.Ormer(), gd.Cluster)
 	err := master.RemoveCluster(name)
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
@@ -738,7 +738,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	master := resource.NewMaster(orm, gd.Cluster)
+	master := resource.NewHostManager(orm, gd.Cluster)
 	err = master.InstallNodes(ctx, horus, nodes, gd.KVClient())
 	if err != nil {
 		httpJSONError(w, err, http.StatusInternalServerError)
@@ -862,7 +862,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	m := resource.NewMaster(gd.Ormer(), gd.Cluster)
+	m := resource.NewHostManager(gd.Ormer(), gd.Cluster)
 
 	err = m.RemoveNode(ctx, horus, node, username, password, force, gd.KVClient())
 	if err != nil {

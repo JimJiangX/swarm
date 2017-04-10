@@ -123,7 +123,7 @@ func (n Node) removeCondition() error {
 	return errors.Errorf("warnings:%s", errs)
 }
 
-func (m master) getNode(nameOrID string) (Node, error) {
+func (m hostManager) getNode(nameOrID string) (Node, error) {
 	n, err := m.dco.GetNode(nameOrID)
 	if err != nil {
 		return Node{}, err
@@ -166,7 +166,7 @@ func NewNodeWithTaskList(len int) []nodeWithTask {
 }
 
 // InstallNodes install new nodes,list should has same ClusterID
-func (m master) InstallNodes(ctx context.Context, horus string, list []nodeWithTask, reg kvstore.Register) error {
+func (m hostManager) InstallNodes(ctx context.Context, horus string, list []nodeWithTask, reg kvstore.Register) error {
 	nodes := make([]database.Node, len(list))
 	tasks := make([]database.Task, len(list))
 	timeout := 250*time.Second + time.Duration(len(list)*30)*time.Second
@@ -376,7 +376,7 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 }
 
 // registerNodes register Nodes
-func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc,
+func (m hostManager) registerNodesLoop(ctx context.Context, cancel context.CancelFunc,
 	nodes []nodeWithTask, sys database.SysConfig, reg kvstore.Register) {
 
 	defer cancel()
@@ -408,7 +408,7 @@ func (m master) registerNodesLoop(ctx context.Context, cancel context.CancelFunc
 	}
 }
 
-func (m master) registerNodes(ctx context.Context, nodes []nodeWithTask, sys database.SysConfig, reg kvstore.Register) error {
+func (m hostManager) registerNodes(ctx context.Context, nodes []nodeWithTask, sys database.SysConfig, reg kvstore.Register) error {
 	var (
 		_err  error
 		count int
@@ -506,7 +506,7 @@ func registerHost(ctx context.Context, node nodeWithTask, reg kvstore.Register, 
 	return err
 }
 
-func (m master) registerNodesTimeout(nodes []nodeWithTask, er error) error {
+func (m hostManager) registerNodesTimeout(nodes []nodeWithTask, er error) error {
 	if len(nodes) == 0 {
 		return nil
 	}
@@ -545,12 +545,12 @@ func (m master) registerNodesTimeout(nodes []nodeWithTask, er error) error {
 	return nil
 }
 
-func (m master) removeNode(ID string) error {
+func (m hostManager) removeNode(ID string) error {
 
 	return m.dco.DelNode(ID)
 }
 
-func (m master) RemoveNode(ctx context.Context, horus, nameOrID, user, password string, force bool, reg kvstore.Register) error {
+func (m hostManager) RemoveNode(ctx context.Context, horus, nameOrID, user, password string, force bool, reg kvstore.Register) error {
 	node, err := m.getNode(nameOrID)
 	if err != nil {
 		if database.IsNotFound(err) {
