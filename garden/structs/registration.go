@@ -58,6 +58,13 @@ type ServiceRegistration struct {
 	Horus  *HorusRegistration
 }
 
+type ServiceDeregistration struct {
+	Type     string
+	Key      string
+	User     string
+	Password string
+}
+
 type ConfigCmds struct {
 	ID         string
 	Name       string

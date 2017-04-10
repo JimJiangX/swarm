@@ -100,7 +100,7 @@ func postRegister(ctx context.Context, uri string, obj interface{}) error {
 }
 
 // typ : hosts / containers / units
-func (c *kvClient) deregisterToHorus(ctx context.Context, typ, key, user, password string, force bool) error {
+func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.ServiceDeregistration, force bool) error {
 	var (
 		addr string
 		ch   = make(chan result, 1)
@@ -125,8 +125,8 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, typ, key, user, passwo
 		return ctx.Err()
 	}
 
-	uri := fmt.Sprintf("http://%s/v1/%s/%s", addr, typ, key)
-	if typ == unitType || typ == containerType {
+	uri := fmt.Sprintf("http://%s/v1/%s/%s", addr, config.Type, config.Type)
+	if config.Type == unitType || config.Type == containerType {
 		uri = uri + "?del_container=true"
 	}
 
@@ -137,14 +137,14 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, typ, key, user, passwo
 	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 
-	if force || user != "" {
+	if force || config.User != "" {
 		params := make(url.Values)
 		if force {
 			params.Set("force", "true")
 		}
-		if user != "" {
-			params.Set("os_user", user)
-			params.Set("os_pwd", password)
+		if config.User != "" {
+			params.Set("os_user", config.User)
+			params.Set("os_pwd", config.Password)
 		}
 		req.URL.RawQuery = params.Encode()
 	}
@@ -187,10 +187,10 @@ func (c *kvClient) RegisterService(ctx context.Context, host string, config stru
 }
 
 // DeregisterService service to consul and Horus
-func (c *kvClient) DeregisterService(ctx context.Context, typ, key, user, password string) error {
-	err := c.deregisterToHorus(ctx, typ, key, user, password, false)
+func (c *kvClient) DeregisterService(ctx context.Context, config structs.ServiceDeregistration) error {
+	err := c.deregisterToHorus(ctx, config, false)
 	if err != nil {
-		err = c.deregisterToHorus(ctx, typ, key, user, password, true)
+		err = c.deregisterToHorus(ctx, config, true)
 	}
 
 	return err
