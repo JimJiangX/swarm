@@ -17,6 +17,12 @@ type Client interface {
 	DeleteKVTree(key string) error
 }
 
+const (
+	hostType      = "hosts"
+	unitType      = "units"
+	containerType = "containers"
+)
+
 type Register interface {
 	HealthChecks(state string, q *api.QueryOptions) (map[string]api.HealthCheck, error)
 

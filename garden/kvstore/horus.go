@@ -54,7 +54,7 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj structs.HorusRegistr
 	}
 
 	if obj.Node.Select {
-		uri := fmt.Sprintf("http://%s/v1/hosts", addr)
+		uri := fmt.Sprintf("http://%s/v1/%s", addr, hostType)
 		err := postRegister(ctx, uri, obj.Node)
 		if err != nil {
 			return err
@@ -62,7 +62,7 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj structs.HorusRegistr
 	}
 
 	if obj.Service.Select {
-		uri := fmt.Sprintf("http://%s/v1/units", addr)
+		uri := fmt.Sprintf("http://%s/v1/%s", addr, unitType)
 		err := postRegister(ctx, uri, obj.Service)
 		if err != nil {
 			return err
@@ -126,6 +126,9 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, typ, key, user, passwo
 	}
 
 	uri := fmt.Sprintf("http://%s/v1/%s/%s", addr, typ, key)
+	if typ == unitType || typ == containerType {
+		uri = uri + "?del_container=true"
+	}
 
 	req, err := http.NewRequest(http.MethodDelete, uri, nil)
 	if err != nil {
