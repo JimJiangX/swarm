@@ -15,15 +15,20 @@ import (
 	"github.com/pkg/errors"
 )
 
-type allocator struct {
-	ormer   database.Ormer
-	cluster cluster.Cluster
+type engineCluster interface {
+	Engine(IDOrName string) *cluster.Engine
+	EngineByAddr(addr string) *cluster.Engine
 }
 
-func NewAllocator(ormer database.Ormer, cluster cluster.Cluster) allocator {
+type allocator struct {
+	ormer database.Ormer
+	ec    engineCluster
+}
+
+func NewAllocator(ormer database.Ormer, ec engineCluster) allocator {
 	return allocator{
-		ormer:   ormer,
-		cluster: cluster,
+		ormer: ormer,
+		ec:    ec,
 	}
 }
 
@@ -47,7 +52,7 @@ nodes:
 			}
 		}
 
-		engine := at.cluster.Engine(nodes[i].EngineID)
+		engine := at.ec.Engine(nodes[i].EngineID)
 		if engine == nil || !engine.IsHealthy() {
 			continue nodes
 		}
@@ -65,7 +70,7 @@ nodes:
 }
 
 func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n *node.Node, stores []structs.VolumeRequire) ([]database.Volume, error) {
-	engine := at.cluster.Engine(n.ID)
+	engine := at.ec.Engine(n.ID)
 	if engine == nil {
 		return nil, errors.Errorf("not found Engine by ID:%s from cluster", n.Addr)
 	}
@@ -177,7 +182,7 @@ func parseUintList(list []string) (map[int]bool, error) {
 func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string,
 	candidates []string, requires []structs.NetDeviceRequire) ([]database.IP, error) {
 
-	engine := at.cluster.Engine(engineID)
+	engine := at.ec.Engine(engineID)
 	if engine == nil {
 		return nil, errors.New("Engine not found")
 	}

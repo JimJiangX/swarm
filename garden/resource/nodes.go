@@ -1,19 +1,18 @@
 package resource
 
 import (
-	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 )
 
 type master struct {
-	clsuter cluster.Cluster
-	dco     database.NodeOrmer
+	ec  engineCluster
+	dco database.NodeOrmer
 }
 
-func NewMaster(dco database.NodeOrmer, c cluster.Cluster) master {
+func NewMaster(dco database.NodeOrmer, ec engineCluster) master {
 	return master{
-		dco:     dco,
-		clsuter: c,
+		dco: dco,
+		ec:  ec,
 	}
 }
 

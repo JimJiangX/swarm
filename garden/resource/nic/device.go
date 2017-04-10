@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	_PFDevLabel = "PF_DEV_BW" // "PF_DEV_BW":"10G"
+	// "PF_DEV_BW":"10G"
+	_PFDevLabel = "PF_DEV_BW"
 
 	// "CONTAINER_NIC":"bond0,bond1,bond2"
 	_ContainerNIC = "CONTAINER_NIC"

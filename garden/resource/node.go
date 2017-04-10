@@ -133,7 +133,7 @@ func (m master) getNode(nameOrID string) (Node, error) {
 		return newNode(n, nil, m.dco), nil
 	}
 
-	eng := m.clsuter.Engine(n.EngineID)
+	eng := m.ec.Engine(n.EngineID)
 
 	return newNode(n, eng, m.dco), nil
 }
@@ -439,7 +439,7 @@ func (m master) registerNodes(ctx context.Context, nodes []nodeWithTask, sys dat
 		}
 
 		addr := fmt.Sprintf("%s:%d", n.Addr, sys.Docker)
-		eng := m.clsuter.EngineByAddr(addr)
+		eng := m.ec.EngineByAddr(addr)
 		if eng == nil || !eng.IsHealthy() {
 			field.Errorf("engine:%s is nil or unhealthy,engine=%v", addr, eng)
 			continue
