@@ -180,7 +180,7 @@ func parseUintList(list []string) (map[int]bool, error) {
 }
 
 func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string,
-	candidates []string, requires []structs.NetDeviceRequire) ([]database.IP, error) {
+	candidates []string, requires []structs.NetDeviceRequire) (out []database.IP, err error) {
 
 	engine := at.ec.Engine(engineID)
 	if engine == nil {
@@ -233,38 +233,34 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 		})
 	}
 
-	var out []database.IP
+	recycle := make([]database.IP, 0, len(in))
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.Errorf("%v", r)
+		}
+
+		if len(recycle) == 0 {
+			return
+		}
+		_err := at.ormer.ResetIPs(recycle)
+		if _err != nil {
+			logrus.Errorf("alloc networking:%+v", _err)
+		}
+	}()
+
 	for i := range candidates {
 		for l := range in {
 			in[l].Networking = candidates[i]
 		}
 		out, err = at.ormer.AllocNetworking(unitID, engine.ID, in)
-		if err == nil {
+		if err == nil && len(out) == len(in) {
 			break
-		}
-	}
-
-	if len(out) != len(in) {
-		n := 0
-	loop:
-		for i := range in {
-			for _, c := range candidates {
-				in[i].Networking = c
-				n++
-
-				if n == len(in) {
-					break loop
-				}
-			}
-		}
-
-		out, err = at.ormer.AllocNetworking(unitID, engine.ID, in)
-		if err != nil {
-			return nil, err
+		} else if len(out) > 0 {
+			recycle = append(recycle, out...)
 		}
 	}
 
 	config.HostConfig.NetworkMode = "none"
 
-	return out, nil
+	return out, err
 }

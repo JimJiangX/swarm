@@ -408,16 +408,9 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 
 	}
 
-	for i := range ips {
-		ips[i].UnitID = ""
-		ips[i].Engine = ""
-		ips[i].Bandwidth = 0
-		ips[i].Bond = ""
-	}
-
 	do := func(tx *sqlx.Tx) error {
 
-		err := db.txSetIPs(tx, ips)
+		err := db.txResetIPs(tx, ips)
 		if err != nil {
 			return err
 		}
@@ -450,15 +443,9 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 }
 
 func (db dbBase) RecycleResource(ips []IP, lvs []Volume) error {
-	for i := range ips {
-		ips[i].UnitID = ""
-		ips[i].Engine = ""
-		ips[i].Bandwidth = 0
-		ips[i].Bond = ""
-	}
 
 	do := func(tx *sqlx.Tx) error {
-		err := db.txSetIPs(tx, ips)
+		err := db.txResetIPs(tx, ips)
 		if err != nil {
 			return err
 		}

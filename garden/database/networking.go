@@ -27,6 +27,7 @@ type NetworkingOrmer interface {
 
 	SetNetworkingEnable(ID string, enable bool) error
 	SetIPEnable([]uint32, string, bool) error
+	ResetIPs(ips []IP) error
 }
 
 // IP is table structure, associate to Networking
@@ -255,6 +256,23 @@ func (db dbBase) txSetIPs(tx *sqlx.Tx, val []IP) error {
 	return nil
 }
 
+func (db dbBase) txResetIPs(tx *sqlx.Tx, ips []IP) error {
+	for i := range ips {
+		ips[i].UnitID = ""
+		ips[i].Engine = ""
+		ips[i].Bandwidth = 0
+		ips[i].Bond = ""
+	}
+
+	return db.txSetIPs(tx, ips)
+}
+
+func (db dbBase) ResetIPs(ips []IP) error {
+	return db.txFrame(func(tx *sqlx.Tx) error {
+		return db.txResetIPs(tx, ips)
+	})
+}
+
 func (db dbBase) txResetIPByUnit(tx *sqlx.Tx, unit string) error {
 	query := "UPDATE " + db.ipTable() + " SET unit_id=?,engine_id=?,net_dev=?,bandwidth=? WHERE unit_id=?"
 	_, err := tx.Exec(query, "", "", "", 0, unit)
@@ -319,17 +337,13 @@ func (db dbBase) DelNetworking(networking string) error {
 }
 
 func (db dbBase) SetNetworkingEnable(networking string, enable bool) error {
-	do := func(tx *sqlx.Tx) error {
 
-		_, err := tx.Exec("UPDATE "+db.ipTable()+" SET enable=? WHERE networking_id=?", enable, networking)
-		if err == nil {
-			return nil
-		}
-
-		return errors.Wrap(err, "Tx delete []IP by NetworkingID")
+	_, err := db.Exec("UPDATE "+db.ipTable()+" SET enable=? WHERE networking_id=?", enable, networking)
+	if err == nil {
+		return nil
 	}
 
-	return db.txFrame(do)
+	return errors.WithStack(err)
 }
 
 func (db dbBase) SetIPEnable(in []uint32, networking string, enable bool) error {
