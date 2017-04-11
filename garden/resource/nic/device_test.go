@@ -72,3 +72,65 @@ func TestParseContainerDevice(t *testing.T) {
 		c.Config.Config.Labels[tests[i].key] = tests[i].src
 	}
 }
+
+func TestParseEngineDevice(t *testing.T) {
+	e := cluster.Engine{
+		Labels: map[string]string{
+			_PFDevLabel:   "10G",
+			_ContainerNIC: "bond0,bond1,bond2",
+		},
+	}
+
+	bonds, total, err := ParseEngineDevice(&e)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if total != 10240 || len(bonds) != 3 {
+		t.Error(total, bonds)
+	}
+
+	e = cluster.Engine{
+		Labels: map[string]string{
+			_PFDevLabel:   "10g",
+			_ContainerNIC: "",
+		},
+	}
+
+	bonds, total, err = ParseEngineDevice(&e)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if total != 10240 || len(bonds) != 0 {
+		t.Error(total, bonds)
+	}
+
+	e = cluster.Engine{
+		Labels: map[string]string{
+			// _PFDevLabel:   "10g",
+			_ContainerNIC: "",
+		},
+	}
+
+	bonds, total, err = ParseEngineDevice(&e)
+	if err == nil {
+		t.Errorf("error expected,but got :%s %d", bonds, total)
+	} else {
+		t.Log(err)
+	}
+
+	e = cluster.Engine{
+		Labels: map[string]string{
+			_PFDevLabel: "10g",
+			//	_ContainerNIC: "bond0,bond1,bond2",
+		},
+	}
+
+	bonds, total, err = ParseEngineDevice(&e)
+	if err == nil {
+		t.Errorf("error expected,but got :%s %d", bonds, total)
+	} else {
+		t.Log(err)
+	}
+}

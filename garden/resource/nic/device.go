@@ -109,5 +109,9 @@ func ParseEngineDevice(e *cluster.Engine) ([]string, int, error) {
 		return nil, total, errors.Errorf("Engine Label:%s is required", _ContainerNIC)
 	}
 
+	if len(val) == 0 {
+		return nil, total, nil
+	}
+
 	return strings.Split(val, ","), total, nil
 }
