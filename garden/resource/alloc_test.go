@@ -49,14 +49,21 @@ func TestAlloctCPUMemory(t *testing.T) {
 			Config: &cluster.ContainerConfig{
 				HostConfig: container.HostConfig{
 					Resources: container.Resources{
-						CpusetCpus: "1-9,15",
+						CpusetCpus: "1-5,15",
+						Memory:     1 << 22,
+					}}}},
+		&cluster.Container{
+			Config: &cluster.ContainerConfig{
+				HostConfig: container.HostConfig{
+					Resources: container.Resources{
+						CpusetCpus: "8-12",
 						Memory:     1 << 22,
 					}}}},
 	}
 	nd := node.Node{
 		Containers:  cluster.Containers(containers),
 		UsedMemory:  8 << 30,
-		UsedCpus:    10,
+		UsedCpus:    11,
 		TotalMemory: 1 << 35,
 		TotalCpus:   16,
 	}
@@ -67,19 +74,23 @@ func TestAlloctCPUMemory(t *testing.T) {
 		t.Error(err, sets)
 	}
 
-	if err == nil && (sets != "0,10,11,12,13" ||
+	if err == nil && (sets != "0,6,7,13,14" ||
 		sets != config.HostConfig.CpusetCpus ||
 		config.HostConfig.Memory != 1<<34) {
 		t.Error(sets, config.HostConfig.CpusetCpus, config.HostConfig.Memory)
 	}
 
-	sets, err = actor.AlloctCPUMemory(&config, &nd, 3, 1<<34, []string{"0-13"})
+	sets, err = actor.AlloctCPUMemory(&config, &nd, 2, 1<<34, []string{"0-13"})
 	if err == nil {
-		t.Errorf("error expected but got '%s'", sets)
+		t.Errorf("error expected,but got '%s'", sets)
+	} else {
+		t.Log(err)
 	}
 
 	sets, err = actor.AlloctCPUMemory(&config, &nd, 3, 1<<35-8<<30+1, []string{"0-11"})
 	if err == nil {
-		t.Errorf("expected Memory is unavailable, but got '%s'", sets)
+		t.Errorf("error expected,but got '%s'", sets)
+	} else {
+		t.Log(err)
 	}
 }
