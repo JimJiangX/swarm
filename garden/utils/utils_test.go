@@ -37,6 +37,7 @@ var test = []struct {
 	code uint32
 }{
 	{"192.168.41.23", 3232246039},
+	{"192.168.41.24", 3232246040},
 	{"127.0.0.1", 2130706433},
 	{"10.0.2.78", 167772750},
 }
@@ -45,8 +46,7 @@ func TestIPToUint32(t *testing.T) {
 	for i := range test {
 		got := IPToUint32(test[i].ip)
 		if got != test[i].code {
-			t.Fatalf("IP:%s [got:%v] != [want:%d]",
-				test[i].ip, got, test[i].code)
+			t.Fatalf("IP:%s [got:%v] != [want:%d]", test[i].ip, got, test[i].code)
 		}
 	}
 }

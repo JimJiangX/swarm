@@ -8,7 +8,6 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/driver"
-	"github.com/docker/swarm/garden/resource/nic"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/docker/swarm/scheduler/node"
@@ -180,87 +179,12 @@ func parseUintList(list []string) (map[int]bool, error) {
 }
 
 func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string,
-	candidates []string, requires []structs.NetDeviceRequire) (out []database.IP, err error) {
+	networkings []string, requires []structs.NetDeviceRequire) (out []database.IP, err error) {
 
-	engine := at.ec.Engine(engineID)
-	if engine == nil {
-		return nil, errors.New("Engine not found")
+	nator := netAllocator{
+		ec:    at.ec,
+		ormer: at.ormer,
 	}
 
-	used, err := at.ormer.ListIPByEngine(engine.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	devices, width, err := nic.ParseEngineDevice(engine)
-	if err != nil {
-		return nil, err
-	}
-
-	list := make([]string, 0, len(devices))
-	for d := range devices {
-		found := false
-
-		for i := range used {
-			if used[i].Bond == devices[d] {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			list = append(list, devices[d])
-		}
-	}
-
-	for i := range used {
-		width = width - used[i].Bandwidth
-	}
-	for _, req := range requires {
-		width = width - req.Bandwidth
-	}
-
-	// check network device bandwidth and band
-	if width < 0 || len(list) < len(requires) {
-		return nil, errors.Errorf("Engine:%s not enough Bandwidth for require", engine.Addr)
-	}
-
-	in := make([]database.NetworkingRequire, 0, len(requires))
-	for i := range requires {
-		in = append(in, database.NetworkingRequire{
-			Bond:      list[i],
-			Bandwidth: requires[i].Bandwidth,
-		})
-	}
-
-	recycle := make([]database.IP, 0, len(in))
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.Errorf("%v", r)
-		}
-
-		if len(recycle) == 0 {
-			return
-		}
-		_err := at.ormer.ResetIPs(recycle)
-		if _err != nil {
-			logrus.Errorf("alloc networking:%+v", _err)
-		}
-	}()
-
-	for i := range candidates {
-		for l := range in {
-			in[l].Networking = candidates[i]
-		}
-		out, err = at.ormer.AllocNetworking(unitID, engine.ID, in)
-		if err == nil && len(out) == len(in) {
-			break
-		} else if len(out) > 0 {
-			recycle = append(recycle, out...)
-		}
-	}
-
-	config.HostConfig.NetworkMode = "none"
-
-	return out, err
+	return nator.AlloctNetworking(config, engineID, unitID, networkings, requires)
 }

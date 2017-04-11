@@ -199,11 +199,11 @@ func (db dbBase) AllocNetworking(unit, engine string, requires []NetworkingRequi
 
 			key := list[0].Networking
 
-			query := fmt.Sprintf("SELECT ip_addr,prefix,gateway,vlan_id,networking_id FROM %s WHERE networking_id=? AND enabled=? AND unit_id=? LIMIT %d FOR UPDATE;", db.ipTable(), len(list))
+			query := fmt.Sprintf("SELECT ip_addr,prefix,gateway,vlan_id,networking_id FROM %s WHERE networking_id=? AND enabled=? AND unit_id=? AND ip_addr <> ? LIMIT %d FOR UPDATE;", db.ipTable(), len(list))
 			query = tx.Rebind(query)
 
 			var ips []IP
-			err := tx.Select(&ips, query, key, true, "")
+			err := tx.Select(&ips, query, key, true, "", 0)
 			if err != nil {
 				return errors.Wrap(err, "Tx get available IP")
 			}
