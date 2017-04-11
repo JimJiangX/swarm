@@ -109,22 +109,22 @@ func TestAlloctNetworking(t *testing.T) {
 	}
 	ips := &network{
 		ips: []database.IP{
-			database.IP{
+			{
 				IPAddr:     3232246039,
 				Enabled:    true,
 				Networking: "networking001",
 			},
-			database.IP{
+			{
 				IPAddr:     3232246040,
 				Enabled:    true,
 				Networking: "networking001",
 			},
-			database.IP{
+			{
 				IPAddr:     3232246041,
 				Enabled:    true,
 				Networking: "networking001",
 			},
-			database.IP{
+			{
 				IPAddr:     3232246042,
 				Enabled:    true,
 				Networking: "networking001",
@@ -133,16 +133,16 @@ func TestAlloctNetworking(t *testing.T) {
 				Bandwidth:  500,
 				Bond:       "bond1",
 			},
-			database.IP{
+			{
 				IPAddr:     3232246043,
 				Networking: "networking001",
 			},
-			database.IP{
+			{
 				IPAddr:     3232246044,
 				Enabled:    true,
 				Networking: "networking002",
 			},
-			database.IP{
+			{
 				IPAddr:     3232246045,
 				Enabled:    true,
 				Networking: "networking002",
@@ -151,7 +151,7 @@ func TestAlloctNetworking(t *testing.T) {
 				Bandwidth:  400,
 				Bond:       "bond0",
 			},
-			database.IP{
+			{
 				IPAddr:     3232246046,
 				Enabled:    true,
 				Networking: "networking002",
@@ -172,13 +172,13 @@ func TestAlloctNetworking(t *testing.T) {
 	}
 
 	requires := []structs.NetDeviceRequire{
-		structs.NetDeviceRequire{
+		{
 			Bandwidth: 100,
 		},
-		structs.NetDeviceRequire{
+		{
 			Bandwidth: 200,
 		},
-		structs.NetDeviceRequire{
+		{
 			Bandwidth: 300,
 		},
 	}
