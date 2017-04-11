@@ -45,14 +45,14 @@ func TestFindIdleCPUs(t *testing.T) {
 func TestAlloctCPUMemory(t *testing.T) {
 	config := cluster.ContainerConfig{}
 	containers := []*cluster.Container{
-		&cluster.Container{
+		{
 			Config: &cluster.ContainerConfig{
 				HostConfig: container.HostConfig{
 					Resources: container.Resources{
 						CpusetCpus: "1-5,15",
 						Memory:     1 << 22,
 					}}}},
-		&cluster.Container{
+		{
 			Config: &cluster.ContainerConfig{
 				HostConfig: container.HostConfig{
 					Resources: container.Resources{
