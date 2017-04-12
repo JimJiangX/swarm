@@ -1,4 +1,4 @@
-package resource
+package alloc
 
 import (
 	"strconv"
@@ -7,7 +7,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
-	"github.com/docker/swarm/garden/resource/driver"
+	"github.com/docker/swarm/garden/resource/alloc/driver"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/docker/swarm/scheduler/node"
@@ -16,15 +16,23 @@ import (
 
 type engineCluster interface {
 	Engine(IDOrName string) *cluster.Engine
-	EngineByAddr(addr string) *cluster.Engine
+}
+
+type allocatorOrmer interface {
+	networkAllocOrmer
+
+	driver.VolumeIface
+
+	ListNodesByClusters(clusters []string, enable bool) ([]database.Node, error)
+	RecycleResource(ips []database.IP, lvs []database.Volume) error
 }
 
 type allocator struct {
-	ormer database.Ormer
+	ormer allocatorOrmer
 	ec    engineCluster
 }
 
-func NewAllocator(ormer database.Ormer, ec engineCluster) allocator {
+func NewAllocator(ormer allocatorOrmer, ec engineCluster) Allocator {
 	return allocator{
 		ormer: ormer,
 		ec:    ec,

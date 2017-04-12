@@ -1,8 +1,14 @@
 package resource
 
 import (
+	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 )
+
+type engineCluster interface {
+	Engine(IDOrName string) *cluster.Engine
+	EngineByAddr(addr string) *cluster.Engine
+}
 
 type hostManager struct {
 	ec  engineCluster

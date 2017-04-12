@@ -17,7 +17,7 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/deploy"
 	"github.com/docker/swarm/garden/resource"
-	"github.com/docker/swarm/garden/resource/driver"
+	"github.com/docker/swarm/garden/resource/alloc/driver"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/gorilla/mux"

@@ -10,6 +10,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
+	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/tasklock"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/docker/swarm/scheduler/node"
@@ -136,7 +137,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 	return tl.Run(isnotInProgress, update, async)
 }
 
-func (svc *Service) ServiceUpdate(ctx context.Context, actor allocator, ncpu, memory int64) error {
+func (svc *Service) ServiceUpdate(ctx context.Context, actor alloc.Allocator, ncpu, memory int64) error {
 	type pending struct {
 		u      *unit
 		cpuset string

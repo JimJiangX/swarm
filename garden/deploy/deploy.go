@@ -7,7 +7,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/garden"
 	"github.com/docker/swarm/garden/database"
-	"github.com/docker/swarm/garden/resource"
+	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
@@ -131,7 +131,7 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *databas
 		return ctx.Err()
 	}
 
-	actor := resource.NewAllocator(d.gd.Ormer(), d.gd.Cluster)
+	actor := alloc.NewAllocator(d.gd.Ormer(), d.gd.Cluster)
 	pendings, err := d.gd.Allocation(ctx, actor, svc)
 	if err != nil {
 		return err
@@ -366,7 +366,7 @@ func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config stru
 
 	// TODO:save task status
 	t := database.NewTask(table.Name, database.ServiceUpdateTask, table.ID, string(out), "", 300)
-	actor := resource.NewAllocator(d.gd.Ormer(), d.gd.Cluster)
+	actor := alloc.NewAllocator(d.gd.Ormer(), d.gd.Cluster)
 
 	if (config.Require.CPU > 0 && table.Desc.NCPU != config.Require.CPU) ||
 		(config.Require.Memory > 0 && table.Desc.Memory != config.Require.Memory) {

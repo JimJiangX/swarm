@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/tasklock"
 	"github.com/docker/swarm/garden/utils"
@@ -30,18 +31,6 @@ const (
 	nodeLabel    = "node"
 	clusterLabel = "cluster"
 )
-
-type allocator interface {
-	ListCandidates(clusters, filters []string, stores []structs.VolumeRequire) ([]database.Node, error)
-
-	AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, ncpu, memory int64, reserved []string) (string, error)
-
-	AlloctVolumes(config *cluster.ContainerConfig, id string, n *node.Node, stores []structs.VolumeRequire) ([]database.Volume, error)
-
-	AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string, networkings []string, requires []structs.NetDeviceRequire) ([]database.IP, error)
-
-	RecycleResource(ips []database.IP, lvs []database.Volume) error
-}
 
 func getImage(orm database.ImageOrmer, version string) (database.Image, string, error) {
 	im, err := orm.GetImageVersion(version)
@@ -159,7 +148,7 @@ type scheduleOption struct {
 	}
 }
 
-func (gd *Garden) schedule(ctx context.Context, actor allocator, config *cluster.ContainerConfig, opts scheduleOption) ([]*node.Node, error) {
+func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *cluster.ContainerConfig, opts scheduleOption) ([]*node.Node, error) {
 	_scheduler := gd.scheduler
 
 	if opts.scheduler.strategy != "" && len(opts.scheduler.filters) > 0 {
@@ -238,7 +227,7 @@ type pendingUnit struct {
 	volumes     []database.Volume
 }
 
-func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service) (ready []pendingUnit, err error) {
+func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Service) (ready []pendingUnit, err error) {
 
 	action := func() (err error) {
 		_, version, err := getImage(gd.Ormer(), svc.svc.Desc.Image)
@@ -386,7 +375,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor allocator, svc *Service)
 	return
 }
 
-func pendingAlloc(actor allocator, unit database.Unit, node *node.Node, opts scheduleOption,
+func pendingAlloc(actor alloc.Allocator, unit database.Unit, node *node.Node, opts scheduleOption,
 	config *cluster.ContainerConfig) (pendingUnit, error) {
 	pu := pendingUnit{
 		swarmID:     unit.ID,
