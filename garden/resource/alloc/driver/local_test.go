@@ -280,23 +280,23 @@ func TestLocalVolumeAlloc(t *testing.T) {
 	testLocalVolumeMap(lvm, t)
 
 	requires := []structs.VolumeRequire{
-		structs.VolumeRequire{
+		{
 			Name: "LOG",
 			Type: _HDD,
 			Size: 5 << 30,
 		},
-		structs.VolumeRequire{
+		{
 			Name: "DAT1",
 			Type: _HDD,
 			Size: 5 << 30,
 		},
-		structs.VolumeRequire{
+		{
 			Name: "DAT2",
 			Type: _HDD,
 			Size: 5 << 30,
 		},
 
-		structs.VolumeRequire{
+		{
 			Name: "DAT",
 			Type: _SSD,
 			Size: 3 << 30,
