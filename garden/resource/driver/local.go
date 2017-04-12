@@ -24,7 +24,7 @@ const (
 	defaultLocalVolumeDriver = "lvm"
 )
 
-func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label string) (Driver, error) {
+func volumeDriverFromEngine(iface VolumeIface, e *cluster.Engine, label string) (Driver, error) {
 	var vgType, sizeLabel string
 
 	switch label {
@@ -66,7 +66,7 @@ func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label st
 		total = t
 	}
 
-	lvs, err := vo.ListVolumeByVG(vg)
+	lvs, err := iface.ListVolumeByVG(vg)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label st
 
 	return &localVolume{
 		engine: e,
-		vo:     vo,
+		vo:     iface,
 		_type:  vgType,
 		driver: defaultLocalVolumeDriver,
 		space: Space{
@@ -90,17 +90,17 @@ func volumeDriverFromEngine(vo database.VolumeOrmer, e *cluster.Engine, label st
 	}, nil
 }
 
-func localVolumeDrivers(e *cluster.Engine, vo database.VolumeOrmer) ([]Driver, error) {
+func localVolumeDrivers(e *cluster.Engine, iface VolumeIface) ([]Driver, error) {
 	drivers := make([]Driver, 0, 4)
 
-	vd, err := volumeDriverFromEngine(vo, e, _HDDVGLabel)
+	vd, err := volumeDriverFromEngine(iface, e, _HDDVGLabel)
 	if err == nil && vd != nil {
 		drivers = append(drivers, vd)
 	} else {
 		logrus.Debugf("%s %s %+v", e.Name, _HDDVGLabel, err)
 	}
 
-	vd, err = volumeDriverFromEngine(vo, e, _SSDVGLabel)
+	vd, err = volumeDriverFromEngine(iface, e, _SSDVGLabel)
 	if err == nil && vd != nil {
 		drivers = append(drivers, vd)
 	} else {
@@ -115,7 +115,7 @@ type localVolume struct {
 	driver string
 	_type  string
 	space  Space
-	vo     database.VolumeOrmer
+	vo     VolumeIface
 }
 
 func (lv localVolume) Name() string {

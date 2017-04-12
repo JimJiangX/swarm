@@ -78,6 +78,7 @@ type stores struct {
 	stores map[string]Store
 }
 
+// SetDefaultStores set defaultStores,function should calls before call DefaultStores()
 func SetDefaultStores(script string, orm database.StorageOrmer) {
 	if script == "" {
 		script = defaultScriptPath
@@ -91,6 +92,7 @@ func SetDefaultStores(script string, orm database.StorageOrmer) {
 	}
 }
 
+// DefaultStores returns defaultStores
 func DefaultStores() *stores {
 	return defaultStores
 }

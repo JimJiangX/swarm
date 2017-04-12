@@ -14,8 +14,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-func newNFSDriver(no database.NodeOrmer, engineID string) (Driver, error) {
-	n, err := no.GetNode(engineID)
+func newNFSDriver(iface VolumeIface, engineID string) (Driver, error) {
+	n, err := iface.GetNode(engineID)
 	if err != nil {
 		return nil, err
 	}
@@ -24,7 +24,7 @@ func newNFSDriver(no database.NodeOrmer, engineID string) (Driver, error) {
 		return nil, nil
 	}
 
-	sys, err := no.GetSysConfig()
+	sys, err := iface.GetSysConfig()
 	if err != nil {
 		return nil, err
 	}

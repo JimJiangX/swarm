@@ -12,7 +12,7 @@ import (
 )
 
 type sanVolume struct {
-	orm database.NodeOrmer
+	iface VolumeIface
 
 	san storage.Store
 
@@ -21,8 +21,8 @@ type sanVolume struct {
 	pluginPort string
 }
 
-func newSanVolumeDriver(e *cluster.Engine, orm database.NodeOrmer, storeID string) (*sanVolume, error) {
-	sys, err := orm.GetSysConfig()
+func newSanVolumeDriver(e *cluster.Engine, iface VolumeIface, storeID string) (Driver, error) {
+	sys, err := iface.GetSysConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func newSanVolumeDriver(e *cluster.Engine, orm database.NodeOrmer, storeID strin
 	}
 
 	return &sanVolume{
-		orm:        orm,
+		iface:      iface,
 		san:        san,
 		engine:     e,
 		pluginPort: strconv.Itoa(sys.Plugin),
@@ -100,7 +100,7 @@ func (sv sanVolume) Recycle(lv database.Volume) error {
 func (sv sanVolume) createSanVG(vg string) error {
 	//	fmt.Printf("Engine %s create San Storeage VG,VG=%s\n", host, vg)
 
-	list, err := sv.orm.ListLunByVG(vg)
+	list, err := sv.iface.ListLunByVG(vg)
 	if err != nil {
 		return err
 	}
