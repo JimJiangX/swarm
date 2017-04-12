@@ -136,6 +136,18 @@ func TestAlloctNetworking(t *testing.T) {
 			},
 		}}
 
+	requires := []structs.NetDeviceRequire{
+		{
+			Bandwidth: 100,
+		},
+		{
+			Bandwidth: 200,
+		},
+		{
+			Bandwidth: 300,
+		},
+	}
+
 	config := cluster.ContainerConfig{}
 	at := netAllocator{
 		ec:    es,
@@ -152,18 +164,6 @@ func TestAlloctNetworking(t *testing.T) {
 	}
 
 	{
-		requires := []structs.NetDeviceRequire{
-			{
-				Bandwidth: 100,
-			},
-			{
-				Bandwidth: 200,
-			},
-			{
-				Bandwidth: 300,
-			},
-		}
-
 		out, err := at.AlloctNetworking(&config, "engineID0001", "unit0024794", []string{"networking0011"}, requires[:2])
 		if err != nil {
 			t.Log("error expected")
@@ -173,7 +173,7 @@ func TestAlloctNetworking(t *testing.T) {
 	}
 
 	{
-		out, err = at.AlloctNetworking(&config, "engineID0001", "unit0024794", []string{"networking001"}, requires[:2])
+		out, err := at.AlloctNetworking(&config, "engineID0001", "unit0024794", []string{"networking001"}, requires[:2])
 		if err != nil {
 			t.Error(len(out), err)
 		} else {
@@ -182,7 +182,7 @@ func TestAlloctNetworking(t *testing.T) {
 	}
 
 	{
-		out, err = at.AlloctNetworking(&config, "engineID0001", "unit0024794", []string{"networking001"}, requires[:1])
+		out, err := at.AlloctNetworking(&config, "engineID0001", "unit0024794", []string{"networking001"}, requires[:1])
 		if err == nil {
 			t.Error("error expected,but got:", len(out))
 		} else {
@@ -191,7 +191,7 @@ func TestAlloctNetworking(t *testing.T) {
 	}
 
 	{
-		out, err = at.AlloctNetworking(&config, "engineID0002", "unit0024794", []string{"networking002"}, requires[:1])
+		out, err := at.AlloctNetworking(&config, "engineID0002", "unit0024794", []string{"networking002"}, requires[:1])
 		if err != nil {
 			t.Error(len(out), err)
 		} else {
@@ -200,7 +200,7 @@ func TestAlloctNetworking(t *testing.T) {
 	}
 
 	{
-		out, err = at.AlloctNetworking(&config, "engineID0002", "unit0024794", []string{"networking001", "networking002"}, requires[:1])
+		out, err := at.AlloctNetworking(&config, "engineID0002", "unit0024794", []string{"networking001", "networking002"}, requires[:1])
 		if err == nil {
 			t.Error("error expected,but got:", len(out))
 		} else {

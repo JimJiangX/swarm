@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
@@ -110,6 +111,41 @@ func (lvm *localVolumeMap) DelVolume(nameOrID string) error {
 	return nil
 }
 
+func parseSize(size string) (int64, error) {
+	siz := strings.TrimSpace(size)
+
+	if len(siz) == 0 {
+		return 0, nil
+	}
+
+	var bits uint
+
+	switch siz[len(siz)-1] {
+	case 'b', 'B':
+		siz = strings.TrimSpace(siz[:len(siz)-1])
+		bits = 0
+
+	case 'k', 'K':
+		siz = strings.TrimSpace(siz[:len(siz)-1])
+		bits = 10
+
+	case 'm', 'M':
+		siz = strings.TrimSpace(siz[:len(siz)-1])
+		bits = 20
+
+	case 'g', 'G':
+		siz = strings.TrimSpace(siz[:len(siz)-1])
+		bits = 30
+	}
+
+	n, err := strconv.ParseInt(siz, 10, 64)
+	if err != nil {
+		return 0, errors.Wrapf(err, "ParseInt '%s' error", size)
+	}
+
+	return n << bits, nil
+}
+
 func volumeDriverFromEngine(iface localVolumeIface, e *cluster.Engine, label string) (Driver, error) {
 	var vgType, sizeLabel string
 
@@ -145,9 +181,9 @@ func volumeDriverFromEngine(iface localVolumeIface, e *cluster.Engine, label str
 
 	var total int64
 	if size != "" {
-		t, err := strconv.ParseInt(size, 10, 64)
+		t, err := parseSize(size)
 		if err != nil {
-			return &localVolume{}, errors.Wrapf(err, "parse VG %s:%s", sizeLabel, size)
+			return &localVolume{}, err
 		}
 		total = t
 	}

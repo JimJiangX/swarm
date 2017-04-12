@@ -5,7 +5,40 @@ import (
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/structs"
 )
+
+func TestParseSize(t *testing.T) {
+	type testSize struct {
+		size string
+		val  int64
+		want bool
+	}
+
+	var tests = []testSize{
+		{" ", 0, true}, {"1", 1, true},
+		{"1 b", 1, true}, {"1B", 1, true},
+		{"1 k", 1 << 10, true}, {"1K", 1 << 10, true},
+		{"1 m", 1 << 20, true}, {"1M", 1 << 20, true},
+		{"1 g", 1 << 30, true}, {"1G", 1 << 30, true},
+		{"497491 m", 497491 << 20, true}, {" 2784991248 ", 2784991248, true},
+		{"497491 m", 497491 << 20, true}, {"2784991248", 2784991248, true},
+		{"497 491 m", 0, false}, {"278499 1248", 0, false},
+	}
+
+	for i := range tests {
+
+		n, err := parseSize(tests[i].size)
+		if err != nil {
+			if tests[i].want {
+				t.Error(i, err)
+			}
+		} else if n != tests[i].val {
+			t.Errorf("%d: %s ,expect %d but got %d", i, tests[i].size, tests[i].val, n)
+
+		}
+	}
+}
 
 func testLocalVolumeMap(lvm *localVolumeMap, t *testing.T) {
 	base := lvm.len()
@@ -24,7 +57,7 @@ func testLocalVolumeMap(lvm *localVolumeMap, t *testing.T) {
 			ID:   "lv0001",
 			Name: "lv0001",
 			VG:   "_HDDVGLabel",
-			Size: 3247441,
+			Size: 2 << 30,
 		})
 		if err != nil {
 			t.Error(err)
@@ -34,7 +67,7 @@ func testLocalVolumeMap(lvm *localVolumeMap, t *testing.T) {
 			ID:   "lv0002",
 			Name: "lv0001", // duplicate name
 			VG:   "_HDDVGLabel",
-			Size: 3247441,
+			Size: 3 << 30,
 		})
 		if err == nil {
 			t.Error(err)
@@ -44,7 +77,7 @@ func testLocalVolumeMap(lvm *localVolumeMap, t *testing.T) {
 			ID:   "lv0003",
 			Name: "lv0003",
 			VG:   "_SSDVGLabel",
-			Size: 3247341,
+			Size: 4 << 30,
 		})
 		if err != nil {
 			t.Error(err)
@@ -54,7 +87,7 @@ func testLocalVolumeMap(lvm *localVolumeMap, t *testing.T) {
 			ID:   "lv0004",
 			Name: "lv00004",
 			VG:   "_HDDVGLabel",
-			Size: 3247441,
+			Size: 5 << 30,
 		})
 		if err != nil {
 			t.Error(err)
@@ -118,9 +151,9 @@ func TestLocalVolumeDrivers(t *testing.T) {
 			Name: "engineName001",
 			Labels: map[string]string{
 				_HDDVGLabel:     "", // nil string
-				_HDDVGSizeLabel: "11941040184",
-				_SSDVGLabel:     "_SSDVGLabel",
-				_SSDVGSizeLabel: "81084012324",
+				_HDDVGSizeLabel: "20G",
+				_SSDVGLabel:     _SSDVGLabel,
+				_SSDVGSizeLabel: "10G",
 			},
 		}
 
@@ -143,8 +176,8 @@ func TestLocalVolumeDrivers(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			if space.Free != 81084012324 {
-				t.Errorf("expected %d but got %d", 81084012324, space.Free)
+			if space.Free != 10<<30 {
+				t.Errorf("expected %d but got %d", 10<<30, space.Free)
 			}
 		}
 	}
@@ -154,10 +187,10 @@ func TestLocalVolumeDrivers(t *testing.T) {
 			ID:   "engineID002",
 			Name: "engineName002",
 			Labels: map[string]string{
-				_HDDVGLabel:     "_HDDVGLabel",
-				_HDDVGSizeLabel: "1194109840184",
-				_SSDVGLabel:     "_SSDVGLabel",
-				_SSDVGSizeLabel: "81084012324",
+				_HDDVGLabel:     _HDDVGLabel,
+				_HDDVGSizeLabel: "200g",
+				_SSDVGLabel:     _SSDVGLabel,
+				_SSDVGSizeLabel: "50G",
 			},
 		}
 
@@ -176,8 +209,8 @@ func TestLocalVolumeDrivers(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			if space.Free != 1194109840184 {
-				t.Errorf("expected %d but got %d", 1194109840184, space.Free)
+			if space.Free != 200<<30 {
+				t.Errorf("expected %d but got %d", 200<<30, space.Free)
 			}
 		}
 
@@ -188,8 +221,8 @@ func TestLocalVolumeDrivers(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			if space.Free != 81084012324 {
-				t.Errorf("expected %d but got %d", 81084012324, space.Free)
+			if space.Free != 50<<30 {
+				t.Errorf("expected %d but got %d", 50<<30, space.Free)
 			}
 		}
 
@@ -202,8 +235,8 @@ func TestLocalVolumeDrivers(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			if space.Free != 1194106592743 {
-				t.Errorf("expected %d but got %d", 1194106592743, space.Free)
+			if space.Free != 214748364800 {
+				t.Errorf("expected %d but got %d", 214748364800, space.Free)
 			}
 		}
 
@@ -214,8 +247,8 @@ func TestLocalVolumeDrivers(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			if space.Free != 81080764983 {
-				t.Errorf("expected %d but got %d", 81080764983, space.Free)
+			if space.Free != 53687091200 {
+				t.Errorf("expected %d but got %d", 53687091200, space.Free)
 			}
 		}
 	}
@@ -225,10 +258,10 @@ func TestLocalVolumeDrivers(t *testing.T) {
 			ID:   "engineID003",
 			Name: "engineName003",
 			Labels: map[string]string{
-				_HDDVGLabel:     "_HDDVGLabel",
+				_HDDVGLabel:     _HDDVGLabel,
 				_HDDVGSizeLabel: "119410y9840184", // wrong number
-				_SSDVGLabel:     "_SSDVGLabel",
-				_SSDVGSizeLabel: "81084012324",
+				_SSDVGLabel:     _SSDVGLabel,
+				_SSDVGSizeLabel: "20G",
 			},
 		}
 
@@ -243,5 +276,101 @@ func TestLocalVolumeDrivers(t *testing.T) {
 }
 
 func TestLocalVolumeAlloc(t *testing.T) {
+	lvm := &localVolumeMap{}
+	testLocalVolumeMap(lvm, t)
 
+	requires := []structs.VolumeRequire{
+		structs.VolumeRequire{
+			Name: "LOG",
+			Type: _HDD,
+			Size: 5 << 30,
+		},
+		structs.VolumeRequire{
+			Name: "DAT1",
+			Type: _HDD,
+			Size: 5 << 30,
+		},
+		structs.VolumeRequire{
+			Name: "DAT2",
+			Type: _HDD,
+			Size: 5 << 30,
+		},
+
+		structs.VolumeRequire{
+			Name: "DAT",
+			Type: _SSD,
+			Size: 3 << 30,
+		},
+	}
+
+	e := &cluster.Engine{
+		ID:   "engineID002",
+		Name: "engineName002",
+		Labels: map[string]string{
+			_HDDVGLabel:     _HDDVGLabel,
+			_HDDVGSizeLabel: "50G",
+			_SSDVGLabel:     _SSDVGLabel,
+			_SSDVGSizeLabel: "10G",
+		},
+	}
+
+	drivers, err := localVolumeDrivers(e, lvm)
+	if err != nil {
+		t.Error(err)
+	}
+
+	vds := VolumeDrivers(drivers)
+	err = vds.IsSpaceEnough(requires)
+	if err != nil {
+		t.Error(err)
+	}
+
+	{
+		config := &cluster.ContainerConfig{}
+		lvs, err := vds.AllocVolumes(config, "unitxxxxx0001", requires)
+		if err != nil {
+			t.Error(err)
+		} else if len(lvs) != len(requires) {
+			t.Errorf("expected %d but got %d", len(requires), len(lvs))
+		}
+	}
+
+	{
+		config := &cluster.ContainerConfig{}
+		lvs, err := vds.AllocVolumes(config, "unit2xxxxx0002", requires)
+		if err != nil {
+			t.Error(err)
+		} else if len(lvs) != len(requires) {
+			t.Errorf("expected %d but got %d", len(requires), len(lvs))
+		}
+	}
+
+	{
+		config := &cluster.ContainerConfig{}
+		lvs, err := vds.AllocVolumes(config, "unit3xxxxx0002", requires)
+		if err != nil {
+			t.Error(err)
+		} else if len(lvs) != len(requires) {
+			t.Errorf("expected %d but got %d", len(requires), len(lvs))
+		}
+	}
+
+	{
+		// not enough _SSD
+		config := &cluster.ContainerConfig{}
+		_, err := vds.AllocVolumes(config, "unit3xxxxx0002", requires)
+		if err == nil {
+			t.Error("error expected")
+		}
+	}
+
+	{
+		config := &cluster.ContainerConfig{}
+		lvs, err := vds.AllocVolumes(config, "unit4xxxxx0002", requires[:1])
+		if err != nil {
+			t.Error(err)
+		} else if len(lvs) != 1 {
+			t.Errorf("expected %d but got %d", len(requires), 1)
+		}
+	}
 }
