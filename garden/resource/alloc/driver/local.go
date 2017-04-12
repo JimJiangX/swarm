@@ -268,10 +268,12 @@ func (lv *localVolume) Alloc(config *cluster.ContainerConfig, uid string, req st
 		return nil, err
 	}
 
+	id := utils.Generate32UUID()
+
 	v := database.Volume{
 		Size:       req.Size,
-		ID:         utils.Generate32UUID(),
-		Name:       fmt.Sprintf("%s_%s_%s_LV", uid[:8], space.VG, req.Name),
+		ID:         id,
+		Name:       fmt.Sprintf("%s_%s_%s_%s_LV", uid[:8], space.VG, id[:8], req.Name),
 		UnitID:     uid,
 		VG:         space.VG,
 		Driver:     lv.Driver(),

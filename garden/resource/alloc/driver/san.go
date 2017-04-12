@@ -8,6 +8,7 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/storage"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/garden/utils"
 	"github.com/docker/swarm/seed/sdk"
 )
 
@@ -68,7 +69,7 @@ func (sv sanVolume) Space() (Space, error) {
 }
 
 func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req structs.VolumeRequire) (*database.Volume, error) {
-	name := fmt.Sprintf("%s_%s_%s_LV", uid, req.Type, req.Name)
+	name := fmt.Sprintf("%s_%s_%s_%s_LV", uid, req.Type, utils.Generate8UUID(), req.Name)
 	vg := uid + "_SAN_VG"
 
 	lun, v, err := sv.san.Alloc(name, uid, vg, int(req.Size))
