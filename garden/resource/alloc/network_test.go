@@ -66,28 +66,6 @@ func (n *network) AllocNetworking(unit, engine string, req []database.Networking
 	return out, nil
 }
 
-type engines []*cluster.Engine
-
-func (es engines) Engine(IDOrName string) *cluster.Engine {
-	for i := range es {
-		if es[i] != nil && (es[i].ID == IDOrName || es[i].Name == IDOrName) {
-			return es[i]
-		}
-	}
-
-	return nil
-}
-
-func (es engines) EngineByAddr(addr string) *cluster.Engine {
-	for i := range es {
-		if es[i] != nil && es[i].Addr == addr {
-			return es[i]
-		}
-	}
-
-	return nil
-}
-
 func TestAlloctNetworking(t *testing.T) {
 	es := engines{
 		&cluster.Engine{

@@ -8,6 +8,28 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 )
 
+type engines []*cluster.Engine
+
+func (es engines) Engine(IDOrName string) *cluster.Engine {
+	for i := range es {
+		if es[i] != nil && (es[i].ID == IDOrName || es[i].Name == IDOrName) {
+			return es[i]
+		}
+	}
+
+	return nil
+}
+
+func (es engines) EngineByAddr(addr string) *cluster.Engine {
+	for i := range es {
+		if es[i] != nil && es[i].Addr == addr {
+			return es[i]
+		}
+	}
+
+	return nil
+}
+
 func TestFindIdleCPUs(t *testing.T) {
 	want := "2,4,6,7"
 	got, err := findIdleCPUs([]string{"0,1", "5,8", "3", "9"}, 10, 4)
