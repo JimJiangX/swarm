@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type ClusterInterface interface {
+type ClusterIface interface {
 	InsertCluster(c Cluster) error
 
 	GetCluster(ID string) (Cluster, error)
@@ -19,9 +19,9 @@ type ClusterInterface interface {
 }
 
 type ClusterOrmer interface {
-	ClusterInterface
-	NodeInterface
-	SysConfigOrmer
+	ClusterIface
+	NodeIface
+	GetSysConfigIface
 }
 
 // Cluster table  structure,correspod with a group of computers

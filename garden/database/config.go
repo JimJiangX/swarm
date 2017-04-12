@@ -9,9 +9,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-type SysConfigOrmer interface {
-	InsertSysConfig(c SysConfig) error
+type GetSysConfigIface interface {
 	GetSysConfig() (SysConfig, error)
+}
+
+type SysConfigOrmer interface {
+	GetSysConfigIface
+
+	InsertSysConfig(c SysConfig) error
 	GetPorts() (Ports, error)
 	GetRegistry() (Registry, error)
 	GetAuthConfig() (*types.AuthConfig, error)

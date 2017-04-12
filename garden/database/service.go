@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type ServiceInterface interface {
+type ServiceIface interface {
 	InsertService(svc Service, units []Unit, t *Task) error
 
 	GetService(nameOrID string) (Service, error)
@@ -25,7 +25,7 @@ type ServiceInterface interface {
 	SetServiceDesc(svc Service) error
 }
 
-type ServiceInfoInterface interface {
+type ServiceInfoIface interface {
 	GetServiceInfo(nameOrID string) (ServiceInfo, error)
 	ListServicesInfo() ([]ServiceInfo, error)
 
@@ -34,21 +34,21 @@ type ServiceInfoInterface interface {
 }
 
 type ServiceOrmer interface {
-	ServiceInterface
+	ServiceIface
 
-	ServiceInfoInterface
+	ServiceInfoIface
 
-	UnitInterface
+	UnitIface
 
-	ContainerInterface
+	ContainerIface
 
-	NodeInterface
+	NodeIface
 
 	VolumeOrmer
 
 	NetworkingOrmer
 
-	ImageInterface
+	ImageIface
 
 	TaskOrmer
 

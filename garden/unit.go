@@ -161,7 +161,7 @@ func (u unit) startContainer(ctx context.Context) error {
 
 	// start networking
 	if u.startNetwork != nil {
-		ports, err := u.uo.GetPorts()
+		sys, err := u.uo.GetSysConfig()
 		if err != nil {
 			return err
 		}
@@ -171,7 +171,7 @@ func (u unit) startContainer(ctx context.Context) error {
 			return err
 		}
 		if len(ips) > 0 {
-			addr := net.JoinHostPort(c.Engine.IP, strconv.Itoa(ports.SwarmAgent))
+			addr := net.JoinHostPort(c.Engine.IP, strconv.Itoa(sys.Ports.SwarmAgent))
 			err := u.startNetwork(ctx, addr, c.ID, ips, nil)
 			if err != nil {
 				return err

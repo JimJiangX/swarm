@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type UnitInterface interface {
+type UnitIface interface {
 	GetUnit(nameOrID string) (Unit, error)
 	ListUnitByServiceID(id string) ([]Unit, error)
 	ListUnitByEngine(id string) ([]Unit, error)
@@ -30,24 +30,24 @@ type UnitInterface interface {
 	DelUnitsRelated(units []Unit, volume bool) error
 }
 
-type ContainerInterface interface {
+type ContainerIface interface {
 	UnitContainerCreated(name, containerID, engineID, mode string, state int) error
 
 	SetUnitByContainer(containerID string, state int) error
 }
 
 type UnitOrmer interface {
-	UnitInterface
+	UnitIface
 
-	ContainerInterface
+	ContainerIface
 
-	NodeInterface
+	NodeIface
 
 	VolumeOrmer
 
 	NetworkingOrmer
 
-	SysConfigOrmer
+	GetSysConfigIface
 }
 
 // Unit is table structure

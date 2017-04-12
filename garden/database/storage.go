@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type StorageInterface interface {
+type StorageIface interface {
 	InsertLunSetVolume(lun LUN, lv Volume) error
 	InsertLunVolume(lun LUN, lv Volume) error
 
@@ -49,7 +49,7 @@ type StorageInterface interface {
 type StorageOrmer interface {
 	VolumeOrmer
 
-	StorageInterface
+	StorageIface
 }
 
 // LUN is table structure,correspod with SAN storage LUN.

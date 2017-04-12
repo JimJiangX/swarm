@@ -11,14 +11,14 @@ import (
 )
 
 type NodeOrmer interface {
-	ClusterInterface
-	NodeInterface
-	SysConfigOrmer
+	ClusterIface
+	NodeIface
+	GetSysConfigIface
 	VolumeOrmer
-	StorageInterface
+	StorageIface
 }
 
-type NodeInterface interface {
+type NodeIface interface {
 	InsertNodesAndTask(nodes []Node, tasks []Task) error
 
 	GetNode(nameOrID string) (Node, error)

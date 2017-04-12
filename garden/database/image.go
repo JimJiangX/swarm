@@ -12,11 +12,11 @@ import (
 
 type ImageOrmer interface {
 	SysConfigOrmer
-	ImageInterface
+	ImageIface
 	TaskOrmer
 }
 
-type ImageInterface interface {
+type ImageIface interface {
 	GetImageVersion(name string) (Image, error)
 	GetImage(name string, major, minor, patch int) (Image, error)
 

@@ -9,7 +9,7 @@ import (
 )
 
 type eventHander struct {
-	ci database.ContainerInterface
+	ci database.ContainerIface
 }
 
 func NewEventHandler(ormer database.Ormer) *eventHander {
@@ -64,7 +64,7 @@ func (eh eventHander) Handle(event *cluster.Event) (err error) {
 	return err
 }
 
-func handleContainerEvent(ci database.ContainerInterface, action, ID string) error {
+func handleContainerEvent(ci database.ContainerIface, action, ID string) error {
 	state := 0
 
 	switch action {

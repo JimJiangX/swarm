@@ -8,14 +8,14 @@ import (
 )
 
 type Ormer interface {
-	ServiceInterface
-	ServiceInfoInterface
-	ClusterInterface
-	UnitInterface
-	ContainerInterface
-	ImageInterface
-	NodeInterface
-	StorageInterface
+	ServiceIface
+	ServiceInfoIface
+	ClusterIface
+	UnitIface
+	ContainerIface
+	ImageIface
+	NodeIface
+	StorageIface
 
 	SysConfigOrmer
 	NetworkingOrmer
