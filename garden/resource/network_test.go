@@ -157,8 +157,8 @@ func TestAlloctNetworking(t *testing.T) {
 				Networking: "networking002",
 			},
 		}}
-	config := cluster.ContainerConfig{}
 
+	config := cluster.ContainerConfig{}
 	at := netAllocator{
 		ec:    es,
 		ormer: ips,

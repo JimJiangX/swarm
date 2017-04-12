@@ -56,9 +56,9 @@ nodes:
 			continue nodes
 		}
 
-		ok, err := at.isNodeStoreEnough(engine, stores)
-		if !ok || err != nil {
-			logrus.Debugf("node %s %t %+v", nodes[i].Addr, ok, err)
+		err := at.isNodeStoreEnough(engine, stores)
+		if err != nil {
+			logrus.Debugf("node %s %+v", nodes[i].Addr, err)
 			continue
 		}
 

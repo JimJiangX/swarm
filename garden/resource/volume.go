@@ -73,13 +73,13 @@ func (vds volumeDrivers) AllocVolumes(config *cluster.ContainerConfig, uid strin
 	return volumes, nil
 }
 
-func (at allocator) isNodeStoreEnough(engine *cluster.Engine, stores []structs.VolumeRequire) (bool, error) {
+func (at allocator) isNodeStoreEnough(engine *cluster.Engine, stores []structs.VolumeRequire) error {
 	drivers, err := driver.FindEngineVolumeDrivers(at.ormer, engine)
 	if err != nil {
 		logrus.Warnf("engine:%s find volume drivers,%+v", engine.Name, err)
 
 		if len(drivers) == 0 {
-			return false, err
+			return err
 		}
 	}
 
@@ -87,5 +87,5 @@ func (at allocator) isNodeStoreEnough(engine *cluster.Engine, stores []structs.V
 
 	err = vds.isSpaceEnough(stores)
 
-	return err == nil, err
+	return err
 }
