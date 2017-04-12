@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"database/sql"
 	"fmt"
 	"strconv"
 
@@ -24,7 +25,92 @@ const (
 	defaultLocalVolumeDriver = "lvm"
 )
 
-func volumeDriverFromEngine(iface VolumeIface, e *cluster.Engine, label string) (Driver, error) {
+type localVolumeIface interface {
+	InsertVolume(lv database.Volume) error
+
+	GetVolume(nameOrID string) (database.Volume, error)
+
+	ListVolumeByVG(string) ([]database.Volume, error)
+
+	DelVolume(nameOrID string) error
+}
+
+type localVolumeMap struct {
+	m map[string]database.Volume
+}
+
+func (lvm *localVolumeMap) len() int {
+	return len(lvm.m)
+}
+
+func (lvm *localVolumeMap) InsertVolume(lv database.Volume) error {
+	if lv.ID == "" {
+		return errors.New("ID is required")
+	}
+
+	if lvm == nil {
+		lvm = &localVolumeMap{make(map[string]database.Volume)}
+	}
+
+	if lvm.m == nil {
+		lvm.m = make(map[string]database.Volume)
+	}
+
+	if _, ok := lvm.m[lv.ID]; ok {
+		return errors.New("Volume ID existed")
+	}
+
+	for _, v := range lvm.m {
+		if v.Name == lv.Name {
+			return errors.New("Volume Name existed")
+		}
+	}
+
+	lvm.m[lv.ID] = lv
+
+	return nil
+}
+
+func (lvm localVolumeMap) GetVolume(nameOrID string) (database.Volume, error) {
+
+	if v, ok := lvm.m[nameOrID]; ok {
+		return v, nil
+	}
+
+	for _, v := range lvm.m {
+		if v.Name == nameOrID {
+			return v, nil
+		}
+	}
+
+	return database.Volume{}, sql.ErrNoRows
+}
+
+func (lvm localVolumeMap) ListVolumeByVG(vg string) ([]database.Volume, error) {
+	out := make([]database.Volume, 0, 5)
+
+	for _, v := range lvm.m {
+		if v.VG == vg {
+			out = append(out, v)
+		}
+	}
+
+	return out, nil
+}
+
+func (lvm *localVolumeMap) DelVolume(nameOrID string) error {
+	delete(lvm.m, nameOrID)
+
+	for _, v := range lvm.m {
+		if v.Name == nameOrID {
+			delete(lvm.m, v.ID)
+		}
+	}
+
+	return nil
+}
+
+func volumeDriverFromEngine(iface localVolumeIface, e *cluster.Engine, label string) (Driver, error) {
 	var vgType, sizeLabel string
 
 	switch label {
@@ -66,31 +152,25 @@ func volumeDriverFromEngine(iface VolumeIface, e *cluster.Engine, label string) 
 		total = t
 	}
 
-	lvs, err := iface.ListVolumeByVG(vg)
-	if err != nil {
-		return nil, err
-	}
-
-	var used int64
-	for i := range lvs {
-		used += lvs[i].Size
-	}
-
-	return &localVolume{
+	lv := &localVolume{
 		engine: e,
 		vo:     iface,
 		_type:  vgType,
 		driver: defaultLocalVolumeDriver,
 		space: Space{
 			Total:  total,
-			Free:   total - used,
+			Free:   total,
 			VG:     vg,
 			Fstype: defaultFileSystem,
 		},
-	}, nil
+	}
+
+	_, err := lv.Space()
+
+	return lv, err
 }
 
-func localVolumeDrivers(e *cluster.Engine, iface VolumeIface) ([]Driver, error) {
+func localVolumeDrivers(e *cluster.Engine, iface localVolumeIface) ([]Driver, error) {
 	drivers := make([]Driver, 0, 4)
 
 	vd, err := volumeDriverFromEngine(iface, e, _HDDVGLabel)
@@ -115,7 +195,7 @@ type localVolume struct {
 	driver string
 	_type  string
 	space  Space
-	vo     VolumeIface
+	vo     localVolumeIface
 }
 
 func (lv localVolume) Name() string {
@@ -131,6 +211,18 @@ func (lv localVolume) Driver() string {
 }
 
 func (lv localVolume) Space() (Space, error) {
+	lvs, err := lv.vo.ListVolumeByVG(lv.space.VG)
+	if err != nil {
+		return Space{}, err
+	}
+
+	var used int64
+	for i := range lvs {
+		used += lvs[i].Size
+	}
+
+	lv.space.Free = lv.space.Total - used
+
 	return lv.space, nil
 }
 

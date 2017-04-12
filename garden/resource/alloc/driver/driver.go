@@ -9,14 +9,11 @@ import (
 )
 
 type VolumeIface interface {
+	localVolumeIface
+
 	database.GetSysConfigIface
 
 	GetNode(nameOrID string) (database.Node, error)
-
-	InsertVolume(lv database.Volume) error
-	GetVolume(nameOrID string) (database.Volume, error)
-	ListVolumeByVG(string) ([]database.Volume, error)
-	DelVolume(nameOrID string) error
 
 	ListLunByVG(vg string) ([]database.LUN, error)
 }

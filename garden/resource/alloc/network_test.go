@@ -142,57 +142,69 @@ func TestAlloctNetworking(t *testing.T) {
 		ormer: ips,
 	}
 
-	out, err := at.AlloctNetworking(&config, "", "", nil, nil)
-	if err == nil {
-		t.Error("error expected,but got:", len(out))
-	} else {
-		t.Log(len(out), err)
+	{
+		out, err := at.AlloctNetworking(&config, "", "", nil, nil)
+		if err == nil {
+			t.Error("error expected,but got:", len(out))
+		} else {
+			t.Log(len(out), err)
+		}
 	}
 
-	requires := []structs.NetDeviceRequire{
-		{
-			Bandwidth: 100,
-		},
-		{
-			Bandwidth: 200,
-		},
-		{
-			Bandwidth: 300,
-		},
+	{
+		requires := []structs.NetDeviceRequire{
+			{
+				Bandwidth: 100,
+			},
+			{
+				Bandwidth: 200,
+			},
+			{
+				Bandwidth: 300,
+			},
+		}
+
+		out, err := at.AlloctNetworking(&config, "engineID0001", "unit0024794", []string{"networking0011"}, requires[:2])
+		if err != nil {
+			t.Log("error expected")
+		} else {
+			t.Error(len(out), err)
+		}
 	}
 
-	out, err = at.AlloctNetworking(&config, "engineID0001", "unit0024794", []string{"networking0011"}, requires[:2])
-	if err != nil {
-		t.Log("error expected")
-	} else {
-		t.Error(len(out), err)
+	{
+		out, err = at.AlloctNetworking(&config, "engineID0001", "unit0024794", []string{"networking001"}, requires[:2])
+		if err != nil {
+			t.Error(len(out), err)
+		} else {
+			t.Log(out, err)
+		}
 	}
 
-	out, err = at.AlloctNetworking(&config, "engineID0001", "unit0024794", []string{"networking001"}, requires[:2])
-	if err != nil {
-		t.Error(len(out), err)
-	} else {
-		t.Log(out, err)
+	{
+		out, err = at.AlloctNetworking(&config, "engineID0001", "unit0024794", []string{"networking001"}, requires[:1])
+		if err == nil {
+			t.Error("error expected,but got:", len(out))
+		} else {
+			t.Log(len(out), err)
+		}
 	}
 
-	out, err = at.AlloctNetworking(&config, "engineID0001", "unit0024794", []string{"networking001"}, requires[:1])
-	if err == nil {
-		t.Error("error expected,but got:", len(out))
-	} else {
-		t.Log(len(out), err)
+	{
+		out, err = at.AlloctNetworking(&config, "engineID0002", "unit0024794", []string{"networking002"}, requires[:1])
+		if err != nil {
+			t.Error(len(out), err)
+		} else {
+			t.Log(out, err)
+		}
 	}
 
-	out, err = at.AlloctNetworking(&config, "engineID0002", "unit0024794", []string{"networking002"}, requires[:1])
-	if err != nil {
-		t.Error(len(out), err)
-	} else {
-		t.Log(out, err)
-	}
-
-	out, err = at.AlloctNetworking(&config, "engineID0002", "unit0024794", []string{"networking001", "networking002"}, requires[:1])
-	if err == nil {
-		t.Error("error expected,but got:", len(out))
-	} else {
-		t.Log(len(out), err)
+	{
+		out, err = at.AlloctNetworking(&config, "engineID0002", "unit0024794", []string{"networking001", "networking002"}, requires[:1])
+		if err == nil {
+			t.Error("error expected,but got:", len(out))
+		} else {
+			t.Log(len(out), err)
+		}
 	}
 }
