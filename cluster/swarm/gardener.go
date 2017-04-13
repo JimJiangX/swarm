@@ -110,77 +110,76 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 
 // syncNodeWithEngine synchronize Node.engine if Node exist
 // engine from new Engine register to Cluster
-func (gd *Gardener) syncNodeWithEngine() {
-	gd.Lock()
-	if gd.Cluster.pendingEngineCh == nil {
-		gd.Cluster.pendingEngineCh = make(chan *cluster.Engine, 50)
-	}
-	gd.Unlock()
+//func (gd *Gardener) syncNodeWithEngine() {
+//	gd.Lock()
+//	if gd.Cluster.pendingEngineCh == nil {
+//		gd.Cluster.pendingEngineCh = make(chan *cluster.Engine, 50)
+//	}
+//	gd.Unlock()
 
-	for {
-		engine := <-gd.Cluster.pendingEngineCh
-		if engine == nil || !engine.IsHealthy() {
-			continue
-		}
+//	for {
+//		engine := <-gd.Cluster.pendingEngineCh
+//		if engine == nil || !engine.IsHealthy() {
+//			continue
+//		}
 
-		nodeTab, err := database.GetNode(engine.ID)
-		if err != nil {
-			logrus.WithField("Engine", engine.Addr).WithError(err).Warn("sync Node with Engine")
+//		nodeTab, err := database.GetNode(engine.ID)
+//		if err != nil {
+//			logrus.WithField("Engine", engine.Addr).WithError(err).Warn("sync Node with Engine")
 
-			nodeTab, err = database.GetNodeByAddr(engine.Addr)
-			if err != nil {
-				logrus.WithField("Engine", engine.Addr).Warn(err)
-				continue
-			}
-			if nodeTab.Status < statusNodeEnable {
-				continue
-			}
-		}
+//			nodeTab, err = database.GetNodeByAddr(engine.Addr)
+//			if err != nil {
+//				logrus.WithField("Engine", engine.Addr).Warn(err)
+//				continue
+//			}
+//			if nodeTab.Status < statusNodeEnable {
+//				continue
+//			}
+//		}
 
-		//		var dc *Datacenter
+//				var dc *Datacenter
 
-		//		gd.RLock()
-		//		for i := range gd.datacenters {
-		//			if gd.datacenters[i].ID == nodeTab.ClusterID {
-		//				dc = gd.datacenters[i]
-		//				break
-		//			}
-		//		}
-		//		gd.RUnlock()
+//				gd.RLock()
+//				for i := range gd.datacenters {
+//					if gd.datacenters[i].ID == nodeTab.ClusterID {
+//						dc = gd.datacenters[i]
+//						break
+//					}
+//				}
+//				gd.RUnlock()
 
-		//		if dc == nil {
-		dc, err := gd.Datacenter(nodeTab.ClusterID)
-		if err != nil {
-			logrus.WithField("Engine", engine.Addr).Warn(err)
-		}
-		continue
+//				if dc == nil {
+//		dc, err := gd.Datacenter(nodeTab.ClusterID)
+//		if err != nil {
+//			logrus.WithField("Engine", engine.Addr).Warn(err)
+//		}
 
-		node, err := dc.GetNode(nodeTab.ID)
-		if err == nil {
-			if node.engine == nil ||
-				(!node.engine.IsHealthy() && node.engine.Addr == engine.Addr) {
+//				node, err := dc.GetNode(nodeTab.ID)
+//				if err == nil {
+//					if node.engine == nil ||
+//						(!node.engine.IsHealthy() && node.engine.Addr == engine.Addr) {
 
-				node.engine = engine
-			}
+//						node.engine = engine
+//					}
 
-		} else {
-			node, err = gd.reloadNode(nodeTab)
-			if err != nil {
-				continue
-			}
-			if dc != nil {
-				dc.Lock()
-				dc.nodes = append(dc.nodes, node)
-				dc.Unlock()
-			}
-		}
+//				} else {
+//					node, err = gd.reloadNode(nodeTab)
+//					if err != nil {
+//						continue
+//					}
+//					if dc != nil {
+//						dc.Lock()
+//						dc.nodes = append(dc.nodes, node)
+//						dc.Unlock()
+//					}
+//				}
 
-		//		err = gd.reloadServiceByEngine(engine.ID)
-		//		if err != nil {
-		//			logrus.WithField("Engine", engine.Addr).WithError(err).Warn("sync Node with Engine,reload Services on engine")
-		//		}
-	}
-}
+//				err = gd.reloadServiceByEngine(engine.ID)
+//				if err != nil {
+//					logrus.WithField("Engine", engine.Addr).WithError(err).Warn("sync Node with Engine,reload Services on engine")
+//				}
+//	}
+//}
 
 //func (gd *Gardener) reloadServiceByEngine(engineID string) error {
 //	units, err := database.ListUnitByEngine(engineID)

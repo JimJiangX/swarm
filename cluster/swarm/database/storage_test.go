@@ -185,7 +185,7 @@ func TestRaidGroup(t *testing.T) {
 	rg4 := RaidGroup{
 		ID:          utils.Generate64UUID(),
 		StorageID:   rg.StorageID,
-		StorageRGID: 2,
+		StorageRGID: "2",
 		Enabled:     rg.Enabled,
 	}
 	err = rg4.Insert()

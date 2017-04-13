@@ -147,7 +147,7 @@ func TestPort(t *testing.T) {
 }
 
 func TestNetwork(t *testing.T) {
-	networking, _, err := TxInsertNetworking("192.168.2.14", "192.168.2.144", "255.255.255.0", "tcp", 24)
+	networking, _, err := TxInsertNetworking("192.168.2.14", "192.168.2.144", "255.255.255.0", "tcp", 24, 1)
 	if err != nil {
 		t.Fatal(err)
 	}

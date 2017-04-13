@@ -145,7 +145,7 @@ func TestHUAWEIStore(t *testing.T) {
 		t.Errorf("Unexpected,want %s got %s", SANStoreDriver, store.Driver())
 	}
 
-	size, err := store.AddSpace(0)
+	size, err := store.AddSpace("0")
 	if err != nil {
 		t.Error(err, size)
 	}
@@ -160,11 +160,11 @@ func TestHUAWEIStore(t *testing.T) {
 		t.Log(key, val)
 	}
 
-	err = store.DisableSpace(0)
+	err = store.DisableSpace("0")
 	if err != nil {
 		t.Error(err)
 	}
-	err = store.EnableSpace(0)
+	err = store.EnableSpace("0")
 	if err != nil {
 		t.Error(err)
 	}

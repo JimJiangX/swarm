@@ -3,6 +3,7 @@ package swarm
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -19,8 +20,7 @@ type serviceBackup struct {
 	id       crontab.EntryID
 	strategy *database.BackupStrategy
 	schedule crontab.Schedule
-
-	svc *Service
+	svc      *Service
 }
 
 func newBackupJob(svc *Service) *serviceBackup {
@@ -228,37 +228,79 @@ func backupTask(ctx context.Context, backup *unit, task *database.Task,
 	return err
 }
 
-// checkBackupFiles checks files.Retention,remove expired files
-func checkBackupFiles(nameOrID string) (bool, error) {
-	service, files, err := database.ListBackupFilesByService(nameOrID)
+func removeExpiredBackupFiles() error {
+	sys, err := database.GetSystemConfig()
 	if err != nil {
-		return false, err
+		return err
+	}
+
+	if _, err := os.Stat(sys.NFSOption.MountDir); os.IsNotExist(err) {
+		logrus.Errorf("nfs:'%s',%s", sys.NFSOption.MountDir, err)
+		return err
+	}
+
+	files, err := database.ListBackupFiles()
+	if err != nil {
+		return err
 	}
 
 	now := time.Now()
 	expired := make([]database.BackupFile, 0, len(files))
-	valid := make([]database.BackupFile, 0, len(files))
 
 	for i := range files {
 		if now.After(files[i].Retention) {
 			expired = append(expired, files[i])
-		} else {
-			valid = append(valid, files[i])
 		}
 	}
 
 	for i := range expired {
-		logrus.Infof("Backup files expired:%v", expired[i].Path)
-
-		err := os.RemoveAll(expired[i].Path)
+		abs, err := abs(sys.NFSOption.MountDir, sys.BackupDir, expired[i].Path)
 		if err != nil {
 			logrus.Errorf("RemoveAll expired backup file %s,%s", expired[i].Path, err)
+			continue
+		}
+
+		logrus.Infof("Backup files expired:%v", abs)
+
+		err = os.RemoveAll(abs)
+		if err != nil {
+			logrus.Errorf("RemoveAll expired backup file %s,%s", abs, err)
 			continue
 		}
 
 		err = database.DelBackupFile(expired[i].ID)
 		if err != nil {
 			logrus.Errorf("del expired backup file,%+v", err)
+		}
+	}
+
+	return err
+}
+
+func abs(prefix, base, path string) (string, error) {
+	rel, err := filepath.Rel(base, path)
+	if err != nil {
+		return "", errors.Wrap(err, path)
+	}
+
+	return filepath.Join(prefix, rel), nil
+}
+
+// checkBackupFiles checks files.Retention,remove expired files
+func checkBackupFiles(nameOrID string) (bool, error) {
+	removeExpiredBackupFiles()
+
+	service, files, err := database.ListBackupFilesByService(nameOrID)
+	if err != nil {
+		return false, err
+	}
+
+	now := time.Now()
+	valid := make([]database.BackupFile, 0, len(files))
+
+	for i := range files {
+		if now.Before(files[i].Retention) {
+			valid = append(valid, files[i])
 		}
 	}
 

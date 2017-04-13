@@ -129,7 +129,7 @@ func TestTxBackupTaskDone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = deleteBackupFile(bf.ID)
+	err = DelBackupFile(bf.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -52,12 +53,37 @@ func (bf BackupFile) tableName() string {
 	return "tbl_dbaas_backup_files"
 }
 
+// ListBackupFiles return all BackupFile
+func ListBackupFiles() ([]BackupFile, error) {
+	db, err := getDB(false)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []BackupFile
+
+	err = db.Select(&out, "SELECT id,task_id,strategy_id,unit_id,type,path,size,retention,created_at,finished_at FROM tbl_dbaas_backup_files")
+	if err == nil {
+		return out, nil
+	} else if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	return nil, errors.Wrap(err, "list []BackupFile")
+}
+
 // ListBackupFilesByService returns Service and []BackupFile select by name or ID
 func ListBackupFilesByService(nameOrID string) (Service, []BackupFile, error) {
 	db, err := getDB(true)
 	if err != nil {
 		return Service{}, nil, err
 	}
+
+	defer func() {
+		if errors.Cause(err) == sql.ErrNoRows {
+			err = nil
+		}
+	}()
 
 	service := Service{}
 	err = db.Get(&service, "SELECT id,name,description,architecture,business_code,auto_healing,auto_scaling,status,backup_max_size,backup_files_retention,created_at,finished_at FROM tbl_dbaas_service WHERE id=? OR name=?", nameOrID, nameOrID)
