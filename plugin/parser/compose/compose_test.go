@@ -49,7 +49,50 @@ func getRedisSpecTest() *structs.ServiceSpec {
 }
 
 func getMysqlSpecTest() *structs.ServiceSpec {
-	return &structs.ServiceSpec{}
+	req := &structs.ServiceSpec{
+		Arch: structs.Arch{
+			Mode:     "replication",
+			Replicas: 3,
+			Code:     "M:1#S:2",
+		},
+
+		Options: map[string]interface{}{"mysqld::port": 6379},
+		Users: []structs.User{
+			structs.User{
+				Name:     "rep1",
+				Password: "rep1",
+				Role:     "replication",
+			},
+		},
+		Units: []structs.UnitSpec{
+			{
+				Networking: []structs.UnitIP{
+					{
+						IP: "192.168.30.105",
+					},
+				},
+			},
+
+			{
+				Networking: []structs.UnitIP{
+					{
+						IP: "192.168.30.104",
+					},
+				},
+			},
+
+			{
+				Networking: []structs.UnitIP{
+					{
+						IP: "192.168.30.103",
+					},
+				},
+			},
+		},
+	}
+	req.Image = "mysql:5.7.17"
+
+	return req
 }
 
 func TestOptions(t *testing.T) {
@@ -84,9 +127,23 @@ func TestRedis(t *testing.T) {
 	if err != nil {
 		t.Skipf("redis ComposeCluster:%+v", err)
 	}
-
 }
 
+func TestMysql(t *testing.T) {
+	spec := getMysqlSpecTest()
+	mgmip := "127.0.0.1"
+	mgmport := 123
+	composer, err := NewCompserBySpec(spec, mgmip, mgmport)
+	//	assert.Nil(t, err)
+	if err != nil {
+		t.Skipf("get composer fail:%s", err.Error())
+	}
+
+	err = composer.ComposeCluster()
+	if err != nil {
+		t.Skipf("redis ComposeCluster:%+v", err)
+	}
+}
 func TestClone(t *testing.T) {
 	spec := getRedisSpecTest()
 	spec.Arch.Mode = "clone"
