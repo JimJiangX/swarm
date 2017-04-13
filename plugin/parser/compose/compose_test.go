@@ -86,7 +86,7 @@ func getMysqlSpecTest() *structs.ServiceSpec {
 
 		Options: map[string]interface{}{"mysqld::port": 6379},
 		Users: []structs.User{
-			structs.User{
+			{
 				Name:     "rep1",
 				Password: "rep1",
 				Role:     "replication",
