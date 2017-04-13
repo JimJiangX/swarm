@@ -122,6 +122,13 @@ func valicateMysqlSpec(req *structs.ServiceSpec) error {
 	if _, ok := port.(int); !ok {
 		return errors.New("bad req:mysql Options[mysqld::port] should  int type")
 	}
+
+	for _, unit := range req.Units {
+		if unit.ContainerID == "" {
+			return errors.New("bad req:mysql ContainerID empty.")
+		}
+	}
+
 	return nil
 
 }

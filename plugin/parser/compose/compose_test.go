@@ -49,6 +49,34 @@ func getRedisSpecTest() *structs.ServiceSpec {
 }
 
 func getMysqlSpecTest() *structs.ServiceSpec {
+
+	db1 := structs.UnitSpec{
+		Networking: []structs.UnitIP{
+			{
+				IP: "192.168.30.105",
+			},
+		},
+	}
+	db1.ContainerID = "db1"
+
+	db2 := structs.UnitSpec{
+		Networking: []structs.UnitIP{
+			{
+				IP: "192.168.30.107",
+			},
+		},
+	}
+	db2.ContainerID = "db2"
+
+	db3 := structs.UnitSpec{
+		Networking: []structs.UnitIP{
+			{
+				IP: "192.168.30.108",
+			},
+		},
+	}
+	db3.ContainerID = "db3"
+
 	req := &structs.ServiceSpec{
 		Arch: structs.Arch{
 			Mode:     "replication",
@@ -64,31 +92,7 @@ func getMysqlSpecTest() *structs.ServiceSpec {
 				Role:     "replication",
 			},
 		},
-		Units: []structs.UnitSpec{
-			{
-				Networking: []structs.UnitIP{
-					{
-						IP: "192.168.30.105",
-					},
-				},
-			},
-
-			{
-				Networking: []structs.UnitIP{
-					{
-						IP: "192.168.30.104",
-					},
-				},
-			},
-
-			{
-				Networking: []structs.UnitIP{
-					{
-						IP: "192.168.30.103",
-					},
-				},
-			},
-		},
+		Units: []structs.UnitSpec{db1, db2, db3},
 	}
 	req.Image = "mysql:5.7.17"
 
@@ -111,6 +115,7 @@ func TestOptions(t *testing.T) {
 	spec4 := &structs.ServiceSpec{Options: map[string]interface{}{"port": 6379}}
 	_, err = getRedisPortBySpec(spec4)
 	assert.Nil(t, err)
+
 }
 
 func TestRedis(t *testing.T) {
@@ -141,7 +146,7 @@ func TestMysql(t *testing.T) {
 
 	err = composer.ComposeCluster()
 	if err != nil {
-		t.Skipf("redis ComposeCluster:%+v", err)
+		t.Skipf("mysql ComposeCluster:%+v", err)
 	}
 }
 func TestClone(t *testing.T) {
