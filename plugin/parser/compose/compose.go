@@ -114,13 +114,13 @@ func valicateMysqlSpec(req *structs.ServiceSpec) error {
 	}
 
 	//mysql port
-	port, ok := req.Options["port"]
+	port, ok := req.Options["mysqld::port"]
 	if !ok {
-		return errors.New("bad req:mysql need Options[port]")
+		return errors.New("bad req:mysql need Options[mysqld::port]")
 	}
 
 	if _, ok := port.(int); !ok {
-		return errors.New("bad req:mysql Options[port] should  int type")
+		return errors.New("bad req:mysql Options[mysqld::port] should  int type")
 	}
 	return nil
 
@@ -249,12 +249,13 @@ func getMysqls(req *structs.ServiceSpec) []Mysql {
 
 	users, _ := getMysqlUser(req)
 
+	port, _ := req.Options["mysqld::port"]
+	intport, _ := port.(int)
+
 	for _, unit := range req.Units {
 		instance := unit.ContainerID
 
 		ip := unit.Networking[0].IP
-		port, _ := req.Options["port"]
-		intport, _ := port.(int)
 
 		mysql := Mysql{
 			MysqlUser: users,
@@ -273,11 +274,13 @@ func getMysqls(req *structs.ServiceSpec) []Mysql {
 func getMysqlUser(req *structs.ServiceSpec) (MysqlUser, error) {
 	users := MysqlUser{}
 	for _, user := range req.Users {
-		_ = user
+		if user.Role == "replication" {
+			users.Replicatepwd = user.Password
+			users.ReplicateUser = user.Name
+		}
 	}
 
-	if users.Replicatepwd == "" || users.ReplicateUser == "" ||
-		users.RootPwd == "" || users.Rootuser == "" {
+	if users.Replicatepwd == "" || users.ReplicateUser == "" {
 		return users, errors.New("some fields has no data")
 	}
 
