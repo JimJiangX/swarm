@@ -10,7 +10,8 @@
 	  ln -s G$OPATH/src/github/upmio/swarm  G$OPATH/src/github/docker/swarm
     3.在$GOPATH/src/github/docker/swarm 目录下开发
 	
-
+		+ .travis.yml	L11-14,L19-21
+	
 	/api:
 	
 		+++ master.go
@@ -34,7 +35,7 @@
 		+++ upmio.go
 		+++ /mesos/addition.go
 		+++ /swarm/addition.go
-		+-	/swarm/cluster.go	L403
+		+-	/swarm/cluster.go	L403-405 
 		
 	/garden:all
 	
@@ -45,6 +46,8 @@
 		+	/filter/filter.go	L38
 		+++ /filter/resource.go
 		+-	/node/node.go 		L58-70
+		+	/strategy/strategy.go L42
+		+++	/strategy/group.go 
 	
 	/vendor: ---> vendor.json
 			
