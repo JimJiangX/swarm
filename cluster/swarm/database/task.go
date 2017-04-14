@@ -93,7 +93,7 @@ func ListBackupFilesByService(nameOrID string) (Service, []BackupFile, error) {
 
 	var units []string
 	err = db.Select(&units, "SELECT id FROM tbl_dbaas_unit WHERE service_id=?", service.ID)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return service, nil, errors.Wrapf(err, "not found Units by service_id='%s'", service.ID)
 	}
 
@@ -108,7 +108,7 @@ func ListBackupFilesByService(nameOrID string) (Service, []BackupFile, error) {
 
 	var files []BackupFile
 	err = db.Select(&files, query, args...)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return service, nil, errors.Wrapf(err, "not found BackupFile by unit_id='%s'", units)
 	}
 

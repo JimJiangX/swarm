@@ -2,8 +2,6 @@ package swarm
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -41,7 +39,7 @@ func (bs *serviceBackup) Run() {
 		return
 	}
 
-	ok, err := checkBackupFiles(strategy.ServiceID)
+	ok, err := checkBackupFiles(bs.svc)
 	if !ok || err != nil {
 		logrus.Infof("Backup Task Canceled,%+v", err)
 		return
@@ -228,79 +226,37 @@ func backupTask(ctx context.Context, backup *unit, task *database.Task,
 	return err
 }
 
-func removeExpiredBackupFiles() error {
-	sys, err := database.GetSystemConfig()
+// checkBackupFiles checks files.Retention,remove expired files
+func checkBackupFiles(svc *Service) (bool, error) {
+	service, files, err := database.ListBackupFilesByService(svc.ID)
 	if err != nil {
-		return err
-	}
-
-	if _, err := os.Stat(sys.NFSOption.MountDir); os.IsNotExist(err) {
-		logrus.Errorf("nfs:'%s',%s", sys.NFSOption.MountDir, err)
-		return err
-	}
-
-	files, err := database.ListBackupFiles()
-	if err != nil {
-		return err
+		return false, err
 	}
 
 	now := time.Now()
 	expired := make([]database.BackupFile, 0, len(files))
+	valid := make([]database.BackupFile, 0, len(files))
 
 	for i := range files {
 		if now.After(files[i].Retention) {
 			expired = append(expired, files[i])
+		} else {
+			valid = append(valid, files[i])
 		}
 	}
 
 	for i := range expired {
-		abs, err := abs(sys.NFSOption.MountDir, sys.BackupDir, expired[i].Path)
+		logrus.Infof("Backup files expired:%v", expired[i].Path)
+
+		err := removeExpiredBackupFile(svc, expired[i])
 		if err != nil {
 			logrus.Errorf("RemoveAll expired backup file %s,%s", expired[i].Path, err)
-			continue
-		}
-
-		logrus.Infof("Backup files expired:%v", abs)
-
-		err = os.RemoveAll(abs)
-		if err != nil {
-			logrus.Errorf("RemoveAll expired backup file %s,%s", abs, err)
 			continue
 		}
 
 		err = database.DelBackupFile(expired[i].ID)
 		if err != nil {
 			logrus.Errorf("del expired backup file,%+v", err)
-		}
-	}
-
-	return err
-}
-
-func abs(prefix, base, path string) (string, error) {
-	rel, err := filepath.Rel(base, path)
-	if err != nil {
-		return "", errors.Wrap(err, path)
-	}
-
-	return filepath.Join(prefix, rel), nil
-}
-
-// checkBackupFiles checks files.Retention,remove expired files
-func checkBackupFiles(nameOrID string) (bool, error) {
-	removeExpiredBackupFiles()
-
-	service, files, err := database.ListBackupFilesByService(nameOrID)
-	if err != nil {
-		return false, err
-	}
-
-	now := time.Now()
-	valid := make([]database.BackupFile, 0, len(files))
-
-	for i := range files {
-		if now.Before(files[i].Retention) {
-			valid = append(valid, files[i])
 		}
 	}
 
@@ -320,6 +276,24 @@ func checkBackupFiles(nameOrID string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func removeExpiredBackupFile(svc *Service, bf database.BackupFile) error {
+	u, err := svc.getUnit(bf.UnitID)
+	if err != nil {
+		return err
+	}
+
+	eng, err := u.Engine()
+	if err != nil {
+		return err
+	}
+
+	cmd := []string{"rm", "-rf", bf.Path}
+
+	_, err = containerExec(context.Background(), eng, u.ContainerID, cmd, false)
+
+	return err
 }
 
 func (gd *Gardener) registerBackupStrategy(strategy *serviceBackup) error {

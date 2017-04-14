@@ -1841,7 +1841,7 @@ func (gd *Gardener) TemporaryServiceBackupTask(service, nameOrID string) (_ stri
 		}
 	}()
 
-	ok, err := checkBackupFiles(svc.ID)
+	ok, err := checkBackupFiles(svc)
 	if err != nil {
 		return "", err
 	}
