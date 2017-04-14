@@ -37,29 +37,44 @@ func (GroupPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes
 }
 
 func byGroup(nodes weightedNodeList) []*node.Node {
-	clusters := make(map[string][]*weightedNode)
-
+	list := make([]groupNodes, 0, 5)
+loop:
 	for i := range nodes {
-		name := nodes[i].Node.Labels["cluster"]
-
-		if group, ok := clusters[name]; ok {
-			clusters[name] = append(group, nodes[i])
-		} else {
-			g := make([]*weightedNode, 1, nodes.Len()-nodes.Len()/2)
-			g[0] = nodes[i]
-			clusters[name] = g
+		if nodes[i] == nil {
+			continue
 		}
+
+		label := nodes[i].Node.Labels["cluster"]
+		if label == "" {
+			label = "&&&&&&&"
+		}
+
+		for l := range list {
+			if list[l].cluster == label {
+				list[l].list = append(list[l].list, nodes[i])
+
+				continue loop
+			}
+		}
+
+		// label is not exist in list,so append it
+		glist := make([]*weightedNode, 1, nodes.Len()-nodes.Len()/2)
+		glist[0] = nodes[i]
+
+		list = append(list, groupNodes{
+			cluster: label,
+			list:    glist,
+		})
+
 	}
 
-	list := make([]groupNodes, 0, len(clusters))
+	for _, g := range list {
 
-	for _, group := range clusters {
-		var score int64
-		for i := range group {
-			score += group[i].Weight
+		for i := range g.list {
+			g.score += g.list[i].Weight
 		}
 
-		list = append(list, groupNodes{group, score / int64(len(group))})
+		g.score = g.score / int64(len(g.list))
 	}
 
 	groups := byGroupList(list)
@@ -78,8 +93,9 @@ func byGroup(nodes weightedNodeList) []*node.Node {
 }
 
 type groupNodes struct {
-	list  []*weightedNode
-	score int64
+	cluster string
+	score   int64
+	list    []*weightedNode
 }
 
 type byGroupList []groupNodes
