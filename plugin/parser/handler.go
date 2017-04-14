@@ -231,6 +231,10 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		httpError(w, err, http.StatusInternalServerError)
 		return
 	}
+	if pair == nil || pair.Value == nil {
+		httpError(w, errors.Errorf("template:%s is not exist", key), http.StatusInternalServerError)
+		return
+	}
 
 	t := structs.ConfigTemplate{}
 	err = json.Unmarshal(pair.Value, &t)
