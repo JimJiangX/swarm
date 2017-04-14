@@ -114,28 +114,28 @@ func (c mysqlConfig) GenerateCommands(id string, desc structs.ServiceSpec) (stru
 
 	//func (mysqlCmd) InitServiceCmd(args ...string) []string {
 	//	cmd := make([]string, len(args)+1)
-	//	cmd[0] = "/root/upsql-init.sh"
+	//	cmd[0] = "/root/mysql-init.sh"
 	//	copy(cmd[1:], args)
 	//	return cmd
 	//}
-	cmds[structs.InitServiceCmd] = []string{"/root/upsql-init.sh"}
+	cmds[structs.InitServiceCmd] = []string{"/root/mysql-init.sh"}
 
-	cmds[structs.StartServiceCmd] = []string{"/root/upsql.service", "start"}
+	cmds[structs.StartServiceCmd] = []string{"/root/mysql.service", "start"}
 
-	cmds[structs.StopServiceCmd] = []string{"/root/upsql.service", "stop"}
+	cmds[structs.StopServiceCmd] = []string{"/root/mysql.service", "stop"}
 
 	//func (mysqlCmd) RestoreCmd(file, backupDir string) []string {
-	//	return []string{"/root/upsql-restore.sh", file, backupDir}
+	//	return []string{"/root/mysql-restore.sh", file, backupDir}
 	//}
-	cmds[structs.RestoreCmd] = []string{"/root/upsql-restore.sh"}
+	cmds[structs.RestoreCmd] = []string{"/root/mysql-restore.sh"}
 
 	//func (mysqlCmd) BackupCmd(args ...string) []string {
 	//	cmd := make([]string, len(args)+1)
-	//	cmd[0] = "/root/upsql-backup.sh"
+	//	cmd[0] = "/root/mysql-backup.sh"
 	//	copy(cmd[1:], args)
 	//	return cmd
 	//}
-	cmds[structs.BackupCmd] = []string{"/root/upsql-backup.sh"}
+	cmds[structs.BackupCmd] = []string{"/root/mysql-backup.sh"}
 
 	return cmds, nil
 }
