@@ -119,8 +119,8 @@ func valicateMysqlSpec(req *structs.ServiceSpec) error {
 		return errors.New("bad req:mysql need Options[mysqld::port]")
 	}
 
-	if _, ok := port.(int); !ok {
-		return errors.New("bad req:mysql Options[mysqld::port] should  int type")
+	if _, err := convertPort(port); err != nil {
+		return errors.New("bad req:mysql need Options[mysqld::port]:" + err.Error())
 	}
 
 	for _, unit := range req.Units {
@@ -133,11 +133,7 @@ func valicateMysqlSpec(req *structs.ServiceSpec) error {
 
 }
 
-func getRedisPortBySpec(req *structs.ServiceSpec) (int, error) {
-	port, ok := req.Options["port"]
-	if !ok {
-		return -1, errors.New("bad req:redis need Options[port]")
-	}
+func convertPort(port interface{}) (int, error) {
 
 	switch value := port.(type) {
 
@@ -157,6 +153,15 @@ func getRedisPortBySpec(req *structs.ServiceSpec) (int, error) {
 	}
 
 	return -1, errors.New("unknown type")
+}
+
+func getRedisPortBySpec(req *structs.ServiceSpec) (int, error) {
+	port, ok := req.Options["port"]
+	if !ok {
+		return -1, errors.New("bad req:redis need Options[port]")
+	}
+
+	return convertPort(port)
 }
 
 func valicateRedisSpec(req *structs.ServiceSpec) error {
@@ -288,7 +293,7 @@ func getMysqlUser(req *structs.ServiceSpec) (MysqlUser, error) {
 	}
 
 	if users.Replicatepwd == "" || users.ReplicateUser == "" {
-		return users, errors.New("some fields has no data")
+		return users, errors.New("get user fail: some fields has no data")
 	}
 
 	return users, nil
