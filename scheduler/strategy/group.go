@@ -38,28 +38,34 @@ func (GroupPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes
 
 func byGroup(nodes weightedNodeList) []*node.Node {
 	list := make([]groupNodes, 0, 5)
-
+loop:
 	for i := range nodes {
-		found := false
+		if nodes[i] == nil {
+			continue
+		}
+
 		label := nodes[i].Node.Labels["cluster"]
+		if label == "" {
+			label = "&&&&&&&"
+		}
 
 		for l := range list {
 			if list[l].cluster == label {
 				list[l].list = append(list[l].list, nodes[i])
-				found = true
-				break
+
+				continue loop
 			}
 		}
 
-		if !found {
-			glist := make([]*weightedNode, 1, nodes.Len()-nodes.Len()/2)
-			glist[0] = nodes[i]
+		// label is not exist in list,so append it
+		glist := make([]*weightedNode, 1, nodes.Len()-nodes.Len()/2)
+		glist[0] = nodes[i]
 
-			list = append(list, groupNodes{
-				cluster: label,
-				list:    glist,
-			})
-		}
+		list = append(list, groupNodes{
+			cluster: label,
+			list:    glist,
+		})
+
 	}
 
 	for _, g := range list {
