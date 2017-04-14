@@ -412,7 +412,7 @@ func pendingAlloc(actor alloc.Allocator, unit database.Unit, node *node.Node, op
 }
 
 func sortByCluster(nodes []*node.Node, clusters []string) [][]*node.Node {
-	if len(nodes) == 0 || len(clusters) == 0 {
+	if len(nodes) == 0 {
 		return nil
 	}
 
@@ -423,6 +423,7 @@ func sortByCluster(nodes []*node.Node, clusters []string) [][]*node.Node {
 
 	sets := make([]set, 0, len(clusters))
 
+loop:
 	for i := range nodes {
 		if nodes[i] == nil {
 			continue
@@ -430,42 +431,36 @@ func sortByCluster(nodes []*node.Node, clusters []string) [][]*node.Node {
 
 		label := nodes[i].Labels[clusterLabel]
 
-		if label == "" {
-			continue
-		}
-
-		exist := false
-
-	cluster:
-		for c := range clusters {
-			if clusters[c] == label {
-				exist = true
-				break cluster
+		if len(clusters) > 0 {
+			exist := false
+		cluster:
+			for c := range clusters {
+				if clusters[c] == label {
+					exist = true
+					break cluster
+				}
+			}
+			if !exist {
+				continue loop
 			}
 		}
-		if !exist {
-			continue
-		}
 
-		exist = false
-	sets:
 		for k := range sets {
 			if sets[k].cluster == label {
 				sets[k].nodes = append(sets[k].nodes, nodes[i])
-				exist = true
-				break sets
+
+				continue loop
 			}
 		}
 
-		if !exist {
-			list := make([]*node.Node, 1, 1+len(nodes)-len(nodes)/len(clusters))
-			list[0] = nodes[i]
+		// label not exist in sets,so append it
+		list := make([]*node.Node, 1, len(nodes)-len(nodes)/2)
+		list[0] = nodes[i]
 
-			sets = append(sets, set{
-				cluster: label,
-				nodes:   list,
-			})
-		}
+		sets = append(sets, set{
+			cluster: label,
+			nodes:   list,
+		})
 	}
 
 	out := make([][]*node.Node, len(sets))
