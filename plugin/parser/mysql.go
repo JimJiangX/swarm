@@ -16,6 +16,10 @@ func init() {
 	register("mysql", "5.7", &mysqlConfig{})
 }
 
+const (
+	monitorRole = "monitor"
+)
+
 type mysqlConfig struct {
 	template *structs.ConfigTemplate
 	config   config.Configer
@@ -110,15 +114,19 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 func (c mysqlConfig) GenerateCommands(id string, desc structs.ServiceSpec) (structs.CmdsMap, error) {
 	cmds := make(structs.CmdsMap, 6)
 
+	users := make([]string, 0, len(desc.Users)*4)
+
+	for _, u := range desc.Users {
+		users = append(users, u.Role, u.Name, u.Password, u.Privilege)
+	}
+
 	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
 
-	//func (mysqlCmd) InitServiceCmd(args ...string) []string {
-	//	cmd := make([]string, len(args)+1)
-	//	cmd[0] = "/root/mysql-init.sh"
-	//	copy(cmd[1:], args)
-	//	return cmd
-	//}
-	cmds[structs.InitServiceCmd] = []string{"/root/mysql-init.sh"}
+	init := make([]string, 1+len(users))
+	init[0] = "/root/mysql-init.sh"
+	copy(init[1:], users)
+
+	cmds[structs.InitServiceCmd] = init
 
 	cmds[structs.StartServiceCmd] = []string{"/root/mysql.service", "start"}
 
@@ -224,7 +232,7 @@ func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 
 	if len(desc.Users) > 0 {
 		for i := range desc.Users {
-			if desc.Users[i].Role == "mon" {
+			if desc.Users[i].Role == monitorRole {
 				mon = &desc.Users[i]
 				break
 			}
