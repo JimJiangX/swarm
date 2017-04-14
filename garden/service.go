@@ -799,12 +799,17 @@ func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]in
 		args = svc.spec.Options
 	}
 
+	users := svc.spec.Users
+
 	spec, err := svc.RefreshSpec()
 	if err != nil {
 		return nil, err
 	}
 
 	spec.Options = args
+	if spec.Users == nil && users != nil {
+		spec.Users = users
+	}
 
 	return svc.pc.GenerateServiceConfig(ctx, *spec)
 }
