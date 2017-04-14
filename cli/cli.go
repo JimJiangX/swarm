@@ -4,6 +4,7 @@ import (
 	"os"
 	"path"
 	"runtime/debug"
+	"runtime/trace"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/experimental"
@@ -40,7 +41,14 @@ func Run() {
 			Name:  "experimental",
 			Usage: "enable experimental features",
 		},
+		cli.BoolFlag{
+			Name:  "trace",
+			Usage: "go tool trace",
+		},
 	}
+
+	exist := make(chan struct{})
+	defer close(exist)
 
 	// logs
 	app.Before = func(c *cli.Context) error {
@@ -58,6 +66,24 @@ func Run() {
 		}
 
 		experimental.ENABLED = c.Bool("experimental")
+
+		if c.Bool("trace") {
+			f, err := os.Create("trace.out")
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer f.Close()
+
+			err = trace.Start(f)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			go func() {
+				<-exist
+				trace.Stop()
+			}()
+		}
 
 		return nil
 	}
