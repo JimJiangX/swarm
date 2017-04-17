@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/swarm/cluster"
@@ -686,7 +687,11 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) 
 		statusServiceDeleting, 0, statusServiceDeleteFailed)
 
 	sl.SetAfter(func(key string, val int, task *database.Task, t time.Time) error {
-		if task != nil {
+		err := svc.so.SetServiceWithTask(key, val, task, t)
+		if err != nil {
+			logrus.WithField("Service", svc.svc.Name).Warnf("remove Service:%+v", err)
+		}
+		if err != nil && task != nil {
 			return svc.so.SetTask(*task)
 		}
 
@@ -701,13 +706,27 @@ func (svc *Service) removeContainers(ctx context.Context, units []*unit, force, 
 	for _, u := range units {
 		engine := u.getEngine()
 		if engine == nil {
-			return nil
+			continue
+		}
+
+		if c := u.getContainer(); c == nil {
+			id := u.u.ContainerID
+			if id == "" {
+				id = u.u.Name
+			}
+			err := engine.RemoveContainer(&cluster.Container{
+				Container: types.Container{ID: id}}, force, rmVolumes)
+			if err != nil {
+				logrus.WithField("Service", svc.svc.Name).Errorf("remove container:%s in engine %s,%+v", id, engine.Addr, err)
+			}
+			continue
 		}
 
 		client := engine.ContainerAPIClient()
 		if client == nil {
-			return nil
+			continue
 		}
+
 		if !force {
 			timeout := 30 * time.Second
 			err := client.ContainerStop(ctx, u.u.Name, &timeout)
