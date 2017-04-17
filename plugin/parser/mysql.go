@@ -71,14 +71,19 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 		return errors.New("unexpected IPAddress")
 	}
 
-	if v := desc.Options["character_set_server"]; v != "" {
+	if v, ok := desc.Options["character_set_server"]; ok && v != nil {
 		m["mysqld::character_set_server"] = v
 	} else {
 		m["mysqld::character_set_server"] = "utf8"
 	}
 
-	m["mysqld::port"] = desc.Options["port"]
-	m["mysqld::server_id"] = desc.Options["port"]
+	if p, ok := desc.Options["port"]; ok && p != nil {
+		m["mysqld::port"] = p
+		m["mysqld::server_id"] = p
+	} else {
+		m["mysqld::port"] = 3306
+		m["mysqld::server_id"] = 3306
+	}
 
 	if c.template != nil {
 		m["mysqld::log_bin"] = filepath.Clean(fmt.Sprintf("%s/BIN/%s-binlog", c.template.LogMount, spec.Name))
@@ -90,25 +95,6 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 		m["mysqld::innodb_buffer_pool_size"] = int(float64(n) * 0.70)
 	} else {
 		m["mysqld::innodb_buffer_pool_size"] = int(float64(n) * 0.5)
-	}
-
-	m["client::user"] = ""
-	m["client::password"] = ""
-
-	var dba *structs.User
-
-	if len(desc.Users) > 0 {
-		for i := range desc.Users {
-			if desc.Users[i].Role == "dba" {
-				dba = &desc.Users[i]
-				break
-			}
-		}
-
-		if dba != nil {
-			m["client::user"] = dba.Name
-			m["client::password"] = dba.Password
-		}
 	}
 
 	for key, val := range m {
