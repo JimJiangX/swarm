@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 )
@@ -16,6 +17,16 @@ func NewEventHandler(ormer database.Ormer) *eventHander {
 	return &eventHander{
 		ci: ormer,
 	}
+}
+
+func getContainerNameFromInfo(c types.ContainerJSON) string {
+	name := c.Name
+	parts := strings.Split(name, "/")
+	if v := parts[len(parts)-1]; v != "" {
+		name = v
+	}
+
+	return name
 }
 
 func (eh eventHander) Handle(event *cluster.Event) (err error) {
@@ -35,7 +46,8 @@ func (eh eventHander) Handle(event *cluster.Event) (err error) {
 			engine := event.Engine
 			c := engine.Containers().Get(msg.ID)
 			if c != nil {
-				err = eh.ci.UnitContainerCreated(c.Info.Name, c.ID, engine.ID, c.HostConfig.NetworkMode, statusContainerCreated)
+				name := getContainerNameFromInfo(c.Info)
+				err = eh.ci.UnitContainerCreated(name, c.ID, engine.ID, c.HostConfig.NetworkMode, statusContainerCreated)
 			}
 		default:
 			err = handleContainerEvent(eh.ci, action, msg.ID)
@@ -49,7 +61,8 @@ func (eh eventHander) Handle(event *cluster.Event) (err error) {
 
 			c := engine.Containers().Get(msg.ID)
 			if c != nil {
-				err = eh.ci.UnitContainerCreated(c.Info.Name, c.ID, engine.ID, c.HostConfig.NetworkMode, statusContainerCreated)
+				name := getContainerNameFromInfo(c.Info)
+				err = eh.ci.UnitContainerCreated(name, c.ID, engine.ID, c.HostConfig.NetworkMode, statusContainerCreated)
 			}
 
 		default:
