@@ -71,6 +71,12 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 		return errors.New("unexpected IPAddress")
 	}
 
+	if v := desc.Options["character_set_server"]; v != "" {
+		m["mysqld::character_set_server"] = v
+	} else {
+		m["mysqld::character_set_server"] = "utf8"
+	}
+
 	m["mysqld::port"] = desc.Options["port"]
 	m["mysqld::server_id"] = desc.Options["port"]
 
