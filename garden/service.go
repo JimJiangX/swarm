@@ -102,12 +102,16 @@ func (svc *Service) Spec() (*structs.ServiceSpec, error) {
 }
 
 func (svc *Service) RefreshSpec() (*structs.ServiceSpec, error) {
-	var ID string
+	var (
+		ID    string
+		users []structs.User
+	)
 
 	if svc.svc != nil {
 		ID = svc.svc.ID
 	} else if svc.spec != nil {
 		ID = svc.spec.ID
+		users = svc.spec.Users
 	} else {
 		return nil, errors.New("Service with non ID")
 	}
@@ -129,6 +133,10 @@ func (svc *Service) RefreshSpec() (*structs.ServiceSpec, error) {
 	spec := ConvertServiceInfo(info, containers)
 	svc.spec = &spec
 	svc.svc = &info.Service
+
+	if spec.Users == nil && users != nil {
+		spec.Users = users
+	}
 
 	return &spec, nil
 }
@@ -574,7 +582,7 @@ func (svc *Service) updateConfigs(ctx context.Context, units []*unit, configs st
 	return nil
 }
 
-func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[string]string) error {
+func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[string]interface{}) error {
 	u, err := svc.getUnit(nameOrID)
 	if err != nil {
 		return err
@@ -812,10 +820,7 @@ func (svc Service) deregisterSerivces(ctx context.Context, reg kvstore.Register,
 }
 
 func (svc *Service) Compose(ctx context.Context, pc pluginapi.PluginAPI) error {
-	var (
-		opts  map[string]interface{}
-		users = svc.spec.Users
-	)
+	var opts map[string]interface{}
 
 	if svc.spec != nil {
 		opts = svc.spec.Options
@@ -827,9 +832,6 @@ func (svc *Service) Compose(ctx context.Context, pc pluginapi.PluginAPI) error {
 	}
 
 	spec.Options = opts
-	if spec.Users == nil && users != nil {
-		spec.Users = users
-	}
 
 	return pc.ServiceCompose(ctx, *spec)
 }
@@ -853,17 +855,12 @@ func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]in
 		args = svc.spec.Options
 	}
 
-	users := svc.spec.Users
-
 	spec, err := svc.RefreshSpec()
 	if err != nil {
 		return nil, err
 	}
 
 	spec.Options = args
-	if spec.Users == nil && users != nil {
-		spec.Users = users
-	}
 
 	return svc.pc.GenerateServiceConfig(ctx, *spec)
 }
@@ -872,8 +869,24 @@ func (svc *Service) GenerateUnitsConfigs(ctx context.Context, args map[string]in
 	return svc.generateUnitsConfigs(ctx, args)
 }
 
-func (svc *Service) generateUnitConfig(ctx context.Context, nameOrID string, args map[string]string) (structs.ConfigCmds, error) {
-	return structs.ConfigCmds{}, nil
+func (svc *Service) generateUnitConfig(ctx context.Context, nameOrID string, args map[string]interface{}) (structs.ConfigCmds, error) {
+	if svc.spec != nil && len(svc.spec.Options) > 0 {
+
+		for key, val := range args {
+			svc.spec.Options[key] = val
+		}
+
+		args = svc.spec.Options
+	}
+
+	spec, err := svc.RefreshSpec()
+	if err != nil {
+		return structs.ConfigCmds{}, err
+	}
+
+	spec.Options = args
+
+	return svc.pc.GenerateUnitConfig(ctx, nameOrID, *spec)
 }
 
 func (svc *Service) generateUnitsCmd(ctx context.Context) (structs.Commands, error) {

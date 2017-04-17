@@ -44,8 +44,9 @@ func NewRouter(c kvstore.Client, ip string, port int) *mux.Router {
 			"/commands/{service:.*}":          getCommands,
 		},
 		"POST": {
-			"/configs":        generateConfigs,
-			"/image/template": postTemplate,
+			"/configs":           generateConfigs,
+			"/configs/{unit:.*}": generateConfig,
+			"/image/template":    postTemplate,
 		},
 		"PUT": {
 			"/configs/{service:.*}":       updateConfigs,
@@ -246,51 +247,16 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	resp := make(structs.ConfigsMap, len(req.Units))
 
 	for i := range req.Units {
-
-		parser = parser.clone(&t)
-
-		err = parser.ParseData([]byte(t.Content))
+		cc, err := generateUnitConfig(req.Units[i].ID, parser, t, req)
 		if err != nil {
 			httpError(w, err, http.StatusInternalServerError)
 			return
 		}
 
-		err = parser.GenerateConfig(req.Units[i].ID, req)
-		if err != nil {
-			httpError(w, err, http.StatusInternalServerError)
-			return
-		}
+		cc.Name = image
+		cc.Version = version
 
-		text, err := parser.Marshal()
-		if err != nil {
-			httpError(w, err, http.StatusInternalServerError)
-			return
-		}
-
-		cmds, err := parser.GenerateCommands(req.Units[i].ID, req)
-		if err != nil {
-			httpError(w, err, http.StatusInternalServerError)
-			return
-		}
-
-		r, err := parser.HealthCheck(req.Units[i].ID, req)
-		if err != nil {
-			httpError(w, err, http.StatusInternalServerError)
-			return
-		}
-
-		resp[req.Units[i].ID] = structs.ConfigCmds{
-			ID:           req.Units[i].ID,
-			Name:         image,
-			Version:      version,
-			LogMount:     t.LogMount,
-			DataMount:    t.DataMount,
-			ConfigFile:   filepath.Join(t.DataMount, t.ConfigFile),
-			Content:      string(text),
-			Cmds:         cmds,
-			Timestamp:    time.Now().Unix(),
-			Registration: r,
-		}
+		resp[req.Units[i].ID] = cc
 	}
 
 	err = putConfigsToKV(ctx.client, req.ID, resp)
@@ -302,6 +268,125 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(resp)
+}
+
+func generateUnitConfig(unitID string, pr parser, t structs.ConfigTemplate, spec structs.ServiceSpec) (structs.ConfigCmds, error) {
+	pr = pr.clone(&t)
+
+	err := pr.ParseData([]byte(t.Content))
+	if err != nil {
+		return structs.ConfigCmds{}, err
+	}
+
+	err = pr.GenerateConfig(unitID, spec)
+	if err != nil {
+		return structs.ConfigCmds{}, err
+	}
+
+	text, err := pr.Marshal()
+	if err != nil {
+		return structs.ConfigCmds{}, err
+	}
+
+	cmds, err := pr.GenerateCommands(unitID, spec)
+	if err != nil {
+		return structs.ConfigCmds{}, err
+	}
+
+	r, err := pr.HealthCheck(unitID, spec)
+	if err != nil {
+		return structs.ConfigCmds{}, err
+	}
+
+	return structs.ConfigCmds{
+		ID:           unitID,
+		LogMount:     t.LogMount,
+		DataMount:    t.DataMount,
+		ConfigFile:   filepath.Join(t.DataMount, t.ConfigFile),
+		Content:      string(text),
+		Cmds:         cmds,
+		Timestamp:    time.Now().Unix(),
+		Registration: r,
+	}, nil
+}
+
+func generateConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["unit"]
+	req := structs.ServiceSpec{}
+
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	var unit *structs.UnitSpec
+
+	for i := range req.Units {
+		if name == req.Units[i].ID || name == req.Units[i].Name {
+			unit = &req.Units[i]
+			break
+		}
+	}
+
+	if unit == nil {
+		httpError(w, errors.New("unknown unit by:"+name), http.StatusBadRequest)
+		return
+	}
+
+	parser, err := factory(req.Service.Image)
+	if err != nil {
+		httpError(w, err, http.StatusNotImplemented)
+		return
+	}
+
+	var image, version string
+	parts := strings.SplitN(req.Service.Image, ":", 2)
+	if len(parts) == 2 {
+		image, version = parts[0], parts[1]
+	} else {
+		image = parts[0]
+	}
+
+	key := strings.Join([]string{imageKey, image, version}, "/")
+	pair, err := ctx.client.GetKV(key)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	if pair == nil || pair.Value == nil {
+		httpError(w, errors.Errorf("template:%s is not exist", key), http.StatusInternalServerError)
+		return
+	}
+
+	t := structs.ConfigTemplate{}
+	err = json.Unmarshal(pair.Value, &t)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	cc, err := generateUnitConfig(unit.ID, parser, t, req)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	cc.Name = image
+	cc.Version = version
+
+	resp := make(structs.ConfigsMap)
+	resp[unit.ID] = cc
+
+	err = putConfigsToKV(ctx.client, req.ID, resp)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(cc)
 }
 
 func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
