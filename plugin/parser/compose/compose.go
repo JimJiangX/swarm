@@ -147,7 +147,7 @@ func convertPort(port interface{}) (int, error) {
 	default:
 	}
 
-	return -1, errors.New("unknown type")
+	return -1, errors.New("unknown port type")
 }
 
 func getRedisPortBySpec(req *structs.ServiceSpec) (int, error) {
@@ -161,9 +161,9 @@ func getRedisPortBySpec(req *structs.ServiceSpec) (int, error) {
 
 func getMysqlPortBySpec(req *structs.ServiceSpec) (int, error) {
 
-	port, ok := req.Options["mysqld::port"]
+	port, ok := req.Options["port"]
 	if !ok {
-		return -1, errors.New("bad req:mysql need Options[mysqld::port]")
+		return -1, errors.New("bad req:mysql need Options[port]")
 	}
 
 	return convertPort(port)
@@ -289,6 +289,7 @@ func getMysqls(req *structs.ServiceSpec) []Mysql {
 
 func getMysqlUser(req *structs.ServiceSpec) (MysqlUser, error) {
 	users := MysqlUser{}
+
 	for _, user := range req.Users {
 		if user.Role == "replication" {
 			users.Replicatepwd = user.Password
@@ -297,7 +298,8 @@ func getMysqlUser(req *structs.ServiceSpec) (MysqlUser, error) {
 	}
 
 	if users.Replicatepwd == "" || users.ReplicateUser == "" {
-		return users, errors.New("get user fail: some fields has no data")
+
+		return users, errors.New("mysql replication pwd/user has no data")
 	}
 
 	return users, nil
