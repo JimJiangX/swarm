@@ -47,7 +47,7 @@ func newService(spec *structs.ServiceSpec,
 	}
 }
 
-func (svc *Service) getUnit(nameOrID string) (*unit, error) {
+func (svc Service) getUnit(nameOrID string) (*unit, error) {
 	u, err := svc.so.GetUnit(nameOrID)
 	if err != nil {
 		return nil, err
@@ -60,7 +60,7 @@ func (svc *Service) getUnit(nameOrID string) (*unit, error) {
 	return newUnit(u, svc.so, svc.cluster), nil
 }
 
-func (svc *Service) getUnits() ([]*unit, error) {
+func (svc Service) getUnits() ([]*unit, error) {
 	list, err := svc.so.ListUnitByServiceID(svc.svc.ID)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (svc *Service) getUnits() ([]*unit, error) {
 	return units, nil
 }
 
-func (svc Service) Spec() (*structs.ServiceSpec, error) {
+func (svc *Service) Spec() (*structs.ServiceSpec, error) {
 	if svc.spec != nil {
 		return svc.spec, nil
 	}
@@ -101,7 +101,7 @@ func (svc Service) Spec() (*structs.ServiceSpec, error) {
 	return nil, errors.New("Service internal error")
 }
 
-func (svc Service) RefreshSpec() (*structs.ServiceSpec, error) {
+func (svc *Service) RefreshSpec() (*structs.ServiceSpec, error) {
 	var ID string
 
 	if svc.svc != nil {
@@ -607,35 +607,6 @@ func (svc *Service) Stop(ctx context.Context, containers, async bool, task *data
 	return sl.Run(isnotInProgress, stop, async)
 }
 
-func (svc *Service) Exec(ctx context.Context, config structs.ServiceExecConfig, async bool, task *database.Task) error {
-
-	exec := func() error {
-		if config.Container != "" {
-			_, err := svc.exec(ctx, config.Container, config.Cmd, config.Detach)
-			return err
-		}
-
-		units, err := svc.getUnits()
-		if err != nil {
-			return err
-		}
-
-		for i := range units {
-			_, err := svc.exec(ctx, units[i].u.ID, config.Cmd, config.Detach)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	}
-
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
-		statusServiceExecStart, statusServiceExecDone, statusServiceExecFailed)
-
-	return sl.Run(isnotInProgress, exec, async)
-}
-
 func (svc *Service) stop(ctx context.Context, units []*unit, containers bool) error {
 	cmds, err := svc.generateUnitsCmd(ctx)
 	if err != nil {
@@ -663,6 +634,35 @@ func (svc *Service) stop(ctx context.Context, units []*unit, containers bool) er
 	}
 
 	return nil
+}
+
+func (svc *Service) Exec(ctx context.Context, config structs.ServiceExecConfig, async bool, task *database.Task) error {
+
+	exec := func() error {
+		if config.Container != "" {
+			_, err := svc.exec(ctx, config.Container, config.Cmd, config.Detach)
+			return err
+		}
+
+		units, err := svc.getUnits()
+		if err != nil {
+			return err
+		}
+
+		for i := range units {
+			_, err := svc.exec(ctx, units[i].u.ID, config.Cmd, config.Detach)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
+		statusServiceExecStart, statusServiceExecDone, statusServiceExecFailed)
+
+	return sl.Run(isnotInProgress, exec, async)
 }
 
 func (svc *Service) exec(ctx context.Context, nameOrID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
@@ -792,11 +792,11 @@ func (svc *Service) removeVolumes(ctx context.Context, units []*unit) error {
 	return nil
 }
 
-func (svc *Service) deleteCondition() error {
+func (svc Service) deleteCondition() error {
 	return nil
 }
 
-func (svc *Service) deregisterSerivces(ctx context.Context, reg kvstore.Register, units []*unit) error {
+func (svc Service) deregisterSerivces(ctx context.Context, reg kvstore.Register, units []*unit) error {
 	for i := range units {
 
 		err := reg.DeregisterService(ctx, structs.ServiceDeregistration{
@@ -812,7 +812,10 @@ func (svc *Service) deregisterSerivces(ctx context.Context, reg kvstore.Register
 }
 
 func (svc *Service) Compose(ctx context.Context, pc pluginapi.PluginAPI) error {
-	var opts map[string]interface{}
+	var (
+		opts  map[string]interface{}
+		users = svc.spec.Users
+	)
 
 	if svc.spec != nil {
 		opts = svc.spec.Options
@@ -824,11 +827,14 @@ func (svc *Service) Compose(ctx context.Context, pc pluginapi.PluginAPI) error {
 	}
 
 	spec.Options = opts
+	if spec.Users == nil && users != nil {
+		spec.Users = users
+	}
 
 	return pc.ServiceCompose(ctx, *spec)
 }
 
-func (svc *Service) Image() (database.Image, error) {
+func (svc Service) Image() (database.Image, error) {
 	img, err := structs.ParseImage(svc.svc.Desc.Image)
 	if err != nil {
 		return database.Image{}, err
