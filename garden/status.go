@@ -10,15 +10,16 @@ const (
 	statusServiceStarting                           // 6,start contaier and start service
 	statusServiceStoping                            // 7
 	statusServiceBackuping                          // 8
-	statusServiceRestoring                          // 9
-	statusServiceUsersUpdating                      // 10
-	statusServiceScaling                            // 11
-	statusServiceConfigUpdating                     // 12
-	statusServiceUnitMigrating                      // 13
-	statusServiceUnitRebuilding                     // 14
-	statusServiceImageUpdating                      // 15
-	statusServiceComposing                          // 16
-	statusServiceDeleting                           // 17
+	statusServiceExecStart                          // 9
+	statusServiceRestoring                          // 10
+	statusServiceUsersUpdating                      // 11
+	statusServiceScaling                            // 12
+	statusServiceConfigUpdating                     // 13
+	statusServiceUnitMigrating                      // 14
+	statusServiceUnitRebuilding                     // 15
+	statusServiceImageUpdating                      // 16
+	statusServiceComposing                          // 17
+	statusServiceDeleting                           // 18
 
 	_ing    = 0
 	_failed = 1
@@ -44,6 +45,9 @@ const (
 
 	statusServiceStoped     = statusServiceStoping + _done
 	statusServiceStopFailed = statusServiceStoping + _failed
+
+	statusServiceExecDone   = statusServiceExecStart + _done
+	statusServiceExecFailed = statusServiceExecStart + _failed
 
 	statusServiceBackupDone   = statusServiceBackuping + _done
 	statusServiceBackupFailed = statusServiceBackuping + _failed

@@ -631,7 +631,7 @@ func (svc *Service) Exec(ctx context.Context, config structs.ServiceExecConfig, 
 	}
 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
-		statusServiceStoping, statusServiceStoped, statusServiceStopFailed)
+		statusServiceExecStart, statusServiceExecDone, statusServiceExecFailed)
 
 	return sl.Run(isnotInProgress, exec, async)
 }
