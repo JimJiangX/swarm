@@ -15,7 +15,7 @@ func getRedisSpecTest() *structs.ServiceSpec {
 			Code:     "M:3#S:0",
 		},
 
-		Options: map[string]interface{}{"port": 6379},
+		Options: map[string]interface{}{"port": float64(6379)},
 
 		Units: []structs.UnitSpec{
 			{
@@ -84,7 +84,7 @@ func getMysqlSpecTest() *structs.ServiceSpec {
 			Code:     "M:1#S:2",
 		},
 
-		Options: map[string]interface{}{"mysqld::port": 6379},
+		Options: map[string]interface{}{"mysqld::port": float64(6379)},
 		Users: []structs.User{
 			{
 				Name:     "rep1",

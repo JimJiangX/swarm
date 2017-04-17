@@ -114,13 +114,8 @@ func valicateMysqlSpec(req *structs.ServiceSpec) error {
 	}
 
 	//mysql port
-	port, ok := req.Options["mysqld::port"]
-	if !ok {
-		return errors.New("bad req:mysql need Options[mysqld::port]")
-	}
-
-	if _, err := convertPort(port); err != nil {
-		return errors.New("bad req:mysql need Options[mysqld::port]:" + err.Error())
+	if _, err := getMysqlPortBySpec(req); err != nil {
+		return err
 	}
 
 	for _, unit := range req.Units {
@@ -159,6 +154,16 @@ func getRedisPortBySpec(req *structs.ServiceSpec) (int, error) {
 	port, ok := req.Options["port"]
 	if !ok {
 		return -1, errors.New("bad req:redis need Options[port]")
+	}
+
+	return convertPort(port)
+}
+
+func getMysqlPortBySpec(req *structs.ServiceSpec) (int, error) {
+
+	port, ok := req.Options["mysqld::port"]
+	if !ok {
+		return -1, errors.New("bad req:mysql need Options[mysqld::port]")
 	}
 
 	return convertPort(port)
@@ -261,8 +266,7 @@ func getMysqls(req *structs.ServiceSpec) []Mysql {
 
 	users, _ := getMysqlUser(req)
 
-	port, _ := req.Options["mysqld::port"]
-	intport, _ := port.(int)
+	intport, _ := getMysqlPortBySpec(req)
 
 	for _, unit := range req.Units {
 		instance := unit.ContainerID
