@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/astaxie/beego/config"
@@ -74,9 +75,9 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	m["mysqld::server_id"] = desc.Options["port"]
 
 	if c.template != nil {
-		m["mysqld::log_bin"] = fmt.Sprintf("%s/BIN/%s-binlog", c.template.LogMount, spec.Name)
+		m["mysqld::log_bin"] = filepath.Clean(fmt.Sprintf("%s/BIN/%s-binlog", c.template.LogMount, spec.Name))
 
-		m["mysqld::relay_log"] = fmt.Sprintf("%s/REL/%s-relay", c.template.LogMount, spec.Name)
+		m["mysqld::relay_log"] = filepath.Clean(fmt.Sprintf("%s/REL/%s-relay", c.template.LogMount, spec.Name))
 	}
 
 	if n := spec.Config.HostConfig.Memory; n>>33 > 0 {
