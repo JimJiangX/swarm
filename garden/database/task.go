@@ -10,14 +10,21 @@ import (
 )
 
 const (
-	_                 = iota // 0
-	TaskCreateStatus         // 1
-	TaskRunningStatus        // 2
-	TaskStopStatus           // 3
-	TaskCancelStatus         // 4
-	TaskDoneStatus           // 5
-	TaskTimeoutStatus        // 6
-	TaskFailedStatus         // 7
+	_ = iota // 0
+	// TaskCreateStatus task is created
+	TaskCreateStatus // 1
+	// TaskRunningStatus task is running
+	TaskRunningStatus // 2
+	// TaskStopStatus task is stoped
+	TaskStopStatus // 3
+	// TaskCancelStatus task is canceled
+	TaskCancelStatus // 4
+	// TaskDoneStatus task has done
+	TaskDoneStatus // 5
+	// TaskTimeoutStatus task is timeout and stoped
+	TaskTimeoutStatus // 6
+	// TaskFailedStatus task is failed
+	TaskFailedStatus // 7
 )
 
 const (
