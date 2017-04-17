@@ -19,6 +19,7 @@ func init() {
 
 const (
 	monitorRole = "monitor"
+	rootRole    = "root"
 )
 
 type mysqlConfig struct {
@@ -95,6 +96,25 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 		m["mysqld::innodb_buffer_pool_size"] = int(float64(n) * 0.70)
 	} else {
 		m["mysqld::innodb_buffer_pool_size"] = int(float64(n) * 0.5)
+	}
+
+	m["client::user"] = ""
+	m["client::password"] = ""
+
+	var root *structs.User
+
+	if len(desc.Users) > 0 {
+		for i := range desc.Users {
+			if desc.Users[i].Role == rootRole {
+				root = &desc.Users[i]
+				break
+			}
+		}
+
+		if root != nil {
+			m["client::user"] = root.Name
+			m["client::password"] = root.Password
+		}
 	}
 
 	for key, val := range m {
