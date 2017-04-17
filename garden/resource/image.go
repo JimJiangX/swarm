@@ -48,7 +48,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 		Labels:   labels,
 		UploadAt: time.Now(),
 	}
-	task := database.NewTask(req.Version(), database.ImageLoadTask, image.ID, "load image", "", 300)
+	task := database.NewTask(req.Version(), database.ImageLoadTask, image.ID, "load image", nil, 300)
 
 	err = ormer.InsertImageWithTask(image, task)
 	if err != nil {
@@ -66,7 +66,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 
 				task.FinishedAt = time.Now()
 				task.Status = database.TaskFailedStatus
-				task.Errors = err.Error()
+				task.SetErrors(err)
 
 				err := ormer.SetTask(task)
 				if err != nil {
@@ -104,7 +104,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 
 		task.FinishedAt = image.UploadAt
 		task.Status = database.TaskDoneStatus
-		task.Errors = ""
+		task.SetErrors(nil)
 
 		err = ormer.SetImageAndTask(image, task)
 

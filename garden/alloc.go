@@ -116,7 +116,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 
 	spec.Units = units
 
-	t := database.NewTask(spec.Name, database.ServiceRunTask, spec.ID, svc.Desc.ID, "", 300)
+	t := database.NewTask(spec.Name, database.ServiceRunTask, spec.ID, svc.Desc.ID, nil, 300)
 
 	err = gd.ormer.InsertService(svc, us, &t)
 	if err != nil {

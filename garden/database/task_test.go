@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -23,7 +24,10 @@ func TestTask(t *testing.T) {
 
 	tasks := make([]Task, 10)
 	for i := range tasks {
-		tasks[i] = NewTask("object00XXX", ServiceUpdateImageTask, "fjaojfay921084-1hkcshnciaj89r", "ajfakpof90iq3j90qjfoqu89qufjqofu98qufq9fjq9u39qujfof9qjfqj983jq93qiojq", "jaofj93u02r3j89fu98ijcnea8n u390	i3	ir0ur3	r8u98uq2ur983uru	r8u9ur	9 om[-o r ", 3000)
+		tasks[i] = NewTask("object00XXX", ServiceUpdateImageTask, "fjaojfay921084-1hkcshnciaj89r", "ajfakpof90iq3j90qjfoqu89qufjqofu98qufq9fjq9u39qujfof9qjfqj983jq93qiojq",
+			map[string]string{
+				"abc":             "anfiojaofmaoijaokm fjao a jnoa  j",
+				"aaofjafjoajfoaf": "faiojfani naojoamoij jmfojauahincia"}, 3000)
 	}
 
 	do := func(tx *sqlx.Tx) error {
@@ -38,7 +42,7 @@ func TestTask(t *testing.T) {
 		}
 
 		tasks[8].Status = TaskDoneStatus
-		tasks[8].Errors = ""
+		tasks[8].errs = nil
 		tasks[8].FinishedAt = time.Time{}
 
 		return db.txSetTask(tx, tasks[8])
@@ -50,7 +54,7 @@ func TestTask(t *testing.T) {
 	}
 
 	tasks[0].Status = TaskDoneStatus
-	tasks[0].Errors = "afjoaifemfljoajfeaoji"
+	tasks[0].SetErrors(errors.New("afjoaifemfljoajfeaoji"))
 
 	err = db.SetTask(tasks[0])
 	if err != nil {

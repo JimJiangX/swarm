@@ -149,7 +149,7 @@ type nodeWithTask struct {
 
 func NewNodeWithTask(n database.Node, hdd, ssd []string, ssh structs.SSHConfig) nodeWithTask {
 
-	t := database.NewTask(n.Addr, database.NodeInstall, n.ID, "install softwares on host", "", 300)
+	t := database.NewTask(n.Addr, database.NodeInstall, n.ID, "install softwares on host", nil, 300)
 
 	return nodeWithTask{
 		hdd:    hdd,
@@ -228,7 +228,7 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 			}
 
 			nt.Task.Status = database.TaskFailedStatus
-			nt.Task.Errors = err.Error()
+			nt.Task.SetErrors(err)
 			nt.Task.FinishedAt = time.Now()
 		}
 
@@ -477,7 +477,7 @@ func (m hostManager) registerNodes(ctx context.Context, nodes []nodeWithTask, sy
 		t := nodes[i].Task
 		t.Status = database.TaskDoneStatus
 		t.FinishedAt = n.RegisterAt
-		t.Errors = ""
+		t.SetErrors(nil)
 
 		err = m.dco.RegisterNode(n, t)
 		if err != nil {
@@ -533,7 +533,7 @@ func (m hostManager) registerNodesTimeout(nodes []nodeWithTask, er error) error 
 
 			t.Status = database.TaskFailedStatus
 			t.FinishedAt = n.RegisterAt
-			t.Errors = er.Error()
+			t.SetErrors(err)
 		}
 
 		err = m.dco.RegisterNode(n, t)

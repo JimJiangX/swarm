@@ -59,6 +59,7 @@ const (
 	BackupManualTask = "backup_manual"
 )
 
+// TaskOrmer Task db table operators
 type TaskOrmer interface {
 	InsertTasks(tx *sqlx.Tx, tasks []Task, linkTable string) error
 
@@ -70,7 +71,7 @@ type TaskOrmer interface {
 }
 
 // NewTask new a Task
-func NewTask(object, relate, linkto, desc, labels string, timeout int) Task {
+func NewTask(object, relate, linkto, desc string, label map[string]string, timeout int) Task {
 	tk := task{
 		ID:        utils.Generate32UUID(),
 		Name:      relate + "-" + object,
@@ -82,45 +83,56 @@ func NewTask(object, relate, linkto, desc, labels string, timeout int) Task {
 		CreatedAt: time.Now(),
 	}
 
-	return Task{task: tk}
+	t := Task{task: tk, label: label}
+	t.toTask()
+
+	return t
 }
 
 // Task
 
 type Task struct {
 	task
-	Errs  []error
-	Label map[string]string
+	errs  []error
+	label map[string]string
+}
+
+func (t *Task) SetErrors(err ...error) {
+	t.errs = err
+}
+
+func (t *Task) AddErr(err error) {
+	if t.errs != nil {
+		t.errs = append(t.errs, err)
+	} else {
+		t.errs = []error{err}
+	}
 }
 
 func (t *Task) toTask() task {
-	if len(t.Errs) > 0 {
+	if len(t.errs) > 0 {
 		buf := bytes.NewBuffer(nil)
-		for i := range t.Errs {
-			if t.Errs[i] != nil {
-				buf.WriteString(t.Errs[i].Error())
+		for i := range t.errs {
+			if t.errs[i] != nil {
+				buf.WriteString(t.errs[i].Error())
 				buf.WriteByte('\n')
 			}
 		}
 		t.Errors = buf.String()
-		t.Errs = nil
+		t.errs = nil
 	}
 
-	if len(t.Label) > 0 {
-		buf := bytes.NewBuffer(nil)
-		for k, v := range t.Label {
+	if len(t.label) > 0 {
+		buf := bytes.NewBufferString(t.Labels)
+		for k, v := range t.label {
 			buf.WriteString(k)
 			buf.WriteByte(':')
 			buf.WriteString(v)
 			buf.WriteByte('\n')
 		}
-		if len(t.Labels) > 0 {
-			buf.WriteString(t.Labels)
-			buf.WriteByte('\n')
-		}
 
 		t.Labels = buf.String()
-		t.Label = nil
+		t.label = nil
 	}
 
 	t.Timestamp = t.CreatedAt.Unix()
@@ -284,12 +296,20 @@ func (db dbBase) ListTasks(link string, status int) ([]Task, error) {
 }
 
 func (db dbBase) delTasks(tasks []Task) error {
+	stmt, err := db.Preparex("DELETE FROM " + db.taskTable() + " WHERE id=?")
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	for i := range tasks {
-		_, err := db.Exec("DELETE FROM "+db.taskTable()+" WHERE id=?", tasks[i].ID)
+		_, err = stmt.Exec(tasks[i].ID)
 		if err != nil {
+			stmt.Close()
 			return errors.WithStack(err)
 		}
 	}
+
+	stmt.Close()
 
 	return nil
 }
