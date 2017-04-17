@@ -156,6 +156,12 @@ type User struct {
 	Privilege string `json:"privilege"`
 }
 
+type ServiceExecConfig struct {
+	Detach    bool     `json:"detach"`
+	Container string   `json:"nameOrID"`
+	Cmd       []string `json:"cmd"`
+}
+
 type ServiceLink struct {
 	priority int
 	Spec     *ServiceSpec `json:"-"`

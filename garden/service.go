@@ -607,6 +607,35 @@ func (svc *Service) Stop(ctx context.Context, containers, async bool, task *data
 	return sl.Run(isnotInProgress, stop, async)
 }
 
+func (svc *Service) Exec(ctx context.Context, config structs.ServiceExecConfig, async bool, task *database.Task) error {
+
+	exec := func() error {
+		if config.Container != "" {
+			_, err := svc.exec(ctx, config.Container, config.Cmd, config.Detach)
+			return err
+		}
+
+		units, err := svc.getUnits()
+		if err != nil {
+			return err
+		}
+
+		for i := range units {
+			_, err := svc.exec(ctx, units[i].u.ID, config.Cmd, config.Detach)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
+		statusServiceStoping, statusServiceStoped, statusServiceStopFailed)
+
+	return sl.Run(isnotInProgress, exec, async)
+}
+
 func (svc *Service) stop(ctx context.Context, units []*unit, containers bool) error {
 	cmds, err := svc.generateUnitsCmd(ctx)
 	if err != nil {
@@ -636,7 +665,7 @@ func (svc *Service) stop(ctx context.Context, units []*unit, containers bool) er
 	return nil
 }
 
-func (svc *Service) Exec(ctx context.Context, nameOrID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
+func (svc *Service) exec(ctx context.Context, nameOrID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
 	u, err := svc.getUnit(nameOrID)
 	if err != nil {
 		return types.ContainerExecInspect{}, err

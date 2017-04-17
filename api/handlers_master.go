@@ -1380,6 +1380,49 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
 }
 
+func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	config := structs.ServiceExecConfig{}
+	err := json.NewDecoder(r.Body).Decode(&config)
+	if err != nil {
+		httpJSONError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil || gd.Cluster == nil {
+
+		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		return
+	}
+
+	svc, err := gd.GetService(name)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	spec, err := svc.Spec()
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	task := database.NewTask(spec.Name, database.ServiceStopTask, spec.ID, spec.Desc, "", 300)
+
+	err = svc.Exec(ctx, config, true, &task)
+	if err != nil {
+		httpJSONError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
+}
+
 func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 

@@ -36,6 +36,7 @@ const (
 	ServiceStopTask   = "service_stop"
 	ServiceScaleTask  = "service_scale"
 	ServiceUpdateTask = "service_update"
+	ServiceExecTask   = "service_exec"
 
 	ServiceUpdateConfigTask = "service_update_config"
 	ServiceUpdateImageTask  = "service_update_image"
