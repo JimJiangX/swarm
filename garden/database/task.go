@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"time"
 
+	"bytes"
+
 	"github.com/docker/swarm/garden/utils"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -69,21 +71,65 @@ type TaskOrmer interface {
 
 // NewTask new a Task
 func NewTask(object, relate, linkto, desc, labels string, timeout int) Task {
-	return Task{
+	tk := task{
 		ID:        utils.Generate32UUID(),
 		Name:      relate + "-" + object,
 		Related:   relate,
 		Linkto:    linkto,
 		Desc:      desc,
-		Labels:    labels,
 		Timeout:   time.Duration(timeout) * time.Second,
 		Status:    TaskRunningStatus,
 		CreatedAt: time.Now(),
 	}
+
+	return Task{task: tk}
 }
 
-// Task is table structure,record tasks status
+// Task
+
 type Task struct {
+	task
+	Errs  []error
+	Label map[string]string
+}
+
+func (t *Task) toTask() task {
+	if len(t.Errs) > 0 {
+		buf := bytes.NewBuffer(nil)
+		for i := range t.Errs {
+			if t.Errs[i] != nil {
+				buf.WriteString(t.Errs[i].Error())
+				buf.WriteByte('\n')
+			}
+		}
+		t.Errors = buf.String()
+		t.Errs = nil
+	}
+
+	if len(t.Label) > 0 {
+		buf := bytes.NewBuffer(nil)
+		for k, v := range t.Label {
+			buf.WriteString(k)
+			buf.WriteByte(':')
+			buf.WriteString(v)
+			buf.WriteByte('\n')
+		}
+		if len(t.Labels) > 0 {
+			buf.WriteString(t.Labels)
+			buf.WriteByte('\n')
+		}
+
+		t.Labels = buf.String()
+		t.Label = nil
+	}
+
+	t.Timestamp = t.CreatedAt.Unix()
+
+	return t.task
+}
+
+// task is table structure,record tasks status
+type task struct {
 	ID         string        `db:"id" json:"id"`
 	Name       string        `db:"name" json:"name"` //Related-Object
 	Related    string        `db:"related" json:"related"`
@@ -107,11 +153,12 @@ func (db dbBase) txInsertTask(tx *sqlx.Tx, t Task, linkTable string) error {
 	if t.LinkTable == "" {
 		t.LinkTable = linkTable
 	}
-	t.Timestamp = t.CreatedAt.Unix()
+
+	tk := t.toTask()
 
 	query := "INSERT INTO " + db.taskTable() + " (id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:link_table,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
 
-	_, err := tx.NamedExec(query, &t)
+	_, err := tx.NamedExec(query, tk)
 	if err == nil {
 		return nil
 	}
@@ -135,12 +182,14 @@ func (db dbBase) InsertTasks(tx *sqlx.Tx, tasks []Task, linkTable string) error 
 		if tasks[i].ID == "" {
 			continue
 		}
+
 		if tasks[i].LinkTable == "" {
 			tasks[i].LinkTable = linkTable
 		}
-		tasks[i].Timestamp = tasks[i].CreatedAt.Unix()
 
-		_, err = stmt.Exec(&tasks[i])
+		tk := tasks[i].toTask()
+
+		_, err = stmt.Exec(tk)
 		if err != nil {
 			stmt.Close()
 
@@ -154,10 +203,11 @@ func (db dbBase) InsertTasks(tx *sqlx.Tx, tasks []Task, linkTable string) error 
 }
 
 func (db dbBase) txSetTask(tx *sqlx.Tx, t Task) error {
+	tk := t.toTask()
 
 	query := "UPDATE " + db.taskTable() + " SET status=?,finished_at=?,errors=? WHERE id=?"
 
-	_, err := tx.Exec(query, t.Status, t.FinishedAt, t.Errors, t.ID)
+	_, err := tx.Exec(query, tk.Status, tk.FinishedAt, tk.Errors, tk.ID)
 	if err == nil {
 		return nil
 	}
@@ -170,9 +220,11 @@ func (db dbBase) SetTask(t Task) error {
 		t.FinishedAt = time.Now()
 	}
 
+	tk := t.toTask()
+
 	query := "UPDATE " + db.taskTable() + " SET status=?,finished_at=?,errors=? WHERE id=?"
 
-	_, err := db.Exec(query, t.Status, t.FinishedAt, t.Errors, t.ID)
+	_, err := db.Exec(query, tk.Status, tk.FinishedAt, tk.Errors, tk.ID)
 	if err == nil {
 		return nil
 	}
@@ -180,21 +232,22 @@ func (db dbBase) SetTask(t Task) error {
 	return errors.Wrap(err, "Tx update Task status & errors")
 }
 
-func (db dbBase) GetTask(ID string) (t Task, err error) {
+func (db dbBase) GetTask(ID string) (Task, error) {
+	tk := task{}
 	query := "SELECT id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM " + db.taskTable() + " WHERE id=?"
 
-	err = db.Get(&t, query, ID)
+	err := db.Get(&tk, query, ID)
 	if err == nil {
-		return t, nil
+		return Task{task: tk}, nil
 	}
 
-	return t, errors.Wrap(err, "get task by id:"+ID)
+	return Task{}, errors.Wrap(err, "get task by id:"+ID)
 }
 
 func (db dbBase) ListTasks(link string, status int) ([]Task, error) {
 	var (
 		err   error
-		out   []Task
+		tks   []task
 		query = "SELECT id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM " + db.taskTable()
 	)
 
@@ -202,21 +255,27 @@ func (db dbBase) ListTasks(link string, status int) ([]Task, error) {
 	case status > 0:
 		query = query + " WHERE status=?"
 
-		err = db.Select(&out, query, status)
+		err = db.Select(&tks, query, status)
 
 	case link != "":
 
 		query = query + " WHERE link_to=?"
 
-		err = db.Select(&out, query, link)
+		err = db.Select(&tks, query, link)
 
 	default:
 
-		err = db.Select(&out, query)
+		err = db.Select(&tks, query)
 	}
 
 	if err == nil {
+		out := make([]Task, 0, len(tks))
+		for i := range tks {
+			out = append(out, Task{task: tks[i]})
+		}
+
 		return out, nil
+
 	} else if err == sql.ErrNoRows {
 		return nil, nil
 	}
