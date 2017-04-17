@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -72,6 +73,8 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 		return errors.New("unexpected IPAddress")
 	}
 
+	m["mysqld::server_id"] = net.ParseIP(spec.Networking[0].IP).To4()[3]
+
 	if v, ok := desc.Options["character_set_server"]; ok && v != nil {
 		m["mysqld::character_set_server"] = v
 	} else {
@@ -80,10 +83,8 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 
 	if p, ok := desc.Options["port"]; ok && p != nil {
 		m["mysqld::port"] = p
-		m["mysqld::server_id"] = p
 	} else {
 		m["mysqld::port"] = 3306
-		m["mysqld::server_id"] = 3306
 	}
 
 	if c.template != nil {
