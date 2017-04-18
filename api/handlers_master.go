@@ -515,14 +515,34 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 // GET /services?from=DBAAS
 func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
+	err := r.ParseForm()
+	if err != nil {
 		httpError2(w, err, http.StatusBadRequest)
 		return
 	}
 
 	from := r.FormValue("from")
+	unit := r.FormValue("unit")
 
-	services, err := database.ListServices()
+	var services []database.Service
+	if unit = strings.TrimSpace(unit); unit != "" {
+
+		services, err = database.ListServices()
+
+	} else {
+		u, err := database.GetUnit(unit)
+		if err != nil {
+			httpError2(w, err, http.StatusInternalServerError)
+			return
+		}
+		s, err := database.GetService(u.ServiceID)
+		if err != nil {
+			httpError2(w, err, http.StatusInternalServerError)
+			return
+		}
+
+		services = []database.Service{s}
+	}
 	if err != nil {
 		httpError2(w, err, http.StatusInternalServerError)
 		return
@@ -549,7 +569,7 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		list := make([]structs.ServiceResponse, length)
 		ch := make(chan structs.ServiceResponse, length)
 		for i := range services {
-			go getServiceResponse(services[i], "", containers, ch)
+			go getServiceResponse(services[i], unit, containers, ch)
 		}
 
 		for i := 0; i < length; i++ {
@@ -858,13 +878,7 @@ func listServiceFromDBAAS(services []database.Service, containers cluster.Contai
 // GET /services/{name}
 // It is able to get Service by Unit ID or name
 func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		httpError2(w, err, http.StatusBadRequest)
-		return
-	}
-
 	name := mux.Vars(r)["name"]
-	unit := r.FormValue("unit")
 
 	service, err := database.GetService(name)
 	if err != nil {
@@ -882,7 +896,7 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	resp := getServiceResponse(service, strings.TrimSpace(unit), gd.Containers(), nil)
+	resp := getServiceResponse(service, "", gd.Containers(), nil)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
