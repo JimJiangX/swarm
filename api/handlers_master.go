@@ -525,22 +525,11 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	unit := r.FormValue("unit")
 
 	var services []database.Service
-	if unit = strings.TrimSpace(unit); unit != "" {
-
+	if unit = strings.TrimSpace(unit); unit == "" {
 		services, err = database.ListServices()
-
 	} else {
-		u, err := database.GetUnit(unit)
-		if err != nil {
-			httpError2(w, err, http.StatusInternalServerError)
-			return
-		}
-		s, err := database.GetService(u.ServiceID)
-		if err != nil {
-			httpError2(w, err, http.StatusInternalServerError)
-			return
-		}
-
+		var s database.Service
+		s, err = database.TxGetServiceByUnit(unit)
 		services = []database.Service{s}
 	}
 	if err != nil {
