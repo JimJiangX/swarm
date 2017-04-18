@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,9 +27,18 @@ func newHitachiStore(orm database.StorageOrmer, script string, hs database.Hitac
 	return &hitachiStore{
 		lock:   new(sync.RWMutex),
 		orm:    orm,
-		script: script,
+		script: filepath.Join(script, HITACHI),
 		hs:     hs,
 	}
+}
+
+func (hs hitachiStore) scriptPath(file string) (string, error) {
+	path, err := utils.GetAbsolutePath(false, hs.script, file)
+	if err != nil {
+		return "", errors.Wrap(err, "not found file:"+file)
+	}
+
+	return path, nil
 }
 
 // ID returns store ID
@@ -48,9 +58,9 @@ func (h hitachiStore) Driver() string {
 
 // Ping connected to store,call connect_test.sh,test whether store available.
 func (h hitachiStore) Ping() error {
-	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "connect_test.sh")
+	path, err := h.scriptPath("connect_test.sh")
 	if err != nil {
-		return errors.Wrap(err, "ping hitachi store:"+h.Vendor())
+		return err
 	}
 
 	cmd := utils.ExecScript(path, h.hs.AdminUnit)
@@ -109,9 +119,9 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 		return lun, lv, errors.New("no available LUN ID in store:" + h.Vendor())
 	}
 
-	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "create_lun.sh")
+	path, err := h.scriptPath("create_lun.sh")
 	if err != nil {
-		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
+		return lun, lv, err
 	}
 	// size:byte-->MB
 	param := []string{path, h.hs.AdminUnit,
@@ -190,9 +200,9 @@ func (h *hitachiStore) Extend(name string, size int) (database.LUN, database.Vol
 		return lun, lv, errors.New("no available LUN ID in store:" + h.Vendor())
 	}
 
-	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "create_lun.sh")
+	path, err := h.scriptPath("create_lun.sh")
 	if err != nil {
-		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
+		return lun, lv, err
 	}
 	// size:byte-->MB
 	param := []string{path, h.hs.AdminUnit,
@@ -242,9 +252,9 @@ func (h *hitachiStore) Recycle(id string, lun int) error {
 		return err
 	}
 
-	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "del_lun.sh")
+	path, err := h.scriptPath("del_lun.sh")
 	if err != nil {
-		return errors.Wrap(err, h.Vendor()+" recycle")
+		return err
 	}
 
 	cmd := utils.ExecScript(path, h.hs.AdminUnit, strconv.Itoa(l.StorageLunID))
@@ -310,9 +320,9 @@ func (h *hitachiStore) list(rg ...string) ([]Space, error) {
 		list = strings.Join(rg, " ")
 	}
 
-	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "listrg.sh")
+	path, err := h.scriptPath("listrg.sh")
 	if err != nil {
-		return nil, errors.Wrap(err, h.Vendor()+" list")
+		return nil, err
 	}
 
 	cmd := utils.ExecScript(path, h.hs.AdminUnit, list)
@@ -362,9 +372,9 @@ func (h hitachiStore) IdleSize() (map[string]int64, error) {
 // AddHost register a host to store,calls add_host.sh,
 // the host able to connect with store and shared store space.
 func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
-	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "add_host.sh")
+	path, err := h.scriptPath("add_host.sh")
 	if err != nil {
-		return errors.Wrap(err, h.Vendor()+" add host")
+		return err
 	}
 
 	h.lock.Lock()
@@ -386,9 +396,9 @@ func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
 
 // DelHost deregister host,calls del_host.sh
 func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
-	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "del_host.sh")
+	path, err := h.scriptPath("del_host.sh")
 	if err != nil {
-		return errors.Wrap(err, h.Vendor()+" delete host")
+		return err
 	}
 
 	h.lock.Lock()
@@ -432,9 +442,9 @@ func (h *hitachiStore) Mapping(host, vg, lun string) error {
 		return err
 	}
 
-	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "create_lunmap.sh")
+	path, err := h.scriptPath("create_lunmap.sh")
 	if err != nil {
-		return errors.Wrap(err, h.Vendor()+" mapping")
+		return err
 	}
 
 	cmd := utils.ExecScript(path, h.hs.AdminUnit,
@@ -456,9 +466,9 @@ func (h *hitachiStore) DelMapping(lun string) error {
 		return err
 	}
 
-	path, err := utils.GetAbsolutePath(false, h.script, HITACHI, "del_lunmap.sh")
+	path, err := h.scriptPath("del_lunmap.sh")
 	if err != nil {
-		return errors.Wrap(err, h.Vendor()+" delete mapping")
+		return err
 	}
 
 	h.lock.Lock()
