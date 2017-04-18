@@ -733,12 +733,13 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) 
 		err := svc.so.SetServiceWithTask(key, val, task, t)
 		if err != nil {
 			logrus.WithField("Service", svc.svc.Name).Warnf("remove Service:%+v", err)
-		}
-		if err != nil && task != nil {
-			return svc.so.SetTask(*task)
+
+			if task != nil {
+				err = svc.so.SetTask(*task)
+			}
 		}
 
-		return nil
+		return err
 	})
 
 	return sl.Run(isnotInProgress, remove, false)
