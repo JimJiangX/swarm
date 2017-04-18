@@ -676,6 +676,12 @@ func (svc *Service) Exec(ctx context.Context, config structs.ServiceExecConfig, 
 func (svc *Service) exec(ctx context.Context, nameOrID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
 	u, err := svc.getUnit(nameOrID)
 	if err != nil {
+		// exec if container exist
+		c := svc.cluster.Container(nameOrID)
+		if c != nil {
+			return c.Exec(ctx, cmd, detach)
+		}
+
 		return types.ContainerExecInspect{}, err
 	}
 
