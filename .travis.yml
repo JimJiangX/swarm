@@ -1,4 +1,4 @@
-language: go
+nguage: go
 
 go:
   - 1.7.1
@@ -8,16 +8,9 @@ sudo: false
 
 install:
   # Symlink below is needed for Travis CI to work correctly on personal forks of swarm
-  - export TRAVIS_REPO_SLUG=docker
-  - mkdir -p $HOME/gopath/src/github.com/docker/swarm
-  - rsync -az ${TRAVIS_BUILD_DIR}/ $HOME/gopath/src/github.com/docker/swarm/
-  - export TRAVIS_BUILD_DIR=$HOME/gopath/src/github.com/docker/swarm
-  - ln -s $HOME/gopath/src/github.com/${TRAVIS_REPO_SLUG///swarm/} $HOME/gopath/src/github.com/docker
+  - ln -s $HOME/gopath/src/github.com/${TRAVIS_REPO_SLUG///swarm/} $HOME/gopath/src/github.com/docker/swarm
   - go get github.com/golang/lint/golint
   - go get github.com/GeertJohan/fgt
-
-before_script:
-  - cd $HOME/gopath/src/github.com/docker/swarm
 
 script:
   - script/validate-gofmt
@@ -28,4 +21,4 @@ script:
   - GOOS=darwin go build
   - GOOS=windows go build
   - GOOS=linux go build
-  - go test -v -race `go list ./... | grep -v /vendor/`
+  - go test -v -race `go list ./... | grep -v /vendor/
