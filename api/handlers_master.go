@@ -682,7 +682,7 @@ type dbaasServiceResp struct {
 
 	CpusetCpus string // "upsql_cpusetCpus": "??",
 	Memory     int64  // "upsql_memory": "??",
-	DatSizze   int
+	DatSize    int
 	BackupSize int
 
 	ManageStatus  int64  `json:"manage_status"`  //"manage_status": "??",
@@ -816,7 +816,7 @@ func serviceFromDBAAS(svc database.Service, containers cluster.Containers, check
 		Arch:          sql.Arch,
 		Memory:        sql.HostConfig.Memory,
 		CpusetCpus:    sql.HostConfig.CpusetCpus,
-		DatSizze:      datSize,
+		DatSize:       datSize,
 		BackupSize:    svc.BackupMaxSizeByte,
 		ManageStatus:  svc.Status,
 		RunningStatus: getServiceRunningStatus(svc.ID, units, containers, checks),
