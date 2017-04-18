@@ -549,7 +549,7 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		list := make([]structs.ServiceResponse, length)
 		ch := make(chan structs.ServiceResponse, length)
 		for i := range services {
-			go getServiceResponse(services[i], containers, ch)
+			go getServiceResponse(services[i], "", containers, ch)
 		}
 
 		for i := 0; i < length; i++ {
@@ -858,7 +858,13 @@ func listServiceFromDBAAS(services []database.Service, containers cluster.Contai
 // GET /services/{name}
 // It is able to get Service by Unit ID or name
 func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		httpError2(w, err, http.StatusBadRequest)
+		return
+	}
+
 	name := mux.Vars(r)["name"]
+	unit := r.FormValue("unit")
 
 	service, err := database.GetService(name)
 	if err != nil {
@@ -876,14 +882,14 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	resp := getServiceResponse(service, gd.Containers(), nil)
+	resp := getServiceResponse(service, strings.TrimSpace(unit), gd.Containers(), nil)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }
 
-func getServiceResponse(service database.Service, containers cluster.Containers, ch chan<- structs.ServiceResponse) structs.ServiceResponse {
+func getServiceResponse(service database.Service, nameOrID string, containers cluster.Containers, ch chan<- structs.ServiceResponse) structs.ServiceResponse {
 	desc := structs.PostServiceRequest{}
 	err := json.NewDecoder(bytes.NewBufferString(service.Desc)).Decode(&desc)
 	if err != nil {
@@ -937,8 +943,12 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 		logrus.Error(err, names)
 	}
 
-	list := make([]structs.UnitInfo, len(units))
+	list := make([]structs.UnitInfo, 0, len(units))
 	for i := range units {
+		if nameOrID != "" && nameOrID != units[i].ID && nameOrID != units[i].Name {
+			continue
+		}
+
 		node := database.Node{}
 		for n := range nodes {
 			if nodes[n].EngineID == units[i].EngineID {
@@ -949,7 +959,7 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 
 		networkings, ports := getUnitNetworking(units[i].ID)
 
-		list[i] = structs.UnitInfo{
+		uinfo := structs.UnitInfo{
 			ID:          units[i].ID,
 			Name:        units[i].Name,
 			Type:        units[i].Type,
@@ -967,19 +977,21 @@ func getServiceResponse(service database.Service, containers cluster.Containers,
 			CreatedAt:  utils.TimeToString(units[i].CreatedAt),
 		}
 
-		//		if list[i].Role == "" && list[i].Type == "upsql" {
-		//			list[i].Role = "unknown"
+		//		if uinfo.Role == "" && uinfo.Type == "upsql" {
+		//			uinfo.Role = "unknown"
 		//		}
 
 		container := containers.Get(units[i].ContainerID)
 		if container != nil {
-			list[i].Info = container.Info
-			list[i].CpusetCpus = container.Info.HostConfig.CpusetCpus
-			list[i].Memory = container.Info.HostConfig.Memory
-			list[i].State = container.Status
+			uinfo.Info = container.Info
+			uinfo.CpusetCpus = container.Info.HostConfig.CpusetCpus
+			uinfo.Memory = container.Info.HostConfig.Memory
+			uinfo.State = container.Status
 		} else {
-			list[i].Status = serviceCritical
+			uinfo.Status = serviceCritical
 		}
+
+		list = append(list, uinfo)
 	}
 
 	if len(units) > 0 {
