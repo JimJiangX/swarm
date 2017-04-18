@@ -75,8 +75,9 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		//		"/services/{name}/service_config":  getServiceServiceConfig,
 		//		"/services/{name}/backup_strategy": getServiceBackupStrategy,
 		//		"/services/{name}/backup_files":    getServiceBackupFiles,
-		//		"/storage/san":                     getSANStoragesInfo,
-		//		"/storage/san/{name:.*}":           getSANStorageInfo,
+
+		"/storage/san":           getSANStoragesInfo,
+		"/storage/san/{name:.*}": getSANStorageInfo,
 	},
 	http.MethodPost: {
 		"/units/{name}/proxy/*": proxySpecialLogic,
@@ -131,10 +132,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 
 		//		"/tasks/backup/callback": postBackupCallback,
 
-		//		"/storage/san":                                   postSanStorage,
-		//		"/storage/san/{name}/raid_group":                 postRGToSanStorage,
-		//		"/storage/san/{name}/raid_group/{rg:.*}/enable":  postEnableRaidGroup,
-		//		"/storage/san/{name}/raid_group/{rg:.*}/disable": postDisableRaidGroup,
+		"/storage/san":                        postSanStorage,
+		"/storage/san/{name}/raid_group/{rg}": postRGToSanStorage,
 	},
 
 	http.MethodPut: {
@@ -147,6 +146,9 @@ var masterRoutes = map[string]map[string]ctxHandler{
 
 		"/networkings/{name}/ips/enable":  putNetworkingEnable,
 		"/networkings/{name}/ips/disable": putNetworkingDisable,
+
+		"/storage/san/{name}/raid_group/{rg:.*}/enable":  postEnableRaidGroup,
+		"/storage/san/{name}/raid_group/{rg:.*}/disable": postDisableRaidGroup,
 	},
 
 	http.MethodDelete: {
@@ -160,8 +162,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/networkings/{name}/ips": deleteNetworking,
 		//		"/ports/{port:[0-9]+}":   deletePort,
 
-		//		"/storage/san/{name}":                    deleteStorage,
-		//		"/storage/san/{name}/raid_group/{rg:.*}": deleteRaidGroup,
+		"/storage/san/{name}":                    deleteStorage,
+		"/storage/san/{name}/raid_group/{rg:.*}": deleteRaidGroup,
 
 		"/softwares/images/{image}": deleteImage,
 	},

@@ -447,7 +447,7 @@ func (m hostManager) registerNodes(ctx context.Context, nodes []nodeWithTask, sy
 
 		// register Node to SAN storage
 		if n.Storage != "" {
-			san, err := storage.DefaultStores().GetStore(n.Storage)
+			san, err := storage.DefaultStores().Get(n.Storage)
 			if err != nil {
 				continue
 			}

@@ -330,15 +330,15 @@ func (db dbBase) GetRaidGroup(id, rg string) (RaidGroup, error) {
 // DelRGCondition count Clusters by storageID.
 func (db dbBase) DelRGCondition(storageID string) error {
 	count := 0
-	query := "SELECT COUNT(id) from " + db.raidGroupTable() + " WHERE storage_id=?"
+	query := "SELECT COUNT(id) from " + db.nodeTable() + " WHERE storage=?"
 
 	err := db.Get(&count, query, storageID)
 	if err != nil {
-		return errors.Wrap(err, "count Cluster by storage_id")
+		return errors.Wrap(err, "count Node by storage")
 	}
 
 	if count > 0 {
-		return errors.Errorf("storage is using by %d clusters", count)
+		return errors.Errorf("storage is using by %d nodes", count)
 	}
 
 	query = "SELECT COUNT(id) from " + db.raidGroupTable() + " WHERE storage_system_id=?"

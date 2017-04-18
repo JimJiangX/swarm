@@ -29,7 +29,7 @@ func newSanVolumeDriver(e *cluster.Engine, iface VolumeIface, storeID string) (D
 	}
 
 	stores := storage.DefaultStores()
-	san, err := stores.GetStore(storeID)
+	san, err := stores.Get(storeID)
 	if err != nil {
 		return nil, err
 	}

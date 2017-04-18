@@ -98,7 +98,7 @@ func DefaultStores() *stores {
 }
 
 // RegisterStore register a new remote storage system
-func (s *stores) AddStore(vendor, addr, user, password, admin string,
+func (s *stores) Add(vendor, addr, user, password, admin string,
 	lstart, lend, hstart, hend int) (store Store, err error) {
 
 	switch strings.ToUpper(vendor) {
@@ -144,7 +144,7 @@ func (s *stores) AddStore(vendor, addr, user, password, admin string,
 }
 
 // GetStore returns store find by ID
-func (s *stores) GetStore(ID string) (Store, error) {
+func (s *stores) Get(ID string) (Store, error) {
 	s.lock.RLock()
 	store, ok := s.stores[ID]
 	s.lock.RUnlock()
@@ -173,7 +173,7 @@ func (s *stores) GetStore(ID string) (Store, error) {
 	return store, nil
 }
 
-func (s *stores) ListStores() ([]Store, error) {
+func (s *stores) List() ([]Store, error) {
 	ids, err := s.orm.ListStorageID()
 	if err != nil {
 		return nil, err
@@ -182,7 +182,7 @@ func (s *stores) ListStores() ([]Store, error) {
 	list := make([]Store, 0, len(ids))
 
 	for i := range ids {
-		store, err := s.GetStore(ids[i])
+		store, err := s.Get(ids[i])
 		if err != nil {
 			return nil, err
 		}
@@ -195,16 +195,16 @@ func (s *stores) ListStores() ([]Store, error) {
 
 // RemoveStore removes the assigned store,
 // if store is using,cannot be remove
-func (s *stores) RemoveStore(ID string) error {
+func (s *stores) Remove(ID string) error {
 	err := s.orm.DelRGCondition(ID)
 	if err != nil {
 		return err
 	}
 
-	return s.removeStore(ID)
+	return s.remove(ID)
 }
 
-func (s *stores) removeStore(ID string) error {
+func (s *stores) remove(ID string) error {
 	s.lock.Lock()
 	delete(s.stores, ID)
 	s.lock.Unlock()
@@ -215,7 +215,7 @@ func (s *stores) removeStore(ID string) error {
 // RemoveStoreSpace removes a Space of store,
 // if Space is using,cannot be removed
 func (s *stores) RemoveStoreSpace(ID, space string) error {
-	store, err := s.GetStore(ID)
+	store, err := s.Get(ID)
 	if err != nil {
 		return err
 	}
