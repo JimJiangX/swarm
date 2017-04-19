@@ -560,13 +560,13 @@ func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.
 		vds := make([]structs.VolumeDriver, 0, len(drivers))
 
 		for _, d := range drivers {
-			if d == nil {
+			if d == nil || d.Type() == "NFS" {
 				continue
 			}
 
 			space, err := d.Space()
 			if err != nil {
-				logrus.WithField("Node", n.Addr).Errorf("get Node space,%+v", err)
+				logrus.WithField("Node", n.Addr).Errorf("get %s space,%+v", d.Name(), err)
 				continue
 			}
 
