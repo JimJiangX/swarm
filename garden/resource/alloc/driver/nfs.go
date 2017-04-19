@@ -129,18 +129,18 @@ func parseNFSSpace(in []byte) (int64, int64, error) {
 }
 
 func execNFScmd(base, ip, dir, mount, opts string) ([]byte, error) {
-	sh := filepath.Join(base, "nfs", "get_NFS_space.sh")
+	p := []string{base, "nfs", "get_NFS_space.sh"}
 
-	path, err := utils.GetAbsolutePath(false, sh)
+	path, err := utils.GetAbsolutePath(false, p...)
 	if err != nil {
-		return nil, err
+		return nil, errors.Errorf("nfs cmd error,%s,%s", filepath.Join(p...), err)
 	}
 
 	cmd := utils.ExecScript(path, ip, dir, mount, opts)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return out, err
+		return out, errors.WithStack(err)
 	}
 
 	return out, nil
