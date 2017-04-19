@@ -268,6 +268,8 @@ func convertUnitInfoToSpec(info database.UnitInfo, container *cluster.Container)
 	spec := structs.UnitSpec{
 		Unit: structs.Unit(info.Unit),
 
+		Config: &cluster.ContainerConfig{},
+
 		Engine: struct {
 			ID   string `json:"id"`
 			Node string `json:"node"`
@@ -295,14 +297,38 @@ func convertUnitInfoToSpec(info database.UnitInfo, container *cluster.Container)
 	return spec
 }
 
+func getUnitContainer(containers cluster.Containers, u database.Unit) *cluster.Container {
+	if len(containers) == 0 {
+		return nil
+	}
+
+	var c *cluster.Container
+
+	if u.ContainerID != "" {
+		c = containers.Get(u.ContainerID)
+	}
+
+	if c == nil {
+		c = containers.Get(u.Name)
+	}
+
+	if c == nil {
+		c = containers.Get(u.ID)
+	}
+
+	if c == nil {
+		logrus.Warnf("not found Container by '%s' & '%s' & '%s'", u.ContainerID, u.Name, u.ID)
+	}
+
+	return c
+}
+
 func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers) structs.ServiceSpec {
 	units := make([]structs.UnitSpec, 0, len(info.Units))
 
 	for u := range info.Units {
-		var c *cluster.Container
-		if containers != nil {
-			c = containers.Get(info.Units[u].Unit.Name)
-		}
+		c := getUnitContainer(containers, info.Units[u].Unit)
+
 		units = append(units, convertUnitInfoToSpec(info.Units[u], c))
 	}
 

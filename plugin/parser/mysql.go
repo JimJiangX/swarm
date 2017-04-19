@@ -93,10 +93,12 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 		m["mysqld::relay_log"] = filepath.Clean(fmt.Sprintf("%s/REL/%s-relay", c.template.LogMount, spec.Name))
 	}
 
-	if n := spec.Config.HostConfig.Memory; n>>33 > 0 {
-		m["mysqld::innodb_buffer_pool_size"] = int(float64(n) * 0.70)
-	} else {
-		m["mysqld::innodb_buffer_pool_size"] = int(float64(n) * 0.5)
+	if spec.Config != nil {
+		if n := spec.Config.HostConfig.Memory; n>>33 > 0 {
+			m["mysqld::innodb_buffer_pool_size"] = int(float64(n) * 0.70)
+		} else {
+			m["mysqld::innodb_buffer_pool_size"] = int(float64(n) * 0.5)
+		}
 	}
 
 	m["client::user"] = ""
