@@ -107,8 +107,18 @@ func (n Node) removeCondition() error {
 	}
 
 	if n.eng != nil {
+		err := n.eng.RefreshContainers(true)
+		if err != nil {
+			errs = append(errs, err.Error())
+		}
+
 		if num := len(n.eng.Containers()); num > 0 {
 			errs = append(errs, fmt.Sprintf("%d containers exists in Node %s", num, n.node.Addr))
+		}
+
+		err = n.eng.RefreshVolumes()
+		if err != nil {
+			errs = append(errs, err.Error())
 		}
 
 		if num := len(n.eng.Volumes()); num > 0 {
