@@ -107,17 +107,17 @@ func (svc *Service) RefreshSpec() (*structs.ServiceSpec, error) {
 		users []structs.User
 	)
 
-	if svc.svc != nil {
-		ID = svc.svc.ID
-	} else if svc.spec != nil {
-		ID = svc.spec.ID
-		users = svc.spec.Users
-	} else {
-		return nil, errors.New("Service with non ID")
+	if svc == nil || svc.so == nil {
+		return nil, errors.New("Service internal error")
 	}
 
-	if svc.so == nil {
-		return nil, errors.New("Service internal error")
+	if svc.spec != nil {
+		ID = svc.spec.ID
+		users = svc.spec.Users
+	} else if svc.svc != nil {
+		ID = svc.svc.ID
+	} else {
+		return nil, errors.New("Service with non ID")
 	}
 
 	var containers cluster.Containers
