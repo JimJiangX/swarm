@@ -1,15 +1,71 @@
 package kvstore
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"testing"
 
+	"github.com/docker/swarm/garden/structs"
 	"github.com/hashicorp/consul/api"
 )
 
+func init() {
+	r := http.NewServeMux()
+	r.HandleFunc("/v1/status/leader", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode("127.0.0.1:6060")
+	})
+
+	r.HandleFunc("/v1/status/peers", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode([]string{"127.0.0.1:6060"})
+	})
+
+	r.HandleFunc("/v1/agent/service/register", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	r.HandleFunc("/v1/health/state/", func(w http.ResponseWriter, r *http.Request) {
+		ck := api.HealthCheck{
+			Output:      "TCP connect 127.0.0.1:8000: Success",
+			ServiceName: "HS-127.0.0.1",
+		}
+		checks := []*api.HealthCheck{&ck}
+		json.NewEncoder(w).Encode(checks)
+	})
+
+	go http.ListenAndServe(":6060", r)
+
+	mockRegisterServer()
+}
+
+func mockRegisterServer() {
+	r := http.NewServeMux()
+
+	r.HandleFunc("/v1/", func(w http.ResponseWriter, r *http.Request) {
+
+		fmt.Println(r.Method, r.RequestURI)
+
+		if r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusCreated)
+		} else if r.Method == http.MethodDelete {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+	})
+
+	go http.ListenAndServe(":8000", r)
+}
+
+func makeClient() (*kvClient, error) {
+	return MakeClient(&api.Config{
+		Address: "127.0.0.1:6060",
+	}, "prefix", "6060", nil)
+}
+
 func TestGetHorusAddr(t *testing.T) {
-	c, err := MakeClient(&api.Config{
-		Address: "192.168.4.131:8500",
-	}, "prefix", "8500", nil)
+	c, err := makeClient()
 	if err != nil {
 		t.Skip(err)
 	}
@@ -29,6 +85,55 @@ func TestGetHorusAddr(t *testing.T) {
 	t.Log("horus:", addr)
 }
 
+func TestRegisterService(t *testing.T) {
+	c, err := makeClient()
+	if err != nil {
+		t.Skip(err)
+	}
+
+	config := structs.ServiceRegistration{
+		Consul: &api.AgentServiceRegistration{},
+		Horus:  &structs.HorusRegistration{},
+	}
+
+	config.Horus.Node.Select = true
+	config.Horus.Service.Select = true
+
+	err = c.RegisterService(context.Background(), "", config)
+	if err != nil {
+		t.Errorf("%+v", err)
+	}
+}
+
+func TestDeregisterService(t *testing.T) {
+	c, err := makeClient()
+	if err != nil {
+		t.Skip(err)
+	}
+
+	configs := []structs.ServiceDeregistration{
+		{
+			Type: unitType,
+			Key:  "unit_jfajfoafajofjaof",
+		}, {
+			Type: containerType,
+			Key:  "contianer_jfajfoafajofjaof",
+		}, {
+			Type:     hostType,
+			Key:      "host_jfajfoafajofjaof",
+			User:     "foiafjoafoia",
+			Password: "ofjajfioafoaf",
+		},
+	}
+
+	for i := range configs {
+		c.DeregisterService(context.Background(), configs[i])
+		if err != nil {
+			t.Errorf("%+v", err)
+		}
+	}
+}
+
 func TestParseIPFromHealthCheck(t *testing.T) {
 	output := "TCP connect 192.168.4.123:8000: Success"
 	id := "HS-192.168.4.123"
@@ -40,79 +145,3 @@ func TestParseIPFromHealthCheck(t *testing.T) {
 
 	t.Logf("'%s'", addr)
 }
-
-/*
-// node
-[
-{
-  "endpoint": "00a4ed42828a484a76d902cee9f3396426a495a75366ced6ed9a25fc6d8c1c82",
-  "collectorname": "",
-  "user": "",
-  "pwd": "",
-  "type": "host",
-  "colletorip": "192.168.16.41",
-  "colletorport": 8123,
-  "metrictags": "00a4ed42828a484a76d902cee9f3396426a495a75366ced6ed9a25fc6d8c1c82",
-  "network": [
-    "bond0",
-    "bond1"
-  ],
-  "status": "on",
-  "table": "host",
-  "CheckType": "health"
-}
-]
-// unit
-[
-{
-  "endpoint": "PMTBTpyAtFUTHJfg17JoFLyVUS8HAur4UG4N2QQS4O1bEk2TjlrvXwVbbtXhZg4X",
-  "collectorname": "PMTBTpyA_XX_kjjy8",
-  "user": "mon",
-  "pwd": "123.com",
-  "type": "upsql",
-  "colletorip": "192.168.16.41",
-  "colletorport": 8123,
-  "metrictags": "00a4ed42828a484a76d902cee9f3396426a495a75366ced6ed9a25fc6d8c1c82",
-  "network": [],
-  "status": "on",
-  "table": "host",
-  "CheckType": "health"
-}
-]
-*/
-
-func TestDeregisterToHorus(t *testing.T) {
-
-	// body := []string{"1234567890", "0987654321"}
-
-	//	err := deregisterToHorus(true, body...)
-	//	if err != nil {
-	//		t.Skip(err)
-	//	}
-}
-
-/*
-func TestFastPing(t *testing.T) {
-	type pingTest struct {
-		host string
-		want bool
-	}
-
-	tests := []pingTest{
-		{"192.168.2.121", true},
-		{"192.168.2.130", true},
-		{"178.3.32.99", false},
-	}
-
-	for i := range tests {
-		ok, err := fastPing(tests[i].host, 5, true)
-		if err != nil {
-			t.Skip(err)
-		}
-
-		if ok != tests[i].want {
-			t.Skipf("ping %s,got %t,%v", tests[i].host, ok, err)
-		}
-	}
-}
-*/

@@ -91,7 +91,7 @@ func postRegister(ctx context.Context, uri string, obj interface{}) error {
 
 		err := json.NewDecoder(resp.Body).Decode(&res)
 		if err != nil {
-			return errors.Wrap(err, "decode response body")
+			return errors.Wrapf(err, "%d:decode response body", resp.StatusCode)
 		}
 		return errors.Errorf("StatusCode:%d,Error:%s", resp.StatusCode, res.Err)
 	}
@@ -125,7 +125,7 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 		return ctx.Err()
 	}
 
-	uri := fmt.Sprintf("http://%s/v1/%s/%s", addr, config.Type, config.Type)
+	uri := fmt.Sprintf("http://%s/v1/%s/%s", addr, config.Type, config.Key)
 	if config.Type == unitType || config.Type == containerType {
 		uri = uri + "?del_container=true"
 	}
@@ -162,7 +162,7 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 
 		err := json.NewDecoder(resp.Body).Decode(&res)
 		if err != nil {
-			return errors.Wrap(err, "decode response body")
+			return errors.Wrapf(err, "%d:decode response body", resp.StatusCode)
 		}
 		return errors.Errorf("StatusCode:%d,Error:%s", resp.StatusCode, res.Err)
 	}
