@@ -10,12 +10,11 @@ nfs_mount_opt=$4
 TYPE=nfs4
 
 #check mount
-df --type=$TYPE $nfs_mount_dir > /dev/null 2>&1 || {
-	mount -t $TYPE -o $nfs_mount_opt $nfs_ip:$nfs_dir $nfs_mount_dir || {
-		echo "mount nfs dir fail"
-		exit 2
-	}
-}
+df --type=$TYPE $nfs_mount_dir | grep -w $nfs_ip:$nfs_dir > /dev/null 2>&1
+if [ $? -ne 0 ]; then 
+	echo "not found nfs dir"
+	exit 2
+fi
 
 total_space=`df --type=$TYPE --output=avail $nfs_mount_dir | sed '1d'`
 used_space=`df --type=$TYPE --output=used $nfs_mount_dir | sed '1d'`
