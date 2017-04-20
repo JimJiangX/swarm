@@ -11,10 +11,10 @@ func TestErrCode(t *testing.T) {
 		code   [3]int
 		want   int
 	}{
-		{method: http.MethodGet, code: [...]int{70, 80, 90}, want: 100708090},
-		{method: http.MethodPut, code: [...]int{7, 8, 9}, want: 103070809},
-		{code: [...]int{7, 8, 9}, want: 109070809},
-		{method: http.MethodGet, code: [...]int{770, 880, 990}, want: 100708090},
+		{method: http.MethodGet, code: [...]int{70, 80, 90}, want: 1017080090},
+		{method: http.MethodPut, code: [...]int{7, 8, 9}, want: 1040708009},
+		{code: [...]int{7, 8, 9}, want: 1000708009},
+		{method: http.MethodGet, code: [...]int{7770, 8880, 9990}, want: 1017080990},
 	}
 
 	for _, c := range tests {

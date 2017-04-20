@@ -10,7 +10,10 @@ import (
 type model int
 
 const (
-	_Cluster model = iota
+	_ model = iota
+	_DC
+	_NFS
+	_Cluster
 	_Host
 	_Task
 	_Unit
@@ -23,7 +26,9 @@ const (
 type category int
 
 const (
-	urlParamError category = iota
+	_ category = iota
+	urlParamError
+	bodyParamsError
 
 	encodeError
 	decodeError
@@ -32,6 +37,10 @@ const (
 	objectRace
 
 	dbBadConnection
+	dbQueryError
+	dbExecError
+	dbTxError
+
 	badConnection
 
 	resourcesLack
@@ -45,45 +54,45 @@ type errCode struct {
 }
 
 func (ec errCode) String() string {
-	return fmt.Sprintf("%-8d:	%s", ec.code, ec.comment)
+	return fmt.Sprintf("%-10d:	%s", ec.code, ec.comment)
 }
 
 func errCodeV1(method string, md model, cg category, serial int) errCode {
-	mt := 9
+	mt := 0
 	switch method {
 	case http.MethodGet:
-		mt = 0
-	case http.MethodHead:
 		mt = 1
-	case http.MethodPost:
+	case http.MethodHead:
 		mt = 2
-	case http.MethodPut:
+	case http.MethodPost:
 		mt = 3
-	case http.MethodPatch:
+	case http.MethodPut:
 		mt = 4
-	case http.MethodDelete:
+	case http.MethodPatch:
 		mt = 5
-	case http.MethodConnect:
+	case http.MethodDelete:
 		mt = 6
-	case http.MethodOptions:
+	case http.MethodConnect:
 		mt = 7
-	case http.MethodTrace:
+	case http.MethodOptions:
 		mt = 8
+	case http.MethodTrace:
+		mt = 9
 	}
 
 	// version|method|model|category|serial
-	//    2		  1      2      2       2
+	//    2		  1      2      2       3
 	newErrCode := func(version, method, model, category, serial int) errCode {
 		mod := func(x, base int) int {
 			return x % base
 		}
 
-		serial = mod(serial, 100)
+		serial = mod(serial, 1000)
 		category = mod(category, 100)
 		model = mod(model, 100)
 
 		return errCode{
-			code: serial + category*100 + model*10000 + method*1000000 + version*10000000,
+			code: serial + category*1000 + model*100000 + method*10000000 + version*100000000,
 		}
 	}
 

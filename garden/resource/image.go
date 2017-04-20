@@ -20,7 +20,7 @@ import (
 func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostLoadImageRequest) (string, string, error) {
 	path, err := utils.GetAbsolutePath(false, req.Path)
 	if err != nil {
-		return "", "", err
+		return "", "", errors.WithStack(err)
 	}
 	req.Path = path
 
