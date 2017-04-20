@@ -28,8 +28,14 @@ import (
 
 var errUnsupportGarden = stderr.New("unsupport Garden yet")
 
+func httpJSONNilGarden(w http.ResponseWriter) {
+	const nilGardenCode = 100000000
+
+	httpJSONError(w, errUnsupportGarden, nilGardenCode, http.StatusInternalServerError)
+}
+
 // Emit an HTTP error and log it.
-func httpJSONError(w http.ResponseWriter, err error, status int) {
+func httpJSONError(w http.ResponseWriter, err error, code, status int) {
 	field := logrus.WithField("status", status)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -38,7 +44,7 @@ func httpJSONError(w http.ResponseWriter, err error, status int) {
 	if err != nil {
 		json.NewEncoder(w).Encode(structs.ResponseHead{
 			Result:  false,
-			Code:    status,
+			Code:    code,
 			Message: err.Error(),
 		})
 
@@ -70,7 +76,10 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 	w.WriteHeader(status)
 
 	if obj != nil {
-		json.NewEncoder(w).Encode(obj)
+		err := json.NewEncoder(w).Encode(obj)
+		if err != nil {
+			logrus.Errorf("write JSON:%d,%s", status, err)
+		}
 	}
 }
 
@@ -79,7 +88,7 @@ func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -88,18 +97,21 @@ func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	u, err := orm.GetUnit(name)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Unit, dbQueryError, 11)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	ips, err := orm.ListIPByUnitID(u.ID)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Unit, dbQueryError, 12)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	if len(ips) == 0 {
-		httpJSONError(w, errors.Errorf("not found Unit %s address", u.Name), http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Unit, objectNotExist, 13)
+		httpJSONError(w, errors.Errorf("not found Unit %s address", u.Name), ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -112,7 +124,8 @@ func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	err = hijack(nil, addr, w, r)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Unit, internalError, 14)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 }
@@ -120,7 +133,8 @@ func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 // -----------------/nfs_backups handlers-----------------
 func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _NFS, urlParamError, 11)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -135,19 +149,21 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	sys, err := gd.Ormer().GetSysConfig()
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _NFS, dbQueryError, 12)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	abs, err := utils.GetAbsolutePath(true, sys.SourceDir)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _NFS, objectNotExist, 13)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -155,7 +171,8 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	space, err := d.Space()
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _NFS, internalError, 14)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -169,7 +186,7 @@ func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -177,7 +194,8 @@ func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	t, err := gd.Ormer().GetTask(name)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Task, dbQueryError, 11)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -186,7 +204,8 @@ func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Task, urlParamError, 21)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -194,7 +213,7 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -214,7 +233,8 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Task, dbQueryError, 22)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -226,18 +246,20 @@ func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.RegisterDC{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _DC, decodeError, 11)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil {
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	err = gd.Register(req)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _DC, internalError, 12)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -250,13 +272,14 @@ func listImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	images, err := gd.Ormer().ListImages()
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Image, dbQueryError, 11)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -286,14 +309,15 @@ func getSupportImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	if !ok || gd == nil ||
 		gd.PluginClient() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	pc := gd.PluginClient()
 	out, err := pc.GetImageSupport(ctx)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Image, internalError, 21)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -304,7 +328,8 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostLoadImageRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Image, decodeError, 31)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -313,7 +338,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		gd.Ormer() == nil ||
 		gd.PluginClient() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -326,7 +351,8 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	pc := gd.PluginClient()
 	supports, err := pc.GetImageSupport(ctx)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Image, internalError, 32)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -341,14 +367,16 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
-		httpJSONError(w, fmt.Errorf("%s unsupported yet", req.Version()), http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Image, objectNotExist, 33)
+		httpJSONError(w, fmt.Errorf("%s unsupported yet", req.Version()), ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	// database.Image.ID
-	id, taskID, err := resource.LoadImage(ctx, gd.Ormer(), req)
+	id, taskID, err := resource.LoadImage(goctx.Background(), gd.Ormer(), req)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Image, internalError, 34)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -363,13 +391,14 @@ func deleteImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil || gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	err := gd.Ormer().DelImage(img)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Image, dbTxError, 41)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -383,20 +412,22 @@ func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil || gd.Ormer() == nil || gd.Cluster == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	orm := gd.Ormer()
 	c, err := orm.GetCluster(name)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Cluster, dbQueryError, 11)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	n, err := orm.CountNodeByCluster(c.ID)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Cluster, dbQueryError, 12)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -414,7 +445,7 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil || gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -422,7 +453,8 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	list, err := orm.ListClusters()
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Cluster, dbQueryError, 21)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -430,7 +462,8 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	for i := range list {
 		n, err := orm.CountNodeByCluster(list[i].ID)
 		if err != nil {
-			httpJSONError(w, err, http.StatusInternalServerError)
+			ec := errCodeV1(r.Method, _Cluster, dbQueryError, 22)
+			httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 			return
 		}
 
@@ -449,7 +482,8 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostClusterRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Cluster, decodeError, 31)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -457,7 +491,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -469,7 +503,8 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err = gd.Ormer().InsertCluster(c)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Cluster, dbExecError, 32)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -483,7 +518,8 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	req := structs.PostClusterRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Cluster, decodeError, 41)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -491,7 +527,7 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -503,7 +539,8 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	err = gd.Ormer().SetClusterParams(c)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Cluster, dbExecError, 42)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -517,14 +554,15 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil || gd.Cluster == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	master := resource.NewHostManager(gd.Ormer(), gd.Cluster)
 	err := master.RemoveCluster(name)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Cluster, dbExecError, 51)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -592,13 +630,14 @@ func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil || gd.Cluster == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	n, err := gd.Ormer().GetNode(name)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, dbQueryError, 11)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -612,7 +651,8 @@ func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Host, urlParamError, 21)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -622,7 +662,7 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil || gd.Cluster == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -635,7 +675,8 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		nodes, err = gd.Ormer().ListNodesByCluster(name)
 	}
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, dbQueryError, 22)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -661,7 +702,8 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	list := structs.PostNodesRequest{}
 	err := json.NewDecoder(r.Body).Decode(&list)
 	if err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Host, decodeError, 31)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -669,7 +711,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil ||
 		gd.KVClient() == nil {
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -679,13 +721,15 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		if n == 0 {
 			err = errors.New("clusters is nil")
 		}
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, dbQueryError, 32)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	for i := range list {
 		if list[i].Cluster == "" {
-			httpJSONError(w, fmt.Errorf("host:%s ClusterID is required", list[i].Addr), http.StatusInternalServerError)
+			ec := errCodeV1(r.Method, _Host, bodyParamsError, 33)
+			httpJSONError(w, fmt.Errorf("host:%s ClusterID is required", list[i].Addr), ec.code, http.StatusInternalServerError)
 			return
 		}
 
@@ -697,7 +741,8 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if !exist {
-			httpJSONError(w, fmt.Errorf("host:%s unknown ClusterID:%s", list[i].Addr, list[i].Cluster), http.StatusInternalServerError)
+			ec := errCodeV1(r.Method, _Host, bodyParamsError, 34)
+			httpJSONError(w, fmt.Errorf("host:%s unknown ClusterID:%s", list[i].Addr, list[i].Cluster), ec.code, http.StatusInternalServerError)
 			return
 		}
 
@@ -705,7 +750,8 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			_, _, err = orm.GetStorageByID(list[i].Storage)
 		}
 		if err != nil {
-			httpJSONError(w, err, http.StatusInternalServerError)
+			ec := errCodeV1(r.Method, _Host, dbQueryError, 35)
+			httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -735,14 +781,16 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	horus, err := gd.KVClient().GetHorusAddr()
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, internalError, 36)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	master := resource.NewHostManager(orm, gd.Cluster)
 	err = master.InstallNodes(ctx, horus, nodes, gd.KVClient())
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, internalError, 37)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -766,13 +814,14 @@ func putNodeEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	err := gd.Ormer().SetNodeEnable(name, true)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, dbExecError, 41)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -786,13 +835,14 @@ func putNodeDisable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	err := gd.Ormer().SetNodeEnable(name, false)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, dbExecError, 51)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -808,7 +858,8 @@ func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&max)
 	if err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Host, decodeError, 61)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -816,13 +867,14 @@ func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	err = gd.Ormer().SetNodeParam(name, max.N)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, dbExecError, 62)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -839,7 +891,8 @@ func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // 510 SSH 出库脚本执行失败
 func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Host, urlParamError, 71)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -853,13 +906,14 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		gd.Ormer() == nil ||
 		gd.KVClient() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	horus, err := gd.KVClient().GetHorusAddr()
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, internalError, 72)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -867,7 +921,8 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err = m.RemoveNode(ctx, horus, node, username, password, force, gd.KVClient())
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, internalError, 73)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -882,27 +937,33 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Networking, decodeError, 11)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
+	errs := make([]string, 0, 4)
 	if req.Prefix < 0 || req.Prefix > 32 {
-		httpJSONError(w, fmt.Errorf("illegal Prefix:%d not in 1~32", req.Prefix), http.StatusBadRequest)
-		return
+		errs = append(errs, fmt.Sprintf("illegal Prefix:%d not in 1~32", req.Prefix))
 	}
 
 	if ip := net.ParseIP(req.Start); ip == nil {
-		httpJSONError(w, fmt.Errorf("illegal IP:'%s' error", req.Start), http.StatusBadRequest)
-		return
+		errs = append(errs, fmt.Sprintf("illegal IP:'%s' error", req.Start))
 	}
+
 	if ip := net.ParseIP(req.End); ip == nil {
-		httpJSONError(w, fmt.Errorf("illegal IP:'%s' error", req.End), http.StatusBadRequest)
-		return
+		errs = append(errs, fmt.Sprintf("illegal IP:'%s' error", req.End))
 	}
 	if ip := net.ParseIP(req.Gateway); ip == nil {
-		httpJSONError(w, fmt.Errorf("illegal Gateway:'%s' error", req.Gateway), http.StatusBadRequest)
+		errs = append(errs, fmt.Sprintf("illegal Gateway:'%s' error", req.Gateway))
+	}
+
+	if len(errs) > 0 {
+		ec := errCodeV1(r.Method, _Networking, bodyParamsError, 12)
+		httpJSONError(w, errors.Errorf("%s", strings.Join(errs, ";")), ec.code, http.StatusBadRequest)
 		return
 	}
+
 	if name == "" && req.Networking != "" {
 		name = req.Networking
 	}
@@ -911,14 +972,15 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	nw := resource.NewNetworks(gd.Ormer())
 	n, err := nw.AddNetworking(req.Start, req.End, req.Gateway, name, req.VLAN, req.Prefix)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Networking, internalError, 13)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -929,7 +991,8 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Networking, urlParamError, 21)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 	name := mux.Vars(r)["name"]
@@ -943,24 +1006,27 @@ func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 	if !all {
 		err := json.NewDecoder(r.Body).Decode(&body)
 		if err != nil {
-			logrus.Warnf("JSON Decode: %s", err)
+			ec := errCodeV1(r.Method, _Networking, decodeError, 22)
+			httpJSONError(w, err, ec.code, http.StatusBadRequest)
+			return
 		}
 	}
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	orm := gd.Ormer()
 	filters := make([]uint32, 0, len(body))
 
-	if !all && len(body) > 0 {
+	if len(body) > 0 {
 		list, err := orm.ListIPByNetworking(name)
 		if err != nil {
-			httpJSONError(w, err, http.StatusInternalServerError)
+			ec := errCodeV1(r.Method, _Networking, dbQueryError, 23)
+			httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 			return
 		}
 
@@ -978,7 +1044,8 @@ func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 				}
 			}
 			if !exist {
-				httpJSONError(w, fmt.Errorf("IP %s is not in networking %s", body[i], name), http.StatusInternalServerError)
+				ec := errCodeV1(r.Method, _Networking, internalError, 24)
+				httpJSONError(w, fmt.Errorf("IP %s is not in networking %s", body[i], name), ec.code, http.StatusInternalServerError)
 				return
 			}
 		}
@@ -990,7 +1057,8 @@ func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 		err = orm.SetIPEnable(filters, name, true)
 	}
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Networking, dbTxError, 25)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -999,7 +1067,8 @@ func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 
 func putNetworkingDisable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Networking, urlParamError, 31)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -1014,14 +1083,16 @@ func putNetworkingDisable(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 	if !all {
 		err := json.NewDecoder(r.Body).Decode(&body)
 		if err != nil {
-			logrus.Warnf("JSON Decode: %s", err)
+			ec := errCodeV1(r.Method, _Networking, decodeError, 32)
+			httpJSONError(w, err, ec.code, http.StatusBadRequest)
+			return
 		}
 	}
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -1031,7 +1102,8 @@ func putNetworkingDisable(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 	if !all && len(body) > 0 {
 		list, err := orm.ListIPByNetworking(name)
 		if err != nil {
-			httpJSONError(w, err, http.StatusInternalServerError)
+			ec := errCodeV1(r.Method, _Networking, dbQueryError, 33)
+			httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 			return
 		}
 
@@ -1049,7 +1121,8 @@ func putNetworkingDisable(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 				}
 			}
 			if !exist {
-				httpJSONError(w, fmt.Errorf("IP %s is not in networking %s", body[i], name), http.StatusInternalServerError)
+				ec := errCodeV1(r.Method, _Networking, internalError, 34)
+				httpJSONError(w, fmt.Errorf("IP %s is not in networking %s", body[i], name), ec.code, http.StatusInternalServerError)
 				return
 			}
 		}
@@ -1061,7 +1134,8 @@ func putNetworkingDisable(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 		err = orm.SetIPEnable(filters, name, false)
 	}
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Networking, dbTxError, 35)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1074,13 +1148,14 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil || gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	err := gd.Ormer().DelNetworking(name)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Networking, internalError, 41)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1091,13 +1166,14 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil || gd.Ormer() == nil || gd.Cluster == nil {
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	services, err := gd.ListServices(ctx)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 11)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1111,13 +1187,14 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil || gd.Ormer() == nil || gd.Cluster == nil {
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	spec, err := gd.ServiceSpec(name)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 21)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1128,7 +1205,8 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, urlParamError, 31)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -1140,7 +1218,8 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	spec := structs.ServiceSpec{}
 	err := json.NewDecoder(r.Body).Decode(&spec)
 	if err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, decodeError, 32)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -1150,7 +1229,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		gd.KVClient() == nil ||
 		gd.PluginClient() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -1158,7 +1237,8 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	out, err := d.Deploy(ctx, spec)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 33)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1171,7 +1251,8 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	arch := structs.Arch{}
 	err := json.NewDecoder(r.Body).Decode(&arch)
 	if err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, decodeError, 41)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -1181,7 +1262,7 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		gd.KVClient() == nil ||
 		gd.PluginClient() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -1189,7 +1270,8 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	id, err := d.ServiceScale(ctx, name, arch)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 42)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1202,7 +1284,8 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	links := structs.ServicesLink{}
 	err := json.NewDecoder(r.Body).Decode(&links)
 	if err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, decodeError, 51)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -1212,7 +1295,7 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		gd.KVClient() == nil ||
 		gd.PluginClient() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -1221,7 +1304,8 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	// task ID
 	id, err := d.Link(ctx, links)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 52)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1232,7 +1316,8 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, decodeError, 61)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -1243,7 +1328,7 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 	if !ok || gd == nil ||
 		gd.Ormer() == nil || gd.PluginClient() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -1251,7 +1336,8 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	id, err := d.ServiceUpdateImage(ctx, name, version, true)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 62)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1267,12 +1353,14 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	err := json.NewDecoder(r.Body).Decode(&update)
 	if err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, decodeError, 71)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
 	if update.Require.CPU == 0 && update.Require.Memory == 0 && len(update.Volumes) == 0 {
-		httpJSONError(w, fmt.Errorf("no updateConfig required"), http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, bodyParamsError, 72)
+		httpJSONError(w, fmt.Errorf("no updateConfig required"), ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -1280,7 +1368,7 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	if !ok || gd == nil ||
 		gd.Ormer() == nil || gd.Cluster == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -1288,7 +1376,8 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	id, err := d.ServiceUpdate(ctx, name, update)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 73)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1305,19 +1394,21 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	if !ok || gd == nil ||
 		gd.Ormer() == nil || gd.KVClient() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 81)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	spec, err := svc.Spec()
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 82)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1325,7 +1416,8 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	err = svc.InitStart(ctx, gd.KVClient(), nil, &task, true, nil)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 83)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1344,7 +1436,8 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, decodeError, 91)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -1352,19 +1445,21 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 92)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	spec, err := svc.Spec()
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 93)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1372,7 +1467,8 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	err = svc.UpdateUnitsConfigs(ctx, req.Configs, req.Args, &task, true)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 94)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1387,7 +1483,8 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	config := structs.ServiceExecConfig{}
 	err := json.NewDecoder(r.Body).Decode(&config)
 	if err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, decodeError, 101)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -1395,19 +1492,21 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	if !ok || gd == nil ||
 		gd.Ormer() == nil || gd.Cluster == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 102)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	spec, err := svc.Spec()
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 103)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1415,7 +1514,8 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	err = svc.Exec(ctx, config, true, &task)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 104)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1431,19 +1531,21 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 111)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	spec, err := svc.Spec()
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 112)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1451,7 +1553,8 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	err = svc.Stop(ctx, false, true, &task)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 113)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1467,7 +1570,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if !ok || gd == nil ||
 		gd.Ormer() == nil || gd.KVClient() == nil {
 
-		httpJSONError(w, errUnsupportGarden, http.StatusInternalServerError)
+		httpJSONNilGarden(w)
 		return
 	}
 
@@ -1477,14 +1580,15 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 121)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	err = svc.Remove(ctx, gd.KVClient())
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 122)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1497,7 +1601,8 @@ func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	ds := storage.DefaultStores()
 	stores, err := ds.List()
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, dbQueryError, 11)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1505,7 +1610,8 @@ func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	for i := range stores {
 		resp[i], err = getSanStoreInfo(stores[i])
 		if err != nil {
-			httpJSONError(w, err, http.StatusInternalServerError)
+			ec := errCodeV1(r.Method, _Storage, internalError, 12)
+			httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -1522,13 +1628,15 @@ func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	ds := storage.DefaultStores()
 	store, err := ds.Get(name)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, dbQueryError, 21)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	resp, err := getSanStoreInfo(store)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, internalError, 22)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1572,7 +1680,8 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostSANStoreRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpJSONError(w, err, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Storage, decodeError, 31)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -1581,7 +1690,8 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		req.Username, req.Password, req.Admin,
 		req.LunStart, req.LunEnd, req.HostLunStart, req.HostLunEnd)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, internalError, 32)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1598,13 +1708,15 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	ds := storage.DefaultStores()
 	store, err := ds.Get(san)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, dbQueryError, 41)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	space, err := store.AddSpace(rg)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, internalError, 42)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1621,13 +1733,15 @@ func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 	ds := storage.DefaultStores()
 	store, err := ds.Get(san)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, dbQueryError, 51)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	err = store.EnableSpace(rg)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, dbExecError, 52)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1642,13 +1756,15 @@ func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Requ
 	ds := storage.DefaultStores()
 	store, err := ds.Get(san)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, dbQueryError, 61)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	err = store.DisableSpace(rg)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, dbExecError, 62)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1663,7 +1779,8 @@ func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err := ds.Remove(name)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, internalError, 71)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
@@ -1679,7 +1796,8 @@ func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	err := ds.RemoveStoreSpace(san, rg)
 	if err != nil {
-		httpJSONError(w, err, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, internalError, 81)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
