@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	_Garden    = "garden"
-	_Cluster   = "cluster"
-	_tlsConfig = "tls"
+	_Garden         = "garden"
+	_ClusterContext = "cluster"
+	_tlsConfig      = "tls"
 )
 
 func tlsFromContext(ctx goctx.Context, key string) (bool, *tls.Config) {
