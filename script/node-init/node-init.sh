@@ -63,7 +63,7 @@ rpm_install() {
 			echo "rpm install faild"
 			exit 2
 		fi
-	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ $RELEASE == "CentOS" ]; then
+	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ "${release}" == "CentOS" ]; then
 		yum --nogpgcheck -y install nfs-utils curl sysstat mariadb ${PT}
 		if [ $? -ne 0 ]; then
 			echo "rpm install faild"
@@ -336,7 +336,7 @@ WantedBy=multi-user.target
 
 EOF
 
-	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ $RELEASE == "CentOS" ]; then
+	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ "${release}" == "CentOS" ]; then
 		if [ "${wwn}" != '' ]; then
 			systemctl enable multipathd.service
 			systemctl start multipathd.service
