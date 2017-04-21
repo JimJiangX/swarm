@@ -1510,7 +1510,7 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceStopTask, spec.ID, spec.Desc, "", 300)
+	task := database.NewTask(spec.Name, database.ServiceStopTask, spec.ID, spec.Desc, nil, 300)
 
 	err = svc.Exec(ctx, config, true, &task)
 	if err != nil {
