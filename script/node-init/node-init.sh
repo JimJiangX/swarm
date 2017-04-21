@@ -51,7 +51,7 @@ rpm_install() {
 			echo "rpm install faild"
 			exit 2
 		fi
-	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ $RELEASE == "CentOS" ]; then
+	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ "${release}" == "CentOS" ]; then
 		yum --nogpgcheck -y install nfs-utils curl sysstat mariadb ${PT}
 		if [ $? -ne 0 ]; then
 			echo "rpm install faild"
@@ -446,7 +446,7 @@ WantedBy=multi-user.target
 
 EOF
 
-	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ $RELEASE == "CentOS" ]; then
+	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ "${release}" == "CentOS" ]; then
 		local docker_rpm=${cur_dir}/rpm/docker-${docker_version}.rhel.centos.rpm
 		local docker_selinux_rpm=${cur_dir}/rpm/docker-selinux-${docker_version}.rhel.centos.rpm
 
@@ -456,7 +456,6 @@ EOF
 			systemctl status multipathd.service
 			if [ $? -ne 0 ]; then
 				echo "start multipathd failed!"
-				exit 2
 			fi
 		fi
 		
