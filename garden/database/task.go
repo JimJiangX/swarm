@@ -27,6 +27,8 @@ const (
 	TaskTimeoutStatus // 6
 	// TaskFailedStatus task is failed
 	TaskFailedStatus // 7
+	// TaskUnknownStatus task status change by replicate changes
+	TaskUnknownStatus // 8
 )
 
 const (
@@ -136,7 +138,9 @@ func (t *Task) toTask() task {
 		t.label = nil
 	}
 
-	t.Timestamp = t.CreatedAt.Unix()
+	if !t.CreatedAt.IsZero() {
+		t.Timestamp = t.CreatedAt.Unix()
+	}
 
 	return t.task
 }
@@ -294,6 +298,30 @@ func (db dbBase) ListTasks(link string, status int) ([]Task, error) {
 	}
 
 	return nil, errors.Wrap(err, "list tasks")
+}
+
+func (db dbBase) txListTasks(tx *sqlx.Tx, status int) ([]Task, error) {
+	var (
+		err   error
+		tks   []task
+		query = "SELECT id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM " + db.taskTable() + " WHERE status=?"
+	)
+
+	err = tx.Select(&tks, query, status)
+
+	if err == nil {
+		out := make([]Task, 0, len(tks))
+		for i := range tks {
+			out = append(out, Task{task: tks[i]})
+		}
+
+		return out, nil
+
+	} else if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	return nil, errors.Wrap(err, "tx list tasks")
 }
 
 func (db dbBase) delTasks(tasks []Task) error {

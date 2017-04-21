@@ -34,6 +34,8 @@ type ContainerIface interface {
 	UnitContainerCreated(name, containerID, engineID, mode string, state int) error
 
 	SetUnitByContainer(containerID string, state int) error
+
+	MarkRunningTasks() error
 }
 
 type UnitOrmer interface {
@@ -467,6 +469,48 @@ func (db dbBase) DelUnitsRelated(units []Unit, volume bool) error {
 			}
 
 			err = db.txDelUnit(tx, u.ID)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	return db.txFrame(do)
+}
+
+func (db dbBase) MarkRunningTasks() error {
+	do := func(tx *sqlx.Tx) error {
+
+		tasks, err := db.txListTasks(tx, TaskRunningStatus)
+		if err != nil {
+			return err
+		}
+
+		svcTasks := make([]Task, 0, len(tasks)/2)
+
+		table := db.serviceTable()
+		for i := range tasks {
+			if tasks[i].LinkTable == table {
+				svcTasks = append(svcTasks, tasks[i])
+			}
+		}
+
+		query := fmt.Sprintf("UPDATE %s SET status=status+1 WHERE id=?", table)
+		for i := range svcTasks {
+			_, err := tx.Exec(query, svcTasks[i].Linkto)
+			if err != nil {
+				return err
+			}
+		}
+
+		now := time.Now()
+		for i := range tasks {
+			tasks[i].Status = TaskUnknownStatus
+			tasks[i].FinishedAt = now
+
+			err := db.txSetTask(tx, tasks[i])
 			if err != nil {
 				return err
 			}
