@@ -1412,7 +1412,7 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceStartTask, spec.ID, spec.Desc, "", 300)
+	task := database.NewTask(spec.Name, database.ServiceStartTask, spec.ID, spec.Desc, nil, 300)
 
 	err = svc.InitStart(ctx, gd.KVClient(), nil, &task, true, nil)
 	if err != nil {
@@ -1463,7 +1463,7 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceUpdateConfigTask, spec.ID, spec.Desc, "", 300)
+	task := database.NewTask(spec.Name, database.ServiceUpdateConfigTask, spec.ID, spec.Desc, nil, 300)
 
 	err = svc.UpdateUnitsConfigs(ctx, req.Configs, req.Args, &task, true)
 	if err != nil {
@@ -1549,7 +1549,7 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceStopTask, spec.ID, spec.Desc, "", 300)
+	task := database.NewTask(spec.Name, database.ServiceStopTask, spec.ID, spec.Desc, nil, 300)
 
 	err = svc.Stop(ctx, false, true, &task)
 	if err != nil {

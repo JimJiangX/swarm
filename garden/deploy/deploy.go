@@ -110,14 +110,14 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *databas
 		}
 
 		if err == nil {
-			t.Errors = ""
 			t.Status = database.TaskDoneStatus
 		} else {
-			t.Errors = err.Error()
 			t.Status = database.TaskFailedStatus
 
 			logrus.Errorf("service deploy error %+v", err)
 		}
+
+		t.SetErrors(err)
 
 		_err := d.gd.Ormer().SetTask(*t)
 		if _err != nil {
@@ -159,7 +159,7 @@ func (d *Deployment) Link(ctx context.Context, links []*structs.ServiceLink) (st
 	}
 
 	// TODO:better task info
-	task := database.NewTask("stack link", database.ServiceLinkTask, "", "", "", 300)
+	task := database.NewTask("stack link", database.ServiceLinkTask, "", "", nil, 300)
 
 	go func() (err error) {
 		defer func() {
@@ -167,14 +167,14 @@ func (d *Deployment) Link(ctx context.Context, links []*structs.ServiceLink) (st
 				err = errors.Errorf("stack link,panic:%v", r)
 			}
 			if err == nil {
-				task.Errors = ""
 				task.Status = database.TaskDoneStatus
 			} else {
-				task.Errors = err.Error()
 				task.Status = database.TaskFailedStatus
 
 				logrus.Errorf("stack link and start,%+v", err)
 			}
+
+			task.SetErrors(err)
 
 			_err := d.gd.Ormer().SetTask(task)
 			if _err != nil {
@@ -338,7 +338,7 @@ func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version strin
 		return "", err
 	}
 
-	t := database.NewTask(spec.Name, database.ServiceUpdateImageTask, spec.ID, "", "", 300)
+	t := database.NewTask(spec.Name, database.ServiceUpdateImageTask, spec.ID, "", nil, 300)
 
 	err = svc.UpdateImage(ctx, d.gd.KVClient(), im, &t, async, authConfig)
 	if err != nil {
@@ -365,7 +365,7 @@ func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config stru
 	}
 
 	// TODO:save task status
-	t := database.NewTask(table.Name, database.ServiceUpdateTask, table.ID, string(out), "", 300)
+	t := database.NewTask(table.Name, database.ServiceUpdateTask, table.ID, string(out), nil, 300)
 	actor := alloc.NewAllocator(d.gd.Ormer(), d.gd.Cluster)
 
 	if (config.Require.CPU > 0 && table.Desc.NCPU != config.Require.CPU) ||
