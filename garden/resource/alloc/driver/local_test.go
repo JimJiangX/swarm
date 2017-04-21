@@ -165,11 +165,11 @@ func TestLocalVolumeDrivers(t *testing.T) {
 			t.Errorf("expected %d but got %d", want, got)
 		}
 
-		if d := VolumeDrivers(drivers).get(_HDD); d != nil {
+		if d := VolumeDrivers(drivers).Get(_HDD); d != nil {
 			t.Error("expected nil value")
 		}
 
-		if d := VolumeDrivers(drivers).get(_SSD); d == nil {
+		if d := VolumeDrivers(drivers).Get(_SSD); d == nil {
 			t.Error("expected non-nil value")
 		} else {
 			space, err := d.Space()
@@ -202,7 +202,7 @@ func TestLocalVolumeDrivers(t *testing.T) {
 			t.Errorf("expected %d but got %d", want, got)
 		}
 
-		if d := VolumeDrivers(drivers).get(_HDD); d == nil {
+		if d := VolumeDrivers(drivers).Get(_HDD); d == nil {
 			t.Error("expected non-nil value")
 		} else {
 			space, err := d.Space()
@@ -214,7 +214,7 @@ func TestLocalVolumeDrivers(t *testing.T) {
 			}
 		}
 
-		if d := VolumeDrivers(drivers).get(_SSD); d == nil {
+		if d := VolumeDrivers(drivers).Get(_SSD); d == nil {
 			t.Error("expected non-nil value")
 		} else {
 			space, err := d.Space()
@@ -228,7 +228,7 @@ func TestLocalVolumeDrivers(t *testing.T) {
 
 		testLocalVolumeMap(lvm, t) // insert []Volume
 
-		if d := VolumeDrivers(drivers).get(_HDD); d == nil {
+		if d := VolumeDrivers(drivers).Get(_HDD); d == nil {
 			t.Error("expected non-nil value")
 		} else {
 			space, err := d.Space()
@@ -240,7 +240,7 @@ func TestLocalVolumeDrivers(t *testing.T) {
 			}
 		}
 
-		if d := VolumeDrivers(drivers).get(_SSD); d == nil {
+		if d := VolumeDrivers(drivers).Get(_SSD); d == nil {
 			t.Error("expected non-nil value")
 		} else {
 			space, err := d.Space()

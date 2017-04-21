@@ -146,6 +146,29 @@ func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.
 }
 
 func (at allocator) RecycleResource(ips []database.IP, lvs []database.Volume) error {
+	for i := range lvs {
+		eng := at.ec.Engine(lvs[i].EngineID)
+		if eng == nil {
+			continue
+		}
+
+		drivers, err := driver.FindEngineVolumeDrivers(at.ormer, eng)
+		if err != nil {
+			logrus.Warnf("engine:%s find volume drivers,%+v", eng.Name, err)
+
+			if len(drivers) == 0 {
+				continue
+			}
+		}
+
+		d := drivers.Get(lvs[i].DriverType)
+		if d != nil {
+			err := d.Recycle(lvs[i])
+			if err != nil {
+				return err
+			}
+		}
+	}
 
 	return at.ormer.RecycleResource(ips, lvs)
 }

@@ -15,7 +15,7 @@ type VolumeOrmer interface {
 	InsertVolume(lv Volume) error
 	InsertVolumes(lvs []Volume) error
 
-	SetVolume(nameOrID string, size int) error
+	SetVolume(nameOrID string, engineID string, size int64) error
 	SetVolumes(lvs []Volume) error
 
 	DelVolume(nameOrID string) error
@@ -28,8 +28,10 @@ type Volume struct {
 	ID         string `db:"id"`
 	Name       string `db:"name"`
 	UnitID     string `db:"unit_id"`
+	EngineID   string `db:"engine_id"`
 	VG         string `db:"vg"`
 	Driver     string `db:"driver"`
+	DriverType string `db:"driver_type"`
 	Filesystem string `db:"fstype"`
 }
 
@@ -40,7 +42,7 @@ func (db dbBase) volumeTable() string {
 // InsertVolume insert a new Volume
 func (db dbBase) InsertVolume(lv Volume) error {
 
-	query := "INSERT INTO " + db.volumeTable() + " (id,name,unit_id,size,vg,driver,fstype) VALUES (:id,:name,:unit_id,:size,:vg,:driver,:fstype)"
+	query := "INSERT INTO " + db.volumeTable() + " (id,name,unit_id,size,vg,engine_id,driver_type,driver,fstype) VALUES (:id,:name,:unit_id,:size,:vg,:engine_id,:driver_type,:driver,:fstype)"
 
 	_, err := db.NamedExec(query, &lv)
 	if err == nil {
@@ -52,7 +54,7 @@ func (db dbBase) InsertVolume(lv Volume) error {
 
 func (db dbBase) txInsertVolume(tx *sqlx.Tx, lv Volume) error {
 
-	query := "INSERT INTO " + db.volumeTable() + " (id,name,unit_id,size,vg,driver,fstype) VALUES (:id,:name,:unit_id,:size,:vg,:driver,:fstype)"
+	query := "INSERT INTO " + db.volumeTable() + " (id,name,unit_id,size,vg,engine_id,driver_type,driver,fstype) VALUES (:id,:name,:unit_id,:size,:vg,:engine_id,:driver_type,:driver,:fstype)"
 
 	_, err := tx.NamedExec(query, lv)
 	if err == nil {
@@ -66,7 +68,7 @@ func (db dbBase) txInsertVolume(tx *sqlx.Tx, lv Volume) error {
 func (db dbBase) InsertVolumes(lvs []Volume) error {
 
 	do := func(tx *sqlx.Tx) error {
-		query := "INSERT INTO " + db.volumeTable() + " (id,name,unit_id,size,vg,driver,fstype) VALUES (:id,:name,:unit_id,:size,:vg,:driver,:fstype)"
+		query := "INSERT INTO " + db.volumeTable() + " (id,name,unit_id,size,vg,engine_id,driver_type,driver,fstype) VALUES (:id,:name,:unit_id,:size,:vg,:engine_id,:driver_type,:driver,:fstype)"
 
 		stmt, err := tx.PrepareNamed(query)
 		if err != nil {
@@ -91,11 +93,11 @@ func (db dbBase) InsertVolumes(lvs []Volume) error {
 }
 
 // SetVolume update size of Volume by name or ID
-func (db dbBase) SetVolume(nameOrID string, size int) error {
+func (db dbBase) SetVolume(nameOrID string, engineID string, size int64) error {
 
-	query := "UPDATE " + db.volumeTable() + " SET size=? WHERE id=? OR name=?"
+	query := "UPDATE " + db.volumeTable() + " SET size=?,engine_id=? WHERE id=? OR name=?"
 
-	_, err := db.Exec(query, size, nameOrID, nameOrID)
+	_, err := db.Exec(query, engineID, size, nameOrID, nameOrID)
 	if err == nil {
 		return nil
 	}
@@ -198,7 +200,7 @@ func (db dbBase) DelVolumes(lvs []Volume) error {
 func (db dbBase) GetVolume(nameOrID string) (Volume, error) {
 	lv := Volume{}
 
-	query := "SELECT id,name,unit_id,size,vg,driver,fstype FROM " + db.volumeTable() + " WHERE id=? OR name=?"
+	query := "SELECT id,name,unit_id,size,vg,engine_id,driver_type,driver,fstype FROM " + db.volumeTable() + " WHERE id=? OR name=?"
 
 	err := db.Get(&lv, query, nameOrID, nameOrID)
 	if err == nil {
@@ -212,7 +214,7 @@ func (db dbBase) GetVolume(nameOrID string) (Volume, error) {
 func (db dbBase) ListVolumeByVG(name string) ([]Volume, error) {
 	var (
 		lvs   []Volume
-		query = "SELECT id,name,unit_id,size,vg,driver,fstype FROM " + db.volumeTable() + " WHERE vg=?"
+		query = "SELECT id,name,unit_id,size,vg,engine_id,driver_type,driver,fstype FROM " + db.volumeTable() + " WHERE vg=?"
 	)
 
 	err := db.Select(&lvs, query, name)
@@ -228,7 +230,7 @@ func (db dbBase) ListVolumeByVG(name string) ([]Volume, error) {
 func (db dbBase) listVolumes() ([]Volume, error) {
 	var (
 		lvs   []Volume
-		query = "SELECT id,name,unit_id,size,vg,driver,fstype FROM " + db.volumeTable()
+		query = "SELECT id,name,unit_id,size,vg,engine_id,driver_type,driver,fstype FROM " + db.volumeTable()
 	)
 
 	err := db.Select(&lvs, query)
@@ -245,7 +247,7 @@ func (db dbBase) listVolumes() ([]Volume, error) {
 func (db dbBase) ListVolumesByUnitID(unit string) ([]Volume, error) {
 	var (
 		lvs   []Volume
-		query = "SELECT id,name,unit_id,size,vg,driver,fstype FROM " + db.volumeTable() + " WHERE unit_id=?"
+		query = "SELECT id,name,unit_id,size,vg,engine_id,driver_type,driver,fstype FROM " + db.volumeTable() + " WHERE unit_id=?"
 	)
 
 	err := db.Select(&lvs, query, unit)

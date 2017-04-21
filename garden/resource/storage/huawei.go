@@ -138,6 +138,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 		UnitID:     unit,
 		VG:         vg,
 		Driver:     h.Driver(),
+		DriverType: SANStore,
 		Filesystem: DefaultFilesystemType,
 	}
 
@@ -326,6 +327,10 @@ func (h *huaweiStore) Mapping(host, vg, lun string) error {
 	if err != nil {
 		return err
 	}
+	lv, err := h.orm.GetVolume(l.Name)
+	if err != nil {
+		return err
+	}
 
 	out, err := h.orm.ListHostLunIDByMapping(host)
 	if err != nil {
@@ -342,6 +347,11 @@ func (h *huaweiStore) Mapping(host, vg, lun string) error {
 		return err
 	}
 
+	lv.EngineID = host
+	err = h.orm.SetVolume(lv.ID, lv.EngineID, lv.Size)
+	if err != nil {
+		return err
+	}
 	path, err := h.scriptPath("create_lunmap.sh")
 	if err != nil {
 		return err

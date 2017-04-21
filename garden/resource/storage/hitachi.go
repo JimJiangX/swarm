@@ -153,6 +153,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 		UnitID:     unit,
 		VG:         vg,
 		Driver:     h.Driver(),
+		DriverType: SANStore,
 		Filesystem: DefaultFilesystemType,
 	}
 
@@ -426,6 +427,10 @@ func (h *hitachiStore) Mapping(host, vg, lun string) error {
 	if err != nil {
 		return err
 	}
+	lv, err := h.orm.GetVolume(l.Name)
+	if err != nil {
+		return err
+	}
 
 	out, err := h.orm.ListHostLunIDByMapping(host)
 	if err != nil {
@@ -438,6 +443,12 @@ func (h *hitachiStore) Mapping(host, vg, lun string) error {
 	}
 
 	err = h.orm.LunMapping(lun, host, vg, val)
+	if err != nil {
+		return err
+	}
+
+	lv.EngineID = host
+	err = h.orm.SetVolume(lv.ID, lv.EngineID, lv.Size)
 	if err != nil {
 		return err
 	}

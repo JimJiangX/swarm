@@ -84,7 +84,7 @@ func FindEngineVolumeDrivers(iface VolumeIface, engine *cluster.Engine) (VolumeD
 
 type VolumeDrivers []Driver
 
-func (vds VolumeDrivers) get(_type string) Driver {
+func (vds VolumeDrivers) Get(_type string) Driver {
 	for i := range vds {
 		if vds[i].Type() == _type {
 			return vds[i]
@@ -107,7 +107,7 @@ func (vds VolumeDrivers) IsSpaceEnough(stores []structs.VolumeRequire) error {
 
 	for typ, size := range need {
 
-		driver := vds.get(typ)
+		driver := vds.Get(typ)
 		if driver == nil {
 			return errors.New("not found volumeDriver by type:" + typ)
 		}
@@ -134,7 +134,7 @@ func (vds VolumeDrivers) AllocVolumes(config *cluster.ContainerConfig, uid strin
 	volumes := make([]database.Volume, 0, len(stores))
 
 	for i := range stores {
-		driver := vds.get(stores[i].Type)
+		driver := vds.Get(stores[i].Type)
 		if driver == nil {
 			return volumes, errors.New("not found the assigned volumeDriver:" + stores[i].Type)
 		}

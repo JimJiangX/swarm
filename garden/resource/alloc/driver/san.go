@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"database/sql"
 	"fmt"
 	"strconv"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/docker/swarm/garden/resource/storage"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/seed/sdk"
+	"github.com/pkg/errors"
 )
 
 type sanVolume struct {
@@ -93,6 +95,10 @@ func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req struc
 }
 
 func (sv sanVolume) Recycle(lv database.Volume) error {
+	err := sv.san.DelMapping(lv.Name)
+	if errors.Cause(err) == sql.ErrNoRows {
+		return nil
+	}
 
 	return sv.san.Recycle(lv.Name, 0)
 }

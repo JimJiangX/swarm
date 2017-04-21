@@ -286,12 +286,18 @@ func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 			field = logrus.WithField("Service", svc.svc.Name)
 		)
 
-		defer func() {
+		recycle := func() error {
 			if r := recover(); r != nil {
 				err = errors.Errorf("panic:%v", r)
 			}
 			// cancel allocation
 			if len(bad) > 0 {
+				ids := make([]string, len(bad))
+				for i := range bad {
+					ids[i] = bad[i].swarmID
+				}
+				gd.Cluster.RemovePendingContainer(ids...)
+
 				ips := make([]database.IP, 0, len(bad))
 				lvs := make([]database.Volume, 0, len(bad)*2)
 				for i := range bad {
@@ -299,28 +305,33 @@ func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 					lvs = append(lvs, bad[i].volumes...)
 				}
 				_err := actor.RecycleResource(ips, lvs)
-				if _err != nil {
-					field.Errorf("Recycle resources error:%+v", _err)
+				if _err == nil {
+					bad = make([]pendingUnit, 0, svc.svc.Desc.Replicas)
+				} else {
 					err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
 				}
 
-				ids := make([]string, len(bad))
-				for i := range bad {
-					ids[i] = bad[i].swarmID
-				}
-				gd.Cluster.RemovePendingContainer(ids...)
+				return _err
 			}
-		}()
 
-		select {
-		default:
-		case <-ctx.Done():
-			return ctx.Err()
+			return nil
 		}
+
+		defer recycle()
 
 		out := sortByCluster(candidates, opts.nodes.clusters)
 
 		for _, nodes := range out {
+			select {
+			default:
+			case <-ctx.Done():
+				return errors.WithStack(ctx.Err())
+			}
+
+			err := recycle()
+			if err != nil {
+				field.Debugf("Recycle resources error:%+v", err)
+			}
 
 			count := svc.svc.Desc.Replicas
 			used := make([]pendingUnit, 0, count)
