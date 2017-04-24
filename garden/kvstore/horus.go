@@ -126,8 +126,10 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 	}
 
 	uri := fmt.Sprintf("http://%s/v1/%s/%s", addr, config.Type, config.Key)
+
+	del := false
 	if config.Type == unitType || config.Type == containerType {
-		uri = uri + "?del_container=true"
+		del = true
 	}
 
 	req, err := http.NewRequest(http.MethodDelete, uri, nil)
@@ -137,10 +139,13 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 
-	if force || config.User != "" {
+	if force || del || config.User != "" {
 		params := make(url.Values)
 		if force {
 			params.Set("force", "true")
+		}
+		if del {
+			params.Set("del_container", "true")
 		}
 		if config.User != "" {
 			params.Set("os_user", config.User)
@@ -187,11 +192,8 @@ func (c *kvClient) RegisterService(ctx context.Context, host string, config stru
 }
 
 // DeregisterService service to consul and Horus
-func (c *kvClient) DeregisterService(ctx context.Context, config structs.ServiceDeregistration) error {
-	err := c.deregisterToHorus(ctx, config, false)
-	if err != nil {
-		err = c.deregisterToHorus(ctx, config, true)
-	}
+func (c *kvClient) DeregisterService(ctx context.Context, config structs.ServiceDeregistration, force bool) error {
+	err := c.deregisterToHorus(ctx, config, force)
 
 	return err
 

@@ -127,7 +127,7 @@ func TestDeregisterService(t *testing.T) {
 	}
 
 	for i := range configs {
-		c.DeregisterService(context.Background(), configs[i])
+		c.DeregisterService(context.Background(), configs[i], false)
 		if err != nil {
 			t.Errorf("%+v", err)
 		}

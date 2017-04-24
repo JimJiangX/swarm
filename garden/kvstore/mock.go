@@ -72,6 +72,6 @@ func (c *mockClient) RegisterService(ctx context.Context, host string, config st
 	return nil
 }
 
-func (c *mockClient) DeregisterService(ctx context.Context, config structs.ServiceDeregistration) error {
+func (c *mockClient) DeregisterService(ctx context.Context, config structs.ServiceDeregistration, force bool) error {
 	return nil
 }

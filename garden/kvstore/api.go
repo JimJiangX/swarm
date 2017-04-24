@@ -28,5 +28,5 @@ type Register interface {
 
 	RegisterService(ctx context.Context, host string, config structs.ServiceRegistration) error
 
-	DeregisterService(ctx context.Context, config structs.ServiceDeregistration) error
+	DeregisterService(ctx context.Context, config structs.ServiceDeregistration, force bool) error
 }

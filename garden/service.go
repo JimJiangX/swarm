@@ -830,7 +830,7 @@ func (svc Service) deregisterSerivces(ctx context.Context, reg kvstore.Register,
 		err := reg.DeregisterService(ctx, structs.ServiceDeregistration{
 			Type: "units",
 			Key:  units[i].u.ID,
-		})
+		}, false)
 		if err != nil {
 			return err
 		}
