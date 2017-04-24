@@ -112,12 +112,18 @@ func (db dbBase) ListServices() ([]Service, error) {
 	}
 
 	for i := range out {
+		found := false
 	in:
 		for l := range list {
 			if out[i].DescID == list[l].ID {
 				out[i].Desc = &list[l]
+				found = true
 				break in
 			}
+		}
+
+		if !found {
+			out[i].Desc = &ServiceDesc{}
 		}
 	}
 
@@ -136,7 +142,9 @@ func (db dbBase) GetService(nameOrID string) (Service, error) {
 		return s, errors.Wrap(err, "get Service by nameOrID")
 	}
 
-	if s.DescID != "" {
+	if s.DescID == "" {
+		s.Desc = &ServiceDesc{}
+	} else {
 		desc, err := db.getServiceDesc(s.DescID)
 		if err != nil {
 			return s, err

@@ -332,14 +332,18 @@ func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers
 		units = append(units, convertUnitInfoToSpec(info.Units[u], c))
 	}
 
-	arch := structs.Arch{}
-	r := strings.NewReader(info.Service.Desc.Architecture)
-	json.NewDecoder(r).Decode(&arch)
+	var (
+		arch structs.Arch
+		opts map[string]interface{}
+	)
 
-	var opts map[string]interface{}
-	r1 := strings.NewReader(info.Service.Desc.Options)
-	json.NewDecoder(r1).Decode(&opts)
+	if info.Service.Desc != nil {
+		r := strings.NewReader(info.Service.Desc.Architecture)
+		json.NewDecoder(r).Decode(&arch)
 
+		r = strings.NewReader(info.Service.Desc.Options)
+		json.NewDecoder(r).Decode(&opts)
+	}
 	return structs.ServiceSpec{
 		Arch:    arch,
 		Service: convertService(info.Service),
