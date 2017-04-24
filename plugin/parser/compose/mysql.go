@@ -72,7 +72,7 @@ func (m Mysql) ChangeMaster(master Mysql) error {
 		strconv.Itoa(m.MgmPort),
 		string(m.RoleType),
 		master.IP,
-		strconv.Itoa(master.MgmPort),
+		strconv.Itoa(master.Port),
 		m.ReplicateUser,
 		m.Replicatepwd,
 		m.IP,
