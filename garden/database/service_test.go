@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/swarm/garden/utils"
 	"github.com/jmoiron/sqlx"
-	"github.com/upmio/mgserver/utils"
 )
 
 func TestListServicesInfo(t *testing.T) {
