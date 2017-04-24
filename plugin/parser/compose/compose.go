@@ -53,7 +53,7 @@ func NewCompserBySpec(req *structs.ServiceSpec, mgmip string, mgmport int) (Comp
 		return newCloneManager(), nil
 	}
 
-	return nil, errors.New("should not happen")
+	return nil, errors.New(string(arch) + ":the composer do not implement yet")
 }
 
 func valicateServiceSpec(req *structs.ServiceSpec) error {
@@ -298,8 +298,7 @@ func getMysqlUser(req *structs.ServiceSpec) (MysqlUser, error) {
 	}
 
 	if users.Replicatepwd == "" || users.ReplicateUser == "" {
-
-		return users, errors.New("mysql replication pwd/user has no data")
+		return users, errors.New("bad req: mysql replication pwd/user has no data")
 	}
 
 	return users, nil
