@@ -49,10 +49,11 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 				return errors.WithStack(newContainerError(u.u.Name, "not found"))
 			}
 			c.Config.Image = version
+			c.Config.SetSwarmID(utils.Generate32UUID())
 
 			nc, err := c.Engine.CreateContainer(c.Config, u.u.Name+"-"+version, true, authConfig)
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			containers = append(containers, struct {
@@ -63,19 +64,17 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 
 		for i, c := range containers {
 			origin := svc.cluster.Container(c.u.ContainerID)
-			if origin == nil {
-				continue
+			if origin != nil {
+				err = origin.Engine.RemoveContainer(origin, true, false)
 			}
 
-			err := origin.Engine.RemoveContainer(origin, true, false)
 			if err == nil {
-
 				if err = c.nc.Engine.RenameContainer(c.nc, c.u.Name); err == nil {
 					err = c.nc.Engine.StartContainer(c.nc, nil)
 				}
 			}
 			if err != nil {
-				return err
+				return errors.WithStack(err)
 			}
 
 			c := svc.cluster.Container(c.u.Name)
