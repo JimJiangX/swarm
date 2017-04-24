@@ -13,8 +13,9 @@ var (
 	driverName     string
 	dbSource       string
 	dbMaxIdleConns int
-	ormer          Ormer
-	db             *dbBase
+
+	ormer Ormer
+	db    *dbBase
 )
 
 func init() {

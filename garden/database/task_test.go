@@ -9,7 +9,7 @@ import (
 )
 
 func TestTask(t *testing.T) {
-	if ormer == nil {
+	if ormer == nil || db == nil {
 		t.Skip("orm:db is required")
 	}
 

@@ -497,12 +497,9 @@ func (db dbBase) MarkRunningTasks() error {
 			}
 		}
 
-		query := fmt.Sprintf("UPDATE %s SET status=status+1 WHERE id=?", table)
-		for i := range svcTasks {
-			_, err := tx.Exec(query, svcTasks[i].Linkto)
-			if err != nil {
-				return err
-			}
+		err = incServiceStatus(tx, table, tasks, 1)
+		if err != nil {
+			return err
 		}
 
 		now := time.Now()
@@ -520,4 +517,16 @@ func (db dbBase) MarkRunningTasks() error {
 	}
 
 	return db.txFrame(do)
+}
+
+func incServiceStatus(tx *sqlx.Tx, table string, tasks []Task, inc int) error {
+	query := fmt.Sprintf("UPDATE %s SET action_status=action_status+%d WHERE id=?", table, inc)
+	for i := range tasks {
+		_, err := tx.Exec(query, tasks[i].Linkto)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
+
+	return nil
 }
