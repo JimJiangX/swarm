@@ -3,14 +3,24 @@ package cluster
 import (
 	"io"
 	"os"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
+
+func (c Container) Exec(ctx context.Context, cmd []string, detach bool) (types.ContainerExecInspect, error) {
+	if c.Engine == nil {
+		return types.ContainerExecInspect{}, errors.Errorf("Engine of Container:%s is required", c.Names)
+	}
+
+	return c.Engine.containerExec(ctx, c.ID, cmd, detach)
+}
 
 // UsedCpus returns the sum of CPUs reserved by containers.
 func (e *Engine) UsedCpus() int64 {
@@ -38,16 +48,72 @@ func (e *Engine) UsedCpus() int64 {
 	return r
 }
 
-func (e *Engine) ContainerAPIClient() client.ContainerAPIClient {
-	return e.apiClient
-}
-
-func (c Container) Exec(ctx context.Context, cmd []string, detach bool) (types.ContainerExecInspect, error) {
-	if c.Engine == nil {
-		return types.ContainerExecInspect{}, errors.Errorf("Engine of Container:%s is required", c.Names)
+// StopContainer stop a container
+func (e *Engine) StopContainer(ctx context.Context, name string, timeout *time.Duration) error {
+	container, err := e.getContainer(name)
+	if err != nil {
+		return err
 	}
 
-	return c.Engine.containerExec(ctx, c.ID, cmd, detach)
+	err = e.apiClient.ContainerStop(ctx, container.ID, timeout)
+	e.CheckConnectionErr(err)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	// refresh the container in the cache
+	_, err = e.refreshContainer(container.ID, true)
+
+	return err
+}
+
+func (e *Engine) getContainer(name string) (*Container, error) {
+	var container *Container
+
+	e.RLock()
+	for _, c := range e.containers {
+		if c.ID == name {
+			container = c
+			break
+		}
+	}
+	e.RUnlock()
+
+	if container == nil {
+		if container = e.Containers().Get(name); container == nil {
+			return nil, errors.Errorf("not found container '%s' in Engine %s", name, e.Addr)
+		}
+	}
+
+	return container, nil
+}
+
+// UpdateContainer updates a container with new UpdateConfig
+func (e *Engine) UpdateContainer(ctx context.Context, name string, config container.UpdateConfig) (*Container, error) {
+	container, err := e.getContainer(name)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := e.apiClient.ContainerUpdate(ctx, container.ID, config)
+	e.CheckConnectionErr(err)
+	if err != nil {
+		return container, errors.Wrapf(err, "container update,warnings:%s", resp.Warnings)
+	}
+
+	// Register the container immediately while waiting for a state refresh.
+	// Force a state refresh to pick up the newly created container.
+	e.refreshContainer(container.ID, true)
+
+	e.Lock()
+	container = e.containers[container.ID]
+	e.Unlock()
+
+	if container == nil {
+		err = errors.New("Container update but refresh didn't report it back")
+	}
+
+	return container, err
 }
 
 // checkTtyInput checks if we are trying to attach to a container tty

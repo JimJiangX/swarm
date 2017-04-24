@@ -779,11 +779,10 @@ func (svc *Service) removeContainers(ctx context.Context, units []*unit, force, 
 			continue
 		}
 
-		if c := u.getContainer(); c == nil {
-			id := u.u.ContainerID
-			if id == "" {
-				id = u.u.Name
-			}
+		c := u.getContainer()
+		if c == nil {
+			id := u.containerIDOrName()
+
 			err := engine.RemoveContainer(&cluster.Container{
 				Container: types.Container{ID: id}}, force, rmVolumes)
 			if err != nil {
@@ -792,27 +791,15 @@ func (svc *Service) removeContainers(ctx context.Context, units []*unit, force, 
 			continue
 		}
 
-		client := engine.ContainerAPIClient()
-		if client == nil {
-			continue
-		}
-
 		if !force {
 			timeout := 30 * time.Second
-			err := client.ContainerStop(ctx, u.u.Name, &timeout)
-			engine.CheckConnectionErr(err)
+			err := engine.StopContainer(ctx, c.ID, &timeout)
 			if err != nil {
 				return err
 			}
 		}
 
-		options := types.ContainerRemoveOptions{
-			RemoveVolumes: rmVolumes,
-			RemoveLinks:   false,
-			Force:         force,
-		}
-		err := client.ContainerRemove(ctx, u.u.Name, options)
-		engine.CheckConnectionErr(err)
+		err := engine.RemoveContainer(c, force, rmVolumes)
 		if err != nil {
 			return err
 		}

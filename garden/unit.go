@@ -102,6 +102,15 @@ func (u unit) getContainer() *cluster.Container {
 	return u.cluster.Container(u.u.Name)
 }
 
+func (u unit) containerIDOrName() string {
+	name := u.u.ContainerID
+	if name == "" {
+		name = u.u.Name
+	}
+
+	return name
+}
+
 func (u unit) getVolumesByUnit() ([]database.Volume, error) {
 	lvs, err := u.uo.ListVolumesByUnitID(u.u.ID)
 
@@ -186,14 +195,8 @@ func (u unit) stopContainer(ctx context.Context) error {
 		return nil
 	}
 
-	client := engine.ContainerAPIClient()
-	if client == nil {
-		return nil
-	}
-
 	timeout := 30 * time.Second
-	err := client.ContainerStop(ctx, u.u.Name, &timeout)
-	engine.CheckConnectionErr(err)
+	err := engine.StopContainer(ctx, u.containerIDOrName(), &timeout)
 
 	return err
 }
@@ -283,15 +286,9 @@ func (u *unit) update(ctx context.Context, config container.UpdateConfig) error 
 		return errors.Errorf("not found Engine %s", u.u.EngineID)
 	}
 
-	client := e.ContainerAPIClient()
-	if client == nil {
-		return errors.Errorf("unit:%s ContainerAPIClient is required", u.u.Name)
-	}
+	_, err := e.UpdateContainer(ctx, u.u.ContainerID, config)
 
-	body, err := client.ContainerUpdate(ctx, u.u.Name, config)
-	e.CheckConnectionErr(err)
-
-	return errors.Wrapf(err, "unit:%s update container,warnings:%s", u.u.Name, body.Warnings)
+	return err
 }
 
 func (u unit) startNetwork(ctx context.Context, addr, container string, ips []database.IP, tlsConfig *tls.Config) error {
