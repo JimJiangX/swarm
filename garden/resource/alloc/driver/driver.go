@@ -1,6 +1,8 @@
 package driver
 
 import (
+	"fmt"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
@@ -26,6 +28,8 @@ type Driver interface {
 	Space() (Space, error)
 
 	Alloc(config *cluster.ContainerConfig, uid string, req structs.VolumeRequire) (*database.Volume, error)
+
+	Expand(database.Volume, string, int64) error
 
 	Recycle(database.Volume) error
 }
@@ -149,4 +153,30 @@ func (vds VolumeDrivers) AllocVolumes(config *cluster.ContainerConfig, uid strin
 	}
 
 	return volumes, nil
+}
+
+func (vds VolumeDrivers) ExpandVolumes(uid, agent string, stores []structs.VolumeRequire) error {
+	for i := range stores {
+		driver := vds.Get(stores[i].Type)
+		if driver == nil {
+			return errors.New("not found the assigned volumeDriver:" + stores[i].Type)
+		}
+
+		space, err := driver.Space()
+		if err != nil {
+			return err
+		}
+
+		// Volume generated as same as Driver.Alloc
+		lv := database.Volume{
+			Name: fmt.Sprintf("%s_%s_%s_LV", uid[:8], space.VG, stores[i].Name),
+		}
+
+		err = driver.Expand(lv, agent, stores[i].Size)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

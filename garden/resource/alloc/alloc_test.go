@@ -8,6 +8,8 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 )
 
+var _ Allocator = allocator{}
+
 type engines []*cluster.Engine
 
 func (es engines) Engine(IDOrName string) *cluster.Engine {

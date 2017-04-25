@@ -64,7 +64,7 @@ nodes:
 			continue nodes
 		}
 
-		err := at.isNodeStoreEnough(engine, stores)
+		err := at.IsNodeStoreEnough(engine, stores)
 		if err != nil {
 			logrus.Debugf("node %s %+v", nodes[i].Addr, err)
 			continue
@@ -74,41 +74,6 @@ nodes:
 	}
 
 	return out, nil
-}
-
-func (at allocator) isNodeStoreEnough(engine *cluster.Engine, stores []structs.VolumeRequire) error {
-	drivers, err := driver.FindEngineVolumeDrivers(at.ormer, engine)
-	if err != nil {
-		logrus.Warnf("engine:%s find volume drivers,%+v", engine.Name, err)
-
-		if len(drivers) == 0 {
-			return err
-		}
-	}
-
-	err = drivers.IsSpaceEnough(stores)
-
-	return err
-}
-
-func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n *node.Node, stores []structs.VolumeRequire) ([]database.Volume, error) {
-	engine := at.ec.Engine(n.ID)
-	if engine == nil {
-		return nil, errors.Errorf("not found Engine by ID:%s from cluster", n.Addr)
-	}
-
-	drivers, err := driver.FindEngineVolumeDrivers(at.ormer, engine)
-	if err != nil {
-		logrus.Warnf("engine:%s find volume drivers,%+v", engine.Name, err)
-
-		if len(drivers) == 0 {
-			return nil, err
-		}
-	}
-
-	lvs, err := drivers.AllocVolumes(config, uid, stores)
-
-	return lvs, err
 }
 
 func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, ncpu, memory int64, reserved []string) (string, error) {

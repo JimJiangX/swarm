@@ -94,6 +94,28 @@ func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req struc
 	return &v, nil
 }
 
+func (sv sanVolume) Expand(lv database.Volume, agent string, size int64) error {
+	lv, err := sv.iface.GetVolume(lv.Name)
+	if err != nil {
+		return err
+	}
+
+	space, err := sv.Space()
+	if err != nil {
+		return err
+	}
+
+	if space.Free < size {
+		return errors.Errorf("node %s local volume driver has no enough space for expansion:%d<%d", sv.engine.IP, space.Free, size)
+	}
+
+	lv.Size += size
+
+	// TODO:make it right later
+
+	return nil
+}
+
 func (sv sanVolume) Recycle(lv database.Volume) error {
 	err := sv.san.DelMapping(lv.Name)
 	if errors.Cause(err) == sql.ErrNoRows {

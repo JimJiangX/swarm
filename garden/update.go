@@ -11,6 +11,7 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/resource/alloc"
+	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/tasklock"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/docker/swarm/scheduler/node"
@@ -242,4 +243,53 @@ func reduceCPUset(cpusetCpus string, need int) (string, error) {
 	}
 
 	return strings.Join(cpuString, ","), nil
+}
+
+func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.VolumeRequire) error {
+	type pending struct {
+		u   *unit
+		eng *cluster.Engine
+		add []structs.VolumeRequire
+	}
+
+	units, err := svc.getUnits()
+	if err != nil {
+		return err
+	}
+
+	pendings := make([]pending, 0, len(units))
+
+	// check node which unit on whether disk has enough free size.
+	for _, u := range units {
+		eng := u.getEngine()
+		if eng == nil {
+			return errors.Errorf("")
+		}
+
+		add, err := u.prepareExpandVolume(target)
+		if err != nil {
+			return err
+		}
+
+		err = actor.IsNodeStoreEnough(eng, add)
+		if err != nil {
+			return err
+		}
+
+		pendings = append(pendings, pending{
+			u:   u,
+			eng: eng,
+			add: add,
+		})
+	}
+
+	// expand volume size
+	for _, pu := range pendings {
+		err := actor.ExpandVolumes(pu.eng, pu.u.u.ID, pu.add)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

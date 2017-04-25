@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/docker/swarm/seed/sdk"
 	"github.com/pkg/errors"
@@ -128,6 +129,38 @@ func (u unit) getEngine() *cluster.Engine {
 	}
 
 	return nil
+}
+
+func (u unit) prepareExpandVolume(target []structs.VolumeRequire) ([]structs.VolumeRequire, error) {
+	lvs, err := u.uo.ListVolumesByUnitID(u.u.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	add := make([]structs.VolumeRequire, len(target))
+
+	for i := range target {
+		found := false
+		add[i] = target[i]
+
+	loop:
+		for v := range lvs {
+			if lvs[v].DriverType == target[i].Type &&
+				strings.Contains(lvs[v].Name, target[i].Name) {
+
+				found = true
+				add[i].Size = target[i].Size - lvs[v].Size
+
+				break loop
+			}
+		}
+
+		if !found {
+			return nil, errors.Errorf("not found volume '%s_%s' on unit %s", target[i].Type, target[i].Name, u.u.Name)
+		}
+	}
+
+	return add, nil
 }
 
 func (u unit) getHostIP() (string, error) {

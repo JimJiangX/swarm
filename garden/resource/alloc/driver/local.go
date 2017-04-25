@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
+	"github.com/docker/swarm/seed/sdk"
 	"github.com/pkg/errors"
 )
 
@@ -28,6 +30,8 @@ const (
 
 type localVolumeIface interface {
 	InsertVolume(lv database.Volume) error
+
+	SetVolume(nameOrID string, engineID string, size int64) error
 
 	GetVolume(nameOrID string) (database.Volume, error)
 
@@ -66,6 +70,20 @@ func (lvm *localVolumeMap) InsertVolume(lv database.Volume) error {
 			return errors.New("Volume Name existed")
 		}
 	}
+
+	lvm.m[lv.ID] = lv
+
+	return nil
+}
+
+func (lvm *localVolumeMap) SetVolume(nameOrID string, engineID string, size int64) error {
+	lv, err := lvm.GetVolume(nameOrID)
+	if err != nil {
+		return err
+	}
+
+	lv.EngineID = engineID
+	lv.Size = size
 
 	lvm.m[lv.ID] = lv
 
@@ -268,6 +286,10 @@ func (lv *localVolume) Alloc(config *cluster.ContainerConfig, uid string, req st
 		return nil, err
 	}
 
+	if space.Free < req.Size {
+		return nil, errors.Errorf("node %s local volume driver has no enough space:%d<%d", lv.engine.IP, space.Free, req.Size)
+	}
+
 	v := database.Volume{
 		Size:       req.Size,
 		ID:         utils.Generate32UUID(),
@@ -292,6 +314,48 @@ func (lv *localVolume) Alloc(config *cluster.ContainerConfig, uid string, req st
 	config.HostConfig.VolumeDriver = lv.Driver()
 
 	return &v, nil
+}
+
+func (lv *localVolume) Expand(dv database.Volume, agent string, size int64) error {
+	dv, err := lv.vo.GetVolume(dv.Name)
+	if err != nil {
+		return err
+	}
+
+	space, err := lv.Space()
+	if err != nil {
+		return err
+	}
+
+	if space.Free < size {
+		return errors.Errorf("node %s local volume driver has no enough space for expansion:%d<%d", lv.engine.IP, space.Free, size)
+	}
+
+	dv.Size += size
+
+	err = lv.vo.SetVolume(dv.ID, dv.EngineID, dv.Size)
+	if err != nil {
+		return err
+	}
+
+	return updateVolume(agent, dv)
+}
+
+func updateVolume(agent string, lv database.Volume) error {
+	option := sdk.VolumeUpdateOption{
+		VgName: lv.VG,
+		LvName: lv.Name,
+		FsType: lv.Filesystem,
+		Size:   int(lv.Size),
+	}
+
+	// TODO:*tls.Config
+	cli, err := sdk.NewClient(agent, 30*time.Second, nil)
+	if err != nil {
+		return err
+	}
+
+	return cli.VolumeUpdate(option)
 }
 
 func (lv *localVolume) Recycle(v database.Volume) (err error) {
