@@ -136,6 +136,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 	return tl.Run(isnotInProgress, update, async)
 }
 
+// ServiceUpdate udpate service containers CPU & memory settings.
 func (svc *Service) ServiceUpdate(ctx context.Context, actor alloc.Allocator, ncpu, memory int64) error {
 	type pending struct {
 		u      *unit
@@ -180,14 +181,16 @@ func (svc *Service) ServiceUpdate(ctx context.Context, actor alloc.Allocator, nc
 		if c.Config.HostConfig.Memory < memory || n < ncpu {
 			node := node.NewNode(c.Engine)
 
-			cpuset, err := actor.AlloctCPUMemory(c.Config, node, ncpu-n, memory, nil)
+			cpuset, err := actor.AlloctCPUMemory(c.Config, node, ncpu-n, memory-c.Config.HostConfig.Memory, nil)
 			if err != nil {
 				return err
 			}
-			if pu.cpuset == "" {
-				pu.cpuset = cpuset
-			} else {
-				pu.cpuset = pu.cpuset + "," + cpuset
+			if cpuset != "" {
+				if pu.cpuset == "" {
+					pu.cpuset = cpuset
+				} else {
+					pu.cpuset = pu.cpuset + "," + cpuset
+				}
 			}
 		}
 
@@ -208,7 +211,8 @@ func (svc *Service) ServiceUpdate(ctx context.Context, actor alloc.Allocator, nc
 			return err
 		}
 	}
-	// TODO:update units config
+
+	// units config file updated by user
 
 	return nil
 }

@@ -395,9 +395,9 @@ func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config stru
 
 		table.DescID = desc.ID
 		table.Desc = &desc
-	}
 
-	err = d.gd.Ormer().SetServiceDesc(table)
+		err = d.gd.Ormer().SetServiceDesc(table)
+	}
 
 	return t.ID, err
 }
