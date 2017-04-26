@@ -18,8 +18,10 @@ const (
 	statusServiceUnitMigrating                      // 14
 	statusServiceUnitRebuilding                     // 15
 	statusServiceImageUpdating                      // 16
-	statusServiceComposing                          // 17
-	statusServiceDeleting                           // 18
+	statusServiceResourceUpdating                   // 17
+	statusServiceVolumeExpanding                    // 18
+	statusServiceComposing                          // 19
+	statusServiceDeleting                           // 20
 
 	_ing    = 0
 	_failed = 1
@@ -72,6 +74,12 @@ const (
 
 	statusServiceImageUpdated      = statusServiceImageUpdating + _done
 	statusServiceImageUpdateFailed = statusServiceImageUpdating + _failed
+
+	statusServiceResourceUpdated      = statusServiceResourceUpdating + _done
+	statusServiceResourceUpdateFailed = statusServiceResourceUpdating + _failed
+
+	statusServiceVolumeExpanded     = statusServiceVolumeExpanding + _done
+	statusServiceVolumeExpandFailed = statusServiceVolumeExpanding + _failed
 
 	statusServiceDeleteFailed = statusServiceDeleting + _failed
 )

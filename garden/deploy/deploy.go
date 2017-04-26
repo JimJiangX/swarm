@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
@@ -106,7 +107,7 @@ func (d *Deployment) DeployServices(ctx context.Context, services []structs.Serv
 func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *database.Task, auth *types.AuthConfig) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors.Errorf("panic:%v", r)
+			err = errors.Errorf("deploy:%v", r)
 		}
 
 		if err == nil {
@@ -159,26 +160,26 @@ func (d *Deployment) Link(ctx context.Context, links []*structs.ServiceLink) (st
 	}
 
 	// TODO:better task info
-	task := database.NewTask("stack link", database.ServiceLinkTask, "", "", nil, 300)
+	task := database.NewTask("deploy link", database.ServiceLinkTask, "", "", nil, 300)
 
 	go func() (err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				err = errors.Errorf("stack link,panic:%v", r)
+				err = errors.Errorf("deploy link,panic:%v", r)
 			}
 			if err == nil {
 				task.Status = database.TaskDoneStatus
 			} else {
 				task.Status = database.TaskFailedStatus
 
-				logrus.Errorf("stack link and start,%+v", err)
+				logrus.Errorf("deploy link and start,%+v", err)
 			}
 
 			task.SetErrors(err)
 
 			_err := d.gd.Ormer().SetTask(task)
 			if _err != nil {
-				logrus.Errorf("stack link and start,%+v", _err)
+				logrus.Errorf("deploy link and start,%+v", _err)
 			}
 		}()
 
@@ -364,40 +365,145 @@ func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config stru
 		return "", err
 	}
 
-	// TODO:save task status
-	t := database.NewTask(table.Name, database.ServiceUpdateTask, table.ID, string(out), nil, 300)
-	actor := alloc.NewAllocator(d.gd.Ormer(), d.gd.Cluster)
-
-	if (config.Require.CPU > 0 && table.Desc.NCPU != config.Require.CPU) ||
-		(config.Require.Memory > 0 && table.Desc.Memory != config.Require.Memory) {
-
-		ncpu := config.Require.CPU
-		if ncpu == 0 {
-			ncpu = table.Desc.NCPU
-		}
-		memory := config.Require.Memory
-		if memory == 0 {
-			memory = table.Desc.Memory
-		}
-
-		err = func() error {
-			d.gd.Lock()
-			defer d.gd.Unlock()
-
-			return svc.ServiceUpdate(ctx, actor, int64(ncpu), memory)
-		}()
-
-		desc := *table.Desc
-		desc.ID = utils.Generate32UUID()
-		desc.NCPU = ncpu
-		desc.Memory = memory
-		desc.Previous = table.DescID
-
-		table.DescID = desc.ID
-		table.Desc = &desc
-
-		err = d.gd.Ormer().SetServiceDesc(table)
+	task := database.NewTask(table.Name, database.ServiceUpdateTask, table.ID, string(out), nil, 300)
+	err = d.gd.Ormer().InsertTask(task)
+	if err != nil {
+		return "", err
 	}
 
-	return t.ID, err
+	update := func() (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				err = errors.Errorf("deploy update:%v", r)
+			}
+
+			if err == nil {
+				task.Status = database.TaskDoneStatus
+			} else {
+				task.Status = database.TaskFailedStatus
+
+				logrus.Errorf("service update error %+v", err)
+			}
+
+			task.SetErrors(err)
+
+			_err := d.gd.Ormer().SetTask(task)
+			if _err != nil {
+				logrus.Errorf("service update task error,%+v", _err)
+			}
+		}()
+
+		actor := alloc.NewAllocator(d.gd.Ormer(), d.gd.Cluster)
+
+		if (config.Require.CPU > 0 && table.Desc.NCPU != config.Require.CPU) ||
+			(config.Require.Memory > 0 && table.Desc.Memory != config.Require.Memory) {
+
+			ncpu := config.Require.CPU
+			if ncpu == 0 {
+				ncpu = table.Desc.NCPU
+			}
+			memory := config.Require.Memory
+			if memory == 0 {
+				memory = table.Desc.Memory
+			}
+
+			err = func() error {
+				d.gd.Lock()
+				defer d.gd.Unlock()
+
+				return svc.UpdateResource(ctx, actor, int64(ncpu), memory)
+			}()
+			if err != nil {
+				return err
+			}
+
+			desc := *table.Desc
+			desc.ID = utils.Generate32UUID()
+			desc.NCPU = ncpu
+			desc.Memory = memory
+			desc.Previous = table.DescID
+
+			table.DescID = desc.ID
+			table.Desc = &desc
+
+			err = d.gd.Ormer().SetServiceDesc(table)
+			if err != nil {
+				return err
+			}
+		}
+
+		select {
+		default:
+		case <-ctx.Done():
+			return errors.WithStack(ctx.Err())
+		}
+
+		if len(config.Volumes) > 0 {
+			err = func() error {
+				d.gd.Lock()
+				defer d.gd.Unlock()
+
+				return svc.VolumeExpansion(actor, config.Volumes)
+			}()
+			if err != nil {
+				return err
+			}
+
+			var old []structs.VolumeRequire
+			r := strings.NewReader(table.Desc.Volumes)
+			err = json.NewDecoder(r).Decode(&old)
+			if err != nil {
+				old = []structs.VolumeRequire{}
+			}
+
+			out := mergeVolumeRequire(old, config.Volumes)
+			vb, err := json.Marshal(out)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			desc := *table.Desc
+			desc.ID = utils.Generate32UUID()
+			desc.Volumes = string(vb)
+			desc.Previous = table.DescID
+
+			table.DescID = desc.ID
+			table.Desc = &desc
+
+			return d.gd.Ormer().SetServiceDesc(table)
+		}
+
+		return nil
+	}
+
+	go update()
+
+	return task.ID, err
+}
+
+func mergeVolumeRequire(old, update []structs.VolumeRequire) []structs.VolumeRequire {
+	if len(old) == 0 {
+		return update
+	}
+
+	out := make([]structs.VolumeRequire, 0, len(old))
+
+	for i := range old {
+		found := false
+
+	loop:
+		for v := range update {
+			if old[i].Name == update[v].Name && old[i].Type == update[v].Type {
+				out = append(out, update[v])
+				found = true
+				break loop
+			}
+		}
+
+		if !found {
+			out = append(out, old[i])
+		}
+	}
+
+	return out
 }

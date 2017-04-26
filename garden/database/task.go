@@ -64,6 +64,8 @@ const (
 
 // TaskOrmer Task db table operators
 type TaskOrmer interface {
+	InsertTask(t Task) error
+
 	InsertTasks(tx *sqlx.Tx, tasks []Task, linkTable string) error
 
 	GetTask(ID string) (Task, error)
@@ -164,6 +166,20 @@ type task struct {
 
 func (db dbBase) taskTable() string {
 	return db.prefix + "_task"
+}
+
+func (db dbBase) InsertTask(t Task) error {
+	tk := t.toTask()
+
+	query := "INSERT INTO " + db.taskTable() + " (id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:link_table,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
+
+	_, err := db.NamedExec(query, tk)
+	if err == nil {
+		return nil
+	}
+
+	return errors.Wrap(err, "insert Task")
+
 }
 
 func (db dbBase) txInsertTask(tx *sqlx.Tx, t Task, linkTable string) error {

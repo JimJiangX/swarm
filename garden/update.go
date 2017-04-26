@@ -137,85 +137,91 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 	return tl.Run(isnotInProgress, update, async)
 }
 
-// ServiceUpdate udpate service containers CPU & memory settings.
-func (svc *Service) ServiceUpdate(ctx context.Context, actor alloc.Allocator, ncpu, memory int64) error {
-	type pending struct {
-		u      *unit
-		cpuset string
-		memory int64
+// UpdateResource udpate service containers CPU & memory settings.
+func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, ncpu, memory int64) error {
+	update := func() error {
+		type pending struct {
+			u      *unit
+			cpuset string
+			memory int64
 
-		config container.UpdateConfig
-	}
-
-	units, err := svc.getUnits()
-	if err != nil {
-		return err
-	}
-
-	pendings := make([]pending, 0, len(units))
-
-	for _, u := range units {
-
-		c := u.getContainer()
-		if c == nil {
-			continue
+			config container.UpdateConfig
 		}
 
-		pu := pending{
-			u:      u,
-			memory: memory,
-			cpuset: c.Config.HostConfig.CpusetCpus,
-		}
-
-		n, err := c.Config.CountCPU()
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
-		if n > ncpu {
-			pu.cpuset, err = reduceCPUset(c.Config.HostConfig.CpusetCpus, int(ncpu))
-			if err != nil {
-				return err
-			}
-		}
-
-		if c.Config.HostConfig.Memory < memory || n < ncpu {
-			node := node.NewNode(c.Engine)
-
-			cpuset, err := actor.AlloctCPUMemory(c.Config, node, ncpu-n, memory-c.Config.HostConfig.Memory, nil)
-			if err != nil {
-				return err
-			}
-			if cpuset != "" {
-				if pu.cpuset == "" {
-					pu.cpuset = cpuset
-				} else {
-					pu.cpuset = pu.cpuset + "," + cpuset
-				}
-			}
-		}
-
-		pu.config = container.UpdateConfig{
-			Resources: container.Resources{
-				CpusetCpus: pu.cpuset,
-				Memory:     pu.memory,
-			},
-		}
-
-		pendings = append(pendings, pu)
-	}
-
-	for _, pu := range pendings {
-
-		err = pu.u.update(ctx, pu.config)
+		units, err := svc.getUnits()
 		if err != nil {
 			return err
 		}
+
+		pendings := make([]pending, 0, len(units))
+
+		for _, u := range units {
+
+			c := u.getContainer()
+			if c == nil {
+				continue
+			}
+
+			pu := pending{
+				u:      u,
+				memory: memory,
+				cpuset: c.Config.HostConfig.CpusetCpus,
+			}
+
+			n, err := c.Config.CountCPU()
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			if n > ncpu {
+				pu.cpuset, err = reduceCPUset(c.Config.HostConfig.CpusetCpus, int(ncpu))
+				if err != nil {
+					return err
+				}
+			}
+
+			if c.Config.HostConfig.Memory < memory || n < ncpu {
+				node := node.NewNode(c.Engine)
+
+				cpuset, err := actor.AlloctCPUMemory(c.Config, node, ncpu-n, memory-c.Config.HostConfig.Memory, nil)
+				if err != nil {
+					return err
+				}
+				if cpuset != "" {
+					if pu.cpuset == "" {
+						pu.cpuset = cpuset
+					} else {
+						pu.cpuset = pu.cpuset + "," + cpuset
+					}
+				}
+			}
+
+			pu.config = container.UpdateConfig{
+				Resources: container.Resources{
+					CpusetCpus: pu.cpuset,
+					Memory:     pu.memory,
+				},
+			}
+
+			pendings = append(pendings, pu)
+		}
+
+		for _, pu := range pendings {
+			err = pu.u.update(ctx, pu.config)
+			if err != nil {
+				return err
+			}
+		}
+
+		// units config file updated by user
+
+		return nil
 	}
 
-	// units config file updated by user
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
+		statusServiceResourceUpdating, statusServiceResourceUpdated, statusServiceResourceUpdateFailed)
 
-	return nil
+	return sl.Run(isnotInProgress, update, false)
 }
 
 func reduceCPUset(cpusetCpus string, need int) (string, error) {
@@ -246,50 +252,57 @@ func reduceCPUset(cpusetCpus string, need int) (string, error) {
 }
 
 func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.VolumeRequire) error {
-	type pending struct {
-		u   *unit
-		eng *cluster.Engine
-		add []structs.VolumeRequire
-	}
-
-	units, err := svc.getUnits()
-	if err != nil {
-		return err
-	}
-
-	pendings := make([]pending, 0, len(units))
-
-	// check node which unit on whether disk has enough free size.
-	for _, u := range units {
-		eng := u.getEngine()
-		if eng == nil {
-			return errors.Errorf("")
+	expansion := func() error {
+		type pending struct {
+			u   *unit
+			eng *cluster.Engine
+			add []structs.VolumeRequire
 		}
 
-		add, err := u.prepareExpandVolume(target)
+		units, err := svc.getUnits()
 		if err != nil {
 			return err
 		}
 
-		err = actor.IsNodeStoreEnough(eng, add)
-		if err != nil {
-			return err
+		pendings := make([]pending, 0, len(units))
+
+		// check node which unit on whether disk has enough free size.
+		for _, u := range units {
+			eng := u.getEngine()
+			if eng == nil {
+				return errors.Errorf("")
+			}
+
+			add, err := u.prepareExpandVolume(target)
+			if err != nil {
+				return err
+			}
+
+			err = actor.IsNodeStoreEnough(eng, add)
+			if err != nil {
+				return err
+			}
+
+			pendings = append(pendings, pending{
+				u:   u,
+				eng: eng,
+				add: add,
+			})
 		}
 
-		pendings = append(pendings, pending{
-			u:   u,
-			eng: eng,
-			add: add,
-		})
-	}
-
-	// expand volume size
-	for _, pu := range pendings {
-		err := actor.ExpandVolumes(pu.eng, pu.u.u.ID, pu.add)
-		if err != nil {
-			return err
+		// expand volume size
+		for _, pu := range pendings {
+			err := actor.ExpandVolumes(pu.eng, pu.u.u.ID, pu.add)
+			if err != nil {
+				return err
+			}
 		}
+
+		return nil
 	}
 
-	return nil
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
+		statusServiceVolumeExpanding, statusServiceVolumeExpanded, statusServiceVolumeExpandFailed)
+
+	return sl.Run(isnotInProgress, expansion, false)
 }
