@@ -1,6 +1,7 @@
 package garden
 
 import (
+	"encoding/json"
 	"sort"
 	"strconv"
 	"strings"
@@ -139,6 +140,22 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 
 // UpdateResource udpate service containers CPU & memory settings.
 func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, ncpu, memory int64) error {
+	desc := svc.svc.Desc
+
+	if (ncpu == 0 || int64(desc.NCPU) == ncpu) &&
+		(memory == 0 || desc.Memory == memory) {
+		// nothing change on CPU & Memory
+		return nil
+	}
+
+	if ncpu == 0 {
+		ncpu = int64(desc.NCPU)
+	}
+
+	if memory == 0 {
+		memory = desc.Memory
+	}
+
 	update := func() error {
 		type pending struct {
 			u      *unit
@@ -215,6 +232,29 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 
 		// units config file updated by user
 
+		{
+			// update Service.Desc
+			table, err := svc.so.GetService(svc.svc.ID)
+			if err != nil {
+				return err
+			}
+			desc := *table.Desc
+			desc.ID = utils.Generate32UUID()
+			desc.NCPU = int(ncpu)
+			desc.Memory = memory
+			desc.Previous = table.DescID
+
+			table.DescID = desc.ID
+			table.Desc = &desc
+
+			err = svc.so.SetServiceDesc(table)
+			if err == nil {
+				svc.svc = &table
+			}
+
+			return err
+		}
+
 		return nil
 	}
 
@@ -252,6 +292,10 @@ func reduceCPUset(cpusetCpus string, need int) (string, error) {
 }
 
 func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.VolumeRequire) error {
+	if len(target) == 0 {
+		return nil
+	}
+
 	expansion := func() error {
 		type pending struct {
 			u   *unit
@@ -298,6 +342,37 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 			}
 		}
 
+		{
+			// update Service.Desc
+			table, err := svc.so.GetService(svc.svc.ID)
+			if err != nil {
+				return err
+			}
+
+			var old []structs.VolumeRequire
+			r := strings.NewReader(table.Desc.Volumes)
+			err = json.NewDecoder(r).Decode(&old)
+			if err != nil {
+				old = []structs.VolumeRequire{}
+			}
+
+			out := mergeVolumeRequire(old, target)
+			vb, err := json.Marshal(out)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			desc := *table.Desc
+			desc.ID = utils.Generate32UUID()
+			desc.Volumes = string(vb)
+			desc.Previous = table.DescID
+
+			table.DescID = desc.ID
+			table.Desc = &desc
+
+			return svc.so.SetServiceDesc(table)
+		}
+
 		return nil
 	}
 
@@ -305,4 +380,31 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 		statusServiceVolumeExpanding, statusServiceVolumeExpanded, statusServiceVolumeExpandFailed)
 
 	return sl.Run(isnotInProgress, expansion, false)
+}
+
+func mergeVolumeRequire(old, update []structs.VolumeRequire) []structs.VolumeRequire {
+	if len(old) == 0 {
+		return update
+	}
+
+	out := make([]structs.VolumeRequire, 0, len(old))
+
+	for i := range old {
+		found := false
+
+	loop:
+		for v := range update {
+			if old[i].Name == update[v].Name && old[i].Type == update[v].Type {
+				out = append(out, update[v])
+				found = true
+				break loop
+			}
+		}
+
+		if !found {
+			out = append(out, old[i])
+		}
+	}
+
+	return out
 }

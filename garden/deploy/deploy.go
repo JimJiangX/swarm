@@ -2,7 +2,6 @@ package deploy
 
 import (
 	"encoding/json"
-	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
@@ -350,12 +349,7 @@ func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version strin
 }
 
 func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config structs.UnitRequire) (string, error) {
-	table, err := d.gd.Ormer().GetService(name)
-	if err != nil {
-		return "", err
-	}
-
-	svc, err := d.gd.GetService(table.ID)
+	svc, err := d.gd.Service(name)
 	if err != nil {
 		return "", err
 	}
@@ -365,7 +359,12 @@ func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config stru
 		return "", err
 	}
 
-	task := database.NewTask(table.Name, database.ServiceUpdateTask, table.ID, string(out), nil, 300)
+	spec, err := svc.Spec()
+	if err != nil {
+		return "", err
+	}
+
+	task := database.NewTask(spec.Name, database.ServiceUpdateTask, spec.ID, string(out), nil, 300)
 	err = d.gd.Ormer().InsertTask(task)
 	if err != nil {
 		return "", err
@@ -395,41 +394,14 @@ func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config stru
 
 		actor := alloc.NewAllocator(d.gd.Ormer(), d.gd.Cluster)
 
-		if (config.Require.CPU > 0 && table.Desc.NCPU != config.Require.CPU) ||
-			(config.Require.Memory > 0 && table.Desc.Memory != config.Require.Memory) {
+		err = func() error {
+			d.gd.Lock()
+			defer d.gd.Unlock()
 
-			ncpu := config.Require.CPU
-			if ncpu == 0 {
-				ncpu = table.Desc.NCPU
-			}
-			memory := config.Require.Memory
-			if memory == 0 {
-				memory = table.Desc.Memory
-			}
-
-			err = func() error {
-				d.gd.Lock()
-				defer d.gd.Unlock()
-
-				return svc.UpdateResource(ctx, actor, int64(ncpu), memory)
-			}()
-			if err != nil {
-				return err
-			}
-
-			desc := *table.Desc
-			desc.ID = utils.Generate32UUID()
-			desc.NCPU = ncpu
-			desc.Memory = memory
-			desc.Previous = table.DescID
-
-			table.DescID = desc.ID
-			table.Desc = &desc
-
-			err = d.gd.Ormer().SetServiceDesc(table)
-			if err != nil {
-				return err
-			}
+			return svc.UpdateResource(ctx, actor, int64(config.Require.CPU), config.Require.Memory)
+		}()
+		if err != nil {
+			return err
 		}
 
 		select {
@@ -445,65 +417,12 @@ func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config stru
 
 				return svc.VolumeExpansion(actor, config.Volumes)
 			}()
-			if err != nil {
-				return err
-			}
-
-			var old []structs.VolumeRequire
-			r := strings.NewReader(table.Desc.Volumes)
-			err = json.NewDecoder(r).Decode(&old)
-			if err != nil {
-				old = []structs.VolumeRequire{}
-			}
-
-			out := mergeVolumeRequire(old, config.Volumes)
-			vb, err := json.Marshal(out)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-
-			desc := *table.Desc
-			desc.ID = utils.Generate32UUID()
-			desc.Volumes = string(vb)
-			desc.Previous = table.DescID
-
-			table.DescID = desc.ID
-			table.Desc = &desc
-
-			return d.gd.Ormer().SetServiceDesc(table)
 		}
 
-		return nil
+		return err
 	}
 
 	go update()
 
 	return task.ID, err
-}
-
-func mergeVolumeRequire(old, update []structs.VolumeRequire) []structs.VolumeRequire {
-	if len(old) == 0 {
-		return update
-	}
-
-	out := make([]structs.VolumeRequire, 0, len(old))
-
-	for i := range old {
-		found := false
-
-	loop:
-		for v := range update {
-			if old[i].Name == update[v].Name && old[i].Type == update[v].Type {
-				out = append(out, update[v])
-				found = true
-				break loop
-			}
-		}
-
-		if !found {
-			out = append(out, old[i])
-		}
-	}
-
-	return out
 }
