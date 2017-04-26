@@ -254,8 +254,6 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 
 			return err
 		}
-
-		return nil
 	}
 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
@@ -373,7 +371,6 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 			return svc.so.SetServiceDesc(table)
 		}
 
-		return nil
 	}
 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
