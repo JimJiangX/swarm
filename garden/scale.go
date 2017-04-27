@@ -1,33 +1,66 @@
 package garden
 
 import (
+	"encoding/json"
+	"fmt"
 	"sort"
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
+	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/tasklock"
+	"github.com/docker/swarm/garden/utils"
 	"golang.org/x/net/context"
 )
 
-func (svc *Service) ScaleDown(ctx context.Context, reg kvstore.Register, replicas int) (err error) {
+func (svc *Service) Scale(ctx context.Context, reg kvstore.Register, arch structs.Arch, async bool) (string, error) {
 	scale := func() error {
 		units, err := svc.getUnits()
 		if err != nil {
 			return err
 		}
 
-		if len(units) > replicas {
-			err = svc.scaleDown(ctx, units, replicas, reg)
+		if len(units) > arch.Replicas {
+			err = svc.scaleDown(ctx, units, arch.Replicas, reg)
+			if err != nil {
+				return err
+			}
 		}
 
-		return err
+		{
+			// update Service.Desc
+			table, err := svc.so.GetService(svc.svc.ID)
+			if err != nil {
+				return err
+			}
+			desc := *table.Desc
+			desc.ID = utils.Generate32UUID()
+			desc.Replicas = arch.Replicas
+			desc.Previous = table.DescID
+
+			out, err := json.Marshal(arch)
+			if err == nil {
+				desc.Architecture = string(out)
+			}
+
+			table.DescID = desc.ID
+			table.Desc = &desc
+
+			err = svc.so.SetServiceDesc(table)
+
+			return err
+		}
 	}
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
+	task := database.NewTask(svc.svc.Name, database.ServiceScaleTask, svc.svc.ID, fmt.Sprintf("replicas=%d", arch.Replicas), nil, 300)
+
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, &task,
 		statusServiceScaling, statusServiceScaled, statusServiceScaleFailed)
 
-	return sl.Run(isnotInProgress, scale, false)
+	err := sl.Run(isnotInProgress, scale, async)
+
+	return task.ID, err
 }
 
 func (svc *Service) scaleDown(ctx context.Context, units []*unit, replicas int, reg kvstore.Register) error {

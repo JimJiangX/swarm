@@ -9,7 +9,6 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/structs"
-	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -255,55 +254,12 @@ func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
 }
 
 func (d *Deployment) ServiceScale(ctx context.Context, nameOrID string, arch structs.Arch) (string, error) {
-	orm := d.gd.Ormer()
-
-	table, err := orm.GetService(nameOrID)
+	svc, err := d.gd.Service(nameOrID)
 	if err != nil {
 		return "", err
 	}
 
-	units, err := orm.ListUnitByServiceID(table.ID)
-	if err != nil {
-		return "", err
-	}
-
-	if len(units) == arch.Replicas {
-		return "", nil
-	}
-
-	svc, err := d.gd.GetService(table.ID)
-	if err != nil {
-		return "", err
-	}
-
-	// spec := svc.Spec()
-	// task := database.NewTask(spec.Name, database.ServiceScaleTask, spec.ID, fmt.Sprintf("replicas=%d", replicas), "", 300)
-
-	if len(units) > arch.Replicas {
-		err = svc.ScaleDown(ctx, d.gd.KVClient(), arch.Replicas)
-	}
-	if err != nil {
-		return "", err
-	}
-
-	{
-		desc := *table.Desc
-		desc.ID = utils.Generate32UUID()
-		desc.Replicas = arch.Replicas
-		desc.Previous = table.DescID
-
-		out, err := json.Marshal(arch)
-		if err == nil {
-			desc.Architecture = string(out)
-		}
-
-		table.DescID = desc.ID
-		table.Desc = &desc
-
-		err = orm.SetServiceDesc(table)
-
-		return "", err
-	}
+	return svc.Scale(ctx, d.gd.KVClient(), arch, true)
 }
 
 func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version string, async bool) (string, error) {
@@ -341,9 +297,6 @@ func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version strin
 	t := database.NewTask(spec.Name, database.ServiceUpdateImageTask, spec.ID, "", nil, 300)
 
 	err = svc.UpdateImage(ctx, d.gd.KVClient(), im, &t, async, authConfig)
-	if err != nil {
-		return t.ID, err
-	}
 
 	return t.ID, err
 }
