@@ -17,7 +17,8 @@ if [ "${running_status}" != "true" ]; then
 	exit
 fi
 
-${dir}/check_proxy --default-file /${container_name}_CNF_LV/upsql-proxy.conf > /dev/null 2>&1
+#${dir}/check_proxy --default-file /${container_name}_CNF_LV/upsql-proxy.conf > /dev/null 2>&1
+${dir}/check_upproxy --default-file /${container_name}_CNF_LV/upsql-proxy.conf > /dev/null 2>&1
 if [  $? -eq 0 ];then
 	status=passing
 else
