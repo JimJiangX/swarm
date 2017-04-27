@@ -2,6 +2,9 @@
 set -o nounset
 
 container_name=$1
+username=$2
+password=$3
+
 dir=/opt/DBaaS/script
 docker inspect $container_name > /dev/null 2>&1
 if [ $? -ne 0 ]; then
@@ -17,7 +20,7 @@ if [ "${running_status}" != "true" ]; then
 	exit
 fi
 
-${dir}/check_db --default-file /${container_name}_DAT_LV/my.cnf > /dev/null 2>&1
+${dir}/check_upsql --default-file /${container_name}_DAT_LV/my.cnf --user $username --password $password
 if [  $? -eq 0 ];then
 	status=passing
 else
