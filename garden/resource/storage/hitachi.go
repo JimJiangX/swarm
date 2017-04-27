@@ -86,7 +86,7 @@ func (h *hitachiStore) Insert() error {
 // Alloc list hitachiStore's RG idle space,alloc a new LUN in free space,
 // the allocated LUN is used to creating a volume.
 // alloction calls create_lun.sh
-func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, database.Volume, error) {
+func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, database.Volume, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -105,7 +105,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 	}
 
 	rg := maxIdleSizeRG(out)
-	if out[rg].Free < int64(size) {
+	if out[rg].Free < size {
 		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
 	}
 
@@ -125,7 +125,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 	}
 	// size:byte-->MB
 	param := []string{path, h.hs.AdminUnit,
-		rg.StorageRGID, strconv.Itoa(id), strconv.Itoa(size>>20 + 100)}
+		rg.StorageRGID, strconv.Itoa(id), strconv.Itoa(int(size)>>20 + 100)}
 
 	cmd := utils.ExecScript(param...)
 
@@ -141,7 +141,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 		VG:              vg,
 		RaidGroupID:     rg.ID,
 		StorageSystemID: h.ID(),
-		SizeByte:        size,
+		SizeByte:        int(size),
 		StorageLunID:    id,
 		CreatedAt:       time.Now(),
 	}
@@ -149,7 +149,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 	lv = database.Volume{
 		ID:         utils.Generate64UUID(),
 		Name:       name,
-		Size:       int64(size),
+		Size:       size,
 		UnitID:     unit,
 		VG:         vg,
 		Driver:     h.Driver(),
@@ -165,12 +165,8 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int) (database.LUN, dat
 	return lun, lv, nil
 }
 
-func (h *hitachiStore) Extend(name string, size int) (database.LUN, database.Volume, error) {
+func (h *hitachiStore) Extend(lv database.Volume, size int64) (database.LUN, database.Volume, error) {
 	lun := database.LUN{}
-	lv, err := h.orm.GetVolume(name)
-	if err != nil {
-		return lun, lv, err
-	}
 
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -187,7 +183,7 @@ func (h *hitachiStore) Extend(name string, size int) (database.LUN, database.Vol
 	}
 
 	rg := maxIdleSizeRG(out)
-	if out[rg].Free < int64(size) {
+	if out[rg].Free < size {
 		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
 	}
 
@@ -207,7 +203,7 @@ func (h *hitachiStore) Extend(name string, size int) (database.LUN, database.Vol
 	}
 	// size:byte-->MB
 	param := []string{path, h.hs.AdminUnit,
-		rg.StorageRGID, strconv.Itoa(id), strconv.Itoa(size>>20 + 100)}
+		rg.StorageRGID, strconv.Itoa(id), strconv.Itoa(int(size)>>20 + 100)}
 
 	cmd := utils.ExecScript(param...)
 
@@ -219,16 +215,16 @@ func (h *hitachiStore) Extend(name string, size int) (database.LUN, database.Vol
 
 	lun = database.LUN{
 		ID:              utils.Generate64UUID(),
-		Name:            name,
+		Name:            lv.Name,
 		VG:              lv.VG,
 		RaidGroupID:     rg.ID,
 		StorageSystemID: h.ID(),
-		SizeByte:        size,
+		SizeByte:        int(size),
 		StorageLunID:    id,
 		CreatedAt:       time.Now(),
 	}
 
-	lv.Size += int64(size)
+	lv.Size += size
 
 	err = h.orm.InsertLunSetVolume(lun, lv)
 

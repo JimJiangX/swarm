@@ -8,6 +8,8 @@ import (
 	"github.com/docker/swarm/garden/structs"
 )
 
+var _ localVolumeIface = &localVolumeMap{}
+
 func TestParseSize(t *testing.T) {
 	type testSize struct {
 		size string

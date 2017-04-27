@@ -5,14 +5,12 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
-	"github.com/docker/swarm/seed/sdk"
 	"github.com/pkg/errors"
 )
 
@@ -338,24 +336,9 @@ func (lv *localVolume) Expand(dv database.Volume, agent string, size int64) erro
 		return err
 	}
 
+	lv.space.Free -= size
+
 	return updateVolume(agent, dv)
-}
-
-func updateVolume(agent string, lv database.Volume) error {
-	option := sdk.VolumeUpdateOption{
-		VgName: lv.VG,
-		LvName: lv.Name,
-		FsType: lv.Filesystem,
-		Size:   int(lv.Size),
-	}
-
-	// TODO:*tls.Config
-	cli, err := sdk.NewClient(agent, 30*time.Second, nil)
-	if err != nil {
-		return err
-	}
-
-	return cli.VolumeUpdate(option)
 }
 
 func (lv *localVolume) Recycle(v database.Volume) (err error) {

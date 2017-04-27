@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
@@ -39,7 +40,7 @@ func newSanVolumeDriver(e *cluster.Engine, iface VolumeIface, storeID string) (D
 		iface:      iface,
 		san:        san,
 		engine:     e,
-		pluginPort: strconv.Itoa(sys.Plugin),
+		pluginPort: strconv.Itoa(sys.SwarmAgent),
 	}, nil
 }
 
@@ -73,25 +74,25 @@ func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req struc
 	name := fmt.Sprintf("%s_%s_%s_LV", uid, req.Type, req.Name)
 	vg := uid + "_SAN_VG"
 
-	lun, v, err := sv.san.Alloc(name, uid, vg, int(req.Size))
+	lun, lv, err := sv.san.Alloc(name, uid, vg, req.Size)
 	if err != nil {
 		return nil, err
 	}
 
 	err = sv.san.Mapping(sv.engine.ID, vg, lun.ID)
 	if err != nil {
-		return &v, err
+		return &lv, err
 	}
 
 	err = sv.createSanVG(vg)
 	if err != nil {
-		return &v, err
+		return &lv, err
 	}
 
-	name = fmt.Sprintf("%s:/UPM/%s", v.Name, req.Name)
+	name = fmt.Sprintf("%s:/UPM/%s", lv.Name, req.Name)
 	config.HostConfig.Binds = append(config.HostConfig.Binds, name)
 
-	return &v, nil
+	return &lv, nil
 }
 
 func (sv sanVolume) Expand(lv database.Volume, agent string, size int64) error {
@@ -111,9 +112,22 @@ func (sv sanVolume) Expand(lv database.Volume, agent string, size int64) error {
 
 	lv.Size += size
 
-	// TODO:make it right later
+	lun, lv, err := sv.san.Extend(lv, size)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	err = sv.san.Mapping(lv.EngineID, lv.VG, lun.ID)
+	if err != nil {
+		return err
+	}
+
+	err = expandSanVG(agent, sv.san.Vendor(), lun)
+	if err != nil {
+		return err
+	}
+
+	return updateVolume(agent, lv)
 }
 
 func (sv sanVolume) Recycle(lv database.Volume) error {
@@ -126,34 +140,72 @@ func (sv sanVolume) Recycle(lv database.Volume) error {
 }
 
 func (sv sanVolume) createSanVG(vg string) error {
-	//	fmt.Printf("Engine %s create San Storeage VG,VG=%s\n", host, vg)
-
 	list, err := sv.iface.ListLunByVG(vg)
 	if err != nil {
 		return err
 	}
-	if len(list) == 0 {
+
+	addr := sv.engine.IP + ":" + sv.pluginPort
+
+	return createSanVG(addr, sv.san.Vendor(), list)
+}
+
+func createSanVG(addr, vendor string, luns []database.LUN) error {
+	if len(luns) == 0 {
 		return nil
 	}
 
-	l, size := make([]int, len(list)), 0
+	list, size := make([]int, len(luns)), 0
 
-	for i := range list {
-		l[i] = list[i].HostLunID
-		size += list[i].SizeByte
+	for i := range luns {
+		list[i] = luns[i].HostLunID
+		size += luns[i].SizeByte
 	}
 
 	config := sdk.VgConfig{
-		HostLunID: l,
-		VgName:    list[0].VG,
-		Type:      sv.san.Vendor(),
+		HostLunID: list,
+		VgName:    luns[0].VG,
+		Type:      vendor,
 	}
 
-	addr := sv.engine.IP + ":" + sv.pluginPort
-	client, err := sdk.NewClient(addr, 0, nil)
+	// TODO:*tls.Config
+	client, err := sdk.NewClient(addr, 30*time.Second, nil)
 	if err != nil {
 		return err
 	}
 
 	return client.SanVgCreate(config)
+}
+
+func expandSanVG(addr, vendor string, lun database.LUN) error {
+	config := sdk.VgConfig{
+		HostLunID: []int{lun.HostLunID},
+		VgName:    lun.VG,
+		Type:      vendor,
+	}
+
+	// TODO:*tls.Config
+	client, err := sdk.NewClient(addr, 30*time.Second, nil)
+	if err != nil {
+		return err
+	}
+
+	return client.SanVgExtend(config)
+}
+
+func updateVolume(addr string, lv database.Volume) error {
+	option := sdk.VolumeUpdateOption{
+		VgName: lv.VG,
+		LvName: lv.Name,
+		FsType: lv.Filesystem,
+		Size:   int(lv.Size),
+	}
+
+	// TODO:*tls.Config
+	cli, err := sdk.NewClient(addr, 30*time.Second, nil)
+	if err != nil {
+		return err
+	}
+
+	return cli.VolumeUpdate(option)
 }

@@ -77,7 +77,7 @@ func (h *huaweiStore) Insert() error {
 	return err
 }
 
-func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, database.Volume, error) {
+func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, database.Volume, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -95,7 +95,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 	}
 
 	rg := maxIdleSizeRG(out)
-	if out[rg].Free < int64(size) {
+	if out[rg].Free < size {
 		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
 	}
 
@@ -105,7 +105,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 	}
 	// size:byte-->MB
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password,
-		rg.StorageRGID, name, strconv.Itoa(size>>20 + 100)}
+		rg.StorageRGID, name, strconv.Itoa(int(size)>>20 + 100)}
 
 	cmd := utils.ExecScript(param...)
 
@@ -126,7 +126,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 		VG:              vg,
 		RaidGroupID:     rg.ID,
 		StorageSystemID: h.ID(),
-		SizeByte:        size,
+		SizeByte:        int(size),
 		StorageLunID:    storageLunID,
 		CreatedAt:       time.Now(),
 	}
@@ -134,7 +134,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 	lv = database.Volume{
 		ID:         utils.Generate64UUID(),
 		Name:       name,
-		Size:       int64(size),
+		Size:       size,
 		UnitID:     unit,
 		VG:         vg,
 		Driver:     h.Driver(),
@@ -150,12 +150,8 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int) (database.LUN, data
 	return lun, lv, nil
 }
 
-func (h *huaweiStore) Extend(name string, size int) (database.LUN, database.Volume, error) {
+func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, database.Volume, error) {
 	lun := database.LUN{}
-	lv, err := h.orm.GetVolume(name)
-	if err != nil {
-		return lun, lv, err
-	}
 
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -171,7 +167,7 @@ func (h *huaweiStore) Extend(name string, size int) (database.LUN, database.Volu
 	}
 
 	rg := maxIdleSizeRG(out)
-	if out[rg].Free < int64(size) {
+	if out[rg].Free < size {
 		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
 	}
 
@@ -181,7 +177,7 @@ func (h *huaweiStore) Extend(name string, size int) (database.LUN, database.Volu
 	}
 	// size:byte-->MB
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password,
-		rg.StorageRGID, name, strconv.Itoa(size>>20 + 100)}
+		rg.StorageRGID, lv.Name, strconv.Itoa(int(size)>>20 + 100)}
 
 	cmd := utils.ExecScript(param...)
 
@@ -198,16 +194,16 @@ func (h *huaweiStore) Extend(name string, size int) (database.LUN, database.Volu
 
 	lun = database.LUN{
 		ID:              utils.Generate64UUID(),
-		Name:            name,
+		Name:            lv.Name,
 		VG:              lv.VG,
 		RaidGroupID:     rg.ID,
 		StorageSystemID: h.ID(),
-		SizeByte:        size,
+		SizeByte:        int(size),
 		StorageLunID:    storageLunID,
 		CreatedAt:       time.Now(),
 	}
 
-	lv.Size += int64(size)
+	lv.Size += size
 
 	err = h.orm.InsertLunSetVolume(lun, lv)
 	if err != nil {

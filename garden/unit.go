@@ -156,7 +156,7 @@ func (u unit) prepareExpandVolume(target []structs.VolumeRequire) ([]structs.Vol
 		}
 
 		if !found {
-			return nil, errors.Errorf("not found volume '%s_%s' on unit %s", target[i].Type, target[i].Name, u.u.Name)
+			return nil, errors.Errorf("unit:%s not found volume '%s_%s'", u.u.Name, target[i].Type, target[i].Name)
 		}
 	}
 
