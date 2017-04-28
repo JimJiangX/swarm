@@ -295,12 +295,13 @@ func scheduleOptionsByUnits(opts scheduleOption, units []*unit) (scheduleOption,
 		opts.Nodes.Networkings = ids
 	}
 
-	filters := make([]string, 0, len(units))
+	engines := make([]string, 0, len(units))
 	for i := range units {
-		filters = append(filters, units[i].u.EngineID)
+		engines = append(engines, units[i].u.EngineID)
 	}
 
-	opts.Nodes.Filters = append(opts.Nodes.Filters, filters...)
+	constraints := fmt.Sprintf("%s!=%s", engineLabel, strings.Join(engines, "|"))
+	opts.Nodes.Constraints = append(opts.Nodes.Constraints, constraints)
 
 	return opts, err
 }
