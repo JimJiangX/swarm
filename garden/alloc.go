@@ -27,7 +27,8 @@ import (
 const (
 	roomLabel    = "room"
 	seatLabel    = "seat"
-	nodeLabel    = "node"
+	nodeLabel    = "nodeID"
+	engineLabel  = "node"
 	clusterLabel = "cluster"
 )
 
@@ -66,13 +67,13 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 	}
 
 	options := scheduleOption{
-		highAvailable: spec.HighAvailable,
-		require:       *spec.Require,
+		HighAvailable: spec.HighAvailable,
+		Require:       *spec.Require,
 	}
 
-	options.nodes.constraints = spec.Constraints
-	options.nodes.networkings = spec.Networkings
-	options.nodes.clusters = spec.Clusters
+	options.Nodes.Constraints = spec.Constraints
+	options.Nodes.Networkings = spec.Networkings
+	options.Nodes.Clusters = spec.Clusters
 
 	im, err := gd.ormer.GetImageVersion(spec.Image)
 	if err != nil {
@@ -123,29 +124,29 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 }
 
 type scheduleOption struct {
-	highAvailable bool
+	HighAvailable bool
 
-	require structs.UnitRequire
+	Require structs.UnitRequire
 
-	nodes struct {
-		networkings []string
-		clusters    []string
-		filters     []string
-		constraints []string
+	Nodes struct {
+		Networkings []string
+		Clusters    []string
+		Filters     []string
+		Constraints []string
 	}
 
-	scheduler struct {
-		strategy string
-		filters  []string
+	Scheduler struct {
+		Strategy string
+		Filters  []string
 	}
 }
 
 func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *cluster.ContainerConfig, opts scheduleOption) ([]*node.Node, error) {
 	_scheduler := gd.scheduler
 
-	if opts.scheduler.strategy != "" && len(opts.scheduler.filters) > 0 {
-		strategy, _ := strategy.New(opts.scheduler.strategy)
-		filters, _ := filter.New(opts.scheduler.filters)
+	if opts.Scheduler.Strategy != "" && len(opts.Scheduler.Filters) > 0 {
+		strategy, _ := strategy.New(opts.Scheduler.Strategy)
+		filters, _ := filter.New(opts.Scheduler.Filters)
 
 		if strategy != nil && len(filters) > 0 {
 			_scheduler = scheduler.New(strategy, filters)
@@ -158,7 +159,7 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 		return nil, ctx.Err()
 	}
 
-	out, err := actor.ListCandidates(opts.nodes.clusters, opts.nodes.filters, opts.require.Volumes)
+	out, err := actor.ListCandidates(opts.Nodes.Clusters, opts.Nodes.Filters, opts.Require.Volumes)
 	if err != nil {
 		return nil, err
 	}
@@ -251,19 +252,19 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		NetworkMode: "none",
 		Binds:       []string{"/etc/localtime:/etc/localtime:ro"},
 		Resources: container.Resources{
-			CpusetCpus: strconv.Itoa(opts.require.Require.CPU),
-			Memory:     opts.require.Require.Memory,
+			CpusetCpus: strconv.Itoa(opts.Require.Require.CPU),
+			Memory:     opts.Require.Require.Memory,
 		},
 	}, network.NetworkingConfig{})
 
 	{
-		for i := range opts.nodes.constraints {
-			config.AddConstraint(opts.nodes.constraints[i])
+		for i := range opts.Nodes.Constraints {
+			config.AddConstraint(opts.Nodes.Constraints[i])
 		}
-		if len(opts.nodes.filters) > 0 {
-			config.AddConstraint(nodeLabel + "!=" + strings.Join(opts.nodes.filters, "|"))
+		if len(opts.Nodes.Filters) > 0 {
+			config.AddConstraint(nodeLabel + "!=" + strings.Join(opts.Nodes.Filters, "|"))
 		}
-		if out := opts.nodes.clusters; len(out) > 0 {
+		if out := opts.Nodes.Clusters; len(out) > 0 {
 			config.AddConstraint(clusterLabel + "==" + strings.Join(out, "|"))
 		}
 	}
@@ -328,7 +329,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 
 	defer recycle()
 
-	out := sortByCluster(candidates, opts.nodes.clusters)
+	out := sortByCluster(candidates, opts.Nodes.Clusters)
 
 	for _, nodes := range out {
 		select {
@@ -393,13 +394,13 @@ func pendingAlloc(actor alloc.Allocator, unit database.Unit, node *node.Node, op
 		volumes:     make([]database.Volume, 0, 3),
 	}
 
-	_, err := actor.AlloctCPUMemory(pu.config, node, int64(opts.require.Require.CPU), config.HostConfig.Memory, nil)
+	_, err := actor.AlloctCPUMemory(pu.config, node, int64(opts.Require.Require.CPU), config.HostConfig.Memory, nil)
 	if err != nil {
 		logrus.Debugf("AlloctCPUMemory:node=%s,%s", node.Name, err)
 		return pu, err
 	}
 
-	networkings, err := actor.AlloctNetworking(pu.config, node.ID, pu.Unit.ID, opts.nodes.networkings, opts.require.Networks)
+	networkings, err := actor.AlloctNetworking(pu.config, node.ID, pu.Unit.ID, opts.Nodes.Networkings, opts.Require.Networks)
 	if len(networkings) > 0 {
 		pu.networkings = append(pu.networkings, networkings...)
 	}
@@ -408,7 +409,7 @@ func pendingAlloc(actor alloc.Allocator, unit database.Unit, node *node.Node, op
 		return pu, err
 	}
 
-	lvs, err := actor.AlloctVolumes(pu.config, pu.Unit.ID, node, opts.require.Volumes)
+	lvs, err := actor.AlloctVolumes(pu.config, pu.Unit.ID, node, opts.Require.Volumes)
 	if len(lvs) > 0 {
 		pu.volumes = append(pu.volumes, lvs...)
 	}

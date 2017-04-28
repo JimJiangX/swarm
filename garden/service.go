@@ -192,6 +192,9 @@ func convertStructsService(spec structs.ServiceSpec, schedopts scheduleOption) (
 		return database.Service{}, errors.WithStack(err)
 	}
 	schd, err := json.Marshal(schedopts)
+	if err != nil {
+		return database.Service{}, errors.WithStack(err)
+	}
 
 	desc := database.ServiceDesc{
 		ID:              utils.Generate32UUID(),

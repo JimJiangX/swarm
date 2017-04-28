@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
@@ -171,9 +172,36 @@ func sortUnitsByContainers(units []*unit, containers cluster.Containers) []*unit
 }
 
 func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocator, scale structs.ServiceScaleRequest) error {
-	spec, err := svc.RefreshSpec()
+	add, err := svc.prepareScale(scale)
 	if err != nil {
 		return err
+	}
+
+	auth, err := gd.AuthConfig()
+	if err != nil {
+		return err
+	}
+
+	pu, err := gd.allocation(ctx, actor, svc, []database.Unit{add})
+	if err != nil {
+		return err
+	}
+
+	err = svc.runContainer(ctx, pu, auth)
+	if err != nil {
+		return err
+	}
+
+	err = svc.initStart(ctx, []*unit{newUnit(add, svc.so, svc.cluster)}, gd.KVClient(), nil, nil)
+
+	return err
+}
+
+func (svc *Service) prepareScale(scale structs.ServiceScaleRequest) (database.Unit, error) {
+	add := database.Unit{}
+	spec, err := svc.RefreshSpec()
+	if err != nil {
+		return add, err
 	}
 	if spec.Users == nil {
 		spec.Users = scale.Users
@@ -193,43 +221,86 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 	r := strings.NewReader(svc.svc.Desc.ScheduleOptions)
 	err = json.NewDecoder(r).Decode(&opts)
 	if err != nil {
-		return err
+		return add, err
+	}
+
+	units, err := svc.getUnits()
+	if err != nil {
+		return add, err
 	}
 
 	// adjust scheduleOption by unit
-	units, err := svc.getUnits()
+	svc.options, err = scheduleOptionsByUnits(opts, units)
 	if err != nil {
-		return err
-	}
-	if len(units) > 0 {
-		svc.options = adjustScheduleOptionsByUnits(opts, units)
+		return add, err
 	}
 
-	auth, err := gd.AuthConfig()
+	im, err := svc.so.GetImageVersion(spec.Image)
 	if err != nil {
-		return err
+		return add, err
 	}
 
-	// TODO:new units
-	// TODO:inset add into DB
-	add := database.Unit{}
-	pu, err := gd.allocation(ctx, actor, svc, []database.Unit{add})
-	if err != nil {
-		return err
+	uid := utils.Generate32UUID()
+	add = database.Unit{
+		ID:          uid,
+		Name:        fmt.Sprintf("%s_%s", spec.Name, uid[:8]), // <service_name>_<unit_id_8bit>
+		Type:        im.Name,
+		ServiceID:   spec.ID,
+		NetworkMode: "none",
+		Status:      0,
+		CreatedAt:   time.Now(),
 	}
 
-	err = svc.runContainer(ctx, pu, auth)
-	if err != nil {
-		return err
-	}
+	err = svc.so.InsertUnit(add)
 
-	err = svc.initStart(ctx, []*unit{newUnit(add, svc.so, svc.cluster)}, gd.KVClient(), nil, nil)
-
-	return err
+	return add, err
 }
 
-func adjustScheduleOptionsByUnits(opts scheduleOption, units []*unit) scheduleOption {
-	// TODO: clusters\filters\networkings
+func scheduleOptionsByUnits(opts scheduleOption, units []*unit) (scheduleOption, error) {
+	if len(units) == 0 {
+		return opts, nil
+	}
 
-	return opts
+	unit := units[0]
+
+	node, err := unit.uo.GetNode(unit.u.EngineID)
+	if err != nil {
+		return opts, err
+	}
+
+	opts.Nodes.Clusters = []string{node.ClusterID}
+
+	ips, err := unit.uo.ListIPByUnitID(unit.u.ID)
+	if err != nil {
+		return opts, err
+	}
+
+	if len(ips) == 1 {
+		opts.Nodes.Networkings = []string{ips[0].Networking}
+	} else {
+		ids := make([]string, 0, len(ips))
+
+	loop:
+		for i := range ips {
+
+			for j := range ids {
+				if ids[j] == ips[i].Networking {
+					continue loop
+				}
+			}
+
+			ids = append(ids, ips[i].Networking)
+		}
+
+		opts.Nodes.Networkings = ids
+	}
+
+	filters := make([]string, 0, len(units))
+	for i := range units {
+		filters = append(filters, units[i].u.EngineID)
+	}
+
+	opts.Nodes.Filters = append(opts.Nodes.Filters, filters...)
+
+	return opts, err
 }
