@@ -191,7 +191,7 @@ type statusError struct {
 }
 
 func (se statusError) Error() string {
-	return fmt.Sprintf("expected %d bug got %d", se.expect, se.got)
+	return fmt.Sprintf("expected %d but got %d", se.expect, se.got)
 }
 
 func newStatusError(expect, got int) error {
