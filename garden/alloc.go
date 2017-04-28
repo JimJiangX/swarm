@@ -82,7 +82,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 	if spec.ID == "" {
 		spec.ID = utils.Generate32UUID()
 	}
-	svc, err := convertStructsService(spec)
+	svc, err := convertStructsService(spec, options)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -228,152 +228,6 @@ type pendingUnit struct {
 }
 
 func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Service) (ready []pendingUnit, err error) {
-
-	action := func() (err error) {
-		_, version, err := getImage(gd.Ormer(), svc.svc.Desc.Image)
-		if err != nil {
-			return err
-		}
-
-		opts := svc.options
-		config := cluster.BuildContainerConfig(container.Config{
-			Tty:       true,
-			OpenStdin: true,
-			Image:     version,
-		}, container.HostConfig{
-			NetworkMode: "none",
-			Binds:       []string{"/etc/localtime:/etc/localtime:ro"},
-			Resources: container.Resources{
-				CpusetCpus: strconv.Itoa(opts.require.Require.CPU),
-				Memory:     opts.require.Require.Memory,
-			},
-		}, network.NetworkingConfig{})
-
-		{
-			for i := range opts.nodes.constraints {
-				config.AddConstraint(opts.nodes.constraints[i])
-			}
-			if len(opts.nodes.filters) > 0 {
-				config.AddConstraint(nodeLabel + "!=" + strings.Join(opts.nodes.filters, "|"))
-			}
-			if out := opts.nodes.clusters; len(out) > 0 {
-				config.AddConstraint(clusterLabel + "==" + strings.Join(out, "|"))
-			}
-		}
-
-		gd.Lock()
-		defer gd.Unlock()
-
-		gd.scheduler.Lock()
-		candidates, err := gd.schedule(ctx, actor, config, opts)
-		if err != nil {
-			gd.scheduler.Unlock()
-			return err
-		}
-		gd.scheduler.Unlock()
-
-		if len(candidates) < svc.svc.Desc.Replicas {
-			return errors.Errorf("not enough nodes for allocation,%d<%d", len(candidates), svc.svc.Desc.Replicas)
-		}
-
-		units, err := svc.so.ListUnitByServiceID(svc.svc.ID)
-		if err != nil {
-			return err
-		}
-
-		var (
-			bad   = make([]pendingUnit, 0, svc.svc.Desc.Replicas)
-			field = logrus.WithField("Service", svc.svc.Name)
-		)
-
-		recycle := func() error {
-			if r := recover(); r != nil {
-				err = errors.Errorf("panic:%v", r)
-			}
-			// cancel allocation
-			if len(bad) > 0 {
-				ids := make([]string, len(bad))
-				for i := range bad {
-					ids[i] = bad[i].swarmID
-				}
-				gd.Cluster.RemovePendingContainer(ids...)
-
-				ips := make([]database.IP, 0, len(bad))
-				lvs := make([]database.Volume, 0, len(bad)*2)
-				for i := range bad {
-					ips = append(ips, bad[i].networkings...)
-					lvs = append(lvs, bad[i].volumes...)
-				}
-				_err := actor.RecycleResource(ips, lvs)
-				if _err == nil {
-					bad = make([]pendingUnit, 0, svc.svc.Desc.Replicas)
-				} else {
-					err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
-				}
-
-				return _err
-			}
-
-			return nil
-		}
-
-		defer recycle()
-
-		out := sortByCluster(candidates, opts.nodes.clusters)
-
-		for _, nodes := range out {
-			select {
-			default:
-			case <-ctx.Done():
-				return errors.WithStack(ctx.Err())
-			}
-
-			err := recycle()
-			if err != nil {
-				field.Debugf("Recycle resources error:%+v", err)
-			}
-
-			count := svc.svc.Desc.Replicas
-			used := make([]pendingUnit, 0, count)
-
-			if len(nodes) < count {
-				continue
-			}
-
-			for i := range nodes {
-
-				pu, err := pendingAlloc(actor, units[count-1], nodes[i], opts, config)
-				if err != nil {
-					bad = append(bad, pu)
-					field.Debugf("pending alloc:node=%s,%+v", nodes[i].Name, err)
-					continue
-				}
-
-				pu.config.SetSwarmID(pu.swarmID)
-				pu.Unit.EngineID = nodes[i].ID
-
-				err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[i].ID, pu.config)
-				if err != nil {
-					field.Debugf("AddPendingContainer:node=%s,%+v", nodes[i].Name, err)
-					continue
-				}
-
-				used = append(used, pu)
-
-				if count--; count == 0 {
-					ready = used
-
-					return nil
-				}
-			}
-			if count > 0 {
-				bad = append(bad, used...)
-			}
-		}
-
-		return errors.Errorf("not enough nodes for allocation,%d units waiting", svc.svc.Desc.Replicas)
-	}
-
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusServiceAllocating, statusServiceAllocated, statusServiceAllocateFailed)
 
@@ -381,9 +235,160 @@ func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		func(val int) bool {
 			return val == statusServcieBuilding
 		},
-		action, false)
+		func() error {
+			ready, err = gd.allocation(ctx, actor, svc, nil)
+			return err
+		},
+		false)
 
 	return
+}
+
+func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Service, units []database.Unit) (ready []pendingUnit, err error) {
+	_, version, err := getImage(gd.Ormer(), svc.svc.Desc.Image)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := svc.options
+	config := cluster.BuildContainerConfig(container.Config{
+		Tty:       true,
+		OpenStdin: true,
+		Image:     version,
+	}, container.HostConfig{
+		NetworkMode: "none",
+		Binds:       []string{"/etc/localtime:/etc/localtime:ro"},
+		Resources: container.Resources{
+			CpusetCpus: strconv.Itoa(opts.require.Require.CPU),
+			Memory:     opts.require.Require.Memory,
+		},
+	}, network.NetworkingConfig{})
+
+	{
+		for i := range opts.nodes.constraints {
+			config.AddConstraint(opts.nodes.constraints[i])
+		}
+		if len(opts.nodes.filters) > 0 {
+			config.AddConstraint(nodeLabel + "!=" + strings.Join(opts.nodes.filters, "|"))
+		}
+		if out := opts.nodes.clusters; len(out) > 0 {
+			config.AddConstraint(clusterLabel + "==" + strings.Join(out, "|"))
+		}
+	}
+
+	gd.Lock()
+	defer gd.Unlock()
+
+	gd.scheduler.Lock()
+	candidates, err := gd.schedule(ctx, actor, config, opts)
+	if err != nil {
+		gd.scheduler.Unlock()
+		return nil, err
+	}
+	gd.scheduler.Unlock()
+
+	if len(candidates) < svc.svc.Desc.Replicas {
+		return nil, errors.Errorf("not enough nodes for allocation,%d<%d", len(candidates), svc.svc.Desc.Replicas)
+	}
+
+	if units == nil {
+		units, err = svc.so.ListUnitByServiceID(svc.svc.ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var (
+		bad   = make([]pendingUnit, 0, svc.svc.Desc.Replicas)
+		field = logrus.WithField("Service", svc.svc.Name)
+	)
+
+	recycle := func() error {
+		if r := recover(); r != nil {
+			err = errors.Errorf("panic:%v", r)
+		}
+		// cancel allocation
+		if len(bad) > 0 {
+			ids := make([]string, len(bad))
+			for i := range bad {
+				ids[i] = bad[i].swarmID
+			}
+			gd.Cluster.RemovePendingContainer(ids...)
+
+			ips := make([]database.IP, 0, len(bad))
+			lvs := make([]database.Volume, 0, len(bad)*2)
+			for i := range bad {
+				ips = append(ips, bad[i].networkings...)
+				lvs = append(lvs, bad[i].volumes...)
+			}
+			_err := actor.RecycleResource(ips, lvs)
+			if _err == nil {
+				bad = make([]pendingUnit, 0, svc.svc.Desc.Replicas)
+			} else {
+				err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
+			}
+
+			return _err
+		}
+
+		return nil
+	}
+
+	defer recycle()
+
+	out := sortByCluster(candidates, opts.nodes.clusters)
+
+	for _, nodes := range out {
+		select {
+		default:
+		case <-ctx.Done():
+			return nil, errors.WithStack(ctx.Err())
+		}
+
+		err := recycle()
+		if err != nil {
+			field.Debugf("Recycle resources error:%+v", err)
+		}
+
+		count := svc.svc.Desc.Replicas
+		used := make([]pendingUnit, 0, count)
+
+		if len(nodes) < count {
+			continue
+		}
+
+		for i := range nodes {
+
+			pu, err := pendingAlloc(actor, units[count-1], nodes[i], opts, config)
+			if err != nil {
+				bad = append(bad, pu)
+				field.Debugf("pending alloc:node=%s,%+v", nodes[i].Name, err)
+				continue
+			}
+
+			pu.config.SetSwarmID(pu.swarmID)
+			pu.Unit.EngineID = nodes[i].ID
+
+			err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[i].ID, pu.config)
+			if err != nil {
+				field.Debugf("AddPendingContainer:node=%s,%+v", nodes[i].Name, err)
+				continue
+			}
+
+			used = append(used, pu)
+
+			if count--; count == 0 {
+				ready = used
+
+				return ready, nil
+			}
+		}
+		if count > 0 {
+			bad = append(bad, used...)
+		}
+	}
+
+	return nil, errors.Errorf("not enough nodes for allocation,%d units waiting", svc.svc.Desc.Replicas)
 }
 
 func pendingAlloc(actor alloc.Allocator, unit database.Unit, node *node.Node, opts scheduleOption,

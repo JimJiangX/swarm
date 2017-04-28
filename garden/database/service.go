@@ -605,19 +605,20 @@ func (db dbBase) ListServicesInfo() ([]ServiceInfo, error) {
 }
 
 type ServiceDesc struct {
-	ID           string `db:"id"`
-	ServiceID    string `db:"service_id"`
-	Architecture string `db:"architecture"`
-	Replicas     int    `db:"unit_num"`
-	NCPU         int    `db:"cpu_num"`
-	Memory       int64  `db:"mem_size"`
-	ImageID      string `db:"image_id"`
-	Image        string `db:"image_version"`
-	Volumes      string `db:"volumes"`
-	Networks     string `db:"networks"`
-	Clusters     string `db:"cluster_id"`
-	Options      string `db:"options"`
-	Previous     string `db:"previous_version"`
+	ID              string `db:"id"`
+	ServiceID       string `db:"service_id"`
+	Architecture    string `db:"architecture"`
+	ScheduleOptions string `db:"schedule_opts"` // TODO:add to db table
+	Replicas        int    `db:"unit_num"`
+	NCPU            int    `db:"cpu_num"`
+	Memory          int64  `db:"mem_size"`
+	ImageID         string `db:"image_id"`
+	Image           string `db:"image_version"`
+	Volumes         string `db:"volumes"`
+	Networks        string `db:"networks"`
+	Clusters        string `db:"cluster_id"`
+	Options         string `db:"options"`
+	Previous        string `db:"previous_version"`
 }
 
 func (db dbBase) serviceDescTable() string {

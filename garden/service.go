@@ -164,7 +164,7 @@ func convertService(svc database.Service) structs.Service {
 	}
 }
 
-func convertStructsService(spec structs.ServiceSpec) (database.Service, error) {
+func convertStructsService(spec structs.ServiceSpec, schedopts scheduleOption) (database.Service, error) {
 	vb, err := json.Marshal(spec.Require.Volumes)
 	if err != nil {
 		return database.Service{}, errors.WithStack(err)
@@ -191,20 +191,22 @@ func convertStructsService(spec structs.ServiceSpec) (database.Service, error) {
 	if err != nil {
 		return database.Service{}, errors.WithStack(err)
 	}
+	schd, err := json.Marshal(schedopts)
 
 	desc := database.ServiceDesc{
-		ID:           utils.Generate32UUID(),
-		ServiceID:    spec.ID,
-		Architecture: string(arch),
-		Replicas:     spec.Arch.Replicas,
-		NCPU:         spec.Require.Require.CPU,
-		Memory:       spec.Require.Require.Memory,
-		Image:        spec.Image,
-		Volumes:      string(vb),
-		Networks:     string(nwb),
-		Clusters:     strings.Join(spec.Clusters, ","),
-		Options:      string(opts),
-		Previous:     "",
+		ID:              utils.Generate32UUID(),
+		ServiceID:       spec.ID,
+		Architecture:    string(arch),
+		ScheduleOptions: string(schd),
+		Replicas:        spec.Arch.Replicas,
+		NCPU:            spec.Require.Require.CPU,
+		Memory:          spec.Require.Require.Memory,
+		Image:           spec.Image,
+		Volumes:         string(vb),
+		Networks:        string(nwb),
+		Clusters:        strings.Join(spec.Clusters, ","),
+		Options:         string(opts),
+		Previous:        "",
 	}
 
 	return database.Service{
