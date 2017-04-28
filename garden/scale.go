@@ -21,6 +21,10 @@ func (svc *Service) Scale(ctx context.Context, reg kvstore.Register, arch struct
 			return err
 		}
 
+		if arch.Replicas == 0 || arch.Replicas == len(units) {
+			return nil
+		}
+
 		if len(units) > arch.Replicas {
 			err = svc.scaleDown(ctx, units, arch.Replicas, reg)
 			if err != nil {
