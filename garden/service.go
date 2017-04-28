@@ -138,7 +138,7 @@ func (svc *Service) RefreshSpec() (*structs.ServiceSpec, error) {
 		spec.Users = users
 	}
 
-	return &spec, nil
+	return svc.spec, nil
 }
 
 func convertService(svc database.Service) structs.Service {

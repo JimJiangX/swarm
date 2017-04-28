@@ -4,17 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
+	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/tasklock"
 	"github.com/docker/swarm/garden/utils"
 	"golang.org/x/net/context"
 )
 
-func (svc *Service) Scale(ctx context.Context, reg kvstore.Register, req structs.ServiceScaleRequest, async bool) (string, error) {
+func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator, req structs.ServiceScaleRequest, async bool) (string, error) {
 	scale := func() error {
 		units, err := svc.getUnits()
 		if err != nil {
@@ -26,10 +28,12 @@ func (svc *Service) Scale(ctx context.Context, reg kvstore.Register, req structs
 		}
 
 		if len(units) > req.Arch.Replicas {
-			err = svc.scaleDown(ctx, units, req.Arch.Replicas, reg)
-			if err != nil {
-				return err
-			}
+			err = svc.scaleDown(ctx, units, req.Arch.Replicas, gd.KVClient())
+		} else {
+			err = gd.scaleUp(ctx, svc, actor, req)
+		}
+		if err != nil {
+			return err
 		}
 
 		{
@@ -164,4 +168,68 @@ func sortUnitsByContainers(units []*unit, containers cluster.Containers) []*unit
 	}
 
 	return out
+}
+
+func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocator, scale structs.ServiceScaleRequest) error {
+	spec, err := svc.RefreshSpec()
+	if err != nil {
+		return err
+	}
+	if spec.Users == nil {
+		spec.Users = scale.Users
+	} else {
+		spec.Users = append(spec.Users, scale.Users...)
+	}
+
+	if spec.Options == nil {
+		spec.Options = make(map[string]interface{})
+	}
+	for k, v := range scale.Options {
+		spec.Options[k] = v
+	}
+
+	// decode scheduleOption
+	var opts scheduleOption
+	r := strings.NewReader(svc.svc.Desc.ScheduleOptions)
+	err = json.NewDecoder(r).Decode(&opts)
+	if err != nil {
+		return err
+	}
+
+	// adjust scheduleOption by unit
+	units, err := svc.getUnits()
+	if err != nil {
+		return err
+	}
+	if len(units) > 0 {
+		svc.options = adjustScheduleOptionsByUnits(opts, units)
+	}
+
+	auth, err := gd.AuthConfig()
+	if err != nil {
+		return err
+	}
+
+	// TODO:new units
+	// TODO:inset add into DB
+	add := database.Unit{}
+	pu, err := gd.allocation(ctx, actor, svc, []database.Unit{add})
+	if err != nil {
+		return err
+	}
+
+	err = svc.runContainer(ctx, pu, auth)
+	if err != nil {
+		return err
+	}
+
+	err = svc.initStart(ctx, []*unit{newUnit(add, svc.so, svc.cluster)}, gd.KVClient(), nil, nil)
+
+	return err
+}
+
+func adjustScheduleOptionsByUnits(opts scheduleOption, units []*unit) scheduleOption {
+	// TODO: clusters\filters\networkings
+
+	return opts
 }

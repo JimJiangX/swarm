@@ -259,7 +259,9 @@ func (d *Deployment) ServiceScale(ctx context.Context, nameOrID string, scale st
 		return "", err
 	}
 
-	return svc.Scale(ctx, d.gd.KVClient(), scale, true)
+	actor := alloc.NewAllocator(d.gd.Ormer(), d.gd.Cluster)
+
+	return d.gd.Scale(ctx, svc, actor, scale, true)
 }
 
 func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version string, async bool) (string, error) {
