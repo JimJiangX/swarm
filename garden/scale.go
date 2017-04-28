@@ -14,19 +14,19 @@ import (
 	"golang.org/x/net/context"
 )
 
-func (svc *Service) Scale(ctx context.Context, reg kvstore.Register, arch structs.Arch, async bool) (string, error) {
+func (svc *Service) Scale(ctx context.Context, reg kvstore.Register, req structs.ServiceScaleRequest, async bool) (string, error) {
 	scale := func() error {
 		units, err := svc.getUnits()
 		if err != nil {
 			return err
 		}
 
-		if arch.Replicas == 0 || arch.Replicas == len(units) {
+		if req.Arch.Replicas == 0 || req.Arch.Replicas == len(units) {
 			return nil
 		}
 
-		if len(units) > arch.Replicas {
-			err = svc.scaleDown(ctx, units, arch.Replicas, reg)
+		if len(units) > req.Arch.Replicas {
+			err = svc.scaleDown(ctx, units, req.Arch.Replicas, reg)
 			if err != nil {
 				return err
 			}
@@ -40,10 +40,10 @@ func (svc *Service) Scale(ctx context.Context, reg kvstore.Register, arch struct
 			}
 			desc := *table.Desc
 			desc.ID = utils.Generate32UUID()
-			desc.Replicas = arch.Replicas
+			desc.Replicas = req.Arch.Replicas
 			desc.Previous = table.DescID
 
-			out, err := json.Marshal(arch)
+			out, err := json.Marshal(req.Arch)
 			if err == nil {
 				desc.Architecture = string(out)
 			}
@@ -57,7 +57,7 @@ func (svc *Service) Scale(ctx context.Context, reg kvstore.Register, arch struct
 		}
 	}
 
-	task := database.NewTask(svc.svc.Name, database.ServiceScaleTask, svc.svc.ID, fmt.Sprintf("replicas=%d", arch.Replicas), nil, 300)
+	task := database.NewTask(svc.svc.Name, database.ServiceScaleTask, svc.svc.ID, fmt.Sprintf("replicas=%d", req.Arch.Replicas), nil, 300)
 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, &task,
 		statusServiceScaling, statusServiceScaled, statusServiceScaleFailed)

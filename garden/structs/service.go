@@ -143,6 +143,14 @@ type NetDeviceRequire struct {
 	Bandwidth int `json:"bandwidth"` // M/s
 }
 
+type ServiceScaleRequest struct {
+	Arch Arch `json:"architecture"`
+
+	Users []User `json:"users,omitempty"`
+
+	Options map[string]interface{} `json:"opts"`
+}
+
 type PostServiceResponse struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`

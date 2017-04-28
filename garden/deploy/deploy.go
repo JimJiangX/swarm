@@ -253,13 +253,13 @@ func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
 	return nil
 }
 
-func (d *Deployment) ServiceScale(ctx context.Context, nameOrID string, arch structs.Arch) (string, error) {
+func (d *Deployment) ServiceScale(ctx context.Context, nameOrID string, scale structs.ServiceScaleRequest) (string, error) {
 	svc, err := d.gd.Service(nameOrID)
 	if err != nil {
 		return "", err
 	}
 
-	return svc.Scale(ctx, d.gd.KVClient(), arch, true)
+	return svc.Scale(ctx, d.gd.KVClient(), scale, true)
 }
 
 func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version string, async bool) (string, error) {
