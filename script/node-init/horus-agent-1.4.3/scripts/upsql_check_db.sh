@@ -20,7 +20,7 @@ if [ "${running_status}" != "true" ]; then
 	exit
 fi
 
-${dir}/check_upsql --default-file /${container_name}_DAT_LV/my.cnf --user $username --password $password
+${dir}/check_upsql --default-file /${container_name}_DAT_LV/my.cnf --user $username --password $password > /dev/null 2>&1
 if [  $? -eq 0 ];then
 	status=passing
 else
