@@ -1248,8 +1248,8 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
-	arch := structs.Arch{}
-	err := json.NewDecoder(r.Body).Decode(&arch)
+	scale := structs.ServiceScaleRequest{}
+	err := json.NewDecoder(r.Body).Decode(&scale)
 	if err != nil {
 		ec := errCodeV1(r.Method, _Service, decodeError, 41)
 		httpJSONError(w, err, ec.code, http.StatusBadRequest)
@@ -1268,7 +1268,7 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	d := deploy.New(gd)
 
-	id, err := d.ServiceScale(ctx, name, arch)
+	id, err := d.ServiceScale(ctx, name, scale)
 	if err != nil {
 		ec := errCodeV1(r.Method, _Service, internalError, 42)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
