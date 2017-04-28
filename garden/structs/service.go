@@ -45,7 +45,6 @@ type Unit struct {
 	EngineID    string `db:"engine_id" json:"engine_id"` // engine.ID
 	ContainerID string `db:"container_id" json:"container_id"`
 	NetworkMode string `db:"network_mode" json:"network_mode"`
-	Networks    string `db:"networks_desc" json:"networks_desc"`
 	LatestError string `db:"latest_error" json:"latest_error"`
 	Status      int    `db:"status" json:"status"`
 

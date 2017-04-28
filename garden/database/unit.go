@@ -61,7 +61,6 @@ type Unit struct {
 	EngineID    string `db:"engine_id" json:"engine_id"` // engine.ID
 	ContainerID string `db:"container_id" json:"container_id"`
 	NetworkMode string `db:"network_mode" json:"network_mode"`
-	Networks    string `db:"networks_desc" json:"networks_desc"`
 	LatestError string `db:"latest_error" json:"latest_error"`
 
 	Status    int       `db:"status" json:"status"`
@@ -76,7 +75,7 @@ func (db dbBase) unitTable() string {
 func (db dbBase) GetUnit(nameOrID string) (Unit, error) {
 	var (
 		u     = Unit{}
-		query = "SELECT id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at FROM " + db.unitTable() + " WHERE id=? OR name=? OR container_id=?"
+		query = "SELECT id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at FROM " + db.unitTable() + " WHERE id=? OR name=? OR container_id=?"
 	)
 
 	err := db.Get(&u, query, nameOrID, nameOrID, nameOrID)
@@ -90,7 +89,7 @@ func (db dbBase) GetUnit(nameOrID string) (Unit, error) {
 // InsertUnit insert Unit
 func (db dbBase) InsertUnit(u Unit) error {
 
-	query := "INSERT INTO " + db.unitTable() + " (id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at) VALUES (:id,:name,:type,:service_id,:engine_id,:container_id,:network_mode,:networks_desc,:latest_error,:status,:created_at)"
+	query := "INSERT INTO " + db.unitTable() + " (id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at) VALUES (:id,:name,:type,:service_id,:engine_id,:container_id,:network_mode,:latest_error,:status,:created_at)"
 
 	_, err := db.NamedExec(query, &u)
 	if err == nil {
@@ -103,7 +102,7 @@ func (db dbBase) InsertUnit(u Unit) error {
 // txInsertUnit insert Unit in Tx
 func (db dbBase) txInsertUnit(tx *sqlx.Tx, u Unit) error {
 
-	query := "INSERT INTO " + db.unitTable() + " (id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at) VALUES (:id,:name,:type,:service_id,:engine_id,:container_id,:network_mode,:networks_desc,:latest_error,:status,:created_at)"
+	query := "INSERT INTO " + db.unitTable() + " (id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at) VALUES (:id,:name,:type,:service_id,:engine_id,:container_id,:network_mode,:latest_error,:status,:created_at)"
 
 	_, err := tx.NamedExec(query, &u)
 	if err == nil {
@@ -116,7 +115,7 @@ func (db dbBase) txInsertUnit(tx *sqlx.Tx, u Unit) error {
 // txInsertUnits insert []Unit in Tx
 func (db dbBase) txInsertUnits(tx *sqlx.Tx, units []Unit) error {
 
-	query := "INSERT INTO " + db.unitTable() + " (id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at) VALUES (:id,:name,:type,:service_id,:engine_id,:container_id,:network_mode,:networks_desc,:latest_error,:status,:created_at)"
+	query := "INSERT INTO " + db.unitTable() + " (id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at) VALUES (:id,:name,:type,:service_id,:engine_id,:container_id,:network_mode,:latest_error,:status,:created_at)"
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
@@ -166,7 +165,7 @@ func (db dbBase) SetUnitByContainer(containerID string, state int) error {
 // SetUnitInfo could update params of unit
 func (db dbBase) SetUnitInfo(u Unit) error {
 
-	query := "UPDATE " + db.unitTable() + " SET name=:name,type=:type,service_id=:service_id,engine_id=:engine_id,container_id=:container_id,network_mode=:network_mode,networks_desc=:networks_desc,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
+	query := "UPDATE " + db.unitTable() + " SET name=:name,type=:type,service_id=:service_id,engine_id=:engine_id,container_id=:container_id,network_mode=:network_mode,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
 
 	_, err := db.NamedExec(query, &u)
 	if err == nil {
@@ -179,7 +178,7 @@ func (db dbBase) SetUnitInfo(u Unit) error {
 // txSetUnit upate unit params in tx
 func (db dbBase) txSetUnit(tx *sqlx.Tx, u Unit) error {
 
-	query := "UPDATE " + db.unitTable() + " SET engine_id=:engine_id,container_id=:container_id,network_mode=:network_mode,networks_desc=:networks_desc,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
+	query := "UPDATE " + db.unitTable() + " SET engine_id=:engine_id,container_id=:container_id,network_mode=:network_mode,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
 
 	_, err := tx.NamedExec(query, &u)
 	if err == nil {
@@ -278,7 +277,7 @@ func (db dbBase) SetUnitAndTask(u *Unit, t *Task, msg string) error {
 
 func (db dbBase) SetUnits(units []Unit) error {
 	do := func(tx *sqlx.Tx) error {
-		query := "UPDATE " + db.unitTable() + " SET engine_id=:engine_id,container_id=:container_id,network_mode=:network_mode,networks_desc=:networks_desc,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
+		query := "UPDATE " + db.unitTable() + " SET engine_id=:engine_id,container_id=:container_id,network_mode=:network_mode,status=:status,latest_error=:latest_error,created_at=:created_at WHERE id=:id"
 
 		stmt, err := tx.PrepareNamed(query)
 		if err != nil {
@@ -334,7 +333,7 @@ func (db dbBase) txDelUnit(tx *sqlx.Tx, nameOrID string) error {
 func (db dbBase) listUnits() ([]Unit, error) {
 	var (
 		out   []Unit
-		query = "SELECT id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at FROM " + db.unitTable()
+		query = "SELECT id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at FROM " + db.unitTable()
 	)
 
 	err := db.Select(&out, query)
@@ -351,7 +350,7 @@ func (db dbBase) listUnits() ([]Unit, error) {
 func (db dbBase) ListUnitByServiceID(id string) ([]Unit, error) {
 	var (
 		out   []Unit
-		query = "SELECT id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at FROM " + db.unitTable() + " WHERE service_id=?"
+		query = "SELECT id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at FROM " + db.unitTable() + " WHERE service_id=?"
 	)
 
 	err := db.Select(&out, query, id)
@@ -368,7 +367,7 @@ func (db dbBase) ListUnitByServiceID(id string) ([]Unit, error) {
 func (db dbBase) ListUnitByEngine(id string) ([]Unit, error) {
 	var (
 		out   []Unit
-		query = "SELECT id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at FROM " + db.unitTable() + " WHERE engine_id=?"
+		query = "SELECT id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at FROM " + db.unitTable() + " WHERE engine_id=?"
 	)
 
 	err := db.Select(&out, query, id)
@@ -446,7 +445,7 @@ func (db dbBase) DelUnitsRelated(units []Unit, volume bool) error {
 		for i := range units {
 
 			u := Unit{}
-			query := "SELECT id,name,type,service_id,engine_id,container_id,network_mode,networks_desc,latest_error,status,created_at FROM " + db.unitTable() + " WHERE id=? OR name=? OR container_id=?"
+			query := "SELECT id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at FROM " + db.unitTable() + " WHERE id=? OR name=? OR container_id=?"
 
 			err := tx.Get(&u, query, units[i].ID, units[i].Name, units[i].ContainerID)
 			if err != nil {
