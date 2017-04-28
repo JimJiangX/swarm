@@ -62,7 +62,7 @@ total=`echo "$pool_pages_total*$page_size" |bc `
 free=`echo "$pool_pages_free*$page_size" |bc `
 
 #upsql.buffer_pool_dirty_page
-dirty_page=`${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e"show engine innodb status \G;" 2>/dev/null | grep '^Total memory allocated' | awk '{print $4}' | tr -d ";"`
+dirty_page=`${EXEC_BIN} -S /${INSTANCE}_DAT_LV/upsql.sock -u${USER} -p${PASSWD}  -e"show engine innodb status \G;" 2>/dev/null | grep -E '^Total memory allocated|^Total large memory allocated' | awk '{print $NF}' | tr -d ";"`
 if [ "$dirty_page" = "" ];then
    dirty="err"
 else
