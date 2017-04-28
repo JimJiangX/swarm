@@ -66,14 +66,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 		return nil, nil, err
 	}
 
-	options := scheduleOption{
-		HighAvailable: spec.HighAvailable,
-		Require:       *spec.Require,
-	}
-
-	options.Nodes.Constraints = spec.Constraints
-	options.Nodes.Networkings = spec.Networkings
-	options.Nodes.Clusters = spec.Clusters
+	options := newScheduleOption(spec)
 
 	im, err := gd.ormer.GetImageVersion(spec.Image)
 	if err != nil {
@@ -141,6 +134,19 @@ type scheduleOption struct {
 	}
 }
 
+func newScheduleOption(spec structs.ServiceSpec) scheduleOption {
+	opts := scheduleOption{
+		HighAvailable: spec.HighAvailable,
+		Require:       *spec.Require,
+	}
+
+	opts.Nodes.Constraints = spec.Constraints
+	opts.Nodes.Networkings = spec.Networkings
+	opts.Nodes.Clusters = spec.Clusters
+
+	return opts
+}
+
 func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *cluster.ContainerConfig, opts scheduleOption) ([]*node.Node, error) {
 	_scheduler := gd.scheduler
 
@@ -156,7 +162,7 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 	select {
 	default:
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return nil, errors.WithStack(ctx.Err())
 	}
 
 	out, err := actor.ListCandidates(opts.Nodes.Clusters, opts.Nodes.Filters, opts.Require.Volumes)
