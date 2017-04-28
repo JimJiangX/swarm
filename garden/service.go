@@ -354,7 +354,21 @@ func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers
 	}
 }
 
-func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, authConfig *types.AuthConfig) (err error) {
+func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, authConfig *types.AuthConfig) error {
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
+		statusServiceContainerCreating, statusServiceContainerRunning, statusServiceContainerCreateFailed)
+
+	return sl.Run(
+		func(val int) bool {
+			return val == statusServiceAllocated
+		},
+		func() error {
+			return svc.runContainer(ctx, pendings, authConfig)
+		},
+		false)
+}
+
+func (svc *Service) runContainer(ctx context.Context, pendings []pendingUnit, authConfig *types.AuthConfig) error {
 	defer func() {
 		ids := make([]string, len(pendings))
 		for i := range pendings {
@@ -363,59 +377,50 @@ func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, au
 		svc.cluster.RemovePendingContainer(ids...)
 	}()
 
-	run := func() error {
-		select {
-		default:
-		case <-ctx.Done():
-			return ctx.Err()
+	select {
+	default:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	for _, pu := range pendings {
+		eng := svc.cluster.Engine(pu.Unit.EngineID)
+		if eng == nil {
+			return errors.Errorf("Engine '%s':no long exist", pu.Unit.EngineID)
 		}
 
-		for _, pu := range pendings {
-			eng := svc.cluster.Engine(pu.Unit.EngineID)
-			if eng == nil {
-				return nil
+		for _, lv := range pu.volumes {
+
+			v := volume.VolumesCreateBody{
+				Name:   lv.Name,
+				Driver: lv.Driver,
+				Labels: nil,
+				DriverOpts: map[string]string{
+					"size":   strconv.Itoa(int(lv.Size)),
+					"fstype": lv.Filesystem,
+					"vgname": lv.VG,
+				},
 			}
 
-			for _, lv := range pu.volumes {
-
-				v := volume.VolumesCreateBody{
-					Name:   lv.Name,
-					Driver: lv.Driver,
-					Labels: nil,
-					DriverOpts: map[string]string{
-						"size":   strconv.Itoa(int(lv.Size)),
-						"fstype": lv.Filesystem,
-						"vgname": lv.VG,
-					},
-				}
-
-				_, err := eng.CreateVolume(&v)
-				if err != nil {
-					return err
-				}
-			}
-
-			c, err := eng.CreateContainer(pu.config, pu.Unit.Name, true, authConfig)
+			_, err := eng.CreateVolume(&v)
 			if err != nil {
 				return err
 			}
-			pu.Unit.ContainerID = c.ID
-
-			err = eng.StartContainer(c, nil)
-			if err != nil {
-				return errors.Wrap(err, "start container:"+pu.Unit.Name)
-			}
 		}
 
-		return nil
+		c, err := eng.CreateContainer(pu.config, pu.Unit.Name, true, authConfig)
+		if err != nil {
+			return err
+		}
+		pu.Unit.ContainerID = c.ID
+
+		err = eng.StartContainer(c, nil)
+		if err != nil {
+			return errors.Wrap(err, "start container:"+pu.Unit.Name)
+		}
 	}
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
-		statusServiceContainerCreating, statusServiceContainerRunning, statusServiceContainerCreateFailed)
-
-	return sl.Run(func(val int) bool {
-		return val == statusServiceAllocated
-	}, run, false)
+	return nil
 }
 
 func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, task *database.Task, async bool, args map[string]interface{}) error {
@@ -438,14 +443,16 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 	}
 
 	return sl.Run(check, func() error {
-		return svc.initStart(ctx, kvc, configs, args)
+		return svc.initStart(ctx, nil, kvc, configs, args)
 	}, async)
 }
 
-func (svc *Service) initStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, args map[string]interface{}) error {
-	units, err := svc.getUnits()
-	if err != nil {
-		return err
+func (svc *Service) initStart(ctx context.Context, units []*unit, kvc kvstore.Client, configs structs.ConfigsMap, args map[string]interface{}) (err error) {
+	if units == nil {
+		units, err = svc.getUnits()
+		if err != nil {
+			return err
+		}
 	}
 
 	if configs == nil {
