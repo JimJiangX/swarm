@@ -25,6 +25,9 @@ func TestInitialize(t *testing.T) {
 }
 
 func TestRegister(t *testing.T) {
+	// Docker hub token service is down. Skip this test.
+	t.Skip("docker hub token service is down")
+
 	d := &Discovery{token: "TEST_TOKEN", url: discoveryURL, heartbeat: 1}
 	expected := "127.0.0.1:2675"
 	expectedEntries, err := discovery.CreateEntries([]string{expected})
@@ -39,11 +42,9 @@ func TestRegister(t *testing.T) {
 	case entries := <-ch:
 		assert.True(t, entries.Equals(expectedEntries))
 	case err := <-errCh:
-		// t.Fatal(err)
-		t.Skip(discoveryURL+" is down,", err)
+		t.Fatal(err)
 	case <-time.After(5 * time.Second):
-		// t.Fatal("Timed out")
-		t.Skip(discoveryURL+" is down,", "Timed out")
+		t.Fatal("Timed out")
 	}
 
 	assert.NoError(t, d.Register(expected))
