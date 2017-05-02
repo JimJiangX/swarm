@@ -35,6 +35,8 @@ func getContainerNameFromInfo(c types.ContainerJSON) string {
 func (eh eventHander) Handle(event *cluster.Event) (err error) {
 	// Something changed - refresh our internal state.
 	eh.once.Do(func() {
+		logrus.Info("mark running tasks")
+
 		err := eh.ci.MarkRunningTasks()
 		if err != nil {
 			logrus.Errorf("%+v", err)

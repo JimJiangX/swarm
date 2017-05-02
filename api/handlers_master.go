@@ -123,11 +123,9 @@ func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	r.URL.Path = "/" + proxyURL
 	addr := utils.Uint32ToIP(ips[0].IPAddr).String()
 	addr = net.JoinHostPort(addr, port)
-
-	r.URL.Path = "/" + proxyURL
-	logrus.Info(r.URL.Path)
 
 	err = hijack(nil, addr, w, r)
 	if err != nil {
