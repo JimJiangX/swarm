@@ -117,21 +117,21 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 }
 
 type scheduleOption struct {
-	HighAvailable bool
+	HighAvailable bool `json:"HighAvailable,omitempty"`
 
-	Require structs.UnitRequire
+	Require structs.UnitRequire `json:"UnitRequire,omitempty"`
 
 	Nodes struct {
-		Networkings []string
-		Clusters    []string
-		Filters     []string
-		Constraints []string
-	}
+		Networkings []string `json:"Networkings,omitempty"`
+		Clusters    []string `json:"Clusters,omitempty"`
+		Filters     []string `json:"Filters,omitempty"`
+		Constraints []string `json:"Constraints,omitempty"`
+	} `json:"Nodes,omitempty"`
 
 	Scheduler struct {
-		Strategy string
-		Filters  []string
-	}
+		Strategy string   `json:"Strategy,omitempty"`
+		Filters  []string `json:"Filters,omitempty"`
+	} `json:"Scheduler,omitempty"`
 }
 
 func newScheduleOption(spec structs.ServiceSpec) scheduleOption {
