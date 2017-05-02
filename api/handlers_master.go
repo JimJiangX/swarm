@@ -84,6 +84,12 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 }
 
 func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(r.Method, _NFS, urlParamError, 11)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
@@ -93,6 +99,8 @@ func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	}
 
 	name := mux.Vars(r)["name"]
+	proxyURL := mux.Vars(r)["proxy"]
+	port := r.FormValue("port")
 	orm := gd.Ormer()
 
 	u, err := orm.GetUnit(name)
@@ -116,11 +124,10 @@ func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	}
 
 	addr := utils.Uint32ToIP(ips[0].IPAddr).String()
+	addr = net.JoinHostPort(addr, port)
 
-	// TODO:get service port
-
-	index := strings.Index(r.URL.Path, "/proxy/")
-	r.URL.Path = r.URL.Path[index+len("/proxy"):]
+	r.URL.Path = "/" + proxyURL
+	logrus.Info(r.URL.Path)
 
 	err = hijack(nil, addr, w, r)
 	if err != nil {

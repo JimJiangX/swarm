@@ -51,7 +51,7 @@ type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 var masterRoutes = map[string]map[string]ctxHandler{
 	http.MethodGet: {
-		"/units/{name}/proxy/*": proxySpecialLogic,
+		//	"/units/{name}/proxy/{proxy:.*}": proxySpecialLogic,
 
 		"/nfs_backups/space": getNFSSPace,
 
@@ -80,7 +80,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/storage/san/{name:.*}": getSANStorageInfo,
 	},
 	http.MethodPost: {
-		"/units/{name}/proxy/*": proxySpecialLogic,
+		//	"/units/{name}/proxy/{proxy:.*}": proxySpecialLogic,
 		// "/datacenter": postRegisterDC,
 		"/clusters": postCluster,
 		//		"/clusters/{name}/enable":        postEnableCluster,
@@ -137,8 +137,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	},
 
 	http.MethodPut: {
-		"/units/{name}/proxy/*": proxySpecialLogic,
-		"/clusters/{name}":      putClusterParams,
+		//	"/units/{name}/proxy/{proxy:.*}": proxySpecialLogic,
+		"/clusters/{name}": putClusterParams,
 
 		"/hosts/{name}":         putNodeParam,
 		"/hosts/{name}/enable":  putNodeEnable,
@@ -152,7 +152,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	},
 
 	http.MethodDelete: {
-		"/units/{name}/proxy/*": proxySpecialLogic,
+		//	"/units/{name}/proxy/{proxy:.*}": proxySpecialLogic,
 
 		"/services/{name}": deleteService,
 
@@ -170,45 +170,50 @@ var masterRoutes = map[string]map[string]ctxHandler{
 }
 
 func setupMasterRouter(r *mux.Router, context *context, debug, enableCors bool) {
+	wrap := func(fct func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
+		return func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
 
+			if enableCors {
+				writeCorsHeaders(w, r)
+			}
+
+			context.apiVersion = mux.Vars(r)["version"]
+			ctx := goctx.Background()
+
+			if wait := intValueOrZero(r, "wait"); wait > 0 {
+				ctx, _ = goctx.WithTimeout(ctx, time.Duration(wait)*time.Second)
+			}
+
+			ctx = goctx.WithValue(ctx, _Garden, context)
+
+			fct(ctx, w, r)
+
+			logrus.WithFields(logrus.Fields{"method": r.Method,
+				"uri":   r.RequestURI,
+				"since": time.Since(start).String()}).Info("HTTP request received")
+		}
+	}
+
+	if debug {
+		r.HandleFunc("/v{version:[0-9]+.[0-9]+}"+"/units/{name}/proxy/{proxy:.*}", DebugRequestMiddleware(wrap(proxySpecialLogic)))
+	} else {
+		r.HandleFunc("/v{version:[0-9]+.[0-9]+}"+"/units/{name}/proxy/{proxy:.*}", wrap(proxySpecialLogic))
+	}
 	for method, mappings := range masterRoutes {
 		for route, fct := range mappings {
 			logrus.WithFields(logrus.Fields{"method": method, "route": route}).Debug("Registering HTTP route")
 
 			localRoute := route
-			localFct := fct
-
-			wrap := func(w http.ResponseWriter, r *http.Request) {
-				start := time.Now()
-
-				if enableCors {
-					writeCorsHeaders(w, r)
-				}
-
-				context.apiVersion = mux.Vars(r)["version"]
-				ctx := goctx.Background()
-
-				if wait := intValueOrZero(r, "wait"); wait > 0 {
-					ctx, _ = goctx.WithTimeout(ctx, time.Duration(wait)*time.Second)
-				}
-
-				ctx = goctx.WithValue(ctx, _Garden, context)
-
-				localFct(ctx, w, r)
-
-				logrus.WithFields(logrus.Fields{"method": r.Method,
-					"uri":   r.RequestURI,
-					"since": time.Since(start).String()}).Info("HTTP request received")
-			}
-
 			localMethod := method
+			localFct := wrap(fct)
 
 			if debug {
-				r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(DebugRequestMiddleware(wrap))
-				r.Path(localRoute).Methods(localMethod).HandlerFunc(DebugRequestMiddleware(wrap))
+				r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(DebugRequestMiddleware(localFct))
+				r.Path(localRoute).Methods(localMethod).HandlerFunc(DebugRequestMiddleware(localFct))
 			} else {
-				r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(wrap)
-				r.Path(localRoute).Methods(localMethod).HandlerFunc(wrap)
+				r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(localFct)
+				r.Path(localRoute).Methods(localMethod).HandlerFunc(localFct)
 			}
 
 			if enableCors {
