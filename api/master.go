@@ -51,49 +51,33 @@ type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 var masterRoutes = map[string]map[string]ctxHandler{
 	http.MethodGet: {
-		//	"/units/{name}/proxy/{proxy:.*}": proxySpecialLogic,
-
 		"/nfs_backups/space": getNFSSPace,
 
 		"/clusters":        getClusters,
 		"/clusters/{name}": getClustersByID,
 		"/hosts":           getAllNodes,
 		"/hosts/{name:.*}": getNode,
-		//		"/resources":                       getClustersResource,
-		//		"/resources/{cluster:.*}":          getNodesResourceByCluster,
+
 		"/tasks":        getTasks,
 		"/tasks/{name}": getTask,
-		//		"/ports":                           getPorts,
-		//		"/networkings":                     getNetworkings,
+
 		"/softwares/images":           listImages,
 		"/softwares/images/supported": getSupportImages,
-		"/services":                   getServices,
-		"/services/{name}":            getServicesByNameOrID,
-		//		"/services/{name}/users":           getServiceUsers,
-		//		"/services/{name}/topology":        hijackTopology,
-		//		"/services/{name}/proxys":          hijackProxys,
-		//		"/services/{name}/service_config":  getServiceServiceConfig,
-		//		"/services/{name}/backup_strategy": getServiceBackupStrategy,
-		//		"/services/{name}/backup_files":    getServiceBackupFiles,
+
+		"/services":        getServices,
+		"/services/{name}": getServicesByNameOrID,
 
 		"/storage/san":           getSANStoragesInfo,
 		"/storage/san/{name:.*}": getSANStorageInfo,
 	},
 	http.MethodPost: {
-		//	"/units/{name}/proxy/{proxy:.*}": proxySpecialLogic,
-		// "/datacenter": postRegisterDC,
 		"/clusters": postCluster,
-		//		"/clusters/{name}/enable":        postEnableCluster,
-		//		"/clusters/{name}/disable":       postDisableCluster,
+
 		"/hosts": postNodes,
-		//		"/clusters/nodes/{node}/enable":  postEnableNode,
-		//		"/clusters/nodes/{node}/disable": postDisableNode,
-		//		"/clusters/nodes/{node}/update":  updateNode,
 
 		"/services":      postService,
 		"/services/link": postServiceLink,
-		//		"/services/{name:.*}/rebuild": postServiceRebuild,
-		//		"/services/{name:.*}/backup":  postServiceBackup,
+
 		"/services/{name}/scale":         postServiceScaled,
 		"/services/{name}/update":        postServiceUpdate,
 		"/services/{name}/image/update":  postServiceVersionUpdate,
@@ -101,34 +85,15 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/services/{name}/stop":          postServiceStop,
 		"/services/{name}/config/update": postServiceUpdateConfigs,
 		"/services/{name}/exec":          postServiceExec,
+		//		"/services/{name:.*}/rebuild": postServiceRebuild,
+		//		"/services/{name:.*}/backup":  postServiceBackup,
 
-		//		"/services/{name:.*}/users": postServiceUsers,
-		//		// "/services/{name:.*}/service_config/update": postServiceConfig,
-		//		"/services/{name:.*}/service_config/update": postServiceConfigModify,
-
-		//		"/services/{name:.*}/backup_strategy":         postStrategyToService,
-		//		"/services/backup_strategy/{name:.*}/update":  postUpdateServiceStrategy,
-		//		"/services/backup_strategy/{name:.*}/enable":  postEnableServiceStrategy,
-		//		"/services/backup_strategy/{name:.*}/disable": postDisableServiceStrategy,
-
-		//		"/units/{name:.*}/start":      postUnitStart,
-		//		"/units/{name:.*}/stop":       postUnitStop,
-		//		"/units/{name:.*}/backup":     postUnitBackup,
-		//		"/units/{name:.*}/restore":    postUnitRestore,
 		//		"/units/{name:.*}/migrate":    postUnitMigrate,
 		//		"/units/{name:.*}/rebuild":    postUnitRebuild,
-		//		"/units/{name:.*}/isolate":    postUnitIsolate,
-		//		"/units/{name:.*}/switchback": postUnitSwitchback,
 
-		//		"/ports":                         postImportPort,
 		"/networkings/{name}/ips": postNetworking,
-		//		"/networkings/{name:.*}/enable":  postEnableNetworking,
-		//		"/networkings/{name:.*}/disable": postDisableNetworking,
 
 		"/softwares/images": postImageLoad,
-		//		"/image/{image:.*}/enable":   postEnableImage,
-		//		"/image/{image:.*}/disable":  postDisableImage,
-		//		"/image/{image:.*}/template": updateImageTemplateConfig,
 
 		//		"/tasks/backup/callback": postBackupCallback,
 
@@ -137,7 +102,6 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	},
 
 	http.MethodPut: {
-		//	"/units/{name}/proxy/{proxy:.*}": proxySpecialLogic,
 		"/clusters/{name}": putClusterParams,
 
 		"/hosts/{name}":         putNodeParam,
@@ -152,15 +116,12 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	},
 
 	http.MethodDelete: {
-		//	"/units/{name}/proxy/{proxy:.*}": proxySpecialLogic,
-
 		"/services/{name}": deleteService,
 
 		"/clusters/{name}": deleteCluster,
 		"/hosts/{node:.*}": deleteNode,
 
 		"/networkings/{name}/ips": deleteNetworking,
-		//		"/ports/{port:[0-9]+}":   deletePort,
 
 		"/storage/san/{name}":                    deleteStorage,
 		"/storage/san/{name}/raid_group/{rg:.*}": deleteRaidGroup,
