@@ -96,10 +96,16 @@ type Cluster interface {
 	RenameContainer(container *Container, newName string) error
 
 	// BuildImage builds an image.
-	BuildImage(io.Reader, *types.ImageBuildOptions, io.Writer) error
+	BuildImage(io.Reader, *types.ImageBuildOptions, func(what, status string, err error)) error
 
 	// TagImage tags an image.
 	TagImage(IDOrName string, ref string, force bool) error
+
+	// RefreshEngine refreshes a single cluster engine.
+	RefreshEngine(hostname string) error
+
+	// RefreshEngines refreshes all engines in the cluster.
+	RefreshEngines() error
 
 	// Get Engine
 	Engine(IDOrName string) *Engine
@@ -108,10 +114,4 @@ type Cluster interface {
 
 	AddPendingContainer(name, swarmID, engineID string, config *ContainerConfig) error
 	RemovePendingContainer(swarmID ...string)
-
-	// Refresh a single cluster engine
-	RefreshEngine(hostname string) error
-
-	// RefreshEngines refreshes all engines in the cluster.
-	RefreshEngines() error
 }

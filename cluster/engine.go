@@ -443,6 +443,19 @@ func (e *Engine) CheckConnectionErr(err error) {
 	// other errors may be ambiguous.
 }
 
+// EngineToContainerNode constructs types.ContainerNode from engine
+func (e *Engine) EngineToContainerNode() *types.ContainerNode {
+	return &types.ContainerNode{
+		ID:        e.ID,
+		IPAddress: e.IP,
+		Addr:      e.Addr,
+		Name:      e.Name,
+		Cpus:      int(e.Cpus),
+		Memory:    int64(e.Memory),
+		Labels:    e.Labels,
+	}
+}
+
 // Update API Version in apiClient
 func (e *Engine) updateClientVersionFromServer(serverVersion string) {
 	// v will be >= 1.8, since this is checked earlier
@@ -496,15 +509,11 @@ func (e *Engine) updateSpecs() error {
 	// Swarm/docker identifies engine by ID. Updating ID but not updating cluster
 	// index will put the cluster into inconsistent state. If this happens, the
 	// engine should be put to pending state for re-validation.
-	var infoID string
-	if info.Swarm.NodeID != "" {
-		// Use the swarm-mode node ID if it's available, since it's
-		// guaranteed to be unique, even if the daemon has a copied
-		// /etc/docker/key.json file from another machine.
-		infoID = info.Swarm.NodeID
-	} else {
-		infoID = info.ID
-	}
+	// We concatenate the engine ID and the address because sometimes engine
+	// IDs can be duplicated on different nodes (e.g. if a user has
+	// accidentally copied their /etc/docker/daemon.json file onto another
+	// node).
+	infoID := info.ID + "|" + e.Addr
 	if e.ID == "" {
 		e.ID = infoID
 	} else if e.ID != infoID {
@@ -559,6 +568,7 @@ func (e *Engine) updateSpecs() error {
 	if info.Architecture != "" {
 		e.Labels["architecture"] = info.Architecture
 	}
+
 	for _, label := range info.Labels {
 		kv := strings.SplitN(label, "=", 2)
 		if len(kv) != 2 {
@@ -1417,6 +1427,28 @@ func (e *Engine) StartContainer(container *Container, hostConfig *dockerclient.H
 	return err
 }
 
+// InspectContainer inspects a container
+func (e *Engine) InspectContainer(id string) (*types.ContainerJSON, error) {
+	container, err := e.apiClient.ContainerInspect(context.Background(), id)
+	e.CheckConnectionErr(err)
+	if err != nil {
+		return nil, err
+	}
+
+	return &container, nil
+}
+
+// CreateContainerExec creates a container exec
+func (e *Engine) CreateContainerExec(id string, config types.ExecConfig) (types.IDResponse, error) {
+	execCreateResp, err := e.apiClient.ContainerExecCreate(context.Background(), id, config)
+	e.CheckConnectionErr(err)
+	if err != nil {
+		return types.IDResponse{}, err
+	}
+
+	return execCreateResp, nil
+}
+
 // RenameContainer renames a container
 func (e *Engine) RenameContainer(container *Container, newName string) error {
 	// send rename request
@@ -1432,13 +1464,32 @@ func (e *Engine) RenameContainer(container *Container, newName string) error {
 }
 
 // BuildImage builds an image
-func (e *Engine) BuildImage(buildContext io.Reader, buildImage *types.ImageBuildOptions) (io.ReadCloser, error) {
+func (e *Engine) BuildImage(buildContext io.Reader, buildImage *types.ImageBuildOptions, callback func(msg JSONMessage)) error {
 	resp, err := e.apiClient.ImageBuild(context.Background(), buildContext, *buildImage)
 	e.CheckConnectionErr(err)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return resp.Body, nil
+	defer resp.Body.Close()
+
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		var msg JSONMessage
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			log.Warnf("Malformed progress line during image build: %s - %s", line, err)
+			continue
+		}
+
+		if msg.Error != nil {
+			return fmt.Errorf("Failed to build image: %s", msg.Error.Message)
+		}
+
+		if callback != nil {
+			callback(msg)
+		}
+	}
+	return nil
 }
 
 // TagImage tags an image
