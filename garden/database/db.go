@@ -16,6 +16,7 @@ type Ormer interface {
 	ImageIface
 	NodeIface
 	StorageIface
+	BackupFileIface
 
 	SysConfigOrmer
 	NetworkingOrmer

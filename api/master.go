@@ -95,7 +95,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 
 		"/softwares/images": postImageLoad,
 
-		//		"/tasks/backup/callback": postBackupCallback,
+		"/tasks/backup/callback": postBackupCallback,
 
 		"/storage/san":                        postSanStorage,
 		"/storage/san/{name}/raid_group/{rg}": postRGToSanStorage,
