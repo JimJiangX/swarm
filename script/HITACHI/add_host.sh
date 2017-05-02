@@ -29,10 +29,13 @@ do
 					echo "delete host_grp failed!"
 					exit 3
 				fi
-				sudo raidcom add host_grp -I${Instance_ID} -port ${port} -host_grp_name ${hostname}
+				sudo raidcom  get host_grp  -I${Instance_ID} -port $port | grep ${hostname}
 				if [ $? -ne 0 ]; then
-					echo "add host_grp failed!"
-					exit 2
+					sudo raidcom add host_grp -I${Instance_ID} -port ${port} -host_grp_name ${hostname}
+					if [ $? -ne 0 ]; then
+						echo "add host_grp failed!"
+						exit 2
+					fi
 				fi
 				sudo raidcom add hba_wwn -I${Instance_ID} -port ${port} ${hostname} -hba_wwn ${wwn}
 				if [ $? -ne 0 ]; then
