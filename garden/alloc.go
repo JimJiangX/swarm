@@ -365,9 +365,6 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 				continue
 			}
 
-			pu.config.SetSwarmID(pu.swarmID)
-			pu.Unit.EngineID = nodes[i].ID
-
 			err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[i].ID, pu.config)
 			if err != nil {
 				field.Debugf("AddPendingContainer:node=%s,%+v", nodes[i].Name, err)
@@ -419,7 +416,10 @@ func pendingAlloc(actor alloc.Allocator, unit database.Unit, node *node.Node, op
 	if len(lvs) > 0 {
 		pu.volumes = append(pu.volumes, lvs...)
 	}
-	if err != nil {
+	if err == nil {
+		pu.config.SetSwarmID(pu.swarmID)
+		pu.Unit.EngineID = node.ID
+	} else {
 		logrus.Debugf("AlloctVolumes:node=%s,%s", node.Name, err)
 	}
 

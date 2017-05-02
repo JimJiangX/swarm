@@ -393,19 +393,7 @@ func (svc *Service) runContainer(ctx context.Context, pendings []pendingUnit, au
 		}
 
 		for _, lv := range pu.volumes {
-
-			v := volume.VolumesCreateBody{
-				Name:   lv.Name,
-				Driver: lv.Driver,
-				Labels: nil,
-				DriverOpts: map[string]string{
-					"size":   strconv.Itoa(int(lv.Size)),
-					"fstype": lv.Filesystem,
-					"vgname": lv.VG,
-				},
-			}
-
-			_, err := eng.CreateVolume(&v)
+			err := engineCreateVolume(eng, lv)
 			if err != nil {
 				return err
 			}
@@ -424,6 +412,26 @@ func (svc *Service) runContainer(ctx context.Context, pendings []pendingUnit, au
 	}
 
 	return nil
+}
+
+func engineCreateVolume(eng *cluster.Engine, lv database.Volume) error {
+	body := volume.VolumesCreateBody{
+		Name:   lv.Name,
+		Driver: lv.Driver,
+		Labels: nil,
+		DriverOpts: map[string]string{
+			"size":   strconv.Itoa(int(lv.Size)),
+			"fstype": lv.Filesystem,
+			"vgname": lv.VG,
+		},
+	}
+
+	_, err := eng.CreateVolume(&body)
+	if err == nil {
+		return nil
+	}
+
+	return errors.WithStack(err)
 }
 
 func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, task *database.Task, async bool, args map[string]interface{}) error {
