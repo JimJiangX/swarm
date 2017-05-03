@@ -3,7 +3,7 @@
 
 	garden server:
 
-    //开发环境：
+    // 开发环境：
 	1. go get github/upmio/swarm
     2. 用github/upmio/swarm 替换 github/docker/swarm:
 	  rm -rf G$OPATH/src/github/docker/swarm
@@ -17,24 +17,28 @@
 		+++ master.go
 		+++ handlers_master.go	
 		+++ middleware.go
+		+++ errcode.go
+		+++ errcode_test.go
 		+   primary.go 	L132	
 				
 		
 	/cli:
 	
-		+	commands.go	L32-33,L44-50
-		+++ configruation.go 	
-		+	flags.go		L162-207
-		+	manage.go	L143-165,L179,L185,L200-206,L213-215,L220,L335-355
+		+++ configruation.go 
+		+++ join_seed.go
+		+	commands.go		L32-33,L44-60	
+		+	flags.go		L162-225
+		+	manage.go		L145-174,L188,L194,L209-215,L222-224,L229,L335,L344-372,L441
 		
 	/cluster:
 	
-		+	cluster.go 	L104-111
-		+	config.go	L301-372
-		+-	engine.go	L943-952,L546-551
+		+	cluster.go 	L110-116
+		+	config.go	L293-364
+		+-	engine.go	L568-571,L968-978
 		+++ upmio.go
 		+++ /mesos/addition.go
 		+++ /swarm/addition.go
+		+++ /swarm/addition_test.go
 		+-	/swarm/cluster.go	L403-405 
 		
 	/garden:all
