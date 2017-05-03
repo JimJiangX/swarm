@@ -85,8 +85,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/services/{name}/stop":          postServiceStop,
 		"/services/{name}/config/update": postServiceUpdateConfigs,
 		"/services/{name}/exec":          postServiceExec,
+		"/services/{name:.*}/backup":     postServiceBackup,
 		//		"/services/{name:.*}/rebuild": postServiceRebuild,
-		//		"/services/{name:.*}/backup":  postServiceBackup,
 
 		//		"/units/{name:.*}/migrate":    postUnitMigrate,
 		//		"/units/{name:.*}/rebuild":    postUnitRebuild,
@@ -95,7 +95,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 
 		"/softwares/images": postImageLoad,
 
-		//		"/tasks/backup/callback": postBackupCallback,
+		"/tasks/backup/callback": postBackupCallback,
 
 		"/storage/san":                        postSanStorage,
 		"/storage/san/{name}/raid_group/{rg}": postRGToSanStorage,

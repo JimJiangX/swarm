@@ -48,6 +48,7 @@ const (
 	ServiceScaleTask  = "service_scale"
 	ServiceUpdateTask = "service_update"
 	ServiceExecTask   = "service_exec"
+	ServiceBackupTask = "service_backup"
 
 	ServiceUpdateConfigTask = "service_update_config"
 	ServiceUpdateImageTask  = "service_update_image"

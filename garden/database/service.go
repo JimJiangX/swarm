@@ -50,6 +50,8 @@ type ServiceOrmer interface {
 
 	ImageIface
 
+	BackupFileIface
+
 	TaskOrmer
 
 	SysConfigOrmer

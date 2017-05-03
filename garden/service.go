@@ -697,18 +697,24 @@ func (svc *Service) stop(ctx context.Context, units []*unit, containers bool) er
 func (svc *Service) Exec(ctx context.Context, config structs.ServiceExecConfig, async bool, task *database.Task) error {
 
 	exec := func() error {
-		if config.Container != "" {
-			_, err := svc.exec(ctx, config.Container, config.Cmd, config.Detach)
-			return err
-		}
+		var (
+			err   error
+			units []*unit
+		)
 
-		units, err := svc.getUnits()
+		if config.Container != "" {
+			var u *unit
+			u, err = svc.getUnit(config.Container)
+			units = []*unit{u}
+		} else {
+			units, err = svc.getUnits()
+		}
 		if err != nil {
 			return err
 		}
 
 		for i := range units {
-			_, err := svc.exec(ctx, units[i].u.ID, config.Cmd, config.Detach)
+			_, err = units[i].containerExec(ctx, config.Cmd, config.Detach)
 			if err != nil {
 				return err
 			}
@@ -721,21 +727,6 @@ func (svc *Service) Exec(ctx context.Context, config structs.ServiceExecConfig, 
 		statusServiceExecStart, statusServiceExecDone, statusServiceExecFailed)
 
 	return sl.Run(isnotInProgress, exec, async)
-}
-
-func (svc *Service) exec(ctx context.Context, nameOrID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
-	u, err := svc.getUnit(nameOrID)
-	if err != nil {
-		// exec if container exist
-		c := svc.cluster.Container(nameOrID)
-		if c != nil {
-			return c.Exec(ctx, cmd, detach)
-		}
-
-		return types.ContainerExecInspect{}, err
-	}
-
-	return u.containerExec(ctx, cmd, detach)
 }
 
 func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) {
