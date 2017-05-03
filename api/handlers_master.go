@@ -1567,7 +1567,7 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceStopTask, spec.ID, spec.Desc, nil, 300)
+	task := database.NewTask(spec.Name, database.ServiceExecTask, spec.ID, spec.Desc, nil, 300)
 
 	err = svc.Exec(ctx, config, true, &task)
 	if err != nil {
@@ -1650,6 +1650,58 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	// go1.7+
+	local, ok := r.Context().Value(http.LocalAddrContextKey).(string)
+	logrus.Debug(r.RemoteAddr, local, ok)
+
+	config := structs.ServiceBackupConfig{}
+	err := json.NewDecoder(r.Body).Decode(&config)
+	if err != nil {
+		ec := errCodeV1(r.Method, _Service, decodeError, 131)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil || gd.Cluster == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	svc, err := gd.GetService(name)
+	if err != nil {
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 132)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
+		return
+	}
+
+	spec, err := svc.Spec()
+	if err != nil {
+		ec := errCodeV1(r.Method, _Service, internalError, 133)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
+		return
+	}
+
+	task := database.NewTask(spec.Name, database.ServiceBackupTask, spec.ID, spec.Desc, nil, 300)
+
+	err = svc.Backup(ctx, local, config, true, &task)
+	if err != nil {
+		ec := errCodeV1(r.Method, _Service, internalError, 134)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
+
 }
 
 // -----------------/storage handlers-----------------

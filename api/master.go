@@ -85,8 +85,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/services/{name}/stop":          postServiceStop,
 		"/services/{name}/config/update": postServiceUpdateConfigs,
 		"/services/{name}/exec":          postServiceExec,
+		"/services/{name:.*}/backup":     postServiceBackup,
 		//		"/services/{name:.*}/rebuild": postServiceRebuild,
-		//		"/services/{name:.*}/backup":  postServiceBackup,
 
 		//		"/units/{name:.*}/migrate":    postUnitMigrate,
 		//		"/units/{name:.*}/rebuild":    postUnitRebuild,
