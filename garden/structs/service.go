@@ -169,6 +169,13 @@ type ServiceExecConfig struct {
 	Cmd       []string `json:"cmd"`
 }
 
+type ServiceBackupConfig struct {
+	Container string `json:"nameOrID"`
+	Type      string `json:"type"`
+	Detach    bool   `json:"detach"`
+	BackupDir string `json:"backup_dir"`
+}
+
 type ServiceLink struct {
 	priority int
 	Spec     *ServiceSpec `json:"-"`
