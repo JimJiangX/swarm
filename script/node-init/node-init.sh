@@ -659,10 +659,7 @@ install_horus_agent() {
 	cp ${cur_dir}/horus-agent-${version}/bin/horus-agent /usr/bin/horus-agent; chmod 755 /usr/bin/horus-agent
 	cp -r ${cur_dir}/horus-agent-${version}/scripts /usr/local/horus-agent/scripts; chmod -R +x /usr/local/horus-agent/scripts/*.sh
 
-	local nets_dev="${adm_nic}#${int_nic}"
-	if [ ! -z "${ext_nic}" ]; then
-		local nets_dev="${nets_dev}#${ext_nic}"
-	fi
+	local nets_dev="bond0"
 
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/horus-agent
