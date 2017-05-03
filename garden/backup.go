@@ -1,6 +1,8 @@
 package garden
 
 import (
+	"time"
+
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/tasklock"
@@ -10,10 +12,13 @@ import (
 
 func (svc *Service) Backup(ctx context.Context, local string, config structs.ServiceBackupConfig, async bool, task *database.Task) error {
 	backup := func() error {
-		var (
-			err   error
-			units []*unit
-		)
+		err := svc.checkBackupFiles(ctx)
+		if err != nil {
+			return err
+		}
+
+		var units []*unit
+
 		if config.Container != "" {
 			var u *unit
 			u, err = svc.getUnit(config.Container)
@@ -51,4 +56,64 @@ func (svc *Service) Backup(ctx context.Context, local string, config structs.Ser
 		statusServiceBackuping, statusServiceBackupDone, statusServiceBackupFailed)
 
 	return sl.Run(isnotInProgress, backup, async)
+}
+
+func (svc *Service) checkBackupFiles(ctx context.Context) error {
+	_, expired, err := checkBackupFilesByService(svc.svc.ID, svc.so)
+	if len(expired) > 0 {
+		_err := svc.removeExpiredBackupFiles(ctx, expired)
+		if _err != nil {
+			return _err
+		}
+	}
+
+	return err
+}
+
+func (svc *Service) removeExpiredBackupFiles(ctx context.Context, files []database.BackupFile) error {
+	for i := range files {
+		u, err := svc.getUnit(files[i].UnitID)
+		if err != nil {
+			return err
+		}
+
+		cmd := []string{"rm", "-rf", files[i].Path}
+
+		_, err = u.containerExec(ctx, cmd, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func checkBackupFilesByService(service string, iface database.BackupFileIface) ([]database.BackupFile, []database.BackupFile, error) {
+	svc, files, err := iface.ListBackupFilesByService(service)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	now := time.Now()
+	valid := make([]database.BackupFile, 0, len(files))
+	expired := make([]database.BackupFile, 0, len(files))
+
+	for i := range files {
+		if now.After(files[i].Retention) {
+			expired = append(expired, files[i])
+		} else {
+			valid = append(valid, files[i])
+		}
+	}
+
+	sum := 0
+	for i := range valid {
+		sum += valid[i].SizeByte
+	}
+
+	if sum > svc.BackupMaxSizeByte {
+		return valid, expired, errors.Errorf("no more space for backup task,%d<%d", svc.BackupMaxSizeByte, sum)
+	}
+
+	return valid, expired, nil
 }
