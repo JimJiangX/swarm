@@ -131,7 +131,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 }
 
 func setupMasterRouter(r *mux.Router, context *context, debug, enableCors bool) {
-	wrap := func(fct func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
+	wrap := func(fct ctxHandler) func(w http.ResponseWriter, r *http.Request) {
 		return func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 
