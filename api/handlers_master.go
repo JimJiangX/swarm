@@ -1655,10 +1655,6 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
-	// go1.7+
-	local, ok := r.Context().Value(http.LocalAddrContextKey).(string)
-	logrus.Debug(r.RemoteAddr, local, ok)
-
 	config := structs.ServiceBackupConfig{}
 	err := json.NewDecoder(r.Body).Decode(&config)
 	if err != nil {
@@ -1691,7 +1687,7 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	task := database.NewTask(spec.Name, database.ServiceBackupTask, spec.ID, spec.Desc, nil, 300)
 
-	err = svc.Backup(ctx, local, config, true, &task)
+	err = svc.Backup(ctx, r.Host, config, true, &task)
 	if err != nil {
 		ec := errCodeV1(r.Method, _Service, internalError, 134)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
