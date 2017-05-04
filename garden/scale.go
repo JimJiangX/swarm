@@ -207,6 +207,12 @@ func (svc *Service) prepareScale(scale structs.ServiceScaleRequest) ([]database.
 	if err != nil {
 		return nil, err
 	}
+
+	_, err = svc.getScheduleOption()
+	if err != nil {
+		return nil, err
+	}
+
 	if spec.Users == nil {
 		spec.Users = scale.Users
 	} else {
@@ -220,26 +226,12 @@ func (svc *Service) prepareScale(scale structs.ServiceScaleRequest) ([]database.
 		spec.Options[k] = v
 	}
 
-	// decode scheduleOption
-	var opts scheduleOption
-	r := strings.NewReader(svc.svc.Desc.ScheduleOptions)
-	err = json.NewDecoder(r).Decode(&opts)
+	im, err := svc.so.GetImageVersion(spec.Image)
 	if err != nil {
 		return nil, err
 	}
 
 	units, err := svc.getUnits()
-	if err != nil {
-		return nil, err
-	}
-
-	// adjust scheduleOption by unit
-	svc.options, err = scheduleOptionsByUnits(opts, units)
-	if err != nil {
-		return nil, err
-	}
-
-	im, err := svc.so.GetImageVersion(spec.Image)
 	if err != nil {
 		return nil, err
 	}
@@ -263,6 +255,29 @@ func (svc *Service) prepareScale(scale structs.ServiceScaleRequest) ([]database.
 	err = svc.so.InsertUnits(add)
 
 	return add, err
+}
+
+func (svc *Service) getScheduleOption() (scheduleOption, error) {
+	// decode scheduleOption
+	var opts scheduleOption
+	r := strings.NewReader(svc.svc.Desc.ScheduleOptions)
+	err := json.NewDecoder(r).Decode(&opts)
+	if err != nil {
+		return svc.options, err
+	}
+
+	units, err := svc.getUnits()
+	if err != nil {
+		return svc.options, err
+	}
+
+	// adjust scheduleOption by unit
+	svc.options, err = scheduleOptionsByUnits(opts, units)
+	if err != nil {
+		return svc.options, err
+	}
+
+	return svc.options, nil
 }
 
 func scheduleOptionsByUnits(opts scheduleOption, units []*unit) (scheduleOption, error) {
