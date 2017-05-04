@@ -222,6 +222,30 @@ func (u unit) startContainer(ctx context.Context) error {
 	return nil
 }
 
+func (u unit) startService(ctx context.Context, cmd []string) error {
+	err := u.startContainer(ctx)
+	if err != nil {
+		return err
+	}
+
+	_, err = u.containerExec(ctx, cmd, false)
+
+	return err
+}
+
+func (u unit) stopService(ctx context.Context, cmd []string, container bool) error {
+	_, err := u.containerExec(ctx, cmd, false)
+	if err != nil {
+		return err
+	}
+
+	if !container {
+		return nil
+	}
+
+	return u.stopContainer(ctx)
+}
+
 func (u unit) stopContainer(ctx context.Context) error {
 	engine := u.getEngine()
 	if engine == nil {
