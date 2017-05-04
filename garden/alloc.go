@@ -23,6 +23,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+const containerKV = "/containers/"
+
 // add engine labels for schedule
 const (
 	roomLabel    = "room"

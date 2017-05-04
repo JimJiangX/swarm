@@ -1,6 +1,7 @@
 package garden
 
 import (
+	"bytes"
 	"encoding/json"
 	"strconv"
 	"strings"
@@ -534,11 +535,31 @@ func saveContainerToKV(kvc kvstore.Client, c *cluster.Container) error {
 		return errors.Wrapf(err, "JSON marshal Container %s", c.Info.Name)
 	}
 
-	const containerKV = "/containers/"
-
 	err = kvc.PutKV(containerKV+c.ID, val)
 
 	return err
+}
+
+func getContainerFromKV(kvc kvstore.Client, containerID string) (*cluster.Container, error) {
+	if kvc == nil {
+		return nil, errors.New("kvstore.Client is required")
+	}
+
+	pair, err := kvc.GetKV(containerKV + containerID)
+	if err != nil {
+		return nil, err
+	}
+
+	var c *cluster.Container
+
+	buf := bytes.NewBuffer(pair.Value)
+
+	err = json.NewDecoder(buf).Decode(&c)
+	if err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }
 
 func (svc *Service) Start(ctx context.Context, task *database.Task, detach bool, cmds structs.Commands) error {
