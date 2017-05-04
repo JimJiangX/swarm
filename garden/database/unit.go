@@ -17,7 +17,7 @@ type UnitIface interface {
 
 	CountUnitsInEngines(engines []string) (int, error)
 
-	InsertUnit(u Unit) error
+	InsertUnits([]Unit) error
 
 	SetUnitInfo(u Unit) error
 	UnitStatusCAS(u *Unit, old, value int, operator string) error
@@ -86,30 +86,13 @@ func (db dbBase) GetUnit(nameOrID string) (Unit, error) {
 	return u, errors.Wrap(err, "Get Unit By nameOrID")
 }
 
-// InsertUnit insert Unit
-func (db dbBase) InsertUnit(u Unit) error {
-
-	query := "INSERT INTO " + db.unitTable() + " (id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at) VALUES (:id,:name,:type,:service_id,:engine_id,:container_id,:network_mode,:latest_error,:status,:created_at)"
-
-	_, err := db.NamedExec(query, &u)
-	if err == nil {
-		return nil
+// InsertUnits insert []Unit in Tx
+func (db dbBase) InsertUnits(units []Unit) error {
+	do := func(tx *sqlx.Tx) error {
+		return db.txInsertUnits(tx, units)
 	}
 
-	return errors.Wrap(err, "insert Unit")
-}
-
-// txInsertUnit insert Unit in Tx
-func (db dbBase) txInsertUnit(tx *sqlx.Tx, u Unit) error {
-
-	query := "INSERT INTO " + db.unitTable() + " (id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at) VALUES (:id,:name,:type,:service_id,:engine_id,:container_id,:network_mode,:latest_error,:status,:created_at)"
-
-	_, err := tx.NamedExec(query, &u)
-	if err == nil {
-		return nil
-	}
-
-	return errors.Wrap(err, "Tx insert Unit")
+	return db.txFrame(do)
 }
 
 // txInsertUnits insert []Unit in Tx

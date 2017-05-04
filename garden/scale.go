@@ -182,26 +182,30 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 		return err
 	}
 
-	pu, err := gd.allocation(ctx, actor, svc, []database.Unit{add})
+	pendings, err := gd.allocation(ctx, actor, svc, add)
 	if err != nil {
 		return err
 	}
 
-	err = svc.runContainer(ctx, pu, auth)
+	err = svc.runContainer(ctx, pendings, auth)
 	if err != nil {
 		return err
 	}
 
-	err = svc.initStart(ctx, []*unit{newUnit(add, svc.so, svc.cluster)}, gd.KVClient(), nil, nil)
+	units := make([]*unit, len(add))
+	for i := range add {
+		units[i] = newUnit(add[i], svc.so, svc.cluster)
+	}
+
+	err = svc.initStart(ctx, units, gd.KVClient(), nil, nil)
 
 	return err
 }
 
-func (svc *Service) prepareScale(scale structs.ServiceScaleRequest) (database.Unit, error) {
-	add := database.Unit{}
+func (svc *Service) prepareScale(scale structs.ServiceScaleRequest) ([]database.Unit, error) {
 	spec, err := svc.RefreshSpec()
 	if err != nil {
-		return add, err
+		return nil, err
 	}
 	if spec.Users == nil {
 		spec.Users = scale.Users
@@ -221,37 +225,42 @@ func (svc *Service) prepareScale(scale structs.ServiceScaleRequest) (database.Un
 	r := strings.NewReader(svc.svc.Desc.ScheduleOptions)
 	err = json.NewDecoder(r).Decode(&opts)
 	if err != nil {
-		return add, err
+		return nil, err
 	}
 
 	units, err := svc.getUnits()
 	if err != nil {
-		return add, err
+		return nil, err
 	}
 
 	// adjust scheduleOption by unit
 	svc.options, err = scheduleOptionsByUnits(opts, units)
 	if err != nil {
-		return add, err
+		return nil, err
 	}
 
 	im, err := svc.so.GetImageVersion(spec.Image)
 	if err != nil {
-		return add, err
+		return nil, err
 	}
 
-	uid := utils.Generate32UUID()
-	add = database.Unit{
-		ID:          uid,
-		Name:        fmt.Sprintf("%s_%s", spec.Name, uid[:8]), // <service_name>_<unit_id_8bit>
-		Type:        im.Name,
-		ServiceID:   spec.ID,
-		NetworkMode: "none",
-		Status:      0,
-		CreatedAt:   time.Now(),
+	add := make([]database.Unit, scale.Arch.Replicas-len(units))
+	now := time.Now()
+
+	for i := range add {
+		uid := utils.Generate32UUID()
+		add[i] = database.Unit{
+			ID:          uid,
+			Name:        fmt.Sprintf("%s_%s", spec.Name, uid[:8]), // <service_name>_<unit_id_8bit>
+			Type:        im.Name,
+			ServiceID:   spec.ID,
+			NetworkMode: "none",
+			Status:      0,
+			CreatedAt:   now,
+		}
 	}
 
-	err = svc.so.InsertUnit(add)
+	err = svc.so.InsertUnits(add)
 
 	return add, err
 }
