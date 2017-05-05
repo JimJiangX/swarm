@@ -356,7 +356,7 @@ func (db dbBase) DelNetworking(networking string) error {
 
 func (db dbBase) SetNetworkingEnable(networking string, enable bool) error {
 
-	_, err := db.Exec("UPDATE "+db.ipTable()+" SET enable=? WHERE networking_id=?", enable, networking)
+	_, err := db.Exec("UPDATE "+db.ipTable()+" SET enabled=? WHERE networking_id=?", enable, networking)
 	if err == nil {
 		return nil
 	}
@@ -367,7 +367,7 @@ func (db dbBase) SetNetworkingEnable(networking string, enable bool) error {
 func (db dbBase) SetIPEnable(in []uint32, networking string, enable bool) error {
 	do := func(tx *sqlx.Tx) error {
 
-		stmt, err := tx.Prepare("UPDATE " + db.ipTable() + " SET enable=? WHERE ip_addr=? AND networking_id=?")
+		stmt, err := tx.Prepare("UPDATE " + db.ipTable() + " SET enabled=? WHERE ip_addr=? AND networking_id=?")
 		if err != nil {
 			return errors.Wrap(err, "tx prepare update []IP")
 		}
