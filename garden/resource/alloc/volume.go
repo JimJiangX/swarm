@@ -66,3 +66,8 @@ func (at allocator) ExpandVolumes(engine *cluster.Engine, uid string, stores []s
 
 	return drivers.ExpandVolumes(uid, agent, stores)
 }
+
+func (at allocator) MigrateVolumes(uid string, config *cluster.ContainerConfig, old, new *cluster.Engine, lvs []database.Volume) error {
+
+	return nil
+}
