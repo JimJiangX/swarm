@@ -1219,6 +1219,94 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func convertNetworking(list []database.IP) []structs.NetworkingInfo {
+	nws := make([]structs.NetworkingInfo, 0, 5)
+
+loop:
+	for i := range list {
+		for n := range nws {
+			if nws[n].Networking == list[i].Networking {
+
+				nws[n].IPs = append(nws[n].IPs, structs.IP{
+					Enabled:   list[i].Enabled,
+					IPAddr:    utils.Uint32ToIP(list[i].IPAddr).String(),
+					UnitID:    list[i].UnitID,
+					Engine:    list[i].Engine,
+					Bond:      list[i].Bond,
+					Bandwidth: list[i].Bandwidth,
+				})
+
+				continue loop
+			}
+		}
+
+		nw := structs.NetworkingInfo{
+			Prefix:     list[i].Prefix,
+			VLAN:       list[i].VLAN,
+			Networking: list[i].Networking,
+			Gateway:    list[i].Gateway,
+			IPs:        make([]structs.IP, 1, 30),
+		}
+
+		nw.IPs[0] = structs.IP{
+			Enabled:   list[i].Enabled,
+			IPAddr:    utils.Uint32ToIP(list[i].IPAddr).String(),
+			UnitID:    list[i].UnitID,
+			Engine:    list[i].Engine,
+			Bond:      list[i].Bond,
+			Bandwidth: list[i].Bandwidth,
+		}
+
+		nws = append(nws, nw)
+	}
+
+	return nws
+}
+
+func listNetworkings(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	out, err := gd.Ormer().ListIPs()
+	if err != nil {
+		ec := errCodeV1(r.Method, _Networking, internalError, 51)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
+		return
+	}
+
+	nws := convertNetworking(out)
+
+	writeJSON(w, nws, http.StatusOK)
+}
+
+func getNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	out, err := gd.Ormer().ListIPByNetworking(name)
+	if err != nil {
+		ec := errCodeV1(r.Method, _Networking, internalError, 61)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
+		return
+	}
+
+	nws := convertNetworking(out)
+
+	writeJSON(w, nws, http.StatusOK)
+}
+
 // -----------------/services handlers-----------------
 func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	ok, _, gd := fromContext(ctx, _Garden)
