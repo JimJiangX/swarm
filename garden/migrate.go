@@ -1,6 +1,7 @@
 package garden
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -39,8 +40,10 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, unit string,
 
 		defer func() {
 			if err != nil {
-				u.startService(ctx, cmds.GetCmd(u.u.ID, structs.StartServiceCmd))
-				// TODO: error
+				_err := u.startService(ctx, cmds.GetCmd(u.u.ID, structs.StartServiceCmd))
+				if _err != nil {
+					err = fmt.Errorf("%+v\n%+v", err, _err)
+				}
 			}
 		}()
 
