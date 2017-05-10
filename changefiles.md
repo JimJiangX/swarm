@@ -53,6 +53,10 @@
 		+	/strategy/strategy.go L42
 		+++	/strategy/group.go 
 	
+	/docs:
+		+++ mgm-api.postman_collection.json
+		
+		
 	/vendor: ---> vendor.json
 			
 
@@ -62,4 +66,5 @@
 	    +   commands.go   seedjoin
 		+	flags.go      flSeedAddr args
 	/seed:all
+	
 	
