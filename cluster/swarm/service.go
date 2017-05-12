@@ -1397,7 +1397,7 @@ func (svc *Service) ModifyUnitConfig(_type string, config map[string]interface{}
 
 			_, err := containerExec(context.Background(), engine, u.ContainerID, cmdList[i][:], false)
 			if err != nil {
-				return err
+				logrus.WithField("Unit", u.Name).Warnf("container exec [%s],%+v", cmdList[i], err)
 			}
 		}
 	}
