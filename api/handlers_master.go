@@ -1251,8 +1251,12 @@ func getNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	nws := convertNetworking(out)
+	if len(nws) == 1 {
+		writeJSON(w, nws[0], http.StatusOK)
+		return
+	}
 
-	writeJSON(w, nws, http.StatusOK)
+	// TODO:more than one
 }
 
 // -----------------/services handlers-----------------
