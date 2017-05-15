@@ -1256,7 +1256,14 @@ func getNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO:more than one
+	for i := range nws {
+		if nws[i].Networking == name {
+			writeJSON(w, nws[i], http.StatusOK)
+			return
+		}
+	}
+
+	writeJSON(w, stderr.New("not found networking:"+name), http.StatusOK)
 }
 
 // -----------------/services handlers-----------------
