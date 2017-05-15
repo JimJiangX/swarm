@@ -57,9 +57,12 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 			table.Desc = &desc
 
 			err = svc.so.SetServiceDesc(table)
-
-			return err
+			if err != nil {
+				return err
+			}
 		}
+
+		return svc.Compose(ctx, gd.PluginClient())
 	}
 
 	task := database.NewTask(svc.svc.Name, database.ServiceScaleTask, svc.svc.ID, fmt.Sprintf("replicas=%d", req.Arch.Replicas), nil, 300)
