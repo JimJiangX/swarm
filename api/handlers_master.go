@@ -83,58 +83,6 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 	}
 }
 
-func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		ec := errCodeV1(r.Method, _NFS, urlParamError, 11)
-		httpJSONError(w, err, ec.code, http.StatusBadRequest)
-		return
-	}
-
-	ok, _, gd := fromContext(ctx, _Garden)
-	if !ok || gd == nil ||
-		gd.Ormer() == nil {
-
-		httpJSONNilGarden(w)
-		return
-	}
-
-	name := mux.Vars(r)["name"]
-	proxyURL := mux.Vars(r)["proxy"]
-	port := r.FormValue("port")
-	orm := gd.Ormer()
-
-	u, err := orm.GetUnit(name)
-	if err != nil {
-		ec := errCodeV1(r.Method, _Unit, dbQueryError, 11)
-		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
-		return
-	}
-
-	ips, err := orm.ListIPByUnitID(u.ID)
-	if err != nil {
-		ec := errCodeV1(r.Method, _Unit, dbQueryError, 12)
-		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
-		return
-	}
-
-	if len(ips) == 0 {
-		ec := errCodeV1(r.Method, _Unit, objectNotExist, 13)
-		httpJSONError(w, errors.Errorf("not found Unit %s address", u.Name), ec.code, http.StatusInternalServerError)
-		return
-	}
-
-	r.URL.Path = "/" + proxyURL
-	addr := utils.Uint32ToIP(ips[0].IPAddr).String()
-	addr = net.JoinHostPort(addr, port)
-
-	err = hijack(nil, addr, w, r)
-	if err != nil {
-		ec := errCodeV1(r.Method, _Unit, internalError, 14)
-		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
-		return
-	}
-}
-
 // -----------------/nfs_backups handlers-----------------
 func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
@@ -1219,6 +1167,105 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func convertNetworking(list []database.IP) []structs.NetworkingInfo {
+	nws := make([]structs.NetworkingInfo, 0, 5)
+
+loop:
+	for i := range list {
+		for n := range nws {
+			if nws[n].Networking == list[i].Networking {
+
+				nws[n].IPs = append(nws[n].IPs, structs.IP{
+					Enabled:   list[i].Enabled,
+					IPAddr:    utils.Uint32ToIP(list[i].IPAddr).String(),
+					UnitID:    list[i].UnitID,
+					Engine:    list[i].Engine,
+					Bond:      list[i].Bond,
+					Bandwidth: list[i].Bandwidth,
+				})
+
+				continue loop
+			}
+		}
+
+		nw := structs.NetworkingInfo{
+			Prefix:     list[i].Prefix,
+			VLAN:       list[i].VLAN,
+			Networking: list[i].Networking,
+			Gateway:    list[i].Gateway,
+			IPs:        make([]structs.IP, 1, 30),
+		}
+
+		nw.IPs[0] = structs.IP{
+			Enabled:   list[i].Enabled,
+			IPAddr:    utils.Uint32ToIP(list[i].IPAddr).String(),
+			UnitID:    list[i].UnitID,
+			Engine:    list[i].Engine,
+			Bond:      list[i].Bond,
+			Bandwidth: list[i].Bandwidth,
+		}
+
+		nws = append(nws, nw)
+	}
+
+	return nws
+}
+
+func listNetworkings(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	out, err := gd.Ormer().ListIPs()
+	if err != nil {
+		ec := errCodeV1(r.Method, _Networking, internalError, 51)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
+		return
+	}
+
+	nws := convertNetworking(out)
+
+	writeJSON(w, nws, http.StatusOK)
+}
+
+func getNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	out, err := gd.Ormer().ListIPByNetworking(name)
+	if err != nil {
+		ec := errCodeV1(r.Method, _Networking, internalError, 61)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
+		return
+	}
+
+	nws := convertNetworking(out)
+	if len(nws) == 1 {
+		writeJSON(w, nws[0], http.StatusOK)
+		return
+	}
+
+	for i := range nws {
+		if nws[i].Networking == name {
+			writeJSON(w, nws[i], http.StatusOK)
+			return
+		}
+	}
+
+	writeJSON(w, stderr.New("not found networking:"+name), http.StatusOK)
+}
+
 // -----------------/services handlers-----------------
 func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	ok, _, gd := fromContext(ctx, _Garden)
@@ -1701,6 +1748,107 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 }
 
 // -----------------/storage handlers-----------------
+func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(r.Method, _Unit, urlParamError, 11)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	name := mux.Vars(r)["name"]
+	proxyURL := mux.Vars(r)["proxy"]
+	port := r.FormValue("port")
+	orm := gd.Ormer()
+
+	u, err := orm.GetUnit(name)
+	if err != nil {
+		ec := errCodeV1(r.Method, _Unit, dbQueryError, 11)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
+		return
+	}
+
+	ips, err := orm.ListIPByUnitID(u.ID)
+	if err != nil {
+		ec := errCodeV1(r.Method, _Unit, dbQueryError, 12)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
+		return
+	}
+
+	if len(ips) == 0 {
+		ec := errCodeV1(r.Method, _Unit, objectNotExist, 13)
+		httpJSONError(w, errors.Errorf("not found Unit %s address", u.Name), ec.code, http.StatusInternalServerError)
+		return
+	}
+
+	r.URL.Path = "/" + proxyURL
+	addr := utils.Uint32ToIP(ips[0].IPAddr).String()
+	addr = net.JoinHostPort(addr, port)
+
+	err = hijack(nil, addr, w, r)
+	if err != nil {
+		ec := errCodeV1(r.Method, _Unit, internalError, 14)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
+		return
+	}
+}
+
+func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(r.Method, _Unit, urlParamError, 21)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
+	name := mux.Vars(r)["name"]
+	from := r.FormValue("from")
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	orm := gd.Ormer()
+
+	bf, err := orm.GetBackupFile(from)
+	if err != nil {
+		ec := errCodeV1(r.Method, _Unit, dbQueryError, 22)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
+		return
+	}
+
+	table, err := orm.GetServiceByUnit(name)
+	if err != nil {
+		ec := errCodeV1(r.Method, _Unit, dbQueryError, 23)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
+		return
+	}
+
+	svc := gd.NewService(nil, &table)
+
+	id, err := svc.UnitRestore(ctx, name, bf.Path, true)
+	if err != nil {
+		ec := errCodeV1(r.Method, _Unit, internalError, 24)
+		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+}
+
+// -----------------/storage handlers-----------------
 // GET /storage/san
 func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	ds := storage.DefaultStores()
@@ -1802,7 +1950,7 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "ID", s.ID())
+	fmt.Fprintf(w, "{%q:%q}", "id", s.ID())
 }
 
 // POST /storage/san/{name}/raidgroup
@@ -1827,7 +1975,7 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%d}", "Size", space.Total)
+	fmt.Fprintf(w, "{%q:%d}", "size", space.Total)
 }
 
 // POST /storage/san/{name}/raid_group/{rg:[0-9]+}/enable

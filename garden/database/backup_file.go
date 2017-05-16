@@ -11,6 +11,8 @@ import (
 type BackupFileIface interface {
 	InsertBackupFileWithTask(bf BackupFile, t Task) error
 
+	GetBackupFile(id string) (BackupFile, error)
+
 	ListBackupFilesByService(nameOrID string) (Service, []BackupFile, error)
 
 	DelBackupFiles(files []BackupFile) error

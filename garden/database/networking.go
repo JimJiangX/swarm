@@ -16,9 +16,10 @@ type NetworkingRequire struct {
 
 type NetworkingOrmer interface {
 	// IP
-	ListIPByNetworking(networkingID string) ([]IP, error)
-	ListIPByUnitID(unit string) ([]IP, error)
+	ListIPs() ([]IP, error)
 	ListIPByEngine(ID string) ([]IP, error)
+	ListIPByUnitID(unit string) ([]IP, error)
+	ListIPByNetworking(networkingID string) ([]IP, error)
 
 	AllocNetworking(unit, engine string, req []NetworkingRequire) ([]IP, error)
 
@@ -47,6 +48,23 @@ type IP struct {
 // ip_addr,prefix,networking_id,unit_id,gateway,vlan_id,enabled
 func (db dbBase) ipTable() string {
 	return db.prefix + "_ip"
+}
+
+// ListIPByNetworking returns []IP select by networking
+func (db dbBase) ListIPs() ([]IP, error) {
+	var (
+		list  []IP
+		query = "SELECT ip_addr,prefix,networking_id,unit_id,gateway,vlan_id,enabled,engine_id,net_dev,bandwidth FROM " + db.ipTable()
+	)
+
+	err := db.Select(&list, query)
+	if err == nil {
+		return list, nil
+	} else if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	return nil, errors.Wrap(err, "list []IP")
 }
 
 // ListIPByNetworking returns []IP select by networking
@@ -338,7 +356,7 @@ func (db dbBase) DelNetworking(networking string) error {
 
 func (db dbBase) SetNetworkingEnable(networking string, enable bool) error {
 
-	_, err := db.Exec("UPDATE "+db.ipTable()+" SET enable=? WHERE networking_id=?", enable, networking)
+	_, err := db.Exec("UPDATE "+db.ipTable()+" SET enabled=? WHERE networking_id=?", enable, networking)
 	if err == nil {
 		return nil
 	}
@@ -349,7 +367,7 @@ func (db dbBase) SetNetworkingEnable(networking string, enable bool) error {
 func (db dbBase) SetIPEnable(in []uint32, networking string, enable bool) error {
 	do := func(tx *sqlx.Tx) error {
 
-		stmt, err := tx.Prepare("UPDATE " + db.ipTable() + " SET enable=? WHERE ip_addr=? AND networking_id=?")
+		stmt, err := tx.Prepare("UPDATE " + db.ipTable() + " SET enabled=? WHERE ip_addr=? AND networking_id=?")
 		if err != nil {
 			return errors.Wrap(err, "tx prepare update []IP")
 		}

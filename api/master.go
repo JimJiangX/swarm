@@ -58,6 +58,9 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/hosts":           getAllNodes,
 		"/hosts/{name:.*}": getNode,
 
+		"/networkings":        listNetworkings,
+		"/networkings/{name}": getNetworking,
+
 		"/tasks":        getTasks,
 		"/tasks/{name}": getTask,
 
@@ -86,10 +89,11 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/services/{name}/config/update": postServiceUpdateConfigs,
 		"/services/{name}/exec":          postServiceExec,
 		"/services/{name:.*}/backup":     postServiceBackup,
-		//		"/services/{name:.*}/rebuild": postServiceRebuild,
 
 		//		"/units/{name:.*}/migrate":    postUnitMigrate,
 		//		"/units/{name:.*}/rebuild":    postUnitRebuild,
+
+		"/units/{name}/restore": postUnitRestore,
 
 		"/networkings/{name}/ips": postNetworking,
 
