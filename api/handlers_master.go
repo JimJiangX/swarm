@@ -84,6 +84,31 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 }
 
 // -----------------/nfs_backups handlers-----------------
+func vaildNFSParams(nfs database.NFS) error {
+	errs := make([]string, 0, 4)
+	if nfs.Addr == "" {
+		errs = append(errs, "nfs:Addr is required")
+	}
+
+	if nfs.Dir == "" {
+		errs = append(errs, "nfs:Dir is required")
+	}
+
+	if nfs.MountDir == "" {
+		errs = append(errs, "nfs:Mount Dir is required")
+	}
+
+	if nfs.Options == "" {
+		errs = append(errs, "nfs:Option is required")
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("nfs:%v,%s", nfs, errs)
+}
+
 func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		ec := errCodeV1(r.Method, _NFS, urlParamError, 11)
@@ -98,6 +123,13 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	nfs.MountDir = r.FormValue("nfs_mount_dir")
 	nfs.Options = r.FormValue("nfs_mount_opts")
 
+	err := vaildNFSParams(nfs)
+	if err != nil {
+		ec := errCodeV1(r.Method, _NFS, urlParamError, 12)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
@@ -108,14 +140,14 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	sys, err := gd.Ormer().GetSysConfig()
 	if err != nil {
-		ec := errCodeV1(r.Method, _NFS, dbQueryError, 12)
+		ec := errCodeV1(r.Method, _NFS, dbQueryError, 13)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	abs, err := utils.GetAbsolutePath(true, sys.SourceDir)
 	if err != nil {
-		ec := errCodeV1(r.Method, _NFS, objectNotExist, 13)
+		ec := errCodeV1(r.Method, _NFS, objectNotExist, 14)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -124,7 +156,7 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	space, err := d.Space()
 	if err != nil {
-		ec := errCodeV1(r.Method, _NFS, internalError, 14)
+		ec := errCodeV1(r.Method, _NFS, internalError, 15)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
