@@ -12,18 +12,16 @@ import (
 	"github.com/urfave/cli"
 )
 
-const (
-	Seedversion = "1.0.0"
-)
+const seedversion = "1.0.0"
 
 func seedServer(c *cli.Context) {
 
-	seedAddr := c.String("seedAddr")
-	if seedAddr == "" {
+	addr := c.String("seedAddr")
+	if addr == "" {
 		log.Fatal("missing mandatory --seedAddr flag")
 	}
 
-	if !checkAddrFormat(seedAddr) {
+	if !checkAddrFormat(addr) {
 		log.Fatal("seed addr should be of the form ip:port or hostname:port")
 	}
 
@@ -32,16 +30,17 @@ func seedServer(c *cli.Context) {
 		log.Fatal(err)
 	}
 
-	server := api.NewServer([]string{seedAddr}, tlsConfig)
+	server := api.NewServer([]string{addr}, tlsConfig)
 
-	server.SetHandler(seed.NewRouter(Seedversion))
+	server.SetHandler(seed.NewRouter(seedversion))
 
-	log.Infof("STARTING SEED SERVER ON : %s", seedAddr)
+	log.Infof("STARTING SEED SERVER ON : %s", addr)
 	log.Fatal(server.ListenAndServe())
 }
 
 func seedJoin(c *cli.Context) {
-	log.Info("seed version:", Seedversion)
+	log.Info("seed version:", seedversion)
+
 	dflag := getDiscovery(c)
 	if dflag == "" {
 		log.Fatalf("discovery required to join a cluster. See '%s join --help'.", c.App.Name)
