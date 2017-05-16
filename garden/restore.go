@@ -24,8 +24,8 @@ func (svc *Service) UnitRestore(ctx context.Context, unit, path string, async bo
 			return err
 		}
 
-		// TODO:stop service
-		err = u.stopContainer(ctx)
+		cmd := cmds.GetCmd(u.u.ID, structs.StopServiceCmd)
+		err = u.stopService(ctx, cmd, false)
 		if err != nil {
 			return err
 		}
@@ -35,7 +35,7 @@ func (svc *Service) UnitRestore(ctx context.Context, unit, path string, async bo
 			return err
 		}
 
-		cmd := cmds.GetCmd(u.u.ID, structs.RestoreCmd)
+		cmd = cmds.GetCmd(u.u.ID, structs.RestoreCmd)
 
 		cmd = append(cmd, path, sys.BackupDir)
 
