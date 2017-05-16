@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -27,10 +26,8 @@ func TestScriptPath(t *testing.T) {
 	files := []string{"connect_test.sh", "create_lun.sh", "del_lun.sh", "listrg.sh",
 		"add_host.sh", "del_host.sh", "create_lunmap.sh", "del_lunmap.sh"}
 
-	gopath := os.Getenv("GOPATH")
-
 	hw := huaweiStore{
-		script: filepath.Join(gopath, "src/github.com/docker/swarm/script", HUAWEI),
+		script: filepath.Join(getScriptPath(), HUAWEI),
 	}
 
 	for i := range files {
@@ -43,7 +40,7 @@ func TestScriptPath(t *testing.T) {
 	}
 
 	hs := hitachiStore{
-		script: filepath.Join(gopath, "src/github.com/docker/swarm/script", HITACHI),
+		script: filepath.Join(getScriptPath(), HITACHI),
 	}
 
 	for i := range files {

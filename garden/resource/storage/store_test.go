@@ -1,255 +1,88 @@
 package storage
 
-//import (
-//	"os"
-//	"testing"
+import (
+	"log"
+	"os"
+	"path/filepath"
+	"testing"
 
-//	"github.com/docker/swarm/garden/database"
-//)
+	"github.com/docker/swarm/garden/database"
+	_ "github.com/go-sql-driver/mysql"
+)
 
-//func init() {
-//	dbSource := "root:111111@tcp(127.0.0.1:3306)/DBaaS?parseTime=true&charset=utf8&loc=Asia%%2FShanghai&sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'"
-//	driverName := "mysql"
-//	maxOpen := 20
-//	database.Connect(driverName, dbSource, maxOpen)
-//	// set Current workdir to be script dir
-//	os.Chdir("/")
-//}
+var (
+	db database.Ormer
 
-//func TestRegisterStore(t *testing.T) {
-//	wrong, err := RegisterStore("HiaChI", "", "", "", "AMS2100_83004824", 0, 255, 1000, 1200)
-//	if err == nil {
-//		t.Error(wrong.Vendor())
-//	}
-//	t.Log("Expected,", err)
-//	hitachi, err := RegisterStore("HiTaChI", "", "", "", "AMS2100_83004824", 0, 255, 1000, 1200)
-//	if err != nil {
-//		t.Error(HITACHI, err)
-//	} else {
-//		t.Log(hitachi.ID(), HITACHI, "registered")
-//	}
+	hw = database.HuaweiStorage{}
+	ht = database.HitachiStorage{}
+)
 
-//	huawei, err := RegisterStore("hUaWeI", "146.240.104.61", "admin", "Admin@storage", "", 0, 255, 1000, 1200)
-//	if err != nil {
-//		t.Error(HUAWEI, err)
-//	} else {
-//		t.Log(huawei.ID(), HUAWEI, "registered")
-//	}
+func init() {
+	dbSource := "root:root@tcp(192.168.4.130:3306)/mgm?parseTime=true&charset=utf8&loc=Asia%2FShanghai&sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'"
+	driverName := "mysql"
+	dbMaxIdleConns := 8
 
-//	if hitachi != nil {
-//		database.DeleteStorageByID(hitachi.ID())
-//	}
-//	if huawei != nil {
-//		database.DeleteStorageByID(huawei.ID())
-//	}
-//}
+	var err error
 
-//func TestHITACHIStore(t *testing.T) {
-//	store, err := RegisterStore("HiTaChI", "", "", "", "AMS2100_83004824", 0, 255, 1000, 1200)
-//	if err != nil {
-//		t.Error(HITACHI, err)
-//	}
+	db, err = database.NewOrmer(driverName, dbSource, "tbl", dbMaxIdleConns)
+	if err != nil {
+		log.Printf("%+v", err)
+		return
+	}
+}
 
-//	if store.Vendor() != HITACHI {
-//		t.Errorf("Unexpected,want %s got %s", HITACHI, store.Vendor())
-//	}
-//	if store.Driver() != SANStoreDriver {
-//		t.Errorf("Unexpected,want %s got %s", SANStoreDriver, store.Driver())
-//	}
+func getScriptPath() string {
+	gopath := os.Getenv("GOPATH")
 
-//	size, err := store.AddSpace("0")
-//	if err != nil {
-//		t.Error(err, size)
-//	}
-//	t.Log(0, size)
+	return filepath.Join(gopath, "src/github.com/docker/swarm/script")
+}
 
-//	spaces, err := store.IdleSize()
-//	if err != nil {
-//		t.Error(err)
-//	}
+func TestDefaultStores(t *testing.T) {
+	path := getScriptPath()
 
-//	for key, val := range spaces {
-//		t.Log(key, val)
-//	}
+	if db == nil {
+		t.Skip("skip tests")
+	}
 
-//	err = store.DisableSpace("0")
-//	if err != nil {
-//		t.Error(err)
-//	}
-//	err = store.EnableSpace("0")
-//	if err != nil {
-//		t.Error(err)
-//	}
-//	err = store.AddHost("node001")
-//	if err != nil {
-//		t.Error(err)
-//	}
+	SetDefaultStores(path, db)
 
-//	lun, lv, err := store.Alloc("test001", "unit001", "vgName001", 1<<20)
-//	if err != nil {
-//		t.Error(err)
-//	}
-//	t.Log(lun, lv)
+	ds := DefaultStores()
 
-//	spaces, err = store.IdleSize()
-//	if err != nil {
-//		t.Error(err)
-//	}
+	out, err := ds.List()
+	if err != nil || len(out) != 0 {
+		t.Error(err, len(out))
+	}
 
-//	for key, val := range spaces {
-//		t.Log(key, val)
-//	}
+	{
+		hws, err := ds.Add(hw.Vendor, hw.IPAddr, hw.Username, hw.Password, "", 0, 0, hw.HluStart, hw.HluEnd)
+		if err != nil {
+			t.Log(err)
+		} else {
+			hw.ID = hws.ID()
 
-//	err = store.Mapping("node001", "vgName001", lun.ID)
-//	if err != nil {
-//		t.Error(err)
-//	}
+			_, err = ds.Get(hws.ID())
+			if err != nil {
+				t.Error(hws.ID(), err)
+			}
+		}
+	}
 
-//	err = store.DelMapping(lun.ID)
-//	if err != nil {
-//		t.Error(err)
-//	}
+	{
+		hts, err := ds.Add(ht.Vendor, "", "", "", ht.AdminUnit, ht.LunStart, ht.LunEnd, ht.HluStart, ht.HluEnd)
+		if err != nil {
+			t.Log(err)
+		} else {
+			ht.ID = hts.ID()
 
-//	err = store.Recycle(lun.ID, 0)
-//	if err != nil {
-//		t.Error(err)
-//	}
+			_, err = ds.Get(hts.ID())
+			if err != nil {
+				t.Error(hts.ID(), err)
+			}
+		}
+	}
 
-//	spaces, err = store.IdleSize()
-//	if err != nil {
-//		t.Error(err)
-//	}
-
-//	for key, val := range spaces {
-//		t.Log(key, val)
-//	}
-
-//	store.DelHost("node001")
-//	if err != nil {
-//		t.Error(err)
-//	}
-
-//	database.DeleteStorageByID(store.ID())
-//}
-
-//func TestHUAWEIStore(t *testing.T) {
-//	store, err := RegisterStore("hUaWeI", "146.240.104.61", "admin", "Admin@storage", "", 0, 255, 1000, 1200)
-//	if err != nil {
-//		t.Error(HUAWEI, err)
-//	}
-
-//	if store.Vendor() != HUAWEI {
-//		t.Errorf("Unexpected,want %s got %s", HUAWEI, store.Vendor())
-//	}
-//	if store.Driver() != SANStoreDriver {
-//		t.Errorf("Unexpected,want %s got %s", SANStoreDriver, store.Driver())
-//	}
-
-//	size, err := store.AddSpace(0)
-//	if err != nil {
-//		t.Error(err, size)
-//	}
-//	t.Log(0, size)
-
-//	spaces, err := store.IdleSize()
-//	if err != nil {
-//		t.Error(err)
-//	}
-
-//	for key, val := range spaces {
-//		t.Log(key, val)
-//	}
-
-//	err = store.DisableSpace(0)
-//	if err != nil {
-//		t.Error(err)
-//	}
-//	err = store.EnableSpace(0)
-//	if err != nil {
-//		t.Error(err)
-//	}
-//	err = store.AddHost("node001")
-//	if err != nil {
-//		t.Error(err)
-//	}
-
-//	lun, lv, err := store.Alloc("test001", "unit001", "vgName001", 1<<20)
-//	if err != nil {
-//		t.Error(err)
-//	}
-//	t.Log(lun, lv)
-
-//	spaces, err = store.IdleSize()
-//	if err != nil {
-//		t.Error(err)
-//	}
-
-//	for key, val := range spaces {
-//		t.Log(key, val)
-//	}
-
-//	err = store.Mapping("node001", "vgName001", lun.ID)
-//	if err != nil {
-//		t.Error(err)
-//	}
-
-//	err = store.DelMapping(lun.ID)
-//	if err != nil {
-//		t.Error(err)
-//	}
-
-//	err = store.Recycle(lun.ID, 0)
-//	if err != nil {
-//		t.Error(err)
-//	}
-
-//	spaces, err = store.IdleSize()
-//	if err != nil {
-//		t.Error(err)
-//	}
-
-//	for key, val := range spaces {
-//		t.Log(key, val)
-//	}
-
-//	store.DelHost("node001")
-//	if err != nil {
-//		t.Error(err)
-//	}
-
-//	database.DeleteStorageByID(store.ID())
-//}
-
-//func TestGetStoreByID(t *testing.T) {
-//	lock.RLock()
-//	n := len(stores)
-//	lock.RUnlock()
-
-//	if n == 0 {
-//		store, err := RegisterStore("HiTaChI", "", "", "", "AMS2100_83004824", 0, 255, 1000, 1200)
-//		if err != nil {
-//			t.Error(HITACHI, err)
-//		}
-//		t.Log(store.ID(), HITACHI, "registered")
-//		store, err = RegisterStore("hUaWeI", "146.240.104.61", "admin", "Admin@storage", "", 0, 255, 1000, 1200)
-//		if err != nil {
-//			t.Error(HUAWEI, err)
-//		}
-//		t.Log(store.ID(), HUAWEI, "registered")
-//	}
-//	list := make([]string, 0, n)
-
-//	lock.Lock()
-//	for id := range stores {
-//		list = append(list, id)
-//		delete(stores, id)
-//	}
-//	lock.Unlock()
-
-//	for i := range list {
-//		store, err := GetStore(list[i])
-//		if err != nil || store == nil {
-//			t.Error("failed to get store", list[i])
-//		}
-//	}
-//}
+	out, err = ds.List()
+	if err != nil || len(out) == 0 {
+		t.Error(err, len(out))
+	}
+}
