@@ -25,4 +25,6 @@ type VolumeAllocator interface {
 	AlloctVolumes(config *cluster.ContainerConfig, uid string, n *node.Node, stores []structs.VolumeRequire) ([]database.Volume, error)
 
 	ExpandVolumes(eng *cluster.Engine, uid string, stores []structs.VolumeRequire) error
+
+	MigrateVolumes(uid string, config *cluster.ContainerConfig, old, new *cluster.Engine, lvs []database.Volume) error
 }
