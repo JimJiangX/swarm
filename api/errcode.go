@@ -80,8 +80,8 @@ func errCodeV1(method string, md model, cg category, serial int) errCode {
 		mt = 9
 	}
 
-	// version|method|model|category|serial
-	//    2		  1      2      2       3
+	// version|model|method|category|serial
+	//    2		 2      1      2       3
 	newErrCode := func(version, method, model, category, serial int) errCode {
 		mod := func(x, base int) int {
 			return x % base
@@ -92,7 +92,7 @@ func errCodeV1(method string, md model, cg category, serial int) errCode {
 		model = mod(model, 100)
 
 		return errCode{
-			code: serial + category*1000 + model*100000 + method*10000000 + version*100000000,
+			code: serial + category*1000 + method*100000 + model*1000000 + version*100000000,
 		}
 	}
 
