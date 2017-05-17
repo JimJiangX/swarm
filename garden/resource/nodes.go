@@ -3,6 +3,7 @@ package resource
 import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/pkg/errors"
 )
 
 type engineCluster interface {
@@ -31,6 +32,15 @@ func (m hostManager) RemoveCluster(ID string) error {
 	cl, err := m.getCluster(ID)
 	if err != nil && database.IsNotFound(err) {
 		return nil
+	}
+
+	n, err := m.dco.CountNodeByCluster(cl.ID)
+	if err != nil {
+		return err
+	}
+
+	if n > 0 {
+		return errors.Errorf("%d nodes belongs to Cluster:%s", n, cl.ID)
 	}
 
 	return m.dco.DelCluster(cl.ID)
