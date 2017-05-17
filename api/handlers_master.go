@@ -125,7 +125,7 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err := vaildNFSParams(nfs)
 	if err != nil {
-		ec := errCodeV1(r.Method, _NFS, urlParamError, 12)
+		ec := errCodeV1(r.Method, _NFS, bodyParamsError, 12)
 		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
@@ -226,6 +226,28 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusOK)
 }
 
+func vaildBackupTaskCallback(bt structs.BackupTaskCallback) error {
+	errs := make([]string, 0, 3)
+
+	if bt.UnitID == "" {
+		errs = append(errs, "Unit is required")
+	}
+
+	if bt.TaskID == "" {
+		errs = append(errs, "TaskID is required")
+	}
+
+	if bt.Path == "" {
+		errs = append(errs, "Path is required")
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("BackupTaskCallback errors:%v,%s", bt, errs)
+}
+
 func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.BackupTaskCallback{}
 
@@ -235,6 +257,14 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
+
+	err = vaildBackupTaskCallback(req)
+	if err != nil {
+		ec := errCodeV1(r.Method, _Task, bodyParamsError, 32)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil || gd.Ormer() == nil {
 		httpJSONNilGarden(w)
@@ -245,7 +275,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	svc, err := orm.GetServiceByUnit(req.UnitID)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Task, dbQueryError, 32)
+		ec := errCodeV1(r.Method, _Task, dbQueryError, 33)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -270,7 +300,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	err = orm.InsertBackupFileWithTask(bf, t)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Task, dbQueryError, 33)
+		ec := errCodeV1(r.Method, _Task, dbQueryError, 34)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
