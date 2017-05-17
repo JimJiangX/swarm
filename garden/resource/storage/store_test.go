@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -18,17 +18,13 @@ var (
 )
 
 func init() {
-	dbSource := "root:root@tcp(192.168.4.130:3306)/mgm?parseTime=true&charset=utf8&loc=Asia%2FShanghai&sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'"
-	driverName := "mysql"
-	dbMaxIdleConns := 8
-
-	var err error
-
-	db, err = database.NewOrmer(driverName, dbSource, "tbl", dbMaxIdleConns)
+	orm, err := database.NewOrmerFromArgs(os.Args)
 	if err != nil {
-		log.Printf("%+v", err)
+		fmt.Printf("%s,%s", os.Args, err)
 		return
 	}
+
+	db = orm
 }
 
 func getScriptPath() string {
