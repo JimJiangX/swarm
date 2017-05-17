@@ -56,8 +56,8 @@ func (h hitachiStore) Driver() string {
 	return SANStoreDriver
 }
 
-// Ping connected to store,call connect_test.sh,test whether store available.
-func (h hitachiStore) Ping() error {
+// ping connected to store,call connect_test.sh,test whether store available.
+func (h hitachiStore) ping() error {
 	path, err := h.scriptPath("connect_test.sh")
 	if err != nil {
 		return err
@@ -74,8 +74,8 @@ func (h hitachiStore) Ping() error {
 	return nil
 }
 
-// Insert insert hitachiStore into DB
-func (h *hitachiStore) Insert() error {
+// insert insert hitachiStore into DB
+func (h *hitachiStore) insert() error {
 	h.lock.Lock()
 	err := h.orm.InsertHitachiStorage(h.hs)
 	h.lock.Unlock()
@@ -348,8 +348,8 @@ func (h *hitachiStore) list(rg ...string) ([]Space, error) {
 	return spaces, nil
 }
 
-// IdleSize list store's RGs free size.
-func (h hitachiStore) IdleSize() (map[string]int64, error) {
+// idleSize list store's RGs free size.
+func (h hitachiStore) idleSize() (map[string]int64, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
@@ -550,6 +550,14 @@ func (h *hitachiStore) EnableSpace(id string) error {
 func (h *hitachiStore) DisableSpace(id string) error {
 	h.lock.Lock()
 	err := h.orm.SetRaidGroupStatus(h.ID(), id, false)
+	h.lock.Unlock()
+
+	return err
+}
+
+func (h *hitachiStore) removeSpace(id string) error {
+	h.lock.Lock()
+	err := h.orm.DelRaidGroup(h.ID(), id)
 	h.lock.Unlock()
 
 	return err

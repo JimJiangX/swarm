@@ -86,3 +86,73 @@ func TestDefaultStores(t *testing.T) {
 		t.Error(err, len(out))
 	}
 }
+
+func TestStore(t *testing.T) {
+	if db == nil {
+		t.Skip("skip test")
+	}
+
+	ds := DefaultStores()
+
+	s, err := ds.Get(hw.ID)
+	if err == nil && s != nil {
+		testStore(s, t)
+
+		err = ds.Remove(s.ID())
+		if err != nil {
+			t.Error(err, s.ID())
+		}
+
+	} else {
+		t.Log(err)
+	}
+
+	s, err = ds.Get(ht.ID)
+	if err == nil && s != nil {
+		testStore(s, t)
+
+		err = ds.Remove(s.ID())
+		if err != nil {
+			t.Error(err, s.ID())
+		}
+	} else {
+		t.Log(err)
+	}
+}
+
+func testStore(s Store, t *testing.T) {
+	err := s.ping()
+	if err != nil {
+		t.Error(err)
+	}
+
+	info, err := s.Info()
+	if err != nil {
+		t.Error(err, info)
+	}
+
+	ids := []string{"1", "2", "3"}
+	for i := range ids {
+		space, err := s.AddSpace(ids[i])
+		if err != nil {
+			t.Error(err, space)
+		}
+
+		err = s.DisableSpace(space.ID)
+		if err != nil {
+			t.Error(err)
+		}
+
+		err = s.EnableSpace(space.ID)
+		if err != nil {
+			t.Error(err)
+		}
+
+		defer func(id string) {
+			err := s.removeSpace(id)
+			if err != nil {
+				t.Error(err)
+			}
+		}(ids[i])
+	}
+}

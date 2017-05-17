@@ -46,10 +46,10 @@ type Store interface {
 	ID() string
 	Vendor() string
 	Driver() string
-	Ping() error
-	IdleSize() (map[string]int64, error)
+	ping() error
+	//	IdleSize() (map[string]int64, error)
 
-	Insert() error
+	insert() error
 
 	AddHost(name string, wwwn ...string) error
 	DelHost(name string, wwwn ...string) error
@@ -64,6 +64,7 @@ type Store interface {
 	AddSpace(id string) (Space, error)
 	EnableSpace(id string) error
 	DisableSpace(id string) error
+	removeSpace(id string) error
 }
 
 var defaultStores *stores
@@ -128,11 +129,11 @@ func (s *stores) Add(vendor, addr, user, password, admin string,
 		return nil, errors.Errorf("unsupported Vendor '%s' yet", vendor)
 	}
 
-	if err := store.Ping(); err != nil {
+	if err := store.ping(); err != nil {
 		return store, err
 	}
 
-	if err := store.Insert(); err != nil {
+	if err := store.insert(); err != nil {
 		return store, err
 	}
 
@@ -155,13 +156,15 @@ func (s *stores) Get(ID string) (Store, error) {
 
 	hitachi, huawei, err := s.orm.GetStorageByID(ID)
 	if err != nil {
-		return nil, errors.Wrap(err, "get store by ID")
+		return nil, err
 	}
 
 	if hitachi != nil {
 		store = newHitachiStore(s.orm, s.script, *hitachi)
 	} else if huawei != nil {
 		store = newHuaweiStore(s.orm, s.script, *huawei)
+	} else {
+		return nil, errors.New("not found Store by ID:" + ID)
 	}
 
 	if store != nil {
@@ -234,5 +237,5 @@ func (s *stores) RemoveStoreSpace(ID, space string) error {
 		return errors.Errorf("Store %s RaidGroup %s is using,cannot be removed", store.ID(), space)
 	}
 
-	return s.orm.DelRaidGroup(store.ID(), space)
+	return store.removeSpace(space)
 }

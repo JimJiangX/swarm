@@ -52,7 +52,7 @@ func (h huaweiStore) Driver() string {
 	return SANStoreDriver
 }
 
-func (h *huaweiStore) Ping() error {
+func (h *huaweiStore) ping() error {
 	path, err := h.scriptPath("connect_test.sh")
 	if err != nil {
 		return err
@@ -69,7 +69,7 @@ func (h *huaweiStore) Ping() error {
 	return nil
 }
 
-func (h *huaweiStore) Insert() error {
+func (h *huaweiStore) insert() error {
 	h.lock.Lock()
 	err := h.orm.InsertHuaweiStorage(h.hs)
 	h.lock.Unlock()
@@ -249,7 +249,7 @@ func (h *huaweiStore) Recycle(id string, lun int) error {
 	return err
 }
 
-func (h huaweiStore) IdleSize() (map[string]int64, error) {
+func (h huaweiStore) idleSize() (map[string]int64, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
@@ -487,6 +487,14 @@ func (h *huaweiStore) EnableSpace(id string) error {
 func (h *huaweiStore) DisableSpace(id string) error {
 	h.lock.Lock()
 	err := h.orm.SetRaidGroupStatus(h.ID(), id, false)
+	h.lock.Unlock()
+
+	return err
+}
+
+func (h *huaweiStore) removeSpace(id string) error {
+	h.lock.Lock()
+	err := h.orm.DelRaidGroup(h.ID(), id)
 	h.lock.Unlock()
 
 	return err
