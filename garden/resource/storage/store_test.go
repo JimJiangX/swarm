@@ -13,8 +13,10 @@ import (
 var (
 	db database.Ormer
 
-	hw = database.HuaweiStorage{}
-	ht = database.HitachiStorage{}
+	hw     = database.HuaweiStorage{}
+	ht     = database.HitachiStorage{}
+	engine = "engine001"
+	wwwn   = "fafokaoka"
 )
 
 func init() {
@@ -150,5 +152,56 @@ func testStore(s Store, t *testing.T) {
 				t.Error(err)
 			}
 		}(ids[i])
+	}
+
+	err = s.AddHost(engine, wwwn)
+	if err != nil {
+		t.Error(err)
+	}
+	defer func() {
+		err := s.DelHost(engine, wwwn)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	lun, lv, err := s.Alloc("volumeName0001", "unitID0001", "VGName001", 2<<30)
+	if err != nil {
+		t.Error(err)
+	}
+
+	defer func() {
+		err := s.Recycle(lun.ID, 0)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	err = s.Mapping(engine, "VGName001", lun.ID)
+	if err != nil {
+		t.Error(err)
+	}
+
+	defer func() {
+		err := s.DelMapping(lun.ID)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	lun1, lv, err := s.Extend(lv, 1<<30)
+	if err != nil {
+		t.Error(err)
+	}
+
+	defer func() {
+		err := s.Recycle(lun1.ID, 0)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	if lv.Size != 3<<30 {
+		t.Error(lv.Size)
 	}
 }
