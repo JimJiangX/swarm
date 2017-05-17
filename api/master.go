@@ -115,8 +115,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/networkings/{name}/ips/enable":  putNetworkingEnable,
 		"/networkings/{name}/ips/disable": putNetworkingDisable,
 
-		"/storage/san/{name}/raid_group/{rg:.*}/enable":  postEnableRaidGroup,
-		"/storage/san/{name}/raid_group/{rg:.*}/disable": postDisableRaidGroup,
+		"/storage/san/{name}/raid_group/{rg:.*}/enable":  putEnableRaidGroup,
+		"/storage/san/{name}/raid_group/{rg:.*}/disable": putDisableRaidGroup,
 	},
 
 	http.MethodDelete: {

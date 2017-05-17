@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -86,6 +85,7 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 // -----------------/nfs_backups handlers-----------------
 func vaildNFSParams(nfs database.NFS) error {
 	errs := make([]string, 0, 4)
+
 	if nfs.Addr == "" {
 		errs = append(errs, "nfs:Addr is required")
 	}
@@ -309,6 +309,10 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 }
 
 // -----------------/datacenter handler-----------------
+func vaildDatacenter(v structs.RegisterDC) error {
+	return nil
+}
+
 func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.RegisterDC{}
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -317,6 +321,13 @@ func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
+
+	if err := vaildDatacenter(req); err != nil {
+		ec := errCodeV1(r.Method, _DC, bodyParamsError, 12)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil {
 		httpJSONNilGarden(w)
@@ -325,7 +336,7 @@ func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err = gd.Register(req)
 	if err != nil {
-		ec := errCodeV1(r.Method, _DC, internalError, 12)
+		ec := errCodeV1(r.Method, _DC, internalError, 13)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -391,11 +402,35 @@ func getSupportImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	writeJSON(w, out, http.StatusOK)
 }
 
+func vaildLoadImageRequest(v structs.PostLoadImageRequest) error {
+	errs := make([]string, 0, 2)
+
+	if v.Name == "" || (v.Major == 0 && v.Minor == 0 && v.Patch == 0) {
+		errs = append(errs, "ImageVersion is required")
+	}
+
+	if v.Path == "" {
+		errs = append(errs, "Path is required")
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("PostLoadImageRequest:%v,%s", v, errs)
+}
+
 func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostLoadImageRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		ec := errCodeV1(r.Method, _Image, decodeError, 31)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
+	if err := vaildLoadImageRequest(req); err != nil {
+		ec := errCodeV1(r.Method, _Image, bodyParamsError, 32)
 		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
@@ -418,7 +453,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	pc := gd.PluginClient()
 	supports, err := pc.GetImageSupport(ctx)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Image, internalError, 32)
+		ec := errCodeV1(r.Method, _Image, internalError, 33)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -434,7 +469,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
-		ec := errCodeV1(r.Method, _Image, objectNotExist, 33)
+		ec := errCodeV1(r.Method, _Image, objectNotExist, 34)
 		httpJSONError(w, fmt.Errorf("%s unsupported yet", req.Version()), ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -442,7 +477,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	// database.Image.ID
 	id, taskID, err := resource.LoadImage(goctx.Background(), gd.Ormer(), req)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Image, internalError, 34)
+		ec := errCodeV1(r.Method, _Image, internalError, 35)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -545,11 +580,21 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusOK)
 }
 
+func vaildPostClusterRequest(v structs.PostClusterRequest) error {
+	return nil
+}
+
 func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostClusterRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		ec := errCodeV1(r.Method, _Cluster, decodeError, 31)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
+	if err := vaildPostClusterRequest(req); err != nil {
+		ec := errCodeV1(r.Method, _Cluster, bodyParamsError, 32)
 		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
@@ -570,7 +615,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err = gd.Ormer().InsertCluster(c)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Cluster, dbExecError, 32)
+		ec := errCodeV1(r.Method, _Cluster, dbExecError, 33)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -586,6 +631,12 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		ec := errCodeV1(r.Method, _Cluster, decodeError, 41)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
+	if err := vaildPostClusterRequest(req); err != nil {
+		ec := errCodeV1(r.Method, _Cluster, bodyParamsError, 42)
 		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
@@ -606,7 +657,7 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	err = gd.Ormer().SetClusterParams(c)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Cluster, dbExecError, 42)
+		ec := errCodeV1(r.Method, _Cluster, dbExecError, 43)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -765,11 +816,46 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusOK)
 }
 
+func vailPostNodesRequest(hosts structs.PostNodesRequest) error {
+	if len(hosts) == 0 {
+		return stderr.New("none host is requir installing")
+	}
+
+	errs := make([]string, 0, 5)
+
+	for i := range hosts {
+		if hosts[i].Cluster == "" {
+			errs = append(errs, "Cluster is required")
+		}
+
+		if hosts[i].Addr == "" {
+			errs = append(errs, "Addr is required")
+		}
+
+		// vaild ssh config
+		if hosts[i].SSHConfig.Username == "" {
+			errs = append(errs, "SSHConfig.Username is required")
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("PostNodesRequest:%v,%s", hosts, errs)
+}
+
 func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	list := structs.PostNodesRequest{}
 	err := json.NewDecoder(r.Body).Decode(&list)
 	if err != nil {
 		ec := errCodeV1(r.Method, _Host, decodeError, 31)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
+	if err := vailPostNodesRequest(list); err != nil {
+		ec := errCodeV1(r.Method, _Host, bodyParamsError, 32)
 		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
@@ -788,14 +874,14 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		if n == 0 {
 			err = errors.New("clusters is nil")
 		}
-		ec := errCodeV1(r.Method, _Host, dbQueryError, 32)
+		ec := errCodeV1(r.Method, _Host, dbQueryError, 33)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	for i := range list {
 		if list[i].Cluster == "" {
-			ec := errCodeV1(r.Method, _Host, bodyParamsError, 33)
+			ec := errCodeV1(r.Method, _Host, bodyParamsError, 34)
 			httpJSONError(w, fmt.Errorf("host:%s ClusterID is required", list[i].Addr), ec.code, http.StatusInternalServerError)
 			return
 		}
@@ -808,7 +894,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if !exist {
-			ec := errCodeV1(r.Method, _Host, bodyParamsError, 34)
+			ec := errCodeV1(r.Method, _Host, bodyParamsError, 35)
 			httpJSONError(w, fmt.Errorf("host:%s unknown ClusterID:%s", list[i].Addr, list[i].Cluster), ec.code, http.StatusInternalServerError)
 			return
 		}
@@ -817,7 +903,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			_, _, err = orm.GetStorageByID(list[i].Storage)
 		}
 		if err != nil {
-			ec := errCodeV1(r.Method, _Host, dbQueryError, 35)
+			ec := errCodeV1(r.Method, _Host, dbQueryError, 36)
 			httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 			return
 		}
@@ -848,7 +934,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	horus, err := gd.KVClient().GetHorusAddr()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, internalError, 36)
+		ec := errCodeV1(r.Method, _Host, internalError, 37)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -856,7 +942,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	master := resource.NewHostManager(orm, gd.Cluster)
 	err = master.InstallNodes(ctx, horus, nodes, gd.KVClient())
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, internalError, 37)
+		ec := errCodeV1(r.Method, _Host, internalError, 38)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -948,6 +1034,24 @@ func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func vaildDelNodesRequest(name, user string) error {
+	errs := make([]string, 0, 2)
+
+	if name == "" {
+		errs = append(errs, "host nameOrID is required")
+	}
+
+	if user == "" {
+		errs = append(errs, "ssh.Username is required")
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("%s", errs)
+}
+
 // DELETE /clusters/nodes/{node:.*}
 //
 // 204 删除成功
@@ -968,6 +1072,12 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
+	if err := vaildDelNodesRequest(node, username); err != nil {
+		ec := errCodeV1(r.Method, _Host, urlParamError, 72)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
 		gd.Ormer() == nil ||
@@ -979,7 +1089,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	horus, err := gd.KVClient().GetHorusAddr()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, internalError, 72)
+		ec := errCodeV1(r.Method, _Host, internalError, 73)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -988,7 +1098,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err = m.RemoveNode(ctx, horus, node, username, password, force, gd.KVClient())
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, internalError, 73)
+		ec := errCodeV1(r.Method, _Host, internalError, 74)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -997,6 +1107,32 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // -----------------/networkings handlers-----------------
+func vailPostNetworkingRequest(v structs.PostNetworkingRequest) error {
+	errs := make([]string, 0, 4)
+
+	if v.Prefix < 0 || v.Prefix > 32 {
+		errs = append(errs, fmt.Sprintf("illegal Prefix:%d not in 1~32", v.Prefix))
+	}
+
+	if ip := net.ParseIP(v.Start); ip == nil {
+		errs = append(errs, fmt.Sprintf("illegal IP:'%s' error", v.Start))
+	}
+
+	if ip := net.ParseIP(v.End); ip == nil {
+		errs = append(errs, fmt.Sprintf("illegal IP:'%s' error", v.End))
+	}
+
+	if ip := net.ParseIP(v.Gateway); ip == nil {
+		errs = append(errs, fmt.Sprintf("illegal Gateway:'%s' error", v.Gateway))
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("PostNetworkingRequest:%v,%s", v, errs)
+}
+
 func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -1009,25 +1145,9 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	errs := make([]string, 0, 4)
-	if req.Prefix < 0 || req.Prefix > 32 {
-		errs = append(errs, fmt.Sprintf("illegal Prefix:%d not in 1~32", req.Prefix))
-	}
-
-	if ip := net.ParseIP(req.Start); ip == nil {
-		errs = append(errs, fmt.Sprintf("illegal IP:'%s' error", req.Start))
-	}
-
-	if ip := net.ParseIP(req.End); ip == nil {
-		errs = append(errs, fmt.Sprintf("illegal IP:'%s' error", req.End))
-	}
-	if ip := net.ParseIP(req.Gateway); ip == nil {
-		errs = append(errs, fmt.Sprintf("illegal Gateway:'%s' error", req.Gateway))
-	}
-
-	if len(errs) > 0 {
+	if err := vailPostNetworkingRequest(req); err != nil {
 		ec := errCodeV1(r.Method, _Networking, bodyParamsError, 12)
-		httpJSONError(w, errors.Errorf("%s", strings.Join(errs, ";")), ec.code, http.StatusBadRequest)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
@@ -1369,6 +1489,18 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(spec)
 }
 
+func vaildPostServiceRequest(spec structs.ServiceSpec) error {
+	errs := make([]string, 0, 5)
+
+	// TODO:check params
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("ServiceSpec:%v,%s", spec, errs)
+}
+
 func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		ec := errCodeV1(r.Method, _Service, urlParamError, 31)
@@ -1389,6 +1521,12 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := vaildPostServiceRequest(spec); err != nil {
+		ec := errCodeV1(r.Method, _Service, bodyParamsError, 33)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
 		gd.Ormer() == nil ||
@@ -1403,12 +1541,24 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	out, err := d.Deploy(ctx, spec)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 33)
+		ec := errCodeV1(r.Method, _Service, internalError, 34)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	writeJSON(w, out, http.StatusCreated)
+}
+
+func vaildPostServiceScaledRequest(v structs.ServiceScaleRequest) error {
+	errs := make([]string, 0, 5)
+
+	// TODO:check params
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("ServiceScaleRequest:%v,%s", v, errs)
 }
 
 func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1418,6 +1568,12 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	err := json.NewDecoder(r.Body).Decode(&scale)
 	if err != nil {
 		ec := errCodeV1(r.Method, _Service, decodeError, 41)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
+	if err := vaildPostServiceScaledRequest(scale); err != nil {
+		ec := errCodeV1(r.Method, _Service, bodyParamsError, 42)
 		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
@@ -1436,7 +1592,7 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	id, err := d.ServiceScale(ctx, name, scale)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 42)
+		ec := errCodeV1(r.Method, _Service, internalError, 43)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -1446,11 +1602,29 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
 }
 
+func vaildPostServiceLinkRequest(v structs.ServicesLink) error {
+	errs := make([]string, 0, 5)
+
+	// TODO:check params
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("ServicesLink:%v,%s", v, errs)
+}
+
 func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	links := structs.ServicesLink{}
 	err := json.NewDecoder(r.Body).Decode(&links)
 	if err != nil {
 		ec := errCodeV1(r.Method, _Service, decodeError, 51)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
+	if err := vaildPostServiceLinkRequest(links); err != nil {
+		ec := errCodeV1(r.Method, _Service, bodyParamsError, 52)
 		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
@@ -1470,7 +1644,7 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	// task ID
 	id, err := d.Link(ctx, links)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 52)
+		ec := errCodeV1(r.Method, _Service, internalError, 53)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -1512,6 +1686,18 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
 }
 
+func vaildPostServiceUpdateRequest(v structs.UnitRequire) error {
+	errs := make([]string, 0, 5)
+
+	// TODO:check params
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("UnitRequire:%v,%s", v, errs)
+}
+
 func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -1524,8 +1710,14 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if update.Require.CPU == 0 && update.Require.Memory == 0 && len(update.Volumes) == 0 {
+	if err := vaildPostServiceUpdateRequest(update); err != nil {
 		ec := errCodeV1(r.Method, _Service, bodyParamsError, 72)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
+	if update.Require.CPU == 0 && update.Require.Memory == 0 && len(update.Volumes) == 0 {
+		ec := errCodeV1(r.Method, _Service, bodyParamsError, 73)
 		httpJSONError(w, fmt.Errorf("no updateConfig required"), ec.code, http.StatusBadRequest)
 		return
 	}
@@ -1542,7 +1734,7 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	id, err := d.ServiceUpdate(ctx, name, update)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 73)
+		ec := errCodeV1(r.Method, _Service, internalError, 74)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -1592,6 +1784,14 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
 }
 
+func vaildPostServiceUpdateConfigsRequest(cmds structs.ConfigsMap, args map[string]interface{}) error {
+	if len(cmds) == 0 && len(args) == 0 {
+		return stderr.New("nothing new for update for service configs")
+	}
+
+	return nil
+}
+
 func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -1607,6 +1807,12 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
+	if err := vaildPostServiceUpdateConfigsRequest(req.Configs, req.Args); err != nil {
+		ec := errCodeV1(r.Method, _Service, bodyParamsError, 92)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
@@ -1617,14 +1823,14 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, dbQueryError, 92)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 93)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	spec, err := svc.Spec()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 93)
+		ec := errCodeV1(r.Method, _Service, internalError, 94)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -1633,7 +1839,7 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	err = svc.UpdateUnitsConfigs(ctx, req.Configs, req.Args, &task, true)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 94)
+		ec := errCodeV1(r.Method, _Service, internalError, 95)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -1643,6 +1849,14 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
 }
 
+func vaildPostServiceExecRequest(v structs.ServiceExecConfig) error {
+	if len(v.Cmd) == 0 {
+		return stderr.New("ServiceExecConfig.Cmd is required")
+	}
+
+	return nil
+}
+
 func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -1650,6 +1864,12 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	err := json.NewDecoder(r.Body).Decode(&config)
 	if err != nil {
 		ec := errCodeV1(r.Method, _Service, decodeError, 101)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
+	if err := vaildPostServiceExecRequest(config); err != nil {
+		ec := errCodeV1(r.Method, _Service, bodyParamsError, 102)
 		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
@@ -1664,14 +1884,14 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, dbQueryError, 102)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 103)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	spec, err := svc.Spec()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 103)
+		ec := errCodeV1(r.Method, _Service, internalError, 104)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -1680,7 +1900,7 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	err = svc.Exec(ctx, config, true, &task)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 104)
+		ec := errCodeV1(r.Method, _Service, internalError, 105)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -1761,6 +1981,18 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func vaildPostServiceBackupRequest(v structs.ServiceBackupConfig) error {
+	errs := make([]string, 0, 3)
+
+	// TODO:check params
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("ServiceBackupConfig:%v,%s", v, errs)
+}
+
 func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
@@ -1768,6 +2000,12 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	err := json.NewDecoder(r.Body).Decode(&config)
 	if err != nil {
 		ec := errCodeV1(r.Method, _Service, decodeError, 131)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
+	if err := vaildPostServiceBackupRequest(config); err != nil {
+		ec := errCodeV1(r.Method, _Service, bodyParamsError, 132)
 		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
@@ -1782,14 +2020,14 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, dbQueryError, 132)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 133)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
 	spec, err := svc.Spec()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 133)
+		ec := errCodeV1(r.Method, _Service, internalError, 134)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -1798,7 +2036,7 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	err = svc.Backup(ctx, r.Host, config, true, &task)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 134)
+		ec := errCodeV1(r.Method, _Service, internalError, 135)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -1990,6 +2228,18 @@ func getSanStoreInfo(store storage.Store) (structs.SANStorageResponse, error) {
 	}, nil
 }
 
+func vaildPostSanStorageRequest(v structs.PostSANStoreRequest) error {
+	errs := make([]string, 0, 3)
+
+	// TODO:check params
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("PostSANStoreRequest:%v,%s", v, errs)
+}
+
 // POST /storage/san
 func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostSANStoreRequest{}
@@ -2000,12 +2250,24 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := vaildPostSanStorageRequest(req); err != nil {
+		ec := errCodeV1(r.Method, _Storage, bodyParamsError, 32)
+		httpJSONError(w, err, ec.code, http.StatusBadRequest)
+		return
+	}
+
 	ds := storage.DefaultStores()
+	if ds == nil {
+		ec := errCodeV1(r.Method, _Storage, internalError, 33)
+		httpJSONError(w, stderr.New("storage:func DefaultStores called before SetDefaultStores"), ec.code, http.StatusInternalServerError)
+		return
+	}
+
 	s, err := ds.Add(req.Vendor, req.Addr,
 		req.Username, req.Password, req.Admin,
 		req.LunStart, req.LunEnd, req.HostLunStart, req.HostLunEnd)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Storage, internalError, 32)
+		ec := errCodeV1(r.Method, _Storage, internalError, 34)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -2040,8 +2302,8 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	fmt.Fprintf(w, "{%q:%d}", "size", space.Total)
 }
 
-// POST /storage/san/{name}/raid_group/{rg:[0-9]+}/enable
-func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+// PUT /storage/san/{name}/raid_group/{rg:[0-9]+}/enable
+func putEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	san := mux.Vars(r)["name"]
 	rg := mux.Vars(r)["rg"]
 
@@ -2063,8 +2325,8 @@ func postEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 }
 
-// POST /storage/san/{name}/raid_group/{rg:[0-9]+}/disable
-func postDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+// PUT /storage/san/{name}/raid_group/{rg:[0-9]+}/disable
+func putDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	san := mux.Vars(r)["name"]
 	rg := mux.Vars(r)["rg"]
 
