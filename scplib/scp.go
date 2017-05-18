@@ -49,6 +49,15 @@ func NewClient(addr, user, password string) (*Client, error) {
 // NewClientByPublicKeys returns a pointer of Client,ssh client with authenticate.
 // rsa default "$HOME/.ssh/id_rsa"
 func NewClientByPublicKeys(addr, user, rsa string) (*Client, error) {
+	_, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		if net.ParseIP(addr) != nil {
+			addr = net.JoinHostPort(addr, defaultSSHPort)
+		} else {
+			return nil, errors.Wrap(err, "parse addr error:"+addr)
+		}
+	}
+
 	if rsa == "" {
 		home := os.Getenv("HOME")
 		rsa = filepath.Join(home, "/.ssh/id_rsa")
