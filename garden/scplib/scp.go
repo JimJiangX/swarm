@@ -27,7 +27,7 @@ type client struct {
 	c *ssh.Client
 }
 
-// NewScpClient returns a pointer of ScpClient.
+// NewScpClient returns ScpClient.
 func NewScpClient(addr, user, password string) (ScpClient, error) {
 	_, _, err := net.SplitHostPort(addr)
 	if err != nil {
@@ -49,15 +49,18 @@ func NewScpClient(addr, user, password string) (ScpClient, error) {
 
 	c, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
+		if c != nil {
+			c.Close()
+		}
 		return nil, errors.Wrap(err, "new SSH client")
 	}
 
 	return &client{c}, nil
 }
 
-// NewClientByPublicKeys returns a pointer of Client,ssh client with authenticate.
+// NewClientByPublicKeys returns ScpClient,ssh client with authenticate.
 // rsa default "$HOME/.ssh/id_rsa"
-func NewClientByPublicKeys(addr, user, rsa string) (*Client, error) {
+func NewClientByPublicKeys(addr, user, rsa string) (ScpClient, error) {
 	if rsa == "" {
 		home := os.Getenv("HOME")
 		rsa = filepath.Join(home, "/.ssh/id_rsa")
@@ -90,16 +93,16 @@ func NewClientByPublicKeys(addr, user, rsa string) (*Client, error) {
 	}
 
 	// Connect to the remote server and perform the SSH handshake.
-	client, err := ssh.Dial("tcp", addr, config)
+	c, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
-		if client != nil {
-			client.Close()
+		if c != nil {
+			c.Close()
 		}
 
 		return nil, errors.Wrap(err, "unable to connect")
 	}
 
-	return &Client{client}, nil
+	return &client{c}, nil
 }
 
 // An implementation of ssh.KeyboardInteractiveChallenge that simply sends
