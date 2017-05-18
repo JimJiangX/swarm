@@ -128,7 +128,7 @@ func LoadImage(req structs.PostLoadImageRequest) (string, string, error) {
 		newName := fmt.Sprintf("%s:%d/%s", config.Registry.Domain, config.Registry.Port, oldName)
 		script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
 
-		c, err := scplib.NewClient(config.Registry.Address, config.Registry.OsUsername, config.Registry.OsPassword)
+		c, err := scplib.NewClientByPublicKeys(config.Registry.Address, config.Registry.OsUsername, "")
 		if err != nil {
 			return err
 		}
