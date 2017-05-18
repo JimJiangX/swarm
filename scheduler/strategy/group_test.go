@@ -32,11 +32,11 @@ func TestGroupPlaceDifferentNodeSize(t *testing.T) {
 
 	nodes[0].Labels["cluster"] = "cluster0"
 	nodes[1].Labels["cluster"] = "cluster0"
-	nodes[2].Labels["cluster"] = "cluster0"
+	nodes[2].Labels["cluster"] = "cluster1"
 	nodes[3].Labels["cluster"] = "cluster1"
 
 	// add 60 containers
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 60; i++ {
 		config := createContainerConfig(0, "")
 		node := selectTopNode(t, s, config, nodes)
 		assert.NoError(t, node.AddContainer(createContainer(fmt.Sprintf("c%d", i), config)))

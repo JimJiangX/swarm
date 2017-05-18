@@ -35,11 +35,7 @@ func (GroupPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes
 
 	sort.Sort(weightedNodes)
 
-	fmt.Println("sorted:\n", weightedNodes)
-
 	out := byGroup(weightedNodes)
-
-	fmt.Println("byGroup:\n", out)
 
 	return out, nil
 }
@@ -72,12 +68,10 @@ func scoreNodes(config *cluster.ContainerConfig, nodes []*node.Node, healthiness
 
 		// Skip nodes that are smaller than the requested resources.
 		if nodeMemory < int64(config.HostConfig.Memory) || nodeCpus < config.HostConfig.CPUShares {
-			fmt.Println("skip 77")
 			continue
 		}
 
 		if nodeMemory-node.UsedMemory < config.HostConfig.Memory || (needCpus > 0 && nodeCpus-node.UsedCpus < needCpus) {
-			fmt.Println("skip 82")
 			continue
 		}
 
@@ -188,7 +182,8 @@ func (n byGroupList) Less(i, j int) bool {
 
 	// If the nodes have the same score sort them out by number of nodes.
 	if ip.score == jp.score {
-		return len(ip.list) < len(jp.list)
+		return len(ip.list) > len(jp.list)
 	}
+
 	return ip.score < jp.score
 }
