@@ -816,45 +816,39 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusOK)
 }
 
-func vailPostNodesRequest(hosts structs.PostNodesRequest) error {
-	if len(hosts) == 0 {
-		return stderr.New("none host is requir installing")
+func vailNodeRequest(node structs.Node) error {
+	errs := make([]string, 0, 3)
+
+	if node.Cluster == "" {
+		errs = append(errs, "Cluster is required")
 	}
 
-	errs := make([]string, 0, 5)
+	if node.Addr == "" {
+		errs = append(errs, "Addr is required")
+	}
 
-	for i := range hosts {
-		if hosts[i].Cluster == "" {
-			errs = append(errs, "Cluster is required")
-		}
-
-		if hosts[i].Addr == "" {
-			errs = append(errs, "Addr is required")
-		}
-
-		// vaild ssh config
-		if hosts[i].SSHConfig.Username == "" {
-			errs = append(errs, "SSHConfig.Username is required")
-		}
+	// vaild ssh config
+	if node.SSHConfig.Username == "" {
+		errs = append(errs, "SSHConfig.Username is required")
 	}
 
 	if len(errs) == 0 {
 		return nil
 	}
 
-	return fmt.Errorf("PostNodesRequest:%v,%s", hosts, errs)
+	return fmt.Errorf("PostNodeRequest:%v,%s", node, errs)
 }
 
-func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	list := structs.PostNodesRequest{}
-	err := json.NewDecoder(r.Body).Decode(&list)
+func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	n := structs.Node{}
+	err := json.NewDecoder(r.Body).Decode(&n)
 	if err != nil {
 		ec := errCodeV1(r.Method, _Host, decodeError, 31)
 		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
 	}
 
-	if err := vailPostNodesRequest(list); err != nil {
+	if err := vailNodeRequest(n); err != nil {
 		ec := errCodeV1(r.Method, _Host, bodyParamsError, 32)
 		httpJSONError(w, err, ec.code, http.StatusBadRequest)
 		return
@@ -869,72 +863,48 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	orm := gd.Ormer()
-	clusters, err := orm.ListClusters()
-	if n := len(clusters); err != nil || n == 0 {
-		if n == 0 {
-			err = errors.New("clusters is nil")
-		}
+
+	_, err = orm.GetCluster(n.Cluster)
+	if err != nil {
 		ec := errCodeV1(r.Method, _Host, dbQueryError, 33)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
-	for i := range list {
-		if list[i].Cluster == "" {
-			ec := errCodeV1(r.Method, _Host, bodyParamsError, 34)
-			httpJSONError(w, fmt.Errorf("host:%s ClusterID is required", list[i].Addr), ec.code, http.StatusInternalServerError)
-			return
-		}
-
-		exist := false
-		for c := range clusters {
-			if clusters[c].ID == list[i].Cluster {
-				exist = true
-				break
-			}
-		}
-		if !exist {
-			ec := errCodeV1(r.Method, _Host, bodyParamsError, 35)
-			httpJSONError(w, fmt.Errorf("host:%s unknown ClusterID:%s", list[i].Addr, list[i].Cluster), ec.code, http.StatusInternalServerError)
-			return
-		}
-
-		if list[i].Storage != "" {
-			_, _, err = orm.GetStorageByID(list[i].Storage)
-		}
+	if n.Storage != "" {
+		_, _, err = orm.GetStorageByID(n.Storage)
 		if err != nil {
-			ec := errCodeV1(r.Method, _Host, dbQueryError, 36)
+			ec := errCodeV1(r.Method, _Host, dbQueryError, 34)
 			httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 			return
 		}
 	}
 
-	nodes := resource.NewNodeWithTaskList(len(list))
-	for i, n := range list {
-		node := database.Node{
-			ID:           utils.Generate32UUID(),
-			ClusterID:    n.Cluster,
-			Addr:         n.Addr,
-			EngineID:     "",
-			Room:         n.Room,
-			Seat:         n.Seat,
-			MaxContainer: n.MaxContainer,
-			Status:       0,
-			Enabled:      false,
-			NFS: database.NFS{
-				Addr:     n.NFS.Address,
-				Dir:      n.NFS.Dir,
-				MountDir: n.NFS.MountDir,
-				Options:  n.NFS.Options,
-			},
-		}
+	nodes := resource.NewNodeWithTaskList(1)
 
-		nodes[i] = resource.NewNodeWithTask(node, n.HDD, n.SSD, n.SSHConfig)
+	node := database.Node{
+		ID:           utils.Generate32UUID(),
+		ClusterID:    n.Cluster,
+		Addr:         n.Addr,
+		EngineID:     "",
+		Room:         n.Room,
+		Seat:         n.Seat,
+		MaxContainer: n.MaxContainer,
+		Status:       0,
+		Enabled:      false,
+		NFS: database.NFS{
+			Addr:     n.NFS.Address,
+			Dir:      n.NFS.Dir,
+			MountDir: n.NFS.MountDir,
+			Options:  n.NFS.Options,
+		},
 	}
+
+	nodes[0] = resource.NewNodeWithTask(node, n.HDD, n.SSD, n.SSHConfig)
 
 	horus, err := gd.KVClient().GetHorusAddr()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, internalError, 37)
+		ec := errCodeV1(r.Method, _Host, internalError, 35)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
@@ -942,22 +912,19 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	master := resource.NewHostManager(orm, gd.Cluster)
 	err = master.InstallNodes(ctx, horus, nodes, gd.KVClient())
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, internalError, 38)
+		ec := errCodeV1(r.Method, _Host, internalError, 36)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
 		return
 	}
 
-	out := make([]structs.PostNodeResponse, len(list))
-
-	for i := range nodes {
-		out[i] = structs.PostNodeResponse{
-			ID:   nodes[i].Node.ID,
-			Addr: nodes[i].Node.Addr,
-			Task: nodes[i].Task.ID,
-		}
+	out := structs.PostNodeResponse{
+		ID:   nodes[0].Node.ID,
+		Addr: nodes[0].Node.Addr,
+		Task: nodes[0].Task.ID,
 	}
 
 	writeJSON(w, out, http.StatusCreated)
+	return
 }
 
 func putNodeEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {

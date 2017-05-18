@@ -76,7 +76,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	http.MethodPost: {
 		"/clusters": postCluster,
 
-		"/hosts": postNodes,
+		"/hosts": postNode,
 
 		"/services":      postService,
 		"/services/link": postServiceLink,
