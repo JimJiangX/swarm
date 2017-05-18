@@ -75,7 +75,6 @@ func NewClientByPublicKeys(addr, user, rsa string) (ScpClient, error) {
 		rsa = filepath.Join(home, "/.ssh/id_rsa")
 	}
 
-	var hostKey ssh.PublicKey
 	// A public key may be used to authenticate against the remote
 	// server by using an unencrypted PEM-encoded private key file.
 	//
@@ -98,7 +97,8 @@ func NewClientByPublicKeys(addr, user, rsa string) (ScpClient, error) {
 			// Use the PublicKeys method for remote authentication.
 			ssh.PublicKeys(signer),
 		},
-		HostKeyCallback: ssh.FixedHostKey(hostKey),
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		// HostKeyCallback: ssh.FixedHostKey(signer.PublicKey()),
 	}
 
 	// Connect to the remote server and perform the SSH handshake.
