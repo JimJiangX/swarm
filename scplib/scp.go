@@ -85,7 +85,7 @@ func NewClientByPublicKeys(addr, user, rsa string) (*Client, error) {
 			// Use the PublicKeys method for remote authentication.
 			ssh.PublicKeys(signer),
 		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: ssh.FixedHostKey(signer.PublicKey()),
 	}
 
 	// Connect to the remote server and perform the SSH handshake.
