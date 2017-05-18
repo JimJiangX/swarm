@@ -1,6 +1,8 @@
 package strategy
 
 import (
+	"bytes"
+	"fmt"
 	"sort"
 
 	"github.com/docker/swarm/cluster"
@@ -26,14 +28,84 @@ func (GroupPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes
 	// for group, a healthy node should decrease its weight to increase its chance of being selected
 	// set healthFactor to -10 to make health degree [0, 100] overpower cpu + memory (each in range [0, 100])
 	const healthFactor int64 = -10
-	weightedNodes, err := weighNodes(config, nodes, healthFactor)
+	weightedNodes, err := scoreNodes(config, nodes, healthFactor)
 	if err != nil {
 		return nil, err
 	}
 
 	sort.Sort(weightedNodes)
 
-	return byGroup(weightedNodes), nil
+	fmt.Println("sorted:\n", weightedNodes)
+
+	out := byGroup(weightedNodes)
+
+	fmt.Println("byGroup:\n", out)
+
+	return out, nil
+}
+
+func (nodes weightedNodeList) String() string {
+	if len(nodes) == 0 {
+		return ""
+	}
+
+	buf := bytes.NewBuffer(nil)
+
+	for i, n := range nodes {
+		buf.WriteString(fmt.Sprintf("%d %s %d\n", i, n.Node.ID, n.Weight))
+	}
+
+	return buf.String()
+}
+
+func scoreNodes(config *cluster.ContainerConfig, nodes []*node.Node, healthinessFactor int64) (weightedNodeList, error) {
+	weightedNodes := weightedNodeList{}
+
+	needCpus, err := config.CountCPU()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, node := range nodes {
+		nodeMemory := node.TotalMemory
+		nodeCpus := node.TotalCpus
+
+		// Skip nodes that are smaller than the requested resources.
+		if nodeMemory < int64(config.HostConfig.Memory) || nodeCpus < config.HostConfig.CPUShares {
+			fmt.Println("skip 77")
+			continue
+		}
+
+		if nodeMemory-node.UsedMemory < config.HostConfig.Memory || (needCpus > 0 && nodeCpus-node.UsedCpus < needCpus) {
+			fmt.Println("skip 82")
+			continue
+		}
+
+		var (
+			cpuScore    int64 = 100
+			memoryScore int64 = 100
+		)
+
+		if needCpus > 0 {
+			cpuScore = (node.UsedCpus + needCpus) * 100 / nodeCpus
+		} else if config.HostConfig.CPUShares > 0 {
+			cpuScore = (node.UsedCpus + config.HostConfig.CPUShares) * 100 / nodeCpus
+		}
+
+		if config.HostConfig.Memory > 0 {
+			memoryScore = (node.UsedMemory + config.HostConfig.Memory) * 100 / nodeMemory
+		}
+
+		if cpuScore <= 100 && memoryScore <= 100 {
+			weightedNodes = append(weightedNodes, &weightedNode{Node: node, Weight: cpuScore + memoryScore + healthinessFactor*node.HealthIndicator})
+		}
+	}
+
+	if len(weightedNodes) == 0 {
+		return nil, ErrNoResourcesAvailable
+	}
+
+	return weightedNodes, nil
 }
 
 func byGroup(nodes weightedNodeList) []*node.Node {

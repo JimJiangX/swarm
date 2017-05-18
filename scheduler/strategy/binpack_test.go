@@ -22,6 +22,7 @@ func createNode(ID string, memory int64, cpus int64) *node.Node {
 		TotalMemory:     memory * 1024 * 1024 * 1024,
 		TotalCpus:       cpus,
 		HealthIndicator: 100,
+		Labels:          make(map[string]string),
 	}
 }
 
@@ -48,7 +49,11 @@ func createContainer(ID string, config *cluster.ContainerConfig) *cluster.Contai
 func selectTopNode(t *testing.T, s PlacementStrategy, config *cluster.ContainerConfig, nodes []*node.Node) *node.Node {
 	n, err := s.RankAndSort(config, nodes)
 	assert.NoError(t, err)
-	return n[0]
+	if len(n) > 0 {
+		return n[0]
+	}
+
+	return nil
 }
 
 func TestPlaceEqualWeight(t *testing.T) {
