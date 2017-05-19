@@ -45,6 +45,7 @@ func NewScpClient(addr, user, password string) (ScpClient, error) {
 			ssh.KeyboardInteractive(
 				passwordKeyboardInteractive(password)),
 		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
 	c, err := ssh.Dial("tcp", addr, config)
@@ -98,7 +99,6 @@ func NewClientByPublicKeys(addr, user, rsa string) (ScpClient, error) {
 			ssh.PublicKeys(signer),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		// HostKeyCallback: ssh.FixedHostKey(signer.PublicKey()),
 	}
 
 	// Connect to the remote server and perform the SSH handshake.

@@ -1,10 +1,11 @@
 package database
 
 import (
-	"github.com/docker/swarm/garden/utils"
-	"github.com/jmoiron/sqlx"
 	"testing"
 	"time"
+
+	"github.com/docker/swarm/garden/utils"
+	"github.com/jmoiron/sqlx"
 )
 
 const nullID = "&&&&&&NULL&&&&&"
