@@ -35,7 +35,7 @@ func (GroupPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes
 
 	sort.Sort(weightedNodes)
 
-	out := byGroup(weightedNodes)
+	out := byGroup(weightedNodes, healthFactor)
 
 	return out, nil
 }
@@ -102,7 +102,7 @@ func scoreNodes(config *cluster.ContainerConfig, nodes []*node.Node, healthiness
 	return weightedNodes, nil
 }
 
-func byGroup(nodes weightedNodeList) []*node.Node {
+func byGroup(nodes weightedNodeList, healthFactor int64) []*node.Node {
 	list := make([]groupNodes, 0, 5)
 loop:
 	for i := range nodes {
@@ -140,7 +140,9 @@ loop:
 			g.score += g.list[i].Weight
 		}
 
-		g.score = g.score / int64(len(g.list))
+		len := int64(len(g.list))
+
+		g.score = g.score/len + healthFactor*len
 	}
 
 	groups := byGroupList(list)
