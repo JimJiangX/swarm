@@ -92,6 +92,24 @@ func (db dbBase) serviceTable() string {
 	return db.prefix + "_service"
 }
 
+func (db dbBase) listServices() ([]Service, error) {
+	var (
+		out   []Service
+		query = "SELECT id,name,description_id,tag,auto_healing,auto_scaling,high_available,action_status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable()
+	)
+
+	err := db.Select(&out, query)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return nil, nil
+		}
+
+		return nil, errors.Wrap(err, "list []Service")
+	}
+
+	return out, nil
+}
+
 // ListServices returns all []Service
 func (db dbBase) ListServices() ([]Service, error) {
 	var (
