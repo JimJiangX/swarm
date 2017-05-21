@@ -32,6 +32,7 @@ type client struct {
 	enc     *encoder
 }
 
+// Client is an HTTP client
 type Client interface {
 	Do(ctx context.Context, method, url string, obj interface{}) (*http.Response, error)
 
@@ -46,6 +47,7 @@ type Client interface {
 	Delete(ctx context.Context, url string) (*http.Response, error)
 }
 
+// NewClient returns Client,implements by *client
 func NewClient(addr string, timeout time.Duration, tlsConfig *tls.Config) Client {
 	scheme := "http"
 	if timeout == 0 {

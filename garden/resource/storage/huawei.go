@@ -21,8 +21,8 @@ type huaweiStore struct {
 	hs  database.HuaweiStorage
 }
 
-func (hs huaweiStore) scriptPath(file string) (string, error) {
-	path, err := utils.GetAbsolutePath(false, hs.script, file)
+func (h huaweiStore) scriptPath(file string) (string, error) {
+	path, err := utils.GetAbsolutePath(false, h.script, file)
 	if err != nil {
 		return "", errors.Wrap(err, "not found file:"+file)
 	}

@@ -165,7 +165,7 @@ func ParseStringToTime(s string) (time.Time, error) {
 	return local.Add(-time.Duration(offset) * time.Second), nil
 }
 
-// ExecScript returns a command to execute a script
+// ExecScript returns a command to execute a script.
 func ExecScript(script ...string) *exec.Cmd {
 	var shell, flag string
 	if runtime.GOOS == "windows" {
@@ -185,6 +185,7 @@ func ExecScript(script ...string) *exec.Cmd {
 	return cmd
 }
 
+// ExecContext returns a context command to execute a script.
 func ExecContext(ctx context.Context, script ...string) *exec.Cmd {
 	var shell, flag string
 	if runtime.GOOS == "windows" {
@@ -289,7 +290,7 @@ func CountCPU(val string) (int64, error) {
 //     03,1-3      <- this is gonna get parsed as [1,2,3]
 //     3,2,1
 //     0-2,3,1
-// copy from github.com/docker/docker/pkg/parsers.go
+// copy from github.com/moby/moby/pkg/parsers/parsers.go#L34
 func ParseUintList(val string) (map[int]bool, error) {
 	if val == "" {
 		return map[int]bool{}, nil

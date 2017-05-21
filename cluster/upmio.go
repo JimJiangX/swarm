@@ -14,14 +14,6 @@ import (
 	"golang.org/x/net/context"
 )
 
-func (c Container) Exec(ctx context.Context, cmd []string, detach bool) (types.ContainerExecInspect, error) {
-	if c.Engine == nil {
-		return types.ContainerExecInspect{}, errors.Errorf("Engine of Container:%s is required", c.Names)
-	}
-
-	return c.Engine.containerExec(ctx, c.ID, cmd, detach)
-}
-
 // UsedCpus returns the sum of CPUs reserved by containers.
 func (e *Engine) UsedCpus() int64 {
 	var r int64
@@ -114,6 +106,15 @@ func (e *Engine) UpdateContainer(ctx context.Context, name string, config contai
 	}
 
 	return container, err
+}
+
+// Exec returns the container exec command result
+func (c Container) Exec(ctx context.Context, cmd []string, detach bool) (types.ContainerExecInspect, error) {
+	if c.Engine == nil {
+		return types.ContainerExecInspect{}, errors.Errorf("Engine of Container:%s is required", c.Names)
+	}
+
+	return c.Engine.containerExec(ctx, c.ID, cmd, detach)
 }
 
 // checkTtyInput checks if we are trying to attach to a container tty

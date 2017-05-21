@@ -6,10 +6,12 @@ import (
 	"github.com/docker/swarm/cluster"
 )
 
+// EngineByAddr returns  *Engine by addr
 func (c *Cluster) EngineByAddr(addr string) *cluster.Engine {
 	return c.getEngineByAddr(addr)
 }
 
+// Engine returns *Engine by ID or Name
 func (c *Cluster) Engine(IDOrName string) *cluster.Engine {
 	if IDOrName == "" {
 		return nil
@@ -121,6 +123,7 @@ func (c *Cluster) ListEngines(list ...string) []*cluster.Engine {
 	return engines
 }
 
+// AddPendingContainer add a pending container to Cluster
 func (c *Cluster) AddPendingContainer(name, swarmID, engineID string, config *cluster.ContainerConfig) error {
 	e := c.Engine(engineID)
 	if e == nil {
@@ -140,6 +143,7 @@ func (c *Cluster) AddPendingContainer(name, swarmID, engineID string, config *cl
 	return nil
 }
 
+// RemovePendingContainer remove slice of specified pending Container by swarmID
 func (c *Cluster) RemovePendingContainer(swarmID ...string) {
 	c.scheduler.Lock()
 

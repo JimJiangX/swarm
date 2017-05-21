@@ -166,6 +166,7 @@ func (tl *goTaskLock) SetAfter(after func(key string, val int, task *database.Ta
 	tl.after = after
 }
 
+// NewServiceTask returns a goTaskLock,init by ServiceOrmer
 func NewServiceTask(key string, ormer database.ServiceOrmer,
 	t *database.Task, current, expect, fail int) goTaskLock {
 

@@ -7,6 +7,7 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 )
 
+// ResourceFilter selects only nodes have enough CPU & memory resource.
 type ResourceFilter struct {
 }
 

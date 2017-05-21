@@ -291,14 +291,17 @@ func (c *ContainerConfig) Validate() error {
 	return nil
 }
 
+// GetCPU parses and validates the specified ContainerConfig.HostConfig.CpusetCpus
 func (c ContainerConfig) GetCPU() (map[int]bool, error) {
 	return utils.ParseUintList(c.HostConfig.CpusetCpus)
 }
 
+// CountCPU returns ContainerConfig.HostConfig.CpusetCpus used cpu num
 func (c ContainerConfig) CountCPU() (int64, error) {
 	return utils.CountCPU(c.HostConfig.CpusetCpus)
 }
 
+// DeepCopy return an cloned value of *ContainerConfig
 func (c *ContainerConfig) DeepCopy() *ContainerConfig {
 	clone := *c
 

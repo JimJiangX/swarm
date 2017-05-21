@@ -32,8 +32,8 @@ func newHitachiStore(orm database.StorageOrmer, script string, hs database.Hitac
 	}
 }
 
-func (hs hitachiStore) scriptPath(file string) (string, error) {
-	path, err := utils.GetAbsolutePath(false, hs.script, file)
+func (h hitachiStore) scriptPath(file string) (string, error) {
+	path, err := utils.GetAbsolutePath(false, h.script, file)
 	if err != nil {
 		return "", errors.Wrap(err, "not found file:"+file)
 	}
