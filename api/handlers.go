@@ -205,6 +205,12 @@ func getImagesJSON(c *context, w http.ResponseWriter, r *http.Request) {
 			Filters: filters,
 		},
 	}
+	if opts.Filters.Include("dangling") &&
+		!(opts.Filters.ExactMatch("dangling", "false") || opts.Filters.ExactMatch("dangling", "true")) {
+		httpError(w, "Invalid filter: 'type'='dangling'", http.StatusBadRequest)
+		return
+	}
+
 	for _, image := range c.cluster.Images().Filter(opts) {
 		if len(accepteds) != 0 {
 			found := false
@@ -741,23 +747,42 @@ func postImagesCreate(c *context, w http.ResponseWriter, r *http.Request) {
 
 		var errorMessage string
 		errorFound := false
-		callback := func(what, status string, err error) {
-			if err != nil {
-				errorFound = true
-				errorMessage = err.Error()
-				sendJSONMessage(wf, what, fmt.Sprintf("Pulling %s... : %s", image, err.Error()))
-				return
-			}
-			if status == "" {
-				sendJSONMessage(wf, what, fmt.Sprintf("Pulling %s...", image))
+		nonOSErrorFound := false
+		successfulPull := false
+		callback := func(msg cluster.JSONMessageWrapper) {
+			msg.Msg.ID = msg.EngineName
+			if msg.Msg.Status != "" {
+				msg.Msg.Status = fmt.Sprintf("Pulling %s... : %s", image, msg.Msg.Status)
 			} else {
-				sendJSONMessage(wf, what, fmt.Sprintf("Pulling %s... : %s", image, status))
+				msg.Msg.Status = fmt.Sprintf("Pulling %s...", image)
 			}
+			// If we get a successful pull on any node, mark
+			// successfulPull as true.
+			if msg.Success {
+				successfulPull = true
+			}
+			if msg.Err != nil {
+				errorFound = true
+				errorMessage = msg.Err.Error()
+				if !strings.Contains(errorMessage, "image operating system") {
+					nonOSErrorFound = true
+				}
+				msg.Msg.Status = fmt.Sprintf("Pulling %s... : %s", image, errorMessage)
+			}
+			json.NewEncoder(wf).Encode(msg.Msg)
 		}
 		c.cluster.Pull(image, &authConfig, callback)
 
 		if errorFound {
-			sendErrorJSONMessage(wf, 1, errorMessage)
+			// If some nodes successfully pulled the image and the
+			// rest failed because the image was the wrong OS
+			// (e.g. we tried to pull a Linux-based image on a
+			// Windows node), we should still consider the pull
+			// successful because we loaded the image on as many
+			// nodes as we could.
+			if !successfulPull || nonOSErrorFound {
+				sendErrorJSONMessage(wf, 1, errorMessage)
+			}
 		}
 
 	} else { //import
@@ -767,14 +792,15 @@ func postImagesCreate(c *context, w http.ResponseWriter, r *http.Request) {
 
 		var errorMessage string
 		errorFound := false
-		callback := func(what, status string, err error) {
-			if err != nil {
+		callback := func(msg cluster.JSONMessageWrapper) {
+			msg.Msg.ID = msg.EngineName
+			if msg.Err != nil {
 				errorFound = true
-				errorMessage = err.Error()
-				sendJSONMessage(wf, what, err.Error())
-				return
+				errorMessage = msg.Err.Error()
+				msg.Msg.Status = errorMessage
 			}
-			sendJSONMessage(wf, what, status)
+			json.NewEncoder(wf).Encode(msg.Msg)
+
 		}
 		ref := getImageRef(repo, tag)
 		c.cluster.Import(source, ref, tag, r.Body, callback)
@@ -794,19 +820,20 @@ func postImagesLoad(c *context, w http.ResponseWriter, r *http.Request) {
 	wf := NewWriteFlusher(w)
 	var errorMessage string
 	errorFound := false
-	callback := func(what, status string, err error) {
-		if err != nil {
-			errorFound = true
-			errorMessage = err.Error()
-			sendJSONMessage(wf, what, fmt.Sprintf("Loading Image... : %s", err.Error()))
-			return
+	callback := func(msg cluster.JSONMessageWrapper) {
+		msg.Msg.ID = msg.EngineName
+		if msg.Msg.Status != "" {
+			msg.Msg.Status = fmt.Sprintf("Loading Image... : %s", msg.Msg.Status)
+		} else {
+			msg.Msg.Status = "Loading Image..."
 		}
 
-		if status == "" {
-			sendJSONMessage(wf, what, "Loading Image...")
-		} else {
-			sendJSONMessage(wf, what, fmt.Sprintf("Loading Image... : %s", status))
+		if msg.Err != nil {
+			errorFound = true
+			errorMessage = msg.Err.Error()
+			msg.Msg.Status = fmt.Sprintf("Loading Image... : %s", errorMessage)
 		}
+		json.NewEncoder(wf).Encode(msg.Msg)
 	}
 	c.cluster.Load(r.Body, callback)
 	if errorFound {
@@ -1349,18 +1376,17 @@ func postBuild(c *context, w http.ResponseWriter, r *http.Request) {
 
 	var errorMessage string
 	errorFound := false
-	callback := func(what, status string, err error) {
-		if err != nil {
+	callback := func(msg cluster.JSONMessageWrapper) {
+		msg.Msg.ID = msg.EngineName
+		if msg.Err != nil {
 			errorFound = true
-			errorMessage = err.Error()
+			errorMessage = msg.Err.Error()
 			osType := matchImageOSError(errorMessage)
 			if osType != "" {
-				errorMessage = fmt.Sprintf("Could not build image: %s. Consider using --build-arg 'constraint:ostype==%s'", err, osType)
+				msg.Msg.Status = fmt.Sprintf("Could not build image: %s. Consider using --build-arg 'constraint:ostype==%s'", errorMessage, osType)
 			}
-			sendJSONMessage(wf, what, errorMessage)
-			return
 		}
-		sendJSONMessage(wf, what, status)
+		json.NewEncoder(wf).Encode(msg.Msg)
 	}
 	err := c.cluster.BuildImage(r.Body, buildImage, callback)
 	if err != nil {
