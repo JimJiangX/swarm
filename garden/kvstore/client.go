@@ -17,6 +17,7 @@ const (
 	defaultTimeout    = 30 * time.Second
 )
 
+// NewClient returns a consul Client
 func NewClient(uri string, tlsConfig *tls.Config) (Client, error) {
 	if uri == "" {
 		uri = defaultConsulAddr
@@ -47,6 +48,7 @@ func NewClient(uri string, tlsConfig *tls.Config) (Client, error) {
 	return MakeClient(config, prefix, port, tlsConfig)
 }
 
+// MakeClient returns a consul kv client
 func MakeClient(config *api.Config, prefix, port string, tlsConfig *tls.Config) (*kvClient, error) {
 	if tlsConfig != nil {
 		os.Setenv(api.HTTPSSLEnvName, "true")

@@ -13,6 +13,7 @@ type mockClient struct {
 	kv map[string][]byte
 }
 
+// NewMockClient returns a Client
 func NewMockClient() Client {
 	return &mockClient{kv: make(map[string][]byte)}
 }

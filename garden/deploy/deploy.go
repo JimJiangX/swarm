@@ -18,16 +18,19 @@ type serviceWithTask struct {
 	task database.Task
 }
 
+// Deployment deploy containers
 type Deployment struct {
 	gd *garden.Garden
 }
 
+// New returns a pointer of Deployment
 func New(gd *garden.Garden) *Deployment {
 	return &Deployment{
 		gd: gd,
 	}
 }
 
+// Deploy build and run Service,task run in a goroutine.
 func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec) (structs.PostServiceResponse, error) {
 	resp := structs.PostServiceResponse{}
 	auth, err := d.gd.AuthConfig()
@@ -54,6 +57,7 @@ func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec) (stru
 	return resp, nil
 }
 
+// DeployServices deploy slice of Service if serivce not exist,tasks run in goroutines.
 func (d *Deployment) DeployServices(ctx context.Context, services []structs.ServiceSpec) ([]structs.PostServiceResponse, error) {
 	list, err := d.gd.ListServices(ctx)
 	if err != nil && !database.IsNotFound(err) {
@@ -151,6 +155,7 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *databas
 	return err
 }
 
+// Link is exported,not done yet.
 func (d *Deployment) Link(ctx context.Context, links []*structs.ServiceLink) (string, error) {
 	err := d.freshServicesLink(links)
 	if err != nil {
@@ -253,6 +258,7 @@ func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
 	return nil
 }
 
+// ServiceScale scale service.
 func (d *Deployment) ServiceScale(ctx context.Context, nameOrID string, scale structs.ServiceScaleRequest) (string, error) {
 	svc, err := d.gd.Service(nameOrID)
 	if err != nil {
@@ -264,6 +270,7 @@ func (d *Deployment) ServiceScale(ctx context.Context, nameOrID string, scale st
 	return d.gd.Scale(ctx, svc, actor, scale, true)
 }
 
+// ServiceUpdateImage update Service image version
 func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version string, async bool) (string, error) {
 	orm := d.gd.Ormer()
 
@@ -303,6 +310,7 @@ func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version strin
 	return t.ID, err
 }
 
+// ServiceUpdate update service CPU & memory & volume resource,task run in goroutine.
 func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config structs.UnitRequire) (string, error) {
 	svc, err := d.gd.Service(name)
 	if err != nil {

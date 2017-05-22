@@ -6,6 +6,7 @@ import (
 	"golang.org/x/net/context"
 )
 
+// Client is a kv store interface
 type Client interface {
 	Register
 
@@ -23,6 +24,7 @@ const (
 	containerType = "containers"
 )
 
+// Register is a client for register service
 type Register interface {
 	HealthChecks(state string, q *api.QueryOptions) (map[string]api.HealthCheck, error)
 

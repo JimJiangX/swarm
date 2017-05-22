@@ -11,12 +11,21 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// ScpClient is exported
 type ScpClient interface {
+	// copy context to remote file.
 	Upload(context, remote string, mode os.FileMode) error
+
+	// UploadFile copy local file to remote
 	UploadFile(remote, local string) error
+
+	// UploadDir copy dir files to remote
 	UploadDir(remote, local string) error
 
+	// Exec exec command
 	Exec(cmd string) ([]byte, error)
+
+	// Close close ScpClient
 	Close() error
 }
 
