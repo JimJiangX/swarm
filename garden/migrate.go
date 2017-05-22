@@ -14,6 +14,7 @@ import (
 	"golang.org/x/net/context"
 )
 
+// ServiceMigrate migrate an unit to other hosts,include volumes、networkings,clean the old container.
 func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID string, candidates []string, async bool) (string, error) {
 	migrate := func() error {
 		opts, err := svc.getScheduleOption()

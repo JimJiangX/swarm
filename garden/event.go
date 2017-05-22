@@ -34,6 +34,9 @@ func getContainerNameFromInfo(c types.ContainerJSON) string {
 	return name
 }
 
+// 当swarm 成为 master时， 执行一次 MarkRunningTasks，把 Task.Status == TaskRunningStatus 标记为 TaskUnknownStatus，
+// 当关联的是 Service时，Service.Status ++1。
+// 依据 event 类型，更新 Unit 与 Container 的关联，写入数据库。
 func (eh eventHander) Handle(event *cluster.Event) (err error) {
 	// Something changed - refresh our internal state.
 	eh.once.Do(func() {

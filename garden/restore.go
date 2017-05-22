@@ -7,6 +7,7 @@ import (
 	"golang.org/x/net/context"
 )
 
+// UnitRestore resotore an unit volume data by the assigned backup file.
 func (svc *Service) UnitRestore(ctx context.Context, unit, path string, async bool) (string, error) {
 	do := func() error {
 		sys, err := svc.so.GetSysConfig()

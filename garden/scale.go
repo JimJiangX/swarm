@@ -17,6 +17,13 @@ import (
 	"golang.org/x/net/context"
 )
 
+// Scale is exported.
+// 服务水平扩展，增加或者减少节点。
+// 	减少节点，移除的顺序排列，按容器顺序：
+// 		not exist -- removing -- dead -- exited -- created -- running
+//
+//  增加节点：
+//      调试准备 -- 调度 -- 分配资源 -- 创建容器 -- 启动容器与服务
 func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator, req structs.ServiceScaleRequest, async bool) (string, error) {
 	scale := func() error {
 		units, err := svc.getUnits()
@@ -140,7 +147,7 @@ func sortUnitsByContainers(units []*unit, containers cluster.Containers) []*unit
 		// StateString from container.go L23
 		switch {
 		case c == nil:
-			score = 0
+			score = 0 // not exist,maybe the engine is down
 		case c.State == "removing":
 			score = 1
 		case c.State == "dead":

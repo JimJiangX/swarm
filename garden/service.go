@@ -21,8 +21,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-// var errConvertServiceSpec = stderr.New("convert structs.ServiceSpec to database.Service")
-
+// Service is exported.
 type Service struct {
 	so      database.ServiceOrmer
 	pc      pluginapi.PluginAPI
@@ -76,6 +75,7 @@ func (svc Service) getUnits() ([]*unit, error) {
 	return units, nil
 }
 
+// Spec returns ServiceSpec,if nil,query ServiceInfo from db,then convert to ServiceSpec
 func (svc *Service) Spec() (*structs.ServiceSpec, error) {
 	if svc.spec != nil {
 		return svc.spec, nil
@@ -102,6 +102,7 @@ func (svc *Service) Spec() (*structs.ServiceSpec, error) {
 	return nil, errors.New("Service internal error")
 }
 
+// RefreshSpec query from db,convert to ServiceSpec
 func (svc *Service) RefreshSpec() (*structs.ServiceSpec, error) {
 	var (
 		ID    string
@@ -329,6 +330,7 @@ func getUnitContainer(containers cluster.Containers, u database.Unit) *cluster.C
 	return c
 }
 
+// ConvertServiceInfo returns ServiceSpec,covert by ServiceInfo and Containers
 func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers) structs.ServiceSpec {
 	units := make([]structs.UnitSpec, 0, len(info.Units))
 
@@ -358,6 +360,7 @@ func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers
 	}
 }
 
+// RunContainer create and start container on engine.
 func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, authConfig *types.AuthConfig) error {
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusServiceContainerCreating, statusServiceContainerRunning, statusServiceContainerCreateFailed)
@@ -435,6 +438,8 @@ func engineCreateVolume(eng *cluster.Engine, lv database.Volume) error {
 	return errors.WithStack(err)
 }
 
+// InitStart start container & exec start service command,exec init-start service command if the first start.
+// register services to consul or other third part auto-service discovery server.
 func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, task *database.Task, async bool, args map[string]interface{}) error {
 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
@@ -562,6 +567,7 @@ func getContainerFromKV(kvc kvstore.Client, containerID string) (*cluster.Contai
 	return c, nil
 }
 
+// Start start containers and services
 func (svc *Service) Start(ctx context.Context, task *database.Task, detach bool, cmds structs.Commands) error {
 
 	start := func() error {
@@ -603,6 +609,7 @@ func (svc *Service) Start(ctx context.Context, task *database.Task, detach bool,
 	return sl.Run(isnotInProgress, start, detach)
 }
 
+// UpdateUnitsConfigs generated new units configs,write to container volume.
 func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.ConfigsMap, args map[string]interface{}, task *database.Task, async bool) (err error) {
 
 	update := func() error {
@@ -653,6 +660,7 @@ func (svc *Service) updateConfigs(ctx context.Context, units []*unit, configs st
 	return nil
 }
 
+// UpdateConfig update the assigned unit config file.
 func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[string]interface{}) error {
 	u, err := svc.getUnit(nameOrID)
 	if err != nil {
@@ -669,6 +677,7 @@ func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[
 	return err
 }
 
+// Stop stop units services,stop container if containers is true.
 func (svc *Service) Stop(ctx context.Context, containers, async bool, task *database.Task) error {
 
 	stop := func() error {
@@ -715,6 +724,7 @@ func (svc *Service) stop(ctx context.Context, units []*unit, containers bool) er
 	return nil
 }
 
+// Exec exec command in Service containers,if config.Container is assigned,exec the assigned unit command
 func (svc *Service) Exec(ctx context.Context, config structs.ServiceExecConfig, async bool, task *database.Task) error {
 
 	exec := func() error {
@@ -750,6 +760,11 @@ func (svc *Service) Exec(ctx context.Context, config structs.ServiceExecConfig, 
 	return sl.Run(isnotInProgress, exec, async)
 }
 
+// Remove remove Service,
+// 1) deregiste services
+// 2) remove containers
+// 3) remove volumes
+// 4) delete Service records in db
 func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) {
 	err = svc.deleteCondition()
 	if err != nil {
@@ -875,6 +890,7 @@ func (svc Service) deregisterSerivces(ctx context.Context, reg kvstore.Register,
 	return nil
 }
 
+// Compose call plugin compose
 func (svc *Service) Compose(ctx context.Context, pc pluginapi.PluginAPI) error {
 	var opts map[string]interface{}
 
@@ -892,6 +908,7 @@ func (svc *Service) Compose(ctx context.Context, pc pluginapi.PluginAPI) error {
 	return pc.ServiceCompose(ctx, *spec)
 }
 
+// Image returns Image,query from db.
 func (svc Service) Image() (database.Image, error) {
 	img, err := structs.ParseImage(svc.svc.Desc.Image)
 	if err != nil {
@@ -919,10 +936,6 @@ func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]in
 	spec.Options = args
 
 	return svc.pc.GenerateServiceConfig(ctx, *spec)
-}
-
-func (svc *Service) GenerateUnitsConfigs(ctx context.Context, args map[string]interface{}) (structs.ConfigsMap, error) {
-	return svc.generateUnitsConfigs(ctx, args)
 }
 
 func (svc *Service) generateUnitConfig(ctx context.Context, nameOrID string, args map[string]interface{}) (structs.ConfigCmds, error) {

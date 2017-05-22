@@ -20,6 +20,9 @@ import (
 	"golang.org/x/net/context"
 )
 
+// UpdateImage update Service image version,
+// stop units services,remove old containers,
+// created & start new container with new version image.
 func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 	im database.Image, task *database.Task, async bool, authConfig *types.AuthConfig) error {
 
@@ -289,6 +292,7 @@ func reduceCPUset(cpusetCpus string, need int) (string, error) {
 	return strings.Join(cpuString, ","), nil
 }
 
+// VolumeExpansion expand container volume size.
 func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.VolumeRequire) error {
 	if len(target) == 0 {
 		return nil

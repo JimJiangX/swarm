@@ -183,6 +183,7 @@ func (u unit) getHostIP() (string, error) {
 	return "", errors.WithStack(newContainerError(u.u.Name, "host IP is required"))
 }
 
+// create networking after start container
 func (u unit) startContainer(ctx context.Context) error {
 	c := u.getContainer()
 	if c == nil {

@@ -1,7 +1,6 @@
 package garden
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -44,6 +43,7 @@ func newNotFound(elem, key string) notFound {
 	}
 }
 
+// Garden is exported.
 type Garden struct {
 	sync.Mutex
 	ormer        database.Ormer
@@ -56,6 +56,7 @@ type Garden struct {
 	authConfig *types.AuthConfig
 }
 
+// NewGarden is exported.
 func NewGarden(kvc kvstore.Client, cl cluster.Cluster,
 	scheduler *scheduler.Scheduler, ormer database.Ormer,
 	pClient pluginapi.PluginAPI, tlsConfig *tls.Config) *Garden {
@@ -70,26 +71,32 @@ func NewGarden(kvc kvstore.Client, cl cluster.Cluster,
 	}
 }
 
+// KVClient returns kv store Client
 func (gd *Garden) KVClient() kvstore.Client {
 	return gd.kvClient
 }
 
+// AuthConfig returns *types.AuthConfig query from db.
 func (gd *Garden) AuthConfig() (*types.AuthConfig, error) {
 	return gd.ormer.GetAuthConfig()
 }
 
+// Ormer returns db orm client.
 func (gd *Garden) Ormer() database.Ormer {
 	return gd.ormer
 }
 
+// PluginClient returns plugin HTTP client.
 func (gd *Garden) PluginClient() pluginapi.PluginAPI {
 	return gd.pluginClient
 }
 
+// TLSConfig returns *tls.Config
 func (gd *Garden) TLSConfig() *tls.Config {
 	return gd.tlsConfig
 }
 
+// NewService is exported.
 func (gd *Garden) NewService(spec *structs.ServiceSpec, svc *database.Service) *Service {
 	if spec == nil && svc == nil {
 		return nil
@@ -98,6 +105,7 @@ func (gd *Garden) NewService(spec *structs.ServiceSpec, svc *database.Service) *
 	return newService(spec, svc, gd.ormer, gd.Cluster, gd.pluginClient)
 }
 
+// GetService get Service by name or id from db,without ServiceSpec.
 func (gd *Garden) GetService(nameOrID string) (*Service, error) {
 	s, err := gd.ormer.GetService(nameOrID)
 	if err != nil {
@@ -109,6 +117,7 @@ func (gd *Garden) GetService(nameOrID string) (*Service, error) {
 	return svc, nil
 }
 
+// Service get ServiceInfo from db,convert to ServiceSpec
 func (gd *Garden) Service(nameOrID string) (*Service, error) {
 	info, err := gd.ormer.GetServiceInfo(nameOrID)
 	if err != nil {
@@ -122,6 +131,7 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 	return svc, nil
 }
 
+// ServiceSpec get ServiceInfo from db,convert to ServiceSpec
 func (gd *Garden) ServiceSpec(nameOrID string) (structs.ServiceSpec, error) {
 	info, err := gd.ormer.GetServiceInfo(nameOrID)
 	if err != nil {
@@ -133,6 +143,7 @@ func (gd *Garden) ServiceSpec(nameOrID string) (structs.ServiceSpec, error) {
 	return spec, nil
 }
 
+// ListServices returns all ServiceSpec query from db.
 func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, error) {
 	list, err := gd.ormer.ListServicesInfo()
 	if err != nil {
@@ -157,11 +168,6 @@ func (gd *Garden) Register(req structs.RegisterDC) error {
 	if err == nil {
 		return errors.Errorf("DC has registered,dc=%d", sys.ID)
 	}
-
-	//	err = validGardenRegister(&req)
-	//	if err != nil {
-	//		return err
-	//	}
 
 	config := database.SysConfig{
 		ID:        req.ID,
@@ -267,14 +273,4 @@ func pingHorus(kvc kvstore.Client) error {
 	}
 
 	return errors.Wrap(err, "ping Horus")
-}
-
-func validGardenRegister(req *structs.RegisterDC) error {
-	buf := bytes.NewBuffer(nil)
-
-	if buf.Len() == 0 {
-		return nil
-	}
-
-	return errors.New(buf.String())
 }
