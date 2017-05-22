@@ -3,6 +3,13 @@
 	"ignore": "",
 	"package": [
 		{
+			"checksumSHA1": "DXx0pJCb8AKuYeKAnkGwLScuKvs=",
+			"origin": "github.com/docker/swarm/vendor/github.com/Sirupsen/logrus",
+			"path": "github.com/Sirupsen/logrus",
+			"revision": "ba1b36c82c5e05c4f912a88eab0dcd91a171688f",
+			"revisionTime": "2017-03-14T19:23:53Z"
+		},
+		{
 			"checksumSHA1": "BnnytsaipFk38uQ5EoNVzxfGQ+8=",
 			"path": "github.com/astaxie/beego/config",
 			"revision": "323a1c4214101331a4b71922c23d19b7409ac71f",
