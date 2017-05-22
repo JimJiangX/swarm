@@ -15,6 +15,8 @@ type eventHander struct {
 	ci   database.ContainerIface
 }
 
+// NewEventHandler is exported.
+//
 func NewEventHandler(ormer database.Ormer) *eventHander {
 	return &eventHander{
 		once: new(sync.Once),

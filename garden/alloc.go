@@ -62,6 +62,8 @@ func validServiceSpec(spec structs.ServiceSpec) error {
 	return nil
 }
 
+// BuildService build a pointer of Service,
+// 根据 ServiceSpec 生成 Service、scheduleOption、[]unit、Task，并记录到数据库。
 func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Task, error) {
 	err := validServiceSpec(spec)
 	if err != nil {
@@ -228,6 +230,7 @@ type pendingUnit struct {
 	volumes     []database.Volume
 }
 
+// Allocation alloc resources for building containers on hosts
 func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Service) (ready []pendingUnit, err error) {
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusServiceAllocating, statusServiceAllocated, statusServiceAllocateFailed)
