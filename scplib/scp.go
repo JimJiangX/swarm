@@ -36,6 +36,7 @@ func NewClient(addr, user, password string) (*Client, error) {
 			ssh.KeyboardInteractive(
 				PasswordKeyboardInteractive(password)),
 		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
 	c, err := ssh.Dial("tcp", addr, config)
