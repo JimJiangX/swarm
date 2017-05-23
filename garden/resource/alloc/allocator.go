@@ -7,6 +7,7 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 )
 
+// Allocator alloc&recycle hosts/CPU/memory/volumes/networkings resources.
 type Allocator interface {
 	VolumeAllocator
 
@@ -19,6 +20,7 @@ type Allocator interface {
 	RecycleResource(ips []database.IP, lvs []database.Volume) error
 }
 
+// VolumeAllocator volume alloction.
 type VolumeAllocator interface {
 	IsNodeStoreEnough(engine *cluster.Engine, stores []structs.VolumeRequire) error
 

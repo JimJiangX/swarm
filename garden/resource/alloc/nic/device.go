@@ -17,6 +17,7 @@ const (
 	_ContainerNIC = "CONTAINER_NIC"
 )
 
+// Device is networking device.
 type Device struct {
 	Bond      string
 	Bandwidth int // M/s
@@ -89,6 +90,7 @@ func parseDevice(dev string) Device {
 	return d
 }
 
+// ParseEngineDevice parse networking devices & bandwidth by engine label.
 func ParseEngineDevice(e *cluster.Engine) ([]string, int, error) {
 	if e == nil || len(e.Labels) == 0 {
 		return nil, 0, nil

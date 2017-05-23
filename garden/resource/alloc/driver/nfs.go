@@ -43,7 +43,8 @@ type _NFSDriver struct {
 	baseDir   string
 }
 
-func NewNFSDriver(nfs database.NFS, base, backup string) _NFSDriver {
+// NewNFSDriver returns _NFS Driver
+func NewNFSDriver(nfs database.NFS, base, backup string) Driver {
 	return _NFSDriver{
 		NFS:       nfs,
 		backupDir: backup,

@@ -27,6 +27,7 @@ type _Context struct {
 	mgmPort int
 }
 
+// NewRouter returns a pointer of mux.Router,router of plugin HTTP APIs.
 func NewRouter(c kvstore.Client, ip string, port int) *mux.Router {
 	type handler func(ctx *_Context, w http.ResponseWriter, r *http.Request)
 

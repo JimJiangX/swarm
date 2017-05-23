@@ -66,10 +66,12 @@ func parseNodeStatus(status int) string {
 
 var dockerNodesKVPath = ""
 
+// SetNodesKVPath set kv path of nodes
 func SetNodesKVPath(path string) {
 	dockerNodesKVPath = path
 }
 
+// Node represents a host
 type Node struct {
 	node   database.Node
 	belong *database.Cluster
@@ -157,6 +159,7 @@ type nodeWithTask struct {
 	Task   database.Task
 }
 
+// NewNodeWithTask node with task and ssh login config,prepare for install host
 func NewNodeWithTask(n database.Node, hdd, ssd []string, ssh structs.SSHConfig) nodeWithTask {
 
 	t := database.NewTask(n.Addr, database.NodeInstall, n.ID, "install softwares on host", nil, 300)
@@ -171,6 +174,7 @@ func NewNodeWithTask(n database.Node, hdd, ssd []string, ssh structs.SSHConfig) 
 	}
 }
 
+// NewNodeWithTaskList returns len of slice nodeWithTask
 func NewNodeWithTaskList(len int) []nodeWithTask {
 	return make([]nodeWithTask, len)
 }
@@ -560,6 +564,7 @@ func (m hostManager) removeNode(ID string) error {
 	return m.dco.DelNode(ID)
 }
 
+// RemoveNode
 func (m hostManager) RemoveNode(ctx context.Context, horus, nameOrID, user, password string, force bool, reg kvstore.Register) error {
 	node, err := m.getNode(nameOrID)
 	if err != nil {

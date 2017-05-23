@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// VolumeIface volume alloction record.
 type VolumeIface interface {
 	localVolumeIface
 
@@ -20,6 +21,7 @@ type VolumeIface interface {
 	ListLunByVG(vg string) ([]database.LUN, error)
 }
 
+// Driver for volume manage
 type Driver interface {
 	Driver() string
 	Name() string
@@ -34,6 +36,7 @@ type Driver interface {
 	Recycle(database.Volume) error
 }
 
+// Space is VG status
 type Space struct {
 	VG     string
 	Total  int64
@@ -41,10 +44,12 @@ type Space struct {
 	Fstype string
 }
 
+// Used returns the used VG size
 func (s Space) Used() int64 {
 	return s.Total - s.Free
 }
 
+// FindEngineVolumeDrivers returns volume drivers supported by engine.
 func FindEngineVolumeDrivers(iface VolumeIface, engine *cluster.Engine) (VolumeDrivers, error) {
 	if engine == nil {
 		return nil, errors.New("Engine is required")
@@ -86,8 +91,10 @@ func FindEngineVolumeDrivers(iface VolumeIface, engine *cluster.Engine) (VolumeD
 	return drivers, nil
 }
 
+// VolumeDrivers volume drivers.
 type VolumeDrivers []Driver
 
+// Get volume driver by type
 func (vds VolumeDrivers) Get(_type string) Driver {
 	for i := range vds {
 		if vds[i].Type() == _type {
@@ -98,6 +105,7 @@ func (vds VolumeDrivers) Get(_type string) Driver {
 	return nil
 }
 
+// IsSpaceEnough decide is there enough space for required.
 func (vds VolumeDrivers) IsSpaceEnough(stores []structs.VolumeRequire) error {
 	if len(vds) == 0 {
 		return errors.New("not found volume Driver")
@@ -129,6 +137,7 @@ func (vds VolumeDrivers) IsSpaceEnough(stores []structs.VolumeRequire) error {
 	return nil
 }
 
+// AllocVolumes alloc required volume space.
 func (vds VolumeDrivers) AllocVolumes(config *cluster.ContainerConfig, uid string, stores []structs.VolumeRequire) ([]database.Volume, error) {
 	err := vds.IsSpaceEnough(stores)
 	if err != nil {
@@ -155,6 +164,7 @@ func (vds VolumeDrivers) AllocVolumes(config *cluster.ContainerConfig, uid strin
 	return volumes, nil
 }
 
+// ExpandVolumes expand required space for exist volumes
 func (vds VolumeDrivers) ExpandVolumes(uid, agent string, stores []structs.VolumeRequire) error {
 	for i := range stores {
 		driver := vds.Get(stores[i].Type)

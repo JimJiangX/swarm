@@ -16,6 +16,7 @@ type hostManager struct {
 	dco database.NodeOrmer
 }
 
+// NewHostManager returns host manager
 func NewHostManager(dco database.NodeOrmer, ec engineCluster) hostManager {
 	return hostManager{
 		dco: dco,
@@ -28,6 +29,7 @@ func (m hostManager) getCluster(ID string) (database.Cluster, error) {
 	return m.dco.GetCluster(ID)
 }
 
+// RemoveCluster remove cluster in db,check if there are none of nodes related to the Cluster.
 func (m hostManager) RemoveCluster(ID string) error {
 	cl, err := m.getCluster(ID)
 	if err != nil && database.IsNotFound(err) {

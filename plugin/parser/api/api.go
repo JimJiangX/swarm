@@ -11,6 +11,7 @@ import (
 	"golang.org/x/net/context"
 )
 
+// PluginAPI is a plugin server HTTP API client.
 type PluginAPI interface {
 	GenerateServiceConfig(ctx context.Context, desc structs.ServiceSpec) (structs.ConfigsMap, error)
 	GenerateUnitConfig(ctx context.Context, unit string, desc structs.ServiceSpec) (structs.ConfigCmds, error)
@@ -32,6 +33,7 @@ type plugin struct {
 	c client.Client
 }
 
+// NewPlugin returns a PluginAPI
 func NewPlugin(cli client.Client) PluginAPI {
 	return plugin{
 		c: cli,

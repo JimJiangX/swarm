@@ -6,16 +6,19 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Networking manage networkings
 type Networking struct {
 	nwo database.NetworkingOrmer
 }
 
+// NewNetworks returns Networking
 func NewNetworks(nwo database.NetworkingOrmer) Networking {
 	return Networking{
 		nwo: nwo,
 	}
 }
 
+// AddNetworking add a new networking,save into db.
 func (nw Networking) AddNetworking(start, end, gateway, networkingID string, vlan, prefix int) (int, error) {
 	startU32 := utils.IPToUint32(start)
 	endU32 := utils.IPToUint32(end)

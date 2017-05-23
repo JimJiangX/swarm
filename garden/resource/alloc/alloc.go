@@ -32,6 +32,7 @@ type allocator struct {
 	ec    engineCluster
 }
 
+// NewAllocator is exported.
 func NewAllocator(ormer allocatorOrmer, ec engineCluster) Allocator {
 	return allocator{
 		ormer: ormer,
