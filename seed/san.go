@@ -47,7 +47,7 @@ func getDriver(name string) (string, bool) {
 	return driver, ok
 }
 
-func VgExtend(ctx *_Context, w http.ResponseWriter, req *http.Request) {
+func vgExtendHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	opt := &VgConfig{}
 	dec := json.NewDecoder(req.Body)
 
@@ -90,7 +90,7 @@ func VgExtend(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 
 }
 
-func VgCreate(ctx *_Context, w http.ResponseWriter, req *http.Request) {
+func vgCreateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	opt := &VgConfig{}
 	dec := json.NewDecoder(req.Body)
 
@@ -131,7 +131,7 @@ func VgCreate(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	w.Write(response)
 }
 
-func VgList(ctx *_Context, w http.ResponseWriter, req *http.Request) {
+func vgListHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 
 	vgs, err := vgList()
 
@@ -219,7 +219,7 @@ func vgList() ([]VgInfo, error) {
 }
 
 func scanSanDisk() error {
-	scriptpath := SCRIPT_DIR + "sanscandisk.sh"
+	scriptpath := scriptDir + "sanscandisk.sh"
 	_, err := os.Lstat(scriptpath)
 	if os.IsNotExist(err) {
 		return errors.New("not find the file:" + scriptpath)
@@ -240,7 +240,7 @@ func scanSanDisk() error {
 }
 
 func getDevicePath(id int, santype string) (string, error) {
-	scriptpath := SCRIPT_DIR + "getsandevice.sh"
+	scriptpath := scriptDir + "getsandevice.sh"
 	_, err := os.Lstat(scriptpath)
 	if os.IsNotExist(err) {
 		return "", errors.New("not find the file:" + scriptpath)

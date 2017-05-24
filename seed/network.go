@@ -26,7 +26,7 @@ type NetworkCfg struct {
 	BandWidth int `json:"bandWidth"`
 }
 
-func networkCreate(ctx *_Context, w http.ResponseWriter, req *http.Request) {
+func networkCreateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	opt := &NetworkCfg{}
 	dec := json.NewDecoder(req.Body)
 
@@ -79,7 +79,7 @@ func createNetwork(cfg *NetworkCfg) error {
 		"-b", strconv.Itoa(cfg.BandWidth),
 	}
 
-	filepath := NET_SCRIPT_DIR + "init_nic.sh"
+	filepath := netScriptDir + "init_nic.sh"
 
 	_, err := ExecShellFile(filepath, args...)
 	return err
