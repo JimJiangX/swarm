@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"testing"
+	"time"
 )
 
 const (
@@ -127,7 +128,7 @@ func (c *Client) Close() error {
 func newClient() (ScpClient, error) {
 	// vagrant up first
 
-	return NewScpClient(sshAddr, username, password)
+	return NewScpClient(sshAddr, username, password, 30*time.Second)
 }
 
 func TestNewClient(t *testing.T) {

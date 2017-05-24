@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/hnakamur/go-scp"
 	"github.com/pkg/errors"
@@ -37,7 +38,7 @@ type client struct {
 }
 
 // NewScpClient returns ScpClient.
-func NewScpClient(addr, user, password string) (ScpClient, error) {
+func NewScpClient(addr, user, password string, timeout time.Duration) (ScpClient, error) {
 	_, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		if net.ParseIP(addr) != nil {
@@ -55,6 +56,7 @@ func NewScpClient(addr, user, password string) (ScpClient, error) {
 				passwordKeyboardInteractive(password)),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         timeout,
 	}
 
 	c, err := ssh.Dial("tcp", addr, config)
@@ -70,7 +72,7 @@ func NewScpClient(addr, user, password string) (ScpClient, error) {
 
 // NewClientByPublicKeys returns ScpClient,ssh client with authenticate.
 // rsa default "$HOME/.ssh/id_rsa"
-func NewClientByPublicKeys(addr, user, rsa string) (ScpClient, error) {
+func NewClientByPublicKeys(addr, user, rsa string, timeout time.Duration) (ScpClient, error) {
 	_, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		if net.ParseIP(addr) != nil {
@@ -108,6 +110,7 @@ func NewClientByPublicKeys(addr, user, rsa string) (ScpClient, error) {
 			ssh.PublicKeys(signer),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         timeout,
 	}
 
 	// Connect to the remote server and perform the SSH handshake.
