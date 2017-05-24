@@ -32,7 +32,7 @@ type RmVGConfig struct {
 	HostLunId []int  `json:"HostLunId"`
 }
 
-func Activate(ctx *_Context, w http.ResponseWriter, req *http.Request) {
+func activateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	opt := &ActConfig{}
 	dec := json.NewDecoder(req.Body)
 
@@ -51,7 +51,7 @@ func Activate(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := DoActivate(opt.VgName, opt.Lvname); err != nil {
+	if err := doActivate(opt.VgName, opt.Lvname); err != nil {
 		errCommonHanlde(w, req, err)
 		return
 	}
@@ -69,7 +69,7 @@ func Activate(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 
 }
 
-func Deactivate(ctx *_Context, w http.ResponseWriter, req *http.Request) {
+func deactivateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	opt := &DeactConfig{}
 	dec := json.NewDecoder(req.Body)
 
@@ -83,12 +83,12 @@ func Deactivate(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := DoDeactivate(opt.VgName, opt.Lvname); err != nil {
+	if err := doDeactivate(opt.VgName, opt.Lvname); err != nil {
 		errCommonHanlde(w, req, err)
 		return
 	}
 
-	if err := SanBlock(opt.Vendor, opt.HostLunId); err != nil {
+	if err := sanBlock(opt.Vendor, opt.HostLunId); err != nil {
 		errCommonHanlde(w, req, err)
 		return
 	}
@@ -96,7 +96,7 @@ func Deactivate(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	//do this because ,export ok ,but can see the vg
 	tryImport(opt.VgName)
 
-	if CheckVg(opt.VgName) {
+	if checkVg(opt.VgName) {
 		errCommonHanlde(w, req, errors.New("exec ok .but the vgname exist yet"))
 		return
 	}
@@ -119,7 +119,7 @@ func Deactivate(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	w.Write(response)
 }
 
-func RemoveVG(ctx *_Context, w http.ResponseWriter, req *http.Request) {
+func removeVGHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	opt := &RmVGConfig{}
 	dec := json.NewDecoder(req.Body)
 
@@ -141,7 +141,7 @@ func RemoveVG(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	err := SanBlock(opt.Vendor, opt.HostLunId)
+	err := sanBlock(opt.Vendor, opt.HostLunId)
 	if err != nil {
 		errCommonHanlde(w, req, err)
 		return
@@ -196,7 +196,7 @@ func checkDeactConfig(opt *DeactConfig) error {
 		return errors.New("HostLunId must  be set")
 	}
 
-	scriptpath := SCRIPT_DIR + "sanDeviceBlock.sh"
+	scriptpath := scriptDir + "sanDeviceBlock.sh"
 	_, err := os.Lstat(scriptpath)
 	if os.IsNotExist(err) {
 		return errors.New("not find the shell: " + scriptpath)
@@ -217,7 +217,7 @@ func checkActConfig(opt *ActConfig) error {
 	return nil
 }
 
-func DoActivate(vgname string, lvs []string) error {
+func doActivate(vgname string, lvs []string) error {
 
 	if err := vgImport(vgname); err != nil {
 		errstr := fmt.Sprintf("  %s vgimport fail:%v", vgname, err)
@@ -243,7 +243,7 @@ func DoActivate(vgname string, lvs []string) error {
 
 }
 
-func DoDeactivate(vgname string, lvs []string) error {
+func doDeactivate(vgname string, lvs []string) error {
 	// for _, lv := range lvs {
 	// 	if !checkLvsVolume(vgname, lv) {
 	// 		errstr := fmt.Sprintf("the %s not find %s ", vgname, lv)
@@ -342,8 +342,8 @@ func lvDeActivate(vg, lv string) error {
 	return nil
 }
 
-func SanBlock(vendor string, ids []int) error {
-	scriptpath := SCRIPT_DIR + "sanDeviceBlock.sh"
+func sanBlock(vendor string, ids []int) error {
+	scriptpath := scriptDir + "sanDeviceBlock.sh"
 	_, err := os.Lstat(scriptpath)
 	if os.IsNotExist(err) {
 		return errors.New("not find the shell: " + scriptpath)

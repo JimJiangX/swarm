@@ -20,7 +20,7 @@ type VolumeFileCfg struct {
 	Mode      string `json:"Mode"`
 }
 
-func VolumeFileCp(ctx *_Context, w http.ResponseWriter, req *http.Request) {
+func volumeFileCpHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	opt := &VolumeFileCfg{}
 	dec := json.NewDecoder(req.Body)
 
@@ -88,7 +88,7 @@ func checkVolumeFileCfg(opt *VolumeFileCfg) error {
 	if opt.VgName == "" {
 		return errors.New("the VgName  is null")
 	}
-	if !CheckVg(opt.VgName) {
+	if !checkVg(opt.VgName) {
 		return errors.New("don't find the VG")
 	}
 
@@ -111,7 +111,7 @@ func checkVolumeFileCfg(opt *VolumeFileCfg) error {
 	return nil
 }
 
-func WriteToTmpfile(data, tempfile string) error {
+func writeToTmpfile(data, tempfile string) error {
 	fi, err := os.OpenFile(tempfile, os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		return errors.New("try open tempfile fail: " + err.Error())
@@ -137,7 +137,7 @@ func doFileRepalce(data, mode, filedes, tempfile string) error {
 		return errors.New("the des is dir!!!")
 	}
 
-	if err := WriteToTmpfile(data, tempfile); err != nil {
+	if err := writeToTmpfile(data, tempfile); err != nil {
 		log.WithFields(log.Fields{
 			"err": err.Error(),
 		}).Error("repalce fail : WriteToTmpfile fail")

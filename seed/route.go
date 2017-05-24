@@ -9,9 +9,10 @@ import (
 	"golang.org/x/net/context"
 )
 
-const SCRIPT_DIR = "/usr/local/swarm-agent/scripts/seed/"
-
-const NET_SCRIPT_DIR = SCRIPT_DIR + "net/"
+const (
+	scriptDir    = "/usr/local/swarm-agent/scripts/seed/"
+	netScriptDir = scriptDir + "net/"
+)
 
 type _Context struct {
 	apiVersion string
@@ -29,11 +30,12 @@ func errCommonHanlde(w http.ResponseWriter, req *http.Request, err error) {
 	log.Printf("the req %s exec error:%s\n", req.Method+":"+req.URL.Path, err.Error())
 }
 
-func GetVersionHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
+func getVersionHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	w.Write([]byte("version:" + ctx.apiVersion + "\n"))
 	// log.Info("the req :", req.Method, req.URL.Path)
 }
 
+// NewRouter create API router.
 func NewRouter(version string) *mux.Router {
 	type handler func(ctx *_Context, w http.ResponseWriter, r *http.Request)
 
@@ -41,27 +43,24 @@ func NewRouter(version string) *mux.Router {
 
 	var routes = map[string]map[string]handler{
 		"GET": {
-			"/san/vglist": VgList,
-			"/version":    GetVersionHandle,
+			"/san/vglist": vgListHandle,
+			"/version":    getVersionHandle,
 		},
 		"POST": {
 
-			"/VolumeDriver.Update": Update,
-			"/volume/file/cp":      VolumeFileCp,
+			"/VolumeDriver.Update": updateHandle,
+			"/volume/file/cp":      volumeFileCpHandle,
 
-			"/san/vgcreate": VgCreate,
-			"/san/vgextend": VgExtend,
+			"/san/vgcreate": vgCreateHandle,
+			"/san/vgextend": vgExtendHandle,
 
 			// "/san/vgblock":  VgBlock,
-			"/san/activate":   Activate,
-			"/san/deactivate": Deactivate,
+			"/san/activate":   activateHandle,
+			"/san/deactivate": deactivateHandle,
 
-			"/san/vg/remove": RemoveVG,
+			"/san/vg/remove": removeVGHandle,
 
-			"/ip/remove": IpRemove,
-			"/ip/create": IPCreate,
-
-			"/network/create": networkCreate,
+			"/network/create": networkCreateHandle,
 		},
 	}
 

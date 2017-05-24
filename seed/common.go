@@ -84,7 +84,7 @@ func checkLvsByName(name string) bool {
 	return strings.Contains(out, name)
 }
 
-func CheckVg(vgname string) bool {
+func checkVg(vgname string) bool {
 	script := fmt.Sprintf("vgs | awk '{print $1}'")
 	out, err := ExecCommand(script)
 	if err != nil {
