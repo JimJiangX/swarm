@@ -445,9 +445,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Timeout > 0 {
-		var cancel goctx.CancelFunc
-		ctx, cancel = goctx.WithTimeout(ctx, time.Duration(req.Timeout)*time.Second)
-		defer cancel()
+		ctx, _ = goctx.WithTimeout(ctx, time.Duration(req.Timeout)*time.Second)
 	}
 
 	pc := gd.PluginClient()
@@ -475,7 +473,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// database.Image.ID
-	id, taskID, err := resource.LoadImage(goctx.Background(), gd.Ormer(), req)
+	id, taskID, err := resource.LoadImage(ctx, gd.Ormer(), req)
 	if err != nil {
 		ec := errCodeV1(r.Method, _Image, internalError, 35)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
@@ -1036,6 +1034,9 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	node := mux.Vars(r)["node"]
 	force := boolValue(r, "force")
+	t := intValueOrZero(r, "timeout")
+	timeout := time.Duration(t) * time.Second
+
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
@@ -1054,6 +1055,12 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if timeout > 0 {
+		var cancel goctx.CancelFunc
+		ctx, cancel = goctx.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
 	horus, err := gd.KVClient().GetHorusAddr()
 	if err != nil {
 		ec := errCodeV1(r.Method, _Host, internalError, 73)
@@ -1063,7 +1070,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	m := resource.NewHostManager(gd.Ormer(), gd.Cluster)
 
-	err = m.RemoveNode(ctx, horus, node, username, password, force, gd.KVClient())
+	err = m.RemoveNode(ctx, horus, node, username, password, force, timeout, gd.KVClient())
 	if err != nil {
 		ec := errCodeV1(r.Method, _Host, internalError, 74)
 		httpJSONError(w, err, ec.code, http.StatusInternalServerError)
