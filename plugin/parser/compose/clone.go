@@ -1,20 +1,20 @@
 package compose
 
-type Clone struct {
+type clone struct {
 }
 
 func newCloneManager() Composer {
-	return &Clone{}
+	return &clone{}
 }
 
-func (c *Clone) ClearCluster() error {
+func (c *clone) ClearCluster() error {
 	return nil
 }
 
-func (c *Clone) CheckCluster() error {
+func (c *clone) CheckCluster() error {
 	return nil
 }
 
-func (c *Clone) ComposeCluster() error {
+func (c *clone) ComposeCluster() error {
 	return nil
 }

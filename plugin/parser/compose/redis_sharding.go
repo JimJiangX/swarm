@@ -7,16 +7,16 @@ import (
 	"time"
 )
 
-//master-slave mysql manager
-type RedisShadeManager struct {
+//master-slave redis manager
+type RedisShardingManager struct {
 	RedisMap map[string]Redis
 
 	Master int
 	Slave  int
 }
 
-func newRedisShadeManager(dbs []Redis, master int, slave int) Composer {
-	rs := &RedisShadeManager{
+func newRedisShardingManager(dbs []Redis, master int, slave int) Composer {
+	rs := &RedisShardingManager{
 		RedisMap: make(map[string]Redis),
 		Master:   master,
 		Slave:    slave,
@@ -28,7 +28,7 @@ func newRedisShadeManager(dbs []Redis, master int, slave int) Composer {
 
 	return rs
 }
-func (r *RedisShadeManager) getRedisAddrs() string {
+func (r *RedisShardingManager) getRedisAddrs() string {
 	addrs := []string{}
 	for _, redis := range r.RedisMap {
 		addr := redis.Ip + ":" + strconv.Itoa(redis.Port)
@@ -38,8 +38,8 @@ func (r *RedisShadeManager) getRedisAddrs() string {
 	return strings.Join(addrs, ",")
 }
 
-func (r *RedisShadeManager) ClearCluster() error {
-	filepath := BASEDIR + "redis-sharding_replication-reset.sh"
+func (r *RedisShardingManager) ClearCluster() error {
+	filepath := scriptDir + "redis-sharding_replication-reset.sh"
 	timeout := time.Second * 120
 	addrs := r.getRedisAddrs()
 	args := []string{addrs}
@@ -47,16 +47,16 @@ func (r *RedisShadeManager) ClearCluster() error {
 	return err
 }
 
-func (r *RedisShadeManager) CheckCluster() error {
+func (r *RedisShardingManager) CheckCluster() error {
 	return nil
 }
 
-func (r *RedisShadeManager) ComposeCluster() error {
+func (r *RedisShardingManager) ComposeCluster() error {
 	if err := r.ClearCluster(); err != nil {
 		return errors.New("ClearCluster fail:" + err.Error())
 	}
 
-	filepath := BASEDIR + "redis-sharding_replication-set.sh"
+	filepath := scriptDir + "redis-sharding_replication-set.sh"
 	timeout := time.Second * 120
 
 	addrs := r.getRedisAddrs()

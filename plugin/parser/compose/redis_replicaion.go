@@ -7,13 +7,13 @@ import (
 )
 
 //master-slave redis manager
-type RedisMSManager struct {
+type RedisRepManager struct {
 	RedisMap map[string]Redis
 }
 
-func newRedisMSManager(dbs []Redis) Composer {
+func newRedisRepManager(dbs []Redis) Composer {
 
-	ms := &RedisMSManager{
+	ms := &RedisRepManager{
 		RedisMap: make(map[string]Redis),
 	}
 
@@ -25,7 +25,7 @@ func newRedisMSManager(dbs []Redis) Composer {
 
 }
 
-func (m *RedisMSManager) ComposeCluster() error {
+func (m *RedisRepManager) ComposeCluster() error {
 	if err := m.ClearCluster(); err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (m *RedisMSManager) ComposeCluster() error {
 	master := m.RedisMap[masterkey]
 
 	for _, db := range m.RedisMap {
-		if db.GetType() != MASTER_TYPE {
+		if db.GetType() != masterRole {
 			if err := db.ChangeMaster(master); err != nil {
 				log.WithFields(log.Fields{
 					"slave":  db.GetKey(),
@@ -64,7 +64,7 @@ func (m *RedisMSManager) ComposeCluster() error {
 	return nil
 }
 
-func (m *RedisMSManager) ClearCluster() error {
+func (m *RedisRepManager) ClearCluster() error {
 	for _, db := range m.RedisMap {
 		if err := db.Clear(); err != nil {
 			log.WithFields(log.Fields{
@@ -78,7 +78,7 @@ func (m *RedisMSManager) ClearCluster() error {
 	return nil
 }
 
-func (m *RedisMSManager) CheckCluster() error {
+func (m *RedisRepManager) CheckCluster() error {
 	for _, db := range m.RedisMap {
 		if err := db.CheckStatus(); err != nil {
 			log.WithFields(log.Fields{
@@ -91,16 +91,16 @@ func (m *RedisMSManager) CheckCluster() error {
 	return nil
 }
 
-func (m *RedisMSManager) preCompose() error {
+func (m *RedisRepManager) preCompose() error {
 	//select master
 	masterkey := m.electMaster()
-	if err := m.setType(masterkey, MASTER_TYPE); err != nil {
+	if err := m.setType(masterkey, masterRole); err != nil {
 		return errors.New("electMaster fail:" + err.Error())
 	}
 
 	for _, db := range m.RedisMap {
 		if db.GetKey() != masterkey {
-			if err := m.setType(db.GetKey(), SLAVE_TYPE); err != nil {
+			if err := m.setType(db.GetKey(), slaveRole); err != nil {
 				log.WithFields(log.Fields{
 					"err": err,
 					"db":  db.GetKey(),
@@ -113,9 +113,9 @@ func (m *RedisMSManager) preCompose() error {
 	return nil
 }
 
-func (m *RedisMSManager) getMasterKey() (string, bool) {
+func (m *RedisRepManager) getMasterKey() (string, bool) {
 	for _, db := range m.RedisMap {
-		if db.GetType() == MASTER_TYPE {
+		if db.GetType() == masterRole {
 			return db.GetKey(), true
 		}
 	}
@@ -123,7 +123,7 @@ func (m *RedisMSManager) getMasterKey() (string, bool) {
 	return "", false
 }
 
-func (m *RedisMSManager) electMaster() string {
+func (m *RedisRepManager) electMaster() string {
 
 	curweight := -1
 	var master Redis
@@ -144,7 +144,7 @@ func (m *RedisMSManager) electMaster() string {
 	return ""
 }
 
-func (m *RedisMSManager) setType(dbkey string, Type ROLE_TYPE) error {
+func (m *RedisRepManager) setType(dbkey string, Type dbRole) error {
 
 	tmp, ok := m.RedisMap[dbkey]
 	if !ok {
