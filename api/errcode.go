@@ -3,8 +3,6 @@ package api
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/pkg/errors"
 )
 
 type model int
@@ -51,10 +49,11 @@ const (
 type errCode struct {
 	code    int
 	comment string
+	chinese string
 }
 
 func (ec errCode) String() string {
-	return fmt.Sprintf("%-10d:	%s", ec.code, ec.comment)
+	return fmt.Sprintf("%-10d:	%s", ec.code, ec.comment, ec.chinese)
 }
 
 func errCodeV1(method string, md model, cg category, serial int) errCode {
@@ -101,24 +100,9 @@ func errCodeV1(method string, md model, cg category, serial int) errCode {
 	return newErrCode(v1, mt, int(md), int(cg), serial)
 }
 
-var errcodeMap map[int]errCode
+var errCodeMap map[int]errCode
 
-func init() {
-	errcodeMap = make(map[int]errCode, 100)
-}
+func getErrCode(code int) errCode {
 
-func getErrCode(code int) (errCode, error) {
-	ec, ok := errcodeMap[code]
-	if ok {
-		return ec, nil
-	}
-
-	return errCode{}, errors.Errorf("err code %d not exist", code)
-}
-
-func addErrCode(code int, msg string) {
-	errcodeMap[code] = errCode{
-		code:    code,
-		comment: msg,
-	}
+	return errCodeMap[code]
 }

@@ -25,12 +25,17 @@ import (
 	goctx "golang.org/x/net/context"
 )
 
-var errUnsupportGarden = stderr.New("unsupport Garden yet")
+var (
+	nilGardenCode = errCode{
+		code:    1000013000,
+		comment: "internal error,not supported 'Garden'",
+		chinese: "不支持 'Garden' 模式",
+	}
+	errUnsupportGarden = stderr.New("unsupport Garden yet")
+)
 
 func httpJSONNilGarden(w http.ResponseWriter) {
-	const nilGardenCode = 100000000
-
-	httpJSONError(w, errUnsupportGarden, nilGardenCode, http.StatusInternalServerError)
+	httpJSONError(w, errUnsupportGarden, nilGardenCode.code, http.StatusInternalServerError)
 }
 
 // Emit an HTTP error and log it.
@@ -41,29 +46,35 @@ func httpJSONError(w http.ResponseWriter, err error, code, status int) {
 	w.WriteHeader(status)
 
 	if err != nil {
+
+		ec := getErrCode(code)
 		json.NewEncoder(w).Encode(structs.ResponseHead{
-			Result:  false,
-			Code:    code,
-			Message: err.Error(),
+			Result:   false,
+			Code:     code,
+			Error:    err.Error(),
+			Category: ec.chinese,
 		})
 
 		field.Errorf("HTTP error: %+v", err)
 	}
 }
 
-// Emit an HTTP error with object and log it.
-func httpJSONErrorWithBody(w http.ResponseWriter, obj interface{}, err error, status int) {
-	field := logrus.WithField("status", status)
+func httpJSONError1(w http.ResponseWriter, err error, status int, ec errCode) {
+	field := logrus.WithFields(logrus.Fields{
+		"status": status,
+		"code":   ec.code,
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 
 	if err != nil {
+
 		json.NewEncoder(w).Encode(structs.ResponseHead{
-			Result:  false,
-			Code:    status,
-			Message: err.Error(),
-			Object:  obj,
+			Result:   false,
+			Code:     ec.code,
+			Error:    err.Error(),
+			Category: ec.chinese,
 		})
 
 		field.Errorf("HTTP error: %+v", err)
