@@ -27,7 +27,7 @@ import (
 
 var (
 	nilGardenCode = errCode{
-		code:    1000013000,
+		code:    1000000000,
 		comment: "internal error,not supported 'Garden'",
 		chinese: "不支持 'Garden' 模式",
 	}
@@ -35,31 +35,11 @@ var (
 )
 
 func httpJSONNilGarden(w http.ResponseWriter) {
-	httpJSONError1(w, errUnsupportGarden, nilGardenCode, http.StatusInternalServerError)
+	httpJSONError(w, errUnsupportGarden, nilGardenCode, http.StatusInternalServerError)
 }
 
 // Emit an HTTP error and log it.
-func httpJSONError(w http.ResponseWriter, err error, code, status int) {
-	field := logrus.WithField("status", status)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-
-	if err != nil {
-
-		ec := getErrCode(code)
-		json.NewEncoder(w).Encode(structs.ResponseHead{
-			Result:   false,
-			Code:     code,
-			Error:    err.Error(),
-			Category: ec.chinese,
-		})
-
-		field.Errorf("HTTP error: %+v", err)
-	}
-}
-
-func httpJSONError1(w http.ResponseWriter, err error, ec errCode, status int) {
+func httpJSONError(w http.ResponseWriter, err error, ec errCode, status int) {
 	field := logrus.WithFields(logrus.Fields{
 		"status": status,
 		"code":   ec.code,
@@ -122,8 +102,8 @@ func vaildNFSParams(nfs database.NFS) error {
 
 func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		ec := errCodeV2(r.Method, _NFS, urlParamError, 11, "parse Request URL parameter error", "解析请求URL参数错误")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _NFS, urlParamError, 11, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -136,8 +116,8 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err := vaildNFSParams(nfs)
 	if err != nil {
-		ec := errCodeV2(r.Method, _NFS, invaildParamsError, 12, "URL parameters are invaild", "URL参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _NFS, invaildParamsError, 12, "URL parameters are invaild", "URL参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -151,15 +131,15 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	sys, err := gd.Ormer().GetSysConfig()
 	if err != nil {
-		ec := errCodeV2(r.Method, _NFS, dbQueryError, 13, "fail to query database error", "数据库查询错误（配置参数表）")
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _NFS, dbQueryError, 13, "fail to query database", "数据库查询错误（配置参数表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	abs, err := utils.GetAbsolutePath(true, sys.SourceDir)
 	if err != nil {
-		ec := errCodeV2(r.Method, _NFS, objectNotExist, 14, sys.SourceDir+":dir is not exist", sys.SourceDir+":目录不存在")
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _NFS, objectNotExist, 14, sys.SourceDir+":dir is not exist", sys.SourceDir+":目录不存在")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -167,8 +147,8 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	space, err := d.Space()
 	if err != nil {
-		ec := errCodeV2(r.Method, _NFS, internalError, 15, "fail to get NFS space info", "NFS 容量信息查询错误")
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _NFS, internalError, 15, "fail to get NFS space info", "NFS 容量信息查询错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -190,8 +170,8 @@ func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	t, err := gd.Ormer().GetTask(name)
 	if err != nil {
-		ec := errCodeV2(r.Method, _Task, dbQueryError, 11, "fail to query database error", "数据库查询错误（任务表）")
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Task, dbQueryError, 11, "fail to query database", "数据库查询错误（任务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -200,8 +180,8 @@ func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		ec := errCodeV2(r.Method, _Task, urlParamError, 21, "parse Request URL parameter error", "解析请求URL参数错误")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Task, urlParamError, 21, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -229,8 +209,8 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		ec := errCodeV1(r.Method, _Task, dbQueryError, 22)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Task, dbQueryError, 22, "fail to query database", "数据库查询错误（任务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -264,15 +244,15 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Task, decodeError, 31)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Task, decodeError, 31, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	err = vaildBackupTaskCallback(req)
 	if err != nil {
-		ec := errCodeV2(r.Method, _Task, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Task, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -286,8 +266,8 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	svc, err := orm.GetServiceByUnit(req.UnitID)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Task, dbQueryError, 33)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Task, dbQueryError, 33, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 	now := time.Now()
@@ -311,8 +291,8 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	err = orm.InsertBackupFileWithTask(bf, t)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Task, dbQueryError, 34)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Task, dbTxError, 34, "fail to exec records in into database in a Tx", "数据库事务处理错误（备份文件表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -328,14 +308,14 @@ func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.RegisterDC{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		ec := errCodeV1(r.Method, _DC, decodeError, 11)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _DC, decodeError, 11, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	if err := vaildDatacenter(req); err != nil {
-		ec := errCodeV2(r.Method, _DC, invaildParamsError, 12, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _DC, invaildParamsError, 12, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -347,8 +327,8 @@ func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err = gd.Register(req)
 	if err != nil {
-		ec := errCodeV1(r.Method, _DC, internalError, 13)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _DC, internalError, 13, "fail to register datacenter", "注册数据中心错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -367,8 +347,8 @@ func listImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	images, err := gd.Ormer().ListImages()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Image, dbQueryError, 11)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Image, dbQueryError, 11, "fail to query database", "数据库查询错误（镜像表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -405,8 +385,8 @@ func getSupportImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	pc := gd.PluginClient()
 	out, err := pc.GetImageSupport(ctx)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Image, internalError, 21)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Image, internalError, 21, "fail to get supported image list", "获取已支持的镜像列表错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -435,14 +415,14 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostLoadImageRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Image, decodeError, 31)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Image, decodeError, 31, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	if err := vaildLoadImageRequest(req); err != nil {
-		ec := errCodeV2(r.Method, _Image, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Image, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -464,8 +444,8 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	pc := gd.PluginClient()
 	supports, err := pc.GetImageSupport(ctx)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Image, internalError, 33)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Image, internalError, 33, "fail to get supported image list", "获取已支持的镜像列表错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -480,16 +460,16 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
-		ec := errCodeV1(r.Method, _Image, objectNotExist, 34)
-		httpJSONError(w, fmt.Errorf("%s unsupported yet", req.Version()), ec.code, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Image, objectNotExist, 34, "unsupported image:"+req.Version(), "不支持镜像:"+req.Version())
+		httpJSONError(w, stderr.New(ec.comment), ec, http.StatusInternalServerError)
 		return
 	}
 
 	// database.Image.ID
 	id, taskID, err := resource.LoadImage(goctx.Background(), gd.Ormer(), req)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Image, internalError, 35)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Image, internalError, 35, "fail to load image", "镜像入库失败")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -510,8 +490,8 @@ func deleteImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err := gd.Ormer().DelImage(img)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Image, dbTxError, 41)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Image, dbTxError, 41, "fail to exec records in into database in a Tx", "数据库事务处理错误（镜像表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -532,15 +512,15 @@ func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	orm := gd.Ormer()
 	c, err := orm.GetCluster(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Cluster, dbQueryError, 11)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Cluster, dbQueryError, 11, "fail to query database", "数据库查询错误（集群表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	n, err := orm.CountNodeByCluster(c.ID)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Cluster, dbQueryError, 12)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Cluster, dbQueryError, 12, "fail to query database", "数据库查询错误（主机表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -566,8 +546,8 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	list, err := orm.ListClusters()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Cluster, dbQueryError, 21)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Cluster, dbQueryError, 21, "fail to query database", "数据库查询错误（集群表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -575,8 +555,8 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	for i := range list {
 		n, err := orm.CountNodeByCluster(list[i].ID)
 		if err != nil {
-			ec := errCodeV1(r.Method, _Cluster, dbQueryError, 22)
-			httpJSONError1(w, err, ec, http.StatusInternalServerError)
+			ec := errCodeV1(r.Method, _Cluster, dbQueryError, 22, "fail to query database", "数据库查询错误（主机表）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
 			return
 		}
 
@@ -599,14 +579,14 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostClusterRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Cluster, decodeError, 31)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Cluster, decodeError, 31, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	if err := vaildPostClusterRequest(req); err != nil {
-		ec := errCodeV2(r.Method, _Cluster, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Cluster, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -626,8 +606,8 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err = gd.Ormer().InsertCluster(c)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Cluster, dbExecError, 33)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Cluster, dbExecError, 33, "fail to insert records into database", "数据库新增记录错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -641,14 +621,14 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	req := structs.PostClusterRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Cluster, decodeError, 41)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Cluster, decodeError, 41, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	if err := vaildPostClusterRequest(req); err != nil {
-		ec := errCodeV2(r.Method, _Cluster, invaildParamsError, 42, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Cluster, invaildParamsError, 42, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -668,8 +648,8 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	err = gd.Ormer().SetClusterParams(c)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Cluster, dbExecError, 43)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Cluster, dbExecError, 43, "fail to update records into database", "数据库更新记录错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -690,8 +670,8 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	master := resource.NewHostManager(gd.Ormer(), gd.Cluster)
 	err := master.RemoveCluster(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Cluster, dbExecError, 51)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Cluster, dbExecError, 51, "fail to delete records into database", "数据库删除记录错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -765,8 +745,8 @@ func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	n, err := gd.Ormer().GetNode(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, dbQueryError, 11)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, dbQueryError, 11, "fail to query database", "数据库查询错误（主机表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -780,9 +760,9 @@ func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
-		ec := errCodeV2(r.Method, _Host, urlParamError, 21, "parse Request URL parameter error", "解析请求URL参数错误")
+		ec := errCodeV1(r.Method, _Host, urlParamError, 21, "parse Request URL parameter error", "解析请求URL参数错误")
 
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -805,8 +785,8 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		nodes, err = gd.Ormer().ListNodesByCluster(name)
 	}
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, dbQueryError, 22)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, dbQueryError, 22, "fail to query database", "数据库查询错误（主机表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -828,7 +808,7 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusOK)
 }
 
-func vailNodeRequest(node structs.Node) error {
+func vaildNodeRequest(node structs.Node) error {
 	errs := make([]string, 0, 3)
 
 	if node.Cluster == "" {
@@ -855,14 +835,14 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	n := structs.Node{}
 	err := json.NewDecoder(r.Body).Decode(&n)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, decodeError, 31)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Host, decodeError, 31, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
-	if err := vailNodeRequest(n); err != nil {
-		ec := errCodeV2(r.Method, _Host, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+	if err := vaildNodeRequest(n); err != nil {
+		ec := errCodeV1(r.Method, _Host, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -878,16 +858,16 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	_, err = orm.GetCluster(n.Cluster)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, dbQueryError, 33)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, dbQueryError, 33, "fail to query database", "数据库查询错误（集群表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	if n.Storage != "" {
 		_, _, err = orm.GetStorageByID(n.Storage)
 		if err != nil {
-			ec := errCodeV1(r.Method, _Host, dbQueryError, 34)
-			httpJSONError1(w, err, ec, http.StatusInternalServerError)
+			ec := errCodeV1(r.Method, _Host, dbQueryError, 34, "fail to query database", "数据库查询错误（外部存储表）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -916,16 +896,16 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	horus, err := gd.KVClient().GetHorusAddr()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, internalError, 35)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, internalError, 35, "fail to query third-part monitor server addr", "获取第三方监控服务地址错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	master := resource.NewHostManager(orm, gd.Cluster)
 	err = master.InstallNodes(ctx, horus, nodes, gd.KVClient())
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, internalError, 36)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, internalError, 36, "fail to install host", "主机入库错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -952,8 +932,8 @@ func putNodeEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err := gd.Ormer().SetNodeEnable(name, true)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, dbExecError, 41)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, dbExecError, 41, "fail to update records into database", "数据库更新记录错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -973,8 +953,8 @@ func putNodeDisable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err := gd.Ormer().SetNodeEnable(name, false)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, dbExecError, 51)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, dbExecError, 51, "fail to update records into database", "数据库更新记录错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -990,8 +970,8 @@ func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&max)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, decodeError, 61)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Host, decodeError, 61, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -1005,8 +985,8 @@ func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err = gd.Ormer().SetNodeParam(name, max.N)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, dbExecError, 62)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, dbExecError, 62, "fail to update records into database", "数据库更新记录错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1041,8 +1021,8 @@ func vaildDelNodesRequest(name, user string) error {
 // 510 SSH 出库脚本执行失败
 func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		ec := errCodeV2(r.Method, _Host, urlParamError, 71, "parse Request URL parameter error", "解析请求URL参数错误")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Host, urlParamError, 71, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -1052,8 +1032,8 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 
 	if err := vaildDelNodesRequest(node, username); err != nil {
-		ec := errCodeV2(r.Method, _Host, invaildParamsError, 72, "URL parameters are invaild", "URL参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Host, invaildParamsError, 72, "URL parameters are invaild", "URL参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -1068,8 +1048,8 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	horus, err := gd.KVClient().GetHorusAddr()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, internalError, 73)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, internalError, 73, "fail to query third-part monitor server addr", "获取第三方监控服务地址错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1077,8 +1057,8 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err = m.RemoveNode(ctx, horus, node, username, password, force, gd.KVClient())
 	if err != nil {
-		ec := errCodeV1(r.Method, _Host, internalError, 74)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Host, internalError, 74, "fail to uninstall host agents", "主机出库错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1087,18 +1067,24 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 // -----------------/networkings handlers-----------------
 func vailPostNetworkingRequest(v structs.PostNetworkingRequest) error {
-	errs := make([]string, 0, 4)
+	errs := make([]string, 0, 5)
 
 	if v.Prefix < 0 || v.Prefix > 32 {
 		errs = append(errs, fmt.Sprintf("illegal Prefix:%d not in 1~32", v.Prefix))
 	}
 
-	if ip := net.ParseIP(v.Start); ip == nil {
+	start := net.ParseIP(v.Start)
+	if start == nil {
 		errs = append(errs, fmt.Sprintf("illegal IP:'%s' error", v.Start))
 	}
 
-	if ip := net.ParseIP(v.End); ip == nil {
+	end := net.ParseIP(v.End)
+	if end == nil {
 		errs = append(errs, fmt.Sprintf("illegal IP:'%s' error", v.End))
+	}
+
+	if mask := net.CIDRMask(v.Prefix, 32); !start.Mask(mask).Equal(end.Mask(mask)) {
+		errs = append(errs, fmt.Sprintf("%s-%s is different network segments", start, end))
 	}
 
 	if ip := net.ParseIP(v.Gateway); ip == nil {
@@ -1119,14 +1105,14 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Networking, decodeError, 11)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Networking, decodeError, 11, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	if err := vailPostNetworkingRequest(req); err != nil {
-		ec := errCodeV2(r.Method, _Networking, invaildParamsError, 12, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Networking, invaildParamsError, 12, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -1145,8 +1131,8 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	nw := resource.NewNetworks(gd.Ormer())
 	n, err := nw.AddNetworking(req.Start, req.End, req.Gateway, name, req.VLAN, req.Prefix)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Networking, internalError, 13)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Networking, dbExecError, 13, "fail to insert records into database", "数据库新增记录错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1155,10 +1141,10 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "{%q:%d}", "num", n)
 }
 
-func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+func setNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request, enable bool) {
 	if err := r.ParseForm(); err != nil {
-		ec := errCodeV2(r.Method, _Networking, urlParamError, 21, "parse Request URL parameter error", "解析请求URL参数错误")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Networking, urlParamError, 21, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 	name := mux.Vars(r)["name"]
@@ -1172,8 +1158,8 @@ func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 	if !all {
 		err := json.NewDecoder(r.Body).Decode(&body)
 		if err != nil {
-			ec := errCodeV1(r.Method, _Networking, decodeError, 22)
-			httpJSONError1(w, err, ec, http.StatusBadRequest)
+			ec := errCodeV1(r.Method, _Networking, decodeError, 22, "JSON Decode Request Body error", "JSON解析请求Body错误")
+			httpJSONError(w, err, ec, http.StatusBadRequest)
 			return
 		}
 	}
@@ -1191,8 +1177,8 @@ func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 	if len(body) > 0 {
 		list, err := orm.ListIPByNetworking(name)
 		if err != nil {
-			ec := errCodeV1(r.Method, _Networking, dbQueryError, 23)
-			httpJSONError1(w, err, ec, http.StatusInternalServerError)
+			ec := errCodeV1(r.Method, _Networking, dbQueryError, 23, "fail to query database", "数据库查询错误（网络IP表）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
 			return
 		}
 
@@ -1210,102 +1196,33 @@ func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 				}
 			}
 			if !exist {
-				ec := errCodeV1(r.Method, _Networking, internalError, 24)
-				httpJSONError(w, fmt.Errorf("IP %s is not in networking %s", body[i], name), ec.code, http.StatusInternalServerError)
+				ec := errCodeV1(r.Method, _Networking, invaildParamsError, 24, fmt.Sprintf("IP %s is not in networking %s", body[i], name), "IP不属于指定网络范围")
+				httpJSONError(w, stderr.New(ec.comment), ec, http.StatusInternalServerError)
 				return
 			}
 		}
 	}
 
 	if len(filters) == 0 {
-		err = orm.SetNetworkingEnable(name, true)
+		err = orm.SetNetworkingEnable(name, enable)
 	} else {
-		err = orm.SetIPEnable(filters, name, true)
+		err = orm.SetIPEnable(filters, name, enable)
 	}
 	if err != nil {
-		ec := errCodeV1(r.Method, _Networking, dbTxError, 25)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Networking, dbTxError, 25, "fail to exec records in into database in a Tx", "数据库事务处理错误（网络IP表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 }
 
+func putNetworkingEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	setNetworking(ctx, w, r, true)
+}
+
 func putNetworkingDisable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		ec := errCodeV2(r.Method, _Networking, urlParamError, 31, "parse Request URL parameter error", "解析请求URL参数错误")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
-		return
-	}
-
-	name := mux.Vars(r)["name"]
-	all := boolValue(r, "all")
-
-	var (
-		err  error
-		body []string
-	)
-
-	if !all {
-		err := json.NewDecoder(r.Body).Decode(&body)
-		if err != nil {
-			ec := errCodeV1(r.Method, _Networking, decodeError, 32)
-			httpJSONError1(w, err, ec, http.StatusBadRequest)
-			return
-		}
-	}
-	ok, _, gd := fromContext(ctx, _Garden)
-	if !ok || gd == nil ||
-		gd.Ormer() == nil {
-
-		httpJSONNilGarden(w)
-		return
-	}
-
-	orm := gd.Ormer()
-	filters := make([]uint32, 0, len(body))
-
-	if !all && len(body) > 0 {
-		list, err := orm.ListIPByNetworking(name)
-		if err != nil {
-			ec := errCodeV1(r.Method, _Networking, dbQueryError, 33)
-			httpJSONError1(w, err, ec, http.StatusInternalServerError)
-			return
-		}
-
-		for i := range body {
-			n := utils.IPToUint32(body[i])
-			if n > 0 {
-				filters = append(filters, n)
-			}
-
-			exist := false
-			for i := range list {
-				if list[i].IPAddr == n {
-					exist = true
-					break
-				}
-			}
-			if !exist {
-				ec := errCodeV1(r.Method, _Networking, internalError, 34)
-				httpJSONError(w, fmt.Errorf("IP %s is not in networking %s", body[i], name), ec.code, http.StatusInternalServerError)
-				return
-			}
-		}
-	}
-
-	if len(filters) == 0 {
-		err = orm.SetNetworkingEnable(name, false)
-	} else {
-		err = orm.SetIPEnable(filters, name, false)
-	}
-	if err != nil {
-		ec := errCodeV1(r.Method, _Networking, dbTxError, 35)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
+	setNetworking(ctx, w, r, false)
 }
 
 func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1320,8 +1237,8 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	err := gd.Ormer().DelNetworking(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Networking, internalError, 41)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Networking, dbExecError, 41, "fail to delete records into database", "数据库删除记录错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1329,6 +1246,10 @@ func deleteNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 }
 
 func convertNetworking(list []database.IP) []structs.NetworkingInfo {
+	if len(list) == 0 {
+		return []structs.NetworkingInfo{}
+	}
+
 	nws := make([]structs.NetworkingInfo, 0, 5)
 
 loop:
@@ -1383,8 +1304,8 @@ func listNetworkings(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	out, err := gd.Ormer().ListIPs()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Networking, internalError, 51)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Networking, dbQueryError, 51, "fail to query database", "数据库查询错误（网络IP表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1406,8 +1327,8 @@ func getNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	out, err := gd.Ormer().ListIPByNetworking(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Networking, internalError, 61)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Networking, dbQueryError, 61, "fail to query database", "数据库查询错误（网络IP表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1424,7 +1345,7 @@ func getNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, stderr.New("not found networking:"+name), http.StatusOK)
+	writeJSON(w, structs.NetworkingInfo{}, http.StatusOK)
 }
 
 // -----------------/services handlers-----------------
@@ -1437,8 +1358,8 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	services, err := gd.ListServices(ctx)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, dbQueryError, 11)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 11, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1458,8 +1379,8 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	spec, err := gd.ServiceSpec(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, dbQueryError, 21)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 21, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1482,8 +1403,8 @@ func vaildPostServiceRequest(spec structs.ServiceSpec) error {
 
 func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		ec := errCodeV2(r.Method, _Service, urlParamError, 31, "parse Request URL parameter error", "解析请求URL参数错误")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, urlParamError, 31, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -1495,14 +1416,14 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	spec := structs.ServiceSpec{}
 	err := json.NewDecoder(r.Body).Decode(&spec)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, decodeError, 32)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, decodeError, 32, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	if err := vaildPostServiceRequest(spec); err != nil {
-		ec := errCodeV2(r.Method, _Service, invaildParamsError, 33, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, invaildParamsError, 33, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -1520,8 +1441,8 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	out, err := d.Deploy(ctx, spec)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 34)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 34, "fail to deploy service", "创建服务错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1546,14 +1467,14 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	scale := structs.ServiceScaleRequest{}
 	err := json.NewDecoder(r.Body).Decode(&scale)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, decodeError, 41)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, decodeError, 41, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	if err := vaildPostServiceScaledRequest(scale); err != nil {
-		ec := errCodeV2(r.Method, _Service, invaildParamsError, 42, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, invaildParamsError, 42, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -1571,8 +1492,8 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	id, err := d.ServiceScale(ctx, name, scale)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 43)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 43, "fail to scale service", "服务水平扩展错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1597,14 +1518,14 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	links := structs.ServicesLink{}
 	err := json.NewDecoder(r.Body).Decode(&links)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, decodeError, 51)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, decodeError, 51, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	if err := vaildPostServiceLinkRequest(links); err != nil {
-		ec := errCodeV2(r.Method, _Service, invaildParamsError, 52, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, invaildParamsError, 52, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -1623,8 +1544,8 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	// task ID
 	id, err := d.Link(ctx, links)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 53)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 53, "fail to link services", "关联服务错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1635,8 +1556,8 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		ec := errCodeV2(r.Method, _Service, urlParamError, 61, "parse Request URL parameter error", "解析请求URL参数错误")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, urlParamError, 61, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -1655,8 +1576,8 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	id, err := d.ServiceUpdateImage(ctx, name, version, true)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 62)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 62, "fail to update service units image version", "服务容器镜像版本升级错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1688,14 +1609,14 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	err := json.NewDecoder(r.Body).Decode(&update)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, decodeError, 71)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, decodeError, 71, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	if err := vaildPostServiceUpdateRequest(update); err != nil {
-		ec := errCodeV2(r.Method, _Service, invaildParamsError, 72, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, invaildParamsError, 72, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -1711,8 +1632,8 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	id, err := d.ServiceUpdate(ctx, name, update)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 73)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 73, "fail to update service containers", "服务垂直扩容错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1735,15 +1656,15 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, dbQueryError, 81)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 81, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	spec, err := svc.Spec()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 82)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 82, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1751,8 +1672,8 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	err = svc.InitStart(ctx, gd.KVClient(), nil, &task, true, nil)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 83)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 83, "fail to init start service", "服务初始化启动错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1779,14 +1700,14 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, decodeError, 91)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, decodeError, 91, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	if err := vaildPostServiceUpdateConfigsRequest(req.Configs, req.Args); err != nil {
-		ec := errCodeV2(r.Method, _Service, bodyParamsError, 92, "URL parameters are invaild", "URL参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, invaildParamsError, 92, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -1800,15 +1721,15 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, dbQueryError, 93)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 93, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	spec, err := svc.Spec()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 94)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 94, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1816,8 +1737,8 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	err = svc.UpdateUnitsConfigs(ctx, req.Configs, req.Args, &task, true)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 95)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 95, "fail to update service config files", "服务配置文件更新错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1840,14 +1761,14 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	config := structs.ServiceExecConfig{}
 	err := json.NewDecoder(r.Body).Decode(&config)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, decodeError, 101)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, decodeError, 101, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	if err := vaildPostServiceExecRequest(config); err != nil {
-		ec := errCodeV2(r.Method, _Service, bodyParamsError, 102, "URL parameters are invaild", "URL参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, invaildParamsError, 102, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -1861,15 +1782,15 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, dbQueryError, 103)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 103, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	spec, err := svc.Spec()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 104)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 104, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1877,8 +1798,8 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	err = svc.Exec(ctx, config, true, &task)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 105)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 105, "fail to exec command in service containers", "服务容器远程命令执行错误（container exec）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1900,15 +1821,15 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, dbQueryError, 111)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 111, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	spec, err := svc.Spec()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 112)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 112, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1916,8 +1837,8 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	err = svc.Stop(ctx, false, true, &task)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 113)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 113, "fail to stop service", "服务关闭错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1943,15 +1864,15 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		ec := errCodeV1(r.Method, _Service, dbQueryError, 121)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 121, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	err = svc.Remove(ctx, gd.KVClient())
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 122)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 122, "fail to remove service", "删除服务错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -1976,14 +1897,14 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	config := structs.ServiceBackupConfig{}
 	err := json.NewDecoder(r.Body).Decode(&config)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, decodeError, 131)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, decodeError, 131, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	if err := vaildPostServiceBackupRequest(config); err != nil {
-		ec := errCodeV2(r.Method, _Service, bodyParamsError, 132, "URL parameters are invaild", "URL参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Service, invaildParamsError, 132, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -1997,15 +1918,15 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, dbQueryError, 133)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 133, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	spec, err := svc.Spec()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 134)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, dbQueryError, 134, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -2013,8 +1934,8 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	err = svc.Backup(ctx, r.Host, config, true, &task)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Service, internalError, 135)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Service, internalError, 135, "fail to back service", "服务备份错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -2027,8 +1948,8 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 // -----------------/storage handlers-----------------
 func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		ec := errCodeV2(r.Method, _Unit, urlParamError, 11, "parse Request URL parameter error", "解析请求URL参数错误")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Unit, urlParamError, 11, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -2047,21 +1968,21 @@ func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	u, err := orm.GetUnit(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Unit, dbQueryError, 11)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Unit, dbQueryError, 11, "fail to query database", "数据库查询错误（服务单元表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	ips, err := orm.ListIPByUnitID(u.ID)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Unit, dbQueryError, 12)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Unit, dbQueryError, 12, "fail to query database", "数据库查询错误（网络IP表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	if len(ips) == 0 {
-		ec := errCodeV1(r.Method, _Unit, objectNotExist, 13)
-		httpJSONError(w, errors.Errorf("not found Unit %s address", u.Name), ec.code, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Unit, objectNotExist, 13, fmt.Sprintf("not found the unit %s server addr", name), "找不到单元的服务地址")
+		httpJSONError(w, stderr.New(ec.comment), ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -2071,16 +1992,16 @@ func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	err = hijack(nil, addr, w, r)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Unit, internalError, 14)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Unit, internalError, 14, "fail to connect the special container", "连接容器服务错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 }
 
 func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		ec := errCodeV2(r.Method, _Unit, urlParamError, 21, "parse Request URL parameter error", "解析请求URL参数错误")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Unit, urlParamError, 21, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
@@ -2099,15 +2020,15 @@ func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	bf, err := orm.GetBackupFile(from)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Unit, dbQueryError, 22)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Unit, dbQueryError, 22, "fail to query database", "数据库查询错误（备份文件表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	table, err := orm.GetServiceByUnit(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Unit, dbQueryError, 23)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Unit, dbQueryError, 23, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -2115,8 +2036,8 @@ func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	id, err := svc.UnitRestore(ctx, name, bf.Path, true)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Unit, internalError, 24)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Unit, internalError, 24, "fail to restore unit data", "服务单元数据恢复错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -2131,8 +2052,8 @@ func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	ds := storage.DefaultStores()
 	stores, err := ds.List()
 	if err != nil {
-		ec := errCodeV1(r.Method, _Storage, dbQueryError, 11)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, dbQueryError, 11, "fail to query database", "数据库查询错误（外部存储表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -2140,8 +2061,8 @@ func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	for i := range stores {
 		resp[i], err = getSanStoreInfo(stores[i])
 		if err != nil {
-			ec := errCodeV1(r.Method, _Storage, internalError, 12)
-			httpJSONError1(w, err, ec, http.StatusInternalServerError)
+			ec := errCodeV1(r.Method, _Storage, internalError, 12, "fail to get san storage info", "外部存储查询错误")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -2158,15 +2079,15 @@ func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	ds := storage.DefaultStores()
 	store, err := ds.Get(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Storage, dbQueryError, 21)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, dbQueryError, 21, "fail to query database", "数据库查询错误（外部存储表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	resp, err := getSanStoreInfo(store)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Storage, internalError, 22)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, internalError, 22, "fail to get san storage info", "外部存储查询错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -2222,21 +2143,21 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.PostSANStoreRequest{}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		ec := errCodeV1(r.Method, _Storage, decodeError, 31)
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Storage, decodeError, 31, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	if err := vaildPostSanStorageRequest(req); err != nil {
-		ec := errCodeV2(r.Method, _Storage, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
-		httpJSONError1(w, err, ec, http.StatusBadRequest)
+		ec := errCodeV1(r.Method, _Storage, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	ds := storage.DefaultStores()
 	if ds == nil {
-		ec := errCodeV1(r.Method, _Storage, internalError, 33)
-		httpJSONError(w, stderr.New("storage:func DefaultStores called before SetDefaultStores"), ec.code, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, internalError, 33, "storage:func DefaultStores called before SetDefaultStores", "内部逻辑错误")
+		httpJSONError(w, stderr.New(ec.comment), ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -2244,8 +2165,8 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		req.Username, req.Password, req.Admin,
 		req.LunStart, req.LunEnd, req.HostLunStart, req.HostLunEnd)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Storage, internalError, 34)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, internalError, 34, "fail to add new storage", "新增外部存储错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -2262,15 +2183,15 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	ds := storage.DefaultStores()
 	store, err := ds.Get(san)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Storage, dbQueryError, 41)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, dbQueryError, 41, "fail to query database", "数据库查询错误（外部存储表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	space, err := store.AddSpace(rg)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Storage, internalError, 42)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, internalError, 42, "fail to add new raidgroup to the storage", "外部存储新增RG错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -2287,15 +2208,15 @@ func putEnableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	ds := storage.DefaultStores()
 	store, err := ds.Get(san)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Storage, dbQueryError, 51)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, dbQueryError, 51, "fail to query database", "数据库查询错误（外部存储表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	err = store.EnableSpace(rg)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Storage, dbExecError, 52)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, dbExecError, 52, "fail to update records into database", "数据库更新记录错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -2310,15 +2231,15 @@ func putDisableRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Reque
 	ds := storage.DefaultStores()
 	store, err := ds.Get(san)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Storage, dbQueryError, 61)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, dbQueryError, 61, "fail to query database", "数据库查询错误（外部存储表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	err = store.DisableSpace(rg)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Storage, dbExecError, 62)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, dbExecError, 62, "fail to update records into database", "数据库更新记录错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -2333,8 +2254,8 @@ func deleteStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err := ds.Remove(name)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Storage, internalError, 71)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, internalError, 71, "fail to remove storage", "删除外部存储系统错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
@@ -2350,8 +2271,8 @@ func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	err := ds.RemoveStoreSpace(san, rg)
 	if err != nil {
-		ec := errCodeV1(r.Method, _Storage, internalError, 81)
-		httpJSONError1(w, err, ec, http.StatusInternalServerError)
+		ec := errCodeV1(r.Method, _Storage, internalError, 81, "fail to remove RG from storage", "删除外部存储系统的RG错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
