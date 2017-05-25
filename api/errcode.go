@@ -27,6 +27,7 @@ const (
 	_ category = iota
 	urlParamError
 	bodyParamsError
+	invaildParamsError
 
 	encodeError
 	decodeError
@@ -54,6 +55,14 @@ type errCode struct {
 
 func (ec errCode) String() string {
 	return fmt.Sprintf("%-10d:	%s", ec.code, ec.comment, ec.chinese)
+}
+
+func errCodeV2(method string, md model, cg category, serial int, comment, chinese string) errCode {
+	ec := errCodeV1(method, md, cg, serial)
+	ec.comment = comment
+	ec.chinese = chinese
+
+	return ec
 }
 
 func errCodeV1(method string, md model, cg category, serial int) errCode {
