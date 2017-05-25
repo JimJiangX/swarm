@@ -3,8 +3,6 @@ package api
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/pkg/errors"
 )
 
 type model int
@@ -26,38 +24,36 @@ const (
 type category int
 
 const (
-	_ category = iota
+	internalError category = iota
 	urlParamError
-	bodyParamsError
+	invaildParamsError
 
 	encodeError
 	decodeError
 
 	objectNotExist
-	objectRace
 
-	dbBadConnection
 	dbQueryError
 	dbExecError
 	dbTxError
 
-	badConnection
+	// dbBadConnection
+	// badConnection
 
 	resourcesLack
-
-	internalError
 )
 
 type errCode struct {
 	code    int
 	comment string
+	chinese string
 }
 
 func (ec errCode) String() string {
-	return fmt.Sprintf("%-10d:	%s", ec.code, ec.comment)
+	return fmt.Sprintf("%-10d:	%s  %s", ec.code, ec.comment, ec.chinese)
 }
 
-func errCodeV1(method string, md model, cg category, serial int) errCode {
+func errCodeV1(method string, md model, cg category, serial int, comment, chinese string) errCode {
 	mt := 0
 	switch method {
 	case http.MethodGet:
@@ -82,7 +78,7 @@ func errCodeV1(method string, md model, cg category, serial int) errCode {
 
 	// version|model|method|category|serial
 	//    2		 2      1      2       3
-	newErrCode := func(version, method, model, category, serial int) errCode {
+	sum := func(version, method, model, category, serial int) int {
 		mod := func(x, base int) int {
 			return x % base
 		}
@@ -91,34 +87,14 @@ func errCodeV1(method string, md model, cg category, serial int) errCode {
 		category = mod(category, 100)
 		model = mod(model, 100)
 
-		return errCode{
-			code: serial + category*1000 + method*100000 + model*1000000 + version*100000000,
-		}
+		return serial + category*1000 + method*100000 + model*1000000 + version*100000000
 	}
 
 	const v1 = 10
 
-	return newErrCode(v1, mt, int(md), int(cg), serial)
-}
-
-var errcodeMap map[int]errCode
-
-func init() {
-	errcodeMap = make(map[int]errCode, 100)
-}
-
-func getErrCode(code int) (errCode, error) {
-	ec, ok := errcodeMap[code]
-	if ok {
-		return ec, nil
-	}
-
-	return errCode{}, errors.Errorf("err code %d not exist", code)
-}
-
-func addErrCode(code int, msg string) {
-	errcodeMap[code] = errCode{
-		code:    code,
-		comment: msg,
+	return errCode{
+		code:    sum(v1, mt, int(md), int(cg), serial),
+		chinese: chinese,
+		comment: comment,
 	}
 }

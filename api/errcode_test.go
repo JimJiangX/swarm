@@ -18,7 +18,7 @@ func TestErrCode(t *testing.T) {
 	}
 
 	for _, c := range tests {
-		ec := errCodeV1(c.method, model(c.code[0]), category(c.code[1]), c.code[2])
+		ec := errCodeV1(c.method, model(c.code[0]), category(c.code[1]), c.code[2], "", "")
 		if ec.code != c.want {
 			t.Errorf("expect %d but got %d", c.want, ec.code)
 		}
