@@ -151,12 +151,13 @@ func (m hostManager) getNode(nameOrID string) (Node, error) {
 }
 
 type nodeWithTask struct {
-	hdd    []string
-	ssd    []string
-	config structs.SSHConfig
-	client scplib.ScpClient
-	Node   database.Node
-	Task   database.Task
+	hdd     []string
+	ssd     []string
+	config  structs.SSHConfig
+	client  scplib.ScpClient
+	Node    database.Node
+	Task    database.Task
+	timeout time.Duration
 }
 
 // NewNodeWithTask node with task and ssh login config,prepare for install host
@@ -189,6 +190,7 @@ func (m hostManager) InstallNodes(ctx context.Context, horus string, list []node
 		nodes[i] = list[i].Node
 		tasks[i] = list[i].Task
 		tasks[i].Timeout = timeout
+		list[i].timeout = timeout
 	}
 
 	select {
@@ -265,7 +267,7 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 	})
 
 	if nt.client == nil {
-		nt.client, err = scplib.NewScpClient(nt.Node.Addr, nt.config.Username, nt.config.Password)
+		nt.client, err = scplib.NewScpClient(nt.Node.Addr, nt.config.Username, nt.config.Password, nt.timeout)
 		if err != nil {
 			entry.WithError(err).Error("ssh dial error")
 
@@ -309,7 +311,7 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 	select {
 	default:
 	case <-ctx.Done():
-		return ctx.Err()
+		return errors.WithStack(ctx.Err())
 	}
 
 	out, err := nt.client.Exec(script)
@@ -565,7 +567,7 @@ func (m hostManager) removeNode(ID string) error {
 }
 
 // RemoveNode
-func (m hostManager) RemoveNode(ctx context.Context, horus, nameOrID, user, password string, force bool, reg kvstore.Register) error {
+func (m hostManager) RemoveNode(ctx context.Context, horus, nameOrID, user, password string, force bool, timeout time.Duration, reg kvstore.Register) error {
 	node, err := m.getNode(nameOrID)
 	if err != nil {
 		if database.IsNotFound(err) {
@@ -607,7 +609,7 @@ func (m hostManager) RemoveNode(ctx context.Context, horus, nameOrID, user, pass
 		return err
 	}
 
-	client, err := scplib.NewScpClient(node.node.Addr, user, password)
+	client, err := scplib.NewScpClient(node.node.Addr, user, password, timeout)
 	if err != nil {
 		return err
 	}
@@ -616,7 +618,7 @@ func (m hostManager) RemoveNode(ctx context.Context, horus, nameOrID, user, pass
 	select {
 	default:
 	case <-ctx.Done():
-		return ctx.Err()
+		return errors.WithStack(ctx.Err())
 	}
 
 	err = node.nodeClean(ctx, client, horus, config)
@@ -653,7 +655,7 @@ func (n *Node) nodeClean(ctx context.Context, client scplib.ScpClient, horus str
 	select {
 	default:
 	case <-ctx.Done():
-		return ctx.Err()
+		return errors.WithStack(ctx.Err())
 	}
 
 	if err := client.UploadFile(destName, srcFile); err != nil {

@@ -11,7 +11,7 @@ type Redis struct {
 	Port int
 
 	Weight   int //Weight越高，优先变成master，等值随机
-	RoleType ROLE_TYPE
+	RoleType dbRole
 }
 
 func (r Redis) GetKey() string {
@@ -19,23 +19,23 @@ func (r Redis) GetKey() string {
 }
 
 func (m Redis) Clear() error {
-	filepath := BASEDIR + ""
+	filepath := scriptDir + ""
 	timeout := time.Second * 60
 	args := []string{}
 	_, err := ExecShellFileTimeout(filepath, timeout, args...)
 	return err
 }
 
-func (m Redis) GetType() ROLE_TYPE {
+func (m Redis) GetType() dbRole {
 	return m.RoleType
 }
 
 func (m Redis) ChangeMaster(master Redis) error {
-	if m.GetType() != MASTER_TYPE && m.GetType() != SLAVE_TYPE {
+	if m.GetType() != masterRole && m.GetType() != slaveRole {
 		return errors.New(string(m.GetType()) + ":should not call the func")
 	}
 
-	filepath := BASEDIR + ""
+	filepath := scriptDir + ""
 	timeout := time.Second * 60
 	args := []string{}
 	_, err := ExecShellFileTimeout(filepath, timeout, args...)
@@ -44,7 +44,7 @@ func (m Redis) ChangeMaster(master Redis) error {
 }
 
 func (m Redis) CheckStatus() error {
-	filepath := BASEDIR + ""
+	filepath := scriptDir + ""
 	timeout := time.Second * 60
 	args := []string{}
 	_, err := ExecShellFileTimeout(filepath, timeout, args...)

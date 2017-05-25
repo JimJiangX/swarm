@@ -18,6 +18,10 @@ import (
 
 // LoadImage load a new Image
 func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostLoadImageRequest) (string, string, error) {
+	if req.Timeout == 0 {
+		req.Timeout = 300
+	}
+
 	path, err := utils.GetAbsolutePath(false, req.Path)
 	if err != nil {
 		return "", "", errors.WithStack(err)
@@ -48,7 +52,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 		Labels:   labels,
 		UploadAt: time.Now(),
 	}
-	task := database.NewTask(req.Version(), database.ImageLoadTask, image.ID, "load image", nil, 300)
+	task := database.NewTask(req.Version(), database.ImageLoadTask, image.ID, "load image", nil, req.Timeout)
 
 	err = ormer.InsertImageWithTask(image, task)
 	if err != nil {
@@ -75,40 +79,60 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 			}
 		}()
 
-		oldName := req.Version()
-		newName := fmt.Sprintf("%s:%d/%s", registry.Domain, registry.Port, oldName)
-		script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
+		ch := make(chan error)
 
-		scp, err := scplib.NewScpClient(registry.Address, registry.OsUsername, registry.OsPassword)
-		if err != nil {
-			logrus.WithField("Image", req.Name).Errorf("load image,'%s@%s',exec:'%s'", registry.OsUsername, registry.Address, script)
-			return err
+		go func(ch chan<- error) {
+			err := func() error {
+				oldName := req.Version()
+				newName := fmt.Sprintf("%s:%d/%s", registry.Domain, registry.Port, oldName)
+				script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
+
+				scp, err := scplib.NewScpClient(registry.Address, registry.OsUsername, registry.OsPassword, time.Duration(req.Timeout)*time.Second)
+				if err != nil {
+					logrus.WithField("Image", req.Name).Errorf("load image,'%s@%s',exec:'%s'", registry.OsUsername, registry.Address, script)
+					return err
+				}
+				defer scp.Close()
+
+				out, err := scp.Exec(script)
+				if err != nil {
+					logrus.WithField("Image", req.Name).Errorf("load image,exec:'%s',output:%s", script, out)
+					return err
+				}
+
+				imageID, size, err := parsePushImageOutput(out)
+				if err != nil {
+					logrus.WithField("Image", req.Name).Errorf("parse output:%s", out)
+					return err
+				}
+
+				image.ImageID = imageID
+				image.Size = size
+				image.UploadAt = time.Now()
+
+				task.FinishedAt = image.UploadAt
+				task.Status = database.TaskDoneStatus
+				task.SetErrors(nil)
+
+				err = ormer.SetImageAndTask(image, task)
+
+				return err
+			}()
+
+			ch <- err
+		}(ch)
+
+		select {
+		case err = <-ch:
+			if err != nil {
+				return err
+			}
+
+		case <-ctx.Done():
+			return errors.WithStack(ctx.Err())
 		}
-		defer scp.Close()
 
-		out, err := scp.Exec(script)
-		if err != nil {
-			logrus.WithField("Image", req.Name).Errorf("load image,exec:'%s',output:%s", script, out)
-			return err
-		}
-
-		imageID, size, err := parsePushImageOutput(out)
-		if err != nil {
-			logrus.WithField("Image", req.Name).Errorf("parse output:%s", out)
-			return err
-		}
-
-		image.ImageID = imageID
-		image.Size = size
-		image.UploadAt = time.Now()
-
-		task.FinishedAt = image.UploadAt
-		task.Status = database.TaskDoneStatus
-		task.SetErrors(nil)
-
-		err = ormer.SetImageAndTask(image, task)
-
-		return err
+		return nil
 	}()
 
 	return image.ID, task.ID, err

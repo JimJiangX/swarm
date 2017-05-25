@@ -19,7 +19,7 @@ type VolumeUpdateOpt struct {
 	Size int `json:"Size"`
 }
 
-func Update(ctx *_Context, w http.ResponseWriter, req *http.Request) {
+func updateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	opt := &VolumeUpdateOpt{}
 	dec := json.NewDecoder(req.Body)
 
@@ -68,7 +68,7 @@ func checkVolumeUpdateOpt(opt *VolumeUpdateOpt) error {
 		return errors.New("the VgName  is null")
 	}
 
-	if !CheckVg(opt.VgName) {
+	if !checkVg(opt.VgName) {
 		return errors.New("don't find the VG")
 	}
 

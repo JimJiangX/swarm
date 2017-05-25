@@ -6,16 +6,6 @@ import (
 	"time"
 )
 
-type ROLE_TYPE string
-
-const (
-	MGROUP_TYPE ROLE_TYPE = "MGROUP"
-	MASTER_TYPE ROLE_TYPE = "MASTER"
-	SLAVE_TYPE  ROLE_TYPE = "SLAVE"
-
-//	NONE_STATUS MYSQL_STATUS = "WAITING_CHECK"
-)
-
 type MysqlUser struct {
 	ReplicateUser string
 	Replicatepwd  string
@@ -32,7 +22,7 @@ type Mysql struct {
 	MysqlUser
 
 	Weight   int //Weight越高，优先变成master，等值随机
-	RoleType ROLE_TYPE
+	RoleType dbRole
 
 	MgmPort int
 	MgmIP   string
@@ -43,7 +33,7 @@ func (m Mysql) GetKey() string {
 }
 
 func (m Mysql) Clear() error {
-	filepath := BASEDIR + "mysql-replication-reset.sh"
+	filepath := scriptDir + "mysql-replication-reset.sh"
 	timeout := time.Second * 60
 	args := []string{
 		m.Instance,
@@ -54,16 +44,16 @@ func (m Mysql) Clear() error {
 	return err
 }
 
-func (m Mysql) GetType() ROLE_TYPE {
+func (m Mysql) GetType() dbRole {
 	return m.RoleType
 }
 
 func (m Mysql) ChangeMaster(master Mysql) error {
-	if m.GetType() != MASTER_TYPE && m.GetType() != SLAVE_TYPE {
+	if m.GetType() != masterRole && m.GetType() != slaveRole {
 		return errors.New(string(m.GetType()) + ":should not call the func")
 	}
 
-	filepath := BASEDIR + "mysql-replication-set.sh"
+	filepath := scriptDir + "mysql-replication-set.sh"
 	timeout := time.Second * 60
 
 	args := []string{
@@ -85,7 +75,7 @@ func (m Mysql) ChangeMaster(master Mysql) error {
 }
 
 func (m Mysql) CheckStatus() error {
-	filepath := BASEDIR + "mysqlcheck.sh"
+	filepath := scriptDir + "mysqlcheck.sh"
 	timeout := time.Second * 60
 	args := []string{}
 	_, err := ExecShellFileTimeout(filepath, timeout, args...)

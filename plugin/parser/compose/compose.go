@@ -10,27 +10,37 @@ import (
 	"github.com/docker/swarm/garden/structs"
 )
 
-type DbArch string
+type dbArch string
+type dbRole string
 
 const (
-	BASEDIR string = "./script/plugin/compose/"
+	scriptDir string = "./script/plugin/compose/"
 
-	NONE  DbArch = "None"
-	CLONE DbArch = "Clone"
+	//db cluster arch
+	noneArch  dbArch = "None"
+	cloneArch dbArch = "clone"
 
-	REDIS_CLUSTER DbArch = "RedisCluster"
-	REDIS_MS      DbArch = "RedisMSlave"
+	redisShardingArch dbArch = "redis_sharding_replication"
+	redisRepArch      dbArch = "redis_replication"
 
-	MYSQL_MS DbArch = "MYsqlMSlave"
-	MYSQL_MG DbArch = "MysqlGroup"
+	mysqlRepArch   dbArch = "MYsqlMSlave"
+	mysqlGroupArch dbArch = "MysqlGroup"
+
+	//db role type
+	shardingRole dbRole = "SHARDING"
+	groupRole    dbRole = "GROUP"
+	masterRole   dbRole = "MASTER"
+	slaveRole    dbRole = "SLAVE"
 )
 
+//Composer  is exported
 type Composer interface {
 	ClearCluster() error
 	CheckCluster() error
 	ComposeCluster() error
 }
 
+//get related Composer  by ServiceSpec
 func NewCompserBySpec(req *structs.ServiceSpec, mgmip string, mgmport int) (Composer, error) {
 
 	if err := valicateServiceSpec(req); err != nil {
@@ -40,16 +50,16 @@ func NewCompserBySpec(req *structs.ServiceSpec, mgmip string, mgmport int) (Comp
 	arch := getDbType(req)
 
 	switch arch {
-	case MYSQL_MS, MYSQL_MG:
+	case mysqlRepArch, mysqlGroupArch:
 		dbs := getMysqls(req)
-		return newMysqlMSManager(dbs, mgmip, mgmport), nil
+		return newMysqlRepManager(dbs, mgmip, mgmport), nil
 
-	case REDIS_CLUSTER:
+	case redisShardingArch:
 		dbs := getRedis(req)
 		master, slave, _ := getmasterAndSlave(req)
-		return newRedisShadeManager(dbs, master, slave), nil
+		return newRedisShardingManager(dbs, master, slave), nil
 
-	case CLONE:
+	case cloneArch:
 		return newCloneManager(), nil
 	}
 
@@ -63,16 +73,16 @@ func valicateServiceSpec(req *structs.ServiceSpec) error {
 
 	arch := getDbType(req)
 	switch arch {
-	case MYSQL_MS, MYSQL_MG:
+	case mysqlRepArch, mysqlGroupArch:
 		return valicateMysqlSpec(req)
 
-	case REDIS_CLUSTER, REDIS_MS:
+	case redisShardingArch, redisRepArch:
 		return valicateRedisSpec(req)
 
-	case CLONE:
+	case cloneArch:
 		return nil
 
-	case NONE:
+	case noneArch:
 		return errors.New("not support the arch")
 	}
 
@@ -206,29 +216,29 @@ func getmasterAndSlave(req *structs.ServiceSpec) (mnum int, snum int, err error)
 
 }
 
-func getDbType(req *structs.ServiceSpec) DbArch {
+func getDbType(req *structs.ServiceSpec) dbArch {
 	datas := strings.Split(req.Image, ":")
 	db, version := datas[0], datas[1]
 	arch := req.Arch.Mode
 
 	if db == "redis" && arch == "sharding_replication" {
-		return REDIS_CLUSTER
+		return redisShardingArch
 	}
 
 	if db == "redis" && arch == "replication" {
-		return REDIS_MS
+		return redisRepArch
 	}
 
 	if db == "mysql" && arch == "replication" {
-		return MYSQL_MS
+		return mysqlRepArch
 	}
 
 	if db == "mysql" && arch == "group_replication" {
-		return MYSQL_MG
+		return mysqlGroupArch
 	}
 
 	if arch == "clone" {
-		return CLONE
+		return cloneArch
 	}
 
 	log.WithFields(log.Fields{
@@ -238,7 +248,7 @@ func getDbType(req *structs.ServiceSpec) DbArch {
 		"err":        "don't match the arch",
 	}).Error("getDbType")
 
-	return NONE
+	return noneArch
 }
 
 func getRedis(req *structs.ServiceSpec) []Redis {
