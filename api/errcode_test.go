@@ -58,7 +58,11 @@ var (
 	}
 )
 
-func ExampleErrCode() {
+func PrintErrCodes() {
+	fmt.Println("OK")
+}
+
+func ExamplePrintErrCodes() {
 	dat, err := readFile("handlers_master.go")
 	if err != nil {
 		fmt.Println(dat, err)
@@ -68,8 +72,8 @@ func ExampleErrCode() {
 
 	key := []byte("errCodeV1(")
 	right := byte(')')
-
 	out := make([]_ErrCode, 1, 150)
+
 	out[0] = _ErrCode{
 		model:    "_Garden",
 		category: "GardenIsNil",
@@ -110,9 +114,9 @@ func ExampleErrCode() {
 	err = writeFile("./errcodes.txt", out)
 	if err != nil {
 		fmt.Println(err)
-	} else {
-		fmt.Println("OK")
 	}
+
+	PrintErrCodes()
 
 	// output:OK
 }
