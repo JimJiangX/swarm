@@ -2,23 +2,22 @@ package api
 
 import (
 	"fmt"
-	"net/http"
 )
 
 type model int
 
 const (
 	_ model = iota
-	_DC
 	_NFS
+	_Task
+	_DC
+	_Image
 	_Cluster
 	_Host
-	_Task
-	_Unit
-	_Image
-	_Service
-	_Storage
 	_Networking
+	_Service
+	_Unit
+	_Storage
 )
 
 type category int
@@ -53,48 +52,30 @@ func (ec errCode) String() string {
 	return fmt.Sprintf("%-10d:	%s  %s", ec.code, ec.comment, ec.chinese)
 }
 
-func errCodeV1(method string, md model, cg category, serial int, comment, chinese string) errCode {
-	mt := 0
-	switch method {
-	case http.MethodGet:
-		mt = 1
-	case http.MethodHead:
-		mt = 2
-	case http.MethodPost:
-		mt = 3
-	case http.MethodPut:
-		mt = 4
-	case http.MethodPatch:
-		mt = 5
-	case http.MethodDelete:
-		mt = 6
-	case http.MethodConnect:
-		mt = 7
-	case http.MethodOptions:
-		mt = 8
-	case http.MethodTrace:
-		mt = 9
+func (ec errCode) Code(version, model, category, sec int) int {
+	mod := func(x, base int) int {
+		return x % base
 	}
 
-	// version|model|method|category|serial
-	//    2		 2      1      2       3
-	sum := func(version, method, model, category, serial int) int {
-		mod := func(x, base int) int {
-			return x % base
-		}
+	sec = mod(sec, 1000)
+	category = mod(category, 100)
+	model = mod(model, 100)
 
-		serial = mod(serial, 1000)
-		category = mod(category, 100)
-		model = mod(model, 100)
+	return sec + category*1000 + model*100000 + version*10000000
+}
 
-		return serial + category*1000 + method*100000 + model*1000000 + version*100000000
-	}
+func errCodeV1(md model, cg category, sec int, comment, chinese string) errCode {
+	// version|model|category|serial
+	//    2		 2      2       3
 
 	const v1 = 10
 
-	return errCode{
-		code:    sum(v1, mt, int(md), int(cg), serial),
+	ec := errCode{
 		chinese: chinese,
 		comment: comment,
 	}
+
+	ec.code = ec.Code(v1, int(md), int(cg), sec)
+
+	return ec
 }
