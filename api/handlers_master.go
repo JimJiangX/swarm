@@ -1203,7 +1203,7 @@ func setNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request, en
 				}
 			}
 			if !exist {
-				ec := errCodeV1(_Networking, invaildParamsError, 24, fmt.Sprintf("IP %s is not in networking %s", body[i], name), fmt.Sprintf("IP %s IP不属于指定网络范围(%s)", body[i], name))
+				ec := errCodeV1(_Networking, invaildParamsError, 24, fmt.Sprintf("IP %s is not in networking %s", body[i], name), fmt.Sprintf("IP %s 不属于指定网络集群(%s)", body[i], name))
 				httpJSONError(w, stderr.New(ec.comment), ec, http.StatusInternalServerError)
 				return
 			}
