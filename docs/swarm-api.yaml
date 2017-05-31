@@ -1,0 +1,899 @@
+swagger: '2.0'
+info:
+  version: 1.0.0
+  title: Simple API
+  description: A simple API to learn how to write OpenAPI Specification
+schemes:
+  - http
+  - https
+host: simple.api
+basePath: /v1.0
+consumes:
+  - application/json
+produces:
+  - application/json
+paths:
+  /nfs_backups/space:
+    get:
+      summary: Gets nfs space info
+      description: Returns nfs total size and free size
+      parameters:
+        - name: nfs_ip
+          in: query
+          description: nfs远程服务IP
+          required: true
+          type: string
+        - name: nfs_dir
+          in: query
+          description: nfs远程目录
+          required: true
+          type: string
+        - name: nfs_mount_dir
+          in: query
+          description: 本地挂载目录
+          required: true
+          type: string
+        - name: nfs_mount_opts
+          in: query
+          description: nfs挂载选项
+          required: true
+          type: string
+      responses:
+        '200':
+          description: nfs total size and free size
+          schema:
+            properties:
+              total_space:
+                type: integer
+              free_space:
+                type: integer
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  /tasks:
+    get:
+      description: 任务批量查询
+      parameters:
+        - name: all
+          in: query
+          type: boolean
+        - name: status
+          in: query
+          type: integer
+        - name: link
+          in: query
+          type: string
+      responses:
+        '200':
+          description: silce of Task
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/Task'
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部数据库查询错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/tasks/{name}':
+    get:
+      description: 查询指定任务
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: The task's id or name
+          type: string
+      responses:
+        '200':
+          description: 指定任务信息
+          schema:
+            $ref: '#/definitions/Task'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  /tasks/backup/callback:
+    post:
+      description: '备份文件任务完成,备份文件信息回调'
+      parameters:
+        - name: backup
+          in: body
+          description: the backup task callback.
+          schema:
+            $ref: '#/definitions/BackupTaskCallBack'
+      responses:
+        '201':
+          description: 逻辑执行成功
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部数据库查询错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  /softwares/images:
+    get:
+      description: 查询所有images
+      responses:
+        '200':
+          description: silce of images
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/GetImageResponse'
+        '500':
+          description: 内部数据库查询错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+    post:
+      description: image 入库
+      parameters:
+        - name: image
+          in: body
+          description: load image request
+          required: true
+          schema:
+            $ref: '#/definitions/PostLoadImageRequest'
+      responses:
+        '201':
+          description: 创建load image 任务
+          schema:
+            $ref: '#/definitions/CreateTaskResponse'
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部数据库查询错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  /softwares/images/supported:
+    get:
+      description: '查询所有支持的images版本,异步接口'
+      responses:
+        '200':
+          description: silce of image version
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/ImageVersion'
+        '500':
+          description: 内部数据库查询错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/softwares/images/{id}':
+    delete:
+      description: delete image by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: image id
+          type: string
+      responses:
+        '204':
+          description: 指定image删除成功
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  /clusters:
+    get:
+      description: 查询所有的主机集群
+      responses:
+        '200':
+          description: 集群信息
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/GetClusterResponse'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+    post:
+      description: 新增集群
+      parameters:
+        - name: request
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/PostClusterRequest'
+      responses:
+        '201':
+          description: 成功
+          schema:
+            $ref: '#/definitions/IDResonse'
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/clusters/{id}':
+    get:
+      description: get cluster by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cluster id
+          type: string
+      responses:
+        '200':
+          description: 指定群集信息
+          schema:
+            $ref: '#/definitions/GetClusterResponse'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+    put:
+      description: 修改集群参数
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cluster id
+          type: string
+        - name: request
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/PostClusterRequest'
+      responses:
+        '200':
+          description: 修改成功
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+    delete:
+      description: 删除指定集群
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cluster id
+          type: string
+      responses:
+        '204':
+          description: 删除成功
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  /hosts:
+    get:
+      description: 查询所有主机或者按cluster id查询主机
+      parameters:
+        - name: cluster
+          in: query
+          description: cluster id
+          type: string
+      responses:
+        '200':
+          description: slice of hosts
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/NodeInfo'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+    post:
+      description: 主机入库
+      parameters:
+        - name: node
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/PostNodeRequest'
+      responses:
+        '201':
+          description: 主机入库任务创建成功，异步接口
+          schema:
+            properties:
+              id:
+                type: string
+              addr:
+                type: string
+              task_id:
+                type: string
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/hosts/{id}':
+    get:
+      description: 查询指定主机信息
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: host id or engine ID
+          type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/NodeInfo'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+    put:
+      description: 修改主机参数
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: host id or engine ID
+          type: string
+        - name: max_container
+          in: body
+          required: true
+          description: 最大可运行容器数量
+          schema:
+            properties:
+              max_container:
+                type: integer
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+    delete:
+      description: 主机出库
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: host id or engine ID
+          type: string
+        - name: force
+          in: query
+          required: false
+          description: 是否强制出库，忽略检查执行出库
+          type: boolean
+        - name: timeout
+          in: query
+          required: false
+          description: 超时时间，单位 /s
+          type: integer
+        - name: username
+          in: query
+          required: true
+          description: host ssh login username
+          type: string
+        - name: password
+          in: query
+          required: true
+          description: host ssh login password
+          type: string
+      responses:
+        '204':
+          description: OK
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/hosts/{id}/enable':
+    put:
+      description: 修改主机状态，启用
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: host id or engine ID
+          type: string
+      responses:
+        '200':
+          description: OK
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/hosts/{id}/disable':
+    put:
+      description: 修改主机状态，停用
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: host id or engine ID
+          type: string
+      responses:
+        '200':
+          description: OK
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  /networkings:
+    get:
+      description: 查询所有 IP 网段
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/NetworkingInfo'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/networkings/{id}':
+    get:
+      description: 查询指定网段 IP
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: networking id
+          type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/NetworkingInfo'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/networkings/{id}/ips':
+    post:
+      description: 增加指定网段 IP
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: networking id
+          type: string
+        - name: networking
+          in: body
+          description: The networking to create.
+          schema:
+            $ref: '#/definitions/PostNetworkingRequest'
+      responses:
+        '201':
+          description: 返回增加的IP数量
+          schema:
+            properties:
+              num:
+                type: integer
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+    delete:
+      description: 删除指定网段 id 的IP
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: networking id
+          type: string
+      responses:
+        '204':
+          description: OK
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/netwokings/{id}/ips/enable':
+    put:
+      description: 修改网段状态，启用
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: networking id
+          type: string
+        - name: all
+          in: query
+          required: false
+          description: 所属网段id 下全部IP，可选
+          type: string
+        - name: body
+          in: body
+          required: false
+          description: 所属网段id 下全部IP，可选
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/netwokings/{id}/ips/disable':
+    put:
+      description: 修改网段状态，停用
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: networking id
+          type: string
+        - name: all
+          in: query
+          required: false
+          description: 所属网段id 下全部IP，可选
+          type: string
+        - name: body
+          in: body
+          required: false
+          description: 所属网段id 下全部IP，可选
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  /services:
+    get:
+      summary: 查询全部 services
+      description: 查询全部 services
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/ServiceSpec'
+definitions:
+  IDResonse:
+    properties:
+      id:
+        type: string
+  ErrorResponseHeader:
+    properties:
+      result:
+        type: boolean
+      code:
+        type: integer
+      msg:
+        type: string
+      category:
+        type: string
+  CreateTaskResponse:
+    properties:
+      id:
+        type: string
+      task_id:
+        type: string
+  Task:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      related:
+        type: string
+      linkto:
+        type: string
+      description:
+        type: string
+      labels:
+        type: string
+      errors:
+        type: string
+      status:
+        type: integer
+      timestamp:
+        type: integer
+      timeout:
+        type: integer
+      created_at:
+        type: string
+      finished_at:
+        type: string
+  BackupTaskCallBack:
+    properties:
+      task_id:
+        type: string
+      unit_id:
+        type: string
+      type:
+        type: string
+      path:
+        type: string
+      code:
+        type: integer
+      size:
+        type: integer
+      msg:
+        type: string
+  ImageVersion:
+    properties:
+      name:
+        type: string
+      major_version:
+        type: integer
+      minor_version:
+        type: integer
+      patch:
+        type: integer
+  GetImageResponse:
+    properties:
+      id:
+        type: string
+      docker_image_id:
+        type: string
+      name:
+        type: string
+      major_version:
+        type: integer
+      minor_version:
+        type: integer
+      patch:
+        type: integer
+      size:
+        type: integer
+      label:
+        type: string
+      upload_at:
+        type: string
+  PostLoadImageRequest:
+    properties:
+      name:
+        type: string
+      major_version:
+        type: integer
+      minor_version:
+        type: integer
+      patch:
+        type: integer
+      path:
+        type: string
+      timeout:
+        type: integer
+  GetClusterResponse:
+    properties:
+      id:
+        type: string
+      max_host:
+        type: integer
+      host_num:
+        type: integer
+      usage_limit:
+        type: number
+  PostClusterRequest:
+    properties:
+      max_host:
+        type: integer
+      usage_limit:
+        type: number
+  VolumeDriver:
+    properties:
+      name:
+        type: string
+      driver:
+        type: string
+      type:
+        type: string
+      VG:
+        type: string
+      total:
+        type: integer
+      free:
+        type: integer
+  engine:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      ip:
+        type: string
+      server_version:
+        type: string
+      kernel_version:
+        type: string
+      os:
+        type: string
+      os_type:
+        type: string
+      architecture:
+        type: string
+      is_healthy:
+        type: boolean
+      cpus:
+        type: integer
+      memory:
+        type: integer
+      free_cpus:
+        type: integer
+      free_memory:
+        type: integer
+  container:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      image:
+        type: string
+      command:
+        type: string
+      created:
+        type: string
+      status:
+        type: string
+  NodeInfo:
+    properties:
+      id:
+        type: string
+      cluster:
+        type: string
+      room:
+        type: string
+      seat:
+        type: string
+      max_container:
+        type: integer
+      enabled:
+        type: boolean
+      register_at:
+        type: string
+      Engine:
+        $ref: '#/definitions/engine'
+      Containers:
+        type: array
+        items:
+          $ref: '#/definitions/container'
+      volume_drivers:
+        type: array
+        items:
+          $ref: '#/definitions/VolumeDriver'
+  PostNodeRequest:
+    properties:
+      cluster_id:
+        type: string
+      addr:
+        type: string
+      storage:
+        type: string
+      max_contianer:
+        type: integer
+      room:
+        type: string
+      seat:
+        type: string
+      username:
+        type: string
+      password:
+        type: string
+      nsf_ip:
+        type: string
+      nfs_dir:
+        type: string
+      nfs_mount_dir:
+        type: string
+      nfs_mount_opts:
+        type: string
+      hdd:
+        type: array
+        items:
+          type: string
+      ssd:
+        type: array
+        items:
+          type: string
+  IP:
+    properties:
+      enabled:
+        type: boolean
+      ip_addr:
+        type: string
+      unit_id:
+        type: string
+      engine_id:
+        type: string
+      net_dev:
+        type: string
+      bandwidth:
+        type: integer
+  NetworkingInfo:
+    properties:
+      prefix:
+        type: integer
+      vlan_id:
+        type: integer
+      networking_id:
+        type: string
+      gateway:
+        type: string
+      IPs:
+        type: array
+        items:
+          $ref: '#/definitions/IP'
+  PostNetworkingRequest:
+    properties:
+      prefix:
+        type: integer
+      vlan_id:
+        type: integer
+      start:
+        type: string
+      end:
+        type: string
+      networking_id:
+        type: string
+      gateway:
+        type: string
+  ServiceSpec:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      desc:
+        type: string
+      architecture:
+        type: string
+      tag:
+        type: string
+      auto_healing:
+        type: boolean
+      auto_scaling:
+        type: boolean
+      high_available:
+        type: boolean
+      status:
+        type: integer
+      max_backup_space:
+        type: integer
+      backup_files_retention:
+        type: integer
+      created_at:
+        type: string
+      finished_at:
+        type: string
