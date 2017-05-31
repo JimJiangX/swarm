@@ -11,6 +11,8 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+//VolumeFileCfg contains file infomation and volume placed
+// used in CopyFileToVolume
 type VolumeFileCfg struct {
 	VgName    string `json:"VgName"`
 	LvsName   string `json:"LvsName"`
@@ -34,9 +36,9 @@ func volumeFileCpHandle(ctx *_Context, w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	mountpoint := GetMountPoint(opt.MountName)
+	mountpoint := getMountPoint(opt.MountName)
 	if !checkMount(mountpoint) {
-		src, err := GetComonVolumePath(opt.VgName, opt.LvsName)
+		src, err := getComonVolumePath(opt.VgName, opt.LvsName)
 		if err != nil {
 			errCommonHanlde(w, req, err)
 			return
@@ -133,8 +135,8 @@ func writeToTmpfile(data, tempfile string) error {
 }
 
 func doFileRepalce(data, mode, filedes, tempfile string) error {
-	if IsDIR(filedes) {
-		return errors.New("the des is dir!!!")
+	if isDIR(filedes) {
+		return errors.New("the des should not be dir")
 	}
 
 	if err := writeToTmpfile(data, tempfile); err != nil {
@@ -145,7 +147,7 @@ func doFileRepalce(data, mode, filedes, tempfile string) error {
 	}
 
 	mvcript := fmt.Sprintf("mv -f  %s %s", tempfile, filedes)
-	_, err := ExecCommand(mvcript)
+	_, err := execCommand(mvcript)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"err":    err.Error(),
@@ -155,7 +157,7 @@ func doFileRepalce(data, mode, filedes, tempfile string) error {
 	}
 
 	chmodscript := fmt.Sprintf("chmod  %s %s", mode, filedes)
-	_, err = ExecCommand(chmodscript)
+	_, err = execCommand(chmodscript)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"err":    err.Error(),

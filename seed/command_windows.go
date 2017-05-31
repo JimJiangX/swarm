@@ -12,26 +12,26 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-type ExecType string
+type execType string
 
 const (
 	defaultTimeout = 5 * time.Second
 
-	Command   ExecType = "command"
-	ShellFile ExecType = "file"
+	commandType   execType = "command"
+	shellFileType execType = "file"
 )
 
-func ExecCommand(command string) (string, error) {
-	return ExecWithTimeout(Command, command, defaultTimeout)
+func execCommand(command string) (string, error) {
+	return execWithTimeout(commandType, command, defaultTimeout)
 }
 
-func ExecShellFile(fpath string, args ...string) (string, error) {
-	return ExecWithTimeout(ShellFile, fpath, defaultTimeout*12, args...)
+func execShellFile(fpath string, args ...string) (string, error) {
+	return execWithTimeout(shellFileType, fpath, defaultTimeout*12, args...)
 }
 
-func ExecWithTimeout(_Type ExecType, shell string, timeout time.Duration, args ...string) (string, error) {
+func execWithTimeout(_Type execType, shell string, timeout time.Duration, args ...string) (string, error) {
 	var cmd *exec.Cmd
-	if _Type == Command {
+	if _Type == commandType {
 		log.Printf("command:%s", shell)
 		cmd = exec.Command("/bin/bash", "-c", shell)
 	} else {

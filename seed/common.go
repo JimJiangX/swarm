@@ -12,7 +12,7 @@ import (
 
 func checkMount(name string) bool {
 	script := fmt.Sprintf("df -h %s", name)
-	out, err := ExecCommand(script)
+	out, err := execCommand(script)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"script": script,
@@ -41,21 +41,21 @@ func mount(src, mountpoint string) error {
 		return errors.New("already exist and it's not a directory")
 	}
 
-	_, err = ExecCommand(mountdatascript)
+	_, err = execCommand(mountdatascript)
 
 	return err
 }
 
 func unmount(target string) error {
 	script := fmt.Sprintf("umount  %s", target)
-	_, err := ExecCommand(script)
+	_, err := execCommand(script)
 	return err
 }
 
 func checkLvsVolume(vgname, name string) bool {
 
 	script := fmt.Sprintf("lvs  %s | awk '{print $1}' ", vgname)
-	out, err := ExecCommand(script)
+	out, err := execCommand(script)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"script": script,
@@ -71,7 +71,7 @@ func checkLvsVolume(vgname, name string) bool {
 func checkLvsByName(name string) bool {
 
 	script := fmt.Sprintf("lvs | awk '{print $1}'")
-	out, err := ExecCommand(script)
+	out, err := execCommand(script)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"script": script,
@@ -86,7 +86,7 @@ func checkLvsByName(name string) bool {
 
 func checkVg(vgname string) bool {
 	script := fmt.Sprintf("vgs | awk '{print $1}'")
-	out, err := ExecCommand(script)
+	out, err := execCommand(script)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"script": script,
@@ -119,7 +119,7 @@ func checkLvsVolumeName(name string) bool {
 
 func getVgName(lvsname string) (string, error) {
 	script := fmt.Sprintf("lvs  | grep '%s' |awk '{print $2}'", lvsname)
-	out, err := ExecCommand(script)
+	out, err := execCommand(script)
 	if err != nil {
 		return "", err
 	}
@@ -131,17 +131,17 @@ func getVgName(lvsname string) (string, error) {
 	return datastr, nil
 }
 
-func GetComonVolumePath(vgname, lvsname string) (string, error) {
+func getComonVolumePath(vgname, lvsname string) (string, error) {
 
 	volumepath := fmt.Sprintf("/dev/%s/%s", vgname, lvsname)
 	return volumepath, nil
 }
 
-func GetMountPoint(vname string) string {
+func getMountPoint(vname string) string {
 	return "/" + vname
 }
 
-func IsDIR(path string) bool {
+func isDIR(path string) bool {
 	fi, err := os.Lstat(path)
 	if os.IsNotExist(err) {
 		return false

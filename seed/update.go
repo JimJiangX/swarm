@@ -11,12 +11,12 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+// VolumeUpdateOpt used in VolumeUpdate
 type VolumeUpdateOpt struct {
 	VgName string `json:"VgName"`
 	LvName string `json:"LvName"`
 	FsType string `json:"FsType"`
-	// Size   string `json:"Size"`
-	Size int `json:"Size"`
+	Size   int    `json:"Size"`
 }
 
 func updateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {

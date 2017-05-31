@@ -52,13 +52,6 @@ type vgListResonse struct {
 	Vgs []VgInfo `json:"Vgs"`
 }
 
-// IPDevConfig contains device and IP
-// IPCIDR:192.168.2.111/24 for example
-type IPDevConfig struct {
-	Device string `json:"Device"`
-	IPCIDR string `json:"IpCIDR"`
-}
-
 // ActiveConfig active a VG,used in SanActivate
 type ActiveConfig struct {
 	VgName string   `json:"VgName"`
@@ -84,6 +77,7 @@ type VolumeFileConfig struct {
 	Mode      string `json:"mode"`
 }
 
+//NetworkConfig used by  /network/create
 type NetworkConfig struct {
 	Container string `json:"containerID"`
 
@@ -103,6 +97,7 @@ type client struct {
 	c httpclient.Client
 }
 
+//NewClient is exported
 func NewClient(addr string, timeout time.Duration, tlsConfig *tls.Config) (ClientAPI, error) {
 
 	if err := checkAddr(addr); err != nil {
@@ -115,10 +110,10 @@ func NewClient(addr string, timeout time.Duration, tlsConfig *tls.Config) (Clien
 	return c, nil
 }
 
+//ClientAPI is exported
 type ClientAPI interface {
 	GetVgList() ([]VgInfo, error)
-	CreateIP(opt IPDevConfig) error
-	RemoveIP(opt IPDevConfig) error
+
 	VolumeUpdate(opt VolumeUpdateOption) error
 
 	CopyFileToVolume(opt VolumeFileConfig) error
@@ -154,19 +149,6 @@ func (c client) GetVgList() ([]VgInfo, error) {
 	}
 
 	return res.Vgs, nil
-}
-
-// CreateIP create a IP on remote host
-// addr is the remote host server agent bind address
-func (c client) CreateIP(opt IPDevConfig) error {
-	return c.postWrap(nil, "/ip/create", opt)
-}
-
-// RemoveIP remove the IP from remote host
-// addr is the remote host server agent bind address
-func (c client) RemoveIP(opt IPDevConfig) error {
-	return c.postWrap(nil, "/ip/remove", opt)
-
 }
 
 // VolumeUpdate update volume optinal on remote host

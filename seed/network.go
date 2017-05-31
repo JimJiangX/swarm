@@ -3,14 +3,12 @@ package seed
 import (
 	"encoding/json"
 	"errors"
-	"strconv"
-
-	//	"log"
 	"net"
 	"net/http"
-	//	log "github.com/Sirupsen/logrus"
+	"strconv"
 )
 
+//NetworkCfg used by  /network/create,which creating docker network
 type NetworkCfg struct {
 	ContainerID string `json:"containerID"`
 
@@ -81,6 +79,6 @@ func createNetwork(cfg *NetworkCfg) error {
 
 	filepath := netScriptDir + "init_nic.sh"
 
-	_, err := ExecShellFile(filepath, args...)
+	_, err := execShellFile(filepath, args...)
 	return err
 }

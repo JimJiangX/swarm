@@ -14,22 +14,25 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
+// ActConfig active a VG,used in SanActivate
 type ActConfig struct {
 	VgName string   `json:"VgName"`
 	Lvname []string `json:"Lvname"`
 }
 
+// DeactConfig used in SanDeActivate
 type DeactConfig struct {
 	VgName    string   `json:"VgName"`
 	Lvname    []string `json:"Lvname"`
-	HostLunId []int    `json:"HostLunId"`
+	HostLunID []int    `json:"HostLunId"`
 	Vendor    string   `json:"Vendor"`
 }
 
+//RmVGConfig used in removeVG
 type RmVGConfig struct {
 	VgName    string `json:"VgName"`
 	Vendor    string `json:"Vendor"`
-	HostLunId []int  `json:"HostLunId"`
+	HostLunID []int  `json:"HostLunId"`
 }
 
 func activateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
@@ -88,7 +91,7 @@ func deactivateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := sanBlock(opt.Vendor, opt.HostLunId); err != nil {
+	if err := sanBlock(opt.Vendor, opt.HostLunID); err != nil {
 		errCommonHanlde(w, req, err)
 		return
 	}
@@ -130,7 +133,7 @@ func removeVGHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 
 	if isVgExist(opt.VgName) {
 		cmd := fmt.Sprintf("vgremove -f %s", opt.VgName)
-		_, err := ExecCommand(cmd)
+		_, err := execCommand(cmd)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"err": err.Error(),
@@ -160,7 +163,7 @@ func removeVGHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 
 func isVgExist(vgname string) bool {
 	cmd := fmt.Sprintf("vgs  %s", vgname)
-	_, err := ExecCommand(cmd)
+	_, err := execCommand(cmd)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"err": err.Error(),
@@ -174,7 +177,7 @@ func isVgExist(vgname string) bool {
 
 func tryImport(vgname string) {
 	cmd := fmt.Sprintf("vgimport  %s", vgname)
-	_, err := ExecCommand(cmd)
+	_, err := execCommand(cmd)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"err": err.Error(),
@@ -269,7 +272,7 @@ func doDeactivate(vgname string, lvs []string) error {
 
 func vgImport(vg string) error {
 	cmd := fmt.Sprintf("vgimport -f %s", vg)
-	_, err := ExecCommand(cmd)
+	_, err := execCommand(cmd)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"err": err.Error(),
@@ -283,7 +286,7 @@ func vgImport(vg string) error {
 func vgExport(vg string) error {
 	time.Sleep(2 * time.Second)
 	cmd := fmt.Sprintf("vgexport  %s", vg)
-	_, err := ExecCommand(cmd)
+	_, err := execCommand(cmd)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"err": err.Error(),
@@ -306,7 +309,7 @@ func lvsActivate(vg string, lvs []string) error {
 }
 func lvActivate(vg, lv string) error {
 	cmd := fmt.Sprintf("lvchange -ay /dev/%s/%s ", vg, lv)
-	_, err := ExecCommand(cmd)
+	_, err := execCommand(cmd)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"err": err.Error(),
@@ -330,7 +333,7 @@ func lvsDeActivate(vg string, lvs []string) error {
 
 func lvDeActivate(vg, lv string) error {
 	cmd := fmt.Sprintf("lvchange -an /dev/%s/%s ", vg, lv)
-	_, err := ExecCommand(cmd)
+	_, err := execCommand(cmd)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"err": err.Error(),
@@ -354,7 +357,7 @@ func sanBlock(vendor string, ids []int) error {
 		args = append(args, strconv.Itoa(id))
 	}
 
-	_, err = ExecShellFile(scriptpath, args...)
+	_, err = execShellFile(scriptpath, args...)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"args":       args,

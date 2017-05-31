@@ -8,26 +8,26 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestExecCommand(t *testing.T) {
-	t.Skip("disable TestExecCommand")
+func TestexecCommand(t *testing.T) {
+	t.Skip("disable TestexecCommand")
 
 	script := fmt.Sprintf("df -h %s", "/home")
-	data, err := ExecCommand(script)
+	data, err := execCommand(script)
 	assert.Nil(t, err)
 	fmt.Println("data:", data)
 
 	script = "sleep 20"
-	data, err = ExecCommand(script)
+	data, err = execCommand(script)
 	assert.Equal(t, err, errors.New("Timeout"))
 
 }
 
-func TestExecShellFile(t *testing.T) {
+func TestexecShellFile(t *testing.T) {
 	//	 #!/bin/bash
 	//     echo "test"
 	//
 	fpath := "/tmp/test.sh"
-	data, err := ExecShellFile(fpath)
+	data, err := execShellFile(fpath)
 	if err != nil {
 		t.Log(err)
 	}
@@ -37,7 +37,7 @@ func TestExecShellFile(t *testing.T) {
 	//     echo "testargs :$1,$@"
 	//
 	fpath = "/tmp/testargs.sh"
-	data, err = ExecShellFile(fpath, "-d", "test1", "-f", "test2")
+	data, err = execShellFile(fpath, "-d", "test1", "-f", "test2")
 	if err != nil {
 		t.Log(err)
 	}
@@ -47,7 +47,7 @@ func TestExecShellFile(t *testing.T) {
 	//      sleep 120
 	//
 	fpath = "/tmp/testtimeout.sh"
-	data, err = ExecShellFile(fpath, "test1", "test2")
+	data, err = execShellFile(fpath, "test1", "test2")
 	if err != nil {
 		t.Log(err)
 	}

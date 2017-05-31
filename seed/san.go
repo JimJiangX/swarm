@@ -17,18 +17,23 @@ import (
 
 var drivers map[string]string
 
+// VgConfig contains VGName&Type and HostLUNID on SAN storage
+// used in SanVgExtend
 type VgConfig struct {
-	HostLunId []int  `json:"HostLunId"`
+	HostLunID []int  `json:"HostLunId"`
 	VgName    string `json:"VgName"`
 	Type      string `json:"Type"`
 }
 
+// VgInfo contains VG total size and free size,unit:byte
+// used in GetVgList response
 type VgInfo struct {
 	VgName string `json:"VgName"`
 	VgSize int    `json:"VgSize"`
 	VgFree int    `json:"VgFree"`
 }
 
+// VgListRes response of /san/vglist
 type VgListRes struct {
 	Err string   `json:"Err"`
 	Vgs []VgInfo `json:"Vgs"`
@@ -66,12 +71,12 @@ func vgExtendHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if len(opt.HostLunId) != 1 {
+	if len(opt.HostLunID) != 1 {
 		errCommonHanlde(w, req, errors.New("now just support extend one device"))
 		return
 	}
 
-	device, err := getDevicePath(opt.HostLunId[0], opt.Type)
+	device, err := getDevicePath(opt.HostLunID[0], opt.Type)
 	if err != nil {
 		errCommonHanlde(w, req, err)
 		return
@@ -169,7 +174,7 @@ func vgList() ([]VgInfo, error) {
 	vgs := []VgInfo{}
 	vgscript := fmt.Sprintf("vgs --units b | sed '1d' | awk '{print $1,$6,$7}' ")
 
-	out, err := ExecCommand(vgscript)
+	out, err := execCommand(vgscript)
 	log.Printf("%s\n%s\n%v\n", vgscript, string(out), err)
 	if err != nil {
 		errstr := "vglist exeec fail:" + err.Error()
@@ -225,7 +230,7 @@ func scanSanDisk() error {
 		return errors.New("not find the file:" + scriptpath)
 	}
 
-	out, err := ExecShellFile(scriptpath)
+	out, err := execShellFile(scriptpath)
 
 	log.Printf("%s\n%s\n%v\n", scriptpath, string(out), err)
 
@@ -247,7 +252,7 @@ func getDevicePath(id int, santype string) (string, error) {
 	}
 	args := []string{santype, strconv.Itoa(id)}
 
-	out, err := ExecShellFile(scriptpath, args...)
+	out, err := execShellFile(scriptpath, args...)
 	if err != nil {
 		return "", err
 	}
@@ -265,7 +270,7 @@ func getDevicePath(id int, santype string) (string, error) {
 
 func vgCreate(name, devices string) error {
 	vgcreatesctript := fmt.Sprintf("vgcreate %s  %s ", name, devices)
-	_, err := ExecCommand(vgcreatesctript)
+	_, err := execCommand(vgcreatesctript)
 
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -280,7 +285,7 @@ func vgCreate(name, devices string) error {
 
 func vgExtend(name, devices string) error {
 	extendsctript := fmt.Sprintf("vgextend  -f %s  %s ", name, devices)
-	_, err := ExecCommand(extendsctript)
+	_, err := execCommand(extendsctript)
 
 	if err != nil {
 		log.WithFields(log.Fields{

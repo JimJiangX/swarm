@@ -19,6 +19,7 @@ type _Context struct {
 	context    context.Context
 }
 
+//CommonRes common http requet response body msg
 type CommonRes struct {
 	Err string `json:"Err"`
 }
@@ -54,7 +55,6 @@ func NewRouter(version string) *mux.Router {
 			"/san/vgcreate": vgCreateHandle,
 			"/san/vgextend": vgExtendHandle,
 
-			// "/san/vgblock":  VgBlock,
 			"/san/activate":   activateHandle,
 			"/san/deactivate": deactivateHandle,
 
