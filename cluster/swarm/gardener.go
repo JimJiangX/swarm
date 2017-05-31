@@ -354,6 +354,8 @@ func (gd *Gardener) Register(req structs.RegisterGardener) error {
 			DBAPassword:         req.Users.DBAPassword,
 			DBUsername:          req.Users.DBUsername,
 			DBPassword:          req.Users.DBPassword,
+			CheckUsername:       req.Users.CheckUsername,
+			CheckPassword:       req.Users.CheckPassword,
 		},
 	}
 
