@@ -115,7 +115,7 @@ func vgCreateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	}
 
 	devices := ""
-	for _, id := range opt.HostLunId {
+	for _, id := range opt.HostLunID {
 		path, err := getDevicePath(id, opt.Type)
 		if err != nil {
 			errCommonHanlde(w, req, err)
@@ -159,8 +159,8 @@ func vgListHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 }
 
 func checkVgConfig(cfg *VgConfig) error {
-	if len(cfg.HostLunId) == 0 {
-		return errors.New("device HostLunId must not be null")
+	if len(cfg.HostLunID) == 0 {
+		return errors.New("device HostLunID must not be null")
 	}
 
 	if _, ok := getDriver(cfg.Type); !ok {

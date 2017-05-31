@@ -144,7 +144,7 @@ func removeVGHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	err := sanBlock(opt.Vendor, opt.HostLunId)
+	err := sanBlock(opt.Vendor, opt.HostLunID)
 	if err != nil {
 		errCommonHanlde(w, req, err)
 		return
@@ -195,8 +195,8 @@ func checkDeactConfig(opt *DeactConfig) error {
 		return errors.New("VgName  and vendor must  be set")
 	}
 
-	if len(opt.HostLunId) == 0 {
-		return errors.New("HostLunId must  be set")
+	if len(opt.HostLunID) == 0 {
+		return errors.New("HostLunID must  be set")
 	}
 
 	scriptpath := scriptDir + "sanDeviceBlock.sh"

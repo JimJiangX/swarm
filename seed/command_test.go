@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestexecCommand(t *testing.T) {
+func TestExecCommand(t *testing.T) {
 	t.Skip("disable TestexecCommand")
 
 	script := fmt.Sprintf("df -h %s", "/home")
@@ -22,7 +22,7 @@ func TestexecCommand(t *testing.T) {
 
 }
 
-func TestexecShellFile(t *testing.T) {
+func TestExecShellFile(t *testing.T) {
 	//	 #!/bin/bash
 	//     echo "test"
 	//
