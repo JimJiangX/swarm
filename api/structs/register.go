@@ -33,6 +33,8 @@ type Users struct {
 	DBPassword          string `json:"db_password"`
 	CheckUsername       string `json:"check_username"`
 	CheckPassword       string `json:"check_password"`
+	ReadOnlyUsername    string `json:"ro_username"`
+	ReadOnlyPassword    string `json:"ro_password"`
 }
 
 type SSHDeliver struct {
