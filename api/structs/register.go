@@ -31,8 +31,8 @@ type Users struct {
 	DBAPassword         string `json:"cup_dba_password"`
 	DBUsername          string `json:"db_username"`
 	DBPassword          string `json:"db_password"`
-	CheckUsername       string `db:"check_username"`
-	CheckPassword       string `db:"check_password"`
+	CheckUsername       string `json:"check_username"`
+	CheckPassword       string `json:"check_password"`
 }
 
 type SSHDeliver struct {
