@@ -6,7 +6,7 @@ info:
 schemes:
   - http
   - https
-host: simple.api
+host: '192.168.3.121:4000'
 basePath: /v1.0
 consumes:
   - application/json
@@ -587,8 +587,127 @@ paths:
         '200':
           description: OK
           schema:
+            type: array
+            items:
+              $ref: '#/definitions/ServiceSpec'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+    post:
+      summary: 创建并运行新Service
+      description: 创建Service任务，调度、分配资源、创建容器并初始化运行服务
+      parameters:
+        - name: timeout
+          in: query
+          required: false
+          description: 超时时间 /s，可选
+          type: integer
+        - name: body
+          in: body
+          required: true
+          description: 所属网段id 下全部IP，可选
+          schema:
             $ref: '#/definitions/ServiceSpec'
+      responses:
+        '201':
+          description: 返回任务信息
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+                description: 服务Name
+              task_id:
+                type: string
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/services/{id}':
+    get:
+      summary: 查询指定Service
+      description: 返回Service及所属容器及其运行状态，by id or name
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: service id or name
+          type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/ServiceSpec'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+    delete:
+      summary: 删除指定Service
+      description: 删除Service相关记录，回收容器、存储、网络资源
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: service id or name
+          type: string
+      responses:
+        '204':
+          description: Done
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/services/{id}/start':
+    post:
+      summary: 启动指定服务
+      description: 启动服务，by id or name
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: service id or name
+          type: string
+      responses:
+        '201':
+          description: OK
+          schema:
+            $ref: '#/definitions/TaskIDResonse'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/services/{id}/stop':
+    post:
+      summary: 关闭指定服务
+      description: 关闭服务，by id or name
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: service id or name
+          type: string
+      responses:
+        '201':
+          description: OK
+          schema:
+            $ref: '#/definitions/TaskIDResonse'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
 definitions:
+  TaskIDResonse:
+    properties:
+      task_id:
+        type: string
   IDResonse:
     properties:
       id:
@@ -633,8 +752,10 @@ definitions:
         type: integer
       created_at:
         type: string
+        format: date-time
       finished_at:
         type: string
+        format: date-time
   BackupTaskCallBack:
     properties:
       task_id:
@@ -681,6 +802,7 @@ definitions:
         type: string
       upload_at:
         type: string
+        format: date-time
   PostLoadImageRequest:
     properties:
       name:
@@ -783,6 +905,7 @@ definitions:
         type: boolean
       register_at:
         type: string
+        format: date-time
       Engine:
         $ref: '#/definitions/engine'
       Containers:
@@ -869,7 +992,7 @@ definitions:
         type: string
       gateway:
         type: string
-  ServiceSpec:
+  Service:
     properties:
       id:
         type: string
@@ -895,5 +1018,426 @@ definitions:
         type: integer
       created_at:
         type: string
+        format: date-time
       finished_at:
         type: string
+        format: date-time
+  Arch:
+    properties:
+      unit_num:
+        type: integer
+      mode:
+        type: string
+      code:
+        type: string
+  Unit:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      type:
+        type: string
+      service_id:
+        type: string
+      engine_id:
+        type: string
+      container_id:
+        type: string
+      network_mode:
+        type: string
+      lastest_error:
+        type: integer
+      created_at:
+        type: string
+        format: data-time
+  unit_engine:
+    properties:
+      id:
+        type: string
+      node:
+        type: string
+      name:
+        type: string
+      addr:
+        type: string
+  MountPoint:
+    properties:
+      Name:
+        type: string
+      Source:
+        type: string
+      Destination:
+        type: string
+      Driver:
+        type: string
+      Mode:
+        type: string
+      RW:
+        type: boolean
+      Propagation:
+        type: string
+        enum:
+          - rprivate
+          - private
+          - rshared
+          - shared
+          - rslave
+          - slave
+  TypesContainer:
+    properties:
+      Id:
+        type: string
+      Names:
+        type: array
+        items:
+          type: string
+      Image:
+        type: string
+      ImageID:
+        type: string
+      Command:
+        type: string
+      Created:
+        type: integer
+      Labels:
+        type: object
+        additionalProperties:
+          type: string
+      State:
+        type: string
+      Status:
+        type: string
+      HostConfig:
+        type: object
+        properties:
+          NetworkMode:
+            type: string
+      Mounts:
+        type: array
+        items:
+          $ref: '#/definitions/MountPoint'
+  containerConfig:
+    properties:
+      Hostname:
+        type: string
+      Domainname:
+        type: string
+      User:
+        type: string
+      AttachStdin:
+        type: boolean
+      AttachStdout:
+        type: boolean
+      AttachStderr:
+        type: boolean
+      Tty:
+        type: boolean
+      OpenStdin:
+        type: boolean
+      StdinOnce:
+        type: boolean
+      Env:
+        type: array
+        items:
+          type: string
+      Cmd:
+        type: array
+        items:
+          type: string
+      Image:
+        type: string
+      WorkingDir:
+        type: string
+      Labels:
+        type: object
+        additionalProperties:
+          type: string
+      Entrypoint:
+        type: array
+        items:
+          type: string
+      OnBuild:
+        type: array
+        items:
+          type: string
+      Shell:
+        type: array
+        items:
+          type: string
+  HostConfigResources:
+    properties:
+      CpuShares:
+        type: integer
+      Memory:
+        type: integer
+      NanoCpus:
+        type: integer
+      BlkioWeight:
+        type: integer
+      CpuPeriod:
+        type: integer
+      CpuQuota:
+        type: integer
+      CpuRealtimePeriod:
+        type: integer
+      CpuRealtimeRuntime:
+        type: integer
+      DiskQuota:
+        type: integer
+      KernelMemory:
+        type: integer
+      MemoryReservation:
+        type: integer
+      MemorySwap:
+        type: integer
+      MemorySwappiness:
+        type: integer
+      PidsLimit:
+        type: integer
+      OomKillDisable:
+        type: boolean
+      CpuCount:
+        type: integer
+      CpuPercent:
+        type: integer
+      IOMaximumIOps:
+        type: integer
+      IOMaximumBandwidth:
+        type: integer
+      CgroupParent:
+        type: string
+      CpusetCpus:
+        type: string
+      CpusetMems:
+        type: string
+  HostConfig:
+    properties:
+      Binds:
+        type: array
+        items:
+          type: string
+      ContainerIDFile:
+        type: string
+      NetworkMode:
+        type: string
+      AutoRemove:
+        type: boolean
+      VolumeDriver:
+        type: string
+      VolumeFrom:
+        type: array
+        items:
+          type: string
+      IpcMode:
+        type: string
+      Cgroup:
+        type: string
+      PidMode:
+        type: string
+      Runtime:
+        type: string
+      UTSMode:
+        type: string
+      UsernsMode:
+        type: string
+      Isolation:
+        type: string
+      ShmSize:
+        type: integer
+      CpuShares:
+        type: integer
+      Memory:
+        type: integer
+      NanoCpus:
+        type: integer
+      BlkioWeight:
+        type: integer
+      CpuPeriod:
+        type: integer
+      CpuQuota:
+        type: integer
+      CpuRealtimePeriod:
+        type: integer
+      CpuRealtimeRuntime:
+        type: integer
+      DiskQuota:
+        type: integer
+      KernelMemory:
+        type: integer
+      MemoryReservation:
+        type: integer
+      MemorySwap:
+        type: integer
+      MemorySwappiness:
+        type: integer
+      PidsLimit:
+        type: integer
+      OomKillDisable:
+        type: boolean
+      CpuCount:
+        type: integer
+      CpuPercent:
+        type: integer
+      IOMaximumIOps:
+        type: integer
+      IOMaximumBandwidth:
+        type: integer
+      CgroupParent:
+        type: string
+      CpusetCpus:
+        type: string
+      CpusetMems:
+        type: string
+  ContainerConfig:
+    properties:
+      HostConfig:
+        $ref: '#/definitions/HostConfig'
+      Hostname:
+        type: string
+      Domainname:
+        type: string
+      User:
+        type: string
+      AttachStdin:
+        type: boolean
+      AttachStdout:
+        type: boolean
+      AttachStderr:
+        type: boolean
+      Tty:
+        type: boolean
+      OpenStdin:
+        type: boolean
+      StdinOnce:
+        type: boolean
+      Env:
+        type: array
+        items:
+          type: string
+      Cmd:
+        type: array
+        items:
+          type: string
+      Image:
+        type: string
+      WorkingDir:
+        type: string
+      Labels:
+        type: object
+        additionalProperties:
+          type: string
+      Entrypoint:
+        type: array
+        items:
+          type: string
+      OnBuild:
+        type: array
+        items:
+          type: string
+      Shell:
+        type: array
+        items:
+          type: string
+  unitIP:
+    properties:
+      prefix:
+        type: integer
+      vlan:
+        type: integer
+      bandwidth:
+        type: integer
+      device:
+        type: string
+      name:
+        type: string
+      ip_addr:
+        type: string
+      proto:
+        type: string
+      gateway:
+        type: string
+      networking:
+        type: string
+  unitPort:
+    properties:
+      name:
+        type: string
+      port:
+        type: integer
+  volumeSpec:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      type:
+        type: string
+      driver:
+        type: string
+      size:
+        type: integer
+      options:
+        type: object
+        additionalProperties:
+          type: string
+  UnitSpec:
+    properties:
+      unit:
+        $ref: '#/definitions/Unit'
+      engine:
+        $ref: '#/definitions/unit_engine'
+      container:
+        $ref: '#/definitions/TypesContainer'
+      container_config:
+        $ref: '#/definitions/ContainerConfig'
+      networkings:
+        type: array
+        items:
+          $ref: '#/definitions/unitIP'
+      ports:
+        type: array
+        items:
+          $ref: '#/definitions/unitPort'
+      volumes:
+        type: array
+        items:
+          $ref: '#/definitions/volumeSpec'
+  ServiceSpec:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      desc:
+        type: string
+      tag:
+        type: string
+      auto_healing:
+        type: boolean
+      auto_scaling:
+        type: boolean
+      high_available:
+        type: boolean
+      status:
+        type: integer
+      max_backup_space:
+        type: integer
+      backup_files_retention:
+        type: integer
+      created_at:
+        type: string
+        format: date-time
+      finished_at:
+        type: string
+        format: date-time
+      architecture:
+        $ref: '#/definitions/Arch'
+      units:
+        type: array
+        items:
+          $ref: '#/definitions/UnitSpec'
+      opts:
+        type: object
+        additionalProperties:
+          type: string
