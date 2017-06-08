@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"runtime"
@@ -30,6 +31,11 @@ import (
 
 // APIVERSION is the API version supported by swarm manager
 const APIVERSION = "1.22"
+
+var (
+	ShouldRefreshOnNodeFilter  = false
+	ContainerNameRefreshFilter = ""
+)
 
 // GET /info
 func getInfo(c *context, w http.ResponseWriter, r *http.Request) {
@@ -182,7 +188,7 @@ func getImagesJSON(c *context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Deprecated "filter" Filter. This is required for backward compability.
+	// Deprecated "filter" Filter. This is required for backward compatibility.
 	filterParam := r.Form.Get("filter")
 	if typesversions.LessThan(c.apiVersion, "1.28") && filterParam != "" {
 		filters.Add("reference", filterParam)
@@ -199,6 +205,12 @@ func getImagesJSON(c *context, w http.ResponseWriter, r *http.Request) {
 			Filters: filters,
 		},
 	}
+	if opts.Filters.Include("dangling") &&
+		!(opts.Filters.ExactMatch("dangling", "false") || opts.Filters.ExactMatch("dangling", "true")) {
+		httpError(w, "Invalid filter: 'type'='dangling'", http.StatusBadRequest)
+		return
+	}
+
 	for _, image := range c.cluster.Images().Filter(opts) {
 		if len(accepteds) != 0 {
 			found := false
@@ -213,7 +225,7 @@ func getImagesJSON(c *context, w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// grouping images by Id, and concat their RepoTags
+		// grouping images by Id, and concatenate their RepoTags
 		if entry, existed := groupImages[image.ID]; existed {
 			entry.RepoTags = append(entry.RepoTags, image.RepoTags...)
 			entry.RepoDigests = append(entry.RepoDigests, image.RepoDigests...)
@@ -277,7 +289,7 @@ func getNetworks(c *context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	out := []*apitypes.NetworkResource{}
-	networks := c.cluster.Networks().Filter(filters.Get("name"), filters.Get("id"), types)
+	networks := c.cluster.Networks().Filter(filters)
 	for _, network := range networks {
 		tmp := (*network).NetworkResource
 		if tmp.Scope == "local" {
@@ -318,9 +330,50 @@ func getVolume(c *context, w http.ResponseWriter, r *http.Request) {
 func getVolumes(c *context, w http.ResponseWriter, r *http.Request) {
 	volumesListResponse := volumetypes.VolumesListOKBody{}
 
+	// Parse filters
+	filters, err := dockerfilters.FromParam(r.URL.Query().Get("filters"))
+	if err != nil {
+		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	names := filters.Get("name")
+	nodes := filters.Get("node")
 	for _, volume := range c.cluster.Volumes() {
+		// Check if the volume matches any name filters
+		found := false
+		for _, name := range names {
+			if strings.Contains(volume.Name, name) {
+				found = true
+				break
+			}
+		}
+
+		if len(names) > 0 && !found {
+			// Do not include this volume in the response if it doesn't match
+			// a name filter, if any exist.
+			continue
+		}
+
+		if filters.Include("label") {
+			if !filters.MatchKVList("label", volume.Labels) {
+				continue
+			}
+		}
+
 		tmp := (*volume).Volume
 		if tmp.Driver == "local" {
+			// Check if the volume matches any node filters
+			found = false
+			for _, node := range nodes {
+				if volume.Engine.Name == node {
+					found = true
+					break
+				}
+			}
+			if len(nodes) > 0 && !found {
+				continue
+			}
 			tmp.Name = volume.Engine.Name + "/" + volume.Name
 		}
 		volumesListResponse.Volumes = append(volumesListResponse.Volumes, &tmp)
@@ -373,6 +426,28 @@ func getContainersJSON(c *context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if ShouldRefreshOnNodeFilter {
+		nodes := filters.Get("node")
+		for _, node := range nodes {
+			err := c.cluster.RefreshEngine(node)
+			if err != nil {
+				log.Debugf("could not match node filter for %s: %s", node, err)
+			}
+		}
+	}
+	if ContainerNameRefreshFilter != "" {
+		names := filters.Get("name")
+		for _, name := range names {
+			if name == ContainerNameRefreshFilter {
+				err := c.cluster.RefreshEngines()
+				if err != nil {
+					log.Debugf("names filter detected but unable to refresh all engines: %s", err)
+				}
+				break
+			}
+		}
+	}
+
 	// Filtering: select the containers we want to return.
 	candidates := []*cluster.Container{}
 	for _, container := range c.cluster.Containers() {
@@ -417,6 +492,26 @@ func getContainersJSON(c *context, w http.ResponseWriter, r *http.Request) {
 				return nil
 			})
 			if err != volumeExist {
+				continue
+			}
+		}
+		if filters.Include("network") {
+			networkExist := fmt.Errorf("network attached to container")
+			err := filters.WalkValues("network", func(value string) error {
+				if _, ok := container.NetworkSettings.Networks[value]; ok {
+					return networkExist
+				}
+				for _, nw := range container.NetworkSettings.Networks {
+					if nw == nil {
+						continue
+					}
+					if strings.HasPrefix(nw.NetworkID, value) {
+						return networkExist
+					}
+				}
+				return nil
+			})
+			if err != networkExist {
 				continue
 			}
 		}
@@ -477,7 +572,7 @@ func getContainersJSON(c *context, w http.ResponseWriter, r *http.Request) {
 		tmp.Ports = make([]apitypes.Port, len(container.Ports))
 		for i, port := range container.Ports {
 			tmp.Ports[i] = port
-			if port.IP == "0.0.0.0" {
+			if ip := net.ParseIP(port.IP); ip != nil && ip.IsUnspecified() {
 				tmp.Ports[i].IP = container.Engine.IP
 			}
 		}
@@ -492,10 +587,6 @@ func getContainersJSON(c *context, w http.ResponseWriter, r *http.Request) {
 // GET /containers/{name:.*}/json
 func getContainerJSON(c *context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
-	sizeQuery := ""
-	if boolValue(r, "size") {
-		sizeQuery = "?size=1"
-	}
 	container := c.cluster.Container(name)
 	if container == nil {
 		httpError(w, fmt.Sprintf("No such container %s", name), http.StatusNotFound)
@@ -507,42 +598,28 @@ func getContainerJSON(c *context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, scheme, err := container.Engine.HTTPClientAndScheme()
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	resp, err := client.Get(scheme + "://" + container.Engine.Addr + "/containers/" + container.ID + "/json" + sizeQuery)
-	container.Engine.CheckConnectionErr(err)
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// cleanup
-	defer resp.Body.Close()
-
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	n, err := json.Marshal(container.Engine)
+	con, err := container.Engine.InspectContainer(container.ID)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// insert Node field
-	data = bytes.Replace(data, []byte("\"Name\":\"/"), []byte(fmt.Sprintf("\"Node\":%s,\"Name\":\"/", n)), -1)
+	con.Node = container.Engine.EngineToContainerNode()
 
-	// insert node IP
-	data = bytes.Replace(data, []byte("\"HostIp\":\"0.0.0.0\""), []byte(fmt.Sprintf("\"HostIp\":%q", container.Engine.IP)), -1)
+	// update zero ip to engine ip, including IPv4 and IPv6
+	if con.NetworkSettings != nil {
+		for _, portBindings := range con.NetworkSettings.Ports {
+			for key, portBinding := range portBindings {
+				if ip := net.ParseIP(portBinding.HostIP); ip == nil || ip.IsUnspecified() {
+					portBindings[key].HostIP = container.Engine.IP
+				}
+			}
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(data)
+	json.NewEncoder(w).Encode(con)
 }
 
 // POST /containers/create
@@ -696,23 +773,42 @@ func postImagesCreate(c *context, w http.ResponseWriter, r *http.Request) {
 
 		var errorMessage string
 		errorFound := false
-		callback := func(what, status string, err error) {
-			if err != nil {
-				errorFound = true
-				errorMessage = err.Error()
-				sendJSONMessage(wf, what, fmt.Sprintf("Pulling %s... : %s", image, err.Error()))
-				return
-			}
-			if status == "" {
-				sendJSONMessage(wf, what, fmt.Sprintf("Pulling %s...", image))
+		nonOSErrorFound := false
+		successfulPull := false
+		callback := func(msg cluster.JSONMessageWrapper) {
+			msg.Msg.ID = msg.EngineName
+			if msg.Msg.Status != "" {
+				msg.Msg.Status = fmt.Sprintf("Pulling %s... : %s", image, msg.Msg.Status)
 			} else {
-				sendJSONMessage(wf, what, fmt.Sprintf("Pulling %s... : %s", image, status))
+				msg.Msg.Status = fmt.Sprintf("Pulling %s...", image)
 			}
+			// If we get a successful pull on any node, mark
+			// successfulPull as true.
+			if msg.Success {
+				successfulPull = true
+			}
+			if msg.Err != nil {
+				errorFound = true
+				errorMessage = msg.Err.Error()
+				if !strings.Contains(errorMessage, "image operating system") {
+					nonOSErrorFound = true
+				}
+				msg.Msg.Status = fmt.Sprintf("Pulling %s... : %s", image, errorMessage)
+			}
+			json.NewEncoder(wf).Encode(msg.Msg)
 		}
 		c.cluster.Pull(image, &authConfig, callback)
 
 		if errorFound {
-			sendErrorJSONMessage(wf, 1, errorMessage)
+			// If some nodes successfully pulled the image and the
+			// rest failed because the image was the wrong OS
+			// (e.g. we tried to pull a Linux-based image on a
+			// Windows node), we should still consider the pull
+			// successful because we loaded the image on as many
+			// nodes as we could.
+			if !successfulPull || nonOSErrorFound {
+				sendErrorJSONMessage(wf, 1, errorMessage)
+			}
 		}
 
 	} else { //import
@@ -722,14 +818,15 @@ func postImagesCreate(c *context, w http.ResponseWriter, r *http.Request) {
 
 		var errorMessage string
 		errorFound := false
-		callback := func(what, status string, err error) {
-			if err != nil {
+		callback := func(msg cluster.JSONMessageWrapper) {
+			msg.Msg.ID = msg.EngineName
+			if msg.Err != nil {
 				errorFound = true
-				errorMessage = err.Error()
-				sendJSONMessage(wf, what, err.Error())
-				return
+				errorMessage = msg.Err.Error()
+				msg.Msg.Status = errorMessage
 			}
-			sendJSONMessage(wf, what, status)
+			json.NewEncoder(wf).Encode(msg.Msg)
+
 		}
 		ref := getImageRef(repo, tag)
 		c.cluster.Import(source, ref, tag, r.Body, callback)
@@ -749,19 +846,20 @@ func postImagesLoad(c *context, w http.ResponseWriter, r *http.Request) {
 	wf := NewWriteFlusher(w)
 	var errorMessage string
 	errorFound := false
-	callback := func(what, status string, err error) {
-		if err != nil {
-			errorFound = true
-			errorMessage = err.Error()
-			sendJSONMessage(wf, what, fmt.Sprintf("Loading Image... : %s", err.Error()))
-			return
+	callback := func(msg cluster.JSONMessageWrapper) {
+		msg.Msg.ID = msg.EngineName
+		if msg.Msg.Status != "" {
+			msg.Msg.Status = fmt.Sprintf("Loading Image... : %s", msg.Msg.Status)
+		} else {
+			msg.Msg.Status = "Loading Image..."
 		}
 
-		if status == "" {
-			sendJSONMessage(wf, what, "Loading Image...")
-		} else {
-			sendJSONMessage(wf, what, fmt.Sprintf("Loading Image... : %s", status))
+		if msg.Err != nil {
+			errorFound = true
+			errorMessage = msg.Err.Error()
+			msg.Msg.Status = fmt.Sprintf("Loading Image... : %s", errorMessage)
 		}
+		json.NewEncoder(wf).Encode(msg.Msg)
 	}
 	c.cluster.Load(r.Body, callback)
 	if errorFound {
@@ -787,14 +885,12 @@ func getEvents(c *context, w http.ResponseWriter, r *http.Request) {
 		until = u
 	}
 
-	c.eventsHandler.Add(r.RemoteAddr, w)
-
 	w.Header().Set("Content-Type", "application/json")
-
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
 	}
 
+	c.eventsHandler.Add(r.RemoteAddr, w)
 	c.eventsHandler.Wait(r.RemoteAddr, until)
 }
 
@@ -851,52 +947,29 @@ func postContainersExec(c *context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, scheme, err := container.Engine.HTTPClientAndScheme()
+	execConfig := apitypes.ExecConfig{}
+	if err := json.NewDecoder(r.Body).Decode(&execConfig); err != nil {
+		httpError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if len(execConfig.Cmd) == 0 {
+		httpError(w, fmt.Sprintf("No exec command specified"), http.StatusBadRequest)
+		return
+	}
+
+	execCreateResp, err := container.Engine.CreateContainerExec(container.ID, execConfig)
 	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	resp, err := client.Post(scheme+"://"+container.Engine.Addr+"/containers/"+container.ID+"/exec", "application/json", r.Body)
-	container.Engine.CheckConnectionErr(err)
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// cleanup
-	defer resp.Body.Close()
-
-	// check status code
-	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			httpError(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		httpError(w, string(body), http.StatusInternalServerError)
-		return
-	}
-
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		httpError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	id := struct{ ID string }{}
-
-	if err := json.Unmarshal(data, &id); err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// add execID to the container, so the later exec/start will work
-	container.Info.ExecIDs = append(container.Info.ExecIDs, id.ID)
+	container.Info.ExecIDs = append(container.Info.ExecIDs, execCreateResp.ID)
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
-	w.Write(data)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(execCreateResp)
 }
 
 // DELETE /images/{name:.*}
@@ -970,15 +1043,20 @@ func ping(c *context, w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /networks/{networkid:.*}/disconnect
-func proxyNetworkDisconnect(c *context, w http.ResponseWriter, r *http.Request) {
+func networkDisconnect(c *context, w http.ResponseWriter, r *http.Request) {
 	var networkid = mux.Vars(r)["networkid"]
 	network := c.cluster.Networks().Uniq().Get(networkid)
 	if network == nil {
 		httpError(w, fmt.Sprintf("No such network: %s", networkid), http.StatusNotFound)
 		return
 	}
-	// Set the network ID in the proxied URL path.
-	r.URL.Path = strings.Replace(r.URL.Path, networkid, network.ID, 1)
+	// If the incoming request used the network's name instead of the ID,
+	// make the request to the daemon with the network's name as well.
+	if strings.Contains(networkid, network.Name) {
+		networkid = network.Name
+	} else {
+		networkid = network.ID
+	}
 
 	// make a copy of r.Body
 	buf, _ := ioutil.ReadAll(r.Body)
@@ -990,39 +1068,41 @@ func proxyNetworkDisconnect(c *context, w http.ResponseWriter, r *http.Request) 
 	// Extract container info from r.Body copy
 	var disconnect apitypes.NetworkDisconnect
 	if err := json.NewDecoder(bodyCopy).Decode(&disconnect); err != nil {
-		httpError(w, fmt.Sprintf("Container is not specified"), http.StatusNotFound)
+		httpError(w, "Container is not specified", http.StatusNotFound)
 		return
 	}
 
-	var engine *cluster.Engine
-
-	if disconnect.Force && network.Scope == "global" {
-		randomEngine, err := c.cluster.RANDOMENGINE()
-		if err != nil {
-			httpError(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		engine = randomEngine
-	} else {
-		container := c.cluster.Container(disconnect.Container)
-		if container == nil {
-			httpError(w, fmt.Sprintf("No such container: %s", disconnect.Container), http.StatusNotFound)
-			return
-		}
-		engine = container.Engine
+	container := c.cluster.Container(disconnect.Container)
+	if container == nil {
+		httpError(w, fmt.Sprintf("No such container: %s", disconnect.Container), http.StatusNotFound)
+		return
 	}
+	engine := container.Engine
 
-	cb := func(resp *http.Response) {
-		// force fresh networks on this engine
-		engine.RefreshNetworks()
-	}
-
-	// request is forwarded to the container's address
-	err := proxyAsync(engine, w, r, cb)
-	engine.CheckConnectionErr(err)
+	// First try to disconnect the container on its associated engine, and
+	// then try a random engine if we can't connect to that engine. We
+	// try the associated engine first because on 1.12+ clusters, the
+	// network may not be known on all nodes.
+	err := engine.NetworkDisconnect(container, networkid, disconnect.Force)
 	if err != nil {
+		if cluster.IsConnectionError(err) && disconnect.Force && network.Scope == "global" {
+			log.Warnf("Could not connect to engine %s: %s, trying to disconnect %s from %s on a random engine", engine.Name, err, disconnect.Container, network.Name)
+			randomEngine, randomEngineErr := c.cluster.RANDOMENGINE()
+			if randomEngineErr != nil {
+				log.Warnf("Could not get a random engine: %s", randomEngineErr)
+				httpError(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			err = randomEngine.NetworkDisconnect(container, networkid, disconnect.Force)
+			if err != nil {
+				httpError(w, err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
 		httpError(w, err.Error(), http.StatusNotFound)
+		return
 	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // POST /networks/{networkid:.*}/connect
@@ -1046,7 +1126,7 @@ func proxyNetworkConnect(c *context, w http.ResponseWriter, r *http.Request) {
 	// Extract container info from r.Body copy
 	var connect apitypes.NetworkConnect
 	if err := json.NewDecoder(bodyCopy).Decode(&connect); err != nil {
-		httpError(w, fmt.Sprintf("Container is not specified"), http.StatusNotFound)
+		httpError(w, "Container is not specified", http.StatusNotFound)
 		return
 	}
 	container := c.cluster.Container(connect.Container)
@@ -1278,6 +1358,7 @@ func postBuild(c *context, w http.ResponseWriter, r *http.Request) {
 		Isolation:      containertypes.Isolation(r.Form.Get("isolation")),
 		Memory:         int64ValueOrZero(r, "memory"),
 		MemorySwap:     int64ValueOrZero(r, "memswap"),
+		NetworkMode:    r.Form.Get("networkmode"),
 		CPUShares:      int64ValueOrZero(r, "cpushares"),
 		CPUPeriod:      int64ValueOrZero(r, "cpuperiod"),
 		CPUQuota:       int64ValueOrZero(r, "cpuquota"),
@@ -1285,6 +1366,7 @@ func postBuild(c *context, w http.ResponseWriter, r *http.Request) {
 		CPUSetMems:     r.Form.Get("cpusetmems"),
 		CgroupParent:   r.Form.Get("cgroupparent"),
 		ShmSize:        int64ValueOrZero(r, "shmsize"),
+		Squash:         boolValue(r, "squash"),
 	}
 
 	buildArgsJSON := r.Form.Get("buildargs")
@@ -1302,6 +1384,11 @@ func postBuild(c *context, w http.ResponseWriter, r *http.Request) {
 		json.Unmarshal([]byte(labelsJSON), &buildImage.Labels)
 	}
 
+	cacheFromJSON := r.Form.Get("cachefrom")
+	if cacheFromJSON != "" {
+		json.Unmarshal([]byte(cacheFromJSON), &buildImage.CacheFrom)
+	}
+
 	authEncoded := r.Header.Get("X-Registry-Config")
 	if authEncoded != "" {
 		buf, err := base64.URLEncoding.DecodeString(r.Header.Get("X-Registry-Config"))
@@ -1313,9 +1400,27 @@ func postBuild(c *context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	wf := NewWriteFlusher(w)
 
-	err := c.cluster.BuildImage(r.Body, buildImage, wf)
+	var errorMessage string
+	errorFound := false
+	callback := func(msg cluster.JSONMessageWrapper) {
+		msg.Msg.ID = msg.EngineName
+		if msg.Err != nil {
+			errorFound = true
+			errorMessage = msg.Err.Error()
+			osType := matchImageOSError(errorMessage)
+			if osType != "" {
+				msg.Msg.Status = fmt.Sprintf("Could not build image: %s. Consider using --build-arg 'constraint:ostype==%s'", errorMessage, osType)
+			}
+		}
+		json.NewEncoder(wf).Encode(msg.Msg)
+	}
+	err := c.cluster.BuildImage(r.Body, buildImage, callback)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if errorFound {
+		sendErrorJSONMessage(wf, 1, errorMessage)
 	}
 }
 
@@ -1378,4 +1483,26 @@ func notImplementedHandler(c *context, w http.ResponseWriter, r *http.Request) {
 
 func optionsHandler(c *context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
+}
+
+// headerFlusher is a convenient wrapper around http.ResponseWriter which
+// always flushes response headers to the client immediately.
+type headerFlusher struct {
+	http.ResponseWriter
+}
+
+func (h headerFlusher) WriteHeader(status int) {
+	h.ResponseWriter.WriteHeader(status)
+
+	// Try to flush the header immediately.
+	if flusher, ok := h.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+// POST /containers/{name:.*}/wait
+// This endpoint is special because it is important to flush the response
+// header immediately.
+func postContainersWait(c *context, w http.ResponseWriter, r *http.Request) {
+	proxyContainerAndForceRefresh(c, headerFlusher{w}, r)
 }

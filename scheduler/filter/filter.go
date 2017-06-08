@@ -13,16 +13,16 @@ import (
 type Filter interface {
 	Name() string
 
-	// Return a subset of nodes that were accepted by the filtering policy.
+	// Filter returns a subset of nodes that were accepted by the filtering policy.
 	Filter(*cluster.ContainerConfig, []*node.Node, bool) ([]*node.Node, error)
 
-	// Return a list of constraints/filters provided
+	// GetFilters returns a list of constraints/filters provided.
 	GetFilters(*cluster.ContainerConfig) ([]string, error)
 }
 
 var (
 	filters []Filter
-	// ErrNotSupported is exported
+	// ErrNotSupported is exported.
 	ErrNotSupported = errors.New("filter not supported")
 )
 
@@ -34,10 +34,11 @@ func init() {
 		&DependencyFilter{},
 		&AffinityFilter{},
 		&ConstraintFilter{},
+		&WhitelistFilter{},
 	}
 }
 
-// New is exported
+// New is exported.
 func New(names []string) ([]Filter, error) {
 	var selectedFilters []Filter
 
@@ -78,13 +79,18 @@ func ApplyFilters(filters []Filter, config *cluster.ContainerConfig, nodes []*no
 	return candidates, nil
 }
 
-// listAllFilters creates a string containing all applied filters
+// listAllFilters creates a string containing all applied filters.
 func listAllFilters(filters []Filter, config *cluster.ContainerConfig, lastFilter string) string {
 	allFilters := ""
 	for _, filter := range filters {
 		list, err := filter.GetFilters(config)
 		if err == nil && len(list) > 0 {
 			allFilters = fmt.Sprintf("%s\n%v", allFilters, list)
+		}
+		if err != nil {
+			allFilters = fmt.Sprintf("%s\nerror from %s filter: %v", allFilters, filter.Name(), err)
+			// when the filter has error, no need to continue.
+			return allFilters
 		}
 		if filter.Name() == lastFilter {
 			return allFilters
@@ -93,7 +99,7 @@ func listAllFilters(filters []Filter, config *cluster.ContainerConfig, lastFilte
 	return allFilters
 }
 
-// List returns the names of all the available filters
+// List returns the names of all the available filters.
 func List() []string {
 	names := []string{}
 

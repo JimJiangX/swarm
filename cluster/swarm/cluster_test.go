@@ -55,7 +55,7 @@ var (
 func createEngine(t *testing.T, ID string, containers ...*cluster.Container) *cluster.Engine {
 	engine := cluster.NewEngine(ID, 0, engOpts)
 	engine.Name = ID
-	engine.ID = ID
+	engine.ID = ID + "|" + engine.Addr
 
 	for _, container := range containers {
 		container.Engine = engine
@@ -129,11 +129,11 @@ func TestImportImage(t *testing.T) {
 		engines: make(map[string]*cluster.Engine),
 	}
 
-	// create engione
+	// create engine
 	id := "test-engine"
 	engine := cluster.NewEngine(id, 0, engOpts)
 	engine.Name = id
-	engine.ID = id
+	engine.ID = id + "|" + engine.Addr
 
 	// create mock client
 	client := mockclient.NewMockClient()
@@ -155,23 +155,23 @@ func TestImportImage(t *testing.T) {
 	c.engines[engine.ID] = engine
 
 	// import success
-	readCloser := nopCloser{bytes.NewBufferString("ok")}
+	readCloser := nopCloser{bytes.NewBufferString("")}
 	apiClient.On("ImageImport", mock.Anything, mock.AnythingOfType("types.ImageImportSource"), mock.Anything, mock.AnythingOfType("types.ImageImportOptions")).Return(readCloser, nil).Once()
 
-	callback := func(what, status string, err error) {
+	callback := func(msg cluster.JSONMessageWrapper) {
 		// import success
-		assert.Nil(t, err)
+		assert.Nil(t, msg.Err)
 	}
 	c.Import("-", "testImageOK", "latest", bytes.NewReader(nil), callback)
 
 	// import error
-	readCloser = nopCloser{bytes.NewBufferString("error")}
+	readCloser = nopCloser{bytes.NewBufferString("")}
 	err := fmt.Errorf("Import error")
 	apiClient.On("ImageImport", mock.Anything, mock.AnythingOfType("types.ImageImportSource"), mock.Anything, mock.AnythingOfType("types.ImageImportOptions")).Return(readCloser, err).Once()
 
-	callback = func(what, status string, err error) {
+	callback = func(msg cluster.JSONMessageWrapper) {
 		// import error
-		assert.NotNil(t, err)
+		assert.NotNil(t, msg.Err)
 	}
 	c.Import("-", "testImageError", "latest", bytes.NewReader(nil), callback)
 }
@@ -182,7 +182,7 @@ func TestLoadImage(t *testing.T) {
 		engines: make(map[string]*cluster.Engine),
 	}
 
-	// create engione
+	// create engine
 	id := "test-engine"
 	engine := cluster.NewEngine(id, 0, engOpts)
 	engine.Name = id
@@ -210,18 +210,18 @@ func TestLoadImage(t *testing.T) {
 	// load success
 	readCloser := nopCloser{bytes.NewBufferString("")}
 	apiClient.On("ImageLoad", mock.Anything, mock.AnythingOfType("*io.PipeReader"), false).Return(types.ImageLoadResponse{Body: readCloser}, nil).Once()
-	callback := func(what, status string, err error) {
+	callback := func(msg cluster.JSONMessageWrapper) {
 		//if load OK, err will be nil
-		assert.Nil(t, err)
+		assert.Nil(t, msg.Err)
 	}
 	c.Load(bytes.NewReader(nil), callback)
 
 	// load error
 	err := fmt.Errorf("Load error")
 	apiClient.On("ImageLoad", mock.Anything, mock.AnythingOfType("*io.PipeReader"), false).Return(types.ImageLoadResponse{}, err).Once()
-	callback = func(what, status string, err error) {
+	callback = func(msg cluster.JSONMessageWrapper) {
 		// load error, err is not nil
-		assert.NotNil(t, err)
+		assert.NotNil(t, msg.Err)
 	}
 	c.Load(bytes.NewReader(nil), callback)
 }
@@ -243,7 +243,7 @@ func TestTagImage(t *testing.T) {
 	id := "test-engine"
 	engine := cluster.NewEngine(id, 0, engOpts)
 	engine.Name = id
-	engine.ID = id
+	engine.ID = id + "|" + engine.Addr
 
 	// create mock client
 	client := mockclient.NewMockClient()

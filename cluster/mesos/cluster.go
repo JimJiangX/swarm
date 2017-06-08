@@ -186,7 +186,7 @@ func (c *Cluster) UnregisterEventHandler(h cluster.EventHandler) {
 func (c *Cluster) StartContainer(container *cluster.Container, hostConfig *dockerclient.HostConfig) error {
 	// if the container was started less than a second ago in detach mode, do not start it
 	if time.Now().Unix()-container.Created > 1 || container.Config.Labels[cluster.SwarmLabelNamespace+".mesos.detach"] != "true" {
-		return container.Engine.StartContainer(container.ID, hostConfig)
+		return container.Engine.StartContainer(container, hostConfig)
 	}
 	return nil
 }
@@ -367,17 +367,17 @@ func (c *Cluster) RemoveImage(image *cluster.Image) ([]types.ImageDelete, error)
 }
 
 // Pull pulls images on the cluster nodes
-func (c *Cluster) Pull(name string, authConfig *types.AuthConfig, callback func(where, status string, err error)) {
+func (c *Cluster) Pull(name string, authConfig *types.AuthConfig, callback func(msg cluster.JSONMessageWrapper)) {
 
 }
 
 // Load images
-func (c *Cluster) Load(imageReader io.Reader, callback func(where, status string, err error)) {
+func (c *Cluster) Load(imageReader io.Reader, callback func(msg cluster.JSONMessageWrapper)) {
 
 }
 
 // Import image
-func (c *Cluster) Import(source string, ref string, tag string, imageReader io.Reader, callback func(what, status string, err error)) {
+func (c *Cluster) Import(source string, ref string, tag string, imageReader io.Reader, callback func(msg cluster.JSONMessageWrapper)) {
 
 }
 
@@ -649,7 +649,7 @@ func (c *Cluster) RANDOMENGINE() (*cluster.Engine, error) {
 }
 
 // BuildImage builds an image
-func (c *Cluster) BuildImage(buildContext io.Reader, buildImage *types.ImageBuildOptions, out io.Writer) error {
+func (c *Cluster) BuildImage(buildContext io.Reader, buildImage *types.ImageBuildOptions, callback func(msg cluster.JSONMessageWrapper)) error {
 	c.scheduler.Lock()
 
 	// get an engine
@@ -667,17 +667,33 @@ func (c *Cluster) BuildImage(buildContext io.Reader, buildImage *types.ImageBuil
 		return err
 	}
 	n := nodes[0]
+	engine := c.agents[n.ID].engine
 
-	reader, err := c.agents[n.ID].engine.BuildImage(buildContext, buildImage)
-	if err != nil {
-		return err
+	var engineCallback func(msg cluster.JSONMessage)
+	if callback != nil {
+		engineCallback = func(msg cluster.JSONMessage) {
+			callback(cluster.JSONMessageWrapper{
+				EngineName: engine.Name,
+				Msg:        msg,
+			})
+		}
+	}
+	err = engine.BuildImage(buildContext, buildImage, engineCallback)
+	if callback != nil {
+		if err != nil {
+			callback(cluster.JSONMessageWrapper{
+				EngineName: engine.Name,
+				Err:        err,
+			})
+		} else {
+			callback(cluster.JSONMessageWrapper{
+				EngineName: engine.Name,
+				Success:    true,
+			})
+		}
 	}
 
-	if _, err := io.Copy(out, reader); err != nil {
-		return err
-	}
-
-	c.agents[n.ID].engine.RefreshImages()
+	engine.RefreshImages()
 	return nil
 }
 
@@ -717,4 +733,12 @@ func (c *Cluster) checkNameUniqueness(name string) bool {
 	}
 
 	return true
+}
+
+func (c *Cluster) RefreshEngine(hostname string) error {
+	return nil
+}
+
+func (c *Cluster) RefreshEngines() error {
+	return nil
 }

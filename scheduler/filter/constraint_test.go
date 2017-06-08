@@ -53,7 +53,7 @@ func testFixtures() []*node.Node {
 	}
 }
 
-func TestConstrainteFilter(t *testing.T) {
+func TestConstraintFilter(t *testing.T) {
 	var (
 		f      = ConstraintFilter{}
 		nodes  = testFixtures()
@@ -70,7 +70,7 @@ func TestConstrainteFilter(t *testing.T) {
 	result, err = f.Filter(cluster.BuildContainerConfig(containertypes.Config{Env: []string{"constraint:does_not_exist==true"}}, containertypes.HostConfig{}, networktypes.NetworkingConfig{}), nodes, true)
 	assert.Error(t, err)
 
-	// Set a contraint that can only be filled by a single node.
+	// Set a constraint that can only be filled by a single node.
 	result, err = f.Filter(cluster.BuildContainerConfig(containertypes.Config{Env: []string{"constraint:name==node1"}}, containertypes.HostConfig{}, networktypes.NetworkingConfig{}), nodes, true)
 	assert.NoError(t, err)
 	assert.Len(t, result, 1)

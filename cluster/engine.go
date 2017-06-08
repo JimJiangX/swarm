@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"bufio"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -37,7 +38,7 @@ const (
 	// Timeout for requests sent out to the engine.
 	requestTimeout = 10 * time.Second
 
-	// Threshold of delta duaration between swarm manager and engine's systime
+	// Threshold of delta duration between swarm manager and engine's systime
 	thresholdTime = 2 * time.Second
 
 	// Minimum docker engine version supported by swarm.
@@ -178,7 +179,7 @@ func (e *Engine) Connect(config *tls.Config) error {
 		return err
 	}
 
-	addr, err := net.ResolveIPAddr("ip4", host)
+	addr, err := net.ResolveIPAddr("ip", host)
 	if err != nil {
 		return err
 	}
@@ -211,18 +212,23 @@ func (e *Engine) Connect(config *tls.Config) error {
 func (e *Engine) StartMonitorEvents() {
 	log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Debug("Start monitoring events")
 	ec := make(chan error)
-	e.eventsMonitor.Start(ec)
 
 	go func() {
 		if err := <-ec; err != nil {
-			if !strings.Contains(err.Error(), "EOF") {
-				// failing node reconnect should use back-off strategy
-				<-e.refreshDelayer.Wait(e.getFailureCount())
+			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).WithError(err).Error("error monitoring events, will restart")
+			// failing node reconnect should use back-off strategy to avoid frequent reconnect
+			retryInterval := e.getFailureCount() + 1
+			// maximum retry interval of 10 seconds
+			if retryInterval > 10 {
+				retryInterval = 10
 			}
+			<-time.After(time.Duration(retryInterval) * time.Second)
 			e.StartMonitorEvents()
 		}
 		close(ec)
 	}()
+
+	e.eventsMonitor.Start(ec)
 }
 
 // ConnectWithClient is exported
@@ -247,7 +253,7 @@ func (e *Engine) ConnectWithClient(client dockerclient.Client, apiClient swarmcl
 		return err
 	}
 
-	// Do not check error as older daemon does't support this call.
+	// Do not check error as older daemon doesn't support this call.
 	e.RefreshVolumes()
 	e.RefreshNetworks()
 
@@ -426,15 +432,7 @@ func (e *Engine) CheckConnectionErr(err error) {
 		return
 	}
 
-	// dockerclient defines ErrConnectionRefused error. but if http client is from swarm, it's not using
-	// dockerclient. We need string matching for these cases. Remove the first character to deal with
-	// case sensitive issue.
-	// docker/api returns ErrConnectionFailed error, so we check for that as long as dockerclient exists
-	if err == dockerclient.ErrConnectionRefused ||
-		engineapi.IsErrConnectionFailed(err) ||
-		strings.Contains(err.Error(), "onnection refused") ||
-		strings.Contains(err.Error(), "annot connect to the docker engine endpoint") ||
-		strings.Contains(err.Error(), "annot connect to the Docker daemon") {
+	if IsConnectionError(err) {
 		// each connection refused instance may increase failure count so
 		// engine can fail fast. Short engine freeze or network failure may result
 		// in engine marked as unhealthy. If this causes unnecessary failure, engine
@@ -446,6 +444,19 @@ func (e *Engine) CheckConnectionErr(err error) {
 		return
 	}
 	// other errors may be ambiguous.
+}
+
+// EngineToContainerNode constructs types.ContainerNode from engine
+func (e *Engine) EngineToContainerNode() *types.ContainerNode {
+	return &types.ContainerNode{
+		ID:        e.ID,
+		IPAddress: e.IP,
+		Addr:      e.Addr,
+		Name:      e.Name,
+		Cpus:      int(e.Cpus),
+		Memory:    int64(e.Memory),
+		Labels:    e.Labels,
+	}
 }
 
 // Update API Version in apiClient
@@ -460,8 +471,10 @@ func (e *Engine) updateClientVersionFromServer(serverVersion string) {
 		e.apiClient.UpdateClientVersion("1.22")
 	case versions.LessThan(serverVersion, "1.12"):
 		e.apiClient.UpdateClientVersion("1.23")
-	default:
+	case versions.LessThan(serverVersion, "1.13"):
 		e.apiClient.UpdateClientVersion("1.24")
+	default:
+		e.apiClient.UpdateClientVersion("1.25")
 	}
 }
 
@@ -499,13 +512,18 @@ func (e *Engine) updateSpecs() error {
 	// Swarm/docker identifies engine by ID. Updating ID but not updating cluster
 	// index will put the cluster into inconsistent state. If this happens, the
 	// engine should be put to pending state for re-validation.
+	// We concatenate the engine ID and the address because sometimes engine
+	// IDs can be duplicated on different nodes (e.g. if a user has
+	// accidentally copied their /etc/docker/daemon.json file onto another
+	// node).
+	infoID := info.ID + "|" + e.Addr
 	if e.ID == "" {
-		e.ID = info.ID
-	} else if e.ID != info.ID {
+		e.ID = infoID
+	} else if e.ID != infoID {
 		e.state = statePending
-		message := fmt.Sprintf("Engine (ID: %s, Addr: %s) shows up with another ID:%s. Please remove it from cluster, it can be added back.", e.ID, e.Addr, info.ID)
+		message := fmt.Sprintf("Engine (ID: %s, Addr: %s) shows up with another ID:%s. Please remove it from cluster, it can be added back.", e.ID, e.Addr, infoID)
 		e.lastError = message
-		return fmt.Errorf(message)
+		return errors.New(message)
 	}
 
 	// delta is an estimation of time difference between manager and engine
@@ -520,7 +538,7 @@ func (e *Engine) updateSpecs() error {
 	}
 
 	// If the servers are sync up on time, this delta might be the source of error
-	// we set a threshhold that to ignore this case.
+	// we set a threshold that to ignore this case.
 	absDelta := delta
 	if delta.Seconds() < 0 {
 		absDelta = time.Duration(-1*delta.Seconds()) * time.Second
@@ -547,11 +565,14 @@ func (e *Engine) updateSpecs() error {
 	if info.OperatingSystem != "" {
 		e.Labels["operatingsystem"] = info.OperatingSystem
 	}
+	if info.OSType != "" {
+		e.Labels["ostype"] = info.OSType
+	}
 	for _, label := range info.Labels {
 		kv := strings.SplitN(label, "=", 2)
 		if len(kv) != 2 {
 			message := fmt.Sprintf("Engine (ID: %s, Addr: %s) contains an invalid label (%s) not formatted as \"key=value\".", e.ID, e.Addr, label)
-			return fmt.Errorf(message)
+			return errors.New(message)
 		}
 
 		// If an engine managed by Swarm contains a label with key "node",
@@ -575,7 +596,10 @@ func (e *Engine) updateSpecs() error {
 
 // RemoveImage deletes an image from the engine.
 func (e *Engine) RemoveImage(name string, force bool) ([]types.ImageDelete, error) {
-	rmOpts := types.ImageRemoveOptions{force, true}
+	rmOpts := types.ImageRemoveOptions{
+		Force:         force,
+		PruneChildren: true,
+	}
 	dels, err := e.apiClient.ImageRemove(context.Background(), name, rmOpts)
 	e.CheckConnectionErr(err)
 
@@ -673,7 +697,7 @@ func (e *Engine) refreshNetwork(ID string) error {
 
 // RefreshNetworks refreshes the list of networks on the engine.
 func (e *Engine) RefreshNetworks() error {
-	netLsOpts := types.NetworkListOptions{filters.NewArgs()}
+	netLsOpts := types.NetworkListOptions{Filters: filters.NewArgs()}
 	networks, err := e.apiClient.NetworkList(context.Background(), netLsOpts)
 	e.CheckConnectionErr(err)
 	if err != nil {
@@ -895,11 +919,6 @@ func (e *Engine) refreshLoop() {
 			lastSpecUpdatedAt = time.Now()
 		}
 
-		if !healthy {
-			e.eventsMonitor.Stop()
-			e.StartMonitorEvents()
-		}
-
 		err = e.RefreshContainers(false)
 		if err == nil {
 			// Do not check error as older daemon doesn't support this call
@@ -992,7 +1011,7 @@ func (e *Engine) CreateContainer(config *ContainerConfig, name string, pullImage
 			return nil, err
 		}
 		// Otherwise, try to pull the image...
-		if err = e.Pull(config.Image, authConfig); err != nil {
+		if err = e.Pull(config.Image, authConfig, nil); err != nil {
 			return nil, err
 		}
 		// ...And try again.
@@ -1077,7 +1096,7 @@ func encodeAuthToBase64(authConfig *types.AuthConfig) (string, error) {
 }
 
 // Pull an image on the engine
-func (e *Engine) Pull(image string, authConfig *types.AuthConfig) error {
+func (e *Engine) Pull(image string, authConfig *types.AuthConfig, callback func(msg JSONMessage)) error {
 	encodedAuth, err := encodeAuthToBase64(authConfig)
 	if err != nil {
 		return err
@@ -1096,20 +1115,22 @@ func (e *Engine) Pull(image string, authConfig *types.AuthConfig) error {
 
 	defer pullResponseBody.Close()
 
-	// wait until the image download is finished
-	dec := json.NewDecoder(pullResponseBody)
-	m := map[string]interface{}{}
-	for {
-		if err := dec.Decode(&m); err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
+	scanner := bufio.NewScanner(pullResponseBody)
+	for scanner.Scan() {
+		line := scanner.Text()
+		var msg JSONMessage
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			log.Warnf("Malformed progress line during pull of %s: %s - %s", image, line, err)
+			continue
 		}
-	}
-	// if the final stream object contained an error, return it
-	if errMsg, ok := m["error"]; ok {
-		return fmt.Errorf("%v", errMsg)
+
+		if msg.Error != nil {
+			return fmt.Errorf("Failed to load %s: %s", image, msg.Error.Message)
+		}
+
+		if callback != nil {
+			callback(msg)
+		}
 	}
 
 	// force refresh images
@@ -1118,7 +1139,7 @@ func (e *Engine) Pull(image string, authConfig *types.AuthConfig) error {
 }
 
 // Load an image on the engine
-func (e *Engine) Load(reader io.Reader) error {
+func (e *Engine) Load(reader io.Reader, callback func(msg JSONMessage)) error {
 	loadResponse, err := e.apiClient.ImageLoad(context.Background(), reader, false)
 	e.CheckConnectionErr(err)
 	if err != nil {
@@ -1127,21 +1148,22 @@ func (e *Engine) Load(reader io.Reader) error {
 
 	defer loadResponse.Body.Close()
 
-	// wait until the image load is finished
-	dec := json.NewDecoder(loadResponse.Body)
-
-	m := map[string]interface{}{}
-	for {
-		if err := dec.Decode(&m); err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
+	scanner := bufio.NewScanner(loadResponse.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		var msg JSONMessage
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			log.Warnf("Malformed progress line during image load: %s - %s", line, err)
+			continue
 		}
-	}
-	// if the final stream object contained an error, return it
-	if errMsg, ok := m["error"]; ok {
-		return fmt.Errorf("%v", errMsg)
+
+		if msg.Error != nil {
+			return fmt.Errorf("Failed to load image: %s", msg.Error.Message)
+		}
+
+		if callback != nil {
+			callback(msg)
+		}
 	}
 
 	// force fresh images
@@ -1151,7 +1173,7 @@ func (e *Engine) Load(reader io.Reader) error {
 }
 
 // Import image
-func (e *Engine) Import(source string, ref string, tag string, imageReader io.Reader) error {
+func (e *Engine) Import(source string, ref string, tag string, imageReader io.Reader, callback func(msg JSONMessage)) error {
 	importSrc := types.ImageImportSource{
 		Source:     imageReader,
 		SourceName: source,
@@ -1160,10 +1182,30 @@ func (e *Engine) Import(source string, ref string, tag string, imageReader io.Re
 		Tag: tag,
 	}
 
-	_, err := e.apiClient.ImageImport(context.Background(), importSrc, ref, opts)
+	importResponseBody, err := e.apiClient.ImageImport(context.Background(), importSrc, ref, opts)
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
+	}
+
+	defer importResponseBody.Close()
+
+	scanner := bufio.NewScanner(importResponseBody)
+	for scanner.Scan() {
+		line := scanner.Text()
+		var msg JSONMessage
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			log.Warnf("Malformed progress line during import of %s: %s - %s", ref, line, err)
+			continue
+		}
+
+		if msg.Error != nil {
+			return fmt.Errorf("Failed to import %s: %s", ref, msg.Error.Message)
+		}
+
+		if callback != nil {
+			callback(msg)
+		}
 	}
 
 	// force fresh images
@@ -1259,8 +1301,13 @@ func (e *Engine) handler(msg events.Message) error {
 			action = "health_status"
 		}
 		switch action {
+		case "commit":
+			// commit a container will generate a new image
+			e.RefreshImages()
 		case "die", "kill", "oom", "pause", "start", "restart", "stop", "unpause", "rename", "update", "health_status":
 			e.refreshContainer(msg.ID, true)
+		case "top", "resize", "export", "exec_create", "exec_start", "exec_detach", "attach", "detach", "extract-to-dir", "copy", "archive-path":
+			// no action needed
 		default:
 			e.refreshContainer(msg.ID, false)
 		}
@@ -1284,6 +1331,8 @@ func (e *Engine) handler(msg events.Message) error {
 			e.refreshContainer(msg.ID, true)
 			e.RefreshVolumes()
 			e.RefreshNetworks()
+		case "top", "resize", "export", "exec_create", "exec_start", "attach", "extract-to-dir", "copy", "archive-path":
+			// no action needed
 		default:
 			// Otherwise, do a "soft" refresh of the container.
 			e.refreshContainer(msg.ID, false)
@@ -1346,22 +1395,57 @@ func (e *Engine) cleanupContainers() {
 }
 
 // StartContainer starts a container
-func (e *Engine) StartContainer(id string, hostConfig *dockerclient.HostConfig) error {
+func (e *Engine) StartContainer(container *Container, hostConfig *dockerclient.HostConfig) error {
 	var err error
 	if hostConfig != nil {
-		err = e.client.StartContainer(id, hostConfig)
+		err = e.client.StartContainer(container.ID, hostConfig)
 	} else {
 		// TODO(nishanttotla): Should ContainerStartOptions be provided?
-		err = e.apiClient.ContainerStart(context.Background(), id, types.ContainerStartOptions{})
+		err = e.apiClient.ContainerStart(context.Background(), container.ID, types.ContainerStartOptions{})
 	}
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
 	}
 
-	// refresh container
-	_, err = e.refreshContainer(id, true)
+	// refresh the container in the cache
+	_, err = e.refreshContainer(container.ID, true)
+
+	// If we could not inspect the container that was just started,
+	// this indicates that it's been already removed by the daemon.
+	// This is expected to occur in API versions 1.25 or higher if
+	// the HostConfig.AutoRemove field is set to true. This could also occur
+	// during race conditions where a third-party client removes the container
+	// immediately after it's started.
+	if container.Info.HostConfig.AutoRemove && engineapi.IsErrContainerNotFound(err) {
+		delete(e.containers, container.ID)
+		log.Debugf("container %s was not detected shortly after ContainerStart, indicating a daemon-side removal", container.ID)
+		return nil
+	}
+
 	return err
+}
+
+// InspectContainer inspects a container
+func (e *Engine) InspectContainer(id string) (*types.ContainerJSON, error) {
+	container, err := e.apiClient.ContainerInspect(context.Background(), id)
+	e.CheckConnectionErr(err)
+	if err != nil {
+		return nil, err
+	}
+
+	return &container, nil
+}
+
+// CreateContainerExec creates a container exec
+func (e *Engine) CreateContainerExec(id string, config types.ExecConfig) (types.IDResponse, error) {
+	execCreateResp, err := e.apiClient.ContainerExecCreate(context.Background(), id, config)
+	e.CheckConnectionErr(err)
+	if err != nil {
+		return types.IDResponse{}, err
+	}
+
+	return execCreateResp, nil
 }
 
 // RenameContainer renames a container
@@ -1379,13 +1463,32 @@ func (e *Engine) RenameContainer(container *Container, newName string) error {
 }
 
 // BuildImage builds an image
-func (e *Engine) BuildImage(buildContext io.Reader, buildImage *types.ImageBuildOptions) (io.ReadCloser, error) {
+func (e *Engine) BuildImage(buildContext io.Reader, buildImage *types.ImageBuildOptions, callback func(msg JSONMessage)) error {
 	resp, err := e.apiClient.ImageBuild(context.Background(), buildContext, *buildImage)
 	e.CheckConnectionErr(err)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return resp.Body, nil
+	defer resp.Body.Close()
+
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		var msg JSONMessage
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			log.Warnf("Malformed progress line during image build: %s - %s", line, err)
+			continue
+		}
+
+		if msg.Error != nil {
+			return fmt.Errorf("Failed to build image: %s", msg.Error.Message)
+		}
+
+		if callback != nil {
+			callback(msg)
+		}
+	}
+	return nil
 }
 
 // TagImage tags an image
@@ -1399,4 +1502,36 @@ func (e *Engine) TagImage(IDOrName string, ref string, force bool) error {
 
 	// refresh image
 	return e.RefreshImages()
+}
+
+// NetworkDisconnect disconnects a container from a network
+func (e *Engine) NetworkDisconnect(container *Container, network string, force bool) error {
+	err := e.apiClient.NetworkDisconnect(context.Background(), network, container.ID, force)
+	e.CheckConnectionErr(err)
+	if err != nil {
+		return err
+	}
+
+	return e.RefreshNetworks()
+}
+
+//IsConnectionError returns true when err is connection problem
+func IsConnectionError(err error) bool {
+	// dockerclient defines ErrConnectionRefused error. but if http client is from swarm, it's not using
+	// dockerclient. We need string matching for these cases. Remove the first character to deal with
+	// case sensitive issue.
+	// docker/api returns ErrConnectionFailed error, so we check for that as long as dockerclient exists
+	return err == dockerclient.ErrConnectionRefused ||
+		engineapi.IsErrConnectionFailed(err) ||
+		strings.Contains(err.Error(), "onnection refused") ||
+		strings.Contains(err.Error(), "annot connect to the docker engine endpoint") ||
+		strings.Contains(err.Error(), "annot connect to the Docker daemon")
+}
+
+// RefreshEngine refreshes container records from an engine
+func (e *Engine) RefreshEngine(hostname string) error {
+	if hostname != e.Name {
+		return fmt.Errorf("invalid engine name during refresh: %s vs %s", hostname, e.Name)
+	}
+	return e.RefreshContainers(true)
 }

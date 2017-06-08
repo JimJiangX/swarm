@@ -72,7 +72,7 @@ var routes = map[string]map[string]handler{
 		"/containers/{name:.*}/start":         postContainersStart,
 		"/containers/{name:.*}/stop":          proxyContainerAndForceRefresh,
 		"/containers/{name:.*}/update":        proxyContainerAndForceRefresh,
-		"/containers/{name:.*}/wait":          proxyContainerAndForceRefresh,
+		"/containers/{name:.*}/wait":          postContainersWait,
 		"/containers/{name:.*}/resize":        proxyContainer,
 		"/containers/{name:.*}/attach":        proxyHijack,
 		"/containers/{name:.*}/copy":          proxyContainer,
@@ -81,7 +81,7 @@ var routes = map[string]map[string]handler{
 		"/exec/{execid:.*}/resize":            proxyContainer,
 		"/networks/create":                    postNetworksCreate,
 		"/networks/{networkid:.*}/connect":    proxyNetworkConnect,
-		"/networks/{networkid:.*}/disconnect": proxyNetworkDisconnect,
+		"/networks/{networkid:.*}/disconnect": networkDisconnect,
 		"/volumes/create":                     postVolumesCreate,
 	},
 	"PUT": {

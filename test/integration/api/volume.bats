@@ -15,16 +15,38 @@ function teardown() {
 	run docker_swarm volume ls
 	[ "${#lines[@]}" -eq 1 ]
 
-	# run
-	docker_swarm run -d -v=/tmp busybox true
+	# run on node-0
+	docker_swarm run -e constraint:node==node-0 -d -v=/tmp busybox true
 
 	run docker_swarm volume ls
 	[ "${#lines[@]}" -eq 2 ]
 
-	docker_swarm run -d -v=/tmp busybox true
+	docker_swarm run -e constraint:node==node-0 -d -v=/tmp busybox true
 
 	run docker_swarm volume ls
 	[ "${#lines[@]}" -eq 3 ]
+
+	# create a named volume on all nodes to test --filter
+	docker_swarm volume create --name=testsubstrvol
+
+	# filter for a named volume using a name substring
+	run docker_swarm volume ls --filter name=substr
+	[ "$status" -eq 0 ]
+	# expect 3 lines: the header and one volume per node
+	[ "${#lines[@]}" -eq 3 ]
+	[[ "${lines[1]}" == *"testsubstrvol"* ]]
+	[[ "${lines[2]}" == *"testsubstrvol"* ]]
+
+	# filter for node-specific volumes
+	# node-0 should have three volumes
+	run docker_swarm volume ls --filter node=node-0
+	[ "$status" -eq 0 ]
+	[ "${#lines[@]}" -eq 4 ]
+
+	# node-1 should have one volume
+	run docker_swarm volume ls --filter node=node-1
+	[ "$status" -eq 0 ]
+	[ "${#lines[@]}" -eq 2 ]
 }
 
 @test "docker volume inspect" {
@@ -95,7 +117,44 @@ function teardown() {
 	run docker_swarm volume rm $volume
 	[ "$status" -eq 0 ]
 	[ "${#lines[@]}" -eq 1 ]
-	
+
 	run docker_swarm volume ls
+	[ "${#lines[@]}" -eq 1 ]
+}
+
+@test "docker volume ls --filter label" {
+	run docker --version
+	if [[ "${output}" == "Docker version 1.9"* || "${output}" == "Docker version 1.10"* || "${output}" == "Docker version 1.11"* || "${output}" == "Docker version 1.12"* ]]; then
+		skip
+	fi
+	start_docker_with_busybox 2
+	swarm_manage
+
+	# make sure no volume exists
+	run docker_swarm volume ls
+	[ "${#lines[@]}" -eq 1 ]
+
+	# create a named volume on all nodes to test --filter
+	docker_swarm volume create --name=testsubstrvol --label testlabel=foobar
+
+	# filter by label
+	run docker_swarm volume ls --filter label=testlabel
+	[ "$status" -eq 0 ]
+	# expect 3 lines: the header and one volume per node
+	[ "${#lines[@]}" -eq 3 ]
+	[[ "${lines[1]}" == *"testsubstrvol"* ]]
+	[[ "${lines[2]}" == *"testsubstrvol"* ]]
+
+	# filter by label and value
+	run docker_swarm volume ls --filter label=testlabel=foobar
+	[ "$status" -eq 0 ]
+	# expect 3 lines: the header and one volume per node
+	[ "${#lines[@]}" -eq 3 ]
+	[[ "${lines[1]}" == *"testsubstrvol"* ]]
+	[[ "${lines[2]}" == *"testsubstrvol"* ]]
+
+	run docker_swarm volume ls --filter label=testlabel=notarealvalue
+	[ "$status" -eq 0 ]
+	# expect 1 line: just the header
 	[ "${#lines[@]}" -eq 1 ]
 }
