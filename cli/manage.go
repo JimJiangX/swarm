@@ -344,26 +344,26 @@ func manage(c *cli.Context) {
 	case "garden":
 		cl, err = swarm.NewCluster(sched, tlsConfig, discovery, c.StringSlice("cluster-opt"), engineOpts)
 		if err != nil {
-			break
+			log.Fatalf("%+v", err)
 		}
 
 		setNodesKVPath(discovery)
 
 		ormer, err = getOrmer(c)
 		if err != nil {
-			break
+			log.Fatalf("%+v", err)
 		}
 
 		sys, err := ormer.GetSysConfig()
 		if err != nil {
-			break
+			log.Fatalf("%+v", err)
 		}
 
 		storage.SetDefaultStores(filepath.Dir(sys.SourceDir), ormer)
 
 		kvc, err := kvstore.NewClient(uri, tlsConfig)
 		if err != nil {
-			break
+			log.Fatalf("%+v", err)
 		}
 
 		pClient := pluginapi.NewPlugin(client.NewClient(c.String("configureAddr"), 0, tlsConfig))
