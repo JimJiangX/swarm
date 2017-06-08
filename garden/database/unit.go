@@ -488,6 +488,7 @@ func (db dbBase) MarkRunningTasks() error {
 		for i := range tasks {
 			tasks[i].Status = TaskUnknownStatus
 			tasks[i].FinishedAt = now
+			tasks[i].Errors = "set task status by replication,status is unknown,task maybe running and real value is seting later"
 
 			err := db.txSetTask(tx, tasks[i])
 			if err != nil {
