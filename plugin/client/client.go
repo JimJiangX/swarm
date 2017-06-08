@@ -112,7 +112,7 @@ func (c *client) Do(ctx context.Context, method, url string, obj interface{}) (*
 		return resp, nil
 	}
 
-	return resp, errors.WithStack(err)
+	return resp, errors.Errorf("%s:%s/%s,%s", method, c.address, url, err)
 }
 
 func (c *client) Get(ctx context.Context, url string) (*http.Response, error) {
@@ -166,12 +166,12 @@ func (c *client) newRequest(method, url string, obj interface{}) (*http.Request,
 	if obj != nil && c.enc != nil {
 		body, err = c.enc.encode(obj)
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, errors.Errorf("%s:%s/%s,%s", method, c.address, url, err)
 		}
 	}
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errors.Errorf("%s:%s/%s,%s", method, c.address, url, err)
 	}
 
 	req.URL.Host = c.address
@@ -199,7 +199,7 @@ func RequireOK(resp *http.Response, e error) (*http.Response, error) {
 		io.Copy(buf, resp.Body)
 		resp.Body.Close()
 
-		return nil, errors.Errorf("Unexpected response code: %d (%s)", resp.StatusCode, buf.Bytes())
+		return nil, errors.Errorf("%s,Unexpected response code: %d (%s)", resp.Request.URL.String(), resp.StatusCode, buf.Bytes())
 	}
 
 	return resp, nil
