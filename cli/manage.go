@@ -314,6 +314,9 @@ func manage(c *cli.Context) {
 		}
 
 		cl, err = swarm.NewGardener(cluster, uri, hosts)
+		if err != nil {
+			log.Fatal(err)
+		}
 
 	default:
 		log.Fatalf("unsupported cluster %q", c.String("cluster-driver"))
