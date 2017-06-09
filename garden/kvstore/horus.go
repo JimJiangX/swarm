@@ -72,6 +72,17 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj structs.HorusRegistr
 	return nil
 }
 
+type errorResponse struct {
+	Result  bool        `json:"result"`
+	Code    int         `json:"code"`
+	Message string      `json:"msg"`
+	Object  interface{} `json:"object"`
+}
+
+func (res errorResponse) String() string {
+	return fmt.Sprintf("%d:%s", res.Code, res.Message)
+}
+
 func postRegister(ctx context.Context, uri string, obj interface{}) error {
 	body := bytes.NewBuffer(nil)
 	if err := json.NewEncoder(body).Encode(obj); err != nil {
@@ -85,15 +96,13 @@ func postRegister(ctx context.Context, uri string, obj interface{}) error {
 	defer ensureReaderClosed(resp)
 
 	if resp.StatusCode != http.StatusCreated {
-		res := struct {
-			Err string
-		}{}
-
-		err := json.NewDecoder(resp.Body).Decode(&res)
+		res := errorResponse{}
+		err = json.NewDecoder(resp.Body).Decode(&res)
 		if err != nil {
-			return errors.Wrapf(err, "%d:decode response body", resp.StatusCode)
+			return errors.Wrapf(err, "%s:code=%d,error=%s", uri, resp.StatusCode, err)
 		}
-		return errors.Errorf("StatusCode:%d,Error:%s", resp.StatusCode, res.Err)
+
+		return errors.Wrapf(err, "%s code:%d,error=%s", uri, resp.StatusCode, res)
 	}
 
 	return nil
@@ -161,15 +170,13 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 	defer ensureReaderClosed(resp)
 
 	if resp.StatusCode != http.StatusNoContent {
-		res := struct {
-			Err string
-		}{}
-
-		err := json.NewDecoder(resp.Body).Decode(&res)
+		res := errorResponse{}
+		err = json.NewDecoder(resp.Body).Decode(&res)
 		if err != nil {
-			return errors.Wrapf(err, "%d:decode response body", resp.StatusCode)
+			return errors.Wrapf(err, "%s:code=%d,error=%s", uri, resp.StatusCode, err)
 		}
-		return errors.Errorf("StatusCode:%d,Error:%s", resp.StatusCode, res.Err)
+
+		return errors.Wrapf(err, "%s code:%d,error=%s", uri, resp.StatusCode, res)
 	}
 
 	return nil
