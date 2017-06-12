@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
@@ -54,13 +56,24 @@ func (nodes weightedNodeList) String() string {
 	return buf.String()
 }
 
+func requireOfCPU(c *cluster.ContainerConfig) int64 {
+	c.HostConfig.CpusetCpus = strings.TrimSpace(c.HostConfig.CpusetCpus)
+
+	if c.HostConfig.CpusetCpus != "" {
+
+		n, err := strconv.ParseInt(c.HostConfig.CpusetCpus, 10, 64)
+		if err == nil {
+			return n
+		}
+	}
+
+	return c.HostConfig.CPUShares
+}
+
 func scoreNodes(config *cluster.ContainerConfig, nodes []*node.Node, healthinessFactor int64) (weightedNodeList, error) {
 	weightedNodes := weightedNodeList{}
 
-	needCpus, err := config.CountCPU()
-	if err != nil {
-		return nil, err
-	}
+	needCpus := requireOfCPU(config)
 
 	for _, node := range nodes {
 		nodeMemory := node.TotalMemory

@@ -2,6 +2,7 @@ package filter
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
@@ -45,10 +46,12 @@ func (f *ResourceFilter) GetFilters(config *cluster.ContainerConfig) ([]string, 
 }
 
 func requireOfCPU(c *cluster.ContainerConfig) int64 {
+	c.HostConfig.CpusetCpus = strings.TrimSpace(c.HostConfig.CpusetCpus)
+
 	if c.HostConfig.CpusetCpus != "" {
 
 		n, err := strconv.ParseInt(c.HostConfig.CpusetCpus, 10, 64)
-		if err == nil && n > 0 {
+		if err == nil {
 			return n
 		}
 	}
