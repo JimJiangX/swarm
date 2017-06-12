@@ -11,6 +11,7 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/scplib"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/garden/tasklock"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -54,31 +55,20 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 	}
 	task := database.NewTask(req.Version(), database.ImageLoadTask, image.ID, "load image", nil, req.Timeout)
 
-	err = ormer.InsertImageWithTask(image, task)
-	if err != nil {
-		return "", "", err
+	befor := func(key string, new int, t *database.Task, f func(val int) bool) (bool, int, error) {
+		err = ormer.InsertImageWithTask(image, *t)
+		if err != nil {
+			return false, 0, err
+		}
+
+		return true, 0, nil
 	}
 
-	go func() (err error) {
-		defer func() {
-			if r := recover(); r != nil {
-				err = fmt.Errorf("load image panic::%+v", r)
-			}
+	after := func(key string, val int, task *database.Task, t time.Time) error {
+		return ormer.SetTask(*task)
+	}
 
-			if err != nil {
-				logrus.WithField("Image", req.Name).Errorf("load image:%+v", err)
-
-				task.FinishedAt = time.Now()
-				task.Status = database.TaskFailedStatus
-				task.SetErrors(err)
-
-				err := ormer.SetTask(task)
-				if err != nil {
-					logrus.WithField("Image", req.Name).Errorf("update image task:%+v", err)
-				}
-			}
-		}()
-
+	run := func() (err error) {
 		ch := make(chan error)
 
 		go func(ch chan<- error) {
@@ -133,9 +123,16 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 		}
 
 		return nil
-	}()
+	}
 
-	return image.ID, task.ID, err
+	tl := tasklock.NewGoTask(image.ID, &task, befor, after)
+
+	err = tl.Go(func(int) bool { return true }, run)
+	if err != nil {
+		return "", "", err
+	}
+
+	return image.ID, task.ID, nil
 }
 
 func parsePushImageOutput(in []byte) (string, int, error) {

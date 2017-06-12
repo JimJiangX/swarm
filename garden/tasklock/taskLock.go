@@ -101,16 +101,16 @@ func (tl goTaskLock) setStatus(val int) error {
 	return err
 }
 
-func (tl goTaskLock) Go(before func(val int) bool, do func() error) error {
-	return tl.run(before, do, true)
+func (tl goTaskLock) Go(check func(val int) bool, do func() error) error {
+	return tl.run(check, do, true)
 }
 
-func (tl goTaskLock) Run(before func(val int) bool, do func() error, async bool) error {
-	return tl.run(before, do, async)
+func (tl goTaskLock) Run(check func(val int) bool, do func() error, async bool) error {
+	return tl.run(check, do, async)
 }
 
-func (tl goTaskLock) run(before func(val int) bool, do func() error, async bool) error {
-	done, val, err := tl._CAS(before)
+func (tl goTaskLock) run(check func(val int) bool, do func() error, async bool) error {
+	done, val, err := tl._CAS(check)
 	if err != nil {
 		return err
 	}
@@ -169,8 +169,27 @@ func (tl goTaskLock) run(before func(val int) bool, do func() error, async bool)
 	return nil
 }
 
+func (tl *goTaskLock) SetBefore(before func(key string, new int, t *database.Task, f func(val int) bool) (bool, int, error)) {
+	tl.before = before
+}
+
 func (tl *goTaskLock) SetAfter(after func(key string, val int, task *database.Task, t time.Time) error) {
 	tl.after = after
+}
+
+// NewGoTask returns goTaskLock
+func NewGoTask(key string, task *database.Task,
+	before func(key string, new int, t *database.Task, f func(val int) bool) (bool, int, error),
+	after func(key string, val int, task *database.Task, t time.Time) error) goTaskLock {
+
+	return goTaskLock{
+		task:     task,
+		key:      key,
+		retries:  3,
+		waitTime: time.Second * 2,
+		after:    after,
+		before:   before,
+	}
 }
 
 // NewServiceTask returns a goTaskLock,init by ServiceOrmer
