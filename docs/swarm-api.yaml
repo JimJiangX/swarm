@@ -13,6 +13,19 @@ consumes:
 produces:
   - application/json
 paths:
+  /configs/system:
+    get:
+      summary: 查询系统配置（mgm）信息
+      description: 查询配置
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/systemConfig'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
   /nfs_backups/space:
     get:
       summary: Gets nfs space info
@@ -1441,3 +1454,39 @@ definitions:
         type: object
         additionalProperties:
           type: string
+  systemConfig:
+    properties:
+      dc_id:
+        type: string
+      backup_dir:
+        type: string
+      retry:
+        type: integer
+      docker_port:
+        type: integer
+      plugin_port:
+        type: integer
+      swarm_agent_port:
+        type: integer
+      consul_port:
+        type: integer
+      consul_wait_time:
+        type: integer
+      consul_ip:
+        type: string
+      consul_dc:
+        type: string
+      registry_port:
+        type: integer
+      registry_domain:
+        type: string
+      registry_ip:
+        type: string
+      source_dir:
+        type: string
+      destination_dir:
+        type: string
+      init_script_name:
+        type: string
+      clean_script_name:
+        type: string
