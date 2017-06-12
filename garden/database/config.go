@@ -24,9 +24,9 @@ type SysConfigOrmer interface {
 
 // SysConfig is the application config file
 type SysConfig struct {
-	ID        int    `db:"dc_id"`
-	Retry     int64  `db:"retry"`
-	BackupDir string `db:"backup_dir"`
+	ID        int    `db:"dc_id" json:"dc_id"`
+	Retry     int64  `db:"retry" json:"retry"`
+	BackupDir string `db:"backup_dir" json:"backup_dir"`
 	Ports
 	ConsulConfig
 	Registry
@@ -34,35 +34,19 @@ type SysConfig struct {
 }
 
 type Ports struct {
-	Docker     int `db:"docker_port"`
-	Plugin     int `db:"plugin_port"`
-	SwarmAgent int `db:"swarm_agent_port"`
+	Docker     int `db:"docker_port" json:"docker_port"`
+	Plugin     int `db:"plugin_port" json:"plugin_port"`
+	SwarmAgent int `db:"swarm_agent_port" json:"swarm_agent_port"`
 	// Consul     int `db:"consul_port"`
 }
 
-// Users is users of DB and Proxy
-//type Users struct {
-//	MonitorUsername     string `db:"mon_username"`
-//	MonitorPassword     string `db:"mon_password"`
-//	ReplicationUsername string `db:"repl_username"`
-//	ReplicationPassword string `db:"repl_password"`
-//	ApplicationUsername string `db:"ap_username"`
-//	ApplicationPassword string `db:"ap_password"`
-//	DBAUsername         string `db:"cup_dba_username"`
-//	DBAPassword         string `db:"cup_dba_password"`
-//	DBUsername          string `db:"db_username"`
-//	DBPassword          string `db:"db_password"`
-//	CheckUsername       string `db:"check_username"`
-//	CheckPassword       string `db:"check_password"`
-//}
-
 // SSHDeliver node-init and node-clean settings
 type SSHDeliver struct {
-	SourceDir       string `db:"source_dir"`
-	CACertName      string `db:"ca_crt_name"`
-	Destination     string `db:"destination_dir"` // must be exist
-	InitScriptName  string `db:"init_script_name"`
-	CleanScriptName string `db:"clean_script_name"`
+	SourceDir       string `db:"source_dir" json:"source_dir"`
+	CACertName      string `db:"ca_crt_name" json:"-"`
+	Destination     string `db:"destination_dir" json:"destination_dir"` // must be exist
+	InitScriptName  string `db:"init_script_name" json:"init_script_name"`
+	CleanScriptName string `db:"clean_script_name" json:"clean_script_name"`
 }
 
 // DestPath returns destination abs path,pkg\script\CA
@@ -76,11 +60,11 @@ func (d SSHDeliver) DestPath() (string, string, string) {
 
 // ConsulConfig consul client config
 type ConsulConfig struct {
-	ConsulIPs        string `db:"consul_ip"`
-	ConsulPort       int    `db:"consul_port"`
-	ConsulDatacenter string `db:"consul_dc"`
-	ConsulToken      string `db:"consul_token"`
-	ConsulWaitTime   int    `db:"consul_wait_time"`
+	ConsulIPs        string `db:"consul_ip" json:"consul_ip"`
+	ConsulPort       int    `db:"consul_port" json:"consul_port"`
+	ConsulDatacenter string `db:"consul_dc" json:"consul_dc"`
+	ConsulToken      string `db:"consul_token" json:"-"`
+	ConsulWaitTime   int    `db:"consul_wait_time" json:"consul_wait_time"`
 }
 
 // HorusConfig horus config
@@ -94,16 +78,16 @@ type HorusConfig struct {
 
 // Registry connection config
 type Registry struct {
-	OsUsername string `db:"registry_os_username"`
-	OsPassword string `db:"registry_os_password"`
-	Domain     string `db:"registry_domain"`
-	Address    string `db:"registry_ip"`
-	Port       int    `db:"registry_port"`
-	Username   string `db:"registry_username"`
-	Password   string `db:"registry_password"`
-	Email      string `db:"registry_email"`
-	Token      string `db:"registry_token"`
-	CACert     string `db:"registry_ca_crt"`
+	OsUsername string `db:"registry_os_username" json:"-"`
+	OsPassword string `db:"registry_os_password" json:"-"`
+	Domain     string `db:"registry_domain" json:"registry_domain"`
+	Address    string `db:"registry_ip" json:"registry_ip"`
+	Port       int    `db:"registry_port" json:"registry_port"`
+	Username   string `db:"registry_username" json:"-"`
+	Password   string `db:"registry_password" json:"-"`
+	Email      string `db:"registry_email" json:"-"`
+	Token      string `db:"registry_token" json:"-"`
+	CACert     string `db:"registry_ca_crt" json:"-"`
 }
 
 func (db dbBase) sysConfigTable() string {

@@ -51,6 +51,8 @@ type ctxHandler func(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 var masterRoutes = map[string]map[string]ctxHandler{
 	http.MethodGet: {
+		"configs/system": getSystemConfig,
+
 		"/nfs_backups/space": getNFSSPace,
 
 		"/clusters":        getClusters,

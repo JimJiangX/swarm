@@ -335,6 +335,23 @@ func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
+func getSystemConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil {
+		httpJSONNilGarden(w)
+		return
+	}
+
+	sys, err := gd.Ormer().GetSysConfig()
+	if err != nil {
+		ec := errCodeV1(_DC, dbQueryError, 21, "fail to query database", "数据库查询错误（配置参数表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, sys, http.StatusOK)
+}
+
 // -----------------/softwares/images handlers-----------------
 func listImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	ok, _, gd := fromContext(ctx, _Garden)
