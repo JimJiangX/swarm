@@ -38,13 +38,13 @@ type ConsulConfig struct {
 
 type Registry struct {
 	OsUsername string `json:"registry_os_username"`
-	OsPassword string `json:"registry_os_password"`
-	Domain     string `json:"registry_domain"`
-	Address    string `json:"registry_ip"`
-	Port       int    `json:"registry_port"`
-	Username   string `json:"registry_username"`
-	Password   string `json:"registry_password"`
-	Email      string `json:"registry_email"`
-	Token      string `json:"registry_token"`
-	CACert     string `json:"registry_ca_crt"`
+	// OsPassword string `json:"registry_os_password"`
+	Domain   string `json:"registry_domain"`
+	Address  string `json:"registry_ip"`
+	Port     int    `json:"registry_port"`
+	Username string `json:"registry_username"`
+	Password string `json:"registry_password"`
+	Email    string `json:"registry_email"`
+	Token    string `json:"registry_token"`
+	CACert   string `json:"registry_ca_crt"`
 }

@@ -79,15 +79,15 @@ type HorusConfig struct {
 // Registry connection config
 type Registry struct {
 	OsUsername string `db:"registry_os_username" json:"-"`
-	OsPassword string `db:"registry_os_password" json:"-"`
-	Domain     string `db:"registry_domain" json:"registry_domain"`
-	Address    string `db:"registry_ip" json:"registry_ip"`
-	Port       int    `db:"registry_port" json:"registry_port"`
-	Username   string `db:"registry_username" json:"-"`
-	Password   string `db:"registry_password" json:"-"`
-	Email      string `db:"registry_email" json:"-"`
-	Token      string `db:"registry_token" json:"-"`
-	CACert     string `db:"registry_ca_crt" json:"-"`
+	// OsPassword string `db:"registry_os_password" json:"-"`
+	Domain   string `db:"registry_domain" json:"registry_domain"`
+	Address  string `db:"registry_ip" json:"registry_ip"`
+	Port     int    `db:"registry_port" json:"registry_port"`
+	Username string `db:"registry_username" json:"-"`
+	Password string `db:"registry_password" json:"-"`
+	Email    string `db:"registry_email" json:"-"`
+	Token    string `db:"registry_token" json:"-"`
+	CACert   string `db:"registry_ca_crt" json:"-"`
 }
 
 func (db dbBase) sysConfigTable() string {
@@ -97,7 +97,7 @@ func (db dbBase) sysConfigTable() string {
 // InsertSysConfig insert a new SysConfig
 func (db dbBase) InsertSysConfig(c SysConfig) error {
 
-	query := "INSERT INTO " + db.sysConfigTable() + " (dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,swarm_agent_port,registry_os_username,registry_os_password,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,backup_dir) VALUES (:dc_id,:consul_ip,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:swarm_agent_port,:registry_os_username,:registry_os_password,:registry_domain,:registry_ip,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:backup_dir)"
+	query := "INSERT INTO " + db.sysConfigTable() + " (dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,swarm_agent_port,registry_os_username,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,backup_dir) VALUES (:dc_id,:consul_ip,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:swarm_agent_port,:registry_os_username,:registry_domain,:registry_ip,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:backup_dir)"
 
 	_, err := db.NamedExec(query, &c)
 
@@ -126,7 +126,7 @@ func (c SysConfig) GetConsulAddrs() []string {
 func (db dbBase) GetSysConfig() (SysConfig, error) {
 	var (
 		c     = SysConfig{}
-		query = "SELECT dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,swarm_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,registry_os_password,backup_dir FROM " + db.sysConfigTable() + " LIMIT 1"
+		query = "SELECT dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,swarm_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,backup_dir FROM " + db.sysConfigTable() + " LIMIT 1"
 	)
 
 	err := db.Get(&c, query)
@@ -149,7 +149,7 @@ func (db dbBase) GetAuthConfig() (*types.AuthConfig, error) {
 func (db dbBase) GetRegistry() (Registry, error) {
 	var (
 		r     Registry
-		query = "SELECT registry_os_username,registry_os_password,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt FROM " + db.sysConfigTable() + " LIMIT 1"
+		query = "SELECT registry_os_username,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt FROM " + db.sysConfigTable() + " LIMIT 1"
 	)
 
 	err := db.Get(&r, query)

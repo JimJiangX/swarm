@@ -187,7 +187,6 @@ func (gd *Garden) Register(req structs.RegisterDC) error {
 		},
 		Registry: database.Registry{
 			OsUsername: req.Registry.OsUsername,
-			OsPassword: req.Registry.OsPassword,
 			Domain:     req.Registry.Domain,
 			Address:    req.Registry.Address,
 			Port:       req.Registry.Port,
