@@ -11,7 +11,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-const defaultSSHPort = "2222"
+const defaultSSHPort = "22"
 
 // Client contains SSH client.
 type Client struct {
