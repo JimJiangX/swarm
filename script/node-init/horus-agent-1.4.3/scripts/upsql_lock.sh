@@ -30,20 +30,26 @@ if [ $? -ne 0 ];then
 	exit 2
 fi
 
+if [ ! -s "$LockFILE" ];then
+	rm  $LockFILE
+	echo "nolock"
+	exit 0
+fi
+
 while read LINE 
- do 
- 	lock1=`echo $LINE| awk '{print $1}'`
- 	if [ "$lock1" = "waiting_thread" ];then 
-      continue
-    fi
- 	lock2=`echo $LINE| awk '{print $2}'`
- 	locks=$locks,$lock1,$lock2
- done <$LockFILE
+do
+	lock1=`echo $LINE| awk '{print $1}'`
+	if [ "$lock1" = "waiting_thread" ];then
+		continue
+	fi
+	lock2=`echo $LINE| awk '{print $2}'`
+	locks=$locks,$lock1,$lock2
+done <$LockFILE
 
 if [ "$locks" = "" ];then
-   rm  $LockFILE 
-   echo "nolock"
-   exit 0
+	rm  $LockFILE
+	echo "nolock"
+	exit 0
 fi
 
 locks=${locks:1}
@@ -58,26 +64,26 @@ fi
 sed -i 's/\t/|/g' $dataFile
 
 while read LINE 
- do 
-  key=`echo $LINE| awk -F'|' '{print $1}'`
-  value=${LINE}
-  map[$key]=$value
- done <$dataFile
+do
+	key=`echo $LINE| awk -F'|' '{print $1}'`
+	value=${LINE}
+	map[$key]=$value
+done <$dataFile
 
 while read LINE 
- do 
-  lock1=`echo $LINE| awk '{print $1}'`
-  if [ "$lock1" = "waiting_thread" ];then 
-    continue
-  fi
-  lock2=`echo $LINE| awk '{print $2}'`
-  lockdatas=${lockdatas}##${map[$lock1]}^^${map[$lock2]}
+do
+	lock1=`echo $LINE| awk '{print $1}'`
+	if [ "$lock1" = "waiting_thread" ];then
+		continue
+	fi
+	lock2=`echo $LINE| awk '{print $2}'`
+	lockdatas=${lockdatas}##${map[$lock1]}^^${map[$lock2]}
 done <$LockFILE
 lockdatas=${lockdatas:2}
 
 lockdatas=`echo $lockdatas | sed 's/\:/@/g'`
 if [ "$lockdatas" = "" ];then
-    lockdatas="nolock"
+	lockdatas="nolock"
 fi
 
 echo  $lockdatas
