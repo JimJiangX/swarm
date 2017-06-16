@@ -52,6 +52,11 @@ func (gd *Garden) RebuildUnits(ctx context.Context, svc *Service, assign []strin
 		}
 
 		err = svc.removeUnits(ctx, rm, gd.KVClient())
+		if err != nil {
+			return err
+		}
+
+		err = svc.Compose(ctx, gd.PluginClient())
 
 		return err
 	}
