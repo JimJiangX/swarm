@@ -806,14 +806,11 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusServiceDeleting, 0, statusServiceDeleteFailed)
 
-	sl.SetAfter(func(key string, val int, task *database.Task, t time.Time) error {
-		err := svc.so.SetServiceWithTask(key, val, task, t)
-		if err != nil {
-			logrus.WithField("Service", svc.svc.Name).Warnf("remove Service:%+v", err)
-
-			if task != nil {
-				err = svc.so.SetTask(*task)
-			}
+	sl.SetAfter(func(key string, val int, task *database.Task, t time.Time) (err error) {
+		if val == statusServiceDeleteFailed {
+			err = svc.so.SetServiceWithTask(key, val, task, t)
+		} else if task != nil {
+			err = svc.so.SetTask(*task)
 		}
 
 		return err
@@ -832,6 +829,10 @@ func (svc *Service) removeContainers(ctx context.Context, units []*unit, force, 
 
 		c := u.getContainer()
 		if c == nil {
+			if !engine.IsHealthy() {
+				continue
+			}
+
 			id := u.containerIDOrName()
 
 			err := engine.RemoveContainer(&cluster.Container{
