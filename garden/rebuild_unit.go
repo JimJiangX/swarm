@@ -9,15 +9,20 @@ import (
 	"golang.org/x/net/context"
 )
 
-func (gd *Garden) RebuildUnits(ctx context.Context, svc *Service, assign []string, actor alloc.Allocator, users []structs.User, async bool) (string, error) {
+func (gd *Garden) RebuildUnits(ctx context.Context, actor alloc.Allocator, svc *Service,
+	req structs.UnitRebuildRequest, async bool) (string, error) {
+	if len(req.Units) < 1 {
+		return "", nil
+	}
+
 	rebuild := func() error {
 		units, err := svc.getUnits()
 		if err != nil {
 			return err
 		}
 
-		rm := make([]*unit, 0, len(assign))
-		for _, id := range assign {
+		rm := make([]*unit, 0, len(req.Units))
+		for _, id := range req.Units {
 			found := false
 			for _, u := range units {
 				if u.u.ID == id || u.u.Name == id || u.u.ContainerID == id {
@@ -36,17 +41,18 @@ func (gd *Garden) RebuildUnits(ctx context.Context, svc *Service, assign []strin
 			return err
 		}
 
-		req := structs.ServiceScaleRequest{
-			Arch:  spec.Arch,
-			Users: users,
+		scale := structs.ServiceScaleRequest{
+			Arch:       spec.Arch,
+			Users:      req.Users,
+			Candidates: req.Candidates,
 		}
-		req.Arch.Replicas += len(assign)
+		scale.Arch.Replicas += len(req.Units)
 
 		if actor == nil {
 			actor = alloc.NewAllocator(gd.Ormer(), gd.Cluster)
 		}
 
-		err = gd.scaleUp(ctx, svc, actor, req)
+		err = gd.scaleUp(ctx, svc, actor, scale)
 		if err != nil {
 			return err
 		}

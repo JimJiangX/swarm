@@ -197,6 +197,11 @@ func (svc *Service) prepareScale(scale structs.ServiceScaleRequest) ([]database.
 		return nil, err
 	}
 
+	if len(scale.Candidates) > 0 {
+		constraints := fmt.Sprintf("%s!=%s", engineLabel, strings.Join(scale.Candidates, "|"))
+		svc.options.Nodes.Constraints = append(svc.options.Nodes.Constraints, constraints)
+	}
+
 	if spec.Users == nil {
 		spec.Users = scale.Users
 	} else {
@@ -303,13 +308,12 @@ func scheduleOptionsByUnits(opts scheduleOption, units []*unit) (scheduleOption,
 		opts.Nodes.Networkings = ids
 	}
 
-	engines := make([]string, 0, len(units))
+	filters := make([]string, 0, len(units))
 	for i := range units {
-		engines = append(engines, units[i].u.EngineID)
+		filters = append(filters, units[i].u.EngineID)
 	}
 
-	constraints := fmt.Sprintf("%s!=%s", engineLabel, strings.Join(engines, "|"))
-	opts.Nodes.Constraints = append(opts.Nodes.Constraints, constraints)
+	opts.Nodes.Filters = append(opts.Nodes.Filters, filters...)
 
 	return opts, err
 }
