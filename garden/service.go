@@ -890,6 +890,36 @@ func (svc Service) deregisterSerivces(ctx context.Context, reg kvstore.Register,
 	return nil
 }
 
+func (svc *Service) removeUnits(ctx context.Context, rm []*unit, reg kvstore.Register) error {
+	err := svc.deregisterSerivces(ctx, reg, rm)
+	if err != nil {
+		return err
+	}
+
+	err = svc.removeContainers(ctx, rm, true, false)
+	if err != nil {
+		return err
+	}
+
+	err = svc.removeVolumes(ctx, rm)
+	if err != nil {
+		return err
+	}
+
+	list := make([]database.Unit, 0, len(rm))
+	for i := range rm {
+		if rm[i] == nil {
+			continue
+		}
+
+		list = append(list, rm[i].u)
+	}
+
+	err = svc.so.DelUnitsRelated(list, true)
+
+	return err
+}
+
 // Compose call plugin compose
 func (svc *Service) Compose(ctx context.Context, pc pluginapi.PluginAPI) error {
 	var opts map[string]interface{}

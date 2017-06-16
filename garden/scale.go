@@ -86,35 +86,9 @@ func (svc *Service) scaleDown(ctx context.Context, units []*unit, replicas int, 
 	containers := svc.cluster.Containers()
 	out := sortUnitsByContainers(units, containers)
 
-	stoped := out[:len(units)-replicas]
+	rm := out[:len(units)-replicas]
 
-	err := svc.deregisterSerivces(ctx, reg, stoped)
-	if err != nil {
-		return err
-	}
-
-	err = svc.removeContainers(ctx, stoped, true, false)
-	if err != nil {
-		return err
-	}
-
-	err = svc.removeVolumes(ctx, stoped)
-	if err != nil {
-		return err
-	}
-
-	list := make([]database.Unit, 0, len(stoped))
-	for i := range stoped {
-		if stoped[i] == nil {
-			continue
-		}
-
-		list = append(list, stoped[i].u)
-	}
-
-	err = svc.so.DelUnitsRelated(list, true)
-
-	return err
+	return svc.removeUnits(ctx, rm, reg)
 }
 
 type unitStatus struct {
