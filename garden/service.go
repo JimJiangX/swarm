@@ -835,10 +835,18 @@ func (svc *Service) removeContainers(ctx context.Context, units []*unit, force, 
 
 			id := u.containerIDOrName()
 
+			fields := logrus.WithFields(logrus.Fields{
+				"Service":   svc.svc.Name,
+				"Engine":    engine.Addr,
+				"Container": id,
+			})
+
+			fields.Info("remove container...")
+
 			err := engine.RemoveContainer(&cluster.Container{
 				Container: types.Container{ID: id}}, force, rmVolumes)
 			if err != nil {
-				logrus.WithField("Service", svc.svc.Name).Errorf("remove container:%s in engine %s,%+v", id, engine.Addr, err)
+				fields.Errorf("remove container:%+v", err)
 			}
 			continue
 		}

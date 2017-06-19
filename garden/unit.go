@@ -286,6 +286,11 @@ func (u unit) removeVolumes(ctx context.Context) error {
 		return ctx.Err()
 	}
 
+	logrus.WithFields(logrus.Fields{
+		"Unit":   u.u.Name,
+		"Engine": u.u.EngineID,
+	}).Info("remove container volumes...")
+
 	engine := u.getEngine()
 	if engine == nil {
 		for i := range lvs {
