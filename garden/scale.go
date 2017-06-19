@@ -86,35 +86,9 @@ func (svc *Service) scaleDown(ctx context.Context, units []*unit, replicas int, 
 	containers := svc.cluster.Containers()
 	out := sortUnitsByContainers(units, containers)
 
-	stoped := out[:len(units)-replicas]
+	rm := out[:len(units)-replicas]
 
-	err := svc.deregisterSerivces(ctx, reg, stoped)
-	if err != nil {
-		return err
-	}
-
-	err = svc.removeContainers(ctx, stoped, true, false)
-	if err != nil {
-		return err
-	}
-
-	err = svc.removeVolumes(ctx, stoped)
-	if err != nil {
-		return err
-	}
-
-	list := make([]database.Unit, 0, len(stoped))
-	for i := range stoped {
-		if stoped[i] == nil {
-			continue
-		}
-
-		list = append(list, stoped[i].u)
-	}
-
-	err = svc.so.DelUnitsRelated(list, true)
-
-	return err
+	return svc.removeUnits(ctx, rm, reg)
 }
 
 type unitStatus struct {
@@ -223,6 +197,11 @@ func (svc *Service) prepareScale(scale structs.ServiceScaleRequest) ([]database.
 		return nil, err
 	}
 
+	if len(scale.Candidates) > 0 {
+		constraints := fmt.Sprintf("%s!=%s", engineLabel, strings.Join(scale.Candidates, "|"))
+		svc.options.Nodes.Constraints = append(svc.options.Nodes.Constraints, constraints)
+	}
+
 	if spec.Users == nil {
 		spec.Users = scale.Users
 	} else {
@@ -329,13 +308,12 @@ func scheduleOptionsByUnits(opts scheduleOption, units []*unit) (scheduleOption,
 		opts.Nodes.Networkings = ids
 	}
 
-	engines := make([]string, 0, len(units))
+	filters := make([]string, 0, len(units))
 	for i := range units {
-		engines = append(engines, units[i].u.EngineID)
+		filters = append(filters, units[i].u.EngineID)
 	}
 
-	constraints := fmt.Sprintf("%s!=%s", engineLabel, strings.Join(engines, "|"))
-	opts.Nodes.Constraints = append(opts.Nodes.Constraints, constraints)
+	opts.Nodes.Filters = append(opts.Nodes.Filters, filters...)
 
 	return opts, err
 }

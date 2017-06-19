@@ -143,11 +143,16 @@ type NetDeviceRequire struct {
 }
 
 type ServiceScaleRequest struct {
-	Arch Arch `json:"architecture"`
+	Arch       Arch                   `json:"architecture"`
+	Candidates []string               `json:"candidates,omitempty"`
+	Users      []User                 `json:"users,omitempty"`
+	Options    map[string]interface{} `json:"opts"`
+}
 
-	Users []User `json:"users,omitempty"`
-
-	Options map[string]interface{} `json:"opts"`
+type UnitRebuildRequest struct {
+	Units      []string `json:"units"`
+	Candidates []string `json:"candidates,omitempty"`
+	Users      []User   `json:"users,omitempty"`
 }
 
 type PostServiceResponse struct {

@@ -806,14 +806,11 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusServiceDeleting, 0, statusServiceDeleteFailed)
 
-	sl.SetAfter(func(key string, val int, task *database.Task, t time.Time) error {
-		err := svc.so.SetServiceWithTask(key, val, task, t)
-		if err != nil {
-			logrus.WithField("Service", svc.svc.Name).Warnf("remove Service:%+v", err)
-
-			if task != nil {
-				err = svc.so.SetTask(*task)
-			}
+	sl.SetAfter(func(key string, val int, task *database.Task, t time.Time) (err error) {
+		if val == statusServiceDeleteFailed {
+			err = svc.so.SetServiceWithTask(key, val, task, t)
+		} else if task != nil {
+			err = svc.so.SetTask(*task)
 		}
 
 		return err
@@ -832,12 +829,24 @@ func (svc *Service) removeContainers(ctx context.Context, units []*unit, force, 
 
 		c := u.getContainer()
 		if c == nil {
+			if !engine.IsHealthy() {
+				continue
+			}
+
 			id := u.containerIDOrName()
+
+			fields := logrus.WithFields(logrus.Fields{
+				"Service":   svc.svc.Name,
+				"Engine":    engine.Addr,
+				"Container": id,
+			})
+
+			fields.Info("remove container...")
 
 			err := engine.RemoveContainer(&cluster.Container{
 				Container: types.Container{ID: id}}, force, rmVolumes)
 			if err != nil {
-				logrus.WithField("Service", svc.svc.Name).Errorf("remove container:%s in engine %s,%+v", id, engine.Addr, err)
+				fields.Errorf("remove container:%+v", err)
 			}
 			continue
 		}
@@ -888,6 +897,36 @@ func (svc Service) deregisterSerivces(ctx context.Context, reg kvstore.Register,
 	}
 
 	return nil
+}
+
+func (svc *Service) removeUnits(ctx context.Context, rm []*unit, reg kvstore.Register) error {
+	err := svc.deregisterSerivces(ctx, reg, rm)
+	if err != nil {
+		return err
+	}
+
+	err = svc.removeContainers(ctx, rm, true, false)
+	if err != nil {
+		return err
+	}
+
+	err = svc.removeVolumes(ctx, rm)
+	if err != nil {
+		return err
+	}
+
+	list := make([]database.Unit, 0, len(rm))
+	for i := range rm {
+		if rm[i] == nil {
+			continue
+		}
+
+		list = append(list, rm[i].u)
+	}
+
+	err = svc.so.DelUnitsRelated(list, true)
+
+	return err
 }
 
 // Compose call plugin compose
