@@ -1872,7 +1872,14 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 }
 
 func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Service, urlParamError, 121, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
 	name := mux.Vars(r)["name"]
+	force := boolValue(r, "force")
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
@@ -1888,14 +1895,14 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		ec := errCodeV1(_Service, dbQueryError, 121, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 122, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	err = svc.Remove(ctx, gd.KVClient())
+	err = svc.Remove(ctx, gd.KVClient(), force)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 122, "fail to remove service", "删除服务错误")
+		ec := errCodeV1(_Service, internalError, 123, "fail to remove service", "删除服务错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}

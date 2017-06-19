@@ -765,7 +765,7 @@ func (svc *Service) Exec(ctx context.Context, config structs.ServiceExecConfig, 
 // 2) remove containers
 // 3) remove volumes
 // 4) delete Service records in db
-func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) {
+func (svc *Service) Remove(ctx context.Context, r kvstore.Register, force bool) (err error) {
 	err = svc.deleteCondition()
 	if err != nil {
 		return err
@@ -785,10 +785,14 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) 
 
 		err = svc.deregisterSerivces(ctx, r, units)
 		if err != nil {
-			return err
+			if force {
+				logrus.WithField("Service", svc.svc.Name).Errorf("Service deregiste error:%+v", err)
+			} else {
+				return err
+			}
 		}
 
-		err = svc.removeContainers(ctx, units, true, false)
+		err = svc.removeContainers(ctx, units, force, false)
 		if err != nil {
 			return err
 		}
@@ -827,28 +831,29 @@ func (svc *Service) removeContainers(ctx context.Context, units []*unit, force, 
 			continue
 		}
 
+		id := u.containerIDOrName()
+
+		fields := logrus.WithFields(logrus.Fields{
+			"Service":   svc.svc.Name,
+			"Engine":    engine.Addr,
+			"Container": id,
+		})
+
+		fields.Info("remove container...")
+
 		c := u.getContainer()
 		if c == nil {
-			if !engine.IsHealthy() {
-				continue
-			}
-
-			id := u.containerIDOrName()
-
-			fields := logrus.WithFields(logrus.Fields{
-				"Service":   svc.svc.Name,
-				"Engine":    engine.Addr,
-				"Container": id,
-			})
-
-			fields.Info("remove container...")
-
 			err := engine.RemoveContainer(&cluster.Container{
 				Container: types.Container{ID: id}}, force, rmVolumes)
 			if err != nil {
 				fields.Errorf("remove container:%+v", err)
+
+				if !engine.IsHealthy() && force {
+					continue
+				}
+
+				return err
 			}
-			continue
 		}
 
 		if !force {

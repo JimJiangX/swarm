@@ -671,6 +671,11 @@ paths:
           required: true
           description: service id or name
           type: string
+        - name: force
+          in: query
+          required: false
+          description: force to delete service
+          type: boolean
       responses:
         '204':
           description: Done
