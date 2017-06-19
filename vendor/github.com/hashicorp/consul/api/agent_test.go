@@ -1,11 +1,9 @@
 package api
 
 import (
-	"io"
 	"io/ioutil"
 	"strings"
 	"testing"
-
 	"time"
 
 	"github.com/hashicorp/consul/testutil"
@@ -34,10 +32,7 @@ func TestAgent_Reload(t *testing.T) {
 	t.Parallel()
 
 	// Create our initial empty config file, to be overwritten later
-	configFile, err := ioutil.TempFile("", "reload")
-	if err != nil {
-		t.Fatalf("err: %s", err)
-	}
+	configFile := testutil.TempFile(t, "reload")
 	if _, err := configFile.Write([]byte("{}")); err != nil {
 		t.Fatalf("err: %s", err)
 	}
@@ -52,7 +47,7 @@ func TestAgent_Reload(t *testing.T) {
 
 	// Update the config file with a service definition
 	config := `{"service":{"name":"redis", "port":1234}}`
-	err = ioutil.WriteFile(configFile.Name(), []byte(config), 0644)
+	err := ioutil.WriteFile(configFile.Name(), []byte(config), 0644)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -613,7 +608,7 @@ func TestAgent_Leave(t *testing.T) {
 
 	// We sometimes see an EOF response to this one, depending on timing.
 	err := c2.Agent().Leave()
-	if err != nil && err != io.EOF {
+	if err != nil && !strings.Contains(err.Error(), "EOF") {
 		t.Fatalf("err: %v", err)
 	}
 

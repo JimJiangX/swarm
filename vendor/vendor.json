@@ -33,16 +33,22 @@
 			"revisionTime": "2017-01-18T13:43:44Z"
 		},
 		{
-			"checksumSHA1": "rj+nTpXoIHt7Lgkj0L7MZJMsdp8=",
+			"checksumSHA1": "7weyRlCORlAJwbHIQ/7gFC8iWBo=",
 			"path": "github.com/hashicorp/consul/api",
-			"revision": "9103e77f574254016406ee512d601ad6de6e1efd",
-			"revisionTime": "2017-02-15T15:00:51Z"
+			"revision": "f4360770d8e7b852e2d05835b583d20799e58133",
+			"revisionTime": "2017-06-09T14:44:26Z"
 		},
 		{
 			"checksumSHA1": "b8F628srIitj5p7Y130xc9k0QWs=",
 			"path": "github.com/hashicorp/go-cleanhttp",
 			"revision": "3573b8b52aa7b37b9358d966a898feb387f62437",
 			"revisionTime": "2017-02-11T01:34:15Z"
+		},
+		{
+			"checksumSHA1": "97ErmnaVTZaPSal4mnSZP7xB1Qs=",
+			"path": "github.com/hashicorp/go-rootcerts",
+			"revision": "6bb64b370b90e7ef1fa532be9e591a81c3493e00",
+			"revisionTime": "2016-05-03T14:34:40Z"
 		},
 		{
 			"checksumSHA1": "XW9eq4+WIPQd3bRsX9wfO3rmrWM=",
@@ -61,6 +67,12 @@
 			"path": "github.com/jmoiron/sqlx/reflectx",
 			"revision": "f980a91bdc37abef88269b8f122d7de6352102f5",
 			"revisionTime": "2017-01-21T10:35:19Z"
+		},
+		{
+			"checksumSHA1": "9VnGHaNfB7VQcYf2INovZvXu7NU=",
+			"path": "github.com/mitchellh/go-homedir",
+			"revision": "b8bc1bf767474819792c23f32d8286a45736f1c6",
+			"revisionTime": "2016-12-03T19:45:07Z"
 		},
 		{
 			"checksumSHA1": "btuIVd4+XdXRmK3OiIdmKpzEl+s=",
