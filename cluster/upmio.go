@@ -14,6 +14,11 @@ import (
 	"golang.org/x/net/context"
 )
 
+// ServerVersion returns information of the docker client and server host.
+func (e *Engine) ServerVersion() (types.Version, error) {
+	return e.apiClient.ServerVersion(context.Background())
+}
+
 // UsedCpus returns the sum of CPUs reserved by containers.
 func (e *Engine) UsedCpus() int64 {
 	var r int64
