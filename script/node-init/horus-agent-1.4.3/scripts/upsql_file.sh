@@ -15,6 +15,10 @@ PASSWD=$3
 #QUOTA=5368709120
 VARFILE=/tmp/${INSTANCE}_file_variables.data
 datadir=/${INSTANCE}_DAT_LV
+if [ -d ${datadir}/DAT ]; then
+	datadir=${datadir}/DAT
+fi
+
 logdir=/${INSTANCE}_LOG_LV
 
 running_status=`docker inspect -f "{{.State.Running}}" ${INSTANCE}`
