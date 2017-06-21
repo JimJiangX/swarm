@@ -59,7 +59,7 @@ func (eh eventHander) Handle(event *cluster.Event) (err error) {
 		}
 
 		switch action {
-		case "create":
+		case "create", "rename":
 			engine := event.Engine
 			c := engine.Containers().Get(msg.ID)
 			if c != nil {
@@ -73,7 +73,7 @@ func (eh eventHander) Handle(event *cluster.Event) (err error) {
 	case "":
 		// docker < 1.10
 		switch msg.Status {
-		case "create":
+		case "create", "rename":
 			engine := event.Engine
 
 			c := engine.Containers().Get(msg.ID)
