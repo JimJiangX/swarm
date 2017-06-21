@@ -88,13 +88,25 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 		}
 
 		{
-			// save new ContainerID
+			// ensure save new ContainerID
 			in := make([]database.Unit, 0, len(containers))
 			for i := range containers {
 				in = append(in, containers[i].u)
 			}
 
 			err = svc.so.SetUnits(in)
+			if err != nil {
+				return err
+			}
+		}
+		{
+			// start units services
+			_, err := svc.RefreshSpec()
+			if err != nil {
+				return err
+			}
+
+			err = svc.start(ctx, nil, nil, nil)
 			if err != nil {
 				return err
 			}

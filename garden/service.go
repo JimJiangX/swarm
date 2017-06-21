@@ -567,40 +567,45 @@ func getContainerFromKV(kvc kvstore.Client, containerID string) (*cluster.Contai
 	return c, nil
 }
 
-// Start start containers and services
-func (svc *Service) Start(ctx context.Context, task *database.Task, detach bool, cmds structs.Commands) error {
-
-	start := func() error {
-		units, err := svc.getUnits()
+func (svc *Service) start(ctx context.Context, units []*unit, task *database.Task, cmds structs.Commands) (err error) {
+	if units == nil {
+		units, err = svc.getUnits()
 		if err != nil {
 			return err
 		}
+	}
 
-		if len(cmds) == 0 {
-			cmds, err = svc.generateUnitsCmd(ctx)
-			if err != nil {
-				return err
-			}
+	if len(cmds) == 0 {
+		cmds, err = svc.generateUnitsCmd(ctx)
+		if err != nil {
+			return err
 		}
+	}
 
-		for i := range units {
-			err = units[i].startContainer(ctx)
-			if err != nil {
-				return err
-			}
+	for i := range units {
+		err = units[i].startContainer(ctx)
+		if err != nil {
+			return err
 		}
+	}
 
-		// get start cmd
-		for i := range units {
-			cmd := cmds.GetCmd(units[i].u.ID, structs.StartServiceCmd)
+	// get start cmd
+	for i := range units {
+		cmd := cmds.GetCmd(units[i].u.ID, structs.StartServiceCmd)
 
-			_, err = units[i].containerExec(ctx, cmd, false)
-			if err != nil {
-				return err
-			}
+		_, err = units[i].containerExec(ctx, cmd, false)
+		if err != nil {
+			return err
 		}
+	}
 
-		return nil
+	return nil
+}
+
+// Start start containers and services
+func (svc *Service) Start(ctx context.Context, task *database.Task, detach bool, cmds structs.Commands) error {
+	start := func() error {
+		return svc.start(ctx, nil, task, cmds)
 	}
 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
@@ -681,12 +686,7 @@ func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[
 func (svc *Service) Stop(ctx context.Context, containers, async bool, task *database.Task) error {
 
 	stop := func() error {
-		units, err := svc.getUnits()
-		if err != nil {
-			return err
-		}
-
-		return svc.stop(ctx, units, containers)
+		return svc.stop(ctx, nil, containers)
 	}
 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
@@ -695,7 +695,14 @@ func (svc *Service) Stop(ctx context.Context, containers, async bool, task *data
 	return sl.Run(isnotInProgress, stop, async)
 }
 
-func (svc *Service) stop(ctx context.Context, units []*unit, containers bool) error {
+func (svc *Service) stop(ctx context.Context, units []*unit, containers bool) (err error) {
+	if units == nil {
+		units, err = svc.getUnits()
+		if err != nil {
+			return err
+		}
+	}
+
 	cmds, err := svc.generateUnitsCmd(ctx)
 	if err != nil {
 		return err
