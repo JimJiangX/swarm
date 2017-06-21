@@ -32,7 +32,13 @@ if [ $? -ne 0 ];then
 	exit 2
 fi
 
-sed /^[[:space:]]*$/d ${TMPFILE} 2>/dev/null
+output=`sed /^[[:space:]]*$/d ${TMPFILE} 2>/dev/null`
+
+if [ "$output" == '' ]; then
+	echo "{}"
+else
+	echo "$output"
+fi
 
 rm $TMPFILE
 
