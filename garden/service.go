@@ -817,7 +817,7 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register, force bool) 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusServiceDeleting, 0, statusServiceDeleteFailed)
 
-	sl.SetAfter(func(key string, val int, task *database.Task, t time.Time) (err error) {
+	sl.After = func(key string, val int, task *database.Task, t time.Time) (err error) {
 		if val == statusServiceDeleteFailed {
 			err = svc.so.SetServiceWithTask(key, val, task, t)
 		} else if task != nil {
@@ -825,7 +825,7 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register, force bool) 
 		}
 
 		return err
-	})
+	}
 
 	return sl.Run(isnotInProgress, remove, false)
 }

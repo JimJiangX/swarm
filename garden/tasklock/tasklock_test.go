@@ -41,13 +41,13 @@ func newStatusM() *statusM {
 	}
 }
 
-func newStatusLock(key string, t *database.Task, origin, current, expect, fail int) goTaskLock {
+func newStatusLock(key string, t *database.Task, origin, current, expect, fail int) GoTaskLock {
 	sm := &statusM{
 		m: make(map[string]int),
 	}
 	sm.m[key] = origin
 
-	return goTaskLock{
+	return GoTaskLock{
 		current: current,
 		expect:  expect,
 		fail:    fail,
@@ -58,8 +58,8 @@ func newStatusLock(key string, t *database.Task, origin, current, expect, fail i
 		waitTime: time.Second * 2,
 
 		load:   sm.load,
-		after:  sm.after,
-		before: sm.before,
+		After:  sm.after,
+		Before: sm.before,
 	}
 }
 
@@ -149,11 +149,11 @@ func TestTasklock(t *testing.T) {
 	task = &database.Task{}
 	sl4 := newStatusLock(key, task, 0, 1, 2, 3)
 	sm := newStatusM()
-	sl4.before = sm.before
+	sl4.Before = sm.before
 	sl4.load = sm.load
 
 	ch := make(chan struct{}, 1)
-	sl4.after = func(key string, val int, task *database.Task, t time.Time) error {
+	sl4.After = func(key string, val int, task *database.Task, t time.Time) error {
 		sm.m[key] = val
 		sm.task = task
 		ch <- struct{}{}

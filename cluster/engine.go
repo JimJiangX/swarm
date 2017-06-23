@@ -228,6 +228,11 @@ func (e *Engine) StartMonitorEvents() {
 		close(ec)
 	}()
 
+	// this call starts a goroutine that collects events from the the engine, and returns an error to
+	// ec (the error channel) in case an error occurs. The corresponding Stop() function tears this
+	// down. The eventsMonitor itself is initialized using the apiClient and handler (defined below)
+	// The handler function processes events as received from the engine and decides what to do based
+	// on each event. Moreover, it also calls the eventHandler's Handle() function.
 	e.eventsMonitor.Start(ec)
 }
 
@@ -599,7 +604,7 @@ func (e *Engine) updateSpecs() error {
 }
 
 // RemoveImage deletes an image from the engine.
-func (e *Engine) RemoveImage(name string, force bool) ([]types.ImageDelete, error) {
+func (e *Engine) RemoveImage(name string, force bool) ([]types.ImageDeleteResponseItem, error) {
 	rmOpts := types.ImageRemoveOptions{
 		Force:         force,
 		PruneChildren: true,
@@ -680,7 +685,7 @@ func (e *Engine) RefreshImages() error {
 
 // refreshNetwork refreshes single network on the engine.
 func (e *Engine) refreshNetwork(ID string) error {
-	network, err := e.apiClient.NetworkInspect(context.Background(), ID)
+	network, err := e.apiClient.NetworkInspect(context.Background(), ID, types.NetworkInspectOptions{})
 	e.CheckConnectionErr(err)
 	if err != nil {
 		if strings.Contains(err.Error(), "No such network") {
