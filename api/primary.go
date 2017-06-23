@@ -72,7 +72,7 @@ var routes = map[string]map[string]handler{
 		"/containers/{name:.*}/start":         postContainersStart,
 		"/containers/{name:.*}/stop":          proxyContainerAndForceRefresh,
 		"/containers/{name:.*}/update":        proxyContainerAndForceRefresh,
-		"/containers/{name:.*}/wait":          proxyContainerAndForceRefresh,
+		"/containers/{name:.*}/wait":          postContainersWait,
 		"/containers/{name:.*}/resize":        proxyContainer,
 		"/containers/{name:.*}/attach":        proxyHijack,
 		"/containers/{name:.*}/copy":          proxyContainer,
@@ -117,7 +117,16 @@ func profilerSetup(mainRouter *mux.Router, path string) {
 // NewPrimary creates a new API router.
 func NewPrimary(cluster cluster.Cluster, tlsConfig *tls.Config, status StatusHandler, debug, enableCors bool) *mux.Router {
 	// Register the API events handler in the cluster.
+
+	// NewEventsHandler creates a new eventsHandler object.
+	// The new eventsHandler is initialized with no writers or channels.
+	// This is in api/events.go
 	eventsHandler := newEventsHandler()
+	// This just calls c.eventHandlers.RegisterEventHandler(eventsHandler) internally.
+	// Eventually, eventsHandler is added to the Cluster struct's EventHandlers map, if it
+	// doesn't already exist there. The Cluster struct implements the cluster.EventHandler
+	// interface, as does eventsHandler. So calling the Handle function for a Cluster object
+	// will eventually call the Handle function for eventsHandler.
 	cluster.RegisterEventHandler(eventsHandler)
 
 	context := &context{

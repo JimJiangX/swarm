@@ -150,13 +150,15 @@ func (c *Cluster) CreateContainer(config *cluster.ContainerConfig, name string, 
 
 	if err != nil {
 		var retries int64
-		//  fails with image not found, then try to reschedule with image affinity
+		// fails with image not found, then try to reschedule with image affinity
+		// we need to check multiple cases to ensure backward compatibility, because
+		// the error message changed over time
 		// ENGINEAPIFIXME: The first error can be removed once dockerclient is removed
 		bImageNotFoundError, _ := regexp.MatchString(`image \S* not found`, err.Error())
-
-		// Since docker engine 1.13 the error message has been changed. We have to check both for backwards compatibility.
 		bImageNotFoundError113, _ := regexp.MatchString(`repository \S* not found`, err.Error())
-		if (bImageNotFoundError || bImageNotFoundError113 || client.IsErrImageNotFound(err)) && !config.HaveNodeConstraint() {
+		bRepositoryNotFoundError1706, _ := regexp.MatchString(`repository does not exist`, err.Error())
+
+		if (bImageNotFoundError || bImageNotFoundError113 || bRepositoryNotFoundError1706 || client.IsErrImageNotFound(err)) && !config.HaveNodeConstraint() {
 			// Check if the image exists in the cluster
 			// If exists, retry with an image affinity
 			if c.Image(config.Image) != nil {
@@ -303,6 +305,13 @@ func (c *Cluster) addEngine(addr string) bool {
 	}
 
 	engine := cluster.NewEngine(addr, c.overcommitRatio, c.engineOpts)
+	// This passes c, which has a Handle(Event) (error) function defined, which acts as the handler
+	// for events. This is the cluster level handler that is called by individual engines when they
+	// receive/emit events. This Handler in turn calls the eventHandlers.Handle() function.
+	// eventHandlers is a map from EventHandler -> struct{}, and eventHandlers.Handle() simply calls
+	// the Handle function for each of the EventHander objects in the map. Remember that EventHandler
+	// is an interface, that is implemented by both the Cluster object, as well as the eventsHandler
+	// object in api/events.go
 	if err := engine.RegisterEventHandler(c); err != nil {
 		log.Error(err)
 	}
@@ -467,8 +476,8 @@ func (c *Cluster) Image(IDOrName string) *cluster.Image {
 }
 
 // RemoveImages removes all the images that match `name` from the cluster.
-func (c *Cluster) RemoveImages(name string, force bool) ([]types.ImageDelete, error) {
-	out := []types.ImageDelete{}
+func (c *Cluster) RemoveImages(name string, force bool) ([]types.ImageDeleteResponseItem, error) {
+	out := []types.ImageDeleteResponseItem{}
 	errs := []string{}
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -551,24 +560,23 @@ func (c *Cluster) CreateVolume(request *volume.VolumesCreateBody) (*types.Volume
 		nodeString = parts[0]
 		request.Name = parts[1]
 	}
-	if nodeString == "" {
-		for _, e := range c.listActiveEngines() {
-			wg.Add(1)
-
-			go func(engine *cluster.Engine) {
-				defer wg.Done()
-
-				v, er := engine.CreateVolume(request)
-				if v != nil {
-					volume = v
-					err = nil
-				}
-				if er != nil && volume == nil {
-					err = er
-				}
-			}(e)
+	nodeWhitelist, hasNodeWhitelist := request.Labels[cluster.SwarmLabelNamespace+".whitelists"]
+	engines := []*cluster.Engine{}
+	if hasNodeWhitelist {
+		labels := map[string]string{
+			cluster.SwarmLabelNamespace + ".whitelists": nodeWhitelist,
 		}
-		wg.Wait()
+		config := cluster.BuildContainerConfig(containertypes.Config{Labels: labels}, containertypes.HostConfig{}, networktypes.NetworkingConfig{})
+		var nodes []*node.Node
+		nodes, err = c.scheduler.SelectNodesForContainer(c.listNodes(), config)
+		if err != nil {
+			return nil, err
+		}
+		for _, node := range nodes {
+			engines = append(engines, c.engines[node.ID])
+		}
+	} else if nodeString == "" {
+		engines = c.listActiveEngines()
 	} else {
 		config := cluster.BuildContainerConfig(containertypes.Config{Env: []string{"constraint:node==" + parts[0]}}, containertypes.HostConfig{}, networktypes.NetworkingConfig{})
 		var nodes []*node.Node
@@ -577,7 +585,17 @@ func (c *Cluster) CreateVolume(request *volume.VolumesCreateBody) (*types.Volume
 			return nil, err
 		}
 		if nodes != nil {
-			v, er := c.engines[nodes[0].ID].CreateVolume(request)
+			engines = append(engines, c.engines[nodes[0].ID])
+		}
+	}
+
+	for _, e := range engines {
+		wg.Add(1)
+
+		go func(engine *cluster.Engine) {
+			defer wg.Done()
+
+			v, er := engine.CreateVolume(request)
 			if v != nil {
 				volume = v
 				err = nil
@@ -585,8 +603,9 @@ func (c *Cluster) CreateVolume(request *volume.VolumesCreateBody) (*types.Volume
 			if er != nil && volume == nil {
 				err = er
 			}
-		}
+		}(e)
 	}
+	wg.Wait()
 
 	return volume, err
 }
