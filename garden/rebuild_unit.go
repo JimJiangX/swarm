@@ -9,6 +9,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+// RebuildUnits rebuild the assigned units on candidates host,
+// remove original containers,than startup service
 func (gd *Garden) RebuildUnits(ctx context.Context, actor alloc.Allocator, svc *Service,
 	req structs.UnitRebuildRequest, async bool) (string, error) {
 	if len(req.Units) < 1 {
