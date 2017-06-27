@@ -167,22 +167,7 @@ func ParseStringToTime(s string) (time.Time, error) {
 
 // ExecScript returns a command to execute a script.
 func ExecScript(script ...string) *exec.Cmd {
-	var shell, flag string
-	if runtime.GOOS == "windows" {
-		shell = "cmd"
-		flag = "/C"
-	} else {
-		shell = "/bin/sh"
-		flag = "-c"
-	}
-
-	if other := os.Getenv("SHELL"); other != "" {
-		shell = other
-	}
-
-	cmd := exec.Command(shell, flag, strings.Join(script, " "))
-
-	return cmd
+	return ExecContext(context.Background(), script...)
 }
 
 // ExecContext returns a context command to execute a script.
@@ -198,10 +183,6 @@ func ExecContext(ctx context.Context, script ...string) *exec.Cmd {
 
 	if other := os.Getenv("SHELL"); other != "" {
 		shell = other
-	}
-
-	if ctx == nil {
-		ctx = context.Background()
 	}
 
 	return exec.CommandContext(ctx, shell, flag, strings.Join(script, " "))
