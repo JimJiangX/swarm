@@ -158,6 +158,76 @@ func TestExecContext(t *testing.T) {
 	if got := time.Since(now); got > 5*time.Second {
 		t.Errorf("want < 10s,but got %s", got)
 	}
+
+	createSleep()
+}
+
+func createSleep() (*os.File, error) {
+	f, err := os.Create("sleep.sh")
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		f.Close()
+		if err != nil {
+			os.Remove(f.Name())
+		}
+	}()
+
+	_, err = f.WriteString(`
+#!/bin/bash  
+  
+echo sleep $1s;
+
+sleep $1 
+
+echo "exit 0"
+`)
+	if err != nil {
+		return nil, err
+	}
+
+	err = f.Chmod(0755)
+	if err != nil {
+		return nil, err
+	}
+
+	return f, err
+}
+
+func TestExecContextTimeout(t *testing.T) {
+	ctx := context.Background()
+
+	_, err := ExecContextTimeout(ctx, 0, true, "echo", "foo", "bar baz")
+	if err == nil {
+		t.Error("error expected,but got nil")
+	}
+
+	_, err = ExecContextTimeout(ctx, time.Second, true, "echo", "foo", "bar baz")
+	if err != nil {
+		t.Error(err)
+	}
+
+	f, err := createSleep()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+
+	_, err = ExecContextTimeout(ctx, 6*time.Second, true, "./sleep.sh", "5")
+	if err != nil {
+		t.Error(err)
+	}
+
+	now := time.Now()
+	_, err = ExecContextTimeout(ctx, 5*time.Second, true, "./sleep.sh", "10")
+	if err == nil {
+		t.Error(err)
+	}
+
+	if got := time.Since(now); got > 6*time.Second {
+		t.Errorf("want < 6s,but got %s", got)
+	}
 }
 
 func TestGetPrivateIP(t *testing.T) {
