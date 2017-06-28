@@ -3,6 +3,7 @@ package storage
 import (
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/utils"
@@ -10,6 +11,9 @@ import (
 )
 
 const (
+	debug          = true
+	defaultTimeout = 30 * time.Second
+
 	defaultScriptPath = "./script"
 	// HITACHI store vendor name
 	HITACHI = "HITACHI"

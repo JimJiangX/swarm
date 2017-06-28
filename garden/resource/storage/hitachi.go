@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -63,12 +62,9 @@ func (h hitachiStore) ping() error {
 		return err
 	}
 
-	cmd := utils.ExecScript(path, h.hs.AdminUnit)
-
-	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, path, h.hs.AdminUnit)
 	if err != nil {
-		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -127,12 +123,9 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 	param := []string{path, h.hs.AdminUnit,
 		rg.StorageRGID, strconv.Itoa(id), strconv.Itoa(int(size)>>20 + 100)}
 
-	cmd := utils.ExecScript(param...)
-
-	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
 	if err != nil {
-		return lun, lv, errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return lun, lv, errors.WithStack(err)
 	}
 
 	lun = database.LUN{
@@ -205,12 +198,9 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (database.LUN, dat
 	param := []string{path, h.hs.AdminUnit,
 		rg.StorageRGID, strconv.Itoa(id), strconv.Itoa(int(size)>>20 + 100)}
 
-	cmd := utils.ExecScript(param...)
-
-	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
 	if err != nil {
-		return lun, lv, errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return lun, lv, errors.WithStack(err)
 	}
 
 	lun = database.LUN{
@@ -254,12 +244,9 @@ func (h *hitachiStore) Recycle(id string, lun int) error {
 		return err
 	}
 
-	cmd := utils.ExecScript(path, h.hs.AdminUnit, strconv.Itoa(l.StorageLunID))
-
-	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, path, h.hs.AdminUnit, strconv.Itoa(l.StorageLunID))
 	if err != nil {
-		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return errors.WithStack(err)
 	}
 
 	err = h.orm.DelLUN(l.ID)
@@ -380,12 +367,9 @@ func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
 	param := []string{path, h.hs.AdminUnit, name}
 	param = append(param, wwwn...)
 
-	cmd := utils.ExecScript(param...)
-
-	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
 	if err != nil {
-		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -403,12 +387,9 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 
 	param := []string{path, h.hs.AdminUnit, name}
 
-	cmd := utils.ExecScript(param...)
-
-	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
 	if err != nil {
-		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -454,13 +435,10 @@ func (h *hitachiStore) Mapping(host, vg, lun string) error {
 		return err
 	}
 
-	cmd := utils.ExecScript(path, h.hs.AdminUnit,
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, path, h.hs.AdminUnit,
 		strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val))
-
-	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
-		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -481,13 +459,10 @@ func (h *hitachiStore) DelMapping(lun string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	cmd := utils.ExecScript(path, h.hs.AdminUnit,
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, path, h.hs.AdminUnit,
 		strconv.Itoa(l.StorageLunID))
-
-	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
-		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return errors.WithStack(err)
 	}
 
 	err = h.orm.DelLunMapping(lun)
