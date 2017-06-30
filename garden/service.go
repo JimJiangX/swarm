@@ -509,7 +509,7 @@ func registerUnits(ctx context.Context, units []*unit, kvc kvstore.Client, confi
 			return err
 		}
 
-		err = saveContainerToKV(kvc, u.getContainer())
+		err = saveContainerToKV(ctx, kvc, u.getContainer())
 		if err != nil {
 			return err
 		}
@@ -530,7 +530,7 @@ func registerUnits(ctx context.Context, units []*unit, kvc kvstore.Client, confi
 	return nil
 }
 
-func saveContainerToKV(kvc kvstore.Client, c *cluster.Container) error {
+func saveContainerToKV(ctx context.Context, kvc kvstore.Client, c *cluster.Container) error {
 	if kvc == nil || c == nil {
 		return nil
 	}
@@ -540,17 +540,17 @@ func saveContainerToKV(kvc kvstore.Client, c *cluster.Container) error {
 		return errors.Wrapf(err, "JSON marshal Container %s", c.Info.Name)
 	}
 
-	err = kvc.PutKV(containerKV+c.ID, val)
+	err = kvc.PutKV(ctx, containerKV+c.ID, val)
 
 	return err
 }
 
-func getContainerFromKV(kvc kvstore.Client, containerID string) (*cluster.Container, error) {
+func getContainerFromKV(ctx context.Context, kvc kvstore.Client, containerID string) (*cluster.Container, error) {
 	if kvc == nil {
 		return nil, errors.New("kvstore.Client is required")
 	}
 
-	pair, err := kvc.GetKV(containerKV + containerID)
+	pair, err := kvc.GetKV(ctx, containerKV+containerID)
 	if err != nil {
 		return nil, err
 	}

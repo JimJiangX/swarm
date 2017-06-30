@@ -237,7 +237,7 @@ func (gd *Garden) Register(req structs.RegisterDC) error {
 		gd.Unlock()
 	}
 
-	err = pingHorus(kvc)
+	err = pingHorus(nil, kvc)
 	if err != nil {
 		logrus.Warnf("%+v", err)
 	}
@@ -254,8 +254,8 @@ func (gd *Garden) Register(req structs.RegisterDC) error {
 	return err
 }
 
-func pingHorus(kvc kvstore.Client) error {
-	addr, err := kvc.GetHorusAddr()
+func pingHorus(ctx context.Context, kvc kvstore.Client) error {
+	addr, err := kvc.GetHorusAddr(ctx)
 	if err != nil {
 		return err
 	}

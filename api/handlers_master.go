@@ -909,7 +909,7 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	nodes[0] = resource.NewNodeWithTask(node, n.HDD, n.SSD, n.SSHConfig)
 
-	horus, err := gd.KVClient().GetHorusAddr()
+	horus, err := gd.KVClient().GetHorusAddr(r.Context())
 	if err != nil {
 		ec := errCodeV1(_Host, internalError, 35, "fail to query third-part monitor server addr", "获取第三方监控服务地址错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -1070,7 +1070,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 	}
 
-	horus, err := gd.KVClient().GetHorusAddr()
+	horus, err := gd.KVClient().GetHorusAddr(r.Context())
 	if err != nil {
 		ec := errCodeV1(_Host, internalError, 73, "fail to query third-part monitor server addr", "获取第三方监控服务地址错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)

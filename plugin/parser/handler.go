@@ -98,7 +98,7 @@ func getConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	service := mux.Vars(r)["service"]
 	key := strings.Join([]string{configKey, service}, "/")
 
-	pairs, err := ctx.client.ListKV(key)
+	pairs, err := ctx.client.ListKV(r.Context(), key)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -121,7 +121,7 @@ func getConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	key := strings.Join([]string{configKey, service, unit}, "/")
 
 	// structs.ConfigCmds,encode by JSON
-	pair, err := ctx.client.GetKV(key)
+	pair, err := ctx.client.GetKV(r.Context(), key)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -136,7 +136,7 @@ func getCommands(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	service := mux.Vars(r)["service"]
 	key := strings.Join([]string{configKey, service}, "/")
 
-	pairs, err := ctx.client.ListKV(key)
+	pairs, err := ctx.client.ListKV(r.Context(), key)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -193,7 +193,7 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	path = append(path, strings.SplitN(req.Image, ":", 2)...)
 
 	key := strings.Join(path, "/")
-	err = ctx.client.PutKV(key, dat)
+	err = ctx.client.PutKV(r.Context(), key, dat)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -228,7 +228,7 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	key := strings.Join([]string{imageKey, image, version}, "/")
-	pair, err := ctx.client.GetKV(key)
+	pair, err := ctx.client.GetKV(r.Context(), key)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -260,7 +260,7 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		resp[req.Units[i].ID] = cc
 	}
 
-	err = putConfigsToKV(ctx.client, req.ID, resp)
+	err = putConfigsToKV(r.Context(), ctx.client, req.ID, resp)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -350,7 +350,7 @@ func generateConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	key := strings.Join([]string{imageKey, image, version}, "/")
-	pair, err := ctx.client.GetKV(key)
+	pair, err := ctx.client.GetKV(r.Context(), key)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -379,7 +379,7 @@ func generateConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	resp := make(structs.ConfigsMap)
 	resp[unit.ID] = cc
 
-	err = putConfigsToKV(ctx.client, req.ID, resp)
+	err = putConfigsToKV(r.Context(), ctx.client, req.ID, resp)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -411,7 +411,7 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	case 1:
 		for _, c := range req {
 			key := strings.Join([]string{configKey, service, c.ID}, "/")
-			pair, err := ctx.client.GetKV(key)
+			pair, err := ctx.client.GetKV(r.Context(), key)
 			if err != nil {
 				httpError(w, err, http.StatusInternalServerError)
 				return
@@ -420,7 +420,7 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		}
 	default:
 		key := strings.Join([]string{configKey, service}, "/")
-		pairs, err = ctx.client.ListKV(key)
+		pairs, err = ctx.client.ListKV(r.Context(), key)
 		if err != nil {
 			httpError(w, err, http.StatusInternalServerError)
 			return
@@ -479,7 +479,7 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		out[id] = c
 	}
 
-	err = putConfigsToKV(ctx.client, service, out)
+	err = putConfigsToKV(r.Context(), ctx.client, service, out)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -546,7 +546,7 @@ func parseListToConfigs(pairs api.KVPairs) (structs.ConfigsMap, error) {
 	return cm, nil
 }
 
-func putConfigsToKV(client kvstore.Client, prefix string, configs structs.ConfigsMap) error {
+func putConfigsToKV(ctx context.Context, client kvstore.Client, prefix string, configs structs.ConfigsMap) error {
 	buf := bytes.NewBuffer(nil)
 
 	for id, val := range configs {
@@ -558,7 +558,7 @@ func putConfigsToKV(client kvstore.Client, prefix string, configs structs.Config
 		}
 
 		key := strings.Join([]string{configKey, prefix, id}, "/")
-		err = client.PutKV(key, buf.Bytes())
+		err = client.PutKV(ctx, key, buf.Bytes())
 		if err != nil {
 			return err
 		}

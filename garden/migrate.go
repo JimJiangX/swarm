@@ -53,7 +53,7 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 
 		old := u.getContainer()
 		if old == nil {
-			old, err = getContainerFromKV(gd.kvClient, u.u.ContainerID)
+			old, err = getContainerFromKV(ctx, gd.kvClient, u.u.ContainerID)
 			if err != nil {
 				return err
 			}

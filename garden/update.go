@@ -115,7 +115,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 		{
 			// save new Container to KV
 			for i := range containers {
-				err := saveContainerToKV(kvc, containers[i].nc)
+				err := saveContainerToKV(ctx, kvc, containers[i].nc)
 				if err != nil {
 					return err
 				}
