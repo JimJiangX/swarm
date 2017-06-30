@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 var errUnavailableKVClient = stderr.New("non-available consul client")
@@ -99,7 +100,7 @@ func (c *kvClient) deregisterHealthCheck(host, ID string) error {
 }
 
 // GetKV lookup a single key of KV store
-func (c *kvClient) GetKV(key string) (*api.KVPair, error) {
+func (c *kvClient) GetKV(ctx context.Context, key string) (*api.KVPair, error) {
 	addr, client, err := c.getClient("")
 	if err != nil {
 		return nil, err
@@ -107,7 +108,14 @@ func (c *kvClient) GetKV(key string) (*api.KVPair, error) {
 
 	key = c.key(key)
 
-	val, _, err := client.KV().Get(key, nil)
+	var q *api.QueryOptions
+	if ctx != nil {
+		q = &api.QueryOptions{
+			Context: ctx,
+		}
+	}
+
+	val, _, err := client.KV().Get(key, q)
 	c.checkConnectError(addr, err)
 	if err == nil {
 		return val, nil
@@ -116,7 +124,7 @@ func (c *kvClient) GetKV(key string) (*api.KVPair, error) {
 	return nil, errors.Wrap(err, "get KVPair:"+key)
 }
 
-func (c *kvClient) ListKV(key string) (api.KVPairs, error) {
+func (c *kvClient) ListKV(ctx context.Context, key string) (api.KVPairs, error) {
 	addr, client, err := c.getClient("")
 	if err != nil {
 		return nil, err
@@ -124,7 +132,14 @@ func (c *kvClient) ListKV(key string) (api.KVPairs, error) {
 
 	key = c.key(key)
 
-	val, _, err := client.KV().List(key, nil)
+	var q *api.QueryOptions
+	if ctx != nil {
+		q = &api.QueryOptions{
+			Context: ctx,
+		}
+	}
+
+	val, _, err := client.KV().List(key, q)
 	c.checkConnectError(addr, err)
 	if err == nil {
 		return val, nil
@@ -133,7 +148,7 @@ func (c *kvClient) ListKV(key string) (api.KVPairs, error) {
 	return nil, errors.Wrap(err, "list KVPairs:"+key)
 }
 
-func (c *kvClient) PutKV(key string, val []byte) error {
+func (c *kvClient) PutKV(ctx context.Context, key string, val []byte) error {
 	addr, client, err := c.getClient("")
 	if err != nil {
 		return err
@@ -152,7 +167,7 @@ func (c *kvClient) PutKV(key string, val []byte) error {
 	return errors.WithStack(err)
 }
 
-func (c *kvClient) DeleteKVTree(key string) error {
+func (c *kvClient) DeleteKVTree(ctx context.Context, key string) error {
 	addr, client, err := c.getClient("")
 	if err != nil {
 		return err

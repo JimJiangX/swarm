@@ -1,7 +1,6 @@
 package kvstore
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/docker/swarm/garden/structs"
 	"github.com/hashicorp/consul/api"
+	"golang.org/x/net/context"
 )
 
 func init() {
@@ -77,7 +77,7 @@ func TestGetHorusAddr(t *testing.T) {
 		t.Log("leader:", leader)
 	}
 
-	addr, err := c.GetHorusAddr()
+	addr, err := c.GetHorusAddr(nil)
 	if err != nil {
 		t.Error(err)
 	}

@@ -10,12 +10,12 @@ import (
 type Client interface {
 	Register
 
-	GetHorusAddr() (string, error)
+	GetHorusAddr(ctx context.Context) (string, error)
 
-	GetKV(key string) (*api.KVPair, error)
-	ListKV(key string) (api.KVPairs, error)
-	PutKV(key string, value []byte) error
-	DeleteKVTree(key string) error
+	GetKV(ctx context.Context, key string) (*api.KVPair, error)
+	ListKV(ctx context.Context, key string) (api.KVPairs, error)
+	PutKV(ctx context.Context, key string, value []byte) error
+	DeleteKVTree(ctx context.Context, key string) error
 }
 
 const (
