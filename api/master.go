@@ -145,7 +145,7 @@ func setupMasterRouter(r *mux.Router, context *context, debug, enableCors bool) 
 			}
 
 			context.apiVersion = mux.Vars(r)["version"]
-			ctx := goctx.Background()
+			ctx := r.Context()
 
 			if wait := intValueOrZero(r, "wait"); wait > 0 {
 				var cancel goctx.CancelFunc
