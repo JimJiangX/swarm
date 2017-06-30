@@ -1994,7 +1994,7 @@ func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	name := mux.Vars(r)["name"]
 	proxyURL := mux.Vars(r)["proxy"]
-	port := r.FormValue("port")
+	port := r.Header.Get("X-Service-Port")
 	orm := gd.Ormer()
 
 	u, err := orm.GetUnit(name)
