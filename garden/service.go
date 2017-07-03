@@ -898,17 +898,20 @@ func (svc Service) deleteCondition() error {
 
 func (svc Service) deregisterSerivces(ctx context.Context, reg kvstore.Register, units []*unit) error {
 	for i := range units {
-
-		err := reg.DeregisterService(ctx, structs.ServiceDeregistration{
-			Type: "units",
-			Key:  units[i].u.ID,
-		}, false)
+		err := deregisterService(ctx, reg, "units", units[i].u.ID)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func deregisterService(ctx context.Context, reg kvstore.Register, _type, key string) error {
+	return reg.DeregisterService(ctx, structs.ServiceDeregistration{
+		Type: _type,
+		Key:  key,
+	}, false)
 }
 
 func (svc *Service) removeUnits(ctx context.Context, rm []*unit, reg kvstore.Register) error {

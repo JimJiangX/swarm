@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/tasklock"
@@ -127,7 +128,17 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 			return err
 		}
 
-		// TODO: register service
+		// update units configs
+		configs, err := svc.generateUnitsConfigs(ctx, nil)
+		if err != nil {
+			return err
+		}
+
+		// register service
+		err = updateUnitRegister(ctx, gd.kvClient, u, configs)
+		if err != nil {
+			return err
+		}
 
 		return nil
 	}
@@ -140,4 +151,15 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 	err := sl.Run(isnotInProgress, migrate, async)
 
 	return task.ID, err
+}
+
+// deregister old service and register new
+func updateUnitRegister(ctx context.Context, kvc kvstore.Client, u *unit, cmds structs.ConfigsMap) error {
+	// deregister service
+	err := deregisterService(ctx, kvc, "units", u.u.ID)
+	if err != nil {
+		return err
+	}
+
+	return registerUnits(ctx, []*unit{u}, kvc, cmds)
 }
