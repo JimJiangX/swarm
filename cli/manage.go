@@ -220,13 +220,18 @@ func run(cl cluster.Cluster, candidate *leadership.Candidate, server *api.Server
 				log.Info("Leader Election: Cluster leadership acquired")
 				watchdog = cluster.NewWatchdog(cl)
 				eh = garden.NewEventHandler(ormer)
-				cl.RegisterEventHandler(eh)
+				cl.RegisterEventHandler(eh, nil)
 
 				server.SetHandler(primary)
 			} else {
 				log.Info("Leader Election: Cluster leadership lost")
 				cl.UnregisterEventHandler(watchdog)
+
 				cl.UnregisterEventHandler(eh)
+
+				// TODO(nishanttotla): perhaps EventHandler for subscription events should
+				// also be unregistered here
+
 				server.SetHandler(replica)
 			}
 
@@ -413,6 +418,7 @@ func manage(c *cli.Context) {
 		server.SetHandler(api.NewPrimary(cl, tlsConfig, &statusHandler{cl, nil, nil}, c.GlobalBool("debug"), c.Bool("cors")))
 		cluster.NewWatchdog(cl)
 	}
+	defer cl.CloseWatchQueue()
 
 	log.Fatal(server.ListenAndServe())
 }
