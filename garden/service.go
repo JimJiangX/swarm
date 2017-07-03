@@ -509,7 +509,7 @@ func registerUnits(ctx context.Context, units []*unit, kvc kvstore.Client, confi
 			return err
 		}
 
-		err = saveContainerToKV(kvc, u.getContainer())
+		err = saveContainerToKV(ctx, kvc, u.getContainer())
 		if err != nil {
 			return err
 		}
@@ -530,7 +530,7 @@ func registerUnits(ctx context.Context, units []*unit, kvc kvstore.Client, confi
 	return nil
 }
 
-func saveContainerToKV(kvc kvstore.Client, c *cluster.Container) error {
+func saveContainerToKV(ctx context.Context, kvc kvstore.Client, c *cluster.Container) error {
 	if kvc == nil || c == nil {
 		return nil
 	}
@@ -540,17 +540,17 @@ func saveContainerToKV(kvc kvstore.Client, c *cluster.Container) error {
 		return errors.Wrapf(err, "JSON marshal Container %s", c.Info.Name)
 	}
 
-	err = kvc.PutKV(containerKV+c.ID, val)
+	err = kvc.PutKV(ctx, containerKV+c.ID, val)
 
 	return err
 }
 
-func getContainerFromKV(kvc kvstore.Client, containerID string) (*cluster.Container, error) {
+func getContainerFromKV(ctx context.Context, kvc kvstore.Client, containerID string) (*cluster.Container, error) {
 	if kvc == nil {
 		return nil, errors.New("kvstore.Client is required")
 	}
 
-	pair, err := kvc.GetKV(containerKV + containerID)
+	pair, err := kvc.GetKV(ctx, containerKV+containerID)
 	if err != nil {
 		return nil, err
 	}
@@ -772,7 +772,7 @@ func (svc *Service) Exec(ctx context.Context, config structs.ServiceExecConfig, 
 // 2) remove containers
 // 3) remove volumes
 // 4) delete Service records in db
-func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) {
+func (svc *Service) Remove(ctx context.Context, r kvstore.Register, force bool) (err error) {
 	err = svc.deleteCondition()
 	if err != nil {
 		return err
@@ -792,10 +792,14 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register) (err error) 
 
 		err = svc.deregisterSerivces(ctx, r, units)
 		if err != nil {
-			return err
+			if force {
+				logrus.WithField("Service", svc.svc.Name).Errorf("Service deregiste error:%+v", err)
+			} else {
+				return err
+			}
 		}
 
-		err = svc.removeContainers(ctx, units, true, false)
+		err = svc.removeContainers(ctx, units, force, false)
 		if err != nil {
 			return err
 		}
@@ -834,28 +838,29 @@ func (svc *Service) removeContainers(ctx context.Context, units []*unit, force, 
 			continue
 		}
 
+		id := u.containerIDOrName()
+
+		fields := logrus.WithFields(logrus.Fields{
+			"Service":   svc.svc.Name,
+			"Engine":    engine.Addr,
+			"Container": id,
+		})
+
+		fields.Info("remove container...")
+
 		c := u.getContainer()
 		if c == nil {
-			if !engine.IsHealthy() {
-				continue
-			}
-
-			id := u.containerIDOrName()
-
-			fields := logrus.WithFields(logrus.Fields{
-				"Service":   svc.svc.Name,
-				"Engine":    engine.Addr,
-				"Container": id,
-			})
-
-			fields.Info("remove container...")
-
 			err := engine.RemoveContainer(&cluster.Container{
 				Container: types.Container{ID: id}}, force, rmVolumes)
 			if err != nil {
 				fields.Errorf("remove container:%+v", err)
+
+				if !engine.IsHealthy() && force {
+					continue
+				}
+
+				return err
 			}
-			continue
 		}
 
 		if !force {

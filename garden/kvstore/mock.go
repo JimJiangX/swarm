@@ -18,11 +18,11 @@ func NewMockClient() Client {
 	return &mockClient{kv: make(map[string][]byte)}
 }
 
-func (c mockClient) GetHorusAddr() (string, error) {
+func (c mockClient) GetHorusAddr(ctx context.Context) (string, error) {
 	return "", errors.New("unsupport")
 }
 
-func (c mockClient) GetKV(key string) (*api.KVPair, error) {
+func (c mockClient) GetKV(ctx context.Context, key string) (*api.KVPair, error) {
 	val, ok := c.kv[key]
 	if ok {
 		return &api.KVPair{
@@ -34,7 +34,7 @@ func (c mockClient) GetKV(key string) (*api.KVPair, error) {
 	return nil, errors.New("not found KV by:" + key)
 }
 
-func (c mockClient) ListKV(key string) (api.KVPairs, error) {
+func (c mockClient) ListKV(ctx context.Context, key string) (api.KVPairs, error) {
 	out := make([]*api.KVPair, 0, 5)
 	for k, val := range c.kv {
 		if strings.HasPrefix(k, key) {
@@ -48,13 +48,13 @@ func (c mockClient) ListKV(key string) (api.KVPairs, error) {
 	return out, nil
 }
 
-func (c *mockClient) PutKV(key string, value []byte) error {
+func (c *mockClient) PutKV(ctx context.Context, key string, value []byte) error {
 	c.kv[key] = value
 
 	return nil
 }
 
-func (c *mockClient) DeleteKVTree(key string) error {
+func (c *mockClient) DeleteKVTree(ctx context.Context, key string) error {
 	for k := range c.kv {
 		if strings.HasPrefix(k, key) {
 

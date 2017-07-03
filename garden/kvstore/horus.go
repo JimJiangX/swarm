@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/docker/swarm/garden/structs"
+	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"golang.org/x/net/context/ctxhttp"
@@ -34,7 +35,7 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj structs.HorusRegistr
 		ch   = make(chan result, 1)
 	)
 	go func(ch chan<- result) {
-		addr, err := c.GetHorusAddr()
+		addr, err := c.GetHorusAddr(ctx)
 		ch <- result{
 			val: addr,
 			err: err,
@@ -115,7 +116,7 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 		ch   = make(chan result, 1)
 	)
 	go func(ch chan<- result) {
-		addr, err := c.GetHorusAddr()
+		addr, err := c.GetHorusAddr(ctx)
 		ch <- result{
 			val: addr,
 			err: err,
@@ -218,13 +219,20 @@ func (c *kvClient) DeregisterService(ctx context.Context, config structs.Service
 	//	return err
 }
 
-func (c *kvClient) GetHorusAddr() (string, error) {
+func (c *kvClient) GetHorusAddr(ctx context.Context) (string, error) {
 	addr, client, err := c.getClient("")
 	if err != nil {
 		return "", err
 	}
 
-	checks, _, err := client.Health().State("passing", nil)
+	var q *api.QueryOptions
+	if ctx != nil {
+		q = &api.QueryOptions{
+			Context: ctx,
+		}
+	}
+
+	checks, _, err := client.Health().State(api.HealthPassing, q)
 	c.checkConnectError(addr, err)
 	if err != nil {
 		return "", errors.Wrap(err, "passing health checks")

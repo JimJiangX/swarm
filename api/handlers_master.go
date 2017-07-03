@@ -453,7 +453,9 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Timeout > 0 {
-		ctx, _ = goctx.WithTimeout(ctx, time.Duration(req.Timeout)*time.Second)
+		var cancel goctx.CancelFunc
+		ctx, cancel = goctx.WithTimeout(ctx, time.Duration(req.Timeout)*time.Second)
+		defer cancel()
 	}
 
 	pc := gd.PluginClient()
@@ -478,6 +480,13 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		ec := errCodeV1(_Image, objectNotExist, 34, "unsupported image:"+req.Version(), "不支持镜像:"+req.Version())
 		httpJSONError(w, stderr.New(ec.comment), ec, http.StatusInternalServerError)
 		return
+	}
+
+	// new context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	// database.Image.ID
@@ -909,11 +918,18 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	nodes[0] = resource.NewNodeWithTask(node, n.HDD, n.SSD, n.SSHConfig)
 
-	horus, err := gd.KVClient().GetHorusAddr()
+	horus, err := gd.KVClient().GetHorusAddr(ctx)
 	if err != nil {
 		ec := errCodeV1(_Host, internalError, 35, "fail to query third-part monitor server addr", "获取第三方监控服务地址错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
+	}
+
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(ctx, deadline)
 	}
 
 	master := resource.NewHostManager(orm, gd.Cluster)
@@ -1070,7 +1086,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 	}
 
-	horus, err := gd.KVClient().GetHorusAddr()
+	horus, err := gd.KVClient().GetHorusAddr(ctx)
 	if err != nil {
 		ec := errCodeV1(_Host, internalError, 73, "fail to query third-part monitor server addr", "获取第三方监控服务地址错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -1434,7 +1450,9 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	timeout := intValueOrZero(r, "timeout")
 	if timeout > 0 {
-		ctx, _ = goctx.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+		var cancel goctx.CancelFunc
+		ctx, cancel = goctx.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+		defer cancel()
 	}
 
 	spec := structs.ServiceSpec{}
@@ -1459,6 +1477,13 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 		httpJSONNilGarden(w)
 		return
+	}
+
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(ctx, deadline)
 	}
 
 	d := deploy.New(gd)
@@ -1512,6 +1537,13 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(ctx, deadline)
+	}
+
 	d := deploy.New(gd)
 
 	id, err := d.ServiceScale(ctx, name, scale)
@@ -1563,6 +1595,13 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(ctx, deadline)
+	}
+
 	d := deploy.New(gd)
 
 	// task ID
@@ -1594,6 +1633,13 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 		httpJSONNilGarden(w)
 		return
+	}
+
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(ctx, deadline)
 	}
 
 	d := deploy.New(gd)
@@ -1652,6 +1698,13 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(ctx, deadline)
+	}
+
 	d := deploy.New(gd)
 
 	id, err := d.ServiceUpdate(ctx, name, update)
@@ -1690,6 +1743,13 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		ec := errCodeV1(_Service, dbQueryError, 82, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
+	}
+
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(ctx, deadline)
 	}
 
 	task := database.NewTask(spec.Name, database.ServiceStartTask, spec.ID, spec.Desc, nil, 300)
@@ -1757,6 +1817,13 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(ctx, deadline)
+	}
+
 	task := database.NewTask(spec.Name, database.ServiceUpdateConfigTask, spec.ID, spec.Desc, nil, 300)
 
 	err = svc.UpdateUnitsConfigs(ctx, req.Configs, req.Args, &task, true)
@@ -1818,6 +1885,13 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(ctx, deadline)
+	}
+
 	task := database.NewTask(spec.Name, database.ServiceExecTask, spec.ID, spec.Desc, nil, 300)
 
 	err = svc.Exec(ctx, config, true, &task)
@@ -1857,6 +1931,13 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(ctx, deadline)
+	}
+
 	task := database.NewTask(spec.Name, database.ServiceStopTask, spec.ID, spec.Desc, nil, 300)
 
 	err = svc.Stop(ctx, false, true, &task)
@@ -1872,7 +1953,14 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 }
 
 func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Service, urlParamError, 121, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
 	name := mux.Vars(r)["name"]
+	force := boolValue(r, "force")
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
@@ -1888,14 +1976,14 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		ec := errCodeV1(_Service, dbQueryError, 121, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 122, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	err = svc.Remove(ctx, gd.KVClient())
+	err = svc.Remove(ctx, gd.KVClient(), force)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 122, "fail to remove service", "删除服务错误")
+		ec := errCodeV1(_Service, internalError, 123, "fail to remove service", "删除服务错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -1954,6 +2042,13 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(ctx, deadline)
+	}
+
 	task := database.NewTask(spec.Name, database.ServiceBackupTask, spec.ID, spec.Desc, nil, 300)
 
 	err = svc.Backup(ctx, r.Host, config, true, &task)
@@ -1987,7 +2082,7 @@ func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	name := mux.Vars(r)["name"]
 	proxyURL := mux.Vars(r)["proxy"]
-	port := r.FormValue("port")
+	port := r.Header.Get("X-Service-Port")
 	orm := gd.Ormer()
 
 	u, err := orm.GetUnit(name)
@@ -2056,6 +2151,13 @@ func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(ctx, deadline)
+	}
+
 	svc := gd.NewService(nil, &table)
 
 	id, err := svc.UnitRestore(ctx, name, bf.Path, true)
@@ -2116,6 +2218,13 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		ec := errCodeV1(_Service, internalError, 33, "not found the service", "查询指定服务错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
+	}
+
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(ctx, deadline)
 	}
 
 	id, err := gd.RebuildUnits(ctx, nil, svc, req, true)

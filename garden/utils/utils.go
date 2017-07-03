@@ -166,27 +166,12 @@ func ParseStringToTime(s string) (time.Time, error) {
 }
 
 // ExecScript returns a command to execute a script.
-func ExecScript(script ...string) *exec.Cmd {
-	var shell, flag string
-	if runtime.GOOS == "windows" {
-		shell = "cmd"
-		flag = "/C"
-	} else {
-		shell = "/bin/sh"
-		flag = "-c"
-	}
-
-	if other := os.Getenv("SHELL"); other != "" {
-		shell = other
-	}
-
-	cmd := exec.Command(shell, flag, strings.Join(script, " "))
-
-	return cmd
+func ExecScript(args ...string) *exec.Cmd {
+	return ExecContext(context.Background(), args...)
 }
 
 // ExecContext returns a context command to execute a script.
-func ExecContext(ctx context.Context, script ...string) *exec.Cmd {
+func ExecContext(ctx context.Context, args ...string) *exec.Cmd {
 	var shell, flag string
 	if runtime.GOOS == "windows" {
 		shell = "cmd"
@@ -200,11 +185,49 @@ func ExecContext(ctx context.Context, script ...string) *exec.Cmd {
 		shell = other
 	}
 
+	return exec.CommandContext(ctx, shell, flag, strings.Join(args, " "))
+}
+
+// ExecContextTimeout exec command with timeout
+func ExecContextTimeout(ctx context.Context, timeout time.Duration, debug bool, args ...string) ([]byte, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if _, ok := ctx.Deadline(); !ok && timeout <= 0 {
+		return nil, fmt.Errorf("timeout is required")
+	}
 
-	return exec.CommandContext(ctx, shell, flag, strings.Join(script, " "))
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	cmd := ExecContext(ctx, args...)
+	if debug {
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		fmt.Println(cmd.Args)
+	}
+
+	err := cmd.Start()
+	if err != nil {
+		return nil, err
+	}
+
+	wait := make(chan error, 1)
+	go func() {
+		wait <- cmd.Wait()
+		close(wait)
+	}()
+
+	select {
+	case err = <-wait:
+	case <-ctx.Done():
+		err = ctx.Err()
+	}
+
+	return nil, err
 }
 
 // GetPrivateIP is used to return the first private IP address

@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -58,12 +57,9 @@ func (h *huaweiStore) ping() error {
 		return err
 	}
 
-	cmd := utils.ExecScript(path, h.hs.IPAddr, h.hs.Username, h.hs.Password)
-
-	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, path, h.hs.IPAddr, h.hs.Username, h.hs.Password)
 	if err != nil {
-		return errors.Wrapf(err, "Exec:%s,Output:%s", cmd.Args, output)
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -108,14 +104,12 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 		rg.StorageRGID, name, strconv.Itoa(int(size)>>20 + 100)}
 
 	cmd := utils.ExecScript(param...)
-
 	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
-		return lun, lv, errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return lun, lv, errors.Errorf("exec:%s,Output:%s,%s", cmd.Args, output, err)
 	}
 
-	storageLunID, err := strconv.Atoi(string(output))
+	storageLunID, err := strconv.Atoi(strings.TrimSpace(string(output)))
 	if err != nil {
 		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
 	}
@@ -180,14 +174,12 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 		rg.StorageRGID, lv.Name, strconv.Itoa(int(size)>>20 + 100)}
 
 	cmd := utils.ExecScript(param...)
-
 	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
 	if err != nil {
-		return lun, lv, errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return lun, lv, errors.Errorf("exec:%s,Output:%s,%s", cmd.Args, output, err)
 	}
 
-	storageLunID, err := strconv.Atoi(string(output))
+	storageLunID, err := strconv.Atoi(strings.TrimSpace(string(output)))
 	if err != nil {
 		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
 	}
@@ -236,12 +228,9 @@ func (h *huaweiStore) Recycle(id string, lun int) error {
 		return err
 	}
 
-	cmd := utils.ExecScript(path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID))
-
-	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID))
 	if err != nil {
-		return errors.Wrapf(err, "Exec:%s,Output:%s", cmd.Args, output)
+		return errors.WithStack(err)
 	}
 
 	err = h.orm.DelLUN(l.ID)
@@ -279,12 +268,9 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 	defer h.lock.Unlock()
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, name}
-	cmd := utils.ExecScript(param...)
-
-	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
 	if err != nil {
-		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -304,12 +290,9 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	cmd := utils.ExecScript(param...)
-
-	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
 	if err != nil {
-		return errors.Errorf("Exec %s:%s,Output:%s", cmd.Args, err, output)
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -354,12 +337,9 @@ func (h *huaweiStore) Mapping(host, vg, lun string) error {
 	}
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val)}
-	cmd := utils.ExecScript(param...)
-
-	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
 	if err != nil {
-		return errors.Wrapf(err, "Exec:%s,Output:%s", cmd.Args, output)
+		return errors.WithStack(err)
 	}
 
 	return nil
@@ -380,12 +360,9 @@ func (h *huaweiStore) DelMapping(lun string) error {
 	defer h.lock.Unlock()
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID)}
-	cmd := utils.ExecScript(param...)
-
-	output, err := cmd.Output()
-	fmt.Printf("exec:%s %s\n%s,error=%v\n", cmd.Path, cmd.Args, output, err)
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
 	if err != nil {
-		return errors.Wrapf(err, "Exec:%s,Output:%s", cmd.Args, output)
+		return errors.WithStack(err)
 	}
 
 	err = h.orm.DelLunMapping(lun)
