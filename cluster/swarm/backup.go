@@ -71,7 +71,11 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 		return next
 	}
 
-	if bs.schedule == nil {
+	if !strategy.Enabled {
+		return next
+	}
+
+	if bs.schedule == nil || bs.strategy.Spec != strategy.Spec {
 		bs.schedule, err = crontab.Parse(bs.strategy.Spec)
 		if err != nil {
 			logrus.Warnf("BackupJob Next,Parse %s,%+v", bs.strategy.Spec, err)
