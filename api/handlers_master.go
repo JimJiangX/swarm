@@ -1267,7 +1267,8 @@ func getServiceServiceConfig(ctx goctx.Context, w http.ResponseWriter, r *http.R
 
 		name, version := "", ""
 		for j := range images {
-			if configs[i].Unit.ImageID == images[j].ID {
+			if configs[i].Unit.ImageID == images[j].ID ||
+				configs[i].Unit.ImageID == images[j].ImageID {
 				name, version = images[j].Name, images[j].Version
 				break
 			}
