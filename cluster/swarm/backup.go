@@ -29,6 +29,10 @@ func newBackupJob(svc *Service) *serviceBackup {
 }
 
 func (bs *serviceBackup) Run() {
+	if bs.strategy == nil {
+		return
+	}
+
 	strategy, err := database.GetBackupStrategy(bs.strategy.ID)
 	if err != nil {
 		logrus.Warnf("BackupJob Run,%+v", err)
@@ -55,7 +59,11 @@ func (bs *serviceBackup) Run() {
 		return
 	}
 
-	bs.svc.tryBackupTask(*strategy, &task)
+	err = bs.svc.tryBackupTask(*strategy, &task)
+	if err != nil {
+		logrus.Warnf("BackupJob Run,%+v", err)
+		return
+	}
 }
 
 func (bs *serviceBackup) Next(time.Time) time.Time {
@@ -111,7 +119,6 @@ func (svc *Service) tryBackupTask(strategy database.BackupStrategy, task *databa
 	if err != nil {
 		err1 := database.UpdateTaskStatus(task, statusTaskCancel, time.Now(), "Cancel,"+err.Error())
 		err = errors.Wrapf(err, "update Task status errors:%v", err1)
-		logrus.Error(err)
 
 		return err
 	}
@@ -131,9 +138,6 @@ func (svc *Service) tryBackupTask(strategy database.BackupStrategy, task *databa
 
 		return err
 	})
-	if err != nil {
-		logrus.Errorf("%s backupTask error:%s", svc.Name, err)
-	}
 
 	return err
 }
