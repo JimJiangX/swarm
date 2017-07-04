@@ -14,6 +14,7 @@ import (
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/tasklock"
 	"github.com/docker/swarm/garden/utils"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -38,7 +39,7 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 		if len(units) > req.Arch.Replicas {
 			err = svc.scaleDown(ctx, units, req.Arch.Replicas, gd.KVClient())
 		} else {
-			err = gd.scaleUp(ctx, svc, actor, req)
+			_, err = gd.scaleUp(ctx, svc, actor, req)
 		}
 		if err != nil {
 			return err
@@ -155,25 +156,10 @@ func sortUnitsByContainers(units []*unit, containers cluster.Containers) []*unit
 	return out
 }
 
-func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocator, scale structs.ServiceScaleRequest) error {
+func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocator, scale structs.ServiceScaleRequest) ([]*unit, error) {
 	add, err := svc.prepareScale(scale)
 	if err != nil {
-		return err
-	}
-
-	auth, err := gd.AuthConfig()
-	if err != nil {
-		return err
-	}
-
-	pendings, err := gd.allocation(ctx, actor, svc, add)
-	if err != nil {
-		return err
-	}
-
-	err = svc.runContainer(ctx, pendings, auth)
-	if err != nil {
-		return err
+		return nil, err
 	}
 
 	units := make([]*unit, len(add))
@@ -181,9 +167,33 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 		units[i] = newUnit(add[i], svc.so, svc.cluster)
 	}
 
+	defer func() {
+		if err != nil {
+			_err := svc.removeUnits(ctx, units, gd.kvClient)
+			if _err != nil {
+				err = errors.Errorf("%+v\nremove new addition units:%+v", err, _err)
+			}
+		}
+	}()
+
+	auth, err := gd.AuthConfig()
+	if err != nil {
+		return units, err
+	}
+
+	pendings, err := gd.allocation(ctx, actor, svc, add)
+	if err != nil {
+		return units, err
+	}
+
+	err = svc.runContainer(ctx, pendings, auth)
+	if err != nil {
+		return units, err
+	}
+
 	err = svc.initStart(ctx, units, gd.KVClient(), nil, nil)
 
-	return err
+	return units, err
 }
 
 func (svc *Service) prepareScale(scale structs.ServiceScaleRequest) ([]database.Unit, error) {
