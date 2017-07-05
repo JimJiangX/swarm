@@ -240,7 +240,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 			return val == statusServcieBuilding
 		},
 		func() error {
-			ready, err = gd.allocation(ctx, actor, svc, nil)
+			ready, err = gd.allocation(ctx, actor, svc, nil, false)
 			return err
 		},
 		false)
@@ -248,7 +248,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	return
 }
 
-func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Service, units []database.Unit) (ready []pendingUnit, err error) {
+func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Service, units []database.Unit, skipVolume bool) (ready []pendingUnit, err error) {
 	_, version, err := getImage(gd.Ormer(), svc.svc.Desc.Image)
 	if err != nil {
 		return nil, err
@@ -363,7 +363,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 
 		for i := range nodes {
 
-			pu, err := pendingAlloc(actor, units[count-1], nodes[i], opts, config)
+			pu, err := pendingAlloc(actor, units[count-1], nodes[i], opts, config, skipVolume)
 			if err != nil {
 				bad = append(bad, pu)
 				field.Debugf("pending alloc:node=%s,%+v", nodes[i].Name, err)
@@ -392,8 +392,9 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	return nil, errors.Errorf("not enough nodes for allocation,%d units waiting", svc.svc.Desc.Replicas)
 }
 
-func pendingAlloc(actor alloc.Allocator, unit database.Unit, node *node.Node, opts scheduleOption,
-	config *cluster.ContainerConfig) (pendingUnit, error) {
+func pendingAlloc(actor alloc.Allocator, unit database.Unit,
+	node *node.Node, opts scheduleOption,
+	config *cluster.ContainerConfig, skipVolume bool) (pendingUnit, error) {
 	pu := pendingUnit{
 		swarmID:     unit.ID,
 		Unit:        unit,
@@ -417,16 +418,19 @@ func pendingAlloc(actor alloc.Allocator, unit database.Unit, node *node.Node, op
 		return pu, err
 	}
 
-	lvs, err := actor.AlloctVolumes(pu.config, pu.Unit.ID, node, opts.Require.Volumes)
-	if len(lvs) > 0 {
-		pu.volumes = append(pu.volumes, lvs...)
+	if !skipVolume {
+		lvs, err := actor.AlloctVolumes(pu.config, pu.Unit.ID, node, opts.Require.Volumes)
+		if len(lvs) > 0 {
+			pu.volumes = append(pu.volumes, lvs...)
+		}
+		if err != nil {
+			logrus.Debugf("AlloctVolumes:node=%s,%s", node.Name, err)
+			return pu, err
+		}
 	}
-	if err == nil {
-		pu.config.SetSwarmID(pu.swarmID)
-		pu.Unit.EngineID = node.ID
-	} else {
-		logrus.Debugf("AlloctVolumes:node=%s,%s", node.Name, err)
-	}
+
+	pu.config.SetSwarmID(pu.swarmID)
+	pu.Unit.EngineID = node.ID
 
 	return pu, err
 }

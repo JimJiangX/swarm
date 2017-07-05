@@ -156,17 +156,41 @@ func sortUnitsByContainers(units []*unit, containers cluster.Containers) []*unit
 	return out
 }
 
-func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocator, scale structs.ServiceScaleRequest) ([]*unit, error) {
-	add, err := svc.prepareScale(scale)
+func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, actor alloc.Allocator,
+	skipVolume bool, replicas int, candidates []string,
+	users []structs.User, options map[string]interface{}) ([]*unit, []pendingUnit, error) {
+
+	err := svc.prepareSchedule(candidates, users, options)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	units := make([]*unit, len(add))
+	units, err := svc.getUnits()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	add, err := svc.addNewUnit(replicas - len(units))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	adds := make([]*unit, len(add))
 	for i := range add {
-		units[i] = newUnit(add[i], svc.so, svc.cluster)
+		adds[i] = newUnit(add[i], svc.so, svc.cluster)
+	}
+	if err != nil {
+		return adds, nil, err
 	}
 
+	pendings, err := gd.allocation(ctx, actor, svc, add, skipVolume)
+
+	return adds, pendings, err
+}
+
+func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocator, scale structs.ServiceScaleRequest) ([]*unit, error) {
+	units, pendings, err := gd.scaleAllocation(ctx, svc, actor, false,
+		scale.Arch.Replicas, scale.Candidates, scale.Users, scale.Options)
 	defer func() {
 		if err != nil {
 			_err := svc.removeUnits(ctx, units, gd.kvClient)
@@ -175,13 +199,11 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 			}
 		}
 	}()
-
-	auth, err := gd.AuthConfig()
 	if err != nil {
 		return units, err
 	}
 
-	pendings, err := gd.allocation(ctx, actor, svc, add)
+	auth, err := gd.AuthConfig()
 	if err != nil {
 		return units, err
 	}
@@ -196,47 +218,61 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 	return units, err
 }
 
-func (svc *Service) prepareScale(scale structs.ServiceScaleRequest) ([]database.Unit, error) {
+func (svc *Service) prepareSchedule(candidates []string, users []structs.User, options map[string]interface{}) error {
 	spec, err := svc.RefreshSpec()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	_, err = svc.getScheduleOption()
+	opts, err := svc.getScheduleOption()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	if len(scale.Candidates) > 0 {
-		constraints := fmt.Sprintf("%s!=%s", engineLabel, strings.Join(scale.Candidates, "|"))
+	if len(candidates) > 0 {
+		constraints := fmt.Sprintf("%s==%s", engineLabel, strings.Join(candidates, "|"))
 		svc.options.Nodes.Constraints = append(svc.options.Nodes.Constraints, constraints)
 	}
 
-	if spec.Users == nil {
-		spec.Users = scale.Users
-	} else {
-		spec.Users = append(spec.Users, scale.Users...)
+	units, err := svc.getUnits()
+	if err != nil {
+		return err
 	}
 
-	if spec.Options == nil {
-		spec.Options = make(map[string]interface{})
+	// adjust scheduleOption by unit
+	svc.options, err = scheduleOptionsByUnits(opts, units, len(candidates) <= 0)
+	if err != nil {
+		return err
 	}
-	for k, v := range scale.Options {
+
+	if spec.Users == nil {
+		spec.Users = users
+	} else {
+		spec.Users = append(spec.Users, users...)
+	}
+
+	if spec.Options == nil && options != nil {
+		spec.Options = options
+
+		return nil
+	}
+
+	for k, v := range options {
 		spec.Options[k] = v
 	}
 
+	return nil
+}
+
+func (svc *Service) addNewUnit(num int) ([]database.Unit, error) {
+	spec := svc.spec
 	im, err := svc.so.GetImageVersion(spec.Image)
 	if err != nil {
 		return nil, err
 	}
 
-	units, err := svc.getUnits()
-	if err != nil {
-		return nil, err
-	}
-
-	add := make([]database.Unit, scale.Arch.Replicas-len(units))
 	now := time.Now()
+	add := make([]database.Unit, num)
 
 	for i := range add {
 		uid := utils.Generate32UUID()
@@ -261,25 +297,11 @@ func (svc *Service) getScheduleOption() (scheduleOption, error) {
 	var opts scheduleOption
 	r := strings.NewReader(svc.svc.Desc.ScheduleOptions)
 	err := json.NewDecoder(r).Decode(&opts)
-	if err != nil {
-		return svc.options, err
-	}
 
-	units, err := svc.getUnits()
-	if err != nil {
-		return svc.options, err
-	}
-
-	// adjust scheduleOption by unit
-	svc.options, err = scheduleOptionsByUnits(opts, units)
-	if err != nil {
-		return svc.options, err
-	}
-
-	return svc.options, nil
+	return svc.options, err
 }
 
-func scheduleOptionsByUnits(opts scheduleOption, units []*unit) (scheduleOption, error) {
+func scheduleOptionsByUnits(opts scheduleOption, units []*unit, filter bool) (scheduleOption, error) {
 	if len(units) == 0 {
 		return opts, nil
 	}
@@ -318,12 +340,14 @@ func scheduleOptionsByUnits(opts scheduleOption, units []*unit) (scheduleOption,
 		opts.Nodes.Networkings = ids
 	}
 
-	filters := make([]string, 0, len(units))
-	for i := range units {
-		filters = append(filters, units[i].u.EngineID)
-	}
+	if filter {
+		filters := make([]string, 0, len(units))
+		for i := range units {
+			filters = append(filters, units[i].u.EngineID)
+		}
 
-	opts.Nodes.Filters = append(opts.Nodes.Filters, filters...)
+		opts.Nodes.Filters = append(opts.Nodes.Filters, filters...)
+	}
 
 	return opts, err
 }
