@@ -17,7 +17,6 @@ import (
 type serviceBackup struct {
 	id       crontab.EntryID
 	strategy *database.BackupStrategy
-	schedule crontab.Schedule
 	svc      *Service
 }
 
@@ -83,13 +82,13 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 		return next
 	}
 
-	bs.schedule, err = crontab.Parse(bs.strategy.Spec)
+	schedule, err := crontab.Parse(strategy.Spec)
 	if err != nil {
-		logrus.Warnf("BackupJob Next,Parse %s,%+v", bs.strategy.Spec, err)
+		logrus.Warnf("BackupJob Next,Parse %s,%+v", strategy.Spec, err)
 		return next
 	}
 
-	next = bs.schedule.Next(time.Now())
+	next = schedule.Next(time.Now())
 
 	if next.IsZero() || next.After(strategy.Valid) {
 		err := strategy.UpdateNext(next, false)
