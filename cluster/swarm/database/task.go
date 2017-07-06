@@ -568,6 +568,24 @@ func GetBackupStrategy(nameOrID string) (*BackupStrategy, error) {
 	return nil, errors.Wrap(err, "get BackupStrategy by nameOrID:"+nameOrID)
 }
 
+// ListBackupStrategy returns []BackupStrategy select by enabled
+func ListBackupStrategy(enabled bool) ([]BackupStrategy, error) {
+	db, err := getDB(false)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []BackupStrategy
+	const query = "SELECT id,name,type,service_id,spec,next,valid,enabled,backup_dir,timeout,created_at FROM tbl_dbaas_backup_strategy WHERE enabled=?"
+
+	err = db.Select(&out, query, enabled)
+	if err == nil || err == sql.ErrNoRows {
+		return out, nil
+	}
+
+	return out, errors.Wrap(err, "list []BackupStrategy")
+}
+
 // ListBackupStrategyByServiceID returns []BackupStrategy select by serviceID
 func ListBackupStrategyByServiceID(serviceID string) ([]BackupStrategy, error) {
 	db, err := getDB(false)

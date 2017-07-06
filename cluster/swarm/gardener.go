@@ -102,10 +102,47 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 		}
 	}
 
-	gd.cron.Start()
 	// go gd.syncNodeWithEngine()
 
 	return gd, nil
+}
+
+// StartCron starts cron
+func (gd *Gardener) StartCron() error {
+	if gd.cron == nil {
+		gd.cron = crontab.New()
+		gd.cronJobs = make(map[crontab.EntryID]*serviceBackup)
+	}
+	defer gd.cron.Start()
+
+	out, err := database.ListBackupStrategy(true)
+	if err != nil {
+		logrus.Errorf("start cron:%+v", err)
+		return err
+	}
+
+	for i := range out {
+		svc, err := gd.GetService(out[i].ServiceID)
+		if err == nil && svc != nil {
+			svc.Lock()
+			svc.backup = &out[i]
+			svc.Unlock()
+
+			bs := newBackupJob(svc)
+			gd.registerBackupStrategy(bs)
+		}
+	}
+
+	return nil
+}
+
+// StopCron stop cron
+func (gd *Gardener) StopCron() {
+	if gd.cron == nil {
+		return
+	}
+
+	gd.cron.Stop()
 }
 
 // syncNodeWithEngine synchronize Node.engine if Node exist
