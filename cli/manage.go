@@ -178,10 +178,16 @@ func run(cl cluster.Cluster, candidate *leadership.Candidate, server *api.Server
 				log.Info("Leader Election: Cluster leadership acquired")
 				watchdog = cluster.NewWatchdog(cl)
 				server.SetHandler(primary)
+				if gd, ok := cl.(*swarm.Gardener); ok && gd != nil {
+					gd.StartCron()
+				}
 			} else {
 				log.Info("Leader Election: Cluster leadership lost")
 				cl.UnregisterEventHandler(watchdog)
 				server.SetHandler(replica)
+				if gd, ok := cl.(*swarm.Gardener); ok && gd != nil {
+					gd.StopCron()
+				}
 			}
 
 		case err := <-errCh:
