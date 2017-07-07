@@ -75,6 +75,19 @@ func (svc Service) getUnits() ([]*unit, error) {
 	return units, nil
 }
 
+func getUnit(units []*unit, nameOrID string) *unit {
+	for i := range units {
+		if units[i].u.ID == nameOrID ||
+			units[i].u.Name == nameOrID ||
+			units[i].u.ContainerID == nameOrID {
+
+			return units[i]
+		}
+	}
+
+	return nil
+}
+
 // Spec returns ServiceSpec,if nil,query ServiceInfo from db,then convert to ServiceSpec
 func (svc *Service) Spec() (*structs.ServiceSpec, error) {
 	if svc.spec != nil {

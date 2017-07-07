@@ -1,16 +1,12 @@
 package garden
 
 import (
-	"fmt"
-	"strconv"
-	"strings"
-
+	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/tasklock"
-	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -18,126 +14,115 @@ import (
 // ServiceMigrate migrate an unit to other hosts,include volumes、networkings,clean the old container.
 func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID string, candidates []string, async bool) (string, error) {
 	migrate := func() error {
-		opts, err := svc.getScheduleOption()
+		type baseContainer struct {
+			unit      unit
+			engine    *cluster.Engine
+			container *cluster.Container
+			volumes   []database.Volume
+		}
+
+		var old, news baseContainer
+
+		units, err := svc.getUnits()
 		if err != nil {
 			return err
 		}
-		if len(candidates) > 0 {
-			opts.Nodes.Constraints = []string{nodeLabel + "==" + strings.Join(candidates, "|")}
-		}
+		{
+			// the assigned unit being migrating
+			got := getUnit(units, nameOrID)
+			if got == nil {
+				return errors.Errorf("unit %s is not exist in service %s", nameOrID, svc.svc.Name)
+			}
 
-		u, err := svc.getUnit(nameOrID)
-		if err != nil {
-			return err
-		}
-
-		oldEngine := u.getEngine()
-
-		cmds, err := svc.generateUnitsCmd(ctx)
-		if err != nil {
-			return err
-		}
-
-		err = u.stopService(ctx, cmds.GetCmd(u.u.ID, structs.StopServiceCmd), true)
-		if err != nil {
-			return err
-		}
-
-		defer func(u unit) {
+			lvs, err := svc.so.ListVolumesByUnitID(got.u.ID)
 			if err != nil {
-				_err := u.startService(ctx, cmds.GetCmd(u.u.ID, structs.StartServiceCmd))
-				if _err != nil {
-					err = fmt.Errorf("%+v\n%+v", err, _err)
+				return err
+			}
+
+			old = baseContainer{
+				unit:      *got,
+				engine:    got.getEngine(),
+				container: got.getContainer(),
+				volumes:   lvs,
+			}
+			if old.engine == nil {
+				old.engine = &cluster.Engine{
+					ID: old.unit.u.EngineID,
 				}
 			}
-		}(*u)
 
-		old := u.getContainer()
-		if old == nil {
-			old, err = getContainerFromKV(ctx, gd.kvClient, u.u.ContainerID)
+			if old.container == nil {
+				c, err := getContainerFromKV(ctx, gd.kvClient, old.unit.u.ContainerID)
+				if err != nil {
+					return err
+				}
+				old.container = c
+			}
+		}
+
+		{
+			actor := alloc.NewAllocator(gd.ormer, gd.Cluster)
+			adds, pendings, err := gd.scaleAllocation(ctx, svc, actor, true,
+				len(units)+1, candidates, nil, nil)
+			defer func() {
+				if err != nil {
+					_err := svc.removeUnits(ctx, units, gd.kvClient)
+					if _err != nil {
+						err = errors.Errorf("%+v\nremove new addition units:%+v", err, _err)
+					}
+				}
+			}()
+			if err != nil {
+				return err
+			}
+
+			if len(adds) > 0 {
+				news.unit = *adds[0]
+			}
+			// migrate volumes
+
+			auth, err := gd.AuthConfig()
+			if err != nil {
+				return err
+			}
+
+			err = svc.runContainer(ctx, pendings, auth)
+			if err != nil {
+				return err
+			}
+
+			if len(pendings) > 0 {
+				news.unit.u = pendings[0].Unit
+				news.container = news.unit.getContainer()
+				news.engine = news.unit.getEngine()
+			}
+
+			cms, err := svc.generateUnitsConfigs(ctx, nil)
+			if err != nil {
+				return err
+			}
+
+			err = svc.start(ctx, adds, nil, cms.Commands())
+			if err != nil {
+				return err
+			}
+
+			err = updateUnitRegister(ctx, gd.kvClient, old.unit, news.unit, cms)
 			if err != nil {
 				return err
 			}
 		}
+		{
+			// clean old
+			err := svc.removeContainers(ctx, []*unit{&old.unit}, false, true)
+			if err != nil {
+				return err
+			}
 
-		old.Config.HostConfig.CpusetCpus = strconv.Itoa(opts.Require.Require.CPU)
-		actor := alloc.NewAllocator(gd.ormer, gd.Cluster)
-		swarmID := utils.Generate32UUID()
-
-		gd.Lock()
-		defer gd.Unlock()
-
-		gd.scheduler.Lock()
-		nodes, err := gd.schedule(ctx, actor, old.Config, opts)
-		if err != nil {
-			gd.scheduler.Unlock()
-			return err
-		}
-
-		gd.scheduler.Unlock()
-
-		gd.AddPendingContainer(u.u.Name, swarmID, nodes[0].ID, old.Config)
-
-		if len(nodes) < 1 {
-			return errors.Errorf("not enough nodes for allocation,%d<%d", len(nodes), 1)
-		}
-
-		_, err = actor.AlloctCPUMemory(old.Config, nodes[0], int64(opts.Require.Require.CPU), opts.Require.Require.Memory, nil)
-		if err != nil {
-			return err
-		}
-
-		// TODO:alloc new networking
-
-		lvs, err := u.getVolumesByUnit()
-		if err != nil {
-			return err
-		}
-
-		eng := gd.Cluster.EngineByAddr(nodes[0].Addr)
-		if eng == nil {
-			// TODO:
-			return nil
-		}
-
-		err = actor.MigrateVolumes(u.u.ID, old.Config, oldEngine, eng, lvs)
-		if err != nil {
-			return err
-		}
-
-		auth, err := gd.AuthConfig()
-		if err != nil {
-			return err
-		}
-
-		container, err := eng.CreateContainer(old.Config, u.u.Name, true, auth)
-		if err != nil {
-			return err
-		}
-
-		u.u.ContainerID = container.ID
-		u.u.EngineID = eng.ID
-
-		err = u.startService(ctx, cmds.GetCmd(u.u.ID, structs.StartServiceCmd))
-		if err != nil {
-			return err
-		}
-
-		err = gd.Cluster.RemoveContainer(old, false, true)
-		if err != nil {
-			return err
-		}
-
-		// update units configs
-		configs, err := svc.generateUnitsConfigs(ctx, nil)
-		if err != nil {
-			return err
-		}
-
-		// register service
-		err = updateUnitRegister(ctx, gd.kvClient, u, configs)
-		if err != nil {
-			return err
+			err = svc.Compose(ctx, gd.pluginClient)
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -154,12 +139,12 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 }
 
 // deregister old service and register new
-func updateUnitRegister(ctx context.Context, kvc kvstore.Client, u *unit, cmds structs.ConfigsMap) error {
+func updateUnitRegister(ctx context.Context, kvc kvstore.Client, old, new unit, cmds structs.ConfigsMap) error {
 	// deregister service
-	err := deregisterService(ctx, kvc, "units", u.u.ID)
+	err := deregisterService(ctx, kvc, "units", old.u.ID)
 	if err != nil {
 		return err
 	}
 
-	return registerUnits(ctx, []*unit{u}, kvc, cmds)
+	return registerUnits(ctx, []*unit{&new}, kvc, cmds)
 }
