@@ -97,13 +97,10 @@ func postRegister(ctx context.Context, uri string, obj interface{}) error {
 	defer ensureReaderClosed(resp)
 
 	if resp.StatusCode != http.StatusCreated {
-		res := errorResponse{}
-		err = json.NewDecoder(resp.Body).Decode(&res)
+		err := readResponseError(resp)
 		if err != nil {
-			return errors.Wrapf(err, "%s:code=%d,error=%s", uri, resp.StatusCode, err)
+			return errors.Wrapf(err, "%s code=%d,error=%s", uri, resp.StatusCode, err)
 		}
-
-		return errors.Wrapf(err, "%s code:%d,error=%s", uri, resp.StatusCode, res)
 	}
 
 	return nil
@@ -171,13 +168,10 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 	defer ensureReaderClosed(resp)
 
 	if resp.StatusCode != http.StatusNoContent {
-		res := errorResponse{}
-		err = json.NewDecoder(resp.Body).Decode(&res)
+		err := readResponseError(resp)
 		if err != nil {
-			return errors.Wrapf(err, "%s:code=%d,error=%s", uri, resp.StatusCode, err)
+			return errors.Wrapf(err, "%s code=%d,error=%s", uri, resp.StatusCode, err)
 		}
-
-		return errors.Wrapf(err, "%s code:%d,error=%s", uri, resp.StatusCode, res)
 	}
 
 	return nil
@@ -353,4 +347,39 @@ func ensureReaderClosed(resp *http.Response) {
 		io.CopyN(ioutil.Discard, resp.Body, 512)
 		resp.Body.Close()
 	}
+}
+
+type responseErrorHead struct {
+	Result   bool        `json:"result"`
+	Code     int         `json:"code"`
+	Msg      string      `json:"msg"`
+	Category string      `json:"category"`
+	Object   interface{} `json:"object"`
+}
+
+func (r responseErrorHead) Error() string {
+	return fmt.Sprintf("%d:%s:%s", r.Code, r.Category, r.Msg)
+}
+
+func readResponseError(resp *http.Response) error {
+	if resp == nil || resp.Body == nil {
+		return nil
+	}
+
+	if resp.Header.Get("Content-Type") == "application/json" {
+		h := responseErrorHead{}
+		err := json.NewDecoder(resp.Body).Decode(&h)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		return errors.WithStack(h)
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return errors.Errorf("Body:%s", body)
 }
