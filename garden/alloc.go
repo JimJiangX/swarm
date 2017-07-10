@@ -89,7 +89,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 	us := make([]database.Unit, spec.Arch.Replicas)
 	units := make([]structs.UnitSpec, spec.Arch.Replicas)
 
-	for i := 0; i < spec.Arch.Replicas; i++ {
+	for i := range us {
 		uid := utils.Generate32UUID()
 		us[i] = database.Unit{
 			ID:          uid,
@@ -291,10 +291,6 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	}
 	gd.scheduler.Unlock()
 
-	if len(candidates) < svc.svc.Desc.Replicas {
-		return nil, errors.Errorf("not enough nodes for allocation,%d<%d", len(candidates), svc.svc.Desc.Replicas)
-	}
-
 	if units == nil {
 		units, err = svc.so.ListUnitByServiceID(svc.svc.ID)
 		if err != nil {
@@ -302,8 +298,14 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		}
 	}
 
+	replicas := len(units)
+
+	if len(candidates) < replicas {
+		return nil, errors.Errorf("not enough nodes for allocation,%d<%d", len(candidates), replicas)
+	}
+
 	var (
-		bad   = make([]pendingUnit, 0, svc.svc.Desc.Replicas)
+		bad   = make([]pendingUnit, 0, replicas)
 		field = logrus.WithField("Service", svc.svc.Name)
 	)
 
@@ -326,10 +328,10 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 				lvs = append(lvs, bad[i].volumes...)
 			}
 			_err := actor.RecycleResource(ips, lvs)
-			if _err == nil {
-				bad = make([]pendingUnit, 0, svc.svc.Desc.Replicas)
-			} else {
+			if _err != nil {
 				err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
+			} else {
+				bad = make([]pendingUnit, 0, replicas)
 			}
 
 			return _err
@@ -354,7 +356,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 			field.Debugf("Recycle resources error:%+v", err)
 		}
 
-		count := svc.svc.Desc.Replicas
+		count := replicas
 		used := make([]pendingUnit, 0, count)
 
 		if len(nodes) < count {
@@ -389,7 +391,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		}
 	}
 
-	return nil, errors.Errorf("not enough nodes for allocation,%d units waiting", svc.svc.Desc.Replicas)
+	return nil, errors.Errorf("not enough nodes for allocation,%d units waiting", replicas)
 }
 
 func pendingAlloc(actor alloc.Allocator, unit database.Unit,
