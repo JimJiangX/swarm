@@ -65,10 +65,8 @@ func NewGardener(cli cluster.Cluster, uri string, hosts []string) (*Gardener, er
 	}
 
 	gd := &Gardener{
-		Cluster:  cluster,
-		cron:     crontab.New(),
-		cronJobs: make(map[crontab.EntryID]*serviceBackup),
-		//		datacenters: make([]*Datacenter, 0, 50),
+		Cluster: cluster,
+		// datacenters: make([]*Datacenter, 0, 50),
 		networkings: make([]*Networking, 0, 50),
 		//	services:    make([]*Service, 0, 100),
 	}
@@ -143,6 +141,8 @@ func (gd *Gardener) StopCron() {
 	}
 
 	gd.cron.Stop()
+	gd.cron = nil
+	gd.cronJobs = nil
 }
 
 // syncNodeWithEngine synchronize Node.engine if Node exist
