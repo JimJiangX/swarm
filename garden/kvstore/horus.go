@@ -97,13 +97,12 @@ func postRegister(ctx context.Context, uri string, obj interface{}) error {
 	defer ensureReaderClosed(resp)
 
 	if resp.StatusCode != http.StatusCreated {
-		res := errorResponse{}
-		err = json.NewDecoder(resp.Body).Decode(&res)
+		body, err := readBody(resp)
 		if err != nil {
-			return errors.Wrapf(err, "%s:code=%d,error=%s", uri, resp.StatusCode, err)
+			return errors.Wrapf(err, "%s code=%d,error=%s", uri, resp.StatusCode, err)
 		}
 
-		return errors.Wrapf(err, "%s code:%d,error=%s", uri, resp.StatusCode, res)
+		return errors.Wrapf(err, "%s code=%d,error=%s", uri, resp.StatusCode, body)
 	}
 
 	return nil
@@ -171,13 +170,12 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 	defer ensureReaderClosed(resp)
 
 	if resp.StatusCode != http.StatusNoContent {
-		res := errorResponse{}
-		err = json.NewDecoder(resp.Body).Decode(&res)
+		body, err := readBody(resp)
 		if err != nil {
-			return errors.Wrapf(err, "%s:code=%d,error=%s", uri, resp.StatusCode, err)
+			return errors.Wrapf(err, "%s code=%d,error=%s", uri, resp.StatusCode, err)
 		}
 
-		return errors.Wrapf(err, "%s code:%d,error=%s", uri, resp.StatusCode, res)
+		return errors.Wrapf(err, "%s code=%d,error=%s", uri, resp.StatusCode, body)
 	}
 
 	return nil
@@ -353,4 +351,12 @@ func ensureReaderClosed(resp *http.Response) {
 		io.CopyN(ioutil.Discard, resp.Body, 512)
 		resp.Body.Close()
 	}
+}
+
+func readBody(resp *http.Response) ([]byte, error) {
+	if resp != nil && resp.Body != nil {
+		return ioutil.ReadAll(resp.Body)
+	}
+
+	return nil, nil
 }
