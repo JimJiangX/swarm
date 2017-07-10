@@ -110,8 +110,9 @@ func (gd *Gardener) StartCron() error {
 	if gd.cron == nil {
 		gd.cron = crontab.New()
 		gd.cronJobs = make(map[crontab.EntryID]*serviceBackup)
+
+		defer gd.cron.Start()
 	}
-	defer gd.cron.Start()
 
 	out, err := database.ListBackupStrategy(true)
 	if err != nil {
