@@ -370,16 +370,16 @@ func readResponseError(resp *http.Response) error {
 		h := responseErrorHead{}
 		err := json.NewDecoder(resp.Body).Decode(&h)
 		if err != nil {
-			return errors.WithStack(err)
+			return err
 		}
 
-		return errors.WithStack(h)
+		return h
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return errors.WithStack(err)
+		return err
 	}
 
-	return errors.Errorf("Body:%s", body)
+	return fmt.Errorf("Body:%s", body)
 }
