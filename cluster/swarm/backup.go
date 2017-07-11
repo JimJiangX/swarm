@@ -65,7 +65,7 @@ func (bs *serviceBackup) Run() {
 	}
 }
 
-func (bs *serviceBackup) Next(time.Time) time.Time {
+func (bs *serviceBackup) Next(t time.Time) time.Time {
 	next := time.Time{}
 
 	if bs.strategy == nil {
@@ -88,7 +88,7 @@ func (bs *serviceBackup) Next(time.Time) time.Time {
 		return next
 	}
 
-	next = schedule.Next(time.Now())
+	next = schedule.Next(t)
 
 	if next.IsZero() || next.After(strategy.Valid) {
 		err := strategy.UpdateNext(next, false)
