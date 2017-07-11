@@ -156,9 +156,10 @@ type UnitRebuildRequest struct {
 }
 
 type PostServiceResponse struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	TaskID string `json:"task_id"`
+	ID     string   `json:"id"`
+	Name   string   `json:"name"`
+	TaskID string   `json:"task_id"`
+	Units  []string `json:"units_id"`
 }
 
 type User struct {

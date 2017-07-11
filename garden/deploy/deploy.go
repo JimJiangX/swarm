@@ -51,6 +51,10 @@ func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec) (stru
 	resp.ID = t.ID
 	resp.Name = t.Name
 	resp.TaskID = task.ID
+	resp.Units = make([]string, len(t.Units))
+	for i := range t.Units {
+		resp.Units[i] = t.Units[i].ID
+	}
 
 	go d.deploy(ctx, svc, task, auth)
 
