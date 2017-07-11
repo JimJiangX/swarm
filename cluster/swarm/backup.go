@@ -88,11 +88,7 @@ func (bs *serviceBackup) Next(t time.Time) time.Time {
 		return next
 	}
 
-	now := time.Now()
-
-	logrus.Debugf("id=%s,spec=%s,now=%s is %t before %s", strategy.ID, strategy.Spec, now, now.Before(t), t)
-
-	next = schedule.Next(now)
+	next = schedule.Next(t)
 
 	if next.IsZero() || next.After(strategy.Valid) {
 		err := strategy.UpdateNext(next, false)

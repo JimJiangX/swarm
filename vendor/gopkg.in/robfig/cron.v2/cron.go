@@ -181,6 +181,8 @@ func (c *Cron) run() {
 
 		select {
 		case now = <-time.After(effective.Sub(now)):
+			now = now.Truncate(time.Second)
+
 			// Run every entry whose next time was this effective time.
 			for _, e := range c.entries {
 				if e.Next != effective {
