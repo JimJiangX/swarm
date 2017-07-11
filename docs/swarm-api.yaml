@@ -635,6 +635,10 @@ paths:
                 description: 服务Name
               task_id:
                 type: string
+              units_id:
+                type: array
+                items:
+                  type: string
         '400':
           description: 参数错误或参数校验问题
           schema:
