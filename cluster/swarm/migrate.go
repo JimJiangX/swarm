@@ -928,11 +928,13 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 
 	oldContainer := rebuild.container
 
-	filters := make([]string, len(svc.units))
-	for i, u := range svc.units {
-		filters[i] = u.EngineID
+	var filters []string
+	if len(candidates) == 0 {
+		filters = make([]string, len(svc.units))
+		for i, u := range svc.units {
+			filters[i] = u.EngineID
+		}
 	}
-
 	module := structs.Module{}
 	for i := range svc.base.Modules {
 		if rebuild.Type == svc.base.Modules[i].Type {
