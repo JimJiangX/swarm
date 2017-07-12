@@ -943,6 +943,13 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 		}
 	}
 
+	if svc.authConfig == nil {
+		svc.authConfig, err = gd.registryAuthConfig()
+		if err != nil {
+			return "", err
+		}
+	}
+
 	svc.RUnlock()
 
 	dc, original, err := gd.getNode(rebuild.EngineID)
@@ -956,264 +963,315 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 	}
 	entry.Debugf("list Candidates:%d", len(out))
 
-	config, err := resetContainerConfig(rebuild.container.Config, hostConfig)
-	if err != nil {
-		return "", err
-	}
+	var background func(ctx context.Context) error
 
-	if im.ImageID != "" {
+	// rebuild on local host
+	if len(out) > 0 && out[0].ID == rebuild.EngineID && im.ImageID != "" {
+		background = func(ctx context.Context) error {
+			rebuild.Unit.ImageID = im.ImageID
+			rebuild.Unit.ImageName = im.Name + ":" + im.Version
+			rebuild.config.Config.Image = image
+			rebuild.config.Config.Labels[_ImageIDInRegistryLabelKey] = im.ImageID
 
-		rebuild.Unit.ImageID = im.ImageID
-		rebuild.Unit.ImageName = im.Name + ":" + im.Version
-
-		config.Config.Image = image
-		config.Config.Labels[_ImageIDInRegistryLabelKey] = im.ImageID
-	}
-
-	swarmID := gd.generateUniqueID()
-	gd.scheduler.Lock()
-
-	engine, err := gd.selectEngine(config, module, out, filters)
-	if err != nil {
-		gd.scheduler.Unlock()
-
-		return "", err
-	}
-
-	config.SetSwarmID(swarmID)
-	gd.pendingContainers[swarmID] = &pendingContainer{
-		Name:   swarmID,
-		Config: config,
-		Engine: engine,
-	}
-
-	gd.scheduler.Unlock()
-
-	background := func(ctx context.Context) (err error) {
-		pending := newPendingAllocResource()
-
-		svc.Lock()
-
-		defer func() {
-			if r := recover(); r != nil {
-				err = fmt.Errorf("%v", r)
-			}
-			svcStatus := statusServiceUnitRebuilt
-			if err == nil {
-				rebuild.Status, rebuild.LatestError = statusUnitRebuilt, ""
-			} else {
-				gd.scheduler.Lock()
-				delete(gd.pendingContainers, swarmID)
-				gd.scheduler.Unlock()
-
-				rebuild.Status, rebuild.LatestError, svcStatus = statusUnitRebuildFailed, err.Error(), statusServiceRestoreFailed
-
-				entry.Errorf("len(localVolume)=%d", len(pending.localStore))
-				// clean local volumes
-				for _, lv := range pending.localStore {
-					if isSanVG(lv.VGName) {
-						continue
-					}
-
-					entry.Debugf("recycle localVolume,VG=%s,Name=%s", lv.VGName, lv.Name)
-
-					_err := database.DeleteLocalVoume(lv.Name)
-					if _err != nil {
-						entry.Errorf("delete localVolume %s,%+v", lv.Name, _err)
-					}
-				}
-			}
-
-			_err := svc.statusLock.SetStatus(svcStatus)
-			if _err != nil {
-				entry.Errorf("%+v", _err)
-			}
-
-			svc.Unlock()
-		}()
-
-		networkings, err := getIPInfoByUnitID(rebuild.ID, engine)
-		if err != nil {
-			return err
-		}
-
-		cpuset, err := gd.allocCPUs(engine, config.HostConfig.CpusetCpus)
-		if err != nil {
-			return err
-		}
-		config.HostConfig.CpusetCpus = cpuset
-
-		oldLVs, lunMap, _, err := listOldVolumes(rebuild.ID)
-		if err != nil {
-			return err
-		}
-
-		defer func() {
-			if err != nil {
-				return
-			} else {
-				entry.Errorf("%+v", err)
-			}
-			// deactivate
-			// del mapping
-			if len(lunMap) > 0 && dc.store != nil {
-
-				for vg, list := range lunMap {
-					_err := removeVGAndLUN(original.engine.IP, vg, list)
-					if _err != nil {
-						entry.Errorf("san remove VG and LUN,%+v", _err)
-					}
-				}
-			}
-
-			// clean local volumes
-			for i := range oldLVs {
-				if isSanVG(oldLVs[i].VGName) {
-					continue
-				}
-				_err := original.localStore.Recycle(oldLVs[i].ID)
-				if _err != nil {
-					entry.Errorf("local Store recycle,%+v", _err)
-				}
-			}
-
-			// clean database
-			_err := database.TxDeleteVolumes(oldLVs)
-			if _err != nil {
-				entry.Errorf("%+v", _err)
-			}
-		}()
-
-		pending.unit = rebuild
-		pending.engine = engine
-
-		err = gd.allocStorage(pending, engine, config, module.Stores, false)
-		if err != nil {
-			return err
-		}
-
-		err = createServiceResources(gd, []*pendingAllocResource{pending})
-		if err != nil {
-			return err
-		}
-
-		if svc.authConfig == nil {
-			svc.authConfig, err = gd.registryAuthConfig()
+			err := stopOldContainer(rebuild)
 			if err != nil {
 				return err
 			}
-		}
 
-		entry.WithField("Engine", engine.Addr).Debug("create container")
+			id := gd.generateUniqueID()
 
-		container, err := engine.CreateContainer(config, swarmID, true, svc.authConfig)
-
-		gd.scheduler.Lock()
-		delete(gd.pendingContainers, swarmID)
-		gd.scheduler.Unlock()
-
-		if err != nil {
-			return err
-		}
-
-		defer func(c *cluster.Container, addr string,
-			networkings []IPInfo, lvs []database.LocalVolume) {
-
-			if err == nil {
-				return
-			} else {
-				entry.Errorf("%+v", err)
-			}
-			entry.Debugf("clean created container %s", c.ID)
-
-			_err := cleanOldContainer(c, lvs)
-			if _err != nil {
-				entry.Errorf("clean old container,%+v", _err)
-			}
-			_err = removeNetworkings(addr, networkings)
-			if _err != nil {
-				entry.Errorf("remove Networkings error:%+v", _err)
-			}
-
-		}(container, engine.IP, networkings, pending.localStore)
-
-		if rebuild.Type != _SwitchManagerType {
-			err := svc.isolate(rebuild.Name)
+			engine, err := rebuild.Engine()
 			if err != nil {
-				entry.Errorf("isolate container:%+v", err)
+				return err
 			}
-		}
 
-		err = stopOldContainer(rebuild)
-		if err != nil {
-			return err
-		}
-
-		err = startUnit(engine, container.ID, rebuild, users, networkings, pending.localStore, true)
-		if err != nil {
-			return err
-		}
-
-		err = engine.RenameContainer(container, rebuild.Name)
-		if err != nil {
-			return errors.Wrap(err, "rename container")
-		}
-
-		rebuild.container = container
-		rebuild.ContainerID = container.ID
-		rebuild.config = container.Config
-		rebuild.engine = engine
-		rebuild.EngineID = engine.ID
-		rebuild.networkings = networkings
-		rebuild.CreatedAt = time.Now()
-
-		err = updateUnit(rebuild.Unit, oldLVs, false)
-		if err != nil {
-			return err
-		}
-
-		if rebuild.Type == _SwitchManagerType {
-			if err = swmInitTopology(svc, rebuild, users); err != nil {
-				entry.Errorf("init Topology:%+v", err)
+			c, err := engine.CreateContainer(rebuild.config, id, true, svc.authConfig)
+			if err != nil {
+				return err
 			}
+
+			oldContainer := rebuild.container
+			rebuild.container = c
+			rebuild.Unit.ContainerID = c.ID
+
+			err = rebuild.startContainer()
+			if err != nil {
+				return err
+			}
+
+			err = rebuild.startService()
+			if err != nil {
+				err := engine.RemoveContainer(c, true, false)
+				if err != nil {
+					return err
+				}
+
+				return err
+			}
+
+			err = database.UpdateUnitInfo(rebuild.Unit)
+			if err != nil {
+				return err
+			}
+
+			err = engine.RemoveContainer(oldContainer, true, false)
+
+			return err
 		}
+	} else {
 
-		err = saveContainerToConsul(container)
-		if err != nil {
-			entry.Errorf("save container to Consul:%+v", err)
-			// return err
+		background = func(ctx context.Context) (err error) {
+			config, err := resetContainerConfig(rebuild.container.Config, hostConfig)
+			if err != nil {
+				return err
+			}
+
+			if im.ImageID != "" {
+
+				rebuild.Unit.ImageID = im.ImageID
+				rebuild.Unit.ImageName = im.Name + ":" + im.Version
+
+				config.Config.Image = image
+				config.Config.Labels[_ImageIDInRegistryLabelKey] = im.ImageID
+			}
+
+			swarmID := gd.generateUniqueID()
+			gd.scheduler.Lock()
+
+			engine, err := gd.selectEngine(config, module, out, filters)
+			if err != nil {
+				gd.scheduler.Unlock()
+
+				return err
+			}
+
+			config.SetSwarmID(swarmID)
+			gd.pendingContainers[swarmID] = &pendingContainer{
+				Name:   swarmID,
+				Config: config,
+				Engine: engine,
+			}
+
+			gd.scheduler.Unlock()
+
+			pending := newPendingAllocResource()
+
+			svc.Lock()
+
+			defer func() {
+				if r := recover(); r != nil {
+					err = fmt.Errorf("%v", r)
+				}
+				svcStatus := statusServiceUnitRebuilt
+				if err == nil {
+					rebuild.Status, rebuild.LatestError = statusUnitRebuilt, ""
+				} else {
+					gd.scheduler.Lock()
+					delete(gd.pendingContainers, swarmID)
+					gd.scheduler.Unlock()
+
+					rebuild.Status, rebuild.LatestError, svcStatus = statusUnitRebuildFailed, err.Error(), statusServiceRestoreFailed
+
+					entry.Errorf("len(localVolume)=%d", len(pending.localStore))
+					// clean local volumes
+					for _, lv := range pending.localStore {
+						if isSanVG(lv.VGName) {
+							continue
+						}
+
+						entry.Debugf("recycle localVolume,VG=%s,Name=%s", lv.VGName, lv.Name)
+
+						_err := database.DeleteLocalVoume(lv.Name)
+						if _err != nil {
+							entry.Errorf("delete localVolume %s,%+v", lv.Name, _err)
+						}
+					}
+				}
+
+				_err := svc.statusLock.SetStatus(svcStatus)
+				if _err != nil {
+					entry.Errorf("%+v", _err)
+				}
+
+				svc.Unlock()
+			}()
+
+			networkings, err := getIPInfoByUnitID(rebuild.ID, engine)
+			if err != nil {
+				return err
+			}
+
+			cpuset, err := gd.allocCPUs(engine, config.HostConfig.CpusetCpus)
+			if err != nil {
+				return err
+			}
+			config.HostConfig.CpusetCpus = cpuset
+
+			oldLVs, lunMap, _, err := listOldVolumes(rebuild.ID)
+			if err != nil {
+				return err
+			}
+
+			defer func() {
+				if err != nil {
+					return
+				} else {
+					entry.Errorf("%+v", err)
+				}
+				// deactivate
+				// del mapping
+				if len(lunMap) > 0 && dc.store != nil {
+
+					for vg, list := range lunMap {
+						_err := removeVGAndLUN(original.engine.IP, vg, list)
+						if _err != nil {
+							entry.Errorf("san remove VG and LUN,%+v", _err)
+						}
+					}
+				}
+
+				// clean local volumes
+				for i := range oldLVs {
+					if isSanVG(oldLVs[i].VGName) {
+						continue
+					}
+					_err := original.localStore.Recycle(oldLVs[i].ID)
+					if _err != nil {
+						entry.Errorf("local Store recycle,%+v", _err)
+					}
+				}
+
+				// clean database
+				_err := database.TxDeleteVolumes(oldLVs)
+				if _err != nil {
+					entry.Errorf("%+v", _err)
+				}
+			}()
+
+			pending.unit = rebuild
+			pending.engine = engine
+
+			err = gd.allocStorage(pending, engine, config, module.Stores, false)
+			if err != nil {
+				return err
+			}
+
+			err = createServiceResources(gd, []*pendingAllocResource{pending})
+			if err != nil {
+				return err
+			}
+
+			entry.WithField("Engine", engine.Addr).Debug("create container")
+
+			container, err := engine.CreateContainer(config, swarmID, true, svc.authConfig)
+
+			gd.scheduler.Lock()
+			delete(gd.pendingContainers, swarmID)
+			gd.scheduler.Unlock()
+
+			if err != nil {
+				return err
+			}
+
+			defer func(c *cluster.Container, addr string,
+				networkings []IPInfo, lvs []database.LocalVolume) {
+
+				if err == nil {
+					return
+				} else {
+					entry.Errorf("%+v", err)
+				}
+				entry.Debugf("clean created container %s", c.ID)
+
+				_err := cleanOldContainer(c, lvs)
+				if _err != nil {
+					entry.Errorf("clean old container,%+v", _err)
+				}
+				_err = removeNetworkings(addr, networkings)
+				if _err != nil {
+					entry.Errorf("remove Networkings error:%+v", _err)
+				}
+
+			}(container, engine.IP, networkings, pending.localStore)
+
+			if rebuild.Type != _SwitchManagerType {
+				err := svc.isolate(rebuild.Name)
+				if err != nil {
+					entry.Errorf("isolate container:%+v", err)
+				}
+			}
+
+			err = stopOldContainer(rebuild)
+			if err != nil {
+				return err
+			}
+
+			err = startUnit(engine, container.ID, rebuild, users, networkings, pending.localStore, true)
+			if err != nil {
+				return err
+			}
+
+			err = engine.RenameContainer(container, rebuild.Name)
+			if err != nil {
+				return errors.Wrap(err, "rename container")
+			}
+
+			rebuild.container = container
+			rebuild.ContainerID = container.ID
+			rebuild.config = container.Config
+			rebuild.engine = engine
+			rebuild.EngineID = engine.ID
+			rebuild.networkings = networkings
+			rebuild.CreatedAt = time.Now()
+
+			err = updateUnit(rebuild.Unit, oldLVs, false)
+			if err != nil {
+				return err
+			}
+
+			if rebuild.Type == _SwitchManagerType {
+				if err = swmInitTopology(svc, rebuild, users); err != nil {
+					entry.Errorf("init Topology:%+v", err)
+				}
+			}
+
+			err = saveContainerToConsul(container)
+			if err != nil {
+				entry.Errorf("save container to Consul:%+v", err)
+				// return err
+			}
+
+			oldEngineIP := oldContainer.Engine.IP
+			err = cleanOldContainer(oldContainer, oldLVs)
+			if err != nil {
+				entry.Errorf("clean old container,%+v", err)
+			}
+
+			sys, err := gd.systemConfig()
+			if err != nil {
+				entry.WithError(err).Error("get System Config")
+			}
+
+			err = deregisterToServices(oldEngineIP, rebuild.ID)
+			if err != nil {
+				entry.Errorf("deregister service,%+v", err)
+			}
+
+			err = registerToServers(rebuild, svc, sys)
+			if err != nil {
+				entry.Errorf("register service:%+v", err)
+			}
+
+			//		if rebuild.Type != _SwitchManagerType {
+			//			// switchback unit
+			//			err = svc.switchBack(rebuild.Name)
+			//			if err != nil {
+			//				entry.Errorf("switchBack error:%+v", err)
+			//			}
+			//		}
+
+			return nil
 		}
-
-		oldEngineIP := oldContainer.Engine.IP
-		err = cleanOldContainer(oldContainer, oldLVs)
-		if err != nil {
-			entry.Errorf("clean old container,%+v", err)
-		}
-
-		sys, err := gd.systemConfig()
-		if err != nil {
-			entry.WithError(err).Error("get System Config")
-		}
-
-		err = deregisterToServices(oldEngineIP, rebuild.ID)
-		if err != nil {
-			entry.Errorf("deregister service,%+v", err)
-		}
-
-		err = registerToServers(rebuild, svc, sys)
-		if err != nil {
-			entry.Errorf("register service:%+v", err)
-		}
-
-		//		if rebuild.Type != _SwitchManagerType {
-		//			// switchback unit
-		//			err = svc.switchBack(rebuild.Name)
-		//			if err != nil {
-		//				entry.Errorf("switchBack error:%+v", err)
-		//			}
-		//		}
-
-		return nil
 	}
 
 	task := database.NewTask(rebuild.Name, unitRebuildTask, rebuild.ID, "", nil, 0)
