@@ -193,3 +193,17 @@ func TestUpload(t *testing.T) {
 		t.Errorf("upload file to %s,%+v", remote, err)
 	}
 }
+
+func TestNewClientByPublicKeys(t *testing.T) {
+	c, err := NewClientByPublicKeys("192.168.3.121", "root", "", 10*time.Second)
+	if err != nil {
+		t.Skipf("%+v", err)
+	}
+
+	out, err := c.Exec("echo $HOME")
+	if err != nil {
+		t.Errorf("%+v", err)
+	} else {
+		t.Log(string(out))
+	}
+}
