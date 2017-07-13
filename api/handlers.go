@@ -27,11 +27,12 @@ import (
 	"github.com/docker/swarm/experimental"
 	"github.com/docker/swarm/version"
 	"github.com/gorilla/mux"
-	"github.com/samalba/dockerclient"
 )
 
-// APIVERSION is the minimum API version supported by swarm manager
-const APIVERSION = "1.22"
+const (
+	// APIVERSION is the default API version supported by swarm manager
+	APIVERSION = "1.30"
+)
 
 var (
 	ShouldRefreshOnNodeFilter  = false
@@ -64,21 +65,7 @@ func getInfo(c *context, w http.ResponseWriter, r *http.Request) {
 		NoProxy:           os.Getenv("no_proxy"),
 		SystemTime:        time.Now().Format(time.RFC3339Nano),
 		ExperimentalBuild: experimental.ENABLED,
-	}
-
-	// API versions older than 1.22 use DriverStatus and return \b characters in the output
-	status := c.statusHandler.Status()
-	if c.apiVersion != "" && typesversions.LessThan(c.apiVersion, "1.22") {
-		for i := range status {
-			if status[i][0][:1] == " " {
-				status[i][0] = status[i][0][1:]
-			} else {
-				status[i][0] = "\b" + status[i][0]
-			}
-		}
-		info.DriverStatus = status
-	} else {
-		info.SystemStatus = status
+		SystemStatus:      c.statusHandler.Status(),
 	}
 
 	kernelVersion := "<unknown>"
@@ -951,27 +938,14 @@ func postContainersStart(c *context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hostConfig := &dockerclient.HostConfig{
-		MemorySwappiness: -1,
-	}
-
-	buf, err := ioutil.ReadAll(r.Body)
+	_, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		httpError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	r.Body.Close()
 
-	if len(buf) <= 2 || (len(buf) == 4 && string(buf) == "null") {
-		hostConfig = nil
-	} else {
-		if err := json.Unmarshal(buf, hostConfig); err != nil {
-			httpError(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-
-	if err := c.cluster.StartContainer(container, hostConfig); err != nil {
+	if err := c.cluster.StartContainer(container); err != nil {
 		httpError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
