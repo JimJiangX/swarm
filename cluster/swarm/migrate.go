@@ -1037,41 +1037,8 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 	} else {
 
 		background = func(ctx context.Context) (err error) {
-			config, err := resetContainerConfig(rebuild.container.Config, hostConfig)
-			if err != nil {
-				return err
-			}
-
-			if im.ImageID != "" {
-
-				rebuild.Unit.ImageID = im.ID
-				rebuild.Unit.ImageName = im.Name + ":" + im.Version
-
-				config.Config.Image = image
-				config.Config.Labels[_ImageIDInRegistryLabelKey] = im.ImageID
-			}
-
-			swarmID := gd.generateUniqueID()
-			gd.scheduler.Lock()
-
-			engine, err := gd.selectEngine(config, module, out, filters)
-			if err != nil {
-				gd.scheduler.Unlock()
-
-				return err
-			}
-
-			config.SetSwarmID(swarmID)
-			gd.pendingContainers[swarmID] = &pendingContainer{
-				Name:   swarmID,
-				Config: config,
-				Engine: engine,
-			}
-
-			gd.scheduler.Unlock()
-
 			pending := newPendingAllocResource()
-
+			swarmID := gd.generateUniqueID()
 			svc.Lock()
 
 			defer func() {
@@ -1111,6 +1078,37 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 
 				svc.Unlock()
 			}()
+			config, err := resetContainerConfig(rebuild.container.Config, hostConfig)
+			if err != nil {
+				return err
+			}
+
+			if im.ImageID != "" {
+
+				rebuild.Unit.ImageID = im.ID
+				rebuild.Unit.ImageName = im.Name + ":" + im.Version
+
+				config.Config.Image = image
+				config.Config.Labels[_ImageIDInRegistryLabelKey] = im.ImageID
+			}
+
+			gd.scheduler.Lock()
+
+			engine, err := gd.selectEngine(config, module, out, filters)
+			if err != nil {
+				gd.scheduler.Unlock()
+
+				return err
+			}
+
+			config.SetSwarmID(swarmID)
+			gd.pendingContainers[swarmID] = &pendingContainer{
+				Name:   swarmID,
+				Config: config,
+				Engine: engine,
+			}
+
+			gd.scheduler.Unlock()
 
 			networkings, err := getIPInfoByUnitID(rebuild.ID, engine)
 			if err != nil {
