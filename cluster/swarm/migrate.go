@@ -969,6 +969,7 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 	if len(out) > 0 && im.ImageID != "" &&
 		(out[0].ID == rebuild.EngineID || out[0].EngineID == rebuild.EngineID) {
 		background = func(ctx context.Context) error {
+
 			rebuild.Unit.ImageID = im.ID
 			rebuild.Unit.ImageName = im.Name + ":" + im.Version
 			rebuild.config.Config.Image = image
@@ -978,6 +979,23 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 			if err != nil {
 				return err
 			}
+
+			defer func() {
+				if r := recover(); r != nil {
+					err = fmt.Errorf("%v", r)
+				}
+				svcStatus := statusServiceUnitRebuilt
+				if err == nil {
+					rebuild.Status, rebuild.LatestError = statusUnitRebuilt, ""
+				} else {
+					rebuild.Status, rebuild.LatestError, svcStatus = statusUnitRebuildFailed, err.Error(), statusServiceUnitRebuildFailed
+				}
+
+				_err := svc.statusLock.SetStatus(svcStatus)
+				if _err != nil {
+					entry.Errorf("%+v", _err)
+				}
+			}()
 
 			engine, err := rebuild.Engine()
 			if err != nil {
@@ -1008,6 +1026,11 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 			}
 
 			err = rebuild.startService()
+			if err != nil {
+				return err
+			}
+
+			err = saveContainerToConsul(c)
 
 			return err
 		}
@@ -1063,7 +1086,7 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 					delete(gd.pendingContainers, swarmID)
 					gd.scheduler.Unlock()
 
-					rebuild.Status, rebuild.LatestError, svcStatus = statusUnitRebuildFailed, err.Error(), statusServiceRestoreFailed
+					rebuild.Status, rebuild.LatestError, svcStatus = statusUnitRebuildFailed, err.Error(), statusServiceUnitRebuildFailed
 
 					entry.Errorf("len(localVolume)=%d", len(pending.localStore))
 					// clean local volumes
