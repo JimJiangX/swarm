@@ -993,6 +993,7 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 			oldContainer := rebuild.container
 			rebuild.container = c
 			rebuild.Unit.ContainerID = c.ID
+			rebuild.Unit.Name = id
 
 			err = rebuild.startContainer()
 			if err != nil {
