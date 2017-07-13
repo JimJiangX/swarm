@@ -409,7 +409,7 @@ func (svc *Service) runContainer(ctx context.Context, pendings []pendingUnit, au
 		}
 		pu.Unit.ContainerID = c.ID
 
-		err = eng.StartContainer(c, nil)
+		err = eng.StartContainer(c)
 		if err != nil {
 			return errors.Wrap(err, "start container:"+pu.Unit.Name)
 		}

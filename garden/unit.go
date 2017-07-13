@@ -196,7 +196,7 @@ func (u unit) startContainer(ctx context.Context) error {
 		return ctx.Err()
 	}
 
-	err := c.Engine.StartContainer(c, nil)
+	err := c.Engine.StartContainer(c)
 	if err != nil {
 		return errors.Wrap(err, "start container:"+u.u.Name)
 	}
