@@ -979,22 +979,28 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 				return err
 			}
 
-			id := gd.generateUniqueID()
-
 			engine, err := rebuild.Engine()
 			if err != nil {
 				return err
 			}
 
-			c, err := engine.CreateContainer(rebuild.config, id, true, svc.authConfig)
+			err = engine.RemoveContainer(rebuild.container, true, false)
+			if err != nil {
+				return errors.Wrap(err, "remove container")
+			}
+
+			c, err := engine.CreateContainer(rebuild.config, rebuild.Unit.Name, true, svc.authConfig)
+			if err != nil {
+				return errors.Wrap(err, "create container")
+			}
+
+			rebuild.container = c
+			rebuild.Unit.ContainerID = c.ID
+
+			err = database.UpdateUnitInfo(rebuild.Unit)
 			if err != nil {
 				return err
 			}
-
-			oldContainer := rebuild.container
-			rebuild.container = c
-			rebuild.Unit.ContainerID = c.ID
-			rebuild.Unit.Name = id
 
 			err = rebuild.startContainer()
 			if err != nil {
@@ -1002,21 +1008,6 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 			}
 
 			err = rebuild.startService()
-			if err != nil {
-				err := engine.RemoveContainer(c, true, false)
-				if err != nil {
-					return err
-				}
-
-				return err
-			}
-
-			err = database.UpdateUnitInfo(rebuild.Unit)
-			if err != nil {
-				return err
-			}
-
-			err = engine.RemoveContainer(oldContainer, true, false)
 
 			return err
 		}
