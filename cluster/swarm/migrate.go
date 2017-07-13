@@ -966,7 +966,8 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 	var background func(ctx context.Context) error
 
 	// rebuild on local host
-	if len(out) > 0 && out[0].ID == rebuild.EngineID && im.ImageID != "" {
+	if len(out) > 0 && im.ImageID != "" &&
+		(out[0].ID == rebuild.EngineID || out[0].EngineID == rebuild.EngineID) {
 		background = func(ctx context.Context) error {
 			rebuild.Unit.ImageID = im.ImageID
 			rebuild.Unit.ImageName = im.Name + ":" + im.Version
