@@ -969,7 +969,7 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 	if len(out) > 0 && im.ImageID != "" &&
 		(out[0].ID == rebuild.EngineID || out[0].EngineID == rebuild.EngineID) {
 		background = func(ctx context.Context) error {
-			rebuild.Unit.ImageID = im.ImageID
+			rebuild.Unit.ImageID = im.ID
 			rebuild.Unit.ImageName = im.Name + ":" + im.Version
 			rebuild.config.Config.Image = image
 			rebuild.config.Config.Labels[_ImageIDInRegistryLabelKey] = im.ImageID
@@ -1030,7 +1030,7 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 
 			if im.ImageID != "" {
 
-				rebuild.Unit.ImageID = im.ImageID
+				rebuild.Unit.ImageID = im.ID
 				rebuild.Unit.ImageName = im.Name + ":" + im.Version
 
 				config.Config.Image = image
