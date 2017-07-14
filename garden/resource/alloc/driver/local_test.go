@@ -159,7 +159,7 @@ func TestLocalVolumeDrivers(t *testing.T) {
 			},
 		}
 
-		drivers, err := localVolumeDrivers(e1, lvm)
+		drivers, err := localVolumeDrivers(e1, lvm, 0)
 		if err != nil {
 			t.Error(err)
 		}
@@ -196,7 +196,7 @@ func TestLocalVolumeDrivers(t *testing.T) {
 			},
 		}
 
-		drivers, err := localVolumeDrivers(e2, lvm)
+		drivers, err := localVolumeDrivers(e2, lvm, 0)
 		if err != nil {
 			t.Error(err)
 		}
@@ -267,7 +267,7 @@ func TestLocalVolumeDrivers(t *testing.T) {
 			},
 		}
 
-		drivers, err := localVolumeDrivers(e3, lvm)
+		drivers, err := localVolumeDrivers(e3, lvm, 0)
 		if err != nil {
 			t.Error(err)
 		}
@@ -316,7 +316,7 @@ func TestLocalVolumeAlloc(t *testing.T) {
 		},
 	}
 
-	drivers, err := localVolumeDrivers(e, lvm)
+	drivers, err := localVolumeDrivers(e, lvm, 0)
 	if err != nil {
 		t.Error(err)
 	}

@@ -221,6 +221,10 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (database.LUN, dat
 	return lun, lv, err
 }
 
+func (h hitachiStore) ListLUN(nameOrVG string) ([]database.LUN, error) {
+	return h.orm.ListLunByNameOrVG(nameOrVG)
+}
+
 // Recycle calls del_lun.sh,make the lun available for alloction.
 func (h *hitachiStore) Recycle(id string, lun int) error {
 	h.lock.Lock()
@@ -396,7 +400,7 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 }
 
 // Mapping calls create_lunmap.sh,associate LUN with host.
-func (h *hitachiStore) Mapping(host, vg, lun string) error {
+func (h *hitachiStore) Mapping(host, vg, lun, unit string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -425,7 +429,9 @@ func (h *hitachiStore) Mapping(host, vg, lun string) error {
 	}
 
 	lv.EngineID = host
-	err = h.orm.SetVolume(lv.ID, lv.EngineID, lv.Size)
+	lv.UnitID = unit
+
+	err = h.orm.SetVolume(lv)
 	if err != nil {
 		return err
 	}
@@ -445,12 +451,7 @@ func (h *hitachiStore) Mapping(host, vg, lun string) error {
 }
 
 // DelMapping disassociate of the lun from host,calls del_lunmap.sh
-func (h *hitachiStore) DelMapping(lun string) error {
-	l, err := h.orm.GetLUN(lun)
-	if err != nil {
-		return err
-	}
-
+func (h *hitachiStore) DelMapping(lun database.LUN) error {
 	path, err := h.scriptPath("del_lunmap.sh")
 	if err != nil {
 		return err
@@ -460,12 +461,12 @@ func (h *hitachiStore) DelMapping(lun string) error {
 	defer h.lock.Unlock()
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, path, h.hs.AdminUnit,
-		strconv.Itoa(l.StorageLunID))
+		strconv.Itoa(lun.StorageLunID))
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	err = h.orm.DelLunMapping(lun)
+	err = h.orm.DelLunMapping(lun.ID)
 
 	return err
 }

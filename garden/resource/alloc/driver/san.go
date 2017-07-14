@@ -1,9 +1,7 @@
 package driver
 
 import (
-	"database/sql"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/docker/swarm/cluster"
@@ -14,6 +12,23 @@ import (
 	"github.com/pkg/errors"
 )
 
+type vgIface interface {
+	ActivateVG(v database.Volume) error
+	DeactivateVG(v database.Volume) error
+}
+
+type unsupportSAN struct{}
+
+var errUnsupportSAN = errors.New("unsupport SAN error")
+
+func (unsupportSAN) ActivateVG(v database.Volume) error {
+	return errUnsupportSAN
+}
+
+func (unsupportSAN) DeactivateVG(v database.Volume) error {
+	return errUnsupportSAN
+}
+
 type sanVolume struct {
 	iface VolumeIface
 
@@ -21,15 +36,10 @@ type sanVolume struct {
 
 	engine *cluster.Engine
 
-	pluginPort string
+	port int
 }
 
-func newSanVolumeDriver(e *cluster.Engine, iface VolumeIface, storeID string) (Driver, error) {
-	sys, err := iface.GetSysConfig()
-	if err != nil {
-		return nil, err
-	}
-
+func newSanVolumeDriver(e *cluster.Engine, iface VolumeIface, storeID string, port int) (Driver, error) {
 	stores := storage.DefaultStores()
 	san, err := stores.Get(storeID)
 	if err != nil {
@@ -37,10 +47,10 @@ func newSanVolumeDriver(e *cluster.Engine, iface VolumeIface, storeID string) (D
 	}
 
 	return &sanVolume{
-		iface:      iface,
-		san:        san,
-		engine:     e,
-		pluginPort: strconv.Itoa(sys.SwarmAgent),
+		iface:  iface,
+		san:    san,
+		engine: e,
+		port:   port,
 	}, nil
 }
 
@@ -79,7 +89,7 @@ func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req struc
 		return nil, err
 	}
 
-	err = sv.san.Mapping(sv.engine.ID, vg, lun.ID)
+	err = sv.san.Mapping(sv.engine.ID, vg, lun.ID, lv.UnitID)
 	if err != nil {
 		return &lv, err
 	}
@@ -95,7 +105,7 @@ func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req struc
 	return &lv, nil
 }
 
-func (sv sanVolume) Expand(lv database.Volume, agent string, size int64) error {
+func (sv sanVolume) Expand(lv database.Volume, size int64) error {
 	lv, err := sv.iface.GetVolume(lv.Name)
 	if err != nil {
 		return err
@@ -117,10 +127,12 @@ func (sv sanVolume) Expand(lv database.Volume, agent string, size int64) error {
 		return err
 	}
 
-	err = sv.san.Mapping(lv.EngineID, lv.VG, lun.ID)
+	err = sv.san.Mapping(sv.engine.ID, lv.VG, lun.ID, lv.UnitID)
 	if err != nil {
 		return err
 	}
+
+	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
 
 	err = expandSanVG(agent, sv.san.Vendor(), lun)
 	if err != nil {
@@ -130,25 +142,87 @@ func (sv sanVolume) Expand(lv database.Volume, agent string, size int64) error {
 	return updateVolume(agent, lv)
 }
 
-func (sv sanVolume) Recycle(lv database.Volume) error {
-	err := sv.san.DelMapping(lv.Name)
-	if errors.Cause(err) == sql.ErrNoRows {
-		return nil
-	}
-
-	return sv.san.Recycle(lv.Name, 0)
-}
-
-func (sv sanVolume) createSanVG(vg string) error {
-	list, err := sv.iface.ListLunByVG(vg)
+func (sv sanVolume) ActivateVG(v database.Volume) error {
+	luns, err := sv.san.ListLUN(v.VG)
 	if err != nil {
 		return err
 	}
 
-	addr := sv.engine.IP + ":" + sv.pluginPort
+	for i := range luns {
+		err = sv.san.Mapping(sv.engine.ID, v.VG, luns[i].ID, v.UnitID)
+		if err != nil {
+			return err
+		}
+	}
 
-	return createSanVG(addr, sv.san.Vendor(), list)
+	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
+
+	err = sanActivate(agent, v.VG, luns)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
+
+func (sv sanVolume) DeactivateVG(v database.Volume) error {
+	luns, err := sv.san.ListLUN(v.VG)
+	if err != nil {
+		return err
+	}
+
+	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
+
+	err = sanDeactivate(sv.san.Vendor(), agent, v.VG, luns)
+	if err != nil {
+		return err
+	}
+
+	for i := range luns {
+		sv.san.DelMapping(luns[i])
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (sv sanVolume) Recycle(lv database.Volume) error {
+	luns, err := sv.san.ListLUN(lv.Name)
+	if err != nil {
+		return err
+	}
+
+	for i := range luns {
+		err := sv.san.DelMapping(luns[i])
+		if err != nil {
+			return err
+		}
+	}
+
+	for i := range luns {
+		err := sv.san.Recycle(luns[i].ID, 0)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (sv sanVolume) createSanVG(vg string) error {
+	list, err := sv.san.ListLUN(vg)
+	if err != nil {
+		return err
+	}
+
+	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
+
+	return createSanVG(agent, sv.san.Vendor(), list)
+}
+
+const defaultTimeout = 30 * time.Second
 
 func createSanVG(addr, vendor string, luns []database.LUN) error {
 	if len(luns) == 0 {
@@ -169,7 +243,7 @@ func createSanVG(addr, vendor string, luns []database.LUN) error {
 	}
 
 	// TODO:*tls.Config
-	client, err := sdk.NewClient(addr, 30*time.Second, nil)
+	client, err := sdk.NewClient(addr, defaultTimeout, nil)
 	if err != nil {
 		return err
 	}
@@ -185,7 +259,7 @@ func expandSanVG(addr, vendor string, lun database.LUN) error {
 	}
 
 	// TODO:*tls.Config
-	client, err := sdk.NewClient(addr, 30*time.Second, nil)
+	client, err := sdk.NewClient(addr, defaultTimeout, nil)
 	if err != nil {
 		return err
 	}
@@ -202,10 +276,74 @@ func updateVolume(addr string, lv database.Volume) error {
 	}
 
 	// TODO:*tls.Config
-	cli, err := sdk.NewClient(addr, 30*time.Second, nil)
+	cli, err := sdk.NewClient(addr, defaultTimeout, nil)
 	if err != nil {
 		return err
 	}
 
 	return cli.VolumeUpdate(option)
 }
+
+func sanActivate(addr, vg string, luns []database.LUN) error {
+	names := make([]string, len(luns))
+
+	for i := range luns {
+		names[i] = luns[i].Name
+	}
+
+	opt := sdk.ActiveConfig{
+		VgName: vg,
+		Lvname: names,
+	}
+
+	cli, err := sdk.NewClient(addr, defaultTimeout, nil)
+	if err != nil {
+		return err
+	}
+
+	return cli.SanActivate(opt)
+}
+
+func sanDeactivate(vendor, addr, vg string, luns []database.LUN) error {
+	names := make([]string, len(luns))
+	hls := make([]int, len(luns))
+
+	for i := range luns {
+		names[i] = luns[i].Name
+		hls[i] = luns[i].HostLunID
+	}
+
+	opt := sdk.DeactivateConfig{
+		VgName:    vg,
+		Lvname:    names,
+		HostLunID: hls,
+		Vendor:    vendor,
+	}
+
+	cli, err := sdk.NewClient(addr, defaultTimeout, nil)
+	if err != nil {
+		return err
+	}
+
+	return cli.SanDeActivate(opt)
+}
+
+//func removeSCSI(vendor, addr string, luns []database.LUN) error {
+//	hls := make([]int, len(luns))
+
+//	for i := range luns {
+//		hls[i] = luns[i].HostLunID
+//	}
+
+//	opt := sdk.RemoveSCSIConfig{
+//		Vendor:    vendor,
+//		HostLunId: hls,
+//	}
+
+//	cli, err := sdk.NewClient(addr, defaultTimeout, nil)
+//	if err != nil {
+//		return err
+//	}
+
+//	return cli.RemoveSCSI(opt)
+//}

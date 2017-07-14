@@ -80,6 +80,11 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 				news.unit = *adds[0]
 			}
 			// migrate volumes
+			out, err := actor.MigrateVolumes(news.unit.u.ID, old.engine, news.engine, old.volumes)
+			news.volumes = out
+			if err != nil {
+				return err
+			}
 
 			auth, err := gd.AuthConfig()
 			if err != nil {

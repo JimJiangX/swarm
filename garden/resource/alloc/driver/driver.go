@@ -17,12 +17,12 @@ type VolumeIface interface {
 	database.GetSysConfigIface
 
 	GetNode(nameOrID string) (database.Node, error)
-
-	ListLunByVG(vg string) ([]database.LUN, error)
 }
 
 // Driver for volume manage
 type Driver interface {
+	vgIface
+
 	Driver() string
 	Name() string
 	Type() string
@@ -31,7 +31,7 @@ type Driver interface {
 
 	Alloc(config *cluster.ContainerConfig, uid string, req structs.VolumeRequire) (*database.Volume, error)
 
-	Expand(database.Volume, string, int64) error
+	Expand(database.Volume, int64) error
 
 	Recycle(database.Volume) error
 }
@@ -55,12 +55,17 @@ func FindEngineVolumeDrivers(iface VolumeIface, engine *cluster.Engine) (VolumeD
 		return nil, errors.New("Engine is required")
 	}
 
-	drivers, err := localVolumeDrivers(engine, iface)
+	sys, err := iface.GetSysConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	nd, err := newNFSDriver(iface, engine.ID)
+	drivers, err := localVolumeDrivers(engine, iface, sys.SwarmAgent)
+	if err != nil {
+		return nil, err
+	}
+
+	nd, err := newNFSDriver(iface, engine.ID, sys.SourceDir, sys.BackupDir)
 	if err != nil {
 		return drivers, err
 	}
@@ -77,7 +82,7 @@ func FindEngineVolumeDrivers(iface VolumeIface, engine *cluster.Engine) (VolumeD
 		return drivers, nil
 	}
 
-	sd, err := newSanVolumeDriver(engine, iface, node.Storage)
+	sd, err := newSanVolumeDriver(engine, iface, node.Storage, sys.SwarmAgent)
 	if err != nil {
 		logrus.Debugf("Engine:%s %+v", engine.Name, err)
 
@@ -182,7 +187,7 @@ func (vds VolumeDrivers) ExpandVolumes(uid, agent string, stores []structs.Volum
 			Name: fmt.Sprintf("%s_%s_%s_LV", uid[:8], space.VG, stores[i].Name),
 		}
 
-		err = driver.Expand(lv, agent, stores[i].Size)
+		err = driver.Expand(lv, stores[i].Size)
 		if err != nil {
 			return err
 		}

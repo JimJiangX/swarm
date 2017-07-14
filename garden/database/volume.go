@@ -15,7 +15,7 @@ type VolumeOrmer interface {
 	InsertVolume(lv Volume) error
 	InsertVolumes(lvs []Volume) error
 
-	SetVolume(nameOrID string, engineID string, size int64) error
+	SetVolume(Volume) error
 	SetVolumes(lvs []Volume) error
 
 	DelVolume(nameOrID string) error
@@ -92,17 +92,17 @@ func (db dbBase) InsertVolumes(lvs []Volume) error {
 	return db.txFrame(do)
 }
 
-// SetVolume update size of Volume by name or ID
-func (db dbBase) SetVolume(nameOrID string, engineID string, size int64) error {
+// SetVolume update volume of Volume by ID
+func (db dbBase) SetVolume(v Volume) error {
 
-	query := "UPDATE " + db.volumeTable() + " SET size=?,engine_id=? WHERE id=? OR name=?"
+	query := "UPDATE " + db.volumeTable() + " SET size=?,engine_id=?,unit_id=? WHERE id=?"
 
-	_, err := db.Exec(query, engineID, size, nameOrID, nameOrID)
+	_, err := db.Exec(query, v.Size, v.EngineID, v.UnitID, v.ID)
 	if err == nil {
 		return nil
 	}
 
-	return errors.Wrap(err, "update Volume size")
+	return errors.Wrap(err, "update Volume")
 }
 
 // SetVolumes update Size of Volume by name or ID in a Tx
