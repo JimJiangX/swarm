@@ -465,43 +465,11 @@ func (e *Engine) EngineToContainerNode() *types.ContainerNode {
 	}
 }
 
-// Update API Version in apiClient
-func (e *Engine) updateClientVersionFromServer(serverVersion string) {
-	// v will be >= 1.8, since this is checked earlier
-	// for server/API version reference, check https://docs.docker.com/engine/api/
-	// new versions of Docker look like 17.06.x-ce etc.
-	s := strings.Split(serverVersion, "-")
-	serverVersion = s[0]
-
-	switch {
-	case versions.LessThan(serverVersion, "1.9"):
-		e.apiClient.UpdateClientVersion("1.20")
-	case versions.LessThan(serverVersion, "1.10"):
-		e.apiClient.UpdateClientVersion("1.21")
-	case versions.LessThan(serverVersion, "1.11"):
-		e.apiClient.UpdateClientVersion("1.22")
-	case versions.LessThan(serverVersion, "1.12"):
-		e.apiClient.UpdateClientVersion("1.23")
-	case versions.LessThan(serverVersion, "1.13"):
-		e.apiClient.UpdateClientVersion("1.24")
-	case versions.LessThan(serverVersion, "1.13.1"):
-		e.apiClient.UpdateClientVersion("1.25")
-	case versions.LessThan(serverVersion, "17.03.1") || versions.Equal(serverVersion, "1.13.1"):
-		e.apiClient.UpdateClientVersion("1.26")
-	case versions.LessThan(serverVersion, "17.04"):
-		e.apiClient.UpdateClientVersion("1.27")
-	case versions.LessThan(serverVersion, "17.05"):
-		e.apiClient.UpdateClientVersion("1.28")
-	case versions.LessThan(serverVersion, "17.06"):
-		e.apiClient.UpdateClientVersion("1.29")
-	default:
-		e.apiClient.UpdateClientVersion("1.30")
-	}
-}
-
 // Gather engine specs (CPU, memory, constraints, ...).
 func (e *Engine) updateSpecs() error {
-	info, err := e.apiClient.Info(context.Background())
+	ctx := context.Background()
+
+	info, err := e.apiClient.Info(ctx)
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
@@ -511,7 +479,7 @@ func (e *Engine) updateSpecs() error {
 		return fmt.Errorf("cannot get resources for this engine, make sure %s is a Docker Engine, not a Swarm manager", e.Addr)
 	}
 
-	v, err := e.apiClient.ServerVersion(context.Background())
+	v, err := e.apiClient.ServerVersion(ctx)
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return err
@@ -526,7 +494,7 @@ func (e *Engine) updateSpecs() error {
 	// update server version
 	e.Version = v.Version
 	// update client version. docker/api handles backward compatibility where needed
-	e.updateClientVersionFromServer(v.Version)
+	e.apiClient.NegotiateAPIVersion(ctx)
 
 	e.Lock()
 	defer e.Unlock()
@@ -1000,37 +968,41 @@ func (e *Engine) UpdateNetworkContainers(containerID string, full bool) error {
 			continue
 		}
 		for _, n := range c.NetworkSettings.Networks {
-			if engineNetwork, ok := e.networks[n.NetworkID]; ok {
-				// extract container name
-				ctrName := ""
-				if len(c.Names) != 0 {
-					if s := strings.Split(c.Names[0], "/"); len(s) > 1 {
-						ctrName = s[1]
-					} else {
-						ctrName = s[0]
-					}
-				}
-				// extract ip addresses
-				ipv4address := ""
-				ipv6address := ""
-				if n.IPAddress != "" {
-					ipv4address = n.IPAddress + "/" + strconv.Itoa(n.IPPrefixLen)
-				}
-				if n.GlobalIPv6Address != "" {
-					ipv6address = n.GlobalIPv6Address + "/" + strconv.Itoa(n.GlobalIPv6PrefixLen)
-				}
-				// udpate network information
-				engineNetwork.Containers[c.ID] = types.EndpointResource{
-					Name:        ctrName,
-					EndpointID:  n.EndpointID,
-					MacAddress:  n.MacAddress,
-					IPv4Address: ipv4address,
-					IPv6Address: ipv6address,
-				}
-			} else {
+			engineNetwork, ok := e.networks[n.NetworkID]
+			if !ok {
 				// it shouldn't be the case that a network which a container is connected to wasn't
 				// even listed. Return an error when that happens.
 				return fmt.Errorf("container %s connected to network %s but the network wasn't listed in the refresh loop", c.ID, n.NetworkID)
+			}
+
+			// extract container name
+			ctrName := ""
+			if len(c.Names) != 0 {
+				if s := strings.Split(c.Names[0], "/"); len(s) > 1 {
+					ctrName = s[1]
+				} else {
+					ctrName = s[0]
+				}
+			}
+			// extract ip addresses
+			ipv4address := ""
+			ipv6address := ""
+			if n.IPAddress != "" {
+				ipv4address = n.IPAddress + "/" + strconv.Itoa(n.IPPrefixLen)
+			}
+			if n.GlobalIPv6Address != "" {
+				ipv6address = n.GlobalIPv6Address + "/" + strconv.Itoa(n.GlobalIPv6PrefixLen)
+			}
+			// update network information
+			if engineNetwork.Containers == nil {
+				engineNetwork.Containers = make(map[string]types.EndpointResource)
+			}
+			engineNetwork.Containers[c.ID] = types.EndpointResource{
+				Name:        ctrName,
+				EndpointID:  n.EndpointID,
+				MacAddress:  n.MacAddress,
+				IPv4Address: ipv4address,
+				IPv6Address: ipv6address,
 			}
 		}
 	}
@@ -1501,15 +1473,11 @@ func (e *Engine) cleanupContainers() {
 }
 
 // StartContainer starts a container
-func (e *Engine) StartContainer(container *Container, hostConfig *dockerclient.HostConfig) error {
-	var err error
-	if hostConfig != nil {
-		err = e.client.StartContainer(container.ID, hostConfig)
-	} else {
-		// TODO(nishanttotla): Should ContainerStartOptions be provided?
-		err = e.apiClient.ContainerStart(context.Background(), container.ID, types.ContainerStartOptions{})
-	}
+func (e *Engine) StartContainer(container *Container) error {
+	// TODO(nishanttotla): Should ContainerStartOptions be provided?
+	err := e.apiClient.ContainerStart(context.Background(), container.ID, types.ContainerStartOptions{})
 	e.CheckConnectionErr(err)
+
 	if err != nil {
 		return err
 	}

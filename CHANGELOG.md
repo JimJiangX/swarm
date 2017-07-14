@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.8 (2017-07-11)
+
+#### API
+
+- Support asterisks in image reference filter
+
+#### Networking
+
+- Fix panic when network is created without connecting to any containers
+
 ## 1.2.7 (2017-06-30)
 
 #### API
