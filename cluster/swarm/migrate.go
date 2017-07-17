@@ -305,12 +305,12 @@ func (gd *Gardener) UnitMigrate(nameOrID string, candidates []string, hostConfig
 		}
 		config.HostConfig.CpusetCpus = cpuset
 
-		if migrate.Type != _SwitchManagerType {
-			err := svc.isolate(migrate.Name)
-			if err != nil {
-				entry.Errorf("isolate container error:%+v", err)
-			}
-		}
+		//		if migrate.Type != _SwitchManagerType {
+		//			err := svc.isolate(migrate.Name)
+		//			if err != nil {
+		//				entry.Errorf("isolate container error:%+v", err)
+		//			}
+		//		}
 
 		if !force {
 			err = stopOldContainer(migrate)
@@ -1208,12 +1208,12 @@ func (gd *Gardener) UnitRebuild(nameOrID, image string, candidates []string, hos
 
 			}(container, engine.IP, networkings, pending.localStore)
 
-			if rebuild.Type != _SwitchManagerType {
-				err := svc.isolate(rebuild.Name)
-				if err != nil {
-					entry.Errorf("isolate container:%+v", err)
-				}
-			}
+			//			if rebuild.Type != _SwitchManagerType {
+			//				err := svc.isolate(rebuild.Name)
+			//				if err != nil {
+			//					entry.Errorf("isolate container:%+v", err)
+			//				}
+			//			}
 
 			err = stopOldContainer(rebuild)
 			if err != nil {
