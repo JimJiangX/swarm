@@ -158,7 +158,7 @@ func (tl GoTaskLock) run(check func(val int) bool, do func() error, async bool) 
 				field.Errorf("go task lock:setStatus error,%+v", _err)
 			}
 
-			field.Debug("Task Done!")
+			field.Info("Task Done!")
 		}()
 
 		return do()
