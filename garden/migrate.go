@@ -11,16 +11,16 @@ import (
 	"golang.org/x/net/context"
 )
 
+type baseContainer struct {
+	unit      unit
+	engine    *cluster.Engine
+	container *cluster.Container
+	volumes   []database.Volume
+}
+
 // ServiceMigrate migrate an unit to other hosts,include volumes、networkings,clean the old container.
 func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID string, candidates []string, async bool) (string, error) {
 	migrate := func() error {
-		type baseContainer struct {
-			unit      unit
-			engine    *cluster.Engine
-			container *cluster.Container
-			volumes   []database.Volume
-		}
-
 		var old, news baseContainer
 
 		units, err := svc.getUnits()

@@ -187,6 +187,11 @@ type ServiceRestoreRequest struct {
 	Units []string `json:"units"`
 }
 
+type PostUnitMigrate struct {
+	NameOrID   string   `json:"nameOrID"`
+	Candidates []string `json:"candidates,omitempty"`
+}
+
 type ServiceLink struct {
 	priority int
 	Spec     *ServiceSpec `json:"-"`

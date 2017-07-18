@@ -2072,7 +2072,7 @@ func vaildPostServiceRestoreRequest(v structs.ServiceRestoreRequest) error {
 		return nil
 	}
 
-	return fmt.Errorf("ServiceBackupConfig:%v,%s", v, errs)
+	return fmt.Errorf("ServiceRestoreRequest:%v,%s", v, errs)
 }
 
 func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2118,7 +2118,7 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 1144, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 144, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2146,7 +2146,7 @@ func vaildPostUnitRebuildRequest(v structs.UnitRebuildRequest) error {
 		return nil
 	}
 
-	return fmt.Errorf("ServiceScaleRequest:%v,%s", v, errs)
+	return fmt.Errorf("UnitRebuildRequest:%v,%s", v, errs)
 }
 
 func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2193,6 +2193,73 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	id, err := gd.RebuildUnits(ctx, nil, svc, req, true)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 154, "fail to scale service", "服务水平扩展错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+}
+
+func vaildPostUnitMigrateRequest(v structs.PostUnitMigrate) error {
+	errs := make([]string, 0, 1)
+
+	if v.NameOrID == "" {
+		errs = append(errs, "Unit name or ID is required")
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("PostUnitMigrate:%v,%s", v, errs)
+}
+
+func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	req := structs.PostUnitMigrate{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		ec := errCodeV1(_Service, decodeError, 161, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	if err := vaildPostUnitMigrateRequest(req); err != nil {
+		ec := errCodeV1(_Service, invaildParamsError, 162, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil ||
+		gd.KVClient() == nil ||
+		gd.PluginClient() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	svc, err := gd.Service(name)
+	if err != nil {
+		ec := errCodeV1(_Service, internalError, 163, "not found the service", "查询指定服务错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
+	}
+
+	id, err := gd.ServiceMigrate(ctx, svc, req.NameOrID, req.Candidates, true)
+	if err != nil {
+		ec := errCodeV1(_Service, internalError, 164, "fail to scale service", "服务水平扩展错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
