@@ -2104,7 +2104,7 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	bf, err := orm.GetBackupFile(req.File)
 	if err != nil {
-		ec := errCodeV1(_Unit, dbQueryError, 143, "fail to query database", "数据库查询错误（备份文件表）")
+		ec := errCodeV1(_Service, dbQueryError, 143, "fail to query database", "数据库查询错误（备份文件表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2125,7 +2125,74 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	id, err := svc.UnitRestore(ctx, req.Units, bf.Path, true)
 	if err != nil {
-		ec := errCodeV1(_Unit, internalError, 145, "fail to restore unit data", "服务单元数据恢复错误")
+		ec := errCodeV1(_Service, internalError, 145, "fail to restore unit data", "服务单元数据恢复错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+}
+
+func vaildPostUnitRebuildRequest(v structs.UnitRebuildRequest) error {
+	errs := make([]string, 0, 1)
+
+	if len(v.Units) < 1 {
+		errs = append(errs, "Units is required")
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("ServiceScaleRequest:%v,%s", v, errs)
+}
+
+func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	req := structs.UnitRebuildRequest{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		ec := errCodeV1(_Service, decodeError, 151, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	if err := vaildPostUnitRebuildRequest(req); err != nil {
+		ec := errCodeV1(_Service, invaildParamsError, 152, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil ||
+		gd.KVClient() == nil ||
+		gd.PluginClient() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	svc, err := gd.Service(name)
+	if err != nil {
+		ec := errCodeV1(_Service, internalError, 153, "not found the service", "查询指定服务错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
+	}
+
+	id, err := gd.RebuildUnits(ctx, nil, svc, req, true)
+	if err != nil {
+		ec := errCodeV1(_Service, internalError, 154, "fail to scale service", "服务水平扩展错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2186,73 +2253,6 @@ func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
-}
-
-func vaildPostUnitRebuildRequest(v structs.UnitRebuildRequest) error {
-	errs := make([]string, 0, 1)
-
-	if len(v.Units) < 1 {
-		errs = append(errs, "Units is required")
-	}
-
-	if len(errs) == 0 {
-		return nil
-	}
-
-	return fmt.Errorf("ServiceScaleRequest:%v,%s", v, errs)
-}
-
-func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-
-	req := structs.UnitRebuildRequest{}
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		ec := errCodeV1(_Service, decodeError, 31, "JSON Decode Request Body error", "JSON解析请求Body错误")
-		httpJSONError(w, err, ec, http.StatusBadRequest)
-		return
-	}
-
-	if err := vaildPostUnitRebuildRequest(req); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
-		httpJSONError(w, err, ec, http.StatusBadRequest)
-		return
-	}
-
-	ok, _, gd := fromContext(ctx, _Garden)
-	if !ok || gd == nil ||
-		gd.Ormer() == nil ||
-		gd.KVClient() == nil ||
-		gd.PluginClient() == nil {
-
-		httpJSONNilGarden(w)
-		return
-	}
-
-	svc, err := gd.Service(name)
-	if err != nil {
-		ec := errCodeV1(_Service, internalError, 33, "not found the service", "查询指定服务错误")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	// new Context with deadline
-	if deadline, ok := ctx.Deadline(); !ok {
-		ctx = goctx.Background()
-	} else {
-		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
-	}
-
-	id, err := gd.RebuildUnits(ctx, nil, svc, req, true)
-	if err != nil {
-		ec := errCodeV1(_Service, internalError, 34, "fail to scale service", "服务水平扩展错误")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
 }
 
 // -----------------/storage handlers-----------------
