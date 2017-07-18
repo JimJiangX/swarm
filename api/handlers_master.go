@@ -929,7 +929,7 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	master := resource.NewHostManager(orm, gd.Cluster)
@@ -1483,7 +1483,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	d := deploy.New(gd)
@@ -1541,7 +1541,7 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	d := deploy.New(gd)
@@ -1599,7 +1599,7 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	d := deploy.New(gd)
@@ -1639,7 +1639,7 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	d := deploy.New(gd)
@@ -1702,7 +1702,7 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	d := deploy.New(gd)
@@ -1749,7 +1749,7 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	task := database.NewTask(spec.Name, database.ServiceStartTask, spec.ID, spec.Desc, nil, 300)
@@ -1821,7 +1821,7 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	task := database.NewTask(spec.Name, database.ServiceUpdateConfigTask, spec.ID, spec.Desc, nil, 300)
@@ -1889,7 +1889,7 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	task := database.NewTask(spec.Name, database.ServiceExecTask, spec.ID, spec.Desc, nil, 300)
@@ -1935,7 +1935,7 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	task := database.NewTask(spec.Name, database.ServiceStopTask, spec.ID, spec.Desc, nil, 300)
@@ -2046,7 +2046,7 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	task := database.NewTask(spec.Name, database.ServiceBackupTask, spec.ID, spec.Desc, nil, 300)
@@ -2155,7 +2155,7 @@ func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	svc := gd.NewService(nil, &table)
@@ -2224,7 +2224,7 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	id, err := gd.RebuildUnits(ctx, nil, svc, req, true)
