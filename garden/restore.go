@@ -64,16 +64,12 @@ func (svc *Service) UnitRestore(ctx context.Context, assigned []string, path str
 			units = make([]*unit, 0, len(assigned))
 
 			for i := range assigned {
-				found := false
-				for k := range out {
-					if out[k].u.ID == assigned[i] || out[k].u.Name == assigned[i] {
-						found = true
-						units = append(units, out[k])
-					}
-				}
-				if !found {
+				u := getUnit(out, assigned[i])
+				if u == nil {
 					return errors.Errorf("%s is not belongs to service %s", assigned[i], svc.svc.Name)
 				}
+
+				units = append(units, u)
 			}
 		}
 

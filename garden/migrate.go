@@ -12,10 +12,11 @@ import (
 )
 
 type baseContainer struct {
-	unit      unit
-	engine    *cluster.Engine
-	container *cluster.Container
-	volumes   []database.Volume
+	unit        unit
+	engine      *cluster.Engine
+	container   *cluster.Container
+	volumes     []database.Volume
+	networkings []database.IP
 }
 
 // ServiceMigrate migrate an unit to other hosts,include volumes、networkings,clean the old container.
@@ -34,16 +35,21 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 				return errors.Errorf("unit %s is not exist in service %s", nameOrID, svc.svc.Name)
 			}
 
-			lvs, err := svc.so.ListVolumesByUnitID(got.u.ID)
+			lvs, err := got.uo.ListVolumesByUnitID(got.u.ID)
+			if err != nil {
+				return err
+			}
+			ips, err := got.uo.ListIPByUnitID(got.u.ID)
 			if err != nil {
 				return err
 			}
 
 			old = baseContainer{
-				unit:      *got,
-				engine:    got.getEngine(),
-				container: got.getContainer(),
-				volumes:   lvs,
+				unit:        *got,
+				engine:      got.getEngine(),
+				container:   got.getContainer(),
+				volumes:     lvs,
+				networkings: ips,
 			}
 			if old.engine == nil {
 				old.engine = &cluster.Engine{
@@ -66,7 +72,12 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 				len(units)+1, candidates, nil, nil)
 			defer func() {
 				if err != nil {
-					_err := svc.removeUnits(ctx, units, gd.kvClient)
+					_, _err := migrateNetworking(svc.so, news.networkings, old.networkings)
+					if _err != nil {
+						err = errors.Errorf("%+v\nmgirate networkings:%+v", err, _err)
+					}
+
+					_err = svc.removeUnits(ctx, units, gd.kvClient)
 					if _err != nil {
 						err = errors.Errorf("%+v\nremove new addition units:%+v", err, _err)
 					}
@@ -79,9 +90,15 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 			if len(adds) > 0 {
 				news.unit = *adds[0]
 			}
+
+			// migrate networkings
+			news.networkings, err = migrateNetworking(svc.so, old.networkings, pendings[0].networkings)
+			if err != nil {
+				return err
+			}
+
 			// migrate volumes
-			out, err := actor.MigrateVolumes(news.unit.u.ID, old.engine, news.engine, old.volumes)
-			news.volumes = out
+			news.volumes, err = actor.MigrateVolumes(news.unit.u.ID, old.engine, news.engine, old.volumes)
 			if err != nil {
 				return err
 			}
@@ -152,4 +169,33 @@ func updateUnitRegister(ctx context.Context, kvc kvstore.Client, old, new unit, 
 	}
 
 	return registerUnits(ctx, []*unit{&new}, kvc, cmds)
+}
+
+func migrateNetworking(orm database.NetworkingOrmer, src, new []database.IP) ([]database.IP, error) {
+	if len(src) != len(new) {
+		return nil, errors.New("invaild input")
+	}
+
+	dst := make([]database.IP, len(src))
+	copy(dst, src)
+
+	for i := range dst {
+		dst[i].Bandwidth = new[i].Bandwidth
+		dst[i].Bond = new[i].Bond
+		dst[i].Engine = new[i].Engine
+		dst[i].UnitID = new[i].UnitID
+		// reset IP
+		new[i].UnitID = ""
+		new[i].Engine = ""
+		new[i].Bandwidth = 0
+		new[i].Bond = ""
+	}
+
+	set := make([]database.IP, len(dst)+len(new))
+	n := copy(set, dst)
+	copy(set[n:], new)
+
+	err := orm.SetIPs(set)
+
+	return dst, err
 }
