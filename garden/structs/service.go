@@ -182,6 +182,11 @@ type ServiceBackupConfig struct {
 	BackupDir string `json:"backup_dir"`
 }
 
+type ServiceRestoreRequest struct {
+	File  string   `json:"file"`
+	Units []string `json:"units"`
+}
+
 type ServiceLink struct {
 	priority int
 	Spec     *ServiceSpec `json:"-"`

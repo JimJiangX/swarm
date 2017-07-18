@@ -2061,7 +2061,78 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
+}
 
+func vaildPostServiceRestoreRequest(v structs.ServiceRestoreRequest) error {
+	errs := make([]string, 0, 2)
+
+	// TODO:check params
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("ServiceBackupConfig:%v,%s", v, errs)
+}
+
+func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	req := structs.ServiceRestoreRequest{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		ec := errCodeV1(_Service, decodeError, 141, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	if err := vaildPostServiceRestoreRequest(req); err != nil {
+		ec := errCodeV1(_Service, invaildParamsError, 142, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	orm := gd.Ormer()
+
+	bf, err := orm.GetBackupFile(req.File)
+	if err != nil {
+		ec := errCodeV1(_Unit, dbQueryError, 143, "fail to query database", "数据库查询错误（备份文件表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
+	}
+
+	svc, err := gd.GetService(name)
+	if err != nil {
+		ec := errCodeV1(_Service, dbQueryError, 1144, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	id, err := svc.UnitRestore(ctx, req.Units, bf.Path, true)
+	if err != nil {
+		ec := errCodeV1(_Unit, internalError, 145, "fail to restore unit data", "服务单元数据恢复错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
 }
 
 // -----------------/units handlers-----------------
@@ -2115,61 +2186,6 @@ func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
-}
-
-func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		ec := errCodeV1(_Unit, urlParamError, 21, "parse Request URL parameter error", "解析请求URL参数错误")
-		httpJSONError(w, err, ec, http.StatusBadRequest)
-		return
-	}
-
-	name := mux.Vars(r)["name"]
-	from := r.FormValue("from")
-
-	ok, _, gd := fromContext(ctx, _Garden)
-	if !ok || gd == nil ||
-		gd.Ormer() == nil {
-
-		httpJSONNilGarden(w)
-		return
-	}
-
-	orm := gd.Ormer()
-
-	bf, err := orm.GetBackupFile(from)
-	if err != nil {
-		ec := errCodeV1(_Unit, dbQueryError, 22, "fail to query database", "数据库查询错误（备份文件表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	table, err := orm.GetServiceByUnit(name)
-	if err != nil {
-		ec := errCodeV1(_Unit, dbQueryError, 23, "fail to query database", "数据库查询错误（服务表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	// new Context with deadline
-	if deadline, ok := ctx.Deadline(); !ok {
-		ctx = goctx.Background()
-	} else {
-		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
-	}
-
-	svc := gd.NewService(nil, &table)
-
-	id, err := svc.UnitRestore(ctx, name, bf.Path, true)
-	if err != nil {
-		ec := errCodeV1(_Unit, internalError, 24, "fail to restore unit data", "服务单元数据恢复错误")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
 }
 
 func vaildPostUnitRebuildRequest(v structs.UnitRebuildRequest) error {
