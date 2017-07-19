@@ -109,6 +109,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	http.MethodPut: {
 		"/clusters/{name}": putClusterParams,
 
+		"/softwares/images/{name:.*}": putImageTemplate,
+
 		"/hosts/{name}":         putNodeParam,
 		"/hosts/{name}/enable":  putNodeEnable,
 		"/hosts/{name}/disable": putNodeDisable,

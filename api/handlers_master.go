@@ -569,6 +569,34 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, resp, http.StatusOK)
 }
 
+func putImageTemplate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	ct := structs.ConfigTemplate{}
+
+	err := json.NewDecoder(r.Body).Decode(&ct)
+	if err != nil {
+		ec := errCodeV1(_Cluster, decodeError, 61, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	err = gd.PluginClient().PostImageTemplate(ctx, ct)
+	if err != nil {
+		ec := errCodeV1(_Image, internalError, 62, "fail to update image template", "更新镜像模板错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // -----------------/clusters handlers-----------------
 func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
