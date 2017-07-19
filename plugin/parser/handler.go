@@ -39,6 +39,7 @@ func NewRouter(c kvstore.Client, ip string, port int) *mux.Router {
 
 	var routes = map[string]map[string]handler{
 		"GET": {
+			"/image/template/{name}":          getImage,
 			"/image/support":                  getSupportImageVersion,
 			"/configs/{service:.*}":           getConfigs,
 			"/configs/{service:.*}/{unit:.*}": getConfig,
@@ -80,6 +81,25 @@ func NewRouter(c kvstore.Client, ip string, port int) *mux.Router {
 	}
 
 	return r
+}
+
+func getImage(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	path := make([]string, 1, 3)
+	path[0] = imageKey
+	path = append(path, strings.SplitN(name, ":", 2)...)
+	key := strings.Join(path, "/")
+
+	pair, err := ctx.client.GetKV(r.Context(), key)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(pair.Value)
 }
 
 func getSupportImageVersion(ctx *_Context, w http.ResponseWriter, r *http.Request) {

@@ -369,10 +369,10 @@ func listImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out := make([]structs.GetImageResponse, len(images))
+	out := make([]structs.ImageResponse, len(images))
 
 	for i := range images {
-		out[i] = structs.GetImageResponse{
+		out[i] = structs.ImageResponse{
 			ImageVersion: structs.ImageVersion{
 				Name:  images[i].Name,
 				Major: images[i].Major,
@@ -520,6 +520,53 @@ func deleteImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	im, err := gd.Ormer().GetImageVersion(name)
+	if err != nil {
+		ec := errCodeV1(_Image, dbQueryError, 51, "fail to query database", "数据库查询错误（镜像表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	imResp := structs.ImageResponse{
+		ImageVersion: structs.ImageVersion{
+			Name:  im.Name,
+			Major: im.Major,
+			Minor: im.Minor,
+			Patch: im.Patch,
+		},
+		Size:     im.Size,
+		ID:       im.ID,
+		ImageID:  im.ImageID,
+		Labels:   im.Labels,
+		UploadAt: utils.TimeToString(im.UploadAt),
+	}
+
+	t, err := gd.PluginClient().GetImage(ctx, im.Version())
+	if err != nil {
+		ec := errCodeV1(_Image, internalError, 52, "fail to query image", "获取镜像错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	resp := structs.GetImageResponse{
+		ImageResponse: imResp,
+		Template:      t,
+	}
+
+	writeJSON(w, resp, http.StatusOK)
 }
 
 // -----------------/clusters handlers-----------------

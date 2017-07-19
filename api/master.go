@@ -67,6 +67,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/tasks/{name}": getTask,
 
 		"/softwares/images":           listImages,
+		"/softwares/images/{name:.*}": getImage,
 		"/softwares/images/supported": getSupportImages,
 
 		"/services":        getServices,

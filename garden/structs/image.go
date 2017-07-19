@@ -109,11 +109,16 @@ type ConfigTemplate struct {
 	Timestamp  int64
 }
 
-type GetImageResponse struct {
+type ImageResponse struct {
 	ImageVersion
 	Size     int    `json:"size"`
 	ID       string `json:"id"`
 	ImageID  string `json:"docker_image_id"`
 	Labels   string `json:"label"`
 	UploadAt string `json:"upload_at"`
+}
+
+type GetImageResponse struct {
+	ImageResponse
+	Template ConfigTemplate
 }
