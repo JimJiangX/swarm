@@ -39,7 +39,7 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 		if len(units) > req.Arch.Replicas {
 			err = svc.scaleDown(ctx, units, req.Arch.Replicas, gd.KVClient())
 		} else {
-			_, err = gd.scaleUp(ctx, svc, actor, req)
+			_, err = gd.scaleUp(ctx, svc, actor, req, nil)
 		}
 		if err != nil {
 			return err
@@ -188,7 +188,9 @@ func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, actor alloc
 	return adds, pendings, err
 }
 
-func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocator, scale structs.ServiceScaleRequest) ([]*unit, error) {
+func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocator,
+	scale structs.ServiceScaleRequest, networkings [][]database.IP) ([]*unit, error) {
+
 	units, pendings, err := gd.scaleAllocation(ctx, svc, actor, false,
 		scale.Arch.Replicas, scale.Candidates, scale.Users, scale.Options)
 	defer func() {

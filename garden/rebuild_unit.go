@@ -25,16 +25,21 @@ func (gd *Garden) RebuildUnits(ctx context.Context, actor alloc.Allocator, svc *
 
 		rm := make([]*unit, 0, len(req.Units))
 		for _, id := range req.Units {
-			found := false
-			for _, u := range units {
-				if u.u.ID == id || u.u.Name == id || u.u.ContainerID == id {
-					rm = append(rm, u)
-					found = true
-					break
-				}
-			}
-			if !found {
+			u := getUnit(units, id)
+			if u == nil {
 				return errors.Errorf("unit '%s' isnot belong to Service '%s'", id, svc.svc.Name)
+			}
+			rm = append(rm, u)
+		}
+
+		networkings := make([][]database.IP, 0, len(rm))
+		{
+			for i := range rm {
+				out, err := rm[i].uo.ListIPByUnitID(rm[i].u.ID)
+				if err != nil {
+					return err
+				}
+				networkings = append(networkings, out)
 			}
 		}
 
@@ -54,7 +59,7 @@ func (gd *Garden) RebuildUnits(ctx context.Context, actor alloc.Allocator, svc *
 			actor = alloc.NewAllocator(gd.Ormer(), gd.Cluster)
 		}
 
-		_, err = gd.scaleUp(ctx, svc, actor, scale)
+		_, err = gd.scaleUp(ctx, svc, actor, scale, networkings)
 		if err != nil {
 			return err
 		}

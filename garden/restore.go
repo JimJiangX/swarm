@@ -66,7 +66,7 @@ func (svc *Service) UnitRestore(ctx context.Context, assigned []string, path str
 			for i := range assigned {
 				u := getUnit(out, assigned[i])
 				if u == nil {
-					return errors.Errorf("%s is not belongs to service %s", assigned[i], svc.svc.Name)
+					return errors.Errorf("%s isnot belongs to Service %s", assigned[i], svc.svc.Name)
 				}
 
 				units = append(units, u)

@@ -32,7 +32,7 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 			// the assigned unit being migrating
 			got := getUnit(units, nameOrID)
 			if got == nil {
-				return errors.Errorf("unit %s is not exist in service %s", nameOrID, svc.svc.Name)
+				return errors.Errorf("unit %s isnot belongs to Service %s", nameOrID, svc.svc.Name)
 			}
 
 			lvs, err := got.uo.ListVolumesByUnitID(got.u.ID)
@@ -77,7 +77,7 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 						err = errors.Errorf("%+v\nmgirate networkings:%+v", err, _err)
 					}
 
-					_err = svc.removeUnits(ctx, units, gd.kvClient)
+					_err = svc.removeUnits(ctx, adds, gd.kvClient)
 					if _err != nil {
 						err = errors.Errorf("%+v\nremove new addition units:%+v", err, _err)
 					}
