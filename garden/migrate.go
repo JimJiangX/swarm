@@ -72,7 +72,7 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 				len(units)+1, candidates, nil, nil)
 			defer func() {
 				if err != nil {
-					_, _err := migrateNetworking(svc.so, news.networkings, old.networkings)
+					_err := svc.so.SetIPs(old.networkings)
 					if _err != nil {
 						err = errors.Errorf("%+v\nmgirate networkings:%+v", err, _err)
 					}
