@@ -126,10 +126,10 @@ type scheduleOption struct {
 	Require structs.UnitRequire `json:"UnitRequire,omitempty"`
 
 	Nodes struct {
-		Networkings []string `json:"Networkings,omitempty"`
-		Clusters    []string `json:"Clusters,omitempty"`
-		Filters     []string `json:"Filters,omitempty"`
-		Constraints []string `json:"Constraints,omitempty"`
+		Networkings map[string][]string `json:"Networkings,omitempty"` // key:cluster id
+		Clusters    []string            `json:"Clusters,omitempty"`
+		Filters     []string            `json:"Filters,omitempty"`
+		Constraints []string            `json:"Constraints,omitempty"`
 	} `json:"Nodes,omitempty"`
 
 	Scheduler struct {
@@ -411,7 +411,8 @@ func pendingAlloc(actor alloc.Allocator, unit database.Unit,
 		return pu, err
 	}
 
-	networkings, err := actor.AlloctNetworking(pu.config, node.ID, pu.Unit.ID, opts.Nodes.Networkings, opts.Require.Networks)
+	netlist := opts.Nodes.Networkings[node.Labels[clusterLabel]]
+	networkings, err := actor.AlloctNetworking(pu.config, node.ID, pu.Unit.ID, netlist, opts.Require.Networks)
 	if len(networkings) > 0 {
 		pu.networkings = append(pu.networkings, networkings...)
 	}

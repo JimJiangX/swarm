@@ -186,7 +186,7 @@ func convertStructsService(spec structs.ServiceSpec, schedopts scheduleOption) (
 	}
 
 	var nw = struct {
-		NetworkingIDs []string
+		NetworkingIDs map[string][]string
 		Require       []structs.NetDeviceRequire
 	}{
 		spec.Networkings,

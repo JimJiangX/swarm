@@ -109,7 +109,7 @@ type ServiceSpec struct {
 
 	Require *UnitRequire `json:"unit_require,omitempty"`
 
-	Networkings []string `json:"networking_id,omitempty"`
+	Networkings map[string][]string `json:"networking_id,omitempty"`
 
 	Clusters []string `json:"cluster_id,omitempty"`
 
