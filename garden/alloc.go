@@ -126,7 +126,7 @@ type scheduleOption struct {
 	Require structs.UnitRequire `json:"UnitRequire,omitempty"`
 
 	Nodes struct {
-		Networkings map[string][]string `json:"Networkings,omitempty"` // key:cluster id
+		Networkings map[string][]string `json:"Networkings,omitempty"` // key:cluster id,value:networking id slice
 		Clusters    []string            `json:"Clusters,omitempty"`
 		Filters     []string            `json:"Filters,omitempty"`
 		Constraints []string            `json:"Constraints,omitempty"`
