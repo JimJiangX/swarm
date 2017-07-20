@@ -621,7 +621,7 @@ paths:
           required: true
           description: 所属网段id 下全部IP，可选
           schema:
-            $ref: '#/definitions/ServiceSpec'
+            $ref: '#/definitions/PostServiceRequst'
       responses:
         '201':
           description: 返回任务信息
@@ -1463,6 +1463,110 @@ definitions:
         type: object
         additionalProperties:
           type: string
+  PostServiceRequst:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      desc:
+        type: string
+      tag:
+        type: string
+      auto_healing:
+        type: boolean
+      auto_scaling:
+        type: boolean
+      high_available:
+        type: boolean
+      status:
+        type: integer
+      max_backup_space:
+        type: integer
+      backup_files_retention:
+        type: integer
+      created_at:
+        type: string
+        format: date-time
+      finished_at:
+        type: string
+        format: date-time
+      architecture:
+        $ref: '#/definitions/Arch'
+      unit_require:
+        $ref: '#/definitions/unitRequire'
+      cluster_id:
+        type: array
+        items:
+          type: string
+      constraints:
+        type: array
+        items:
+          type: string
+      opts:
+        type: object
+        additionalProperties:
+          type: string
+      users:
+        type: array
+        items:
+          properties:
+            name:
+              type: string
+            password:
+              type: string
+            role:
+              type: string
+            privilege:
+              type: string
+      networking:
+        type: object
+        additionalProperties:
+          type: array
+          items:
+            type: string
+  unitRequire:
+    properties:
+      require:
+        type: object
+        properties:
+          ncpu:
+            type: integer
+          memory:
+            type: integer
+      limit:
+        type: object
+        properties:
+          ncpu:
+            type: integer
+          memory:
+            type: integer
+      volumes:
+        type: array
+        items:
+          properties:
+            from:
+              type: string
+            name:
+              type: string
+            type:
+              type: string
+            driver:
+              type: string
+            size:
+              type: integer
+            options:
+              type: object
+              additionalProperties:
+                type: string
+      networks:
+        type: array
+        items:
+          properties:
+            device:
+              type: integer
+            bandwidth:
+              type: integer
   systemConfig:
     properties:
       dc_id:
