@@ -348,7 +348,7 @@ func scheduleOptionsByUnits(opts scheduleOption, units []*unit, filter bool) (sc
 	}
 
 	if len(ips) == 1 {
-		opts.Nodes.Networkings = map[string][]string{node.ClusterID: []string{ips[0].Networking}}
+		opts.Nodes.Networkings = map[string][]string{node.ClusterID: {ips[0].Networking}}
 	} else {
 		ids := make([]string, 0, len(ips))
 
