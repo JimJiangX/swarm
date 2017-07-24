@@ -170,6 +170,11 @@ func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	t, err := gd.Ormer().GetTask(name)
 	if err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			writeJSON(w, "{}", http.StatusOK)
+			return
+		}
+
 		ec := errCodeV1(_Task, dbQueryError, 11, "fail to query database", "数据库查询错误（任务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
@@ -344,6 +349,11 @@ func getSystemConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	sys, err := gd.Ormer().GetSysConfig()
 	if err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			writeJSON(w, "{}", http.StatusOK)
+			return
+		}
+
 		ec := errCodeV1(_DC, dbQueryError, 21, "fail to query database", "数据库查询错误（配置参数表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
@@ -535,6 +545,11 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	im, err := gd.Ormer().GetImageVersion(name)
 	if err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			writeJSON(w, "{}", http.StatusOK)
+			return
+		}
+
 		ec := errCodeV1(_Image, dbQueryError, 51, "fail to query database", "数据库查询错误（镜像表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
@@ -611,6 +626,11 @@ func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	orm := gd.Ormer()
 	c, err := orm.GetCluster(name)
 	if err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			writeJSON(w, "{}", http.StatusOK)
+			return
+		}
+
 		ec := errCodeV1(_Cluster, dbQueryError, 11, "fail to query database", "数据库查询错误（集群表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
@@ -844,6 +864,11 @@ func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	n, err := gd.Ormer().GetNode(name)
 	if err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			writeJSON(w, "{}", http.StatusOK)
+			return
+		}
+
 		ec := errCodeV1(_Host, dbQueryError, 11, "fail to query database", "数据库查询错误（主机表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
@@ -1022,7 +1047,6 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, out, http.StatusCreated)
-	return
 }
 
 func putNodeEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1460,7 +1484,7 @@ func getNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, structs.NetworkingInfo{}, http.StatusOK)
+	writeJSON(w, "{}", http.StatusOK)
 }
 
 // -----------------/services handlers-----------------
@@ -1478,9 +1502,7 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(services)
+	writeJSON(w, services, http.StatusOK)
 }
 
 func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1494,14 +1516,17 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	spec, err := gd.ServiceSpec(name)
 	if err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			writeJSON(w, "{}", http.StatusOK)
+			return
+		}
+
 		ec := errCodeV1(_Service, dbQueryError, 21, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(spec)
+	writeJSON(w, spec, http.StatusOK)
 }
 
 func vaildPostServiceRequest(spec structs.ServiceSpec) error {
@@ -2418,9 +2443,7 @@ func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
+	writeJSON(w, resp, http.StatusOK)
 }
 
 // GET /storage/san/{name:.*}
@@ -2430,6 +2453,11 @@ func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	ds := storage.DefaultStores()
 	store, err := ds.Get(name)
 	if err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			writeJSON(w, "{}", http.StatusOK)
+			return
+		}
+
 		ec := errCodeV1(_Storage, dbQueryError, 21, "fail to query database", "数据库查询错误（外部存储表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
@@ -2442,9 +2470,7 @@ func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
+	writeJSON(w, resp, http.StatusOK)
 }
 
 func getSanStoreInfo(store storage.Store) (structs.SANStorageResponse, error) {
