@@ -73,6 +73,18 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 	}
 }
 
+func writeJSONNull(w http.ResponseWriter, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	fmt.Fprint(w, "{}")
+}
+
+func writeJSONFprintf(w http.ResponseWriter, status int, format string, args ...interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	fmt.Fprintf(w, format, args...)
+}
+
 // -----------------/nfs_backups handlers-----------------
 func vaildNFSParams(nfs database.NFS) error {
 	errs := make([]string, 0, 4)
@@ -152,8 +164,7 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"total_space": %d,"free_space": %d}`, space.Total, space.Free)
+	writeJSONFprintf(w, http.StatusOK, `{"total_space": %d,"free_space": %d}`, space.Total, space.Free)
 }
 
 // -----------------/tasks handlers-----------------
@@ -171,7 +182,7 @@ func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	t, err := gd.Ormer().GetTask(name)
 	if err != nil {
 		if errors.Cause(err) == sql.ErrNoRows {
-			writeJSON(w, "{}", http.StatusOK)
+			writeJSONNull(w, http.StatusOK)
 			return
 		}
 
@@ -350,7 +361,7 @@ func getSystemConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	sys, err := gd.Ormer().GetSysConfig()
 	if err != nil {
 		if errors.Cause(err) == sql.ErrNoRows {
-			writeJSON(w, "{}", http.StatusOK)
+			writeJSONNull(w, http.StatusOK)
 			return
 		}
 
@@ -507,9 +518,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q,%q:%q}", "id", id, "task_id", taskID)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q,%q:%q}", "id", id, "task_id", taskID)
 }
 
 func deleteImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -546,7 +555,7 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	im, err := gd.Ormer().GetImageVersion(name)
 	if err != nil {
 		if errors.Cause(err) == sql.ErrNoRows {
-			writeJSON(w, "{}", http.StatusOK)
+			writeJSONNull(w, http.StatusOK)
 			return
 		}
 
@@ -627,7 +636,7 @@ func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	c, err := orm.GetCluster(name)
 	if err != nil {
 		if errors.Cause(err) == sql.ErrNoRows {
-			writeJSON(w, "{}", http.StatusOK)
+			writeJSONNull(w, http.StatusOK)
 			return
 		}
 
@@ -730,9 +739,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "id", c.ID)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "id", c.ID)
 }
 
 func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -865,7 +872,7 @@ func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	n, err := gd.Ormer().GetNode(name)
 	if err != nil {
 		if errors.Cause(err) == sql.ErrNoRows {
-			writeJSON(w, "{}", http.StatusOK)
+			writeJSONNull(w, http.StatusOK)
 			return
 		}
 
@@ -1275,9 +1282,7 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%d}", "num", n)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%d}", "num", n)
 }
 
 func setNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request, enable bool) {
@@ -1517,7 +1522,7 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	spec, err := gd.ServiceSpec(name)
 	if err != nil {
 		if errors.Cause(err) == sql.ErrNoRows {
-			writeJSON(w, "{}", http.StatusOK)
+			writeJSONNull(w, http.StatusOK)
 			return
 		}
 
@@ -1653,9 +1658,7 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
 func vaildPostServiceLinkRequest(v structs.ServicesLink) error {
@@ -1712,9 +1715,7 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
 func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1751,9 +1752,7 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
 func vaildPostServiceUpdateRequest(v structs.UnitRequire) error {
@@ -1814,10 +1813,7 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
-
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
 func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1861,9 +1857,7 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
 func vaildPostServiceUpdateConfigsRequest(cmds structs.ConfigsMap, args map[string]interface{}) error {
@@ -1933,9 +1927,7 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
 func vaildPostServiceExecRequest(v structs.ServiceExecConfig) error {
@@ -2001,9 +1993,7 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
 func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2047,9 +2037,7 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
 func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2158,9 +2146,7 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
 func vaildPostServiceRestoreRequest(v structs.ServiceRestoreRequest) error {
@@ -2230,9 +2216,7 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
 func vaildPostUnitRebuildRequest(v structs.UnitRebuildRequest) error {
@@ -2297,9 +2281,7 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
 func vaildPostUnitMigrateRequest(v structs.PostUnitMigrate) error {
@@ -2364,9 +2346,7 @@ func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
 // -----------------/units handlers-----------------
@@ -2454,7 +2434,7 @@ func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	store, err := ds.Get(name)
 	if err != nil {
 		if errors.Cause(err) == sql.ErrNoRows {
-			writeJSON(w, "{}", http.StatusOK)
+			writeJSONNull(w, http.StatusOK)
 			return
 		}
 
@@ -2547,9 +2527,7 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "id", s.ID())
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "id", s.ID())
 }
 
 // POST /storage/san/{name}/raidgroup
@@ -2572,9 +2550,7 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%d}", "size", space.Total)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%d}", "size", space.Total)
 }
 
 // PUT /storage/san/{name}/raid_group/{rg:[0-9]+}/enable
