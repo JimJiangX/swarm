@@ -90,23 +90,23 @@ type PostLoadImageRequest struct {
 }
 
 type Keyset struct {
-	CanSet      bool `json:"can_set"`
-	MustRestart bool `json:"must_restart"`
-	Key         string
-	Default     string
-	Desc        string
-	Range       string
+	CanSet      bool   `json:"can_set"`
+	MustRestart bool   `json:"must_restart"`
+	Key         string `json:"key"`
+	Default     string `json:"default"`
+	Desc        string `json:"desc"`
+	Range       string `json:"range"`
 }
 
 type ConfigTemplate struct {
-	Image string
+	Image string `json:"image"`
 	// Mount     string
-	LogMount   string `json:"log_mount"`
-	DataMount  string `json:"data_mount"`
-	ConfigFile string `json:"config_file"`
-	Content    string
-	Keysets    []Keyset
-	Timestamp  int64
+	LogMount   string   `json:"log_mount"`
+	DataMount  string   `json:"data_mount"`
+	ConfigFile string   `json:"config_file"`
+	Content    string   `json:"content"`
+	Keysets    []Keyset `json:"keysets"`
+	Timestamp  int64    `json:"timestamp"`
 }
 
 type ImageResponse struct {
@@ -120,5 +120,5 @@ type ImageResponse struct {
 
 type GetImageResponse struct {
 	ImageResponse
-	Template ConfigTemplate
+	Template ConfigTemplate `json:"config_template"`
 }

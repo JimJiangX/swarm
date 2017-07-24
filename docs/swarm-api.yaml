@@ -143,7 +143,7 @@ paths:
           schema:
             type: array
             items:
-              $ref: '#/definitions/GetImageResponse'
+              $ref: '#/definitions/ImageResponse'
         '500':
           description: 内部数据库查询错误
           schema:
@@ -185,6 +185,41 @@ paths:
           schema:
             $ref: '#/definitions/ErrorResponseHeader'
   '/softwares/images/{id}':
+    get:
+      description: get image & template config
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+          description: image name or id
+      responses:
+        '200':
+          description: returns image with template config
+          schema:
+            properties:
+              id:
+                type: string
+              docker_image_id:
+                type: string
+              name:
+                type: string
+              major_version:
+                type: integer
+              minor_version:
+                type: integer
+              patch:
+                type: integer
+              size:
+                type: integer
+              label:
+                type: string
+              upload_at:
+                type: string
+                format: date-time
+              config_template:
+                type: object
+                $ref: '#/definitions/configTemplate'
     delete:
       description: delete image by id
       parameters:
@@ -804,7 +839,7 @@ definitions:
         type: integer
       patch:
         type: integer
-  GetImageResponse:
+  ImageResponse:
     properties:
       id:
         type: string
@@ -825,6 +860,37 @@ definitions:
       upload_at:
         type: string
         format: date-time
+  configTemplate:
+    properties:
+      image:
+        type: string
+      log_mount:
+        type: string
+      data_mount:
+        type: string
+      config_file:
+        type: string
+      content:
+        type: string
+      timestamp:
+        type: integer
+      keysets:
+        type: array
+        items:
+          type: object
+          properties:
+            can_set:
+              type: boolean
+            must_restart:
+              type: boolean
+            key:
+              type: string
+            default:
+              type: string
+            desc:
+              type: string
+            range:
+              type: string
   PostLoadImageRequest:
     properties:
       name:
@@ -833,7 +899,7 @@ definitions:
         type: integer
       minor_version:
         type: integer
-      patch:
+      patch_version:
         type: integer
       path:
         type: string
