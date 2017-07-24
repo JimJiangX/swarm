@@ -797,6 +797,15 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register, force bool) 
 			return err
 		}
 
+		if !force {
+			// check engines whether is alive before really delete
+			for _, u := range units {
+				if e := u.getEngine(); e == nil {
+					return errors.Errorf("Engine %s is unhealthy", u.u.EngineID)
+				}
+			}
+		}
+
 		select {
 		default:
 		case <-ctx.Done():
