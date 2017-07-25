@@ -158,7 +158,7 @@ func (db dbBase) RegisterNode(n Node, t Task) error {
 func (db dbBase) GetNode(nameOrID string) (Node, error) {
 	var (
 		node  Node
-		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE id=? OR engine_id=?"
+		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at, nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE id=? OR engine_id=?"
 	)
 
 	err := db.Get(&node, query, nameOrID, nameOrID)
