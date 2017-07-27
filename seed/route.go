@@ -3,16 +3,22 @@ package seed
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"golang.org/x/net/context"
 )
 
-const (
-	scriptDir    = "/usr/local/swarm-agent/scripts/seed/"
-	netScriptDir = scriptDir + "net/"
+var (
+	scriptDir = "/usr/local/swarm-agent/scripts/seed/"
 )
+
+func init() {
+	if dir := os.Getenv("SCRIPT_DIR"); dir != "" {
+		scriptDir = dir
+	}
+}
 
 type _Context struct {
 	apiVersion string

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strconv"
 )
 
@@ -77,8 +78,9 @@ func createNetwork(cfg *NetworkCfg) error {
 		"-b", strconv.Itoa(cfg.BandWidth),
 	}
 
-	filepath := netScriptDir + "init_nic.sh"
+	file := filepath.Join(scriptDir, "net/", "init_nic.sh")
 
-	_, err := execShellFile(filepath, args...)
+	_, err := execShellFile(file, args...)
+
 	return err
 }

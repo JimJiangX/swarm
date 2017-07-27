@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"net/http"
 	"os"
@@ -139,7 +140,6 @@ func vgCreateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 func vgListHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 
 	vgs, err := vgList()
-
 	if err != nil {
 		res := &VgListRes{
 			Err: err.Error(),
@@ -224,15 +224,15 @@ func vgList() ([]VgInfo, error) {
 }
 
 func scanSanDisk() error {
-	scriptpath := scriptDir + "sanscandisk.sh"
-	_, err := os.Lstat(scriptpath)
+	script := filepath.Join(scriptDir, "sanscandisk.sh")
+	_, err := os.Lstat(script)
 	if os.IsNotExist(err) {
-		return errors.New("not find the file:" + scriptpath)
+		return errors.New("not find the file:" + script)
 	}
 
-	out, err := execShellFile(scriptpath)
+	out, err := execShellFile(script)
 
-	log.Printf("%s\n%s\n%v\n", scriptpath, string(out), err)
+	log.Printf("%s\n%s\n%v\n", script, string(out), err)
 
 	if err != nil {
 		errstr := "scanSanDisk fail:" + err.Error()
@@ -245,14 +245,14 @@ func scanSanDisk() error {
 }
 
 func getDevicePath(id int, santype string) (string, error) {
-	scriptpath := scriptDir + "getsandevice.sh"
-	_, err := os.Lstat(scriptpath)
+	script := filepath.Join(scriptDir, "getsandevice.sh")
+	_, err := os.Lstat(script)
 	if os.IsNotExist(err) {
-		return "", errors.New("not find the file:" + scriptpath)
+		return "", errors.New("not find the file:" + script)
 	}
 	args := []string{santype, strconv.Itoa(id)}
 
-	out, err := execShellFile(scriptpath, args...)
+	out, err := execShellFile(script, args...)
 	if err != nil {
 		return "", err
 	}
