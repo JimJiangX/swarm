@@ -31,15 +31,33 @@ type CommonRes struct {
 }
 
 func errCommonHanlde(w http.ResponseWriter, req *http.Request, err error) {
-	bts, _ := json.Marshal(CommonRes{Err: err.Error()})
-	// http.Error(w, string(bts), 400)
-	w.Write(bts)
-	log.Printf("the req %s exec error:%s\n", req.Method+":"+req.URL.Path, err.Error())
+	if err != nil {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusInternalServerError)
+
+	json.NewEncoder(w).Encode(CommonRes{Err: err.Error()})
+
+	log.Errorf("%s %s,error:%s\n", req.Method+":"+req.URL.Path, err)
+}
+
+func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+
+	if obj != nil {
+		err := json.NewEncoder(w).Encode(obj)
+		if err != nil {
+			log.Errorf("write JSON:%d,%s", status, err)
+		}
+	}
 }
 
 func getVersionHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	w.Write([]byte("version:" + ctx.apiVersion + "\n"))
-	// log.Info("the req :", req.Method, req.URL.Path)
 }
 
 // NewRouter create API router.
@@ -54,7 +72,6 @@ func NewRouter(version string) *mux.Router {
 			"/version":    getVersionHandle,
 		},
 		"POST": {
-
 			"/VolumeDriver.Update": updateHandle,
 			"/volume/file/cp":      volumeFileCpHandle,
 
