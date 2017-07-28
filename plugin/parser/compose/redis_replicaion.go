@@ -1,9 +1,7 @@
 package compose
 
 import (
-	"errors"
-
-	log "github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 //master-slave redis manager
@@ -26,23 +24,17 @@ func newRedisRepManager(dbs []Redis) Composer {
 }
 
 func (m *RedisRepManager) ComposeCluster() error {
-	if err := m.ClearCluster(); err != nil {
+	err := m.ClearCluster()
+	if err != nil {
 		return err
 	}
 
 	if err := m.preCompose(); err != nil {
-		log.WithFields(log.Fields{
-			"error": err.Error(),
-		}).Error("preCompose fail")
-		return errors.New("preCompose err:" + err.Error())
-
+		return err
 	}
 
 	masterkey, ok := m.getMasterKey()
 	if !ok {
-		log.WithFields(log.Fields{
-			"error": "don't find the master",
-		}).Error("get master key fail")
 		return errors.New("don't find the master")
 	}
 
@@ -51,12 +43,7 @@ func (m *RedisRepManager) ComposeCluster() error {
 	for _, db := range m.RedisMap {
 		if db.GetType() != masterRole {
 			if err := db.ChangeMaster(master); err != nil {
-				log.WithFields(log.Fields{
-					"slave":  db.GetKey(),
-					"master": master.GetKey(),
-					"error":  err.Error(),
-				}).Error("db ChangeMaster fail")
-				return errors.New(db.Ip + ":" + "db ChangeMaster fail")
+				return err
 			}
 		}
 	}
@@ -67,11 +54,7 @@ func (m *RedisRepManager) ComposeCluster() error {
 func (m *RedisRepManager) ClearCluster() error {
 	for _, db := range m.RedisMap {
 		if err := db.Clear(); err != nil {
-			log.WithFields(log.Fields{
-				"db":    db.GetKey(),
-				"error": err.Error(),
-			}).Error("db Clear fail")
-			return errors.New(db.GetKey() + " : clear fail" + "  " + err.Error())
+			return err
 		}
 	}
 
@@ -81,11 +64,7 @@ func (m *RedisRepManager) ClearCluster() error {
 func (m *RedisRepManager) CheckCluster() error {
 	for _, db := range m.RedisMap {
 		if err := db.CheckStatus(); err != nil {
-			log.WithFields(log.Fields{
-				"db":    db.GetKey(),
-				"error": err.Error(),
-			}).Error("db CheckStatus fail")
-			return errors.New(db.GetKey() + " : CheckStatus fail" + "  " + err.Error())
+			return err
 		}
 	}
 	return nil
@@ -101,10 +80,6 @@ func (m *RedisRepManager) preCompose() error {
 	for _, db := range m.RedisMap {
 		if db.GetKey() != masterkey {
 			if err := m.setType(db.GetKey(), slaveRole); err != nil {
-				log.WithFields(log.Fields{
-					"err": err,
-					"db":  db.GetKey(),
-				}).Error("set slave fail(should not happen.)")
 				return err
 			}
 		}
@@ -145,7 +120,6 @@ func (m *RedisRepManager) electMaster() string {
 }
 
 func (m *RedisRepManager) setType(dbkey string, Type dbRole) error {
-
 	tmp, ok := m.RedisMap[dbkey]
 	if !ok {
 		return errors.New("don't find the db key")
@@ -153,6 +127,7 @@ func (m *RedisRepManager) setType(dbkey string, Type dbRole) error {
 	tmp.RoleType = Type
 
 	m.RedisMap[dbkey] = tmp
+
 	return nil
 
 }

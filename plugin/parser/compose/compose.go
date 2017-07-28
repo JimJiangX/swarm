@@ -1,21 +1,19 @@
 package compose
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/pkg/errors"
 )
 
 type dbArch string
 type dbRole string
 
 const (
-	scriptDir string = "./script/plugin/compose/"
-
 	//db cluster arch
 	noneArch  dbArch = "None"
 	cloneArch dbArch = "clone"
@@ -41,10 +39,10 @@ type Composer interface {
 }
 
 //get related Composer  by ServiceSpec
-func NewCompserBySpec(req *structs.ServiceSpec, mgmip string, mgmport int) (Composer, error) {
+func NewCompserBySpec(req *structs.ServiceSpec, script, mgmip string, mgmport int) (Composer, error) {
 
 	if err := valicateServiceSpec(req); err != nil {
-		return nil, errors.New("valicateServiceSpec fail:" + err.Error())
+		return nil, err
 	}
 
 	arch := getDbType(req)
@@ -52,15 +50,15 @@ func NewCompserBySpec(req *structs.ServiceSpec, mgmip string, mgmport int) (Comp
 	switch arch {
 	case mysqlRepArch, mysqlGroupArch:
 		dbs := getMysqls(req)
-		return newMysqlRepManager(dbs, mgmip, mgmport), nil
+		return newMysqlRepManager(dbs, script, mgmip, mgmport), nil
 
 	case redisShardingArch:
 		dbs := getRedis(req)
 		master, slave, _ := getmasterAndSlave(req)
-		return newRedisShardingManager(dbs, master, slave), nil
+		return newRedisShardingManager(dbs, master, slave, script), nil
 
 	case cloneArch:
-		return newCloneManager(), nil
+		return newCloneManager(script), nil
 	}
 
 	return nil, errors.New(string(arch) + ":the composer do not implement yet")
@@ -90,30 +88,35 @@ func valicateServiceSpec(req *structs.ServiceSpec) error {
 }
 
 func valicateCommonSpec(req *structs.ServiceSpec) error {
+	errs := make([]string, 0, 4)
 	//req.Image: "mysql:5.6.7"
-	datas := strings.Split(req.Image, ":")
-	if len(datas) != 2 {
-		return errors.New("req.Image:bad format")
+	_, err := structs.ParseImage(req.Image)
+	if err != nil {
+		errs = append(errs, fmt.Sprintf("%+v", err))
 	}
 
 	//req.Arch.Code
-	_, _, err := getmasterAndSlave(req)
+	_, _, err = getmasterAndSlave(req)
 	if err != nil {
-		return errors.New("Arch.Code:" + err.Error())
+		errs = append(errs, fmt.Sprintf("%+v", err))
 	}
 
 	if len(req.Units) != req.Arch.Replicas {
-		return errors.New("req.Units nums not equal with req.Arch.Replicas ")
+		errs = append(errs, "req.Units nums not equal with req.Arch.Replicas")
 	}
+
 	//unit ip
 	for _, unit := range req.Units {
 		if len(unit.Networking) == 0 {
-			errstr := fmt.Sprintf("the unit %s :addr len equal 0", unit.ContainerID)
-			return errors.New(errstr)
+			errs = append(errs, fmt.Sprintf("the unit %s :addr len equal 0", unit.ContainerID))
 		}
 	}
 
-	return nil
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("%s", strings.Join(errs, "\n"))
 }
 
 func valicateMysqlSpec(req *structs.ServiceSpec) error {
@@ -157,7 +160,7 @@ func convertPort(port interface{}) (int, error) {
 	default:
 	}
 
-	return -1, errors.New("unknown port type")
+	return -1, errors.Errorf("unknown port type,%s", port)
 }
 
 func getRedisPortBySpec(req *structs.ServiceSpec) (int, error) {
@@ -189,27 +192,27 @@ func valicateRedisSpec(req *structs.ServiceSpec) error {
 func getmasterAndSlave(req *structs.ServiceSpec) (mnum int, snum int, err error) {
 	codes := strings.Split(req.Arch.Code, "#")
 	if len(codes) != 2 {
-		return 0, 0, errors.New("bad format")
+		return 0, 0, errors.Errorf("bad format,Arch.Code:%v", req.Arch.Code)
 	}
 
 	//get master num
 	master := strings.Split(codes[0], ":")
 	if len(master) != 2 {
-		return 0, 0, errors.New("bad format")
+		return 0, 0, errors.Errorf("bad format,get master,Arch.Code:%v", req.Arch.Code)
 	}
 	mnum, err = strconv.Atoi(master[1])
 	if err != nil || master[0] != "M" {
-		return 0, 0, errors.New("bad format")
+		return 0, 0, errors.Errorf("bad format,get master num,Arch.Code:%v", req.Arch.Code)
 	}
 
 	//get slave num
 	slave := strings.Split(codes[1], ":")
 	if len(slave) != 2 {
-		return 0, 0, errors.New("bad format")
+		return 0, 0, errors.Errorf("bad format,get slave,Arch.Code:%v", req.Arch.Code)
 	}
 	snum, err = strconv.Atoi(slave[1])
 	if err != nil || slave[0] != "S" {
-		return 0, 0, errors.New("bad format")
+		return 0, 0, errors.Errorf("bad format,get slave num,Arch.Code:%v", req.Arch.Code)
 	}
 
 	return mnum, snum, nil
@@ -245,8 +248,7 @@ func getDbType(req *structs.ServiceSpec) dbArch {
 		"db type":    db,
 		"db version": version,
 		"arch":       arch,
-		"err":        "don't match the arch",
-	}).Error("getDbType")
+	}).Error("don't match the arch")
 
 	return noneArch
 }
@@ -271,12 +273,17 @@ func getRedis(req *structs.ServiceSpec) []Redis {
 }
 
 func getMysqls(req *structs.ServiceSpec) []Mysql {
+	users, err := getMysqlUser(req)
+	if err != nil {
+		log.Warnf("%+v", err)
+	}
 
-	mysqls := []Mysql{}
+	intport, err := getMysqlPortBySpec(req)
+	if err != nil {
+		log.Warnf("%+v", err)
+	}
 
-	users, _ := getMysqlUser(req)
-
-	intport, _ := getMysqlPortBySpec(req)
+	mysqls := make([]Mysql, 0, len(req.Units))
 
 	for _, unit := range req.Units {
 		instance := unit.ContainerID
@@ -285,10 +292,9 @@ func getMysqls(req *structs.ServiceSpec) []Mysql {
 
 		mysql := Mysql{
 			MysqlUser: users,
-
-			IP:       ip,
-			Port:     intport,
-			Instance: instance,
+			IP:        ip,
+			Port:      intport,
+			Instance:  instance,
 		}
 
 		mysqls = append(mysqls, mysql)
@@ -304,6 +310,7 @@ func getMysqlUser(req *structs.ServiceSpec) (MysqlUser, error) {
 		if user.Role == "replication" {
 			users.Replicatepwd = user.Password
 			users.ReplicateUser = user.Name
+			break
 		}
 	}
 

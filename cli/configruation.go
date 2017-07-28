@@ -3,6 +3,7 @@ package cli
 import (
 	"crypto/tls"
 	"errors"
+	"path/filepath"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api"
@@ -39,7 +40,6 @@ func loadTLSConfigFromContext(c *cli.Context) (*tls.Config, error) {
 }
 
 func configruation(c *cli.Context) {
-
 	tlsConfig, err := loadTLSConfigFromContext(c)
 	if err != nil {
 		log.Fatal(err)
@@ -47,6 +47,11 @@ func configruation(c *cli.Context) {
 
 	mgmIP := c.String("mgmIP")
 	mgmPort := c.Int("mgmPort")
+
+	dir, err := filepath.Abs(c.String("script"))
+	if err != nil {
+		log.Fatalf("fail to get script dir by '%s'", c.String("script"))
+	}
 
 	uri := getDiscovery(c)
 	if uri == "" {
@@ -66,7 +71,7 @@ func configruation(c *cli.Context) {
 
 	server := api.NewServer(hosts, tlsConfig)
 
-	server.SetHandler(parser.NewRouter(kvClient, mgmIP, mgmPort))
+	server.SetHandler(parser.NewRouter(kvClient, dir, mgmIP, mgmPort))
 
 	log.Fatal(server.ListenAndServe())
 }

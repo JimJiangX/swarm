@@ -1,9 +1,7 @@
 package compose
 
 import (
-	"errors"
-
-	log "github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 //master-slave mysql manager
@@ -13,7 +11,7 @@ type MysqlRepManager struct {
 	MgmPort int
 }
 
-func newMysqlRepManager(dbs []Mysql, ip string, port int) Composer {
+func newMysqlRepManager(dbs []Mysql, dir, ip string, port int) Composer {
 
 	ms := &MysqlRepManager{
 		MgmIP:   ip,
@@ -24,6 +22,7 @@ func newMysqlRepManager(dbs []Mysql, ip string, port int) Composer {
 	for _, db := range dbs {
 		db.MgmIP = ip
 		db.MgmPort = port
+		db.scriptDir = dir
 		ms.Mysqls[db.GetKey()] = db
 	}
 
@@ -36,18 +35,11 @@ func (m *MysqlRepManager) ComposeCluster() error {
 	}
 
 	if err := m.preCompose(); err != nil {
-		log.WithFields(log.Fields{
-			"error": err.Error(),
-		}).Error("preCompose fail")
-		return errors.New("preCompose err:" + err.Error())
-
+		return err
 	}
 
 	masterkey, ok := m.getMasterKey()
 	if !ok {
-		log.WithFields(log.Fields{
-			"error": "don't find the master",
-		}).Error("get master key fail")
 		return errors.New("don't find the master")
 	}
 
@@ -56,12 +48,7 @@ func (m *MysqlRepManager) ComposeCluster() error {
 	for _, db := range m.Mysqls {
 		if db.GetType() != masterRole {
 			if err := db.ChangeMaster(master); err != nil {
-				log.WithFields(log.Fields{
-					"slave":  db.GetKey(),
-					"master": master.GetKey(),
-					"error":  err.Error(),
-				}).Error("db ChangeMaster fail")
-				return errors.New(db.IP + ":" + "db ChangeMaster fail")
+				return err
 			}
 		}
 	}
@@ -72,11 +59,7 @@ func (m *MysqlRepManager) ComposeCluster() error {
 func (m *MysqlRepManager) ClearCluster() error {
 	for _, db := range m.Mysqls {
 		if err := db.Clear(); err != nil {
-			log.WithFields(log.Fields{
-				"db":    db.GetKey(),
-				"error": err.Error(),
-			}).Error("db Clear fail")
-			return errors.New(db.GetKey() + " : clear fail" + "  " + err.Error())
+			return err
 		}
 	}
 
@@ -86,11 +69,7 @@ func (m *MysqlRepManager) ClearCluster() error {
 func (m *MysqlRepManager) CheckCluster() error {
 	for _, db := range m.Mysqls {
 		if err := db.CheckStatus(); err != nil {
-			log.WithFields(log.Fields{
-				"db":    db.GetKey(),
-				"error": err.Error(),
-			}).Error("db CheckStatus fail")
-			return errors.New(db.GetKey() + " : CheckStatus fail" + "  " + err.Error())
+			return err
 		}
 	}
 	return nil
@@ -100,16 +79,12 @@ func (m *MysqlRepManager) preCompose() error {
 	//select master
 	masterkey := m.electMaster()
 	if err := m.setMysqlType(masterkey, masterRole); err != nil {
-		return errors.New("electMaster fail:" + err.Error())
+		return err
 	}
 
 	for _, db := range m.Mysqls {
 		if db.GetKey() != masterkey {
 			if err := m.setMysqlType(db.GetKey(), slaveRole); err != nil {
-				log.WithFields(log.Fields{
-					"err": err,
-					"db":  db.GetKey(),
-				}).Error("set slave fail(should not happen.)")
 				return err
 			}
 		}
@@ -131,7 +106,7 @@ func (m *MysqlRepManager) getMasterKey() (string, bool) {
 func (m *MysqlRepManager) electMaster() string {
 
 	curweight := -1
-	var master Mysql
+	master := Mysql{}
 	tmp := false
 
 	for _, db := range m.Mysqls {
@@ -149,15 +124,16 @@ func (m *MysqlRepManager) electMaster() string {
 	return ""
 }
 
-func (m *MysqlRepManager) setMysqlType(dbkey string, Type dbRole) error {
+func (m *MysqlRepManager) setMysqlType(dbkey string, typ dbRole) error {
 
 	tmp, ok := m.Mysqls[dbkey]
 	if !ok {
 		return errors.New("don't find the db key")
 	}
-	tmp.RoleType = Type
 
+	tmp.RoleType = typ
 	m.Mysqls[dbkey] = tmp
+
 	return nil
 
 }

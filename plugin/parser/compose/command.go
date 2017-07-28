@@ -4,13 +4,13 @@ package compose
 
 import (
 	"bytes"
-	"errors"
 	"os/exec"
 	"strings"
 	"syscall"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 type ExecType string
@@ -51,7 +51,7 @@ func ExecWithTimeout(_Type ExecType, shell string, timeout time.Duration, args .
 	cmd.Stderr = &stderr
 	err := cmd.Start()
 	if err != nil {
-		return "", errors.New("cmd start err:" + err.Error())
+		return "", errors.Errorf("cmd start err:%s", err)
 	}
 
 	err, isTimeout := cmdRunWithTimeout(cmd, timeout)
@@ -77,12 +77,11 @@ func ExecWithTimeout(_Type ExecType, shell string, timeout time.Duration, args .
 	}
 
 	if err != nil {
-		return "", errors.New("exec error:" + err.Error())
+		return "", errors.Errorf("exec error:%s", err)
 	}
 
 	// exec successfully
-	data := stdout.Bytes()
-	return string(data), nil
+	return stdout.String(), nil
 }
 
 func cmdRunWithTimeout(cmd *exec.Cmd, timeout time.Duration) (error, bool) {
@@ -105,17 +104,16 @@ func cmdRunWithTimeout(cmd *exec.Cmd, timeout time.Duration) (error, bool) {
 			if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
 				log.WithFields(log.Fields{
 					"cmd": cmd,
-					"err": err.Error(),
-				}).Warnf(" exec timeout kill fail: syscall.Kill error")
+				}).Warnf("exec timeout kill fail: syscall.Kill error,%s", err)
 			}
 		} else {
 			log.WithFields(log.Fields{
 				"cmd": cmd,
-				"err": err.Error(),
-			}).Warnf(" exec timeout kill  process fail")
+			}).Warnf(" exec timeout kill  process fail,%s", err)
 		}
 
 		return err, true
+
 	case err = <-done:
 		return err, false
 	}

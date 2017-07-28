@@ -212,6 +212,12 @@ var (
 		Usage: "address of seed server",
 	}
 
+	flScriptDir = cli.StringFlag{
+		Name:  "script",
+		Value: "./script/plugin/compose/",
+		Usage: "compose script dir",
+	}
+
 	flMgmIP = cli.StringFlag{
 		Name:  "mgmIP",
 		Value: "127.0.0.1",

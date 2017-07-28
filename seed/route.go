@@ -41,7 +41,7 @@ func errCommonHanlde(w http.ResponseWriter, req *http.Request, err error) {
 
 	json.NewEncoder(w).Encode(CommonRes{Err: err.Error()})
 
-	log.Errorf("%s %s,error:%s\n", req.Method+":"+req.URL.Path, err)
+	log.Errorf("%s:%s,error:%s\n", req.Method, req.URL.Path, err)
 }
 
 func writeJSON(w http.ResponseWriter, obj interface{}, status int) {

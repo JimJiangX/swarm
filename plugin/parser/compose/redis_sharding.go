@@ -1,7 +1,7 @@
 package compose
 
 import (
-	"errors"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -13,16 +13,20 @@ type RedisShardingManager struct {
 
 	Master int
 	Slave  int
+
+	scriptDir string
 }
 
-func newRedisShardingManager(dbs []Redis, master int, slave int) Composer {
+func newRedisShardingManager(dbs []Redis, master int, slave int, dir string) Composer {
 	rs := &RedisShardingManager{
-		RedisMap: make(map[string]Redis),
-		Master:   master,
-		Slave:    slave,
+		RedisMap:  make(map[string]Redis),
+		Master:    master,
+		Slave:     slave,
+		scriptDir: dir,
 	}
 
 	for _, db := range dbs {
+		db.scriptDir = dir
 		rs.RedisMap[db.GetKey()] = db
 	}
 
@@ -39,11 +43,13 @@ func (r *RedisShardingManager) getRedisAddrs() string {
 }
 
 func (r *RedisShardingManager) ClearCluster() error {
-	filepath := scriptDir + "redis-sharding_replication-reset.sh"
+	filepath := filepath.Join(r.scriptDir, "redis-sharding_replication-reset.sh")
 	timeout := time.Second * 120
 	addrs := r.getRedisAddrs()
 	args := []string{addrs}
+
 	_, err := ExecShellFileTimeout(filepath, timeout, args...)
+
 	return err
 }
 
@@ -52,15 +58,18 @@ func (r *RedisShardingManager) CheckCluster() error {
 }
 
 func (r *RedisShardingManager) ComposeCluster() error {
-	if err := r.ClearCluster(); err != nil {
-		return errors.New("ClearCluster fail:" + err.Error())
+	err := r.ClearCluster()
+	if err != nil {
+		return err
 	}
 
-	filepath := scriptDir + "redis-sharding_replication-set.sh"
+	filepath := filepath.Join(r.scriptDir, "redis-sharding_replication-set.sh")
 	timeout := time.Second * 120
 
 	addrs := r.getRedisAddrs()
 	args := []string{strconv.Itoa(r.Slave), addrs}
-	_, err := ExecShellFileTimeout(filepath, timeout, args...)
+
+	_, err = ExecShellFileTimeout(filepath, timeout, args...)
+
 	return err
 }
