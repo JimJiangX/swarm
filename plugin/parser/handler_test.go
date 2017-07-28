@@ -18,7 +18,7 @@ var pc pclient.PluginAPI
 
 func init() {
 	kvc := kvstore.NewMockClient()
-	mux := NewRouter(kvc, "", 0)
+	mux := NewRouter(kvc, ".", "", 0)
 
 	go http.ListenAndServe(":8080", mux)
 
