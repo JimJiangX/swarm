@@ -50,7 +50,7 @@ else
 fi
 
 # check container_nic
-container_nic=`ifconfig | grep -e 'container[0-9]\{1,3\}' | awk '{print $1}' | sed 's/://g' |  tr "\n" "," |sed 's/.$//'` 
+container_nic=`ifconfig | grep -e 'cbond[0-9]\{1,3\}' | awk '{print $1}' | sed 's/://g' |  tr "\n" "," |sed 's/.$//'` 
 if [ $container_nic = '' ]; then
 	echo "not found container nic"
 	exit 2
