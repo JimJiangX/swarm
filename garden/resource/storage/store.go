@@ -52,6 +52,7 @@ type Store interface {
 	Driver() string
 	ping() error
 	//	IdleSize() (map[string]int64, error)
+	ListLUN(nameOrVG string) ([]database.LUN, error)
 
 	insert() error
 
@@ -62,8 +63,8 @@ type Store interface {
 	Extend(lv database.Volume, size int64) (database.LUN, database.Volume, error)
 	Recycle(id string, lun int) error // delete LUN
 
-	Mapping(host, vgName, lun string) error
-	DelMapping(lun string) error
+	Mapping(host, vgName, lun, unit string) error
+	DelMapping(lun database.LUN) error
 
 	AddSpace(id string) (Space, error)
 	EnableSpace(id string) error

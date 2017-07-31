@@ -73,6 +73,18 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 	}
 }
 
+func writeJSONNull(w http.ResponseWriter, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	fmt.Fprint(w, "{}")
+}
+
+func writeJSONFprintf(w http.ResponseWriter, status int, format string, args ...interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	fmt.Fprintf(w, format, args...)
+}
+
 // -----------------/nfs_backups handlers-----------------
 func vaildNFSParams(nfs database.NFS) error {
 	errs := make([]string, 0, 4)
@@ -152,8 +164,7 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"total_space": %d,"free_space": %d}`, space.Total, space.Free)
+	writeJSONFprintf(w, http.StatusOK, `{"total_space": %d,"free_space": %d}`, space.Total, space.Free)
 }
 
 // -----------------/tasks handlers-----------------
@@ -170,6 +181,11 @@ func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	t, err := gd.Ormer().GetTask(name)
 	if err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			writeJSONNull(w, http.StatusOK)
+			return
+		}
+
 		ec := errCodeV1(_Task, dbQueryError, 11, "fail to query database", "数据库查询错误（任务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
@@ -344,6 +360,11 @@ func getSystemConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	sys, err := gd.Ormer().GetSysConfig()
 	if err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			writeJSONNull(w, http.StatusOK)
+			return
+		}
+
 		ec := errCodeV1(_DC, dbQueryError, 21, "fail to query database", "数据库查询错误（配置参数表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
@@ -369,10 +390,10 @@ func listImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out := make([]structs.GetImageResponse, len(images))
+	out := make([]structs.ImageResponse, len(images))
 
 	for i := range images {
-		out[i] = structs.GetImageResponse{
+		out[i] = structs.ImageResponse{
 			ImageVersion: structs.ImageVersion{
 				Name:  images[i].Name,
 				Major: images[i].Major,
@@ -497,9 +518,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q,%q:%q}", "id", id, "task_id", taskID)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q,%q:%q}", "id", id, "task_id", taskID)
 }
 
 func deleteImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -522,6 +541,86 @@ func deleteImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	im, err := gd.Ormer().GetImageVersion(name)
+	if err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			writeJSONNull(w, http.StatusOK)
+			return
+		}
+
+		ec := errCodeV1(_Image, dbQueryError, 51, "fail to query database", "数据库查询错误（镜像表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	imResp := structs.ImageResponse{
+		ImageVersion: structs.ImageVersion{
+			Name:  im.Name,
+			Major: im.Major,
+			Minor: im.Minor,
+			Patch: im.Patch,
+		},
+		Size:     im.Size,
+		ID:       im.ID,
+		ImageID:  im.ImageID,
+		Labels:   im.Labels,
+		UploadAt: utils.TimeToString(im.UploadAt),
+	}
+
+	t, err := gd.PluginClient().GetImage(ctx, im.Version())
+	if err != nil {
+		ec := errCodeV1(_Image, internalError, 52, "fail to query image", "获取镜像错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	resp := structs.GetImageResponse{
+		ImageResponse: imResp,
+		Template:      t,
+	}
+
+	writeJSON(w, resp, http.StatusOK)
+}
+
+func putImageTemplate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	ct := structs.ConfigTemplate{}
+
+	err := json.NewDecoder(r.Body).Decode(&ct)
+	if err != nil {
+		ec := errCodeV1(_Cluster, decodeError, 61, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	err = gd.PluginClient().PostImageTemplate(ctx, ct)
+	if err != nil {
+		ec := errCodeV1(_Image, internalError, 62, "fail to update image template", "更新镜像模板错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // -----------------/clusters handlers-----------------
 func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
@@ -536,6 +635,11 @@ func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	orm := gd.Ormer()
 	c, err := orm.GetCluster(name)
 	if err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			writeJSONNull(w, http.StatusOK)
+			return
+		}
+
 		ec := errCodeV1(_Cluster, dbQueryError, 11, "fail to query database", "数据库查询错误（集群表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
@@ -635,9 +739,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "id", c.ID)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "id", c.ID)
 }
 
 func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -769,6 +871,11 @@ func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	n, err := gd.Ormer().GetNode(name)
 	if err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			writeJSONNull(w, http.StatusOK)
+			return
+		}
+
 		ec := errCodeV1(_Host, dbQueryError, 11, "fail to query database", "数据库查询错误（主机表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
@@ -929,7 +1036,7 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	master := resource.NewHostManager(orm, gd.Cluster)
@@ -947,7 +1054,6 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, out, http.StatusCreated)
-	return
 }
 
 func putNodeEnable(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1176,9 +1282,7 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%d}", "num", n)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%d}", "num", n)
 }
 
 func setNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request, enable bool) {
@@ -1385,7 +1489,7 @@ func getNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, structs.NetworkingInfo{}, http.StatusOK)
+	writeJSON(w, "{}", http.StatusOK)
 }
 
 // -----------------/services handlers-----------------
@@ -1403,9 +1507,7 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(services)
+	writeJSON(w, services, http.StatusOK)
 }
 
 func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1419,14 +1521,17 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	spec, err := gd.ServiceSpec(name)
 	if err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			writeJSONNull(w, http.StatusOK)
+			return
+		}
+
 		ec := errCodeV1(_Service, dbQueryError, 21, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(spec)
+	writeJSON(w, spec, http.StatusOK)
 }
 
 func vaildPostServiceRequest(spec structs.ServiceSpec) error {
@@ -1483,7 +1588,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	d := deploy.New(gd)
@@ -1541,7 +1646,7 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	d := deploy.New(gd)
@@ -1553,9 +1658,7 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
 func vaildPostServiceLinkRequest(v structs.ServicesLink) error {
@@ -1599,7 +1702,7 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	d := deploy.New(gd)
@@ -1612,9 +1715,7 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
 func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1639,7 +1740,7 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	d := deploy.New(gd)
@@ -1651,9 +1752,7 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
 func vaildPostServiceUpdateRequest(v structs.UnitRequire) error {
@@ -1702,7 +1801,7 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	d := deploy.New(gd)
@@ -1714,10 +1813,7 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
-
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
 func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1749,7 +1845,7 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	task := database.NewTask(spec.Name, database.ServiceStartTask, spec.ID, spec.Desc, nil, 300)
@@ -1761,9 +1857,7 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
 func vaildPostServiceUpdateConfigsRequest(cmds structs.ConfigsMap, args map[string]interface{}) error {
@@ -1821,7 +1915,7 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	task := database.NewTask(spec.Name, database.ServiceUpdateConfigTask, spec.ID, spec.Desc, nil, 300)
@@ -1833,9 +1927,7 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
 func vaildPostServiceExecRequest(v structs.ServiceExecConfig) error {
@@ -1889,7 +1981,7 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	task := database.NewTask(spec.Name, database.ServiceExecTask, spec.ID, spec.Desc, nil, 300)
@@ -1901,9 +1993,7 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
 func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1935,7 +2025,7 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	task := database.NewTask(spec.Name, database.ServiceStopTask, spec.ID, spec.Desc, nil, 300)
@@ -1947,9 +2037,7 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
 func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2046,7 +2134,7 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	task := database.NewTask(spec.Name, database.ServiceBackupTask, spec.ID, spec.Desc, nil, 300)
@@ -2058,10 +2146,207 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", task.ID)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
+}
 
+func vaildPostServiceRestoreRequest(v structs.ServiceRestoreRequest) error {
+	errs := make([]string, 0, 2)
+
+	// TODO:check params
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("ServiceRestoreRequest:%v,%s", v, errs)
+}
+
+func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	req := structs.ServiceRestoreRequest{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		ec := errCodeV1(_Service, decodeError, 141, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	if err := vaildPostServiceRestoreRequest(req); err != nil {
+		ec := errCodeV1(_Service, invaildParamsError, 142, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	orm := gd.Ormer()
+
+	bf, err := orm.GetBackupFile(req.File)
+	if err != nil {
+		ec := errCodeV1(_Service, dbQueryError, 143, "fail to query database", "数据库查询错误（备份文件表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
+	}
+
+	svc, err := gd.GetService(name)
+	if err != nil {
+		ec := errCodeV1(_Service, dbQueryError, 144, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	id, err := svc.UnitRestore(ctx, req.Units, bf.Path, true)
+	if err != nil {
+		ec := errCodeV1(_Service, internalError, 145, "fail to restore unit data", "服务单元数据恢复错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
+}
+
+func vaildPostUnitRebuildRequest(v structs.UnitRebuildRequest) error {
+	errs := make([]string, 0, 1)
+
+	if len(v.Units) < 1 {
+		errs = append(errs, "Units is required")
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("UnitRebuildRequest:%v,%s", v, errs)
+}
+
+func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	req := structs.UnitRebuildRequest{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		ec := errCodeV1(_Service, decodeError, 151, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	if err := vaildPostUnitRebuildRequest(req); err != nil {
+		ec := errCodeV1(_Service, invaildParamsError, 152, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil ||
+		gd.KVClient() == nil ||
+		gd.PluginClient() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	svc, err := gd.Service(name)
+	if err != nil {
+		ec := errCodeV1(_Service, internalError, 153, "not found the service", "查询指定服务错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
+	}
+
+	id, err := gd.RebuildUnits(ctx, nil, svc, req, true)
+	if err != nil {
+		ec := errCodeV1(_Service, internalError, 154, "fail to scale service", "服务水平扩展错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
+}
+
+func vaildPostUnitMigrateRequest(v structs.PostUnitMigrate) error {
+	errs := make([]string, 0, 1)
+
+	if v.NameOrID == "" {
+		errs = append(errs, "Unit name or ID is required")
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("PostUnitMigrate:%v,%s", v, errs)
+}
+
+func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	req := structs.PostUnitMigrate{}
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		ec := errCodeV1(_Service, decodeError, 161, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	if err := vaildPostUnitMigrateRequest(req); err != nil {
+		ec := errCodeV1(_Service, invaildParamsError, 162, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil ||
+		gd.KVClient() == nil ||
+		gd.PluginClient() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	svc, err := gd.Service(name)
+	if err != nil {
+		ec := errCodeV1(_Service, internalError, 163, "not found the service", "查询指定服务错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	// new Context with deadline
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx = goctx.Background()
+	} else {
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
+	}
+
+	id, err := gd.ServiceMigrate(ctx, svc, req.NameOrID, req.Candidates, true)
+	if err != nil {
+		ec := errCodeV1(_Service, internalError, 164, "fail to scale service", "服务水平扩展错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
 // -----------------/units handlers-----------------
@@ -2117,128 +2402,6 @@ func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	}
 }
 
-func postUnitRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		ec := errCodeV1(_Unit, urlParamError, 21, "parse Request URL parameter error", "解析请求URL参数错误")
-		httpJSONError(w, err, ec, http.StatusBadRequest)
-		return
-	}
-
-	name := mux.Vars(r)["name"]
-	from := r.FormValue("from")
-
-	ok, _, gd := fromContext(ctx, _Garden)
-	if !ok || gd == nil ||
-		gd.Ormer() == nil {
-
-		httpJSONNilGarden(w)
-		return
-	}
-
-	orm := gd.Ormer()
-
-	bf, err := orm.GetBackupFile(from)
-	if err != nil {
-		ec := errCodeV1(_Unit, dbQueryError, 22, "fail to query database", "数据库查询错误（备份文件表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	table, err := orm.GetServiceByUnit(name)
-	if err != nil {
-		ec := errCodeV1(_Unit, dbQueryError, 23, "fail to query database", "数据库查询错误（服务表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	// new Context with deadline
-	if deadline, ok := ctx.Deadline(); !ok {
-		ctx = goctx.Background()
-	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
-	}
-
-	svc := gd.NewService(nil, &table)
-
-	id, err := svc.UnitRestore(ctx, name, bf.Path, true)
-	if err != nil {
-		ec := errCodeV1(_Unit, internalError, 24, "fail to restore unit data", "服务单元数据恢复错误")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
-}
-
-func vaildPostUnitRebuildRequest(v structs.UnitRebuildRequest) error {
-	errs := make([]string, 0, 1)
-
-	if len(v.Units) < 1 {
-		errs = append(errs, "Units is required")
-	}
-
-	if len(errs) == 0 {
-		return nil
-	}
-
-	return fmt.Errorf("ServiceScaleRequest:%v,%s", v, errs)
-}
-
-func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-
-	req := structs.UnitRebuildRequest{}
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		ec := errCodeV1(_Service, decodeError, 31, "JSON Decode Request Body error", "JSON解析请求Body错误")
-		httpJSONError(w, err, ec, http.StatusBadRequest)
-		return
-	}
-
-	if err := vaildPostUnitRebuildRequest(req); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
-		httpJSONError(w, err, ec, http.StatusBadRequest)
-		return
-	}
-
-	ok, _, gd := fromContext(ctx, _Garden)
-	if !ok || gd == nil ||
-		gd.Ormer() == nil ||
-		gd.KVClient() == nil ||
-		gd.PluginClient() == nil {
-
-		httpJSONNilGarden(w)
-		return
-	}
-
-	svc, err := gd.Service(name)
-	if err != nil {
-		ec := errCodeV1(_Service, internalError, 33, "not found the service", "查询指定服务错误")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	// new Context with deadline
-	if deadline, ok := ctx.Deadline(); !ok {
-		ctx = goctx.Background()
-	} else {
-		ctx, _ = goctx.WithDeadline(ctx, deadline)
-	}
-
-	id, err := gd.RebuildUnits(ctx, nil, svc, req, true)
-	if err != nil {
-		ec := errCodeV1(_Service, internalError, 34, "fail to scale service", "服务水平扩展错误")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "task_id", id)
-}
-
 // -----------------/storage handlers-----------------
 // GET /storage/san
 func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2260,9 +2423,7 @@ func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
+	writeJSON(w, resp, http.StatusOK)
 }
 
 // GET /storage/san/{name:.*}
@@ -2272,6 +2433,11 @@ func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	ds := storage.DefaultStores()
 	store, err := ds.Get(name)
 	if err != nil {
+		if errors.Cause(err) == sql.ErrNoRows {
+			writeJSONNull(w, http.StatusOK)
+			return
+		}
+
 		ec := errCodeV1(_Storage, dbQueryError, 21, "fail to query database", "数据库查询错误（外部存储表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
@@ -2284,9 +2450,7 @@ func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(resp)
+	writeJSON(w, resp, http.StatusOK)
 }
 
 func getSanStoreInfo(store storage.Store) (structs.SANStorageResponse, error) {
@@ -2363,9 +2527,7 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%q}", "id", s.ID())
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "id", s.ID())
 }
 
 // POST /storage/san/{name}/raidgroup
@@ -2388,9 +2550,7 @@ func postRGToSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "{%q:%d}", "size", space.Total)
+	writeJSONFprintf(w, http.StatusCreated, "{%q:%d}", "size", space.Total)
 }
 
 // PUT /storage/san/{name}/raid_group/{rg:[0-9]+}/enable

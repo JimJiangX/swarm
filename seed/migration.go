@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	//	"log"
 	"net/http"
 	"os"
@@ -199,10 +200,10 @@ func checkDeactConfig(opt *DeactConfig) error {
 		return errors.New("HostLunID must  be set")
 	}
 
-	scriptpath := scriptDir + "sanDeviceBlock.sh"
-	_, err := os.Lstat(scriptpath)
+	script := filepath.Join(scriptDir, "sanDeviceBlock.sh")
+	_, err := os.Lstat(script)
 	if os.IsNotExist(err) {
-		return errors.New("not find the shell: " + scriptpath)
+		return errors.New("not find the shell: " + script)
 	}
 
 	return nil
@@ -346,10 +347,10 @@ func lvDeActivate(vg, lv string) error {
 }
 
 func sanBlock(vendor string, ids []int) error {
-	scriptpath := scriptDir + "sanDeviceBlock.sh"
-	_, err := os.Lstat(scriptpath)
+	script := filepath.Join(scriptDir, "sanDeviceBlock.sh")
+	_, err := os.Lstat(script)
 	if os.IsNotExist(err) {
-		return errors.New("not find the shell: " + scriptpath)
+		return errors.New("not find the shell: " + script)
 	}
 
 	args := []string{vendor}
@@ -357,11 +358,11 @@ func sanBlock(vendor string, ids []int) error {
 		args = append(args, strconv.Itoa(id))
 	}
 
-	_, err = execShellFile(scriptpath, args...)
+	_, err = execShellFile(script, args...)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"args":       args,
-			"scriptpath": scriptpath,
+			"scriptpath": script,
 			"err":        err.Error(),
 		}).Error("SanBlock fail")
 		return err

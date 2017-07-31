@@ -1,10 +1,11 @@
 package compose
 
 type clone struct {
+	scriptDir string
 }
 
-func newCloneManager() Composer {
-	return &clone{}
+func newCloneManager(dir string) Composer {
+	return &clone{scriptDir: dir}
 }
 
 func (c *clone) ClearCluster() error {

@@ -177,13 +177,13 @@ func testStore(s Store, t *testing.T) {
 		}
 	}()
 
-	err = s.Mapping(engine, "VGName001", lun.ID)
+	err = s.Mapping(engine, "VGName001", lun.ID, lv.UnitID)
 	if err != nil {
 		t.Error(err)
 	}
 
 	defer func() {
-		err := s.DelMapping(lun.ID)
+		err := s.DelMapping(lun)
 		if err != nil {
 			t.Error(err)
 		}

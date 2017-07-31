@@ -23,22 +23,26 @@ type _Context struct {
 	client     kvstore.Client
 	context    context.Context
 
+	scriptDir string
+
 	mgmIP   string
 	mgmPort int
 }
 
 // NewRouter returns a pointer of mux.Router,router of plugin HTTP APIs.
-func NewRouter(c kvstore.Client, ip string, port int) *mux.Router {
+func NewRouter(c kvstore.Client, dir, ip string, port int) *mux.Router {
 	type handler func(ctx *_Context, w http.ResponseWriter, r *http.Request)
 
 	ctx := &_Context{
-		client:  c,
-		mgmIP:   ip,
-		mgmPort: port,
+		client:    c,
+		scriptDir: dir,
+		mgmIP:     ip,
+		mgmPort:   port,
 	}
 
 	var routes = map[string]map[string]handler{
 		"GET": {
+			"/image/template/{name}":          getImage,
 			"/image/support":                  getSupportImageVersion,
 			"/configs/{service:.*}":           getConfigs,
 			"/configs/{service:.*}/{unit:.*}": getConfig,
@@ -80,6 +84,25 @@ func NewRouter(c kvstore.Client, ip string, port int) *mux.Router {
 	}
 
 	return r
+}
+
+func getImage(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	path := make([]string, 1, 3)
+	path[0] = imageKey
+	path = append(path, strings.SplitN(name, ":", 2)...)
+	key := strings.Join(path, "/")
+
+	pair, err := ctx.client.GetKV(r.Context(), key)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(pair.Value)
 }
 
 func getSupportImageVersion(ctx *_Context, w http.ResponseWriter, r *http.Request) {
@@ -501,7 +524,7 @@ func composeService(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	composer, err := compose.NewCompserBySpec(&req, ip, port)
+	composer, err := compose.NewCompserBySpec(&req, ctx.scriptDir, ip, port)
 	if err != nil {
 		httpError(w, err, http.StatusBadRequest)
 		return
@@ -513,7 +536,6 @@ func composeService(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-
 }
 
 func linkServices(ctx *_Context, w http.ResponseWriter, r *http.Request) {
@@ -527,7 +549,7 @@ func httpError(w http.ResponseWriter, err error, status int) {
 		return
 	}
 
-	http.Error(w, "", status)
+	w.WriteHeader(status)
 }
 
 func parseListToConfigs(pairs api.KVPairs) (structs.ConfigsMap, error) {

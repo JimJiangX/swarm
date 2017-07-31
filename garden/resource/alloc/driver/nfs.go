@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func newNFSDriver(iface VolumeIface, engineID string) (Driver, error) {
+func newNFSDriver(iface VolumeIface, engineID, sourceDir, backupDir string) (Driver, error) {
 	n, err := iface.GetNode(engineID)
 	if err != nil {
 		return nil, err
@@ -24,20 +24,16 @@ func newNFSDriver(iface VolumeIface, engineID string) (Driver, error) {
 		return nil, nil
 	}
 
-	sys, err := iface.GetSysConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	abs, err := utils.GetAbsolutePath(true, sys.SourceDir)
+	abs, err := utils.GetAbsolutePath(true, sourceDir)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	return NewNFSDriver(n.NFS, filepath.Dir(abs), sys.BackupDir), nil
+	return NewNFSDriver(n.NFS, filepath.Dir(abs), backupDir), nil
 }
 
 type _NFSDriver struct {
+	vgIface
 	database.NFS
 	backupDir string
 	baseDir   string
@@ -46,6 +42,7 @@ type _NFSDriver struct {
 // NewNFSDriver returns _NFS Driver
 func NewNFSDriver(nfs database.NFS, base, backup string) Driver {
 	return _NFSDriver{
+		vgIface:   unsupportSAN{},
 		NFS:       nfs,
 		backupDir: backup,
 		baseDir:   base,
@@ -80,7 +77,7 @@ func (nd _NFSDriver) Alloc(config *cluster.ContainerConfig, uid string, req stru
 	return nil, nil
 }
 
-func (nd _NFSDriver) Expand(dv database.Volume, agent string, size int64) error {
+func (nd _NFSDriver) Expand(dv database.Volume, size int64) error {
 	return nil
 }
 

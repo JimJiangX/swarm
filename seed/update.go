@@ -41,8 +41,7 @@ func updateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	res := &CommonRes{
 		Err: "",
 	}
-	response, _ := json.Marshal(res)
-	w.Write(response)
+	writeJSON(w, res, http.StatusOK)
 }
 
 func checkVolumeUpdateOpt(opt *VolumeUpdateOpt) error {

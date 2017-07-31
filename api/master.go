@@ -67,6 +67,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/tasks/{name}": getTask,
 
 		"/softwares/images":           listImages,
+		"/softwares/images/{name:.*}": getImage,
 		"/softwares/images/supported": getSupportImages,
 
 		"/services":        getServices,
@@ -90,11 +91,10 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/services/{name}/stop":          postServiceStop,
 		"/services/{name}/config/update": postServiceUpdateConfigs,
 		"/services/{name}/exec":          postServiceExec,
-		"/services/{name:.*}/backup":     postServiceBackup,
-
-		//		"/units/{name:.*}/migrate":    postUnitMigrate,
-		"/units/{name:.*}/rebuild": postUnitRebuild,
-		"/units/{name}/restore":    postUnitRestore,
+		"/services/{name}/backup":        postServiceBackup,
+		"/services/{name}/restore":       postServiceRestore,
+		"/services/{name}/rebuild":       postUnitRebuild,
+		"/services/{name}/migrate":       postUnitMigrate,
 
 		"/networkings/{name}/ips": postNetworking,
 
@@ -108,6 +108,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 
 	http.MethodPut: {
 		"/clusters/{name}": putClusterParams,
+
+		"/softwares/images/{name:.*}": putImageTemplate,
 
 		"/hosts/{name}":         putNodeParam,
 		"/hosts/{name}/enable":  putNodeEnable,

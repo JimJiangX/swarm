@@ -29,7 +29,7 @@ const (
 type localVolumeIface interface {
 	InsertVolume(lv database.Volume) error
 
-	SetVolume(nameOrID string, engineID string, size int64) error
+	SetVolume(database.Volume) error
 
 	GetVolume(nameOrID string) (database.Volume, error)
 
@@ -74,14 +74,11 @@ func (lvm *localVolumeMap) InsertVolume(lv database.Volume) error {
 	return nil
 }
 
-func (lvm *localVolumeMap) SetVolume(nameOrID string, engineID string, size int64) error {
-	lv, err := lvm.GetVolume(nameOrID)
+func (lvm *localVolumeMap) SetVolume(v database.Volume) error {
+	lv, err := lvm.GetVolume(v.ID)
 	if err != nil {
 		return err
 	}
-
-	lv.EngineID = engineID
-	lv.Size = size
 
 	lvm.m[lv.ID] = lv
 
@@ -162,7 +159,7 @@ func parseSize(size string) (int64, error) {
 	return n << bits, nil
 }
 
-func volumeDriverFromEngine(iface localVolumeIface, e *cluster.Engine, label string) (Driver, error) {
+func volumeDriverFromEngine(iface localVolumeIface, e *cluster.Engine, label string, port int) (Driver, error) {
 	var vgType, sizeLabel string
 
 	switch label {
@@ -208,6 +205,7 @@ func volumeDriverFromEngine(iface localVolumeIface, e *cluster.Engine, label str
 		engine: e,
 		vo:     iface,
 		_type:  vgType,
+		port:   port,
 		driver: defaultLocalVolumeDriver,
 		space: Space{
 			Total:  total,
@@ -215,6 +213,7 @@ func volumeDriverFromEngine(iface localVolumeIface, e *cluster.Engine, label str
 			VG:     vg,
 			Fstype: defaultFileSystem,
 		},
+		vgIface: unsupportSAN{},
 	}
 
 	_, err := lv.Space()
@@ -222,17 +221,17 @@ func volumeDriverFromEngine(iface localVolumeIface, e *cluster.Engine, label str
 	return lv, err
 }
 
-func localVolumeDrivers(e *cluster.Engine, iface localVolumeIface) ([]Driver, error) {
+func localVolumeDrivers(e *cluster.Engine, iface localVolumeIface, port int) ([]Driver, error) {
 	drivers := make([]Driver, 0, 4)
 
-	vd, err := volumeDriverFromEngine(iface, e, _HDDVGLabel)
+	vd, err := volumeDriverFromEngine(iface, e, _HDDVGLabel, port)
 	if err == nil && vd != nil {
 		drivers = append(drivers, vd)
 	} else {
 		logrus.Debugf("%s %s %+v", e.Name, _HDDVGLabel, err)
 	}
 
-	vd, err = volumeDriverFromEngine(iface, e, _SSDVGLabel)
+	vd, err = volumeDriverFromEngine(iface, e, _SSDVGLabel, port)
 	if err == nil && vd != nil {
 		drivers = append(drivers, vd)
 	} else {
@@ -243,9 +242,11 @@ func localVolumeDrivers(e *cluster.Engine, iface localVolumeIface) ([]Driver, er
 }
 
 type localVolume struct {
+	vgIface
 	engine *cluster.Engine
 	driver string
 	_type  string
+	port   int
 	space  Space
 	vo     localVolumeIface
 }
@@ -314,7 +315,7 @@ func (lv *localVolume) Alloc(config *cluster.ContainerConfig, uid string, req st
 	return &v, nil
 }
 
-func (lv *localVolume) Expand(dv database.Volume, agent string, size int64) error {
+func (lv *localVolume) Expand(dv database.Volume, size int64) error {
 	dv, err := lv.vo.GetVolume(dv.Name)
 	if err != nil {
 		return err
@@ -331,12 +332,14 @@ func (lv *localVolume) Expand(dv database.Volume, agent string, size int64) erro
 
 	dv.Size += size
 
-	err = lv.vo.SetVolume(dv.ID, dv.EngineID, dv.Size)
+	err = lv.vo.SetVolume(dv)
 	if err != nil {
 		return err
 	}
 
 	lv.space.Free -= size
+
+	agent := fmt.Sprintf("%s:%d", lv.engine.IP, lv.port)
 
 	return updateVolume(agent, dv)
 }

@@ -4,12 +4,12 @@ package compose
 
 import (
 	"bytes"
-	"errors"
 	"os/exec"
 	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 type ExecType string
@@ -50,7 +50,7 @@ func ExecWithTimeout(_Type ExecType, shell string, timeout time.Duration, args .
 	cmd.Stderr = &stderr
 	err := cmd.Start()
 	if err != nil {
-		return "", errors.New("cmd start err:" + err.Error())
+		return "", errors.Errorf("cmd start err:%s", err)
 	}
 
 	err, isTimeout := cmdRunWithTimeout(cmd, timeout)
@@ -76,12 +76,11 @@ func ExecWithTimeout(_Type ExecType, shell string, timeout time.Duration, args .
 	}
 
 	if err != nil {
-		return "", errors.New("exec error:" + err.Error())
+		return "", errors.Errorf("exec error:%s", err)
 	}
 
 	// exec successfully
-	data := stdout.Bytes()
-	return string(data), nil
+	return stdout.String(), nil
 }
 
 func cmdRunWithTimeout(cmd *exec.Cmd, timeout time.Duration) (error, bool) {

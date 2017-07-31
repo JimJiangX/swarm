@@ -109,7 +109,7 @@ type ServiceSpec struct {
 
 	Require *UnitRequire `json:"unit_require,omitempty"`
 
-	Networkings []string `json:"networking_id,omitempty"`
+	Networkings map[string][]string `json:"networking,omitempty"`
 
 	Clusters []string `json:"cluster_id,omitempty"`
 
@@ -180,6 +180,16 @@ type ServiceBackupConfig struct {
 	Type      string `json:"type"`
 	Detach    bool   `json:"detach"`
 	BackupDir string `json:"backup_dir"`
+}
+
+type ServiceRestoreRequest struct {
+	File  string   `json:"file"`
+	Units []string `json:"units"`
+}
+
+type PostUnitMigrate struct {
+	NameOrID   string   `json:"nameOrID"`
+	Candidates []string `json:"candidates,omitempty"`
 }
 
 type ServiceLink struct {

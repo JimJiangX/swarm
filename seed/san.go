@@ -2,17 +2,16 @@ package seed
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-
 	"net/http"
 	"os"
-
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 var drivers map[string]string
@@ -137,25 +136,24 @@ func vgCreateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 }
 
 func vgListHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
-
 	vgs, err := vgList()
-
 	if err != nil {
-		res := &VgListRes{
+		log.Errorf("%+v", err)
+
+		writeJSON(w, VgListRes{
 			Err: err.Error(),
-		}
-		response, _ := json.Marshal(res)
-		w.Write(response)
+		}, http.StatusInternalServerError)
+
 		return
 	}
 
-	res := &VgListRes{
+	res := VgListRes{
 		Err: "",
 		Vgs: vgs,
 	}
-	log.Println("VGLIST:", res)
-	response, _ := json.Marshal(res)
-	w.Write(response)
+	log.Debug("VGLIST:", res)
+
+	writeJSON(w, res, http.StatusOK)
 }
 
 func checkVgConfig(cfg *VgConfig) error {
@@ -171,18 +169,17 @@ func checkVgConfig(cfg *VgConfig) error {
 }
 
 func vgList() ([]VgInfo, error) {
-	vgs := []VgInfo{}
-	vgscript := fmt.Sprintf("vgs --units b | sed '1d' | awk '{print $1,$6,$7}' ")
+	script := fmt.Sprintf("vgs --units b | sed '1d' | awk '{print $1,$6,$7}' ")
 
-	out, err := execCommand(vgscript)
-	log.Printf("%s\n%s\n%v\n", vgscript, string(out), err)
+	out, err := execCommand(script)
+	log.Debugf("%s\n%s\n%v\n", script, string(out), err)
 	if err != nil {
-		errstr := "vglist exeec fail:" + err.Error()
-		log.Println(errstr)
-		return nil, errors.New(errstr)
+		return nil, errors.Errorf("vglist exeec fail:%s", err)
 	}
-	outstr := string(out)
-	lines := strings.Split(outstr, "\n")
+
+	lines := strings.Split(string(out), "\n")
+	vgs := make([]VgInfo, 0, len(lines))
+
 	for _, line := range lines {
 		if line == "" {
 			continue
@@ -190,7 +187,7 @@ func vgList() ([]VgInfo, error) {
 
 		slices := strings.Fields(line)
 		if len(slices) != 3 {
-			log.Println("[warn]the line not 3 slice:", line)
+			log.Debug("[warn]the line not 3 slice:", line)
 			continue
 		}
 
@@ -198,14 +195,14 @@ func vgList() ([]VgInfo, error) {
 		sizeslice := strings.Split(slices[1], ".")
 		size, err := strconv.Atoi(strings.Split(sizeslice[0], "B")[0])
 		if err != nil {
-			log.Printf("[warn]the line %s get the VSize fail: %d", line, size)
+			log.Debugf("[warn]the line %s get the VSize fail: %d", line, size)
 			continue
 		}
 
 		freeslice := strings.Split(slices[2], ".")
 		free, err := strconv.Atoi(strings.Split(freeslice[0], "B")[0])
 		if err != nil {
-			log.Printf("[warn]the line %s get the VFree fail: %d", line, free)
+			log.Debugf("[warn]the line %s get the VFree fail: %d", line, free)
 			continue
 		}
 
@@ -224,15 +221,15 @@ func vgList() ([]VgInfo, error) {
 }
 
 func scanSanDisk() error {
-	scriptpath := scriptDir + "sanscandisk.sh"
-	_, err := os.Lstat(scriptpath)
+	script := filepath.Join(scriptDir, "sanscandisk.sh")
+	_, err := os.Lstat(script)
 	if os.IsNotExist(err) {
-		return errors.New("not find the file:" + scriptpath)
+		return errors.New("not find the file:" + script)
 	}
 
-	out, err := execShellFile(scriptpath)
+	out, err := execShellFile(script)
 
-	log.Printf("%s\n%s\n%v\n", scriptpath, string(out), err)
+	log.Printf("%s\n%s\n%v\n", script, string(out), err)
 
 	if err != nil {
 		errstr := "scanSanDisk fail:" + err.Error()
@@ -245,14 +242,14 @@ func scanSanDisk() error {
 }
 
 func getDevicePath(id int, santype string) (string, error) {
-	scriptpath := scriptDir + "getsandevice.sh"
-	_, err := os.Lstat(scriptpath)
+	script := filepath.Join(scriptDir, "getsandevice.sh")
+	_, err := os.Lstat(script)
 	if os.IsNotExist(err) {
-		return "", errors.New("not find the file:" + scriptpath)
+		return "", errors.New("not find the file:" + script)
 	}
 	args := []string{santype, strconv.Itoa(id)}
 
-	out, err := execShellFile(scriptpath, args...)
+	out, err := execShellFile(script, args...)
 	if err != nil {
 		return "", err
 	}

@@ -1,9 +1,11 @@
 package compose
 
 import (
-	"errors"
+	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 type MysqlUser struct {
@@ -26,6 +28,8 @@ type Mysql struct {
 
 	MgmPort int
 	MgmIP   string
+
+	scriptDir string
 }
 
 func (m Mysql) GetKey() string {
@@ -33,14 +37,16 @@ func (m Mysql) GetKey() string {
 }
 
 func (m Mysql) Clear() error {
-	filepath := scriptDir + "mysql-replication-reset.sh"
+	filepath := filepath.Join(m.scriptDir, "mysql-replication-reset.sh")
 	timeout := time.Second * 60
 	args := []string{
 		m.Instance,
 		m.MgmIP,
 		strconv.Itoa(m.MgmPort),
 	}
+
 	_, err := ExecShellFileTimeout(filepath, timeout, args...)
+
 	return err
 }
 
@@ -53,7 +59,7 @@ func (m Mysql) ChangeMaster(master Mysql) error {
 		return errors.New(string(m.GetType()) + ":should not call the func")
 	}
 
-	filepath := scriptDir + "mysql-replication-set.sh"
+	filepath := filepath.Join(m.scriptDir, "mysql-replication-set.sh")
 	timeout := time.Second * 60
 
 	args := []string{
@@ -75,9 +81,10 @@ func (m Mysql) ChangeMaster(master Mysql) error {
 }
 
 func (m Mysql) CheckStatus() error {
-	filepath := scriptDir + "mysqlcheck.sh"
+	filepath := filepath.Join(m.scriptDir, "mysqlcheck.sh")
 	timeout := time.Second * 60
-	args := []string{}
-	_, err := ExecShellFileTimeout(filepath, timeout, args...)
+
+	_, err := ExecShellFileTimeout(filepath, timeout)
+
 	return err
 }

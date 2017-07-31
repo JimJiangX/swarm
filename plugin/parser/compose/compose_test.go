@@ -122,7 +122,8 @@ func TestRedis(t *testing.T) {
 	spec := getRedisSpecTest()
 	mgmip := "127.0.0.1"
 	mgmport := 123
-	composer, err := NewCompserBySpec(spec, mgmip, mgmport)
+	dir := "."
+	composer, err := NewCompserBySpec(spec, dir, mgmip, mgmport)
 	//	assert.Nil(t, err)
 	if err != nil {
 		t.Skipf("get composer fail:%s", err.Error())
@@ -138,7 +139,8 @@ func TestMysql(t *testing.T) {
 	spec := getMysqlSpecTest()
 	mgmip := "127.0.0.1"
 	mgmport := 123
-	composer, err := NewCompserBySpec(spec, mgmip, mgmport)
+	dir := "."
+	composer, err := NewCompserBySpec(spec, dir, mgmip, mgmport)
 	//	assert.Nil(t, err)
 	if err != nil {
 		t.Skipf("get composer fail:%s", err.Error())
@@ -153,7 +155,9 @@ func TestClone(t *testing.T) {
 	spec := getRedisSpecTest()
 	spec.Arch.Mode = "clone"
 
-	composer, err := NewCompserBySpec(spec, "", 0)
+	dir := "."
+
+	composer, err := NewCompserBySpec(spec, dir, "", 0)
 	//	assert.Nil(t, err)
 	if err != nil {
 		t.Skipf("get composer fail:%s", err.Error())

@@ -205,6 +205,10 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 	return lun, lv, nil
 }
 
+func (h huaweiStore) ListLUN(nameOrVG string) ([]database.LUN, error) {
+	return h.orm.ListLunByNameOrVG(nameOrVG)
+}
+
 func (h *huaweiStore) Recycle(id string, lun int) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -298,7 +302,7 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 	return nil
 }
 
-func (h *huaweiStore) Mapping(host, vg, lun string) error {
+func (h *huaweiStore) Mapping(host, vg, lun, unit string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -327,7 +331,9 @@ func (h *huaweiStore) Mapping(host, vg, lun string) error {
 	}
 
 	lv.EngineID = host
-	err = h.orm.SetVolume(lv.ID, lv.EngineID, lv.Size)
+	lv.UnitID = unit
+
+	err = h.orm.SetVolume(lv)
 	if err != nil {
 		return err
 	}
@@ -345,12 +351,7 @@ func (h *huaweiStore) Mapping(host, vg, lun string) error {
 	return nil
 }
 
-func (h *huaweiStore) DelMapping(lun string) error {
-	l, err := h.orm.GetLUN(lun)
-	if err != nil {
-		return err
-	}
-
+func (h *huaweiStore) DelMapping(lun database.LUN) error {
 	path, err := h.scriptPath("del_lunmap.sh")
 	if err != nil {
 		return err
@@ -359,13 +360,13 @@ func (h *huaweiStore) DelMapping(lun string) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID)}
+	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(lun.StorageLunID)}
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	err = h.orm.DelLunMapping(lun)
+	err = h.orm.DelLunMapping(lun.ID)
 
 	return err
 }

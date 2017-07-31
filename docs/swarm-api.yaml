@@ -143,7 +143,7 @@ paths:
           schema:
             type: array
             items:
-              $ref: '#/definitions/GetImageResponse'
+              $ref: '#/definitions/ImageResponse'
         '500':
           description: 内部数据库查询错误
           schema:
@@ -185,6 +185,57 @@ paths:
           schema:
             $ref: '#/definitions/ErrorResponseHeader'
   '/softwares/images/{id}':
+    get:
+      description: get image & template config
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+          description: image name or id
+      responses:
+        '200':
+          description: returns image with template config
+          schema:
+            properties:
+              id:
+                type: string
+              docker_image_id:
+                type: string
+              name:
+                type: string
+              major_version:
+                type: integer
+              minor_version:
+                type: integer
+              patch_version:
+                type: integer
+              size:
+                type: integer
+              label:
+                type: string
+              upload_at:
+                type: string
+                format: date-time
+              config_template:
+                $ref: '#/definitions/configTemplate'
+    put:
+      description: 修改image的配置文件模板
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+          description: image name or id
+        - name: template
+          in: body
+          required: true
+          description: image template config
+          schema:
+            $ref: '#/definitions/configTemplate'
+      responses:
+        '200':
+          description: OK
     delete:
       description: delete image by id
       parameters:
@@ -621,7 +672,7 @@ paths:
           required: true
           description: 所属网段id 下全部IP，可选
           schema:
-            $ref: '#/definitions/ServiceSpec'
+            $ref: '#/definitions/PostServiceRequst'
       responses:
         '201':
           description: 返回任务信息
@@ -725,6 +776,318 @@ paths:
           description: 内部逻辑错误
           schema:
             $ref: '#/definitions/ErrorResponseHeader'
+  '/services/{id}/scale':
+    post:
+      summary: 服务水平扩展
+      description: 服务节点对等扩展，扩展指定相同资源配置的节点数
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: service id or name
+          type: string
+        - name: body
+          in: body
+          required: true
+          description: scale request parameters
+          schema:
+            $ref: '#/definitions/serviceScaleRequest'
+      responses:
+        '201':
+          description: OK，返回 task_id.
+          schema:
+            $ref: '#/definitions/TaskIDResonse'
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/services/{id}/update':
+    post:
+      summary: 服务可使用资源扩缩
+      description: 服务容器资源扩缩，扩缩到指定大小的资源配置，其他配置保持不变
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: service id or name
+          type: string
+        - name: body
+          in: body
+          required: true
+          description: unit required resources config
+          schema:
+            $ref: '#/definitions/unitRequire'
+      responses:
+        '201':
+          description: OK，返回 task_id.
+          schema:
+            $ref: '#/definitions/TaskIDResonse'
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/services/{id}/image/update':
+    post:
+      summary: 服务容器镜像版本升级
+      description: 升级所属服务的容器中的镜像版本，其他配置保持不变
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: service id or name
+          type: string
+        - name: image
+          in: query
+          required: true
+          description: image version name or image id or docker image id
+          type: string
+      responses:
+        '201':
+          description: OK，返回 task_id.
+          schema:
+            $ref: '#/definitions/TaskIDResonse'
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/services/{id}/config/update':
+    post:
+      summary: 服务配置文件升级
+      description: 更新服务容器中的配置文件
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: service id or name
+          type: string
+        - name: updateConfig
+          in: body
+          required: true
+          description: 配置文件的配置
+          schema:
+            properties:
+              Configs:
+                type: object
+                additionalProperties:
+                  $ref: '#/definitions/configCmds'
+              Args:
+                type: object
+                additionalProperties:
+                  type: string
+      responses:
+        '201':
+          description: OK，返回 task_id.
+          schema:
+            $ref: '#/definitions/TaskIDResonse'
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/services/{id}/exec':
+    post:
+      summary: 在服务容器内执行命令
+      description: 在所属服务指定容器内执行特定指令
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: service id or name
+          type: string
+        - name: ececConfig
+          in: body
+          required: true
+          description: 待执行指令及执行方式
+          schema:
+            properties:
+              detach:
+                type: boolean
+              nameOrID:
+                type: string
+                description: '指定容器id或者unit id or name,为空时所属服务的容器全部执行特定指令'
+              cmd:
+                type: array
+                items:
+                  type: string
+      responses:
+        '201':
+          description: OK，返回 task_id.
+          schema:
+            $ref: '#/definitions/TaskIDResonse'
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/services/{id}/backup':
+    post:
+      summary: 在服务容器内执行备份任务
+      description: 在所属服务指定容器内执行备份任务
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: service id or name
+          type: string
+        - name: backupCofig
+          in: body
+          required: true
+          schema:
+            properties:
+              detach:
+                type: boolean
+              nameOrID:
+                type: string
+                description: '指定容器id或者unit id or name,为空时所属服务的容器全部执行特定指令'
+              type:
+                type: string
+                description: 备份类型（增量备份、全备份）
+              backup_dir:
+                type: string
+                description: 备份文件存储目录
+      responses:
+        '201':
+          description: OK，返回 task_id.
+          schema:
+            $ref: '#/definitions/TaskIDResonse'
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/services/{id}/restore':
+    post:
+      summary: 从指定文件中恢复服务中某容器的数据
+      description: 在所属服务指定容器内执行特定指令
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: service id or name
+          type: string
+        - name: body
+          in: body
+          required: true
+          schema:
+            properties:
+              units:
+                type: array
+                items:
+                  type: string
+                  description: '指定容器id或者unit id or name,为空时所属服务的容器全部执行特定指令'
+              file:
+                type: string
+                description: 指定的备份文件
+      responses:
+        '201':
+          description: OK，返回 task_id.
+          schema:
+            $ref: '#/definitions/TaskIDResonse'
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/services/{id}/rebuild':
+    post:
+      summary: 重建所属服务下的指定unit
+      description: 重建所属服务下的指定unit，重建后的网络ip：port配置不变
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: service id or name
+          type: string
+        - name: body
+          in: body
+          required: true
+          schema:
+            properties:
+              units:
+                type: array
+                items:
+                  type: string
+                  description: '指定容器id或者unit id or name,为空时所属服务的容器全部执行特定指令'
+              candidates:
+                type: array
+                items:
+                  type: string
+              users:
+                type: array
+                items:
+                  $ref: '#/definitions/User'
+      responses:
+        '201':
+          description: OK，返回 task_id.
+          schema:
+            $ref: '#/definitions/TaskIDResonse'
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/services/{id}/migrate':
+    post:
+      summary: 迁移所属服务下的指定unit
+      description: 迁移所属服务下的指定unit，重建后的网络ip：port配置不变，volume不变，只有外部存储可实现数据迁移，以SAN存储为例
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: service id or name
+          type: string
+        - name: body
+          in: body
+          required: true
+          schema:
+            properties:
+              nameOrID:
+                type: string
+                description: '指定容器id或者unit id or name,为空时所属服务的容器全部执行特定指令'
+              candidates:
+                type: array
+                items:
+                  type: string
+      responses:
+        '201':
+          description: OK，返回 task_id.
+          schema:
+            $ref: '#/definitions/TaskIDResonse'
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
 definitions:
   TaskIDResonse:
     properties:
@@ -802,9 +1165,9 @@ definitions:
         type: integer
       minor_version:
         type: integer
-      patch:
+      patch_version:
         type: integer
-  GetImageResponse:
+  ImageResponse:
     properties:
       id:
         type: string
@@ -816,7 +1179,7 @@ definitions:
         type: integer
       minor_version:
         type: integer
-      patch:
+      patch_version:
         type: integer
       size:
         type: integer
@@ -825,6 +1188,37 @@ definitions:
       upload_at:
         type: string
         format: date-time
+  configTemplate:
+    properties:
+      image:
+        type: string
+      log_mount:
+        type: string
+      data_mount:
+        type: string
+      config_file:
+        type: string
+      content:
+        type: string
+      timestamp:
+        type: integer
+      keysets:
+        type: array
+        items:
+          type: object
+          properties:
+            can_set:
+              type: boolean
+            must_restart:
+              type: boolean
+            key:
+              type: string
+            default:
+              type: string
+            desc:
+              type: string
+            range:
+              type: string
   PostLoadImageRequest:
     properties:
       name:
@@ -833,7 +1227,7 @@ definitions:
         type: integer
       minor_version:
         type: integer
-      patch:
+      patch_version:
         type: integer
       path:
         type: string
@@ -1463,6 +1857,112 @@ definitions:
         type: object
         additionalProperties:
           type: string
+  User:
+    properties:
+      name:
+        type: string
+      password:
+        type: string
+      role:
+        type: string
+      privilege:
+        type: string
+  PostServiceRequst:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      desc:
+        type: string
+      tag:
+        type: string
+      auto_healing:
+        type: boolean
+      auto_scaling:
+        type: boolean
+      high_available:
+        type: boolean
+      status:
+        type: integer
+      max_backup_space:
+        type: integer
+      backup_files_retention:
+        type: integer
+      created_at:
+        type: string
+        format: date-time
+      finished_at:
+        type: string
+        format: date-time
+      architecture:
+        $ref: '#/definitions/Arch'
+      unit_require:
+        $ref: '#/definitions/unitRequire'
+      cluster_id:
+        type: array
+        items:
+          type: string
+      constraints:
+        type: array
+        items:
+          type: string
+      opts:
+        type: object
+        additionalProperties:
+          type: string
+      users:
+        type: array
+        items:
+          $ref: '#/definitions/User'
+      networking:
+        type: object
+        additionalProperties:
+          type: array
+          items:
+            type: string
+  unitRequire:
+    properties:
+      require:
+        type: object
+        properties:
+          ncpu:
+            type: integer
+          memory:
+            type: integer
+      limit:
+        type: object
+        properties:
+          ncpu:
+            type: integer
+          memory:
+            type: integer
+      volumes:
+        type: array
+        items:
+          properties:
+            from:
+              type: string
+            name:
+              type: string
+            type:
+              type: string
+            driver:
+              type: string
+            size:
+              type: integer
+            options:
+              type: object
+              additionalProperties:
+                type: string
+      networks:
+        type: array
+        items:
+          properties:
+            device:
+              type: integer
+            bandwidth:
+              type: integer
   systemConfig:
     properties:
       dc_id:
@@ -1499,3 +1999,43 @@ definitions:
         type: string
       clean_script_name:
         type: string
+  serviceScaleRequest:
+    properties:
+      architecture:
+        $ref: '#/definitions/Arch'
+      candidates:
+        type: array
+        items:
+          type: string
+      users:
+        type: array
+        items:
+          $ref: '#/definitions/User'
+      options:
+        type: object
+        additionalProperties:
+          type: string
+  configCmds:
+    properties:
+      ID:
+        type: string
+      Name:
+        type: string
+      Version:
+        type: string
+      Content:
+        type: string
+      LogMount:
+        type: string
+      DataMount:
+        type: string
+      config_file:
+        type: string
+      Timestamp:
+        type: integer
+      Cmds:
+        type: object
+        additionalProperties:
+          type: array
+          items:
+            type: string

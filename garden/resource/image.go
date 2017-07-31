@@ -55,7 +55,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 	}
 	task := database.NewTask(req.Version(), database.ImageLoadTask, image.ID, "load image", nil, req.Timeout)
 
-	befor := func(key string, new int, t *database.Task, f func(val int) bool) (bool, int, error) {
+	before := func(key string, new int, t *database.Task, f func(val int) bool) (bool, int, error) {
 		err = ormer.InsertImageWithTask(image, *t)
 		if err != nil {
 			return false, 0, err
@@ -65,6 +65,10 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 	}
 
 	after := func(key string, val int, task *database.Task, t time.Time) error {
+		if task == nil || task.Status == database.TaskDoneStatus {
+			return nil
+		}
+
 		return ormer.SetTask(*task)
 	}
 
@@ -76,6 +80,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 				oldName := req.Version()
 				newName := fmt.Sprintf("%s:%d/%s", registry.Domain, registry.Port, oldName)
 				script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
+				logrus.WithField("Image", req.Name).Info("ssh exec:'%s'", script)
 
 				scp, err := scplib.NewClientByPublicKeys(registry.Address, registry.OsUsername, "", time.Duration(req.Timeout)*time.Second)
 				if err != nil {
@@ -125,7 +130,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 		return nil
 	}
 
-	tl := tasklock.NewGoTask(image.ID, &task, befor, after)
+	tl := tasklock.NewGoTask(image.ID, &task, before, after)
 
 	err = tl.Go(func(int) bool { return true }, run)
 	if err != nil {

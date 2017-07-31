@@ -75,6 +75,19 @@ func (svc Service) getUnits() ([]*unit, error) {
 	return units, nil
 }
 
+func getUnit(units []*unit, nameOrID string) *unit {
+	for i := range units {
+		if units[i].u.ID == nameOrID ||
+			units[i].u.Name == nameOrID ||
+			units[i].u.ContainerID == nameOrID {
+
+			return units[i]
+		}
+	}
+
+	return nil
+}
+
 // Spec returns ServiceSpec,if nil,query ServiceInfo from db,then convert to ServiceSpec
 func (svc *Service) Spec() (*structs.ServiceSpec, error) {
 	if svc.spec != nil {
@@ -173,7 +186,7 @@ func convertStructsService(spec structs.ServiceSpec, schedopts scheduleOption) (
 	}
 
 	var nw = struct {
-		NetworkingIDs []string
+		NetworkingIDs map[string][]string
 		Require       []structs.NetDeviceRequire
 	}{
 		spec.Networkings,
@@ -784,6 +797,15 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register, force bool) 
 			return err
 		}
 
+		if !force {
+			// check engines whether is alive before really delete
+			for _, u := range units {
+				if e := u.getEngine(); e == nil {
+					return errors.Errorf("Engine %s is unhealthy", u.u.EngineID)
+				}
+			}
+		}
+
 		select {
 		default:
 		case <-ctx.Done():
@@ -898,17 +920,20 @@ func (svc Service) deleteCondition() error {
 
 func (svc Service) deregisterSerivces(ctx context.Context, reg kvstore.Register, units []*unit) error {
 	for i := range units {
-
-		err := reg.DeregisterService(ctx, structs.ServiceDeregistration{
-			Type: "units",
-			Key:  units[i].u.ID,
-		}, false)
+		err := deregisterService(ctx, reg, "units", units[i].u.ID)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func deregisterService(ctx context.Context, reg kvstore.Register, _type, key string) error {
+	return reg.DeregisterService(ctx, structs.ServiceDeregistration{
+		Type: _type,
+		Key:  key,
+	}, false)
 }
 
 func (svc *Service) removeUnits(ctx context.Context, rm []*unit, reg kvstore.Register) error {

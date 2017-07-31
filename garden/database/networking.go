@@ -28,6 +28,7 @@ type NetworkingOrmer interface {
 
 	SetNetworkingEnable(ID string, enable bool) error
 	SetIPEnable([]uint32, string, bool) error
+	SetIPs(ips []IP) error
 	ResetIPs(ips []IP) error
 }
 
@@ -272,6 +273,13 @@ func (db dbBase) txSetIPs(tx *sqlx.Tx, val []IP) error {
 	stmt.Close()
 
 	return nil
+}
+
+// SetIPs update []IP in Tx
+func (db dbBase) SetIPs(ips []IP) error {
+	return db.txFrame(func(tx *sqlx.Tx) error {
+		return db.txSetIPs(tx, ips)
+	})
 }
 
 func (db dbBase) txResetIPs(tx *sqlx.Tx, ips []IP) error {
