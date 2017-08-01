@@ -43,7 +43,11 @@ func main() {
 
 		found := false
 		for i := range list {
-			if list[i].Name == iv.Name && list[i].Major == iv.Major && list[i].Minor == iv.Minor {
+			if list[i].Name == iv.Name &&
+				list[i].Major == iv.Major &&
+				list[i].Minor == iv.Minor &&
+				list[i].Build == iv.Build {
+
 				found = true
 				break
 			}

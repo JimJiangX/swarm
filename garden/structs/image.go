@@ -13,18 +13,20 @@ type ImageVersion struct {
 	Major int    `json:"major_version"`
 	Minor int    `json:"minor_version"`
 	Patch int    `json:"patch_version"`
+	Build int    `json:"build_version"`
 }
 
 func (iv ImageVersion) Version() string {
-	return fmt.Sprintf("%s:%d.%d.%d", iv.Name, iv.Major, iv.Minor, iv.Patch)
+	return fmt.Sprintf("%s:%d.%d.%d.%d", iv.Name, iv.Major, iv.Minor, iv.Patch, iv.Build)
 }
 
-func NewImageVersion(name string, major, minor, patch int) ImageVersion {
+func NewImageVersion(name string, major, minor, patch, build int) ImageVersion {
 	return ImageVersion{
 		Name:  name,
 		Major: major,
 		Minor: minor,
 		Patch: patch,
+		Build: build,
 	}
 }
 
@@ -55,7 +57,15 @@ func ParseImage(name string) (iv ImageVersion, err error) {
 		}
 
 		if len(dots) > 2 {
-			iv.Patch, err = strconv.Atoi(string(dots[2]))
+			iv.Patch, err = strconv.Atoi(dots[2])
+			if err != nil {
+				return iv, errors.Wrap(err, "parse image error,image:"+name)
+
+			}
+		}
+
+		if len(dots) > 3 {
+			iv.Build, err = strconv.Atoi(string(dots[3]))
 		}
 	}
 
@@ -79,7 +89,11 @@ func (iv ImageVersion) LessThan(v ImageVersion) (bool, error) {
 		return iv.Minor < iv.Minor, nil
 	}
 
-	return iv.Patch < v.Patch, nil
+	if iv.Patch != v.Patch {
+		return iv.Patch < iv.Patch, nil
+	}
+
+	return iv.Build < v.Build, nil
 }
 
 type PostLoadImageRequest struct {

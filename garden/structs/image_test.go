@@ -3,16 +3,17 @@ package structs
 import "testing"
 
 func TestParseImage(t *testing.T) {
-	v, err := ParseImage("mysql:5.7.19")
+	v, err := ParseImage("mysql:5.7.19.2")
 	if err != nil {
 		t.Error(err, v)
 	}
 
-	if v.Name != "mysql" || v.Major != 5 || v.Minor != 7 || v.Patch != 19 {
+	if v.Name != "mysql" || v.Major != 5 ||
+		v.Minor != 7 || v.Patch != 19 || v.Build != 2 {
 		t.Errorf("%#v", v)
 	}
 
-	v1, err := ParseImage("mysql:5.7")
+	v1, err := ParseImage("mysql:5.7.0")
 	if err != nil {
 		t.Error(err, v1)
 	}
@@ -23,9 +24,9 @@ func TestParseImage(t *testing.T) {
 }
 
 func TestImageVersion(t *testing.T) {
-	v := ImageVersion{"mysql", 5, 7, 19}
-	if got := v.Version(); got != "mysql:5.7.19" {
-		t.Error(got, "!=", "mysql:5.7.19")
+	v := ImageVersion{"mysql", 5, 7, 19, 0}
+	if got := v.Version(); got != "mysql:5.7.19.0" {
+		t.Error(got, "!=", "mysql:5.7.19.0")
 	}
 
 	v1 := ImageVersion{
@@ -33,8 +34,8 @@ func TestImageVersion(t *testing.T) {
 		Major: 4,
 		Minor: 17,
 	}
-	if got := v1.Version(); got != "mysql:4.17.0" {
-		t.Error(got, "!=", "mysql:4.17.0")
+	if got := v1.Version(); got != "mysql:4.17.0.0" {
+		t.Error(got, "!=", "mysql:4.17.0.0")
 	}
 
 	less, err := v.LessThan(v1)

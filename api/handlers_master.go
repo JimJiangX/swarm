@@ -399,6 +399,7 @@ func listImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 				Major: images[i].Major,
 				Minor: images[i].Minor,
 				Patch: images[i].Patch,
+				Build: images[i].Build,
 			},
 			Size:     images[i].Size,
 			ID:       images[i].ID,
@@ -434,7 +435,9 @@ func getSupportImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 func vaildLoadImageRequest(v structs.PostLoadImageRequest) error {
 	errs := make([]string, 0, 2)
 
-	if v.Name == "" || (v.Major == 0 && v.Minor == 0 && v.Patch == 0) {
+	if v.Name == "" ||
+		(v.Major == 0 && v.Minor == 0 &&
+			v.Patch == 0 && v.Build == 0) {
 		errs = append(errs, "ImageVersion is required")
 	}
 
@@ -491,7 +494,9 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	for _, version := range supports {
 		if version.Name == req.Name &&
 			version.Major == req.Major &&
-			version.Minor == req.Minor {
+			version.Minor == req.Minor &&
+			version.Build == req.Build {
+
 			found = true
 			break
 		}
@@ -570,6 +575,7 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			Major: im.Major,
 			Minor: im.Minor,
 			Patch: im.Patch,
+			Build: im.Build,
 		},
 		Size:     im.Size,
 		ID:       im.ID,

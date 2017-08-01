@@ -50,6 +50,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 		Major:    req.Major,
 		Minor:    req.Minor,
 		Patch:    req.Patch,
+		Build:    req.Build,
 		Labels:   labels,
 		UploadAt: time.Now(),
 	}
