@@ -210,6 +210,8 @@ paths:
                 type: integer
               patch_version:
                 type: integer
+              build_version:
+                type: integer
               size:
                 type: integer
               label:
@@ -1167,6 +1169,8 @@ definitions:
         type: integer
       patch_version:
         type: integer
+      build_version:
+        type: integer
   ImageResponse:
     properties:
       id:
@@ -1180,6 +1184,8 @@ definitions:
       minor_version:
         type: integer
       patch_version:
+        type: integer
+      build_version:
         type: integer
       size:
         type: integer
@@ -1228,6 +1234,8 @@ definitions:
       minor_version:
         type: integer
       patch_version:
+        type: integer
+      build_version:
         type: integer
       path:
         type: string
