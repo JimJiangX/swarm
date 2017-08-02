@@ -991,7 +991,7 @@ func (svc Service) Image() (database.Image, error) {
 		return database.Image{}, err
 	}
 
-	return svc.so.GetImage(img.Name, img.Major, img.Minor, img.Patch)
+	return svc.so.GetImage(img.Name, img.Major, img.Minor, img.Patch, img.Build)
 }
 
 func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]interface{}) (structs.ConfigsMap, error) {

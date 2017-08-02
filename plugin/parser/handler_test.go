@@ -39,7 +39,7 @@ func TestGetSupportImageVersion(t *testing.T) {
 
 func TestPostTemplate(t *testing.T) {
 	ct := structs.ConfigTemplate{
-		Image:     "redis:3.2.8",
+		Image:     "redis:3.2.8.0",
 		LogMount:  "/usr/local/log",
 		DataMount: "/usr/local/data",
 		Content:   configTemplateContext,
@@ -114,7 +114,7 @@ var redisSpec = structs.ServiceSpec{
 	Service: structs.Service{
 		ID:    "serivce0001",
 		Name:  "redis_service_001",
-		Image: "redis:3.2.8",
+		Image: "redis:3.2.8.0",
 	},
 	Arch: structs.Arch{
 		Mode:     "sharding_replication",
@@ -194,7 +194,7 @@ func TestGenerateConfigs(t *testing.T) {
 		Service: structs.Service{
 			ID:    "serivce0001",
 			Name:  "redis_service_001",
-			Image: "redis:3.2.8",
+			Image: "redis:3.2.8.0",
 		},
 		Options: map[string]interface{}{
 			"port": 8327,

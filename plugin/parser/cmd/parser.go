@@ -43,7 +43,11 @@ func main() {
 
 		found := false
 		for i := range list {
-			if list[i].Name == iv.Name && list[i].Major == iv.Major && list[i].Minor == iv.Minor {
+			if list[i].Name == iv.Name &&
+				list[i].Major == iv.Major &&
+				list[i].Minor == iv.Minor &&
+				list[i].Build == iv.Build {
+
 				found = true
 				break
 			}
@@ -70,12 +74,21 @@ func main() {
 	}
 
 	{
-		if v := iv.Version(); temp.Image != "" && temp.Image != iv.Version() {
-			log.Fatalf("image:'%s' != '%s' from JSON file", *flImage, temp.Image)
-		} else {
-			temp.Image = v
-		}
+		v := iv.Version()
 
+		if temp.Image != "" {
+			t, err := structs.ParseImage(*flImage)
+			if err != nil {
+				log.Printf("parse image version '%s':%+v\n", *flImage, err)
+			}
+			if t.Version() != v {
+				log.Fatalf("image:'%s' != '%s' from JSON file", *flImage, temp.Image)
+			}
+		}
+		temp.Image = v
+	}
+
+	{
 		if *flContext != "" {
 			path, err := utils.GetAbsolutePath(false, *flContext)
 			if err != nil {
