@@ -13,8 +13,15 @@ import (
 var (
 	db database.Ormer
 
-	hw     = database.HuaweiStorage{}
-	ht     = database.HitachiStorage{}
+	hw = database.HuaweiStorage{}
+	ht = database.HitachiStorage{
+		Vendor:    "HITACHI",
+		AdminUnit: "AMS2100_83004824",
+		LunStart:  1000,
+		LunEnd:    1200,
+		HluEnd:    500,
+		HluEnd:    600,
+	}
 	engine = "engine001"
 	wwwn   = "fafokaoka"
 )
@@ -51,10 +58,10 @@ func TestDefaultStores(t *testing.T) {
 		t.Error(err, len(out))
 	}
 
-	{
+	if hw.Vendor != "" {
 		hws, err := ds.Add(hw.Vendor, hw.IPAddr, hw.Username, hw.Password, "", 0, 0, hw.HluStart, hw.HluEnd)
 		if err != nil {
-			t.Log(err)
+			t.Error(err)
 		} else {
 			hw.ID = hws.ID()
 
@@ -65,10 +72,10 @@ func TestDefaultStores(t *testing.T) {
 		}
 	}
 
-	{
+	if ht.Vendor != "" {
 		hts, err := ds.Add(ht.Vendor, "", "", "", ht.AdminUnit, ht.LunStart, ht.LunEnd, ht.HluStart, ht.HluEnd)
 		if err != nil {
-			t.Log(err)
+			t.Error(err)
 		} else {
 			ht.ID = hts.ID()
 
