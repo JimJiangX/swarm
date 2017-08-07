@@ -2524,7 +2524,7 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s, err := ds.Add(req.Vendor, req.Addr,
+	s, err := ds.Add(req.Vendor, req.Version, req.Addr,
 		req.Username, req.Password, req.Admin,
 		req.LunStart, req.LunEnd, req.HostLunStart, req.HostLunEnd)
 	if err != nil {

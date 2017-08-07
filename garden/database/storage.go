@@ -358,6 +358,7 @@ func (db dbBase) DelRaidGroup(id, rg string) error {
 type HitachiStorage struct {
 	ID        string `db:"id"`
 	Vendor    string `db:"vendor"`
+	Version   string `db:"version"`
 	AdminUnit string `db:"admin_unit"`
 	LunStart  int    `db:"lun_start"`
 	LunEnd    int    `db:"lun_end"`
@@ -372,7 +373,7 @@ func (db dbBase) hitachiTable() string {
 // Insert inserts a new HitachiStorage
 func (db dbBase) InsertHitachiStorage(hs HitachiStorage) error {
 
-	query := "INSERT INTO " + db.hitachiTable() + " (id,vendor,admin_unit,lun_start,lun_end,hlu_start,hlu_end) VALUES (:id,:vendor,:admin_unit,:lun_start,:lun_end,:hlu_start,:hlu_end)"
+	query := "INSERT INTO " + db.hitachiTable() + " (id,vendor,version,admin_unit,lun_start,lun_end,hlu_start,hlu_end) VALUES (:id,:vendor,:version,:admin_unit,:lun_start,:lun_end,:hlu_start,:hlu_end)"
 
 	_, err := db.NamedExec(query, hs)
 	if err == nil {
@@ -387,6 +388,7 @@ func (db dbBase) InsertHitachiStorage(hs HitachiStorage) error {
 type HuaweiStorage struct {
 	ID       string `db:"id"`
 	Vendor   string `db:"vendor"`
+	Version  string `db:"version"`
 	IPAddr   string `db:"ip_addr"`
 	Username string `db:"username"`
 	Password string `db:"password"`
@@ -401,7 +403,7 @@ func (db dbBase) huaweiTable() string {
 // Insert inserts a new HuaweiStorage
 func (db dbBase) InsertHuaweiStorage(hs HuaweiStorage) error {
 
-	query := "INSERT INTO " + db.huaweiTable() + " (id,vendor,ip_addr,username,password,hlu_start,hlu_end) VALUES (:id,:vendor,:ip_addr,:username,:password,:hlu_start,:hlu_end)"
+	query := "INSERT INTO " + db.huaweiTable() + " (id,vendor,version,ip_addr,username,password,hlu_start,hlu_end) VALUES (:id,:vendor,:version,:ip_addr,:username,:password,:hlu_start,:hlu_end)"
 
 	_, err := db.NamedExec(query, hs)
 	if err == nil {
@@ -415,13 +417,13 @@ func (db dbBase) InsertHuaweiStorage(hs HuaweiStorage) error {
 func (db dbBase) GetStorageByID(id string) (*HitachiStorage, *HuaweiStorage, error) {
 	hitachi, huawei := &HitachiStorage{}, &HuaweiStorage{}
 
-	query := "SELECT id,vendor,admin_unit,lun_start,lun_end,hlu_start,hlu_end FROM " + db.hitachiTable() + " WHERE id=?"
+	query := "SELECT id,vendor,version,admin_unit,lun_start,lun_end,hlu_start,hlu_end FROM " + db.hitachiTable() + " WHERE id=?"
 	err := db.Get(hitachi, query, id)
 	if err == nil {
 		return hitachi, nil, nil
 	}
 
-	query = "SELECT id,vendor,ip_addr,username,password,hlu_start,hlu_end FROM " + db.huaweiTable() + " WHERE id=?"
+	query = "SELECT id,vendor,version,ip_addr,username,password,hlu_start,hlu_end FROM " + db.huaweiTable() + " WHERE id=?"
 	err = db.Get(huawei, query, id)
 	if err == nil {
 		return nil, huawei, nil

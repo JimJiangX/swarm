@@ -16,10 +16,11 @@ var (
 	hw = database.HuaweiStorage{}
 	ht = database.HitachiStorage{
 		Vendor:    "HITACHI",
+		Version:   "",
 		AdminUnit: "AMS2100_83004824",
 		LunStart:  1000,
 		LunEnd:    1200,
-		HluEnd:    500,
+		HluStart:  500,
 		HluEnd:    600,
 	}
 	engine = "engine001"
@@ -59,7 +60,7 @@ func TestDefaultStores(t *testing.T) {
 	}
 
 	if hw.Vendor != "" {
-		hws, err := ds.Add(hw.Vendor, hw.IPAddr, hw.Username, hw.Password, "", 0, 0, hw.HluStart, hw.HluEnd)
+		hws, err := ds.Add(hw.Vendor, hw.Version, hw.IPAddr, hw.Username, hw.Password, "", 0, 0, hw.HluStart, hw.HluEnd)
 		if err != nil {
 			t.Error(err)
 		} else {
@@ -73,7 +74,7 @@ func TestDefaultStores(t *testing.T) {
 	}
 
 	if ht.Vendor != "" {
-		hts, err := ds.Add(ht.Vendor, "", "", "", ht.AdminUnit, ht.LunStart, ht.LunEnd, ht.HluStart, ht.HluEnd)
+		hts, err := ds.Add(ht.Vendor, ht.Version, "", "", "", ht.AdminUnit, ht.LunStart, ht.LunEnd, ht.HluStart, ht.HluEnd)
 		if err != nil {
 			t.Error(err)
 		} else {

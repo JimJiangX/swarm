@@ -104,7 +104,7 @@ func DefaultStores() *stores {
 }
 
 // RegisterStore register a new remote storage system
-func (s *stores) Add(vendor, addr, user, password, admin string,
+func (s *stores) Add(vendor, version, addr, user, password, admin string,
 	lstart, lend, hstart, hend int) (store Store, err error) {
 
 	switch strings.ToUpper(vendor) {
@@ -112,6 +112,7 @@ func (s *stores) Add(vendor, addr, user, password, admin string,
 		hs := database.HuaweiStorage{
 			ID:       utils.Generate32UUID(),
 			Vendor:   HUAWEI,
+			Version:  version,
 			IPAddr:   addr,
 			Username: user,
 			Password: password,
@@ -123,6 +124,7 @@ func (s *stores) Add(vendor, addr, user, password, admin string,
 		hs := database.HitachiStorage{
 			ID:        utils.Generate32UUID(),
 			Vendor:    HITACHI,
+			Version:   version,
 			AdminUnit: admin,
 			LunStart:  lstart,
 			LunEnd:    lend,

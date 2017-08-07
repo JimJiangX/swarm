@@ -34,7 +34,7 @@ func newHuaweiStore(orm database.StorageOrmer, script string, hw database.Huawei
 	return &huaweiStore{
 		lock:   new(sync.RWMutex),
 		orm:    orm,
-		script: filepath.Join(script, HUAWEI),
+		script: filepath.Join(script, HUAWEI, hw.Version),
 		hs:     hw,
 	}
 }

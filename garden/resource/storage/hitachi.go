@@ -26,7 +26,7 @@ func newHitachiStore(orm database.StorageOrmer, script string, hs database.Hitac
 	return &hitachiStore{
 		lock:   new(sync.RWMutex),
 		orm:    orm,
-		script: filepath.Join(script, HITACHI),
+		script: filepath.Join(script, HITACHI, hs.Version),
 		hs:     hs,
 	}
 }
