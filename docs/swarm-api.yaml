@@ -1090,6 +1090,180 @@ paths:
           description: 内部逻辑错误
           schema:
             $ref: '#/definitions/ErrorResponseHeader'
+  /storage/san:
+    get:
+      description: 查询SAN共享存储信息
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/SANStorageInfo'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+    post:
+      description: 增加SAN共享存储信息
+      parameters:
+        - name: body
+          in: body
+          required: true
+          description: storage config
+          schema:
+            properties:
+              Vendor:
+                type: string
+              ip_addr:
+                type: string
+              Username:
+                type: string
+              Password:
+                type: string
+              admin_unit:
+                type: string
+              lun_start:
+                type: integer
+              lun_end:
+                type: integer
+              host_lun_start:
+                type: integer
+              host_lun_end:
+                type: integer
+      responses:
+        '201':
+          description: OK
+          schema:
+            $ref: '#/definitions/IDResonse'
+        '400':
+          description: 参数错误或参数校验问题
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/storage/san/{id}':
+    get:
+      description: 查询指定SAN共享存储信息，by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: storage id
+          type: string
+      responses:
+        '200':
+          description: OK
+          schema:
+            $ref: '#/definitions/IDResonse'
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+    delete:
+      description: 删除指定SAN共享存储信息，by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: storage id
+          type: string
+      responses:
+        '204':
+          description: OK
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/storage/san/{id}/raid_group/{rg}':
+    post:
+      description: 新增指定SAN共享存储的RaidGroup，by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: storage id
+          type: string
+        - name: rg
+          in: path
+          required: true
+          description: RaidGroup id
+          type: string
+      responses:
+        '201':
+          description: OK
+          schema:
+            properties:
+              size:
+                type: integer
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+    delete:
+      description: 删除指定SAN共享存储的指定RaidGroup，by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: storage id
+          type: string
+        - name: rg
+          in: path
+          required: true
+          description: RaidGroup id
+          type: string
+      responses:
+        '204':
+          description: OK
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/storage/san/{id}/raid_group/{rg}/enable':
+    put:
+      description: 指定SAN共享存储的启用指定RaidGroup，by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: storage id
+          type: string
+        - name: rg
+          in: path
+          required: true
+          description: RaidGroup id
+          type: string
+      responses:
+        '200':
+          description: OK
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
+  '/storage/san/{id}/raid_group/{rg}/disable':
+    put:
+      description: 指定SAN共享存储的停用指定RaidGroup，by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: storage id
+          type: string
+        - name: rg
+          in: path
+          required: true
+          description: RaidGroup id
+          type: string
+      responses:
+        '200':
+          description: OK
+        '500':
+          description: 内部逻辑错误
+          schema:
+            $ref: '#/definitions/ErrorResponseHeader'
 definitions:
   TaskIDResonse:
     properties:
@@ -2047,3 +2221,34 @@ definitions:
           type: array
           items:
             type: string
+  SANStorageInfo:
+    properties:
+      id:
+        type: string
+      vendor:
+        type: string
+      driver:
+        type: string
+      total:
+        type: integer
+      free:
+        type: integer
+      used:
+        type: integer
+      spaces:
+        type: array
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+            total:
+              type: integer
+            free:
+              type: integer
+            enable:
+              type: boolean
+            lun_num:
+              type: integer
+            state:
+              type: string

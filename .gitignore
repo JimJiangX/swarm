@@ -1,1 +1,9 @@
 /swarm
+
+# OSX leaves these everywhere on SMB shares
+._*
+
+# OSX trash
+.DS_Store
+
+.exe
