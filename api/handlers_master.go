@@ -280,12 +280,6 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	orm := gd.Ormer()
 
-	svc, err := orm.GetServiceByUnit(req.UnitID)
-	if err != nil {
-		ec := errCodeV1(_Task, dbQueryError, 33, "fail to query database", "数据库查询错误（服务表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
 	now := time.Now()
 	bf := database.BackupFile{
 		ID:         utils.Generate32UUID(),
@@ -294,7 +288,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		Type:       req.Type,
 		Path:       req.Path,
 		SizeByte:   req.Size,
-		Retention:  now.AddDate(0, 0, svc.BackupFilesRetention),
+		Retention:  now.AddDate(0, 0, req.Retention),
 		CreatedAt:  now,
 		FinishedAt: now,
 	}

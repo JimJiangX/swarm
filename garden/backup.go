@@ -1,6 +1,7 @@
 package garden
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/docker/swarm/garden/database"
@@ -14,7 +15,7 @@ import (
 // 对服务进行备份，如果指定则对指定的容器进行备份，执行ContainerExec进行备份任务。
 func (svc *Service) Backup(ctx context.Context, local string, config structs.ServiceBackupConfig, async bool, task *database.Task) error {
 	backup := func() error {
-		err := svc.checkBackupFiles(ctx)
+		err := svc.checkBackupFiles(ctx, config.BackupMaxSizeByte)
 		if err != nil {
 			return err
 		}
@@ -43,7 +44,7 @@ func (svc *Service) Backup(ctx context.Context, local string, config structs.Ser
 				return errors.Errorf("%s:%s unsupport backup yet", u.u.Name, u.u.Type)
 			}
 
-			cmd = append(cmd, local+"v1.0/tasks/backup/callback", task.ID, config.Type, config.BackupDir)
+			cmd = append(cmd, local+"v1.0/tasks/backup/callback", task.ID, config.Type, config.BackupDir, strconv.Itoa(config.BackupFilesRetention))
 
 			_, err = u.containerExec(ctx, cmd, config.Detach)
 			if err != nil {
@@ -60,8 +61,8 @@ func (svc *Service) Backup(ctx context.Context, local string, config structs.Ser
 	return sl.Run(isnotInProgress, backup, async)
 }
 
-func (svc *Service) checkBackupFiles(ctx context.Context) error {
-	_, expired, err := checkBackupFilesByService(svc.svc.ID, svc.so)
+func (svc *Service) checkBackupFiles(ctx context.Context, maxSize int) error {
+	_, expired, err := checkBackupFilesByService(svc.svc.ID, svc.so, maxSize)
 	if len(expired) > 0 {
 		_err := svc.removeExpiredBackupFiles(ctx, expired)
 		if _err != nil {
@@ -90,8 +91,8 @@ func (svc *Service) removeExpiredBackupFiles(ctx context.Context, files []databa
 	return nil
 }
 
-func checkBackupFilesByService(service string, iface database.BackupFileIface) ([]database.BackupFile, []database.BackupFile, error) {
-	svc, files, err := iface.ListBackupFilesByService(service)
+func checkBackupFilesByService(service string, iface database.BackupFileIface, maxSize int) ([]database.BackupFile, []database.BackupFile, error) {
+	files, err := iface.ListBackupFilesByService(service)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -113,8 +114,8 @@ func checkBackupFilesByService(service string, iface database.BackupFileIface) (
 		sum += valid[i].SizeByte
 	}
 
-	if sum > svc.BackupMaxSizeByte {
-		return valid, expired, errors.Errorf("no more space for backup task,%d<%d", svc.BackupMaxSizeByte, sum)
+	if sum > maxSize {
+		return valid, expired, errors.Errorf("no more space for backup task,%d<%d", maxSize, sum)
 	}
 
 	return valid, expired, nil

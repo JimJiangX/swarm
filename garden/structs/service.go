@@ -10,21 +10,18 @@ import (
 
 // Service if table structure
 type Service struct {
-	ID                string `db:"id" json:"id"`
-	Name              string `db:"name" json:"name"`
-	Image             string `json:"image_version"`
-	Desc              string `db:"description" json:"description"` // short for Description
-	Architecture      string `db:"architecture" json:"architecture"`
-	Tag               string `db:"tag" json:"tag"` // part of business
-	AutoHealing       bool   `db:"auto_healing" json:"auto_healing"`
-	AutoScaling       bool   `db:"auto_scaling" json:"auto_scaling"`
-	HighAvailable     bool   `db:"high_available" json:"high_available"`
-	Status            int    `db:"status" json:"status"`
-	BackupMaxSizeByte int    `db:"backup_max_size" json:"max_backup_space"`
-	// count by Day,used in swarm.BackupTaskCallback(),calculate BackupFile.Retention
-	BackupFilesRetention int    `db:"backup_files_retention" json:"backup_files_retention"`
-	CreatedAt            string `db:"created_at" json:"created_at"`
-	FinishedAt           string `db:"finished_at" json:"finished_at"`
+	ID            string `db:"id" json:"id"`
+	Name          string `db:"name" json:"name"`
+	Image         string `json:"image_version"`
+	Desc          string `db:"description" json:"description"` // short for Description
+	Architecture  string `db:"architecture" json:"architecture"`
+	Tag           string `db:"tag" json:"tag"` // part of business
+	AutoHealing   bool   `db:"auto_healing" json:"auto_healing"`
+	AutoScaling   bool   `db:"auto_scaling" json:"auto_scaling"`
+	HighAvailable bool   `db:"high_available" json:"high_available"`
+	Status        int    `db:"status" json:"status"`
+	CreatedAt     string `db:"created_at" json:"created_at"`
+	FinishedAt    string `db:"finished_at" json:"finished_at"`
 }
 
 type VolumeRequire struct {
@@ -176,10 +173,13 @@ type ServiceExecConfig struct {
 }
 
 type ServiceBackupConfig struct {
-	Container string `json:"nameOrID"`
-	Type      string `json:"type"`
-	Detach    bool   `json:"detach"`
-	BackupDir string `json:"backup_dir"`
+	Container         string `json:"nameOrID"`
+	Type              string `json:"type"`
+	Detach            bool   `json:"detach"`
+	BackupDir         string `json:"backup_dir"`
+	BackupMaxSizeByte int    `json:"max_backup_space"`
+	// count by Day,used in swarm.BackupTaskCallback(),calculate BackupFile.Retention
+	BackupFilesRetention int `json:"backup_files_retention"`
 }
 
 type ServiceRestoreRequest struct {

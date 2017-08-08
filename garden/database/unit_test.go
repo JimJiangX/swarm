@@ -21,18 +21,16 @@ func makeService(status int) Service {
 	uuid := utils.Generate32UUID()
 
 	return Service{
-		Desc:                 &desc,
-		ID:                   uuid,
-		Name:                 uuid,
-		DescID:               desc.ID,
-		Tag:                  uuid,
-		AutoHealing:          false,
-		AutoScaling:          true,
-		HighAvailable:        true,
-		Status:               status,
-		BackupMaxSizeByte:    100 << 30,
-		BackupFilesRetention: 1024,
-		CreatedAt:            time.Now(),
+		Desc:          &desc,
+		ID:            uuid,
+		Name:          uuid,
+		DescID:        desc.ID,
+		Tag:           uuid,
+		AutoHealing:   false,
+		AutoScaling:   true,
+		HighAvailable: true,
+		Status:        status,
+		CreatedAt:     time.Now(),
 	}
 }
 

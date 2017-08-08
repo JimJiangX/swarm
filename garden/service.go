@@ -162,20 +162,18 @@ func convertService(svc database.Service) structs.Service {
 	}
 
 	return structs.Service{
-		ID:                   svc.ID,
-		Name:                 svc.Name,
-		Image:                svc.Desc.Image,
-		Desc:                 svc.DescID,
-		Architecture:         svc.Desc.Architecture,
-		Tag:                  svc.Tag,
-		AutoHealing:          svc.AutoHealing,
-		AutoScaling:          svc.AutoScaling,
-		HighAvailable:        svc.HighAvailable,
-		Status:               svc.Status,
-		BackupMaxSizeByte:    svc.BackupMaxSizeByte,
-		BackupFilesRetention: svc.BackupFilesRetention,
-		CreatedAt:            svc.CreatedAt.String(),
-		FinishedAt:           svc.FinishedAt.String(),
+		ID:            svc.ID,
+		Name:          svc.Name,
+		Image:         svc.Desc.Image,
+		Desc:          svc.DescID,
+		Architecture:  svc.Desc.Architecture,
+		Tag:           svc.Tag,
+		AutoHealing:   svc.AutoHealing,
+		AutoScaling:   svc.AutoScaling,
+		HighAvailable: svc.HighAvailable,
+		Status:        svc.Status,
+		CreatedAt:     svc.CreatedAt.String(),
+		FinishedAt:    svc.FinishedAt.String(),
 	}
 }
 
@@ -228,18 +226,16 @@ func convertStructsService(spec structs.ServiceSpec, schedopts scheduleOption) (
 	}
 
 	return database.Service{
-		ID:                   spec.ID,
-		Name:                 spec.Name,
-		DescID:               desc.ID,
-		Tag:                  spec.Tag,
-		AutoHealing:          spec.AutoHealing,
-		AutoScaling:          spec.AutoScaling,
-		HighAvailable:        spec.HighAvailable,
-		Status:               spec.Status,
-		BackupMaxSizeByte:    spec.BackupMaxSizeByte,
-		BackupFilesRetention: spec.BackupFilesRetention,
-		CreatedAt:            time.Now(),
-		Desc:                 &desc,
+		ID:            spec.ID,
+		Name:          spec.Name,
+		DescID:        desc.ID,
+		Tag:           spec.Tag,
+		AutoHealing:   spec.AutoHealing,
+		AutoScaling:   spec.AutoScaling,
+		HighAvailable: spec.HighAvailable,
+		Status:        spec.Status,
+		CreatedAt:     time.Now(),
+		Desc:          &desc,
 	}, nil
 }
 
