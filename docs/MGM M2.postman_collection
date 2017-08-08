@@ -1,0 +1,1123 @@
+{
+	"variables": [],
+	"info": {
+		"name": "MGM M2",
+		"_postman_id": "eb5ba54a-a1b0-6a54-17f6-6cf75639b1fb",
+		"description": "",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "clusters",
+			"description": "",
+			"item": [
+				{
+					"name": "/clusters",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/clusters",
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"max_host\": 100,\n    \"usage_limit\": 80\n}"
+						},
+						"description": "查询ips"
+					},
+					"response": []
+				},
+				{
+					"name": "/clusters/{cluster_id}",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/clusters/{cluster_id}",
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"max_host\": 100,\n    \"usage_limit\": 80\n}"
+						},
+						"description": "查询ips"
+					},
+					"response": []
+				},
+				{
+					"name": "/clusters",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/clusters",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"max_host\": 100,\n  \"usage_limit\": 80\n}"
+						},
+						"description": "查询ips"
+					},
+					"response": []
+				},
+				{
+					"name": "/clusters/{cluster_id}",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/clusters/{cluster_id}",
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"max_host\":10,\n  \"usage_limit\":0.9\n}"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/clusters/{cluster_id}",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/clusters/2876fa02b14a9c175c677cb9ccd961b5",
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": "查询ips"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "hosts",
+			"description": "",
+			"item": [
+				{
+					"name": "/hosts",
+					"request": {
+						"url": {
+							"raw": "{{mgm_url}}/v1.0/hosts?cluster={cluster_id}",
+							"host": [
+								"{{mgm_url}}"
+							],
+							"path": [
+								"v1.0",
+								"hosts"
+							],
+							"query": [
+								{
+									"key": "cluster",
+									"value": "{cluster_id}",
+									"equals": true,
+									"description": ""
+								}
+							],
+							"variable": []
+						},
+						"method": "GET",
+						"header": [],
+						"body": {},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/hosts/{host_id}",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/hosts/{host_id}",
+						"method": "GET",
+						"header": [],
+						"body": {},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/hosts",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/hosts",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "[\n  {\n    \"cluster_id\": \"e25ff19d2f863e36db95ba6aa2057f3d\",\n    \"addr\": \"192.168.4.144\",\n    \"username\": \"root\",\n    \"password\": \"root\",\n    \"hdd\": [\n      \"sdb\"\n    ],\n    \"ssd\": [],\n    \"max_container\": 10,\n    \"room\": \"001\",\n    \"seat\": \"005\",\n    \"nfs_ip\": \"192.168.4.129\",\n    \"nfs_dir\": \"/NFSbackup\",\n    \"nfs_mount_dir\": \"/NFSbackup\",\n    \"nfs_mount_opts\": \"nolock\"\n  }\n]"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/hosts/{host_id}/enable",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/hosts/{host_id}/enable",
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/hosts/{host_id}/disable",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/hosts/{host_id}/disable",
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/hosts/{host_id}?username=root&password=root",
+					"request": {
+						"url": {
+							"raw": "{{mgm_url}}/v1.0/hosts/{host_id}?username=root&password=root",
+							"host": [
+								"{{mgm_url}}"
+							],
+							"path": [
+								"v1.0",
+								"hosts",
+								"{host_id}"
+							],
+							"query": [
+								{
+									"key": "username",
+									"value": "root",
+									"equals": true,
+									"description": ""
+								},
+								{
+									"key": "password",
+									"value": "root",
+									"equals": true,
+									"description": ""
+								}
+							],
+							"variable": []
+						},
+						"method": "DELETE",
+						"header": [],
+						"body": {},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "images",
+			"description": "",
+			"item": [
+				{
+					"name": "/softwares/images",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/softwares/images",
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/softwares/images",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/softwares/images",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"mysql\",\n    \"major_version\": 5,\n    \"minor_version\": 7,\n    \"patch_version\": 17,\n    \"build_version\": 0,\n    \"image_path\": \"/NFSbackup/images/mysql/mysql-5.7.17.0.tar\"\n}"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/softwares/images/{image_id}",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/softwares/images/0c497b7acabfe47930584677bc708206",
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/softwares/Images/supported",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/softwares/images/supported",
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/softwares/images/{image_id}",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/softwares/images/{image_id}",
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/softwares/images/{image_id}",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/softwares/images/{image_id}",
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": ""
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json;charset=utf-8",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"image\":\"image\",\"log_mount\":\"log_mount\",\"data_mount\":\"data_mount\",\"config_file\":\"config_file\",\"content\":\"content\",\"timestamp\":230,\"keysets\":[{\"can_set\":true,\"must_restart\":true,\"key\":\"key\",\"default\":\"default\",\"desc\":\"desc\",\"range\":\"range\"}]}"
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "networking_ips",
+			"description": "",
+			"item": [
+				{
+					"name": "/networkings/{networking_id}/ips",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/networkings/testid123456/ips",
+						"method": "GET",
+						"header": [],
+						"body": {},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/networkings/{networking_id}/ips",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/networkings/testid123456/ips",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"start\": \"192.168.100.100\",\n  \"end\": \"192.168.100.200\",\n  \"prefix\": 24,\n  \"gateway\": \"192.168.100.1\",\n  \"vlan_id\": 1\n}"
+						},
+						"description": "查询ips"
+					},
+					"response": []
+				},
+				{
+					"name": "/networkings/{networking_id}/ips",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/networkings/testid123456/ips",
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/networkings",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/networkings",
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/networkings/{networkings_id}",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/networkings/86c24369140a4c08aa47419e3bb87c90",
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/networkings/{networkings_id}/ips/enable",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/networkings/86c24369140a4c08aa47419e3bb87c90/ips/enable",
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "[\n  \"192.168.3.100\",\n    \"192.168.3.101\"\n]"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/networkings/{networkings_id}/ips/disable",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/networkings/86c24369140a4c08aa47419e3bb87c90/ips/disable",
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "[\n  \"192.168.3.100\",\n    \"192.168.3.101\"\n]"
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "nfs",
+			"description": "",
+			"item": [
+				{
+					"name": "/nfs_backups/space",
+					"request": {
+						"url": {
+							"raw": "{{mgm_url}}/v1.0/nfs_backups/space?nfs_ip=192.168.2.129&nfs_dir=/NFSbackup&nfs_mount_dir=/NFSbackup&nfs_mount_opts=nolock",
+							"host": [
+								"{{mgm_url}}"
+							],
+							"path": [
+								"v1.0",
+								"nfs_backups",
+								"space"
+							],
+							"query": [
+								{
+									"key": "nfs_ip",
+									"value": "192.168.2.129",
+									"equals": true,
+									"description": ""
+								},
+								{
+									"key": "nfs_dir",
+									"value": "/NFSbackup",
+									"equals": true,
+									"description": ""
+								},
+								{
+									"key": "nfs_mount_dir",
+									"value": "/NFSbackup",
+									"equals": true,
+									"description": ""
+								},
+								{
+									"key": "nfs_mount_opts",
+									"value": "nolock",
+									"equals": true,
+									"description": ""
+								}
+							],
+							"variable": []
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "services",
+			"description": "",
+			"item": [
+				{
+					"name": "/services",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/services",
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"max_host\": 100,\n    \"usage_limit\": 80\n}"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/services/{serive_id}",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/services/81f7cc126285e76fe09509fe1a58dd31",
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"max_host\": 100,\n    \"usage_limit\": 80\n}"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/services",
+					"request": {
+						"url": {
+							"raw": "{{mgm_url}}/v1.0/services?timeout=120",
+							"host": [
+								"{{mgm_url}}"
+							],
+							"path": [
+								"v1.0",
+								"services"
+							],
+							"query": [
+								{
+									"key": "timeout",
+									"value": "120",
+									"equals": true,
+									"description": ""
+								}
+							],
+							"variable": []
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"architecture\": {\n    \"code\": \"M:1#S:1\",\n    \"mode\": \"replication\",\n    \"unit_num\": 2\n  },\n  \"cluster_id\": [\n    \"ae786048ca3c2416a6b6d84954024dc1\"\n  ],\n  \"image_version\": \"mysql:5.7.17\",\n  \"name\": \"9eb29fc6542e403aa02475650ecee1d7\",\n  \"networking\": {\n    \"ae786048ca3c2416a6b6d84954024dc1\": [\n      \"66828cd7a1d44f0aaf8230cdfb6c2cfe\"\n    ]\n  },\n  \"opts\": {\n    \"port\": 3306\n  },\n  \"tag\": \"mysql测试\",\n  \"unit_require\": {\n    \"networks\": [\n      {\n        \"bandwidth\": 100\n      }\n    ],\n    \"require\": {\n      \"memory\": 2147483648,\n      \"ncpu\": 1\n    },\n    \"volumes\": [\n      {\n        \"name\": \"DAT\",\n        \"size\": 5368709120,\n        \"type\": \"local:HDD\"\n      },\n      {\n        \"name\": \"LOG\",\n        \"size\": 10737418240,\n        \"type\": \"local:HDD\"\n      }\n    ]\n  },\n  \"users\": [\n    {\n      \"role\": \"mon\",\n      \"name\": \"monitor\",\n      \"password\": \"123.com\",\n      \"privilege\": \"CREATE,DROP,UPDATE\"\n    },\n    {\n      \"role\": \"repl\",\n      \"name\": \"replictaion\",\n      \"password\": \"123.com\",\n      \"privilege\": \"CREATE,DROP,UPDATE\"\n    },\n    {\n      \"role\": \"root\",\n      \"name\": \"root\",\n      \"password\": \"123.com\",\n      \"privilege\": \"CREATE,DROP,UPDATE\"\n    }\n  ]\n}"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/services bak",
+					"request": {
+						"url": {
+							"raw": "{{url}}/v1.0/services?timeout=120",
+							"host": [
+								"{{url}}"
+							],
+							"path": [
+								"v1.0",
+								"services"
+							],
+							"query": [
+								{
+									"key": "timeout",
+									"value": "120",
+									"equals": true,
+									"description": ""
+								}
+							],
+							"variable": []
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": ""
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json;charset=utf-8",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"id\": \"id\",\n  \"name\": \"name\",\n  \"desc\": \"desc\",\n  \"tag\": \"tag\",\n  \"auto_healing\": true,\n  \"auto_scaling\": true,\n  \"high_available\": true,\n  \"status\": 139,\n  \"created_at\": \"2017-08-01T05:48:43.8278765Z\",\n  \"finished_at\": \"2017-08-01T05:48:43.8278765Z\",\n  \"architecture\": {\n    \"unit_num\": 139,\n    \"mode\": \"mode\",\n    \"code\": \"code\"\n  },\n  \"unit_require\": {\n    \"require\": {\n      \"ncpu\": 139,\n      \"memory\": 139\n    },\n    \"limit\": {\n      \"ncpu\": 139,\n      \"memory\": 139\n    },\n    \"volumes\": [\n      {\n        \"from\": \"from\",\n        \"name\": \"name\",\n        \"type\": \"type\",\n        \"driver\": \"driver\",\n        \"size\": 139,\n        \"options\": \"options\"\n      }\n    ],\n    \"networks\": [\n      {\n        \"device\": 139,\n        \"bandwidth\": 139\n      }\n    ]\n  },\n  \"cluster_id\": [\n    \"cluster_id\"\n  ],\n  \"constraints\": [\n    \"constraints\"\n  ],\n  \"opts\": \"opts\",\n  \"users\": [\n    {\n      \"name\": \"name\",\n      \"password\": \"password\",\n      \"role\": \"role\",\n      \"privilege\": \"privilege\"\n    }\n  ],\n  \"networking\": {}\n}"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/services/{service_id}/start",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/services/56b2271b3c0263aeee06e9870eb267ad/start",
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/services/{service_id}/scale",
+					"request": {
+						"url": {
+							"raw": "{{mgm_url}}/v1.0/services/:id/scale",
+							"host": [
+								"{{mgm_url}}"
+							],
+							"path": [
+								"v1.0",
+								"services",
+								":id",
+								"scale"
+							],
+							"query": [],
+							"variable": [
+								{
+									"description": "",
+									"key": "id",
+									"value": ""
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": ""
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json;charset=utf-8",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"architecture\": {\n    \"unit_num\": 139,\n    \"mode\": \"mode\",\n    \"code\": \"code\"\n  },\n  \"candidates\": [\n    \"candidates\"\n  ],\n  \"users\": [\n    {\n      \"name\": \"name\",\n      \"password\": \"password\",\n      \"role\": \"role\",\n      \"privilege\": \"privilege\"\n    }\n  ],\n  \"options\": \"options\"\n}"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/services/{service_id}/update",
+					"request": {
+						"url": {
+							"raw": "{{mgm_url}}/v1.0/services/:id/update",
+							"host": [
+								"{{mgm_url}}"
+							],
+							"path": [
+								"v1.0",
+								"services",
+								":id",
+								"update"
+							],
+							"query": [],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": ""
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json;charset=utf-8",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"require\": {\n    \"ncpu\": 139,\n    \"memory\": 139\n  },\n  \"limit\": {\n    \"ncpu\": 139,\n    \"memory\": 139\n  },\n  \"volumes\": [\n    {\n      \"from\": \"from\",\n      \"name\": \"name\",\n      \"type\": \"type\",\n      \"driver\": \"driver\",\n      \"size\": 139,\n      \"options\": \"options\"\n    }\n  ],\n  \"networks\": [\n    {\n      \"device\": 139,\n      \"bandwidth\": 139\n    }\n  ]\n}"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/services/{service_id}/image/update",
+					"request": {
+						"url": {
+							"raw": "{{mgm_url}}/v1.0/services/{service_id}/image/update?image=",
+							"host": [
+								"{{mgm_url}}"
+							],
+							"path": [
+								"v1.0",
+								"services",
+								"{service_id}",
+								"image",
+								"update"
+							],
+							"query": [
+								{
+									"key": "image",
+									"value": "",
+									"equals": true,
+									"description": ""
+								}
+							],
+							"variable": []
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/services/{service_id}/config/update",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/services/{service_id}/config/update",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": ""
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json;charset=utf-8",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"Configs\": {\n    \"ID\": \"ID\",\n    \"Name\": \"Name\",\n    \"Version\": \"Version\",\n    \"Content\": \"Content\",\n    \"LogMount\": \"LogMount\",\n    \"DataMount\": \"DataMount\",\n    \"config_file\": \"config_file\",\n    \"Timestamp\": 139,\n    \"Cmds\": {}\n  },\n  \"Args\": \"Args\"\n}"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/services/{service_id}/exec",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/services/{service_id}/exec",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": ""
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json;charset=utf-8",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"detach\": true,\n  \"nameOrID\": \"nameOrID\",\n  \"cmd\": [\n    \"cmd\"\n  ]\n}"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/services/{service_id}/backup",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/services/{service_id}/backup",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": ""
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json;charset=utf-8",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"detach\": true,\n  \"nameOrID\": \"nameOrID\",\n  \"type\": \"type\",\n  \"backup_dir\": \"backup_dir\",\n  \"backup_files_retention\": 1,\n  \"max_space\": 5368709120\n}"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/services/{service_id}/restore",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/services/{service_id}/restore",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": ""
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json;charset=utf-8",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"units\": [\n    \"units\"\n  ],\n  \"file\": \"file\"\n}"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/services/{service_id}/rebuild",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/services/{service_id}/rebuild",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": ""
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json;charset=utf-8",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"units\": [\n    \"units\"\n  ],\n  \"candidates\": [\n    \"candidates\"\n  ],\n  \"users\": [\n    {\n      \"name\": \"name\",\n      \"password\": \"password\",\n      \"role\": \"role\",\n      \"privilege\": \"privilege\"\n    }\n  ]\n}"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/services/{service_id}/migrate",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/services/{service_id}/migrate",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": ""
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json;charset=utf-8",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nameOrID\": \"nameOrID\",\n  \"candidates\": [\n    \"candidates\"\n  ]\n}"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/services/link",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/services/link",
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "[\n  {\n    \"id\": \"serviceXXX005\",\n    \"deps\": [\n      \"serviceXXX001\",\n      \"serviceXXX002\"\n    ]\n  }\n]"
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/services/{service_id}",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/services/3aee0e1d173b643faae8602c5d10e96b",
+						"method": "DELETE",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "tasks",
+			"description": "",
+			"item": [
+				{
+					"name": "/tasks/{task_id}",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/tasks/975b77040f238521b86a0efc496b53d2",
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "/tasks",
+					"request": {
+						"url": {
+							"raw": "{{mgm_url}}/v1.0/tasks?all=true&status=130&link=link",
+							"host": [
+								"{{mgm_url}}"
+							],
+							"path": [
+								"v1.0",
+								"tasks"
+							],
+							"query": [
+								{
+									"key": "all",
+									"value": "true",
+									"equals": true,
+									"description": ""
+								},
+								{
+									"key": "status",
+									"value": "130",
+									"equals": true,
+									"description": ""
+								},
+								{
+									"key": "link",
+									"value": "link",
+									"equals": true,
+									"description": ""
+								}
+							],
+							"variable": []
+						},
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": ""
+					},
+					"response": []
+				},
+				{
+					"name": "tasks/backup/callback",
+					"request": {
+						"url": "{{mgm_url}}/v1.0/tasks/backup/callback",
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"description": ""
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json;charset=utf-8",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"task_id\": \"task_id\",\n  \"unit_id\": \"unit_id\",\n  \"type\": \"type\",\n  \"path\": \"path\",\n  \"code\": 166,\n  \"size\": 166,\n  \"msg\": \"msg\"\n}"
+						},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "/_ping",
+			"request": {
+				"url": "{{mgm_url}}/v1.0/_ping",
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": ""
+				},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "/configs/system",
+			"request": {
+				"url": "{{mgm_url}}/v1.0/configs/system",
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": ""
+				},
+				"description": ""
+			},
+			"response": []
+		},
+		{
+			"name": "/info",
+			"request": {
+				"url": "{{mgm_url}}/v1.0/info",
+				"method": "GET",
+				"header": [],
+				"body": {},
+				"description": ""
+			},
+			"response": []
+		}
+	]
+}
