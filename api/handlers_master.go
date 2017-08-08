@@ -453,16 +453,24 @@ func vaildLoadImageRequest(v structs.PostLoadImageRequest) error {
 }
 
 func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Image, urlParamError, 31, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	timeout := intValueOrZero(r, "timeout")
+
 	req := structs.PostLoadImageRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		ec := errCodeV1(_Image, decodeError, 31, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		ec := errCodeV1(_Image, decodeError, 32, "JSON Decode Request Body error", "JSON解析请求Body错误")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	if err := vaildLoadImageRequest(req); err != nil {
-		ec := errCodeV1(_Image, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		ec := errCodeV1(_Image, invaildParamsError, 33, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -476,16 +484,16 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Timeout > 0 {
+	if timeout > 0 {
 		var cancel goctx.CancelFunc
-		ctx, cancel = goctx.WithTimeout(ctx, time.Duration(req.Timeout)*time.Second)
+		ctx, cancel = goctx.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 		defer cancel()
 	}
 
 	pc := gd.PluginClient()
 	supports, err := pc.GetImageSupport(ctx)
 	if err != nil {
-		ec := errCodeV1(_Image, internalError, 33, "fail to get supported image list", "获取已支持的镜像列表错误")
+		ec := errCodeV1(_Image, internalError, 34, "fail to get supported image list", "获取已支持的镜像列表错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -503,7 +511,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
-		ec := errCodeV1(_Image, objectNotExist, 34, "unsupported image:"+req.Version(), "不支持镜像:"+req.Version())
+		ec := errCodeV1(_Image, objectNotExist, 35, "unsupported image:"+req.Version(), "不支持镜像:"+req.Version())
 		httpJSONError(w, stderr.New(ec.comment), ec, http.StatusInternalServerError)
 		return
 	}
@@ -516,9 +524,9 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// database.Image.ID
-	id, taskID, err := resource.LoadImage(ctx, gd.Ormer(), req)
+	id, taskID, err := resource.LoadImage(ctx, gd.Ormer(), req, timeout)
 	if err != nil {
-		ec := errCodeV1(_Image, internalError, 35, "fail to load image", "镜像入库失败")
+		ec := errCodeV1(_Image, internalError, 36, "fail to load image", "镜像入库失败")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -1192,12 +1200,6 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if timeout > 0 {
-		var cancel goctx.CancelFunc
-		ctx, cancel = goctx.WithTimeout(ctx, timeout)
-		defer cancel()
-	}
-
 	horus, err := gd.KVClient().GetHorusAddr(ctx)
 	if err != nil {
 		ec := errCodeV1(_Host, internalError, 73, "fail to query third-part monitor server addr", "获取第三方监控服务地址错误")
@@ -1560,11 +1562,6 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	timeout := intValueOrZero(r, "timeout")
-	if timeout > 0 {
-		var cancel goctx.CancelFunc
-		ctx, cancel = goctx.WithTimeout(ctx, time.Duration(timeout)*time.Second)
-		defer cancel()
-	}
 
 	spec := structs.ServiceSpec{}
 	err := json.NewDecoder(r.Body).Decode(&spec)
@@ -1591,6 +1588,9 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// new Context with deadline
+	if timeout > 0 {
+		ctx, _ = goctx.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+	}
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
 	} else {
