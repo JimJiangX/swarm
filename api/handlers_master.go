@@ -278,9 +278,13 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if req.Retention == 0 {
+		// default keep a week
+		req.Retention = 7
+	}
 	orm := gd.Ormer()
-
 	now := time.Now()
+
 	bf := database.BackupFile{
 		ID:         utils.Generate32UUID(),
 		TaskID:     req.TaskID,
