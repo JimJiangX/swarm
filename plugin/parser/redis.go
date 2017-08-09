@@ -124,27 +124,6 @@ func (c redisConfig) Marshal() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-//func (redisConfig) Requirement() structs.RequireResource {
-//	ports := []port{
-//		port{
-//			proto: "tcp",
-//			name:  "port",
-//		},
-//	}
-//	nets := []netRequire{
-//		netRequire{
-//			Type: _ContainersNetworking,
-//			num:  1,
-//		},
-//	}
-//	return require{
-//		ports:       ports,
-//		networkings: nets,
-//	}
-
-//	return structs.RequireResource{}
-//}
-
 func (c redisConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
 	var spec *structs.UnitSpec
 
@@ -159,21 +138,6 @@ func (c redisConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 		return structs.ServiceRegistration{}, errors.Errorf("not found unit '%s' in service '%s'", id, desc.Name)
 	}
 
-	//	Service struct {
-	//		Select bool `json:"-"`
-
-	//		Name            string
-	//		Type            string
-	//		MonitorUser     string `json:"mon_user"`
-	//		MonitorPassword string `json:"mon_pwd"`
-	//		Tag             string
-
-	//		Container struct {
-	//			Name     string
-	//			HostName string `json:"host_name"`
-	//		} `json:"container"`
-	//	}
-
 	im, err := structs.ParseImage(c.template.Image)
 	if err != nil {
 		return structs.ServiceRegistration{}, err
@@ -186,22 +150,6 @@ func (c redisConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 	reg.Service.Tag = desc.ID
 	reg.Service.Container.Name = spec.Container.ID
 	reg.Service.Container.HostName = spec.Engine.Node
-
-	//	var mon *structs.User
-
-	//	if len(desc.Users) > 0 {
-	//		for i := range desc.Users {
-	//			if desc.Users[i].Role == "mon" {
-	//				mon = &desc.Users[i]
-	//				break
-	//			}
-	//		}
-
-	//		if mon != nil {
-	//			reg.Service.MonitorUser = mon.Name
-	//			reg.Service.MonitorPassword = mon.Password
-	//		}
-	//	}
 
 	return structs.ServiceRegistration{Horus: &reg}, nil
 }
