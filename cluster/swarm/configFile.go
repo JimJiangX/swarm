@@ -161,6 +161,10 @@ func initialize(name, version string) (parser configParser, cmder containerCmd, 
 		parser = &proxyConfigV110{}
 		cmder = &proxyCmd{}
 
+	case _ImageProxy == name && version == "1.2.6":
+		parser = &proxyConfigV126{}
+		cmder = &proxyCmd{}
+
 	case _ImageSwitchManager == name && version == "1.1.19":
 		parser = &switchManagerConfigV1119{}
 		cmder = &switchManagerCmd{}
@@ -663,6 +667,89 @@ func (c proxyConfigV110) defaultUserConfig(args ...interface{}) (_ map[string]in
 				m["adm-cli::proxy_admin_port"] = adminPort
 			}
 		}
+		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", addr, dataPort)
+		m["supervise::supervise-address"] = fmt.Sprintf("%s:%d", addr, adminPort)
+		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", addr, adminPort)
+	}
+
+	ncpu, err := utils.GetCPUNum(u.config.HostConfig.CpusetCpus)
+	if err == nil {
+		m["upsql-proxy::event-threads-count"] = ncpu
+	} else {
+		logrus.WithError(err).Warnf("%s upsql-proxy::event-threads-count", u.Name)
+		m["upsql-proxy::event-threads-count"] = 1
+	}
+
+	swm, err := svc.getSwithManagerUnit()
+	if err == nil && swm != nil {
+		swmProxyPort := 0
+		for i := range swm.ports {
+			if swm.ports[i].Name == "ProxyPort" {
+				swmProxyPort = swm.ports[i].Port
+				break
+			}
+		}
+		if len(swm.networkings) == 1 {
+			m["adm-cli::adm-svr-address"] = fmt.Sprintf("%s:%d", swm.networkings[0].IP.String(), swmProxyPort)
+		}
+	}
+
+	return m, nil
+}
+
+type proxyConfigV126 struct {
+	proxyConfig
+}
+
+func (c proxyConfigV126) defaultUserConfig(args ...interface{}) (_ map[string]interface{}, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.Errorf("%v", r)
+		}
+	}()
+
+	errMsg := fmt.Sprintf("unexpected args,len=%d", len(args))
+
+	if len(args) < 2 {
+		return nil, errors.New(errMsg)
+	}
+	svc, ok := args[0].(*Service)
+	if !ok || svc == nil {
+		return nil, errors.New(errMsg)
+	}
+
+	u, ok := args[1].(*unit)
+	if !ok || u == nil {
+		return nil, errors.New(errMsg)
+	}
+
+	m := make(map[string]interface{}, 10)
+
+	m["upsql-proxy::proxy-domain"] = svc.ID
+	m["upsql-proxy::proxy-name"] = u.Name
+	if len(u.networkings) > 0 && len(u.ports) >= 2 {
+		addr := ""
+		adminPort, dataPort := 0, 0
+		for i := range u.networkings {
+			if u.networkings[i].Type == _ContainersNetworking {
+				addr = u.networkings[i].IP.String()
+			}
+			//			else if u.networkings[i].Type == _ExternalAccessNetworking {
+			//				dataAddr = u.networkings[i].IP.String()
+			//			}
+		}
+
+		for i := range u.ports {
+			if u.ports[i].Name == "proxy_data_port" {
+				dataPort = u.ports[i].Port
+			} else if u.ports[i].Name == "proxy_admin_port" {
+				adminPort = u.ports[i].Port
+
+			}
+		}
+
+		m["adm-cli::proxy_admin_port"] = adminPort
+		m["upsql-proxy::proxy-id"] = dataPort
 		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", addr, dataPort)
 		m["supervise::supervise-address"] = fmt.Sprintf("%s:%d", addr, adminPort)
 		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", addr, adminPort)
