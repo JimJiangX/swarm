@@ -13,8 +13,7 @@ import (
 var (
 	db database.Ormer
 
-	hw = database.HuaweiStorage{}
-	ht = database.HitachiStorage{
+	ht = database.SANStorage{
 		Vendor:    "HITACHI",
 		Version:   "",
 		AdminUnit: "AMS2100_83004824",
@@ -59,20 +58,6 @@ func TestDefaultStores(t *testing.T) {
 		t.Error(err, len(out))
 	}
 
-	if hw.Vendor != "" {
-		hws, err := ds.Add(hw.Vendor, hw.Version, hw.IPAddr, hw.Username, hw.Password, "", 0, 0, hw.HluStart, hw.HluEnd)
-		if err != nil {
-			t.Error(err)
-		} else {
-			hw.ID = hws.ID()
-
-			_, err = ds.Get(hws.ID())
-			if err != nil {
-				t.Error(hws.ID(), err)
-			}
-		}
-	}
-
 	if ht.Vendor != "" {
 		hts, err := ds.Add(ht.Vendor, ht.Version, "", "", "", ht.AdminUnit, ht.LunStart, ht.LunEnd, ht.HluStart, ht.HluEnd)
 		if err != nil {
@@ -100,20 +85,7 @@ func TestStore(t *testing.T) {
 
 	ds := DefaultStores()
 
-	s, err := ds.Get(hw.ID)
-	if err == nil && s != nil {
-		testStore(s, t)
-
-		err = ds.Remove(s.ID())
-		if err != nil {
-			t.Error(err, s.ID())
-		}
-
-	} else {
-		t.Log(err)
-	}
-
-	s, err = ds.Get(ht.ID)
+	s, err := ds.Get(ht.ID)
 	if err == nil && s != nil {
 		testStore(s, t)
 

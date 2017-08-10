@@ -12,12 +12,23 @@ import (
 	"github.com/pkg/errors"
 )
 
+type huawei struct {
+	ID       string `db:"id"`
+	Vendor   string `db:"vendor"`
+	Version  string `db:"version"`
+	IPAddr   string `db:"ip_addr"`
+	Username string `db:"username"`
+	Password string `db:"password"`
+	HluStart int    `db:"hlu_start"`
+	HluEnd   int    `db:"hlu_end"`
+}
+
 type huaweiStore struct {
 	lock   *sync.RWMutex
 	script string
 
 	orm database.StorageOrmer
-	hs  database.HuaweiStorage
+	hs  huawei
 }
 
 func (h huaweiStore) scriptPath(file string) (string, error) {
@@ -30,11 +41,14 @@ func (h huaweiStore) scriptPath(file string) (string, error) {
 }
 
 // NewHuaweiStore returns a new huawei store
-func newHuaweiStore(orm database.StorageOrmer, script string, hw database.HuaweiStorage) Store {
+func newHuaweiStore(orm database.StorageOrmer, script string, san database.SANStorage) Store {
+	hw := huawei{
+	// TODO:
+	}
 	return &huaweiStore{
 		lock:   new(sync.RWMutex),
 		orm:    orm,
-		script: filepath.Join(script, HUAWEI, hw.Version),
+		script: filepath.Join(script, hw.Vendor, hw.Version),
 		hs:     hw,
 	}
 }
@@ -66,8 +80,11 @@ func (h *huaweiStore) ping() error {
 }
 
 func (h *huaweiStore) insert() error {
+	san := database.SANStorage{
+	// TODO:
+	}
 	h.lock.Lock()
-	err := h.orm.InsertHuaweiStorage(h.hs)
+	err := h.orm.InsertSANStorage(san)
 	h.lock.Unlock()
 
 	return err

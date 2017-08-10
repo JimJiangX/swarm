@@ -12,21 +12,42 @@ import (
 	"github.com/pkg/errors"
 )
 
+type hitachi struct {
+	ID        string `db:"id"`
+	Vendor    string `db:"vendor"`
+	Version   string `db:"version"`
+	AdminUnit string `db:"admin_unit"`
+	LunStart  int    `db:"lun_start"`
+	LunEnd    int    `db:"lun_end"`
+	HluStart  int    `db:"hlu_start"`
+	HluEnd    int    `db:"hlu_end"`
+}
+
 // hitachi store
 type hitachiStore struct {
 	lock   *sync.RWMutex
 	script string
 
 	orm database.StorageOrmer
-	hs  database.HitachiStorage
+	hs  hitachi
 }
 
 // NewHitachiStore returns a new Store
-func newHitachiStore(orm database.StorageOrmer, script string, hs database.HitachiStorage) Store {
+func newHitachiStore(orm database.StorageOrmer, script string, san database.SANStorage) Store {
+	hs := hitachi{
+		ID:        san.ID,
+		Vendor:    san.Vendor,
+		Version:   san.Version,
+		AdminUnit: san.AdminUnit,
+		LunStart:  san.LunStart,
+		LunEnd:    san.LunEnd,
+		HluStart:  san.HluStart,
+		HluEnd:    san.HluEnd,
+	}
 	return &hitachiStore{
 		lock:   new(sync.RWMutex),
 		orm:    orm,
-		script: filepath.Join(script, HITACHI, hs.Version),
+		script: filepath.Join(script, hs.Vendor, hs.Version),
 		hs:     hs,
 	}
 }
@@ -72,8 +93,18 @@ func (h hitachiStore) ping() error {
 
 // insert insert hitachiStore into DB
 func (h *hitachiStore) insert() error {
+	san := database.SANStorage{
+		ID:        h.hs.ID,
+		Vendor:    h.hs.Vendor,
+		Version:   h.hs.Version,
+		AdminUnit: h.hs.AdminUnit,
+		LunStart:  h.hs.LunStart,
+		LunEnd:    h.hs.LunEnd,
+		HluStart:  h.hs.HluStart,
+		HluEnd:    h.hs.HluEnd,
+	}
 	h.lock.Lock()
-	err := h.orm.InsertHitachiStorage(h.hs)
+	err := h.orm.InsertSANStorage(san)
 	h.lock.Unlock()
 
 	return err

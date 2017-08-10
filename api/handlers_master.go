@@ -1007,7 +1007,7 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if n.Storage != "" {
-		_, _, err = orm.GetStorageByID(n.Storage)
+		_, err = orm.GetStorageByID(n.Storage)
 		if err != nil {
 			ec := errCodeV1(_Host, dbQueryError, 34, "fail to query database", "数据库查询错误（外部存储表）")
 			httpJSONError(w, err, ec, http.StatusInternalServerError)

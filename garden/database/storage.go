@@ -37,10 +37,9 @@ type StorageIface interface {
 	DelRGCondition(storageID string) error
 	DelRaidGroup(id, rg string) error
 
-	InsertHitachiStorage(hs HitachiStorage) error
-	InsertHuaweiStorage(hs HuaweiStorage) error
+	InsertSANStorage(hs SANStorage) error
 
-	GetStorageByID(id string) (*HitachiStorage, *HuaweiStorage, error)
+	GetStorageByID(id string) (SANStorage, error)
 	ListStorageID() ([]string, error)
 
 	DelStorageByID(id string) error
@@ -67,7 +66,7 @@ type LUN struct {
 }
 
 func (db dbBase) lunTable() string {
-	return db.prefix + "_lun"
+	return db.prefix + "_san_raid_group_lun"
 }
 
 func (db dbBase) txInsertLun(tx *sqlx.Tx, lun LUN) error {
@@ -243,7 +242,7 @@ type RaidGroup struct {
 }
 
 func (db dbBase) raidGroupTable() string {
-	return db.prefix + "_raid_group"
+	return db.prefix + "_san_raid_group"
 }
 
 // InsertRaidGroup insert a new RaidGroup
@@ -353,9 +352,9 @@ func (db dbBase) DelRaidGroup(id, rg string) error {
 	return errors.Wrap(err, "Delete RaidGroup")
 }
 
-// HitachiStorage is table _storage_HITACHI structure,
+// SANStorage is table _san structure,
 // correspod with HITACHI storage
-type HitachiStorage struct {
+type SANStorage struct {
 	ID        string `db:"id"`
 	Vendor    string `db:"vendor"`
 	Version   string `db:"version"`
@@ -366,14 +365,14 @@ type HitachiStorage struct {
 	HluEnd    int    `db:"hlu_end"`
 }
 
-func (db dbBase) hitachiTable() string {
-	return db.prefix + "_storage_HITACHI"
+func (db dbBase) sanTable() string {
+	return db.prefix + "_san"
 }
 
-// Insert inserts a new HitachiStorage
-func (db dbBase) InsertHitachiStorage(hs HitachiStorage) error {
+// InsertSANStorage inserts a new SAN Storage
+func (db dbBase) InsertSANStorage(hs SANStorage) error {
 
-	query := "INSERT INTO " + db.hitachiTable() + " (id,vendor,version,admin_unit,lun_start,lun_end,hlu_start,hlu_end) VALUES (:id,:vendor,:version,:admin_unit,:lun_start,:lun_end,:hlu_start,:hlu_end)"
+	query := "INSERT INTO " + db.sanTable() + " (id,vendor,version,admin_unit,lun_start,lun_end,hlu_start,hlu_end) VALUES (:id,:vendor,:version,:admin_unit,:lun_start,:lun_end,:hlu_start,:hlu_end)"
 
 	_, err := db.NamedExec(query, hs)
 	if err == nil {
@@ -385,89 +384,62 @@ func (db dbBase) InsertHitachiStorage(hs HitachiStorage) error {
 
 // HuaweiStorage is table _storage_HUAWEI structure,
 // correspod with HUAWEI storage
-type HuaweiStorage struct {
-	ID       string `db:"id"`
-	Vendor   string `db:"vendor"`
-	Version  string `db:"version"`
-	IPAddr   string `db:"ip_addr"`
-	Username string `db:"username"`
-	Password string `db:"password"`
-	HluStart int    `db:"hlu_start"`
-	HluEnd   int    `db:"hlu_end"`
-}
+//type HuaweiStorage struct {
+//	ID       string `db:"id"`
+//	Vendor   string `db:"vendor"`
+//	Version  string `db:"version"`
+//	IPAddr   string `db:"ip_addr"`
+//	Username string `db:"username"`
+//	Password string `db:"password"`
+//	HluStart int    `db:"hlu_start"`
+//	HluEnd   int    `db:"hlu_end"`
+//}
 
-func (db dbBase) huaweiTable() string {
-	return db.prefix + "_storage_HUAWEI"
-}
+//func (db dbBase) huaweiTable() string {
+//	return db.prefix + "_storage_HUAWEI"
+//}
 
 // Insert inserts a new HuaweiStorage
-func (db dbBase) InsertHuaweiStorage(hs HuaweiStorage) error {
+//func (db dbBase) InsertHuaweiStorage(hs HuaweiStorage) error {
 
-	query := "INSERT INTO " + db.huaweiTable() + " (id,vendor,version,ip_addr,username,password,hlu_start,hlu_end) VALUES (:id,:vendor,:version,:ip_addr,:username,:password,:hlu_start,:hlu_end)"
+//	query := "INSERT INTO " + db.huaweiTable() + " (id,vendor,version,ip_addr,username,password,hlu_start,hlu_end) VALUES (:id,:vendor,:version,:ip_addr,:username,:password,:hlu_start,:hlu_end)"
 
-	_, err := db.NamedExec(query, hs)
-	if err == nil {
-		return nil
-	}
+//	_, err := db.NamedExec(query, hs)
+//	if err == nil {
+//		return nil
+//	}
 
-	return errors.Wrap(err, "insert HUAWEI Storage")
-}
+//	return errors.Wrap(err, "insert HUAWEI Storage")
+//}
 
 // GetStorageByID returns *HitachiStorage or *HuaweiStorage,select by ID
-func (db dbBase) GetStorageByID(id string) (*HitachiStorage, *HuaweiStorage, error) {
-	hitachi, huawei := &HitachiStorage{}, &HuaweiStorage{}
-
-	query := "SELECT id,vendor,version,admin_unit,lun_start,lun_end,hlu_start,hlu_end FROM " + db.hitachiTable() + " WHERE id=?"
-	err := db.Get(hitachi, query, id)
+func (db dbBase) GetStorageByID(id string) (SANStorage, error) {
+	san := SANStorage{}
+	query := "SELECT id,vendor,version,admin_unit,lun_start,lun_end,hlu_start,hlu_end FROM " + db.sanTable() + " WHERE id=?"
+	err := db.Get(&san, query, id)
 	if err == nil {
-		return hitachi, nil, nil
+		return san, nil
 	}
 
-	query = "SELECT id,vendor,version,ip_addr,username,password,hlu_start,hlu_end FROM " + db.huaweiTable() + " WHERE id=?"
-	err = db.Get(huawei, query, id)
-	if err == nil {
-		return nil, huawei, nil
-	}
-
-	return nil, nil, errors.Wrap(err, "not found Storage by ID")
+	return san, errors.Wrap(err, "not found Storage by ID")
 }
 
 // ListStorageID returns all StorageSystemID
 func (db dbBase) ListStorageID() ([]string, error) {
-	var hitachi []string
-	err := db.Select(&hitachi, "SELECT id FROM "+db.hitachiTable())
+	var out []string
+	err := db.Select(&out, "SELECT id FROM "+db.sanTable())
 	if err != nil {
-		return nil, errors.Wrap(err, "select []HitachiStorage")
+		return nil, errors.Wrap(err, "select []SANStorage")
 	}
-
-	var huawei []string
-	err = db.Select(&huawei, "SELECT id FROM "+db.huaweiTable())
-	if err != nil {
-		return nil, errors.Wrap(err, "select []HuaweiStorage")
-	}
-
-	out := make([]string, len(hitachi)+len(huawei))
-
-	length := copy(out, hitachi)
-	copy(out[length:], huawei)
 
 	return out, nil
 }
 
 // DelStorageByID delete storage system by ID
 func (db dbBase) DelStorageByID(id string) error {
-	query := "DELETE FROM " + db.hitachiTable() + " WHERE id=?"
+	query := "DELETE FROM " + db.sanTable() + " WHERE id=?"
 
-	r, err := db.Exec(query, id)
-	if err == nil {
-		num, err := r.RowsAffected()
-		if num > 0 && err == nil {
-			return nil
-		}
-	}
-
-	query = "DELETE FROM " + db.huaweiTable() + " WHERE id=?"
-	_, err = db.Exec(query, id)
+	_, err := db.Exec(query, id)
 	if err == nil {
 		return nil
 	}

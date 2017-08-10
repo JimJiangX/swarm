@@ -103,37 +103,39 @@ func DefaultStores() *stores {
 	return defaultStores
 }
 
+func newStore(orm database.StorageOrmer, script string, san database.SANStorage) (store Store, err error) {
+	switch strings.ToUpper(san.Vendor) {
+	case HUAWEI:
+		san.Vendor = HUAWEI
+		store = newHuaweiStore(orm, script, san)
+	case HITACHI:
+		san.Vendor = HITACHI
+		store = newHitachiStore(orm, script, san)
+	default:
+		return nil, errors.Errorf("unsupported Vendor '%s' yet", san.Vendor)
+	}
+
+	return store, nil
+}
+
 // RegisterStore register a new remote storage system
 func (s *stores) Add(vendor, version, addr, user, password, admin string,
-	lstart, lend, hstart, hend int) (store Store, err error) {
+	lstart, lend, hstart, hend int) (Store, error) {
 
-	switch strings.ToUpper(vendor) {
-	case HUAWEI:
-		hs := database.HuaweiStorage{
-			ID:       utils.Generate32UUID(),
-			Vendor:   HUAWEI,
-			Version:  version,
-			IPAddr:   addr,
-			Username: user,
-			Password: password,
-			HluStart: hstart,
-			HluEnd:   hend,
-		}
-		store = newHuaweiStore(s.orm, s.script, hs)
-	case HITACHI:
-		hs := database.HitachiStorage{
-			ID:        utils.Generate32UUID(),
-			Vendor:    HITACHI,
-			Version:   version,
-			AdminUnit: admin,
-			LunStart:  lstart,
-			LunEnd:    lend,
-			HluStart:  hstart,
-			HluEnd:    hend,
-		}
-		store = newHitachiStore(s.orm, s.script, hs)
-	default:
-		return nil, errors.Errorf("unsupported Vendor '%s' yet", vendor)
+	san := database.SANStorage{
+		ID:        utils.Generate32UUID(),
+		Vendor:    vendor,
+		Version:   version,
+		AdminUnit: admin,
+		LunStart:  lstart,
+		LunEnd:    lend,
+		HluStart:  hstart,
+		HluEnd:    hend,
+	}
+
+	store, err := newStore(s.orm, s.script, san)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := store.ping(); err != nil {
@@ -161,17 +163,14 @@ func (s *stores) Get(ID string) (Store, error) {
 		return store, nil
 	}
 
-	hitachi, huawei, err := s.orm.GetStorageByID(ID)
+	san, err := s.orm.GetStorageByID(ID)
 	if err != nil {
 		return nil, err
 	}
 
-	if hitachi != nil {
-		store = newHitachiStore(s.orm, s.script, *hitachi)
-	} else if huawei != nil {
-		store = newHuaweiStore(s.orm, s.script, *huawei)
-	} else {
-		return nil, errors.New("not found Store by ID:" + ID)
+	store, err = newStore(s.orm, s.script, san)
+	if err != nil {
+		return nil, err
 	}
 
 	if store != nil {
