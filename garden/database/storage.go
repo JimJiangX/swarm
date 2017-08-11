@@ -140,7 +140,7 @@ func (db dbBase) GetLUN(nameOrID string) (LUN, error) {
 	lun := LUN{}
 	query := "SELECT id,name,vg_name,raid_group_id,san_id,mapping_hostname,size,host_lun_id,san_lun_id,created_at FROM " + db.lunTable() + " WHERE id=? OR name=?"
 
-	err := db.Get(&lun, query, nameOrID)
+	err := db.Get(&lun, query, nameOrID, nameOrID)
 	if err == nil {
 		return lun, nil
 	}
