@@ -57,11 +57,11 @@ type LUN struct {
 	Name            string    `db:"name"`
 	VG              string    `db:"vg_name"`
 	RaidGroupID     string    `db:"raid_group_id"`
-	StorageSystemID string    `db:"storage_system_id"`
+	StorageSystemID string    `db:"san_id"`
 	MappingTo       string    `db:"mapping_hostname"`
 	SizeByte        int       `db:"size"`
 	HostLunID       int       `db:"host_lun_id"`
-	StorageLunID    int       `db:"storage_lun_id"`
+	StorageLunID    int       `db:"san_lun_id"`
 	CreatedAt       time.Time `db:"created_at"`
 }
 
@@ -70,7 +70,7 @@ func (db dbBase) lunTable() string {
 }
 
 func (db dbBase) txInsertLun(tx *sqlx.Tx, lun LUN) error {
-	query := "INSERT INTO " + db.lunTable() + " (id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at) VALUES (:id,:name,:vg_name,:raid_group_id,:storage_system_id,:mapping_hostname,:size,:host_lun_id,:storage_lun_id,:created_at)"
+	query := "INSERT INTO " + db.lunTable() + " (id,name,vg_name,raid_group_id,san_id,mapping_hostname,size,host_lun_id,san_lun_id,created_at) VALUES (:id,:name,:vg_name,:raid_group_id,:san_id,:mapping_hostname,:size,:host_lun_id,:san_lun_id,:created_at)"
 	_, err := tx.NamedExec(query, lun)
 	if err == nil {
 		return nil
@@ -138,7 +138,7 @@ func (db dbBase) LunMapping(lun, host, vg string, hlun int) error {
 // GetLUN returns LUN,select by ID
 func (db dbBase) GetLUN(nameOrID string) (LUN, error) {
 	lun := LUN{}
-	query := "SELECT id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at FROM " + db.lunTable() + " WHERE id=? OR name=?"
+	query := "SELECT id,name,vg_name,raid_group_id,san_id,mapping_hostname,size,host_lun_id,san_lun_id,created_at FROM " + db.lunTable() + " WHERE id=? OR name=?"
 
 	err := db.Get(&lun, query, nameOrID)
 	if err == nil {
@@ -152,7 +152,7 @@ func (db dbBase) GetLUN(nameOrID string) (LUN, error) {
 func (db dbBase) ListLunByNameOrVG(nameOrVG string) ([]LUN, error) {
 	var (
 		list  []LUN
-		query = "SELECT id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at FROM " + db.lunTable() + " WHERE name=? OR vg_name=?"
+		query = "SELECT id,name,vg_name,raid_group_id,san_id,mapping_hostname,size,host_lun_id,san_lun_id,created_at FROM " + db.lunTable() + " WHERE name=? OR vg_name=?"
 	)
 
 	err := db.Select(&list, query, nameOrVG, nameOrVG)
@@ -166,7 +166,7 @@ func (db dbBase) ListLunByNameOrVG(nameOrVG string) ([]LUN, error) {
 // GetLunByLunID returns a LUN select by StorageLunID and StorageSystemID
 func (db dbBase) GetLunByLunID(systemID string, id int) (LUN, error) {
 	lun := LUN{}
-	query := "SELECT id,name,vg_name,raid_group_id,storage_system_id,mapping_hostname,size,host_lun_id,storage_lun_id,created_at FROM " + db.lunTable() + " WHERE storage_system_id=? AND storage_lun_id=?"
+	query := "SELECT id,name,vg_name,raid_group_id,san_id,mapping_hostname,size,host_lun_id,san_lun_id,created_at FROM " + db.lunTable() + " WHERE storage_system_id=? AND san_lun_id=?"
 
 	err := db.Get(&lun, query, systemID, id)
 	if err == nil {
@@ -221,7 +221,7 @@ func (db dbBase) ListHostLunIDByMapping(host string) ([]int, error) {
 func (db dbBase) ListLunIDBySystemID(id string) ([]int, error) {
 	var (
 		out   []int
-		query = "SELECT storage_lun_id FROM " + db.lunTable() + " WHERE storage_system_id=?"
+		query = "SELECT san_lun_id FROM " + db.lunTable() + " WHERE san_id=?"
 	)
 
 	err := db.Select(&out, query, id)

@@ -55,26 +55,26 @@ func TestDefaultStores(t *testing.T) {
 
 	out, err := ds.List()
 	if err != nil || len(out) != 0 {
-		t.Error(err, len(out))
+		t.Errorf("%+v %d", err, len(out))
 	}
 
 	if ht.Vendor != "" {
 		hts, err := ds.Add(ht.Vendor, ht.Version, "", "", "", ht.AdminUnit, ht.LunStart, ht.LunEnd, ht.HluStart, ht.HluEnd)
 		if err != nil {
-			t.Error(err)
+			t.Errorf("%+v", err)
 		} else {
 			ht.ID = hts.ID()
 
 			_, err = ds.Get(hts.ID())
 			if err != nil {
-				t.Error(hts.ID(), err)
+				t.Errorf("%s:%+v", hts.ID(), err)
 			}
 		}
 	}
 
 	out, err = ds.List()
 	if err != nil || len(out) == 0 {
-		t.Error(err, len(out))
+		t.Errorf("%+v %d", err, len(out))
 	}
 }
 
@@ -91,93 +91,93 @@ func TestStore(t *testing.T) {
 
 		err = ds.Remove(s.ID())
 		if err != nil {
-			t.Error(err, s.ID())
+			t.Errorf("%s:%+v ", s.ID(), err)
 		}
 	} else {
-		t.Log(err)
+		t.Logf("%+v", err)
 	}
 }
 
 func testStore(s Store, t *testing.T) {
 	err := s.ping()
 	if err != nil {
-		t.Error(err)
+		t.Errorf("%+v", err)
 	}
 
 	info, err := s.Info()
 	if err != nil {
-		t.Error(err, info)
+		t.Errorf("%+v\n%v", err, info)
 	}
 
 	ids := []string{"1", "2", "3"}
 	for i := range ids {
 		space, err := s.AddSpace(ids[i])
 		if err != nil {
-			t.Error(err, space)
+			t.Errorf("%+v\n%v", err, space)
 		}
 
 		err = s.DisableSpace(space.ID)
 		if err != nil {
-			t.Error(err)
+			t.Errorf("%+v", err)
 		}
 
 		err = s.EnableSpace(space.ID)
 		if err != nil {
-			t.Error(err)
+			t.Errorf("%+v", err)
 		}
 
 		defer func(id string) {
 			err := s.removeSpace(id)
 			if err != nil {
-				t.Error(err)
+				t.Errorf("%+v", err)
 			}
 		}(ids[i])
 	}
 
 	err = s.AddHost(engine, wwwn)
 	if err != nil {
-		t.Error(err)
+		t.Errorf("%+v", err)
 	}
 	defer func() {
 		err := s.DelHost(engine, wwwn)
 		if err != nil {
-			t.Error(err)
+			t.Errorf("%+v", err)
 		}
 	}()
 
 	lun, lv, err := s.Alloc("volumeName0001", "unitID0001", "VGName001", 2<<30)
 	if err != nil {
-		t.Error(err)
+		t.Errorf("%+v", err)
 	}
 
 	defer func() {
 		err := s.Recycle(lun.ID, 0)
 		if err != nil {
-			t.Error(err)
+			t.Errorf("%+v", err)
 		}
 	}()
 
 	err = s.Mapping(engine, "VGName001", lun.ID, lv.UnitID)
 	if err != nil {
-		t.Error(err)
+		t.Errorf("%+v", err)
 	}
 
 	defer func() {
 		err := s.DelMapping(lun)
 		if err != nil {
-			t.Error(err)
+			t.Errorf("%+v", err)
 		}
 	}()
 
 	lun1, lv, err := s.Extend(lv, 1<<30)
 	if err != nil {
-		t.Error(err)
+		t.Errorf("%+v", err)
 	}
 
 	defer func() {
 		err := s.Recycle(lun1.ID, 0)
 		if err != nil {
-			t.Error(err)
+			t.Errorf("%+v", err)
 		}
 	}()
 
