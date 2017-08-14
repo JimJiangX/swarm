@@ -17,14 +17,14 @@ var (
 	ht = database.SANStorage{
 		Vendor:    "HITACHI",
 		Version:   "",
-		AdminUnit: "AMS2100_83004824",
+		AdminUnit: "100",
 		LunStart:  1000,
 		LunEnd:    1200,
 		HluStart:  500,
 		HluEnd:    600,
 	}
-	engine = "engine001"
-	wwwn   = "fafokaoka"
+	engine = "2QAC:RHRO:QZRZ:QNJV:TXT6:NV2S:WNEO:W47V:6DNL:5EO2:KEPB:LRWN"
+	wwwn   = []string{"10000090fae3a561", "10000090fae3b0c4", "10000090fae3b0c5", "10000090fae3a560"}
 )
 
 func init() {
@@ -118,12 +118,12 @@ func testStore(s Store, t *testing.T) {
 		}
 	}
 
-	err = s.AddHost(engine, wwwn)
+	err = s.AddHost(engine, wwwn...)
 	if err != nil {
 		t.Errorf("%+v", err)
 	}
 	defer func() {
-		err := s.DelHost(engine, wwwn)
+		err := s.DelHost(engine, wwwn...)
 		if err != nil {
 			t.Errorf("%+v", err)
 		}
