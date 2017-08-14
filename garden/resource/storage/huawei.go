@@ -289,7 +289,7 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 	defer h.lock.Unlock()
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, name}
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout*5, debug, param...)
+	_, err = utils.ExecContextTimeout(nil, 0, debug, param...)
 	if err != nil {
 		return errors.WithStack(err)
 	}

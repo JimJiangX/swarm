@@ -473,7 +473,7 @@ func (m hostManager) registerNodes(ctx context.Context, nodes []nodeWithTask, sy
 			wwn := eng.Labels[_SAN_HBA_WWN_Lable]
 			list := strings.Split(wwn, ",")
 
-			if err = san.AddHost(n.Addr, list...); err != nil {
+			if err = san.AddHost(n.EngineID, list...); err != nil {
 				_err = err
 				field.Errorf("register to SAN,WWN:%s,%+v", wwn, err)
 				continue

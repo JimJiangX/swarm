@@ -402,7 +402,7 @@ func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
 	param := []string{path, h.hs.AdminUnit, name}
 	param = append(param, wwwn...)
 
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout*5, debug, param...)
+	_, err = utils.ExecContextTimeout(nil, 0, debug, param...)
 	if err != nil {
 		return errors.WithStack(err)
 	}

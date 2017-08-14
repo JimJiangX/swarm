@@ -110,24 +110,31 @@ func testStore(s Store, t *testing.T) {
 		t.Errorf("%+v\n%v", err, info)
 	}
 
-	ids := []string{"1", "2", "3"}
+	ids := []string{"1-1", "1-2", "1-3"}
 	for i := range ids {
-		err := testSpace(s, ids[i])
-		if err != nil {
-			t.Errorf("%+v", err)
-		}
-	}
+		defer func(rg string) {
+			err := s.removeSpace(rg)
+			if err != nil {
+				t.Errorf("%+v", err)
+			}
+		}(ids[i])
 
-	err = s.AddHost(engine, wwwn...)
-	if err != nil {
-		t.Errorf("%+v", err)
-	}
-	defer func() {
-		err := s.DelHost(engine, wwwn...)
+		space, err := s.AddSpace(ids[i])
+		if err != nil {
+			t.Errorf("%+v", err)
+			continue
+		}
+
+		err = s.DisableSpace(space.ID)
 		if err != nil {
 			t.Errorf("%+v", err)
 		}
-	}()
+
+		err = s.EnableSpace(space.ID)
+		if err != nil {
+			t.Errorf("%+v", err)
+		}
+	}
 
 	err = testAlloc(s)
 	if err != nil {
@@ -135,33 +142,22 @@ func testStore(s Store, t *testing.T) {
 	}
 }
 
-func testSpace(s Store, rg string) (err error) {
+func testAlloc(s Store) (err error) {
+	err = s.AddHost(engine, wwwn...)
+	if err != nil {
+		return err
+	}
 	defer func() {
-		_err := s.removeSpace(rg)
+		_err := s.DelHost(engine, wwwn...)
 		if _err != nil {
 			if err == nil {
 				err = _err
 			} else {
-				err = fmt.Errorf("%+v\n,remove space %s,%+v", err, rg, _err)
+				err = fmt.Errorf("%+v\n,del host,%+v", err, _err)
 			}
 		}
 	}()
-	space, err := s.AddSpace(rg)
-	if err != nil {
-		return err
-	}
 
-	err = s.DisableSpace(space.ID)
-	if err != nil {
-		return err
-	}
-
-	err = s.EnableSpace(space.ID)
-
-	return err
-}
-
-func testAlloc(s Store) (err error) {
 	lun, lv, err := s.Alloc("volumeName0001", "unitID0001", "VGName001", 2<<30)
 	if err != nil {
 		return err
