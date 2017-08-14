@@ -226,7 +226,7 @@ func (h huaweiStore) ListLUN(nameOrVG string) ([]database.LUN, error) {
 	return h.orm.ListLunByNameOrVG(nameOrVG)
 }
 
-func (h *huaweiStore) Recycle(id string, lun int) error {
+func (h *huaweiStore) RecycleLUN(id string, lun int) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -285,6 +285,10 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 		return err
 	}
 
+	if len(name) >= maxHostLen {
+		name = name[:maxHostLen]
+	}
+
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -304,6 +308,10 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 	path, err := h.scriptPath("del_host.sh")
 	if err != nil {
 		return err
+	}
+
+	if len(name) >= maxHostLen {
+		name = name[:maxHostLen]
 	}
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, name}
@@ -357,6 +365,10 @@ func (h *huaweiStore) Mapping(host, vg, lun, unit string) error {
 	path, err := h.scriptPath("create_lunmap.sh")
 	if err != nil {
 		return err
+	}
+
+	if len(host) >= maxHostLen {
+		host = host[:maxHostLen]
 	}
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val)}

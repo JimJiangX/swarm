@@ -31,6 +31,8 @@ const (
 
 	// DefaultFilesystemType default filesystem type
 	DefaultFilesystemType = "xfs"
+
+	maxHostLen = 30
 )
 
 // Info describle remote storage system infomation
@@ -61,7 +63,7 @@ type Store interface {
 
 	Alloc(name, unitID, vgName string, size int64) (database.LUN, database.Volume, error) // create LUN
 	Extend(lv database.Volume, size int64) (database.LUN, database.Volume, error)
-	Recycle(id string, lun int) error // delete LUN
+	RecycleLUN(id string, lun int) error // delete LUN
 
 	Mapping(host, vgName, lun, unit string) error
 	DelMapping(lun database.LUN) error

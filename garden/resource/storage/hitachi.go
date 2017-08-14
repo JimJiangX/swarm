@@ -257,7 +257,7 @@ func (h hitachiStore) ListLUN(nameOrVG string) ([]database.LUN, error) {
 }
 
 // Recycle calls del_lun.sh,make the lun available for alloction.
-func (h *hitachiStore) Recycle(id string, lun int) error {
+func (h *hitachiStore) RecycleLUN(id string, lun int) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	var (
@@ -396,6 +396,10 @@ func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
 		return err
 	}
 
+	if len(name) >= maxHostLen {
+		name = name[:maxHostLen]
+	}
+
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -415,6 +419,10 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 	path, err := h.scriptPath("del_host.sh")
 	if err != nil {
 		return err
+	}
+
+	if len(name) >= maxHostLen {
+		name = name[:maxHostLen]
 	}
 
 	h.lock.Lock()
@@ -470,6 +478,10 @@ func (h *hitachiStore) Mapping(host, vg, lun, unit string) error {
 	path, err := h.scriptPath("create_lunmap.sh")
 	if err != nil {
 		return err
+	}
+
+	if len(host) >= maxHostLen {
+		host = host[:maxHostLen]
 	}
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, path, h.hs.AdminUnit,

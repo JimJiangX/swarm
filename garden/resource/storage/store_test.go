@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/utils"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 )
@@ -15,7 +16,7 @@ var (
 	db database.Ormer
 
 	ht = database.SANStorage{
-		Vendor:    "HITACHI",
+		Vendor:    HITACHI,
 		Version:   "",
 		AdminUnit: "100",
 		LunStart:  1000,
@@ -23,8 +24,8 @@ var (
 		HluStart:  500,
 		HluEnd:    600,
 	}
-	engine = "2QAC:RHRO:QZRZ:QNJV:TXT6:NV2S:WNEO:W47V:6DNL:5EO2:KEPB:LRWN"
-	wwwn   = []string{"10000090fae3a561", "10000090fae3b0c4", "10000090fae3b0c5", "10000090fae3a560"}
+
+	wwwn = []string{"10000090fae3a561", "10000090fae3b0c4", "10000090fae3b0c5", "10000090fae3a560"}
 )
 
 func init() {
@@ -143,6 +144,8 @@ func testStore(s Store, t *testing.T) {
 }
 
 func testAlloc(s Store) (err error) {
+	engine := utils.Generate128UUID()
+
 	err = s.AddHost(engine, wwwn...)
 	if err != nil {
 		return err
@@ -158,13 +161,26 @@ func testAlloc(s Store) (err error) {
 		}
 	}()
 
-	lun, lv, err := s.Alloc("volumeName0001", "unitID0001", "VGName001", 2<<30)
+	vg := utils.Generate64UUID()
+	lun, lv, err := s.Alloc(utils.Generate64UUID(), utils.Generate64UUID(), vg, 2<<30)
 	if err != nil {
 		return err
 	}
 
 	defer func() {
-		_err := s.Recycle(lun.ID, 0)
+		// clean volume
+		_err := DefaultStores().orm.DelVolume(lv.ID)
+		if _err != nil {
+			if err == nil {
+				err = _err
+			} else {
+				err = fmt.Errorf("%+v\n,clean volume:%+v", err, _err)
+			}
+		}
+	}()
+
+	defer func() {
+		_err := s.RecycleLUN(lun.ID, 0)
 		if _err != nil {
 			if err == nil {
 				err = _err
@@ -174,7 +190,7 @@ func testAlloc(s Store) (err error) {
 		}
 	}()
 
-	err = s.Mapping(engine, "VGName001", lun.ID, lv.UnitID)
+	err = s.Mapping(engine, vg, lun.ID, lv.UnitID)
 	if err != nil {
 		return err
 	}
@@ -196,7 +212,7 @@ func testAlloc(s Store) (err error) {
 	}
 
 	defer func() {
-		_err := s.Recycle(lun1.ID, 0)
+		_err := s.RecycleLUN(lun1.ID, 0)
 		if _err != nil {
 			if err == nil {
 				err = _err
