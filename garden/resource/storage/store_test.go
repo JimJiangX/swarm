@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/swarm/garden/database"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -111,27 +112,10 @@ func testStore(s Store, t *testing.T) {
 
 	ids := []string{"1", "2", "3"}
 	for i := range ids {
-		space, err := s.AddSpace(ids[i])
-		if err != nil {
-			t.Errorf("%+v\n%v", err, space)
-		}
-
-		err = s.DisableSpace(space.ID)
+		err := testSpace(s, ids[i])
 		if err != nil {
 			t.Errorf("%+v", err)
 		}
-
-		err = s.EnableSpace(space.ID)
-		if err != nil {
-			t.Errorf("%+v", err)
-		}
-
-		defer func(id string) {
-			err := s.removeSpace(id)
-			if err != nil {
-				t.Errorf("%+v", err)
-			}
-		}(ids[i])
 	}
 
 	err = s.AddHost(engine, wwwn)
@@ -145,43 +129,101 @@ func testStore(s Store, t *testing.T) {
 		}
 	}()
 
-	lun, lv, err := s.Alloc("volumeName0001", "unitID0001", "VGName001", 2<<30)
+	err = testAlloc(s)
 	if err != nil {
 		t.Errorf("%+v", err)
 	}
+}
+
+func testSpace(s Store, rg string) (err error) {
+	defer func() {
+		_err := s.removeSpace(rg)
+		if _err != nil {
+			if err == nil {
+				err = _err
+			} else {
+				err = fmt.Errorf("%+v\n,remove space %s,%+v", err, rg, _err)
+			}
+		}
+	}()
+	space, err := s.AddSpace(rg)
+	if err != nil {
+		return err
+	}
+
+	err = s.DisableSpace(space.ID)
+	if err != nil {
+		return err
+	}
+
+	err = s.EnableSpace(space.ID)
+
+	return err
+}
+
+func testAlloc(s Store) (err error) {
+	lun, lv, err := s.Alloc("volumeName0001", "unitID0001", "VGName001", 2<<30)
+	if err != nil {
+		return err
+	}
 
 	defer func() {
-		err := s.Recycle(lun.ID, 0)
-		if err != nil {
-			t.Errorf("%+v", err)
+		_err := s.Recycle(lun.ID, 0)
+		if _err != nil {
+			if err == nil {
+				err = _err
+			} else {
+				err = fmt.Errorf("%+v\n,recycle lun %d,%+v", err, lun.HostLunID, _err)
+			}
 		}
 	}()
 
 	err = s.Mapping(engine, "VGName001", lun.ID, lv.UnitID)
 	if err != nil {
-		t.Errorf("%+v", err)
+		return err
 	}
 
 	defer func() {
-		err := s.DelMapping(lun)
-		if err != nil {
-			t.Errorf("%+v", err)
+		_err := s.DelMapping(lun)
+		if _err != nil {
+			if err == nil {
+				err = _err
+			} else {
+				err = fmt.Errorf("%+v\n,del mapping %d,%+v", err, lun.HostLunID, _err)
+			}
 		}
 	}()
 
 	lun1, lv, err := s.Extend(lv, 1<<30)
 	if err != nil {
-		t.Errorf("%+v", err)
+		return err
 	}
 
 	defer func() {
-		err := s.Recycle(lun1.ID, 0)
-		if err != nil {
-			t.Errorf("%+v", err)
+		_err := s.Recycle(lun1.ID, 0)
+		if _err != nil {
+			if err == nil {
+				err = _err
+			} else {
+				err = fmt.Errorf("%+v\n,recycle lun %d,%+v", err, lun1.HostLunID, _err)
+			}
+		}
+	}()
+
+	defer func() {
+		_err := s.DelMapping(lun1)
+		if _err != nil {
+			if err == nil {
+				err = _err
+			} else {
+				err = fmt.Errorf("%+v\n,del mapping %d,%+v", err, lun1.HostLunID, _err)
+			}
 		}
 	}()
 
 	if lv.Size != 3<<30 {
-		t.Error(lv.Size)
+		return errors.Errorf("expect volume size extend to 3G,but got %d", lv.Size)
 	}
+
+	return nil
 }
