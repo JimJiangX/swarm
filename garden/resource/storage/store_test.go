@@ -56,7 +56,7 @@ func TestDefaultStores(t *testing.T) {
 	ds := DefaultStores()
 
 	out, err := ds.List()
-	if err != nil || len(out) != 0 {
+	if err != nil {
 		t.Errorf("%+v %d", err, len(out))
 	}
 
@@ -74,8 +74,9 @@ func TestDefaultStores(t *testing.T) {
 		}
 	}
 
+	n := len(out)
 	out, err = ds.List()
-	if err != nil || len(out) == 0 {
+	if err != nil || len(out)-n <= 0 {
 		t.Errorf("%+v %d", err, len(out))
 	}
 }
