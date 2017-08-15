@@ -12,21 +12,42 @@ import (
 	"github.com/pkg/errors"
 )
 
+type hitachi struct {
+	ID        string `db:"id"`
+	Vendor    string `db:"vendor"`
+	Version   string `db:"version"`
+	AdminUnit string `db:"admin_unit"`
+	LunStart  int    `db:"lun_start"`
+	LunEnd    int    `db:"lun_end"`
+	HluStart  int    `db:"hlu_start"`
+	HluEnd    int    `db:"hlu_end"`
+}
+
 // hitachi store
 type hitachiStore struct {
 	lock   *sync.RWMutex
 	script string
 
 	orm database.StorageOrmer
-	hs  database.HitachiStorage
+	hs  hitachi
 }
 
 // NewHitachiStore returns a new Store
-func newHitachiStore(orm database.StorageOrmer, script string, hs database.HitachiStorage) Store {
+func newHitachiStore(orm database.StorageOrmer, script string, san database.SANStorage) Store {
+	hs := hitachi{
+		ID:        san.ID,
+		Vendor:    san.Vendor,
+		Version:   san.Version,
+		AdminUnit: san.AdminUnit,
+		LunStart:  san.LunStart,
+		LunEnd:    san.LunEnd,
+		HluStart:  san.HluStart,
+		HluEnd:    san.HluEnd,
+	}
 	return &hitachiStore{
 		lock:   new(sync.RWMutex),
 		orm:    orm,
-		script: filepath.Join(script, HITACHI),
+		script: filepath.Join(script, hs.Vendor, hs.Version),
 		hs:     hs,
 	}
 }
@@ -72,8 +93,18 @@ func (h hitachiStore) ping() error {
 
 // insert insert hitachiStore into DB
 func (h *hitachiStore) insert() error {
+	san := database.SANStorage{
+		ID:        h.hs.ID,
+		Vendor:    h.hs.Vendor,
+		Version:   h.hs.Version,
+		AdminUnit: h.hs.AdminUnit,
+		LunStart:  h.hs.LunStart,
+		LunEnd:    h.hs.LunEnd,
+		HluStart:  h.hs.HluStart,
+		HluEnd:    h.hs.HluEnd,
+	}
 	h.lock.Lock()
-	err := h.orm.InsertHitachiStorage(h.hs)
+	err := h.orm.InsertSANStorage(san)
 	h.lock.Unlock()
 
 	return err
@@ -83,6 +114,7 @@ func (h *hitachiStore) insert() error {
 // the allocated LUN is used to creating a volume.
 // alloction calls create_lun.sh
 func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, database.Volume, error) {
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -161,6 +193,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 func (h *hitachiStore) Extend(lv database.Volume, size int64) (database.LUN, database.Volume, error) {
 	lun := database.LUN{}
 
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -226,9 +259,11 @@ func (h hitachiStore) ListLUN(nameOrVG string) ([]database.LUN, error) {
 }
 
 // Recycle calls del_lun.sh,make the lun available for alloction.
-func (h *hitachiStore) Recycle(id string, lun int) error {
+func (h *hitachiStore) RecycleLUN(id string, lun int) error {
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
+
 	var (
 		l   database.LUN
 		err error
@@ -365,13 +400,18 @@ func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
 		return err
 	}
 
+	if len(name) >= maxHostLen {
+		name = name[:maxHostLen]
+	}
+
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
 	param := []string{path, h.hs.AdminUnit, name}
 	param = append(param, wwwn...)
 
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
+	_, err = utils.ExecContextTimeout(nil, 0, debug, param...)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -384,6 +424,10 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 	path, err := h.scriptPath("del_host.sh")
 	if err != nil {
 		return err
+	}
+
+	if len(name) >= maxHostLen {
+		name = name[:maxHostLen]
 	}
 
 	h.lock.Lock()
@@ -401,6 +445,7 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 
 // Mapping calls create_lunmap.sh,associate LUN with host.
 func (h *hitachiStore) Mapping(host, vg, lun, unit string) error {
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -441,6 +486,10 @@ func (h *hitachiStore) Mapping(host, vg, lun, unit string) error {
 		return err
 	}
 
+	if len(host) >= maxHostLen {
+		host = host[:maxHostLen]
+	}
+
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, path, h.hs.AdminUnit,
 		strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val))
 	if err != nil {
@@ -452,11 +501,13 @@ func (h *hitachiStore) Mapping(host, vg, lun, unit string) error {
 
 // DelMapping disassociate of the lun from host,calls del_lunmap.sh
 func (h *hitachiStore) DelMapping(lun database.LUN) error {
+
 	path, err := h.scriptPath("del_lunmap.sh")
 	if err != nil {
 		return err
 	}
 
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 

@@ -193,9 +193,6 @@ func ExecContextTimeout(ctx context.Context, timeout time.Duration, debug bool, 
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if _, ok := ctx.Deadline(); !ok && timeout <= 0 {
-		return nil, fmt.Errorf("timeout is required")
-	}
 
 	if timeout > 0 {
 		var cancel context.CancelFunc

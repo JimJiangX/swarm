@@ -77,8 +77,6 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 
 	if v, ok := desc.Options["character_set_server"]; ok && v != nil {
 		m["mysqld::character_set_server"] = v
-	} else {
-		m["mysqld::character_set_server"] = "utf8"
 	}
 
 	if p, ok := desc.Options["port"]; ok && p != nil {
@@ -148,17 +146,8 @@ func (c mysqlConfig) GenerateCommands(id string, desc structs.ServiceSpec) (stru
 
 	cmds[structs.StopServiceCmd] = []string{"/root/mysql.service", "stop"}
 
-	//func (mysqlCmd) RestoreCmd(file, backupDir string) []string {
-	//	return []string{"/root/mysql-restore.sh", file, backupDir}
-	//}
 	cmds[structs.RestoreCmd] = []string{"/root/mysql-restore.sh"}
 
-	//func (mysqlCmd) BackupCmd(args ...string) []string {
-	//	cmd := make([]string, len(args)+1)
-	//	cmd[0] = "/root/mysql-backup.sh"
-	//	copy(cmd[1:], args)
-	//	return cmd
-	//}
 	cmds[structs.BackupCmd] = []string{"/root/mysql-backup.sh"}
 
 	return cmds, nil
@@ -195,27 +184,6 @@ func (c mysqlConfig) Marshal() ([]byte, error) {
 
 	return data, errors.WithStack(err)
 }
-
-//func (mysqlConfig) Requirement() structs.RequireResource {
-//	ports := []port{
-//		port{
-//			proto: "tcp",
-//			name:  "mysqld::port",
-//		},
-//	}
-//	nets := []netRequire{
-//		netRequire{
-//			Type: _ContainersNetworking,
-//			num:  1,
-//		},
-//	}
-//	return require{
-//		ports:       ports,
-//		networkings: nets,
-//	}
-
-//	return structs.RequireResource{}
-//}
 
 func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
 	var spec *structs.UnitSpec

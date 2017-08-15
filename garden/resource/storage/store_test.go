@@ -7,16 +7,25 @@ import (
 	"testing"
 
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/utils"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/pkg/errors"
 )
 
 var (
 	db database.Ormer
 
-	hw     = database.HuaweiStorage{}
-	ht     = database.HitachiStorage{}
-	engine = "engine001"
-	wwwn   = "fafokaoka"
+	ht = database.SANStorage{
+		Vendor:    HITACHI,
+		Version:   "",
+		AdminUnit: "101",
+		LunStart:  1000,
+		LunEnd:    1200,
+		HluStart:  500,
+		HluEnd:    600,
+	}
+
+	wwwn = []string{"10000090fae3a561", "10000090fae3b0c4", "10000090fae3b0c5", "10000090fae3a560"}
 )
 
 func init() {
@@ -47,41 +56,28 @@ func TestDefaultStores(t *testing.T) {
 	ds := DefaultStores()
 
 	out, err := ds.List()
-	if err != nil || len(out) != 0 {
-		t.Error(err, len(out))
+	if err != nil {
+		t.Errorf("%+v %d", err, len(out))
 	}
 
-	{
-		hws, err := ds.Add(hw.Vendor, hw.IPAddr, hw.Username, hw.Password, "", 0, 0, hw.HluStart, hw.HluEnd)
+	if ht.Vendor != "" {
+		hts, err := ds.Add(ht.Vendor, ht.Version, "", "", "", ht.AdminUnit, ht.LunStart, ht.LunEnd, ht.HluStart, ht.HluEnd)
 		if err != nil {
-			t.Log(err)
-		} else {
-			hw.ID = hws.ID()
-
-			_, err = ds.Get(hws.ID())
-			if err != nil {
-				t.Error(hws.ID(), err)
-			}
-		}
-	}
-
-	{
-		hts, err := ds.Add(ht.Vendor, "", "", "", ht.AdminUnit, ht.LunStart, ht.LunEnd, ht.HluStart, ht.HluEnd)
-		if err != nil {
-			t.Log(err)
+			t.Errorf("%+v", err)
 		} else {
 			ht.ID = hts.ID()
 
 			_, err = ds.Get(hts.ID())
 			if err != nil {
-				t.Error(hts.ID(), err)
+				t.Errorf("%s:%+v", hts.ID(), err)
 			}
 		}
 	}
 
+	n := len(out)
 	out, err = ds.List()
-	if err != nil || len(out) == 0 {
-		t.Error(err, len(out))
+	if err != nil || len(out)-n <= 0 {
+		t.Errorf("%+v %d", err, len(out))
 	}
 }
 
@@ -92,116 +88,151 @@ func TestStore(t *testing.T) {
 
 	ds := DefaultStores()
 
-	s, err := ds.Get(hw.ID)
+	s, err := ds.Get(ht.ID)
 	if err == nil && s != nil {
 		testStore(s, t)
 
 		err = ds.Remove(s.ID())
 		if err != nil {
-			t.Error(err, s.ID())
-		}
-
-	} else {
-		t.Log(err)
-	}
-
-	s, err = ds.Get(ht.ID)
-	if err == nil && s != nil {
-		testStore(s, t)
-
-		err = ds.Remove(s.ID())
-		if err != nil {
-			t.Error(err, s.ID())
+			t.Errorf("%s:%+v ", s.ID(), err)
 		}
 	} else {
-		t.Log(err)
+		t.Logf("%+v", err)
 	}
 }
 
 func testStore(s Store, t *testing.T) {
 	err := s.ping()
 	if err != nil {
-		t.Error(err)
+		t.Errorf("%+v", err)
 	}
 
 	info, err := s.Info()
 	if err != nil {
-		t.Error(err, info)
+		t.Errorf("%+v\n%v", err, info)
 	}
 
-	ids := []string{"1", "2", "3"}
+	ids := []string{"1-1", "1-2", "1-3"}
 	for i := range ids {
+		defer func(rg string) {
+			err := s.removeSpace(rg)
+			if err != nil {
+				t.Errorf("%+v", err)
+			}
+		}(ids[i])
+
 		space, err := s.AddSpace(ids[i])
 		if err != nil {
-			t.Error(err, space)
+			t.Errorf("%+v", err)
+			continue
 		}
 
 		err = s.DisableSpace(space.ID)
 		if err != nil {
-			t.Error(err)
+			t.Errorf("%+v", err)
 		}
 
 		err = s.EnableSpace(space.ID)
 		if err != nil {
-			t.Error(err)
+			t.Errorf("%+v", err)
 		}
+	}
 
-		defer func(id string) {
-			err := s.removeSpace(id)
-			if err != nil {
-				t.Error(err)
+	info, err = s.Info()
+	if err != nil {
+		t.Errorf("%+v", err)
+	}
+
+	t.Logf("%+v", info)
+
+	err = testAlloc(s)
+	if err != nil {
+		t.Errorf("%+v", err)
+	}
+}
+
+func testAlloc(s Store) (err error) {
+	engine := utils.Generate128UUID()
+
+	err = s.AddHost(engine, wwwn...)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_err := s.DelHost(engine, wwwn...)
+		if _err != nil {
+			if err == nil {
+				err = _err
+			} else {
+				err = fmt.Errorf("%+v\n,del host,%+v", err, _err)
 			}
-		}(ids[i])
-	}
-
-	err = s.AddHost(engine, wwwn)
-	if err != nil {
-		t.Error(err)
-	}
-	defer func() {
-		err := s.DelHost(engine, wwwn)
-		if err != nil {
-			t.Error(err)
 		}
 	}()
 
-	lun, lv, err := s.Alloc("volumeName0001", "unitID0001", "VGName001", 2<<30)
+	vg := utils.Generate64UUID()
+	lun, lv, err := s.Alloc(utils.Generate64UUID(), utils.Generate64UUID(), vg, 2<<30)
 	if err != nil {
-		t.Error(err)
+		return err
 	}
 
 	defer func() {
-		err := s.Recycle(lun.ID, 0)
-		if err != nil {
-			t.Error(err)
+		// clean volume
+		_err := DefaultStores().orm.DelVolume(lv.ID)
+		if _err != nil {
+			if err == nil {
+				err = _err
+			} else {
+				err = fmt.Errorf("%+v\n,clean volume:%+v", err, _err)
+			}
 		}
 	}()
 
-	err = s.Mapping(engine, "VGName001", lun.ID, lv.UnitID)
+	defer func() {
+		_err := s.RecycleLUN(lun.ID, 0)
+		if _err != nil {
+			if err == nil {
+				err = _err
+			} else {
+				err = fmt.Errorf("%+v\n,recycle lun %d,%+v", err, lun.HostLunID, _err)
+			}
+		}
+	}()
+
+	err = s.Mapping(engine, vg, lun.ID, lv.UnitID)
 	if err != nil {
-		t.Error(err)
+		return err
 	}
 
 	defer func() {
-		err := s.DelMapping(lun)
-		if err != nil {
-			t.Error(err)
+		_err := s.DelMapping(lun)
+		if _err != nil {
+			if err == nil {
+				err = _err
+			} else {
+				err = fmt.Errorf("%+v\n,del mapping %d,%+v", err, lun.HostLunID, _err)
+			}
 		}
 	}()
 
 	lun1, lv, err := s.Extend(lv, 1<<30)
 	if err != nil {
-		t.Error(err)
+		return err
 	}
 
 	defer func() {
-		err := s.Recycle(lun1.ID, 0)
-		if err != nil {
-			t.Error(err)
+		_err := s.RecycleLUN(lun1.ID, 0)
+		if _err != nil {
+			if err == nil {
+				err = _err
+			} else {
+				err = fmt.Errorf("%+v\n,recycle lun %d,%+v", err, lun1.HostLunID, _err)
+			}
 		}
 	}()
 
 	if lv.Size != 3<<30 {
-		t.Error(lv.Size)
+		return errors.Errorf("expect volume size extend to 3G,but got %d", lv.Size)
 	}
+
+	return nil
 }

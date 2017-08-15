@@ -202,7 +202,7 @@ func (sv sanVolume) Recycle(lv database.Volume) error {
 	}
 
 	for i := range luns {
-		err := sv.san.Recycle(luns[i].ID, 0)
+		err := sv.san.RecycleLUN(luns[i].ID, 0)
 		if err != nil {
 			return err
 		}

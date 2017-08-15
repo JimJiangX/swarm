@@ -199,8 +199,8 @@ func TestExecContextTimeout(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := ExecContextTimeout(ctx, 0, true, "echo", "foo", "bar baz")
-	if err == nil {
-		t.Error("error expected,but got nil")
+	if err != nil {
+		t.Error(err)
 	}
 
 	_, err = ExecContextTimeout(ctx, time.Second, true, "echo", "foo", "bar baz")

@@ -13,7 +13,7 @@ type BackupFileIface interface {
 
 	GetBackupFile(id string) (BackupFile, error)
 
-	ListBackupFilesByService(nameOrID string) (Service, []BackupFile, error)
+	ListBackupFilesByService(nameOrID string) ([]BackupFile, error)
 
 	DelBackupFiles(files []BackupFile) error
 }
@@ -52,41 +52,36 @@ func (db dbBase) ListBackupFiles() ([]BackupFile, error) {
 	return nil, errors.Wrap(err, "list []BackupFile")
 }
 
-// ListBackupFilesByService returns Service and []BackupFile select by name or ID
-func (db dbBase) ListBackupFilesByService(nameOrID string) (Service, []BackupFile, error) {
-	service, err := db.GetService(nameOrID)
-	if err != nil {
-		return service, nil, errors.Wrapf(err, "not found Service by '%s'", nameOrID)
-	}
-
+// ListBackupFilesByService returns []BackupFile select by name or ID
+func (db dbBase) ListBackupFilesByService(service string) ([]BackupFile, error) {
 	var (
 		units []string
 		files []BackupFile
 		query = "SELECT id FROM " + db.unitTable() + " WHERE service_id=?"
 	)
 
-	err = db.Select(&units, query, service.ID)
+	err := db.Select(&units, query, service)
 	if err != nil && err != sql.ErrNoRows {
-		return service, nil, errors.Wrapf(err, "not found Units by service_id='%s'", service.ID)
+		return nil, errors.Wrapf(err, "not found Units by service_id='%s'", service)
 	}
 
 	if len(units) == 0 {
-		return service, nil, nil
+		return nil, nil
 	}
 
 	query = "SELECT id,task_id,unit_id,type,path,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " WHERE unit_id IN (?);"
 
 	query, args, err := sqlx.In(query, units)
 	if err != nil {
-		return service, nil, errors.Wrap(err, "select BackupFile by UnitIDs")
+		return nil, errors.Wrap(err, "select BackupFile by UnitIDs")
 	}
 
 	err = db.Select(&files, query, args...)
 	if err != nil && err != sql.ErrNoRows {
-		return service, nil, errors.Wrapf(err, "not found BackupFile by unit_id='%s'", units)
+		return nil, errors.Wrapf(err, "not found BackupFile by unit_id='%s'", units)
 	}
 
-	return service, files, nil
+	return files, nil
 }
 
 // GetBackupFile returns BackupFile select by ID

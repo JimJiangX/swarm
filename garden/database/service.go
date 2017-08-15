@@ -61,19 +61,16 @@ type ServiceOrmer interface {
 type Service struct {
 	Desc *ServiceDesc
 
-	ID                string `db:"id" json:"id"`
-	Name              string `db:"name" json:"name"`
-	DescID            string `db:"description_id" json:"description_id"` // short for Description
-	Tag               string `db:"tag" json:"tag"`                       // part of business
-	AutoHealing       bool   `db:"auto_healing" json:"auto_healing"`
-	AutoScaling       bool   `db:"auto_scaling" json:"auto_scaling"`
-	HighAvailable     bool   `db:"high_available" json:"high_available"`
-	Status            int    `db:"action_status" json:"action_status"`
-	BackupMaxSizeByte int    `db:"backup_max_size" json:"backup_max_size"`
-	// count by Day,used in swarm.BackupTaskCallback(),calculate BackupFile.Retention
-	BackupFilesRetention int       `db:"backup_files_retention" json:"backup_files_retention"`
-	CreatedAt            time.Time `db:"created_at" json:"created_at"`
-	FinishedAt           time.Time `db:"finished_at" json:"finished_at"`
+	ID            string    `db:"id" json:"id"`
+	Name          string    `db:"name" json:"name"`
+	DescID        string    `db:"description_id" json:"description_id"` // short for Description
+	Tag           string    `db:"tag" json:"tag"`                       // part of business
+	AutoHealing   bool      `db:"auto_healing" json:"auto_healing"`
+	AutoScaling   bool      `db:"auto_scaling" json:"auto_scaling"`
+	HighAvailable bool      `db:"high_available" json:"high_available"`
+	Status        int       `db:"action_status" json:"action_status"`
+	CreatedAt     time.Time `db:"created_at" json:"created_at"`
+	FinishedAt    time.Time `db:"finished_at" json:"finished_at"`
 }
 
 func (s Service) ParseImage() (string, string) {
@@ -95,7 +92,7 @@ func (db dbBase) serviceTable() string {
 func (db dbBase) listServices() ([]Service, error) {
 	var (
 		out   []Service
-		query = "SELECT id,name,description_id,tag,auto_healing,auto_scaling,high_available,action_status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable()
+		query = "SELECT id,name,description_id,tag,auto_healing,auto_scaling,high_available,action_status,created_at,finished_at FROM " + db.serviceTable()
 	)
 
 	err := db.Select(&out, query)
@@ -114,7 +111,7 @@ func (db dbBase) listServices() ([]Service, error) {
 func (db dbBase) ListServices() ([]Service, error) {
 	var (
 		out   []Service
-		query = "SELECT id,name,description_id,tag,auto_healing,auto_scaling,high_available,action_status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable()
+		query = "SELECT id,name,description_id,tag,auto_healing,auto_scaling,high_available,action_status,created_at,finished_at FROM " + db.serviceTable()
 	)
 
 	err := db.Select(&out, query)
@@ -154,7 +151,7 @@ func (db dbBase) ListServices() ([]Service, error) {
 func (db dbBase) GetService(nameOrID string) (Service, error) {
 	var (
 		s     = Service{}
-		query = "SELECT id,name,description_id,tag,auto_healing,auto_scaling,high_available,action_status,backup_max_size,backup_files_retention,created_at,finished_at FROM " + db.serviceTable() + " WHERE id=? OR name=?"
+		query = "SELECT id,name,description_id,tag,auto_healing,auto_scaling,high_available,action_status,created_at,finished_at FROM " + db.serviceTable() + " WHERE id=? OR name=?"
 	)
 
 	err := db.Get(&s, query, nameOrID, nameOrID)
@@ -303,7 +300,7 @@ func (db dbBase) InsertService(svc Service, units []Unit, t *Task) error {
 
 func (db dbBase) txInsertSerivce(tx *sqlx.Tx, svc Service) error {
 
-	query := "INSERT INTO " + db.serviceTable() + " ( id,name,description_id,tag,auto_healing,auto_scaling,high_available,action_status,backup_max_size,backup_files_retention,created_at,finished_at ) VALUES ( :id,:name,:description_id,:tag,:auto_healing,:auto_scaling,:high_available,:action_status,:backup_max_size,:backup_files_retention,:created_at,:finished_at )"
+	query := "INSERT INTO " + db.serviceTable() + " ( id,name,description_id,tag,auto_healing,auto_scaling,high_available,action_status,created_at,finished_at ) VALUES ( :id,:name,:description_id,:tag,:auto_healing,:auto_scaling,:high_available,:action_status,:created_at,:finished_at )"
 
 	_, err := tx.NamedExec(query, &svc)
 	if err == nil {

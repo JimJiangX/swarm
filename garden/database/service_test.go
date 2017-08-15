@@ -40,15 +40,13 @@ func TestIncServiceStatus(t *testing.T) {
 		tasks[i].Linkto = uuid
 
 		tables[i] = Service{
-			ID:                   uuid,
-			Name:                 uuid,
-			DescID:               uuid,
-			Tag:                  uuid,
-			Status:               300,
-			BackupMaxSizeByte:    1 << 35,
-			BackupFilesRetention: 30,
-			CreatedAt:            now,
-			FinishedAt:           now,
+			ID:         uuid,
+			Name:       uuid,
+			DescID:     uuid,
+			Tag:        uuid,
+			Status:     300,
+			CreatedAt:  now,
+			FinishedAt: now,
 		}
 	}
 

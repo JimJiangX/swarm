@@ -12,12 +12,23 @@ import (
 	"github.com/pkg/errors"
 )
 
+type huawei struct {
+	ID       string `db:"id"`
+	Vendor   string `db:"vendor"`
+	Version  string `db:"version"`
+	IPAddr   string `db:"ip_addr"`
+	Username string `db:"username"`
+	Password string `db:"password"`
+	HluStart int    `db:"hlu_start"`
+	HluEnd   int    `db:"hlu_end"`
+}
+
 type huaweiStore struct {
 	lock   *sync.RWMutex
 	script string
 
 	orm database.StorageOrmer
-	hs  database.HuaweiStorage
+	hs  huawei
 }
 
 func (h huaweiStore) scriptPath(file string) (string, error) {
@@ -30,11 +41,14 @@ func (h huaweiStore) scriptPath(file string) (string, error) {
 }
 
 // NewHuaweiStore returns a new huawei store
-func newHuaweiStore(orm database.StorageOrmer, script string, hw database.HuaweiStorage) Store {
+func newHuaweiStore(orm database.StorageOrmer, script string, san database.SANStorage) Store {
+	hw := huawei{
+	// TODO:
+	}
 	return &huaweiStore{
 		lock:   new(sync.RWMutex),
 		orm:    orm,
-		script: filepath.Join(script, HUAWEI),
+		script: filepath.Join(script, hw.Vendor, hw.Version),
 		hs:     hw,
 	}
 }
@@ -66,14 +80,18 @@ func (h *huaweiStore) ping() error {
 }
 
 func (h *huaweiStore) insert() error {
+	san := database.SANStorage{
+	// TODO:
+	}
 	h.lock.Lock()
-	err := h.orm.InsertHuaweiStorage(h.hs)
+	err := h.orm.InsertSANStorage(san)
 	h.lock.Unlock()
 
 	return err
 }
 
 func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, database.Volume, error) {
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -147,6 +165,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, database.Volume, error) {
 	lun := database.LUN{}
 
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -209,7 +228,8 @@ func (h huaweiStore) ListLUN(nameOrVG string) ([]database.LUN, error) {
 	return h.orm.ListLunByNameOrVG(nameOrVG)
 }
 
-func (h *huaweiStore) Recycle(id string, lun int) error {
+func (h *huaweiStore) RecycleLUN(id string, lun int) error {
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -268,11 +288,16 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 		return err
 	}
 
+	if len(name) >= maxHostLen {
+		name = name[:maxHostLen]
+	}
+
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, name}
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
+	_, err = utils.ExecContextTimeout(nil, 0, debug, param...)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -289,6 +314,10 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 		return err
 	}
 
+	if len(name) >= maxHostLen {
+		name = name[:maxHostLen]
+	}
+
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, name}
 
 	h.lock.Lock()
@@ -303,6 +332,7 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 }
 
 func (h *huaweiStore) Mapping(host, vg, lun, unit string) error {
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -342,6 +372,10 @@ func (h *huaweiStore) Mapping(host, vg, lun, unit string) error {
 		return err
 	}
 
+	if len(host) >= maxHostLen {
+		host = host[:maxHostLen]
+	}
+
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val)}
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
 	if err != nil {
@@ -352,11 +386,13 @@ func (h *huaweiStore) Mapping(host, vg, lun, unit string) error {
 }
 
 func (h *huaweiStore) DelMapping(lun database.LUN) error {
+
 	path, err := h.scriptPath("del_lunmap.sh")
 	if err != nil {
 		return err
 	}
 
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 

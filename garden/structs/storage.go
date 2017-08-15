@@ -1,7 +1,8 @@
 package structs
 
 type PostSANStoreRequest struct {
-	Vendor       string
+	Vendor       string `json:"vendor"`
+	Version      string `json:"version"`
 	Addr         string `json:"ip_addr,omitempty"`
 	Username     string `json:",omitempty"`
 	Password     string `json:",omitempty"`
