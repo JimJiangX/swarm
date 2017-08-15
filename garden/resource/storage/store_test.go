@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/utils"
@@ -199,8 +198,6 @@ func testAlloc(s Store) (err error) {
 		}
 	}()
 
-	time.Sleep(time.Second * 2)
-
 	err = s.Mapping(engine, vg, lun.ID, lv.UnitID)
 	if err != nil {
 		return err
@@ -217,8 +214,6 @@ func testAlloc(s Store) (err error) {
 		}
 	}()
 
-	time.Sleep(time.Second * 2)
-
 	lun1, lv, err := s.Extend(lv, 1<<30)
 	if err != nil {
 		return err
@@ -234,8 +229,6 @@ func testAlloc(s Store) (err error) {
 			}
 		}
 	}()
-
-	time.Sleep(time.Second * 2)
 
 	if lv.Size != 3<<30 {
 		return errors.Errorf("expect volume size extend to 3G,but got %d", lv.Size)

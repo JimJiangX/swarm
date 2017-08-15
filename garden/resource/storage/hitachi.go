@@ -114,6 +114,7 @@ func (h *hitachiStore) insert() error {
 // the allocated LUN is used to creating a volume.
 // alloction calls create_lun.sh
 func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, database.Volume, error) {
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -192,6 +193,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 func (h *hitachiStore) Extend(lv database.Volume, size int64) (database.LUN, database.Volume, error) {
 	lun := database.LUN{}
 
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -258,8 +260,10 @@ func (h hitachiStore) ListLUN(nameOrVG string) ([]database.LUN, error) {
 
 // Recycle calls del_lun.sh,make the lun available for alloction.
 func (h *hitachiStore) RecycleLUN(id string, lun int) error {
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
+
 	var (
 		l   database.LUN
 		err error
@@ -400,6 +404,7 @@ func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
 		name = name[:maxHostLen]
 	}
 
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -440,6 +445,7 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 
 // Mapping calls create_lunmap.sh,associate LUN with host.
 func (h *hitachiStore) Mapping(host, vg, lun, unit string) error {
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -495,11 +501,13 @@ func (h *hitachiStore) Mapping(host, vg, lun, unit string) error {
 
 // DelMapping disassociate of the lun from host,calls del_lunmap.sh
 func (h *hitachiStore) DelMapping(lun database.LUN) error {
+
 	path, err := h.scriptPath("del_lunmap.sh")
 	if err != nil {
 		return err
 	}
 
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 

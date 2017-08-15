@@ -91,6 +91,7 @@ func (h *huaweiStore) insert() error {
 }
 
 func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, database.Volume, error) {
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -164,6 +165,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, database.Volume, error) {
 	lun := database.LUN{}
 
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -227,6 +229,7 @@ func (h huaweiStore) ListLUN(nameOrVG string) ([]database.LUN, error) {
 }
 
 func (h *huaweiStore) RecycleLUN(id string, lun int) error {
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -289,6 +292,7 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 		name = name[:maxHostLen]
 	}
 
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -328,6 +332,7 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 }
 
 func (h *huaweiStore) Mapping(host, vg, lun, unit string) error {
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
@@ -381,11 +386,13 @@ func (h *huaweiStore) Mapping(host, vg, lun, unit string) error {
 }
 
 func (h *huaweiStore) DelMapping(lun database.LUN) error {
+
 	path, err := h.scriptPath("del_lunmap.sh")
 	if err != nil {
 		return err
 	}
 
+	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
