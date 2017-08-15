@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/utils"
@@ -18,7 +19,7 @@ var (
 	ht = database.SANStorage{
 		Vendor:    HITACHI,
 		Version:   "",
-		AdminUnit: "100",
+		AdminUnit: "101",
 		LunStart:  1000,
 		LunEnd:    1200,
 		HluStart:  500,
@@ -138,6 +139,13 @@ func testStore(s Store, t *testing.T) {
 		}
 	}
 
+	info, err = s.Info()
+	if err != nil {
+		t.Errorf("%+v", err)
+	}
+
+	t.Logf("%+v", info)
+
 	err = testAlloc(s)
 	if err != nil {
 		t.Errorf("%+v", err)
@@ -191,6 +199,8 @@ func testAlloc(s Store) (err error) {
 		}
 	}()
 
+	time.Sleep(time.Second * 2)
+
 	err = s.Mapping(engine, vg, lun.ID, lv.UnitID)
 	if err != nil {
 		return err
@@ -206,6 +216,8 @@ func testAlloc(s Store) (err error) {
 			}
 		}
 	}()
+
+	time.Sleep(time.Second * 2)
 
 	lun1, lv, err := s.Extend(lv, 1<<30)
 	if err != nil {
@@ -223,16 +235,7 @@ func testAlloc(s Store) (err error) {
 		}
 	}()
 
-	defer func() {
-		_err := s.DelMapping(lun1)
-		if _err != nil {
-			if err == nil {
-				err = _err
-			} else {
-				err = fmt.Errorf("%+v\n,del mapping %d,%+v", err, lun1.HostLunID, _err)
-			}
-		}
-	}()
+	time.Sleep(time.Second * 2)
 
 	if lv.Size != 3<<30 {
 		return errors.Errorf("expect volume size extend to 3G,but got %d", lv.Size)
