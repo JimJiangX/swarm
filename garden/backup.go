@@ -15,7 +15,7 @@ import (
 // 对服务进行备份，如果指定则对指定的容器进行备份，执行ContainerExec进行备份任务。
 func (svc *Service) Backup(ctx context.Context, local string, config structs.ServiceBackupConfig, async bool, task *database.Task) error {
 	backup := func() error {
-		err := svc.checkBackupFiles(ctx, config.BackupMaxSizeByte)
+		err := svc.checkBackupFiles(ctx, config.MaxSizeByte)
 		if err != nil {
 			return err
 		}
@@ -44,7 +44,7 @@ func (svc *Service) Backup(ctx context.Context, local string, config structs.Ser
 				return errors.Errorf("%s:%s unsupport backup yet", u.u.Name, u.u.Type)
 			}
 
-			cmd = append(cmd, local+"v1.0/tasks/backup/callback", task.ID, config.Type, config.BackupDir, strconv.Itoa(config.BackupFilesRetention))
+			cmd = append(cmd, local+"v1.0/tasks/backup/callback", task.ID, config.Type, config.BackupDir, strconv.Itoa(config.FilesRetention))
 
 			_, err = u.containerExec(ctx, cmd, config.Detach)
 			if err != nil {

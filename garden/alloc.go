@@ -50,26 +50,9 @@ func getImage(orm database.ImageOrmer, version string) (database.Image, string, 
 	return im, name, nil
 }
 
-func validServiceSpec(spec structs.ServiceSpec) error {
-	if spec.Arch.Replicas == 0 {
-		return errors.New("replicas==0")
-	}
-
-	if spec.Require == nil {
-		return errors.New("require UnitRequire")
-	}
-
-	return nil
-}
-
 // BuildService build a pointer of Service,
 // 根据 ServiceSpec 生成 Service、scheduleOption、[]unit、Task，并记录到数据库。
 func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Task, error) {
-	err := validServiceSpec(spec)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	options := newScheduleOption(spec)
 
 	im, err := gd.ormer.GetImageVersion(spec.Image)
