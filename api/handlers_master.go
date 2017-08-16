@@ -1549,7 +1549,7 @@ func vaildPostServiceRequest(spec structs.ServiceSpec) error {
 		errs = append(errs, fmt.Sprintf("Arch invaild,%+v", spec.Arch))
 	}
 
-	if spec.Require == nil || spec.Require.Limit.CPU == 0 || spec.Require.Limit.Memory == 0 {
+	if spec.Require == nil || spec.Require.Require.CPU == 0 || spec.Require.Require.Memory == 0 {
 		errs = append(errs, "unit require is nil")
 	}
 
