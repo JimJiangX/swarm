@@ -172,17 +172,11 @@ func ExecScript(args ...string) *exec.Cmd {
 
 // ExecContext returns a context command to execute a script.
 func ExecContext(ctx context.Context, args ...string) *exec.Cmd {
-	var shell, flag string
+	shell, flag := "/bin/bash", "-c"
+
 	if runtime.GOOS == "windows" {
 		shell = "cmd"
 		flag = "/C"
-	} else {
-		shell = "/bin/sh"
-		flag = "-c"
-	}
-
-	if other := os.Getenv("SHELL"); other != "" {
-		shell = other
 	}
 
 	return exec.CommandContext(ctx, shell, flag, strings.Join(args, " "))

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/utils"
@@ -220,6 +221,8 @@ func testAlloc(s Store) (err error) {
 	}
 
 	defer func() {
+		time.Sleep(5 * time.Second)
+
 		_err := s.RecycleLUN(lun1.ID, 0)
 		if _err != nil {
 			if err == nil {

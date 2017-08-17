@@ -1,6 +1,10 @@
 package database
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/docker/swarm/garden/utils"
+)
 
 func TestCombin(t *testing.T) {
 	tests := []NetworkingRequire{
@@ -42,4 +46,95 @@ func TestCombin(t *testing.T) {
 	}
 
 	t.Log(out)
+}
+
+func TestNetworking(t *testing.T) {
+	if ormer == nil {
+		t.Skip("orm:db is required")
+	}
+
+	networks := []string{utils.Generate64UUID(), utils.Generate64UUID()}
+	ips := make([]IP, 50)
+
+	for i := range ips {
+		ips[i].IPAddr = 3232237000 + uint32(i)
+		ips[i].Prefix = 24
+
+		ips[i].Networking = networks[i&0x01]
+
+		ips[i].Gateway = utils.Generate32UUID()
+		ips[i].Enabled = i&0x03 != 3
+		ips[i].VLAN = i&0x01 + 1
+	}
+
+	err := ormer.InsertNetworking(ips)
+	if err != nil {
+		t.Errorf("%+v", err)
+	}
+
+	for i := range networks {
+		defer func(id string) {
+			err := ormer.DelNetworking(id)
+			if err != nil {
+				t.Errorf("%+v", err)
+			}
+		}(networks[i])
+	}
+
+	req := []NetworkingRequire{
+		{
+			Networking: networks[0],
+			Bond:       utils.Generate16UUID(),
+			Bandwidth:  1000,
+		},
+		{
+			Networking: networks[0],
+			Bond:       utils.Generate16UUID(),
+			Bandwidth:  1000,
+		},
+		{
+			Networking: networks[0],
+			Bond:       utils.Generate16UUID(),
+			Bandwidth:  1000,
+		},
+		{
+			Networking: networks[0],
+			Bond:       utils.Generate16UUID(),
+			Bandwidth:  1000,
+		},
+		{
+			Networking: networks[1],
+			Bond:       utils.Generate16UUID(),
+			Bandwidth:  1000,
+		},
+		{
+			Networking: networks[1],
+			Bond:       utils.Generate16UUID(),
+			Bandwidth:  1000,
+		},
+		{
+			Networking: networks[1],
+			Bond:       utils.Generate16UUID(),
+			Bandwidth:  1000,
+		},
+	}
+
+	out, err := ormer.AllocNetworking(utils.Generate64UUID(), utils.Generate128UUID(), req)
+	if err != nil {
+		t.Errorf("%+v", err)
+	}
+
+	if len(out) != len(req) {
+		t.Errorf("expected %d but got %d", len(out), len(req))
+	}
+
+	err = ormer.DelNetworking(networks[0])
+	if err == nil {
+		t.Error("expected del networking failed,networking in used")
+	}
+
+	err = ormer.ResetIPs(out)
+	if err != nil {
+		t.Errorf("%+v", err)
+	}
 }

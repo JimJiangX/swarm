@@ -315,9 +315,11 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 // -----------------/datacenter handler-----------------
 func vaildDatacenter(v structs.RegisterDC) error {
+	// TODO:
 	return nil
 }
 
+// TODO:remove this?
 func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	req := structs.RegisterDC{}
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -1541,9 +1543,23 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 }
 
 func vaildPostServiceRequest(spec structs.ServiceSpec) error {
-	errs := make([]string, 0, 5)
+	errs := make([]string, 0, 4)
 
-	// TODO:check params
+	if spec.Arch.Code == "" || spec.Arch.Mode == "" || spec.Arch.Replicas == 0 {
+		errs = append(errs, fmt.Sprintf("Arch invaild,%+v", spec.Arch))
+	}
+
+	if spec.Require == nil || spec.Require.Require.CPU == 0 || spec.Require.Require.Memory == 0 {
+		errs = append(errs, "unit require is nil")
+	}
+
+	if len(spec.Require.Networks) > 0 && len(spec.Networkings) == 0 {
+		errs = append(errs, "networkings is required")
+	}
+
+	if len(spec.Clusters) == 0 {
+		errs = append(errs, "clusters is required")
+	}
 
 	if len(errs) == 0 {
 		return nil
@@ -1608,15 +1624,12 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func vaildPostServiceScaledRequest(v structs.ServiceScaleRequest) error {
-	errs := make([]string, 0, 5)
 
-	// TODO:check params
-
-	if len(errs) == 0 {
-		return nil
+	if v.Arch.Code == "" || v.Arch.Mode == "" || v.Arch.Replicas == 0 {
+		return fmt.Errorf("Arch invaild,%+v", v.Arch)
 	}
 
-	return fmt.Errorf("ServiceScaleRequest:%v,%s", v, errs)
+	return nil
 }
 
 func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1666,9 +1679,17 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 }
 
 func vaildPostServiceLinkRequest(v structs.ServicesLink) error {
-	errs := make([]string, 0, 5)
+	if v.Len() == 0 {
+		return fmt.Errorf("invaild params")
+	}
 
-	// TODO:check params
+	errs := make([]string, 0, 3)
+
+	for i := range v {
+		if v[i] != nil && v[i].ID == "" {
+			errs = append(errs, "ServiceLink.ID is required")
+		}
+	}
 
 	if len(errs) == 0 {
 		return nil
@@ -1760,19 +1781,11 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 }
 
 func vaildPostServiceUpdateRequest(v structs.UnitRequire) error {
-	errs := make([]string, 0, 5)
-
 	if v.Require.CPU == 0 && v.Require.Memory == 0 && len(v.Volumes) == 0 {
-		errs = append(errs, "no resource update required")
+		return fmt.Errorf("UnitRequire:%v,%s", v, "no resource update required")
 	}
 
-	// TODO:check params
-
-	if len(errs) == 0 {
-		return nil
-	}
-
-	return fmt.Errorf("UnitRequire:%v,%s", v, errs)
+	return nil
 }
 
 func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2084,12 +2097,22 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func vaildPostServiceBackupRequest(v structs.ServiceBackupConfig) error {
-	errs := make([]string, 0, 3)
+	errs := make([]string, 0, 4)
 
-	// TODO:check params
+	if v.BackupDir == "" {
+		errs = append(errs, "BackupDir is required")
+	}
 
-	if len(errs) == 0 {
-		return nil
+	if v.Type == "" {
+		errs = append(errs, "Type is required")
+	}
+
+	if v.MaxSizeByte <= 0 {
+		errs = append(errs, "MaxSizeByte is required")
+	}
+
+	if v.FilesRetention == 0 {
+		errs = append(errs, "FilesRetention is required")
 	}
 
 	return fmt.Errorf("ServiceBackupConfig:%v,%s", v, errs)
@@ -2154,15 +2177,11 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 }
 
 func vaildPostServiceRestoreRequest(v structs.ServiceRestoreRequest) error {
-	errs := make([]string, 0, 2)
-
-	// TODO:check params
-
-	if len(errs) == 0 {
+	if v.File != "" {
 		return nil
 	}
 
-	return fmt.Errorf("ServiceRestoreRequest:%v,%s", v, errs)
+	return fmt.Errorf("ServiceRestoreRequest:%v,restore file is required", v)
 }
 
 func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2224,17 +2243,11 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 }
 
 func vaildPostUnitRebuildRequest(v structs.UnitRebuildRequest) error {
-	errs := make([]string, 0, 1)
-
 	if len(v.Units) < 1 {
-		errs = append(errs, "Units is required")
+		return stderr.New("Units is required")
 	}
 
-	if len(errs) == 0 {
-		return nil
-	}
-
-	return fmt.Errorf("UnitRebuildRequest:%v,%s", v, errs)
+	return nil
 }
 
 func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2289,17 +2302,11 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 }
 
 func vaildPostUnitMigrateRequest(v structs.PostUnitMigrate) error {
-	errs := make([]string, 0, 1)
-
 	if v.NameOrID == "" {
-		errs = append(errs, "Unit name or ID is required")
+		return stderr.New("Unit name or ID is required")
 	}
 
-	if len(errs) == 0 {
-		return nil
-	}
-
-	return fmt.Errorf("PostUnitMigrate:%v,%s", v, errs)
+	return nil
 }
 
 func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2488,9 +2495,16 @@ func getSanStoreInfo(store storage.Store) (structs.SANStorageResponse, error) {
 }
 
 func vaildPostSanStorageRequest(v structs.PostSANStoreRequest) error {
-	errs := make([]string, 0, 3)
+	errs := make([]string, 0, 2)
 
-	// TODO:check params
+	if v.Vendor == "" {
+		errs = append(errs, "Vendor is required")
+	}
+
+	if v.HostLunStart < v.HostLunEnd || v.HostLunEnd < 0 {
+		errs = append(errs, "host_lun_end or host_lun_start is invaild")
+
+	}
 
 	if len(errs) == 0 {
 		return nil
