@@ -1,9 +1,8 @@
 package parser
 
 import (
-	"fmt"
-
 	"github.com/docker/swarm/garden/structs"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -69,5 +68,5 @@ func factory(name string) (parser, error) {
 		return temp, nil
 	}
 
-	return nil, fmt.Errorf("Unsupported image %s yet", name)
+	return nil, errors.Errorf("Unsupported image %s yet", name)
 }

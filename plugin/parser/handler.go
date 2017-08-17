@@ -35,9 +35,9 @@ func NewRouter(c kvstore.Client, dir, ip string, port int) *mux.Router {
 
 	ctx := &_Context{
 		client:    c,
-		scriptDir: dir,
 		mgmIP:     ip,
 		mgmPort:   port,
+		scriptDir: dir,
 	}
 
 	var routes = map[string]map[string]handler{
@@ -94,7 +94,7 @@ func getImage(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	path = append(path, strings.SplitN(name, ":", 2)...)
 	key := strings.Join(path, "/")
 
-	pair, err := ctx.client.GetKV(r.Context(), key)
+	pair, err := ctx.client.GetKV(ctx.context, key)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -121,7 +121,7 @@ func getConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	service := mux.Vars(r)["service"]
 	key := strings.Join([]string{configKey, service}, "/")
 
-	pairs, err := ctx.client.ListKV(r.Context(), key)
+	pairs, err := ctx.client.ListKV(ctx.context, key)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -144,7 +144,7 @@ func getConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	key := strings.Join([]string{configKey, service, unit}, "/")
 
 	// structs.ConfigCmds,encode by JSON
-	pair, err := ctx.client.GetKV(r.Context(), key)
+	pair, err := ctx.client.GetKV(ctx.context, key)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -159,7 +159,7 @@ func getCommands(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	service := mux.Vars(r)["service"]
 	key := strings.Join([]string{configKey, service}, "/")
 
-	pairs, err := ctx.client.ListKV(r.Context(), key)
+	pairs, err := ctx.client.ListKV(ctx.context, key)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -216,7 +216,7 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	path = append(path, strings.SplitN(req.Image, ":", 2)...)
 
 	key := strings.Join(path, "/")
-	err = ctx.client.PutKV(r.Context(), key, dat)
+	err = ctx.client.PutKV(ctx.context, key, dat)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -251,7 +251,7 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	key := strings.Join([]string{imageKey, image, version}, "/")
-	pair, err := ctx.client.GetKV(r.Context(), key)
+	pair, err := ctx.client.GetKV(ctx.context, key)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -283,7 +283,7 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		resp[req.Units[i].ID] = cc
 	}
 
-	err = putConfigsToKV(r.Context(), ctx.client, req.ID, resp)
+	err = putConfigsToKV(ctx.context, ctx.client, req.ID, resp)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -373,7 +373,7 @@ func generateConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	key := strings.Join([]string{imageKey, image, version}, "/")
-	pair, err := ctx.client.GetKV(r.Context(), key)
+	pair, err := ctx.client.GetKV(ctx.context, key)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -402,7 +402,7 @@ func generateConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	resp := make(structs.ConfigsMap)
 	resp[unit.ID] = cc
 
-	err = putConfigsToKV(r.Context(), ctx.client, req.ID, resp)
+	err = putConfigsToKV(ctx.context, ctx.client, req.ID, resp)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -434,7 +434,7 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	case 1:
 		for _, c := range req {
 			key := strings.Join([]string{configKey, service, c.ID}, "/")
-			pair, err := ctx.client.GetKV(r.Context(), key)
+			pair, err := ctx.client.GetKV(ctx.context, key)
 			if err != nil {
 				httpError(w, err, http.StatusInternalServerError)
 				return
@@ -443,7 +443,7 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		}
 	default:
 		key := strings.Join([]string{configKey, service}, "/")
-		pairs, err = ctx.client.ListKV(r.Context(), key)
+		pairs, err = ctx.client.ListKV(ctx.context, key)
 		if err != nil {
 			httpError(w, err, http.StatusInternalServerError)
 			return
@@ -502,7 +502,7 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		out[id] = c
 	}
 
-	err = putConfigsToKV(r.Context(), ctx.client, service, out)
+	err = putConfigsToKV(ctx.context, ctx.client, service, out)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return

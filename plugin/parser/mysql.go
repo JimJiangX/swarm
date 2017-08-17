@@ -128,19 +128,17 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 func (c mysqlConfig) GenerateCommands(id string, desc structs.ServiceSpec) (structs.CmdsMap, error) {
 	cmds := make(structs.CmdsMap, 6)
 
-	users := make([]string, 0, len(desc.Users)*4)
-
-	for _, u := range desc.Users {
-		users = append(users, u.Role, u.Name, u.Password, u.Privilege)
-	}
+	//	users := make([]string, 0, len(desc.Users)*4)
+	//	for _, u := range desc.Users {
+	//		users = append(users, u.Role, u.Name, u.Password, u.Privilege)
+	//	}
+	//	init := make([]string, 1+len(users))
+	//	init[0] = "/root/mysql-init.sh"
+	//	copy(init[1:], users)
 
 	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
 
-	init := make([]string, 1+len(users))
-	init[0] = "/root/mysql-init.sh"
-	copy(init[1:], users)
-
-	cmds[structs.InitServiceCmd] = init
+	cmds[structs.InitServiceCmd] = []string{"/root/mysql-init.sh"}
 
 	cmds[structs.StartServiceCmd] = []string{"/root/mysql.service", "start"}
 
