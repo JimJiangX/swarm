@@ -849,47 +849,8 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register, force bool) 
 }
 
 func (svc *Service) removeContainers(ctx context.Context, units []*unit, force, rmVolumes bool) error {
-
 	for _, u := range units {
-		engine := u.getEngine()
-		if engine == nil {
-			continue
-		}
-
-		id := u.containerIDOrName()
-
-		fields := logrus.WithFields(logrus.Fields{
-			"Service":   svc.svc.Name,
-			"Engine":    engine.Addr,
-			"Container": id,
-		})
-
-		fields.Info("remove container...")
-
-		c := u.getContainer()
-		if c == nil {
-			err := engine.RemoveContainer(&cluster.Container{
-				Container: types.Container{ID: id}}, force, rmVolumes)
-			if err != nil {
-				fields.Errorf("remove container:%+v", err)
-
-				if !engine.IsHealthy() && force {
-					continue
-				}
-
-				return err
-			}
-		}
-
-		if !force {
-			timeout := 30 * time.Second
-			err := engine.StopContainer(ctx, c.ID, &timeout)
-			if err != nil {
-				return err
-			}
-		}
-
-		err := engine.RemoveContainer(c, force, rmVolumes)
+		err := u.removeContainer(ctx, rmVolumes, force)
 		if err != nil {
 			return err
 		}

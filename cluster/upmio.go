@@ -58,9 +58,6 @@ func (e *Engine) StopContainer(ctx context.Context, name string, timeout *time.D
 		return errors.WithStack(err)
 	}
 
-	// refresh the container in the cache
-	_, err = e.refreshContainer(container.ID, true)
-
 	return err
 }
 
