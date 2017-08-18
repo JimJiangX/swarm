@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/discovery"
 	kvdiscovery "github.com/docker/docker/pkg/discovery/kv"
@@ -219,10 +220,19 @@ func run(cl cluster.Cluster, candidate *leadership.Candidate, server *api.Server
 			if isElected {
 				log.Info("Leader Election: Cluster leadership acquired")
 				watchdog = cluster.NewWatchdog(cl)
-				eh = garden.NewEventHandler(ormer)
-				cl.RegisterEventHandler(eh, nil)
 
 				server.SetHandler(primary)
+
+				if ormer != nil {
+					eh = garden.NewEventHandler(ormer)
+					cl.RegisterEventHandler(eh, nil)
+
+					logrus.Info("mark running tasks")
+					err := ormer.MarkRunningTasks()
+					if err != nil {
+						logrus.Errorf("%+v", err)
+					}
+				}
 			} else {
 				log.Info("Leader Election: Cluster leadership lost")
 				cl.UnregisterEventHandler(watchdog)

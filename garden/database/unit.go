@@ -34,8 +34,6 @@ type ContainerIface interface {
 	UnitContainerCreated(name, containerID, engineID, mode string, state int) error
 
 	SetUnitByContainer(containerID string, state int) error
-
-	MarkRunningTasks() error
 }
 
 type UnitOrmer interface {
