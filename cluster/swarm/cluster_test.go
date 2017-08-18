@@ -14,7 +14,6 @@ import (
 	"github.com/docker/docker/api/types/volume"
 	engineapimock "github.com/docker/swarm/api/mockclient"
 	"github.com/docker/swarm/cluster"
-	"github.com/samalba/dockerclient/mockclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -136,7 +135,6 @@ func TestImportImage(t *testing.T) {
 	engine.ID = id + "|" + engine.Addr
 
 	// create mock client
-	client := mockclient.NewMockClient()
 	apiClient := engineapimock.NewMockClient()
 	apiClient.On("Info", mock.Anything).Return(mockInfo, nil)
 	apiClient.On("ServerVersion", mock.Anything).Return(mockVersion, nil)
@@ -147,9 +145,10 @@ func TestImportImage(t *testing.T) {
 	apiClient.On("Events", mock.Anything, mock.AnythingOfType("EventsOptions")).Return(make(chan events.Message), make(chan error))
 	apiClient.On("ImageList", mock.Anything, mock.AnythingOfType("ImageListOptions")).Return([]types.ImageSummary{}, nil)
 	apiClient.On("ContainerList", mock.Anything, types.ContainerListOptions{All: true, Size: false}).Return([]types.Container{}, nil).Once()
+	apiClient.On("NegotiateAPIVersion", mock.Anything).Return()
 
 	// connect client
-	engine.ConnectWithClient(client, apiClient)
+	engine.ConnectWithClient(apiClient)
 
 	// add engine to cluster
 	c.engines[engine.ID] = engine
@@ -189,7 +188,6 @@ func TestLoadImage(t *testing.T) {
 	engine.ID = id
 
 	// create mock client
-	client := mockclient.NewMockClient()
 	apiClient := engineapimock.NewMockClient()
 	apiClient.On("Info", mock.Anything).Return(mockInfo, nil)
 	apiClient.On("ServerVersion", mock.Anything).Return(mockVersion, nil)
@@ -200,9 +198,10 @@ func TestLoadImage(t *testing.T) {
 	apiClient.On("Events", mock.Anything, mock.AnythingOfType("EventsOptions")).Return(make(chan events.Message), make(chan error))
 	apiClient.On("ImageList", mock.Anything, mock.AnythingOfType("ImageListOptions")).Return([]types.ImageSummary{}, nil)
 	apiClient.On("ContainerList", mock.Anything, types.ContainerListOptions{All: true, Size: false}).Return([]types.Container{}, nil).Once()
+	apiClient.On("NegotiateAPIVersion", mock.Anything).Return()
 
 	// connect client
-	engine.ConnectWithClient(client, apiClient)
+	engine.ConnectWithClient(apiClient)
 
 	// add engine to cluster
 	c.engines[engine.ID] = engine
@@ -246,7 +245,6 @@ func TestTagImage(t *testing.T) {
 	engine.ID = id + "|" + engine.Addr
 
 	// create mock client
-	client := mockclient.NewMockClient()
 	apiClient := engineapimock.NewMockClient()
 	apiClient.On("Info", mock.Anything).Return(mockInfo, nil)
 	apiClient.On("ServerVersion", mock.Anything).Return(mockVersion, nil)
@@ -257,9 +255,10 @@ func TestTagImage(t *testing.T) {
 	apiClient.On("Events", mock.Anything, mock.AnythingOfType("EventsOptions")).Return(make(chan events.Message), make(chan error))
 	apiClient.On("ImageList", mock.Anything, mock.AnythingOfType("ImageListOptions")).Return(images, nil)
 	apiClient.On("ContainerList", mock.Anything, types.ContainerListOptions{All: true, Size: false}).Return([]types.Container{}, nil).Once()
+	apiClient.On("NegotiateAPIVersion", mock.Anything).Return()
 
 	// connect client
-	engine.ConnectWithClient(client, apiClient)
+	engine.ConnectWithClient(apiClient)
 
 	// add engine to cluster
 	c.engines[engine.ID] = engine

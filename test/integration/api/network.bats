@@ -16,12 +16,6 @@ function teardown() {
 }
 
 @test "docker network ls --filter type" {
-	# docker network ls --filter type is introduced in docker 1.10, skip older version without --filter type
-	run docker --version
-	if [[ "${output}" != "Docker version 1.1"* ]]; then
-		skip
-	fi
-
 	start_docker 2
 	swarm_manage
 
@@ -44,12 +38,6 @@ function teardown() {
 
 # docker network ls --filter node returns networks that are present on a specific node
 @test "docker network ls --filter node" {
-	# docker network ls --filter type is introduced in docker 1.10, skip older version without --filter type
-	run docker --version
-	if [[ "${output}" != "Docker version 1.1"* ]]; then
-		skip
-	fi
-
 	start_docker 2
 	swarm_manage
 
@@ -60,12 +48,40 @@ function teardown() {
 	[ "${#lines[@]}" -eq 4 ]
 }
 
+# docker network ls --filter name returns networks that match with a provided name
+@test "docker network ls --filter name" {
+	# don't bother running this for older versions
+	run docker --version
+	if [[ "${output}" == "Docker version 1.12"* || "${output}" == "Docker version 1.13"* ]]; then
+			skip
+	fi
+
+	start_docker 2
+	swarm_manage
+
+	run docker_swarm network create networknameone
+	run docker_swarm network create networknametwo
+
+	run docker_swarm network ls
+	echo $output
+
+	run docker_swarm network ls --filter name=networkname
+	echo $output
+	[ "${#lines[@]}" -eq 3 ]
+}
 
 @test "docker network inspect" {
 	# Docker 1.12 client shows "Attachable" and "Created" fields while docker daemon 1.12
 	# doesn't return them. Network inspect from Swarm is different from daemon.
 	run docker --version
 	if [[ "${output}" == "Docker version 1.12"* ]]; then
+		skip
+	fi
+
+	# Docker 1.13, 17.03 client shows "Ingress" and "ConfigFrom" fields while docker daemon 1.13
+	# doesn't return them. Network inspect from Swarm is different from daemon.
+	run docker --version
+	if [[ "${output}" == "Docker version 1.13"* || "${output}" == "Docker version 17.03"* ]]; then
 		skip
 	fi
 
@@ -80,6 +96,12 @@ function teardown() {
 
 	run docker_swarm network inspect node-0/bridge
 	[[ "${output}" != *"\"Containers\": {}"* ]]
+
+	run docker_swarm network inspect node-0/bridge
+	echo "FIRSTINSPECT $output"
+
+	run docker -H ${HOSTS[0]} network inspect bridge
+	echo "SECONDINSPECT $output"
 
 	diff <(docker_swarm network inspect node-0/bridge) <(docker -H ${HOSTS[0]} network inspect bridge)
 }
@@ -149,12 +171,6 @@ function teardown() {
 }
 
 @test "docker network connect --ip" {
-	# docker network connect --ip is introduced in docker 1.10, skip older version without --ip
-	run docker network connect --help
-	if [[ "${output}" != *"--ip"* ]]; then
-		skip
-	fi
-
 	start_docker_with_busybox 1
 	swarm_manage
 
@@ -176,12 +192,6 @@ function teardown() {
 }
 
 @test "docker network connect --alias" {
-	# docker network connect --alias is introduced in docker 1.10, skip older version without --alias
-	run docker network connect --help
-	if [[ "${output}" != *"--alias"* ]]; then
-		skip
-	fi
-
 	start_docker_with_busybox 1
 	swarm_manage
 

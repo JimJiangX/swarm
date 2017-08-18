@@ -33,6 +33,14 @@ function teardown() {
 	# run with --rm
 	docker_swarm run --rm busybox echo hello
 	[ "$status" -eq 0 ]
+	docker_swarm run --rm busybox echo hello
+	[ "$status" -eq 0 ]
+	docker_swarm run --rm busybox echo hello
+	[ "$status" -eq 0 ]
+
+	# check that containers were removed
+	docker_swarm ps -aq
+	[ "${#lines[@]}" -eq  1 ]
 }
 
 @test "docker run with image digest" {
@@ -109,12 +117,6 @@ function teardown() {
 	# stop-signal
 	[[ "${output}" == *"\"StopSignal\": \"SIGKILL\""* ]]
 
-	# following options are introduced in docker 1.10, skip older version
-	run docker --version
-	if [[ "${output}" == "Docker version 1.9"* ]]; then
-		skip
-	fi
-
 	docker_swarm run -d --name test_container2 \
 			 --oom-score-adj=350 \
 			 --tmpfs=/tempfs:rw \
@@ -140,13 +142,6 @@ function teardown() {
 }
 
 @test "docker run --ip" {
-	# docker run --ip is introduced in docker 1.10, skip older version without --ip
-	# look for --ip6 because --ip will match --ipc
-	run docker run --help
-	if [[ "${output}" != *"--ip6"* ]]; then
-		skip
-	fi
-
 	start_docker_with_busybox 1
 	swarm_manage
 
@@ -157,19 +152,13 @@ function teardown() {
 	[[ "${output}" == *"10.0.0.42"* ]]
 }
 
-@test "docker run --net-alias" {
-	# docker run --net-alias is introduced in docker 1.10, skip older version without --net-alias
-	run docker run --help
-	if [[ "${output}" != *"--net-alias"* ]]; then
-		skip
-	fi
-
+@test "docker run --network-alias" {
 	start_docker_with_busybox 1
 	swarm_manage
 
 	docker_swarm network create -d bridge testn
 
-	docker_swarm run --name testc --net testn -d --net-alias=testa busybox sh
+	docker_swarm run --name testc --net testn -d --network-alias=testa busybox sh
 	run docker_swarm inspect testc
 	[[ "${output}" == *"testa"* ]]
 }
@@ -219,7 +208,8 @@ function teardown() {
 
 	# check error message
 	[[ "${output}" != *"unable to find a node that satisfies the constraint"* ]]
-	[[ "${output}" == *"not found"* ]]
+	# the error message changed sometime after 1.13, so we need to check both cases
+	[[ "${output}" == *"repository does not exist"* || "${output}" == *"not found"* ]]
 }
 
 @test "docker run - constraint and soft affinities" {

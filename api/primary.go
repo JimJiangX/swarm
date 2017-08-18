@@ -14,7 +14,7 @@ import (
 // Primary router context, used by handlers.
 type context struct {
 	cluster       cluster.Cluster
-	eventsHandler *eventsHandler
+	eventsHandler *cluster.APIEventHandler
 	statusHandler StatusHandler
 	debug         bool
 	tlsConfig     *tls.Config
@@ -117,7 +117,9 @@ func profilerSetup(mainRouter *mux.Router, path string) {
 // NewPrimary creates a new API router.
 func NewPrimary(cluster cluster.Cluster, tlsConfig *tls.Config, status StatusHandler, debug, enableCors bool) *mux.Router {
 	// Register the API events handler in the cluster.
-	eventsHandler := newEventsHandler()
+
+	// eventsHandler is the handler for API events
+	eventsHandler := cluster.NewAPIEventHandler()
 	cluster.RegisterEventHandler(eventsHandler)
 
 	context := &context{
@@ -151,6 +153,7 @@ func setupPrimaryRouter(r *mux.Router, context *context, enableCors bool) {
 					writeCorsHeaders(w, r)
 				}
 				context.apiVersion = mux.Vars(r)["version"]
+				w.Header().Set("API-Version", APIVERSION)
 				localFct(context, w, r)
 			}
 			localMethod := method
@@ -169,6 +172,7 @@ func setupPrimaryRouter(r *mux.Router, context *context, enableCors bool) {
 						writeCorsHeaders(w, r)
 					}
 					context.apiVersion = mux.Vars(r)["version"]
+					w.Header().Set("API-Version", APIVERSION)
 					optionsFct(context, w, r)
 				}
 

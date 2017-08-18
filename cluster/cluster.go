@@ -5,7 +5,6 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/volume"
-	"github.com/samalba/dockerclient"
 )
 
 // Cluster is exported
@@ -23,13 +22,13 @@ type Cluster interface {
 	Image(IDOrName string) *Image
 
 	// RemoveImages removes images from the cluster.
-	RemoveImages(name string, force bool) ([]types.ImageDelete, error)
+	RemoveImages(name string, force bool) ([]types.ImageDeleteResponseItem, error)
 
 	// Containers returns all containers.
 	Containers() Containers
 
 	// StartContainer starts a container.
-	StartContainer(container *Container, hostConfig *dockerclient.HostConfig) error
+	StartContainer(container *Container) error
 
 	// Container returns the container matching `IDOrName`.
 	// TODO: remove this method from the interface as we can use
@@ -81,6 +80,14 @@ type Cluster interface {
 
 	// UnregisterEventHandler unregisters an event handler.
 	UnregisterEventHandler(h EventHandler)
+
+	// NewAPIEventHandler creates a new API events handler
+	NewAPIEventHandler() *APIEventHandler
+
+	// CloseWatchQueues unregisters all API event handlers (the ones with
+	// watch queues) and closes the respective queues. This should be
+	// called when the manager shuts down
+	CloseWatchQueues()
 
 	// FIXME: remove this method
 	// RANDOMENGINE returns a random engine.
