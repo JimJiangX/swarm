@@ -393,7 +393,7 @@ func (c *Cluster) validatePendingEngine(engine *cluster.Engine) bool {
 func (c *Cluster) removeEngine(addr string) bool {
 	engine := c.getEngineByAddr(addr)
 	if engine == nil {
-		return false
+		return true
 	}
 	engine.Disconnect()
 
