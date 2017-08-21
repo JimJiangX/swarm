@@ -2047,7 +2047,7 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	task := database.NewTask(spec.Name, database.ServiceStopTask, spec.ID, spec.Desc, nil, 300)
 
-	err = svc.Stop(ctx, false, true, &task)
+	err = svc.Stop(ctx, true, true, &task)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 113, "fail to stop service", "服务关闭错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)

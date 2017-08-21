@@ -191,6 +191,10 @@ func (u unit) startContainer(ctx context.Context) error {
 		return errors.WithStack(newNotFound("Container", u.u.Name))
 	}
 
+	if c.Info.State != nil && c.Info.State.Running {
+		return nil
+	}
+
 	select {
 	default:
 	case <-ctx.Done():
