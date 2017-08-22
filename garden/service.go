@@ -796,7 +796,7 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register, force bool) 
 		if !force && svc.svc.Status >= statusServiceContainerCreating {
 			// check engines whether is alive before really delete
 			for _, u := range units {
-				if e := u.getEngine(); e == nil {
+				if e := u.getEngine(); e == nil && u.u.EngineID != "" {
 					return errors.Errorf("Engine %s is unhealthy", u.u.EngineID)
 				}
 			}

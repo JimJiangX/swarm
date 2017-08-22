@@ -266,7 +266,7 @@ func (u unit) stopContainer(ctx context.Context) error {
 func (u unit) removeContainer(ctx context.Context, rmVolumes, force bool) error {
 	engine := u.getEngine()
 	if engine == nil {
-		if force {
+		if force || u.u.EngineID == "" {
 			return nil
 		}
 
