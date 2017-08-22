@@ -128,11 +128,6 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 			if err != nil {
 				return err
 			}
-
-			err = updateUnitRegister(ctx, gd.kvClient, old.unit, news.unit, cms)
-			if err != nil {
-				return err
-			}
 		}
 		{
 			// clean old
@@ -142,6 +137,11 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 			}
 
 			err = svc.Compose(ctx, gd.pluginClient)
+			if err != nil {
+				return err
+			}
+
+			err = svc.so.MigrateUnit(news.unit.u.ID, old.unit.u.ID)
 			if err != nil {
 				return err
 			}

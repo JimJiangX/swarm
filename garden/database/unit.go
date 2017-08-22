@@ -3,7 +3,6 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -25,7 +24,7 @@ type UnitIface interface {
 	SetUnitStatus(u *Unit, status int, msg string) error
 	SetUnitAndTask(u *Unit, t *Task, msg string) error
 	SetUnits(units []Unit) error
-	// SetMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error
+	MigrateUnit(new, old string) error
 
 	DelUnitsRelated(units []Unit, volume bool) error
 }
@@ -398,23 +397,41 @@ func (db dbBase) CountUnitsInEngines(engines []string) (int, error) {
 	return count, errors.Wrap(err, "cound Units by engines")
 }
 
-// SetMigrateUnit update Unit and delete old LocalVolumes in a Tx
-func (db dbBase) SetMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error {
-	// update database Unit
-	// delete old localVolumes
-	do := func(tx *sqlx.Tx) error {
-		for i := range lvs {
-			if reserveSAN && strings.HasSuffix(lvs[i].VG, "_SAN_VG") {
-				continue
-			}
+func (db dbBase) MigrateUnit(new, old string) error {
 
-			err := db.txDelVolume(tx, lvs[i].ID)
-			if err != nil {
-				return err
-			}
+	do := func(tx *sqlx.Tx) error {
+		u := Unit{}
+		query := "SELECT id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at FROM " + db.unitTable() + " WHERE id=? OR name=?"
+
+		err := tx.Get(&u, query, new, new)
+		if err != nil {
+			return errors.Wrap(err, "Get Unit By nameOrID")
 		}
 
-		return db.txSetUnit(tx, u)
+		query = "UPDATE " + db.ipTable() + " SET unit_id=? WHERE unit_id=?"
+		_, err = tx.Exec(query, old, new)
+		if err != nil {
+			return errors.Wrap(err, "set ips")
+		}
+
+		query = "UPDATE " + db.volumeTable() + " SET unit_id=? WHERE unit_id=?"
+		_, err = db.Exec(query, old, new)
+		if err != nil {
+			return errors.Wrap(err, "set volume")
+		}
+
+		query = "UPDATE" + db.unitTable() + "SET type=?,engine_id=?,container_id=?,status=? WHERE id=? OR name=?"
+		_, err = db.Exec(query, u.Type, u.EngineID, u.ContainerID, u.Status, old, old)
+		if err != nil {
+			return errors.Wrap(err, "set unit")
+		}
+
+		err = db.txDelUnit(tx, new)
+		if err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	return db.txFrame(do)
@@ -424,7 +441,6 @@ func (db dbBase) DelUnitsRelated(units []Unit, volume bool) error {
 	do := func(tx *sqlx.Tx) error {
 
 		for i := range units {
-
 			u := Unit{}
 			query := "SELECT id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at FROM " + db.unitTable() + " WHERE id=? OR name=? OR container_id=?"
 
