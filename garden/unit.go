@@ -11,7 +11,6 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/structs"
@@ -279,7 +278,7 @@ func (u unit) removeContainer(ctx context.Context, rmVolumes, force bool) error 
 		err := engine.RemoveContainer(&cluster.Container{
 			Container: types.Container{ID: u.containerIDOrName()}}, force, rmVolumes)
 		if err != nil {
-			if client.IsErrContainerNotFound(err) || (force && !engine.IsHealthy()) {
+			if cluster.IsErrContainerNotFound(err) || (force && !engine.IsHealthy()) {
 				return nil
 			}
 
@@ -291,7 +290,7 @@ func (u unit) removeContainer(ctx context.Context, rmVolumes, force bool) error 
 		timeout := 30 * time.Second
 		err := engine.StopContainer(ctx, c.ID, &timeout)
 		if err != nil {
-			if client.IsErrContainerNotFound(err) {
+			if cluster.IsErrContainerNotFound(err) {
 				return nil
 			}
 
@@ -300,11 +299,11 @@ func (u unit) removeContainer(ctx context.Context, rmVolumes, force bool) error 
 	}
 
 	err := engine.RemoveContainer(c, force, rmVolumes)
-	if err != nil && client.IsErrContainerNotFound(err) {
+	if err != nil && cluster.IsErrContainerNotFound(err) {
 		return nil
 	}
 
-	return err
+	return errors.WithStack(err)
 }
 
 func (u unit) removeVolumes(ctx context.Context) error {

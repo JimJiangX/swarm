@@ -3,6 +3,7 @@ package cluster
 import (
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -13,6 +14,24 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
+
+// IsErrContainerNotFound returns true if the error is caused
+// when a container is not found in the docker host.
+func IsErrContainerNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if client.IsErrContainerNotFound(err) {
+		return true
+	}
+
+	if strings.Contains(err.Error(), "No such container") {
+		return true
+	}
+
+	return false
+}
 
 // ServerVersion returns information of the docker client and server host.
 func (e *Engine) ServerVersion() (types.Version, error) {
