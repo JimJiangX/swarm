@@ -190,9 +190,7 @@ func (u unit) startContainer(ctx context.Context) error {
 		return errors.WithStack(newNotFound("Container", u.u.Name))
 	}
 
-	if c.Info.State != nil && c.Info.State.Running {
-		return nil
-	}
+	state := c.Info.State
 
 	select {
 	default:
@@ -220,6 +218,10 @@ func (u unit) startContainer(ctx context.Context) error {
 		addr := net.JoinHostPort(c.Engine.IP, strconv.Itoa(sys.Ports.SwarmAgent))
 		err := u.startNetwork(ctx, addr, c.ID, ips, nil)
 		if err != nil {
+			if state != nil && state.Running {
+				return nil
+			}
+
 			return err
 		}
 	}
