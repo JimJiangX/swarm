@@ -1785,7 +1785,19 @@ func vaildPostServiceUpdateRequest(v structs.UnitRequire) error {
 		return fmt.Errorf("UnitRequire:%v,%s", v, "no resource update required")
 	}
 
-	return nil
+	errs := make([]string, 0, 3)
+
+	for _, vr := range v.Volumes {
+		if vr.Name == "" && vr.Type == "" {
+			errs = append(errs, fmt.Sprintf("VolumeRequire is invaild,%+v", vr))
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("ServiceUpdateRequest:%s", errs)
 }
 
 func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2113,6 +2125,10 @@ func vaildPostServiceBackupRequest(v structs.ServiceBackupConfig) error {
 
 	if v.FilesRetention == 0 {
 		errs = append(errs, "FilesRetention is required")
+	}
+
+	if len(errs) == 0 {
+		return nil
 	}
 
 	return fmt.Errorf("ServiceBackupConfig:%v,%s", v, errs)
