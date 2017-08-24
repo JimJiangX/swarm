@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
@@ -83,7 +84,9 @@ func (h hitachiStore) ping() error {
 		return err
 	}
 
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, path, h.hs.AdminUnit)
+	logrus.Debug(path, h.hs.AdminUnit)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -155,7 +158,9 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 	param := []string{path, h.hs.AdminUnit,
 		rg.StorageRGID, strconv.Itoa(id), strconv.Itoa(int(size)>>20 + 100)}
 
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
+	logrus.Debug(param)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
 	if err != nil {
 		return lun, lv, errors.WithStack(err)
 	}
@@ -231,7 +236,9 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (database.LUN, dat
 	param := []string{path, h.hs.AdminUnit,
 		rg.StorageRGID, strconv.Itoa(id), strconv.Itoa(int(size)>>20 + 100)}
 
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
+	logrus.Debug(param)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
 	if err != nil {
 		return lun, lv, errors.WithStack(err)
 	}
@@ -283,7 +290,9 @@ func (h *hitachiStore) RecycleLUN(id string, lun int) error {
 		return err
 	}
 
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, path, h.hs.AdminUnit, strconv.Itoa(l.StorageLunID))
+	logrus.Debug(path, h.hs.AdminUnit, l.StorageLunID)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit, strconv.Itoa(l.StorageLunID))
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -348,6 +357,8 @@ func (h *hitachiStore) list(rg ...string) ([]Space, error) {
 		return nil, err
 	}
 
+	logrus.Debug(path, h.hs.AdminUnit, list)
+
 	cmd := utils.ExecScript(path, h.hs.AdminUnit, list)
 
 	r, err := cmd.StdoutPipe()
@@ -411,7 +422,9 @@ func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
 	param := []string{path, h.hs.AdminUnit, name}
 	param = append(param, wwwn...)
 
-	_, err = utils.ExecContextTimeout(nil, 0, debug, param...)
+	logrus.Debug(param)
+
+	_, err = utils.ExecContextTimeout(nil, 0, param...)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -435,7 +448,9 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 
 	param := []string{path, h.hs.AdminUnit, name}
 
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
+	logrus.Debug(param)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -490,7 +505,9 @@ func (h *hitachiStore) Mapping(host, vg, lun, unit string) error {
 		host = host[:maxHostLen]
 	}
 
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, path, h.hs.AdminUnit,
+	logrus.Debug(path, h.hs.AdminUnit, l.StorageLunID, host, val)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit,
 		strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val))
 	if err != nil {
 		return errors.WithStack(err)
@@ -511,7 +528,9 @@ func (h *hitachiStore) DelMapping(lun database.LUN) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, path, h.hs.AdminUnit,
+	logrus.Debug(path, h.hs.AdminUnit, lun.StorageLunID)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit,
 		strconv.Itoa(lun.StorageLunID))
 	if err != nil {
 		return errors.WithStack(err)

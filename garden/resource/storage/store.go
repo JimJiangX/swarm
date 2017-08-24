@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	debug          = true
 	defaultTimeout = 30 * time.Second
 
 	defaultScriptPath = "./script"
