@@ -131,11 +131,14 @@ func (u unit) getEngine() *cluster.Engine {
 	return nil
 }
 
-func (u unit) prepareExpandVolume(target []structs.VolumeRequire) ([]structs.VolumeRequire, error) {
+func (u unit) prepareExpandVolume(eng *cluster.Engine, target []structs.VolumeRequire) ([]structs.VolumeRequire, []database.Volume, error) {
 	lvs, err := u.uo.ListVolumesByUnitID(u.u.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+
+	volumes := eng.Volumes()
+	pending := make([]database.Volume, 0, len(lvs))
 
 	add := make([]structs.VolumeRequire, len(target))
 
@@ -145,22 +148,33 @@ func (u unit) prepareExpandVolume(target []structs.VolumeRequire) ([]structs.Vol
 
 	loop:
 		for v := range lvs {
-			if lvs[v].DriverType == target[i].Type &&
-				strings.Contains(lvs[v].Name, target[i].Name) {
+			if lvs[v].EngineID != eng.ID {
+				continue
+			}
 
+			if strings.Contains(lvs[v].Name, target[i].Name) {
 				found = true
+
 				add[i].Size = target[i].Size - lvs[v].Size
+
+				if target[i].Type == "" {
+					add[i].Type = lvs[v].DriverType
+				}
+
+				if volumes.Get(lvs[v].Name) == nil {
+					pending = append(pending, lvs[v])
+				}
 
 				break loop
 			}
 		}
 
-		if !found {
-			return nil, errors.Errorf("unit:%s not found volume '%s_%s'", u.u.Name, target[i].Type, target[i].Name)
+		if !found && (target[i].Type == "" || target[i].Name == "") {
+			return nil, nil, errors.Errorf("unit:%s not found volume '%s_%s'", u.u.Name, target[i].Type, target[i].Name)
 		}
 	}
 
-	return add, nil
+	return add, pending, nil
 }
 
 func (u unit) getHostIP() (string, error) {

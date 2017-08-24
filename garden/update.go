@@ -312,9 +312,10 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 
 	expansion := func() error {
 		type pending struct {
-			u   *unit
-			eng *cluster.Engine
-			add []structs.VolumeRequire
+			u        *unit
+			eng      *cluster.Engine
+			add      []structs.VolumeRequire
+			creating []database.Volume
 		}
 
 		units, err := svc.getUnits()
@@ -331,7 +332,7 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 				return errors.Errorf("")
 			}
 
-			add, err := u.prepareExpandVolume(target)
+			add, creating, err := u.prepareExpandVolume(eng, target)
 			if err != nil {
 				return err
 			}
@@ -342,14 +343,22 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 			}
 
 			pendings = append(pendings, pending{
-				u:   u,
-				eng: eng,
-				add: add,
+				u:        u,
+				eng:      eng,
+				add:      add,
+				creating: creating,
 			})
 		}
 
 		// expand volume size
 		for _, pu := range pendings {
+			for i := range pu.creating {
+				err := engineCreateVolume(pu.eng, pu.creating[i])
+				if err != nil {
+					return err
+				}
+			}
+
 			err := actor.ExpandVolumes(pu.eng, pu.u.u.ID, pu.add)
 			if err != nil {
 				return err
