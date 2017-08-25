@@ -1,6 +1,7 @@
 package garden
 
 import (
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/structs"
@@ -33,14 +34,12 @@ func (gd *Garden) RebuildUnits(ctx context.Context, actor alloc.Allocator, svc *
 		}
 
 		networkings := make([][]database.IP, 0, len(rm))
-		{
-			for i := range rm {
-				out, err := rm[i].uo.ListIPByUnitID(rm[i].u.ID)
-				if err != nil {
-					return err
-				}
-				networkings = append(networkings, out)
+		for i := range rm {
+			out, err := rm[i].uo.ListIPByUnitID(rm[i].u.ID)
+			if err != nil {
+				return err
 			}
+			networkings = append(networkings, out)
 		}
 
 		spec, err := svc.Spec()
@@ -59,17 +58,19 @@ func (gd *Garden) RebuildUnits(ctx context.Context, actor alloc.Allocator, svc *
 			actor = alloc.NewAllocator(gd.Ormer(), gd.Cluster)
 		}
 
-		_, err = gd.scaleUp(ctx, svc, actor, scale, networkings)
-		if err != nil {
-			return err
-		}
-
-		err = svc.removeUnits(ctx, rm, gd.KVClient())
+		adds, err := gd.scaleUp(ctx, svc, actor, scale, networkings)
 		if err != nil {
 			return err
 		}
 
 		err = svc.Compose(ctx, gd.PluginClient())
+
+		err = svc.removeUnits(ctx, rm, nil)
+		if err != nil {
+			return err
+		}
+
+		err = migrateUnits(svc.so, adds, networkings)
 
 		return err
 	}
@@ -82,4 +83,45 @@ func (gd *Garden) RebuildUnits(ctx context.Context, actor alloc.Allocator, svc *
 	err := sl.Run(isnotInProgress, rebuild, async)
 
 	return task.ID, err
+}
+
+func migrateUnits(orm database.UnitOrmer, adds []*unit, networkings [][]database.IP) error {
+	type migrateID struct {
+		src, dest string
+	}
+
+	list := make([]migrateID, 0, len(adds))
+
+high:
+	for i := range adds {
+		ips, err := orm.ListIPByUnitID(adds[i].u.ID)
+		if err != nil {
+			logrus.Errorf("%+v", err)
+		}
+
+		for j := range networkings {
+			for k := range networkings[j] {
+
+				for x := range ips {
+					if ips[x].IPAddr == networkings[j][k].IPAddr {
+						list = append(list, migrateID{
+							src:  ips[x].UnitID,
+							dest: networkings[j][k].UnitID,
+						})
+
+						continue high
+					}
+				}
+			}
+		}
+	}
+
+	for i := range list {
+		err := orm.MigrateUnit(list[i].src, list[i].dest)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

@@ -24,7 +24,7 @@ type UnitIface interface {
 	SetUnitStatus(u *Unit, status int, msg string) error
 	SetUnitAndTask(u *Unit, t *Task, msg string) error
 	SetUnits(units []Unit) error
-	MigrateUnit(new, old string) error
+	MigrateUnit(src, dest string) error
 
 	DelUnitsRelated(units []Unit, volume bool) error
 }
@@ -94,8 +94,20 @@ func (db dbBase) InsertUnits(units []Unit) error {
 
 // txInsertUnits insert []Unit in Tx
 func (db dbBase) txInsertUnits(tx *sqlx.Tx, units []Unit) error {
+	if len(units) == 0 {
+		return nil
+	}
 
 	query := "INSERT INTO " + db.unitTable() + " (id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at) VALUES (:id,:name,:type,:service_id,:engine_id,:container_id,:network_mode,:latest_error,:status,:created_at)"
+
+	if len(units) == 1 && units[0].ID != "" {
+		_, err := tx.NamedExec(query, units[0])
+		if err == nil {
+			return nil
+		}
+
+		return errors.Wrap(err, "Tx Insert Unit")
+	}
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
@@ -397,36 +409,41 @@ func (db dbBase) CountUnitsInEngines(engines []string) (int, error) {
 	return count, errors.Wrap(err, "cound Units by engines")
 }
 
-func (db dbBase) MigrateUnit(new, old string) error {
+func (db dbBase) MigrateUnit(src, dest string) error {
 
 	do := func(tx *sqlx.Tx) error {
 		u := Unit{}
 		query := "SELECT id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at FROM " + db.unitTable() + " WHERE id=? OR name=?"
 
-		err := tx.Get(&u, query, new, new)
+		err := tx.Get(&u, query, src, src)
 		if err != nil {
 			return errors.Wrap(err, "Get Unit By nameOrID")
 		}
 
 		query = "UPDATE " + db.ipTable() + " SET unit_id=? WHERE unit_id=?"
-		_, err = tx.Exec(query, old, new)
+		_, err = tx.Exec(query, dest, src)
 		if err != nil {
 			return errors.Wrap(err, "set ips")
 		}
 
 		query = "UPDATE " + db.volumeTable() + " SET unit_id=? WHERE unit_id=?"
-		_, err = db.Exec(query, old, new)
+		_, err = db.Exec(query, dest, src)
 		if err != nil {
 			return errors.Wrap(err, "set volume")
 		}
 
-		query = "UPDATE" + db.unitTable() + "SET type=?,engine_id=?,container_id=?,status=? WHERE id=? OR name=?"
-		_, err = db.Exec(query, u.Type, u.EngineID, u.ContainerID, u.Status, old, old)
+		err = db.txDelUnit(tx, dest)
 		if err != nil {
-			return errors.Wrap(err, "set unit")
+			return err
 		}
 
-		err = db.txDelUnit(tx, new)
+		u.ID = dest
+		err = db.txInsertUnits(tx, []Unit{u})
+		if err != nil {
+			return err
+		}
+
+		err = db.txDelUnit(tx, src)
 		if err != nil {
 			return err
 		}
