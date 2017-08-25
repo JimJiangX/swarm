@@ -894,12 +894,14 @@ func deregisterService(ctx context.Context, reg kvstore.Register, _type, key str
 }
 
 func (svc *Service) removeUnits(ctx context.Context, rm []*unit, reg kvstore.Register) error {
-	err := svc.deregisterSerivces(ctx, reg, rm)
-	if err != nil {
-		return err
+	if reg != nil {
+		err := svc.deregisterSerivces(ctx, reg, rm)
+		if err != nil {
+			return err
+		}
 	}
 
-	err = svc.removeContainers(ctx, rm, true, false)
+	err := svc.removeContainers(ctx, rm, true, false)
 	if err != nil {
 		return err
 	}

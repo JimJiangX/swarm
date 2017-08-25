@@ -72,12 +72,7 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 				len(units)+1, candidates, nil, nil)
 			defer func() {
 				if err != nil {
-					_err := svc.so.SetIPs(old.networkings)
-					if _err != nil {
-						err = errors.Errorf("%+v\nmgirate networkings:%+v", err, _err)
-					}
-
-					_err = svc.removeUnits(ctx, adds, gd.kvClient)
+					_err := svc.removeUnits(ctx, adds, nil)
 					if _err != nil {
 						err = errors.Errorf("%+v\nremove new addition units:%+v", err, _err)
 					}
@@ -97,11 +92,30 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 				return err
 			}
 
+			defer func() {
+				if err != nil {
+					_err := svc.so.SetIPs(old.networkings)
+					if _err != nil {
+						err = errors.Errorf("%+v\nmgirate networkings:%+v", err, _err)
+					}
+				}
+			}()
+
 			// migrate volumes
 			news.volumes, err = actor.MigrateVolumes(news.unit.u.ID, old.engine, news.engine, old.volumes)
 			if err != nil {
 				return err
 			}
+
+			defer func() {
+				if err != nil {
+					// migrate volumes
+					_, _err := actor.MigrateVolumes(old.unit.u.ID, news.engine, old.engine, news.volumes)
+					if _err != nil {
+						err = errors.Errorf("%+v\nmgirate volumes:%+v", err, _err)
+					}
+				}
+			}()
 
 			auth, err := gd.AuthConfig()
 			if err != nil {
