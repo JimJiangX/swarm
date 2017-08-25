@@ -33,7 +33,7 @@ umount_backup_dir() {
 	local i=${backup_dir//'/'/'\/'}
 	sed -i "${i}/d" /etc/fstab
 
-	umount -f $backup_dir
+	umount -f ${backup_dir}
 }
 
 

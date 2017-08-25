@@ -1,16 +1,16 @@
 #!/bin/bash
 set -o nounset
 
-swarm_key=$1
-adm_ip=$2
-cs_datacenter=$3
-cs_list=$4
-registry_domain=$5
-registry_ip=$6
-registry_port=$7
-registry_username=$8
-registry_passwd=$9
-regstry_ca_file=${10}
+swarm_key=${1}
+adm_ip=${2}
+cs_datacenter=${3}
+cs_list=${4}
+registry_domain=${5}
+registry_ip=${6}
+registry_port=${7}
+registry_username=${8}
+registry_passwd=${9}
+registry_ca_file=${10}
 docker_port=${11}
 hdd_dev=${12}
 ssd_dev=${13}
@@ -51,7 +51,7 @@ fi
 
 # check container_nic
 container_nic=`ifconfig | grep -e 'cbond[0-9]\{1,3\}' | awk '{print $1}' | sed 's/://g' |  tr "\n" "," |sed 's/.$//'` 
-if [ $container_nic = '' ]; then
+if [ ${container_nic} = '' ]; then
 	echo "not found container nic"
 	exit 2
 fi
@@ -416,7 +416,7 @@ EOF
 }
 
 init_docker() {
-	local cert_file=$regstry_ca_file
+	local cert_file=${registry_ca_file}
 	local cert_dir="/etc/docker/certs.d/${registry_domain}:${registry_port}"
 
 	# add DNS 
@@ -436,7 +436,7 @@ init_docker() {
 # install docker plugin
 install_docker_plugin() {
 	local base_dir=/usr/local/logicalVolume-volume-plugin
-	local script_dir=$base_dir/scripts
+	local script_dir=${base_dir}/scripts
 
 	mkdir -p ${base_dir}/bin
 	mkdir -p ${script_dir}
@@ -444,7 +444,7 @@ install_docker_plugin() {
 	pkill -9 local-volume-plugin > /dev/null 2>&1
 
 	# copy binary file
-	cp ${cur_dir}/logicalVolume-volume-plugin-${logicalVolume_volume_plugin_version}/bin/logicalVolume_volume_plugin $base_dir/bin/logicalVolume_volume_plugin
+	cp ${cur_dir}/logicalVolume-volume-plugin-${logicalVolume_volume_plugin_version}/bin/logicalVolume_volume_plugin ${base_dir}/bin/logicalVolume_volume_plugin
 	chmod +x /usr/bin/logicalVolume_volume_plugin
 
 	# copy script
@@ -461,7 +461,7 @@ After=docker.service
 [Service]
 Restart=on-failure
 RestartSec=30s
-ExecStart=$base_dir/bin/logicalVolume_volume_plugin
+ExecStart=${base_dir}/bin/logicalVolume_volume_plugin
 
 [Install]
 WantedBy=multi-user.target
@@ -485,7 +485,7 @@ EOF
 # install swarm agent
 install_swarm_agent() {
 	local base_dir=/usr/local/swarm-agent
-	local script_dir=$base_dir/scripts
+	local script_dir=${base_dir}/scripts
 
 	# stop swarm-agent
 	pkill -9 swarm >/dev/null 2>&1
@@ -496,8 +496,8 @@ install_swarm_agent() {
 	chmod +x ${script_dir}/seed/net/* ${script_dir}/seed/san/*
 
 	# copy binary file
-	cp ${cur_dir}/swarm-agent-${swarm_agent_version}/bin/swarm $base_dir/swarm 
-	chmod 755 $base_dir/swarm
+	cp ${cur_dir}/swarm-agent-${swarm_agent_version}/bin/swarm ${base_dir}/swarm
+	chmod 755 ${base_dir}/swarm
 
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/swarm-agent
@@ -520,7 +520,7 @@ After=network.target consul.service
 
 [Service]
 EnvironmentFile=/etc/sysconfig/swarm-agent
-ExecStart=$base_dir/swarm  \$SWARM_AGENT_OPTS
+ExecStart=${base_dir}/swarm  \$SWARM_AGENT_OPTS
 
 [Install]
 WantedBy=multi-user.target
@@ -553,7 +553,7 @@ install_docker_plugin
 reg_to_consul DockerPlugin ${docker_plugin_port}
 #reg_to_horus_server DockerPlugin 
 
-install_docker ${docker_version}
+install_docker
 reg_to_consul Docker ${docker_port}
 #reg_to_horus_server Docker
 

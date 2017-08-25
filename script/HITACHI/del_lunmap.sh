@@ -15,7 +15,7 @@ for port in ${port_list}
 do
 	sudo raidcom delete lun -I${Instance_ID} -port ${port} -ldev_id ${lun_id}
 	if [ $? -ne 0 ]; then
-		echo "delete port(${port}) ldev(${lun_id} mapping to ${hostname} failed!"
+		echo "delete port(${port}) ldev(${lun_id} mapping failed!"
 		exit 2
 	fi
 	

@@ -17,22 +17,22 @@ fi
 temp1=`mktemp -u /tmp/XXXXXXX`
 for port in ${port_list}
 do
-	hosts=`sudo raidcom  get host_grp  -I${Instance_ID} -port $port | sed '1d' | awk '{print $2}'`
-	for host in $hosts
+	hosts=`sudo raidcom  get host_grp  -I${Instance_ID} -port ${port} | sed '1d' | awk '{print $2}'`
+	for host in ${hosts}
 	do
-		sudo raidcom get hba_wwn -I${Instance_ID} -port $port-$host | awk '{print $1,$3,$4}' >> $temp1 
+		sudo raidcom get hba_wwn -I${Instance_ID} -port ${port}-${host} | awk '{print $1,$3,$4}' >> ${temp1}
 	done
 done
 
 
-tempfile=`mktemp -u /tmp/XXXXXXX`
+temp_file=`mktemp -u /tmp/XXXXXXX`
 for wwn in $@
 do
-	grep  $wwn $temp1 >> $tempfile
+	grep  ${wwn} ${temp1} >> ${temp_file}
 done
-#rm -rf $temp1
+rm -rf ${temp1}
 
-if [ -z $tempfile ]; then
+if [ -z ${temp_file} ]; then
 	for port in ${port_list}
 	do
 		ret=`sudo raidcom get port -I${Instance_ID} -port ${port} | grep -w ${wwn} | wc -l`
@@ -42,48 +42,48 @@ if [ -z $tempfile ]; then
 				sudo raidcom add host_grp -I${Instance_ID} -port ${port} -host_grp_name ${hostname}
 				if [ $? -ne 0 ]; then
 					echo "add host_grp failed!"
-					#rm -rf $tempfile
+					rm -rf ${temp_file}
 					exit 2
 				fi
 			fi
 			sudo raidcom add hba_wwn -I${Instance_ID} -port ${port} ${hostname} -hba_wwn ${wwn}
 			if [ $? -ne 0 ]; then
 				echo "add hba_wwn failed!"
-				#rm -rf $tempfile
+				rm -rf ${temp_file}
 				exit 1
 			fi
 		fi
 	done
 	
-	#rm -rf $tempfile
+	rm -rf ${temp_file}
 	exit 0
 fi
 
 while read LINE 
 do
-	port=`echo $LINE| awk '{print $1}'`
-	old_host=`echo $LINE| awk '{print $2}'`
-	wwn=`echo $LINE| awk '{print $3}'`
+	port=`echo ${LINE} | awk '{print $1}'`
+	old_host=`echo ${LINE} | awk '{print $2}'`
+	wwn=`echo ${LINE} | awk '{print $3}'`
 	sudo raidcom delete host_grp -I${Instance_ID} -port ${port} ${old_host}
 	ret=$?
-	if [ $ret -ne 0 ] && [ $ret -ne 205 ]; then
+	if [ ${ret} -ne 0 ] && [ ${ret} -ne 205 ]; then
 		echo "Delete old host $old_host on port $wwn failed!"
-		#rm -rf $tempfile
+		rm -rf ${temp_file}
 		exit 1
 	fi
 	sudo raidcom add host_grp -I${Instance_ID} -port ${port} -host_grp_name ${hostname}
 	ret=$?
-	if [ $ret -ne 0 ] && [ $ret -ne 221 ]; then
+	if [ ${ret} -ne 0 ] && [ ${ret} -ne 221 ]; then
 		echo "Add new host_grp  ${hostname} failed!"
-		#rm -rf $tempfile
+		rm -rf ${temp_file}
 		exit 2
 	fi
 	sudo raidcom add hba_wwn -I${Instance_ID} -port ${port} ${hostname} -hba_wwn ${wwn}
 	if [ $? -ne 0 ]; then
 		echo "add hba_wwn failed!"
-		#rm -rf $tempfile
+		rm -rf ${temp_file}
 		exit 3
 	fi
-done <$tempfile
+done <${temp_file}
 
-#rm -rf $tempfile
+rm -rf ${temp_file}
