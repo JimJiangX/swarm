@@ -145,7 +145,22 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 		}
 		{
 			// clean old
-			err := svc.removeContainers(ctx, []*unit{&old.unit}, false, true)
+			err := svc.deregisterSerivces(ctx, gd.KVClient(), []*unit{&old.unit})
+			if err != nil {
+				return err
+			}
+
+			err = svc.removeContainers(ctx, []*unit{&old.unit}, false, true)
+			if err != nil {
+				return err
+			}
+
+			err = svc.so.MigrateUnit(news.unit.u.ID, old.unit.u.ID)
+			if err != nil {
+				return err
+			}
+
+			cms, err := svc.generateUnitsConfigs(ctx, nil)
 			if err != nil {
 				return err
 			}
@@ -155,7 +170,12 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 				return err
 			}
 
-			err = svc.so.MigrateUnit(news.unit.u.ID, old.unit.u.ID)
+			u, err := svc.getUnit(old.unit.u.ID)
+			if err != nil {
+				return err
+			}
+
+			err = registerUnits(ctx, []*unit{u}, gd.KVClient(), cms)
 			if err != nil {
 				return err
 			}

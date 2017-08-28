@@ -503,7 +503,11 @@ func (svc *Service) initStart(ctx context.Context, units []*unit, kvc kvstore.Cl
 		}
 	}
 
-	return registerUnits(ctx, units, kvc, configs)
+	if kvc != nil {
+		return registerUnits(ctx, units, kvc, configs)
+	}
+
+	return nil
 }
 
 func registerUnits(ctx context.Context, units []*unit, kvc kvstore.Client, configs structs.ConfigsMap) error {

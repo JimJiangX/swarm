@@ -58,7 +58,7 @@ func (gd *Garden) RebuildUnits(ctx context.Context, actor alloc.Allocator, svc *
 			actor = alloc.NewAllocator(gd.Ormer(), gd.Cluster)
 		}
 
-		adds, err := gd.scaleUp(ctx, svc, actor, scale, networkings)
+		adds, err := gd.scaleUp(ctx, svc, actor, scale, networkings, false)
 		if err != nil {
 			return err
 		}
