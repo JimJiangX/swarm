@@ -271,3 +271,14 @@ func (sl ServicesLink) Links() []string {
 
 	return ids
 }
+
+type UnitLink struct {
+	NameOrID      string
+	ConfigFile    string
+	ConfigContent string
+	Commands      []string
+}
+
+type ServiceLinkResponse struct {
+	Links []UnitLink
+}
