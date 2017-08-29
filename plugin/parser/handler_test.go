@@ -9,6 +9,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/plugin/client"
 	pclient "github.com/docker/swarm/plugin/parser/api"
 	"golang.org/x/net/context"
 )
@@ -21,7 +22,7 @@ func init() {
 
 	go http.ListenAndServe(":8080", mux)
 
-	pc = pclient.NewPlugin("localhost:8080", 30*time.Second, nil)
+	pc = pclient.NewPlugin("localhost:8080", client.NewClient("localhost:8080", 30*time.Second, nil))
 }
 
 func TestGetSupportImageVersion(t *testing.T) {

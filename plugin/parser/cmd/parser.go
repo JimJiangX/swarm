@@ -9,6 +9,7 @@ import (
 
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
+	"github.com/docker/swarm/plugin/client"
 	"github.com/docker/swarm/plugin/parser/api"
 )
 
@@ -22,7 +23,7 @@ var (
 func main() {
 	flag.Parse()
 
-	pc := api.NewPlugin(*flHost, 30*time.Second, nil)
+	pc := api.NewPlugin(*flHost, client.NewClient(*flHost, 30*time.Second, nil))
 	list, err := pc.GetImageSupport(nil)
 	if err != nil {
 		log.Fatalf("get supported image list error\n%+v", err)
