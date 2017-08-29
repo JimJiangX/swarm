@@ -190,7 +190,7 @@ func RequireOK(resp *http.Response, e error) (*http.Response, error) {
 		if resp != nil {
 			resp.Body.Close()
 		}
-		return nil, errors.WithStack(e)
+		return nil, e
 	}
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {

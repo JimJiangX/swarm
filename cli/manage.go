@@ -25,7 +25,6 @@ import (
 	"github.com/docker/swarm/garden/resource"
 	"github.com/docker/swarm/garden/resource/storage"
 	"github.com/docker/swarm/garden/utils"
-	"github.com/docker/swarm/plugin/client"
 	pluginapi "github.com/docker/swarm/plugin/parser/api"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/filter"
@@ -381,7 +380,7 @@ func manage(c *cli.Context) {
 			log.Fatalf("%+v", err)
 		}
 
-		pClient := pluginapi.NewPlugin(client.NewClient(c.String("configureAddr"), 0, tlsConfig))
+		pClient := pluginapi.NewPlugin(c.String("configureAddr"), 0, tlsConfig)
 
 		cl = garden.NewGarden(kvc, cl, sched, ormer, pClient, tlsConfig)
 

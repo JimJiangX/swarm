@@ -1,9 +1,11 @@
 package api
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/plugin/client"
@@ -31,62 +33,64 @@ type PluginAPI interface {
 }
 
 type plugin struct {
-	c client.Client
+	host string
+	c    client.Client
 }
 
 // NewPlugin returns a PluginAPI
-func NewPlugin(cli client.Client) PluginAPI {
+func NewPlugin(host string, timeout time.Duration, tlsConfig *tls.Config) PluginAPI {
+	cli := client.NewClient(host, timeout, tlsConfig)
+
 	return plugin{
-		c: cli,
+		host: host,
+		c:    cli,
 	}
 }
 
 func (p plugin) GenerateServiceConfig(ctx context.Context, desc structs.ServiceSpec) (structs.ConfigsMap, error) {
 	var m structs.ConfigsMap
+	const uri = "/configs"
 
-	resp, err := client.RequireOK(p.c.Post(ctx, "/configs", desc))
+	resp, err := client.RequireOK(p.c.Post(ctx, uri, desc))
 	if err != nil {
 		return m, err
 	}
 	defer resp.Body.Close()
 
 	err = decodeBody(resp, &m)
+	if err != nil {
+		return nil, errors.Errorf("%s %s%s,%v", http.MethodPost, p.host, uri, err)
+	}
 
 	return m, err
 }
 
 func (p plugin) GenerateUnitConfig(ctx context.Context, unit string, desc structs.ServiceSpec) (structs.ConfigCmds, error) {
-	var cc structs.ConfigCmds
+	var (
+		cc  structs.ConfigCmds
+		uri = "/configs/" + unit
+	)
 
-	resp, err := client.RequireOK(p.c.Post(ctx, "/configs/"+unit, desc))
+	resp, err := client.RequireOK(p.c.Post(ctx, uri, desc))
 	if err != nil {
 		return cc, err
 	}
 	defer resp.Body.Close()
 
 	err = decodeBody(resp, &cc)
+	if err != nil {
+		return cc, errors.Errorf("%s %s%s,%v", http.MethodPost, p.host, uri, err)
+	}
 
 	return cc, err
 }
 
 func (p plugin) GetServiceConfig(ctx context.Context, service string) (structs.ConfigsMap, error) {
-	var m structs.ConfigsMap
+	var (
+		m   structs.ConfigsMap
+		uri = "/configs/" + service
+	)
 
-	resp, err := client.RequireOK(p.c.Get(ctx, "/configs/"+service))
-	if err != nil {
-		return m, err
-	}
-	defer resp.Body.Close()
-
-	err = decodeBody(resp, &m)
-
-	return m, err
-}
-
-func (p plugin) GetUnitConfig(ctx context.Context, service, unit string) (structs.ConfigCmds, error) {
-	var m structs.ConfigCmds
-
-	uri := fmt.Sprintf("/configs/%s/%s", service, unit)
 	resp, err := client.RequireOK(p.c.Get(ctx, uri))
 	if err != nil {
 		return m, err
@@ -94,40 +98,74 @@ func (p plugin) GetUnitConfig(ctx context.Context, service, unit string) (struct
 	defer resp.Body.Close()
 
 	err = decodeBody(resp, &m)
+	if err != nil {
+		return nil, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, uri, err)
+	}
 
 	return m, err
 }
 
-func (p plugin) GetCommands(ctx context.Context, service string) (structs.Commands, error) {
-	var m structs.Commands
+func (p plugin) GetUnitConfig(ctx context.Context, service, unit string) (structs.ConfigCmds, error) {
+	var (
+		m   structs.ConfigCmds
+		uri = fmt.Sprintf("/configs/%s/%s", service, unit)
+	)
 
-	resp, err := client.RequireOK(p.c.Get(ctx, "/commands/"+service))
+	resp, err := client.RequireOK(p.c.Get(ctx, uri))
 	if err != nil {
 		return m, err
 	}
 	defer resp.Body.Close()
 
 	err = decodeBody(resp, &m)
+	if err != nil {
+		return m, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, uri, err)
+	}
+
+	return m, err
+}
+
+func (p plugin) GetCommands(ctx context.Context, service string) (structs.Commands, error) {
+	var (
+		m   structs.Commands
+		uri = "/commands/" + service
+	)
+	resp, err := client.RequireOK(p.c.Get(ctx, uri))
+	if err != nil {
+		return m, err
+	}
+	defer resp.Body.Close()
+
+	err = decodeBody(resp, &m)
+	if err != nil {
+		return nil, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, uri, err)
+	}
 
 	return m, err
 }
 
 func (p plugin) GetImage(ctx context.Context, version string) (structs.ConfigTemplate, error) {
 	obj := structs.ConfigTemplate{}
+	uri := "/image/template/" + version
 
-	resp, err := client.RequireOK(p.c.Get(ctx, "/image/template/"+version))
+	resp, err := client.RequireOK(p.c.Get(ctx, uri))
 	if err != nil {
 		return obj, err
 	}
 	defer resp.Body.Close()
 
 	err = decodeBody(resp, &obj)
+	if err != nil {
+		return obj, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, uri, err)
+	}
 
 	return obj, err
 }
 
 func (p plugin) GetImageSupport(ctx context.Context) ([]structs.ImageVersion, error) {
-	resp, err := client.RequireOK(p.c.Get(ctx, "/image/support"))
+	const uri = "/image/support"
+
+	resp, err := client.RequireOK(p.c.Get(ctx, uri))
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +174,9 @@ func (p plugin) GetImageSupport(ctx context.Context) ([]structs.ImageVersion, er
 	var obj []structs.ImageVersion
 
 	err = decodeBody(resp, &obj)
+	if err != nil {
+		return nil, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, uri, err)
+	}
 
 	return obj, err
 }
@@ -158,6 +199,9 @@ func (p plugin) GetImageSupport(ctx context.Context) ([]structs.ImageVersion, er
 //	defer resp.Body.Close()
 
 //	err = decodeBody(resp, &obj)
+//  if err != nil {
+//		return obj, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, url.String(), err)
+//	}
 
 //	return obj, err
 //}
@@ -212,5 +256,5 @@ func (p plugin) ServicesLink(ctx context.Context, links structs.ServicesLink) er
 func decodeBody(resp *http.Response, out interface{}) error {
 	dec := json.NewDecoder(resp.Body)
 
-	return errors.WithStack(dec.Decode(out))
+	return dec.Decode(out)
 }
