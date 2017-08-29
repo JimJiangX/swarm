@@ -639,7 +639,7 @@ type ServiceDesc struct {
 }
 
 func (db dbBase) serviceDescTable() string {
-	return db.prefix + "_service_decription"
+	return db.prefix + "_service_description"
 }
 
 func (db dbBase) getServiceDesc(ID string) (ServiceDesc, error) {
