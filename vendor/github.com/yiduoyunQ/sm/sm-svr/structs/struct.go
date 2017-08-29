@@ -7,7 +7,7 @@ type MgmPost struct {
 	DbReplicateUser     string                  `json:"db-replicate-user"`
 	DbReplicatePassword string                  `json:"db-replicate-password"`
 	SwarmApiVersion     string                  `json:"swarm-api-version,omitempty"`
-	ProxyNames          []string                `json:"proxy-names"`
+	ProxyGroups         map[string]*ProxyInfo   `json:"proxy_groups"`
 	Users               []User                  `json:"users"`
 	DataNode            map[string]DatabaseInfo `json:"data-node"`
 }
@@ -25,10 +25,13 @@ type User struct {
 }
 
 type ProxyInfo struct {
+	Id            string `json:"id,omitempty"`
+	Ip            string `json:"ip,omitempty"`
+	Port          string `json:"port,omitempty"`
 	ClientAddress string `json:"cli-address,omitempty"`
 	ProxyAddress  string `json:"proxy-address,omitempty"`
 	StartupTime   string `json:"startup-time,omitempty"`
-	Status        int    `json:"status"`
+	Status        int    `json:"status,omitempty"`
 	ActiveTime    int64  `json:"active-time,omitempty"`
 }
 
@@ -36,6 +39,7 @@ type Topology struct {
 	Version       string                              `json:"version,omitempty"`
 	ProxyMode     *ProxyModeInfo                      `json:"proxy_mode,omitempty"`
 	ProxyUsers    map[string]*AuthInfo                `json:"proxy_users"`
+	ProxyGroups   map[string]*ProxyInfo               `json:"proxy_groups"`
 	DatabaseAuth  *DatabaseAuth                       `json:"database_auth,omitempty"`
 	DataNodeGroup map[string]map[string]*DatabaseInfo `json:"datanode_group"`
 	// DatanodeGroupCnt : status=normal db count

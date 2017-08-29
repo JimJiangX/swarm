@@ -7,6 +7,7 @@ import (
 	stderrors "errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1475,9 +1476,18 @@ func swmInitTopology(svc *Service, swm *unit, users []database.User) error {
 		addr = swm.engine.IP
 	}
 
-	proxyNames := make([]string, len(proxys))
+	//	proxyNames := make([]string, len(proxys))
+	proxyGroup := make(map[string]*swm_structs.ProxyInfo, len(proxys))
 	for i := range proxys {
-		proxyNames[i] = proxys[i].Name
+		ip, port, err := proxys[i].getNetworkingAddr(_ContainersNetworking, "proxy_data_port")
+		if err != nil {
+			return err
+		}
+		proxyGroup[proxys[i].ID] = &swm_structs.ProxyInfo{
+			Id:   proxys[i].ID,
+			Ip:   ip,
+			Port: strconv.Itoa(port),
+		}
 	}
 
 	var (
@@ -1523,9 +1533,9 @@ func swmInitTopology(svc *Service, swm *unit, users []database.User) error {
 		DbReplicateUser:     replicater.Username, //  string   `json:"db-replicate-user"`
 		DbReplicatePassword: replicater.Password, //  string   `json:"db-replicate-password"`
 		SwarmApiVersion:     "1.22",              //  string   `json:"swarm-api-version,omitempty"`
-		ProxyNames:          proxyNames,          //  []string `json:"proxy-names"`
-		Users:               swmUsers,            //  []User   `json:"users"`
-		DataNode:            dataNodes,           //  map[string]DatabaseInfo `json:"data-node"`
+		ProxyGroups:         proxyGroup,
+		Users:               swmUsers,  //  []User   `json:"users"`
+		DataNode:            dataNodes, //  map[string]DatabaseInfo `json:"data-node"`
 	}
 
 	err = smlib.InitSm(addr, port, topolony)
