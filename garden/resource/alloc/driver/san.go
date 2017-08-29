@@ -106,6 +106,10 @@ func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req struc
 }
 
 func (sv sanVolume) Expand(lv database.Volume, size int64) error {
+	if size <= 0 {
+		return nil
+	}
+
 	lv, err := sv.iface.GetVolume(lv.Name)
 	if err != nil {
 		return err

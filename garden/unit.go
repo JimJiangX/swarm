@@ -146,10 +146,13 @@ func (u unit) prepareExpandVolume(eng *cluster.Engine, target []structs.VolumeRe
 		found := false
 		add[i] = target[i]
 
-	loop:
 		for v := range lvs {
 			if lvs[v].EngineID != eng.ID {
 				continue
+			}
+
+			if volumes.Get(lvs[v].Name) == nil {
+				pending = append(pending, lvs[v])
 			}
 
 			if strings.Contains(lvs[v].Name, target[i].Name) {
@@ -160,12 +163,6 @@ func (u unit) prepareExpandVolume(eng *cluster.Engine, target []structs.VolumeRe
 				if target[i].Type == "" {
 					add[i].Type = lvs[v].DriverType
 				}
-
-				if volumes.Get(lvs[v].Name) == nil {
-					pending = append(pending, lvs[v])
-				}
-
-				break loop
 			}
 		}
 
@@ -174,7 +171,14 @@ func (u unit) prepareExpandVolume(eng *cluster.Engine, target []structs.VolumeRe
 		}
 	}
 
-	return add, pending, nil
+	out := make([]structs.VolumeRequire, 0, len(add))
+	for i := range add {
+		if add[i].Size > 0 {
+			out = append(out, add[i])
+		}
+	}
+
+	return out, pending, nil
 }
 
 func (u unit) getHostIP() (string, error) {

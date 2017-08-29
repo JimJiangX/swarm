@@ -316,6 +316,10 @@ func (lv *localVolume) Alloc(config *cluster.ContainerConfig, uid string, req st
 }
 
 func (lv *localVolume) Expand(dv database.Volume, size int64) error {
+	if size <= 0 {
+		return nil
+	}
+
 	dv, err := lv.vo.GetVolume(dv.Name)
 	if err != nil {
 		return err
