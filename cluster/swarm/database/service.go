@@ -137,24 +137,28 @@ func InsertUnit(u Unit) error {
 
 // UpdateUnitInfo could update params of unit
 func UpdateUnitInfo(unit Unit) error {
-	db, err := getDB(false)
+	tx, err := GetTX()
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback()
 
-	const query = "UPDATE tbl_dbaas_unit SET name=:name,type=:type,image_id=:image_id,image_name=:image_name,service_id=:service_id,node_id=:node_id,container_id=:container_id,unit_config_id=:unit_config_id,network_mode=:network_mode,status=:status,latest_error=:latest_error,check_interval=:check_interval,created_at=:created_at WHERE id=:id"
+	query := "UPDATE tbl_dbaas_unit SET name=:name,type=:type,image_id=:image_id,image_name=:image_name,service_id=:service_id,node_id=:node_id,container_id=:container_id,unit_config_id=:unit_config_id,network_mode=:network_mode,status=:status,latest_error=:latest_error,check_interval=:check_interval,created_at=:created_at WHERE id=:id"
 
-	_, err = db.NamedExec(query, &unit)
-	if err == nil {
-		return nil
-	}
-
-	db, err = getDB(true)
+	_, err = tx.NamedExec(query, &unit)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "update unit info")
 	}
 
-	_, err = db.NamedExec(query, &unit)
+	if unit.ConfigID != "" && unit.ImageID != "" {
+		query := "UPDATE tbl_dbaas_unit_config SET image_id=? where id=?"
+		_, err = tx.Exec(query, unit.ImageID, unit.ConfigID)
+		if err != nil {
+			return errors.Wrap(err, "update unit config imageID")
+		}
+	}
+
+	err = tx.Commit()
 
 	return errors.Wrap(err, "update Unit params")
 }
