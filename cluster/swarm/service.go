@@ -1483,10 +1483,13 @@ func swmInitTopology(svc *Service, swm *unit, users []database.User) error {
 		if err != nil {
 			return err
 		}
+
+		p := strconv.Itoa(port)
 		proxyGroup[proxys[i].Name] = &swm_structs.ProxyInfo{
-			Id:   proxys[i].Name,
+			Id:   p,
+			Name: proxys[i].Name,
 			Ip:   ip,
-			Port: strconv.Itoa(port),
+			Port: p,
 		}
 	}
 

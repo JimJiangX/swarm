@@ -26,6 +26,7 @@ type User struct {
 
 type ProxyInfo struct {
 	Id            string `json:"id,omitempty"`
+	Name          string `json:"name,omitempty"`
 	Ip            string `json:"ip,omitempty"`
 	Port          string `json:"port,omitempty"`
 	ClientAddress string `json:"cli-address,omitempty"`
