@@ -225,7 +225,7 @@ func run(cl cluster.Cluster, candidate *leadership.Candidate, server *api.Server
 
 				if ormer != nil {
 					eh = garden.NewEventHandler(ormer)
-					cl.RegisterEventHandler(eh, nil)
+					cl.RegisterEventHandler(eh)
 
 					logrus.Info("mark running tasks")
 					err := ormer.MarkRunningTasks()
