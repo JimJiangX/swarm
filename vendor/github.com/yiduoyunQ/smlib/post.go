@@ -2,19 +2,15 @@ package smlib
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/yiduoyunQ/sm/sm-svr/structs"
 )
-
-const timeout = time.Second * 10
 
 func Ping(ip string, port int) error {
 	return post(nil, ip, port, "ping", "")
@@ -101,19 +97,7 @@ func post(body []byte, ip string, port int, method, arg string) error {
 		bodyType = "application/json"
 	}
 
-	req, err := http.NewRequest("POST", uri, reader)
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Content-Type", bodyType)
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	req = req.WithContext(ctx)
-
-	res, err := http.DefaultClient.Do(req)
+	res, err := http.Post(uri, bodyType, reader)
 	if err != nil {
 		return err
 	}
@@ -127,8 +111,6 @@ func post(body []byte, ip string, port int, method, arg string) error {
 
 		return errors.New(string(body))
 	}
-
-	io.CopyN(ioutil.Discard, res.Body, 512)
 
 	return nil
 }
