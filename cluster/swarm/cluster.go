@@ -21,10 +21,10 @@ import (
 	"github.com/docker/docker/pkg/discovery"
 	"github.com/docker/docker/pkg/stringid"
 	units "github.com/docker/go-units"
+	"github.com/docker/swarm/api"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/node"
-	"github.com/docker/swarmkit/watch"
 )
 
 type pendingContainer struct {
@@ -58,8 +58,8 @@ func (p *pendingContainer) ToContainer() *cluster.Container {
 type Cluster struct {
 	sync.RWMutex
 
-	eventHandlers     *cluster.EventHandlers
-	watchQueue        *watch.Queue
+	cluster.ClusterEventHandlers
+
 	engines           map[string]*cluster.Engine
 	pendingEngines    map[string]*cluster.Engine
 	scheduler         *scheduler.Scheduler
@@ -77,16 +77,16 @@ func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery
 	log.WithFields(log.Fields{"name": "swarm"}).Debug("Initializing cluster")
 
 	cluster := &Cluster{
-		eventHandlers:     cluster.NewEventHandlers(),
-		engines:           make(map[string]*cluster.Engine),
-		pendingEngines:    make(map[string]*cluster.Engine),
-		scheduler:         scheduler,
-		TLSConfig:         TLSConfig,
-		discovery:         discovery,
-		pendingContainers: make(map[string]*pendingContainer),
-		overcommitRatio:   0.05,
-		engineOpts:        engineOptions,
-		createRetry:       0,
+		ClusterEventHandlers: cluster.NewClusterEventHandlers(),
+		engines:              make(map[string]*cluster.Engine),
+		pendingEngines:       make(map[string]*cluster.Engine),
+		scheduler:            scheduler,
+		TLSConfig:            TLSConfig,
+		discovery:            discovery,
+		pendingContainers:    make(map[string]*pendingContainer),
+		overcommitRatio:      0.05,
+		engineOpts:           engineOptions,
+		createRetry:          0,
 	}
 
 	if val, ok := options.Float("swarm.overcommit", ""); ok {
@@ -114,33 +114,9 @@ func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery
 	return cluster, nil
 }
 
-// Handle callbacks for the events.
-func (c *Cluster) Handle(e *cluster.Event) error {
-	// publish event to the watchQueue for external subscribers
-	c.watchQueue.Publish(e)
-	// call Handle for other eventHandlers
-	c.eventHandlers.Handle(e)
-	return nil
-}
-
-// RegisterEventHandler registers an event handler.
-func (c *Cluster) RegisterEventHandler(h cluster.EventHandler, q *watch.Queue) error {
-	// only set if watchQueue hasn't been set already. This is to avoid issues because
-	// the watchdog code still uses the old event handler.
-	if q != nil && c.watchQueue == nil {
-		c.watchQueue = q
-	}
-	return c.eventHandlers.RegisterEventHandler(h)
-}
-
-// UnregisterEventHandler unregisters a previously registered event handler.
-func (c *Cluster) UnregisterEventHandler(h cluster.EventHandler) {
-	c.eventHandlers.UnregisterEventHandler(h)
-}
-
-// CloseWatchQueue closes the watchQueue when the manager shuts down.
-func (c *Cluster) CloseWatchQueue() {
-	c.watchQueue.Close()
+// NewAPIEventHandler creates a new API events handler
+func (c *Cluster) NewAPIEventHandler() *cluster.APIEventHandler {
+	return cluster.NewAPIEventHandler()
 }
 
 // generateUniqueID generates a globally (across the cluster) unique ID.
@@ -163,7 +139,17 @@ func (c *Cluster) CreateContainer(config *cluster.ContainerConfig, name string, 
 	container, err := c.createContainer(config, name, false, authConfig)
 
 	if err != nil {
+
 		var retries int64
+		osMismatch := api.MatchImageOSError(err.Error())
+		if osMismatch != "" {
+			config.AddConstraint("ostype==" + osMismatch)
+			container, err = c.createContainer(config, name, false, authConfig)
+			if err == nil {
+				return container, nil
+			}
+			retries++
+		}
 		// fails with image not found, then try to reschedule with image affinity
 		// we need to check multiple cases to ensure backward compatibility, because
 		// the error message changed over time
@@ -321,11 +307,9 @@ func (c *Cluster) addEngine(addr string) bool {
 	engine := cluster.NewEngine(addr, c.overcommitRatio, c.engineOpts)
 	// This passes c, which has a Handle(Event) (error) function defined, which acts as the handler
 	// for events. This is the cluster level handler that is called by individual engines when they
-	// receive/emit events. This Handler in turn calls the eventHandlers.Handle() function.
-	// eventHandlers is a map from EventHandler -> struct{}, and eventHandlers.Handle() simply calls
-	// the Handle function for each of the EventHander objects in the map. Remember that EventHandler
-	// is an interface, that is implemented by both the Cluster object, as well as the eventsHandler
-	// object in api/events.go
+	// receive/emit events. This Handler in turn calls the clusterEventHandlers.Handle() function.
+	// clusterEventHandlers is a map from EventHandler -> struct{}, and clusterEventHandlers.Handle() simply calls
+	// the Handle function for each of the EventHander objects in the map.
 	if err := engine.RegisterEventHandler(c); err != nil {
 		log.Error(err)
 	}
@@ -729,13 +713,22 @@ func (c *Cluster) Load(imageReader io.Reader, callback func(msg cluster.JSONMess
 			}
 			err := engine.Load(reader, engineCallback)
 			if callback != nil {
+
 				if err != nil {
-					callback(cluster.JSONMessageWrapper{
-						EngineName: engine.Name,
-						Err:        err,
-					})
+					if mismatch, imageOS, engineOS := isErrorLoadImageOsMismatch(err.Error()); mismatch {
+						callback(cluster.JSONMessageWrapper{
+							EngineName: engine.Name,
+							Msg:        cluster.JSONMessage{Status: fmt.Sprintf("Load skipped because image is for %s and engine is running %s", imageOS, engineOS)},
+						})
+					} else {
+						callback(cluster.JSONMessageWrapper{
+							EngineName: engine.Name,
+							Err:        err,
+						})
+					}
 				}
 			}
+
 		}(pipeReader, e)
 	}
 
@@ -788,10 +781,18 @@ func (c *Cluster) Import(source string, ref string, tag string, imageReader io.R
 			err := engine.Import(source, ref, tag, reader, engineCallback)
 			if callback != nil {
 				if err != nil {
-					callback(cluster.JSONMessageWrapper{
-						EngineName: engine.Name,
-						Err:        err,
-					})
+					if mismatch, imageOS, engineOS := isErrorLoadImageOsMismatch(err.Error()); mismatch {
+						callback(cluster.JSONMessageWrapper{
+							EngineName: engine.Name,
+							Msg:        cluster.JSONMessage{Status: fmt.Sprintf("Import skipped because image is for %s and engine is running %s", imageOS, engineOS)},
+							Success:    true,
+						})
+					} else {
+						callback(cluster.JSONMessageWrapper{
+							EngineName: engine.Name,
+							Err:        err,
+						})
+					}
 				} else {
 					callback(cluster.JSONMessageWrapper{
 						EngineName: engine.Name,
