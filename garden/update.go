@@ -56,7 +56,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 			c.Config.Image = version
 			c.Config.SetSwarmID(utils.Generate32UUID())
 
-			nc, err := c.Engine.CreateContainer(c.Config, u.u.Name+"-"+version, true, authConfig)
+			nc, err := c.Engine.CreateContainer(c.Config, u.u.Name+"_"+im.Version(), true, authConfig)
 			if err != nil {
 				return errors.WithStack(err)
 			}
