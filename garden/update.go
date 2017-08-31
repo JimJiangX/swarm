@@ -53,7 +53,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 			c := u.getContainer()
 
 			if c == nil || c.Engine == nil {
-				return errors.WithStack(newContainerError(u.u.Name, "not found"))
+				return errors.WithStack(newContainerError(u.u.Name, notFound))
 			}
 			swarmID := utils.Generate32UUID()
 			c.Config.Image = version
