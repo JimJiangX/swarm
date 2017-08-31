@@ -138,7 +138,7 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 				return err
 			}
 
-			err = svc.start(ctx, adds, nil, cms.Commands())
+			err = svc.start(ctx, adds, cms.Commands())
 			if err != nil {
 				return err
 			}

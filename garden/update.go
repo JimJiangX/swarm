@@ -39,7 +39,9 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 
 		err = svc.stop(ctx, units, true)
 		if err != nil {
-			return err
+			if _err, ok := err.(errContainer); !ok || _err.action != notRunning {
+				return err
+			}
 		}
 
 		containers := make([]struct {
@@ -107,7 +109,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 				return err
 			}
 
-			err = svc.start(ctx, nil, nil, nil)
+			err = svc.start(ctx, nil, nil)
 			if err != nil {
 				return err
 			}

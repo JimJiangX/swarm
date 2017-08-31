@@ -65,6 +65,8 @@ const (
 	statusContainerExited
 )
 
+const notRunning = "is not running"
+
 type errContainer struct {
 	name   string
 	action string
@@ -385,7 +387,7 @@ func (u unit) containerExec(ctx context.Context, cmd []string, detach bool) (typ
 	}
 
 	if !c.Info.State.Running {
-		return types.ContainerExecInspect{}, errors.WithStack(newContainerError(u.u.Name, "is not running"))
+		return types.ContainerExecInspect{}, errors.WithStack(newContainerError(u.u.Name, notRunning))
 	}
 
 	return c.Exec(ctx, cmd, detach)

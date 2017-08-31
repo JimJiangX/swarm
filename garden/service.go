@@ -580,7 +580,7 @@ func getContainerFromKV(ctx context.Context, kvc kvstore.Client, containerID str
 	return c, nil
 }
 
-func (svc *Service) start(ctx context.Context, units []*unit, task *database.Task, cmds structs.Commands) (err error) {
+func (svc *Service) start(ctx context.Context, units []*unit, cmds structs.Commands) (err error) {
 	if units == nil {
 		units, err = svc.getUnits()
 		if err != nil {
@@ -618,7 +618,7 @@ func (svc *Service) start(ctx context.Context, units []*unit, task *database.Tas
 // Start start containers and services
 func (svc *Service) Start(ctx context.Context, task *database.Task, detach bool, cmds structs.Commands) error {
 	start := func() error {
-		return svc.start(ctx, nil, task, cmds)
+		return svc.start(ctx, nil, cmds)
 	}
 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
