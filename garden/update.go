@@ -51,12 +51,17 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 
 		for _, u := range units {
 			c := u.getContainer()
-
 			if c == nil || c.Engine == nil {
 				return errors.WithStack(newContainerError(u.u.Name, notFound))
 			}
-			swarmID := utils.Generate32UUID()
+
+			if c.Config.Image == version {
+				continue
+			}
+
 			c.Config.Image = version
+			// set new swarmID
+			swarmID := utils.Generate32UUID()
 			c.Config.SetSwarmID(swarmID)
 
 			nc, err := c.Engine.CreateContainer(c.Config, swarmID, true, authConfig)
@@ -187,7 +192,7 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 		for _, u := range units {
 
 			c := u.getContainer()
-			if c == nil {
+			if c == nil || c.Engine == nil {
 				return errors.WithStack(newContainerError(u.u.Name, notFound))
 			}
 
