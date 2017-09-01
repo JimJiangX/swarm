@@ -160,12 +160,6 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, ncpu, memory int64) error {
 	desc := svc.svc.Desc
 
-	if (ncpu == 0 || int64(desc.NCPU) == ncpu) &&
-		(memory == 0 || desc.Memory == memory) {
-		// nothing change on CPU & Memory
-		return nil
-	}
-
 	if ncpu == 0 {
 		ncpu = int64(desc.NCPU)
 	}
@@ -194,7 +188,13 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 
 			c := u.getContainer()
 			if c == nil {
-				continue
+				return errors.WithStack(newContainerError(u.u.Name, notFound))
+			}
+
+			if c.Config.HostConfig.Memory == memory {
+				if n, err := c.Config.CountCPU(); err == nil && n == ncpu {
+					continue
+				}
 			}
 
 			pu := pending{
