@@ -148,7 +148,7 @@ func (c redisConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 	reg.Service.Name = spec.ID
 	reg.Service.Type = "unit_" + im.Name
 	reg.Service.Tag = desc.ID
-	reg.Service.Container.Name = spec.Container.ID
+	reg.Service.Container.Name = spec.Name
 	reg.Service.Container.HostName = spec.Engine.Node
 
 	return structs.ServiceRegistration{Horus: &reg}, nil
