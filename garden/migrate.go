@@ -155,7 +155,12 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 				return err
 			}
 
-			err = svc.so.MigrateUnit(news.unit.u.ID, old.unit.u.ID)
+			err = renameContainer(&news.unit, old.unit.u.Name)
+			if err != nil {
+				return err
+			}
+
+			err = svc.so.MigrateUnit(news.unit.u.ID, old.unit.u.ID, old.unit.u.Name)
 			if err != nil {
 				return err
 			}

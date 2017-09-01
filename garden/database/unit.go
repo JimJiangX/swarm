@@ -24,7 +24,7 @@ type UnitIface interface {
 	SetUnitStatus(u *Unit, status int, msg string) error
 	SetUnitAndTask(u *Unit, t *Task, msg string) error
 	SetUnits(units []Unit) error
-	MigrateUnit(src, dest string) error
+	MigrateUnit(src, destID, destName string) error
 
 	DelUnitsRelated(units []Unit, volume bool) error
 }
@@ -409,7 +409,7 @@ func (db dbBase) CountUnitsInEngines(engines []string) (int, error) {
 	return count, errors.Wrap(err, "cound Units by engines")
 }
 
-func (db dbBase) MigrateUnit(src, dest string) error {
+func (db dbBase) MigrateUnit(src, destID, destName string) error {
 
 	do := func(tx *sqlx.Tx) error {
 		u := Unit{}
@@ -421,23 +421,24 @@ func (db dbBase) MigrateUnit(src, dest string) error {
 		}
 
 		query = "UPDATE " + db.ipTable() + " SET unit_id=? WHERE unit_id=?"
-		_, err = tx.Exec(query, dest, src)
+		_, err = tx.Exec(query, destID, src)
 		if err != nil {
 			return errors.Wrap(err, "set ips")
 		}
 
 		query = "UPDATE " + db.volumeTable() + " SET unit_id=? WHERE unit_id=?"
-		_, err = db.Exec(query, dest, src)
+		_, err = db.Exec(query, destID, src)
 		if err != nil {
 			return errors.Wrap(err, "set volume")
 		}
 
-		err = db.txDelUnit(tx, dest)
+		err = db.txDelUnit(tx, destID)
 		if err != nil {
 			return err
 		}
 
-		u.ID = dest
+		u.ID = destID
+		u.Name = destName
 		err = db.txInsertUnits(tx, []Unit{u})
 		if err != nil {
 			return err

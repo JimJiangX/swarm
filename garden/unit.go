@@ -67,7 +67,7 @@ const (
 
 const (
 	notRunning = "is not running"
-	notFound   = "not found"
+	notFound   = "is not found"
 )
 
 type errContainer struct {

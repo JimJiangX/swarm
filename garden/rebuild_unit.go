@@ -62,15 +62,44 @@ func (gd *Garden) RebuildUnits(ctx context.Context, actor alloc.Allocator, svc *
 		if err != nil {
 			return err
 		}
+		{
+			err = svc.removeUnits(ctx, rm, nil)
+			if err != nil {
+				return err
+			}
 
-		err = svc.Compose(ctx, gd.PluginClient())
+			err = migrateUnits(adds, rm, networkings)
+			if err != nil {
+				return err
+			}
+		}
 
-		err = svc.removeUnits(ctx, rm, nil)
+		cms, err := svc.generateUnitsConfigs(ctx, nil)
 		if err != nil {
 			return err
 		}
 
-		err = migrateUnits(svc.so, adds, networkings)
+		err = svc.Compose(ctx, gd.PluginClient())
+		if err != nil {
+			return err
+		}
+
+		{
+
+			list := make([]*unit, 0, len(rm))
+			units, err := svc.getUnits()
+			if err != nil {
+				return err
+			}
+
+			for i := range rm {
+				if u := getUnit(units, rm[i].u.ID); u != nil {
+					list = append(list, u)
+				}
+			}
+
+			err = registerUnits(ctx, list, gd.KVClient(), cms)
+		}
 
 		return err
 	}
@@ -85,16 +114,16 @@ func (gd *Garden) RebuildUnits(ctx context.Context, actor alloc.Allocator, svc *
 	return task.ID, err
 }
 
-func migrateUnits(orm database.UnitOrmer, adds []*unit, networkings [][]database.IP) error {
-	type migrateID struct {
-		src, dest string
+func migrateUnits(adds, rm []*unit, networkings [][]database.IP) error {
+	type migrate struct {
+		src, dest *unit
 	}
 
-	list := make([]migrateID, 0, len(adds))
+	list := make([]migrate, 0, len(adds))
 
 high:
 	for i := range adds {
-		ips, err := orm.ListIPByUnitID(adds[i].u.ID)
+		ips, err := adds[i].uo.ListIPByUnitID(adds[i].u.ID)
 		if err != nil {
 			logrus.Errorf("%+v", err)
 		}
@@ -104,9 +133,11 @@ high:
 
 				for x := range ips {
 					if ips[x].IPAddr == networkings[j][k].IPAddr {
-						list = append(list, migrateID{
-							src:  ips[x].UnitID,
-							dest: networkings[j][k].UnitID,
+						u := getUnit(rm, networkings[j][k].UnitID)
+
+						list = append(list, migrate{
+							src:  adds[i],
+							dest: u,
 						})
 
 						continue high
@@ -116,11 +147,38 @@ high:
 		}
 	}
 
+	// rename container name
 	for i := range list {
-		err := orm.MigrateUnit(list[i].src, list[i].dest)
+		src, id, name := list[i].src, list[i].dest.u.ID, list[i].dest.u.Name
+
+		err := renameContainer(src, list[i].dest.u.Name)
 		if err != nil {
 			return err
 		}
+
+		err = src.uo.MigrateUnit(src.u.ID, id, name)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func renameContainer(u *unit, name string) error {
+	e := u.getEngine()
+	if e == nil {
+		return errors.WithStack(newNotFound("Engine", u.u.EngineID))
+	}
+
+	c := u.getContainer()
+	if c == nil {
+		return errors.WithStack(newContainerError(u.u.Name, notFound))
+	}
+
+	err := e.RenameContainer(c, name)
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
 	return nil
