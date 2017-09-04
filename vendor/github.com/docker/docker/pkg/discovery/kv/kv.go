@@ -96,16 +96,6 @@ func (s *Discovery) Initialize(uris string, heartbeat time.Duration, ttl time.Du
 		logrus.Info("Initializing discovery without TLS")
 	}
 
-	if clusterOpts["kv.dc"] != "" {
-		if config == nil {
-			config = &store.Config{
-				Datacenter: clusterOpts["kv.dc"],
-			}
-		} else {
-			config.Datacenter = clusterOpts["kv.dc"]
-		}
-	}
-
 	// Creates a new store, will ignore options given
 	// if not supported by the chosen store
 	s.store, err = libkv.NewStore(s.backend, addrs, config)
