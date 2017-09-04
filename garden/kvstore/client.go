@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -65,13 +64,6 @@ func NewClient(uri string, options map[string]string) (Client, error) {
 // MakeClient returns a consul kv client
 func MakeClient(config *api.Config, prefix, port string, tlsConfig *tls.Config) (*kvClient, error) {
 	if tlsConfig != nil {
-		os.Setenv(api.HTTPSSLEnvName, "true")
-		defer os.Setenv(api.HTTPSSLEnvName, "false")
-
-		if tlsConfig.InsecureSkipVerify {
-			os.Setenv(api.HTTPSSLVerifyEnvName, "false")
-		}
-
 		config.HttpClient.Transport = &http.Transport{
 			TLSClientConfig: tlsConfig,
 		}
