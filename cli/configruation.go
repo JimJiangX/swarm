@@ -58,7 +58,7 @@ func configruation(c *cli.Context) {
 		log.Fatalf("discovery required to manage a cluster. See '%s manage --help'.", c.App.Name)
 	}
 
-	kvClient, err := kvstore.NewClient(uri, tlsConfig)
+	kvClient, err := kvstore.NewClient(uri, getDiscoveryOpt(c))
 	if err != nil {
 		log.Fatalf("fail to connect to kv store:'%s',%+v", uri, err)
 	}

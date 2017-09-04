@@ -3,11 +3,13 @@ package kvstore
 import (
 	"crypto/tls"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/docker/go-connections/tlsconfig"
 	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 )
@@ -18,7 +20,7 @@ const (
 )
 
 // NewClient returns a consul Client
-func NewClient(uri string, tlsConfig *tls.Config) (Client, error) {
+func NewClient(uri string, options map[string]string) (Client, error) {
 	if uri == "" {
 		uri = defaultConsulAddr
 	}
@@ -45,6 +47,18 @@ func NewClient(uri string, tlsConfig *tls.Config) (Client, error) {
 		WaitTime: defaultTimeout,
 	}
 
+	var tlsConfig *tls.Config
+	if options["kv.cacertfile"] != "" && options["kv.certfile"] != "" && options["kv.keyfile"] != "" {
+		tlsConfig, err = tlsconfig.Client(tlsconfig.Options{
+			CAFile:   options["kv.cacertfile"],
+			CertFile: options["kv.certfile"],
+			KeyFile:  options["kv.keyfile"],
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return MakeClient(config, prefix, port, tlsConfig)
 }
 
@@ -57,7 +71,13 @@ func MakeClient(config *api.Config, prefix, port string, tlsConfig *tls.Config) 
 		if tlsConfig.InsecureSkipVerify {
 			os.Setenv(api.HTTPSSLVerifyEnvName, "false")
 		}
+
+		config.HttpClient.Transport = &http.Transport{
+			TLSClientConfig: tlsConfig,
+		}
+		config.Scheme = "https"
 	}
+
 	c, err := api.NewClient(config)
 	if err != nil {
 		return nil, errors.WithStack(err)

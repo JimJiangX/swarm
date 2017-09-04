@@ -376,7 +376,7 @@ func manage(c *cli.Context) {
 
 		storage.SetDefaultStores(filepath.Dir(sys.SourceDir), ormer)
 
-		kvc, err := kvstore.NewClient(uri, tlsConfig)
+		kvc, err := kvstore.NewClient(uri, getDiscoveryOpt(c))
 		if err != nil {
 			log.Fatalf("%+v", err)
 		}
