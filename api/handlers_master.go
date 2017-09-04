@@ -1685,8 +1685,8 @@ func vaildPostServiceLinkRequest(v structs.ServicesLink) error {
 
 	errs := make([]string, 0, 3)
 
-	for i := range v {
-		if v[i] != nil && v[i].ID == "" {
+	for i := range v.Links {
+		if v.Links[i] != nil && v.Links[i].ID == "" {
 			errs = append(errs, "ServiceLink.ID is required")
 		}
 	}

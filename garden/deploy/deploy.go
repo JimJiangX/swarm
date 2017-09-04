@@ -160,7 +160,7 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *databas
 }
 
 // Link is exported,not done yet.
-func (d *Deployment) Link(ctx context.Context, links []*structs.ServiceLink) (string, error) {
+func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (string, error) {
 	err := d.freshServicesLink(links)
 	if err != nil {
 		return "", err
@@ -199,7 +199,7 @@ func (d *Deployment) Link(ctx context.Context, links []*structs.ServiceLink) (st
 }
 
 func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
-	ids := links.Links()
+	ids := links.LinkIDs()
 
 	switch len(ids) {
 	case 0:
@@ -215,7 +215,7 @@ func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
 			return err
 		}
 
-		links[0].Spec = spec
+		links.Links[0].Spec = spec
 
 		return nil
 	}
@@ -240,20 +240,20 @@ func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
 
 	containers := d.gd.Cluster.Containers()
 
-	for l := range links {
+	for l := range links.Links {
 
-		info, ok := m[links[l].ID]
+		info, ok := m[links.Links[l].ID]
 		if ok {
 			spec := garden.ConvertServiceInfo(info, containers)
-			links[l].Spec = &spec
+			links.Links[l].Spec = &spec
 		}
 
-		delete(m, links[l].ID)
+		delete(m, links.Links[l].ID)
 	}
 
 	for _, val := range m {
 		spec := garden.ConvertServiceInfo(val, containers)
-		links = append(links, &structs.ServiceLink{
+		links.Links = append(links.Links, &structs.ServiceLink{
 			ID:   spec.ID,
 			Spec: &spec,
 		})
