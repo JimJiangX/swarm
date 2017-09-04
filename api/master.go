@@ -70,8 +70,9 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/softwares/images/{name:.*}": getImage,
 		"/softwares/images/supported": getSupportImages,
 
-		"/services":        getServices,
-		"/services/{name}": getServicesByNameOrID,
+		"/services":                    getServices,
+		"/services/{name}":             getServicesByNameOrID,
+		"/services/{name}/backupfiles": getServiceBackupFiles,
 
 		"/storage/san":           getSANStoragesInfo,
 		"/storage/san/{name:.*}": getSANStorageInfo,

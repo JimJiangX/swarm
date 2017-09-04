@@ -20,15 +20,15 @@ type BackupFileIface interface {
 
 // BackupFile is table _backup_files structure,correspod with backup files
 type BackupFile struct {
-	ID         string    `db:"id"`
-	TaskID     string    `db:"task_id"`
-	UnitID     string    `db:"unit_id"`
-	Type       string    `db:"type"` // full or incremental
-	Path       string    `db:"path"`
-	SizeByte   int       `db:"size"`
-	Retention  time.Time `db:"retention"`
-	CreatedAt  time.Time `db:"created_at"`
-	FinishedAt time.Time `db:"finished_at"`
+	ID         string    `db:"id" json:"id"`
+	TaskID     string    `db:"task_id" json:"task_id"`
+	UnitID     string    `db:"unit_id" json:"unit_id"`
+	Type       string    `db:"type" json:"type"` // full or incremental
+	Path       string    `db:"path" json:"path"`
+	SizeByte   int       `db:"size" json:"size"`
+	Retention  time.Time `db:"retention" json:"retention"`
+	CreatedAt  time.Time `db:"created_at" json:"created_at"`
+	FinishedAt time.Time `db:"finished_at" json:"finished_at"`
 }
 
 func (db dbBase) backupFileTable() string {

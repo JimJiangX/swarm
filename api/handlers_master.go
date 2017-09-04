@@ -2156,7 +2156,7 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		config.BackupDir = "/backup"
 	}
 	if config.Type == "" {
-		config.Type = "full-backup"
+		config.Type = "full"
 	}
 	if config.FilesRetention == 0 {
 		config.FilesRetention = 7
@@ -2385,6 +2385,27 @@ func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	}
 
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
+}
+
+func getServiceBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	files, err := gd.Ormer().ListBackupFilesByService(name)
+	if err != nil {
+		ec := errCodeV1(_Service, dbQueryError, 171, "fail to query database", "数据库查询错误（备份文件表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, files, http.StatusOK)
 }
 
 // -----------------/units handlers-----------------
