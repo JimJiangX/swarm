@@ -109,13 +109,16 @@ func checkBackupFilesByService(service string, iface database.BackupFileIface, m
 		}
 	}
 
-	sum := 0
-	for i := range valid {
-		sum += valid[i].SizeByte
-	}
+	// check used space if space is limited
+	if maxSize > 0 {
+		sum := 0
+		for i := range valid {
+			sum += valid[i].SizeByte
+		}
 
-	if sum > maxSize {
-		return valid, expired, errors.Errorf("no more space for backup task,%d<%d", maxSize, sum)
+		if sum > maxSize {
+			return valid, expired, errors.Errorf("no more space for backup task,%d<%d", maxSize, sum)
+		}
 	}
 
 	return valid, expired, nil

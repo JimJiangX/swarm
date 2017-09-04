@@ -2109,29 +2109,30 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func vaildPostServiceBackupRequest(v structs.ServiceBackupConfig) error {
-	errs := make([]string, 0, 4)
+	return nil
+	//	errs := make([]string, 0, 4)
 
-	if v.BackupDir == "" {
-		errs = append(errs, "BackupDir is required")
-	}
+	//	if v.BackupDir == "" {
+	//		errs = append(errs, "BackupDir is required")
+	//	}
 
-	if v.Type == "" {
-		errs = append(errs, "Type is required")
-	}
+	//	if v.Type == "" {
+	//		errs = append(errs, "Type is required")
+	//	}
 
-	if v.MaxSizeByte <= 0 {
-		errs = append(errs, "MaxSizeByte is required")
-	}
+	//	if v.MaxSizeByte <= 0 {
+	//		errs = append(errs, "MaxSizeByte is required")
+	//	}
 
-	if v.FilesRetention == 0 {
-		errs = append(errs, "FilesRetention is required")
-	}
+	//	if v.FilesRetention == 0 {
+	//		errs = append(errs, "FilesRetention is required")
+	//	}
 
-	if len(errs) == 0 {
-		return nil
-	}
+	//	if len(errs) == 0 {
+	//		return nil
+	//	}
 
-	return fmt.Errorf("ServiceBackupConfig:%v,%s", v, errs)
+	//	return fmt.Errorf("ServiceBackupConfig:%v,%s", v, errs)
 }
 
 func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2149,6 +2150,16 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		ec := errCodeV1(_Service, invaildParamsError, 132, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
+	}
+
+	if config.BackupDir == "" {
+		config.BackupDir = "/backup"
+	}
+	if config.Type == "" {
+		config.Type = "full-backup"
+	}
+	if config.FilesRetention == 0 {
+		config.FilesRetention = 7
 	}
 
 	ok, _, gd := fromContext(ctx, _Garden)
