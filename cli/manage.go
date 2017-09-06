@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -375,6 +376,12 @@ func manage(c *cli.Context) {
 		}
 
 		storage.SetDefaultStores(filepath.Dir(sys.SourceDir), ormer)
+
+		// set consul datacenter env
+		err = os.Setenv("CONSUL_HTTP_DATACENTER", sys.ConsulDatacenter)
+		if err != nil {
+			log.Fatalf("%+v", err)
+		}
 
 		kvc, err := kvstore.NewClient(uri, getDiscoveryOpt(c))
 		if err != nil {
