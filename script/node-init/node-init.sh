@@ -24,6 +24,10 @@ nfs_ip=${20}
 nfs_dir=${21}
 nfs_mount_dir=${22}
 nfs_mount_opts=${23}
+san_id=${24}
+if [ "$san_id" == "null" ]; then
+	san_id=''
+fi
 
 cur_dir=`dirname $0`
 
@@ -301,7 +305,7 @@ install_docker() {
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label CONTAINER_NIC=${container_nic} --label PF_DEV_BW=${pf_dev_bw}
+DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label CONTAINER_NIC=${container_nic} --label PF_DEV_BW=${pf_dev_bw} --label SAN_ID=${san_id}
 
 DOCKER_NETWORK_OPTIONS=""
 
