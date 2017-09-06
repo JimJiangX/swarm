@@ -373,22 +373,26 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 		nfs_dir=${21}
 		nfs_mount_dir=${22}
 		nfs_mount_opts=${23}
+		san_storage_id=${24}
 	*/
-	hdd, ssd := "null", "null"
+	hdd, ssd, store := "null", "null", "null"
 	if len(nt.hdd) > 0 {
 		hdd = strings.Join(nt.hdd, ",")
 	}
 	if len(nt.ssd) > 0 {
 		ssd = strings.Join(nt.ssd, ",")
 	}
+	if nt.Node.Storage != "" {
+		nt.Node.Storage = store
+	}
 
-	script := fmt.Sprintf(`chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %s %s %s %d %d %s %s %s %s`,
+	script := fmt.Sprintf(`chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %s %s %s %d %d %s %s %s %s %s`,
 		path, path, dockerNodesKVPath, nt.Node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile,
 		config.Ports.Docker, hdd, ssd, config.ConsulPort,
 		nt.Node.ID, horusIP, horusPort, config.Ports.Plugin, config.Ports.SwarmAgent,
-		nt.Node.NFS.Addr, nt.Node.NFS.Dir, nt.Node.NFS.MountDir, nt.Node.NFS.Options)
+		nt.Node.NFS.Addr, nt.Node.NFS.Dir, nt.Node.NFS.MountDir, nt.Node.NFS.Options, store)
 
 	return script, nil
 }
