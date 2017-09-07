@@ -94,5 +94,6 @@ type UnitLink struct {
 }
 
 type ServiceLinkResponse struct {
-	Links []UnitLink
+	Links   []UnitLink
+	Compose []string
 }

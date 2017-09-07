@@ -73,6 +73,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/services":                    getServices,
 		"/services/{name}":             getServicesByNameOrID,
 		"/services/{name}/backupfiles": getServiceBackupFiles,
+		"/services/{name}/configs":     getServiceConfigFiles,
 
 		"/storage/san":           getSANStoragesInfo,
 		"/storage/san/{name:.*}": getSANStorageInfo,

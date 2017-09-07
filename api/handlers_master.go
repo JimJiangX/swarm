@@ -2408,6 +2408,33 @@ func getServiceBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	writeJSON(w, files, http.StatusOK)
 }
 
+func getServiceConfigFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	svc, err := gd.GetService(name)
+	if err != nil {
+		ec := errCodeV1(_Service, dbQueryError, 181, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	cms, err := svc.GetUnitsConfigs(ctx)
+	if err != nil {
+		ec := errCodeV1(_Service, dbQueryError, 182, "fail to query units configs from kv", "获取服务单元配置错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, cms, http.StatusOK)
+}
+
 // -----------------/units handlers-----------------
 func proxySpecialLogic(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {

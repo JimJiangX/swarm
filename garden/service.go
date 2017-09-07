@@ -1000,3 +1000,7 @@ func (svc *Service) generateUnitConfig(ctx context.Context, nameOrID string, arg
 func (svc *Service) generateUnitsCmd(ctx context.Context) (structs.Commands, error) {
 	return svc.pc.GetCommands(ctx, svc.svc.ID)
 }
+
+func (svc *Service) GetUnitsConfigs(ctx context.Context) (structs.ConfigsMap, error) {
+	return svc.pc.GetServiceConfig(ctx, svc.svc.ID)
+}
