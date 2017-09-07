@@ -1001,6 +1001,21 @@ func (svc *Service) generateUnitsCmd(ctx context.Context) (structs.Commands, err
 	return svc.pc.GetCommands(ctx, svc.svc.ID)
 }
 
-func (svc *Service) GetUnitsConfigs(ctx context.Context) (structs.ConfigsMap, error) {
-	return svc.pc.GetServiceConfig(ctx, svc.svc.ID)
+func (svc *Service) GetUnitsConfigs(ctx context.Context) (structs.ServiceConfigsResponse, error) {
+	resp := structs.ServiceConfigsResponse{}
+
+	cms, err := svc.pc.GetServiceConfig(ctx, svc.svc.ID)
+	if err != nil {
+		return resp, err
+	}
+
+	ct, err := svc.pc.GetImage(ctx, svc.svc.Desc.Image)
+	if err != nil {
+		return resp, err
+	}
+
+	resp.Configs = cms
+	resp.Keysets = ct.Keysets
+
+	return resp, err
 }
