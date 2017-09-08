@@ -185,6 +185,7 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 				n.Labels[nodeLabel] = out[o].ID
 				n.Labels[roomLabel] = out[o].Room
 				n.Labels[seatLabel] = out[o].Seat
+				n.Labels[sanLabel] = out[o].Storage
 				break
 			}
 		}
