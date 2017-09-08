@@ -240,6 +240,8 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	}
 
 	opts := svc.options
+	isSAN := isSANStorage(opts.Require.Volumes)
+
 	config := cluster.BuildContainerConfig(container.Config{
 		Tty:       true,
 		OpenStdin: true,
@@ -262,6 +264,9 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		}
 		if out := opts.Nodes.Clusters; len(out) > 0 {
 			config.AddConstraint(clusterLabel + "==" + strings.Join(out, "|"))
+		}
+		if isSAN {
+			config.AddConstraint(sanLabel + `!=""`)
 		}
 	}
 
@@ -328,7 +333,6 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	defer recycle()
 
 	out := sortByCluster(candidates, opts.Nodes.Clusters)
-	isSAN := isSANStorage(opts.Require.Volumes)
 
 	for _, nodes := range out {
 		select {
