@@ -690,9 +690,17 @@ func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[
 		return err
 	}
 
-	err = u.updateServiceConfig(ctx, config.DataMount, config.Content)
+	return u.updateServiceConfig(ctx, config.DataMount, config.Content)
+}
 
-	return err
+// UpdateUnitConfig update the assigned unit config file.
+func (svc *Service) UpdateUnitConfig(ctx context.Context, nameOrID, path, content string) error {
+	u, err := svc.getUnit(nameOrID)
+	if err != nil {
+		return err
+	}
+
+	return u.updateServiceConfig(ctx, path, content)
 }
 
 // Stop stop units services,stop container if containers is true.

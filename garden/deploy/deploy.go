@@ -190,12 +190,93 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 			}
 		}()
 
-		err = d.gd.PluginClient().ServicesLink(ctx, links)
+		// generate new units config and commands,and sorted
+		resp, err := d.gd.PluginClient().ServicesLink(ctx, links)
+		if err != nil {
+			return err
+		}
+
+		var (
+			svc       *garden.Service
+			serviceID string
+		)
+
+		// update units config file.
+		for _, ul := range resp.Links {
+			if ul.ServiceID == "" || ul.NameOrID == "" {
+				continue
+			}
+
+			if ul.ServiceID != serviceID {
+				s := d.serviceFromLinks(links, ul.ServiceID)
+				if s == nil {
+					return errors.Errorf("not found Service '%s' from ServicesLink", ul.ServiceID)
+				}
+
+				svc = s
+				serviceID = ul.ServiceID
+			}
+
+			err := svc.UpdateUnitConfig(ctx, ul.NameOrID, ul.ConfigFile, ul.ConfigContent)
+			if err != nil {
+				return err
+			}
+		}
+
+		// start units service
+		for _, ul := range resp.Links {
+			if ul.ServiceID == "" || ul.NameOrID == "" {
+				continue
+			}
+
+			if ul.ServiceID != serviceID {
+				s := d.serviceFromLinks(links, ul.ServiceID)
+				if s == nil {
+					return errors.Errorf("not found Service '%s' from ServicesLink", ul.ServiceID)
+				}
+
+				svc = s
+				serviceID = ul.ServiceID
+			}
+
+			err := svc.Exec(ctx, structs.ServiceExecConfig{
+				Container: ul.NameOrID,
+				Cmd:       ul.Commands,
+			}, false, nil)
+
+			if err != nil {
+				return err
+			}
+		}
+
+		// service compose
+		for _, name := range resp.Compose {
+			svc := d.serviceFromLinks(links, name)
+			if svc == nil {
+				return errors.Errorf("not found Service '%s' from ServicesLink", name)
+			}
+
+			err := svc.Compose(ctx, d.gd.PluginClient())
+			if err != nil {
+				return err
+			}
+		}
 
 		return err
 	}()
 
 	return task.ID, nil
+}
+
+func (d *Deployment) serviceFromLinks(links structs.ServicesLink, nameOrID string) *garden.Service {
+	for _, l := range links.Links {
+		if l.Spec != nil &&
+			(l.Spec.ID == nameOrID || l.Spec.Name == nameOrID) {
+			return d.gd.NewService(l.Spec, nil)
+		}
+	}
+
+	return nil
 }
 
 func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {

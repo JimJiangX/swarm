@@ -37,7 +37,7 @@ type PluginAPI interface {
 
 	UpdateConfigs(ctx context.Context, service string, configs structs.ConfigsMap) error
 	ServiceCompose(ctx context.Context, spec structs.ServiceSpec) error
-	ServicesLink(ctx context.Context, links structs.ServicesLink) error
+	ServicesLink(ctx context.Context, links structs.ServicesLink) (structs.ServiceLinkResponse, error)
 }
 
 type plugin struct {
@@ -247,15 +247,22 @@ func (p plugin) ServiceCompose(ctx context.Context, spec structs.ServiceSpec) er
 	return nil
 }
 
-func (p plugin) ServicesLink(ctx context.Context, links structs.ServicesLink) error {
-	resp, err := requireOK(p.c.Post(ctx, "/services/link", links))
+func (p plugin) ServicesLink(ctx context.Context, links structs.ServicesLink) (structs.ServiceLinkResponse, error) {
+	const uri = "/services/link"
+	obj := structs.ServiceLinkResponse{}
+
+	resp, err := requireOK(p.c.Post(ctx, uri, links))
 	if err != nil {
-		return err
+		return obj, err
+	}
+	defer resp.Body.Close()
+
+	err = decodeBody(resp, &obj)
+	if err != nil {
+		return obj, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, uri, err)
 	}
 
-	ensureBodyClose(resp)
-
-	return nil
+	return obj, nil
 }
 
 // decodeBody is used to JSON decode a body

@@ -88,6 +88,7 @@ func (sl ServicesLink) LinkIDs() []string {
 
 type UnitLink struct {
 	NameOrID      string
+	ServiceID     string
 	ConfigFile    string
 	ConfigContent string
 	Commands      []string
