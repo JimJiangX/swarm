@@ -263,7 +263,7 @@ func defaultConfig(transportFn func() *http.Transport) *Config {
 	}
 
 	if dc := os.Getenv(HTTPDatacenterEnvName); dc != "" {
-		config.Datacenter = dc
+		config.Datacenter = strings.ToLower(dc)
 	}
 
 	if auth := os.Getenv(HTTPAuthEnvName); auth != "" {
