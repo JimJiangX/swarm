@@ -30,7 +30,7 @@ func parseListToConfigs(pairs api.KVPairs) (structs.ConfigsMap, error) {
 		c := structs.ConfigCmds{}
 		err := json.Unmarshal(pairs[i].Value, &c)
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return cm, errors.WithStack(err)
 		}
 
 		cm[c.ID] = c

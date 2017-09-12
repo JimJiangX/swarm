@@ -422,9 +422,14 @@ func generateServiceConfigs(ctx context.Context, kvc kvstore.Store, req structs.
 		image = parts[0]
 	}
 
-	t, err := getTemplateFromStore(ctx, kvc, image, version)
+	template, err := getTemplateFromStore(ctx, kvc, image, version)
 	if err != nil {
 		return nil, err
+	}
+
+	cm, err := getConfigMapFromStore(ctx, kvc, req.Service.ID)
+	if err != nil {
+		// ignore error
 	}
 
 	resp := make(structs.ConfigsMap, len(req.Units))
@@ -432,6 +437,15 @@ func generateServiceConfigs(ctx context.Context, kvc kvstore.Store, req structs.
 	for i := range req.Units {
 		if unitID != "" && req.Units[i].ID != unitID {
 			continue
+		}
+
+		t := template
+
+		if cc, ok := cm[req.Units[i].ID]; ok {
+			t.ConfigFile = cc.ConfigFile
+			t.Content = cc.Content
+			t.DataMount = cc.DataMount
+			t.LogMount = cc.LogMount
 		}
 
 		cc, err := generateUnitConfig(req.Units[i].ID, parser, t, req)
