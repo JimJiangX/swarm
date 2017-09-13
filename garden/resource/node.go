@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -417,6 +418,10 @@ func (m hostManager) registerNodesLoop(ctx context.Context, cancel context.Cance
 				logrus.Errorf("reigster nodes error,%+v", err)
 			}
 
+			if errors.Cause(err) == sql.ErrNoRows {
+				return
+			}
+
 			err = m.registerNodesTimeout(nodes, ctx.Err())
 			logrus.Errorf("deal with Nodes timeout%+v", err)
 
@@ -426,6 +431,10 @@ func (m hostManager) registerNodesLoop(ctx context.Context, cancel context.Cance
 		err := m.registerNodes(ctx, nodes, sys, reg)
 		if err != nil {
 			logrus.Errorf("reigster nodes error,%+v", err)
+		}
+
+		if errors.Cause(err) == sql.ErrNoRows {
+			return
 		}
 	}
 }
@@ -438,14 +447,20 @@ func (m hostManager) registerNodes(ctx context.Context, nodes []nodeWithTask, sy
 
 	for i := range nodes {
 
+		field := logrus.WithField("host", nodes[i].Node.Addr)
+
 		n, err := m.dco.GetNode(nodes[i].Node.ID)
 		if err != nil {
-			return err
+			field.Warnf("%+v", err)
+
+			if len(nodes)-1 == i {
+				return err
+			}
+
+			continue
 		}
 
 		nodes[i].Node = n
-
-		field := logrus.WithField("host", n.Addr)
 
 		if n.Status != statusNodeInstalled {
 			if n.Status > statusNodeInstalled {
