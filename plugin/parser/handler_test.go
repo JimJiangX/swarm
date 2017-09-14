@@ -220,7 +220,7 @@ func TestGetConfigs(t *testing.T) {
 	}
 
 	for id, val := range cm {
-		t.Log(id, val.ID, val.GetServiceRegistration().Horus == nil)
+		t.Log(id, val.ID)
 	}
 }
 
