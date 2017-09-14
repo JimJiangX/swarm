@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/docker/swarm/garden/structs"
 	"github.com/pkg/errors"
@@ -24,6 +25,16 @@ func (redisConfig) clone(t *structs.ConfigTemplate) parser {
 		template: t,
 		config:   make(map[string]string, 100),
 	}
+}
+
+func (c *redisConfig) set(key string, val interface{}) error {
+	if c.config == nil {
+		c.config = make(map[string]string, 100)
+	}
+
+	c.config[strings.ToLower(key)] = fmt.Sprintf("%v", val)
+
+	return nil
 }
 
 func (c redisConfig) Validate(data map[string]interface{}) error {
