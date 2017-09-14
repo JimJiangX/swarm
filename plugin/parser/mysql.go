@@ -16,6 +16,10 @@ import (
 func init() {
 	register("mysql", "5.6", &mysqlConfig{})
 	register("mysql", "5.7", &mysqlConfig{})
+
+	register("upsql", "1.0", &mysqlConfig{})
+	register("upsql", "2.0", &mysqlConfig{})
+	register("upsql", "3.0", &mysqlConfig{})
 }
 
 const (
@@ -36,6 +40,26 @@ func (mysqlConfig) clone(t *structs.ConfigTemplate) parser {
 
 func (mysqlConfig) Validate(data map[string]interface{}) error {
 	return nil
+}
+
+func (c mysqlConfig) get(key string) string {
+	if c.config == nil {
+		return ""
+	}
+
+	if val := c.config.String(key); val != "" {
+		return val
+	}
+
+	if c.template != nil {
+		for i := range c.template.Keysets {
+			if c.template.Keysets[i].Key == key {
+				return c.template.Keysets[i].Default
+			}
+		}
+	}
+
+	return ""
 }
 
 func (c *mysqlConfig) set(key string, val interface{}) error {
@@ -81,8 +105,6 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 
 	if p, ok := desc.Options["port"]; ok && p != nil {
 		m["mysqld::port"] = p
-	} else {
-		m["mysqld::port"] = 3306
 	}
 
 	if c.template != nil {

@@ -16,6 +16,11 @@ func init() {
 	register("proxy", "1.0.2", &proxyConfigV102{})
 	register("proxy", "1.1.0", &proxyConfigV110{})
 	register("proxy", "1.2.6", &proxyConfigV126{})
+
+	register("upproxy", "1.0", &proxyConfigV102{})
+	register("upproxy", "1.1", &proxyConfigV110{})
+	register("upproxy", "1.2", &proxyConfigV126{})
+	register("upproxy", "1.3", &proxyConfigV126{})
 }
 
 type proxyConfig struct {
@@ -28,6 +33,26 @@ func (proxyConfig) clone(t *structs.ConfigTemplate) parser {
 }
 
 func (proxyConfig) Validate(data map[string]interface{}) error { return nil }
+
+func (c proxyConfig) get(key string) string {
+	if c.config == nil {
+		return ""
+	}
+
+	if val := c.config.String(key); val != "" {
+		return val
+	}
+
+	if c.template != nil {
+		for i := range c.template.Keysets {
+			if c.template.Keysets[i].Key == key {
+				return c.template.Keysets[i].Default
+			}
+		}
+	}
+
+	return ""
+}
 
 func (c *proxyConfig) set(key string, val interface{}) error {
 	if c.config == nil {

@@ -13,6 +13,11 @@ import (
 
 func init() {
 	register("redis", "3.2", &redisConfig{})
+
+	register("upredis", "1.0", &redisConfig{})
+	register("upredis", "1.1", &redisConfig{})
+	register("upredis", "1.2", &redisConfig{})
+	register("upredis", "2.0", &redisConfig{})
 }
 
 type redisConfig struct {
@@ -25,6 +30,26 @@ func (redisConfig) clone(t *structs.ConfigTemplate) parser {
 		template: t,
 		config:   make(map[string]string, 100),
 	}
+}
+
+func (c redisConfig) get(key string) string {
+	if c.config == nil {
+		return ""
+	}
+
+	if val, ok := c.config[key]; ok {
+		return val
+	}
+
+	if c.template != nil {
+		for i := range c.template.Keysets {
+			if c.template.Keysets[i].Key == key {
+				return c.template.Keysets[i].Default
+			}
+		}
+	}
+
+	return ""
 }
 
 func (c *redisConfig) set(key string, val interface{}) error {

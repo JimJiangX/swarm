@@ -2425,14 +2425,14 @@ func getServiceConfigFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	cms, err := svc.GetUnitsConfigs(ctx)
+	out, err := svc.GetUnitsConfigs(ctx)
 	if err != nil {
 		ec := errCodeV1(_Service, dbQueryError, 182, "fail to query units configs from kv", "获取服务单元配置错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	writeJSON(w, cms, http.StatusOK)
+	writeJSON(w, out, http.StatusOK)
 }
 
 // -----------------/units handlers-----------------

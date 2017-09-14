@@ -85,10 +85,7 @@ type Commands map[string]CmdsMap
 
 type ConfigsMap map[string]ConfigCmds
 
-type ServiceConfigsResponse struct {
-	Configs ConfigsMap `json:"config_map"`
-	Keysets []Keyset   `json:"keysets"`
-}
+type ServiceConfigsResponse []UnitConfigResponse
 
 func (c CmdsMap) Get(typ string) []string {
 	if c == nil {

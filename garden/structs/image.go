@@ -106,6 +106,7 @@ type Keyset struct {
 	CanSet      bool   `json:"can_set"`
 	MustRestart bool   `json:"must_restart"`
 	Key         string `json:"key"`
+	Value       string `json:"value"`
 	Default     string `json:"default"`
 	Desc        string `json:"desc"`
 	Range       string `json:"range"`
@@ -114,12 +115,20 @@ type Keyset struct {
 type ConfigTemplate struct {
 	Image string `json:"image"`
 	// Mount     string
-	LogMount   string   `json:"log_mount"`
-	DataMount  string   `json:"data_mount"`
-	ConfigFile string   `json:"config_file"`
-	Content    string   `json:"content"`
-	Keysets    []Keyset `json:"keysets"`
-	Timestamp  int64    `json:"timestamp"`
+	LogMount   string `json:"log_mount"`
+	DataMount  string `json:"data_mount"`
+	ConfigFile string `json:"config_file"`
+	Content    string `json:"content"`
+
+	Keysets   []Keyset `json:"keysets"`
+	Timestamp int64    `json:"timestamp"`
+}
+
+type UnitConfigResponse struct {
+	ID      string `json:"id"`
+	Service string `json:"name"`
+	ConfigTemplate
+	Cmds CmdsMap `json:"cmds,omitempty"`
 }
 
 type ImageResponse struct {

@@ -39,6 +39,26 @@ func (c *switchManagerConfig) ParseData(data []byte) error {
 	return nil
 }
 
+func (c switchManagerConfig) get(key string) string {
+	if c.config == nil {
+		return ""
+	}
+
+	if val := c.config.String(key); val != "" {
+		return val
+	}
+
+	if c.template != nil {
+		for i := range c.template.Keysets {
+			if c.template.Keysets[i].Key == key {
+				return c.template.Keysets[i].Default
+			}
+		}
+	}
+
+	return ""
+}
+
 func (c *switchManagerConfig) set(key string, val interface{}) error {
 	if c.config == nil {
 		return errors.New("switchManagerConfig Configer is nil")

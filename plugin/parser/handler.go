@@ -125,9 +125,76 @@ func getConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	image, version := "", ""
+	for _, v := range cm {
+		image = v.Name
+		version = v.Version
+		break
+	}
+
+	t, err := getTemplateFromStore(ctx.context, ctx.client, image, version)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	out, err := getServiceConfigResponse(service, cm, t)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(cm)
+	json.NewEncoder(w).Encode(out)
+}
+
+func getServiceConfigResponse(service string, cm structs.ConfigsMap, t structs.ConfigTemplate) ([]structs.UnitConfigResponse, error) {
+	out := make([]structs.UnitConfigResponse, 0, len(cm))
+	var (
+		pr  parser
+		err error
+	)
+
+	for _, cc := range cm {
+		image := cc.Name + ":" + cc.Version
+
+		uc := structs.UnitConfigResponse{
+			ID:      cc.ID,
+			Service: service,
+			Cmds:    cc.Cmds,
+			ConfigTemplate: structs.ConfigTemplate{
+				Image:      image,
+				LogMount:   cc.LogMount,
+				DataMount:  cc.DataMount,
+				ConfigFile: cc.ConfigFile,
+				Content:    cc.Content,
+				Keysets:    t.Keysets,
+				Timestamp:  cc.Timestamp,
+			},
+		}
+
+		if pr == nil {
+			pr, err = factory(image)
+			if err != nil {
+				return out, err
+			}
+		}
+		pr = pr.clone(&t)
+
+		err = pr.ParseData([]byte(cc.Content))
+		if err != nil {
+			return out, err
+		}
+
+		for i := range uc.Keysets {
+			uc.Keysets[i].Value = pr.get(uc.Keysets[i].Key)
+		}
+
+		out = append(out, uc)
+	}
+
+	return out, nil
 }
 
 func getConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
@@ -184,10 +251,34 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 	parser = parser.clone(&req)
 
-	err = parser.ParseData([]byte(req.Content))
-	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
+	if len(req.Content) > 0 {
+		err = parser.ParseData([]byte(req.Content))
+		if err != nil {
+			httpError(w, err, http.StatusInternalServerError)
+			return
+		}
+
+		for i := range req.Keysets {
+			req.Keysets[i].Value = parser.get(req.Keysets[i].Key)
+		}
+	} else {
+		for i, ks := range req.Keysets {
+			err = parser.set(ks.Key, ks.Default)
+			if err != nil {
+				httpError(w, err, http.StatusInternalServerError)
+				return
+			}
+
+			req.Keysets[i].Value = req.Keysets[i].Default
+		}
+
+		out, err := parser.Marshal()
+		if err != nil {
+			httpError(w, err, http.StatusInternalServerError)
+			return
+		}
+
+		req.Content = string(out)
 	}
 
 	err = putTemplateToStore(ctx.context, ctx.client, req)

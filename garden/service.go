@@ -678,21 +678,6 @@ func (svc *Service) updateConfigs(ctx context.Context, units []*unit, configs st
 	return nil
 }
 
-// UpdateConfig update the assigned unit config file.
-func (svc *Service) UpdateConfig(ctx context.Context, nameOrID string, args map[string]interface{}) error {
-	u, err := svc.getUnit(nameOrID)
-	if err != nil {
-		return err
-	}
-
-	config, err := svc.generateUnitConfig(ctx, u.u.ID, args)
-	if err != nil {
-		return err
-	}
-
-	return u.updateServiceConfig(ctx, config.DataMount, config.Content)
-}
-
 // UpdateUnitConfig update the assigned unit config file.
 func (svc *Service) UpdateUnitConfig(ctx context.Context, nameOrID, path, content string) error {
 	u, err := svc.getUnit(nameOrID)
@@ -1010,20 +995,5 @@ func (svc *Service) generateUnitsCmd(ctx context.Context) (structs.Commands, err
 }
 
 func (svc *Service) GetUnitsConfigs(ctx context.Context) (structs.ServiceConfigsResponse, error) {
-	resp := structs.ServiceConfigsResponse{}
-
-	cms, err := svc.pc.GetServiceConfig(ctx, svc.svc.ID)
-	if err != nil {
-		return resp, err
-	}
-
-	ct, err := svc.pc.GetImage(ctx, svc.svc.Desc.Image)
-	if err != nil {
-		return resp, err
-	}
-
-	resp.Configs = cms
-	resp.Keysets = ct.Keysets
-
-	return resp, err
+	return svc.pc.GetServiceConfig(ctx, svc.svc.ID)
 }

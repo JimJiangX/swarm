@@ -27,7 +27,7 @@ type PluginAPI interface {
 	GenerateUnitConfig(ctx context.Context, unit string, desc structs.ServiceSpec) (structs.ConfigCmds, error)
 
 	GetUnitConfig(ctx context.Context, service, unit string) (structs.ConfigCmds, error)
-	GetServiceConfig(ctx context.Context, service string) (structs.ConfigsMap, error)
+	GetServiceConfig(ctx context.Context, service string) (structs.ServiceConfigsResponse, error)
 	GetCommands(ctx context.Context, service string) (structs.Commands, error)
 
 	GetImage(ctx context.Context, version string) (structs.ConfigTemplate, error)
@@ -91,24 +91,24 @@ func (p plugin) GenerateUnitConfig(ctx context.Context, unit string, desc struct
 	return cc, err
 }
 
-func (p plugin) GetServiceConfig(ctx context.Context, service string) (structs.ConfigsMap, error) {
+func (p plugin) GetServiceConfig(ctx context.Context, service string) (structs.ServiceConfigsResponse, error) {
 	var (
-		m   structs.ConfigsMap
+		obj structs.ServiceConfigsResponse
 		uri = "/configs/" + service
 	)
 
 	resp, err := requireOK(p.c.Get(ctx, uri))
 	if err != nil {
-		return m, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	err = decodeBody(resp, &m)
+	err = decodeBody(resp, &obj)
 	if err != nil {
 		return nil, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, uri, err)
 	}
 
-	return m, err
+	return obj, err
 }
 
 func (p plugin) GetUnitConfig(ctx context.Context, service, unit string) (structs.ConfigCmds, error) {
