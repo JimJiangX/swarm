@@ -27,7 +27,7 @@ type PluginAPI interface {
 	GenerateUnitConfig(ctx context.Context, unit string, desc structs.ServiceSpec) (structs.ConfigCmds, error)
 
 	GetUnitConfig(ctx context.Context, service, unit string) (structs.ConfigCmds, error)
-	GetServiceConfig(ctx context.Context, service string) (structs.ServiceConfigsResponse, error)
+	GetServiceConfig(ctx context.Context, service string) (structs.ServiceConfigs, error)
 	GetCommands(ctx context.Context, service string) (structs.Commands, error)
 
 	GetImage(ctx context.Context, version string) (structs.ConfigTemplate, error)
@@ -35,7 +35,7 @@ type PluginAPI interface {
 
 	PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate) error
 
-	UpdateConfigs(ctx context.Context, service string, configs structs.ConfigsMap) error
+	UpdateConfigs(ctx context.Context, service string, configs structs.ServiceConfigs) (structs.ConfigsMap, error)
 	ServiceCompose(ctx context.Context, spec structs.ServiceSpec) error
 	ServicesLink(ctx context.Context, links structs.ServicesLink) (structs.ServiceLinkResponse, error)
 }
@@ -54,14 +54,15 @@ func NewPlugin(host string, cli pclient) PluginAPI {
 }
 
 func (p plugin) GenerateServiceConfig(ctx context.Context, desc structs.ServiceSpec) (structs.ConfigsMap, error) {
-	var m structs.ConfigsMap
 	const uri = "/configs"
 
 	resp, err := requireOK(p.c.Post(ctx, uri, desc))
 	if err != nil {
-		return m, err
+		return nil, err
 	}
 	defer resp.Body.Close()
+
+	var m structs.ConfigsMap
 
 	err = decodeBody(resp, &m)
 	if err != nil {
@@ -91,9 +92,9 @@ func (p plugin) GenerateUnitConfig(ctx context.Context, unit string, desc struct
 	return cc, err
 }
 
-func (p plugin) GetServiceConfig(ctx context.Context, service string) (structs.ServiceConfigsResponse, error) {
+func (p plugin) GetServiceConfig(ctx context.Context, service string) (structs.ServiceConfigs, error) {
 	var (
-		obj structs.ServiceConfigsResponse
+		obj structs.ServiceConfigs
 		uri = "/configs/" + service
 	)
 
@@ -223,15 +224,23 @@ func (p plugin) PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate
 	return nil
 }
 
-func (p plugin) UpdateConfigs(ctx context.Context, service string, configs structs.ConfigsMap) error {
-	resp, err := requireOK(p.c.Put(ctx, "/configs/"+service, configs))
+func (p plugin) UpdateConfigs(ctx context.Context, service string, configs structs.ServiceConfigs) (structs.ConfigsMap, error) {
+	uri := "/configs/" + service
+	resp, err := requireOK(p.c.Put(ctx, uri, configs))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	ensureBodyClose(resp)
+	defer resp.Body.Close()
 
-	return nil
+	var m structs.ConfigsMap
+
+	err = decodeBody(resp, &m)
+	if err != nil {
+		return nil, errors.Errorf("%s %s%s,%v", http.MethodPost, p.host, uri, err)
+	}
+
+	return m, err
 }
 
 func (p plugin) ServiceCompose(ctx context.Context, spec structs.ServiceSpec) error {

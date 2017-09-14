@@ -1889,8 +1889,8 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
-func vaildPostServiceUpdateConfigsRequest(cmds structs.ConfigsMap, args map[string]interface{}) error {
-	if len(cmds) == 0 && len(args) == 0 {
+func vaildPostServiceUpdateConfigsRequest(req structs.ServiceConfigs) error {
+	if len(req) == 0 {
 		return stderr.New("nothing new for update for service configs")
 	}
 
@@ -1900,10 +1900,7 @@ func vaildPostServiceUpdateConfigsRequest(cmds structs.ConfigsMap, args map[stri
 func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
-	var req = struct {
-		Configs structs.ConfigsMap
-		Args    map[string]interface{}
-	}{}
+	var req structs.ServiceConfigs
 
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -1912,7 +1909,7 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := vaildPostServiceUpdateConfigsRequest(req.Configs, req.Args); err != nil {
+	if err := vaildPostServiceUpdateConfigsRequest(req); err != nil {
 		ec := errCodeV1(_Service, invaildParamsError, 92, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
@@ -1949,7 +1946,7 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	task := database.NewTask(spec.Name, database.ServiceUpdateConfigTask, spec.ID, spec.Desc, nil, 300)
 
-	err = svc.UpdateUnitsConfigs(ctx, req.Configs, req.Args, &task, true)
+	err = svc.UpdateUnitsConfigs(ctx, req, &task, true)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 95, "fail to update service config files", "服务配置文件更新错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)

@@ -628,7 +628,7 @@ func (svc *Service) Start(ctx context.Context, task *database.Task, detach bool,
 }
 
 // UpdateUnitsConfigs generated new units configs,write to container volume.
-func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.ConfigsMap, args map[string]interface{}, task *database.Task, async bool) (err error) {
+func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.ServiceConfigs, task *database.Task, async bool) (err error) {
 
 	update := func() error {
 		units, err := svc.getUnits()
@@ -636,7 +636,19 @@ func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.Conf
 			return err
 		}
 
-		return svc.updateConfigs(ctx, units, configs, args)
+		cm, err := svc.pc.UpdateConfigs(ctx, svc.svc.ID, configs)
+		if err != nil {
+			return err
+		}
+
+		list := make([]*unit, 0, len(units))
+		for i := range configs {
+			if u := getUnit(units, configs[i].ID); u != nil {
+				list = append(list, u)
+			}
+		}
+
+		return svc.updateConfigs(ctx, list, cm, nil)
 	}
 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
@@ -994,6 +1006,6 @@ func (svc *Service) generateUnitsCmd(ctx context.Context) (structs.Commands, err
 	return svc.pc.GetCommands(ctx, svc.svc.ID)
 }
 
-func (svc *Service) GetUnitsConfigs(ctx context.Context) (structs.ServiceConfigsResponse, error) {
+func (svc *Service) GetUnitsConfigs(ctx context.Context) (structs.ServiceConfigs, error) {
 	return svc.pc.GetServiceConfig(ctx, svc.svc.ID)
 }

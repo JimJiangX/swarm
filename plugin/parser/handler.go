@@ -12,7 +12,6 @@ import (
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/plugin/parser/compose"
 	"github.com/gorilla/mux"
-	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -347,7 +346,7 @@ func generateConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	var (
-		req     structs.ConfigsMap
+		req     structs.ServiceConfigs
 		service = mux.Vars(r)["service"]
 	)
 
@@ -357,91 +356,89 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var pairs api.KVPairs
-
-	switch len(req) {
-	case 0:
+	if len(req) == 0 {
 		httpError(w, errors.New("no data need update"), http.StatusBadRequest)
 		return
-	case 1:
-		for _, c := range req {
-			key := strings.Join([]string{configKey, service, c.ID}, "/")
-			pair, err := ctx.client.GetKV(ctx.context, key)
+	}
+
+	configs, err := getConfigMapFromStore(ctx.context, ctx.client, service)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	var (
+		pr  parser
+		out = make(structs.ConfigsMap, len(configs))
+	)
+	for _, u := range req {
+		if pr == nil {
+			pr, err = factory(u.Image)
 			if err != nil {
 				httpError(w, err, http.StatusInternalServerError)
 				return
 			}
-			pairs = api.KVPairs{pair}
 		}
-	default:
-		key := strings.Join([]string{configKey, service}, "/")
-		pairs, err = ctx.client.ListKV(ctx.context, key)
+
+		cc, err := mergeUnitConfig(pr, u, configs[u.ID])
+		if err != nil {
+			httpError(w, err, http.StatusInternalServerError)
+			return
+		}
+
+		out[cc.ID] = cc
+
+		err = putConfigsToStore(ctx.context, ctx.client, service, map[string]structs.ConfigCmds{
+			cc.ID: cc,
+		})
 		if err != nil {
 			httpError(w, err, http.StatusInternalServerError)
 			return
 		}
 	}
 
-	configs, err := parseListToConfigs(pairs)
-	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
-	}
-
-	out := make(structs.ConfigsMap, len(configs))
-
-	for id, u := range req {
-		c, exist := configs[id]
-		if !exist {
-			out[id] = c
-			continue
-		}
-
-		if u.ID != "" && c.ID != u.ID {
-			c.ID = u.ID
-		}
-
-		if u.LogMount != "" && c.LogMount != u.LogMount {
-			c.LogMount = u.LogMount
-		}
-		if u.DataMount != "" && c.DataMount != u.DataMount {
-			c.DataMount = u.DataMount
-		}
-		if u.ConfigFile != "" && c.ConfigFile != u.ConfigFile {
-			c.ConfigFile = u.ConfigFile
-		}
-
-		if u.Content != "" && c.Content != u.Content {
-			parser, err := factory(c.Name + ":" + c.Version)
-			if err != nil {
-				httpError(w, err, http.StatusInternalServerError)
-				return
-			}
-
-			parser = parser.clone(nil)
-
-			err = parser.ParseData([]byte(u.Content))
-			if err != nil {
-				httpError(w, err, http.StatusInternalServerError)
-				return
-			}
-
-			c.Content = u.Content
-		}
-
-		c.Timestamp = time.Now().Unix()
-
-		out[id] = c
-	}
-
-	err = putConfigsToStore(ctx.context, ctx.client, service, out)
-	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
-	}
-
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	return
+	json.NewEncoder(w).Encode(out)
+}
+
+func mergeUnitConfig(pr parser, uc structs.UnitConfigResponse, cc structs.ConfigCmds) (structs.ConfigCmds, error) {
+	if uc.ID != "" && cc.ID != uc.ID {
+		cc.ID = uc.ID
+	}
+
+	if uc.LogMount != "" && cc.LogMount != uc.LogMount {
+		cc.LogMount = uc.LogMount
+	}
+	if uc.DataMount != "" && cc.DataMount != uc.DataMount {
+		cc.DataMount = uc.DataMount
+	}
+	if uc.ConfigFile != "" && cc.ConfigFile != uc.ConfigFile {
+		cc.ConfigFile = uc.ConfigFile
+	}
+
+	pr = pr.clone(nil)
+	err := pr.ParseData([]byte(cc.Content))
+	if err != nil {
+		return cc, err
+	}
+
+	for _, ks := range uc.Keysets {
+		err := pr.set(ks.Key, ks.Value)
+		if err != nil {
+			return cc, err
+		}
+	}
+
+	content, err := pr.Marshal()
+	if err != nil {
+		return cc, err
+	}
+
+	cc.Content = string(content)
+	cc.Timestamp = time.Now().Unix()
+
+	return cc, nil
 }
 
 func composeService(ctx *_Context, w http.ResponseWriter, r *http.Request) {
