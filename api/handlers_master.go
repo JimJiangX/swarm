@@ -807,7 +807,7 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	master := resource.NewHostManager(gd.Ormer(), gd.Cluster)
+	master := resource.NewHostManager(gd.Ormer(), gd.Cluster, nil)
 	err := master.RemoveCluster(name)
 	if err != nil {
 		ec := errCodeV1(_Cluster, dbExecError, 51, "fail to delete records into database", "数据库删除记录错误")
@@ -1053,8 +1053,8 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	master := resource.NewHostManager(orm, gd.Cluster)
-	err = master.InstallNodes(ctx, horus, nodes, gd.KVClient())
+	master := resource.NewHostManager(orm, gd.Cluster, nodes)
+	err = master.InstallNodes(ctx, horus, gd.KVClient())
 	if err != nil {
 		ec := errCodeV1(_Host, internalError, 36, "fail to install host", "主机入库错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -1207,7 +1207,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	m := resource.NewHostManager(gd.Ormer(), gd.Cluster)
+	m := resource.NewHostManager(gd.Ormer(), gd.Cluster, nil)
 
 	err = m.RemoveNode(ctx, horus, node, username, password, force, timeout, gd.KVClient())
 	if err != nil {

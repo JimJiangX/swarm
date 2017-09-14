@@ -65,7 +65,7 @@ func parseNodeStatus(status int) string {
 	return "unknown"
 }
 
-var dockerNodesKVPath = ""
+var dockerNodesKVPath = "/docker/swarm/nodes"
 
 // SetNodesKVPath set kv path of nodes
 func SetNodesKVPath(path string) {
@@ -184,16 +184,16 @@ func NewNodeWithTaskList(len int) []nodeWithTask {
 }
 
 // InstallNodes install new nodes,list should has same ClusterID
-func (m hostManager) InstallNodes(ctx context.Context, horus string, list []nodeWithTask, reg kvstore.Register) error {
-	nodes := make([]database.Node, len(list))
-	tasks := make([]database.Task, len(list))
-	timeout := 250*time.Second + time.Duration(len(list)*30)*time.Second
+func (m hostManager) InstallNodes(ctx context.Context, horus string, reg kvstore.Register) error {
+	nodes := make([]database.Node, len(m.nodes))
+	tasks := make([]database.Task, len(m.nodes))
+	timeout := 250*time.Second + time.Duration(len(m.nodes)*30)*time.Second
 
-	for i := range list {
-		nodes[i] = list[i].Node
-		tasks[i] = list[i].Task
+	for i := range m.nodes {
+		nodes[i] = m.nodes[i].Node
+		tasks[i] = m.nodes[i].Task
 		tasks[i].Timeout = timeout
-		list[i].timeout = timeout
+		m.nodes[i].timeout = timeout
 	}
 
 	select {
@@ -214,11 +214,11 @@ func (m hostManager) InstallNodes(ctx context.Context, horus string, list []node
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 
-	for i := range list {
-		go list[i].distribute(ctx, horus, m.dco, config)
+	for i := range m.nodes {
+		go m.nodes[i].distribute(ctx, horus, m.dco, config)
 	}
 
-	go m.registerNodesLoop(ctx, cancel, list, config, reg)
+	go m.registerNodesLoop(ctx, cancel, config, reg)
 
 	return nil
 }
@@ -251,7 +251,7 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 			nt.Task.FinishedAt = time.Now()
 		}
 
-		_err := ormer.RegisterNode(nt.Node, nt.Task)
+		_err := ormer.RegisterNode(&nt.Node, &nt.Task)
 		if _err != nil {
 			entry.Errorf("%+v,%+v", err, _err)
 		}
@@ -316,6 +316,8 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 	case <-ctx.Done():
 		return errors.WithStack(ctx.Err())
 	}
+
+	entry.Debug("SSH Exec:", script)
 
 	out, err := nt.client.Exec(script)
 	if err != nil {
@@ -399,8 +401,7 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 }
 
 // registerNodes register Nodes
-func (m hostManager) registerNodesLoop(ctx context.Context, cancel context.CancelFunc,
-	nodes []nodeWithTask, sys database.SysConfig, reg kvstore.Register) {
+func (m hostManager) registerNodesLoop(ctx context.Context, cancel context.CancelFunc, sys database.SysConfig, reg kvstore.Register) {
 
 	defer cancel()
 
@@ -410,64 +411,62 @@ func (m hostManager) registerNodesLoop(ctx context.Context, cancel context.Cance
 	for {
 		select {
 		case <-t.C:
+			m.registerNodes(ctx, sys, reg)
 
 		case <-ctx.Done():
 			// try again
-			err := m.registerNodes(ctx, nodes, sys, reg)
-			if err != nil {
-				logrus.Errorf("reigster nodes error,%+v", err)
-			}
+			m.registerNodes(ctx, sys, reg)
 
-			if errors.Cause(err) == sql.ErrNoRows {
-				return
-			}
-
-			err = m.registerNodesTimeout(nodes, ctx.Err())
+			err := m.registerNodesTimeout(ctx.Err())
 			logrus.Errorf("deal with Nodes timeout%+v", err)
 
-			return
-		}
-
-		err := m.registerNodes(ctx, nodes, sys, reg)
-		if err != nil {
-			logrus.Errorf("reigster nodes error,%+v", err)
-		}
-
-		if errors.Cause(err) == sql.ErrNoRows {
 			return
 		}
 	}
 }
 
-func (m hostManager) registerNodes(ctx context.Context, nodes []nodeWithTask, sys database.SysConfig, reg kvstore.Register) error {
-	var (
-		_err  error
-		count int
-	)
+func (m *hostManager) removeNodeTask(id string) {
+	list := make([]nodeWithTask, 0, len(m.nodes))
 
-	for i := range nodes {
+	for i := range m.nodes {
+		if m.nodes[i].Node.ID != id {
+			list = append(list, m.nodes[i])
+		}
+	}
 
-		field := logrus.WithField("host", nodes[i].Node.Addr)
+	m.nodes = list
+}
 
-		n, err := m.dco.GetNode(nodes[i].Node.ID)
+func (m hostManager) registerNodes(ctx context.Context, sys database.SysConfig, reg kvstore.Register) {
+	for _, node := range m.nodes {
+
+		field := logrus.WithField("host", node.Node.Addr)
+
+		n, err := m.dco.GetNode(node.Node.ID)
 		if err != nil {
 			field.Warnf("%+v", err)
 
-			if len(nodes)-1 == i {
-				return err
+			if errors.Cause(err) == sql.ErrNoRows {
+				t := node.Task
+				t.Status = database.TaskFailedStatus
+				t.FinishedAt = time.Now()
+				t.SetErrors(err)
+
+				err = m.dco.RegisterNode(nil, &t)
+				if err != nil {
+					field.Errorf("%+v", err)
+				}
+
+				m.removeNodeTask(n.ID)
 			}
 
 			continue
 		}
 
-		nodes[i].Node = n
+		node.Node = n
 
 		if n.Status != statusNodeInstalled {
 			if n.Status > statusNodeInstalled {
-				count++
-				if count >= len(nodes) {
-					return nil
-				}
 				continue
 			}
 
@@ -493,15 +492,13 @@ func (m hostManager) registerNodes(ctx context.Context, nodes []nodeWithTask, sy
 			list := strings.Split(wwn, ",")
 
 			if err = san.AddHost(n.EngineID, list...); err != nil {
-				_err = err
 				field.Errorf("register to SAN,WWN:%s,%+v", wwn, err)
 				continue
 			}
 		}
 
-		err = registerHost(ctx, nodes[i], reg, eng.Labels["CONTAINER_NIC"])
+		err = registerHost(ctx, node, reg, eng.Labels["CONTAINER_NIC"])
 		if err != nil {
-			_err = err
 			field.Errorf("%+v", err)
 			continue
 		}
@@ -511,19 +508,18 @@ func (m hostManager) registerNodes(ctx context.Context, nodes []nodeWithTask, sy
 		n.Enabled = true
 		n.RegisterAt = time.Now()
 
-		t := nodes[i].Task
+		t := node.Task
 		t.Status = database.TaskDoneStatus
 		t.FinishedAt = n.RegisterAt
 		t.SetErrors(nil)
 
-		err = m.dco.RegisterNode(n, t)
+		err = m.dco.RegisterNode(&n, &t)
 		if err != nil {
-			_err = err
 			field.Errorf("%+v", err)
+		} else {
+			m.removeNodeTask(n.ID)
 		}
 	}
-
-	return _err
 }
 
 func registerHost(ctx context.Context, node nodeWithTask, reg kvstore.Register, dev string) error {
@@ -543,25 +539,38 @@ func registerHost(ctx context.Context, node nodeWithTask, reg kvstore.Register, 
 	return err
 }
 
-func (m hostManager) registerNodesTimeout(nodes []nodeWithTask, er error) error {
-	if len(nodes) == 0 {
+func (m hostManager) registerNodesTimeout(err error) error {
+	if len(m.nodes) == 0 {
 		return nil
 	}
 
-	for i := range nodes {
-		n, err := m.dco.GetNode(nodes[i].Node.ID)
+	for i := range m.nodes {
+		t := m.nodes[i].Task
+		n := m.nodes[i].Node
+
+		n1, err := m.dco.GetNode(n.ID)
 		if err != nil {
-			logrus.WithField("host", nodes[i].Node.Addr).Errorf("%+v", err)
+			logrus.WithField("host", n.Addr).Errorf("%+v", err)
+
+			if errors.Cause(err) == sql.ErrNoRows {
+				t.Status = database.TaskFailedStatus
+				t.FinishedAt = time.Now()
+				t.SetErrors(err)
+
+				err = m.dco.RegisterNode(nil, &t)
+				if err != nil {
+					logrus.WithField("host", n.Addr).Errorf("%+v", err)
+				}
+			}
+
 			continue
 		}
 
-		nodes[i].Node = n
+		n = n1
 
 		if n.Status >= statusNodeEnable {
 			continue
 		}
-
-		t := nodes[i].Task
 
 		if n.Status == statusNodeInstalled {
 			n.Status = statusNodeRegisterTimeout
@@ -573,7 +582,7 @@ func (m hostManager) registerNodesTimeout(nodes []nodeWithTask, er error) error 
 			t.SetErrors(err)
 		}
 
-		err = m.dco.RegisterNode(n, t)
+		err = m.dco.RegisterNode(&n, &t)
 		if err != nil {
 			logrus.WithField("Addr", n.Addr).WithError(err).Error("Node register timeout")
 		}
@@ -707,6 +716,8 @@ func (n *Node) nodeClean(ctx context.Context, client scplib.ScpClient, horus str
 	script := fmt.Sprintf("chmod 755 %s && %s %s %d %s %s %s %s",
 		destName, destName, n.node.Addr, config.ConsulPort, n.node.ID,
 		horusIP, horusPort, n.node.NFS.MountDir)
+
+	entry.Debug("SSH Exec:", script)
 
 	out, err := client.Exec(script)
 	if err != nil {

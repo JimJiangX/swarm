@@ -12,15 +12,17 @@ type engineCluster interface {
 }
 
 type hostManager struct {
-	ec  engineCluster
-	dco database.NodeOrmer
+	ec    engineCluster
+	dco   database.NodeOrmer
+	nodes []nodeWithTask
 }
 
 // NewHostManager returns host manager
-func NewHostManager(dco database.NodeOrmer, ec engineCluster) hostManager {
+func NewHostManager(dco database.NodeOrmer, ec engineCluster, nodes []nodeWithTask) hostManager {
 	return hostManager{
-		dco: dco,
-		ec:  ec,
+		dco:   dco,
+		ec:    ec,
+		nodes: nodes,
 	}
 }
 

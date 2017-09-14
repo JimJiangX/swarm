@@ -35,7 +35,7 @@ type NodeIface interface {
 	SetNodeEnable(string, bool) error
 	SetNodeParam(string, int) error
 
-	RegisterNode(n Node, t Task) error
+	RegisterNode(n *Node, t *Task) error
 
 	DelNode(nameOrID string) error
 }
@@ -136,17 +136,20 @@ func (db dbBase) SetNodeEnable(ID string, enabled bool) error {
 }
 
 // RegisterNode returns error when Node UPDATE infomation.
-func (db dbBase) RegisterNode(n Node, t Task) error {
+func (db dbBase) RegisterNode(n *Node, t *Task) error {
 	do := func(tx *sqlx.Tx) (err error) {
+		if n != nil {
+			query := "UPDATE " + db.nodeTable() + " SET engine_id=?,status=?,enabled=?,register_at=? WHERE id=?"
 
-		query := "UPDATE " + db.nodeTable() + " SET engine_id=?,status=?,enabled=?,register_at=? WHERE id=?"
-
-		_, err = tx.Exec(query, n.EngineID, n.Status, n.Enabled, n.RegisterAt, n.ID)
-		if err != nil {
-			return errors.Wrap(err, "Tx update Node status")
+			_, err = tx.Exec(query, n.EngineID, n.Status, n.Enabled, n.RegisterAt, n.ID)
+			if err != nil {
+				return errors.Wrap(err, "Tx update Node status")
+			}
 		}
 
-		err = db.txSetTask(tx, t)
+		if t != nil {
+			err = db.txSetTask(tx, *t)
+		}
 
 		return err
 	}
