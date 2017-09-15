@@ -58,6 +58,8 @@ func configruation(c *cli.Context) {
 		log.Fatalf("discovery required to manage a cluster. See '%s manage --help'.", c.App.Name)
 	}
 
+	kvpath := filepath.Join(uri, leaderElectionPath)
+
 	kvClient, err := kvstore.NewClient(uri, getDiscoveryOpt(c))
 	if err != nil {
 		log.Fatalf("fail to connect to kv store:'%s',%+v", uri, err)
@@ -71,7 +73,7 @@ func configruation(c *cli.Context) {
 
 	server := api.NewServer(hosts, tlsConfig)
 
-	server.SetHandler(parser.NewRouter(kvClient, dir, mgmIP, mgmPort))
+	server.SetHandler(parser.NewRouter(kvClient, kvpath, dir, mgmIP, mgmPort))
 
 	log.Fatal(server.ListenAndServe())
 }

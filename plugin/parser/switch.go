@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"strings"
 
@@ -15,6 +16,38 @@ func init() {
 	register("switch_manager", "1.0", &switchManagerConfig{})
 	register("switch_manager", "1.1.19", &switchManagerConfigV1119{})
 	register("switch_manager", "1.1.23", &switchManagerConfigV1123{})
+	register("switch_manager", "1.1.47", &switchManagerConfigV1147{})
+}
+
+var (
+	consulPort         = "8500"
+	leaderElectionPath = "docker/swarm/leader"
+)
+
+func parseKvPath(rawurl string) (string, string) {
+	parts := strings.SplitN(rawurl, "://", 2)
+
+	// nodes:port,node2:port => nodes://node1:port,node2:port
+	if len(parts) == 1 {
+		return "nodes", parts[0]
+	}
+	return parts[0], parts[1]
+}
+
+func setLeaderElectionPath(path string) {
+	_, uris := parseKvPath(path)
+
+	parts := strings.SplitN(uris, "/", 2)
+
+	// A custom prefix to the path can be optionally used.
+	if len(parts) == 2 {
+		leaderElectionPath = parts[1]
+
+		_, port, err := net.SplitHostPort(parts[0])
+		if err == nil {
+			consulPort = port
+		}
+	}
 }
 
 type switchManagerConfig struct {
@@ -129,7 +162,13 @@ func (c *switchManagerConfig) GenerateConfig(id string, desc structs.ServiceSpec
 	m["name"] = spec.Name
 
 	m["Port"] = desc.Options["Port"]
-	m["ProxyPort"] = desc.Options["ProxyPort"]
+
+	m["ConsulPort"] = consulPort
+
+	// swarm
+	m["ConsulPort"] = consulPort
+	m["SwarmHostKey"] = leaderElectionPath
+	m["SwarmUserAgent"] = "1.31"
 
 	//	// consul
 	//	m["ConsulBindNetworkName"] = u.engine.Labels[_Admin_NIC_Lable]
@@ -204,19 +243,66 @@ func (c switchManagerConfigV1123) GenerateConfig(id string, desc structs.Service
 	m["name"] = spec.Name
 
 	m["Port"] = desc.Options["Port"]
-	m["ProxyPort"] = desc.Options["ProxyPort"]
 
-	//	// consul
+	// consul
 	//	m["ConsulBindNetworkName"] = u.engine.Labels[_Admin_NIC_Lable]
-	//	m["ConsulPort"] = sys.ConsulPort
+	m["ConsulPort"] = consulPort
 
-	//	// swarm
-	//	m["SwarmUserAgent"] = version.VERSION
-	//	m["SwarmHostKey"] = leaderElectionPath
+	// swarm
+	m["ConsulPort"] = consulPort
+	m["SwarmHostKey"] = leaderElectionPath
+	m["SwarmUserAgent"] = "1.31"
 
 	//	// _User_Check Role
 	//	m["swarmhealthcheckuser"] = user.Username
 	//	m["swarmhealthcheckpassword"] = user.Password
+
+	for key, val := range m {
+		err = c.set(key, val)
+	}
+
+	return err
+}
+
+type switchManagerConfigV1147 struct {
+	switchManagerConfig
+}
+
+func (switchManagerConfigV1147) clone(t *structs.ConfigTemplate) parser {
+	pr := &switchManagerConfigV1123{}
+	pr.template = t
+
+	return pr
+}
+
+func (c switchManagerConfigV1147) GenerateConfig(id string, desc structs.ServiceSpec) error {
+
+	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
+
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return err
+	}
+
+	m := make(map[string]interface{}, 10)
+
+	m["domain"] = desc.ID
+	m["name"] = spec.Name
+
+	m["Port"] = desc.Options["Port"]
+
+	ip, _, err := net.SplitHostPort(spec.Engine.Addr)
+	if err != nil {
+		return err
+	}
+	m["ConsulIP"] = ip
+
+	m["ConsulPort"] = consulPort
+	m["SwarmHostKey"] = leaderElectionPath
+	m["SwarmUserAgent"] = "1.31"
 
 	for key, val := range m {
 		err = c.set(key, val)

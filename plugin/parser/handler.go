@@ -28,8 +28,10 @@ type _Context struct {
 }
 
 // NewRouter returns a pointer of mux.Router,router of plugin HTTP APIs.
-func NewRouter(c kvstore.Client, dir, ip string, port int) *mux.Router {
+func NewRouter(c kvstore.Client, kvpath, dir, ip string, port int) *mux.Router {
 	type handler func(ctx *_Context, w http.ResponseWriter, r *http.Request)
+
+	setLeaderElectionPath(kvpath)
 
 	ctx := &_Context{
 		client:    c,
