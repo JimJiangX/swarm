@@ -86,7 +86,7 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	if len(spec.Networking) >= 1 {
 		m["mysqld::bind_address"] = spec.Networking[0].IP
 	} else {
-		return errors.New("unexpected IPAddress")
+		return errors.New("miss mysqld::bind_address")
 	}
 
 	m["mysqld::server_id"] = net.ParseIP(spec.Networking[0].IP).To4()[3]
@@ -95,14 +95,27 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 		m["mysqld::character_set_server"] = v
 	}
 
-	if p, ok := desc.Options["port"]; ok && p != nil {
-		m["mysqld::port"] = p
+	if port, ok := desc.Options["mysqld::port"]; ok {
+		m["mysqld::port"] = port
+	} else {
+		return errors.New("miss mysqld::port")
 	}
 
 	if c.template != nil {
+		m["mysqld::tmpdir"] = c.template.DataMount
+		m["mysqld::datadir"] = c.template.DataMount
+
+		m["mysqld::socket"] = filepath.Join(c.template.DataMount, "/upsql.sock")
+
 		m["mysqld::log_bin"] = filepath.Clean(fmt.Sprintf("%s/BIN/%s-binlog", c.template.LogMount, spec.Name))
 
 		m["mysqld::relay_log"] = filepath.Clean(fmt.Sprintf("%s/REL/%s-relay", c.template.LogMount, spec.Name))
+
+		m["mysqld::slow_query_log_file"] = filepath.Join(c.template.LogMount, "/slow-query.log")
+
+		m["mysqld::innodb_log_group_home_dir"] = filepath.Join(c.template.LogMount, "/RED")
+
+		m["client::socket"] = filepath.Join(c.template.DataMount, "/upsql.sock")
 	}
 
 	if spec.Config != nil {
@@ -113,8 +126,8 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 		}
 	}
 
-	m["client::user"] = ""
-	m["client::password"] = ""
+	m["client::user"] = desc.Options["client::user"]
+	m["client::password"] = desc.Options["client::password"]
 
 	var root *structs.User
 
