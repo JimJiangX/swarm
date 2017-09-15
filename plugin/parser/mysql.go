@@ -17,9 +17,9 @@ func init() {
 	register("mysql", "5.6", &mysqlConfig{})
 	register("mysql", "5.7", &mysqlConfig{})
 
-	register("upsql", "1.0", &mysqlConfig{})
-	register("upsql", "2.0", &mysqlConfig{})
-	register("upsql", "3.0", &mysqlConfig{})
+	register("upsql", "1.0", &upsqlConfig{})
+	register("upsql", "2.0", &upsqlConfig{})
+	register("upsql", "3.0", &upsqlConfig{})
 }
 
 const (
@@ -76,17 +76,9 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 		return err
 	}
 
-	var spec *structs.UnitSpec
-
-	for i := range desc.Units {
-		if id == desc.Units[i].ID {
-			spec = &desc.Units[i]
-			break
-		}
-	}
-
-	if spec == nil {
-		return errors.Errorf("not found unit '%s' in service '%s'", id, desc.Name)
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return err
 	}
 
 	m := make(map[string]interface{}, 20)
@@ -150,21 +142,13 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 func (c mysqlConfig) GenerateCommands(id string, desc structs.ServiceSpec) (structs.CmdsMap, error) {
 	cmds := make(structs.CmdsMap, 6)
 
-	//	users := make([]string, 0, len(desc.Users)*4)
-	//	for _, u := range desc.Users {
-	//		users = append(users, u.Role, u.Name, u.Password, u.Privilege)
-	//	}
-	//	init := make([]string, 1+len(users))
-	//	init[0] = "/root/mysql-init.sh"
-	//	copy(init[1:], users)
-
 	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
 
 	cmds[structs.InitServiceCmd] = []string{"/root/mysql-init.sh"}
 
-	cmds[structs.StartServiceCmd] = []string{"/root/mysql.service", "start"}
+	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
 
-	cmds[structs.StopServiceCmd] = []string{"/root/mysql.service", "stop"}
+	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
 
 	cmds[structs.RestoreCmd] = []string{"/root/mysql-restore.sh"}
 
@@ -206,17 +190,9 @@ func (c mysqlConfig) Marshal() ([]byte, error) {
 }
 
 func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
-	var spec *structs.UnitSpec
-
-	for i := range desc.Units {
-		if id == desc.Units[i].ID {
-			spec = &desc.Units[i]
-			break
-		}
-	}
-
-	if spec == nil {
-		return structs.ServiceRegistration{}, errors.Errorf("not found unit '%s' in service '%s'", id, desc.Name)
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return structs.ServiceRegistration{}, err
 	}
 
 	im, err := structs.ParseImage(c.template.Image)
@@ -249,4 +225,43 @@ func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 	}
 
 	return structs.ServiceRegistration{Horus: &reg}, nil
+}
+
+type upsqlConfig struct {
+	mysqlConfig
+}
+
+func (upsqlConfig) clone(t *structs.ConfigTemplate) parser {
+	pr := &upsqlConfig{}
+	pr.template = t
+
+	return pr
+}
+
+func (upsqlConfig) GenerateCommands(id string, desc structs.ServiceSpec) (structs.CmdsMap, error) {
+	cmds := make(structs.CmdsMap, 6)
+
+	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
+
+	cmds[structs.InitServiceCmd] = []string{"/root/upsql-init.sh"}
+
+	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
+
+	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
+
+	cmds[structs.RestoreCmd] = []string{"/root/upsql-restore.sh"}
+
+	cmds[structs.BackupCmd] = []string{"/root/upsql-backup.sh"}
+
+	return cmds, nil
+}
+
+func getUnitSpec(units []structs.UnitSpec, id string) (*structs.UnitSpec, error) {
+	for i := range units {
+		if id == units[i].ID {
+			return &units[i], nil
+		}
+	}
+
+	return nil, errors.Errorf("not found unit '%s'", id)
 }

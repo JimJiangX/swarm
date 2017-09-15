@@ -26,7 +26,9 @@ func (switchManagerConfig) clone(t *structs.ConfigTemplate) parser {
 	return &switchManagerConfig{template: t}
 }
 
-func (switchManagerConfig) Validate(data map[string]interface{}) error { return nil }
+func (switchManagerConfig) Validate(data map[string]interface{}) error {
+	return nil
+}
 
 func (c *switchManagerConfig) ParseData(data []byte) error {
 	configer, err := config.NewConfigData("ini", data)
@@ -89,48 +91,45 @@ func (c *switchManagerConfig) Marshal() ([]byte, error) {
 }
 
 func (c switchManagerConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
-	//	if c.config == nil || len(args) == 0 {
-	//		return healthCheck{}, errors.New("params not ready")
-	//	}
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return structs.ServiceRegistration{}, err
+	}
 
-	//	port, err := c.config.Int("Port")
-	//	if err != nil {
-	//		return healthCheck{}, errors.Wrap(err, "get 'Port'")
-	//	}
+	im, err := structs.ParseImage(c.template.Image)
+	if err != nil {
+		return structs.ServiceRegistration{}, err
+	}
 
-	//	return healthCheck{
-	//		Addr:     "",
-	//		Port:     port,
-	//		Script:   "/opt/DBaaS/script/check_switchmanager.sh " + args[0],
-	//		Shell:    "",
-	//		Interval: "10s",
-	//		TTL:      "",
-	//		Tags:     nil,
-	//	}, nil
+	reg := structs.HorusRegistration{}
+	reg.Service.Select = true
+	reg.Service.Name = spec.ID
+	reg.Service.Type = "unit_" + im.Name
+	reg.Service.Tag = desc.ID
+	reg.Service.Container.Name = spec.Name
+	reg.Service.Container.HostName = spec.Engine.Node
 
-	return structs.ServiceRegistration{}, nil
+	return structs.ServiceRegistration{Horus: &reg}, nil
 }
 
-func (c switchManagerConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
+func (c *switchManagerConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
+
+	spec, err := getUnitSpec(desc.Units, id)
 	if err != nil {
 		return err
 	}
 
 	m := make(map[string]interface{}, 10)
 
-	//	m["domain"] = svc.ID
-	//	m["name"] = u.Name
-	//	port, proxyPort := 0, 0
-	//	for i := range u.ports {
-	//		if u.ports[i].Name == "Port" {
-	//			port = u.ports[i].Port
-	//		} else if u.ports[i].Name == "ProxyPort" {
-	//			proxyPort = u.ports[i].Port
-	//		}
-	//	}
-	//	m["ProxyPort"] = proxyPort
-	//	m["Port"] = port
+	m["domain"] = desc.ID
+	m["name"] = spec.Name
+
+	m["Port"] = desc.Options["Port"]
+	m["ProxyPort"] = desc.Options["ProxyPort"]
 
 	//	// consul
 	//	m["ConsulBindNetworkName"] = u.engine.Labels[_Admin_NIC_Lable]
@@ -156,11 +155,11 @@ func (c switchManagerConfig) GenerateCommands(id string, desc structs.ServiceSpe
 
 	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
 
-	cmds[structs.InitServiceCmd] = []string{"/root/swm.service", "start"}
+	cmds[structs.InitServiceCmd] = []string{"/root/serv", "start"}
 
-	cmds[structs.StartServiceCmd] = []string{"/root/swm.service", "start"}
+	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
 
-	cmds[structs.StopServiceCmd] = []string{"/root/swm.service", "stop"}
+	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
 
 	return cmds, nil
 }
@@ -194,24 +193,18 @@ func (c switchManagerConfigV1123) GenerateConfig(id string, desc structs.Service
 		return err
 	}
 
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return err
+	}
+
 	m := make(map[string]interface{}, 10)
 
-	for key, val := range desc.Options {
-		_ = key
-		_ = val
-	}
-	//	m["domain"] = svc.ID
-	//	m["name"] = u.Name
-	//	port, proxyPort := 0, 0
-	//	for i := range u.ports {
-	//		if u.ports[i].Name == "Port" {
-	//			port = u.ports[i].Port
-	//		} else if u.ports[i].Name == "ProxyPort" {
-	//			proxyPort = u.ports[i].Port
-	//		}
-	//	}
-	//	m["ProxyPort"] = proxyPort
-	//	m["Port"] = port
+	m["domain"] = desc.ID
+	m["name"] = spec.Name
+
+	m["Port"] = desc.Options["Port"]
+	m["ProxyPort"] = desc.Options["ProxyPort"]
 
 	//	// consul
 	//	m["ConsulBindNetworkName"] = u.engine.Labels[_Admin_NIC_Lable]

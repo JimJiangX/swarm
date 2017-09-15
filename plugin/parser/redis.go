@@ -8,16 +8,17 @@ import (
 	"strings"
 
 	"github.com/docker/swarm/garden/structs"
-	"github.com/pkg/errors"
 )
+
+const redisConfigLine = 100
 
 func init() {
 	register("redis", "3.2", &redisConfig{})
 
-	register("upredis", "1.0", &redisConfig{})
-	register("upredis", "1.1", &redisConfig{})
-	register("upredis", "1.2", &redisConfig{})
-	register("upredis", "2.0", &redisConfig{})
+	register("upredis", "1.0", &upredisConfig{})
+	register("upredis", "1.1", &upredisConfig{})
+	register("upredis", "1.2", &upredisConfig{})
+	register("upredis", "2.0", &upredisConfig{})
 }
 
 type redisConfig struct {
@@ -28,7 +29,7 @@ type redisConfig struct {
 func (redisConfig) clone(t *structs.ConfigTemplate) parser {
 	return &redisConfig{
 		template: t,
-		config:   make(map[string]string, 100),
+		config:   make(map[string]string, redisConfigLine),
 	}
 }
 
@@ -54,7 +55,7 @@ func (c redisConfig) get(key string) string {
 
 func (c *redisConfig) set(key string, val interface{}) error {
 	if c.config == nil {
-		c.config = make(map[string]string, 100)
+		c.config = make(map[string]string, redisConfigLine)
 	}
 
 	c.config[strings.ToLower(key)] = fmt.Sprintf("%v", val)
@@ -68,7 +69,7 @@ func (c redisConfig) Validate(data map[string]interface{}) error {
 
 func (c *redisConfig) ParseData(data []byte) error {
 	if c.config == nil {
-		c.config = make(map[string]string, 100)
+		c.config = make(map[string]string, redisConfigLine)
 	}
 
 	lines := bytes.Split(data, []byte{'\n'})
@@ -103,17 +104,9 @@ func (c redisConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 		return err
 	}
 
-	var spec *structs.UnitSpec
-
-	for i := range desc.Units {
-		if id == desc.Units[i].ID {
-			spec = &desc.Units[i]
-			break
-		}
-	}
-
-	if spec == nil {
-		return errors.Errorf("not found unit '%s' in service '%s'", id, desc.Name)
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return err
 	}
 
 	if len(spec.Networking) >= 1 {
@@ -138,11 +131,11 @@ func (redisConfig) GenerateCommands(id string, desc structs.ServiceSpec) (struct
 
 	cmds[structs.StartContainerCmd] = []string{"bin/bash"}
 
-	cmds[structs.InitServiceCmd] = []string{"/root/redis.service", "start"}
+	cmds[structs.InitServiceCmd] = []string{"/root/serv", "start"}
 
-	cmds[structs.StartServiceCmd] = []string{"/root/redis.service", "start"}
+	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
 
-	cmds[structs.StopServiceCmd] = []string{"/root/redis.service", "stop"}
+	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
 
 	return cmds, nil
 }
@@ -161,17 +154,9 @@ func (c redisConfig) Marshal() ([]byte, error) {
 }
 
 func (c redisConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
-	var spec *structs.UnitSpec
-
-	for i := range desc.Units {
-		if id == desc.Units[i].ID {
-			spec = &desc.Units[i]
-			break
-		}
-	}
-
-	if spec == nil {
-		return structs.ServiceRegistration{}, errors.Errorf("not found unit '%s' in service '%s'", id, desc.Name)
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return structs.ServiceRegistration{}, err
 	}
 
 	im, err := structs.ParseImage(c.template.Image)
@@ -188,4 +173,16 @@ func (c redisConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 	reg.Service.Container.HostName = spec.Engine.Node
 
 	return structs.ServiceRegistration{Horus: &reg}, nil
+}
+
+type upredisConfig struct {
+	redisConfig
+}
+
+func (upredisConfig) clone(t *structs.ConfigTemplate) parser {
+	pr := &redisConfig{}
+	pr.template = t
+	pr.config = make(map[string]string, redisConfigLine)
+
+	return pr
 }
