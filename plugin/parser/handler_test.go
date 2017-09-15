@@ -227,7 +227,7 @@ func TestGetConfigs(t *testing.T) {
 func TestGetConfig(t *testing.T) {
 	cc, err := pc.GetUnitConfig(context.Background(), "serivce0001", "unitXXX002")
 	if err != nil {
-		t.Error(err)
+		t.Errorf("%+v", err)
 	}
 
 	t.Log(cc.GetCmd(structs.InitServiceCmd), cc.GetServiceRegistration().Horus == nil)

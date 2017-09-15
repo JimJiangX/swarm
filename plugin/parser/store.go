@@ -43,8 +43,6 @@ func putConfigsToStore(ctx context.Context, client kvstore.Store, prefix string,
 	buf := bytes.NewBuffer(nil)
 
 	for id, val := range configs {
-		buf.Reset()
-
 		err := json.NewEncoder(buf).Encode(val)
 		if err != nil {
 			return err
@@ -55,6 +53,8 @@ func putConfigsToStore(ctx context.Context, client kvstore.Store, prefix string,
 		if err != nil {
 			return err
 		}
+
+		buf.Reset()
 	}
 
 	return nil

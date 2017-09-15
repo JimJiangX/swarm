@@ -42,11 +42,11 @@ func NewRouter(c kvstore.Client, kvpath, dir, ip string, port int) *mux.Router {
 
 	var routes = map[string]map[string]handler{
 		"GET": {
-			"/image/template/{name}":          getImage,
-			"/image/support":                  getSupportImageVersion,
-			"/configs/{service:.*}":           getConfigs,
-			"/configs/{service:.*}/{unit:.*}": getConfig,
-			"/commands/{service:.*}":          getCommands,
+			"/image/template/{name}":       getImage,
+			"/image/support":               getSupportImageVersion,
+			"/configs/{service}":           getConfigs,
+			"/configs/{service}/{unit:.*}": getConfig,
+			"/commands/{service:.*}":       getCommands,
 		},
 		"POST": {
 			"/configs":           generateConfigs,
