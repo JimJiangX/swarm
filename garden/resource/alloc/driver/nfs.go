@@ -74,6 +74,7 @@ func (nd _NFSDriver) Alloc(config *cluster.ContainerConfig, uid string, req stru
 	if req.Type == "NFS" || req.Type == "nfs" {
 		config.HostConfig.Binds = append(config.HostConfig.Binds, nd.MountDir+":"+nd.backupDir)
 	}
+
 	return nil, nil
 }
 

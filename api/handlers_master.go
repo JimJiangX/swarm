@@ -2149,16 +2149,6 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if config.BackupDir == "" {
-		config.BackupDir = "/backup"
-	}
-	if config.Type == "" {
-		config.Type = "full"
-	}
-	if config.FilesRetention == 0 {
-		config.FilesRetention = 7
-	}
-
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
 		gd.Ormer() == nil || gd.Cluster == nil {
@@ -2167,16 +2157,33 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if config.BackupDir == "" {
+		sys, err := gd.Ormer().GetSysConfig()
+		if err != nil {
+			ec := errCodeV1(_Service, dbQueryError, 133, "fail to query database", "数据库查询错误（系统配置表）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+			return
+		}
+
+		config.BackupDir = sys.BackupDir
+	}
+	if config.Type == "" {
+		config.Type = "full"
+	}
+	if config.FilesRetention == 0 {
+		config.FilesRetention = 7
+	}
+
 	svc, err := gd.GetService(name)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 133, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 134, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	spec, err := svc.Spec()
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 134, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 135, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2192,7 +2199,7 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	err = svc.Backup(ctx, r.Host, config, true, &task)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 135, "fail to back service", "服务备份错误")
+		ec := errCodeV1(_Service, internalError, 136, "fail to back service", "服务备份错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
