@@ -91,7 +91,7 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 
 	m["mysqld::server_id"] = net.ParseIP(spec.Networking[0].IP).To4()[3]
 
-	if v, ok := desc.Options["character_set_server"]; ok && v != nil {
+	if v, ok := desc.Options["mysqld::character_set_server"]; ok && v != nil {
 		m["mysqld::character_set_server"] = v
 	}
 
