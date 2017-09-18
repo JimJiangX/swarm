@@ -280,7 +280,7 @@ func (c *upsqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		if err != nil {
 			return errors.WithStack(err)
 		}
-		err = c.set("client::socket", filepath.Join(c.template.DataMount, "/mysql.sock"))
+		err = c.set("client::socket", filepath.Join(c.template.DataMount, "/upsql.sock"))
 	}
 
 	if err == nil {
