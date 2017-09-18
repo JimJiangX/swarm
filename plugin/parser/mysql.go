@@ -126,24 +126,24 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		}
 	}
 
-	m["client::user"] = desc.Options["client::user"]
-	m["client::password"] = desc.Options["client::password"]
+	//	m["client::user"] = desc.Options["client::user"]
+	//	m["client::password"] = desc.Options["client::password"]
 
-	var root *structs.User
+	//	var root *structs.User
 
-	if len(desc.Users) > 0 {
-		for i := range desc.Users {
-			if desc.Users[i].Role == rootRole {
-				root = &desc.Users[i]
-				break
-			}
-		}
+	//	if len(desc.Users) > 0 {
+	//		for i := range desc.Users {
+	//			if desc.Users[i].Role == rootRole {
+	//				root = &desc.Users[i]
+	//				break
+	//			}
+	//		}
 
-		if root != nil {
-			m["client::user"] = root.Name
-			m["client::password"] = root.Password
-		}
-	}
+	//		if root != nil {
+	//			m["client::user"] = root.Name
+	//			m["client::password"] = root.Password
+	//		}
+	//	}
 
 	for key, val := range m {
 		err = c.set(key, val)
