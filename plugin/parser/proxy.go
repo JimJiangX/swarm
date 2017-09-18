@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/astaxie/beego/config"
@@ -253,6 +254,149 @@ func (c *proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) er
 		m["adm-cli::adm-svr-address"] = addr
 	}
 
+	for key, val := range m {
+		err = c.set(key, val)
+	}
+
+	return err
+}
+
+type upproxyConfigV100 struct {
+	template *structs.ConfigTemplate
+	config   config.Configer
+}
+
+func (upproxyConfigV100) clone(t *structs.ConfigTemplate) parser {
+	return &upproxyConfigV100{template: t}
+}
+
+func (upproxyConfigV100) Validate(data map[string]interface{}) error { return nil }
+
+func (c upproxyConfigV100) get(key string) string {
+	if c.config == nil {
+		return ""
+	}
+
+	if val := c.config.String(key); val != "" {
+		return val
+	}
+
+	if c.template != nil {
+		for i := range c.template.Keysets {
+			if c.template.Keysets[i].Key == key {
+				return c.template.Keysets[i].Default
+			}
+		}
+	}
+
+	return ""
+}
+
+func (c *upproxyConfigV100) set(key string, val interface{}) error {
+	if c.config == nil {
+		return errors.New("upproxyConfig Configer is nil")
+	}
+
+	return c.config.Set(strings.ToLower(key), fmt.Sprintf("%v", val))
+}
+
+func (c *upproxyConfigV100) ParseData(data []byte) error {
+	configer, err := config.NewConfigData("ini", data)
+	if err != nil {
+		return errors.Wrap(err, "parse ini")
+	}
+
+	c.config = configer
+
+	return nil
+}
+
+func (c *upproxyConfigV100) Marshal() ([]byte, error) {
+	tmpfile, err := ioutil.TempFile("", "serviceConfig")
+	if err != nil {
+		return nil, errors.Wrap(err, "create tempFile")
+	}
+	tmpfile.Close()
+	defer os.Remove(tmpfile.Name())
+
+	err = c.config.SaveConfigFile(tmpfile.Name())
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	data, err := ioutil.ReadFile(tmpfile.Name())
+	if err == nil {
+		return data, nil
+	}
+
+	return data, errors.Wrap(err, "read file")
+}
+
+func (c upproxyConfigV100) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return structs.ServiceRegistration{}, err
+	}
+
+	im, err := structs.ParseImage(c.template.Image)
+	if err != nil {
+		return structs.ServiceRegistration{}, err
+	}
+
+	reg := structs.HorusRegistration{}
+	reg.Service.Select = true
+	reg.Service.Name = spec.ID
+	reg.Service.Type = "unit_" + im.Name
+	reg.Service.Tag = desc.ID
+	reg.Service.Container.Name = spec.Name
+	reg.Service.Container.HostName = spec.Engine.Node
+
+	var mon *structs.User
+
+	if len(desc.Users) > 0 {
+		for i := range desc.Users {
+			if desc.Users[i].Role == "mon" {
+				mon = &desc.Users[i]
+				break
+			}
+		}
+
+		if mon != nil {
+			reg.Service.MonitorUser = mon.Name
+			reg.Service.MonitorPassword = mon.Password
+		}
+	}
+
+	return structs.ServiceRegistration{Horus: &reg}, nil
+}
+
+func (c *upproxyConfigV100) GenerateConfig(id string, desc structs.ServiceSpec) error {
+	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
+
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return err
+	}
+
+	m := make(map[string]interface{}, 10)
+
+	m["upsql-proxy::proxy-domain"] = desc.ID
+	m["upsql-proxy::proxy-name"] = spec.Name
+
+	addr := "127.0.0.1"
+	if len(spec.Networking) > 0 {
+		addr = spec.Networking[0].IP
+	}
+
+	if dataPort, ok := desc.Options["upsql-proxy::proxy_data_port"]; !ok {
+		return errors.New("miss key:upsql-proxy::proxy_data_port")
+	} else {
+		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%v", addr, dataPort)
+	}
+
 	m["upsql-proxy::event-threads-count"] = 1
 	if spec.Config != nil {
 		ncpu, err := spec.Config.CountCPU()
@@ -261,8 +405,10 @@ func (c *proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) er
 		}
 	}
 
-	if addr, ok := desc.Options["adm-cli::adm-svr-address"]; ok {
-		m["adm-cli::adm-svr-address"] = addr
+	if c.template != nil {
+		m["upsql-proxy::topology-config"] = filepath.Join(c.template.DataMount, "/topology.json")
+
+		m["log::log-dir"] = c.template.LogMount
 	}
 
 	for key, val := range m {
@@ -272,13 +418,13 @@ func (c *proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) er
 	return err
 }
 
-type upproxyConfigV100 struct {
-	proxyConfigV110
-}
+func (c upproxyConfigV100) GenerateCommands(id string, desc structs.ServiceSpec) (structs.CmdsMap, error) {
+	cmds := make(structs.CmdsMap, 4)
 
-func (upproxyConfigV100) clone(t *structs.ConfigTemplate) parser {
-	pr := &upproxyConfigV100{}
-	pr.template = t
+	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
+	cmds[structs.InitServiceCmd] = []string{"/root/serv", "start"}
+	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
+	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
 
-	return pr
+	return cmds, nil
 }
