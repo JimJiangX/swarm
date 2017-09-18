@@ -126,7 +126,7 @@ type ConfigTemplate struct {
 
 type UnitConfigResponse struct {
 	ID      string `json:"id"`
-	Service string `json:"name"`
+	Service string `json:"service"`
 	ConfigTemplate
 	Cmds CmdsMap `json:"cmds,omitempty"`
 }
