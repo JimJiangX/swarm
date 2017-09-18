@@ -122,7 +122,7 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 				return err
 			}
 
-			err = svc.runContainer(ctx, pendings, auth)
+			err = svc.runContainer(ctx, pendings, false, auth)
 			if err != nil {
 				return err
 			}

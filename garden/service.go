@@ -370,7 +370,7 @@ func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers
 }
 
 // RunContainer create and start container on engine.
-func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, authConfig *types.AuthConfig) error {
+func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, start bool, authConfig *types.AuthConfig) error {
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
 		statusServiceContainerCreating, statusServiceContainerRunning, statusServiceContainerCreateFailed)
 
@@ -379,12 +379,12 @@ func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, au
 			return val == statusServiceAllocated
 		},
 		func() error {
-			return svc.runContainer(ctx, pendings, authConfig)
+			return svc.runContainer(ctx, pendings, start, authConfig)
 		},
 		false)
 }
 
-func (svc *Service) runContainer(ctx context.Context, pendings []pendingUnit, authConfig *types.AuthConfig) error {
+func (svc *Service) runContainer(ctx context.Context, pendings []pendingUnit, start bool, authConfig *types.AuthConfig) error {
 	defer func() {
 		ids := make([]string, len(pendings))
 		for i := range pendings {
@@ -418,9 +418,11 @@ func (svc *Service) runContainer(ctx context.Context, pendings []pendingUnit, au
 		}
 		pu.Unit.ContainerID = c.ID
 
-		err = eng.StartContainer(c)
-		if err != nil {
-			return errors.Wrap(err, "start container:"+pu.Unit.Name)
+		if start {
+			err = eng.StartContainer(c)
+			if err != nil {
+				return errors.Wrap(err, "start container:"+pu.Unit.Name)
+			}
 		}
 	}
 

@@ -147,7 +147,7 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *databas
 		return err
 	}
 
-	err = svc.RunContainer(ctx, pendings, auth)
+	err = svc.RunContainer(ctx, pendings, false, auth)
 	if err != nil {
 		return err
 	}

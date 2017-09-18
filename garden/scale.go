@@ -213,7 +213,7 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 		return units, err
 	}
 
-	err = svc.runContainer(ctx, pendings, auth)
+	err = svc.runContainer(ctx, pendings, false, auth)
 	if err != nil {
 		return units, err
 	}
