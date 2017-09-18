@@ -70,7 +70,7 @@ func (c *mysqlConfig) set(key string, val interface{}) error {
 	return c.config.Set(strings.ToLower(key), fmt.Sprintf("%v", val))
 }
 
-func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
+func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	err := c.Validate(desc.Options)
 	if err != nil {
 		return err
@@ -105,7 +105,7 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 		m["mysqld::tmpdir"] = c.template.DataMount
 		m["mysqld::datadir"] = c.template.DataMount
 
-		m["mysqld::socket"] = filepath.Join(c.template.DataMount, "/upsql.sock")
+		m["mysqld::socket"] = filepath.Join(c.template.DataMount, "/mysql.sock")
 
 		m["mysqld::log_bin"] = filepath.Clean(fmt.Sprintf("%s/BIN/%s-binlog", c.template.LogMount, spec.Name))
 
@@ -115,7 +115,7 @@ func (c mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 
 		m["mysqld::innodb_log_group_home_dir"] = filepath.Join(c.template.LogMount, "/RED")
 
-		m["client::socket"] = filepath.Join(c.template.DataMount, "/upsql.sock")
+		m["client::socket"] = filepath.Join(c.template.DataMount, "/mysql.sock")
 	}
 
 	if spec.Config != nil {
@@ -267,6 +267,27 @@ func (upsqlConfig) GenerateCommands(id string, desc structs.ServiceSpec) (struct
 	cmds[structs.BackupCmd] = []string{"/root/upsql-backup.sh"}
 
 	return cmds, nil
+}
+
+func (c *upsqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
+	err := c.mysqlConfig.GenerateConfig(id, desc)
+	if err != nil {
+		return err
+	}
+
+	if c.template != nil {
+		err = c.set("mysqld::socket", filepath.Join(c.template.DataMount, "/upsql.sock"))
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		err = c.set("client::socket", filepath.Join(c.template.DataMount, "/mysql.sock"))
+	}
+
+	if err == nil {
+		return nil
+	}
+
+	return errors.WithStack(err)
 }
 
 func getUnitSpec(units []structs.UnitSpec, id string) (*structs.UnitSpec, error) {

@@ -132,7 +132,7 @@ func (c proxyConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 	return structs.ServiceRegistration{Horus: &reg}, nil
 }
 
-func (c proxyConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
+func (c *proxyConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	err := c.Validate(desc.Options)
 	if err != nil {
 		return err
@@ -212,7 +212,7 @@ func (proxyConfigV110) clone(t *structs.ConfigTemplate) parser {
 	return pr
 }
 
-func (c proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) error {
+func (c *proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	err := c.Validate(desc.Options)
 	if err != nil {
 		return err

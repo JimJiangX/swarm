@@ -225,7 +225,7 @@ func (switchManagerConfigV1123) clone(t *structs.ConfigTemplate) parser {
 	return pr
 }
 
-func (c switchManagerConfigV1123) GenerateConfig(id string, desc structs.ServiceSpec) error {
+func (c *switchManagerConfigV1123) GenerateConfig(id string, desc structs.ServiceSpec) error {
 
 	err := c.Validate(desc.Options)
 	if err != nil {
@@ -275,7 +275,7 @@ func (switchManagerConfigV1147) clone(t *structs.ConfigTemplate) parser {
 	return pr
 }
 
-func (c switchManagerConfigV1147) GenerateConfig(id string, desc structs.ServiceSpec) error {
+func (c *switchManagerConfigV1147) GenerateConfig(id string, desc structs.ServiceSpec) error {
 
 	err := c.Validate(desc.Options)
 	if err != nil {

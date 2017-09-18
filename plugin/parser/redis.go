@@ -98,7 +98,7 @@ func (c *redisConfig) ParseData(data []byte) error {
 	return nil
 }
 
-func (c redisConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
+func (c *redisConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	err := c.Validate(desc.Options)
 	if err != nil {
 		return err
