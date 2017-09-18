@@ -89,12 +89,6 @@ func (c *redisConfig) ParseData(data []byte) error {
 		}
 	}
 
-	if c.template != nil {
-		c.config["dir"] = c.template.DataMount
-		c.config["pidfile"] = filepath.Join(c.template.DataMount, "redis.pid")
-		c.config["logfile"] = filepath.Join(c.template.DataMount, "redis.log")
-	}
-
 	return nil
 }
 
