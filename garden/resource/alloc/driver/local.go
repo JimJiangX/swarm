@@ -279,8 +279,14 @@ func (lv localVolume) Space() (Space, error) {
 	return lv.space, nil
 }
 
-func volumeDirEnv(name string) string {
-	return name + "_DIR=/UPM/" + name
+func setVolumeBind(config *cluster.ContainerConfig, lvName, req string) {
+	name := fmt.Sprintf("%s:/UPM_%s", lvName, req)
+	config.HostConfig.Binds = append(config.HostConfig.Binds, name)
+
+	if config.Config.Env == nil {
+		config.Config.Env = make([]string, 0, 3)
+	}
+	config.Config.Env = append(config.Config.Env, req+"_DIR=/UPM_"+req)
 }
 
 func (lv *localVolume) Alloc(config *cluster.ContainerConfig, uid string, req structs.VolumeRequire) (*database.Volume, error) {
@@ -312,14 +318,7 @@ func (lv *localVolume) Alloc(config *cluster.ContainerConfig, uid string, req st
 
 	lv.space.Free -= req.Size
 
-	name := fmt.Sprintf("%s:/UPM/%s", v.Name, req.Name)
-	config.HostConfig.Binds = append(config.HostConfig.Binds, name)
-	config.HostConfig.VolumeDriver = lv.Driver()
-
-	if config.Config.Env == nil {
-		config.Config.Env = make([]string, 0, 3)
-	}
-	config.Config.Env = append(config.Config.Env, volumeDirEnv(req.Name))
+	setVolumeBind(config, v.Name, req.Name)
 
 	return &v, nil
 }

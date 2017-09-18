@@ -99,13 +99,7 @@ func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req struc
 		return &lv, err
 	}
 
-	name = fmt.Sprintf("%s:/UPM/%s", lv.Name, req.Name)
-	config.HostConfig.Binds = append(config.HostConfig.Binds, name)
-
-	if config.Config.Env == nil {
-		config.Config.Env = make([]string, 0, 3)
-	}
-	config.Config.Env = append(config.Config.Env, volumeDirEnv(req.Name))
+	setVolumeBind(config, lv.Name, req.Name)
 
 	return &lv, nil
 }
