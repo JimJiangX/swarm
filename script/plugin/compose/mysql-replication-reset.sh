@@ -5,10 +5,12 @@ container_id=$1
 swarm_ip=$2
 swarm_port=$3
 
-DOCKERBIN=docker
+CUR_DIR=`dirname $0`
+TOOLS_DIR=${CUR_DIR}/tools
+DOCKERBIN=${TOOLS_DIR}/docker
 
 reset_master="RESET MASTER;"
 reset_slave="RESET SLAVE;"
 
-docker -H $swarm_ip:$swarm_port exec $container_id mysql -e "$reset_slave" && \
-docker -H $swarm_ip:$swarm_port exec $container_id mysql -e "$reset_master"
+${DOCKERBIN} -H $swarm_ip:$swarm_port exec $container_id mysql -e "$reset_slave" && \
+${DOCKERBIN} -H $swarm_ip:$swarm_port exec $container_id mysql -e "$reset_master"

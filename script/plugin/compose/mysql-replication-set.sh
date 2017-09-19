@@ -12,7 +12,9 @@ repl_pwd=$8
 slave_ip=$9
 slave_port=${10}
 
-DOCKERBIN=docker
+CUR_DIR=`dirname $0`
+TOOLS_DIR=${CUR_DIR}/tools
+DOCKERBIN=${TOOLS_DIR}/docker
 
 stop_slave="STOP SLAVE;"
 
@@ -21,9 +23,9 @@ change_master="CHANGE MASTER TO MASTER_HOST = '$master_ip', MASTER_PORT = $maste
 start_slave="START SLAVE;"
 
 set_replication() {
-	docker -H $swarm_ip:$swarm_port exec $container_id mysql -e "$stop_slave" && \
-	docker -H $swarm_ip:$swarm_port exec $container_id mysql -e "$change_master" && \
-	docker -H $swarm_ip:$swarm_port exec $container_id mysql -e "$start_slave"
+	${DOCKERBIN} -H $swarm_ip:$swarm_port exec $container_id mysql -e "$stop_slave" && \
+	${DOCKERBIN} -H $swarm_ip:$swarm_port exec $container_id mysql -e "$change_master" && \
+	${DOCKERBIN} -H $swarm_ip:$swarm_port exec $container_id mysql -e "$start_slave"
 }
 
 if [ "$role" == MASTER ]; then
