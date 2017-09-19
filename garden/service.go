@@ -17,6 +17,7 @@ import (
 	"github.com/docker/swarm/garden/tasklock"
 	"github.com/docker/swarm/garden/utils"
 	pluginapi "github.com/docker/swarm/plugin/parser/api"
+	"github.com/docker/swarm/vars"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -498,6 +499,12 @@ func (svc *Service) initStart(ctx context.Context, units []*unit, kvc kvstore.Cl
 
 	for i := range units {
 		cmd := configs.GetCmd(units[i].u.ID, structs.InitServiceCmd)
+		root := vars.Root
+		mon := vars.Monitor
+		repl := vars.Replication
+		cmd = append(cmd, root.Role, root.User, root.Password, root.Privilege,
+			mon.Role, mon.User, mon.Password, mon.Privilege,
+			repl.Role, repl.User, repl.Password, repl.Privilege)
 
 		_, err = units[i].containerExec(ctx, cmd, false)
 		if err != nil {
