@@ -354,10 +354,7 @@ func (u unit) removeVolumes(ctx context.Context) error {
 	engine := u.getEngine()
 	if engine == nil {
 		for i := range lvs {
-			ok, err := u.cluster.RemoveVolumes(lvs[i].Name)
-			if !ok {
-				continue
-			}
+			_, err := u.cluster.RemoveVolumes(lvs[i].Name)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -369,10 +366,6 @@ func (u unit) removeVolumes(ctx context.Context) error {
 	for i := range lvs {
 		err := engine.RemoveVolume(lvs[i].Name)
 		if err != nil {
-			ok, err := u.cluster.RemoveVolumes(lvs[i].Name)
-			if !ok {
-				continue
-			}
 			return errors.WithStack(err)
 		}
 	}

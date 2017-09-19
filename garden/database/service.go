@@ -430,7 +430,6 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 		if err == nil {
 			volumes = append(volumes, vl...)
 		}
-
 	}
 
 	do := func(tx *sqlx.Tx) error {
