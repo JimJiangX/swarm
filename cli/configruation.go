@@ -9,6 +9,7 @@ import (
 	"github.com/docker/swarm/api"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/plugin/parser"
+	"github.com/docker/swarm/vars"
 	"github.com/urfave/cli"
 )
 
@@ -43,6 +44,10 @@ func configruation(c *cli.Context) {
 	tlsConfig, err := loadTLSConfigFromContext(c)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if err := vars.ValidateReplication(); err != nil {
+		log.Warn(err)
 	}
 
 	mgmIP := c.String("mgmIP")

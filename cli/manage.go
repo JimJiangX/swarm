@@ -31,6 +31,7 @@ import (
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/filter"
 	"github.com/docker/swarm/scheduler/strategy"
+	"github.com/docker/swarm/vars"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 	"github.com/urfave/cli"
@@ -364,6 +365,10 @@ func manage(c *cli.Context) {
 		}
 
 		setNodesKVPath(discovery)
+
+		if err := vars.Validate(); err != nil {
+			log.Warn(err)
+		}
 
 		ormer, err = getOrmer(c)
 		if err != nil {
