@@ -102,8 +102,9 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 	}
 
 	if c.template != nil {
-		m["mysqld::tmpdir"] = c.template.DataMount
-		m["mysqld::datadir"] = c.template.DataMount
+		dat := filepath.Join(c.template.DataMount, "/DAT")
+		m["mysqld::tmpdir"] = dat
+		m["mysqld::datadir"] = dat
 
 		m["mysqld::socket"] = filepath.Join(c.template.DataMount, "/mysql.sock")
 
@@ -125,25 +126,6 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 			m["mysqld::innodb_buffer_pool_size"] = int(float64(n) * 0.5)
 		}
 	}
-
-	//	m["client::user"] = desc.Options["client::user"]
-	//	m["client::password"] = desc.Options["client::password"]
-
-	//	var root *structs.User
-
-	//	if len(desc.Users) > 0 {
-	//		for i := range desc.Users {
-	//			if desc.Users[i].Role == rootRole {
-	//				root = &desc.Users[i]
-	//				break
-	//			}
-	//		}
-
-	//		if root != nil {
-	//			m["client::user"] = root.Name
-	//			m["client::password"] = root.Password
-	//		}
-	//	}
 
 	for key, val := range m {
 		err = c.set(key, val)
