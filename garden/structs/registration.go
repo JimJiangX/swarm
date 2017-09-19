@@ -85,7 +85,7 @@ type Commands map[string]CmdsMap
 
 type ConfigsMap map[string]ConfigCmds
 
-type ServiceConfigs []UnitConfigResponse
+type ServiceConfigs []UnitConfig
 
 func (c CmdsMap) Get(typ string) []string {
 	if c == nil {

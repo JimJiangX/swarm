@@ -118,15 +118,15 @@ type ConfigTemplate struct {
 	LogMount   string `json:"log_mount"`
 	DataMount  string `json:"data_mount"`
 	ConfigFile string `json:"config_file"`
-	Content    string `json:"content"`
+	Content    string `json:"content,omitempty"`
 
 	Keysets   []Keyset `json:"keysets"`
 	Timestamp int64    `json:"timestamp"`
 }
 
-type UnitConfigResponse struct {
-	ID      string `json:"id"`
-	Service string `json:"service"`
+type UnitConfig struct {
+	ID      string `json:"id,omitempty"`
+	Service string `json:"service,omitempty"`
 	ConfigTemplate
 	Cmds CmdsMap `json:"cmds,omitempty"`
 }

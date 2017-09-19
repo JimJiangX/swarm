@@ -150,8 +150,8 @@ func getConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(out)
 }
 
-func getServiceConfigResponse(service string, cm structs.ConfigsMap, t structs.ConfigTemplate) ([]structs.UnitConfigResponse, error) {
-	out := make([]structs.UnitConfigResponse, 0, len(cm))
+func getServiceConfigResponse(service string, cm structs.ConfigsMap, t structs.ConfigTemplate) ([]structs.UnitConfig, error) {
+	out := make([]structs.UnitConfig, 0, len(cm))
 	var (
 		pr  parser
 		err error
@@ -160,7 +160,7 @@ func getServiceConfigResponse(service string, cm structs.ConfigsMap, t structs.C
 	for _, cc := range cm {
 		image := cc.Name + ":" + cc.Version
 
-		uc := structs.UnitConfigResponse{
+		uc := structs.UnitConfig{
 			ID:      cc.ID,
 			Service: service,
 			Cmds:    cc.Cmds,
@@ -404,7 +404,7 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(out)
 }
 
-func mergeUnitConfig(pr parser, uc structs.UnitConfigResponse, cc structs.ConfigCmds) (structs.ConfigCmds, error) {
+func mergeUnitConfig(pr parser, uc structs.UnitConfig, cc structs.ConfigCmds) (structs.ConfigCmds, error) {
 	if uc.ID != "" && cc.ID != uc.ID {
 		cc.ID = uc.ID
 	}

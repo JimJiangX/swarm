@@ -1889,27 +1889,98 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
-func vaildPostServiceUpdateConfigsRequest(req structs.ServiceConfigs) error {
-	if len(req) == 0 {
+func vaildPostServiceUpdateConfigsRequest(req structs.UnitConfig) error {
+	if len(req.Keysets) == 0 {
 		return stderr.New("nothing new for update for service configs")
 	}
 
 	return nil
 }
 
+func mergeServiceConfigsChange(ctx goctx.Context, svc *garden.Service, change structs.UnitConfig) (structs.ServiceConfigs, bool, error) {
+	restart := false
+
+	configs, err := svc.GetUnitsConfigs(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+
+	for i := range configs {
+		cc, ok, err := mergeUnitConfigChange(configs[i], change)
+		if err != nil {
+			return nil, false, err
+		}
+
+		configs[i] = cc
+
+		if ok {
+			restart = ok
+		}
+	}
+
+	return configs, restart, nil
+}
+
+func mergeUnitConfigChange(cc, change structs.UnitConfig) (structs.UnitConfig, bool, error) {
+	if change.LogMount != "" {
+		cc.LogMount = change.LogMount
+	}
+	if change.DataMount != "" {
+		cc.DataMount = change.DataMount
+	}
+	if change.ConfigFile != "" {
+		cc.ConfigFile = change.ConfigFile
+	}
+
+	m := make(map[string]structs.Keyset, len(cc.Keysets))
+
+	for i := range cc.Keysets {
+		m[change.Keysets[i].Key] = change.Keysets[i]
+	}
+
+	restart := false
+
+	for i := range change.Keysets {
+		val, ok := m[change.Keysets[i].Key]
+		if !ok {
+			return cc, false, errors.Errorf("UnitConfig key:%s not exist", change.Keysets[i].Key)
+		}
+
+		if !val.CanSet {
+			return cc, false, errors.Errorf("UnitConfig key:%s forbit to reset", val.Key)
+		}
+
+		if val.MustRestart {
+			restart = true
+		}
+
+		val.Value = change.Keysets[i].Value
+	}
+
+	ks := make([]structs.Keyset, 0, len(m))
+
+	for _, val := range m {
+		ks = append(ks, val)
+	}
+
+	cc.Keysets = ks
+
+	return cc, restart, nil
+}
+
 func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
-	var req structs.ServiceConfigs
+	change := structs.UnitConfig{}
 
-	err := json.NewDecoder(r.Body).Decode(&req)
+	err := json.NewDecoder(r.Body).Decode(&change)
 	if err != nil {
 		ec := errCodeV1(_Service, decodeError, 91, "JSON Decode Request Body error", "JSON解析请求Body错误")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
-	if err := vaildPostServiceUpdateConfigsRequest(req); err != nil {
+	if err := vaildPostServiceUpdateConfigsRequest(change); err != nil {
 		ec := errCodeV1(_Service, invaildParamsError, 92, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
@@ -1937,6 +2008,13 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
+	configs, restart, err := mergeServiceConfigsChange(ctx, svc, change)
+	if err != nil {
+		ec := errCodeV1(_Service, dbQueryError, 95, "fail to update config file", "数据合并错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
 	// new Context with deadline
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
@@ -1946,9 +2024,9 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	task := database.NewTask(spec.Name, database.ServiceUpdateConfigTask, spec.ID, spec.Desc, nil, 300)
 
-	err = svc.UpdateUnitsConfigs(ctx, req, &task, true)
+	err = svc.UpdateUnitsConfigs(ctx, configs, &task, restart, true)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 95, "fail to update service config files", "服务配置文件更新错误")
+		ec := errCodeV1(_Service, internalError, 96, "fail to update service config files", "服务配置文件更新错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2413,7 +2491,15 @@ func getServiceBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 }
 
 func getServiceConfigFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Service, urlParamError, 181, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
 	name := mux.Vars(r)["name"]
+	canset := boolValue(r, "canset")
+
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
 		gd.Ormer() == nil {
@@ -2424,19 +2510,42 @@ func getServiceConfigFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 181, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 182, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	out, err := svc.GetUnitsConfigs(ctx)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 182, "fail to query units configs from kv", "获取服务单元配置错误")
+		ec := errCodeV1(_Service, dbQueryError, 183, "fail to query units configs from kv", "获取服务单元配置错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	writeJSON(w, out, http.StatusOK)
+	if canset {
+		writeJSON(w, out, http.StatusOK)
+		return
+	}
+
+	config := structs.UnitConfig{}
+
+	if len(out) > 1 {
+		config = out[0]
+		config.ID = ""
+		config.Content = ""
+		config.Cmds = nil
+
+		keysets := make([]structs.Keyset, 0, len(out[0].Keysets))
+		for i := range out[0].Keysets {
+			if out[0].Keysets[i].CanSet {
+				keysets = append(keysets, out[0].Keysets[i])
+			}
+		}
+
+		config.Keysets = keysets
+	}
+
+	writeJSON(w, structs.ServiceConfigs{config}, http.StatusOK)
 }
 
 // -----------------/units handlers-----------------

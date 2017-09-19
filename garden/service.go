@@ -637,7 +637,7 @@ func (svc *Service) Start(ctx context.Context, task *database.Task, detach bool,
 }
 
 // UpdateUnitsConfigs generated new units configs,write to container volume.
-func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.ServiceConfigs, task *database.Task, async bool) (err error) {
+func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.ServiceConfigs, task *database.Task, restart, async bool) (err error) {
 
 	update := func() error {
 		units, err := svc.getUnits()
@@ -650,14 +650,16 @@ func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.Serv
 			return err
 		}
 
-		list := make([]*unit, 0, len(units))
-		for i := range configs {
-			if u := getUnit(units, configs[i].ID); u != nil {
-				list = append(list, u)
-			}
+		err = svc.updateConfigs(ctx, units, cm, nil)
+		if err != nil {
+			return err
 		}
 
-		return svc.updateConfigs(ctx, list, cm, nil)
+		if restart {
+			err = svc.start(ctx, units, cm.Commands())
+		}
+
+		return err
 	}
 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
