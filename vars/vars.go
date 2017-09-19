@@ -14,6 +14,8 @@ type User struct {
 }
 
 var (
+	root     = ""
+	root_pwd = ""
 	// root_name=cup_dba
 	// root_password=123.com
 	// root_privilege="ALL"
@@ -22,6 +24,8 @@ var (
 		Privilege: "ALL",
 	}
 
+	mon     = ""
+	mon_pwd = ""
 	// mon_name=mon
 	// mon_password=111111
 	// mon_privilege="SELECT,PROCESS,REPLICATION CLENT"
@@ -30,6 +34,8 @@ var (
 		Privilege: "SELECT,PROCESS,REPLICATION CLENT",
 	}
 
+	repl     = ""
+	repl_pwd = ""
 	// repl_name=repl
 	// repl_password=111111
 	// repl_privilege="REPLICATION SLAVE"
@@ -38,6 +44,17 @@ var (
 		Privilege: "REPLICATION SLAVE",
 	}
 )
+
+func init() {
+	Root.User = root
+	Root.Password = root_pwd
+
+	Monitor.User = mon
+	Monitor.Password = mon_pwd
+
+	Replication.User = repl
+	Replication.Password = repl_pwd
+}
 
 func Validate() error {
 	if Root.User == "" || Root.Password == "" ||
