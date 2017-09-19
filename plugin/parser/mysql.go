@@ -115,8 +115,6 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		m["mysqld::slow_query_log_file"] = filepath.Join(c.template.LogMount, "/slow-query.log")
 
 		m["mysqld::innodb_log_group_home_dir"] = filepath.Join(c.template.LogMount, "/RED")
-
-		m["client::socket"] = filepath.Join(c.template.DataMount, "/mysql.sock")
 	}
 
 	if spec.Config != nil {
@@ -259,17 +257,13 @@ func (c *upsqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 
 	if c.template != nil {
 		err = c.set("mysqld::socket", filepath.Join(c.template.DataMount, "/upsql.sock"))
-		if err != nil {
-			return errors.WithStack(err)
-		}
-		err = c.set("client::socket", filepath.Join(c.template.DataMount, "/upsql.sock"))
 	}
 
-	if err == nil {
-		return nil
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
-	return errors.WithStack(err)
+	return nil
 }
 
 func getUnitSpec(units []structs.UnitSpec, id string) (*structs.UnitSpec, error) {
