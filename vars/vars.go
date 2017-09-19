@@ -41,7 +41,8 @@ var (
 
 func Validate() error {
 	if Root.User == "" || Root.Password == "" ||
-		Monitor.User == "" || Monitor.Password == "" {
+		Monitor.User == "" || Monitor.Password == "" ||
+		Replication.User == "" || Replication.Password == "" {
 
 		return errUserInvaild
 	}
