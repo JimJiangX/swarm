@@ -174,7 +174,7 @@ func getRedisPortBySpec(req *structs.ServiceSpec) (int, error) {
 
 func getMysqlPortBySpec(req *structs.ServiceSpec) (int, error) {
 
-	port, ok := req.Options["port"]
+	port, ok := req.Options["mysqld::port"]
 	if !ok {
 		return -1, errors.New("bad req:mysql need Options[port]")
 	}
@@ -189,20 +189,21 @@ func valicateRedisSpec(req *structs.ServiceSpec) error {
 
 //check && get value
 //"m:2#s:1"
-func getmasterAndSlave(req *structs.ServiceSpec) (mnum int, snum int, err error) {
+func getmasterAndSlave(req *structs.ServiceSpec) (int, int, error) {
 	codes := strings.Split(req.Arch.Code, "#")
-	if len(codes) != 2 {
-		return 0, 0, errors.Errorf("bad format,Arch.Code:%v", req.Arch.Code)
-	}
 
 	//get master num
 	master := strings.Split(codes[0], ":")
 	if len(master) != 2 {
 		return 0, 0, errors.Errorf("bad format,get master,Arch.Code:%v", req.Arch.Code)
 	}
-	mnum, err = strconv.Atoi(master[1])
+	mnum, err := strconv.Atoi(master[1])
 	if err != nil || master[0] != "M" {
 		return 0, 0, errors.Errorf("bad format,get master num,Arch.Code:%v", req.Arch.Code)
+	}
+
+	if len(codes) == 1 {
+		return mnum, 0, nil
 	}
 
 	//get slave num
@@ -210,7 +211,7 @@ func getmasterAndSlave(req *structs.ServiceSpec) (mnum int, snum int, err error)
 	if len(slave) != 2 {
 		return 0, 0, errors.Errorf("bad format,get slave,Arch.Code:%v", req.Arch.Code)
 	}
-	snum, err = strconv.Atoi(slave[1])
+	snum, err := strconv.Atoi(slave[1])
 	if err != nil || slave[0] != "S" {
 		return 0, 0, errors.Errorf("bad format,get slave num,Arch.Code:%v", req.Arch.Code)
 	}
@@ -224,20 +225,20 @@ func getDbType(req *structs.ServiceSpec) dbArch {
 	db, version := datas[0], datas[1]
 	arch := req.Arch.Mode
 
-	if db == "redis" && arch == "sharding_replication" {
-		return redisShardingArch
+	if db == "redis" || db == "upredis" {
+		if arch == "sharding_replication" {
+			return redisShardingArch
+		} else if arch == "replication" {
+			return redisRepArch
+		}
 	}
 
-	if db == "redis" && arch == "replication" {
-		return redisRepArch
-	}
-
-	if db == "mysql" && arch == "replication" {
-		return mysqlRepArch
-	}
-
-	if db == "mysql" && arch == "group_replication" {
-		return mysqlGroupArch
+	if db == "mysql" || db == "upsql" {
+		if arch == "replication" {
+			return mysqlRepArch
+		} else if arch == "group_replication" {
+			return mysqlGroupArch
+		}
 	}
 
 	if arch == "clone" {
