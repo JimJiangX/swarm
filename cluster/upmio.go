@@ -174,12 +174,13 @@ func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []st
 		return inspect, errors.Wrapf(err, "Container %s exec create", containerID)
 	}
 
+	// TODO: remove
 	logrus.WithFields(logrus.Fields{
 		"Container": containerID,
 		"Engine":    e.Addr,
 		"ExecID":    exec.ID,
 		"Detach":    execConfig.Detach,
-	}).Infof("start exec:%s", cmd)
+	}).Debugf("start exec:%s", cmd)
 
 	if execConfig.Detach {
 		err := e.apiClient.ContainerExecStart(ctx, exec.ID, types.ExecStartCheck{Detach: detach})
