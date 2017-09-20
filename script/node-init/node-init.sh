@@ -34,7 +34,38 @@ cur_dir=`dirname $0`
 hdd_vgname=${HOSTNAME}_HDD_VG
 ssd_vgname=${HOSTNAME}_SSD_VG
 
-pf_dev_bw=1000M
+bond_dev=bond0
+
+bond_mode=`cat cat /sys/class/net/${bond_dev}/bonding/mode`
+
+bond_slaves=`cat /sys/class/net/${bond_dev}/bonding/slaves`
+if [ ! -n "${bond_slaves}" ]; then
+	echo "${bond_dev} slaves is null"
+	exit 2
+fi
+
+pf_dev_bw_num=0
+if [ "${bond_mode}" == "balance-xor 2" ]; then
+	for d in ${bond_slaves}
+	do
+		d_bw=`ethtool enp130s0f0| grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}'`	
+		pf_dev_bw_num=`expr ${pf_dev_bw_num} + ${d_bw}`
+	done
+	pf_dev_bw=${pf_dev_bw_num}M
+elif [ "${bond_mode}" == "active-backup 1" ]; then
+	for d in ${bond_slaves}
+        do
+                d_bw=`ethtool enp130s0f0| grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}'`    
+		if [ ${d_bw} -gt ${pf_dev_bw_num} ]; then
+                	pf_dev_bw_num=${d_bw}
+		fi
+        done
+        pf_dev_bw=${pf_dev_bw_num}M
+else
+	echo "${bond_dev} bond mode unsupport "
+	exit 2		
+fi
+
 
 PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
 
