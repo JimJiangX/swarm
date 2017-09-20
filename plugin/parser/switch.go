@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/astaxie/beego/config"
@@ -16,7 +17,8 @@ func init() {
 	register("switch_manager", "1.0", &switchManagerConfig{})
 	register("switch_manager", "1.1.19", &switchManagerConfigV1119{})
 	register("switch_manager", "1.1.23", &switchManagerConfigV1123{})
-	register("switch_manager", "1.1.47", &switchManagerConfigV1147{})
+	//	register("switch_manager", "1.1.47", &switchManagerConfigV1147{})
+	register("switch_manager", "1.2.0", &switchManagerConfigV120{})
 }
 
 var (
@@ -194,7 +196,7 @@ func (c switchManagerConfig) GenerateCommands(id string, desc structs.ServiceSpe
 
 	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
 
-	cmds[structs.InitServiceCmd] = []string{"/root/serv", "start"}
+	cmds[structs.InitServiceCmd] = []string{"/root/swm-init.sh"}
 
 	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
 
@@ -303,6 +305,62 @@ func (c *switchManagerConfigV1147) GenerateConfig(id string, desc structs.Servic
 	m["ConsulPort"] = consulPort
 	m["SwarmHostKey"] = leaderElectionPath
 	m["SwarmUserAgent"] = "1.31"
+
+	for key, val := range m {
+		err = c.set(key, val)
+	}
+
+	return err
+}
+
+type switchManagerConfigV120 struct {
+	switchManagerConfig
+}
+
+func (switchManagerConfigV120) clone(t *structs.ConfigTemplate) parser {
+	pr := &switchManagerConfigV120{}
+	pr.template = t
+
+	return pr
+}
+
+func (c *switchManagerConfigV120) GenerateConfig(id string, desc structs.ServiceSpec) error {
+
+	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
+
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return err
+	}
+
+	m := make(map[string]interface{}, 10)
+
+	m["domain"] = desc.ID
+	m["name"] = spec.Name
+
+	if port, ok := desc.Options["Port"]; ok {
+		m["Port"] = port
+	} else {
+		return errors.New("miss key:Port")
+	}
+
+	ip, _, err := net.SplitHostPort(spec.Engine.Addr)
+	if err != nil {
+		return err
+	}
+	m["ConsulIP"] = ip
+
+	m["ConsulPort"] = consulPort
+	m["SwarmHostKey"] = leaderElectionPath
+	m["SwarmUserAgent"] = "1.31"
+
+	if c.template != nil {
+		m["SwarmSocketPath"] = filepath.Join(c.template.DataMount, "/upsql.sock")
+		m["SwarmHealthCheckConfigFile"] = filepath.Join(c.template.DataMount, "/my.cnf")
+	}
 
 	for key, val := range m {
 		err = c.set(key, val)

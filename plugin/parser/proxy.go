@@ -184,7 +184,7 @@ func (c proxyConfig) GenerateCommands(id string, desc structs.ServiceSpec) (stru
 	cmds := make(structs.CmdsMap, 4)
 
 	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
-	cmds[structs.InitServiceCmd] = []string{"/root/serv", "start"}
+	cmds[structs.InitServiceCmd] = []string{"/root/proxy-init.sh"}
 	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
 	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
 
@@ -422,7 +422,7 @@ func (c upproxyConfigV100) GenerateCommands(id string, desc structs.ServiceSpec)
 	cmds := make(structs.CmdsMap, 4)
 
 	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
-	cmds[structs.InitServiceCmd] = []string{"/root/serv", "start"}
+	cmds[structs.InitServiceCmd] = []string{"/root/upproxy-init.sh"}
 	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
 	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
 
