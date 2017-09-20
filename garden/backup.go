@@ -68,6 +68,8 @@ func (svc *Service) checkBackupFiles(ctx context.Context, maxSize int) error {
 		if _err != nil {
 			return _err
 		}
+
+		err = svc.so.DelBackupFiles(expired)
 	}
 
 	return err
