@@ -432,6 +432,7 @@ func pendingAlloc(actor alloc.Allocator, unit database.Unit,
 
 	pu.config.SetSwarmID(pu.swarmID)
 	pu.Unit.EngineID = node.ID
+	pu.config.Config.Env = append(pu.config.Config.Env, "C_NAME="+pu.Unit.Name)
 
 	return pu, err
 }
