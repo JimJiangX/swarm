@@ -295,12 +295,7 @@ func (c *switchManagerConfigV1147) GenerateConfig(id string, desc structs.Servic
 	m["name"] = spec.Name
 
 	m["Port"] = desc.Options["Port"]
-
-	ip, _, err := net.SplitHostPort(spec.Engine.Addr)
-	if err != nil {
-		return err
-	}
-	m["ConsulIP"] = ip
+	m["ConsulIP"] = spec.Engine.Addr
 
 	m["ConsulPort"] = consulPort
 	m["SwarmHostKey"] = leaderElectionPath
@@ -347,11 +342,7 @@ func (c *switchManagerConfigV120) GenerateConfig(id string, desc structs.Service
 		return errors.New("miss key:Port")
 	}
 
-	ip, _, err := net.SplitHostPort(spec.Engine.Addr)
-	if err != nil {
-		return err
-	}
-	m["ConsulIP"] = ip
+	m["ConsulIP"] = spec.Engine.Addr
 
 	m["ConsulPort"] = consulPort
 	m["SwarmHostKey"] = leaderElectionPath
