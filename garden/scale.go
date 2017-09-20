@@ -310,7 +310,7 @@ func (svc *Service) addNewUnit(num int) ([]database.Unit, error) {
 		uid := utils.Generate32UUID()
 		add[i] = database.Unit{
 			ID:          uid,
-			Name:        fmt.Sprintf("%s_%s", spec.Name, uid[:8]), // <service_name>_<unit_id_8bit>
+			Name:        fmt.Sprintf("%s_%s", uid[:8], spec.Tag), // <unit_id_8bit>_<service_tag>
 			Type:        im.Name,
 			ServiceID:   spec.ID,
 			NetworkMode: "none",

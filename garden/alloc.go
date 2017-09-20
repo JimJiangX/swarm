@@ -78,7 +78,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 		uid := utils.Generate32UUID()
 		us[i] = database.Unit{
 			ID:          uid,
-			Name:        fmt.Sprintf("%s_%s", uid[:8], spec.Tag), // <service_name>_<unit_id_8bit>
+			Name:        fmt.Sprintf("%s_%s", uid[:8], spec.Tag), // <unit_id_8bit>_<service_tag>
 			Type:        im.Name,
 			ServiceID:   spec.ID,
 			NetworkMode: "none",
