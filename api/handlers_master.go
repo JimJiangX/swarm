@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -2535,16 +2536,17 @@ func getServiceConfigFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if canset {
+	if !canset {
 		writeJSON(w, out, http.StatusOK)
 		return
 	}
 
 	config := structs.UnitConfig{}
 
-	if len(out) > 1 {
+	if len(out) > 0 {
 		config = out[0]
 		config.ID = ""
+		config.Service = ""
 		config.Content = ""
 		config.Cmds = nil
 
@@ -2846,6 +2848,91 @@ func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		ec := errCodeV1(_Storage, internalError, 81, "fail to remove RG from storage", "删除外部存储系统的RG错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// -----------------/backupfiles handlers-----------------
+// DELETE /backupfiles
+func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		ec := errCodeV1(_Backup, urlParamError, 11, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	service := r.FormValue("serivce")
+	expired := boolValue(r, "expired")
+
+	if service == "" && !expired {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil || gd.Ormer() == nil {
+		httpJSONNilGarden(w)
+		return
+	}
+
+	var (
+		orm    = gd.Ormer()
+		remove []database.BackupFile
+	)
+
+	if service != "" {
+		remove, err = orm.ListBackupFilesByService(service)
+		if err != nil {
+			ec := errCodeV1(_Backup, dbQueryError, 12, "fail to query database", "数据库查询错误（备份文件表）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if expired {
+		files, err := orm.ListBackupFiles()
+		if err != nil {
+			ec := errCodeV1(_Backup, dbQueryError, 13, "fail to query database", "数据库查询错误（备份文件表）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+			return
+		}
+
+		now := time.Now()
+		expired := make([]database.BackupFile, 0, len(files))
+		for i := range files {
+			if now.Sub(files[i].Retention) < time.Minute {
+				expired = append(expired, files[i])
+			}
+		}
+
+		if len(remove) == 0 {
+			remove = expired
+		} else {
+			remove = append(remove, expired...)
+		}
+	}
+
+	if len(remove) > 0 {
+		rm := make([]database.BackupFile, 0, len(remove))
+		for i := range remove {
+			// TODO:replace dir
+			path := filepath.Base(remove[i].Path)
+			err := os.RemoveAll(path)
+			if err == nil {
+				rm = append(rm, remove[i])
+			} else {
+				logrus.Warnf("fail to delete backup file:%s", path)
+			}
+		}
+
+		err = orm.DelBackupFiles(rm)
+		if err != nil {
+			ec := errCodeV1(_Backup, dbExecError, 14, "fail to delete records in database", "数据库删除记录错误（备份文件表）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)

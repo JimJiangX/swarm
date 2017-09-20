@@ -136,6 +136,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/storage/san/{name}/raid_group/{rg:.*}": deleteRaidGroup,
 
 		"/softwares/images/{image}": deleteImage,
+
+		"/backupfiles": deleteBackupFiles,
 	},
 }
 

@@ -13,6 +13,8 @@ type BackupFileIface interface {
 
 	GetBackupFile(id string) (BackupFile, error)
 
+	ListBackupFiles() ([]BackupFile, error)
+
 	ListBackupFilesByService(nameOrID string) ([]BackupFile, error)
 
 	DelBackupFiles(files []BackupFile) error

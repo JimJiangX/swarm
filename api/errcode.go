@@ -18,6 +18,7 @@ const (
 	_Service
 	_Unit
 	_Storage
+	_Backup
 )
 
 type category int
