@@ -1949,7 +1949,7 @@ func mergeUnitConfigChange(cc, change structs.UnitConfig) (structs.UnitConfig, b
 	m := make(map[string]structs.Keyset, len(cc.Keysets))
 
 	for i := range cc.Keysets {
-		m[change.Keysets[i].Key] = change.Keysets[i]
+		m[cc.Keysets[i].Key] = cc.Keysets[i]
 	}
 
 	restart := false
