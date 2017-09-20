@@ -44,7 +44,7 @@ func (svc *Service) Backup(ctx context.Context, local string, config structs.Ser
 				return errors.Errorf("%s:%s unsupport backup yet", u.u.Name, u.u.Type)
 			}
 
-			cmd = append(cmd, local+"v1.0/tasks/backup/callback", task.ID, config.Type, config.BackupDir, strconv.Itoa(config.FilesRetention))
+			cmd = append(cmd, local+"v1.0/tasks/backup/callback", task.ID, u.u.ID, config.Type, config.BackupDir, strconv.Itoa(config.FilesRetention), config.Remark)
 
 			_, err = u.containerExec(ctx, cmd, config.Detach)
 			if err != nil {

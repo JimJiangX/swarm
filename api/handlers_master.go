@@ -277,13 +277,28 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		httpJSONNilGarden(w)
 		return
 	}
+	orm := gd.Ormer()
+	now := time.Now()
+	t := database.Task{}
+	t.FinishedAt = now
+	t.ID = req.TaskID
+
+	if req.Code != 0 {
+		t.Status = database.TaskFailedStatus
+		t.Errors = req.Msg
+
+		err := orm.SetTask(t)
+		if err != nil {
+			ec := errCodeV1(_Task, dbExecError, 34, "fail to exec records into database", "数据库更新错误（任务表）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+		}
+		return
+	}
 
 	if req.Retention == 0 {
 		// default keep a week
 		req.Retention = 7
 	}
-	orm := gd.Ormer()
-	now := time.Now()
 
 	bf := database.BackupFile{
 		ID:         utils.Generate32UUID(),
@@ -291,21 +306,19 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		UnitID:     req.UnitID,
 		Type:       req.Type,
 		Path:       req.Path,
+		Remark:     req.Remark,
 		SizeByte:   req.Size,
 		Retention:  now.AddDate(0, 0, req.Retention),
 		CreatedAt:  now,
 		FinishedAt: now,
 	}
 
-	t := database.Task{}
-	t.ID = req.TaskID
 	t.Status = database.TaskDoneStatus
 	t.SetErrors(nil)
-	t.FinishedAt = now
 
 	err = orm.InsertBackupFileWithTask(bf, t)
 	if err != nil {
-		ec := errCodeV1(_Task, dbTxError, 34, "fail to exec records in into database in a Tx", "数据库事务处理错误（备份文件表）")
+		ec := errCodeV1(_Task, dbTxError, 35, "fail to exec records in into database in a Tx", "数据库事务处理错误（备份文件表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
