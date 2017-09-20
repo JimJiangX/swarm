@@ -313,7 +313,7 @@ install_docker() {
 
 
 	if [ "${release}" == "SUSE LINUX" ]; then
-		if [ "${wwn}" != '' ]; then
+		if [ "${san_id}" != '' ]; then
 			systemctl enable multipathd.service
 			systemctl start multipathd.service
 			systemctl status multipathd.service
@@ -372,7 +372,7 @@ WantedBy=multi-user.target
 EOF
 
 	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ "${release}" == "CentOS" ]; then
-		if [ "${wwn}" != '' ]; then
+		if [ "${san_id}" != '' ]; then
 			systemctl enable multipathd.service
 			systemctl start multipathd.service
 			systemctl status multipathd.service
