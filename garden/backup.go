@@ -15,12 +15,15 @@ import (
 // 对服务进行备份，如果指定则对指定的容器进行备份，执行ContainerExec进行备份任务。
 func (svc *Service) Backup(ctx context.Context, local string, config structs.ServiceBackupConfig, async bool, task *database.Task) error {
 	backup := func() error {
-		err := svc.checkBackupFiles(ctx, config.MaxSizeByte)
-		if err != nil {
-			return err
-		}
+		//		err := svc.checkBackupFiles(ctx, config.MaxSizeByte)
+		//		if err != nil {
+		//			return err
+		//		}
 
-		var units []*unit
+		var (
+			err   error
+			units []*unit
+		)
 
 		if config.Container != "" {
 			var u *unit
