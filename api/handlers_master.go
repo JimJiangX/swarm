@@ -1969,6 +1969,8 @@ func mergeUnitConfigChange(cc, change structs.UnitConfig) (structs.UnitConfig, b
 		}
 
 		val.Value = change.Keysets[i].Value
+
+		m[change.Keysets[i].Key] = val
 	}
 
 	ks := make([]structs.Keyset, 0, len(m))

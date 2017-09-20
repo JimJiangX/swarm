@@ -406,7 +406,7 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 func mergeUnitConfig(pr parser, uc structs.UnitConfig, cc structs.ConfigCmds) (structs.ConfigCmds, error) {
 	if uc.ID != "" && cc.ID != uc.ID {
-		cc.ID = uc.ID
+		return cc, errors.New("unit ID not match")
 	}
 
 	if uc.LogMount != "" && cc.LogMount != uc.LogMount {
