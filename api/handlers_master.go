@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -2858,18 +2859,19 @@ func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 // -----------------/backupfiles handlers-----------------
 // DELETE /backupfiles
 func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-	if err != nil {
+	if err := r.ParseForm(); err != nil {
 		ec := errCodeV1(_Backup, urlParamError, 11, "parse Request URL parameter error", "解析请求URL参数错误")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	service := r.FormValue("serivce")
-	expired := boolValue(r, "expired")
+	deadline := r.FormValue("expired")
+	nfs := r.FormValue("nfs_mount")
 
-	if service == "" && !expired {
-		w.WriteHeader(http.StatusNoContent)
+	if nfs == "" {
+		ec := errCodeV1(_Backup, urlParamError, 12, "Request URL parameter error", "请求URL参数错误,miss nfs_mount")
+		httpJSONError(w, errors.New("miss nfs_mount"), ec, http.StatusBadRequest)
 		return
 	}
 
@@ -2880,62 +2882,75 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	}
 
 	var (
-		orm    = gd.Ormer()
-		remove []database.BackupFile
+		orm = gd.Ormer()
+
+		err   error
+		files []database.BackupFile
 	)
 
 	if service != "" {
-		remove, err = orm.ListBackupFilesByService(service)
-		if err != nil {
-			ec := errCodeV1(_Backup, dbQueryError, 12, "fail to query database", "数据库查询错误（备份文件表）")
-			httpJSONError(w, err, ec, http.StatusInternalServerError)
-			return
+		files, err = orm.ListBackupFilesByService(service)
+	} else {
+		files, err = orm.ListBackupFiles()
+	}
+
+	if err != nil {
+		ec := errCodeV1(_Backup, dbQueryError, 13, "fail to query database", "数据库查询错误（备份文件表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	t := time.Now()
+	if deadline != "" {
+		d, err := time.Parse("2006-01-02", deadline)
+		if err == nil && d.Before(t) {
+			t = d
 		}
 	}
 
-	if expired {
-		files, err := orm.ListBackupFiles()
-		if err != nil {
-			ec := errCodeV1(_Backup, dbQueryError, 13, "fail to query database", "数据库查询错误（备份文件表）")
-			httpJSONError(w, err, ec, http.StatusInternalServerError)
-			return
+	expired := make([]database.BackupFile, 0, len(files))
+	for i := range files {
+		if t.After(files[i].Retention) {
+			expired = append(expired, files[i])
 		}
+	}
 
-		now := time.Now()
-		expired := make([]database.BackupFile, 0, len(files))
-		for i := range files {
-			if now.Sub(files[i].Retention) < time.Minute {
-				expired = append(expired, files[i])
-			}
-		}
+	if len(expired) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 
-		if len(remove) == 0 {
-			remove = expired
+	sys, err := orm.GetSysConfig()
+	if err != nil {
+		ec := errCodeV1(_Backup, dbQueryError, 14, "fail to query database", "数据库查询错误（系统配置表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	rm := make([]database.BackupFile, 0, len(expired))
+	for i := range expired {
+		path := getNFSBackupFile(expired[i].Path, sys.BackupDir, nfs)
+
+		err := os.RemoveAll(path)
+		if err == nil {
+			rm = append(rm, expired[i])
 		} else {
-			remove = append(remove, expired...)
+			logrus.Warnf("fail to delete backup file:%s", path)
 		}
 	}
 
-	if len(remove) > 0 {
-		rm := make([]database.BackupFile, 0, len(remove))
-		for i := range remove {
-			// TODO:replace dir
-			path := filepath.Base(remove[i].Path)
-			err := os.RemoveAll(path)
-			if err == nil {
-				rm = append(rm, remove[i])
-			} else {
-				logrus.Warnf("fail to delete backup file:%s", path)
-			}
-		}
-
-		err = orm.DelBackupFiles(rm)
-		if err != nil {
-			ec := errCodeV1(_Backup, dbExecError, 14, "fail to delete records in database", "数据库删除记录错误（备份文件表）")
-			httpJSONError(w, err, ec, http.StatusInternalServerError)
-			return
-		}
+	err = orm.DelBackupFiles(rm)
+	if err != nil {
+		ec := errCodeV1(_Backup, dbExecError, 15, "fail to delete records in database", "数据库删除记录错误（备份文件表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func getNFSBackupFile(file, backup, nfs string) string {
+	file = strings.Replace(file, backup, nfs, 1)
+
+	return filepath.Clean(file)
 }
