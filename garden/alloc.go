@@ -235,7 +235,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 }
 
 func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Service, units []database.Unit, skipVolume bool) (ready []pendingUnit, err error) {
-	_, version, err := getImage(gd.Ormer(), svc.svc.Desc.Image)
+	im, version, err := getImage(gd.Ormer(), svc.svc.Desc.Image)
 	if err != nil {
 		return nil, err
 	}
@@ -255,6 +255,8 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 			Memory:     opts.Require.Require.Memory,
 		},
 	}, network.NetworkingConfig{})
+
+	config.Config.Labels["mgm.unit.type"] = im.Name
 
 	{
 		for i := range opts.Nodes.Constraints {
@@ -433,6 +435,7 @@ func pendingAlloc(actor alloc.Allocator, unit database.Unit,
 	pu.config.SetSwarmID(pu.swarmID)
 	pu.Unit.EngineID = node.ID
 	pu.config.Config.Env = append(pu.config.Config.Env, "C_NAME="+pu.Unit.Name)
+	pu.config.Config.Labels["mgm.unit.id"] = pu.Unit.ID
 
 	return pu, err
 }
