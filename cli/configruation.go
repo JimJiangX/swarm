@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"path/filepath"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api"
@@ -63,7 +64,7 @@ func configruation(c *cli.Context) {
 		log.Fatalf("discovery required to manage a cluster. See '%s manage --help'.", c.App.Name)
 	}
 
-	kvpath := filepath.Join(uri, leaderElectionPath)
+	kvpath := strings.Join([]string{uri, leaderElectionPath}, "/")
 
 	kvClient, err := kvstore.NewClient(uri, getDiscoveryOpt(c))
 	if err != nil {
