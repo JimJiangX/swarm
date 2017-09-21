@@ -19,4 +19,6 @@ type BackupTaskCallback struct {
 	Retention int    `json:"retention"`
 	Size      int    `json:"size,omitempty"`
 	Code      int    `json:"code,omitempty"`
+	Created   int64  `json:"created_at"`
+	Finished  int64  `json:"finished_at"`
 }

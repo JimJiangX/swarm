@@ -311,8 +311,8 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		Remark:     req.Remark,
 		SizeByte:   req.Size,
 		Retention:  now.AddDate(0, 0, req.Retention),
-		CreatedAt:  now,
-		FinishedAt: now,
+		CreatedAt:  time.Unix(req.Created, 0),
+		FinishedAt: time.Unix(req.Finished, 0),
 	}
 
 	t.Status = database.TaskDoneStatus
