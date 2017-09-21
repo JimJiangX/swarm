@@ -280,13 +280,13 @@ func (lv localVolume) Space() (Space, error) {
 }
 
 func setVolumeBind(config *cluster.ContainerConfig, lvName, req string) {
-	name := fmt.Sprintf("%s:/UPM_%s", lvName, req)
+	name := fmt.Sprintf("%s:/DBAAS%s", lvName, req)
 	config.HostConfig.Binds = append(config.HostConfig.Binds, name)
 
 	if config.Config.Env == nil {
 		config.Config.Env = make([]string, 0, 3)
 	}
-	config.Config.Env = append(config.Config.Env, req+"_DIR=/UPM_"+req)
+	config.Config.Env = append(config.Config.Env, req+"_DIR=/DBAAS"+req)
 }
 
 func (lv *localVolume) Alloc(config *cluster.ContainerConfig, uid string, req structs.VolumeRequire) (*database.Volume, error) {
