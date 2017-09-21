@@ -2486,30 +2486,9 @@ func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
-func getServiceBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	name := mux.Vars(r)["name"]
-
-	ok, _, gd := fromContext(ctx, _Garden)
-	if !ok || gd == nil ||
-		gd.Ormer() == nil {
-
-		httpJSONNilGarden(w)
-		return
-	}
-
-	files, err := gd.Ormer().ListBackupFilesByService(name)
-	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 171, "fail to query database", "数据库查询错误（备份文件表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	writeJSON(w, files, http.StatusOK)
-}
-
 func getServiceConfigFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		ec := errCodeV1(_Service, urlParamError, 181, "parse Request URL parameter error", "解析请求URL参数错误")
+		ec := errCodeV1(_Service, urlParamError, 171, "parse Request URL parameter error", "解析请求URL参数错误")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -2527,14 +2506,14 @@ func getServiceConfigFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 182, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 172, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	out, err := svc.GetUnitsConfigs(ctx)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 183, "fail to query units configs from kv", "获取服务单元配置错误")
+		ec := errCodeV1(_Service, dbQueryError, 173, "fail to query units configs from kv", "获取服务单元配置错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2953,4 +2932,42 @@ func getNFSBackupFile(file, backup, nfs string) string {
 	file = strings.Replace(file, backup, nfs, 1)
 
 	return filepath.Clean(file)
+}
+
+func getBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Backup, urlParamError, 21, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	service := r.FormValue("serivce")
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	var (
+		orm = gd.Ormer()
+
+		err   error
+		files []database.BackupFile
+	)
+
+	if service != "" {
+		files, err = orm.ListBackupFilesByService(service)
+	} else {
+		files, err = orm.ListBackupFiles()
+	}
+	if err != nil {
+		ec := errCodeV1(_Backup, dbQueryError, 22, "fail to query database", "数据库查询错误（备份文件表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, files, http.StatusOK)
 }

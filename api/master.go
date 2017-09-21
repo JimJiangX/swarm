@@ -70,13 +70,14 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/softwares/images/{name:.*}": getImage,
 		"/softwares/images/supported": getSupportImages,
 
-		"/services":                    getServices,
-		"/services/{name}":             getServicesByNameOrID,
-		"/services/{name}/backupfiles": getServiceBackupFiles,
-		"/services/{name}/configs":     getServiceConfigFiles,
+		"/services":                getServices,
+		"/services/{name}":         getServicesByNameOrID,
+		"/services/{name}/configs": getServiceConfigFiles,
 
 		"/storage/san":           getSANStoragesInfo,
 		"/storage/san/{name:.*}": getSANStorageInfo,
+
+		"/backupfiles": getBackupFiles,
 	},
 	http.MethodPost: {
 		"/clusters": postCluster,
