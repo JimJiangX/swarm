@@ -45,7 +45,7 @@ func (db dbBase) backupFileTable() string {
 func (db dbBase) ListBackupFiles() ([]BackupFile, error) {
 	var (
 		out   []BackupFile
-		query = "SELECT id,task_id,unit_id,type,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable()
+		query = "SELECT id,task_id,unit_id,type,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " ORDER BY finished_at DESC"
 	)
 
 	err := db.Select(&out, query)
@@ -62,7 +62,7 @@ func (db dbBase) ListBackupFiles() ([]BackupFile, error) {
 func (db dbBase) ListBackupFilesByTag(tag string) ([]BackupFile, error) {
 	var (
 		out   []BackupFile
-		query = "SELECT id,task_id,unit_id,type,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + "WHERE tag=?"
+		query = "SELECT id,task_id,unit_id,type,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + "WHERE tag=? ORDER BY finished_at DESC"
 	)
 
 	err := db.Select(&out, query, tag)
