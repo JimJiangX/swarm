@@ -308,6 +308,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		ID:         utils.Generate32UUID(),
 		TaskID:     req.TaskID,
 		UnitID:     req.UnitID,
+		Tag:        req.Tag,
 		Type:       req.Type,
 		Path:       req.Path,
 		Remark:     req.Remark,
