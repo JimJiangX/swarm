@@ -27,6 +27,8 @@ import (
 	goctx "golang.org/x/net/context"
 )
 
+const dateLayout = "2006-01-02"
+
 var (
 	nilGardenCode = errCode{
 		code:    100000000,
@@ -2885,7 +2887,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	t := time.Now()
 	if deadline != "" {
-		d, err := time.Parse("2006-01-02", deadline)
+		d, err := time.Parse(dateLayout, deadline)
 		if err == nil && d.Before(t) {
 			t = d
 		}
@@ -2954,6 +2956,8 @@ func getBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	tag := r.FormValue("tag")
 	service := r.FormValue("serivce")
+	start := r.FormValue("start")
+	end := r.FormValue("end")
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
@@ -2976,6 +2980,7 @@ func getBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		files, err = orm.ListBackupFilesByService(service)
 	} else {
 		files, err = orm.ListBackupFiles()
+		files = filterBackupFilesByTime(files, start, end)
 	}
 	if err != nil {
 		ec := errCodeV1(_Backup, dbQueryError, 22, "fail to query database", "数据库查询错误（备份文件表）")
@@ -2984,4 +2989,54 @@ func getBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, files, http.StatusOK)
+}
+
+func filterBackupFilesByTime(files []database.BackupFile, start, end string) []database.BackupFile {
+	if len(files) == 0 || (start == "" && end == "") {
+		return files
+	}
+
+	var (
+		err    error
+		st, et time.Time
+	)
+
+	if start != "" {
+		st, err = time.Parse(dateLayout, start)
+		if err != nil {
+			return files
+		}
+	}
+
+	if end != "" {
+		et, err = time.Parse(dateLayout, start)
+		if err != nil {
+			return files
+		}
+	}
+
+	if st.After(et) {
+		st, et = et, st
+	}
+
+	out := make([]database.BackupFile, 0, len(files))
+
+	sN0 := !st.IsZero()
+	eN0 := !et.IsZero()
+
+	for i := range files {
+		at := files[i].CreatedAt
+
+		if sN0 && at.Before(st) {
+			continue
+		}
+
+		if eN0 && at.After(et) {
+			continue
+		}
+
+		out = append(out, files[i])
+	}
+
+	return out
 }
