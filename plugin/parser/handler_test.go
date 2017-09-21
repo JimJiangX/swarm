@@ -232,3 +232,23 @@ func TestGetConfig(t *testing.T) {
 
 	t.Log(cc.GetCmd(structs.InitServiceCmd), cc.GetServiceRegistration().Horus == nil)
 }
+
+func TestSetLeaderElectionPath(t *testing.T) {
+	setLeaderElectionPath("consul://146.32.99.22:8400/unionpay/docker/swarm/leader")
+	if consulPort != "8400" {
+		t.Error(consulPort)
+	}
+
+	if leaderElectionPath != "/unionpay/docker/swarm/leader" {
+		t.Error(leaderElectionPath)
+	}
+
+	setLeaderElectionPath("146.32.99.22:8300/unionpay/docker/swarm/")
+	if consulPort != "8300" {
+		t.Error(consulPort)
+	}
+
+	if leaderElectionPath != "/unionpay/docker/swarm" {
+		t.Error(leaderElectionPath)
+	}
+}

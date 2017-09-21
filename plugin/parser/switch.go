@@ -43,7 +43,7 @@ func setLeaderElectionPath(path string) {
 
 	// A custom prefix to the path can be optionally used.
 	if len(parts) == 2 {
-		leaderElectionPath = parts[1]
+		leaderElectionPath = filepath.Join("/", parts[1])
 
 		_, port, err := net.SplitHostPort(parts[0])
 		if err == nil {
@@ -248,7 +248,6 @@ func (c *switchManagerConfigV1123) GenerateConfig(id string, desc structs.Servic
 
 	// consul
 	//	m["ConsulBindNetworkName"] = u.engine.Labels[_Admin_NIC_Lable]
-	m["ConsulPort"] = consulPort
 
 	// swarm
 	m["ConsulPort"] = consulPort
