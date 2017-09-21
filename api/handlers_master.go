@@ -2201,30 +2201,11 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func vaildPostServiceBackupRequest(v structs.ServiceBackupConfig) error {
+	if v.Container == "" {
+		return stderr.New("not assigned unit nameOrID")
+	}
+
 	return nil
-	//	errs := make([]string, 0, 4)
-
-	//	if v.BackupDir == "" {
-	//		errs = append(errs, "BackupDir is required")
-	//	}
-
-	//	if v.Type == "" {
-	//		errs = append(errs, "Type is required")
-	//	}
-
-	//	if v.MaxSizeByte <= 0 {
-	//		errs = append(errs, "MaxSizeByte is required")
-	//	}
-
-	//	if v.FilesRetention == 0 {
-	//		errs = append(errs, "FilesRetention is required")
-	//	}
-
-	//	if len(errs) == 0 {
-	//		return nil
-	//	}
-
-	//	return fmt.Errorf("ServiceBackupConfig:%v,%s", v, errs)
 }
 
 func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
