@@ -5,11 +5,13 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/discovery"
 	kvdiscovery "github.com/docker/docker/pkg/discovery/kv"
@@ -29,6 +31,7 @@ import (
 	"github.com/docker/swarm/scheduler"
 	"github.com/docker/swarm/scheduler/filter"
 	"github.com/docker/swarm/scheduler/strategy"
+	"github.com/docker/swarm/vars"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 	"github.com/urfave/cli"
@@ -219,10 +222,19 @@ func run(cl cluster.Cluster, candidate *leadership.Candidate, server *api.Server
 			if isElected {
 				log.Info("Leader Election: Cluster leadership acquired")
 				watchdog = cluster.NewWatchdog(cl)
-				eh = garden.NewEventHandler(ormer)
-				cl.RegisterEventHandler(eh, nil)
 
 				server.SetHandler(primary)
+
+				if ormer != nil {
+					eh = garden.NewEventHandler(ormer)
+					cl.RegisterEventHandler(eh)
+
+					logrus.Info("mark running tasks")
+					err := ormer.MarkRunningTasks()
+					if err != nil {
+						logrus.Errorf("%+v", err)
+					}
+				}
 			} else {
 				log.Info("Leader Election: Cluster leadership lost")
 				cl.UnregisterEventHandler(watchdog)
@@ -354,6 +366,10 @@ func manage(c *cli.Context) {
 
 		setNodesKVPath(discovery)
 
+		if err := vars.Validate(); err != nil {
+			log.Warn(err)
+		}
+
 		ormer, err = getOrmer(c)
 		if err != nil {
 			log.Fatalf("%+v", err)
@@ -366,12 +382,19 @@ func manage(c *cli.Context) {
 
 		storage.SetDefaultStores(filepath.Dir(sys.SourceDir), ormer)
 
-		kvc, err := kvstore.NewClient(uri, tlsConfig)
+		// set consul datacenter env
+		err = os.Setenv("CONSUL_HTTP_DATACENTER", sys.ConsulDatacenter)
 		if err != nil {
 			log.Fatalf("%+v", err)
 		}
 
-		pClient := pluginapi.NewPlugin(client.NewClient(c.String("configureAddr"), 0, tlsConfig))
+		kvc, err := kvstore.NewClient(uri, getDiscoveryOpt(c))
+		if err != nil {
+			log.Fatalf("%+v", err)
+		}
+
+		caddr := c.String("configureAddr")
+		pClient := pluginapi.NewPlugin(caddr, client.NewClient(caddr, 0, tlsConfig))
 
 		cl = garden.NewGarden(kvc, cl, sched, ormer, pClient, tlsConfig)
 
@@ -418,7 +441,7 @@ func manage(c *cli.Context) {
 		server.SetHandler(api.NewPrimary(cl, tlsConfig, &statusHandler{cl, nil, nil}, c.GlobalBool("debug"), c.Bool("cors")))
 		cluster.NewWatchdog(cl)
 	}
-	defer cl.CloseWatchQueue()
+	defer cl.CloseWatchQueues()
 
 	log.Fatal(server.ListenAndServe())
 }

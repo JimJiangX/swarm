@@ -94,7 +94,8 @@ type NetworkConfig struct {
 }
 
 type client struct {
-	c httpclient.Client
+	addr string
+	c    httpclient.Client
 }
 
 //NewClient is exported
@@ -105,7 +106,7 @@ func NewClient(addr string, timeout time.Duration, tlsConfig *tls.Config) (Clien
 	}
 
 	cli := httpclient.NewClient(addr, timeout, tlsConfig)
-	c := client{c: cli}
+	c := client{addr: addr, c: cli}
 
 	return c, nil
 }
@@ -145,7 +146,7 @@ func (c client) GetVgList() ([]VgInfo, error) {
 
 	err = decodeBody(resp, &res)
 	if len(res.Err) > 0 {
-		return nil, errors.New(res.Err)
+		return nil, errors.Errorf("%s:%s/%s,%s", http.MethodGet, c.addr, "/san/vglist", res.Err)
 	}
 
 	return res.Vgs, nil
@@ -225,11 +226,11 @@ func (c client) postWrap(ctx context.Context, url string, opt interface{}) error
 
 	err = decodeBody(resp, &res)
 	if err != nil {
-		return err
+		return errors.Errorf("%s:%s/%s,%s", http.MethodPost, c.addr, url, err)
 	}
 
 	if len(res.Err) > 0 {
-		return errors.New(res.Err)
+		return errors.Errorf("%s:%s/%s,%s", http.MethodPost, c.addr, url, res.Err)
 	}
 
 	return nil

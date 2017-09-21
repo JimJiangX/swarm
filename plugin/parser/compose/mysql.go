@@ -8,9 +8,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-type MysqlUser struct {
-	ReplicateUser string
-	Replicatepwd  string
+type mysqlUser struct {
+	user     string
+	password string
 
 	//	Rootuser string
 	//	RootPwd  string
@@ -21,7 +21,7 @@ type Mysql struct {
 	Port     int
 	Instance string
 
-	MysqlUser
+	user mysqlUser
 
 	Weight   int //Weight越高，优先变成master，等值随机
 	RoleType dbRole
@@ -69,8 +69,8 @@ func (m Mysql) ChangeMaster(master Mysql) error {
 		string(m.RoleType),
 		master.IP,
 		strconv.Itoa(master.Port),
-		m.ReplicateUser,
-		m.Replicatepwd,
+		m.user.user,
+		m.user.password,
 		m.IP,
 		strconv.Itoa(m.Port),
 	}

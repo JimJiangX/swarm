@@ -27,6 +27,7 @@ type Ormer interface {
 	TaskOrmer
 	VolumeOrmer
 
+	MarkRunningTasks() error
 	TxFrame(do func(tx *sqlx.Tx) error) error
 }
 

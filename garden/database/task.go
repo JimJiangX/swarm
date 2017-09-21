@@ -263,7 +263,7 @@ func (db dbBase) SetTask(t Task) error {
 		return nil
 	}
 
-	return errors.Wrap(err, "Tx update Task status & errors")
+	return errors.Wrap(err, "update Task status & errors")
 }
 
 func (db dbBase) GetTask(ID string) (Task, error) {

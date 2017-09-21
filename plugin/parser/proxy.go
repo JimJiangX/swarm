@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/astaxie/beego/config"
@@ -15,7 +16,12 @@ func init() {
 	register("proxy", "1.0", &proxyConfig{})
 	register("proxy", "1.0.2", &proxyConfigV102{})
 	register("proxy", "1.1.0", &proxyConfigV110{})
-	register("proxy", "1.2.6", &proxyConfigV126{})
+	register("proxy", "1.2.6", &proxyConfigV110{})
+
+	register("upproxy", "1.0", &upproxyConfigV100{})
+	register("upproxy", "1.1", &upproxyConfigV100{})
+	register("upproxy", "1.2", &upproxyConfigV100{})
+	register("upproxy", "1.3", &upproxyConfigV100{})
 }
 
 type proxyConfig struct {
@@ -28,6 +34,26 @@ func (proxyConfig) clone(t *structs.ConfigTemplate) parser {
 }
 
 func (proxyConfig) Validate(data map[string]interface{}) error { return nil }
+
+func (c proxyConfig) get(key string) string {
+	if c.config == nil {
+		return ""
+	}
+
+	if val := c.config.String(key); val != "" {
+		return val
+	}
+
+	if c.template != nil {
+		for i := range c.template.Keysets {
+			if c.template.Keysets[i].Key == key {
+				return c.template.Keysets[i].Default
+			}
+		}
+	}
+
+	return ""
+}
 
 func (c *proxyConfig) set(key string, val interface{}) error {
 	if c.config == nil {
@@ -70,17 +96,9 @@ func (c *proxyConfig) Marshal() ([]byte, error) {
 }
 
 func (c proxyConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
-	var spec *structs.UnitSpec
-
-	for i := range desc.Units {
-		if id == desc.Units[i].ID {
-			spec = &desc.Units[i]
-			break
-		}
-	}
-
-	if spec == nil {
-		return structs.ServiceRegistration{}, errors.Errorf("not found unit '%s' in service '%s'", id, desc.Name)
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return structs.ServiceRegistration{}, err
 	}
 
 	im, err := structs.ParseImage(c.template.Image)
@@ -93,7 +111,7 @@ func (c proxyConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 	reg.Service.Name = spec.ID
 	reg.Service.Type = "unit_" + im.Name
 	reg.Service.Tag = desc.ID
-	reg.Service.Container.Name = spec.Container.ID
+	reg.Service.Container.Name = spec.Name
 	reg.Service.Container.HostName = spec.Engine.Node
 
 	var mon *structs.User
@@ -115,60 +133,45 @@ func (c proxyConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 	return structs.ServiceRegistration{Horus: &reg}, nil
 }
 
-func (c proxyConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
+func (c *proxyConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
+
+	spec, err := getUnitSpec(desc.Units, id)
 	if err != nil {
 		return err
 	}
 
 	m := make(map[string]interface{}, 10)
 
-	//	m["upsql-proxy::proxy-domain"] = svc.ID
-	//	m["upsql-proxy::proxy-name"] = u.Name
-	//	if len(u.networkings) == 2 && len(u.ports) >= 2 {
-	//		adminAddr, dataAddr := "", ""
-	//		adminPort, dataPort := 0, 0
-	//		for i := range u.networkings {
-	//			if u.networkings[i].Type == _ContainersNetworking {
-	//				adminAddr = u.networkings[i].IP.String()
-	//			} else if u.networkings[i].Type == _ExternalAccessNetworking {
-	//				dataAddr = u.networkings[i].IP.String()
-	//			}
-	//		}
+	m["upsql-proxy::proxy-domain"] = desc.ID
+	m["upsql-proxy::proxy-name"] = spec.Name
 
-	//		for i := range u.ports {
-	//			if u.ports[i].Name == "proxy_data_port" {
-	//				dataPort = u.ports[i].Port
-	//			} else if u.ports[i].Name == "proxy_admin_port" {
-	//				adminPort = u.ports[i].Port
-	//				m["adm-cli::proxy_admin_port"] = adminPort
-	//			}
-	//		}
-	//		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", dataAddr, dataPort)
-	//		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", adminAddr, adminPort)
-	//	}
+	addr := "localhost"
+	if len(spec.Networking) > 0 {
+		addr = spec.Networking[0].IP
+	}
 
-	//	ncpu, err := utils.GetCPUNum(u.config.HostConfig.CpusetCpus)
-	//	if err == nil {
-	//		m["upsql-proxy::event-threads-count"] = ncpu
-	//	} else {
-	//		logrus.WithError(err).Warnf("%s upsql-proxy::event-threads-count", u.Name)
-	//		m["upsql-proxy::event-threads-count"] = 1
-	//	}
+	dataPort := desc.Options["proxy_data_port"]
+	adminPort := desc.Options["proxy_admin_port"]
 
-	//	swm, err := svc.getSwithManagerUnit()
-	//	if err == nil && swm != nil {
-	//		swmProxyPort := 0
-	//		for i := range swm.ports {
-	//			if swm.ports[i].Name == "ProxyPort" {
-	//				swmProxyPort = swm.ports[i].Port
-	//				break
-	//			}
-	//		}
-	//		if len(swm.networkings) == 1 {
-	//			m["adm-cli::adm-svr-address"] = fmt.Sprintf("%s:%d", swm.networkings[0].IP.String(), swmProxyPort)
-	//		}
-	//	}
+	m["adm-cli::proxy_admin_port"] = adminPort
+	m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%v", addr, adminPort)
+	m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%v", addr, dataPort)
+
+	m["upsql-proxy::event-threads-count"] = 1
+	if spec.Config != nil {
+		ncpu, err := spec.Config.CountCPU()
+		if err == nil {
+			m["upsql-proxy::event-threads-count"] = ncpu
+		}
+	}
+
+	if addr, ok := desc.Options["adm-cli::adm-svr-address"]; ok {
+		m["adm-cli::adm-svr-address"] = addr
+	}
 
 	for key, val := range m {
 		err = c.set(key, val)
@@ -181,9 +184,9 @@ func (c proxyConfig) GenerateCommands(id string, desc structs.ServiceSpec) (stru
 	cmds := make(structs.CmdsMap, 4)
 
 	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
-	cmds[structs.InitServiceCmd] = []string{"/root/proxy.service", "start"}
-	cmds[structs.StartServiceCmd] = []string{"/root/proxy.service", "start"}
-	cmds[structs.StopServiceCmd] = []string{"/root/proxy.service", "stop"}
+	cmds[structs.InitServiceCmd] = []string{"/root/proxy-init.sh"}
+	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
+	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
 
 	return cmds, nil
 }
@@ -210,62 +213,46 @@ func (proxyConfigV110) clone(t *structs.ConfigTemplate) parser {
 	return pr
 }
 
-func (c proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) error {
+func (c *proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
+
+	spec, err := getUnitSpec(desc.Units, id)
 	if err != nil {
 		return err
 	}
 
 	m := make(map[string]interface{}, 10)
 
-	//	m["upsql-proxy::proxy-domain"] = svc.ID
-	//	m["upsql-proxy::proxy-name"] = u.Name
-	//	if len(u.networkings) > 0 && len(u.ports) >= 2 {
-	//		addr := ""
-	//		adminPort, dataPort := 0, 0
-	//		for i := range u.networkings {
-	//			if u.networkings[i].Type == _ContainersNetworking {
-	//				addr = u.networkings[i].IP.String()
-	//			}
-	//			//			else if u.networkings[i].Type == _ExternalAccessNetworking {
-	//			//				dataAddr = u.networkings[i].IP.String()
-	//			//			}
-	//		}
+	m["upsql-proxy::proxy-domain"] = desc.ID
+	m["upsql-proxy::proxy-name"] = spec.Name
 
-	//		for i := range u.ports {
-	//			if u.ports[i].Name == "proxy_data_port" {
-	//				dataPort = u.ports[i].Port
-	//			} else if u.ports[i].Name == "proxy_admin_port" {
-	//				adminPort = u.ports[i].Port
-	//				m["adm-cli::proxy_admin_port"] = adminPort
-	//			}
-	//		}
-	//		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", addr, dataPort)
-	//		m["supervise::supervise-address"] = fmt.Sprintf("%s:%d", addr, adminPort)
-	//		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", addr, adminPort)
-	//	}
+	addr := "localhost"
+	if len(spec.Networking) > 0 {
+		addr = spec.Networking[0].IP
+	}
 
-	//	ncpu, err := utils.GetCPUNum(u.config.HostConfig.CpusetCpus)
-	//	if err == nil {
-	//		m["upsql-proxy::event-threads-count"] = ncpu
-	//	} else {
-	//		logrus.WithError(err).Warnf("%s upsql-proxy::event-threads-count", u.Name)
-	//		m["upsql-proxy::event-threads-count"] = 1
-	//	}
+	dataPort := desc.Options["proxy_data_port"]
+	adminPort := desc.Options["proxy_admin_port"]
 
-	//	swm, err := svc.getSwithManagerUnit()
-	//	if err == nil && swm != nil {
-	//		swmProxyPort := 0
-	//		for i := range swm.ports {
-	//			if swm.ports[i].Name == "ProxyPort" {
-	//				swmProxyPort = swm.ports[i].Port
-	//				break
-	//			}
-	//		}
-	//		if len(swm.networkings) == 1 {
-	//			m["adm-cli::adm-svr-address"] = fmt.Sprintf("%s:%d", swm.networkings[0].IP.String(), swmProxyPort)
-	//		}
-	//	}
+	m["adm-cli::proxy_admin_port"] = adminPort
+	m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%v", addr, adminPort)
+	m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%v", addr, dataPort)
+	m["supervise::supervise-address"] = fmt.Sprintf("%s:%v", addr, adminPort)
+
+	m["upsql-proxy::event-threads-count"] = 1
+	if spec.Config != nil {
+		ncpu, err := spec.Config.CountCPU()
+		if err == nil {
+			m["upsql-proxy::event-threads-count"] = ncpu
+		}
+	}
+
+	if addr, ok := desc.Options["adm-cli::adm-svr-address"]; ok {
+		m["adm-cli::adm-svr-address"] = addr
+	}
 
 	for key, val := range m {
 		err = c.set(key, val)
@@ -274,80 +261,170 @@ func (c proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) err
 	return err
 }
 
-type proxyConfigV126 struct {
-	proxyConfig
+type upproxyConfigV100 struct {
+	template *structs.ConfigTemplate
+	config   config.Configer
 }
 
-func (proxyConfigV126) clone(t *structs.ConfigTemplate) parser {
-	pr := &proxyConfigV126{}
-	pr.template = t
-
-	return pr
+func (upproxyConfigV100) clone(t *structs.ConfigTemplate) parser {
+	return &upproxyConfigV100{template: t}
 }
 
-func (c proxyConfigV126) GenerateConfig(id string, desc structs.ServiceSpec) error {
+func (upproxyConfigV100) Validate(data map[string]interface{}) error { return nil }
+
+func (c upproxyConfigV100) get(key string) string {
+	if c.config == nil {
+		return ""
+	}
+
+	if val := c.config.String(key); val != "" {
+		return val
+	}
+
+	if c.template != nil {
+		for i := range c.template.Keysets {
+			if c.template.Keysets[i].Key == key {
+				return c.template.Keysets[i].Default
+			}
+		}
+	}
+
+	return ""
+}
+
+func (c *upproxyConfigV100) set(key string, val interface{}) error {
+	if c.config == nil {
+		return errors.New("upproxyConfig Configer is nil")
+	}
+
+	return c.config.Set(strings.ToLower(key), fmt.Sprintf("%v", val))
+}
+
+func (c *upproxyConfigV100) ParseData(data []byte) error {
+	configer, err := config.NewConfigData("ini", data)
+	if err != nil {
+		return errors.Wrap(err, "parse ini")
+	}
+
+	c.config = configer
+
+	return nil
+}
+
+func (c *upproxyConfigV100) Marshal() ([]byte, error) {
+	tmpfile, err := ioutil.TempFile("", "serviceConfig")
+	if err != nil {
+		return nil, errors.Wrap(err, "create tempFile")
+	}
+	tmpfile.Close()
+	defer os.Remove(tmpfile.Name())
+
+	err = c.config.SaveConfigFile(tmpfile.Name())
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	data, err := ioutil.ReadFile(tmpfile.Name())
+	if err == nil {
+		return data, nil
+	}
+
+	return data, errors.Wrap(err, "read file")
+}
+
+func (c upproxyConfigV100) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return structs.ServiceRegistration{}, err
+	}
+
+	im, err := structs.ParseImage(c.template.Image)
+	if err != nil {
+		return structs.ServiceRegistration{}, err
+	}
+
+	reg := structs.HorusRegistration{}
+	reg.Service.Select = true
+	reg.Service.Name = spec.ID
+	reg.Service.Type = "unit_" + im.Name
+	reg.Service.Tag = desc.ID
+	reg.Service.Container.Name = spec.Name
+	reg.Service.Container.HostName = spec.Engine.Node
+
+	var mon *structs.User
+
+	if len(desc.Users) > 0 {
+		for i := range desc.Users {
+			if desc.Users[i].Role == "mon" {
+				mon = &desc.Users[i]
+				break
+			}
+		}
+
+		if mon != nil {
+			reg.Service.MonitorUser = mon.Name
+			reg.Service.MonitorPassword = mon.Password
+		}
+	}
+
+	return structs.ServiceRegistration{Horus: &reg}, nil
+}
+
+func (c *upproxyConfigV100) GenerateConfig(id string, desc structs.ServiceSpec) error {
 	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
+
+	spec, err := getUnitSpec(desc.Units, id)
 	if err != nil {
 		return err
 	}
 
 	m := make(map[string]interface{}, 10)
 
-	//	m["upsql-proxy::proxy-domain"] = svc.ID
-	//	m["upsql-proxy::proxy-name"] = u.Name
-	//	if len(u.networkings) > 0 && len(u.ports) >= 2 {
-	//		addr := ""
-	//		adminPort, dataPort := 0, 0
-	//		for i := range u.networkings {
-	//			if u.networkings[i].Type == _ContainersNetworking {
-	//				addr = u.networkings[i].IP.String()
-	//			}
-	//			//			else if u.networkings[i].Type == _ExternalAccessNetworking {
-	//			//				dataAddr = u.networkings[i].IP.String()
-	//			//			}
-	//		}
+	m["upsql-proxy::proxy-domain"] = desc.ID
+	m["upsql-proxy::proxy-name"] = spec.Name
 
-	//		for i := range u.ports {
-	//			if u.ports[i].Name == "proxy_data_port" {
-	//				dataPort = u.ports[i].Port
-	//			} else if u.ports[i].Name == "proxy_admin_port" {
-	//				adminPort = u.ports[i].Port
+	addr := "127.0.0.1"
+	if len(spec.Networking) > 0 {
+		addr = spec.Networking[0].IP
+	}
 
-	//			}
-	//		}
+	if dataPort, ok := desc.Options["upsql-proxy::proxy_data_port"]; !ok {
+		return errors.New("miss key:upsql-proxy::proxy_data_port")
+	} else {
+		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%v", addr, dataPort)
+	}
 
-	//		m["adm-cli::proxy_admin_port"] = adminPort
-	//		m["upsql-proxy::proxy-id"] = dataPort
-	//		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", addr, dataPort)
-	//		m["supervise::supervise-address"] = fmt.Sprintf("%s:%d", addr, adminPort)
-	//		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%d", addr, adminPort)
-	//	}
+	m["upsql-proxy::event-threads-count"] = 1
+	if spec.Config != nil {
+		ncpu, err := spec.Config.CountCPU()
+		if err == nil {
+			m["upsql-proxy::event-threads-count"] = ncpu
+		}
+	}
 
-	//	ncpu, err := utils.GetCPUNum(u.config.HostConfig.CpusetCpus)
-	//	if err == nil {
-	//		m["upsql-proxy::event-threads-count"] = ncpu
-	//	} else {
-	//		logrus.WithError(err).Warnf("%s upsql-proxy::event-threads-count", u.Name)
-	//		m["upsql-proxy::event-threads-count"] = 1
-	//	}
+	if c.template != nil {
+		m["upsql-proxy::topology-config"] = filepath.Join(c.template.DataMount, "/topology.json")
 
-	//	swm, err := svc.getSwithManagerUnit()
-	//	if err == nil && swm != nil {
-	//		swmProxyPort := 0
-	//		for i := range swm.ports {
-	//			if swm.ports[i].Name == "ProxyPort" {
-	//				swmProxyPort = swm.ports[i].Port
-	//				break
-	//			}
-	//		}
-	//		if len(swm.networkings) == 1 {
-	//			m["adm-cli::adm-svr-address"] = fmt.Sprintf("%s:%d", swm.networkings[0].IP.String(), swmProxyPort)
-	//		}
-	//	}
+		m["log::log-dir"] = c.template.LogMount
+	}
 
 	for key, val := range m {
 		err = c.set(key, val)
 	}
 
 	return err
+}
+
+func (c upproxyConfigV100) GenerateCommands(id string, desc structs.ServiceSpec) (structs.CmdsMap, error) {
+	cmds := make(structs.CmdsMap, 4)
+
+	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
+	cmds[structs.InitServiceCmd] = []string{"/root/upproxy-init.sh"}
+	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
+	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
+
+	return cmds, nil
 }

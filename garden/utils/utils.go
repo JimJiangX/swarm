@@ -183,7 +183,7 @@ func ExecContext(ctx context.Context, args ...string) *exec.Cmd {
 }
 
 // ExecContextTimeout exec command with timeout
-func ExecContextTimeout(ctx context.Context, timeout time.Duration, debug bool, args ...string) ([]byte, error) {
+func ExecContextTimeout(ctx context.Context, timeout time.Duration, args ...string) ([]byte, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -195,11 +195,6 @@ func ExecContextTimeout(ctx context.Context, timeout time.Duration, debug bool, 
 	}
 
 	cmd := ExecContext(ctx, args...)
-	if debug {
-		cmd.Stderr = os.Stderr
-		cmd.Stdout = os.Stdout
-		fmt.Println(cmd.Args)
-	}
 
 	err := cmd.Start()
 	if err != nil {

@@ -2,7 +2,6 @@ package garden
 
 import (
 	"strings"
-	"sync"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
@@ -11,16 +10,14 @@ import (
 )
 
 type eventHander struct {
-	once *sync.Once
-	ci   database.ContainerIface
+	ci database.ContainerIface
 }
 
 // NewEventHandler is exported.
 //
 func NewEventHandler(ormer database.Ormer) *eventHander {
 	return &eventHander{
-		once: new(sync.Once),
-		ci:   ormer,
+		ci: ormer,
 	}
 }
 
@@ -39,15 +36,6 @@ func getContainerNameFromInfo(c types.ContainerJSON) string {
 // 依据 event 类型，更新 Unit 与 Container 的关联，写入数据库。
 func (eh eventHander) Handle(event *cluster.Event) (err error) {
 	// Something changed - refresh our internal state.
-	eh.once.Do(func() {
-		logrus.Info("mark running tasks")
-
-		err := eh.ci.MarkRunningTasks()
-		if err != nil {
-			logrus.Errorf("%+v", err)
-		}
-	})
-
 	msg := event.Message
 
 	switch msg.Type {

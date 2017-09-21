@@ -15,19 +15,17 @@ import (
 // 对服务进行备份，如果指定则对指定的容器进行备份，执行ContainerExec进行备份任务。
 func (svc *Service) Backup(ctx context.Context, local string, config structs.ServiceBackupConfig, async bool, task *database.Task) error {
 	backup := func() error {
-		err := svc.checkBackupFiles(ctx, config.MaxSizeByte)
-		if err != nil {
-			return err
-		}
-
-		var units []*unit
+		//		err := svc.checkBackupFiles(ctx, config.MaxSizeByte)
+		//		if err != nil {
+		//			return err
+		//		}
+		var (
+			u   *unit
+			err error
+		)
 
 		if config.Container != "" {
-			var u *unit
 			u, err = svc.getUnit(config.Container)
-			units = []*unit{u}
-		} else {
-			units, err = svc.getUnits()
 		}
 		if err != nil {
 			return err
@@ -38,21 +36,17 @@ func (svc *Service) Backup(ctx context.Context, local string, config structs.Ser
 			return err
 		}
 
-		for _, u := range units {
-			cmd := cmds.GetCmd(u.u.ID, structs.BackupCmd)
-			if len(cmd) == 0 {
-				return errors.Errorf("%s:%s unsupport backup yet", u.u.Name, u.u.Type)
-			}
-
-			cmd = append(cmd, local+"v1.0/tasks/backup/callback", task.ID, config.Type, config.BackupDir, strconv.Itoa(config.FilesRetention))
-
-			_, err = u.containerExec(ctx, cmd, config.Detach)
-			if err != nil {
-				return err
-			}
+		cmd := cmds.GetCmd(u.u.ID, structs.BackupCmd)
+		if len(cmd) == 0 {
+			return errors.Errorf("%s:%s unsupport backup yet", u.u.Name, u.u.Type)
 		}
 
-		return nil
+		cmd = append(cmd, local+"/v1.0/tasks/backup/callback", task.ID, u.u.ID, config.Type, config.BackupDir,
+			strconv.Itoa(config.FilesRetention), config.Remark, config.Tag)
+
+		_, err = u.containerExec(ctx, cmd, config.Detach)
+
+		return err
 	}
 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
@@ -68,6 +62,8 @@ func (svc *Service) checkBackupFiles(ctx context.Context, maxSize int) error {
 		if _err != nil {
 			return _err
 		}
+
+		err = svc.so.DelBackupFiles(expired)
 	}
 
 	return err
@@ -109,13 +105,16 @@ func checkBackupFilesByService(service string, iface database.BackupFileIface, m
 		}
 	}
 
-	sum := 0
-	for i := range valid {
-		sum += valid[i].SizeByte
-	}
+	// check used space if space is limited
+	if maxSize > 0 {
+		sum := 0
+		for i := range valid {
+			sum += valid[i].SizeByte
+		}
 
-	if sum > maxSize {
-		return valid, expired, errors.Errorf("no more space for backup task,%d<%d", maxSize, sum)
+		if sum > maxSize {
+			return valid, expired, errors.Errorf("no more space for backup task,%d<%d", maxSize, sum)
+		}
 	}
 
 	return valid, expired, nil

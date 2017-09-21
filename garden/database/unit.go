@@ -3,7 +3,6 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -25,7 +24,7 @@ type UnitIface interface {
 	SetUnitStatus(u *Unit, status int, msg string) error
 	SetUnitAndTask(u *Unit, t *Task, msg string) error
 	SetUnits(units []Unit) error
-	// SetMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error
+	MigrateUnit(src, destID, destName string) error
 
 	DelUnitsRelated(units []Unit, volume bool) error
 }
@@ -34,8 +33,6 @@ type ContainerIface interface {
 	UnitContainerCreated(name, containerID, engineID, mode string, state int) error
 
 	SetUnitByContainer(containerID string, state int) error
-
-	MarkRunningTasks() error
 }
 
 type UnitOrmer interface {
@@ -97,8 +94,20 @@ func (db dbBase) InsertUnits(units []Unit) error {
 
 // txInsertUnits insert []Unit in Tx
 func (db dbBase) txInsertUnits(tx *sqlx.Tx, units []Unit) error {
+	if len(units) == 0 {
+		return nil
+	}
 
 	query := "INSERT INTO " + db.unitTable() + " (id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at) VALUES (:id,:name,:type,:service_id,:engine_id,:container_id,:network_mode,:latest_error,:status,:created_at)"
+
+	if len(units) == 1 && units[0].ID != "" {
+		_, err := tx.NamedExec(query, units[0])
+		if err == nil {
+			return nil
+		}
+
+		return errors.Wrap(err, "Tx Insert Unit")
+	}
 
 	stmt, err := tx.PrepareNamed(query)
 	if err != nil {
@@ -400,23 +409,47 @@ func (db dbBase) CountUnitsInEngines(engines []string) (int, error) {
 	return count, errors.Wrap(err, "cound Units by engines")
 }
 
-// SetMigrateUnit update Unit and delete old LocalVolumes in a Tx
-func (db dbBase) SetMigrateUnit(u Unit, lvs []Volume, reserveSAN bool) error {
-	// update database Unit
-	// delete old localVolumes
-	do := func(tx *sqlx.Tx) error {
-		for i := range lvs {
-			if reserveSAN && strings.HasSuffix(lvs[i].VG, "_SAN_VG") {
-				continue
-			}
+func (db dbBase) MigrateUnit(src, destID, destName string) error {
 
-			err := db.txDelVolume(tx, lvs[i].ID)
-			if err != nil {
-				return err
-			}
+	do := func(tx *sqlx.Tx) error {
+		u := Unit{}
+		query := "SELECT id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at FROM " + db.unitTable() + " WHERE id=? OR name=?"
+
+		err := tx.Get(&u, query, src, src)
+		if err != nil {
+			return errors.Wrap(err, "Get Unit By nameOrID")
 		}
 
-		return db.txSetUnit(tx, u)
+		query = "UPDATE " + db.ipTable() + " SET unit_id=? WHERE unit_id=?"
+		_, err = tx.Exec(query, destID, src)
+		if err != nil {
+			return errors.Wrap(err, "set ips")
+		}
+
+		query = "UPDATE " + db.volumeTable() + " SET unit_id=? WHERE unit_id=?"
+		_, err = db.Exec(query, destID, src)
+		if err != nil {
+			return errors.Wrap(err, "set volume")
+		}
+
+		err = db.txDelUnit(tx, destID)
+		if err != nil {
+			return err
+		}
+
+		u.ID = destID
+		u.Name = destName
+		err = db.txInsertUnits(tx, []Unit{u})
+		if err != nil {
+			return err
+		}
+
+		err = db.txDelUnit(tx, src)
+		if err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	return db.txFrame(do)
@@ -426,7 +459,6 @@ func (db dbBase) DelUnitsRelated(units []Unit, volume bool) error {
 	do := func(tx *sqlx.Tx) error {
 
 		for i := range units {
-
 			u := Unit{}
 			query := "SELECT id,name,type,service_id,engine_id,container_id,network_mode,latest_error,status,created_at FROM " + db.unitTable() + " WHERE id=? OR name=? OR container_id=?"
 

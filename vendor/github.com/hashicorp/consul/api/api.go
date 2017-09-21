@@ -30,6 +30,10 @@ const (
 	// the HTTP token.
 	HTTPTokenEnvName = "CONSUL_HTTP_TOKEN"
 
+	// HTTPDatacenterEnvName defines an environment variable name which sets
+	// the HTTP datacenter.
+	HTTPDatacenterEnvName = "CONSUL_HTTP_DATACENTER"
+
 	// HTTPAuthEnvName defines an environment variable name which sets
 	// the HTTP authentication header.
 	HTTPAuthEnvName = "CONSUL_HTTP_AUTH"
@@ -256,6 +260,10 @@ func defaultConfig(transportFn func() *http.Transport) *Config {
 
 	if token := os.Getenv(HTTPTokenEnvName); token != "" {
 		config.Token = token
+	}
+
+	if dc := os.Getenv(HTTPDatacenterEnvName); dc != "" {
+		config.Datacenter = strings.ToLower(dc)
 	}
 
 	if auth := os.Getenv(HTTPAuthEnvName); auth != "" {

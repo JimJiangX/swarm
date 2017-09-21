@@ -23,12 +23,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-type notFound struct {
+type notFoundError struct {
 	key  string
 	elem string
 }
 
-func (nf notFound) Error() string {
+func (nf notFoundError) Error() string {
 	if nf.key != "" {
 		return fmt.Sprintf("%s not found %s", nf.elem, nf.key)
 	}
@@ -36,8 +36,8 @@ func (nf notFound) Error() string {
 	return fmt.Sprintf("%s not found", nf.elem)
 }
 
-func newNotFound(elem, key string) notFound {
-	return notFound{
+func newNotFound(elem, key string) notFoundError {
+	return notFoundError{
 		elem: elem,
 		key:  key,
 	}

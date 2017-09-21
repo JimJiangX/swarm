@@ -51,9 +51,12 @@ func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec) (stru
 	resp.ID = t.ID
 	resp.Name = t.Name
 	resp.TaskID = task.ID
-	resp.Units = make([]string, len(t.Units))
+	resp.Units = make([]structs.UnitNameID, len(t.Units))
 	for i := range t.Units {
-		resp.Units[i] = t.Units[i].ID
+		resp.Units[i] = structs.UnitNameID{
+			ID:   t.Units[i].ID,
+			Name: t.Units[i].Name,
+		}
 	}
 
 	go d.deploy(ctx, svc, task, auth)
@@ -144,7 +147,7 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *databas
 		return err
 	}
 
-	err = svc.RunContainer(ctx, pendings, auth)
+	err = svc.RunContainer(ctx, pendings, false, auth)
 	if err != nil {
 		return err
 	}
@@ -160,7 +163,7 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *databas
 }
 
 // Link is exported,not done yet.
-func (d *Deployment) Link(ctx context.Context, links []*structs.ServiceLink) (string, error) {
+func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (string, error) {
 	err := d.freshServicesLink(links)
 	if err != nil {
 		return "", err
@@ -190,7 +193,77 @@ func (d *Deployment) Link(ctx context.Context, links []*structs.ServiceLink) (st
 			}
 		}()
 
-		err = d.gd.PluginClient().ServicesLink(ctx, links)
+		// generate new units config and commands,and sorted
+		resp, err := d.gd.PluginClient().ServicesLink(ctx, links)
+		if err != nil {
+			return err
+		}
+
+		var (
+			svc       *garden.Service
+			serviceID string
+		)
+
+		// update units config file.
+		for _, ul := range resp.Links {
+			if ul.ServiceID == "" || ul.NameOrID == "" {
+				continue
+			}
+
+			if ul.ServiceID != serviceID {
+				s := d.serviceFromLinks(links, ul.ServiceID)
+				if s == nil {
+					return errors.Errorf("not found Service '%s' from ServicesLink", ul.ServiceID)
+				}
+
+				svc = s
+				serviceID = ul.ServiceID
+			}
+
+			err := svc.UpdateUnitConfig(ctx, ul.NameOrID, ul.ConfigFile, ul.ConfigContent)
+			if err != nil {
+				return err
+			}
+		}
+
+		// start units service
+		for _, ul := range resp.Links {
+			if ul.ServiceID == "" || ul.NameOrID == "" {
+				continue
+			}
+
+			if ul.ServiceID != serviceID {
+				s := d.serviceFromLinks(links, ul.ServiceID)
+				if s == nil {
+					return errors.Errorf("not found Service '%s' from ServicesLink", ul.ServiceID)
+				}
+
+				svc = s
+				serviceID = ul.ServiceID
+			}
+
+			err := svc.Exec(ctx, structs.ServiceExecConfig{
+				Container: ul.NameOrID,
+				Cmd:       ul.Commands,
+			}, false, nil)
+
+			if err != nil {
+				return err
+			}
+		}
+
+		// service compose
+		for _, name := range resp.Compose {
+			svc := d.serviceFromLinks(links, name)
+			if svc == nil {
+				return errors.Errorf("not found Service '%s' from ServicesLink", name)
+			}
+
+			err := svc.Compose(ctx, d.gd.PluginClient())
+			if err != nil {
+				return err
+			}
+		}
 
 		return err
 	}()
@@ -198,8 +271,19 @@ func (d *Deployment) Link(ctx context.Context, links []*structs.ServiceLink) (st
 	return task.ID, nil
 }
 
+func (d *Deployment) serviceFromLinks(links structs.ServicesLink, nameOrID string) *garden.Service {
+	for _, l := range links.Links {
+		if l.Spec != nil &&
+			(l.Spec.ID == nameOrID || l.Spec.Name == nameOrID) {
+			return d.gd.NewService(l.Spec, nil)
+		}
+	}
+
+	return nil
+}
+
 func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
-	ids := links.Links()
+	ids := links.LinkIDs()
 
 	switch len(ids) {
 	case 0:
@@ -215,7 +299,7 @@ func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
 			return err
 		}
 
-		links[0].Spec = spec
+		links.Links[0].Spec = spec
 
 		return nil
 	}
@@ -240,20 +324,20 @@ func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
 
 	containers := d.gd.Cluster.Containers()
 
-	for l := range links {
+	for l := range links.Links {
 
-		info, ok := m[links[l].ID]
+		info, ok := m[links.Links[l].ID]
 		if ok {
 			spec := garden.ConvertServiceInfo(info, containers)
-			links[l].Spec = &spec
+			links.Links[l].Spec = &spec
 		}
 
-		delete(m, links[l].ID)
+		delete(m, links.Links[l].ID)
 	}
 
 	for _, val := range m {
 		spec := garden.ConvertServiceInfo(val, containers)
-		links = append(links, &structs.ServiceLink{
+		links.Links = append(links.Links, &structs.ServiceLink{
 			ID:   spec.ID,
 			Spec: &spec,
 		})

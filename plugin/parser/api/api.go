@@ -1,15 +1,25 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/docker/swarm/garden/structs"
-	"github.com/docker/swarm/plugin/client"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
+
+type pclient interface {
+	Get(ctx context.Context, url string) (*http.Response, error)
+
+	Post(ctx context.Context, url string, body interface{}) (*http.Response, error)
+
+	Put(ctx context.Context, url string, body interface{}) (*http.Response, error)
+}
 
 // PluginAPI is a plugin server HTTP API client.
 type PluginAPI interface {
@@ -17,7 +27,7 @@ type PluginAPI interface {
 	GenerateUnitConfig(ctx context.Context, unit string, desc structs.ServiceSpec) (structs.ConfigCmds, error)
 
 	GetUnitConfig(ctx context.Context, service, unit string) (structs.ConfigCmds, error)
-	GetServiceConfig(ctx context.Context, service string) (structs.ConfigsMap, error)
+	GetServiceConfig(ctx context.Context, service string) (structs.ServiceConfigs, error)
 	GetCommands(ctx context.Context, service string) (structs.Commands, error)
 
 	GetImage(ctx context.Context, version string) (structs.ConfigTemplate, error)
@@ -25,109 +35,144 @@ type PluginAPI interface {
 
 	PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate) error
 
-	UpdateConfigs(ctx context.Context, service string, configs structs.ConfigsMap) error
+	UpdateConfigs(ctx context.Context, service string, configs structs.ServiceConfigs) (structs.ConfigsMap, error)
 	ServiceCompose(ctx context.Context, spec structs.ServiceSpec) error
-	ServicesLink(ctx context.Context, links structs.ServicesLink) error
+	ServicesLink(ctx context.Context, links structs.ServicesLink) (structs.ServiceLinkResponse, error)
 }
 
 type plugin struct {
-	c client.Client
+	host string
+	c    pclient
 }
 
 // NewPlugin returns a PluginAPI
-func NewPlugin(cli client.Client) PluginAPI {
+func NewPlugin(host string, cli pclient) PluginAPI {
 	return plugin{
-		c: cli,
+		host: host,
+		c:    cli,
 	}
 }
 
 func (p plugin) GenerateServiceConfig(ctx context.Context, desc structs.ServiceSpec) (structs.ConfigsMap, error) {
-	var m structs.ConfigsMap
+	const uri = "/configs"
 
-	resp, err := client.RequireOK(p.c.Post(ctx, "/configs", desc))
+	resp, err := requireOK(p.c.Post(ctx, uri, desc))
 	if err != nil {
-		return m, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
+	var m structs.ConfigsMap
+
 	err = decodeBody(resp, &m)
+	if err != nil {
+		return nil, errors.Errorf("%s %s%s,%v", http.MethodPost, p.host, uri, err)
+	}
 
 	return m, err
 }
 
 func (p plugin) GenerateUnitConfig(ctx context.Context, unit string, desc structs.ServiceSpec) (structs.ConfigCmds, error) {
-	var cc structs.ConfigCmds
+	var (
+		cc  structs.ConfigCmds
+		uri = "/configs/" + unit
+	)
 
-	resp, err := client.RequireOK(p.c.Post(ctx, "/configs/"+unit, desc))
+	resp, err := requireOK(p.c.Post(ctx, uri, desc))
 	if err != nil {
 		return cc, err
 	}
 	defer resp.Body.Close()
 
 	err = decodeBody(resp, &cc)
+	if err != nil {
+		return cc, errors.Errorf("%s %s%s,%v", http.MethodPost, p.host, uri, err)
+	}
 
 	return cc, err
 }
 
-func (p plugin) GetServiceConfig(ctx context.Context, service string) (structs.ConfigsMap, error) {
-	var m structs.ConfigsMap
+func (p plugin) GetServiceConfig(ctx context.Context, service string) (structs.ServiceConfigs, error) {
+	var (
+		obj structs.ServiceConfigs
+		uri = "/configs/" + service
+	)
 
-	resp, err := client.RequireOK(p.c.Get(ctx, "/configs/"+service))
+	resp, err := requireOK(p.c.Get(ctx, uri))
 	if err != nil {
-		return m, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	err = decodeBody(resp, &m)
+	err = decodeBody(resp, &obj)
+	if err != nil {
+		return nil, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, uri, err)
+	}
 
-	return m, err
+	return obj, err
 }
 
 func (p plugin) GetUnitConfig(ctx context.Context, service, unit string) (structs.ConfigCmds, error) {
-	var m structs.ConfigCmds
+	var (
+		m   structs.ConfigCmds
+		uri = fmt.Sprintf("/configs/%s/%s", service, unit)
+	)
 
-	uri := fmt.Sprintf("/configs/%s/%s", service, unit)
-	resp, err := client.RequireOK(p.c.Get(ctx, uri))
+	resp, err := requireOK(p.c.Get(ctx, uri))
 	if err != nil {
 		return m, err
 	}
 	defer resp.Body.Close()
 
 	err = decodeBody(resp, &m)
+	if err != nil {
+		return m, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, uri, err)
+	}
 
 	return m, err
 }
 
 func (p plugin) GetCommands(ctx context.Context, service string) (structs.Commands, error) {
-	var m structs.Commands
-
-	resp, err := client.RequireOK(p.c.Get(ctx, "/commands/"+service))
+	var (
+		m   structs.Commands
+		uri = "/commands/" + service
+	)
+	resp, err := requireOK(p.c.Get(ctx, uri))
 	if err != nil {
 		return m, err
 	}
 	defer resp.Body.Close()
 
 	err = decodeBody(resp, &m)
+	if err != nil {
+		return nil, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, uri, err)
+	}
 
 	return m, err
 }
 
 func (p plugin) GetImage(ctx context.Context, version string) (structs.ConfigTemplate, error) {
 	obj := structs.ConfigTemplate{}
+	uri := "/image/template/" + version
 
-	resp, err := client.RequireOK(p.c.Get(ctx, "/image/template/"+version))
+	resp, err := requireOK(p.c.Get(ctx, uri))
 	if err != nil {
 		return obj, err
 	}
 	defer resp.Body.Close()
 
 	err = decodeBody(resp, &obj)
+	if err != nil {
+		return obj, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, uri, err)
+	}
 
 	return obj, err
 }
 
 func (p plugin) GetImageSupport(ctx context.Context) ([]structs.ImageVersion, error) {
-	resp, err := client.RequireOK(p.c.Get(ctx, "/image/support"))
+	const uri = "/image/support"
+
+	resp, err := requireOK(p.c.Get(ctx, uri))
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +181,9 @@ func (p plugin) GetImageSupport(ctx context.Context) ([]structs.ImageVersion, er
 	var obj []structs.ImageVersion
 
 	err = decodeBody(resp, &obj)
+	if err != nil {
+		return nil, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, uri, err)
+	}
 
 	return obj, err
 }
@@ -158,59 +206,107 @@ func (p plugin) GetImageSupport(ctx context.Context) ([]structs.ImageVersion, er
 //	defer resp.Body.Close()
 
 //	err = decodeBody(resp, &obj)
+//  if err != nil {
+//		return obj, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, url.String(), err)
+//	}
 
 //	return obj, err
 //}
 
 func (p plugin) PostImageTemplate(ctx context.Context, ct structs.ConfigTemplate) error {
-	resp, err := client.RequireOK(p.c.Post(ctx, "/image/template", ct))
+	resp, err := requireOK(p.c.Post(ctx, "/image/template", ct))
 	if err != nil {
 		return err
 	}
 
-	client.EnsureBodyClose(resp)
+	ensureBodyClose(resp)
 
 	return nil
 }
 
-func (p plugin) UpdateConfigs(ctx context.Context, service string, configs structs.ConfigsMap) error {
-	resp, err := client.RequireOK(p.c.Put(ctx, "/configs/"+service, configs))
+func (p plugin) UpdateConfigs(ctx context.Context, service string, configs structs.ServiceConfigs) (structs.ConfigsMap, error) {
+	uri := "/configs/" + service
+	resp, err := requireOK(p.c.Put(ctx, uri, configs))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	client.EnsureBodyClose(resp)
+	defer resp.Body.Close()
 
-	return nil
+	var m structs.ConfigsMap
+
+	err = decodeBody(resp, &m)
+	if err != nil {
+		return nil, errors.Errorf("%s %s%s,%v", http.MethodPost, p.host, uri, err)
+	}
+
+	return m, err
 }
 
 func (p plugin) ServiceCompose(ctx context.Context, spec structs.ServiceSpec) error {
 	uri := fmt.Sprintf("/services/%s/compose", spec.ID)
 
-	resp, err := client.RequireOK(p.c.Put(ctx, uri, spec))
+	resp, err := requireOK(p.c.Put(ctx, uri, spec))
 	if err != nil {
 		return err
 	}
 
-	client.EnsureBodyClose(resp)
+	ensureBodyClose(resp)
 
 	return nil
 }
 
-func (p plugin) ServicesLink(ctx context.Context, links structs.ServicesLink) error {
-	resp, err := client.RequireOK(p.c.Put(ctx, "/services/link", links))
+func (p plugin) ServicesLink(ctx context.Context, links structs.ServicesLink) (structs.ServiceLinkResponse, error) {
+	const uri = "/services/link"
+	obj := structs.ServiceLinkResponse{}
+
+	resp, err := requireOK(p.c.Post(ctx, uri, links))
 	if err != nil {
-		return err
+		return obj, err
+	}
+	defer resp.Body.Close()
+
+	err = decodeBody(resp, &obj)
+	if err != nil {
+		return obj, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, uri, err)
 	}
 
-	client.EnsureBodyClose(resp)
-
-	return nil
+	return obj, nil
 }
 
 // decodeBody is used to JSON decode a body
 func decodeBody(resp *http.Response, out interface{}) error {
 	dec := json.NewDecoder(resp.Body)
 
-	return errors.WithStack(dec.Decode(out))
+	return dec.Decode(out)
+}
+
+// requireOK is used to wrap doRequest and check for a 200
+func requireOK(resp *http.Response, e error) (*http.Response, error) {
+	if e != nil {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return nil, e
+	}
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
+		buf := bytes.NewBuffer(nil)
+
+		io.Copy(buf, resp.Body)
+		resp.Body.Close()
+
+		return nil, errors.Errorf("%s,Unexpected response code: %d (%s)", resp.Request.URL.String(), resp.StatusCode, buf.Bytes())
+	}
+
+	return resp, nil
+}
+
+// ensureBodyClose close *http.Response
+func ensureBodyClose(resp *http.Response) {
+	if resp.Body != nil {
+		io.CopyN(ioutil.Discard, resp.Body, 512)
+
+		resp.Body.Close()
+	}
 }

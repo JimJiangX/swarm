@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -24,6 +26,8 @@ import (
 	"github.com/pkg/errors"
 	goctx "golang.org/x/net/context"
 )
+
+const dateLayout = "2006-01-02"
 
 var (
 	nilGardenCode = errCode{
@@ -277,35 +281,49 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		httpJSONNilGarden(w)
 		return
 	}
+	orm := gd.Ormer()
+	now := time.Now()
+	t := database.Task{}
+	t.FinishedAt = now
+	t.ID = req.TaskID
+
+	if req.Code != 0 {
+		t.Status = database.TaskFailedStatus
+		t.Errors = req.Msg
+
+		err := orm.SetTask(t)
+		if err != nil {
+			ec := errCodeV1(_Task, dbExecError, 34, "fail to exec records into database", "数据库更新错误（任务表）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+		}
+		return
+	}
 
 	if req.Retention == 0 {
 		// default keep a week
 		req.Retention = 7
 	}
-	orm := gd.Ormer()
-	now := time.Now()
 
 	bf := database.BackupFile{
 		ID:         utils.Generate32UUID(),
 		TaskID:     req.TaskID,
 		UnitID:     req.UnitID,
+		Tag:        req.Tag,
 		Type:       req.Type,
 		Path:       req.Path,
+		Remark:     req.Remark,
 		SizeByte:   req.Size,
 		Retention:  now.AddDate(0, 0, req.Retention),
-		CreatedAt:  now,
-		FinishedAt: now,
+		CreatedAt:  time.Unix(req.Created, 0),
+		FinishedAt: time.Unix(req.Finished, 0),
 	}
 
-	t := database.Task{}
-	t.ID = req.TaskID
 	t.Status = database.TaskDoneStatus
 	t.SetErrors(nil)
-	t.FinishedAt = now
 
 	err = orm.InsertBackupFileWithTask(bf, t)
 	if err != nil {
-		ec := errCodeV1(_Task, dbTxError, 34, "fail to exec records in into database in a Tx", "数据库事务处理错误（备份文件表）")
+		ec := errCodeV1(_Task, dbTxError, 35, "fail to exec records in into database in a Tx", "数据库事务处理错误（备份文件表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -807,7 +825,7 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	master := resource.NewHostManager(gd.Ormer(), gd.Cluster)
+	master := resource.NewHostManager(gd.Ormer(), gd.Cluster, nil)
 	err := master.RemoveCluster(name)
 	if err != nil {
 		ec := errCodeV1(_Cluster, dbExecError, 51, "fail to delete records into database", "数据库删除记录错误")
@@ -1053,8 +1071,8 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	master := resource.NewHostManager(orm, gd.Cluster)
-	err = master.InstallNodes(ctx, horus, nodes, gd.KVClient())
+	master := resource.NewHostManager(orm, gd.Cluster, nodes)
+	err = master.InstallNodes(ctx, horus, gd.KVClient())
 	if err != nil {
 		ec := errCodeV1(_Host, internalError, 36, "fail to install host", "主机入库错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -1207,7 +1225,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	m := resource.NewHostManager(gd.Ormer(), gd.Cluster)
+	m := resource.NewHostManager(gd.Ormer(), gd.Cluster, nil)
 
 	err = m.RemoveNode(ctx, horus, node, username, password, force, timeout, gd.KVClient())
 	if err != nil {
@@ -1685,8 +1703,8 @@ func vaildPostServiceLinkRequest(v structs.ServicesLink) error {
 
 	errs := make([]string, 0, 3)
 
-	for i := range v {
-		if v[i] != nil && v[i].ID == "" {
+	for i := range v.Links {
+		if v.Links[i] != nil && v.Links[i].ID == "" {
 			errs = append(errs, "ServiceLink.ID is required")
 		}
 	}
@@ -1785,7 +1803,19 @@ func vaildPostServiceUpdateRequest(v structs.UnitRequire) error {
 		return fmt.Errorf("UnitRequire:%v,%s", v, "no resource update required")
 	}
 
-	return nil
+	errs := make([]string, 0, 3)
+
+	for _, vr := range v.Volumes {
+		if vr.Name == "" && vr.Type == "" {
+			errs = append(errs, fmt.Sprintf("VolumeRequire is invaild,%+v", vr))
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("ServiceUpdateRequest:%s", errs)
 }
 
 func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1877,30 +1907,100 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
-func vaildPostServiceUpdateConfigsRequest(cmds structs.ConfigsMap, args map[string]interface{}) error {
-	if len(cmds) == 0 && len(args) == 0 {
+func vaildPostServiceUpdateConfigsRequest(req structs.UnitConfig) error {
+	if len(req.Keysets) == 0 {
 		return stderr.New("nothing new for update for service configs")
 	}
 
 	return nil
 }
 
+func mergeServiceConfigsChange(ctx goctx.Context, svc *garden.Service, change structs.UnitConfig) (structs.ServiceConfigs, bool, error) {
+	restart := false
+
+	configs, err := svc.GetUnitsConfigs(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+
+	for i := range configs {
+		cc, ok, err := mergeUnitConfigChange(configs[i], change)
+		if err != nil {
+			return nil, false, err
+		}
+
+		configs[i] = cc
+
+		if ok {
+			restart = ok
+		}
+	}
+
+	return configs, restart, nil
+}
+
+func mergeUnitConfigChange(cc, change structs.UnitConfig) (structs.UnitConfig, bool, error) {
+	if change.LogMount != "" {
+		cc.LogMount = change.LogMount
+	}
+	if change.DataMount != "" {
+		cc.DataMount = change.DataMount
+	}
+	if change.ConfigFile != "" {
+		cc.ConfigFile = change.ConfigFile
+	}
+
+	m := make(map[string]structs.Keyset, len(cc.Keysets))
+
+	for i := range cc.Keysets {
+		m[cc.Keysets[i].Key] = cc.Keysets[i]
+	}
+
+	restart := false
+
+	for i := range change.Keysets {
+		val, ok := m[change.Keysets[i].Key]
+		if !ok {
+			return cc, false, errors.Errorf("UnitConfig key:%s not exist", change.Keysets[i].Key)
+		}
+
+		if !val.CanSet {
+			return cc, false, errors.Errorf("UnitConfig key:%s forbit to reset", val.Key)
+		}
+
+		if val.MustRestart {
+			restart = true
+		}
+
+		val.Value = change.Keysets[i].Value
+
+		m[change.Keysets[i].Key] = val
+	}
+
+	ks := make([]structs.Keyset, 0, len(m))
+
+	for _, val := range m {
+		ks = append(ks, val)
+	}
+
+	cc.Keysets = ks
+
+	return cc, restart, nil
+}
+
 func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
-	var req = struct {
-		Configs structs.ConfigsMap
-		Args    map[string]interface{}
-	}{}
+	change := structs.UnitConfig{}
 
-	err := json.NewDecoder(r.Body).Decode(&req)
+	err := json.NewDecoder(r.Body).Decode(&change)
 	if err != nil {
 		ec := errCodeV1(_Service, decodeError, 91, "JSON Decode Request Body error", "JSON解析请求Body错误")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
-	if err := vaildPostServiceUpdateConfigsRequest(req.Configs, req.Args); err != nil {
+	if err := vaildPostServiceUpdateConfigsRequest(change); err != nil {
 		ec := errCodeV1(_Service, invaildParamsError, 92, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
@@ -1928,6 +2028,13 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
+	configs, restart, err := mergeServiceConfigsChange(ctx, svc, change)
+	if err != nil {
+		ec := errCodeV1(_Service, dbQueryError, 95, "fail to update config file", "数据合并错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
 	// new Context with deadline
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
@@ -1937,9 +2044,9 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	task := database.NewTask(spec.Name, database.ServiceUpdateConfigTask, spec.ID, spec.Desc, nil, 300)
 
-	err = svc.UpdateUnitsConfigs(ctx, req.Configs, req.Args, &task, true)
+	err = svc.UpdateUnitsConfigs(ctx, configs, &task, restart, true)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 95, "fail to update service config files", "服务配置文件更新错误")
+		ec := errCodeV1(_Service, internalError, 96, "fail to update service config files", "服务配置文件更新错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2047,7 +2154,7 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	task := database.NewTask(spec.Name, database.ServiceStopTask, spec.ID, spec.Desc, nil, 300)
 
-	err = svc.Stop(ctx, false, true, &task)
+	err = svc.Stop(ctx, true, true, &task)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 113, "fail to stop service", "服务关闭错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -2097,25 +2204,11 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func vaildPostServiceBackupRequest(v structs.ServiceBackupConfig) error {
-	errs := make([]string, 0, 4)
-
-	if v.BackupDir == "" {
-		errs = append(errs, "BackupDir is required")
+	if v.Container == "" {
+		return stderr.New("not assigned unit nameOrID")
 	}
 
-	if v.Type == "" {
-		errs = append(errs, "Type is required")
-	}
-
-	if v.MaxSizeByte <= 0 {
-		errs = append(errs, "MaxSizeByte is required")
-	}
-
-	if v.FilesRetention == 0 {
-		errs = append(errs, "FilesRetention is required")
-	}
-
-	return fmt.Errorf("ServiceBackupConfig:%v,%s", v, errs)
+	return nil
 }
 
 func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2143,16 +2236,33 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if config.BackupDir == "" {
+		sys, err := gd.Ormer().GetSysConfig()
+		if err != nil {
+			ec := errCodeV1(_Service, dbQueryError, 133, "fail to query database", "数据库查询错误（系统配置表）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+			return
+		}
+
+		config.BackupDir = sys.BackupDir
+	}
+	if config.Type == "" {
+		config.Type = "full"
+	}
+	if config.FilesRetention == 0 {
+		config.FilesRetention = 7
+	}
+
 	svc, err := gd.GetService(name)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 133, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 134, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	spec, err := svc.Spec()
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 134, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 135, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2168,7 +2278,7 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	err = svc.Backup(ctx, r.Host, config, true, &task)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 135, "fail to back service", "服务备份错误")
+		ec := errCodeV1(_Service, internalError, 136, "fail to back service", "服务备份错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2358,6 +2468,65 @@ func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	}
 
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
+}
+
+func getServiceConfigFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Service, urlParamError, 171, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	name := mux.Vars(r)["name"]
+	canset := boolValue(r, "canset")
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	svc, err := gd.GetService(name)
+	if err != nil {
+		ec := errCodeV1(_Service, dbQueryError, 172, "fail to query database", "数据库查询错误（服务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	out, err := svc.GetUnitsConfigs(ctx)
+	if err != nil {
+		ec := errCodeV1(_Service, dbQueryError, 173, "fail to query units configs from kv", "获取服务单元配置错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	if !canset {
+		writeJSON(w, out, http.StatusOK)
+		return
+	}
+
+	config := structs.UnitConfig{}
+
+	if len(out) > 0 {
+		config = out[0]
+		config.ID = ""
+		config.Service = ""
+		config.Content = ""
+		config.Cmds = nil
+
+		keysets := make([]structs.Keyset, 0, len(out[0].Keysets))
+		for i := range out[0].Keysets {
+			if out[0].Keysets[i].CanSet {
+				keysets = append(keysets, out[0].Keysets[i])
+			}
+		}
+
+		config.Keysets = keysets
+	}
+
+	writeJSON(w, structs.ServiceConfigs{config}, http.StatusOK)
 }
 
 // -----------------/units handlers-----------------
@@ -2648,4 +2817,227 @@ func deleteRaidGroup(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// -----------------/backupfiles handlers-----------------
+// DELETE /backupfiles
+func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Backup, urlParamError, 11, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	id := r.FormValue("id")
+	tag := r.FormValue("tag")
+	service := r.FormValue("serivce")
+	deadline := r.FormValue("expired")
+	nfs := r.FormValue("nfs_mount")
+
+	if nfs == "" {
+		ec := errCodeV1(_Backup, urlParamError, 12, "Request URL parameter error", "请求URL参数错误,miss nfs_mount")
+		httpJSONError(w, errors.New("miss nfs_mount"), ec, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil || gd.Ormer() == nil {
+		httpJSONNilGarden(w)
+		return
+	}
+
+	var (
+		orm = gd.Ormer()
+
+		err   error
+		files []database.BackupFile
+	)
+
+	if id != "" {
+		bf, err := orm.GetBackupFile(id)
+		if err != nil {
+			ec := errCodeV1(_Backup, dbQueryError, 13, "fail to query database", "数据库查询错误（备份文件表）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+			return
+		}
+
+		files = []database.BackupFile{bf}
+
+		err = removeBackupFiles(orm, nfs, files)
+		if err != nil {
+			ec := errCodeV1(_Backup, dbExecError, 15, "fail to remove backup files", "删除备份文件错误")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+		}
+
+		return
+	}
+
+	if tag != "" {
+		orm.ListBackupFilesByTag(tag)
+	} else if service != "" {
+		files, err = orm.ListBackupFilesByService(service)
+	} else {
+		files, err = orm.ListBackupFiles()
+	}
+
+	if err != nil {
+		ec := errCodeV1(_Backup, dbQueryError, 13, "fail to query database", "数据库查询错误（备份文件表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	t := time.Now()
+	if deadline != "" {
+		d, err := time.Parse(dateLayout, deadline)
+		if err == nil && d.Before(t) {
+			t = d
+		}
+	}
+
+	expired := make([]database.BackupFile, 0, len(files))
+	for i := range files {
+		if t.After(files[i].Retention) {
+			expired = append(expired, files[i])
+		}
+	}
+
+	if len(expired) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	err = removeBackupFiles(orm, nfs, expired)
+	if err != nil {
+		ec := errCodeV1(_Backup, dbExecError, 15, "fail to remove backup files", "删除备份文件错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type rmBackupFilesIface interface {
+	GetSysConfig() (database.SysConfig, error)
+	DelBackupFiles(files []database.BackupFile) error
+}
+
+func removeBackupFiles(orm rmBackupFilesIface, nfs string, files []database.BackupFile) error {
+	sys, err := orm.GetSysConfig()
+	if err != nil {
+		return err
+	}
+
+	rm := make([]database.BackupFile, 0, len(files))
+	for i := range files {
+		path := getNFSBackupFile(files[i].Path, sys.BackupDir, nfs)
+
+		err := os.RemoveAll(path)
+		if err == nil {
+			rm = append(rm, files[i])
+		} else {
+			logrus.Warnf("fail to delete backup file:%s", path)
+		}
+	}
+
+	return orm.DelBackupFiles(rm)
+}
+
+func getNFSBackupFile(file, backup, nfs string) string {
+	file = strings.Replace(file, backup, nfs, 1)
+
+	return filepath.Clean(file)
+}
+
+func getBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Backup, urlParamError, 21, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	tag := r.FormValue("tag")
+	service := r.FormValue("serivce")
+	start := r.FormValue("start")
+	end := r.FormValue("end")
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	var (
+		orm = gd.Ormer()
+
+		err   error
+		files []database.BackupFile
+	)
+
+	if tag != "" {
+		orm.ListBackupFilesByTag(tag)
+	} else if service != "" {
+		files, err = orm.ListBackupFilesByService(service)
+	} else {
+		files, err = orm.ListBackupFiles()
+		files = filterBackupFilesByTime(files, start, end)
+	}
+	if err != nil {
+		ec := errCodeV1(_Backup, dbQueryError, 22, "fail to query database", "数据库查询错误（备份文件表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, files, http.StatusOK)
+}
+
+func filterBackupFilesByTime(files []database.BackupFile, start, end string) []database.BackupFile {
+	if len(files) == 0 || (start == "" && end == "") {
+		return files
+	}
+
+	var (
+		err    error
+		st, et time.Time
+	)
+
+	if start != "" {
+		st, err = time.Parse(dateLayout, start)
+		if err != nil {
+			return files
+		}
+	}
+
+	if end != "" {
+		et, err = time.Parse(dateLayout, start)
+		if err != nil {
+			return files
+		}
+	}
+
+	if st.After(et) {
+		st, et = et, st
+	}
+
+	out := make([]database.BackupFile, 0, len(files))
+
+	sN0 := !st.IsZero()
+	eN0 := !et.IsZero()
+
+	for i := range files {
+		at := files[i].CreatedAt
+
+		if sN0 && at.Before(st) {
+			continue
+		}
+
+		if eN0 && at.After(et) {
+			continue
+		}
+
+		out = append(out, files[i])
+	}
+
+	return out
 }

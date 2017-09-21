@@ -1,16 +1,16 @@
 #!/bin/bash
 set -o nounset
 
-swarm_key=$1
-adm_ip=$2
-cs_datacenter=$3
-cs_list=$4
-registry_domain=$5
-registry_ip=$6
-registry_port=$7
-registry_username=$8
-registry_passwd=$9
-regstry_ca_file=${10}
+swarm_key=${1}
+adm_ip=${2}
+cs_datacenter=${3}
+cs_list=${4}
+registry_domain=${5}
+registry_ip=${6}
+registry_port=${7}
+registry_username=${8}
+registry_passwd=${9}
+registry_ca_file=${10}
 docker_port=${11}
 hdd_dev=${12}
 ssd_dev=${13}
@@ -24,19 +24,54 @@ nfs_ip=${20}
 nfs_dir=${21}
 nfs_mount_dir=${22}
 nfs_mount_opts=${23}
+san_id=${24}
+if [ "$san_id" == "null" ]; then
+	san_id=''
+fi
 
 cur_dir=`dirname $0`
 
 hdd_vgname=${HOSTNAME}_HDD_VG
 ssd_vgname=${HOSTNAME}_SSD_VG
 
-pf_dev_bw=1000M
+bond_dev=bond0
+
+bond_mode=`cat cat /sys/class/net/${bond_dev}/bonding/mode`
+
+bond_slaves=`cat /sys/class/net/${bond_dev}/bonding/slaves`
+if [ ! -n "${bond_slaves}" ]; then
+	echo "${bond_dev} slaves is null"
+	exit 2
+fi
+
+pf_dev_bw_num=0
+if [ "${bond_mode}" == "balance-xor 2" ]; then
+	for d in ${bond_slaves}
+	do
+		d_bw=`ethtool enp130s0f0| grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}'`	
+		pf_dev_bw_num=`expr ${pf_dev_bw_num} + ${d_bw}`
+	done
+	pf_dev_bw=${pf_dev_bw_num}M
+elif [ "${bond_mode}" == "active-backup 1" ]; then
+	for d in ${bond_slaves}
+        do
+                d_bw=`ethtool enp130s0f0| grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}'`    
+		if [ ${d_bw} -gt ${pf_dev_bw_num} ]; then
+                	pf_dev_bw_num=${d_bw}
+		fi
+        done
+        pf_dev_bw=${pf_dev_bw_num}M
+else
+	echo "${bond_dev} bond mode unsupport "
+	exit 2		
+fi
+
 
 PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
 
 docker_version=1.12.6
-consul_version=0.8.4
-swarm_agent_version=1.0.0
+consul_version=0.9.2
+swarm_agent_version=1.2.8-bf351e2
 logicalVolume_volume_plugin_version=3.0.0
 
 platform="$(uname -s)"
@@ -51,7 +86,7 @@ fi
 
 # check container_nic
 container_nic=`ifconfig | grep -e 'cbond[0-9]\{1,3\}' | awk '{print $1}' | sed 's/://g' |  tr "\n" "," |sed 's/.$//'` 
-if [ $container_nic = '' ]; then
+if [ ${container_nic} = '' ]; then
 	echo "not found container nic"
 	exit 2
 fi
@@ -278,7 +313,7 @@ install_docker() {
 
 
 	if [ "${release}" == "SUSE LINUX" ]; then
-		if [ "${wwn}" != '' ]; then
+		if [ "${san_id}" != '' ]; then
 			systemctl enable multipathd.service
 			systemctl start multipathd.service
 			systemctl status multipathd.service
@@ -301,7 +336,7 @@ install_docker() {
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label CONTAINER_NIC=${container_nic} --label PF_DEV_BW=${pf_dev_bw}
+DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label CONTAINER_NIC=${container_nic} --label PF_DEV_BW=${pf_dev_bw} --label SAN_ID=${san_id}
 
 DOCKER_NETWORK_OPTIONS=""
 
@@ -337,7 +372,7 @@ WantedBy=multi-user.target
 EOF
 
 	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ "${release}" == "CentOS" ]; then
-		if [ "${wwn}" != '' ]; then
+		if [ "${san_id}" != '' ]; then
 			systemctl enable multipathd.service
 			systemctl start multipathd.service
 			systemctl status multipathd.service
@@ -416,7 +451,7 @@ EOF
 }
 
 init_docker() {
-	local cert_file=$regstry_ca_file
+	local cert_file=${registry_ca_file}
 	local cert_dir="/etc/docker/certs.d/${registry_domain}:${registry_port}"
 
 	# add DNS 
@@ -436,7 +471,7 @@ init_docker() {
 # install docker plugin
 install_docker_plugin() {
 	local base_dir=/usr/local/logicalVolume-volume-plugin
-	local script_dir=$base_dir/scripts
+	local script_dir=${base_dir}/scripts
 
 	mkdir -p ${base_dir}/bin
 	mkdir -p ${script_dir}
@@ -444,7 +479,7 @@ install_docker_plugin() {
 	pkill -9 local-volume-plugin > /dev/null 2>&1
 
 	# copy binary file
-	cp ${cur_dir}/logicalVolume-volume-plugin-${logicalVolume_volume_plugin_version}/bin/logicalVolume_volume_plugin $base_dir/bin/logicalVolume_volume_plugin
+	cp ${cur_dir}/logicalVolume-volume-plugin-${logicalVolume_volume_plugin_version}/bin/logicalVolume_volume_plugin ${base_dir}/bin/logicalVolume_volume_plugin
 	chmod +x /usr/bin/logicalVolume_volume_plugin
 
 	# copy script
@@ -461,7 +496,7 @@ After=docker.service
 [Service]
 Restart=on-failure
 RestartSec=30s
-ExecStart=$base_dir/bin/logicalVolume_volume_plugin
+ExecStart=${base_dir}/bin/logicalVolume_volume_plugin
 
 [Install]
 WantedBy=multi-user.target
@@ -485,7 +520,7 @@ EOF
 # install swarm agent
 install_swarm_agent() {
 	local base_dir=/usr/local/swarm-agent
-	local script_dir=$base_dir/scripts
+	local script_dir=${base_dir}/scripts
 
 	# stop swarm-agent
 	pkill -9 swarm >/dev/null 2>&1
@@ -496,8 +531,8 @@ install_swarm_agent() {
 	chmod +x ${script_dir}/seed/net/* ${script_dir}/seed/san/*
 
 	# copy binary file
-	cp ${cur_dir}/swarm-agent-${swarm_agent_version}/bin/swarm $base_dir/swarm 
-	chmod 755 $base_dir/swarm
+	cp ${cur_dir}/swarm-agent-${swarm_agent_version}/bin/swarm ${base_dir}/swarm
+	chmod 755 ${base_dir}/swarm
 
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/swarm-agent
@@ -519,8 +554,9 @@ Documentation=https://docs.docker.com
 After=network.target consul.service
 
 [Service]
+Environment=CONSUL_HTTP_DATACENTER=${cs_datacenter}
 EnvironmentFile=/etc/sysconfig/swarm-agent
-ExecStart=$base_dir/swarm  \$SWARM_AGENT_OPTS
+ExecStart=${base_dir}/swarm  \$SWARM_AGENT_OPTS
 
 [Install]
 WantedBy=multi-user.target
@@ -553,7 +589,7 @@ install_docker_plugin
 reg_to_consul DockerPlugin ${docker_plugin_port}
 #reg_to_horus_server DockerPlugin 
 
-install_docker ${docker_version}
+install_docker
 reg_to_consul Docker ${docker_port}
 #reg_to_horus_server Docker
 

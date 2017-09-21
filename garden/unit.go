@@ -65,6 +65,11 @@ const (
 	statusContainerExited
 )
 
+const (
+	notRunning = "is not running"
+	notFound   = "is not found"
+)
+
 type errContainer struct {
 	name   string
 	action string
@@ -131,11 +136,14 @@ func (u unit) getEngine() *cluster.Engine {
 	return nil
 }
 
-func (u unit) prepareExpandVolume(target []structs.VolumeRequire) ([]structs.VolumeRequire, error) {
+func (u unit) prepareExpandVolume(eng *cluster.Engine, target []structs.VolumeRequire) ([]structs.VolumeRequire, []database.Volume, error) {
 	lvs, err := u.uo.ListVolumesByUnitID(u.u.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+
+	volumes := eng.Volumes()
+	pending := make([]database.Volume, 0, len(lvs))
 
 	add := make([]structs.VolumeRequire, len(target))
 
@@ -143,24 +151,39 @@ func (u unit) prepareExpandVolume(target []structs.VolumeRequire) ([]structs.Vol
 		found := false
 		add[i] = target[i]
 
-	loop:
 		for v := range lvs {
-			if lvs[v].DriverType == target[i].Type &&
-				strings.Contains(lvs[v].Name, target[i].Name) {
+			if lvs[v].EngineID != eng.ID {
+				continue
+			}
 
+			if volumes.Get(lvs[v].Name) == nil {
+				pending = append(pending, lvs[v])
+			}
+
+			if strings.Contains(lvs[v].Name, target[i].Name) {
 				found = true
+
 				add[i].Size = target[i].Size - lvs[v].Size
 
-				break loop
+				if target[i].Type == "" {
+					add[i].Type = lvs[v].DriverType
+				}
 			}
 		}
 
-		if !found {
-			return nil, errors.Errorf("unit:%s not found volume '%s_%s'", u.u.Name, target[i].Type, target[i].Name)
+		if !found && (target[i].Type == "" || target[i].Name == "") {
+			return nil, nil, errors.Errorf("unit:%s not found volume '%s_%s'", u.u.Name, target[i].Type, target[i].Name)
 		}
 	}
 
-	return add, nil
+	out := make([]structs.VolumeRequire, 0, len(add))
+	for i := range add {
+		if add[i].Size > 0 {
+			out = append(out, add[i])
+		}
+	}
+
+	return out, pending, nil
 }
 
 func (u unit) getHostIP() (string, error) {
@@ -190,6 +213,8 @@ func (u unit) startContainer(ctx context.Context) error {
 		return errors.WithStack(newNotFound("Container", u.u.Name))
 	}
 
+	state := c.Info.State
+
 	select {
 	default:
 	case <-ctx.Done():
@@ -216,6 +241,10 @@ func (u unit) startContainer(ctx context.Context) error {
 		addr := net.JoinHostPort(c.Engine.IP, strconv.Itoa(sys.Ports.SwarmAgent))
 		err := u.startNetwork(ctx, addr, c.ID, ips, nil)
 		if err != nil {
+			if state != nil && state.Running {
+				return nil
+			}
+
 			return err
 		}
 	}
@@ -259,16 +288,47 @@ func (u unit) stopContainer(ctx context.Context) error {
 	return err
 }
 
-func (u unit) removeContainer(ctx context.Context) error {
+func (u unit) removeContainer(ctx context.Context, rmVolumes, force bool) error {
+	engine := u.getEngine()
+	if engine == nil {
+		if force || u.u.EngineID == "" {
+			return nil
+		}
+
+		return errors.WithStack(newNotFound("Engine", u.u.EngineID))
+	}
+
 	c := u.getContainer()
 	if c == nil {
+		err := engine.RemoveContainer(&cluster.Container{
+			Container: types.Container{ID: u.containerIDOrName()}}, force, rmVolumes)
+		if err != nil {
+			if cluster.IsErrContainerNotFound(err) || (force && !engine.IsHealthy()) {
+				return nil
+			}
+
+			return err
+		}
+	}
+
+	if !force {
+		timeout := 30 * time.Second
+		err := engine.StopContainer(ctx, c.ID, &timeout)
+		if err != nil {
+			if cluster.IsErrContainerNotFound(err) {
+				return nil
+			}
+
+			return err
+		}
+	}
+
+	err := engine.RemoveContainer(c, force, rmVolumes)
+	if err != nil && cluster.IsErrContainerNotFound(err) {
 		return nil
 	}
 
-	err := c.Engine.RemoveContainer(c, true, false)
-	c.Engine.CheckConnectionErr(err)
-
-	return err
+	return errors.WithStack(err)
 }
 
 func (u unit) removeVolumes(ctx context.Context) error {
@@ -294,10 +354,7 @@ func (u unit) removeVolumes(ctx context.Context) error {
 	engine := u.getEngine()
 	if engine == nil {
 		for i := range lvs {
-			ok, err := u.cluster.RemoveVolumes(lvs[i].Name)
-			if !ok {
-				continue
-			}
+			_, err := u.cluster.RemoveVolumes(lvs[i].Name)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -309,10 +366,6 @@ func (u unit) removeVolumes(ctx context.Context) error {
 	for i := range lvs {
 		err := engine.RemoveVolume(lvs[i].Name)
 		if err != nil {
-			ok, err := u.cluster.RemoveVolumes(lvs[i].Name)
-			if !ok {
-				continue
-			}
 			return errors.WithStack(err)
 		}
 	}
@@ -326,11 +379,11 @@ func (u unit) containerExec(ctx context.Context, cmd []string, detach bool) (typ
 	}
 	c := u.getContainer()
 	if c == nil {
-		return types.ContainerExecInspect{}, errors.WithStack(newContainerError(u.u.Name, "not found"))
+		return types.ContainerExecInspect{}, errors.WithStack(newContainerError(u.u.Name, notFound))
 	}
 
 	if !c.Info.State.Running {
-		return types.ContainerExecInspect{}, errors.WithStack(newContainerError(u.u.Name, "is not running"))
+		return types.ContainerExecInspect{}, errors.WithStack(newContainerError(u.u.Name, notRunning))
 	}
 
 	return c.Exec(ctx, cmd, detach)

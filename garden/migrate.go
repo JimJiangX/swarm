@@ -72,12 +72,7 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 				len(units)+1, candidates, nil, nil)
 			defer func() {
 				if err != nil {
-					_err := svc.so.SetIPs(old.networkings)
-					if _err != nil {
-						err = errors.Errorf("%+v\nmgirate networkings:%+v", err, _err)
-					}
-
-					_err = svc.removeUnits(ctx, adds, gd.kvClient)
+					_err := svc.removeUnits(ctx, adds, nil)
 					if _err != nil {
 						err = errors.Errorf("%+v\nremove new addition units:%+v", err, _err)
 					}
@@ -97,18 +92,37 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 				return err
 			}
 
+			defer func() {
+				if err != nil {
+					_err := svc.so.SetIPs(old.networkings)
+					if _err != nil {
+						err = errors.Errorf("%+v\nmgirate networkings:%+v", err, _err)
+					}
+				}
+			}()
+
 			// migrate volumes
 			news.volumes, err = actor.MigrateVolumes(news.unit.u.ID, old.engine, news.engine, old.volumes)
 			if err != nil {
 				return err
 			}
 
+			defer func() {
+				if err != nil {
+					// migrate volumes
+					_, _err := actor.MigrateVolumes(old.unit.u.ID, news.engine, old.engine, news.volumes)
+					if _err != nil {
+						err = errors.Errorf("%+v\nmgirate volumes:%+v", err, _err)
+					}
+				}
+			}()
+
 			auth, err := gd.AuthConfig()
 			if err != nil {
 				return err
 			}
 
-			err = svc.runContainer(ctx, pendings, auth)
+			err = svc.runContainer(ctx, pendings, false, auth)
 			if err != nil {
 				return err
 			}
@@ -124,24 +138,49 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 				return err
 			}
 
-			err = svc.start(ctx, adds, nil, cms.Commands())
-			if err != nil {
-				return err
-			}
-
-			err = updateUnitRegister(ctx, gd.kvClient, old.unit, news.unit, cms)
+			err = svc.start(ctx, adds, cms.Commands())
 			if err != nil {
 				return err
 			}
 		}
 		{
 			// clean old
-			err := svc.removeContainers(ctx, []*unit{&old.unit}, false, true)
+			err := svc.deregisterSerivces(ctx, gd.KVClient(), []*unit{&old.unit})
+			if err != nil {
+				return err
+			}
+
+			err = svc.removeContainers(ctx, []*unit{&old.unit}, false, true)
+			if err != nil {
+				return err
+			}
+
+			err = renameContainer(&news.unit, old.unit.u.Name)
+			if err != nil {
+				return err
+			}
+
+			err = svc.so.MigrateUnit(news.unit.u.ID, old.unit.u.ID, old.unit.u.Name)
+			if err != nil {
+				return err
+			}
+
+			cms, err := svc.generateUnitsConfigs(ctx, nil)
 			if err != nil {
 				return err
 			}
 
 			err = svc.Compose(ctx, gd.pluginClient)
+			if err != nil {
+				return err
+			}
+
+			u, err := svc.getUnit(old.unit.u.ID)
+			if err != nil {
+				return err
+			}
+
+			err = registerUnits(ctx, []*unit{u}, gd.KVClient(), cms)
 			if err != nil {
 				return err
 			}

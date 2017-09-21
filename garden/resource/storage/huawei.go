@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
@@ -71,7 +72,9 @@ func (h *huaweiStore) ping() error {
 		return err
 	}
 
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, path, h.hs.IPAddr, h.hs.Username, h.hs.Password)
+	logrus.Debug(path, h.hs.IPAddr, h.hs.Username, h.hs.Password)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.IPAddr, h.hs.Username, h.hs.Password)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -120,6 +123,8 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 	// size:byte-->MB
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password,
 		rg.StorageRGID, name, strconv.Itoa(int(size)>>20 + 100)}
+
+	logrus.Debug(param)
 
 	cmd := utils.ExecScript(param...)
 	output, err := cmd.Output()
@@ -192,6 +197,8 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password,
 		rg.StorageRGID, lv.Name, strconv.Itoa(int(size)>>20 + 100)}
 
+	logrus.Debug(param)
+
 	cmd := utils.ExecScript(param...)
 	output, err := cmd.Output()
 	if err != nil {
@@ -252,7 +259,9 @@ func (h *huaweiStore) RecycleLUN(id string, lun int) error {
 		return err
 	}
 
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID))
+	logrus.Debug(path, h.hs.IPAddr, h.hs.Username, h.hs.Password, l.StorageLunID)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID))
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -292,12 +301,15 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 		name = name[:maxHostLen]
 	}
 
+	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, name}
+
+	logrus.Debug(param)
+
 	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, name}
-	_, err = utils.ExecContextTimeout(nil, 0, debug, param...)
+	_, err = utils.ExecContextTimeout(nil, 0, param...)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -320,10 +332,12 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, name}
 
+	logrus.Debug(param)
+
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -377,7 +391,10 @@ func (h *huaweiStore) Mapping(host, vg, lun, unit string) error {
 	}
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val)}
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
+
+	logrus.Debug(param)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -397,7 +414,10 @@ func (h *huaweiStore) DelMapping(lun database.LUN) error {
 	defer h.lock.Unlock()
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(lun.StorageLunID)}
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout, debug, param...)
+
+	logrus.Debug(param)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -463,6 +483,8 @@ func (h *huaweiStore) list(rg ...string) ([]Space, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	logrus.Debug(path, h.hs.IPAddr, h.hs.Username, h.hs.Password, list)
 
 	cmd := utils.ExecScript(path, h.hs.IPAddr, h.hs.Username, h.hs.Password, list)
 

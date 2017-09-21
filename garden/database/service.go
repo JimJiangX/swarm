@@ -430,7 +430,6 @@ func (db dbBase) DelServiceRelation(serviceID string, rmVolumes bool) error {
 		if err == nil {
 			volumes = append(volumes, vl...)
 		}
-
 	}
 
 	do := func(tx *sqlx.Tx) error {
@@ -639,7 +638,7 @@ type ServiceDesc struct {
 }
 
 func (db dbBase) serviceDescTable() string {
-	return db.prefix + "_service_decription"
+	return db.prefix + "_service_description"
 }
 
 func (db dbBase) getServiceDesc(ID string) (ServiceDesc, error) {

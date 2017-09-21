@@ -6,6 +6,7 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/alloc/nic"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 )
 
@@ -110,6 +111,14 @@ func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineI
 	}
 
 	config.HostConfig.NetworkMode = "none"
+	for i := range out {
+		ip := utils.Uint32ToIP(out[i].IPAddr)
+		if ip == nil {
+			continue
+		}
 
+		config.Config.Env = append(config.Config.Env, "IPADDR="+ip.String())
+		break
+	}
 	return out, nil
 }

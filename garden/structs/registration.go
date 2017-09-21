@@ -29,33 +29,33 @@ const (
 
 type HorusRegistration struct {
 	Node struct {
-		Select     bool
-		Name       string
+		Select     bool     `json:"select"`
+		Name       string   `json:"name"`
 		IPAddr     string   `json:"ip_addr"`
 		OSUser     string   `json:"os_user"`
 		OSPassword string   `json:"os_pwd"`
 		CheckType  string   `json:"check_type"`
 		NetDevice  []string `json:"net_dev"`
-	}
+	} `json:"node,omitempty"`
 
 	Service struct {
-		Select          bool
-		Name            string
-		Type            string
+		Select          bool   `json:"select"`
+		Name            string `json:"name"`
+		Type            string `json:"type"`
 		MonitorUser     string `json:"mon_user"`
 		MonitorPassword string `json:"mon_pwd"`
-		Tag             string
+		Tag             string `json:"tag"`
 
 		Container struct {
-			Name     string
+			Name     string `json:"name"`
 			HostName string `json:"host_name"`
-		} `json:"container"`
-	}
+		} `json:"container,omitempty"`
+	} `json:"service,omitempty"`
 }
 
 type ServiceRegistration struct {
-	Consul *api.AgentServiceRegistration
-	Horus  *HorusRegistration
+	Consul *api.AgentServiceRegistration `json:"consul_server,omitempty"`
+	Horus  *HorusRegistration            `json:"horus_server,omitempty"`
 }
 
 type ServiceDeregistration struct {
@@ -66,17 +66,17 @@ type ServiceDeregistration struct {
 }
 
 type ConfigCmds struct {
-	ID         string
-	Name       string
-	Version    string
-	Content    string
-	LogMount   string
-	DataMount  string
-	ConfigFile string `json:"config_file"`
-	Cmds       CmdsMap
-	Timestamp  int64
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	Version    string  `json:"version"`
+	Content    string  `json:"content"`
+	LogMount   string  `json:"log_mount"`
+	DataMount  string  `json:"data_mount"`
+	ConfigFile string  `json:"config_file"`
+	Cmds       CmdsMap `json:"cmds,omitempty"`
+	Timestamp  int64   `json:"timestamp"`
 
-	Registration ServiceRegistration
+	Registration ServiceRegistration `json:"registration,omitempty"`
 }
 
 type CmdsMap map[string][]string
@@ -84,6 +84,8 @@ type CmdsMap map[string][]string
 type Commands map[string]CmdsMap
 
 type ConfigsMap map[string]ConfigCmds
+
+type ServiceConfigs []UnitConfig
 
 func (c CmdsMap) Get(typ string) []string {
 	if c == nil {

@@ -55,14 +55,13 @@ func TestNetworking(t *testing.T) {
 
 	networks := []string{utils.Generate64UUID(), utils.Generate64UUID()}
 	ips := make([]IP, 50)
+	gateway := utils.Generate32UUID()
 
 	for i := range ips {
-		ips[i].IPAddr = 3232237000 + uint32(i)
+		ips[i].IPAddr = 4232237000 + uint32(i)
 		ips[i].Prefix = 24
-
 		ips[i].Networking = networks[i&0x01]
-
-		ips[i].Gateway = utils.Generate32UUID()
+		ips[i].Gateway = gateway
 		ips[i].Enabled = i&0x03 != 3
 		ips[i].VLAN = i&0x01 + 1
 	}

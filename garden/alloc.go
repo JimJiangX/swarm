@@ -12,6 +12,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/alloc"
+	"github.com/docker/swarm/garden/resource/storage"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/tasklock"
 	"github.com/docker/swarm/garden/utils"
@@ -32,6 +33,7 @@ const (
 	nodeLabel    = "nodeID"
 	engineLabel  = "node"
 	clusterLabel = "cluster"
+	sanLabel     = "SAN_ID"
 )
 
 func getImage(orm database.ImageOrmer, version string) (database.Image, string, error) {
@@ -76,7 +78,7 @@ func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Ta
 		uid := utils.Generate32UUID()
 		us[i] = database.Unit{
 			ID:          uid,
-			Name:        fmt.Sprintf("%s_%s", spec.Name, uid[:8]), // <service_name>_<unit_id_8bit>
+			Name:        fmt.Sprintf("%s_%s", uid[:8], spec.Tag), // <unit_id_8bit>_<service_tag>
 			Type:        im.Name,
 			ServiceID:   spec.ID,
 			NetworkMode: "none",
@@ -183,6 +185,7 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 				n.Labels[nodeLabel] = out[o].ID
 				n.Labels[roomLabel] = out[o].Room
 				n.Labels[seatLabel] = out[o].Seat
+				n.Labels[sanLabel] = out[o].Storage
 				break
 			}
 		}
@@ -238,6 +241,8 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	}
 
 	opts := svc.options
+	isSAN := isSANStorage(opts.Require.Volumes)
+
 	config := cluster.BuildContainerConfig(container.Config{
 		Tty:       true,
 		OpenStdin: true,
@@ -260,6 +265,9 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		}
 		if out := opts.Nodes.Clusters; len(out) > 0 {
 			config.AddConstraint(clusterLabel + "==" + strings.Join(out, "|"))
+		}
+		if isSAN {
+			config.AddConstraint(sanLabel + `!=""`)
 		}
 	}
 
@@ -341,12 +349,18 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 
 		count := replicas
 		used := make([]pendingUnit, 0, count)
+		usedNodes := make([]*node.Node, 0, count)
 
 		if len(nodes) < count {
 			continue
 		}
 
 		for i := range nodes {
+			if isSAN && opts.HighAvailable {
+				if !selectNodeInDifferentStorage(opts.HighAvailable, replicas, nodes[i], usedNodes) {
+					continue
+				}
+			}
 
 			pu, err := pendingAlloc(actor, units[count-1], nodes[i], opts, config, skipVolume)
 			if err != nil {
@@ -362,6 +376,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 			}
 
 			used = append(used, pu)
+			usedNodes = append(usedNodes, nodes[i])
 
 			if count--; count == 0 {
 				ready = used
@@ -417,6 +432,7 @@ func pendingAlloc(actor alloc.Allocator, unit database.Unit,
 
 	pu.config.SetSwarmID(pu.swarmID)
 	pu.Unit.EngineID = node.ID
+	pu.config.Config.Env = append(pu.config.Config.Env, "C_NAME="+pu.Unit.Name)
 
 	return pu, err
 }
@@ -482,7 +498,7 @@ loop:
 	return out
 }
 
-func selectNodeInDifferentCluster(highAvailable bool, num int, n *node.Node, used []*node.Node) bool {
+func selectNodeInDifferentStorage(highAvailable bool, num int, n *node.Node, used []*node.Node) bool {
 	if !highAvailable {
 		return true
 	}
@@ -493,11 +509,11 @@ func selectNodeInDifferentCluster(highAvailable bool, num int, n *node.Node, use
 
 	clusters := make(map[string]int, len(used))
 	for i := range used {
-		name := used[i].Labels[clusterLabel]
+		name := used[i].Labels[sanLabel]
 		clusters[name]++
 	}
 
-	name := n.Labels[clusterLabel]
+	name := n.Labels[sanLabel]
 	sum := clusters[name]
 	if sum*2 < num {
 		return true
@@ -505,6 +521,16 @@ func selectNodeInDifferentCluster(highAvailable bool, num int, n *node.Node, use
 
 	if len(clusters) > 1 && sum*2 <= num {
 		return true
+	}
+
+	return false
+}
+
+func isSANStorage(vrs []structs.VolumeRequire) bool {
+	for i := range vrs {
+		if vrs[i].Type == storage.SANStore {
+			return true
+		}
 	}
 
 	return false

@@ -1,7 +1,6 @@
 package structs
 
 import (
-	"sort"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -153,10 +152,15 @@ type UnitRebuildRequest struct {
 }
 
 type PostServiceResponse struct {
-	ID     string   `json:"id"`
-	Name   string   `json:"name"`
-	TaskID string   `json:"task_id"`
-	Units  []string `json:"units_id"`
+	ID     string       `json:"id"`
+	Name   string       `json:"name"`
+	TaskID string       `json:"task_id"`
+	Units  []UnitNameID `json:"units"`
+}
+
+type UnitNameID struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type User struct {
@@ -175,6 +179,8 @@ type ServiceExecConfig struct {
 type ServiceBackupConfig struct {
 	Container   string `json:"nameOrID"`
 	Type        string `json:"type"`
+	Remark      string `json:"remark"`
+	Tag         string `json:"tag"`
 	Detach      bool   `json:"detach"`
 	BackupDir   string `json:"backup_dir"`
 	MaxSizeByte int    `json:"max_backup_space"`
@@ -190,84 +196,4 @@ type ServiceRestoreRequest struct {
 type PostUnitMigrate struct {
 	NameOrID   string   `json:"nameOrID"`
 	Candidates []string `json:"candidates,omitempty"`
-}
-
-type ServiceLink struct {
-	priority int
-	Spec     *ServiceSpec `json:"-"`
-
-	ID   string   `json:"from_service_name"`
-	Deps []string `json:"to_services_name"`
-}
-
-type ServicesLink []*ServiceLink
-
-func (sl ServicesLink) Less(i, j int) bool {
-	return sl[i].priority > sl[j].priority
-}
-
-// Len is the number of elements in the collection.
-func (sl ServicesLink) Len() int {
-	return len(sl)
-}
-
-// Swap swaps the elements with indexes i and j.
-func (sl ServicesLink) Swap(i, j int) {
-	sl[i], sl[j] = sl[j], sl[i]
-}
-
-// https://play.golang.org/p/1tkv9z4DtC
-func (sl ServicesLink) Sort() {
-	deps := make(map[string]int, len(sl))
-
-	for i := range sl {
-		deps[sl[i].ID] = len(sl[i].Deps)
-	}
-
-	for i := len(sl) - 1; i > 0; i-- {
-		for _, s := range sl {
-
-			max := 0
-
-			for _, id := range s.Deps {
-				if n := deps[id]; n > max {
-					max = n + 1
-				}
-			}
-			if max > 0 {
-				deps[s.ID] = max
-			}
-		}
-	}
-
-	for i := range sl {
-		sl[i].priority = deps[sl[i].ID]
-	}
-
-	sort.Sort(sl)
-}
-
-func (sl ServicesLink) Links() []string {
-	l := make([]string, 0, len(sl)*2)
-	for i := range sl {
-		l = append(l, sl[i].ID)
-		l = append(l, sl[i].Deps...)
-	}
-
-	ids := make([]string, 0, len(l))
-
-	for i := range l {
-		ok := false
-		for c := range ids {
-			if ids[c] == l[i] {
-				ok = true
-				break
-			}
-		}
-		if !ok {
-			ids = append(ids, l[i])
-		}
-	}
-
-	return ids
 }

@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/vars"
 	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -63,7 +64,12 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj structs.HorusRegistr
 	}
 
 	if obj.Service.Select {
+		// add monitor user
+		obj.Service.MonitorUser = vars.Replication.User
+		obj.Service.MonitorPassword = vars.Replication.Password
+
 		uri := fmt.Sprintf("http://%s/v1/%s", addr, unitType)
+
 		err := postRegister(ctx, uri, obj.Service)
 		if err != nil {
 			return err

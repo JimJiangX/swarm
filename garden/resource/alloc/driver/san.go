@@ -99,13 +99,16 @@ func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req struc
 		return &lv, err
 	}
 
-	name = fmt.Sprintf("%s:/UPM/%s", lv.Name, req.Name)
-	config.HostConfig.Binds = append(config.HostConfig.Binds, name)
+	setVolumeBind(config, lv.Name, req.Name)
 
 	return &lv, nil
 }
 
 func (sv sanVolume) Expand(lv database.Volume, size int64) error {
+	if size <= 0 {
+		return nil
+	}
+
 	lv, err := sv.iface.GetVolume(lv.Name)
 	if err != nil {
 		return err

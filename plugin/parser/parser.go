@@ -1,9 +1,8 @@
 package parser
 
 import (
-	"fmt"
-
 	"github.com/docker/swarm/garden/structs"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -13,6 +12,9 @@ const (
 
 type parser interface {
 	clone(*structs.ConfigTemplate) parser
+
+	set(key string, val interface{}) error
+	get(key string) string
 
 	Validate(data map[string]interface{}) error
 
@@ -69,5 +71,5 @@ func factory(name string) (parser, error) {
 		return temp, nil
 	}
 
-	return nil, fmt.Errorf("Unsupported image %s yet", name)
+	return nil, errors.Errorf("Unsupported image %s yet", name)
 }

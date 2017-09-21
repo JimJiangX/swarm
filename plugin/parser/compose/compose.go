@@ -5,8 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/vars"
 	"github.com/pkg/errors"
 )
 
@@ -174,7 +175,7 @@ func getRedisPortBySpec(req *structs.ServiceSpec) (int, error) {
 
 func getMysqlPortBySpec(req *structs.ServiceSpec) (int, error) {
 
-	port, ok := req.Options["port"]
+	port, ok := req.Options["mysqld::port"]
 	if !ok {
 		return -1, errors.New("bad req:mysql need Options[port]")
 	}
@@ -188,21 +189,22 @@ func valicateRedisSpec(req *structs.ServiceSpec) error {
 }
 
 //check && get value
-//"m:2#s:1"
-func getmasterAndSlave(req *structs.ServiceSpec) (mnum int, snum int, err error) {
+//"M:2#S:1"
+func getmasterAndSlave(req *structs.ServiceSpec) (int, int, error) {
 	codes := strings.Split(req.Arch.Code, "#")
-	if len(codes) != 2 {
-		return 0, 0, errors.Errorf("bad format,Arch.Code:%v", req.Arch.Code)
-	}
 
 	//get master num
 	master := strings.Split(codes[0], ":")
 	if len(master) != 2 {
 		return 0, 0, errors.Errorf("bad format,get master,Arch.Code:%v", req.Arch.Code)
 	}
-	mnum, err = strconv.Atoi(master[1])
+	mnum, err := strconv.Atoi(master[1])
 	if err != nil || master[0] != "M" {
 		return 0, 0, errors.Errorf("bad format,get master num,Arch.Code:%v", req.Arch.Code)
+	}
+
+	if len(codes) == 1 {
+		return mnum, 0, nil
 	}
 
 	//get slave num
@@ -210,7 +212,7 @@ func getmasterAndSlave(req *structs.ServiceSpec) (mnum int, snum int, err error)
 	if len(slave) != 2 {
 		return 0, 0, errors.Errorf("bad format,get slave,Arch.Code:%v", req.Arch.Code)
 	}
-	snum, err = strconv.Atoi(slave[1])
+	snum, err := strconv.Atoi(slave[1])
 	if err != nil || slave[0] != "S" {
 		return 0, 0, errors.Errorf("bad format,get slave num,Arch.Code:%v", req.Arch.Code)
 	}
@@ -224,27 +226,27 @@ func getDbType(req *structs.ServiceSpec) dbArch {
 	db, version := datas[0], datas[1]
 	arch := req.Arch.Mode
 
-	if db == "redis" && arch == "sharding_replication" {
-		return redisShardingArch
+	if db == "redis" || db == "upredis" {
+		if arch == "sharding_replication" {
+			return redisShardingArch
+		} else if arch == "replication" {
+			return redisRepArch
+		}
 	}
 
-	if db == "redis" && arch == "replication" {
-		return redisRepArch
-	}
-
-	if db == "mysql" && arch == "replication" {
-		return mysqlRepArch
-	}
-
-	if db == "mysql" && arch == "group_replication" {
-		return mysqlGroupArch
+	if db == "mysql" || db == "upsql" {
+		if arch == "replication" {
+			return mysqlRepArch
+		} else if arch == "group_replication" {
+			return mysqlGroupArch
+		}
 	}
 
 	if arch == "clone" {
 		return cloneArch
 	}
 
-	log.WithFields(log.Fields{
+	logrus.WithFields(logrus.Fields{
 		"db type":    db,
 		"db version": version,
 		"arch":       arch,
@@ -273,14 +275,14 @@ func getRedis(req *structs.ServiceSpec) []Redis {
 }
 
 func getMysqls(req *structs.ServiceSpec) []Mysql {
-	users, err := getMysqlUser(req)
+	user, err := getMysqlUser(req)
 	if err != nil {
-		log.Warnf("%+v", err)
+		logrus.Warnf("%+v", err)
 	}
 
 	intport, err := getMysqlPortBySpec(req)
 	if err != nil {
-		log.Warnf("%+v", err)
+		logrus.Warnf("%+v", err)
 	}
 
 	mysqls := make([]Mysql, 0, len(req.Units))
@@ -291,10 +293,10 @@ func getMysqls(req *structs.ServiceSpec) []Mysql {
 		ip := unit.Networking[0].IP
 
 		mysql := Mysql{
-			MysqlUser: users,
-			IP:        ip,
-			Port:      intport,
-			Instance:  instance,
+			user:     user,
+			IP:       ip,
+			Port:     intport,
+			Instance: instance,
 		}
 
 		mysqls = append(mysqls, mysql)
@@ -303,20 +305,15 @@ func getMysqls(req *structs.ServiceSpec) []Mysql {
 	return mysqls
 }
 
-func getMysqlUser(req *structs.ServiceSpec) (MysqlUser, error) {
-	users := MysqlUser{}
-
-	for _, user := range req.Users {
-		if user.Role == "replication" {
-			users.Replicatepwd = user.Password
-			users.ReplicateUser = user.Name
-			break
-		}
+func getMysqlUser(req *structs.ServiceSpec) (mysqlUser, error) {
+	user := mysqlUser{
+		user:     vars.Replication.User,
+		password: vars.Replication.Password,
 	}
 
-	if users.Replicatepwd == "" || users.ReplicateUser == "" {
-		return users, errors.New("bad req: mysql replication pwd/user has no data")
+	if user.password == "" || user.user == "" {
+		return mysqlUser{}, errors.New("mysql replication pwd/user has no data")
 	}
 
-	return users, nil
+	return user, nil
 }

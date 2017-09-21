@@ -198,12 +198,12 @@ echo "exit 0"
 func TestExecContextTimeout(t *testing.T) {
 	ctx := context.Background()
 
-	_, err := ExecContextTimeout(ctx, 0, true, "echo", "foo", "bar baz")
+	_, err := ExecContextTimeout(ctx, 0, "echo", "foo", "bar baz")
 	if err != nil {
 		t.Error(err)
 	}
 
-	_, err = ExecContextTimeout(ctx, time.Second, true, "echo", "foo", "bar baz")
+	_, err = ExecContextTimeout(ctx, time.Second, "echo", "foo", "bar baz")
 	if err != nil {
 		t.Error(err)
 	}
@@ -214,13 +214,13 @@ func TestExecContextTimeout(t *testing.T) {
 	}
 	defer os.Remove(f.Name())
 
-	_, err = ExecContextTimeout(ctx, 6*time.Second, true, "./sleep.sh", "5")
+	_, err = ExecContextTimeout(ctx, 6*time.Second, "./sleep.sh", "5")
 	if err != nil {
 		t.Error(err)
 	}
 
 	now := time.Now()
-	_, err = ExecContextTimeout(ctx, 5*time.Second, true, "./sleep.sh", "10")
+	_, err = ExecContextTimeout(ctx, 5*time.Second, "./sleep.sh", "10")
 	if err == nil {
 		t.Error(err)
 	}

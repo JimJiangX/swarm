@@ -4,11 +4,13 @@ import (
 	"crypto/tls"
 	"errors"
 	"path/filepath"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api"
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/plugin/parser"
+	"github.com/docker/swarm/vars"
 	"github.com/urfave/cli"
 )
 
@@ -45,6 +47,10 @@ func configruation(c *cli.Context) {
 		log.Fatal(err)
 	}
 
+	if err := vars.ValidateReplication(); err != nil {
+		log.Warn(err)
+	}
+
 	mgmIP := c.String("mgmIP")
 	mgmPort := c.Int("mgmPort")
 
@@ -58,7 +64,9 @@ func configruation(c *cli.Context) {
 		log.Fatalf("discovery required to manage a cluster. See '%s manage --help'.", c.App.Name)
 	}
 
-	kvClient, err := kvstore.NewClient(uri, tlsConfig)
+	kvpath := strings.Join([]string{uri, leaderElectionPath}, "/")
+
+	kvClient, err := kvstore.NewClient(uri, getDiscoveryOpt(c))
 	if err != nil {
 		log.Fatalf("fail to connect to kv store:'%s',%+v", uri, err)
 	}
@@ -71,7 +79,7 @@ func configruation(c *cli.Context) {
 
 	server := api.NewServer(hosts, tlsConfig)
 
-	server.SetHandler(parser.NewRouter(kvClient, dir, mgmIP, mgmPort))
+	server.SetHandler(parser.NewRouter(kvClient, kvpath, dir, mgmIP, mgmPort))
 
 	log.Fatal(server.ListenAndServe())
 }

@@ -18,12 +18,11 @@ var pc pclient.PluginAPI
 
 func init() {
 	kvc := kvstore.NewMockClient()
-	mux := NewRouter(kvc, ".", "", 0)
+	mux := NewRouter(kvc, "", ".", "", 0)
 
 	go http.ListenAndServe(":8080", mux)
 
-	cli := client.NewClient("localhost:8080", 30*time.Second, nil)
-	pc = pclient.NewPlugin(cli)
+	pc = pclient.NewPlugin("localhost:8080", client.NewClient("localhost:8080", 30*time.Second, nil))
 }
 
 func TestGetSupportImageVersion(t *testing.T) {
@@ -221,15 +220,35 @@ func TestGetConfigs(t *testing.T) {
 	}
 
 	for id, val := range cm {
-		t.Log(id, val.ID, val.GetServiceRegistration().Horus == nil)
+		t.Log(id, val.ID)
 	}
 }
 
 func TestGetConfig(t *testing.T) {
 	cc, err := pc.GetUnitConfig(context.Background(), "serivce0001", "unitXXX002")
 	if err != nil {
-		t.Error(err)
+		t.Errorf("%+v", err)
 	}
 
 	t.Log(cc.GetCmd(structs.InitServiceCmd), cc.GetServiceRegistration().Horus == nil)
+}
+
+func TestSetLeaderElectionPath(t *testing.T) {
+	setLeaderElectionPath("consul://146.32.99.22:8400/unionpay/docker/swarm/leader")
+	if consulPort != "8400" {
+		t.Error(consulPort)
+	}
+
+	if leaderElectionPath != "/unionpay/docker/swarm/leader" {
+		t.Error(leaderElectionPath)
+	}
+
+	setLeaderElectionPath("146.32.99.22:8300/unionpay/docker/swarm/")
+	if consulPort != "8300" {
+		t.Error(consulPort)
+	}
+
+	if leaderElectionPath != "/unionpay/docker/swarm" {
+		t.Error(leaderElectionPath)
+	}
 }

@@ -3,6 +3,7 @@ package cluster
 import (
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -13,6 +14,24 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
+
+// IsErrContainerNotFound returns true if the error is caused
+// when a container is not found in the docker host.
+func IsErrContainerNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if client.IsErrContainerNotFound(err) {
+		return true
+	}
+
+	if strings.Contains(err.Error(), "No such container") {
+		return true
+	}
+
+	return false
+}
 
 // ServerVersion returns information of the docker client and server host.
 func (e *Engine) ServerVersion() (types.Version, error) {
@@ -57,9 +76,6 @@ func (e *Engine) StopContainer(ctx context.Context, name string, timeout *time.D
 	if err != nil {
 		return errors.WithStack(err)
 	}
-
-	// refresh the container in the cache
-	_, err = e.refreshContainer(container.ID, true)
 
 	return err
 }
@@ -158,12 +174,13 @@ func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []st
 		return inspect, errors.Wrapf(err, "Container %s exec create", containerID)
 	}
 
+	// TODO: remove
 	logrus.WithFields(logrus.Fields{
 		"Container": containerID,
 		"Engine":    e.Addr,
 		"ExecID":    exec.ID,
 		"Detach":    execConfig.Detach,
-	}).Infof("start exec:%s", cmd)
+	}).Debugf("start exec:%s", cmd)
 
 	if execConfig.Detach {
 		err := e.apiClient.ContainerExecStart(ctx, exec.ID, types.ExecStartCheck{Detach: detach})

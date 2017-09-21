@@ -39,7 +39,9 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 
 		err = svc.stop(ctx, units, true)
 		if err != nil {
-			return err
+			if _err, ok := err.(errContainer); !ok || _err.action != notRunning {
+				return err
+			}
 		}
 
 		containers := make([]struct {
@@ -49,14 +51,20 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 
 		for _, u := range units {
 			c := u.getContainer()
-
 			if c == nil || c.Engine == nil {
-				return errors.WithStack(newContainerError(u.u.Name, "not found"))
+				return errors.WithStack(newContainerError(u.u.Name, notFound))
 			}
-			c.Config.Image = version
-			c.Config.SetSwarmID(utils.Generate32UUID())
 
-			nc, err := c.Engine.CreateContainer(c.Config, u.u.Name+"-"+version, true, authConfig)
+			if c.Config.Image == version {
+				continue
+			}
+
+			c.Config.Image = version
+			// set new swarmID
+			swarmID := utils.Generate32UUID()
+			c.Config.SetSwarmID(swarmID)
+
+			nc, err := c.Engine.CreateContainer(c.Config, swarmID, true, authConfig)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -106,7 +114,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 				return err
 			}
 
-			err = svc.start(ctx, nil, nil, nil)
+			err = svc.start(ctx, nil, nil)
 			if err != nil {
 				return err
 			}
@@ -157,12 +165,6 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, ncpu, memory int64) error {
 	desc := svc.svc.Desc
 
-	if (ncpu == 0 || int64(desc.NCPU) == ncpu) &&
-		(memory == 0 || desc.Memory == memory) {
-		// nothing change on CPU & Memory
-		return nil
-	}
-
 	if ncpu == 0 {
 		ncpu = int64(desc.NCPU)
 	}
@@ -190,8 +192,14 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 		for _, u := range units {
 
 			c := u.getContainer()
-			if c == nil {
-				continue
+			if c == nil || c.Engine == nil {
+				return errors.WithStack(newContainerError(u.u.Name, notFound))
+			}
+
+			if c.Config.HostConfig.Memory == memory {
+				if n, err := c.Config.CountCPU(); err == nil && n == ncpu {
+					continue
+				}
 			}
 
 			pu := pending{
@@ -312,9 +320,10 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 
 	expansion := func() error {
 		type pending struct {
-			u   *unit
-			eng *cluster.Engine
-			add []structs.VolumeRequire
+			u        *unit
+			eng      *cluster.Engine
+			add      []structs.VolumeRequire
+			creating []database.Volume
 		}
 
 		units, err := svc.getUnits()
@@ -331,7 +340,7 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 				return errors.Errorf("")
 			}
 
-			add, err := u.prepareExpandVolume(target)
+			add, creating, err := u.prepareExpandVolume(eng, target)
 			if err != nil {
 				return err
 			}
@@ -342,14 +351,22 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 			}
 
 			pendings = append(pendings, pending{
-				u:   u,
-				eng: eng,
-				add: add,
+				u:        u,
+				eng:      eng,
+				add:      add,
+				creating: creating,
 			})
 		}
 
 		// expand volume size
 		for _, pu := range pendings {
+			for i := range pu.creating {
+				err := engineCreateVolume(pu.eng, pu.creating[i])
+				if err != nil {
+					return err
+				}
+			}
+
 			err := actor.ExpandVolumes(pu.eng, pu.u.u.ID, pu.add)
 			if err != nil {
 				return err
