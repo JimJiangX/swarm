@@ -98,6 +98,7 @@ type container struct {
 	Command string `json:"command"`
 	Created string `json:"created"`
 	Status  string `json:"status"`
+	State   string `json:"state"`
 }
 
 func convertToContainer(c *cluster.Container) container {
@@ -117,6 +118,7 @@ func convertToContainer(c *cluster.Container) container {
 		Command: c.Command,
 		Created: c.Info.Created,
 		Status:  c.Status,
+		State:   c.State,
 	}
 }
 
