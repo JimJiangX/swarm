@@ -2844,6 +2844,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	id := r.FormValue("id")
 	service := r.FormValue("serivce")
 	deadline := r.FormValue("expired")
 	nfs := r.FormValue("nfs_mount")
@@ -2866,6 +2867,25 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		err   error
 		files []database.BackupFile
 	)
+
+	if id != "" {
+		bf, err := orm.GetBackupFile(id)
+		if err != nil {
+			ec := errCodeV1(_Backup, dbQueryError, 13, "fail to query database", "数据库查询错误（备份文件表）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+			return
+		}
+
+		files = []database.BackupFile{bf}
+
+		err = removeBackupFiles(orm, nfs, files)
+		if err != nil {
+			ec := errCodeV1(_Backup, dbExecError, 15, "fail to remove backup files", "删除备份文件错误")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+		}
+
+		return
+	}
 
 	if service != "" {
 		files, err = orm.ListBackupFilesByService(service)
@@ -2899,33 +2919,40 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	sys, err := orm.GetSysConfig()
+	err = removeBackupFiles(orm, nfs, expired)
 	if err != nil {
-		ec := errCodeV1(_Backup, dbQueryError, 14, "fail to query database", "数据库查询错误（系统配置表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	rm := make([]database.BackupFile, 0, len(expired))
-	for i := range expired {
-		path := getNFSBackupFile(expired[i].Path, sys.BackupDir, nfs)
-
-		err := os.RemoveAll(path)
-		if err == nil {
-			rm = append(rm, expired[i])
-		} else {
-			logrus.Warnf("fail to delete backup file:%s", path)
-		}
-	}
-
-	err = orm.DelBackupFiles(rm)
-	if err != nil {
-		ec := errCodeV1(_Backup, dbExecError, 15, "fail to delete records in database", "数据库删除记录错误（备份文件表）")
+		ec := errCodeV1(_Backup, dbExecError, 15, "fail to remove backup files", "删除备份文件错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type rmBackupFilesIface interface {
+	GetSysConfig() (database.SysConfig, error)
+	DelBackupFiles(files []database.BackupFile) error
+}
+
+func removeBackupFiles(orm rmBackupFilesIface, nfs string, files []database.BackupFile) error {
+	sys, err := orm.GetSysConfig()
+	if err != nil {
+		return err
+	}
+
+	rm := make([]database.BackupFile, 0, len(files))
+	for i := range files {
+		path := getNFSBackupFile(files[i].Path, sys.BackupDir, nfs)
+
+		err := os.RemoveAll(path)
+		if err == nil {
+			rm = append(rm, files[i])
+		} else {
+			logrus.Warnf("fail to delete backup file:%s", path)
+		}
+	}
+
+	return orm.DelBackupFiles(rm)
 }
 
 func getNFSBackupFile(file, backup, nfs string) string {
