@@ -180,6 +180,7 @@ type ServiceBackupConfig struct {
 	Container   string `json:"nameOrID"`
 	Type        string `json:"type"`
 	Remark      string `json:"remark"`
+	Tag         string `json:"tag"`
 	Detach      bool   `json:"detach"`
 	BackupDir   string `json:"backup_dir"`
 	MaxSizeByte int    `json:"max_backup_space"`

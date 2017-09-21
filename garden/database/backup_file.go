@@ -15,6 +15,8 @@ type BackupFileIface interface {
 
 	ListBackupFiles() ([]BackupFile, error)
 
+	ListBackupFilesByTag(tag string) ([]BackupFile, error)
+
 	ListBackupFilesByService(nameOrID string) ([]BackupFile, error)
 
 	DelBackupFiles(files []BackupFile) error
@@ -28,6 +30,7 @@ type BackupFile struct {
 	Type       string    `db:"type" json:"type"` // full or incremental
 	Path       string    `db:"path" json:"path"`
 	Remark     string    `db:"remark" json:"remark"`
+	Tag        string    `db:"tag" json:"tag"`
 	SizeByte   int       `db:"size" json:"size"`
 	Retention  time.Time `db:"retention" json:"retention"`
 	CreatedAt  time.Time `db:"created_at" json:"created_at"`
@@ -42,10 +45,27 @@ func (db dbBase) backupFileTable() string {
 func (db dbBase) ListBackupFiles() ([]BackupFile, error) {
 	var (
 		out   []BackupFile
-		query = "SELECT id,task_id,unit_id,type,path,remark,size,retention,created_at,finished_at FROM " + db.backupFileTable()
+		query = "SELECT id,task_id,unit_id,type,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable()
 	)
 
 	err := db.Select(&out, query)
+	if err == nil {
+		return out, nil
+	} else if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	return nil, errors.Wrap(err, "list []BackupFile")
+}
+
+// ListBackupFilesByTag return all []BackupFile by tag
+func (db dbBase) ListBackupFilesByTag(tag string) ([]BackupFile, error) {
+	var (
+		out   []BackupFile
+		query = "SELECT id,task_id,unit_id,type,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + "WHERE tag=?"
+	)
+
+	err := db.Select(&out, query, tag)
 	if err == nil {
 		return out, nil
 	} else if err == sql.ErrNoRows {
@@ -72,7 +92,7 @@ func (db dbBase) ListBackupFilesByService(service string) ([]BackupFile, error) 
 		return nil, nil
 	}
 
-	query = "SELECT id,task_id,unit_id,type,path,remark,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " WHERE unit_id IN (?);"
+	query = "SELECT id,task_id,unit_id,type,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " WHERE unit_id IN (?);"
 
 	query, args, err := sqlx.In(query, units)
 	if err != nil {
@@ -91,7 +111,7 @@ func (db dbBase) ListBackupFilesByService(service string) ([]BackupFile, error) 
 func (db dbBase) GetBackupFile(id string) (BackupFile, error) {
 	var (
 		row   BackupFile
-		query = "SELECT id,task_id,unit_id,type,path,remark,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " WHERE id=?"
+		query = "SELECT id,task_id,unit_id,type,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " WHERE id=?"
 	)
 	err := db.Get(&row, query, id)
 	if err == nil {
@@ -102,7 +122,7 @@ func (db dbBase) GetBackupFile(id string) (BackupFile, error) {
 }
 
 func (db dbBase) txInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
-	query := "INSERT INTO " + db.backupFileTable() + " (id,task_id,unit_id,type,path,remark,size,retention,created_at,finished_at) VALUES (:id,:task_id,:unit_id,:type,:path,:remark,:size,:retention,:created_at,:finished_at)"
+	query := "INSERT INTO " + db.backupFileTable() + " (id,task_id,unit_id,type,path,remark,tag,size,retention,created_at,finished_at) VALUES (:id,:task_id,:unit_id,:type,:path,:remark,:tag,:size,:retention,:created_at,:finished_at)"
 
 	_, err := tx.NamedExec(query, bf)
 	if err == nil {

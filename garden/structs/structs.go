@@ -14,6 +14,7 @@ type BackupTaskCallback struct {
 	Type      string `json:"type,omitempty"`
 	Path      string `json:"path,omitempty"`
 	Remark    string `json:"remark,omitempty"`
+	Tag       string `json:"tag,omitempty"`
 	Msg       string `json:"msg,omitempty"`
 	Retention int    `json:"retention"`
 	Size      int    `json:"size,omitempty"`

@@ -2845,6 +2845,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	}
 
 	id := r.FormValue("id")
+	tag := r.FormValue("tag")
 	service := r.FormValue("serivce")
 	deadline := r.FormValue("expired")
 	nfs := r.FormValue("nfs_mount")
@@ -2887,7 +2888,9 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if service != "" {
+	if tag != "" {
+		orm.ListBackupFilesByTag(tag)
+	} else if service != "" {
 		files, err = orm.ListBackupFilesByService(service)
 	} else {
 		files, err = orm.ListBackupFiles()
@@ -2968,6 +2971,7 @@ func getBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tag := r.FormValue("tag")
 	service := r.FormValue("serivce")
 
 	ok, _, gd := fromContext(ctx, _Garden)
@@ -2985,7 +2989,9 @@ func getBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		files []database.BackupFile
 	)
 
-	if service != "" {
+	if tag != "" {
+		orm.ListBackupFilesByTag(tag)
+	} else if service != "" {
 		files, err = orm.ListBackupFilesByService(service)
 	} else {
 		files, err = orm.ListBackupFiles()
