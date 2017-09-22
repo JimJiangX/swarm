@@ -145,7 +145,7 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 		}
 		{
 			// clean old
-			err := svc.deregisterSerivces(ctx, gd.KVClient(), []*unit{&old.unit})
+			err := svc.deregisterServices(ctx, gd.KVClient(), []*unit{&old.unit})
 			if err != nil {
 				return err
 			}

@@ -54,7 +54,7 @@ func TestMarkRunningTasks(t *testing.T) {
 
 	prepare := func(tx *sqlx.Tx) error {
 		for i := range services {
-			err := db.txInsertSerivce(tx, services[i])
+			err := db.txInsertService(tx, services[i])
 			if err != nil {
 				return err
 			}

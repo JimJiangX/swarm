@@ -111,7 +111,7 @@ daemonize yes
 
 var redisSpec = structs.ServiceSpec{
 	Service: structs.Service{
-		ID:    "serivce0001",
+		ID:    "service0001",
 		Name:  "redis_service_001",
 		Image: "redis:3.2.8.0",
 	},
@@ -191,7 +191,7 @@ func TestGenerateConfigs(t *testing.T) {
 
 	configs, err = pc.GenerateServiceConfig(context.Background(), structs.ServiceSpec{
 		Service: structs.Service{
-			ID:    "serivce0001",
+			ID:    "service0001",
 			Name:  "redis_service_001",
 			Image: "redis:3.2.8.0",
 		},
@@ -214,7 +214,7 @@ func TestGenerateConfigs(t *testing.T) {
 }
 
 func TestGetConfigs(t *testing.T) {
-	cm, err := pc.GetServiceConfig(context.Background(), "serivce0001")
+	cm, err := pc.GetServiceConfig(context.Background(), "service0001")
 	if err != nil {
 		t.Error(err)
 	}
@@ -225,7 +225,7 @@ func TestGetConfigs(t *testing.T) {
 }
 
 func TestGetConfig(t *testing.T) {
-	cc, err := pc.GetUnitConfig(context.Background(), "serivce0001", "unitXXX002")
+	cc, err := pc.GetUnitConfig(context.Background(), "service0001", "unitXXX002")
 	if err != nil {
 		t.Errorf("%+v", err)
 	}

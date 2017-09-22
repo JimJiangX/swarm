@@ -828,7 +828,7 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register, force bool) 
 			return errors.WithStack(ctx.Err())
 		}
 
-		err = svc.deregisterSerivces(ctx, r, units)
+		err = svc.deregisterServices(ctx, r, units)
 		if err != nil {
 			if force {
 				logrus.WithField("Service", svc.svc.Name).Errorf("Service deregiste error:%+v", err)
@@ -895,7 +895,7 @@ func (svc Service) deleteCondition() error {
 	return nil
 }
 
-func (svc Service) deregisterSerivces(ctx context.Context, reg kvstore.Register, units []*unit) error {
+func (svc Service) deregisterServices(ctx context.Context, reg kvstore.Register, units []*unit) error {
 	for i := range units {
 		err := deregisterService(ctx, reg, "units", units[i].u.ID)
 		if err != nil {
@@ -915,7 +915,7 @@ func deregisterService(ctx context.Context, reg kvstore.Register, _type, key str
 
 func (svc *Service) removeUnits(ctx context.Context, rm []*unit, reg kvstore.Register) error {
 	if reg != nil {
-		err := svc.deregisterSerivces(ctx, reg, rm)
+		err := svc.deregisterServices(ctx, reg, rm)
 		if err != nil {
 			return err
 		}

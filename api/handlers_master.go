@@ -2830,7 +2830,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	id := r.FormValue("id")
 	tag := r.FormValue("tag")
-	service := r.FormValue("serivce")
+	service := r.FormValue("service")
 	deadline := r.FormValue("expired")
 	nfs := r.FormValue("nfs_mount")
 
@@ -2956,7 +2956,7 @@ func getBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag := r.FormValue("tag")
-	service := r.FormValue("serivce")
+	service := r.FormValue("service")
 	start := r.FormValue("start")
 	end := r.FormValue("end")
 

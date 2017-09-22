@@ -265,7 +265,7 @@ func (db dbBase) InsertService(svc Service, units []Unit, t *Task) error {
 	do := func(tx *sqlx.Tx) error {
 
 		if svc.Desc != nil {
-			err := db.txInsertSerivceDesc(tx, svc.Desc)
+			err := db.txInsertServiceDesc(tx, svc.Desc)
 			if err != nil {
 				return err
 			}
@@ -273,7 +273,7 @@ func (db dbBase) InsertService(svc Service, units []Unit, t *Task) error {
 			svc.DescID = svc.Desc.ID
 		}
 
-		err := db.txInsertSerivce(tx, svc)
+		err := db.txInsertService(tx, svc)
 		if err != nil {
 			return err
 		}
@@ -298,7 +298,7 @@ func (db dbBase) InsertService(svc Service, units []Unit, t *Task) error {
 	return db.txFrame(do)
 }
 
-func (db dbBase) txInsertSerivce(tx *sqlx.Tx, svc Service) error {
+func (db dbBase) txInsertService(tx *sqlx.Tx, svc Service) error {
 
 	query := "INSERT INTO " + db.serviceTable() + " ( id,name,description_id,tag,auto_healing,auto_scaling,high_available,action_status,created_at,finished_at ) VALUES ( :id,:name,:description_id,:tag,:auto_healing,:auto_scaling,:high_available,:action_status,:created_at,:finished_at )"
 
@@ -689,7 +689,7 @@ func (db dbBase) listDescByService(ID string) ([]ServiceDesc, error) {
 	return nil, errors.Wrap(err, "list []ServiceDesc by serviceID")
 }
 
-func (db dbBase) txInsertSerivceDesc(tx *sqlx.Tx, desc *ServiceDesc) error {
+func (db dbBase) txInsertServiceDesc(tx *sqlx.Tx, desc *ServiceDesc) error {
 
 	query := "INSERT INTO " + db.serviceDescTable() + " ( id,service_id,architecture,schedule_opts,unit_num,cpu_num,mem_size,image_id,image_version,volumes,networks,cluster_id,options,previous_version ) VALUES ( :id,:service_id,:architecture,:schedule_opts,:unit_num,:cpu_num,:mem_size,:image_id,:image_version,:volumes,:networks,:cluster_id,:options,:previous_version )"
 
@@ -720,7 +720,7 @@ func (db dbBase) SetServiceDesc(svc Service) error {
 			return errors.Wrap(err, "update Service DescID")
 		}
 
-		return db.txInsertSerivceDesc(tx, svc.Desc)
+		return db.txInsertServiceDesc(tx, svc.Desc)
 	}
 
 	return db.txFrame(do)

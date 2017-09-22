@@ -64,7 +64,7 @@ func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec) (stru
 	return resp, nil
 }
 
-// DeployServices deploy slice of Service if serivce not exist,tasks run in goroutines.
+// DeployServices deploy slice of Service if service not exist,tasks run in goroutines.
 func (d *Deployment) DeployServices(ctx context.Context, services []structs.ServiceSpec) ([]structs.PostServiceResponse, error) {
 	list, err := d.gd.ListServices(ctx)
 	if err != nil && !database.IsNotFound(err) {

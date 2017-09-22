@@ -70,7 +70,7 @@ func TestIncServiceStatus(t *testing.T) {
 
 	do := func(tx *sqlx.Tx) error {
 		for i := range tables {
-			err := db.txInsertSerivce(tx, tables[i])
+			err := db.txInsertService(tx, tables[i])
 			if err != nil {
 				return err
 			}
