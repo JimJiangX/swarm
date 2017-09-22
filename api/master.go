@@ -77,7 +77,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/storage/san":           getSANStoragesInfo,
 		"/storage/san/{name:.*}": getSANStorageInfo,
 
-		"/backupfiles": getBackupFiles,
+		"/backupfiles":        getBackupFiles,
+		"/backupFiles/{name}": getBackupFile,
 	},
 	http.MethodPost: {
 		"/clusters": postCluster,

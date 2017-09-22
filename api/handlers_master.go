@@ -2961,9 +2961,7 @@ func getBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	end := r.FormValue("end")
 
 	ok, _, gd := fromContext(ctx, _Garden)
-	if !ok || gd == nil ||
-		gd.Ormer() == nil {
-
+	if !ok || gd == nil || gd.Ormer() == nil {
 		httpJSONNilGarden(w)
 		return
 	}
@@ -3040,4 +3038,23 @@ func filterBackupFilesByTime(files []database.BackupFile, start, end string) []d
 	}
 
 	return out
+}
+
+func getBackupFile(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil || gd.Ormer() == nil {
+		httpJSONNilGarden(w)
+		return
+	}
+
+	bf, err := gd.Ormer().GetBackupFile(id)
+	if err != nil {
+		ec := errCodeV1(_Backup, dbQueryError, 31, "fail to query database", "数据库查询错误（备份文件表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, bf, http.StatusOK)
 }
