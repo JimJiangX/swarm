@@ -2319,15 +2319,6 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	orm := gd.Ormer()
-
-	bf, err := orm.GetBackupFile(req.File)
-	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 143, "fail to query database", "数据库查询错误（备份文件表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
 	// new Context with deadline
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
@@ -2342,7 +2333,7 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	id, err := svc.UnitRestore(ctx, req.Units, bf.Path, true)
+	id, err := svc.UnitRestore(ctx, req.Units, req.File, true)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 145, "fail to restore unit data", "服务单元数据恢复错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
