@@ -36,7 +36,7 @@ ssd_vgname=${HOSTNAME}_SSD_VG
 
 bond_dev=bond0
 
-bond_mode=`cat cat /sys/class/net/${bond_dev}/bonding/mode`
+bond_mode=`cat /sys/class/net/${bond_dev}/bonding/mode`
 
 bond_slaves=`cat /sys/class/net/${bond_dev}/bonding/slaves`
 if [ ! -n "${bond_slaves}" ]; then
