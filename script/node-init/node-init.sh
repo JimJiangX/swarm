@@ -50,7 +50,7 @@ if [ "${bond_mode}" == "balance-xor 2" ]; then
 	do
 		#d_bw=`ethtool enp130s0f0| grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}'`	
 		#pf_dev_bw_num=`expr ${pf_dev_bw_num} + ${d_bw}`
-                d_bw=`ethtool ${d} | grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}'`    
+                d_bw=`ethtool ${d} | grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}' | sed s/[[:space:]]//g`    
 		if [ ${d_bw} -gt ${pf_dev_bw_num} ]; then
                 	pf_dev_bw_num=${d_bw}
 		fi
@@ -59,7 +59,7 @@ if [ "${bond_mode}" == "balance-xor 2" ]; then
 elif [ "${bond_mode}" == "active-backup 1" ]; then
 	for d in ${bond_slaves}
         do
-                d_bw=`ethtool ${d} | grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}'`    
+                d_bw=`ethtool ${d} | grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}' | sed s/[[:space:]]//g`    
 		if [ ${d_bw} -gt ${pf_dev_bw_num} ]; then
                 	pf_dev_bw_num=${d_bw}
 		fi
