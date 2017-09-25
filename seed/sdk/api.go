@@ -136,8 +136,9 @@ func (c client) CreateNetwork(ctx context.Context, opt NetworkConfig) error {
 func (c client) GetVgList() ([]VgInfo, error) {
 
 	var res vgListResonse
+	const uri = "/san/vglist"
 
-	resp, err := httpclient.RequireOK(c.c.Get(nil, "/san/vglist"))
+	resp, err := httpclient.RequireOK(c.c.Get(nil, uri))
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +147,7 @@ func (c client) GetVgList() ([]VgInfo, error) {
 
 	err = decodeBody(resp, &res)
 	if len(res.Err) > 0 {
-		return nil, errors.Errorf("%s:%s/%s,%s", http.MethodGet, c.addr, "/san/vglist", res.Err)
+		return nil, errors.Errorf("%s:%s%s,%s", http.MethodGet, c.addr, uri, res.Err)
 	}
 
 	return res.Vgs, nil
@@ -226,11 +227,11 @@ func (c client) postWrap(ctx context.Context, url string, opt interface{}) error
 
 	err = decodeBody(resp, &res)
 	if err != nil {
-		return errors.Errorf("%s:%s/%s,%s", http.MethodPost, c.addr, url, err)
+		return errors.Errorf("%s:%s%s,%s", http.MethodPost, c.addr, url, err)
 	}
 
 	if len(res.Err) > 0 {
-		return errors.Errorf("%s:%s/%s,%s", http.MethodPost, c.addr, url, res.Err)
+		return errors.Errorf("%s:%s%s,%s", http.MethodPost, c.addr, url, res.Err)
 	}
 
 	return nil

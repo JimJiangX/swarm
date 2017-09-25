@@ -31,7 +31,7 @@ type CommonRes struct {
 }
 
 func errCommonHanlde(w http.ResponseWriter, req *http.Request, err error) {
-	if err != nil {
+	if err == nil {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
