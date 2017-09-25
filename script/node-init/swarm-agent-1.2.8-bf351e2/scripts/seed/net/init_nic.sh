@@ -118,6 +118,17 @@ case "$IPADDR" in
 esac
 }
 
+if installed docker
+then
+  getIPaddr
+  IPADDR=${IPADDR%%/*}
+  docker exec $CONTAINER ifconfig $CONTAINER_IFNAME | grep $IPADDR
+  if [ $? -eq 0 ]; then
+    exit 0
+  fi
+fi
+
+
 # First step: determine type of first argument (bridge, physical interface...),
 if [ -d "/sys/class/net/$IFNAME" ]
 then
@@ -127,26 +138,13 @@ then
     die 1 "unsupported for ovs."
   elif [ "$(cat "/sys/class/net/$IFNAME/type")" -eq 32 ]; then # Infiniband IPoIB interface type 32
     die 1 "unsupported for IPoIB."
-  else IFTYPE=phys
+  elif -d "/sys/class/net/$IFNAME/bonding" ]; then
+    IFTYPE=bond
+  else
+    IFTYPE=phys
   fi
 else
-  case "$IFNAME" in
-    container*)
-      if installed docker; then
-        getIPaddr
-        IPADDR=${IPADDR%%/*}
-        docker exec $CONTAINER ifconfig $CONTAINER_IFNAME | grep $IPADDR 
-        if [ $? -ne 0 ]; then
-          die 1 "not found host interface $IFNAME"
-        else
-          exit 0
-        fi
-      fi
-      ;;
-    *)
-      die 1 "I do not know how to setup interface $IFNAME."
-      ;;
-  esac
+  die 1 "I do not know how to setup interface $IFNAME."
 fi
 
 # Second step: find the container and get container pid
@@ -157,40 +155,21 @@ getIPaddr
 
 
 # Check if an incompatible VLAN device already exists
-if [ "$IFTYPE" = phys ] && [ "$VLAN" ] && [ -d "/sys/class/net/$IFNAME.VLAN" ]
+if [ "$IFTYPE" = bond ] && [ "$VLAN" ]
 then
-  ip -d link show "$IFNAME.$VLAN" | grep -q "vlan.*id $VLAN" || {
-    die 1 "$IFNAME.VLAN already exists but is not a VLAN device for tag $VLAN"
+  ip -d link show "$IFNAME.$VLAN" || {
+    die 1 "$IFNAME.VLAN already exists"
   }
 else
   # If get bandwidth ,try to set bandwidth
   if [ "$BANDWIDTH" ]; then
-    # Check host interface is bond
-    if [ -d "/sys/class/net/$IFNAME/bonding" ]; then
-      # Get bond slave device
-      SLAVES=`cat /sys/class/net/$IFNAME/bonding/slaves`
-      for slave in $SLAVES
-      do
-        # Get bond slave PF device name
-        PF_NAME=`ls /sys/class/net/$slave/device/physfn/net/ 2> /dev/null | tr -d "\n"`
-        [ "$PF_NAME" ] || continue
-        # If is sriov device, Get vf number
-        VF_LIST=`ls -l /sys/class/net/$PF_NAME/device/ 2> /dev/null | grep virtfn | awk '{print $9}'`
-        for vf in $VF_LIST
-        do
-          VF_NAME=`ls /sys/class/net/$PF_NAME/device/$vf/net/ 2>/dev/null | tr -d "\n"`
-          if [ "$VF_NAME" = $slave ]; then
-            VF_NUM=`echo $vf | cut -c 7-`
-            ip link set $PF_NAME vf $VF_NUM rate $BANDWIDTH || {
-              warn "Set $slave bandwidth faild"
-            }
-          fi
-        done
-      done
-    else
-      # Get host interface PF device name
-      PF_NAME=`ls /sys/class/net/$IFNAME/device/physfn/net/ 2> /dev/null | tr -d "\n"`
-	    [ "$PF_NAME" ] || continue
+    # Get bond slave device
+    SLAVES=`cat /sys/class/net/$IFNAME/bonding/slaves`
+    for slave in $SLAVES
+    do
+      # Get bond slave PF device name
+      PF_NAME=`ls /sys/class/net/$slave/device/physfn/net/ 2> /dev/null | tr -d "\n"`
+      [ "$PF_NAME" ] || continue
       # If is sriov device, Get vf number
       VF_LIST=`ls -l /sys/class/net/$PF_NAME/device/ 2> /dev/null | grep virtfn | awk '{print $9}'`
       for vf in $VF_LIST
@@ -199,12 +178,56 @@ else
         if [ "$VF_NAME" = $slave ]; then
           VF_NUM=`echo $vf | cut -c 7-`
           ip link set $PF_NAME vf $VF_NUM rate $BANDWIDTH || {
-            warn "Set $IFNAME bandwidth faild"
+            warn "Set $slave bandwidth faild"
           }
         fi
       done
-    fi
+    done
   fi
+
+  # If get VLAN ,try to set VLAN
+  if [ $VLAN -ne 0 ]; then
+    # If it's a bond interface, create a vlan subinterface
+    MTU=$(ip link show "$IFNAME" | awk '{print $5}')
+    [ ! -d "/sys/class/net/${IFNAME}.${VLAN}" ] && {
+      ip link add link "$IFNAME" name "$IFNAME.$VLAN" mtu "$MTU" type vlan id "$VLAN" || {
+        die 1 "create $IFNAME.VLAN faild"
+      }
+    }
+    ip link set "$IFNAME" up || {
+      die 1 "$IFNAME.VLAN up faild"
+    }
+    GUEST_IFNAME=$IFNAME.$VLAN
+  else
+    GUEST_IFNAME=$IFNAME
+  fi
+fi
+
+if [ "$IFTYPE" = phys ] && [ "$VLAN" ] && [ -d "/sys/class/net/$IFNAME.VLAN" ]
+then
+  ip -d link show "$IFNAME.$VLAN" | grep -q "vlan.*id $VLAN" || {
+    die 1 "$IFNAME.VLAN already exists but is not a VLAN device for tag $VLAN"
+  }
+else
+  # If get bandwidth ,try to set bandwidth
+  if [ "$BANDWIDTH" ]; then
+    # Get host interface PF device name
+    PF_NAME=`ls /sys/class/net/$IFNAME/device/physfn/net/ 2> /dev/null | tr -d "\n"`
+    [ "$PF_NAME" ] || continue
+    # If is sriov device, Get vf number
+    VF_LIST=`ls -l /sys/class/net/$PF_NAME/device/ 2> /dev/null | grep virtfn | awk '{print $9}'`
+    for vf in $VF_LIST
+    do
+      VF_NAME=`ls /sys/class/net/$PF_NAME/device/$vf/net/ 2>/dev/null | tr -d "\n"`
+      if [ "$VF_NAME" = $slave ]; then
+        VF_NUM=`echo $vf | cut -c 7-`
+        ip link set $PF_NAME vf $VF_NUM rate $BANDWIDTH || {
+          warn "Set $IFNAME bandwidth faild"
+        }
+      fi
+    done
+  fi
+
   if [ $VLAN -ne 0 ]; then
     # If it's a physical interface, create a vlan subinterface
     MTU=$(ip link show "$IFNAME" | awk '{print $5}')
