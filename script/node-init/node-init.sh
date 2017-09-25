@@ -36,7 +36,7 @@ ssd_vgname=${HOSTNAME}_SSD_VG
 
 bond_dev=bond0
 
-bond_mode=`cat cat /sys/class/net/${bond_dev}/bonding/mode`
+bond_mode=`cat /sys/class/net/${bond_dev}/bonding/mode`
 
 bond_slaves=`cat /sys/class/net/${bond_dev}/bonding/slaves`
 if [ ! -n "${bond_slaves}" ]; then
@@ -48,14 +48,18 @@ pf_dev_bw_num=0
 if [ "${bond_mode}" == "balance-xor 2" ]; then
 	for d in ${bond_slaves}
 	do
-		d_bw=`ethtool enp130s0f0| grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}'`	
-		pf_dev_bw_num=`expr ${pf_dev_bw_num} + ${d_bw}`
+		#d_bw=`ethtool enp130s0f0| grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}'`	
+		#pf_dev_bw_num=`expr ${pf_dev_bw_num} + ${d_bw}`
+                d_bw=`ethtool ${d} | grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}'`    
+		if [ ${d_bw} -gt ${pf_dev_bw_num} ]; then
+                	pf_dev_bw_num=${d_bw}
+		fi
 	done
 	pf_dev_bw=${pf_dev_bw_num}M
 elif [ "${bond_mode}" == "active-backup 1" ]; then
 	for d in ${bond_slaves}
         do
-                d_bw=`ethtool enp130s0f0| grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}'`    
+                d_bw=`ethtool ${d} | grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}'`    
 		if [ ${d_bw} -gt ${pf_dev_bw_num} ]; then
                 	pf_dev_bw_num=${d_bw}
 		fi
@@ -521,6 +525,7 @@ EOF
 install_swarm_agent() {
 	local base_dir=/usr/local/swarm-agent
 	local script_dir=${base_dir}/scripts
+	local bin_dir=${base_dir}/bin
 
 	# stop swarm-agent
 	pkill -9 swarm >/dev/null 2>&1
@@ -531,8 +536,9 @@ install_swarm_agent() {
 	chmod +x ${script_dir}/seed/net/* ${script_dir}/seed/san/*
 
 	# copy binary file
-	cp ${cur_dir}/swarm-agent-${swarm_agent_version}/bin/swarm ${base_dir}/swarm
-	chmod 755 ${base_dir}/swarm
+	mkdir -p ${bin_dir}
+	cp ${cur_dir}/swarm-agent-${swarm_agent_version}/bin/swarm ${bin_dir}
+	chmod 755 ${bin_dir}/swarm
 
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/swarm-agent
@@ -556,7 +562,7 @@ After=network.target consul.service
 [Service]
 Environment=CONSUL_HTTP_DATACENTER=${cs_datacenter}
 EnvironmentFile=/etc/sysconfig/swarm-agent
-ExecStart=${base_dir}/swarm  \$SWARM_AGENT_OPTS
+ExecStart=${bin_dir}/swarm  \$SWARM_AGENT_OPTS
 
 [Install]
 WantedBy=multi-user.target
