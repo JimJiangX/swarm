@@ -16,9 +16,11 @@ if [ $? -ne 0 ]; then
 	exit 2
 fi
 
-total_space=`df --type=$TYPE --output=avail $nfs_mount_dir | sed '1d'`
-used_space=`df --type=$TYPE --output=used $nfs_mount_dir | sed '1d'`
-free_space=`expr $total_space - $used_space`
+free_space_kb=`df --type=$TYPE --output=avail $nfs_mount_dir | sed '1d'`
+used_space_kb=`df --type=$TYPE --output=used $nfs_mount_dir | sed '1d'`
+total_space_kb=`expr $free_space_kb + $used_space_kb`
+free_space_byte=`expr ${free_space_kb} \* 1024`
+total_space_byte=`expr ${total_space_kb} \* 1024`
 
-echo "total_space:${total_space}"
-echo "free_space:${free_space}"
+echo "total_space:${total_space_byte}"
+echo "free_space:${free_space_byte}"
