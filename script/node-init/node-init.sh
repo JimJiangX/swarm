@@ -75,7 +75,7 @@ PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
 
 docker_version=1.12.6
 consul_version=0.9.2
-swarm_agent_version=1.2.8-bf351e2
+swarm_agent_version=1.2.8-668eaac
 logicalVolume_volume_plugin_version=3.0.0
 
 platform="$(uname -s)"
