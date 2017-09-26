@@ -92,13 +92,14 @@ type VolumeDriver struct {
 }
 
 type container struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Image   string `json:"image"`
-	Command string `json:"command"`
-	Created string `json:"created"`
-	Status  string `json:"status"`
-	State   string `json:"state"`
+	ID      string            `json:"id"`
+	Name    string            `json:"name"`
+	Image   string            `json:"image"`
+	Command string            `json:"command"`
+	Created string            `json:"created"`
+	Status  string            `json:"status"`
+	State   string            `json:"state"`
+	Labels  map[string]string `json:"labels"`
 }
 
 func convertToContainer(c *cluster.Container) container {
@@ -119,6 +120,7 @@ func convertToContainer(c *cluster.Container) container {
 		Created: c.Info.Created,
 		Status:  c.Status,
 		State:   c.State,
+		Labels:  c.Labels,
 	}
 }
 
