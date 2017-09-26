@@ -124,11 +124,35 @@ type ClientAPI interface {
 	SanVgCreate(opt VgConfig) error
 	SanVgExtend(opt VgConfig) error
 	CreateNetwork(ctx context.Context, opt NetworkConfig) error
+	UpdateNetwork(ctx context.Context, opt NetworkConfig) error
 }
 
 //create network for contianer(use pipewrok),which network mode is none
 func (c client) CreateNetwork(ctx context.Context, opt NetworkConfig) error {
 	return c.postWrap(ctx, "/network/create", opt)
+}
+
+func (c client) UpdateNetwork(ctx context.Context, opt NetworkConfig) error {
+	const url = "/network/update"
+
+	resp, err := httpclient.RequireOK(c.c.Put(ctx, url, opt))
+	if err != nil {
+		return err
+	}
+
+	defer httpclient.EnsureBodyClose(resp)
+
+	res := commonResonse{}
+	err = decodeBody(resp, &res)
+	if err != nil {
+		return errors.Errorf("%s:%s%s,%s", http.MethodPut, c.addr, url, err)
+	}
+
+	if len(res.Err) > 0 {
+		return errors.Errorf("%s:%s%s,%s", http.MethodPut, c.addr, url, res.Err)
+	}
+
+	return nil
 }
 
 // GetVgList returns remote host VG list

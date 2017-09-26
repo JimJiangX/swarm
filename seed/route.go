@@ -85,6 +85,9 @@ func NewRouter(version string) *mux.Router {
 
 			"/network/create": networkCreateHandle,
 		},
+		"PUT": {
+			"/network/update": networkUpdateHandle,
+		},
 	}
 
 	r := mux.NewRouter()
