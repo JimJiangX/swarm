@@ -214,6 +214,7 @@ func (u unit) startContainer(ctx context.Context) error {
 	}
 
 	state := c.Info.State
+	u.u.ContainerID = c.ID
 
 	select {
 	default:
@@ -227,29 +228,14 @@ func (u unit) startContainer(ctx context.Context) error {
 	}
 
 	// start networking
-
-	sys, err := u.uo.GetSysConfig()
+	err = u.startNetworking(ctx, c.Engine.IP, nil)
 	if err != nil {
-		return err
-	}
-
-	ips, err := u.uo.ListIPByUnitID(u.u.ID)
-	if err != nil {
-		return err
-	}
-	if len(ips) > 0 {
-		addr := net.JoinHostPort(c.Engine.IP, strconv.Itoa(sys.Ports.SwarmAgent))
-		err := u.startNetwork(ctx, addr, c.ID, ips, nil)
-		if err != nil {
-			if state != nil && state.Running {
-				return nil
-			}
-
-			return err
+		if state != nil && state.Running {
+			return nil
 		}
 	}
 
-	return nil
+	return err
 }
 
 func (u unit) startService(ctx context.Context, cmd []string) error {
@@ -411,26 +397,47 @@ func (u *unit) update(ctx context.Context, config container.UpdateConfig) error 
 	return err
 }
 
-func (u unit) startNetwork(ctx context.Context, addr, container string, ips []database.IP, tlsConfig *tls.Config) error {
-	return createNetworkDevice(ctx, addr, container, ips, tlsConfig)
+func (u unit) startNetworking(ctx context.Context, host string, tlsConfig *tls.Config) error {
+	ips, err := u.uo.ListIPByUnitID(u.u.ID)
+	if err != nil {
+		return err
+	}
+	if len(ips) == 0 {
+		return nil
+	}
+
+	sys, err := u.uo.GetSysConfig()
+	if err != nil {
+		return err
+	}
+
+	addr := net.JoinHostPort(host, strconv.Itoa(sys.Ports.SwarmAgent))
+
+	for i := range ips {
+		err := createNetworkDevice(ctx, addr, u.u.ContainerID, ips[i], tlsConfig)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func createNetworkDevice(ctx context.Context, addr, container string, ips []database.IP, tlsConfig *tls.Config) error {
-	for i := range ips {
-		config := sdk.NetworkConfig{
-			Container:  container,
-			HostDevice: ips[i].Bond,
-			// ContainerDevice: ips[i].Bond,
-			IPCIDR:    fmt.Sprintf("%s/%d", utils.Uint32ToIP(ips[i].IPAddr), ips[i].Prefix),
-			Gateway:   ips[i].Gateway,
-			VlanID:    ips[i].VLAN,
-			BandWidth: ips[i].Bandwidth,
-		}
+func createNetworkDevice(ctx context.Context, addr, container string, ip database.IP, tlsConfig *tls.Config) error {
 
-		err := postCreateNetwork(ctx, addr, config, tlsConfig)
-		if err != nil {
-			return errors.WithStack(err)
-		}
+	config := sdk.NetworkConfig{
+		Container:  container,
+		HostDevice: ip.Bond,
+		// ContainerDevice: ips[i].Bond,
+		IPCIDR:    fmt.Sprintf("%s/%d", utils.Uint32ToIP(ip.IPAddr), ip.Prefix),
+		Gateway:   ip.Gateway,
+		VlanID:    ip.VLAN,
+		BandWidth: ip.Bandwidth,
+	}
+
+	err := postCreateNetwork(ctx, addr, config, tlsConfig)
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
 	return nil
