@@ -31,7 +31,7 @@ func New(gd *garden.Garden) *Deployment {
 }
 
 // Deploy build and run Service,task run in a goroutine.
-func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec) (structs.PostServiceResponse, error) {
+func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec, compose bool) (structs.PostServiceResponse, error) {
 	resp := structs.PostServiceResponse{}
 	auth, err := d.gd.AuthConfig()
 	if err != nil {
@@ -59,13 +59,13 @@ func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec) (stru
 		}
 	}
 
-	go d.deploy(ctx, svc, task, auth)
+	go d.deploy(ctx, svc, compose, task, auth)
 
 	return resp, nil
 }
 
 // DeployServices deploy slice of Service if service not exist,tasks run in goroutines.
-func (d *Deployment) DeployServices(ctx context.Context, services []structs.ServiceSpec) ([]structs.PostServiceResponse, error) {
+func (d *Deployment) DeployServices(ctx context.Context, services []structs.ServiceSpec, compose bool) ([]structs.PostServiceResponse, error) {
 	list, err := d.gd.ListServices(ctx)
 	if err != nil && !database.IsNotFound(err) {
 		return nil, err
@@ -107,13 +107,14 @@ func (d *Deployment) DeployServices(ctx context.Context, services []structs.Serv
 			TaskID: task.ID,
 		})
 
-		go d.deploy(ctx, service, task, auth)
+		go d.deploy(ctx, service, compose, task, auth)
 	}
 
 	return out, nil
 }
 
-func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *database.Task, auth *types.AuthConfig) (err error) {
+func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bool,
+	t *database.Task, auth *types.AuthConfig) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.Errorf("deploy:%v", r)
@@ -157,7 +158,9 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *databas
 		return err
 	}
 
-	err = svc.Compose(ctx, d.gd.PluginClient())
+	if compose {
+		err = svc.Compose(ctx, d.gd.PluginClient())
+	}
 
 	return err
 }

@@ -1593,6 +1593,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	compose := boolValue(r, "compose")
 	timeout := intValueOrZero(r, "timeout")
 
 	spec := structs.ServiceSpec{}
@@ -1631,7 +1632,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	d := deploy.New(gd)
 
-	out, err := d.Deploy(ctx, spec)
+	out, err := d.Deploy(ctx, spec, compose)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 34, "fail to deploy service", "创建服务错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
