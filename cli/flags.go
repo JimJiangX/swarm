@@ -213,9 +213,10 @@ var (
 	}
 
 	flScriptDir = cli.StringFlag{
-		Name:  "script",
-		Value: "./script/plugin/compose/",
-		Usage: "compose script dir",
+		Name: "script",
+		// Value: "./script/plugin/compose/",
+		// Value: "/usr/local/swarm-agent/scripts/seed/",
+		Usage: "script dir",
 	}
 
 	flMgmIP = cli.StringFlag{

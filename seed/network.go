@@ -38,7 +38,7 @@ func networkCreateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request
 		return
 	}
 
-	if err := createNetwork(opt); err != nil {
+	if err := createNetwork(ctx.scriptDir, opt); err != nil {
 		errCommonHanlde(w, req, err)
 		return
 	}
@@ -58,7 +58,7 @@ func valicateNetworkCfg(cfg *NetworkCfg) error {
 	return nil
 }
 
-func createNetwork(cfg *NetworkCfg) error {
+func createNetwork(scriptDir string, cfg *NetworkCfg) error {
 	if cfg.ContainerDevice == "" {
 		cfg.ContainerDevice = "eth0"
 	}
@@ -87,7 +87,7 @@ func networkUpdateHandle(ctx *_Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := updateNetwork(opt); err != nil {
+	if err := updateNetwork(ctx.scriptDir, opt); err != nil {
 		errCommonHanlde(w, r, err)
 		return
 	}
@@ -96,7 +96,7 @@ func networkUpdateHandle(ctx *_Context, w http.ResponseWriter, r *http.Request) 
 }
 
 // update_nic_bw.sh -h 设备名称 -b 升级后的带宽值
-func updateNetwork(cfg *NetworkCfg) error {
+func updateNetwork(scriptDir string, cfg *NetworkCfg) error {
 	if cfg.HostDevice == "" {
 		return errors.New("HostDevice is required")
 	}

@@ -3,25 +3,15 @@ package seed
 import (
 	"encoding/json"
 	"net/http"
-	"os"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"golang.org/x/net/context"
 )
 
-var (
-	scriptDir = "/usr/local/swarm-agent/scripts/seed/"
-)
-
-func init() {
-	if dir := os.Getenv("SCRIPT_DIR"); dir != "" {
-		scriptDir = dir
-	}
-}
-
 type _Context struct {
 	apiVersion string
+	scriptDir  string
 	context    context.Context
 }
 
@@ -61,10 +51,13 @@ func getVersionHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 }
 
 // NewRouter create API router.
-func NewRouter(version string) *mux.Router {
+func NewRouter(version, script string) *mux.Router {
 	type handler func(ctx *_Context, w http.ResponseWriter, r *http.Request)
 
-	ctx := &_Context{apiVersion: version}
+	ctx := &_Context{
+		apiVersion: version,
+		scriptDir:  script,
+	}
 
 	var routes = map[string]map[string]handler{
 		"GET": {

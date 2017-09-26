@@ -65,7 +65,7 @@ func vgExtendHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := scanSanDisk(); err != nil {
+	if err := scanSanDisk(ctx.scriptDir); err != nil {
 		errCommonHanlde(w, req, err)
 		return
 	}
@@ -75,7 +75,7 @@ func vgExtendHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	device, err := getDevicePath(opt.HostLunID[0], opt.Type)
+	device, err := getDevicePath(ctx.scriptDir, opt.Type, opt.HostLunID[0])
 	if err != nil {
 		errCommonHanlde(w, req, err)
 		return
@@ -108,14 +108,14 @@ func vgCreateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := scanSanDisk(); err != nil {
+	if err := scanSanDisk(ctx.scriptDir); err != nil {
 		errCommonHanlde(w, req, err)
 		return
 	}
 
 	devices := ""
 	for _, id := range opt.HostLunID {
-		path, err := getDevicePath(id, opt.Type)
+		path, err := getDevicePath(ctx.scriptDir, opt.Type, id)
 		if err != nil {
 			errCommonHanlde(w, req, err)
 			return
@@ -220,7 +220,7 @@ func vgList() ([]VgInfo, error) {
 
 }
 
-func scanSanDisk() error {
+func scanSanDisk(scriptDir string) error {
 	script := filepath.Join(scriptDir, "sanscandisk.sh")
 	_, err := os.Lstat(script)
 	if os.IsNotExist(err) {
@@ -241,7 +241,7 @@ func scanSanDisk() error {
 	return nil
 }
 
-func getDevicePath(id int, santype string) (string, error) {
+func getDevicePath(scriptDir, santype string, id int) (string, error) {
 	script := filepath.Join(scriptDir, "getsandevice.sh")
 	_, err := os.Lstat(script)
 	if os.IsNotExist(err) {

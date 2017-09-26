@@ -50,7 +50,7 @@ func activateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := scanSanDisk(); err != nil {
+	if err := scanSanDisk(ctx.scriptDir); err != nil {
 		errCommonHanlde(w, req, err)
 		return
 	}
@@ -82,7 +82,7 @@ func deactivateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := checkDeactConfig(opt); err != nil {
+	if err := checkDeactConfig(ctx.scriptDir, opt); err != nil {
 		errCommonHanlde(w, req, err)
 		return
 	}
@@ -92,7 +92,7 @@ func deactivateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if err := sanBlock(opt.Vendor, opt.HostLunID); err != nil {
+	if err := sanBlock(ctx.scriptDir, opt.Vendor, opt.HostLunID); err != nil {
 		errCommonHanlde(w, req, err)
 		return
 	}
@@ -145,7 +145,7 @@ func removeVGHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	err := sanBlock(opt.Vendor, opt.HostLunID)
+	err := sanBlock(ctx.scriptDir, opt.Vendor, opt.HostLunID)
 	if err != nil {
 		errCommonHanlde(w, req, err)
 		return
@@ -187,7 +187,7 @@ func tryImport(vgname string) {
 	}
 }
 
-func checkDeactConfig(opt *DeactConfig) error {
+func checkDeactConfig(scriptDir string, opt *DeactConfig) error {
 	if len(opt.Lvname) == 0 {
 		return errors.New("Lvname must  be set")
 	}
@@ -346,7 +346,7 @@ func lvDeActivate(vg, lv string) error {
 	return nil
 }
 
-func sanBlock(vendor string, ids []int) error {
+func sanBlock(scriptDir, vendor string, ids []int) error {
 	script := filepath.Join(scriptDir, "sanDeviceBlock.sh")
 	_, err := os.Lstat(script)
 	if os.IsNotExist(err) {
