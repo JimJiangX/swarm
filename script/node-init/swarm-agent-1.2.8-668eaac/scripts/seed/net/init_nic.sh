@@ -118,17 +118,6 @@ case "$IPADDR" in
 esac
 }
 
-if installed docker
-then
-  getIPaddr
-  IPADDR=${IPADDR%%/*}
-  docker exec $CONTAINER ifconfig $CONTAINER_IFNAME | grep $IPADDR
-  if [ $? -eq 0 ]; then
-    exit 0
-  fi
-fi
-
-
 # First step: determine type of first argument (bridge, physical interface...),
 if [ -d "/sys/class/net/$IFNAME" ]
 then
@@ -138,7 +127,7 @@ then
     die 1 "unsupported for ovs."
   elif [ "$(cat "/sys/class/net/$IFNAME/type")" -eq 32 ]; then # Infiniband IPoIB interface type 32
     die 1 "unsupported for IPoIB."
-  elif -d "/sys/class/net/$IFNAME/bonding" ]; then
+  elif [ -d "/sys/class/net/$IFNAME/bonding" ]; then
     IFTYPE=bond
   else
     IFTYPE=phys
@@ -157,10 +146,6 @@ getIPaddr
 # Check if an incompatible VLAN device already exists
 if [ "$IFTYPE" = bond ] && [ "$VLAN" ]
 then
-  ip -d link show "$IFNAME.$VLAN" || {
-    die 1 "$IFNAME.VLAN already exists"
-  }
-else
   # If get bandwidth ,try to set bandwidth
   if [ "$BANDWIDTH" ]; then
     # Get bond slave device
@@ -201,14 +186,8 @@ else
   else
     GUEST_IFNAME=$IFNAME
   fi
-fi
-
-if [ "$IFTYPE" = phys ] && [ "$VLAN" ] && [ -d "/sys/class/net/$IFNAME.VLAN" ]
+elif [ "$IFTYPE" = phys ] && [ "$VLAN" ] 
 then
-  ip -d link show "$IFNAME.$VLAN" | grep -q "vlan.*id $VLAN" || {
-    die 1 "$IFNAME.VLAN already exists but is not a VLAN device for tag $VLAN"
-  }
-else
   # If get bandwidth ,try to set bandwidth
   if [ "$BANDWIDTH" ]; then
     # Get host interface PF device name
