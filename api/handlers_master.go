@@ -520,8 +520,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	for _, version := range supports {
 		if version.Name == req.Name &&
 			version.Major == req.Major &&
-			version.Minor == req.Minor &&
-			version.Build == req.Build {
+			version.Minor == req.Minor {
 
 			found = true
 			break
