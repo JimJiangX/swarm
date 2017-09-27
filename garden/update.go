@@ -37,6 +37,26 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 			return err
 		}
 
+		changes := make([]*unit, 0, len(units))
+
+		for _, u := range units {
+
+			c := u.getContainer()
+			if c == nil || c.Engine == nil {
+				return errors.WithStack(newContainerError(u.u.Name, notFound))
+			}
+
+			if c.Config.Image == version {
+				continue
+			}
+
+			changes = append(changes, u)
+		}
+
+		if len(changes) == 0 {
+			return nil
+		}
+
 		err = svc.stop(ctx, units, true)
 		if err != nil {
 			if _err, ok := err.(errContainer); !ok || _err.action != notRunning {
@@ -47,9 +67,9 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 		containers := make([]struct {
 			u  database.Unit
 			nc *cluster.Container
-		}, 0, len(units))
+		}, 0, len(changes))
 
-		for _, u := range units {
+		for _, u := range changes {
 			c := u.getContainer()
 			if c == nil || c.Engine == nil {
 				return errors.WithStack(newContainerError(u.u.Name, notFound))
