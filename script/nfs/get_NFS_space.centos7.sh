@@ -1,4 +1,5 @@
 #!/bin/bash
+# for CentOS 7
 set -o nounset
 LANG=POSXIA
 
