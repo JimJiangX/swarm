@@ -1,6 +1,8 @@
 package alloc
 
 import (
+	"context"
+	"net"
 	"strconv"
 	"strings"
 
@@ -192,4 +194,34 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 	}
 
 	return nator.AlloctNetworking(config, engineID, unitID, networkings, requires)
+}
+
+func (at allocator) AllocDevice(engineID string, ips []database.IP) ([]database.IP, error) {
+	nator := netAllocator{
+		ec:    at.ec,
+		ormer: at.ormer,
+	}
+
+	return nator.AllocDevice(engineID, ips)
+}
+
+func (at allocator) UpdateNetworking(ctx context.Context, engineID string, ips []database.IP, width int) error {
+	eng := at.ec.Engine(engineID)
+	if eng == nil {
+		return errors.Errorf("Engine not found:%s", engineID)
+	}
+
+	sys, err := at.ormer.GetSysConfig()
+	if err != nil {
+		return err
+	}
+
+	addr := net.JoinHostPort(eng.IP, strconv.Itoa(sys.Ports.SwarmAgent))
+
+	nator := netAllocator{
+		ec:    at.ec,
+		ormer: at.ormer,
+	}
+
+	return nator.UpdateNetworking(ctx, engineID, addr, ips, width)
 }

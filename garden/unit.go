@@ -13,9 +13,8 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/structs"
-	"github.com/docker/swarm/garden/utils"
-	"github.com/docker/swarm/seed/sdk"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -414,40 +413,11 @@ func (u unit) startNetworking(ctx context.Context, host string, tlsConfig *tls.C
 	addr := net.JoinHostPort(host, strconv.Itoa(sys.Ports.SwarmAgent))
 
 	for i := range ips {
-		err := createNetworkDevice(ctx, addr, u.u.ContainerID, ips[i], tlsConfig)
+		err := alloc.CreateNetworkDevice(ctx, addr, u.u.ContainerID, ips[i], tlsConfig)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
-}
-
-func createNetworkDevice(ctx context.Context, addr, container string, ip database.IP, tlsConfig *tls.Config) error {
-
-	config := sdk.NetworkConfig{
-		Container:  container,
-		HostDevice: ip.Bond,
-		// ContainerDevice: ips[i].Bond,
-		IPCIDR:    fmt.Sprintf("%s/%d", utils.Uint32ToIP(ip.IPAddr), ip.Prefix),
-		Gateway:   ip.Gateway,
-		VlanID:    ip.VLAN,
-		BandWidth: ip.Bandwidth,
-	}
-
-	err := postCreateNetwork(ctx, addr, config, tlsConfig)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	return nil
-}
-
-func postCreateNetwork(ctx context.Context, addr string, config sdk.NetworkConfig, tlsConfig *tls.Config) error {
-	cli, err := sdk.NewClient(addr, 30*time.Second, tlsConfig)
-	if err != nil {
-		return err
-	}
-
-	return cli.CreateNetwork(ctx, config)
 }

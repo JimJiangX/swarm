@@ -24,6 +24,20 @@ func (n network) ListIPByEngine(engine string) ([]database.IP, error) {
 	return out, nil
 }
 
+func (n *network) SetIPs(ips []database.IP) error {
+	for i := range ips {
+
+		for j := range n.ips {
+			if n.ips[j].IPAddr == ips[i].IPAddr {
+				n.ips[j] = ips[i]
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
 func (n *network) ResetIPs(ips []database.IP) error {
 	for i := range ips {
 

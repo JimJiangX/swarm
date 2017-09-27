@@ -1,6 +1,8 @@
 package alloc
 
 import (
+	"context"
+
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/structs"
@@ -11,13 +13,22 @@ import (
 type Allocator interface {
 	VolumeAllocator
 
+	NetworkingAllocator
+
 	ListCandidates(clusters, filters []string, stores []structs.VolumeRequire) ([]database.Node, error)
 
 	AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, ncpu, memory int64, reserved []string) (string, error)
 
+	RecycleResource(ips []database.IP, lvs []database.Volume) error
+}
+
+// NetworkingAllocator networking alloction.
+type NetworkingAllocator interface {
 	AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string, networkings []string, requires []structs.NetDeviceRequire) ([]database.IP, error)
 
-	RecycleResource(ips []database.IP, lvs []database.Volume) error
+	AllocDevice(engineID string, ips []database.IP) ([]database.IP, error)
+
+	UpdateNetworking(ctx context.Context, engineID string, ips []database.IP, width int) error
 }
 
 // VolumeAllocator volume alloction.
