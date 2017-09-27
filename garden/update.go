@@ -265,6 +265,23 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 			desc.ID = utils.Generate32UUID()
 			desc.NCPU = int(ncpu)
 			desc.Memory = memory
+
+			schedOpts := scheduleOption{}
+			r := strings.NewReader(table.Desc.ScheduleOptions)
+			err = json.NewDecoder(r).Decode(&schedOpts)
+			if err != nil && table.Desc.ScheduleOptions != "" {
+				return errors.WithStack(err)
+			}
+
+			schedOpts.Require.Require.CPU = desc.NCPU
+			schedOpts.Require.Require.Memory = desc.Memory
+
+			sr, err := json.Marshal(schedOpts)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
+			desc.ScheduleOptions = string(sr)
 			desc.Previous = table.DescID
 
 			table.DescID = desc.ID
@@ -393,9 +410,23 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 				return errors.WithStack(err)
 			}
 
+			schedOpts := scheduleOption{}
+			r = strings.NewReader(table.Desc.ScheduleOptions)
+			err = json.NewDecoder(r).Decode(&schedOpts)
+			if err != nil && table.Desc.ScheduleOptions != "" {
+				return errors.WithStack(err)
+			}
+
+			schedOpts.Require.Volumes = out
+			sr, err := json.Marshal(schedOpts)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+
 			desc := *table.Desc
 			desc.ID = utils.Generate32UUID()
 			desc.Volumes = string(vb)
+			desc.ScheduleOptions = string(sr)
 			desc.Previous = table.DescID
 
 			table.DescID = desc.ID
