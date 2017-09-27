@@ -2661,7 +2661,7 @@ func vaildPostSanStorageRequest(v structs.PostSANStoreRequest) error {
 		errs = append(errs, "Vendor is required")
 	}
 
-	if v.HostLunStart < v.HostLunEnd || v.HostLunEnd < 0 {
+	if v.HostLunStart > v.HostLunEnd || v.HostLunEnd < 0 {
 		errs = append(errs, "host_lun_end or host_lun_start is invaild")
 
 	}
