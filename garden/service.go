@@ -351,8 +351,9 @@ func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers
 	}
 
 	var (
-		arch structs.Arch
-		opts map[string]interface{}
+		arch    structs.Arch
+		opts    map[string]interface{}
+		require structs.UnitRequire
 	)
 
 	if info.Service.Desc != nil {
@@ -361,10 +362,15 @@ func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers
 
 		r = strings.NewReader(info.Service.Desc.Options)
 		json.NewDecoder(r).Decode(&opts)
+
+		r = strings.NewReader(info.Service.Desc.ScheduleOptions)
+		json.NewDecoder(r).Decode(&require)
 	}
+
 	return structs.ServiceSpec{
 		Arch:    arch,
 		Service: convertService(info.Service),
+		Require: &require,
 		Units:   units,
 		Options: opts,
 	}
