@@ -18,7 +18,7 @@ var (
 
 	ht = database.SANStorage{
 		Vendor:    HITACHI,
-		Version:   "",
+		Version:   "G600",
 		AdminUnit: "101",
 		LunStart:  1000,
 		LunEnd:    1200,

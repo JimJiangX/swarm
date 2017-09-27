@@ -53,7 +53,7 @@ func TestScriptPath(t *testing.T) {
 	}
 
 	hs := hitachiStore{
-		script: filepath.Join(getScriptPath(), HITACHI),
+		script: filepath.Join(getScriptPath(), HITACHI, "G600"),
 	}
 
 	for i := range files {
