@@ -364,6 +364,7 @@ func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers
 		json.NewDecoder(r).Decode(&opts)
 
 		r = strings.NewReader(info.Service.Desc.ScheduleOptions)
+
 		json.NewDecoder(r).Decode(&scheOpts)
 	}
 
