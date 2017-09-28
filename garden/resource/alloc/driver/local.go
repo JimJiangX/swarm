@@ -299,10 +299,12 @@ func (lv *localVolume) Alloc(config *cluster.ContainerConfig, uid string, req st
 		return nil, errors.Errorf("node %s local volume driver has no enough space:%d<%d", lv.engine.IP, space.Free, req.Size)
 	}
 
+	tag := config.Config.Labels["service.tag"]
+
 	v := database.Volume{
 		Size:       req.Size,
 		ID:         utils.Generate32UUID(),
-		Name:       fmt.Sprintf("%s_%s_%s_LV", uid[:8], space.VG, req.Name),
+		Name:       strings.Join([]string{uid[:8], tag, req.Name}, "_"),
 		UnitID:     uid,
 		EngineID:   lv.engine.ID,
 		VG:         space.VG,

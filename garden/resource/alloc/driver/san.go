@@ -2,6 +2,7 @@ package driver
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/docker/swarm/cluster"
@@ -81,7 +82,9 @@ func (sv sanVolume) Space() (Space, error) {
 }
 
 func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req structs.VolumeRequire) (*database.Volume, error) {
-	name := fmt.Sprintf("%s_%s_%s_LV", uid, req.Type, req.Name)
+	tag := config.Config.Labels["service.tag"]
+
+	name := strings.Join([]string{uid[:8], tag, req.Name}, "_")
 	vg := uid + "_SAN_VG"
 
 	lun, lv, err := sv.san.Alloc(name, uid, vg, req.Size)

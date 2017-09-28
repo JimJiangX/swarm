@@ -28,12 +28,13 @@ const containerKV = "/containers/"
 
 // add engine labels for schedule
 const (
-	roomLabel    = "room"
-	seatLabel    = "seat"
-	nodeLabel    = "nodeID"
-	engineLabel  = "node"
-	clusterLabel = "cluster"
-	sanLabel     = "SAN_ID"
+	roomLabel       = "room"
+	seatLabel       = "seat"
+	nodeLabel       = "nodeID"
+	engineLabel     = "node"
+	clusterLabel    = "cluster"
+	serviceTagLabel = "service.tag"
+	sanLabel        = "SAN_ID"
 )
 
 func getImage(orm database.ImageOrmer, version string) (database.Image, string, error) {
@@ -257,6 +258,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	}, network.NetworkingConfig{})
 
 	config.Config.Labels["mgm.unit.type"] = im.Name
+	config.Config.Labels[serviceTagLabel] = svc.svc.Tag
 
 	{
 		for i := range opts.Nodes.Constraints {
