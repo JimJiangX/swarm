@@ -196,13 +196,13 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 	return nator.AlloctNetworking(config, engineID, unitID, networkings, requires)
 }
 
-func (at allocator) AllocDevice(engineID string, ips []database.IP) ([]database.IP, error) {
+func (at allocator) AllocDevice(engineID, unitID string, ips []database.IP) ([]database.IP, error) {
 	nator := netAllocator{
 		ec:    at.ec,
 		ormer: at.ormer,
 	}
 
-	return nator.AllocDevice(engineID, ips)
+	return nator.AllocDevice(engineID, unitID, ips)
 }
 
 func (at allocator) UpdateNetworking(ctx context.Context, engineID string, ips []database.IP, width int) error {

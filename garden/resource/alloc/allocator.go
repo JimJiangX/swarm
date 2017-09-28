@@ -26,7 +26,7 @@ type Allocator interface {
 type NetworkingAllocator interface {
 	AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string, networkings []string, requires []structs.NetDeviceRequire) ([]database.IP, error)
 
-	AllocDevice(engineID string, ips []database.IP) ([]database.IP, error)
+	AllocDevice(engineID, unitID string, ips []database.IP) ([]database.IP, error)
 
 	UpdateNetworking(ctx context.Context, engineID string, ips []database.IP, width int) error
 }

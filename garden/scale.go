@@ -39,7 +39,7 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 		if len(units) > req.Arch.Replicas {
 			err = svc.scaleDown(ctx, units, req.Arch.Replicas, gd.KVClient())
 		} else {
-			_, err = gd.scaleUp(ctx, svc, actor, req, nil, true)
+			_, err = gd.scaleUp(ctx, svc, actor, req, nil, true, true, true)
 		}
 		if err != nil {
 			return err
@@ -157,7 +157,7 @@ func sortUnitsByContainers(units []*unit, containers cluster.Containers) []*unit
 }
 
 func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, actor alloc.Allocator,
-	skipVolume bool, replicas int, candidates []string,
+	vr, nr bool, replicas int, candidates []string,
 	users []structs.User, options map[string]interface{}) ([]*unit, []pendingUnit, error) {
 
 	err := svc.prepareSchedule(candidates, users, options)
@@ -183,15 +183,15 @@ func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, actor alloc
 		return adds, nil, err
 	}
 
-	pendings, err := gd.allocation(ctx, actor, svc, add, skipVolume)
+	pendings, err := gd.allocation(ctx, actor, svc, add, vr, nr)
 
 	return adds, pendings, err
 }
 
 func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocator,
-	scale structs.ServiceScaleRequest, networkings [][]database.IP, register bool) ([]*unit, error) {
+	scale structs.ServiceScaleRequest, networkings [][]database.IP, vr, nr, register bool) ([]*unit, error) {
 
-	units, pendings, err := gd.scaleAllocation(ctx, svc, actor, false,
+	units, pendings, err := gd.scaleAllocation(ctx, svc, actor, vr, nr,
 		scale.Arch.Replicas, scale.Candidates, scale.Users, scale.Options)
 	defer func() {
 		if err != nil {
@@ -204,22 +204,11 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 	if err != nil {
 		return units, err
 	}
-	if len(pendings) > len(networkings) {
-		return units, errors.Errorf("not enough networkings for addition units")
-	}
+	if !nr && len(networkings) > 0 {
+		if len(pendings) > len(networkings) {
+			return units, errors.Errorf("not enough networkings for addition units")
+		}
 
-	auth, err := gd.AuthConfig()
-	if err != nil {
-		return units, err
-	}
-
-	err = svc.runContainer(ctx, pendings, false, auth)
-	if err != nil {
-		return units, err
-	}
-
-	{
-		// migrate networkings
 		defer func() {
 			if err != nil {
 				list := make([]database.IP, 0, len(networkings)*2)
@@ -232,12 +221,37 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 				}
 			}
 		}()
-		for i := range pendings {
-			_, err = migrateNetworking(svc.so, networkings[i], pendings[i].networkings)
-			if err != nil {
-				return units, err
+
+		list := make([]database.IP, 0, len(pendings))
+
+		for i, pu := range pendings {
+			nets := make([]database.IP, len(networkings[i]))
+			copy(nets, networkings[i])
+
+			for _, ip := range nets {
+				ip.UnitID = pu.Unit.ID
+				ip.Engine = pu.Unit.EngineID
 			}
+
+			pendings[i].networkings = nets
+
+			list = append(list, nets...)
 		}
+
+		err = svc.so.SetIPs(list)
+		if err != nil {
+			return units, err
+		}
+	}
+
+	auth, err := gd.AuthConfig()
+	if err != nil {
+		return units, err
+	}
+
+	err = svc.runContainer(ctx, pendings, false, auth)
+	if err != nil {
+		return units, err
 	}
 
 	kvc := gd.KVClient()

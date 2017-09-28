@@ -140,7 +140,7 @@ func (at netAllocator) availableDevice(engineID string) ([]string, int, error) {
 	return list, width, nil
 }
 
-func (at netAllocator) AllocDevice(engineID string, ips []database.IP) ([]database.IP, error) {
+func (at netAllocator) AllocDevice(engineID, unitID string, ips []database.IP) ([]database.IP, error) {
 	idle, width, err := at.availableDevice(engineID)
 	if err != nil {
 		return ips, err
@@ -160,17 +160,22 @@ func (at netAllocator) AllocDevice(engineID string, ips []database.IP) ([]databa
 		return ips, errors.Errorf("Engine:%s not enough Bandwidth for require,%d less", engineID, width)
 	}
 
-	for i := range ips {
-		ips[i].Engine = engineID
-		ips[i].Bond = idle[i]
+	out := make([]database.IP, 0, len(ips))
+
+	for i, t := range ips {
+		t.Engine = engineID
+		t.Bond = idle[i]
+		t.UnitID = unitID
+
+		out = append(out, t)
 	}
 
-	err = at.ormer.SetIPs(ips)
+	err = at.ormer.SetIPs(out)
 	if err != nil {
-		return ips, err
+		return out, err
 	}
 
-	return ips, nil
+	return out, nil
 }
 
 func (at netAllocator) UpdateNetworking(ctx context.Context, engineID, addr string, ips []database.IP, width int) error {

@@ -68,7 +68,7 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 
 		{
 			actor := alloc.NewAllocator(gd.ormer, gd.Cluster)
-			adds, pendings, err := gd.scaleAllocation(ctx, svc, actor, true,
+			adds, pendings, err := gd.scaleAllocation(ctx, svc, actor, false, false,
 				len(units)+1, candidates, nil, nil)
 			defer func() {
 				if err != nil {
@@ -86,12 +86,6 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 				news.unit = *adds[0]
 			}
 
-			// migrate networkings
-			news.networkings, err = migrateNetworking(svc.so, old.networkings, pendings[0].networkings)
-			if err != nil {
-				return err
-			}
-
 			defer func() {
 				if err != nil {
 					_err := svc.so.SetIPs(old.networkings)
@@ -100,6 +94,12 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 					}
 				}
 			}()
+
+			// migrate networkings
+			news.networkings, err = actor.AllocDevice(news.unit.u.EngineID, news.unit.u.ID, old.networkings)
+			if err != nil {
+				return err
+			}
 
 			// migrate volumes
 			news.volumes, err = actor.MigrateVolumes(news.unit.u.ID, old.engine, news.engine, old.volumes)

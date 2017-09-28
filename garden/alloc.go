@@ -227,7 +227,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 			return val == statusServcieBuilding
 		},
 		func() error {
-			ready, err = gd.allocation(ctx, actor, svc, nil, false)
+			ready, err = gd.allocation(ctx, actor, svc, nil, true, true)
 			return err
 		},
 		false)
@@ -235,7 +235,9 @@ func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	return
 }
 
-func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Service, units []database.Unit, skipVolume bool) (ready []pendingUnit, err error) {
+func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Service,
+	units []database.Unit, vr, nr bool) (ready []pendingUnit, err error) {
+
 	im, version, err := getImage(gd.Ormer(), svc.svc.Desc.Image)
 	if err != nil {
 		return nil, err
@@ -366,7 +368,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 				}
 			}
 
-			pu, err := pendingAlloc(actor, units[count-1], nodes[i], opts, config, skipVolume)
+			pu, err := pendingAlloc(actor, units[count-1], nodes[i], opts, config, vr, nr)
 			if err != nil {
 				bad = append(bad, pu)
 				field.Debugf("pending alloc:node=%s,%+v", nodes[i].Name, err)
@@ -398,7 +400,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 
 func pendingAlloc(actor alloc.Allocator, unit database.Unit,
 	node *node.Node, opts scheduleOption,
-	config *cluster.ContainerConfig, skipVolume bool) (pendingUnit, error) {
+	config *cluster.ContainerConfig, vr, nr bool) (pendingUnit, error) {
 	pu := pendingUnit{
 		swarmID:     unit.ID,
 		Unit:        unit,
@@ -413,17 +415,20 @@ func pendingAlloc(actor alloc.Allocator, unit database.Unit,
 		return pu, err
 	}
 
-	netlist := opts.Nodes.Networkings[node.Labels[clusterLabel]]
-	networkings, err := actor.AlloctNetworking(pu.config, node.ID, pu.Unit.ID, netlist, opts.Require.Networks)
-	if len(networkings) > 0 {
-		pu.networkings = append(pu.networkings, networkings...)
-	}
-	if err != nil {
-		logrus.Debugf("AlloctNetworking:node=%s,%s", node.Name, err)
-		return pu, err
+	if nr {
+		netlist := opts.Nodes.Networkings[node.Labels[clusterLabel]]
+
+		networkings, err := actor.AlloctNetworking(pu.config, node.ID, pu.Unit.ID, netlist, opts.Require.Networks)
+		if len(networkings) > 0 {
+			pu.networkings = append(pu.networkings, networkings...)
+		}
+		if err != nil {
+			logrus.Debugf("AlloctNetworking:node=%s,%s", node.Name, err)
+			return pu, err
+		}
 	}
 
-	if !skipVolume {
+	if vr {
 		lvs, err := actor.AlloctVolumes(pu.config, pu.Unit.ID, node, opts.Require.Volumes)
 		if len(lvs) > 0 {
 			pu.volumes = append(pu.volumes, lvs...)
