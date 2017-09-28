@@ -51,18 +51,8 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 			if err != nil {
 				return err
 			}
-			desc := *table.Desc
-			desc.ID = utils.Generate32UUID()
-			desc.Replicas = req.Arch.Replicas
-			desc.Previous = table.DescID
 
-			out, err := json.Marshal(req.Arch)
-			if err == nil {
-				desc.Architecture = string(out)
-			}
-
-			table.DescID = desc.ID
-			table.Desc = &desc
+			table = updateDescByArch(table, req.Arch)
 
 			err = svc.so.SetServiceDesc(table)
 			if err != nil {

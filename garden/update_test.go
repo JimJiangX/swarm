@@ -180,3 +180,19 @@ func TestMergeVolumeRequire(t *testing.T) {
 
 	t.Log(out)
 }
+
+func TestUpdateDescByArch(t *testing.T) {
+	table := updateDescByArch(es, structs.Arch{
+		Replicas: 5,
+		Mode:     "mode",
+		Code:     "modexxx990",
+	})
+
+	if table.Desc.ID == es.ID ||
+		table.DescID == es.DescID ||
+		table.Desc.Previous != es.Desc.ID ||
+		table.Desc.Replicas != 5 ||
+		table.Desc.Architecture == es.Desc.Architecture {
+		t.Error(table, es)
+	}
+}

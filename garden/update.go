@@ -589,3 +589,20 @@ func (svc *Service) UpdateNetworking(ctx context.Context, actor alloc.Allocator,
 
 	return sl.Run(isnotInProgress, update, false)
 }
+
+func updateDescByArch(table database.Service, arch structs.Arch) database.Service {
+	desc := *table.Desc
+	desc.ID = utils.Generate32UUID()
+	desc.Replicas = arch.Replicas
+	desc.Previous = table.DescID
+
+	out, err := json.Marshal(arch)
+	if err == nil {
+		desc.Architecture = string(out)
+	}
+
+	table.DescID = desc.ID
+	table.Desc = &desc
+
+	return table
+}
