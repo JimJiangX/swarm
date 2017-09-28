@@ -18,13 +18,12 @@ consul_port=${14}
 node_id=${15}
 horus_server_ip=${16}
 horus_server_port=${17}
-docker_plugin_port=${18}
-swarm_agent_port=${19}
-nfs_ip=${20}
-nfs_dir=${21}
-nfs_mount_dir=${22}
-nfs_mount_opts=${23}
-san_id=${24}
+swarm_agent_port=${18}
+nfs_ip=${19}
+nfs_dir=${20}
+nfs_mount_dir=${21}
+nfs_mount_opts=${22}
+san_id=${23}
 if [ "$san_id" == "null" ]; then
 	san_id=''
 fi
@@ -592,7 +591,7 @@ init_ssd_vg
 install_consul
 
 install_docker_plugin
-reg_to_consul DockerPlugin ${docker_plugin_port}
+#reg_to_consul DockerPlugin ${docker_plugin_port}
 #reg_to_horus_server DockerPlugin 
 
 install_docker
