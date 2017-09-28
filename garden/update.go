@@ -155,14 +155,8 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 			if err != nil {
 				return err
 			}
-			desc := *table.Desc
-			desc.ID = utils.Generate32UUID()
-			desc.Image = im.Version()
-			desc.ImageID = im.ImageID
-			desc.Previous = table.DescID
 
-			table.DescID = desc.ID
-			table.Desc = &desc
+			table = updateDescByImage(table, im)
 
 			err = svc.so.SetServiceDesc(table)
 			if err == nil {
@@ -179,6 +173,20 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 		statusServiceImageUpdateFailed)
 
 	return tl.Run(isnotInProgress, update, async)
+}
+
+func updateDescByImage(table database.Service, im database.Image) database.Service {
+	desc := *table.Desc
+	desc.ID = utils.Generate32UUID()
+	desc.Image = im.Version()
+	desc.ImageID = im.ImageID
+	desc.Previous = table.DescID
+
+	table.DescID = desc.ID
+	table.Desc = &desc
+
+	return table
+
 }
 
 // UpdateResource udpate service containers CPU & memory settings.
@@ -281,31 +289,11 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 			if err != nil {
 				return err
 			}
-			desc := *table.Desc
-			desc.ID = utils.Generate32UUID()
-			desc.NCPU = int(ncpu)
-			desc.Memory = memory
 
-			schedOpts := scheduleOption{}
-			r := strings.NewReader(table.Desc.ScheduleOptions)
-			err = json.NewDecoder(r).Decode(&schedOpts)
-			if err != nil && table.Desc.ScheduleOptions != "" {
-				return errors.WithStack(err)
-			}
-
-			schedOpts.Require.Require.CPU = desc.NCPU
-			schedOpts.Require.Require.Memory = desc.Memory
-
-			sr, err := json.Marshal(schedOpts)
+			table, err = updateDescByResource(table, ncpu, memory)
 			if err != nil {
-				return errors.WithStack(err)
+				return err
 			}
-
-			desc.ScheduleOptions = string(sr)
-			desc.Previous = table.DescID
-
-			table.DescID = desc.ID
-			table.Desc = &desc
 
 			err = svc.so.SetServiceDesc(table)
 			if err == nil {
@@ -320,6 +308,36 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 		statusServiceResourceUpdating, statusServiceResourceUpdated, statusServiceResourceUpdateFailed)
 
 	return sl.Run(isnotInProgress, update, false)
+}
+
+func updateDescByResource(table database.Service, ncpu, memory int64) (database.Service, error) {
+	desc := *table.Desc
+	desc.ID = utils.Generate32UUID()
+	desc.NCPU = int(ncpu)
+	desc.Memory = memory
+
+	schedOpts := scheduleOption{}
+	r := strings.NewReader(table.Desc.ScheduleOptions)
+	err := json.NewDecoder(r).Decode(&schedOpts)
+	if err != nil && table.Desc.ScheduleOptions != "" {
+		return table, errors.WithStack(err)
+	}
+
+	schedOpts.Require.Require.CPU = desc.NCPU
+	schedOpts.Require.Require.Memory = desc.Memory
+
+	sr, err := json.Marshal(schedOpts)
+	if err != nil {
+		return table, errors.WithStack(err)
+	}
+
+	desc.ScheduleOptions = string(sr)
+	desc.Previous = table.DescID
+
+	table.DescID = desc.ID
+	table.Desc = &desc
+
+	return table, nil
 }
 
 func reduceCPUset(cpusetCpus string, need int) (string, error) {
@@ -356,6 +374,16 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 	}
 
 	expansion := func() error {
+		opts, err := svc.getScheduleOption()
+		if err != nil {
+			return err
+		}
+
+		target, err = mergeVolumeRequire(opts.Require.Volumes, target)
+		if err != nil {
+			return err
+		}
+
 		type pending struct {
 			u        *unit
 			eng      *cluster.Engine
@@ -417,44 +445,18 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 				return err
 			}
 
-			var old []structs.VolumeRequire
-			r := strings.NewReader(table.Desc.Volumes)
-			err = json.NewDecoder(r).Decode(&old)
+			table, err = updateDescByVolumeReuires(table, &opts, target)
 			if err != nil {
-				old = []structs.VolumeRequire{}
+				return err
 			}
 
-			out := mergeVolumeRequire(old, target)
-			vb, err := json.Marshal(out)
-			if err != nil {
-				return errors.WithStack(err)
+			err = svc.so.SetServiceDesc(table)
+			if err == nil {
+				svc.svc = &table
 			}
 
-			schedOpts := scheduleOption{}
-			r = strings.NewReader(table.Desc.ScheduleOptions)
-			err = json.NewDecoder(r).Decode(&schedOpts)
-			if err != nil && table.Desc.ScheduleOptions != "" {
-				return errors.WithStack(err)
-			}
-
-			schedOpts.Require.Volumes = out
-			sr, err := json.Marshal(schedOpts)
-			if err != nil {
-				return errors.WithStack(err)
-			}
-
-			desc := *table.Desc
-			desc.ID = utils.Generate32UUID()
-			desc.Volumes = string(vb)
-			desc.ScheduleOptions = string(sr)
-			desc.Previous = table.DescID
-
-			table.DescID = desc.ID
-			table.Desc = &desc
-
-			return svc.so.SetServiceDesc(table)
+			return err
 		}
-
 	}
 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
@@ -463,29 +465,83 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 	return sl.Run(isnotInProgress, expansion, false)
 }
 
-func mergeVolumeRequire(old, update []structs.VolumeRequire) []structs.VolumeRequire {
+func updateDescByVolumeReuires(table database.Service, opts *scheduleOption, target []structs.VolumeRequire) (database.Service, error) {
+	if opts == nil {
+		opts = &scheduleOption{}
+		r := strings.NewReader(table.Desc.ScheduleOptions)
+		err := json.NewDecoder(r).Decode(opts)
+		if err != nil && table.Desc.ScheduleOptions != "" {
+			return table, errors.WithStack(err)
+		}
+
+		target, err = mergeVolumeRequire(opts.Require.Volumes, target)
+		if err != nil {
+			return table, err
+		}
+	}
+
+	opts.Require.Volumes = target
+
+	sr, err := json.Marshal(opts)
+	if err != nil {
+		return table, errors.WithStack(err)
+	}
+
+	vb, err := json.Marshal(target)
+	if err != nil {
+		return table, errors.WithStack(err)
+	}
+
+	desc := *table.Desc
+	desc.ID = utils.Generate32UUID()
+	desc.Volumes = string(vb)
+	desc.ScheduleOptions = string(sr)
+	desc.Previous = table.DescID
+
+	table.DescID = desc.ID
+	table.Desc = &desc
+
+	return table, nil
+}
+
+func mergeVolumeRequire(old, update []structs.VolumeRequire) ([]structs.VolumeRequire, error) {
 	if len(old) == 0 {
-		return update
+
+		for v := range update {
+			if update[v].Name == "" || update[v].Type == "" {
+				return nil, errors.Errorf("invalid volume require,%v", update[v])
+			}
+		}
+
+		return update, nil
 	}
 
 	out := make([]structs.VolumeRequire, 0, len(old))
 
-	for i := range old {
+	for v := range update {
 		found := false
 
 	loop:
-		for v := range update {
-			if old[i].Name == update[v].Name && old[i].Type == update[v].Type {
-				out = append(out, update[v])
+		for i := range old {
+			if old[i].Name == update[v].Name {
+
+				old[i].Size = update[v].Size
+				out = append(out, old[i])
+
 				found = true
+
 				break loop
 			}
 		}
 
 		if !found {
-			out = append(out, old[i])
+			if update[v].Name == "" || update[v].Type == "" {
+				return nil, errors.Errorf("invalid volume require,%v", update[v])
+			}
+
+			out = append(out, update[v])
 		}
 	}
 
-	return out
+	return out, nil
 }
