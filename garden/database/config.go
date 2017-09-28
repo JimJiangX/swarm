@@ -34,8 +34,8 @@ type SysConfig struct {
 }
 
 type Ports struct {
-	Docker     int `db:"docker_port" json:"docker_port"`
-	Plugin     int `db:"plugin_port" json:"plugin_port"`
+	Docker int `db:"docker_port" json:"docker_port"`
+	// Plugin     int `db:"plugin_port" json:"plugin_port"`
 	SwarmAgent int `db:"swarm_agent_port" json:"swarm_agent_port"`
 	// Consul     int `db:"consul_port"`
 }
@@ -97,7 +97,7 @@ func (db dbBase) sysConfigTable() string {
 // InsertSysConfig insert a new SysConfig
 func (db dbBase) InsertSysConfig(c SysConfig) error {
 
-	query := "INSERT INTO " + db.sysConfigTable() + " (dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,swarm_agent_port,registry_os_username,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,backup_dir) VALUES (:dc_id,:consul_ip,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:swarm_agent_port,:registry_os_username,:registry_domain,:registry_ip,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:plugin_port,:retry,:backup_dir)"
+	query := "INSERT INTO " + db.sysConfigTable() + " (dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,swarm_agent_port,registry_os_username,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,retry,backup_dir) VALUES (:dc_id,:consul_ip,:consul_port,:consul_dc,:consul_token,:consul_wait_time,:swarm_agent_port,:registry_os_username,:registry_domain,:registry_ip,:registry_port,:registry_username,:registry_password,:registry_email,:registry_token,:registry_ca_crt,:source_dir,:clean_script_name,:init_script_name,:ca_crt_name,:destination_dir,:docker_port,:retry,:backup_dir)"
 
 	_, err := db.NamedExec(query, &c)
 
@@ -126,7 +126,7 @@ func (c SysConfig) GetConsulAddrs() []string {
 func (db dbBase) GetSysConfig() (SysConfig, error) {
 	var (
 		c     = SysConfig{}
-		query = "SELECT dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,swarm_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,plugin_port,retry,registry_os_username,backup_dir FROM " + db.sysConfigTable() + " LIMIT 1"
+		query = "SELECT dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,swarm_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,retry,registry_os_username,backup_dir FROM " + db.sysConfigTable() + " LIMIT 1"
 	)
 
 	err := db.Get(&c, query)
@@ -176,7 +176,7 @@ func newAuthConfig(username, password, email, token string) *types.AuthConfig {
 func (db dbBase) GetPorts() (Ports, error) {
 	var (
 		p     Ports
-		query = "SELECT swarm_agent_port,docker_port,plugin_port FROM " + db.sysConfigTable() + " LIMIT 1"
+		query = "SELECT swarm_agent_port,docker_port FROM " + db.sysConfigTable() + " LIMIT 1"
 	)
 
 	err := db.Get(&p, query)

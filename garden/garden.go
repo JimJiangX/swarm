@@ -175,7 +175,6 @@ func (gd *Garden) Register(req structs.RegisterDC) error {
 		Retry:     req.Retry,
 		Ports: database.Ports{
 			Docker:     req.DockerPort,
-			Plugin:     req.PluginPort,
 			SwarmAgent: req.SwarmAgentPort,
 		},
 		ConsulConfig: database.ConsulConfig{
