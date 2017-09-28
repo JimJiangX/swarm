@@ -402,7 +402,7 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 		for _, u := range units {
 			eng := u.getEngine()
 			if eng == nil {
-				return errors.Errorf("")
+				return errors.WithStack(newNotFound("Engine", u.u.EngineID))
 			}
 
 			add, creating, err := u.prepareExpandVolume(eng, target)
@@ -544,4 +544,48 @@ func mergeVolumeRequire(old, update []structs.VolumeRequire) ([]structs.VolumeRe
 	}
 
 	return out, nil
+}
+
+func (svc *Service) UpdateNetworking(ctx context.Context, actor alloc.Allocator, require []structs.NetDeviceRequire) error {
+	if len(require) == 0 {
+		return nil
+	}
+
+	width := 0
+	for i := range require {
+		if require[i].Bandwidth > width {
+			width = require[i].Bandwidth
+		}
+	}
+
+	update := func() error {
+		units, err := svc.getUnits()
+		if err != nil {
+			return err
+		}
+
+		for _, u := range units {
+			eng := u.getEngine()
+			if eng == nil {
+				return errors.WithStack(newNotFound("Engine", u.u.EngineID))
+			}
+
+			ips, err := u.uo.ListIPByUnitID(u.u.ID)
+			if err != nil {
+				return err
+			}
+
+			err = actor.UpdateNetworking(ctx, eng.ID, ips, width)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
+		statusServiceNetworkUpdating, statusServiceNetworkUpdated, statusServiceNetworkUpdateFailed)
+
+	return sl.Run(isnotInProgress, update, false)
 }

@@ -20,8 +20,9 @@ const (
 	statusServiceImageUpdating                      // 16
 	statusServiceResourceUpdating                   // 17
 	statusServiceVolumeExpanding                    // 18
-	statusServiceComposing                          // 19
-	statusServiceDeleting                           // 20
+	statusServiceNetworkUpdating                    // 19
+	statusServiceComposing                          // 20
+	statusServiceDeleting                           // 21
 
 	_ing    = 0
 	_failed = 1
@@ -80,6 +81,9 @@ const (
 
 	statusServiceVolumeExpanded     = statusServiceVolumeExpanding + _done
 	statusServiceVolumeExpandFailed = statusServiceVolumeExpanding + _failed
+
+	statusServiceNetworkUpdated      = statusServiceNetworkUpdating + _done
+	statusServiceNetworkUpdateFailed = statusServiceNetworkUpdating + _failed
 
 	statusServiceDeleteFailed = statusServiceDeleting + _failed
 )

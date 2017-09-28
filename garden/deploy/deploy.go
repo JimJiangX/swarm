@@ -472,6 +472,24 @@ func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config stru
 				return svc.VolumeExpansion(actor, config.Volumes)
 			}()
 		}
+		if err != nil {
+			return err
+		}
+
+		select {
+		default:
+		case <-ctx.Done():
+			return errors.WithStack(ctx.Err())
+		}
+
+		if len(config.Networks) > 0 {
+			err = func() error {
+				d.gd.Lock()
+				defer d.gd.Unlock()
+
+				return svc.UpdateNetworking(ctx, actor, config.Networks)
+			}()
+		}
 
 		return err
 	}
