@@ -212,25 +212,11 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 			}
 		}()
 
-		list := make([]database.IP, 0, len(pendings))
-
 		for i, pu := range pendings {
-			nets := make([]database.IP, len(networkings[i]))
-			copy(nets, networkings[i])
-
-			for _, ip := range nets {
-				ip.UnitID = pu.Unit.ID
-				ip.Engine = pu.Unit.EngineID
+			pendings[i].networkings, err = actor.AllocDevice(pu.Unit.EngineID, pu.Unit.ID, networkings[i])
+			if err != nil {
+				return units, err
 			}
-
-			pendings[i].networkings = nets
-
-			list = append(list, nets...)
-		}
-
-		err = svc.so.SetIPs(list)
-		if err != nil {
-			return units, err
 		}
 	}
 
