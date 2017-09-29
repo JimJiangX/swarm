@@ -169,11 +169,15 @@ func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, actor alloc
 	for i := range add {
 		adds[i] = newUnit(add[i], svc.so, svc.cluster)
 	}
+
+	pendings, err := gd.allocation(ctx, actor, svc, add, vr, nr)
 	if err != nil {
 		return adds, nil, err
 	}
 
-	pendings, err := gd.allocation(ctx, actor, svc, add, vr, nr)
+	for i := range add {
+		adds[i] = newUnit(pendings[i].Unit, svc.so, svc.cluster)
+	}
 
 	return adds, pendings, err
 }
