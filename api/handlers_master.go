@@ -1799,7 +1799,9 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 }
 
 func vaildPostServiceUpdateRequest(v structs.UnitRequire) error {
-	if v.Require.CPU == 0 && v.Require.Memory == 0 && len(v.Volumes) == 0 {
+	if v.Require.CPU == 0 && v.Require.Memory == 0 &&
+		len(v.Volumes) == 0 && len(v.Networks) == 0 {
+
 		return fmt.Errorf("UnitRequire:%v,%s", v, "no resource update required")
 	}
 
