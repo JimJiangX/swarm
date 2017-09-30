@@ -43,6 +43,13 @@ var (
 		Role:      "replication",
 		Privilege: "REPLICATION SLAVE",
 	}
+
+	check     = ""
+	check_pwd = ""
+	Check     = User{
+		Role:      "check",
+		Privilege: "ALL",
+	}
 )
 
 func init() {
@@ -54,10 +61,14 @@ func init() {
 
 	Replication.User = repl
 	Replication.Password = repl_pwd
+
+	Check.User = check
+	Check.Password = check_pwd
 }
 
 func Validate() error {
 	if Root.User == "" || Root.Password == "" ||
+		Check.User == "" || Check.Password == "" ||
 		Monitor.User == "" || Monitor.Password == "" ||
 		Replication.User == "" || Replication.Password == "" {
 
