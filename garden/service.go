@@ -510,10 +510,10 @@ func (svc *Service) initStart(ctx context.Context, units []*unit, kvc kvstore.Cl
 		mon := vars.Monitor
 		repl := vars.Replication
 		chk := vars.Check
-		cmd = append(cmd, root.Role, root.User, root.Password, root.Privilege,
-			mon.Role, mon.User, mon.Password, mon.Privilege,
-			repl.Role, repl.User, repl.Password, repl.Privilege,
-			chk.Role, chk.User, chk.Password, chk.Privilege)
+		cmd = append(cmd, root.Role, root.User, root.Password,
+			mon.Role, mon.User, mon.Password,
+			repl.Role, repl.User, repl.Password,
+			chk.Role, chk.User, chk.Password)
 
 		_, err = units[i].containerExec(ctx, cmd, false)
 		if err != nil {

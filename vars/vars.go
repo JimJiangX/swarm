@@ -7,10 +7,10 @@ import (
 var errUserInvaild = errors.New("invaild user")
 
 type User struct {
-	Role      string
-	User      string
-	Password  string
-	Privilege string
+	Role     string
+	User     string
+	Password string
+	//	Privilege string
 }
 
 var (
@@ -20,8 +20,8 @@ var (
 	// root_password=123.com
 	// root_privilege="ALL"
 	Root = User{
-		Role:      "root",
-		Privilege: "ALL",
+		Role: "root",
+		//	Privilege: "ALL",
 	}
 
 	mon     = ""
@@ -30,8 +30,8 @@ var (
 	// mon_password=111111
 	// mon_privilege="SELECT,PROCESS,REPLICATION CLENT"
 	Monitor = User{
-		Role:      "monitor",
-		Privilege: "SELECT,PROCESS,REPLICATION CLENT",
+		Role: "monitor",
+		//	Privilege: "SELECT,PROCESS,REPLICATION CLENT",
 	}
 
 	repl     = ""
@@ -40,15 +40,15 @@ var (
 	// repl_password=111111
 	// repl_privilege="REPLICATION SLAVE"
 	Replication = User{
-		Role:      "replication",
-		Privilege: "REPLICATION SLAVE",
+		Role: "replication",
+		//	Privilege: "REPLICATION SLAVE",
 	}
 
 	check     = ""
 	check_pwd = ""
 	Check     = User{
-		Role:      "check",
-		Privilege: "ALL",
+		Role: "check",
+		//	Privilege: "ALL",
 	}
 )
 
