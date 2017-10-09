@@ -127,7 +127,7 @@ type ClientAPI interface {
 	UpdateNetwork(ctx context.Context, opt NetworkConfig) error
 }
 
-//create network for contianer(use pipewrok),which network mode is none
+//create network for container(use pipework),which network mode is none
 func (c client) CreateNetwork(ctx context.Context, opt NetworkConfig) error {
 	return c.postWrap(ctx, "/network/create", opt)
 }

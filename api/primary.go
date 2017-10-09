@@ -3,7 +3,6 @@ package api
 import (
 	"crypto/tls"
 	"net/http"
-
 	"net/http/pprof"
 
 	log "github.com/Sirupsen/logrus"

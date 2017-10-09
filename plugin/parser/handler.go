@@ -470,6 +470,13 @@ func composeService(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func linkServices(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	req := structs.ServicesLink{}
+
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
 }
 
 // Emit an HTTP error and log it.
