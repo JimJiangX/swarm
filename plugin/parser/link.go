@@ -1,12 +1,14 @@
 package parser
 
 import (
+	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 type linkGenerator interface {
-	generateLinkConfig() (structs.ServiceLinkResponse, error)
+	generateLinkConfig(ctx context.Context, client kvstore.Store) (structs.ServiceLinkResponse, error)
 }
 
 const (
@@ -72,6 +74,75 @@ func newLinkUpSQL(links []*structs.ServiceLink) (linkUpSQL, error) {
 	return obj, nil
 }
 
-func (sql linkUpSQL) generateLinkConfig() (structs.ServiceLinkResponse, error) {
-	return structs.ServiceLinkResponse{}, nil
+func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Store) (structs.ServiceLinkResponse, error) {
+	resp := structs.ServiceLinkResponse{
+		Links: make([]structs.UnitLink, 0, 5),
+	}
+
+	{
+		opts := make(map[string]map[string]interface{})
+
+		// set options
+
+		ulinks, err := generateServiceLink(ctx, client, *sql.sql.Spec, opts)
+		if err != nil {
+			return resp, err
+		}
+
+		resp.Links = append(resp.Links, ulinks...)
+	}
+
+	{
+		opts := make(map[string]map[string]interface{})
+		// set options
+
+		ulinks, err := generateServiceLink(ctx, client, *sql.proxy.Spec, opts)
+		if err != nil {
+			return resp, err
+		}
+
+		resp.Links = append(resp.Links, ulinks...)
+	}
+
+	{
+		opts := make(map[string]map[string]interface{})
+
+		// set options
+
+		ulinks, err := generateServiceLink(ctx, client, *sql.swm.Spec, opts)
+		if err != nil {
+			return resp, err
+		}
+
+		resp.Links = append(resp.Links, ulinks...)
+	}
+
+	resp.Compose = []string{sql.sql.ID, sql.proxy.ID, sql.swm.ID}
+
+	return resp, nil
+}
+
+func generateServiceLink(ctx context.Context,
+	client kvstore.Store,
+	spec structs.ServiceSpec,
+	opts map[string]map[string]interface{}) ([]structs.UnitLink, error) {
+
+	cm, err := generateServiceConfigs(ctx, client, spec, "", opts)
+	if err != nil {
+		return nil, err
+	}
+
+	ulinks := make([]structs.UnitLink, 0, len(spec.Units))
+
+	for _, cc := range cm {
+		ulinks = append(ulinks, structs.UnitLink{
+			NameOrID:      cc.ID,
+			ServiceID:     spec.ID,
+			ConfigFile:    cc.ConfigFile,
+			ConfigContent: cc.Content,
+			Commands:      cc.Cmds[structs.StartServiceCmd], // TODO:
+		})
+	}
+
+	return ulinks, nil
 }
