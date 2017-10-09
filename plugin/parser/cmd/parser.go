@@ -23,39 +23,12 @@ var (
 func main() {
 	flag.Parse()
 
-	pc := api.NewPlugin(*flHost, client.NewClient(*flHost, 30*time.Second, nil))
-	list, err := pc.GetImageSupport(nil)
+	iv, err := structs.ParseImage(*flImage)
 	if err != nil {
-		log.Fatalf("get supported image list error\n%+v", err)
+		log.Fatalf("parse image version '%s':%+v", *flImage, err)
 	}
 
-	var (
-		iv   structs.ImageVersion
-		temp structs.ConfigTemplate
-	)
-	{
-		if *flImage != "" {
-			iv, err = structs.ParseImage(*flImage)
-			if err != nil {
-				log.Fatalf("parse image version '%s':%+v", *flImage, err)
-			}
-		}
-
-		found := false
-		for i := range list {
-			if list[i].Name == iv.Name &&
-				list[i].Major == iv.Major &&
-				list[i].Minor == iv.Minor &&
-				list[i].Build == iv.Build {
-
-				found = true
-				break
-			}
-		}
-		if !found {
-			log.Fatalf("unsupport image '%s' yet", *flImage)
-		}
-	}
+	var temp structs.ConfigTemplate
 
 	{
 		path, err := utils.GetAbsolutePath(false, *flConfig)
@@ -107,6 +80,8 @@ func main() {
 		if temp.Timestamp == 0 {
 			temp.Timestamp = time.Now().Unix()
 		}
+
+		pc := api.NewPlugin(*flHost, client.NewClient(*flHost, 30*time.Second, nil))
 
 		err := pc.PostImageTemplate(nil, temp)
 		if err != nil {
