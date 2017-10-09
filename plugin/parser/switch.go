@@ -10,6 +10,7 @@ import (
 
 	"github.com/astaxie/beego/config"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/vars"
 	"github.com/pkg/errors"
 )
 
@@ -351,6 +352,9 @@ func (c *switchManagerConfigV120) GenerateConfig(id string, desc structs.Service
 		m["SwarmSocketPath"] = filepath.Join(c.template.DataMount, "/upsql.sock")
 		m["SwarmHealthCheckConfigFile"] = filepath.Join(c.template.DataMount, "/my.cnf")
 	}
+
+	m["SwarmHealthCheckUser"] = vars.Check.User
+	m["SwarmHealthCheckPassword"] = vars.Check.Password
 
 	for key, val := range m {
 		err = c.set(key, val)

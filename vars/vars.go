@@ -77,12 +77,3 @@ func Validate() error {
 
 	return nil
 }
-
-func ValidateReplication() error {
-	if Replication.User == "" || Replication.Password == "" {
-
-		return errUserInvaild
-	}
-
-	return nil
-}
