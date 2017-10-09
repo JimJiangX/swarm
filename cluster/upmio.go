@@ -130,12 +130,12 @@ func (e *Engine) UpdateContainer(ctx context.Context, name string, config contai
 }
 
 // Exec returns the container exec command result
-func (c Container) Exec(ctx context.Context, cmd []string, detach bool) (types.ContainerExecInspect, error) {
+func (c Container) Exec(ctx context.Context, cmd []string, detach bool, w io.Writer) (types.ContainerExecInspect, error) {
 	if c.Engine == nil {
 		return types.ContainerExecInspect{}, errors.Errorf("Engine of Container:%s is required", c.Names)
 	}
 
-	return c.Engine.containerExec(ctx, c.ID, cmd, detach)
+	return c.Engine.containerExec(ctx, c.ID, cmd, detach, w)
 }
 
 // checkTtyInput checks if we are trying to attach to a container tty
@@ -151,7 +151,7 @@ func checkTtyInput(attachStdin, ttyMode bool) error {
 }
 
 // containerExec exec cmd in containeID,It returns ContainerExecInspect.
-func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
+func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []string, detach bool, w io.Writer) (types.ContainerExecInspect, error) {
 	inspect := types.ContainerExecInspect{}
 
 	execConfig := types.ExecConfig{
@@ -193,7 +193,7 @@ func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []st
 			logrus.Warn(err)
 		}
 
-		err = e.containerExecAttch(ctx, exec.ID, execConfig)
+		err = e.containerExecAttch(ctx, exec.ID, w, execConfig)
 		e.CheckConnectionErr(err)
 		if err != nil {
 			return inspect, err
@@ -212,11 +212,16 @@ func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []st
 	return inspect, err
 }
 
-func (e *Engine) containerExecAttch(ctx context.Context, execID string, execConfig types.ExecConfig) error {
+func (e *Engine) containerExecAttch(ctx context.Context, execID string, w io.Writer, execConfig types.ExecConfig) error {
 	var (
 		out, stderr io.Writer     = os.Stdout, os.Stderr
 		in          io.ReadCloser = os.Stdin
 	)
+
+	if w != nil {
+		out, stderr = w, w
+	}
+
 	resp, err := e.apiClient.ContainerExecAttach(ctx, execID, execConfig)
 	if err != nil {
 		return errors.WithStack(err)

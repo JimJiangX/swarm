@@ -37,6 +37,8 @@ const (
 	dbExecError
 	dbTxError
 
+	intervalExec
+
 	// dbBadConnection
 	// badConnection
 

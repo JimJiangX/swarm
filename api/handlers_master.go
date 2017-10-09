@@ -2096,13 +2096,6 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	spec, err := svc.Spec()
-	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 104, "fail to query database", "数据库查询错误（服务表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
 	// new Context with deadline
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
@@ -2110,16 +2103,33 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceExecTask, spec.ID, spec.Desc, nil, 300)
+	execFunc := func() error {
 
-	err = svc.Exec(ctx, config, true, &task)
+		u, err := svc.GetUnit(config.Container)
+		if err != nil {
+			ec := errCodeV1(_Service, intervalExec, 104, "fail to query database", "数据库查询错误（服务表）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+			return err
+		}
+
+		_, err = u.ContainerExec(ctx, config.Cmd, config.Detach, w)
+		if err != nil {
+			ec := errCodeV1(_Service, intervalExec, 105, "container exec failed", "容器exec执行错误")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+			return err
+		}
+
+		return nil
+	}
+
+	err = svc.ExecLock(ctx, execFunc, false, nil)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 105, "fail to exec command in service containers", "服务容器远程命令执行错误（container exec）")
+		ec := errCodeV1(_Service, internalError, 106, "fail to exec command in service containers", "服务容器远程命令执行错误（container exec）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
+	//	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
 func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
