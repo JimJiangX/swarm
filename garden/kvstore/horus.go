@@ -65,8 +65,8 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj structs.HorusRegistr
 
 	if obj.Service.Select {
 		// add monitor user
-		obj.Service.MonitorUser = vars.Replication.User
-		obj.Service.MonitorPassword = vars.Replication.Password
+		obj.Service.MonitorUser = vars.Monitor.User
+		obj.Service.MonitorPassword = vars.Monitor.Password
 
 		uri := fmt.Sprintf("http://%s/v1/%s", addr, unitType)
 
