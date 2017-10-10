@@ -132,9 +132,6 @@ func TestUpdateDescByVolumeReuires(t *testing.T) {
 
 		t.Error(table, es)
 	}
-
-	//	t.Log(table.Desc.Volumes)
-	//	t.Log(table.Desc.ScheduleOptions)
 }
 
 func TestMergeVolumeRequire(t *testing.T) {

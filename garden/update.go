@@ -466,20 +466,6 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 }
 
 func updateDescByVolumeReuires(table database.Service, opts *scheduleOption, target []structs.VolumeRequire) (database.Service, error) {
-	if opts == nil {
-		opts = &scheduleOption{}
-		r := strings.NewReader(table.Desc.ScheduleOptions)
-		err := json.NewDecoder(r).Decode(opts)
-		if err != nil && table.Desc.ScheduleOptions != "" {
-			return table, errors.WithStack(err)
-		}
-
-		target, err = mergeVolumeRequire(opts.Require.Volumes, target)
-		if err != nil {
-			return table, err
-		}
-	}
-
 	opts.Require.Volumes = target
 
 	sr, err := json.Marshal(opts)
@@ -581,7 +567,25 @@ func (svc *Service) UpdateNetworking(ctx context.Context, actor alloc.Allocator,
 			}
 		}
 
-		return nil
+		{
+			// update Service.Desc
+			table, err := svc.so.GetService(svc.svc.ID)
+			if err != nil {
+				return err
+			}
+
+			table, err = updateDescByNetworkReuires(table, nil, require)
+			if err != nil {
+				return err
+			}
+
+			err = svc.so.SetServiceDesc(table)
+			if err == nil {
+				svc.svc = &table
+			}
+
+			return err
+		}
 	}
 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
@@ -605,4 +609,38 @@ func updateDescByArch(table database.Service, arch structs.Arch) database.Servic
 	table.Desc = &desc
 
 	return table
+}
+
+func updateDescByNetworkReuires(table database.Service, opts *scheduleOption, target []structs.NetDeviceRequire) (database.Service, error) {
+	if opts == nil {
+		opts = &scheduleOption{}
+		r := strings.NewReader(table.Desc.ScheduleOptions)
+		err := json.NewDecoder(r).Decode(opts)
+		if err != nil && table.Desc.ScheduleOptions != "" {
+			return table, errors.WithStack(err)
+		}
+	}
+
+	opts.Require.Networks = target
+
+	sr, err := json.Marshal(opts)
+	if err != nil {
+		return table, errors.WithStack(err)
+	}
+
+	nb, err := json.Marshal(target)
+	if err != nil {
+		return table, errors.WithStack(err)
+	}
+
+	desc := *table.Desc
+	desc.ID = utils.Generate32UUID()
+	desc.Networks = string(nb)
+	desc.ScheduleOptions = string(sr)
+	desc.Previous = table.DescID
+
+	table.DescID = desc.ID
+	table.Desc = &desc
+
+	return table, nil
 }
