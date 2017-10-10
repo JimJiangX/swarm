@@ -47,7 +47,7 @@ var (
 	categoryMap = map[string]category{
 		"internalError":      internalError,
 		"urlParamError":      urlParamError,
-		"invaildParamsError": invaildParamsError,
+		"invalidParamsError": invalidParamsError,
 		"encodeError":        encodeError,
 		"decodeError":        decodeError,
 		"objectNotExist":     objectNotExist,

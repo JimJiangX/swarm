@@ -90,7 +90,7 @@ func writeJSONFprintf(w http.ResponseWriter, status int, format string, args ...
 }
 
 // -----------------/nfs_backups handlers-----------------
-func vaildNFSParams(nfs database.NFS) error {
+func validNFSParams(nfs database.NFS) error {
 	errs := make([]string, 0, 4)
 
 	if nfs.Addr == "" {
@@ -130,9 +130,9 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	nfs.MountDir = r.FormValue("nfs_mount_dir")
 	nfs.Options = r.FormValue("nfs_mount_opts")
 
-	err := vaildNFSParams(nfs)
+	err := validNFSParams(nfs)
 	if err != nil {
-		ec := errCodeV1(_NFS, invaildParamsError, 12, "URL parameters are invaild", "URL参数校验错误，包含无效参数")
+		ec := errCodeV1(_NFS, invalidParamsError, 12, "URL parameters are invalid", "URL参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -237,7 +237,7 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusOK)
 }
 
-func vaildBackupTaskCallback(bt structs.BackupTaskCallback) error {
+func validBackupTaskCallback(bt structs.BackupTaskCallback) error {
 	errs := make([]string, 0, 3)
 
 	if bt.UnitID == "" {
@@ -269,9 +269,9 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = vaildBackupTaskCallback(req)
+	err = validBackupTaskCallback(req)
 	if err != nil {
-		ec := errCodeV1(_Task, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		ec := errCodeV1(_Task, invalidParamsError, 32, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -332,7 +332,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 }
 
 // -----------------/datacenter handler-----------------
-func vaildDatacenter(v structs.RegisterDC) error {
+func validDatacenter(v structs.RegisterDC) error {
 	// TODO:
 	return nil
 }
@@ -347,8 +347,8 @@ func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := vaildDatacenter(req); err != nil {
-		ec := errCodeV1(_DC, invaildParamsError, 12, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validDatacenter(req); err != nil {
+		ec := errCodeV1(_DC, invalidParamsError, 12, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -450,7 +450,7 @@ func getSupportImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	writeJSON(w, out, http.StatusOK)
 }
 
-func vaildLoadImageRequest(v structs.PostLoadImageRequest) error {
+func validLoadImageRequest(v structs.PostLoadImageRequest) error {
 	errs := make([]string, 0, 2)
 
 	if v.Name == "" ||
@@ -487,8 +487,8 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := vaildLoadImageRequest(req); err != nil {
-		ec := errCodeV1(_Image, invaildParamsError, 33, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validLoadImageRequest(req); err != nil {
+		ec := errCodeV1(_Image, invalidParamsError, 33, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -730,7 +730,7 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusOK)
 }
 
-func vaildPostClusterRequest(v structs.PostClusterRequest) error {
+func validPostClusterRequest(v structs.PostClusterRequest) error {
 	return nil
 }
 
@@ -743,8 +743,8 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := vaildPostClusterRequest(req); err != nil {
-		ec := errCodeV1(_Cluster, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostClusterRequest(req); err != nil {
+		ec := errCodeV1(_Cluster, invalidParamsError, 32, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -783,8 +783,8 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := vaildPostClusterRequest(req); err != nil {
-		ec := errCodeV1(_Cluster, invaildParamsError, 42, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostClusterRequest(req); err != nil {
+		ec := errCodeV1(_Cluster, invalidParamsError, 42, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -970,7 +970,7 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusOK)
 }
 
-func vaildNodeRequest(node structs.Node) error {
+func validNodeRequest(node structs.Node) error {
 	errs := make([]string, 0, 3)
 
 	if node.Cluster == "" {
@@ -981,7 +981,7 @@ func vaildNodeRequest(node structs.Node) error {
 		errs = append(errs, "Addr is required")
 	}
 
-	// vaild ssh config
+	// valid ssh config
 	if node.SSHConfig.Username == "" {
 		errs = append(errs, "SSHConfig.Username is required")
 	}
@@ -1002,8 +1002,8 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := vaildNodeRequest(n); err != nil {
-		ec := errCodeV1(_Host, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validNodeRequest(n); err != nil {
+		ec := errCodeV1(_Host, invalidParamsError, 32, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1161,7 +1161,7 @@ func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func vaildDelNodesRequest(name, user string) error {
+func validDelNodesRequest(name, user string) error {
 	errs := make([]string, 0, 2)
 
 	if name == "" {
@@ -1202,8 +1202,8 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
-	if err := vaildDelNodesRequest(node, username); err != nil {
-		ec := errCodeV1(_Host, invaildParamsError, 72, "URL parameters are invaild", "URL参数校验错误，包含无效参数")
+	if err := validDelNodesRequest(node, username); err != nil {
+		ec := errCodeV1(_Host, invalidParamsError, 72, "URL parameters are invalid", "URL参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1282,7 +1282,7 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := vailPostNetworkingRequest(req); err != nil {
-		ec := errCodeV1(_Networking, invaildParamsError, 12, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		ec := errCodeV1(_Networking, invalidParamsError, 12, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1365,7 +1365,7 @@ func setNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request, en
 				}
 			}
 			if !exist {
-				ec := errCodeV1(_Networking, invaildParamsError, 24, fmt.Sprintf("IP %s is not in networking %s", body[i], name), fmt.Sprintf("IP %s 不属于指定网络集群(%s)", body[i], name))
+				ec := errCodeV1(_Networking, invalidParamsError, 24, fmt.Sprintf("IP %s is not in networking %s", body[i], name), fmt.Sprintf("IP %s 不属于指定网络集群(%s)", body[i], name))
 				httpJSONError(w, stderr.New(ec.comment), ec, http.StatusInternalServerError)
 				return
 			}
@@ -1559,11 +1559,11 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 	writeJSON(w, spec, http.StatusOK)
 }
 
-func vaildPostServiceRequest(spec structs.ServiceSpec) error {
+func validPostServiceRequest(spec structs.ServiceSpec) error {
 	errs := make([]string, 0, 4)
 
 	if spec.Arch.Code == "" || spec.Arch.Mode == "" || spec.Arch.Replicas == 0 {
-		errs = append(errs, fmt.Sprintf("Arch invaild,%+v", spec.Arch))
+		errs = append(errs, fmt.Sprintf("Arch invalid,%+v", spec.Arch))
 	}
 
 	if spec.Require == nil || spec.Require.Require.CPU == 0 || spec.Require.Require.Memory == 0 {
@@ -1603,8 +1603,8 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := vaildPostServiceRequest(spec); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 33, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceRequest(spec); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 33, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1641,10 +1641,10 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusCreated)
 }
 
-func vaildPostServiceScaledRequest(v structs.ServiceScaleRequest) error {
+func validPostServiceScaledRequest(v structs.ServiceScaleRequest) error {
 
 	if v.Arch.Code == "" || v.Arch.Mode == "" || v.Arch.Replicas == 0 {
-		return fmt.Errorf("Arch invaild,%+v", v.Arch)
+		return fmt.Errorf("Arch invalid,%+v", v.Arch)
 	}
 
 	return nil
@@ -1661,8 +1661,8 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := vaildPostServiceScaledRequest(scale); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 42, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceScaledRequest(scale); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 42, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1696,9 +1696,9 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
-func vaildPostServiceLinkRequest(v structs.ServicesLink) error {
+func validPostServiceLinkRequest(v structs.ServicesLink) error {
 	if v.Len() == 0 {
-		return fmt.Errorf("invaild params")
+		return fmt.Errorf("invalid params")
 	}
 
 	errs := make([]string, 0, 3)
@@ -1725,8 +1725,8 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := vaildPostServiceLinkRequest(links); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 52, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceLinkRequest(links); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 52, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1798,7 +1798,7 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
-func vaildPostServiceUpdateRequest(v structs.UnitRequire) error {
+func validPostServiceUpdateRequest(v structs.UnitRequire) error {
 	if v.Require.CPU == 0 && v.Require.Memory == 0 &&
 		len(v.Volumes) == 0 && len(v.Networks) == 0 {
 
@@ -1809,7 +1809,7 @@ func vaildPostServiceUpdateRequest(v structs.UnitRequire) error {
 
 	for _, vr := range v.Volumes {
 		if vr.Name == "" && vr.Type == "" {
-			errs = append(errs, fmt.Sprintf("VolumeRequire is invaild,%+v", vr))
+			errs = append(errs, fmt.Sprintf("VolumeRequire is invalid,%+v", vr))
 		}
 	}
 
@@ -1832,8 +1832,8 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := vaildPostServiceUpdateRequest(update); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 72, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceUpdateRequest(update); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 72, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1909,7 +1909,7 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
-func vaildPostServiceUpdateConfigsRequest(req structs.UnitConfig) error {
+func validPostServiceUpdateConfigsRequest(req structs.UnitConfig) error {
 	if len(req.Keysets) == 0 {
 		return stderr.New("nothing new for update for service configs")
 	}
@@ -2002,8 +2002,8 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := vaildPostServiceUpdateConfigsRequest(change); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 92, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceUpdateConfigsRequest(change); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 92, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -2056,7 +2056,7 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
-func vaildPostServiceExecRequest(v structs.ServiceExecConfig) error {
+func validPostServiceExecRequest(v structs.ServiceExecConfig) error {
 	if len(v.Cmd) == 0 {
 		return stderr.New("ServiceExecConfig.Cmd is required")
 	}
@@ -2075,8 +2075,8 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := vaildPostServiceExecRequest(config); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 102, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceExecRequest(config); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 102, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -2205,7 +2205,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func vaildPostServiceBackupRequest(v structs.ServiceBackupConfig) error {
+func validPostServiceBackupRequest(v structs.ServiceBackupConfig) error {
 	if v.Container == "" {
 		return stderr.New("not assigned unit nameOrID")
 	}
@@ -2224,8 +2224,8 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := vaildPostServiceBackupRequest(config); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 132, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceBackupRequest(config); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 132, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -2288,7 +2288,7 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
-func vaildPostServiceRestoreRequest(v structs.ServiceRestoreRequest) error {
+func validPostServiceRestoreRequest(v structs.ServiceRestoreRequest) error {
 	if v.File != "" {
 		return nil
 	}
@@ -2307,8 +2307,8 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := vaildPostServiceRestoreRequest(req); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 142, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceRestoreRequest(req); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 142, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -2345,7 +2345,7 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
-func vaildPostUnitRebuildRequest(v structs.UnitRebuildRequest) error {
+func validPostUnitRebuildRequest(v structs.UnitRebuildRequest) error {
 	if len(v.Units) < 1 {
 		return stderr.New("Units is required")
 	}
@@ -2364,8 +2364,8 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := vaildPostUnitRebuildRequest(req); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 152, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostUnitRebuildRequest(req); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 152, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -2404,7 +2404,7 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
-func vaildPostUnitMigrateRequest(v structs.PostUnitMigrate) error {
+func validPostUnitMigrateRequest(v structs.PostUnitMigrate) error {
 	if v.NameOrID == "" {
 		return stderr.New("Unit name or ID is required")
 	}
@@ -2423,8 +2423,8 @@ func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := vaildPostUnitMigrateRequest(req); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 162, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostUnitMigrateRequest(req); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 162, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -2656,7 +2656,7 @@ func getSanStoreInfo(store storage.Store) (structs.SANStorageResponse, error) {
 	}, nil
 }
 
-func vaildPostSanStorageRequest(v structs.PostSANStoreRequest) error {
+func validPostSanStorageRequest(v structs.PostSANStoreRequest) error {
 	errs := make([]string, 0, 2)
 
 	if v.Vendor == "" {
@@ -2664,7 +2664,7 @@ func vaildPostSanStorageRequest(v structs.PostSANStoreRequest) error {
 	}
 
 	if v.HostLunStart > v.HostLunEnd || v.HostLunEnd < 0 {
-		errs = append(errs, "host_lun_end or host_lun_start is invaild")
+		errs = append(errs, "host_lun_end or host_lun_start is invalid")
 
 	}
 
@@ -2685,8 +2685,8 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := vaildPostSanStorageRequest(req); err != nil {
-		ec := errCodeV1(_Storage, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostSanStorageRequest(req); err != nil {
+		ec := errCodeV1(_Storage, invalidParamsError, 32, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}

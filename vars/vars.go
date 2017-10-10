@@ -4,7 +4,7 @@ import (
 	"errors"
 )
 
-var errUserInvaild = errors.New("invaild user")
+var errUserInvalid = errors.New("invalid user")
 
 type User struct {
 	Role     string
@@ -72,7 +72,7 @@ func Validate() error {
 		Monitor.User == "" || Monitor.Password == "" ||
 		Replication.User == "" || Replication.Password == "" {
 
-		return errUserInvaild
+		return errUserInvalid
 	}
 
 	return nil

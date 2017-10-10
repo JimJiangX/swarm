@@ -212,7 +212,7 @@ func updateUnitRegister(ctx context.Context, kvc kvstore.Client, old, new unit, 
 
 func migrateNetworking(orm database.NetworkingOrmer, src, new []database.IP) ([]database.IP, error) {
 	if len(src) != len(new) {
-		return nil, errors.New("invaild input")
+		return nil, errors.New("invalid input")
 	}
 
 	dst := make([]database.IP, len(src))

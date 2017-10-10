@@ -41,7 +41,7 @@ func newLinkUpSQL(links []*structs.ServiceLink) (linkUpSQL, error) {
 	obj := linkUpSQL{}
 
 	if len(links) != 3 {
-		return obj, errors.Errorf("invaild paramaters in %s mode", SM_UPP_UPSQL)
+		return obj, errors.Errorf("invalid paramaters in %s mode", SM_UPP_UPSQL)
 	}
 
 	for i := range links {

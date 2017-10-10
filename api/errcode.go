@@ -26,7 +26,7 @@ type category int
 const (
 	internalError category = iota
 	urlParamError
-	invaildParamsError
+	invalidParamsError
 
 	encodeError
 	decodeError
