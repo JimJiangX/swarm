@@ -3,7 +3,6 @@ package garden
 import (
 	"crypto/tls"
 	"fmt"
-	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -359,23 +358,6 @@ func (u unit) removeVolumes(ctx context.Context) error {
 	return nil
 }
 
-// ContainerExec exec commands in container
-func (u unit) ContainerExec(ctx context.Context, cmd []string, detach bool, w io.Writer) (types.ContainerExecInspect, error) {
-	if len(cmd) == 0 {
-		return types.ContainerExecInspect{}, nil
-	}
-	c := u.getContainer()
-	if c == nil {
-		return types.ContainerExecInspect{}, errors.WithStack(newContainerError(u.u.Name, notFound))
-	}
-
-	if !c.Info.State.Running {
-		return types.ContainerExecInspect{}, errors.WithStack(newContainerError(u.u.Name, notRunning))
-	}
-
-	return c.Exec(ctx, cmd, detach, w)
-}
-
 func (u unit) containerExec(ctx context.Context, cmd []string, detach bool) (types.ContainerExecInspect, error) {
 	if len(cmd) == 0 {
 		return types.ContainerExecInspect{}, nil
@@ -389,7 +371,7 @@ func (u unit) containerExec(ctx context.Context, cmd []string, detach bool) (typ
 		return types.ContainerExecInspect{}, errors.WithStack(newContainerError(u.u.Name, notRunning))
 	}
 
-	return c.Exec(ctx, cmd, detach, nil)
+	return c.Exec(ctx, cmd, detach)
 }
 
 func (u unit) updateServiceConfig(ctx context.Context, path, context string) error {

@@ -48,11 +48,6 @@ func newService(spec *structs.ServiceSpec,
 	}
 }
 
-// GetUnit returns *unit by name or ID
-func (svc Service) GetUnit(nameOrID string) (*unit, error) {
-	return svc.getUnit(nameOrID)
-}
-
 func (svc Service) getUnit(nameOrID string) (*unit, error) {
 	u, err := svc.so.GetUnit(nameOrID)
 	if err != nil {
@@ -800,15 +795,6 @@ func (svc *Service) Exec(ctx context.Context, config structs.ServiceExecConfig, 
 
 		return nil
 	}
-
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
-		statusServiceExecStart, statusServiceExecDone, statusServiceExecFailed)
-
-	return sl.Run(isnotInProgress, exec, async)
-}
-
-// ExecLock is exported
-func (svc *Service) ExecLock(ctx context.Context, exec func() error, async bool, task *database.Task) error {
 
 	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
 		statusServiceExecStart, statusServiceExecDone, statusServiceExecFailed)
