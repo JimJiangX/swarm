@@ -320,9 +320,13 @@ func (svc *Service) addNewUnit(num int) ([]database.Unit, error) {
 
 func (svc *Service) getScheduleOption() (scheduleOption, error) {
 	// decode scheduleOption
-	var opts scheduleOption
+	opts := scheduleOption{}
+
 	r := strings.NewReader(svc.svc.Desc.ScheduleOptions)
 	err := json.NewDecoder(r).Decode(&opts)
+	if err == nil {
+		svc.options = opts
+	}
 
 	return svc.options, err
 }
