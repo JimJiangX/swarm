@@ -466,6 +466,9 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 }
 
 func updateDescByVolumeReuires(table database.Service, opts *scheduleOption, target []structs.VolumeRequire) (database.Service, error) {
+	if opts == nil {
+		opts = &scheduleOption{}
+	}
 	opts.Require.Volumes = target
 
 	sr, err := json.Marshal(opts)
