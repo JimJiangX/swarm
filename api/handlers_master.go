@@ -2065,25 +2065,18 @@ func vaildPostServiceExecRequest(v structs.ServiceExecConfig) error {
 }
 
 func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		ec := errCodeV1(_Service, urlParamError, 101, "parse Request URL parameter error", "解析请求URL参数错误")
-		httpJSONError(w, err, ec, http.StatusBadRequest)
-		return
-	}
-
 	name := mux.Vars(r)["name"]
-	synchronize := boolValue(r, "sync") // 同步
 
 	config := structs.ServiceExecConfig{}
 	err := json.NewDecoder(r.Body).Decode(&config)
 	if err != nil {
-		ec := errCodeV1(_Service, decodeError, 102, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		ec := errCodeV1(_Service, decodeError, 101, "JSON Decode Request Body error", "JSON解析请求Body错误")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
 	if err := vaildPostServiceExecRequest(config); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 103, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		ec := errCodeV1(_Service, invaildParamsError, 102, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -2098,7 +2091,7 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	svc, err := gd.GetService(name)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 104, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 103, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2110,51 +2103,33 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	if synchronize {
-		execFunc := func() error {
-			u, err := svc.GetUnit(config.Container)
-			if err != nil {
-				ec := errCodeV1(_Service, intervalExec, 105, "fail to query database", "数据库查询错误（服务表）")
-				httpJSONError(w, err, ec, http.StatusInternalServerError)
-				return err
-			}
+	execFunc := func() error {
 
-			_, err = u.ContainerExec(ctx, config.Cmd, config.Detach, w)
-			if err != nil {
-				ec := errCodeV1(_Service, intervalExec, 106, "container exec failed", "容器exec执行错误")
-				httpJSONError(w, err, ec, http.StatusInternalServerError)
-				return err
-			}
-
-			return nil
-		}
-
-		err = svc.ExecLock(ctx, execFunc, false, nil)
+		u, err := svc.GetUnit(config.Container)
 		if err != nil {
-			ec := errCodeV1(_Service, internalError, 107, "fail to exec command in service containers", "服务容器远程命令执行错误（container exec）")
+			ec := errCodeV1(_Service, intervalExec, 104, "fail to query database", "数据库查询错误（服务表）")
 			httpJSONError(w, err, ec, http.StatusInternalServerError)
+			return err
 		}
 
-		return
+		_, err = u.ContainerExec(ctx, config.Cmd, config.Detach, w)
+		if err != nil {
+			ec := errCodeV1(_Service, intervalExec, 105, "container exec failed", "容器exec执行错误")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+			return err
+		}
+
+		return nil
 	}
 
-	spec, err := svc.Spec()
+	err = svc.ExecLock(ctx, execFunc, false, nil)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 108, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, internalError, 106, "fail to exec command in service containers", "服务容器远程命令执行错误（container exec）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceExecTask, spec.ID, spec.Desc, nil, 300)
-
-	err = svc.Exec(ctx, config, true, &task)
-	if err != nil {
-		ec := errCodeV1(_Service, internalError, 109, "fail to exec command in service containers", "服务容器远程命令执行错误（container exec）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
+	//	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
 func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
