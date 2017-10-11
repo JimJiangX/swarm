@@ -245,7 +245,7 @@ func checkBackupFiles(svc *Service) (bool, error) {
 	valid := make([]database.BackupFile, 0, len(files))
 
 	for i := range files {
-		if now.After(files[i].Retention) {
+		if now.Sub(files[i].Retention) > -time.Minute {
 			expired = append(expired, files[i])
 		} else {
 			valid = append(valid, files[i])
