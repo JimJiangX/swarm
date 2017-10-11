@@ -10,7 +10,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -259,11 +258,12 @@ func (e *Engine) getExecExitCode(ctx context.Context, execID string) (types.Cont
 
 func holdHijackedConnection(ctx context.Context, tty bool, inputStream io.Reader, outputStream, errorStream io.Writer, resp types.HijackedResponse) error {
 	receiveStdout := make(chan error, 1)
-	if outputStream != nil || errorStream != nil {
+	if outputStream != nil {
 		go func() {
-			_, err := stdcopy.StdCopy(outputStream, errorStream, resp.Reader)
+			io.Copy(outputStream, resp.Reader)
+			//	_, err := stdcopy.StdCopy(outputStream, errorStream, resp.Reader)
 			logrus.Debugf("[hijack] End of stdout")
-			receiveStdout <- err
+			receiveStdout <- nil
 		}()
 	}
 
