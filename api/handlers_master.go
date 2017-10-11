@@ -2110,6 +2110,7 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 			httpJSONError(w, err, ec, http.StatusInternalServerError)
 			return
 		}
+		defer wc.Close()
 
 		execFunc := func() error {
 			u, err := svc.GetUnit(config.Container)
