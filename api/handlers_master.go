@@ -2065,6 +2065,12 @@ func validPostServiceExecRequest(v structs.ServiceExecConfig) error {
 }
 
 func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Service, urlParamError, 31, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
 	name := mux.Vars(r)["name"]
 
 	config := structs.ServiceExecConfig{}
@@ -2093,6 +2099,37 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		ec := errCodeV1(_Service, dbQueryError, 103, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	if boolValue(r, "sync") {
+
+		wc, _, err := w.(http.Hijacker).Hijack()
+		if err != nil {
+			ec := errCodeV1(_Service, dbQueryError, 103, "fail to query database", "数据库查询错误（服务表）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+			return
+		}
+
+		execFunc := func() error {
+
+			u, err := svc.GetUnit(config.Container)
+			if err != nil {
+				return err
+			}
+
+			_, err = u.ContainerExec(ctx, config.Cmd, config.Detach, wc)
+
+			return err
+		}
+
+		err = svc.ExecLock(execFunc, false, nil)
+		if err != nil {
+			ec := errCodeV1(_Service, dbQueryError, 103, "fail to query database", "数据库查询错误（服务表）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+			return
+		}
+
 		return
 	}
 
