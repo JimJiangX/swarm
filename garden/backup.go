@@ -98,7 +98,7 @@ func checkBackupFilesByService(service string, iface database.BackupFileIface, m
 	expired := make([]database.BackupFile, 0, len(files))
 
 	for i := range files {
-		if now.After(files[i].Retention) {
+		if now.Sub(files[i].Retention) > -time.Minute {
 			expired = append(expired, files[i])
 		} else {
 			valid = append(valid, files[i])
