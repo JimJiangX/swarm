@@ -359,6 +359,7 @@ func (u unit) removeVolumes(ctx context.Context) error {
 	return nil
 }
 
+// ContainerExec returns the container exec command result,message of exec print into write
 func (u unit) ContainerExec(ctx context.Context, cmd []string, detach bool, w io.Writer) (types.ContainerExecInspect, error) {
 	if len(cmd) == 0 {
 		return types.ContainerExecInspect{}, nil

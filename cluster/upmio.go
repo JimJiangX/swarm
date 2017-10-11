@@ -174,6 +174,12 @@ func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []st
 		return inspect, errors.Wrapf(err, "Container %s exec create", containerID)
 	}
 
+	{
+		// add execID to the container, so the later exec/start will work
+		container := e.Containers().Get(containerID)
+		container.Info.ExecIDs = append(container.Info.ExecIDs, exec.ID)
+	}
+
 	// TODO: remove
 	logrus.WithFields(logrus.Fields{
 		"Container": containerID,
