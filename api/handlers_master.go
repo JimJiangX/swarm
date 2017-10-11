@@ -2112,6 +2112,9 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		}
 		defer wc.Close()
 
+		// Flush the options to make sure the client sets the raw mode
+		wc.Write([]byte{})
+
 		execFunc := func() error {
 			u, err := svc.GetUnit(config.Container)
 			if err != nil {
