@@ -505,31 +505,26 @@ func mergeVolumeRequire(old, update []structs.VolumeRequire) ([]structs.VolumeRe
 		return update, nil
 	}
 
-	out := make([]structs.VolumeRequire, 0, len(old))
+	out := make([]structs.VolumeRequire, len(old))
+	copy(out, old)
 
+loop:
 	for v := range update {
-		found := false
 
-	loop:
-		for i := range old {
-			if old[i].Name == update[v].Name {
+		for i := range out {
+			if out[i].Name == update[v].Name {
 
-				old[i].Size = update[v].Size
-				out = append(out, old[i])
+				out[i].Size = update[v].Size
 
-				found = true
-
-				break loop
+				continue loop
 			}
 		}
 
-		if !found {
-			if update[v].Name == "" || update[v].Type == "" {
-				return nil, errors.Errorf("invalid volume require,%v", update[v])
-			}
-
-			out = append(out, update[v])
+		if update[v].Name == "" || update[v].Type == "" {
+			return nil, errors.Errorf("invalid volume require,%v", update[v])
 		}
+
+		out = append(out, update[v])
 	}
 
 	return out, nil

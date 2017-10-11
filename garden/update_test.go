@@ -112,11 +112,11 @@ func TestUpdateDescByVolumeReuires(t *testing.T) {
 			Name: "SAN",
 			Size: 7492740840,
 		},
-		{
-			Type: "LOG",
-			Name: "local:HDD",
-			Size: 74927410840,
-		},
+		//		{
+		//			Type: "LOG",
+		//			Name: "local:HDD",
+		//			Size: 74927410840,
+		//		},
 	}
 
 	table, err := updateDescByVolumeReuires(es, nil, req)
@@ -132,6 +132,9 @@ func TestUpdateDescByVolumeReuires(t *testing.T) {
 
 		t.Error(table, es)
 	}
+
+	t.Log(es.Desc.ScheduleOptions)
+	t.Log(table.Desc.ScheduleOptions)
 }
 
 func TestMergeVolumeRequire(t *testing.T) {
@@ -170,12 +173,20 @@ func TestMergeVolumeRequire(t *testing.T) {
 
 	t.Log(err)
 
-	out, err = mergeVolumeRequire(old, req[0:2])
+	out, err = mergeVolumeRequire(old, req[:2])
 	if err != nil {
 		t.Error(err)
 	}
 
 	t.Log(out)
+
+	out, err = mergeVolumeRequire(old, req[:1])
+	if err != nil {
+		t.Error(err)
+	}
+
+	t.Log(out)
+
 }
 
 func TestUpdateDescByArch(t *testing.T) {
