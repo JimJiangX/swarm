@@ -148,9 +148,9 @@ func sortUnitsByContainers(units []*unit, containers cluster.Containers) []*unit
 
 func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, actor alloc.Allocator,
 	vr, nr bool, replicas int, candidates []string,
-	users []structs.User, options map[string]interface{}) ([]*unit, []pendingUnit, error) {
+	options map[string]interface{}) ([]*unit, []pendingUnit, error) {
 
-	err := svc.prepareSchedule(candidates, users, options)
+	err := svc.prepareSchedule(candidates, options)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -186,7 +186,7 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 	scale structs.ServiceScaleRequest, networkings [][]database.IP, vr, nr, register bool) ([]*unit, error) {
 
 	units, pendings, err := gd.scaleAllocation(ctx, svc, actor, vr, nr,
-		scale.Arch.Replicas, scale.Candidates, scale.Users, scale.Options)
+		scale.Arch.Replicas, scale.Candidates, scale.Options)
 	defer func() {
 		if err != nil {
 			_err := svc.removeUnits(ctx, units, gd.kvClient)
@@ -244,7 +244,7 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 	return units, err
 }
 
-func (svc *Service) prepareSchedule(candidates []string, users []structs.User, options map[string]interface{}) error {
+func (svc *Service) prepareSchedule(candidates []string, options map[string]interface{}) error {
 	spec, err := svc.RefreshSpec()
 	if err != nil {
 		return err
@@ -269,12 +269,6 @@ func (svc *Service) prepareSchedule(candidates []string, users []structs.User, o
 	svc.options, err = scheduleOptionsByUnits(opts, units, len(candidates) <= 0)
 	if err != nil {
 		return err
-	}
-
-	if spec.Users == nil {
-		spec.Users = users
-	} else {
-		spec.Users = append(spec.Users, users...)
 	}
 
 	if spec.Options == nil && options != nil {

@@ -49,7 +49,6 @@ func (gd *Garden) RebuildUnits(ctx context.Context, actor alloc.Allocator, svc *
 
 		scale := structs.ServiceScaleRequest{
 			Arch:       spec.Arch,
-			Users:      req.Users,
 			Candidates: req.Candidates,
 		}
 		scale.Arch.Replicas += len(req.Units)

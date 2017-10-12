@@ -69,7 +69,7 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 		{
 			actor := alloc.NewAllocator(gd.ormer, gd.Cluster)
 			adds, pendings, err := gd.scaleAllocation(ctx, svc, actor, false, false,
-				len(units)+1, candidates, nil, nil)
+				len(units)+1, candidates, nil)
 			defer func() {
 				if err != nil {
 					_err := svc.removeUnits(ctx, adds, nil)
