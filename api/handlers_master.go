@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	stderr "errors"
@@ -2103,17 +2104,7 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	}
 
 	if boolValue(r, "sync") {
-
-		wc, _, err := w.(http.Hijacker).Hijack()
-		if err != nil {
-			ec := errCodeV1(_Service, dbQueryError, 105, "fail to query database", "数据库查询错误（服务表）")
-			httpJSONError(w, err, ec, http.StatusInternalServerError)
-			return
-		}
-		defer wc.Close()
-
-		// Flush the options to make sure the client sets the raw mode
-		wc.Write([]byte{})
+		buf := bytes.NewBuffer(nil)
 
 		execFunc := func() error {
 			u, err := svc.GetUnit(config.Container)
@@ -2121,16 +2112,22 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 				return err
 			}
 
-			_, err = u.ContainerExec(ctx, config.Cmd, config.Detach, wc)
+			_, err = u.ContainerExec(ctx, config.Cmd, config.Detach, buf)
 
 			return err
 		}
 
 		err = svc.ExecLock(execFunc, false, nil)
 		if err != nil {
-			fmt.Fprintf(w, "%+v", wc)
+			ec := errCodeV1(_Service, internalError, 105, "fail to exec command in service containers", "服务容器远程命令执行错误（container exec）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+			return
 		}
 
+		output := buf.Bytes()
+		logrus.Debugf("%v", output)
+
+		writeJSONFprintf(w, http.StatusOK, "{%q:%s}", "output", output)
 		return
 	}
 
