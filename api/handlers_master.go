@@ -2387,8 +2387,8 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 }
 
 func validPostUnitRebuildRequest(v structs.UnitRebuildRequest) error {
-	if len(v.Units) < 1 {
-		return stderr.New("Units is required")
+	if v.NameOrID == "" {
+		return stderr.New("Unit name or ID is required")
 	}
 
 	return nil
@@ -2494,7 +2494,7 @@ func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	id, err := gd.ServiceMigrate(ctx, svc, req.NameOrID, req.Candidates, true)
+	id, err := gd.ServiceMigrate(ctx, svc, req, true)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 164, "fail to scale service", "服务水平扩展错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)

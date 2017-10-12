@@ -20,87 +20,107 @@ type baseContainer struct {
 }
 
 // ServiceMigrate migrate an unit to other hosts,include volumes、networkings,clean the old container.
-func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID string, candidates []string, async bool) (string, error) {
-	migrate := func() error {
-		var old, news baseContainer
+func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, req structs.PostUnitMigrate, async bool) (string, error) {
 
-		units, err := svc.getUnits()
+	task := database.NewTask(svc.svc.Name, database.UnitMigrateTask, svc.svc.ID, req.NameOrID, nil, 300)
+
+	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, &task,
+		statusServiceUnitMigrating, statusServiceUnitMigrated, statusServiceUnitMigrateFailed)
+
+	err := sl.Run(isnotInProgress, func() error {
+		return gd.rebuildUnit(ctx, svc, req.NameOrID, req.Candidates, true)
+	}, async)
+
+	return task.ID, err
+}
+
+func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string, candidates []string, migrate bool) error {
+	var old, news baseContainer
+
+	units, err := svc.getUnits()
+	if err != nil {
+		return err
+	}
+	{
+		// the assigned unit being migrating
+		got := getUnit(units, nameOrID)
+		if got == nil {
+			return errors.Errorf("unit %s isnot belongs to Service %s", nameOrID, svc.svc.Name)
+		}
+
+		lvs, err := got.uo.ListVolumesByUnitID(got.u.ID)
 		if err != nil {
 			return err
 		}
-		{
-			// the assigned unit being migrating
-			got := getUnit(units, nameOrID)
-			if got == nil {
-				return errors.Errorf("unit %s isnot belongs to Service %s", nameOrID, svc.svc.Name)
-			}
+		ips, err := got.uo.ListIPByUnitID(got.u.ID)
+		if err != nil {
+			return err
+		}
 
-			lvs, err := got.uo.ListVolumesByUnitID(got.u.ID)
-			if err != nil {
-				return err
-			}
-			ips, err := got.uo.ListIPByUnitID(got.u.ID)
-			if err != nil {
-				return err
-			}
-
-			old = baseContainer{
-				unit:        *got,
-				engine:      got.getEngine(),
-				container:   got.getContainer(),
-				volumes:     lvs,
-				networkings: ips,
-			}
-			if old.engine == nil {
-				old.engine = &cluster.Engine{
-					ID: old.unit.u.EngineID,
-				}
-			}
-
-			if old.container == nil {
-				c, err := getContainerFromKV(ctx, gd.kvClient, old.unit.u.ContainerID)
-				if err != nil {
-					return err
-				}
-				old.container = c
+		old = baseContainer{
+			unit:        *got,
+			engine:      got.getEngine(),
+			container:   got.getContainer(),
+			volumes:     lvs,
+			networkings: ips,
+		}
+		if old.engine == nil {
+			old.engine = &cluster.Engine{
+				ID: old.unit.u.EngineID,
 			}
 		}
 
-		{
-			actor := alloc.NewAllocator(gd.ormer, gd.Cluster)
-			adds, pendings, err := gd.scaleAllocation(ctx, svc, actor, false, false,
-				len(units)+1, candidates, nil)
-			defer func() {
-				if err != nil {
-					_err := svc.removeUnits(ctx, adds, nil)
-					if _err != nil {
-						err = errors.Errorf("%+v\nremove new addition units:%+v", err, _err)
-					}
-				}
-			}()
+		if old.container == nil {
+			c, err := getContainerFromKV(ctx, gd.kvClient, old.unit.u.ContainerID)
 			if err != nil {
 				return err
 			}
+			old.container = c
+		}
+	}
 
-			if len(adds) > 0 {
-				news.unit = *adds[0]
-			}
+	{
+		// required alloc new volume
+		vr := true
+		if migrate {
+			vr = false
+		}
 
-			defer func() {
-				if err != nil {
-					_err := svc.so.SetIPs(old.networkings)
-					if _err != nil {
-						err = errors.Errorf("%+v\nmgirate networkings:%+v", err, _err)
-					}
-				}
-			}()
-
-			// migrate networkings
-			news.networkings, err = actor.AllocDevice(news.unit.u.EngineID, news.unit.u.ID, old.networkings)
+		actor := alloc.NewAllocator(gd.ormer, gd.Cluster)
+		adds, pendings, err := gd.scaleAllocation(ctx, svc, actor, vr, false,
+			len(units)+1, candidates, nil)
+		defer func() {
 			if err != nil {
-				return err
+				_err := svc.removeUnits(ctx, adds, nil)
+				if _err != nil {
+					err = errors.Errorf("%+v\nremove new addition units:%+v", err, _err)
+				}
 			}
+		}()
+		if err != nil {
+			return err
+		}
 
+		if len(adds) > 0 {
+			news.unit = *adds[0]
+		}
+
+		defer func() {
+			if err != nil {
+				_err := svc.so.SetIPs(old.networkings)
+				if _err != nil {
+					err = errors.Errorf("%+v\nmgirate networkings:%+v", err, _err)
+				}
+			}
+		}()
+
+		// migrate networkings
+		news.networkings, err = actor.AllocDevice(news.unit.u.EngineID, news.unit.u.ID, old.networkings)
+		if err != nil {
+			return err
+		}
+
+		if migrate {
 			// migrate volumes
 			news.volumes, err = actor.MigrateVolumes(news.unit.u.ID, old.engine, news.engine, old.volumes)
 			if err != nil {
@@ -116,87 +136,78 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, nameOrID str
 					}
 				}
 			}()
-
-			auth, err := gd.AuthConfig()
-			if err != nil {
-				return err
-			}
-
-			err = svc.runContainer(ctx, pendings, false, auth)
-			if err != nil {
-				return err
-			}
-
-			if len(pendings) > 0 {
-				news.unit.u = pendings[0].Unit
-				news.container = news.unit.getContainer()
-				news.engine = news.unit.getEngine()
-			}
-
-			cms, err := svc.generateUnitsConfigs(ctx, nil)
-			if err != nil {
-				return err
-			}
-
-			err = svc.start(ctx, adds, cms.Commands())
-			if err != nil {
-				return err
-			}
-		}
-		{
-			// clean old
-			err := svc.deregisterServices(ctx, gd.KVClient(), []*unit{&old.unit})
-			if err != nil {
-				return err
-			}
-
-			err = svc.removeContainers(ctx, []*unit{&old.unit}, false, true)
-			if err != nil {
-				return err
-			}
-
-			err = renameContainer(&news.unit, old.unit.u.Name)
-			if err != nil {
-				return err
-			}
-
-			err = svc.so.MigrateUnit(news.unit.u.ID, old.unit.u.ID, old.unit.u.Name)
-			if err != nil {
-				return err
-			}
-
-			cms, err := svc.generateUnitsConfigs(ctx, nil)
-			if err != nil {
-				return err
-			}
-
-			err = svc.Compose(ctx, gd.pluginClient)
-			if err != nil {
-				return err
-			}
-
-			u, err := svc.getUnit(old.unit.u.ID)
-			if err != nil {
-				return err
-			}
-
-			err = registerUnits(ctx, []*unit{u}, gd.KVClient(), cms)
-			if err != nil {
-				return err
-			}
 		}
 
-		return nil
+		auth, err := gd.AuthConfig()
+		if err != nil {
+			return err
+		}
+
+		err = svc.runContainer(ctx, pendings, false, auth)
+		if err != nil {
+			return err
+		}
+
+		if len(pendings) > 0 {
+			news.unit.u = pendings[0].Unit
+			news.container = news.unit.getContainer()
+			news.engine = news.unit.getEngine()
+		}
+
+		cms, err := svc.generateUnitsConfigs(ctx, nil)
+		if err != nil {
+			return err
+		}
+
+		err = svc.start(ctx, adds, cms.Commands())
+		if err != nil {
+			return err
+		}
+	}
+	{
+		// clean old
+		err := svc.deregisterServices(ctx, gd.KVClient(), []*unit{&old.unit})
+		if err != nil {
+			return err
+		}
+
+		err = svc.removeContainers(ctx, []*unit{&old.unit}, false, true)
+		if err != nil {
+			return err
+		}
+
+		err = renameContainer(&news.unit, old.unit.u.Name)
+		if err != nil {
+			return err
+		}
+
+		err = svc.so.MigrateUnit(news.unit.u.ID, old.unit.u.ID, old.unit.u.Name)
+		if err != nil {
+			return err
+		}
+
+		cms, err := svc.generateUnitsConfigs(ctx, nil)
+		if err != nil {
+			return err
+		}
+
+		u, err := svc.getUnit(old.unit.u.ID)
+		if err != nil {
+			return err
+		}
+
+		err = registerUnits(ctx, []*unit{u}, gd.KVClient(), cms)
+		if err != nil {
+			return err
+		}
+
+		err = svc.Compose(ctx, gd.pluginClient)
+		if err != nil {
+			return err
+		}
 	}
 
-	task := database.NewTask(svc.svc.Name, database.UnitMigrateTask, svc.svc.ID, nameOrID, nil, 300)
-
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, &task,
-		statusServiceUnitMigrating, statusServiceUnitMigrated, statusServiceUnitMigrateFailed)
-
-	err := sl.Run(isnotInProgress, migrate, async)
-
-	return task.ID, err
+	return nil
 }
 
 // deregister old service and register new

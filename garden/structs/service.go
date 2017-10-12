@@ -144,10 +144,7 @@ type ServiceScaleRequest struct {
 	Options    map[string]interface{} `json:"opts"`
 }
 
-type UnitRebuildRequest struct {
-	Units      []string `json:"units"`
-	Candidates []string `json:"candidates,omitempty"`
-}
+type UnitRebuildRequest PostUnitMigrate
 
 type PostServiceResponse struct {
 	ID     string       `json:"id"`
