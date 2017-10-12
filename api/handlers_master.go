@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden"
 	"github.com/docker/swarm/garden/database"
@@ -2104,7 +2105,9 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	}
 
 	if boolValue(r, "sync") {
+
 		buf := bytes.NewBuffer(nil)
+		inspect := types.ContainerExecInspect{}
 
 		execFunc := func() error {
 			u, err := svc.GetUnit(config.Container)
@@ -2112,7 +2115,7 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 				return err
 			}
 
-			_, err = u.ContainerExec(ctx, config.Cmd, config.Detach, buf)
+			inspect, err = u.ContainerExec(ctx, config.Cmd, config.Detach, buf)
 
 			return err
 		}
@@ -2124,10 +2127,13 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		output := buf.Bytes()
-		logrus.Debugf("%v", output)
+		resp := struct {
+			Code   int    `json:"code"`
+			Output string `json:"output"`
+		}{inspect.ExitCode, buf.String()}
 
-		writeJSONFprintf(w, http.StatusOK, "{%q:%s}", "output", output)
+		writeJSON(w, resp, http.StatusCreated)
+
 		return
 	}
 
