@@ -15,8 +15,8 @@ type ServiceLink struct {
 	Spec     *ServiceSpec `json:"-"`
 
 	Arch Arch     `json:"architecture"`
-	ID   string   `json:"from_service_name"`
-	Deps []string `json:"to_services_name"`
+	ID   string   `json:"id"`
+	Deps []string `json:"deps"`
 }
 
 type ServicesLink struct {
