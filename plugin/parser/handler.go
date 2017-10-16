@@ -565,6 +565,16 @@ func generateServiceConfigs(ctx context.Context,
 		}
 
 		opt := opts[spec.Units[i].ID]
+		if m := opts[allUnitsEffect]; len(m) > 0 {
+			if len(opt) == 0 {
+				opt = m
+			} else {
+				for k, v := range m {
+					opt[k] = v
+				}
+			}
+		}
+
 		cc, err := generateUnitConfig(spec.Units[i].ID, parser, t, spec, opt)
 		if err != nil {
 			return nil, err

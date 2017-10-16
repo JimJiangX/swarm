@@ -1,11 +1,15 @@
 package parser
 
 import (
+	"net"
+
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
+
+const allUnitsEffect = "ALL_UNITS"
 
 type linkGenerator interface {
 	generateLinkConfig(ctx context.Context, client kvstore.Store) (structs.ServiceLinkResponse, error)
@@ -79,22 +83,46 @@ func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 		Links: make([]structs.UnitLink, 0, 5),
 	}
 
+	//	{
+	//		opts := make(map[string]map[string]interface{})
+
+	//		// set options
+
+	//		ulinks, err := generateServiceLink(ctx, client, *sql.sql.Spec, opts)
+	//		if err != nil {
+	//			return resp, err
+	//		}
+
+	//		resp.Links = append(resp.Links, ulinks...)
+	//	}
+
 	{
 		opts := make(map[string]map[string]interface{})
-
 		// set options
+		{
+			ip := sql.swm.Spec.Units[0].Networking[0].IP
 
-		ulinks, err := generateServiceLink(ctx, client, *sql.sql.Spec, opts)
-		if err != nil {
-			return resp, err
+			swmc, err := getServiceUnitConfig(ctx, client, sql.swm.Spec.ID, sql.swm.Spec.Units[0].ID)
+			if err != nil {
+				return resp, err
+			}
+
+			pr, err := factory(sql.swm.Spec.Image)
+			if err != nil {
+				return resp, err
+			}
+
+			pr = pr.clone(nil)
+
+			err = pr.ParseData([]byte(swmc.Content))
+			if err != nil {
+				return resp, err
+			}
+
+			port := pr.get("proxyport")
+
+			opts[allUnitsEffect] = map[string]interface{}{"adm-cli::adm-svr-address": net.JoinHostPort(ip, port)}
 		}
-
-		resp.Links = append(resp.Links, ulinks...)
-	}
-
-	{
-		opts := make(map[string]map[string]interface{})
-		// set options
 
 		ulinks, err := generateServiceLink(ctx, client, *sql.proxy.Spec, opts)
 		if err != nil {

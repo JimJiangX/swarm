@@ -12,6 +12,24 @@ import (
 	"golang.org/x/net/context"
 )
 
+func getServiceUnitConfig(ctx context.Context, client kvstore.Store, service, unit string) (structs.ConfigCmds, error) {
+	cc := structs.ConfigCmds{}
+	key := strings.Join([]string{configKey, service, unit}, "/")
+
+	// structs.ConfigCmds,encode by JSON
+	pair, err := client.GetKV(ctx, key)
+	if err != nil {
+		return cc, err
+	}
+
+	err = json.Unmarshal(pair.Value, &cc)
+	if err != nil {
+		return cc, errors.WithStack(err)
+	}
+
+	return cc, nil
+}
+
 func getConfigMapFromStore(ctx context.Context, kvc kvstore.Store, service string) (structs.ConfigsMap, error) {
 	key := strings.Join([]string{configKey, service}, "/")
 
