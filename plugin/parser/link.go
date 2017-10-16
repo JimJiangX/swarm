@@ -113,11 +113,15 @@ func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 		if err != nil {
 			return resp, err
 		}
+		{
+			// TODO:generate switch_manager init topoloy request
+
+		}
 
 		resp.Links = append(resp.Links, ulinks...)
 	}
 
-	resp.Compose = []string{sql.sql.ID, sql.proxy.ID, sql.swm.ID}
+	//	resp.Compose = []string{sql.sql.ID, sql.proxy.ID, sql.swm.ID}
 
 	return resp, nil
 }

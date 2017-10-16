@@ -268,6 +268,19 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 			}
 		}
 
+		// service interval requests
+
+		for _, ul := range resp.Links {
+			if ul.Request == nil {
+				continue
+			}
+
+			err := ul.Request.Send()
+			if err != nil {
+				return err
+			}
+		}
+
 		return err
 	}()
 

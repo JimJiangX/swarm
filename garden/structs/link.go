@@ -1,6 +1,14 @@
 package structs
 
-import "sort"
+import (
+	"bytes"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"sort"
+
+	"github.com/pkg/errors"
+)
 
 type ServiceLink struct {
 	priority int
@@ -92,9 +100,61 @@ type UnitLink struct {
 	ConfigFile    string
 	ConfigContent string
 	Commands      []string
+	Request       *HTTPRequest `json:"request,omitempty"`
 }
 
 type ServiceLinkResponse struct {
 	Links   []UnitLink
 	Compose []string
+}
+
+type HTTPRequest struct {
+	Method string
+	URL    string `json:"url"`
+	Body   []byte
+	Header map[string][]string
+}
+
+// Send send request to remote server
+func (r HTTPRequest) Send() error {
+	req, err := http.NewRequest(r.Method, r.URL, bytes.NewReader(r.Body))
+	if err != nil {
+		return err
+	}
+
+	for key, val := range r.Header {
+		for i := range val {
+			req.Header.Add(key, val[i])
+		}
+	}
+
+	resp, err := requireOK(http.DefaultClient.Do(req))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	io.CopyN(ioutil.Discard, resp.Body, 512)
+
+	return err
+}
+
+func requireOK(resp *http.Response, e error) (*http.Response, error) {
+	if e != nil {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+		return nil, e
+	}
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
+		buf := bytes.NewBuffer(nil)
+
+		io.Copy(buf, resp.Body)
+		resp.Body.Close()
+
+		return nil, errors.Errorf("%s,Unexpected response code: %d (%s)", resp.Request.URL.String(), resp.StatusCode, buf.Bytes())
+	}
+
+	return resp, nil
 }
