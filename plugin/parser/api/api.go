@@ -260,7 +260,7 @@ func (p plugin) ServicesLink(ctx context.Context, links structs.ServicesLink) (s
 	const uri = "/services/link"
 	obj := structs.ServiceLinkResponse{}
 
-	resp, err := requireOK(p.c.Post(ctx, uri, links))
+	resp, err := requireOK(p.c.Put(ctx, uri, links))
 	if err != nil {
 		return obj, err
 	}
