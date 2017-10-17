@@ -244,6 +244,10 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !strings.HasPrefix(req.ConfigFile, req.DataMount) {
+		req.ConfigFile = filepath.Join(req.DataMount, req.ConfigFile)
+	}
+
 	parser, err := factory(req.Image)
 	if err != nil {
 		httpError(w, err, http.StatusNotImplemented)
@@ -639,7 +643,7 @@ func generateUnitConfig(unitID string, pr parser, t structs.ConfigTemplate, spec
 		ID:           unitID,
 		LogMount:     t.LogMount,
 		DataMount:    t.DataMount,
-		ConfigFile:   filepath.Join(t.DataMount, t.ConfigFile),
+		ConfigFile:   t.ConfigFile,
 		Content:      string(text),
 		Cmds:         cmds,
 		Timestamp:    time.Now().Unix(),

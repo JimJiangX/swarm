@@ -132,22 +132,22 @@ func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 		resp.Links = append(resp.Links, ulinks...)
 	}
 
-	{
-		opts := make(map[string]map[string]interface{})
+	//	{
+	//		opts := make(map[string]map[string]interface{})
 
-		// set options
+	//		// set options
 
-		ulinks, err := generateServiceLink(ctx, client, *sql.swm.Spec, opts)
-		if err != nil {
-			return resp, err
-		}
-		{
-			// TODO:generate switch_manager init topoloy request
+	//		ulinks, err := generateServiceLink(ctx, client, *sql.swm.Spec, opts)
+	//		if err != nil {
+	//			return resp, err
+	//		}
+	//		{
+	//			// TODO:generate switch_manager init topoloy request
 
-		}
+	//		}
 
-		resp.Links = append(resp.Links, ulinks...)
-	}
+	//		resp.Links = append(resp.Links, ulinks...)
+	//	}
 
 	//	resp.Compose = []string{sql.sql.ID, sql.proxy.ID, sql.swm.ID}
 
