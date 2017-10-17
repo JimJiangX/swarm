@@ -218,7 +218,7 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 
 		// update units config file.
 		for _, ul := range resp.Links {
-			if ul.ServiceID == "" || ul.NameOrID == "" {
+			if ul.ServiceID == "" || ul.NameOrID == "" || ul.ConfigFile == "" {
 				continue
 			}
 
@@ -240,7 +240,7 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 
 		// start units service
 		for _, ul := range resp.Links {
-			if ul.ServiceID == "" || ul.NameOrID == "" {
+			if ul.ServiceID == "" || ul.NameOrID == "" || len(ul.Commands) == 0 {
 				continue
 			}
 
