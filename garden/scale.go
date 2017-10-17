@@ -47,7 +47,7 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 
 		{
 			// update Service.Desc
-			table, err := svc.so.GetService(svc.svc.ID)
+			table, err := svc.so.GetService(svc.ID())
 			if err != nil {
 				return err
 			}
@@ -63,9 +63,9 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 		return svc.Compose(ctx, gd.PluginClient())
 	}
 
-	task := database.NewTask(svc.svc.Name, database.ServiceScaleTask, svc.svc.ID, fmt.Sprintf("replicas=%d", req.Arch.Replicas), nil, 300)
+	task := database.NewTask(svc.Name(), database.ServiceScaleTask, svc.ID(), fmt.Sprintf("replicas=%d", req.Arch.Replicas), nil, 300)
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, &task,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, &task,
 		statusServiceScaling, statusServiceScaled, statusServiceScaleFailed)
 
 	err := sl.Run(isnotInProgress, scale, async)

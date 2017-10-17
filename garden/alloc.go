@@ -219,7 +219,7 @@ type pendingUnit struct {
 
 // Allocation alloc resources for building containers on hosts
 func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Service) (ready []pendingUnit, err error) {
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
 		statusServiceAllocating, statusServiceAllocated, statusServiceAllocateFailed)
 
 	err = sl.Run(
@@ -289,7 +289,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	gd.scheduler.Unlock()
 
 	if units == nil {
-		units, err = svc.so.ListUnitByServiceID(svc.svc.ID)
+		units, err = svc.so.ListUnitByServiceID(svc.ID())
 		if err != nil {
 			return nil, err
 		}
@@ -303,7 +303,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 
 	var (
 		bad   = make([]pendingUnit, 0, replicas)
-		field = logrus.WithField("Service", svc.svc.Name)
+		field = logrus.WithField("Service", svc.Name())
 	)
 
 	recycle := func() error {

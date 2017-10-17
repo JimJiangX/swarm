@@ -49,14 +49,14 @@ func (svc *Service) Backup(ctx context.Context, local string, config structs.Ser
 		return err
 	}
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
 		statusServiceBackuping, statusServiceBackupDone, statusServiceBackupFailed)
 
 	return sl.Run(isnotInProgress, backup, async)
 }
 
 func (svc *Service) checkBackupFiles(ctx context.Context, maxSize int) error {
-	_, expired, err := checkBackupFilesByService(svc.svc.ID, svc.so, maxSize)
+	_, expired, err := checkBackupFilesByService(svc.ID(), svc.so, maxSize)
 	if len(expired) > 0 {
 		_err := svc.removeExpiredBackupFiles(ctx, expired)
 		if _err != nil {

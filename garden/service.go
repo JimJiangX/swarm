@@ -48,6 +48,32 @@ func newService(spec *structs.ServiceSpec,
 	}
 }
 
+// ID returns Service ID
+func (svc Service) ID() string {
+	if svc.svc != nil {
+		return svc.svc.ID
+	}
+
+	if svc.spec != nil {
+		return svc.spec.ID
+	}
+
+	return ""
+}
+
+// Name returns Service Name
+func (svc Service) Name() string {
+	if svc.svc != nil {
+		return svc.svc.Name
+	}
+
+	if svc.spec != nil {
+		return svc.spec.Name
+	}
+
+	return ""
+}
+
 // GetUnit returns unit by name or id
 func (svc Service) GetUnit(nameOrID string) (*unit, error) {
 	return svc.getUnit(nameOrID)
@@ -59,7 +85,7 @@ func (svc Service) getUnit(nameOrID string) (*unit, error) {
 		return nil, err
 	}
 
-	if u.ServiceID != svc.svc.ID {
+	if u.ServiceID != svc.ID() {
 		return nil, nil
 	}
 
@@ -67,7 +93,7 @@ func (svc Service) getUnit(nameOrID string) (*unit, error) {
 }
 
 func (svc Service) getUnits() ([]*unit, error) {
-	list, err := svc.so.ListUnitByServiceID(svc.svc.ID)
+	list, err := svc.so.ListUnitByServiceID(svc.ID())
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +133,7 @@ func (svc *Service) Spec() (*structs.ServiceSpec, error) {
 			containers = svc.cluster.Containers()
 		}
 
-		info, err := svc.so.GetServiceInfo(svc.svc.ID)
+		info, err := svc.so.GetServiceInfo(svc.ID())
 		if err != nil {
 			return nil, err
 		}
@@ -136,7 +162,7 @@ func (svc *Service) RefreshSpec() (*structs.ServiceSpec, error) {
 		ID = svc.spec.ID
 		users = svc.spec.Users
 	} else if svc.svc != nil {
-		ID = svc.svc.ID
+		ID = svc.ID()
 	} else {
 		return nil, errors.New("Service with non ID")
 	}
@@ -381,7 +407,7 @@ func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers
 
 // RunContainer create and start container on engine.
 func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, start bool, authConfig *types.AuthConfig) error {
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
 		statusServiceContainerCreating, statusServiceContainerRunning, statusServiceContainerCreateFailed)
 
 	return sl.Run(
@@ -463,7 +489,7 @@ func engineCreateVolume(eng *cluster.Engine, lv database.Volume) error {
 // register services to consul or other third part auto-service discovery server.
 func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, task *database.Task, async bool, args map[string]interface{}) error {
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
 		statusInitServiceStarting, statusInitServiceStarted, statusInitServiceStartFailed)
 
 	val, err := sl.Load()
@@ -641,7 +667,7 @@ func (svc *Service) Start(ctx context.Context, task *database.Task, detach bool,
 		return svc.start(ctx, nil, cmds)
 	}
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
 		statusServiceStarting, statusServiceStarted, statusServiceStartFailed)
 
 	return sl.Run(isnotInProgress, start, detach)
@@ -656,7 +682,7 @@ func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.Serv
 			return err
 		}
 
-		cm, err := svc.pc.UpdateConfigs(ctx, svc.svc.ID, configs)
+		cm, err := svc.pc.UpdateConfigs(ctx, svc.ID(), configs)
 		if err != nil {
 			return err
 		}
@@ -673,7 +699,7 @@ func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.Serv
 		return err
 	}
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
 		statusServiceConfigUpdating, statusServiceConfigUpdated, statusServiceConfigUpdateFailed)
 
 	return sl.Run(isnotInProgress, update, async)
@@ -729,7 +755,7 @@ func (svc *Service) Stop(ctx context.Context, containers, async bool, task *data
 		return svc.stop(ctx, nil, containers)
 	}
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
 		statusServiceStoping, statusServiceStoped, statusServiceStopFailed)
 
 	return sl.Run(isnotInProgress, stop, async)
@@ -801,14 +827,14 @@ func (svc *Service) Exec(ctx context.Context, config structs.ServiceExecConfig, 
 		return nil
 	}
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
 		statusServiceExecStart, statusServiceExecDone, statusServiceExecFailed)
 
 	return sl.Run(isnotInProgress, exec, async)
 }
 
 func (svc *Service) ExecLock(exec func() error, async bool, task *database.Task) error {
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
 		statusServiceExecStart, statusServiceExecDone, statusServiceExecFailed)
 
 	return sl.Run(isnotInProgress, exec, async)
@@ -849,7 +875,7 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register, force bool) 
 		err = svc.deregisterServices(ctx, r, units)
 		if err != nil {
 			if force {
-				logrus.WithField("Service", svc.svc.Name).Errorf("Service deregiste error:%+v", err)
+				logrus.WithField("Service", svc.Name()).Errorf("Service deregiste error:%+v", err)
 			} else {
 				return err
 			}
@@ -865,12 +891,12 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register, force bool) 
 			return err
 		}
 
-		err = svc.so.DelServiceRelation(svc.svc.ID, true)
+		err = svc.so.DelServiceRelation(svc.ID(), true)
 
 		return err
 	}
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
 		statusServiceDeleting, 0, statusServiceDeleteFailed)
 
 	sl.After = func(key string, val int, task *database.Task, t time.Time) (err error) {
@@ -1032,9 +1058,9 @@ func (svc *Service) generateUnitConfig(ctx context.Context, nameOrID string, arg
 }
 
 func (svc *Service) generateUnitsCmd(ctx context.Context) (structs.Commands, error) {
-	return svc.pc.GetCommands(ctx, svc.svc.ID)
+	return svc.pc.GetCommands(ctx, svc.ID())
 }
 
 func (svc *Service) GetUnitsConfigs(ctx context.Context) (structs.ServiceConfigs, error) {
-	return svc.pc.GetServiceConfig(ctx, svc.svc.ID)
+	return svc.pc.GetServiceConfig(ctx, svc.ID())
 }

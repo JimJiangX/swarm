@@ -386,7 +386,7 @@ func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version strin
 		return "", err
 	}
 
-	svc, err := d.gd.GetService(name)
+	svc, err := d.gd.Service(name)
 	if err != nil {
 		return "", err
 	}
@@ -405,12 +405,7 @@ func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version strin
 		return "", err
 	}
 
-	spec, err := svc.Spec()
-	if err != nil {
-		return "", err
-	}
-
-	t := database.NewTask(spec.Name, database.ServiceUpdateImageTask, spec.ID, "", nil, 300)
+	t := database.NewTask(svc.Name(), database.ServiceUpdateImageTask, svc.ID(), "", nil, 300)
 
 	err = svc.UpdateImage(ctx, d.gd.KVClient(), im, &t, async, authConfig)
 

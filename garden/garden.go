@@ -105,18 +105,6 @@ func (gd *Garden) NewService(spec *structs.ServiceSpec, svc *database.Service) *
 	return newService(spec, svc, gd.ormer, gd.Cluster, gd.pluginClient)
 }
 
-// GetService get Service by name or id from db,without ServiceSpec.
-func (gd *Garden) GetService(nameOrID string) (*Service, error) {
-	s, err := gd.ormer.GetService(nameOrID)
-	if err != nil {
-		return nil, err
-	}
-
-	svc := gd.NewService(nil, &s)
-
-	return svc, nil
-}
-
 // Service get ServiceInfo from db,convert to ServiceSpec
 func (gd *Garden) Service(nameOrID string) (*Service, error) {
 	info, err := gd.ormer.GetServiceInfo(nameOrID)

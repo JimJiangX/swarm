@@ -22,9 +22,9 @@ type baseContainer struct {
 // ServiceMigrate migrate an unit to other hosts,include volumes、networkings,clean the old container.
 func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, req structs.PostUnitMigrate, async bool) (string, error) {
 
-	task := database.NewTask(svc.svc.Name, database.UnitMigrateTask, svc.svc.ID, req.NameOrID, nil, 300)
+	task := database.NewTask(svc.Name(), database.UnitMigrateTask, svc.ID(), req.NameOrID, nil, 300)
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, &task,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, &task,
 		statusServiceUnitMigrating, statusServiceUnitMigrated, statusServiceUnitMigrateFailed)
 
 	err := sl.Run(isnotInProgress, func() error {
@@ -45,7 +45,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 		// the assigned unit being migrating
 		got := getUnit(units, nameOrID)
 		if got == nil {
-			return errors.Errorf("unit %s isnot belongs to Service %s", nameOrID, svc.svc.Name)
+			return errors.Errorf("unit %s isnot belongs to Service %s", nameOrID, svc.Name())
 		}
 
 		lvs, err := got.uo.ListVolumesByUnitID(got.u.ID)

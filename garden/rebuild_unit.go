@@ -15,9 +15,9 @@ import (
 func (gd *Garden) RebuildUnits(ctx context.Context, actor alloc.Allocator, svc *Service,
 	req structs.UnitRebuildRequest, async bool) (string, error) {
 
-	task := database.NewTask(svc.svc.Name, database.UnitRebuildTask, svc.svc.ID, "", nil, 300)
+	task := database.NewTask(svc.Name(), database.UnitRebuildTask, svc.ID(), "", nil, 300)
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, &task,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, &task,
 		statusServiceUnitRebuilding, statusServiceUnitRebuilt, statusServiceUnitRebuildFailed)
 
 	err := sl.Run(isnotInProgress, func() error {

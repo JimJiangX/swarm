@@ -295,7 +295,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 		err := orm.SetTask(t)
 		if err != nil {
-			ec := errCodeV1(_Task, dbExecError, 34, "fail to exec records into database", "数据库更新错误（任务表）")
+			ec := errCodeV1(_Task, dbExecError, 33, "fail to exec records into database", "数据库更新错误（任务表）")
 			httpJSONError(w, err, ec, http.StatusInternalServerError)
 		}
 		return
@@ -325,7 +325,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	err = orm.InsertBackupFileWithTask(bf, t)
 	if err != nil {
-		ec := errCodeV1(_Task, dbTxError, 35, "fail to exec records in into database in a Tx", "数据库事务处理错误（备份文件表）")
+		ec := errCodeV1(_Task, dbTxError, 34, "fail to exec records in into database in a Tx", "数据库事务处理错误（备份文件表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -1878,16 +1878,9 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	svc, err := gd.GetService(name)
+	svc, err := gd.Service(name)
 	if err != nil {
 		ec := errCodeV1(_Service, dbQueryError, 81, "fail to query database", "数据库查询错误（服务表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	spec, err := svc.Spec()
-	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 82, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -1899,11 +1892,11 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceStartTask, spec.ID, spec.Desc, nil, 300)
+	task := database.NewTask(svc.Name(), database.ServiceStartTask, svc.ID(), "", nil, 300)
 
 	err = svc.InitStart(ctx, gd.KVClient(), nil, &task, true, nil)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 83, "fail to init start service", "服务初始化启动错误")
+		ec := errCodeV1(_Service, internalError, 82, "fail to init start service", "服务初始化启动错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2018,23 +2011,16 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
-	svc, err := gd.GetService(name)
+	svc, err := gd.Service(name)
 	if err != nil {
 		ec := errCodeV1(_Service, dbQueryError, 93, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	spec, err := svc.Spec()
-	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 94, "fail to query database", "数据库查询错误（服务表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
 	configs, restart, err := mergeServiceConfigsChange(ctx, svc, change)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 95, "fail to update config file", "数据合并错误")
+		ec := errCodeV1(_Service, dbQueryError, 94, "fail to update config file", "数据合并错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2046,11 +2032,11 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceUpdateConfigTask, spec.ID, spec.Desc, nil, 300)
+	task := database.NewTask(svc.Name(), database.ServiceUpdateConfigTask, svc.ID(), "", nil, 300)
 
 	err = svc.UpdateUnitsConfigs(ctx, configs, &task, restart, true)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 96, "fail to update service config files", "服务配置文件更新错误")
+		ec := errCodeV1(_Service, internalError, 95, "fail to update service config files", "服务配置文件更新错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2097,7 +2083,7 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	svc, err := gd.GetService(name)
+	svc, err := gd.Service(name)
 	if err != nil {
 		ec := errCodeV1(_Service, dbQueryError, 104, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -2137,13 +2123,6 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	spec, err := svc.Spec()
-	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 106, "fail to query database", "数据库查询错误（服务表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
 	// new Context with deadline
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
@@ -2151,11 +2130,11 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceExecTask, spec.ID, spec.Desc, nil, 300)
+	task := database.NewTask(svc.Name(), database.ServiceExecTask, svc.ID(), "", nil, 300)
 
 	err = svc.Exec(ctx, config, true, &task)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 107, "fail to exec command in service containers", "服务容器远程命令执行错误（container exec）")
+		ec := errCodeV1(_Service, internalError, 106, "fail to exec command in service containers", "服务容器远程命令执行错误（container exec）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2174,16 +2153,9 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	svc, err := gd.GetService(name)
+	svc, err := gd.Service(name)
 	if err != nil {
 		ec := errCodeV1(_Service, dbQueryError, 111, "fail to query database", "数据库查询错误（服务表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	spec, err := svc.Spec()
-	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 112, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2195,11 +2167,11 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceStopTask, spec.ID, spec.Desc, nil, 300)
+	task := database.NewTask(svc.Name(), database.ServiceStopTask, svc.ID(), "", nil, 300)
 
 	err = svc.Stop(ctx, true, true, &task)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 113, "fail to stop service", "服务关闭错误")
+		ec := errCodeV1(_Service, internalError, 112, "fail to stop service", "服务关闭错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2225,7 +2197,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svc, err := gd.GetService(name)
+	svc, err := gd.Service(name)
 	if err != nil {
 		if errors.Cause(err) == sql.ErrNoRows {
 			w.WriteHeader(http.StatusNoContent)
@@ -2296,16 +2268,9 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		config.FilesRetention = 7
 	}
 
-	svc, err := gd.GetService(name)
+	svc, err := gd.Service(name)
 	if err != nil {
 		ec := errCodeV1(_Service, dbQueryError, 134, "fail to query database", "数据库查询错误（服务表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	spec, err := svc.Spec()
-	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 135, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2317,11 +2282,11 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceBackupTask, spec.ID, spec.Desc, nil, 300)
+	task := database.NewTask(svc.Name(), database.ServiceBackupTask, svc.ID(), "", nil, 300)
 
 	err = svc.Backup(ctx, r.Host, config, true, &task)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 136, "fail to back service", "服务备份错误")
+		ec := errCodeV1(_Service, internalError, 135, "fail to back service", "服务备份错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2369,16 +2334,16 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	svc, err := gd.GetService(name)
+	svc, err := gd.Service(name)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 144, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 143, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
 	id, err := svc.UnitRestore(ctx, req.Units, req.File, true)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 145, "fail to restore unit data", "服务单元数据恢复错误")
+		ec := errCodeV1(_Service, internalError, 144, "fail to restore unit data", "服务单元数据恢复错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2522,7 +2487,7 @@ func getServiceConfigFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	svc, err := gd.GetService(name)
+	svc, err := gd.Service(name)
 	if err != nil {
 		ec := errCodeV1(_Service, dbQueryError, 172, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -2899,7 +2864,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 		err = removeBackupFiles(orm, nfs, files)
 		if err != nil {
-			ec := errCodeV1(_Backup, dbExecError, 15, "fail to remove backup files", "删除备份文件错误")
+			ec := errCodeV1(_Backup, dbExecError, 14, "fail to remove backup files", "删除备份文件错误")
 			httpJSONError(w, err, ec, http.StatusInternalServerError)
 		}
 
@@ -2915,7 +2880,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	}
 
 	if err != nil {
-		ec := errCodeV1(_Backup, dbQueryError, 13, "fail to query database", "数据库查询错误（备份文件表）")
+		ec := errCodeV1(_Backup, dbQueryError, 15, "fail to query database", "数据库查询错误（备份文件表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2942,7 +2907,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	err = removeBackupFiles(orm, nfs, expired)
 	if err != nil {
-		ec := errCodeV1(_Backup, dbExecError, 15, "fail to remove backup files", "删除备份文件错误")
+		ec := errCodeV1(_Backup, dbExecError, 16, "fail to remove backup files", "删除备份文件错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
