@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/docker/swarm/garden/kvstore"
@@ -50,8 +49,6 @@ func newLinkUpSQL(links []*structs.ServiceLink) (linkUpSQL, error) {
 	}
 
 	for i := range links {
-
-		fmt.Printf("%#v\n", links[i])
 
 		v, err := structs.ParseImage(links[i].Spec.Image)
 		if err != nil {

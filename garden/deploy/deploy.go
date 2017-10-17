@@ -2,7 +2,6 @@ package deploy
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
@@ -172,8 +171,6 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 	if err != nil {
 		return "", err
 	}
-
-	fmt.Printf("%#v\n", links)
 
 	// TODO:better task info
 	task := database.NewTask("deploy link", database.ServiceLinkTask, "", "", nil, 300)
