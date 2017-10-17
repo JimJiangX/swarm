@@ -12,7 +12,7 @@ import (
 
 type ServiceLink struct {
 	priority int
-	Spec     *ServiceSpec `json:"-"`
+	Spec     *ServiceSpec
 
 	Arch Arch     `json:"architecture"`
 	ID   string   `json:"id"`
