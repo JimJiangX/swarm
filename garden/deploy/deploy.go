@@ -174,12 +174,19 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 
 	// TODO:better task info
 	task := database.NewTask("deploy link", database.ServiceLinkTask, "", "", nil, 300)
+	err = d.gd.Ormer().InsertTask(task)
+	if err != nil {
+		return "", err
+	}
 
 	go func() (err error) {
 		defer func() {
+			d.gd.Unlock()
+
 			if r := recover(); r != nil {
 				err = errors.Errorf("deploy link,panic:%v", r)
 			}
+
 			if err == nil {
 				task.Status = database.TaskDoneStatus
 			} else {
@@ -195,6 +202,8 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 				logrus.Errorf("deploy link and start,%+v", _err)
 			}
 		}()
+
+		d.gd.Lock()
 
 		// generate new units config and commands,and sorted
 		resp, err := d.gd.PluginClient().ServicesLink(ctx, links)
