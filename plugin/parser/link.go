@@ -83,20 +83,22 @@ func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 		Links: make([]structs.UnitLink, 0, 5),
 	}
 
-	//	{
-	//		opts := make(map[string]map[string]interface{})
-
-	//		// set options
-
-	//		ulinks, err := generateServiceLink(ctx, client, *sql.sql.Spec, opts)
-	//		if err != nil {
-	//			return resp, err
-	//		}
-
-	//		resp.Links = append(resp.Links, ulinks...)
-	//	}
+	{
+		// sql
+		if sql.sql != nil {
+			for _, u := range sql.sql.Spec.Units {
+				resp.Links = append(resp.Links, structs.UnitLink{
+					NameOrID:  u.ID,
+					ServiceID: sql.sql.Spec.ID,
+					Commands:  []string{"/root/serv", "start"}, // TODO:
+				})
+			}
+		}
+	}
 
 	{
+		// proxy
+
 		opts := make(map[string]map[string]interface{})
 		// set options
 		{
@@ -132,24 +134,18 @@ func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 		resp.Links = append(resp.Links, ulinks...)
 	}
 
-	//	{
-	//		opts := make(map[string]map[string]interface{})
-
-	//		// set options
-
-	//		ulinks, err := generateServiceLink(ctx, client, *sql.swm.Spec, opts)
-	//		if err != nil {
-	//			return resp, err
-	//		}
-	//		{
-	//			// TODO:generate switch_manager init topoloy request
-
-	//		}
-
-	//		resp.Links = append(resp.Links, ulinks...)
-	//	}
-
-	//	resp.Compose = []string{sql.sql.ID, sql.proxy.ID, sql.swm.ID}
+	{
+		// swm
+		if sql.swm != nil {
+			for _, u := range sql.swm.Spec.Units {
+				resp.Links = append(resp.Links, structs.UnitLink{
+					NameOrID:  u.ID,
+					ServiceID: sql.swm.Spec.ID,
+					Commands:  []string{"/root/serv", "start"}, // TODO:
+				})
+			}
+		}
+	}
 
 	return resp, nil
 }
