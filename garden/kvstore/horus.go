@@ -227,9 +227,7 @@ func (c *kvClient) GetHorusAddr(ctx context.Context) (string, error) {
 
 	var q *api.QueryOptions
 	if ctx != nil {
-		q = &api.QueryOptions{
-			Context: ctx,
-		}
+		q = q.WithContext(ctx)
 	}
 
 	checks, _, err := client.Health().State(api.HealthPassing, q)

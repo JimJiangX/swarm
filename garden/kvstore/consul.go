@@ -49,10 +49,15 @@ func getStatus(c *api.Client, port string) (string, []string, error) {
 
 // HealthChecksFromConsul is used to retrieve all the checks in a given state.
 // The wildcard "any" state can also be used for all checks.
-func (c *kvClient) HealthChecks(state string, q *api.QueryOptions) (map[string]api.HealthCheck, error) {
+func (c *kvClient) HealthChecks(ctx context.Context, state string) (map[string]api.HealthCheck, error) {
 	addr, client, err := c.getClient("")
 	if err != nil {
 		return nil, err
+	}
+
+	var q *api.QueryOptions
+	if ctx != nil {
+		q = q.WithContext(ctx)
 	}
 
 	checks, _, err := client.Health().Checks(state, q)
@@ -110,9 +115,7 @@ func (c *kvClient) GetKV(ctx context.Context, key string) (*api.KVPair, error) {
 
 	var q *api.QueryOptions
 	if ctx != nil {
-		q = &api.QueryOptions{
-			Context: ctx,
-		}
+		q = q.WithContext(ctx)
 	}
 
 	val, _, err := client.KV().Get(key, q)
@@ -134,9 +137,7 @@ func (c *kvClient) ListKV(ctx context.Context, key string) (api.KVPairs, error) 
 
 	var q *api.QueryOptions
 	if ctx != nil {
-		q = &api.QueryOptions{
-			Context: ctx,
-		}
+		q = q.WithContext(ctx)
 	}
 
 	val, _, err := client.KV().List(key, q)
@@ -158,7 +159,13 @@ func (c *kvClient) PutKV(ctx context.Context, key string, val []byte) error {
 		Key:   c.key(key),
 		Value: val,
 	}
-	_, err = client.KV().Put(pair, nil)
+
+	var wo *api.WriteOptions
+	if ctx != nil {
+		wo = wo.WithContext(ctx)
+	}
+
+	_, err = client.KV().Put(pair, wo)
 	c.checkConnectError(addr, err)
 	if err == nil {
 		return nil
@@ -173,9 +180,14 @@ func (c *kvClient) DeleteKVTree(ctx context.Context, key string) error {
 		return err
 	}
 
+	var wo *api.WriteOptions
+	if ctx != nil {
+		wo = wo.WithContext(ctx)
+	}
+
 	key = c.key(key)
 
-	_, err = client.KV().DeleteTree(key, nil)
+	_, err = client.KV().DeleteTree(key, wo)
 	c.checkConnectError(addr, err)
 	if err == nil {
 		return nil
