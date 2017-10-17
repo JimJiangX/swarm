@@ -844,8 +844,9 @@ func (svc *Service) ExecLock(exec func() error, async bool, task *database.Task)
 // 1) deregiste services
 // 2) remove containers
 // 3) remove volumes
-// 4) delete Service records in db
-func (svc *Service) Remove(ctx context.Context, r kvstore.Register, force bool) (err error) {
+// 4) remove units configs,ignore error
+// 5) delete Service records in db
+func (svc *Service) Remove(ctx context.Context, r kvstore.Client, force bool) (err error) {
 	err = svc.deleteCondition()
 	if err != nil {
 		return err
@@ -889,6 +890,11 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Register, force bool) 
 		err = svc.removeVolumes(ctx, units)
 		if err != nil {
 			return err
+		}
+
+		err = svc.removeUnitsConfigs(ctx, r)
+		if err != nil {
+			logrus.WithField("Service", svc.Name()).Errorf("Service remove units configs error:%+v", err)
 		}
 
 		err = svc.so.DelServiceRelation(svc.ID(), true)
@@ -987,6 +993,14 @@ func (svc *Service) removeUnits(ctx context.Context, rm []*unit, reg kvstore.Reg
 	err = svc.so.DelUnitsRelated(list, true)
 
 	return err
+}
+
+func (svc Service) removeUnitsConfigs(ctx context.Context, kvc kvstore.Store) error {
+	if kvc == nil {
+		return nil
+	}
+
+	return kvc.DeleteKVTree(ctx, "/configs/"+svc.ID())
 }
 
 // Compose call plugin compose
