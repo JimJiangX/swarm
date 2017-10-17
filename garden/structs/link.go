@@ -25,7 +25,7 @@ type ServicesLink struct {
 }
 
 func (sl ServicesLink) Less(i, j int) bool {
-	return sl.Links[i].priority > sl.Links[j].priority
+	return sl.Links[i].priority < sl.Links[j].priority
 }
 
 // Len is the number of elements in the collection.

@@ -167,7 +167,7 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bo
 
 // Link is exported,not done yet.
 func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (string, error) {
-	err := d.freshServicesLink(links)
+	links, err := d.freshServicesLink(links)
 	if err != nil {
 		return "", err
 	}
@@ -297,31 +297,31 @@ func (d *Deployment) serviceFromLinks(links structs.ServicesLink, nameOrID strin
 	return nil
 }
 
-func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
+func (d *Deployment) freshServicesLink(links structs.ServicesLink) (structs.ServicesLink, error) {
 	ids := links.LinkIDs()
 
 	switch len(ids) {
 	case 0:
-		return nil
+		return links, nil
 	case 1:
 		svc, err := d.gd.Service(ids[0])
 		if err != nil {
-			return err
+			return links, err
 		}
 
 		spec, err := svc.Spec()
 		if err != nil {
-			return err
+			return links, err
 		}
 
 		links.Links[0].Spec = spec
 
-		return nil
+		return links, nil
 	}
 
 	out, err := d.gd.Ormer().ListServicesInfo()
 	if err != nil {
-		return err
+		return links, err
 	}
 
 	m := make(map[string]database.ServiceInfo, len(ids))
@@ -335,30 +335,34 @@ func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
 		}
 	}
 
-	links.Sort()
-
 	containers := d.gd.Cluster.Containers()
+	linkSlice := make([]*structs.ServiceLink, len(links.Links), len(ids))
+	copy(linkSlice, links.Links)
 
-	for l := range links.Links {
+	for l := range linkSlice {
 
-		info, ok := m[links.Links[l].ID]
+		info, ok := m[linkSlice[l].ID]
 		if ok {
 			spec := garden.ConvertServiceInfo(info, containers)
-			links.Links[l].Spec = &spec
+			linkSlice[l].Spec = &spec
 		}
 
-		delete(m, links.Links[l].ID)
+		delete(m, linkSlice[l].ID)
 	}
 
 	for _, val := range m {
 		spec := garden.ConvertServiceInfo(val, containers)
-		links.Links = append(links.Links, &structs.ServiceLink{
+		linkSlice = append(linkSlice, &structs.ServiceLink{
 			ID:   spec.ID,
 			Spec: &spec,
 		})
 	}
 
-	return nil
+	links.Links = linkSlice
+
+	links.Sort()
+
+	return links, nil
 }
 
 // ServiceScale scale service.
