@@ -352,7 +352,8 @@ func (c *switchManagerConfigV120) GenerateConfig(id string, desc structs.Service
 	m["ConsulIP"] = spec.Engine.Addr
 
 	m["ConsulPort"] = consulPort
-	m["SwarmConsulPrefix"] = consulPrefix
+	m["ConsulPrefix"] = consulPrefix
+	m["ConsulDatacenter"] = os.Getenv("CONSUL_HTTP_DATACENTER")
 	m["SwarmHostKey"] = leaderElectionPath
 	m["SwarmUserAgent"] = "1.31"
 
