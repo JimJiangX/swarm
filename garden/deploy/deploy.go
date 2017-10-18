@@ -283,6 +283,8 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 				continue
 			}
 
+			logrus.Debugf("LINK:%s %s\nBody:%s", ul.Request.Method, ul.Request.URL, ul.Request.Body)
+
 			err := ul.Request.Send()
 			if err != nil {
 				return err
