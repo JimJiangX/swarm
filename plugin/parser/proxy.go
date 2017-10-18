@@ -226,7 +226,7 @@ func (c *proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) er
 
 	m := make(map[string]interface{}, 10)
 
-	m["upsql-proxy::proxy-domain"] = desc.ID
+	m["upsql-proxy::proxy-domain"] = desc.Tag
 	m["upsql-proxy::proxy-name"] = spec.Name
 
 	addr := "localhost"
@@ -383,7 +383,7 @@ func (c *upproxyConfigV100) GenerateConfig(id string, desc structs.ServiceSpec) 
 
 	m := make(map[string]interface{}, 10)
 
-	m["upsql-proxy::proxy-domain"] = desc.ID
+	m["upsql-proxy::proxy-domain"] = desc.Tag
 	m["upsql-proxy::proxy-name"] = spec.Name
 
 	addr := "127.0.0.1"

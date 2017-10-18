@@ -24,6 +24,7 @@ func init() {
 
 var (
 	consulPort         = "8500"
+	consulPrefix       = ""
 	leaderElectionPath = "docker/swarm/leader"
 )
 
@@ -44,6 +45,12 @@ func setLeaderElectionPath(path string) {
 
 	// A custom prefix to the path can be optionally used.
 	if len(parts) == 2 {
+
+		end := strings.Index(parts[1], leaderElectionPath)
+		if end > 0 {
+			consulPrefix = filepath.Join("/", string(parts[1][:end]))
+		}
+
 		leaderElectionPath = filepath.Join("/", parts[1])
 
 		_, port, err := net.SplitHostPort(parts[0])
@@ -333,7 +340,7 @@ func (c *switchManagerConfigV120) GenerateConfig(id string, desc structs.Service
 
 	m := make(map[string]interface{}, 10)
 
-	m["domain"] = desc.ID
+	m["domain"] = desc.Tag
 	m["name"] = spec.Name
 
 	if port, ok := desc.Options["Port"]; ok {
@@ -345,6 +352,7 @@ func (c *switchManagerConfigV120) GenerateConfig(id string, desc structs.Service
 	m["ConsulIP"] = spec.Engine.Addr
 
 	m["ConsulPort"] = consulPort
+	m["SwarmConsulPrefix"] = consulPrefix
 	m["SwarmHostKey"] = leaderElectionPath
 	m["SwarmUserAgent"] = "1.31"
 

@@ -366,6 +366,10 @@ func TestSetLeaderElectionPath(t *testing.T) {
 		t.Error(leaderElectionPath)
 	}
 
+	if consulPrefix != "/unionpay" {
+		t.Error(consulPrefix)
+	}
+
 	setLeaderElectionPath("146.32.99.22:8300/unionpay/docker/swarm/")
 	if consulPort != "8300" {
 		t.Error(consulPort)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/garden/utils"
 	"github.com/docker/swarm/vars"
 	"github.com/pkg/errors"
 	swm_structs "github.com/yiduoyunQ/sm/sm-svr/structs"
@@ -200,7 +201,7 @@ func swmInitTopology(ctx context.Context, kvc kvstore.Store, sql linkUpSQL) ([]b
 		parts := strings.SplitN(addr, ":", 2)
 
 		proxyGroup[u.Name] = &swm_structs.ProxyInfo{
-			Id:   parts[1],
+			Id:   strconv.Itoa(int(utils.IPToUint32(parts[0]))),
 			Name: u.Name,
 			Ip:   parts[0],
 			Port: parts[1],
