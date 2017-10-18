@@ -1,0 +1,1 @@
+{"Id":"Id","Type":"Type","UserName":"UserName","Password":"Password","Role":"Role","WhiteList":["WhiteList1","WhiteList2"],"BlackList":["BlackList1","BlackList2"],"ReadOnly":true,"RwSplit":true,"Shard":true}

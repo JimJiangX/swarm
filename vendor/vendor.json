@@ -81,6 +81,12 @@
 			"revisionTime": "2016-10-29T09:36:37Z"
 		},
 		{
+			"checksumSHA1": "3mRxbkevdLPRkiwuVmohab0SkzQ=",
+			"path": "github.com/yiduoyunQ/sm/sm-svr/structs",
+			"revision": "3117f2b23561b90dfe6bdccdc4f8b6ba03b98d6f",
+			"revisionTime": "2017-10-16T06:25:41Z"
+		},
+		{
 			"checksumSHA1": "LzlSlifCUTtWAJHqQJPRSsjaeTQ=",
 			"path": "golang.org/x/crypto/curve25519",
 			"revision": "f6b343c37ca80bfa8ea539da67a0b621f84fab1d",
