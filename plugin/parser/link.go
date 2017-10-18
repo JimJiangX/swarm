@@ -153,7 +153,7 @@ func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 						URL:    "http://" + swmAddr + "/init",
 						Body:   body,
 						Header: map[string][]string{
-							"Content-Type": {"application/json"},
+							"Content-Type": []string{"application/json"},
 						},
 					},
 				})

@@ -1,1 +1,0 @@
-{"password":"password","connection-max":9,"connection-min":1,"dbpm_name":"dbpm_name","white_list":["white_list1","white_list2"],"black_list":["black_list1","black_list2"],"proxy_mode":{"is_shard":true,"is_rw_split":true,"is_readonly":true,"datanode":"datanode"},"role":"role"}
