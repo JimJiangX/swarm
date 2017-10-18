@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
@@ -284,8 +285,14 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 			}
 
 			logrus.Debugf("LINK:%s %s\nBody:%s", ul.Request.Method, ul.Request.URL, ul.Request.Body)
-
-			err := ul.Request.Send()
+		retry:
+			for i := 3; i > 0; i-- {
+				err = ul.Request.Send()
+				if err == nil {
+					break retry
+				}
+				time.Sleep(time.Second)
+			}
 			if err != nil {
 				return err
 			}
