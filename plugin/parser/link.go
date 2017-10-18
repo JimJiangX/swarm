@@ -120,11 +120,13 @@ func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 		opts := make(map[string]map[string]interface{})
 		// set options
 		{
-			port := swmPr.get("proxyport")
-			ip := sql.swm.Spec.Units[0].Networking[0].IP
-			swmAddr = net.JoinHostPort(ip, port)
 
-			opts[allUnitsEffect] = map[string]interface{}{"adm-cli::adm-svr-address": swmAddr}
+			ip := sql.swm.Spec.Units[0].Networking[0].IP
+			port := swmPr.get("proxyport")
+
+			opts[allUnitsEffect] = map[string]interface{}{"adm-cli::adm-svr-address": net.JoinHostPort(ip, port)}
+
+			swmAddr = net.JoinHostPort(ip, swmPr.get("port"))
 		}
 
 		ulinks, err := generateServiceLink(ctx, client, *sql.proxy.Spec, opts)
