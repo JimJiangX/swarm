@@ -92,6 +92,8 @@ type VolumeDriver struct {
 }
 
 type container struct {
+	NCPU    int64             `json:"ncpu"`
+	Memory  int64             `json:"memory"`
 	ID      string            `json:"id"`
 	Name    string            `json:"name"`
 	Image   string            `json:"image"`
@@ -150,7 +152,10 @@ func (n *NodeInfo) SetByEngine(e *cluster.Engine) {
 			num, err := c.Config.CountCPU()
 			if err == nil {
 				ncpu += num
+				n.Containers[i].NCPU = num
 			}
+
+			n.Containers[i].Memory = c.Config.HostConfig.Memory
 			memory += c.Config.HostConfig.Memory
 		}
 	}
