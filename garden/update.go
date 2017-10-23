@@ -218,6 +218,8 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 		pendings := make([]pending, 0, len(units))
 
 		for _, u := range units {
+			var nccpu int64   // container HostConfig.CpusetCpus
+			countCPU := false // set true after called CountCPU
 
 			c := u.getContainer()
 			if c == nil || c.Engine == nil {
@@ -225,9 +227,15 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 			}
 
 			if c.Config.HostConfig.Memory == memory {
-				if n, err := c.Config.CountCPU(); err == nil && n == ncpu {
+				nccpu, err = c.Config.CountCPU()
+				if err != nil {
+					return errors.WithStack(err)
+				}
+
+				if nccpu == ncpu {
 					continue
 				}
+				countCPU = true
 			}
 
 			pu := pending{
@@ -236,22 +244,24 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 				cpuset: c.Config.HostConfig.CpusetCpus,
 			}
 
-			n, err := c.Config.CountCPU()
-			if err != nil {
-				return errors.WithStack(err)
+			if !countCPU {
+				nccpu, err = c.Config.CountCPU()
+				if err != nil {
+					return errors.WithStack(err)
+				}
 			}
 
-			if n > ncpu {
+			if nccpu > ncpu {
 				pu.cpuset, err = reduceCPUset(c.Config.HostConfig.CpusetCpus, int(ncpu))
 				if err != nil {
 					return err
 				}
 			}
 
-			if c.Config.HostConfig.Memory < memory || n < ncpu {
+			if c.Config.HostConfig.Memory < memory || nccpu < ncpu {
 				node := node.NewNode(c.Engine)
 
-				cpuset, err := actor.AlloctCPUMemory(c.Config, node, ncpu-n, memory-c.Config.HostConfig.Memory, nil)
+				cpuset, err := actor.AlloctCPUMemory(c.Config, node, ncpu-nccpu, memory-c.Config.HostConfig.Memory, nil)
 				if err != nil {
 					return err
 				}
@@ -272,6 +282,11 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 			}
 
 			pendings = append(pendings, pu)
+		}
+
+		if len(pendings) == 0 {
+			// no cpu&memory update
+			return nil
 		}
 
 		for _, pu := range pendings {
