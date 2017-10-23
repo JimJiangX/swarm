@@ -165,17 +165,23 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 		}
 	}
 	{
-		// clean old
-		err := svc.deregisterServices(ctx, gd.KVClient(), []*unit{&old.unit})
+		// remove old unit container & volume
+		rmUnits := []*unit{&old.unit}
+
+		err = svc.removeContainers(ctx, rmUnits, false, true)
 		if err != nil {
 			return err
 		}
 
-		err = svc.removeContainers(ctx, []*unit{&old.unit}, false, true)
-		if err != nil {
-			return err
+		if !migrate {
+			err = svc.removeVolumes(ctx, rmUnits)
+			if err != nil {
+				return err
+			}
 		}
-
+	}
+	{
+		// rename new container name as old unit name
 		err = renameContainer(&news.unit, old.unit.u.Name)
 		if err != nil {
 			return err
@@ -185,7 +191,8 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 		if err != nil {
 			return err
 		}
-
+	}
+	{
 		cms, err := svc.generateUnitsConfigs(ctx, nil)
 		if err != nil {
 			return err

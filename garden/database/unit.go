@@ -421,13 +421,18 @@ func (db dbBase) MigrateUnit(src, destID, destName string) error {
 		}
 
 		query = "UPDATE " + db.ipTable() + " SET unit_id=? WHERE unit_id=?"
-		_, err = tx.Exec(query, destID, src)
+		_, err = tx.Exec(query, destID, u.ID)
 		if err != nil {
 			return errors.Wrap(err, "set ips")
 		}
 
+		err = db.txDelVolumeByUnit(tx, destID)
+		if err != nil {
+			return err
+		}
+
 		query = "UPDATE " + db.volumeTable() + " SET unit_id=? WHERE unit_id=?"
-		_, err = db.Exec(query, destID, src)
+		_, err = tx.Exec(query, destID, u.ID)
 		if err != nil {
 			return errors.Wrap(err, "set volume")
 		}
