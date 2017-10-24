@@ -160,14 +160,13 @@ func (at netAllocator) AllocDevice(engineID, unitID string, ips []database.IP) (
 		return ips, errors.Errorf("Engine:%s not enough Bandwidth for require,%d less", engineID, width)
 	}
 
-	out := make([]database.IP, 0, len(ips))
+	out := make([]database.IP, len(ips))
+	copy(out, ips)
 
-	for i, t := range ips {
-		t.Engine = engineID
-		t.Bond = idle[i]
-		t.UnitID = unitID
-
-		out = append(out, t)
+	for i := range out {
+		out[i].Engine = engineID
+		out[i].Bond = idle[i]
+		out[i].UnitID = unitID
 	}
 
 	err = at.ormer.SetIPs(out)
