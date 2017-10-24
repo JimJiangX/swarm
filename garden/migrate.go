@@ -36,6 +36,7 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, req structs.
 
 func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string, candidates []string, migrate bool) error {
 	var old, news baseContainer
+	var cms structs.ConfigsMap
 
 	units, err := svc.getUnits()
 	if err != nil {
@@ -154,12 +155,32 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			news.engine = news.unit.getEngine()
 		}
 
-		cms, err := svc.generateUnitsConfigs(ctx, nil)
-		if err != nil {
-			return err
+		{
+			// using old unit config as news unit
+			cc, err := svc.getUnitConfig(ctx, old.unit.u.ID)
+			if err != nil {
+				return err
+			}
+
+			if cc.Registration.Horus != nil {
+				node, err := svc.so.GetNode(news.unit.u.EngineID)
+				if err != nil {
+					return err
+				}
+				cc.Registration.Horus.Service.Container.HostName = node.ID
+			}
+
+			cms = make(structs.ConfigsMap)
+			cms[news.unit.u.ID] = cc
+			cms[old.unit.u.ID] = cc
 		}
 
-		err = svc.start(ctx, adds, cms.Commands())
+		// start unit service
+		if migrate {
+			err = svc.start(ctx, adds, cms.Commands())
+		} else {
+			err = svc.initStart(ctx, adds, nil, cms, nil)
+		}
 		if err != nil {
 			return err
 		}
@@ -193,11 +214,6 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 		}
 	}
 	{
-		cms, err := svc.generateUnitsConfigs(ctx, nil)
-		if err != nil {
-			return err
-		}
-
 		u, err := svc.getUnit(old.unit.u.ID)
 		if err != nil {
 			return err

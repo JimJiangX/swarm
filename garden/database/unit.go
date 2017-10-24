@@ -420,12 +420,6 @@ func (db dbBase) MigrateUnit(src, destID, destName string) error {
 			return errors.Wrap(err, "Get Unit By nameOrID")
 		}
 
-		query = "UPDATE " + db.ipTable() + " SET unit_id=? WHERE unit_id=?"
-		_, err = tx.Exec(query, destID, u.ID)
-		if err != nil {
-			return errors.Wrap(err, "set ips")
-		}
-
 		err = db.txDelVolumeByUnit(tx, destID)
 		if err != nil {
 			return err
