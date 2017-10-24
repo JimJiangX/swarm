@@ -3,7 +3,6 @@ package garden
 import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
-	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/tasklock"
@@ -219,7 +218,12 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			return err
 		}
 
-		err = registerUnits(ctx, []*unit{u}, gd.KVClient(), cms)
+		if old.engine.ID == news.engine.ID {
+			c := gd.Container(news.unit.u.ContainerID)
+			err = saveContainerToKV(ctx, gd.KVClient(), c)
+		} else {
+			err = registerUnits(ctx, []*unit{u}, gd.KVClient(), cms)
+		}
 		if err != nil {
 			return err
 		}
@@ -231,44 +235,4 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 	}
 
 	return nil
-}
-
-// deregister old service and register new
-func updateUnitRegister(ctx context.Context, kvc kvstore.Client, old, new unit, cmds structs.ConfigsMap) error {
-	// deregister service
-	err := deregisterService(ctx, kvc, "units", old.u.ID)
-	if err != nil {
-		return err
-	}
-
-	return registerUnits(ctx, []*unit{&new}, kvc, cmds)
-}
-
-func migrateNetworking(orm database.NetworkingOrmer, src, new []database.IP) ([]database.IP, error) {
-	if len(src) != len(new) {
-		return nil, errors.New("invalid input")
-	}
-
-	dst := make([]database.IP, len(src))
-	copy(dst, src)
-
-	for i := range dst {
-		dst[i].Bandwidth = new[i].Bandwidth
-		dst[i].Bond = new[i].Bond
-		dst[i].Engine = new[i].Engine
-		dst[i].UnitID = new[i].UnitID
-		// reset IP
-		new[i].UnitID = ""
-		new[i].Engine = ""
-		new[i].Bandwidth = 0
-		new[i].Bond = ""
-	}
-
-	set := make([]database.IP, len(dst)+len(new))
-	n := copy(set, dst)
-	copy(set[n:], new)
-
-	err := orm.SetIPs(set)
-
-	return dst, err
 }

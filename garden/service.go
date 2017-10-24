@@ -563,12 +563,7 @@ func registerUnits(ctx context.Context, units []*unit, kvc kvstore.Client, confi
 
 	// register to kv store and third-part services
 	for _, u := range units {
-		host, err := u.getHostIP()
-		if err != nil {
-			return err
-		}
-
-		err = saveContainerToKV(ctx, kvc, u.getContainer())
+		err := saveContainerToKV(ctx, kvc, u.getContainer())
 		if err != nil {
 			return err
 		}
@@ -580,7 +575,7 @@ func registerUnits(ctx context.Context, units []*unit, kvc kvstore.Client, confi
 
 		r := config.GetServiceRegistration()
 
-		err = kvc.RegisterService(ctx, host, r)
+		err = kvc.RegisterService(ctx, "", r)
 		if err != nil {
 			return err
 		}
