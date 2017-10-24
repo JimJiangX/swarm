@@ -230,6 +230,10 @@ func (u unit) startContainer(ctx context.Context) error {
 	// start networking
 	err = u.startNetworking(ctx, c.Engine.IP, nil)
 	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"Engine": c.Engine.ID,
+			"Unit":   u.u.Name}).Warnf("[skip] start networking error:%+v", err)
+
 		if state != nil && state.Running {
 			return nil
 		}
