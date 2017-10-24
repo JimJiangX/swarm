@@ -329,7 +329,7 @@ func (u unit) removeVolumes(ctx context.Context) error {
 	select {
 	default:
 	case <-ctx.Done():
-		return ctx.Err()
+		return errors.WithStack(ctx.Err())
 	}
 
 	logrus.WithFields(logrus.Fields{
