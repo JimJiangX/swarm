@@ -366,7 +366,7 @@ func TestSetLeaderElectionPath(t *testing.T) {
 		t.Error(leaderElectionPath)
 	}
 
-	if consulPrefix != "/unionpay" {
+	if consulPrefix != "unionpay" {
 		t.Error(consulPrefix)
 	}
 

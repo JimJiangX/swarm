@@ -49,7 +49,7 @@ func setLeaderElectionPath(path string) {
 
 		end := strings.Index(parts[1], leaderElectionPath)
 		if end > 0 {
-			consulPrefix = filepath.Join("/", string(parts[1][:end]))
+			consulPrefix = filepath.Clean(string(parts[1][:end]))
 		}
 
 		leaderElectionPath = filepath.Join("/", parts[1])
