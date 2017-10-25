@@ -20,6 +20,7 @@ func init() {
 	register("switch_manager", "1.1.23", &switchManagerConfigV1123{})
 	//	register("switch_manager", "1.1.47", &switchManagerConfigV1147{})
 	register("switch_manager", "1.2.0", &switchManagerConfigV120{})
+	register("switch_manager", "2.0.0", &switchManagerConfigV120{})
 }
 
 var (
