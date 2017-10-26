@@ -67,10 +67,8 @@ func (c redisConfig) Validate(data map[string]interface{}) error {
 	return nil
 }
 
-func (c *redisConfig) ParseData(data []byte) error {
-	if c.config == nil {
-		c.config = make(map[string]string, redisConfigLine)
-	}
+func parseRedisConfig(data []byte) (map[string]string, error) {
+	config := make(map[string]string, redisConfigLine)
 
 	lines := bytes.Split(data, []byte{'\n'})
 	for _, l := range lines {
@@ -85,9 +83,20 @@ func (c *redisConfig) ParseData(data []byte) error {
 
 		parts := bytes.SplitN(line, []byte{' '}, 2)
 		if len(parts) == 2 {
-			c.config[string(parts[0])] = string(bytes.TrimSpace(parts[1]))
+			config[string(parts[0])] = string(bytes.TrimSpace(parts[1]))
 		}
 	}
+
+	return config, nil
+}
+
+func (c *redisConfig) ParseData(data []byte) error {
+	cnf, err := parseRedisConfig(data)
+	if err != nil {
+		return err
+	}
+
+	c.config = cnf
 
 	return nil
 }
@@ -179,4 +188,37 @@ func (upredisConfig) clone(t *structs.ConfigTemplate) parser {
 	pr.config = make(map[string]string, redisConfigLine)
 
 	return pr
+}
+
+func (c *upredisConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
+	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
+
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return err
+	}
+
+	if len(spec.Networking) >= 1 {
+		c.config["bind"] = spec.Networking[0].IP
+	}
+
+	c.config["port"] = fmt.Sprintf("%v", desc.Options["port"])
+
+	c.config["maxmemory"] = strconv.Itoa(int(float64(spec.Config.HostConfig.Memory) * 0.5))
+
+	if c.template != nil {
+		c.config["dir"] = c.template.DataMount
+		c.config["pidfile"] = filepath.Join(c.template.DataMount, "upredis.pid")
+		c.config["logfile"] = filepath.Join(c.template.DataMount, "upredis.log")
+	}
+
+	c.config["requirepass"] = ""
+	c.config["masterauth"] = ""
+	c.config["dbfilename"] = spec.Name + "-dump.rdb"
+	c.config["appendfilename"] = spec.Name + "-appendonly.aof"
+
+	return nil
 }
