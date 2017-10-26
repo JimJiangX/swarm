@@ -631,7 +631,7 @@ func (m hostManager) RemoveNode(ctx context.Context, horus, nameOrID, user, pass
 		Addr:     node.node.Addr,
 		User:     user,
 		Password: password,
-	}, false)
+	}, true)
 	if err != nil {
 		return err
 	}
