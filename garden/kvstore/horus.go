@@ -171,6 +171,19 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 		return ctx.Err()
 	}
 
+	err := delHost(ctx, addr, config, force)
+	if err != nil {
+		return err
+	}
+
+	if config.Addr != "" {
+		err = delHostAgent(ctx, addr, config)
+	}
+
+	return err
+}
+
+func delHost(ctx context.Context, addr string, config structs.ServiceDeregistration, force bool) error {
 	uri := fmt.Sprintf("http://%s/v1/%s/%s", addr, config.Type, config.Key)
 
 	del := false
@@ -197,6 +210,41 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 			params.Set("os_user", config.User)
 			params.Set("os_pwd", config.Password)
 		}
+		req.URL.RawQuery = params.Encode()
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return errors.Wrap(err, "deregister to Horus response")
+	}
+	defer ensureReaderClosed(resp)
+
+	if resp.StatusCode != http.StatusNoContent {
+		err := readResponseError(resp)
+		if err != nil {
+			return errors.Wrapf(err, "%s code=%d,error=%s", uri, resp.StatusCode, err)
+		}
+	}
+
+	return nil
+}
+
+func delHostAgent(ctx context.Context, addr string, config structs.ServiceDeregistration) error {
+	uri := fmt.Sprintf("http://%s/v1/agent/%s", addr, config.Key)
+
+	req, err := http.NewRequest(http.MethodDelete, uri, nil)
+	if err != nil {
+		return errors.Wrap(err, "deregister to Horus")
+	}
+	req = req.WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+
+	if config.User != "" {
+		params := make(url.Values)
+
+		params.Set("os_user", config.User)
+		params.Set("os_pwd", config.Password)
+
 		req.URL.RawQuery = params.Encode()
 	}
 

@@ -628,6 +628,7 @@ func (m hostManager) RemoveNode(ctx context.Context, horus, nameOrID, user, pass
 	err = reg.DeregisterService(ctx, structs.ServiceDeregistration{
 		Type:     "hosts",
 		Key:      node.node.ID,
+		Addr:     node.node.Addr,
 		User:     user,
 		Password: password,
 	}, false)
