@@ -57,24 +57,6 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj structs.HorusRegistr
 
 	if obj.Node.Select {
 		{
-			uri := fmt.Sprintf("http://%s/v1/%s", addr, hostType)
-			body := struct {
-				Name      string   `json:"name"`
-				IPAddr    string   `json:"ip_addr"`
-				CheckType string   `json:"check_type"`
-				NetDevice []string `json:"net_dev"`
-			}{
-				Name:      obj.Node.Name,
-				IPAddr:    obj.Node.IPAddr,
-				CheckType: obj.Node.CheckType,
-				NetDevice: obj.Node.NetDevice,
-			}
-			err := postRegister(ctx, uri, body)
-			if err != nil {
-				return err
-			}
-		}
-		{
 			uri := fmt.Sprintf("http://%s/v1/%s", addr, agentType)
 			body := struct {
 				Name       string `json:"name"`
@@ -88,6 +70,24 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj structs.HorusRegistr
 				OSUser:     obj.Node.OSUser,
 				OSPassword: obj.Node.OSPassword,
 				CheckType:  obj.Node.CheckType,
+			}
+			err := postRegister(ctx, uri, body)
+			if err != nil {
+				return err
+			}
+		}
+		{
+			uri := fmt.Sprintf("http://%s/v1/%s", addr, hostType)
+			body := struct {
+				Name      string   `json:"name"`
+				IPAddr    string   `json:"ip_addr"`
+				CheckType string   `json:"check_type"`
+				NetDevice []string `json:"net_dev"`
+			}{
+				Name:      obj.Node.Name,
+				IPAddr:    obj.Node.IPAddr,
+				CheckType: obj.Node.CheckType,
+				NetDevice: obj.Node.NetDevice,
 			}
 			err := postRegister(ctx, uri, body)
 			if err != nil {
