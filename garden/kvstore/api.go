@@ -25,6 +25,7 @@ const (
 	hostType      = "hosts"
 	unitType      = "units"
 	containerType = "containers"
+	agentType     = "agent/install"
 )
 
 // Register is a client for register service
