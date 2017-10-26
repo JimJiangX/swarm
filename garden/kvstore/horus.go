@@ -230,7 +230,7 @@ func delHost(ctx context.Context, addr string, config structs.ServiceDeregistrat
 }
 
 func delHostAgent(ctx context.Context, addr string, config structs.ServiceDeregistration) error {
-	uri := fmt.Sprintf("http://%s/v1/agent/%s", addr, config.Key)
+	uri := fmt.Sprintf("http://%s/v1/agent", addr)
 
 	req, err := http.NewRequest(http.MethodDelete, uri, nil)
 	if err != nil {
@@ -239,9 +239,10 @@ func delHostAgent(ctx context.Context, addr string, config structs.ServiceDeregi
 	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 
-	if config.User != "" {
+	if config.Addr != "" {
 		params := make(url.Values)
 
+		params.Set("ip_addr", config.Addr)
 		params.Set("os_user", config.User)
 		params.Set("os_pwd", config.Password)
 
