@@ -168,6 +168,18 @@ func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []st
 		execConfig.AttachStdout = false
 	}
 
+	// We need to check the tty _before_ we do the ContainerExecCreate, because
+	// otherwise if we error out we will leak execIDs on the server (and
+	// there's no easy way to clean those up). But also in order to make "not
+	// exist" errors take precedence we do a dummy inspect first.
+	c, err := e.apiClient.ContainerInspect(ctx, containerID)
+	e.CheckConnectionErr(err)
+	if err != nil {
+		return inspect, errors.WithStack(err)
+	}
+
+	containerID = c.ID
+
 	exec, err := e.apiClient.ContainerExecCreate(ctx, containerID, execConfig)
 	e.CheckConnectionErr(err)
 	if err != nil {

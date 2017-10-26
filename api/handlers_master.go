@@ -1745,7 +1745,7 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	// new Context with deadline
 	if deadline, ok := ctx.Deadline(); !ok {
-		ctx = goctx.Background()
+		ctx, _ = goctx.WithTimeout(goctx.Background(), 5*time.Minute)
 	} else {
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}

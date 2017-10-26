@@ -180,32 +180,7 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 		return "", err
 	}
 
-	go func() (err error) {
-		defer func() {
-			d.gd.Unlock()
-
-			if r := recover(); r != nil {
-				err = errors.Errorf("deploy link,panic:%v", r)
-			}
-
-			if err == nil {
-				task.Status = database.TaskDoneStatus
-			} else {
-				task.Status = database.TaskFailedStatus
-
-				logrus.Errorf("deploy link and start,%+v", err)
-			}
-
-			task.SetErrors(err)
-
-			_err := d.gd.Ormer().SetTask(task)
-			if _err != nil {
-				logrus.Errorf("deploy link and start,%+v", _err)
-			}
-		}()
-
-		d.gd.Lock()
-
+	runLink := func() error {
 		// generate new units config and commands,and sorted
 		resp, err := d.gd.PluginClient().ServicesLink(ctx, links)
 		if err != nil {
@@ -287,7 +262,7 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 			logrus.Debugf("LINK:%s %s\nBody:%s", ul.Request.Method, ul.Request.URL, ul.Request.Body)
 		retry:
 			for i := 3; i > 0; i-- {
-				err = ul.Request.Send()
+				err = ul.Request.Send(ctx)
 				if err == nil {
 					break retry
 				}
@@ -298,6 +273,38 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 			}
 		}
 
+		return nil
+	}
+
+	go func() (err error) {
+		d.gd.Lock()
+		defer func() {
+			d.gd.Unlock()
+
+			if r := recover(); r != nil {
+				err = errors.Errorf("deploy link,panic:%v", r)
+			}
+
+			if err == nil {
+				task.Status = database.TaskDoneStatus
+			} else {
+				task.Status = database.TaskFailedStatus
+
+				logrus.Errorf("deploy link failed,%+v", err)
+			}
+
+			task.SetErrors(err)
+
+			_err := d.gd.Ormer().SetTask(task)
+			if _err != nil {
+				logrus.Errorf("deploy link and start,%+v", _err)
+				return
+			}
+
+			logrus.Info("deploy link and done!")
+		}()
+
+		err = runLink()
 		return err
 	}()
 

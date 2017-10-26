@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 type ServiceLink struct {
@@ -116,10 +117,14 @@ type HTTPRequest struct {
 }
 
 // Send send request to remote server
-func (r HTTPRequest) Send() error {
+func (r HTTPRequest) Send(ctx context.Context) error {
 	req, err := http.NewRequest(r.Method, r.URL, bytes.NewReader(r.Body))
 	if err != nil {
 		return err
+	}
+
+	if ctx != nil {
+		req = req.WithContext(ctx)
 	}
 
 	for key, val := range r.Header {
