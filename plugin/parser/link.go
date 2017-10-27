@@ -23,14 +23,14 @@ type linkGenerator interface {
 }
 
 const (
-	SM_UPP_UPSQL = "SwitchManager_Upproxy_UpSQL"
-	Proxy_Redis  = "proxy_redis"
+	SM_UPP_UPSQLs = "SwitchManager_Upproxy_UpSQL"
+	Proxy_Redis   = "proxy_redis"
 )
 
 func linkFactory(mode string, links []*structs.ServiceLink) (linkGenerator, error) {
 	switch mode {
 
-	case SM_UPP_UPSQL:
+	case SM_UPP_UPSQLs:
 		return newLinkUpSQL(links)
 
 	case Proxy_Redis:
@@ -45,14 +45,14 @@ func linkFactory(mode string, links []*structs.ServiceLink) (linkGenerator, erro
 type linkUpSQL struct {
 	swm   *structs.ServiceLink
 	proxy *structs.ServiceLink
-	sql   *structs.ServiceLink
+	sqls  []*structs.ServiceLink
 }
 
 func newLinkUpSQL(links []*structs.ServiceLink) (linkUpSQL, error) {
 	obj := linkUpSQL{}
 
 	if len(links) != 3 {
-		return obj, errors.Errorf("invalid paramaters in %s mode", SM_UPP_UPSQL)
+		return obj, errors.Errorf("invalid paramaters in %s mode", SM_UPP_UPSQLs)
 	}
 
 	for i := range links {
@@ -69,7 +69,11 @@ func newLinkUpSQL(links []*structs.ServiceLink) (linkUpSQL, error) {
 		switch v.Name {
 		case "upsql":
 
-			obj.sql = links[i]
+			if obj.sqls == nil {
+				obj.sqls = make([]*structs.ServiceLink, 0, 2)
+			}
+
+			obj.sqls = append(obj.sqls, links[i])
 
 		case "upproxy":
 			obj.proxy = links[i]
@@ -78,7 +82,7 @@ func newLinkUpSQL(links []*structs.ServiceLink) (linkUpSQL, error) {
 			obj.swm = links[i]
 
 		default:
-			return obj, errors.Errorf("Unsupported image %s in link %s", v.Name, SM_UPP_UPSQL)
+			return obj, errors.Errorf("Unsupported image %s in link %s", v.Name, SM_UPP_UPSQLs)
 		}
 	}
 
@@ -91,12 +95,12 @@ func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 	}
 
 	{
-		// sql
-		if sql.sql != nil {
-			for _, u := range sql.sql.Spec.Units {
+		// sqls
+		for _, sql := range sql.sqls {
+			for _, u := range sql.Spec.Units {
 				resp.Links = append(resp.Links, structs.UnitLink{
 					NameOrID:  u.ID,
-					ServiceID: sql.sql.Spec.ID,
+					ServiceID: sql.Spec.ID,
 					Commands:  []string{"/root/serv", "start"}, // TODO:
 				})
 			}
@@ -140,8 +144,7 @@ func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 	{
 		// swm
 		if sql.swm != nil {
-
-			body, err := swmInitTopology(ctx, client, sql.swm, sql.proxy, []*structs.ServiceLink{sql.sql})
+			body, err := swmInitTopology(ctx, client, sql.swm, sql.proxy, sql.sqls)
 			if err != nil {
 				return resp, err
 			}
