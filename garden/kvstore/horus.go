@@ -222,7 +222,7 @@ func delHost(ctx context.Context, addr string, config structs.ServiceDeregistrat
 	if resp.StatusCode != http.StatusNoContent {
 		err := readResponseError(resp)
 		if err != nil {
-			return errors.Wrapf(err, "%s code=%d,error=%s", uri, resp.StatusCode, err)
+			return errors.Wrapf(err, "%s code=%d,error=%s", req.RequestURI, resp.StatusCode, err)
 		}
 	}
 
@@ -258,7 +258,7 @@ func delHostAgent(ctx context.Context, addr string, config structs.ServiceDeregi
 	if resp.StatusCode != http.StatusNoContent {
 		err := readResponseError(resp)
 		if err != nil {
-			return errors.Wrapf(err, "%s code=%d,error=%s", uri, resp.StatusCode, err)
+			return errors.Wrapf(err, "%s code=%d,error=%s", req.RequestURI, resp.StatusCode, err)
 		}
 	}
 
