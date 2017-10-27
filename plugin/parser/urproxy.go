@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/docker/swarm/garden/structs"
@@ -38,6 +40,7 @@ func init() {
   black_list:
   -
 */
+const stringAndString = "&&&"
 
 type upredisProxy struct {
 	AutoEjectHosts    bool     `yaml:"auto_eject_hosts"`
@@ -61,38 +64,81 @@ type upredisProxyConfig struct {
 }
 
 func (upredisProxyConfig) clone(t *structs.ConfigTemplate) parser {
-	return &sentinelConfig{
+	return &upredisProxyConfig{
 		template: t,
 	}
 }
 
 func (c upredisProxyConfig) get(key string) string {
+	if c.upredisProxy == nil {
+		return ""
+	}
+
+	header, key, err := c.header(key)
+	if err != nil {
+		return ""
+	}
+
+	obj := c.upredisProxy[header]
 
 	switch strings.ToLower(key) {
 	case "auto_eject_hosts":
+		if obj.AutoEjectHosts {
+			return "true"
+		}
+
+		return "false"
+
 	case "distribution":
+		return obj.Distribution
+
 	case "hash":
+		return obj.Hash
+
 	case "listen":
+		return obj.Listen
+
 	case "preconnect":
+		if obj.Preconnect {
+			return "true"
+		}
+
+		return "false"
+
 	case "redis":
+		if obj.Redis {
+			return "true"
+		}
+
+		return "false"
+
 	case "redis_auth":
+		return obj.RedisAuth
+
 	case "timeout":
+		return fmt.Sprintf("%v", obj.Timeout)
+
 	case "server_connections":
+		return fmt.Sprintf("%v", obj.ServerConnections)
 	case "servers":
+		return strings.Join(obj.Servers, stringAndString)
+
 	case "sentinels":
+		return strings.Join(obj.Sentinels, stringAndString)
+
 	case "white_list":
+		return strings.Join(obj.WhiteList, stringAndString)
+
 	case "black_list":
+		return strings.Join(obj.BlackList, stringAndString)
 	}
 
 	return ""
 }
 
-func (c *upredisProxyConfig) set(key string, val interface{}) error {
-	if c.upredisProxy == nil {
-		c.upredisProxy = make(map[string]upredisProxy)
-	}
+func (c upredisProxyConfig) header(key string) (string, string, error) {
+	header := "default"
 
-	header := ""
 	parts := strings.SplitN(key, "::", 2)
 	if len(parts) == 2 {
 		header = parts[0]
@@ -102,31 +148,183 @@ func (c *upredisProxyConfig) set(key string, val interface{}) error {
 	if header != "" {
 		_, ok := c.upredisProxy[header]
 		if !ok && len(c.upredisProxy) > 0 {
-			return errors.Errorf("undefined ID:%s", header)
+			return "", "", errors.Errorf("undefined ID:%s", header)
 		}
 	} else if len(c.upredisProxy) > 0 {
 		for header = range c.upredisProxy {
 			break
 		}
 	} else {
-		return errors.New("key without ID")
+		return "", "", errors.New("key without HEADER")
 	}
+
+	return header, key, nil
+}
+
+func boolValue(val interface{}) bool {
+	if val == nil {
+		return false
+	}
+
+	switch val.(type) {
+	case bool:
+		return val.(bool)
+	case int:
+		return val.(int) != 0
+	case byte:
+		return val.(byte) != 0
+	case string:
+		s := val.(string)
+		return !(s == "" || s == "0" || s == "no" || s == "false" || s == "none")
+	}
+
+	return false
+}
+
+func atoi(v interface{}) (int, error) {
+	if v == nil {
+		return 0, nil
+	}
+
+	n := 0
+
+	switch v.(type) {
+	case int:
+		n = v.(int)
+	case byte:
+		n = int(v.(byte))
+	case string:
+		if s := v.(string); s == "" {
+			n = 0
+		} else {
+			var err error
+			n, err = strconv.Atoi(s)
+			if err != nil {
+				return n, errors.Errorf("parse '%s' => int error,%s", s, err)
+			}
+		}
+	}
+
+	return n, nil
+}
+
+func stringSliceValue(in []string, val interface{}) ([]string, error) {
+	if val == nil {
+		return nil, nil
+	}
+
+	switch val.(type) {
+
+	case []string:
+		return val.([]string), nil
+
+	case string:
+		s := val.(string)
+		if s == "" {
+			return nil, nil
+		}
+
+		if s[0] == '+' {
+			in = append(in, s[1:])
+		} else if s[0] == '-' {
+			s = s[1:]
+			out := make([]string, 0, len(in))
+			for i := range in {
+				if s != in[i] {
+					out = append(out, in[i])
+				}
+			}
+			return out, nil
+		} else {
+			return strings.Split(s, stringAndString), nil
+		}
+	}
+
+	return in, nil
+}
+
+func (c *upredisProxyConfig) set(key string, val interface{}) error {
+	if c.upredisProxy == nil {
+		c.upredisProxy = make(map[string]upredisProxy)
+	}
+
+	header, key, err := c.header(key)
+	if err != nil {
+		return err
+	}
+
+	obj := c.upredisProxy[header]
 
 	switch strings.ToLower(key) {
 	case "auto_eject_hosts":
+		obj.AutoEjectHosts = boolValue(val)
+
 	case "distribution":
+		obj.Distribution = fmt.Sprintf("%v", val)
+
 	case "hash":
+		obj.Hash = fmt.Sprintf("%v", val)
+
 	case "listen":
+		obj.Hash = fmt.Sprintf("%v", val)
+
 	case "preconnect":
+		obj.Preconnect = boolValue(val)
+
 	case "redis":
+		obj.Redis = boolValue(val)
+
 	case "redis_auth":
+		obj.RedisAuth = fmt.Sprintf("%v", val)
+
 	case "timeout":
+		v, err := atoi(val)
+		if err != nil {
+			return err
+		}
+
+		obj.Timeout = v
+
 	case "server_connections":
+		v, err := atoi(val)
+		if err != nil {
+			return err
+		}
+
+		obj.ServerConnections = v
+
 	case "servers":
+		out, err := stringSliceValue(obj.Servers, val)
+		if err != nil {
+			return err
+		}
+
+		obj.Servers = out
+
 	case "sentinels":
+		out, err := stringSliceValue(obj.Sentinels, val)
+		if err != nil {
+			return err
+		}
+
+		obj.Sentinels = out
 	case "white_list":
+		out, err := stringSliceValue(obj.WhiteList, val)
+		if err != nil {
+			return err
+		}
+
+		obj.WhiteList = out
 	case "black_list":
+		out, err := stringSliceValue(obj.BlackList, val)
+		if err != nil {
+			return err
+		}
+
+		obj.BlackList = out
 	}
+
+	c.upredisProxy[header] = obj
 
 	return nil
 }
@@ -149,6 +347,25 @@ func (c *upredisProxyConfig) ParseData(data []byte) error {
 }
 
 func (c *upredisProxyConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {
+	if c.upredisProxy == nil {
+		c.upredisProxy = make(map[string]upredisProxy)
+	}
+
+	obj := c.upredisProxy[id]
+
+	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
+
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return err
+	}
+
+	obj.Listen = fmt.Sprintf("%s:%v", spec.Networking[0].IP, desc.Options["port"])
+
+	c.upredisProxy[id] = obj
 
 	return nil
 }
