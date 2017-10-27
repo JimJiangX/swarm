@@ -141,7 +141,7 @@ func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 		// swm
 		if sql.swm != nil {
 
-			body, err := swmInitTopology(ctx, client, sql)
+			body, err := swmInitTopology(ctx, client, sql.swm, sql.proxy, []*structs.ServiceLink{sql.sql})
 			if err != nil {
 				return resp, err
 			}
@@ -183,18 +183,23 @@ func getServiceConfigParser(ctx context.Context, kvc kvstore.Store, service, ima
 	return cm, pr, err
 }
 
-func swmInitTopology(ctx context.Context, kvc kvstore.Store, sql linkUpSQL) ([]byte, error) {
-	if len(sql.sql.Spec.Units) == 0 || len(sql.proxy.Spec.Units) == 0 || len(sql.swm.Spec.Units) == 0 {
+func swmInitTopology(ctx context.Context, kvc kvstore.Store,
+	swm, proxy *structs.ServiceLink,
+	sqls []*structs.ServiceLink) ([]byte, error) {
+
+	if len(sqls) == 0 || proxy == nil || swm == nil ||
+		len(proxy.Spec.Units) == 0 ||
+		len(swm.Spec.Units) == 0 {
 		return nil, nil
 	}
 
-	proxyCM, proxyPr, err := getServiceConfigParser(ctx, kvc, sql.proxy.Spec.ID, sql.proxy.Spec.Image)
+	proxyCM, proxyPr, err := getServiceConfigParser(ctx, kvc, proxy.Spec.ID, proxy.Spec.Image)
 	if err != nil {
 		return nil, err
 	}
 
-	proxyGroup := make(map[string]*swm_structs.ProxyInfo, len(sql.proxy.Spec.Units))
-	for _, u := range sql.proxy.Spec.Units {
+	proxyGroup := make(map[string]*swm_structs.ProxyInfo, len(proxy.Spec.Units))
+	for _, u := range proxy.Spec.Units {
 		cc := proxyCM[u.ID]
 		proxyPr = proxyPr.clone(nil)
 		proxyPr.ParseData([]byte(cc.Content))
@@ -210,31 +215,38 @@ func swmInitTopology(ctx context.Context, kvc kvstore.Store, sql linkUpSQL) ([]b
 		}
 	}
 
-	sqlCM, sqlPr, err := getServiceConfigParser(ctx, kvc, sql.sql.Spec.ID, sql.sql.Spec.Image)
-	if err != nil {
-		return nil, err
-	}
+	dataNodesMap := make(map[string]map[string]swm_structs.DatabaseInfo, len(sqls))
 
-	dataNodes := make(map[string]swm_structs.DatabaseInfo, len(sql.sql.Spec.Units))
-	for _, u := range sql.sql.Spec.Units {
-		cc := sqlCM[u.ID]
-		sqlPr = sqlPr.clone(nil)
-		sqlPr.ParseData([]byte(cc.Content))
-
-		port := sqlPr.get("mysqld::port")
-		p, err := strconv.Atoi(port)
+	for _, sql := range sqls {
+		sqlCM, sqlPr, err := getServiceConfigParser(ctx, kvc, sql.Spec.ID, sql.Spec.Image)
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, err
 		}
 
-		dataNodes[u.Name] = swm_structs.DatabaseInfo{
-			Ip:   sqlPr.get("mysqld::bind_address"),
-			Port: p,
+		dataNodes := make(map[string]swm_structs.DatabaseInfo, len(sql.Spec.Units))
+
+		for _, u := range sql.Spec.Units {
+			cc := sqlCM[u.ID]
+			sqlPr = sqlPr.clone(nil)
+			sqlPr.ParseData([]byte(cc.Content))
+
+			port := sqlPr.get("mysqld::port")
+			p, err := strconv.Atoi(port)
+			if err != nil {
+				return nil, errors.WithStack(err)
+			}
+
+			dataNodes[u.Name] = swm_structs.DatabaseInfo{
+				Ip:   sqlPr.get("mysqld::bind_address"),
+				Port: p,
+			}
 		}
+
+		dataNodesMap[sql.ID] = dataNodes
 	}
 
 	arch := swm_structs.Type_M
-	switch num := len(sql.sql.Spec.Units); {
+	switch num := len(sqls[0].Spec.Units); {
 	case num == 1:
 		arch = swm_structs.Type_M
 	case num == 2:
@@ -252,7 +264,7 @@ func swmInitTopology(ctx context.Context, kvc kvstore.Store, sql linkUpSQL) ([]b
 		SwarmApiVersion:     "1.31",                    //  string   `json:"swarm-api-version,omitempty"`
 		ProxyGroups:         proxyGroup,
 		//	Users:               swmUsers,  //  []User   `json:"users"`
-		DataNode: dataNodes, //  map[string]DatabaseInfo `json:"data-node"`
+		DataNode: dataNodesMap, //  map[string]map[string]DatabaseInfo `json:"data-node"`
 	}
 
 	buf, err := json.Marshal(topology)

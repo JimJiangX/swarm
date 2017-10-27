@@ -207,11 +207,19 @@ func MgmPostFull() MgmPost {
 
 	users := []User{UserFull(), UserFull()}
 
-	dataNodes := make(map[string]DatabaseInfo)
-	databaseInfo1 := DatabaseInfoFull()
-	dataNodes["key1"] = databaseInfo1
-	databaseInfo2 := DatabaseInfoFull()
-	dataNodes["key2"] = databaseInfo2
+	dataNodeMap := make(map[string]map[string]DatabaseInfo)
+	dataNodes1 := make(map[string]DatabaseInfo)
+	databaseInfo11 := DatabaseInfoFull()
+	dataNodes1["key1"] = databaseInfo11
+	databaseInfo12 := DatabaseInfoFull()
+	dataNodes1["key2"] = databaseInfo12
+	dataNodeMap["key1"] = dataNodes1
+	dataNodes2 := make(map[string]DatabaseInfo)
+	databaseInfo21 := DatabaseInfoFull()
+	dataNodes2["key1"] = databaseInfo21
+	databaseInfo22 := DatabaseInfoFull()
+	dataNodes2["key2"] = databaseInfo22
+	dataNodeMap["key2"] = dataNodes1
 
 	mgmPost := MgmPost{
 		DbaasType:           "dbaas-type",
@@ -222,7 +230,7 @@ func MgmPostFull() MgmPost {
 		SwarmApiVersion:     "swarm-api-version",
 		ProxyGroups:         proxyGroups,
 		Users:               users,
-		DataNode:            dataNodes,
+		DataNode:            dataNodeMap,
 	}
 
 	return mgmPost

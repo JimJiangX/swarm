@@ -1,15 +1,15 @@
 package structs
 
 type MgmPost struct {
-	DbaasType           string                  `json:"dbaas-type"`
-	DbRootUser          string                  `json:"db-root-user"`
-	DbRootPassword      string                  `json:"db-root-password"`
-	DbReplicateUser     string                  `json:"db-replicate-user"`
-	DbReplicatePassword string                  `json:"db-replicate-password"`
-	SwarmApiVersion     string                  `json:"swarm-api-version,omitempty"`
-	ProxyGroups         map[string]*ProxyInfo   `json:"proxy_groups"`
-	Users               []User                  `json:"users"`
-	DataNode            map[string]DatabaseInfo `json:"data-node"`
+	DbaasType           string                             `json:"dbaas-type"`
+	DbRootUser          string                             `json:"db-root-user"`
+	DbRootPassword      string                             `json:"db-root-password"`
+	DbReplicateUser     string                             `json:"db-replicate-user"`
+	DbReplicatePassword string                             `json:"db-replicate-password"`
+	SwarmApiVersion     string                             `json:"swarm-api-version,omitempty"`
+	ProxyGroups         map[string]*ProxyInfo              `json:"proxy_groups"`
+	Users               []User                             `json:"users"`
+	DataNode            map[string]map[string]DatabaseInfo `json:"data-node"`
 }
 type User struct {
 	Id        string
