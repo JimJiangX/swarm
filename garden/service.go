@@ -955,7 +955,7 @@ func deregisterService(ctx context.Context, reg kvstore.Register, _type, key str
 	return reg.DeregisterService(ctx, structs.ServiceDeregistration{
 		Type: _type,
 		Key:  key,
-	}, false)
+	}, true)
 }
 
 func (svc *Service) removeUnits(ctx context.Context, rm []*unit, reg kvstore.Register) error {
