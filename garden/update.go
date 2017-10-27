@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/swarm/cluster"
@@ -296,7 +297,14 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 			}
 		}
 
-		// units config file updated by user
+		{
+			// update units config file but whether start by user
+			err := svc.updateConfigs(ctx, units, nil, nil)
+			if err != nil {
+				logrus.Errorf("%+v", err)
+			}
+
+		}
 
 		{
 			// update Service.Desc
