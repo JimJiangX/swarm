@@ -108,6 +108,7 @@ rpm_install() {
 			exit 2
 		fi
 	fi	
+	cp ${cur_dir}/rpm/jq /usr/bin/
 }
 
 nfs_mount() {
