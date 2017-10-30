@@ -94,7 +94,7 @@ remove_docker() {
 	if [ "${release}" == "SUSE LINUX" ]; then
 		rpm -e containerd runc docker
 	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ "${release}" == "CentOS" ]; then
-		rpm -e docker-engine docker-engine-selinux
+		rpm -e docker-ce container-selinux
 	else
 		echo "only support SUSE LINUX and RedHatEnterpriseServer and CentOS"
 		exit 2
