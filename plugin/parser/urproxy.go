@@ -154,8 +154,6 @@ func (c upredisProxyConfig) header(key string) (string, string, error) {
 		for header = range c.upredisProxy {
 			break
 		}
-	} else {
-		return "", "", errors.New("key without HEADER")
 	}
 
 	return header, key, nil
