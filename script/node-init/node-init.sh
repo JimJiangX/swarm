@@ -72,7 +72,7 @@ fi
 
 PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
 
-docker_version=1.12.6
+docker_version=17.09.0
 consul_version=0.9.2
 swarm_agent_version=1.2.8-df2bd04
 logicalVolume_volume_plugin_version=3.0.0
@@ -315,67 +315,7 @@ install_docker() {
 	
 	wwn=${wwn:1}
 
-
-	if [ "${release}" == "SUSE LINUX" ]; then
-		if [ "${san_id}" != '' ]; then
-			systemctl enable multipathd.service
-			systemctl start multipathd.service
-			systemctl status multipathd.service
-			if [ $? -ne 0 ]; then
-				echo "start multipathd failed!"
-				exit 2
-			fi
-		fi
-
-		zypper --no-gpg-checks --non-interactive install ${cur_dir}/rpm/docker-${docker_version}.sles/*.rpm
-		if [ $? -ne 0 ]; then
-			echo "docker rpm install faild"
-			exit 2
-		fi
-		cat << EOF > /etc/sysconfig/docker
-## Path           : System/Management
-## Description    : Extra cli switches for docker daemon
-## Type           : string
-## Default        : ""
-## ServiceRestart : docker
-
-#
-DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label CONTAINER_NIC=${container_nic} --label PF_DEV_BW=${pf_dev_bw} --label SAN_ID=${san_id}
-
-DOCKER_NETWORK_OPTIONS=""
-
-EOF
-
-		cat << EOF > /usr/lib/systemd/system/docker.service
-[Unit]
-Description=Docker Application Container Engine
-Documentation=https://docs.docker.com
-After=network.target docker.socket containerd.socket
-Requires=docker.socket containerd.socket
-
-[Service]
-EnvironmentFile=/etc/sysconfig/docker
-ExecStart=/usr/bin/dockerd --containerd /run/containerd/containerd.sock \$DOCKER_NETWORK_OPTIONS \$DOCKER_OPTS
-ExecReload=/bin/kill -s HUP \$MAINPID
-# Having non-zero Limit*s causes performance problems due to accounting overhead
-# in the kernel. We recommend using cgroups to do container-local accounting.
-LimitNOFILE=infinity
-LimitNPROC=infinity
-LimitCORE=infinity
-# Uncomment TasksMax if your systemd version supports it.
-# Only systemd 226 and above support this property.
-#TasksMax=infinity
-# Set delegate yes so that systemd does not reset the cgroups of docker containers
-# Only systemd 218 and above support this property.
-#Delegate=yes
-# KillMode=process is not necessary because of how we set up containerd.
-
-[Install]
-WantedBy=multi-user.target
-
-EOF
-
-	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ "${release}" == "CentOS" ]; then
+	if [ "${release}" == "RedHatEnterpriseServer" ] || [ "${release}" == "CentOS" ]; then
 		if [ "${san_id}" != '' ]; then
 			systemctl enable multipathd.service
 			systemctl start multipathd.service
@@ -386,7 +326,7 @@ EOF
 			fi
 		fi
 		
-		yum --nogpgcheck -y install ${cur_dir}/rpm/docker-${docker_version}.el7/*.rpm
+		yum --nogpgcheck -y install ${cur_dir}/rpm/docker-ce-${docker_version}.el7/*.rpm
 		if [ $? -ne 0 ]; then
 			echo "docker rpm install faild"
 			exit 2
@@ -399,15 +339,17 @@ EOF
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label="NODE_ID=${node_id}" --label="HBA_WWN=${wwn}" --label="HDD_VG=${hdd_vgname}" --label="HDD_VG_SIZE=${hdd_vg_size}" --label="SSD_VG=${ssd_vgname}" --label="SSD_VG_SIZE=${ssd_vg_size}" --label="CONTAINER_NIC=${container_nic}" --label PF_DEV_BW=${pf_dev_bw}
+DOCKER_OPTS=--host=tcp://0.0.0.0:${docker_port} --host=unix:///var/run/docker.sock --label="NODE_ID=${node_id}" --label="HBA_WWN=${wwn}" --label="HDD_VG=${hdd_vgname}" --label="HDD_VG_SIZE=${hdd_vg_size}" --label="SSD_VG=${ssd_vgname}" --label="SSD_VG_SIZE=${ssd_vg_size}" --label="CONTAINER_NIC=${container_nic}" --label PF_DEV_BW=${pf_dev_bw}
 
 EOF
 
 		cat << EOF > /usr/lib/systemd/system/docker.service
+
 [Unit]
 Description=Docker Application Container Engine
 Documentation=https://docs.docker.com
-After=network.target
+After=network-online.target firewalld.service
+Wants=network-online.target
 
 [Service]
 Type=notify
@@ -417,25 +359,30 @@ Type=notify
 EnvironmentFile=/etc/sysconfig/docker
 ExecStart=/usr/bin/dockerd \$DOCKER_OPTS
 ExecReload=/bin/kill -s HUP \$MAINPID
-MountFlags=slave
-# Uncomment TasksMax if your systemd version supports it.
-# Only systemd 226 and above support this version.
-#TasksMax=infinity
 # Having non-zero Limit*s causes performance problems due to accounting overhead
 # in the kernel. We recommend using cgroups to do container-local accounting.
 LimitNOFILE=infinity
 LimitNPROC=infinity
 LimitCORE=infinity
+# Uncomment TasksMax if your systemd version supports it.
+# Only systemd 226 and above support this version.
+#TasksMax=infinity
 TimeoutStartSec=0
 # set delegate yes so that systemd does not reset the cgroups of docker containers
 Delegate=yes
 # kill only the docker process, not all processes in the cgroup
 KillMode=process
+# restart the docker process if it exits prematurely
+Restart=on-failure
+StartLimitBurst=3
+StartLimitInterval=60s
 
 [Install]
 WantedBy=multi-user.target
 EOF
-
+	else 
+		echo "only support Centos and RHEL"
+		exit 2
 	fi
 
 	# reload
