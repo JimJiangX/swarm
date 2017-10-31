@@ -2,8 +2,9 @@ package compose
 
 import (
 	"strconv"
-	"time"
 
+	"github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 )
 
@@ -22,11 +23,11 @@ func (r Redis) GetKey() string {
 }
 
 func (m Redis) Clear() error {
-	filepath := m.scriptDir + ""
-	timeout := time.Second * 60
-	args := []string{}
+	args := []string{m.scriptDir + ""}
 
-	_, err := ExecShellFileTimeout(filepath, timeout, args...)
+	out, err := utils.ExecContextTimeout(nil, defaultTimeout, args...)
+
+	logrus.Debugf("exec:%s,output:%s", args, out)
 
 	return err
 }
@@ -41,21 +42,21 @@ func (m Redis) ChangeMaster(master Redis) error {
 	}
 
 	// TODO:script path
-	filepath := m.scriptDir + ""
-	timeout := time.Second * 60
-	args := []string{}
+	args := []string{m.scriptDir + ""}
 
-	_, err := ExecShellFileTimeout(filepath, timeout, args...)
+	out, err := utils.ExecContextTimeout(nil, defaultTimeout, args...)
+
+	logrus.Debugf("exec:%s,output:%s", args, out)
 
 	return err
 }
 
 func (m Redis) CheckStatus() error {
-	filepath := m.scriptDir + ""
-	timeout := time.Second * 60
-	args := []string{}
+	args := []string{m.scriptDir + ""}
 
-	_, err := ExecShellFileTimeout(filepath, timeout, args...)
+	out, err := utils.ExecContextTimeout(nil, defaultTimeout, args...)
+
+	logrus.Debugf("exec:%s,output:%s", args, out)
 
 	return err
 }

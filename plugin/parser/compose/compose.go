@@ -32,7 +32,7 @@ const (
 	slaveRole    dbRole = "SLAVE"
 )
 
-//Composer  is exported
+//Composer is exported
 type Composer interface {
 	ClearCluster() error
 	CheckCluster() error
