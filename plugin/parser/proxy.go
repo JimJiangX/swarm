@@ -154,12 +154,23 @@ func (c *proxyConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		addr = spec.Networking[0].IP
 	}
 
-	dataPort := desc.Options["proxy_data_port"]
+	{
+		val, ok := desc.Options["upsql-proxy::proxy_data_port"]
+		if !ok {
+			return errors.New("miss upsql-proxy::proxy_data_port")
+		}
+		port, err := atoi(val)
+		if err != nil || port == 0 {
+			return errors.New("miss upsql-proxy::proxy_data_port")
+		}
+
+		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", addr, port)
+	}
+
 	adminPort := desc.Options["proxy_admin_port"]
 
 	m["adm-cli::proxy_admin_port"] = adminPort
 	m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%v", addr, adminPort)
-	m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%v", addr, dataPort)
 
 	m["upsql-proxy::event-threads-count"] = 1
 	if spec.Config != nil {
@@ -234,12 +245,23 @@ func (c *proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) er
 		addr = spec.Networking[0].IP
 	}
 
-	dataPort := desc.Options["proxy_data_port"]
+	{
+		val, ok := desc.Options["upsql-proxy::proxy_data_port"]
+		if !ok {
+			return errors.New("miss upsql-proxy::proxy_data_port")
+		}
+		port, err := atoi(val)
+		if err != nil || port == 0 {
+			return errors.New("miss upsql-proxy::proxy_data_port")
+		}
+
+		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", addr, port)
+	}
+
 	adminPort := desc.Options["proxy_admin_port"]
 
 	m["adm-cli::proxy_admin_port"] = adminPort
 	m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%v", addr, adminPort)
-	m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%v", addr, dataPort)
 	m["supervise::supervise-address"] = fmt.Sprintf("%s:%v", addr, adminPort)
 
 	m["upsql-proxy::event-threads-count"] = 1
@@ -391,10 +413,17 @@ func (c *upproxyConfigV100) GenerateConfig(id string, desc structs.ServiceSpec) 
 		addr = spec.Networking[0].IP
 	}
 
-	if dataPort, ok := desc.Options["upsql-proxy::proxy_data_port"]; !ok {
-		return errors.New("miss key:upsql-proxy::proxy_data_port")
-	} else {
-		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%v", addr, dataPort)
+	{
+		val, ok := desc.Options["upsql-proxy::proxy_data_port"]
+		if !ok {
+			return errors.New("miss upsql-proxy::proxy_data_port")
+		}
+		port, err := atoi(val)
+		if err != nil || port == 0 {
+			return errors.New("miss upsql-proxy::proxy_data_port")
+		}
+
+		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", addr, port)
 	}
 
 	m["upsql-proxy::event-threads-count"] = 1

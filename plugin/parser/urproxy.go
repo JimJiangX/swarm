@@ -164,16 +164,16 @@ func boolValue(val interface{}) bool {
 		return false
 	}
 
-	switch val.(type) {
+	switch v := val.(type) {
 	case bool:
-		return val.(bool)
-	case int:
-		return val.(int) != 0
-	case byte:
-		return val.(byte) != 0
+		return v
+
+	case int8, int32, int64, int, uint8, uint32, uint64, uint:
+		return v != 0
+
 	case string:
-		s := val.(string)
-		return !(s == "" || s == "0" || s == "no" || s == "false" || s == "none")
+
+		return !(v == "" || v == "0" || v == "no" || v == "false" || v == "none")
 	}
 
 	return false
@@ -265,7 +265,7 @@ func (c *upredisProxyConfig) set(key string, val interface{}) error {
 		obj.Hash = fmt.Sprintf("%v", val)
 
 	case "listen":
-		obj.Hash = fmt.Sprintf("%v", val)
+		obj.Listen = fmt.Sprintf("%v", val)
 
 	case "preconnect":
 		obj.Preconnect = boolValue(val)
@@ -364,7 +364,16 @@ func (c *upredisProxyConfig) GenerateConfig(id string, desc structs.ServiceSpec)
 		return err
 	}
 
-	obj.Listen = fmt.Sprintf("%s:%v", spec.Networking[0].IP, desc.Options["port"])
+	val, ok := desc.Options["port"]
+	if !ok {
+		return errors.New("miss port")
+	}
+	port, err := atoi(val)
+	if err != nil || port == 0 {
+		return errors.New("miss port")
+	}
+
+	obj.Listen = fmt.Sprintf("%s:%v", spec.Networking[0].IP, port)
 
 	c.upredisProxy[id] = obj
 

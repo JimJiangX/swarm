@@ -95,10 +95,17 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		m["mysqld::character_set_server"] = v
 	}
 
-	if port, ok := desc.Options["mysqld::port"]; ok {
+	{
+		val, ok := desc.Options["mysqld::port"]
+		if !ok {
+			return errors.New("miss mysqld::port")
+		}
+		port, err := atoi(val)
+		if err != nil || port == 0 {
+			return errors.New("miss mysqld::port")
+		}
+
 		m["mysqld::port"] = port
-	} else {
-		return errors.New("miss mysqld::port")
 	}
 
 	if c.template != nil {

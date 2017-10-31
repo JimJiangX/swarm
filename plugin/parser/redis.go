@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -116,7 +117,18 @@ func (c *redisConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		c.config["bind"] = spec.Networking[0].IP
 	}
 
-	c.config["port"] = fmt.Sprintf("%v", desc.Options["port"])
+	{
+		val, ok := desc.Options["port"]
+		if !ok {
+			return errors.New("miss port")
+		}
+		port, err := atoi(val)
+		if err != nil || port == 0 {
+			return errors.New("miss port")
+		}
+
+		c.config["port"] = strconv.Itoa(port)
+	}
 
 	c.config["maxmemory"] = strconv.Itoa(int(float64(spec.Config.HostConfig.Memory) * 0.7))
 
@@ -205,7 +217,18 @@ func (c *upredisConfig) GenerateConfig(id string, desc structs.ServiceSpec) erro
 		c.config["bind"] = spec.Networking[0].IP
 	}
 
-	c.config["port"] = fmt.Sprintf("%v", desc.Options["port"])
+	{
+		val, ok := desc.Options["port"]
+		if !ok {
+			return errors.New("miss port")
+		}
+		port, err := atoi(val)
+		if err != nil || port == 0 {
+			return errors.New("miss port")
+		}
+
+		c.config["port"] = strconv.Itoa(port)
+	}
 
 	c.config["maxmemory"] = strconv.Itoa(int(float64(spec.Config.HostConfig.Memory) * 0.5))
 

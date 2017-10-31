@@ -71,7 +71,7 @@ func newLinkUpSQL(links []*structs.ServiceLink) (linkUpSQL, error) {
 
 func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Store) (structs.ServiceLinkResponse, error) {
 	resp := structs.ServiceLinkResponse{
-		Links: make([]structs.UnitLink, 0, 5),
+		Links: make([]structs.UnitLink, 0, 6),
 	}
 
 	{

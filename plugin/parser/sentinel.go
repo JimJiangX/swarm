@@ -2,8 +2,10 @@ package parser
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/docker/swarm/garden/structs"
@@ -91,7 +93,18 @@ func (c *sentinelConfig) GenerateConfig(id string, desc structs.ServiceSpec) err
 		return err
 	}
 
-	c.config["port"] = fmt.Sprintf("%v", desc.Options["port"])
+	{
+		val, ok := desc.Options["port"]
+		if !ok {
+			return errors.New("miss port")
+		}
+		port, err := atoi(val)
+		if err != nil || port == 0 {
+			return errors.New("miss port")
+		}
+
+		c.config["port"] = strconv.Itoa(port)
+	}
 
 	if c.template != nil {
 		c.config["dir"] = c.template.DataMount
