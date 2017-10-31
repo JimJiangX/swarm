@@ -1,6 +1,9 @@
 package parser
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/pkg/errors"
@@ -50,11 +53,51 @@ func newLinkRedis(links []*structs.ServiceLink) (linkRedis, error) {
 		}
 	}
 
+	if obj.proxy == nil || obj.redis == nil || obj.sentinel == nil {
+		return obj, errors.Errorf("the condition is not satisfied mode %s", Proxy_Redis)
+	}
+
 	return obj, nil
 }
 
 func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store) (structs.ServiceLinkResponse, error) {
 	resp := structs.ServiceLinkResponse{}
+
+	{
+		cms, pr, err := getServiceConfigParser(ctx, client, lr.sentinel.Spec.ID, lr.sentinel.Spec.Image)
+		if err != nil {
+			return resp, err
+		}
+
+		addrs := make([]string, 0, len(lr.sentinel.Spec.Units))
+
+		for _, u := range lr.sentinel.Spec.Units {
+
+			cc := cms[u.ID]
+			pr.clone(nil)
+
+			err := pr.ParseData([]byte(cc.Content))
+			if err != nil {
+				return resp, err
+			}
+
+			port := pr.get("port")
+
+			addrs = append(addrs, fmt.Sprintf("%s:%s", u.Networking[0].IP, port))
+		}
+
+		opts := make(map[string]map[string]interface{})
+		opts[allUnitsEffect] = map[string]interface{}{
+			"default::sentinels": strings.Join(addrs, stringAndString),
+		}
+
+		ulinks, err := generateServiceLink(ctx, client, *lr.proxy.Spec, opts)
+		if err != nil {
+			return resp, err
+		}
+
+		resp.Links = append(resp.Links, ulinks...)
+	}
 
 	return resp, nil
 }

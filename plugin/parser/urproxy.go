@@ -307,6 +307,7 @@ func (c *upredisProxyConfig) set(key string, val interface{}) error {
 		}
 
 		obj.Sentinels = out
+
 	case "white_list":
 		out, err := stringSliceValue(obj.WhiteList, val)
 		if err != nil {
@@ -314,6 +315,7 @@ func (c *upredisProxyConfig) set(key string, val interface{}) error {
 		}
 
 		obj.WhiteList = out
+
 	case "black_list":
 		out, err := stringSliceValue(obj.BlackList, val)
 		if err != nil {

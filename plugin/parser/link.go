@@ -22,7 +22,6 @@ func linkFactory(mode string, links []*structs.ServiceLink) (linkGenerator, erro
 		return newLinkUpSQL(links)
 
 	case Proxy_Redis:
-
 		return newLinkRedis(links)
 
 	default:

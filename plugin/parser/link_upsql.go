@@ -62,6 +62,10 @@ func newLinkUpSQL(links []*structs.ServiceLink) (linkUpSQL, error) {
 		}
 	}
 
+	if obj.proxy == nil || obj.sqls == nil || obj.swm == nil {
+		return obj, errors.Errorf("the condition is not satisfied mode %s", SM_UPP_UPSQLs)
+	}
+
 	return obj, nil
 }
 
