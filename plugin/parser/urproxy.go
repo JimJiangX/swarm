@@ -186,13 +186,15 @@ func atoi(v interface{}) (int, error) {
 
 	n := 0
 
-	switch v.(type) {
+	switch val := v.(type) {
 	case int:
-		n = v.(int)
+		n = val
+
 	case byte:
-		n = int(v.(byte))
+		n = int(val)
+
 	case string:
-		if s := v.(string); s == "" {
+		if s := val; s == "" {
 			n = 0
 		} else {
 			var err error
@@ -211,30 +213,29 @@ func stringSliceValue(in []string, val interface{}) ([]string, error) {
 		return nil, nil
 	}
 
-	switch val.(type) {
+	switch v := val.(type) {
 
 	case []string:
-		return val.([]string), nil
+		return v, nil
 
 	case string:
-		s := val.(string)
-		if s == "" {
+		if v == "" {
 			return nil, nil
 		}
 
-		if s[0] == '+' {
-			in = append(in, s[1:])
-		} else if s[0] == '-' {
-			s = s[1:]
+		if v[0] == '+' {
+			in = append(in, v[1:])
+		} else if v[0] == '-' {
+			v = v[1:]
 			out := make([]string, 0, len(in))
 			for i := range in {
-				if s != in[i] {
+				if v != in[i] {
 					out = append(out, in[i])
 				}
 			}
 			return out, nil
 		} else {
-			return strings.Split(s, stringAndString), nil
+			return strings.Split(v, stringAndString), nil
 		}
 	}
 
