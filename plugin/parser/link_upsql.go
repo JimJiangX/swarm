@@ -94,6 +94,7 @@ func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 
 	swmAddr := ""
 	swmc := swmCM[sql.swm.Spec.Units[0].ID]
+	swmPr = swmPr.clone(nil)
 	err = swmPr.ParseData([]byte(swmc.Content))
 	if err != nil {
 		return resp, err
@@ -160,8 +161,6 @@ func getServiceConfigParser(ctx context.Context, kvc kvstore.Store, service, ima
 	if err != nil {
 		return cm, nil, err
 	}
-
-	pr = pr.clone(nil)
 
 	return cm, pr, err
 }

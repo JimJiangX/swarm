@@ -79,7 +79,7 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 		for _, u := range lr.proxy.Spec.Units {
 
 			cc := cms[u.ID]
-			pr.clone(nil)
+			pr = pr.clone(nil)
 
 			err := pr.ParseData([]byte(cc.Content))
 			if err != nil {
@@ -100,7 +100,7 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 		for _, u := range lr.sentinel.Spec.Units {
 
 			cc := cms[u.ID]
-			pr.clone(nil)
+			pr = pr.clone(nil)
 
 			err := pr.ParseData([]byte(cc.Content))
 			if err != nil {
@@ -125,7 +125,7 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 		for _, u := range lr.redis[i].Spec.Units {
 
 			cc := cms[u.ID]
-			pr.clone(nil)
+			pr = pr.clone(nil)
 
 			err := pr.ParseData([]byte(cc.Content))
 			if err != nil {
