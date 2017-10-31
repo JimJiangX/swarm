@@ -2,13 +2,13 @@ package parser
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/docker/swarm/garden/structs"
+	"github.com/pkg/errors"
 )
 
 const redisConfigLine = 100
@@ -124,7 +124,7 @@ func (c *redisConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		}
 		port, err := atoi(val)
 		if err != nil || port == 0 {
-			return errors.New("miss port")
+			return errors.Wrap(err, "miss port")
 		}
 
 		c.config["port"] = strconv.Itoa(port)
@@ -224,7 +224,7 @@ func (c *upredisConfig) GenerateConfig(id string, desc structs.ServiceSpec) erro
 		}
 		port, err := atoi(val)
 		if err != nil || port == 0 {
-			return errors.New("miss port")
+			return errors.Wrap(err, "miss port")
 		}
 
 		c.config["port"] = strconv.Itoa(port)

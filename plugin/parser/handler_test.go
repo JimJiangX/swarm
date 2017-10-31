@@ -269,7 +269,7 @@ func TestGenerateConfigs(t *testing.T) {
 
 	configs, err = pc.GenerateServiceConfig(context.Background(), redisSpec)
 	if err != nil {
-		t.Error(err)
+		t.Errorf("%+v", err)
 	}
 
 	if len(configs) != len(redisSpec.Units) {

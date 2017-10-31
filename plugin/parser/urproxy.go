@@ -187,10 +187,25 @@ func atoi(v interface{}) (int, error) {
 	n := 0
 
 	switch val := v.(type) {
+	case float32:
+		n = int(val)
+	case float64:
+		n = int(val)
+	case int8:
+		n = int(val)
+	case uint8:
+		n = int(val)
+	case int32:
+		n = int(val)
+	case uint32:
+		n = int(val)
 	case int:
-		n = val
-
-	case byte:
+		n = int(val)
+	case uint:
+		n = int(val)
+	case int64:
+		n = int(val)
+	case uint64:
 		n = int(val)
 
 	case string:
@@ -203,6 +218,9 @@ func atoi(v interface{}) (int, error) {
 				return n, errors.Errorf("parse '%s' => int error,%s", s, err)
 			}
 		}
+
+	default:
+		return 0, errors.Errorf("unknown type of input,%T:%v", v, v)
 	}
 
 	return n, nil
@@ -214,6 +232,8 @@ func stringSliceValue(in []string, val interface{}) ([]string, error) {
 	}
 
 	switch v := val.(type) {
+	default:
+		return nil, errors.Errorf("unknown type of input,%T:%v", v, v)
 
 	case []string:
 		return v, nil
@@ -370,7 +390,7 @@ func (c *upredisProxyConfig) GenerateConfig(id string, desc structs.ServiceSpec)
 	}
 	port, err := atoi(val)
 	if err != nil || port == 0 {
-		return errors.New("miss port")
+		return errors.Wrap(err, "miss port")
 	}
 
 	obj.Listen = fmt.Sprintf("%s:%v", spec.Networking[0].IP, port)

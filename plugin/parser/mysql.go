@@ -102,7 +102,7 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		}
 		port, err := atoi(val)
 		if err != nil || port == 0 {
-			return errors.New("miss mysqld::port")
+			return errors.Wrap(err, "miss mysqld::port")
 		}
 
 		m["mysqld::port"] = port
