@@ -34,6 +34,7 @@ func newRedisShardingManager(dbs []Redis, master int, slave int, dir string) Com
 
 	return rs
 }
+
 func (r *RedisShardingManager) getRedisAddrs() string {
 	addrs := []string{}
 	for _, redis := range r.RedisMap {

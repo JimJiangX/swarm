@@ -2,10 +2,6 @@ package compose
 
 import (
 	"strconv"
-
-	"github.com/Sirupsen/logrus"
-	"github.com/docker/swarm/garden/utils"
-	"github.com/pkg/errors"
 )
 
 type Redis struct {
@@ -22,41 +18,41 @@ func (r Redis) GetKey() string {
 	return r.Ip + ":" + strconv.Itoa(r.Port)
 }
 
-func (m Redis) Clear() error {
-	args := []string{m.scriptDir + ""}
-
-	out, err := utils.ExecContextTimeout(nil, defaultTimeout, args...)
-
-	logrus.Debugf("exec:%s,output:%s", args, out)
-
-	return err
-}
-
 func (m Redis) GetType() dbRole {
 	return m.RoleType
 }
 
-func (m Redis) ChangeMaster(master Redis) error {
-	if m.GetType() != masterRole && m.GetType() != slaveRole {
-		return errors.New(string(m.GetType()) + ":should not call the func")
-	}
+//func (m Redis) Clear() error {
+//	args := []string{m.scriptDir + ""}
 
-	// TODO:script path
-	args := []string{m.scriptDir + ""}
+//	out, err := utils.ExecContextTimeout(nil, defaultTimeout, args...)
 
-	out, err := utils.ExecContextTimeout(nil, defaultTimeout, args...)
+//	logrus.Debugf("exec:%s,output:%s", args, out)
 
-	logrus.Debugf("exec:%s,output:%s", args, out)
+//	return err
+//}
 
-	return err
-}
+//func (m Redis) ChangeMaster(master Redis) error {
+//	if m.GetType() != masterRole && m.GetType() != slaveRole {
+//		return errors.New(string(m.GetType()) + ":should not call the func")
+//	}
 
-func (m Redis) CheckStatus() error {
-	args := []string{m.scriptDir + ""}
+//	// TODO:script path
+//	args := []string{m.scriptDir + ""}
 
-	out, err := utils.ExecContextTimeout(nil, defaultTimeout, args...)
+//	out, err := utils.ExecContextTimeout(nil, defaultTimeout, args...)
 
-	logrus.Debugf("exec:%s,output:%s", args, out)
+//	logrus.Debugf("exec:%s,output:%s", args, out)
 
-	return err
-}
+//	return err
+//}
+
+//func (m Redis) CheckStatus() error {
+//	args := []string{m.scriptDir + ""}
+
+//	out, err := utils.ExecContextTimeout(nil, defaultTimeout, args...)
+
+//	logrus.Debugf("exec:%s,output:%s", args, out)
+
+//	return err
+//}
