@@ -8,8 +8,6 @@ type Redis struct {
 	Ip   string
 	Port int
 
-	scriptDir string
-
 	Weight   int //Weight越高，优先变成master，等值随机
 	RoleType dbRole
 }

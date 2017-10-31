@@ -58,6 +58,11 @@ func NewCompserBySpec(req *structs.ServiceSpec, script, mgmip string, mgmport in
 		master, slave, _ := getmasterAndSlave(req)
 		return newRedisShardingManager(dbs, master, slave, script), nil
 
+	case redisRepArch:
+		dbs := getRedis(req)
+
+		return newRedisRepManager(dbs, script), nil
+
 	case cloneArch:
 		return newCloneManager(script), nil
 	}

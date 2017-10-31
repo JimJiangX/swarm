@@ -28,7 +28,6 @@ func newRedisShardingManager(dbs []Redis, master int, slave int, dir string) Com
 	}
 
 	for _, db := range dbs {
-		db.scriptDir = dir
 		rs.RedisMap[db.GetKey()] = db
 	}
 
