@@ -2200,7 +2200,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svc, err := gd.Service(name)
+	table, err := gd.Ormer().GetService(name)
 	if err != nil {
 		if errors.Cause(err) == sql.ErrNoRows {
 			w.WriteHeader(http.StatusNoContent)
@@ -2211,6 +2211,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	svc := gd.NewService(nil, &table)
 	err = svc.Remove(ctx, gd.KVClient(), force)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 123, "fail to remove service", "删除服务错误")
