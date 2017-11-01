@@ -128,6 +128,7 @@ func convertToContainer(c *cluster.Container) container {
 
 func (n *NodeInfo) SetByEngine(e *cluster.Engine) {
 	if e == nil {
+		n.Containers = []container{}
 		return
 	}
 	n.Engine.ID = e.ID

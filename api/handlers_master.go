@@ -862,6 +862,8 @@ func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.
 	drivers, err := driver.FindEngineVolumeDrivers(gd.Ormer(), e)
 	if err != nil && len(drivers) == 0 {
 		logrus.WithField("Node", n.Addr).Errorf("find Node VolumeDrivers error,%+v", err)
+
+		info.VolumeDrivers = []structs.VolumeDriver{}
 	} else {
 		vds := make([]structs.VolumeDriver, 0, len(drivers))
 
