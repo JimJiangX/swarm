@@ -141,15 +141,13 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 		redisClusters = append(redisClusters, strings.Join(redis, ","))
 	}
 
-	// link commands,/root/link-init.sh -s ip:port,ip:port -p ip:port,ip:port -r ip:port,ip:port ip:port,ip:port
-	linkCmd := make([]string, 6+len(redisClusters))
-	linkCmd[0] = "/root/link-init.sh"
-	linkCmd[1] = "-s"
-	linkCmd[2] = strings.Join(sentinels, ",")
-	linkCmd[3] = "-p"
-	linkCmd[4] = strings.Join(proxys, ",")
-	linkCmd[5] = "-r"
-	copy(linkCmd[6:], redisClusters)
+	// link commands,/root/link-init.sh -s ip:port,ip:port -p ip:port,ip:port -r ip:port,ip:port#ip:port,ip:port
+	linkCmd := []string{
+		"/root/link-init.sh",
+		"-s", strings.Join(sentinels, ","),
+		"-p", strings.Join(proxys, ","),
+		"-r", strings.Join(redisClusters, "#"),
+	}
 
 	{
 		opts := make(map[string]map[string]interface{})
