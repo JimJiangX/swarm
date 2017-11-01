@@ -840,13 +840,14 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // -----------------/hosts handlers-----------------
 func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.NodeInfo {
 	info := structs.NodeInfo{
-		ID:           n.ID,
-		Cluster:      n.ClusterID,
-		Room:         n.Room,
-		Seat:         n.Seat,
-		MaxContainer: n.MaxContainer,
-		Enabled:      n.Enabled,
-		RegisterAt:   utils.TimeToString(n.RegisterAt),
+		ID:            n.ID,
+		Cluster:       n.ClusterID,
+		Room:          n.Room,
+		Seat:          n.Seat,
+		MaxContainer:  n.MaxContainer,
+		Enabled:       n.Enabled,
+		RegisterAt:    utils.TimeToString(n.RegisterAt),
+		VolumeDrivers: []structs.VolumeDriver{},
 	}
 
 	info.SetByEngine(e)
@@ -862,8 +863,6 @@ func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.
 	drivers, err := driver.FindEngineVolumeDrivers(gd.Ormer(), e)
 	if err != nil && len(drivers) == 0 {
 		logrus.WithField("Node", n.Addr).Errorf("find Node VolumeDrivers error,%+v", err)
-
-		info.VolumeDrivers = []structs.VolumeDriver{}
 	} else {
 		vds := make([]structs.VolumeDriver, 0, len(drivers))
 
@@ -888,7 +887,9 @@ func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.
 			})
 		}
 
-		info.VolumeDrivers = vds
+		if len(vds) > 0 {
+			info.VolumeDrivers = vds
+		}
 	}
 
 	return info
