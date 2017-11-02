@@ -195,7 +195,7 @@ type upredisConfig struct {
 }
 
 func (upredisConfig) clone(t *structs.ConfigTemplate) parser {
-	pr := &redisConfig{}
+	pr := &upredisConfig{}
 	pr.template = t
 	pr.config = make(map[string]string, redisConfigLine)
 
@@ -236,6 +236,7 @@ func (c *upredisConfig) GenerateConfig(id string, desc structs.ServiceSpec) erro
 		c.config["dir"] = c.template.DataMount
 		c.config["pidfile"] = filepath.Join(c.template.DataMount, "upredis.pid")
 		c.config["logfile"] = filepath.Join(c.template.DataMount, "upredis.log")
+		c.config["unixsocket"] = filepath.Join(c.template.DataMount, "upredis.sock")
 	}
 
 	c.config["requirepass"] = ""

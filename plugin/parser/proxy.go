@@ -230,7 +230,7 @@ type proxyConfigV110 struct {
 }
 
 func (proxyConfigV110) clone(t *structs.ConfigTemplate) parser {
-	pr := &proxyConfigV102{}
+	pr := &proxyConfigV110{}
 	pr.template = t
 
 	return pr

@@ -279,7 +279,7 @@ type switchManagerConfigV1147 struct {
 }
 
 func (switchManagerConfigV1147) clone(t *structs.ConfigTemplate) parser {
-	pr := &switchManagerConfigV1123{}
+	pr := &switchManagerConfigV1147{}
 	pr.template = t
 
 	return pr
