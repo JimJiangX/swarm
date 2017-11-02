@@ -10,7 +10,7 @@ fi
 node_list=$1
 default_pass=dbaas
 
-master_node=ip="${node_list%%,*}"
+master_node="${node_list%%,*}"
 master_ip="${master_node%%:*}"
 master_port="${master_node##*:}"
 
