@@ -11,10 +11,10 @@ import (
 )
 
 func init() {
-	register("upredis-proxy", "1.0", &upredisProxyConfig{})
-	register("upredis-proxy", "1.1", &upredisProxyConfig{})
-	register("upredis-proxy", "1.2", &upredisProxyConfig{})
-	register("upredis-proxy", "1.3", &upredisProxyConfig{})
+	register("urproxy", "1.0", &upredisProxyConfig{})
+	register("urproxy", "1.1", &upredisProxyConfig{})
+	register("urproxy", "1.2", &upredisProxyConfig{})
+	register("urproxy", "1.3", &upredisProxyConfig{})
 }
 
 /*

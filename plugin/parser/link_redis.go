@@ -42,7 +42,7 @@ func newLinkRedis(links []*structs.ServiceLink) (linkRedis, error) {
 
 			obj.redis = append(obj.redis, links[i])
 
-		case "upredis-proxy":
+		case "urproxy":
 			obj.proxy = links[i]
 
 		case "sentinel":
