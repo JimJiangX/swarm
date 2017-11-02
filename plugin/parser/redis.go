@@ -239,8 +239,8 @@ func (c *upredisConfig) GenerateConfig(id string, desc structs.ServiceSpec) erro
 		c.config["unixsocket"] = filepath.Join(c.template.DataMount, "upredis.sock")
 	}
 
-	c.config["requirepass"] = ""
-	c.config["masterauth"] = ""
+	//	c.config["requirepass"] = ""
+	//	c.config["masterauth"] = ""
 	c.config["dbfilename"] = spec.Name + "-dump.rdb"
 	c.config["appendfilename"] = spec.Name + "-appendonly.aof"
 
