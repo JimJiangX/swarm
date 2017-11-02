@@ -139,6 +139,10 @@ func (c upredisProxyConfig) get(key string) string {
 func (c upredisProxyConfig) header(key string) (string, string, error) {
 	header := "default"
 
+	if key == "" {
+		return header, "", nil
+	}
+
 	parts := strings.SplitN(key, "::", 2)
 	if len(parts) == 2 {
 		header = parts[0]
@@ -362,7 +366,16 @@ func (c *upredisProxyConfig) ParseData(data []byte) error {
 		return errors.Wrap(err, "parse upredis proxy config")
 	}
 
-	c.upredisProxy = config
+	header, _, _ := c.header("")
+
+	if _, ok := config[header]; ok {
+		c.upredisProxy = config
+	} else {
+		for _, cc := range config {
+			c.upredisProxy[header] = cc
+			break
+		}
+	}
 
 	return nil
 }
@@ -372,7 +385,9 @@ func (c *upredisProxyConfig) GenerateConfig(id string, desc structs.ServiceSpec)
 		c.upredisProxy = make(map[string]upredisProxy)
 	}
 
-	obj := c.upredisProxy[id]
+	header, _, _ := c.header("")
+
+	obj := c.upredisProxy[header]
 
 	err := c.Validate(desc.Options)
 	if err != nil {
@@ -395,7 +410,7 @@ func (c *upredisProxyConfig) GenerateConfig(id string, desc structs.ServiceSpec)
 
 	obj.Listen = fmt.Sprintf("%s:%v", spec.Networking[0].IP, port)
 
-	c.upredisProxy[id] = obj
+	c.upredisProxy[header] = obj
 
 	return nil
 }
