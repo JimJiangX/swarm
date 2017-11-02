@@ -146,7 +146,7 @@ func (redisConfig) GenerateCommands(id string, desc structs.ServiceSpec) (struct
 
 	cmds[structs.StartContainerCmd] = []string{"bin/bash"}
 
-	cmds[structs.InitServiceCmd] = []string{"/root/serv", "start"}
+	cmds[structs.InitServiceCmd] = []string{"/root/redis-init.sh"}
 
 	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
 
@@ -245,4 +245,18 @@ func (c *upredisConfig) GenerateConfig(id string, desc structs.ServiceSpec) erro
 	c.config["appendfilename"] = spec.Name + "-appendonly.aof"
 
 	return nil
+}
+
+func (upredisConfig) GenerateCommands(id string, desc structs.ServiceSpec) (structs.CmdsMap, error) {
+	cmds := make(structs.CmdsMap, 4)
+
+	cmds[structs.StartContainerCmd] = []string{"bin/bash"}
+
+	cmds[structs.InitServiceCmd] = []string{"/root/upredis-init.sh"}
+
+	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
+
+	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
+
+	return cmds, nil
 }

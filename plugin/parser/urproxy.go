@@ -420,7 +420,7 @@ func (upredisProxyConfig) GenerateCommands(id string, desc structs.ServiceSpec) 
 
 	cmds[structs.StartContainerCmd] = []string{"bin/bash"}
 
-	cmds[structs.InitServiceCmd] = []string{"/root/serv", "start"}
+	cmds[structs.InitServiceCmd] = []string{"/root/urproxy-init.sh"}
 
 	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
 
