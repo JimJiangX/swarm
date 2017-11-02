@@ -8,6 +8,7 @@ fi
 
 #nodelist=192.168.2.100:6375,192.168.2.101:6375,192.168.2.102:6375
 node_list=$1
+default_pass=dbaas
 
 MODE=sharding_replication
 CUR_DIR=`dirname $0`
@@ -24,7 +25,7 @@ for node in ${node_arr[@]}
 do
     ip=${node%%:*}
     port=${node##*:}
-    ${TOOLS_DIR}/redis-cli -h ${ip} -p ${port} flashall
+    ${TOOLS_DIR}/redis-cli -h ${ip} -p ${port} -a ${default_pass} flushall
     if [ $? -ne 0 ]; then
         echo "redis($node) flashall failed"
         exit 3

@@ -8,6 +8,7 @@ fi
 
 #nodelist=192.168.2.100:6375,192.168.2.101:6375,192.168.2.102:6375
 node_list=$1
+default_pass=dbaas
 
 master_node=ip="${node_list%%,*}"
 master_ip="${master_node%%:*}"
@@ -31,7 +32,7 @@ do
         continue
     fi
     port=${node##*:}
-    ${TOOLS_DIR}/redis-cli -h ${ip} -p ${port} slaveof ${master_ip} ${master_port}
+    ${TOOLS_DIR}/redis-cli -h ${ip} -p ${port} -a ${default_pass} slaveof ${master_ip} ${master_port}
     if [ $? -ne 0 ]; then
         echo "redis($node) set failed"
         exit 3
