@@ -13,7 +13,7 @@ type linkGenerator interface {
 
 const (
 	SM_UPP_UPSQLs = "SwitchManager_Upproxy_UpSQL"
-	Proxy_Redis   = "Sentinel_Proxy_Redis"
+	Proxy_Redis   = "Sentinel_Urproxy_Upredis"
 )
 
 func linkFactory(mode, nameOrID string, links []*structs.ServiceLink) (linkGenerator, error) {
