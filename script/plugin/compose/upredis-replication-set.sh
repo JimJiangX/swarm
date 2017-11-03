@@ -10,7 +10,7 @@ fi
 node_list=$1
 default_pass=dbaas
 
-master_node=ip="${node_list%%,*}"
+master_node="${node_list%%,*}"
 master_ip="${master_node%%:*}"
 master_port="${master_node##*:}"
 
@@ -32,9 +32,15 @@ do
         continue
     fi
     port=${node##*:}
-    ${TOOLS_DIR}/redis-cli -h ${ip} -p ${port} -a ${default_pass} slaveof ${master_ip} ${master_port}
+    ${TOOLS_DIR}/redis-cli -h ${ip} -p ${port} -a ${default_pass} SLAVEOF ${master_ip} ${master_port}
     if [ $? -ne 0 ]; then
         echo "redis($node) set failed"
+        exit 3
+    fi
+
+    ${TOOLS_DIR}/redis-cli -h ${ip} -p ${port} -a ${default_pass} CONFIG REWRITE
+    if [ $? -ne 0 ]; then
+        echo "redis($node) config rewrite failed"
         exit 3
     fi
 done

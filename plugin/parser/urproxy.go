@@ -29,8 +29,6 @@ func init() {
   redis_auth: <PWD>
   timeout: 400
   server_connections: 1
-  #servers:
-  #- 146.33.20.23:64000:1 master1
   sentinels:
   - <S1>:<S_PORT>
   - <S2>:<S_PORT>
@@ -52,7 +50,6 @@ type upredisProxy struct {
 	RedisAuth         string   `yaml:"redis_auth"`
 	Timeout           int      `yaml:"timeout"`
 	ServerConnections int      `yaml:"server_connections"`
-	Servers           []string `yaml:"servers"`
 	Sentinels         []string `yaml:"sentinels"`
 	WhiteList         []string `yaml:"white_list"`
 	BlackList         []string `yaml:"black_list"`
@@ -120,8 +117,6 @@ func (c upredisProxyConfig) get(key string) string {
 
 	case "server_connections":
 		return fmt.Sprintf("%v", obj.ServerConnections)
-	case "servers":
-		return strings.Join(obj.Servers, stringAndString)
 
 	case "sentinels":
 		return strings.Join(obj.Sentinels, stringAndString)
@@ -315,14 +310,6 @@ func (c *upredisProxyConfig) set(key string, val interface{}) error {
 		}
 
 		obj.ServerConnections = v
-
-	case "servers":
-		out, err := stringSliceValue(obj.Servers, val)
-		if err != nil {
-			return err
-		}
-
-		obj.Servers = out
 
 	case "sentinels":
 		out, err := stringSliceValue(obj.Sentinels, val)
