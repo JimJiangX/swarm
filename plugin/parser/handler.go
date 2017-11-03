@@ -480,7 +480,7 @@ func linkServices(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lf, err := linkFactory(req.Mode, req.Links)
+	lf, err := linkFactory(req.Mode, req.NameOrID, req.Links)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return

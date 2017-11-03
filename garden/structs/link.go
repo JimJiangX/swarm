@@ -21,8 +21,9 @@ type ServiceLink struct {
 }
 
 type ServicesLink struct {
-	Mode  string
-	Links []*ServiceLink
+	Mode     string
+	NameOrID string // service id or name,unit id or name or containerID
+	Links    []*ServiceLink
 }
 
 func (sl ServicesLink) Less(i, j int) bool {

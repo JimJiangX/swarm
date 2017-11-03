@@ -19,13 +19,16 @@ import (
 const allUnitsEffect = "ALL_UNITS"
 
 type linkUpSQL struct {
-	swm   *structs.ServiceLink
-	proxy *structs.ServiceLink
-	sqls  []*structs.ServiceLink
+	nameOrID string
+	swm      *structs.ServiceLink
+	proxy    *structs.ServiceLink
+	sqls     []*structs.ServiceLink
 }
 
-func newLinkUpSQL(links []*structs.ServiceLink) (linkUpSQL, error) {
-	obj := linkUpSQL{}
+func newLinkUpSQL(nameOrID string, links []*structs.ServiceLink) (linkUpSQL, error) {
+	obj := linkUpSQL{
+		nameOrID: nameOrID,
+	}
 
 	if len(links) < 3 {
 		return obj, errors.Errorf("invalid paramaters in %s mode", SM_UPP_UPSQLs)
@@ -69,15 +72,23 @@ func newLinkUpSQL(links []*structs.ServiceLink) (linkUpSQL, error) {
 	return obj, nil
 }
 
-func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Store) (structs.ServiceLinkResponse, error) {
+func (lus linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Store) (structs.ServiceLinkResponse, error) {
 	resp := structs.ServiceLinkResponse{
 		Links: make([]structs.UnitLink, 0, 6),
 	}
 
 	{
 		// sqls
-		for _, sql := range sql.sqls {
+		for _, sql := range lus.sqls {
+			if !isDesignated(lus.nameOrID, "", sql.Spec) {
+				continue
+			}
+
 			for _, u := range sql.Spec.Units {
+				if !isDesignated(lus.nameOrID, u.ID, sql.Spec) {
+					continue
+				}
+
 				resp.Links = append(resp.Links, structs.UnitLink{
 					NameOrID:  u.ID,
 					ServiceID: sql.Spec.ID,
@@ -87,13 +98,13 @@ func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 		}
 	}
 
-	swmCM, swmPr, err := getServiceConfigParser(ctx, client, sql.swm.Spec.ID, sql.swm.Spec.Image)
+	swmCM, swmPr, err := getServiceConfigParser(ctx, client, lus.swm.Spec.ID, lus.swm.Spec.Image)
 	if err != nil {
 		return resp, err
 	}
 
 	swmAddr := ""
-	swmc := swmCM[sql.swm.Spec.Units[0].ID]
+	swmc := swmCM[lus.swm.Spec.Units[0].ID]
 	swmPr = swmPr.clone(nil)
 	err = swmPr.ParseData([]byte(swmc.Content))
 	if err != nil {
@@ -106,7 +117,7 @@ func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 		// set options
 		{
 
-			ip := sql.swm.Spec.Units[0].Networking[0].IP
+			ip := lus.swm.Spec.Units[0].Networking[0].IP
 			port := swmPr.get("proxyport")
 
 			opts[allUnitsEffect] = map[string]interface{}{"adm-cli::adm-svr-address": net.JoinHostPort(ip, port)}
@@ -114,26 +125,37 @@ func (sql linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 			swmAddr = net.JoinHostPort(ip, swmPr.get("port"))
 		}
 
-		ulinks, err := generateServiceLink(ctx, client, *sql.proxy.Spec, opts)
-		if err != nil {
-			return resp, err
-		}
+		if isDesignated(lus.nameOrID, "", lus.proxy.Spec) {
 
-		resp.Links = append(resp.Links, ulinks...)
-	}
-
-	{
-		// swm
-		if sql.swm != nil {
-			body, err := swmInitTopology(ctx, client, sql.swm, sql.proxy, sql.sqls)
+			ulinks, err := generateServiceLink(ctx, client, *lus.proxy.Spec, opts)
 			if err != nil {
 				return resp, err
 			}
 
-			for _, u := range sql.swm.Spec.Units {
+			for i := range ulinks {
+				if isDesignated(lus.nameOrID, ulinks[i].NameOrID, lus.proxy.Spec) {
+					resp.Links = append(resp.Links, ulinks...)
+				}
+			}
+		}
+	}
+
+	{
+		// swm
+		if lus.swm != nil && isDesignated(lus.nameOrID, "", lus.swm.Spec) {
+			body, err := swmInitTopology(ctx, client, lus.swm, lus.proxy, lus.sqls)
+			if err != nil {
+				return resp, err
+			}
+
+			for i := range lus.swm.Spec.Units {
+				if !isDesignated(lus.nameOrID, lus.swm.Spec.Units[i].ID, lus.swm.Spec) {
+					continue
+				}
+
 				resp.Links = append(resp.Links, structs.UnitLink{
-					NameOrID:  u.ID,
-					ServiceID: sql.swm.Spec.ID,
+					NameOrID:  lus.swm.Spec.Units[i].ID,
+					ServiceID: lus.swm.Spec.ID,
 					Commands:  swmc.Cmds[structs.StartServiceCmd],
 					Request: &structs.HTTPRequest{
 						Method: http.MethodPost,

@@ -11,13 +11,16 @@ import (
 )
 
 type linkRedis struct {
+	nameOrID string
 	sentinel *structs.ServiceLink
 	proxy    *structs.ServiceLink
 	redis    []*structs.ServiceLink
 }
 
-func newLinkRedis(links []*structs.ServiceLink) (linkRedis, error) {
-	obj := linkRedis{}
+func newLinkRedis(nameOrID string, links []*structs.ServiceLink) (linkRedis, error) {
+	obj := linkRedis{
+		nameOrID: nameOrID,
+	}
 
 	if len(links) < 3 {
 		return obj, errors.Errorf("invalid paramaters in %s mode", Proxy_Redis)
@@ -149,7 +152,8 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 		"-r", strings.Join(redisClusters, "#"),
 	}
 
-	{
+	if isDesignated(lr.nameOrID, "", lr.proxy.Spec) {
+
 		opts := make(map[string]map[string]interface{})
 		opts[allUnitsEffect] = map[string]interface{}{
 			"default::sentinels": strings.Join(sentinels, stringAndString),
@@ -161,13 +165,22 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 		}
 
 		for i := range ulinks {
+			if !isDesignated(lr.nameOrID, ulinks[i].NameOrID, lr.proxy.Spec) {
+				continue
+			}
+
 			ulinks[i].Commands = linkCmd
 			resp.Links = append(resp.Links, ulinks[i])
 		}
 	}
-	{
+
+	if isDesignated(lr.nameOrID, "", lr.sentinel.Spec) {
 
 		for _, u := range lr.sentinel.Spec.Units {
+			if !isDesignated(lr.nameOrID, u.ID, lr.proxy.Spec) {
+				continue
+			}
+
 			ul := structs.UnitLink{
 				NameOrID:  u.ID,
 				ServiceID: u.ServiceID,
