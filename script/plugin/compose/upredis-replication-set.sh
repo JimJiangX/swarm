@@ -32,7 +32,7 @@ do
         continue
     fi
     port=${node##*:}
-    ${TOOLS_DIR}/redis-cli -h ${ip} -p ${port} -a ${default_pass} CONFIG SET slaveof ${master_ip} ${master_port}
+    ${TOOLS_DIR}/redis-cli -h ${ip} -p ${port} -a ${default_pass} SLAVEOF ${master_ip} ${master_port}
     if [ $? -ne 0 ]; then
         echo "redis($node) set failed"
         exit 3
