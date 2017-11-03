@@ -3,6 +3,7 @@ package parser
 import (
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -24,11 +25,9 @@ func linkFactory(mode, nameOrID string, links []*structs.ServiceLink) (linkGener
 	case Proxy_Redis:
 		return newLinkRedis(nameOrID, links)
 
-	default:
-
 	}
 
-	return nil, nil
+	return nil, errors.Errorf("Unsupported %s mode yet", mode)
 }
 
 func isDesignated(dest, unit string, spec *structs.ServiceSpec) bool {
