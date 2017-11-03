@@ -67,10 +67,13 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 	resp := structs.ServiceLinkResponse{
 		Links: make([]structs.UnitLink, 0, 6),
 	}
+
 	// services addr
 	sentinels := make([]string, 0, len(lr.sentinel.Spec.Units))
 	proxys := make([]string, 0, len(lr.proxy.Spec.Units))
 	redisClusters := make([]string, 0, len(lr.redis))
+
+	var proxyCMS, sentinelCMS structs.ConfigsMap
 
 	{
 		// proxy
@@ -78,6 +81,8 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 		if err != nil {
 			return resp, err
 		}
+
+		proxyCMS = cms
 
 		for _, u := range lr.proxy.Spec.Units {
 
@@ -99,6 +104,8 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 		if err != nil {
 			return resp, err
 		}
+
+		sentinelCMS = cms
 
 		for _, u := range lr.sentinel.Spec.Units {
 
@@ -177,7 +184,7 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 	if isDesignated(lr.nameOrID, "", lr.sentinel.Spec) {
 
 		for _, u := range lr.sentinel.Spec.Units {
-			if !isDesignated(lr.nameOrID, u.ID, lr.proxy.Spec) {
+			if !isDesignated(lr.nameOrID, u.ID, lr.sentinel.Spec) {
 				continue
 			}
 
@@ -185,6 +192,42 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 				NameOrID:  u.ID,
 				ServiceID: u.ServiceID,
 				Commands:  linkCmd,
+			}
+
+			resp.Links = append(resp.Links, ul)
+		}
+	}
+
+	// start service
+
+	if isDesignated(lr.nameOrID, "", lr.proxy.Spec) {
+
+		for _, u := range lr.proxy.Spec.Units {
+			if !isDesignated(lr.nameOrID, u.ID, lr.proxy.Spec) {
+				continue
+			}
+
+			ul := structs.UnitLink{
+				NameOrID:  u.ID,
+				ServiceID: u.ServiceID,
+				Commands:  proxyCMS[u.ID].GetCmd(structs.StartServiceCmd),
+			}
+
+			resp.Links = append(resp.Links, ul)
+		}
+	}
+
+	if isDesignated(lr.nameOrID, "", lr.sentinel.Spec) {
+
+		for _, u := range lr.sentinel.Spec.Units {
+			if !isDesignated(lr.nameOrID, u.ID, lr.sentinel.Spec) {
+				continue
+			}
+
+			ul := structs.UnitLink{
+				NameOrID:  u.ID,
+				ServiceID: u.ServiceID,
+				Commands:  sentinelCMS[u.ID].GetCmd(structs.StartServiceCmd),
 			}
 
 			resp.Links = append(resp.Links, ul)
