@@ -112,7 +112,7 @@ func (c *client) Do(ctx context.Context, method, url string, obj interface{}) (*
 		return resp, nil
 	}
 
-	return resp, errors.Errorf("%s:%s/%s,%s", method, c.address, url, err)
+	return resp, errors.Wrap(err, req.RequestURI)
 }
 
 func (c *client) Get(ctx context.Context, url string) (*http.Response, error) {
