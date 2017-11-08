@@ -34,17 +34,19 @@ func Print(v interface{}, fileName string) {
 }
 
 func UserFull() User {
+	dbPrivilegesMap := make(map[string][]string)
+	dbPrivilegesMap["key1"] = []string{"val11", "val12"}
+	dbPrivilegesMap["key2"] = []string{"val21", "val22"}
 	user := User{
-		Id:        "Id",
-		Type:      "Type",
-		UserName:  "UserName",
-		Password:  "Password",
-		Role:      "Role",
-		WhiteList: []string{"WhiteList1", "WhiteList2"},
-		BlackList: []string{"BlackList1", "BlackList2"},
-		ReadOnly:  true,
-		RwSplit:   true,
-		Shard:     true,
+		Id:              "Id",
+		UserName:        "UserName",
+		Password:        "Password",
+		DbPrivilegesMap: dbPrivilegesMap,
+		WhiteList:       []string{"WhiteList1", "WhiteList2"},
+		BlackList:       []string{"BlackList1", "BlackList2"},
+		ReadOnly:        true,
+		RwSplit:         true,
+		Shard:           true,
 	}
 	return user
 }
@@ -64,7 +66,6 @@ func AuthInfoFull() AuthInfo {
 		WhiteList:     []string{"white_list1", "white_list2"},
 		BlackList:     []string{"black_list1", "black_list2"},
 		ProxyMode:     &proxyModeInfo,
-		Role:          "role",
 	}
 	return authInfo
 }

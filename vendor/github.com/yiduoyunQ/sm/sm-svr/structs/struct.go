@@ -12,16 +12,15 @@ type MgmPost struct {
 	DataNode            map[string]map[string]DatabaseInfo `json:"data-node"`
 }
 type User struct {
-	Id        string
-	Type      string
-	UserName  string
-	Password  string
-	Role      string
-	WhiteList []string
-	BlackList []string
-	ReadOnly  bool
-	RwSplit   bool
-	Shard     bool
+	Id              string
+	UserName        string
+	Password        string
+	DbPrivilegesMap map[string][]string
+	WhiteList       []string
+	BlackList       []string
+	ReadOnly        bool
+	RwSplit         bool
+	Shard           bool
 }
 
 type ProxyInfo struct {
@@ -66,7 +65,6 @@ type AuthInfo struct {
 	WhiteList     []string       `json:"white_list,omitempty"`
 	BlackList     []string       `json:"black_list,omitempty"`
 	ProxyMode     *ProxyModeInfo `json:"proxy_mode,omitempty"`
-	Role          string         `json:"role,omitempty"`
 }
 type DatabaseInfo struct {
 	Ip           string        `json:"ip"`
