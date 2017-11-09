@@ -136,6 +136,12 @@ else
   die 1 "I do not know how to setup interface $IFNAME."
 fi
 
+# check interface up
+if ! ifup ${IFNAME}
+then
+  die 1 "ifup ${IFNAME} failed"
+fi
+
 # Second step: find the container and get container pid
 getContainerPID
 
