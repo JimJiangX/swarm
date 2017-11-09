@@ -1526,6 +1526,12 @@ func getNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 // -----------------/services handlers-----------------
 func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Service, urlParamError, 11, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil || gd.Ormer() == nil || gd.Cluster == nil {
 		httpJSONNilGarden(w)
@@ -1534,12 +1540,30 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	services, err := gd.ListServices(ctx)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 11, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 12, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	writeJSON(w, services, http.StatusOK)
+	name := r.FormValue("image_name")
+	if name == "" || len(services) == 0 {
+		writeJSON(w, services, http.StatusOK)
+		return
+	}
+
+	images := strings.Split(name, ",")
+	out := make([]structs.ServiceSpec, 0, len(services))
+
+	for i := range images {
+
+		for k := range services {
+			if services[k].Image.Name == images[i] {
+				out = append(out, services[k])
+			}
+		}
+	}
+
+	writeJSON(w, out, http.StatusOK)
 }
 
 func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
