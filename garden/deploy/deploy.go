@@ -422,7 +422,7 @@ func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version strin
 	}
 
 	if im1.Name != im.Name || im1.Major != im.Major {
-		return "", errors.Errorf("Service:%s unsupported image update from %s to %s", name, im1.Version(), im.Version())
+		return "", errors.Errorf("Service:%s unsupported image update from %s to %s", name, im1.Image(), im.Image())
 	}
 
 	authConfig, err := d.gd.AuthConfig()

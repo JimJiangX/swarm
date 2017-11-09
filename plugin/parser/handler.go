@@ -529,18 +529,12 @@ func generateServiceConfigs(ctx context.Context,
 		}
 	}
 
-	parser, err := factory(spec.Service.Image)
+	parser, err := factoryByImage(spec.Service.Image)
 	if err != nil {
 		return nil, err
 	}
 
-	var image, version string
-	parts := strings.SplitN(spec.Service.Image, ":", 2)
-	if len(parts) == 2 {
-		image, version = parts[0], parts[1]
-	} else {
-		image = parts[0]
-	}
+	image, version := spec.Service.Image.Name, spec.Service.Image.Version()
 
 	template, err := getTemplateFromStore(ctx, kvc, image, version)
 	if err != nil {

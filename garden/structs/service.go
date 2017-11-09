@@ -9,18 +9,18 @@ import (
 
 // Service if table structure
 type Service struct {
-	ID            string `db:"id" json:"id"`
-	Name          string `db:"name" json:"name"`
-	Image         string `json:"image_version"`
-	Desc          string `db:"description" json:"description"` // short for Description
-	Architecture  string `db:"architecture" json:"architecture"`
-	Tag           string `db:"tag" json:"tag"` // part of business
-	AutoHealing   bool   `db:"auto_healing" json:"auto_healing"`
-	AutoScaling   bool   `db:"auto_scaling" json:"auto_scaling"`
-	HighAvailable bool   `db:"high_available" json:"high_available"`
-	Status        int    `db:"status" json:"status"`
-	CreatedAt     string `db:"created_at" json:"created_at"`
-	FinishedAt    string `db:"finished_at" json:"finished_at"`
+	ID            string       `json:"id"`
+	Name          string       `json:"name"`
+	Image         ImageVersion `json:"image"`
+	Desc          string       `json:"description"` // short for Description
+	Architecture  string       `json:"architecture"`
+	Tag           string       `json:"tag"` // part of business
+	AutoHealing   bool         `json:"auto_healing"`
+	AutoScaling   bool         `json:"auto_scaling"`
+	HighAvailable bool         `json:"high_available"`
+	Status        int          `json:"status"`
+	CreatedAt     string       `json:"created_at"`
+	FinishedAt    string       `json:"finished_at"`
 }
 
 type VolumeRequire struct {

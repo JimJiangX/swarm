@@ -72,7 +72,7 @@ func TestUpdateDescByImage(t *testing.T) {
 		Major:   5,
 		Minor:   7,
 		Patch:   16,
-		Build:   0,
+		Dev:     0,
 	})
 
 	if table.Desc.ID == es.ID ||

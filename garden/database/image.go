@@ -18,7 +18,7 @@ type ImageOrmer interface {
 
 type ImageIface interface {
 	GetImageVersion(name string) (Image, error)
-	GetImage(name string, major, minor, patch, build int) (Image, error)
+	//	GetImage(name string, major, minor, patch, build int) (Image, error)
 
 	ListImages() ([]Image, error)
 
@@ -36,7 +36,7 @@ type Image struct {
 	Major    int       `db:"major_version"`
 	Minor    int       `db:"minor_version"`
 	Patch    int       `db:"patch_version"`
-	Build    int       `db:"build_version"`
+	Dev      int       `db:"build_version"`
 	Size     int       `db:"size"`
 	Labels   string    `db:"label"`
 	UploadAt time.Time `db:"upload_at"`
@@ -46,8 +46,8 @@ func (db dbBase) imageTable() string {
 	return db.prefix + "_software_image"
 }
 
-func (im Image) Version() string {
-	return fmt.Sprintf("%s:%d.%d.%d.%d", im.Name, im.Major, im.Minor, im.Patch, im.Build)
+func (im Image) Image() string {
+	return fmt.Sprintf("%s:%d.%d.%d.%d", im.Name, im.Major, im.Minor, im.Patch, im.Dev)
 }
 
 // InsertImage insert Image
@@ -84,16 +84,16 @@ func (db dbBase) ListImages() ([]Image, error) {
 }
 
 func (db dbBase) GetImageVersion(nameOrID string) (Image, error) {
-	im, err := structs.ParseImage(nameOrID)
-	if err == nil {
-		return db.GetImage(im.Name, im.Major, im.Minor, im.Patch, im.Build)
-	}
-
 	image := Image{}
 	query := "SELECT id,software_name,docker_image_id,major_version,minor_version,patch_version,build_version,size,label,upload_at FROM " + db.imageTable() + " WHERE id=? OR docker_image_id=?"
-	err = db.Get(&image, query, nameOrID, nameOrID)
+	err := db.Get(&image, query, nameOrID, nameOrID)
 	if err == nil {
 		return image, nil
+	}
+
+	im, err := structs.ParseImage(nameOrID)
+	if err == nil {
+		return db.GetImage(im.Name, im.Major, im.Minor, im.Patch, im.Dev)
 	}
 
 	return image, errors.Wrap(err, "get image by id:"+nameOrID)

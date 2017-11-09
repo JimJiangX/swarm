@@ -175,9 +175,14 @@ host = localhost
 
 var redisSpec = structs.ServiceSpec{
 	Service: structs.Service{
-		ID:    "service0001",
-		Name:  "redis_service_001",
-		Image: "redis:3.2.8.0",
+		ID:   "service0001",
+		Name: "redis_service_001",
+		Image: structs.ImageVersion{
+			Name:  "redis",
+			Major: 3,
+			Minor: 2,
+			Patch: 8,
+		},
 	},
 	Arch: structs.Arch{
 		Mode:     "sharding_replication",
@@ -255,9 +260,14 @@ func TestGenerateConfigs(t *testing.T) {
 
 	configs, err = pc.GenerateServiceConfig(context.Background(), structs.ServiceSpec{
 		Service: structs.Service{
-			ID:    "service0001",
-			Name:  "redis_service_001",
-			Image: "redis:3.2.8.0",
+			ID:   "service0001",
+			Name: "redis_service_001",
+			Image: structs.ImageVersion{
+				Name:  "redis",
+				Major: 3,
+				Minor: 2,
+				Patch: 8,
+			},
 		},
 		Options: map[string]interface{}{
 			"port": 8327,

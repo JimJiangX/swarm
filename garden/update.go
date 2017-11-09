@@ -33,7 +33,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 			return err
 		}
 
-		_, version, err := getImage(svc.so, im.ID)
+		version, err := getImage(svc.so, im.ID)
 		if err != nil {
 			return err
 		}
@@ -179,7 +179,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 func updateDescByImage(table database.Service, im database.Image) database.Service {
 	desc := *table.Desc
 	desc.ID = utils.Generate32UUID()
-	desc.Image = im.Version()
+	desc.Image = im.Image()
 	desc.ImageID = im.ImageID
 	desc.Previous = table.DescID
 

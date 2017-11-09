@@ -96,13 +96,12 @@ func valicateServiceSpec(req *structs.ServiceSpec) error {
 func valicateCommonSpec(req *structs.ServiceSpec) error {
 	errs := make([]string, 0, 4)
 	//req.Image: "mysql:5.6.7"
-	_, err := structs.ParseImage(req.Image)
-	if err != nil {
-		errs = append(errs, fmt.Sprintf("%+v", err))
+	if req.Image.Name == "" {
+		errs = append(errs, "image name is required")
 	}
 
 	//req.Arch.Code
-	_, _, err = getmasterAndSlave(req)
+	_, _, err := getmasterAndSlave(req)
 	if err != nil {
 		errs = append(errs, fmt.Sprintf("%+v", err))
 	}
@@ -227,11 +226,9 @@ func getmasterAndSlave(req *structs.ServiceSpec) (int, int, error) {
 }
 
 func getDbType(req *structs.ServiceSpec) dbArch {
-	datas := strings.Split(req.Image, ":")
-	db, version := datas[0], datas[1]
 	arch := req.Arch.Mode
 
-	if db == "redis" || db == "upredis" {
+	if req.Image.Name == "redis" || req.Image.Name == "upredis" {
 		if arch == "sharding_replication" {
 			return redisShardingArch
 		} else if arch == "replication" {
@@ -239,7 +236,7 @@ func getDbType(req *structs.ServiceSpec) dbArch {
 		}
 	}
 
-	if db == "mysql" || db == "upsql" {
+	if req.Image.Name == "mysql" || req.Image.Name == "upsql" {
 		if arch == "replication" {
 			return mysqlRepArch
 		} else if arch == "group_replication" {
@@ -252,9 +249,8 @@ func getDbType(req *structs.ServiceSpec) dbArch {
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"db type":    db,
-		"db version": version,
-		"arch":       arch,
+		"image": req.Image.Image(),
+		"arch":  arch,
 	}).Error("don't match the arch")
 
 	return noneArch

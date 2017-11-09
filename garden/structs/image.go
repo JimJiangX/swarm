@@ -9,24 +9,29 @@ import (
 )
 
 type ImageVersion struct {
+	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Major int    `json:"major_version"`
 	Minor int    `json:"minor_version"`
 	Patch int    `json:"patch_version"`
-	Build int    `json:"build_version"`
+	Dev   int    `json:"build_version"`
+}
+
+func (iv ImageVersion) Image() string {
+	return fmt.Sprintf("%s:%d.%d.%d.%d", iv.Name, iv.Major, iv.Minor, iv.Patch, iv.Dev)
 }
 
 func (iv ImageVersion) Version() string {
-	return fmt.Sprintf("%s:%d.%d.%d.%d", iv.Name, iv.Major, iv.Minor, iv.Patch, iv.Build)
+	return fmt.Sprintf("%d.%d.%d.%d", iv.Major, iv.Minor, iv.Patch, iv.Dev)
 }
 
-func NewImageVersion(name string, major, minor, patch, build int) ImageVersion {
+func NewImageVersion(name string, major, minor, patch, dev int) ImageVersion {
 	return ImageVersion{
 		Name:  name,
 		Major: major,
 		Minor: minor,
 		Patch: patch,
-		Build: build,
+		Dev:   dev,
 	}
 }
 
@@ -65,7 +70,7 @@ func ParseImage(name string) (iv ImageVersion, err error) {
 		}
 
 		if len(dots) > 3 {
-			iv.Build, err = strconv.Atoi(string(dots[3]))
+			iv.Dev, err = strconv.Atoi(string(dots[3]))
 		}
 	}
 
@@ -93,7 +98,7 @@ func (iv ImageVersion) LessThan(v ImageVersion) (bool, error) {
 		return iv.Patch < iv.Patch, nil
 	}
 
-	return iv.Build < v.Build, nil
+	return iv.Dev < v.Dev, nil
 }
 
 type PostLoadImageRequest struct {

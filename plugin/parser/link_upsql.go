@@ -36,16 +36,11 @@ func newLinkUpSQL(nameOrID string, links []*structs.ServiceLink) (linkUpSQL, err
 
 	for i := range links {
 
-		v, err := structs.ParseImage(links[i].Spec.Image)
-		if err != nil {
-			return obj, err
-		}
-
 		if links[i].Arch != (structs.Arch{}) {
 			links[i].Spec.Arch = links[i].Arch
 		}
 
-		switch v.Name {
+		switch links[i].Spec.Image.Name {
 		case "upsql":
 
 			if obj.sqls == nil {
@@ -61,7 +56,7 @@ func newLinkUpSQL(nameOrID string, links []*structs.ServiceLink) (linkUpSQL, err
 			obj.swm = links[i]
 
 		default:
-			return obj, errors.Errorf("Unsupported image %s in link %s", v.Name, SM_UPP_UPSQLs)
+			return obj, errors.Errorf("Unsupported image %s in link %s", links[i].Spec.Image.Image(), SM_UPP_UPSQLs)
 		}
 	}
 
@@ -173,13 +168,13 @@ func (lus linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 	return resp, nil
 }
 
-func getServiceConfigParser(ctx context.Context, kvc kvstore.Store, service, image string) (structs.ConfigsMap, parser, error) {
+func getServiceConfigParser(ctx context.Context, kvc kvstore.Store, service string, im structs.ImageVersion) (structs.ConfigsMap, parser, error) {
 	cm, err := getConfigMapFromStore(ctx, kvc, service)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pr, err := factory(image)
+	pr, err := factoryByImage(im)
 	if err != nil {
 		return cm, nil, err
 	}

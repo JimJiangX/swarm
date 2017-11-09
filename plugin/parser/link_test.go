@@ -16,9 +16,14 @@ func TestLinkFactory(t *testing.T) {
 				ID: "upredisID0001",
 				Spec: &structs.ServiceSpec{
 					Service: structs.Service{
-						ID:    "upredisID0001",
-						Name:  "upredisName0001",
-						Image: "upredis:1.1.5",
+						ID:   "upredisID0001",
+						Name: "upredisName0001",
+						Image: structs.ImageVersion{
+							Name:  "upredis",
+							Major: 1,
+							Minor: 1,
+							Patch: 5,
+						},
 					},
 					Units: []structs.UnitSpec{
 						{
@@ -38,9 +43,14 @@ func TestLinkFactory(t *testing.T) {
 				ID: "urproxyID0001",
 				Spec: &structs.ServiceSpec{
 					Service: structs.Service{
-						ID:    "urproxyID0001",
-						Name:  "urproxyName0001",
-						Image: "urproxy:1.1.5",
+						ID:   "urproxyID0001",
+						Name: "urproxyName0001",
+						Image: structs.ImageVersion{
+							Name:  "urproxy",
+							Major: 1,
+							Minor: 1,
+							Patch: 5,
+						},
 					},
 					Units: []structs.UnitSpec{
 						{
@@ -60,9 +70,14 @@ func TestLinkFactory(t *testing.T) {
 				ID: "sentinelID0001",
 				Spec: &structs.ServiceSpec{
 					Service: structs.Service{
-						ID:    "sentinelID0001",
-						Name:  "sentinelName0001",
-						Image: "sentinel:1.1.5",
+						ID:   "sentinelID0001",
+						Name: "sentinelName0001",
+						Image: structs.ImageVersion{
+							Name:  "sentinel",
+							Major: 1,
+							Minor: 1,
+							Patch: 5,
+						},
 					},
 					Units: []structs.UnitSpec{
 						{

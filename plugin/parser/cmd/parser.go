@@ -47,14 +47,13 @@ func main() {
 	}
 
 	{
-		v := iv.Version()
+		v := iv.Image()
 
 		if temp.Image != "" {
-			t, err := structs.ParseImage(*flImage)
+			t, err := structs.ParseImage(temp.Image)
 			if err != nil {
-				log.Printf("parse image version '%s':%+v\n", *flImage, err)
-			}
-			if t.Version() != v {
+				log.Printf("parse image version '%s':%+v\n", temp.Image, err)
+			} else if t.Image() != v {
 				log.Fatalf("image:'%s' != '%s' from JSON file", *flImage, temp.Image)
 			}
 		}

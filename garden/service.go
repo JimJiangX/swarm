@@ -193,10 +193,17 @@ func convertService(svc database.Service) structs.Service {
 		svc.Desc = &database.ServiceDesc{}
 	}
 
+	im, err := structs.ParseImage(svc.Desc.Image)
+	if err != nil {
+		im.Name = svc.Desc.Image
+	}
+
+	im.ID = svc.Desc.ImageID
+
 	return structs.Service{
 		ID:            svc.ID,
 		Name:          svc.Name,
-		Image:         svc.Desc.Image,
+		Image:         im,
 		Desc:          svc.DescID,
 		Architecture:  svc.Desc.Architecture,
 		Tag:           svc.Tag,
@@ -249,7 +256,8 @@ func convertStructsService(spec structs.ServiceSpec, schedopts scheduleOption) (
 		Replicas:        spec.Arch.Replicas,
 		NCPU:            spec.Require.Require.CPU,
 		Memory:          spec.Require.Require.Memory,
-		Image:           spec.Image,
+		Image:           spec.Image.Image(),
+		ImageID:         spec.Image.ID,
 		Volumes:         string(vb),
 		Networks:        string(nwb),
 		Clusters:        strings.Join(spec.Clusters, ","),
@@ -1018,12 +1026,8 @@ func (svc *Service) Compose(ctx context.Context, pc pluginapi.PluginAPI) error {
 
 // Image returns Image,query from db.
 func (svc Service) Image() (database.Image, error) {
-	img, err := structs.ParseImage(svc.svc.Desc.Image)
-	if err != nil {
-		return database.Image{}, err
-	}
 
-	return svc.so.GetImage(img.Name, img.Major, img.Minor, img.Patch, img.Build)
+	return svc.so.GetImageVersion(svc.svc.Desc.ImageID)
 }
 
 func (svc *Service) generateUnitsConfigs(ctx context.Context, args map[string]interface{}) (structs.ConfigsMap, error) {

@@ -415,11 +415,12 @@ func listImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	for i := range images {
 		out[i] = structs.ImageResponse{
 			ImageVersion: structs.ImageVersion{
+				ID:    images[i].ID,
 				Name:  images[i].Name,
 				Major: images[i].Major,
 				Minor: images[i].Minor,
 				Patch: images[i].Patch,
-				Build: images[i].Build,
+				Dev:   images[i].Dev,
 			},
 			Size:     images[i].Size,
 			ID:       images[i].ID,
@@ -457,7 +458,7 @@ func validLoadImageRequest(v structs.PostLoadImageRequest) error {
 
 	if v.Name == "" ||
 		(v.Major == 0 && v.Minor == 0 &&
-			v.Patch == 0 && v.Build == 0) {
+			v.Patch == 0 && v.Dev == 0) {
 		errs = append(errs, "ImageVersion is required")
 	}
 
@@ -530,7 +531,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
-		ec := errCodeV1(_Image, objectNotExist, 35, "unsupported image:"+req.Version(), "不支持镜像:"+req.Version())
+		ec := errCodeV1(_Image, objectNotExist, 35, "unsupported image:"+req.Image(), "不支持镜像:"+req.Image())
 		httpJSONError(w, stderr.New(ec.comment), ec, http.StatusInternalServerError)
 		return
 	}
@@ -598,11 +599,12 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	imResp := structs.ImageResponse{
 		ImageVersion: structs.ImageVersion{
+			ID:    im.ID,
 			Name:  im.Name,
 			Major: im.Major,
 			Minor: im.Minor,
 			Patch: im.Patch,
-			Build: im.Build,
+			Dev:   im.Dev,
 		},
 		Size:     im.Size,
 		ID:       im.ID,
@@ -611,7 +613,7 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		UploadAt: utils.TimeToString(im.UploadAt),
 	}
 
-	t, err := gd.PluginClient().GetImage(ctx, im.Version())
+	t, err := gd.PluginClient().GetImage(ctx, im.Image())
 	if err != nil {
 		ec := errCodeV1(_Image, internalError, 52, "fail to query image", "获取镜像错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -1565,7 +1567,11 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 }
 
 func validPostServiceRequest(spec structs.ServiceSpec) error {
-	errs := make([]string, 0, 4)
+	errs := make([]string, 0, 5)
+
+	if spec.Image.ID == "" {
+		errs = append(errs, fmt.Sprintf("Image ID is required,%+v", spec.Image))
+	}
 
 	if spec.Arch.Code == "" || spec.Arch.Mode == "" || spec.Arch.Replicas == 0 {
 		errs = append(errs, fmt.Sprintf("Arch invalid,%+v", spec.Arch))

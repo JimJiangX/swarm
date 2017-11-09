@@ -28,16 +28,11 @@ func newLinkRedis(nameOrID string, links []*structs.ServiceLink) (linkRedis, err
 
 	for i := range links {
 
-		v, err := structs.ParseImage(links[i].Spec.Image)
-		if err != nil {
-			return obj, err
-		}
-
 		if links[i].Arch != (structs.Arch{}) {
 			links[i].Spec.Arch = links[i].Arch
 		}
 
-		switch v.Name {
+		switch links[i].Spec.Image.Name {
 		case "upredis":
 			if obj.redis == nil {
 				obj.redis = make([]*structs.ServiceLink, 0, 2)
@@ -52,7 +47,7 @@ func newLinkRedis(nameOrID string, links []*structs.ServiceLink) (linkRedis, err
 			obj.sentinel = links[i]
 
 		default:
-			return obj, errors.Errorf("Unsupported image %s in link %s", v.Name, Proxy_Redis)
+			return obj, errors.Errorf("Unsupported image %s in link %s", links[i].Spec.Image.Image(), Proxy_Redis)
 		}
 	}
 

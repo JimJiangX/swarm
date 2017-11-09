@@ -430,15 +430,10 @@ func (c upredisProxyConfig) HealthCheck(id string, desc structs.ServiceSpec) (st
 		return structs.ServiceRegistration{}, err
 	}
 
-	im, err := structs.ParseImage(c.template.Image)
-	if err != nil {
-		return structs.ServiceRegistration{}, err
-	}
-
 	reg := structs.HorusRegistration{}
 	reg.Service.Select = true
 	reg.Service.Name = spec.ID
-	reg.Service.Type = "unit_" + im.Name
+	reg.Service.Type = "unit_" + desc.Image.Name
 	reg.Service.Tag = desc.ID
 	reg.Service.Container.Name = spec.Name
 	reg.Service.Container.HostName = spec.Engine.Node

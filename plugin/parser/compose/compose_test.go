@@ -43,7 +43,12 @@ func getRedisSpecTest() *structs.ServiceSpec {
 			},
 		},
 	}
-	req.Image = "redis:12.3.3"
+	req.Image = structs.ImageVersion{
+		Name:  "redis",
+		Major: 12,
+		Minor: 3,
+		Patch: 3,
+	}
 
 	return req
 }
@@ -94,7 +99,12 @@ func getMysqlSpecTest() *structs.ServiceSpec {
 		},
 		Units: []structs.UnitSpec{db1, db2, db3},
 	}
-	req.Image = "mysql:5.7.17"
+	req.Image = structs.ImageVersion{
+		Name:  "mysql",
+		Major: 5,
+		Minor: 7,
+		Patch: 17,
+	}
 
 	return req
 }

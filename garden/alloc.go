@@ -37,20 +37,15 @@ const (
 	sanLabel        = "SAN_ID"
 )
 
-func getImage(orm database.ImageOrmer, version string) (database.Image, string, error) {
-	im, err := orm.GetImageVersion(version)
-	if err != nil {
-		return im, "", err
-	}
-
+func getImage(orm database.ImageOrmer, version string) (string, error) {
 	reg, err := orm.GetRegistry()
 	if err != nil {
-		return im, "", err
+		return "", err
 	}
 
-	name := fmt.Sprintf("%s:%d/%s", reg.Domain, reg.Port, im.Version())
+	name := fmt.Sprintf("%s:%d/%s", reg.Domain, reg.Port, version)
 
-	return im, name, nil
+	return name, nil
 }
 
 // BuildService build a pointer of Service,
@@ -58,13 +53,23 @@ func getImage(orm database.ImageOrmer, version string) (database.Image, string, 
 func (gd *Garden) BuildService(spec structs.ServiceSpec) (*Service, *database.Task, error) {
 	options := newScheduleOption(spec)
 
-	im, err := gd.ormer.GetImageVersion(spec.Image)
+	im, err := gd.ormer.GetImageVersion(spec.Image.ID)
 	if err != nil {
 		return nil, nil, err
 	}
+	spec.Image = structs.ImageVersion{
+		ID:    im.ID,
+		Name:  im.Name,
+		Major: im.Major,
+		Minor: im.Minor,
+		Patch: im.Patch,
+		Dev:   im.Dev,
+	}
+
 	if spec.ID == "" {
 		spec.ID = utils.Generate32UUID()
 	}
+
 	svc, err := convertStructsService(spec, options)
 	if err != nil {
 		return nil, nil, err
@@ -238,7 +243,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Service,
 	units []database.Unit, vr, nr bool) (ready []pendingUnit, err error) {
 
-	im, version, err := getImage(gd.Ormer(), svc.svc.Desc.Image)
+	version, err := getImage(gd.Ormer(), svc.spec.Image.Image())
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +264,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		},
 	}, network.NetworkingConfig{})
 
-	config.Config.Labels["mgm.unit.type"] = im.Name
+	config.Config.Labels["mgm.unit.type"] = svc.spec.Image.Name
 	config.Config.Labels[serviceTagLabel] = svc.svc.Tag
 
 	{

@@ -286,10 +286,6 @@ func (svc *Service) prepareSchedule(candidates []string, options map[string]inte
 
 func (svc *Service) addNewUnit(num int) ([]database.Unit, error) {
 	spec := svc.spec
-	im, err := svc.so.GetImageVersion(spec.Image)
-	if err != nil {
-		return nil, err
-	}
 
 	now := time.Now()
 	add := make([]database.Unit, num)
@@ -299,7 +295,7 @@ func (svc *Service) addNewUnit(num int) ([]database.Unit, error) {
 		add[i] = database.Unit{
 			ID:          uid,
 			Name:        fmt.Sprintf("%s_%s", uid[:8], spec.Tag), // <unit_id_8bit>_<service_tag>
-			Type:        im.Name,
+			Type:        spec.Image.Name,
 			ServiceID:   spec.ID,
 			NetworkMode: "none",
 			Status:      0,
@@ -307,7 +303,7 @@ func (svc *Service) addNewUnit(num int) ([]database.Unit, error) {
 		}
 	}
 
-	err = svc.so.InsertUnits(add)
+	err := svc.so.InsertUnits(add)
 
 	return add, err
 }
