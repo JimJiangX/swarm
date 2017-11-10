@@ -9,10 +9,11 @@ type PostClusterRequest struct {
 }
 
 type GetClusterResponse struct {
-	ID         string  `json:"id"`
-	MaxNode    int     `json:"max_host"`
-	NodeNum    int     `json:"host_num"`
-	UsageLimit float32 `json:"usage_limit"`
+	ID               string  `json:"id"`
+	NetworkPartition string  `json:"ha_network_tag"`
+	MaxNode          int     `json:"max_host"`
+	NodeNum          int     `json:"host_num"`
+	UsageLimit       float32 `json:"usage_limit"`
 }
 
 type Node struct {

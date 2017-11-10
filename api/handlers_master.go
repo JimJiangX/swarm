@@ -688,10 +688,11 @@ func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	}
 
 	resp := structs.GetClusterResponse{
-		ID:         c.ID,
-		MaxNode:    c.MaxNode,
-		UsageLimit: c.UsageLimit,
-		NodeNum:    n,
+		ID:               c.ID,
+		NetworkPartition: c.NetworkPartition,
+		MaxNode:          c.MaxNode,
+		UsageLimit:       c.UsageLimit,
+		NodeNum:          n,
 	}
 
 	writeJSON(w, resp, http.StatusOK)
@@ -724,10 +725,11 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 
 		out[i] = structs.GetClusterResponse{
-			ID:         list[i].ID,
-			MaxNode:    list[i].MaxNode,
-			UsageLimit: list[i].UsageLimit,
-			NodeNum:    n,
+			ID:               list[i].ID,
+			MaxNode:          list[i].MaxNode,
+			UsageLimit:       list[i].UsageLimit,
+			NetworkPartition: list[i].NetworkPartition,
+			NodeNum:          n,
 		}
 	}
 
