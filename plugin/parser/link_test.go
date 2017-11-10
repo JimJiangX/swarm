@@ -12,7 +12,7 @@ func TestLinkFactory(t *testing.T) {
 	req := structs.ServicesLink{
 		Mode: Proxy_Redis,
 		Links: []*structs.ServiceLink{
-			&structs.ServiceLink{
+			{
 				ID: "upredisID0001",
 				Spec: &structs.ServiceSpec{
 					Service: structs.Service{
@@ -39,7 +39,7 @@ func TestLinkFactory(t *testing.T) {
 					},
 				},
 			},
-			&structs.ServiceLink{
+			{
 				ID: "urproxyID0001",
 				Spec: &structs.ServiceSpec{
 					Service: structs.Service{
@@ -66,7 +66,7 @@ func TestLinkFactory(t *testing.T) {
 					},
 				},
 			},
-			&structs.ServiceLink{
+			{
 				ID: "sentinelID0001",
 				Spec: &structs.ServiceSpec{
 					Service: structs.Service{
