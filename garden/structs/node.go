@@ -3,8 +3,9 @@ package structs
 import "github.com/docker/swarm/cluster"
 
 type PostClusterRequest struct {
-	Max        int     `json:"max_host"`
-	UsageLimit float32 `json:"usage_limit"`
+	NetworkPartition string  `json:"ha_network_tag"`
+	Max              int     `json:"max_host"`
+	UsageLimit       float32 `json:"usage_limit"`
 }
 
 type GetClusterResponse struct {

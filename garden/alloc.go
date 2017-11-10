@@ -28,13 +28,14 @@ const containerKV = "/containers/"
 
 // add engine labels for schedule
 const (
-	roomLabel       = "room"
-	seatLabel       = "seat"
-	nodeLabel       = "nodeID"
-	engineLabel     = "node"
-	clusterLabel    = "cluster"
-	serviceTagLabel = "service.tag"
-	sanLabel        = "SAN_ID"
+	roomLabel             = "room"
+	seatLabel             = "seat"
+	nodeLabel             = "nodeID"
+	engineLabel           = "node"
+	clusterLabel          = "cluster"
+	serviceTagLabel       = "service.tag"
+	sanLabel              = "SAN_ID"
+	networkPartitionLable = "network_partition"
 )
 
 func getImage(orm database.ImageOrmer, version string) (string, error) {
@@ -176,6 +177,15 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 		}
 	}
 
+	clusters, err := gd.Ormer().ListClusters()
+	if err != nil {
+		return nil, err
+	}
+	if len(clusters) == 0 {
+		return nil, errors.New("List Cluster result empty")
+	}
+
+	clusterID, partition := clusters[0].ID, clusters[0].NetworkPartition
 	list := gd.Cluster.ListEngines(engines...)
 	nodes := make([]*node.Node, 0, len(list))
 	for i := range list {
@@ -192,6 +202,19 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 				n.Labels[roomLabel] = out[o].Room
 				n.Labels[seatLabel] = out[o].Seat
 				n.Labels[sanLabel] = out[o].Storage
+
+				if out[o].ClusterID != clusterID {
+					for c := range clusters {
+						if clusters[c].ID == out[o].ClusterID {
+							partition = clusters[c].NetworkPartition
+							clusterID = clusters[c].ID
+							break
+						}
+					}
+				}
+
+				n.Labels[networkPartitionLable] = partition
+
 				break
 			}
 		}
@@ -525,7 +548,7 @@ func selectNodeInDifferentStorage(highAvailable bool, num int, n *node.Node, use
 	clusters := make(map[string]int, len(used))
 	for i := range used {
 		name := used[i].Labels[sanLabel]
-		clusters[name]++
+		clusters[name] = clusters[name] + 1
 	}
 
 	name := n.Labels[sanLabel]

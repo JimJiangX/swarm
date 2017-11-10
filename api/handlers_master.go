@@ -762,9 +762,10 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := database.Cluster{
-		ID:         utils.Generate32UUID(),
-		MaxNode:    req.Max,
-		UsageLimit: req.UsageLimit,
+		ID:               utils.Generate32UUID(),
+		NetworkPartition: req.NetworkPartition,
+		MaxNode:          req.Max,
+		UsageLimit:       req.UsageLimit,
 	}
 
 	err = gd.Ormer().InsertCluster(c)
