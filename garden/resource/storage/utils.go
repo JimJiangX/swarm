@@ -84,21 +84,27 @@ func parseSpace(r io.Reader) ([]Space, []error) {
 			break
 		}
 
-		parts := bytes.Split(line, []byte{' '})
+		out := bytes.Split(line, []byte{' '})
+		parts := make([][]byte, 0, 5)
+
+		for i := range out {
+			if len(out[i]) > 0 {
+				parts = append(parts, out[i])
+			}
+		}
 
 		if len(parts) >= 5 {
-
-			if len(bytes.TrimSpace(parts[0])) == 0 {
-				errs = append(errs, errors.Errorf("RG ID is required,'%s'", line))
-				continue
-			}
-
 			var (
 				space = Space{}
 				err   error
 			)
 
-			space.ID = string(parts[0])
+			space.ID = string(bytes.TrimSpace(parts[0]))
+
+			if len(space.ID) == 0 {
+				errs = append(errs, errors.Errorf("RG ID is required,'%s'", line))
+				continue
+			}
 
 			space.Total, err = strconv.ParseInt(string(parts[1]), 10, 64)
 			if err != nil {

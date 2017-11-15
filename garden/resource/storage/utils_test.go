@@ -7,14 +7,15 @@ import (
 )
 
 func TestParseSpace(t *testing.T) {
-	src0 := `1 10200400 2568900 online 19
-2 107800 25600 online 2
-3 102100 256800 online 33
-4 2400 500 online 100`
+	src0 := `
+			1 10200400 2568900 online 19
+            2 107800 25600 online 2
+			3 102100 256800 online 33
+            4 2400 500 online 100`
 	src1 := `1-1 921600 258048 NML 36
 1-2 921600 258048 NML 36
 1-3 921600 258048 NML 36
-1-4 921600 258048 NML 36
+  1-4   921600  258048  NML  36
 `
 	buffer := strings.NewReader(src0)
 	spaces, warnings := parseSpace(buffer)
