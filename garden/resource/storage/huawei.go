@@ -498,11 +498,15 @@ func (h *huaweiStore) list(rg ...string) ([]Space, error) {
 		return nil, errors.Errorf("Exec %s:%s", cmd.Args, err)
 	}
 
-	spaces := parseSpace(r)
+	spaces, warnings := parseSpace(r)
+
+	if len(warnings) > 0 {
+		logrus.Warningf("parse SAN RG warinings:%s", warnings)
+	}
 
 	err = cmd.Wait()
 	if err != nil {
-		return nil, errors.Errorf("Wait %s:%s", cmd.Args, err)
+		return nil, errors.Errorf("Wait %s:%s,warnings:%s", cmd.Args, err, warnings)
 	}
 
 	if len(spaces) == 0 {

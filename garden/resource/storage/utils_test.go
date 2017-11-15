@@ -17,7 +17,11 @@ func TestParseSpace(t *testing.T) {
 1-4 921600 258048 NML 36
 `
 	buffer := strings.NewReader(src0)
-	spaces := parseSpace(buffer)
+	spaces, warnings := parseSpace(buffer)
+
+	if len(warnings) > 0 {
+		t.Error(warnings)
+	}
 
 	if len(spaces) != 4 {
 		t.Error("Unexpected,", spaces)
@@ -26,7 +30,11 @@ func TestParseSpace(t *testing.T) {
 	}
 
 	buffer = strings.NewReader(src1)
-	spaces = parseSpace(buffer)
+	spaces, warnings = parseSpace(buffer)
+
+	if len(warnings) > 0 {
+		t.Error(warnings)
+	}
 
 	if len(spaces) != 4 {
 		t.Error("Unexpected,", spaces)

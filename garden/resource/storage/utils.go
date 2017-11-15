@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/docker/swarm/garden/database"
+	"github.com/pkg/errors"
 )
 
 func findIdleNum(min, max int, filter []int) (bool, int) {
@@ -68,34 +69,46 @@ type Space struct {
 	LunNum int
 }
 
-func parseSpace(r io.Reader) []Space {
+func parseSpace(r io.Reader) ([]Space, []error) {
 	spaces := make([]Space, 0, 10)
+	errs := make([]error, 0, 10)
+
 	br := bufio.NewReader(r)
 
 	for {
 		line, _, err := br.ReadLine()
 		if err != nil {
+			if err != io.EOF {
+				errs = append(errs, errors.WithStack(err))
+			}
 			break
 		}
 
 		parts := bytes.Split(line, []byte{' '})
 
-		if len(parts) == 5 {
+		if len(parts) >= 5 {
+
+			if len(bytes.TrimSpace(parts[0])) == 0 {
+				errs = append(errs, errors.Errorf("RG ID is required,'%s'", line))
+				continue
+			}
+
 			var (
 				space = Space{}
 				err   error
 			)
+
 			space.ID = string(parts[0])
 
 			space.Total, err = strconv.ParseInt(string(parts[1]), 10, 64)
 			if err != nil {
-				continue
+				errs = append(errs, errors.Errorf("parse '%s':'%s' error,%s", line, parts[1], err))
 			}
 			space.Total = space.Total << 20
 
 			space.Free, err = strconv.ParseInt(string(parts[2]), 10, 64)
 			if err != nil {
-				continue
+				errs = append(errs, errors.Errorf("parse '%s':'%s' error,%s", line, parts[2], err))
 			}
 			space.Free = space.Free << 20
 
@@ -103,12 +116,12 @@ func parseSpace(r io.Reader) []Space {
 
 			space.LunNum, err = strconv.Atoi(string(parts[4]))
 			if err != nil {
-				continue
+				errs = append(errs, errors.Errorf("parse '%s':'%s' error,%s", line, parts[4], err))
 			}
 
 			spaces = append(spaces, space)
 		}
 	}
 
-	return spaces
+	return spaces, errs
 }
