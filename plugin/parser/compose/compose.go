@@ -193,7 +193,7 @@ func valicateRedisSpec(req *structs.ServiceSpec) error {
 }
 
 //check && get value
-//"M:2#S:1"
+//"M:2#SB:1#S:1"
 func getmasterAndSlave(req *structs.ServiceSpec) (int, int, error) {
 	codes := strings.Split(req.Arch.Code, "#")
 
@@ -217,12 +217,24 @@ func getmasterAndSlave(req *structs.ServiceSpec) (int, int, error) {
 		return 0, 0, errors.Errorf("bad format,get slave,Arch.Code:%v", req.Arch.Code)
 	}
 	snum, err := strconv.Atoi(slave[1])
-	if err != nil || slave[0] != "S" {
+	if err != nil || slave[0] != "S" || slave[0] != "SB" {
 		return 0, 0, errors.Errorf("bad format,get slave num,Arch.Code:%v", req.Arch.Code)
 	}
 
-	return mnum, snum, nil
+	if len(codes) == 1 {
+		return mnum, snum, nil
+	}
 
+	slave = strings.Split(codes[2], ":")
+	if len(slave) != 2 {
+		return 0, 0, errors.Errorf("bad format,get slave,Arch.Code:%v", req.Arch.Code)
+	}
+	n, err := strconv.Atoi(slave[2])
+	if err != nil || slave[0] != "S" || slave[0] != "SB" {
+		return 0, 0, errors.Errorf("bad format,get slave num,Arch.Code:%v", req.Arch.Code)
+	}
+
+	return mnum, snum + n, nil
 }
 
 func getDbType(req *structs.ServiceSpec) dbArch {
