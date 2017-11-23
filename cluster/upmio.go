@@ -15,6 +15,16 @@ import (
 	"golang.org/x/net/context"
 )
 
+// IsErrVolumeNotFound returns true if the error is caused
+// when a volume is not found in the docker host.
+func IsErrVolumeNotFound(err error) bool {
+	if client.IsErrVolumeNotFound(err) {
+		return true
+	}
+
+	return strings.Contains(strings.ToLower(err.Error()), "no such volume")
+}
+
 // IsErrContainerNotFound returns true if the error is caused
 // when a container is not found in the docker host.
 func IsErrContainerNotFound(err error) bool {

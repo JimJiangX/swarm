@@ -18,8 +18,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/context"
-
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -31,6 +29,7 @@ import (
 	engineapi "github.com/docker/docker/client"
 	engineapinop "github.com/docker/swarm/api/nopclient"
 	"github.com/docker/swarm/swarmclient"
+	"golang.org/x/net/context"
 )
 
 const (
@@ -629,7 +628,7 @@ func (e *Engine) AddNetwork(network *Network) {
 func (e *Engine) RemoveVolume(name string) error {
 	err := e.apiClient.VolumeRemove(context.Background(), name, false)
 	e.CheckConnectionErr(err)
-	if err != nil {
+	if err != nil && !IsErrVolumeNotFound(err) {
 		return err
 	}
 
