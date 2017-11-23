@@ -288,6 +288,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	}, network.NetworkingConfig{})
 
 	config.Config.Labels["mgm.unit.type"] = svc.spec.Image.Name
+	config.Config.Labels["mgm.image.id"] = svc.spec.Image.ID
 	config.Config.Labels[serviceTagLabel] = svc.svc.Tag
 
 	{
@@ -613,6 +614,7 @@ func (gd *Garden) allocationV2(ctx context.Context, actor alloc.Allocator, svc *
 	}, network.NetworkingConfig{})
 
 	config.Config.Labels["mgm.unit.type"] = svc.spec.Image.Name
+	config.Config.Labels["mgm.image.id"] = svc.spec.Image.ID
 	config.Config.Labels[serviceTagLabel] = svc.svc.Tag
 
 	{

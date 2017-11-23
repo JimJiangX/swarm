@@ -84,6 +84,8 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 			// set new swarmID
 			swarmID := utils.Generate32UUID()
 			c.Config.SetSwarmID(swarmID)
+			c.Config.Config.Labels["mgm.unit.type"] = im.Name
+			c.Config.Config.Labels["mgm.image.id"] = im.ID
 
 			nc, err := c.Engine.CreateContainer(c.Config, swarmID, true, authConfig)
 			if err != nil {
