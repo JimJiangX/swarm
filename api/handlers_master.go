@@ -780,9 +780,17 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "id", c.ID)
 }
 
+func validPutClusterRequest(v structs.PutClusterRequest) error {
+	if v.Max == nil && v.UsageLimit == nil {
+		return errors.Errorf("neither MaxNode nor UsageLimit is non-nil")
+	}
+
+	return nil
+}
+
 func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
-	req := structs.PostClusterRequest{}
+	req := structs.PutClusterRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		ec := errCodeV1(_Cluster, decodeError, 41, "JSON Decode Request Body error", "JSON解析请求Body错误")
@@ -790,7 +798,7 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := validPostClusterRequest(req); err != nil {
+	if err := validPutClusterRequest(req); err != nil {
 		ec := errCodeV1(_Cluster, invalidParamsError, 42, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
@@ -804,15 +812,24 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	c := database.Cluster{
-		ID:         name,
-		MaxNode:    req.Max,
-		UsageLimit: req.UsageLimit,
+	c, err := gd.Ormer().GetCluster(name)
+	if err != nil {
+		ec := errCodeV1(_Cluster, dbQueryError, 43, "fail to query records from database", "数据库查询记录错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	if req.Max != nil {
+		c.MaxNode = *req.Max
+	}
+
+	if req.UsageLimit != nil {
+		c.UsageLimit = *req.UsageLimit
 	}
 
 	err = gd.Ormer().SetClusterParams(c)
 	if err != nil {
-		ec := errCodeV1(_Cluster, dbExecError, 43, "fail to update records into database", "数据库更新记录错误")
+		ec := errCodeV1(_Cluster, dbExecError, 44, "fail to update records into database", "数据库更新记录错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}

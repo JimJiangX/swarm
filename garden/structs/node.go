@@ -8,6 +8,11 @@ type PostClusterRequest struct {
 	UsageLimit       float32 `json:"usage_limit"`
 }
 
+type PutClusterRequest struct {
+	Max        *int     `json:"max_host"`
+	UsageLimit *float32 `json:"usage_limit"`
+}
+
 type GetClusterResponse struct {
 	ID               string  `json:"id"`
 	NetworkPartition string  `json:"ha_network_tag"`
