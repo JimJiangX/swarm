@@ -1963,15 +1963,21 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
-func validPostServiceUpdateConfigsRequest(req structs.UnitConfig) error {
-	if len(req.Keysets) == 0 {
+func validPostServiceUpdateConfigsRequest(req structs.ModifyUnitConfig) error {
+	if len(req.Keysets) == 0 &&
+		req.ConfigFile == nil &&
+		req.DataMount == nil &&
+		req.LogMount == nil &&
+		req.Content == nil &&
+		len(req.Cmds) == 0 {
+
 		return stderr.New("nothing new for update for service configs")
 	}
 
 	return nil
 }
 
-func mergeServiceConfigsChange(ctx goctx.Context, svc *garden.Service, change structs.UnitConfig) (structs.ServiceConfigs, bool, error) {
+func mergeServiceConfigsChange(ctx goctx.Context, svc *garden.Service, change structs.ModifyUnitConfig) (structs.ServiceConfigs, bool, error) {
 	restart := false
 
 	configs, err := svc.GetUnitsConfigs(ctx)
@@ -1995,15 +2001,18 @@ func mergeServiceConfigsChange(ctx goctx.Context, svc *garden.Service, change st
 	return configs, restart, nil
 }
 
-func mergeUnitConfigChange(cc, change structs.UnitConfig) (structs.UnitConfig, bool, error) {
-	if change.LogMount != "" {
-		cc.LogMount = change.LogMount
+func mergeUnitConfigChange(cc structs.UnitConfig, change structs.ModifyUnitConfig) (structs.UnitConfig, bool, error) {
+	if change.LogMount != nil {
+		cc.LogMount = *change.LogMount
 	}
-	if change.DataMount != "" {
-		cc.DataMount = change.DataMount
+	if change.DataMount != nil {
+		cc.DataMount = *change.DataMount
 	}
-	if change.ConfigFile != "" {
-		cc.ConfigFile = change.ConfigFile
+	if change.ConfigFile != nil {
+		cc.ConfigFile = *change.ConfigFile
+	}
+	if change.Content != nil {
+		cc.Content = *change.Content
 	}
 
 	m := make(map[string]structs.Keyset, len(cc.Keysets))
@@ -2047,7 +2056,7 @@ func mergeUnitConfigChange(cc, change structs.UnitConfig) (structs.UnitConfig, b
 func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
-	change := structs.UnitConfig{}
+	change := structs.ModifyUnitConfig{}
 
 	err := json.NewDecoder(r.Body).Decode(&change)
 	if err != nil {

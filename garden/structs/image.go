@@ -136,6 +136,21 @@ type UnitConfig struct {
 	Cmds CmdsMap `json:"cmds,omitempty"`
 }
 
+type ModifyUnitConfig struct {
+	ID      string `json:"id,omitempty"`
+	Service string `json:"service,omitempty"`
+	Image   string `json:"image"`
+	// Mount     string
+	LogMount   *string `json:"log_mount,omitempty"`
+	DataMount  *string `json:"data_mount,omitempty"`
+	ConfigFile *string `json:"config_file,omitempty"`
+	Content    *string `json:"content,omitempty"`
+
+	Keysets   []Keyset `json:"keysets,omitempty"`
+	Timestamp int64    `json:"timestamp,omitempty"`
+	Cmds      CmdsMap  `json:"cmds,omitempty"`
+}
+
 type ImageResponse struct {
 	ImageVersion
 	Size     int    `json:"size"`
