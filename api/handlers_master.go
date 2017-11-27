@@ -1160,12 +1160,18 @@ func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
 	var max = struct {
-		N int `json:"max_container"`
+		N *int `json:"max_container"`
 	}{}
 
 	err := json.NewDecoder(r.Body).Decode(&max)
 	if err != nil {
 		ec := errCodeV1(_Host, decodeError, 61, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	if max.N == nil {
+		ec := errCodeV1(_Host, invalidParamsError, 62, "URL parameters are invalid", "URL参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1178,9 +1184,9 @@ func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = gd.Ormer().SetNodeParam(name, max.N)
+	err = gd.Ormer().SetNodeParam(name, *max.N)
 	if err != nil {
-		ec := errCodeV1(_Host, dbExecError, 62, "fail to update records into database", "数据库更新记录错误")
+		ec := errCodeV1(_Host, dbExecError, 63, "fail to update records into database", "数据库更新记录错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -1853,8 +1859,8 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
-func validPostServiceUpdateRequest(v structs.UnitRequire) error {
-	if v.Require.CPU == 0 && v.Require.Memory == 0 &&
+func validPostServiceUpdateRequest(v structs.UpdateUnitRequire) error {
+	if v.Require.CPU == nil && v.Require.Memory == nil &&
 		len(v.Volumes) == 0 && len(v.Networks) == 0 {
 
 		return fmt.Errorf("UnitRequire:%v,%s", v, "no resource update required")
@@ -1878,16 +1884,16 @@ func validPostServiceUpdateRequest(v structs.UnitRequire) error {
 func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
-	var update structs.UnitRequire
+	config := structs.UpdateUnitRequire{}
 
-	err := json.NewDecoder(r.Body).Decode(&update)
+	err := json.NewDecoder(r.Body).Decode(&config)
 	if err != nil {
 		ec := errCodeV1(_Service, decodeError, 71, "JSON Decode Request Body error", "JSON解析请求Body错误")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
-	if err := validPostServiceUpdateRequest(update); err != nil {
+	if err := validPostServiceUpdateRequest(config); err != nil {
 		ec := errCodeV1(_Service, invalidParamsError, 72, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
@@ -1910,7 +1916,7 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	d := deploy.New(gd)
 
-	id, err := d.ServiceUpdate(ctx, name, update)
+	id, err := d.ServiceUpdate(ctx, name, config)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 73, "fail to update service containers", "服务垂直扩容错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)

@@ -438,7 +438,7 @@ func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version strin
 }
 
 // ServiceUpdate update service CPU & memory & volume resource,task run in goroutine.
-func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config structs.UnitRequire) (string, error) {
+func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config structs.UpdateUnitRequire) (string, error) {
 	svc, err := d.gd.Service(name)
 	if err != nil {
 		return "", err
@@ -488,7 +488,7 @@ func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config stru
 			d.gd.Lock()
 			defer d.gd.Unlock()
 
-			return svc.UpdateResource(ctx, actor, int64(config.Require.CPU), config.Require.Memory)
+			return svc.UpdateResource(ctx, actor, config.Require.CPU, config.Require.Memory)
 		}()
 		if err != nil {
 			return err

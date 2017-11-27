@@ -133,6 +133,21 @@ type UnitRequire struct {
 	Networks []NetDeviceRequire `json:"networks"`
 }
 
+type UpdateUnitRequire struct {
+	Require struct {
+		CPU    *int64 `json:"ncpu,omitempty"`
+		Memory *int64 `json:"memory,omitempty"`
+	} `json:"require"`
+
+	Limit *struct {
+		CPU    int   `json:"ncpu"`
+		Memory int64 `json:"memory"`
+	} `json:"limit,omitempty"`
+
+	Volumes  []VolumeRequire    `json:"volumes"`
+	Networks []NetDeviceRequire `json:"networks"`
+}
+
 type NetDeviceRequire struct {
 	Device    int `json:"device,omitempty"`
 	Bandwidth int `json:"bandwidth"` // M/s

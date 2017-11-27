@@ -193,15 +193,16 @@ func updateDescByImage(table database.Service, im database.Image) database.Servi
 }
 
 // UpdateResource udpate service containers CPU & memory settings.
-func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, ncpu, memory int64) error {
+func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, ncpu, memory *int64) error {
 	desc := svc.svc.Desc
 
-	if ncpu == 0 {
-		ncpu = int64(desc.NCPU)
+	if ncpu == nil {
+		n := int64(desc.NCPU)
+		ncpu = &n
 	}
 
-	if memory == 0 {
-		memory = desc.Memory
+	if memory == nil {
+		memory = &desc.Memory
 	}
 
 	update := func() error {
@@ -229,13 +230,13 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 				return errors.WithStack(newContainerError(u.u.Name, notFound))
 			}
 
-			if c.Config.HostConfig.Memory == memory {
+			if c.Config.HostConfig.Memory == *memory {
 				nccpu, err = c.Config.CountCPU()
 				if err != nil {
 					return errors.WithStack(err)
 				}
 
-				if nccpu == ncpu {
+				if nccpu == *ncpu {
 					continue
 				}
 				countCPU = true
@@ -243,7 +244,7 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 
 			pu := pending{
 				u:      u,
-				memory: memory,
+				memory: *memory,
 				cpuset: c.Config.HostConfig.CpusetCpus,
 			}
 
@@ -254,17 +255,17 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 				}
 			}
 
-			if nccpu > ncpu {
-				pu.cpuset, err = reduceCPUset(c.Config.HostConfig.CpusetCpus, int(ncpu))
+			if nccpu > *ncpu {
+				pu.cpuset, err = reduceCPUset(c.Config.HostConfig.CpusetCpus, int(*ncpu))
 				if err != nil {
 					return err
 				}
 			}
 
-			if c.Config.HostConfig.Memory < memory || nccpu < ncpu {
+			if c.Config.HostConfig.Memory < *memory || nccpu < *ncpu {
 				node := node.NewNode(c.Engine)
 
-				cpuset, err := actor.AlloctCPUMemory(c.Config, node, ncpu-nccpu, memory-c.Config.HostConfig.Memory, nil)
+				cpuset, err := actor.AlloctCPUMemory(c.Config, node, *ncpu-nccpu, *memory-c.Config.HostConfig.Memory, nil)
 				if err != nil {
 					return err
 				}
@@ -315,7 +316,7 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 				return err
 			}
 
-			table, err = updateDescByResource(table, ncpu, memory)
+			table, err = updateDescByResource(table, *ncpu, *memory)
 			if err != nil {
 				return err
 			}
