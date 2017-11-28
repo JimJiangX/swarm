@@ -221,7 +221,7 @@ func getmasterAndSlave(req *structs.ServiceSpec) (int, int, error) {
 		return 0, 0, errors.Errorf("bad format,get slave num,Arch.Code:%v", req.Arch.Code)
 	}
 
-	if len(codes) == 1 {
+	if len(codes) == 2 {
 		return mnum, snum, nil
 	}
 
@@ -229,7 +229,7 @@ func getmasterAndSlave(req *structs.ServiceSpec) (int, int, error) {
 	if len(slave) != 2 {
 		return 0, 0, errors.Errorf("bad format,get slave,Arch.Code:%v", req.Arch.Code)
 	}
-	n, err := strconv.Atoi(slave[2])
+	n, err := strconv.Atoi(slave[1])
 	if err != nil || (slave[0] != "S" && slave[0] != "SB") {
 		return 0, 0, errors.Errorf("bad format,get slave num,Arch.Code:%v", req.Arch.Code)
 	}

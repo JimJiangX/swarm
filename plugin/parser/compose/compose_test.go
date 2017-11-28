@@ -87,7 +87,7 @@ func getMysqlSpecTest() *structs.ServiceSpec {
 		Arch: structs.Arch{
 			Mode:     "replication",
 			Replicas: 3,
-			Code:     "M:1#S:2",
+			Code:     "M:1#SB:1#S:1",
 		},
 
 		Options: map[string]interface{}{"port": float64(6379)},
