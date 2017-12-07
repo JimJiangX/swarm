@@ -1,11 +1,14 @@
 package garden
 
 import (
+	"strings"
+
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/tasklock"
+	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -114,10 +117,18 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			}
 		}()
 
-		// migrate networkings
-		news.networkings, err = actor.AllocDevice(news.unit.u.EngineID, news.unit.u.ID, old.networkings)
-		if err != nil {
-			return err
+		{
+			// migrate networkings
+			news.networkings, err = actor.AllocDevice(news.unit.u.EngineID, news.unit.u.ID, old.networkings)
+			if err != nil {
+				return err
+			}
+			if len(pendings) > 0 {
+				for i := range news.networkings {
+					ip := utils.Uint32ToIP(news.networkings[i].IPAddr)
+					pendings[0].config.Config.Env = append(pendings[0].config.Config.Env, "IPADDR="+ip.String())
+				}
+			}
 		}
 
 		if migrate {
@@ -125,6 +136,17 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			news.volumes, err = actor.MigrateVolumes(news.unit.u.ID, old.engine, news.engine, old.volumes)
 			if err != nil {
 				return err
+			}
+
+			if len(pendings) > 0 {
+				pendings[0].config.HostConfig.Binds = old.container.Config.HostConfig.Binds
+
+				for _, env := range old.container.Config.Env {
+
+					if strings.Contains(env, "_DIR=/DBAAS") {
+						pendings[0].config.Env = append(pendings[0].config.Env, env)
+					}
+				}
 			}
 
 			defer func() {
