@@ -1627,7 +1627,7 @@ func validPostServiceRequest(spec structs.ServiceSpec) error {
 		errs = append(errs, fmt.Sprintf("Arch invalid,%+v", spec.Arch))
 	}
 
-	if spec.Require == nil || spec.Require.Require.CPU == 0 || spec.Require.Require.Memory == 0 {
+	if spec.Require == nil {
 		errs = append(errs, "unit require is nil")
 	}
 
