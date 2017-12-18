@@ -1547,7 +1547,7 @@ func getNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, "{}", http.StatusOK)
+	writeJSONNull(w, http.StatusOK)
 }
 
 // -----------------/services handlers-----------------
@@ -1571,25 +1571,59 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	name := r.FormValue("image_name")
-	if name == "" || len(services) == 0 {
+	if len(services) == 0 {
 		writeJSON(w, services, http.StatusOK)
 		return
 	}
 
-	images := strings.Split(name, ",")
-	out := make([]structs.ServiceSpec, 0, len(services))
+	var out []structs.ServiceSpec
+	name := r.FormValue("image_name")
 
-	for i := range images {
+	if name == "" {
+		out = services
+	} else {
+		images := strings.Split(name, ",")
+		out := make([]structs.ServiceSpec, 0, len(services))
 
-		for k := range services {
-			if services[k].Image.Name == images[i] {
-				out = append(out, services[k])
+		for i := range images {
+
+			for k := range services {
+				if services[k].Image.Name == images[i] {
+					out = append(out, services[k])
+				}
 			}
 		}
 	}
 
-	writeJSON(w, out, http.StatusOK)
+	bfs, err := gd.Ormer().ListBackupFiles()
+	if err != nil {
+		ec := errCodeV1(_Service, dbQueryError, 13, "fail to query database", "数据库查询错误（备份表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	resp := make([]structs.ServiceResponse, 0, len(out))
+
+	for i := range out {
+		sum := 0
+		for j := range bfs {
+
+		units:
+			for k := range out[i].Units {
+				if bfs[j].UnitID == out[i].Units[k].ID {
+					sum += bfs[j].SizeByte
+					break units
+				}
+			}
+		}
+
+		resp = append(resp, structs.ServiceResponse{
+			ServiceSpec:   out[i],
+			BuckupFileSum: sum,
+		})
+	}
+
+	writeJSON(w, resp, http.StatusOK)
 }
 
 func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1613,7 +1647,33 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	writeJSON(w, spec, http.StatusOK)
+	sum, err := getBackupFileSumByService(gd.Ormer(), spec.ID)
+	if err != nil {
+		ec := errCodeV1(_Service, dbQueryError, 22, "fail to query database", "数据库查询错误（备份表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	resp := structs.ServiceResponse{
+		ServiceSpec:   spec,
+		BuckupFileSum: sum,
+	}
+
+	writeJSON(w, resp, http.StatusOK)
+}
+
+func getBackupFileSumByService(biface database.BackupFileIface, id string) (int, error) {
+	files, err := biface.ListBackupFilesByService(id)
+	if err != nil {
+		return 0, err
+	}
+
+	sum := 0
+	for i := range files {
+		sum += files[i].SizeByte
+	}
+
+	return sum, nil
 }
 
 func validPostServiceRequest(spec structs.ServiceSpec) error {

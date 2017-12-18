@@ -133,6 +133,11 @@ type UnitRequire struct {
 	Networks []NetDeviceRequire `json:"networks"`
 }
 
+type ServiceResponse struct {
+	ServiceSpec
+	BuckupFileSum int `json:"backup_file_sum"`
+}
+
 type UpdateUnitRequire struct {
 	Require struct {
 		CPU    *int64 `json:"ncpu,omitempty"`
