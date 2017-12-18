@@ -1,10 +1,11 @@
 package client
 
 import (
-	"context"
 	"net/http"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 func setupTestServer(addr string) *http.Server {
