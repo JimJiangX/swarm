@@ -1583,7 +1583,7 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		out = services
 	} else {
 		images := strings.Split(name, ",")
-		out := make([]structs.ServiceSpec, 0, len(services))
+		out = make([]structs.ServiceSpec, 0, len(services))
 
 		for i := range images {
 
