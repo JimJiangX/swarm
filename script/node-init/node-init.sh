@@ -73,7 +73,7 @@ fi
 PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
 
 docker_version=17.09.0
-consul_version=0.9.2
+consul_version=1.0.2
 swarm_agent_version=1.2.8-f70ba02
 logicalVolume_volume_plugin_version=3.0.0
 
@@ -273,8 +273,7 @@ install_consul() {
   "disable_update_check": true,
   "log_level": "INFO",
   "addresses": {
-    "http": "${adm_ip}",
-    "rpc": "${adm_ip}"
+    "http": "${adm_ip}"
   },
   "start_join": ${cs_list}
 }
