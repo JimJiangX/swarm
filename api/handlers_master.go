@@ -1045,17 +1045,30 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	orm := gd.Ormer()
 
-	_, err = orm.GetCluster(n.Cluster)
+	cl, err := orm.GetCluster(n.Cluster)
 	if err != nil {
 		ec := errCodeV1(_Host, dbQueryError, 33, "fail to query database", "数据库查询错误（集群表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
+	num, err := orm.CountNodeByCluster(cl.ID)
+	if err != nil {
+		ec := errCodeV1(_Host, dbQueryError, 34, "fail to query database", "数据库查询错误（物理主机表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	if num >= cl.MaxNode {
+		ec := errCodeV1(_Host, invalidParamsError, 35, fmt.Sprintf("Exceeded cluster max node limit,%d>=%d", num, cl.MaxNode), fmt.Sprintf("超出集群数量限制，%d>%d", num, cl.MaxNode))
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
 	if n.Storage != "" {
 		_, err = orm.GetStorageByID(n.Storage)
 		if err != nil {
-			ec := errCodeV1(_Host, dbQueryError, 34, "fail to query database", "数据库查询错误（外部存储表）")
+			ec := errCodeV1(_Host, dbQueryError, 36, "fail to query database", "数据库查询错误（外部存储表）")
 			httpJSONError(w, err, ec, http.StatusInternalServerError)
 			return
 		}
@@ -1085,7 +1098,7 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	horus, err := gd.KVClient().GetHorusAddr(ctx)
 	if err != nil {
-		ec := errCodeV1(_Host, internalError, 35, "fail to query third-part monitor server addr", "获取第三方监控服务地址错误")
+		ec := errCodeV1(_Host, internalError, 37, "fail to query third-part monitor server addr", "获取第三方监控服务地址错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -1100,7 +1113,7 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	master := resource.NewHostManager(orm, gd.Cluster, nodes)
 	err = master.InstallNodes(ctx, horus, gd.KVClient())
 	if err != nil {
-		ec := errCodeV1(_Host, internalError, 36, "fail to install host", "主机入库错误")
+		ec := errCodeV1(_Host, internalError, 38, "fail to install host", "主机入库错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
