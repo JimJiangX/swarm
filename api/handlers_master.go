@@ -1851,7 +1851,7 @@ func postNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	if len(nodes) > 3 {
 		min += len(nodes) * 60
 	}
-	go gd.RegisterNodes(name, nodes, time.Second*time.Duration(min))
+	go gd.RegisterNodes(dc, nodes, time.Second*time.Duration(min))
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

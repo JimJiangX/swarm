@@ -69,8 +69,6 @@ type Cluster struct {
 	engineOpts      *cluster.EngineOpts
 	createRetry     int64
 	TLSConfig       *tls.Config
-
-	pendingEngineCh chan *cluster.Engine // added by fugr
 }
 
 // NewCluster is exported
@@ -88,7 +86,6 @@ func NewCluster(scheduler *scheduler.Scheduler, TLSConfig *tls.Config, discovery
 		overcommitRatio:   0.05,
 		engineOpts:        engineOptions,
 		createRetry:       0,
-		pendingEngineCh:   make(chan *cluster.Engine, 20),
 	}
 
 	if val, ok := options.Float("swarm.overcommit", ""); ok {
@@ -362,7 +359,6 @@ func (c *Cluster) validatePendingEngine(engine *cluster.Engine) bool {
 	// set engine state to healthy, and start refresh loop
 	engine.ValidationComplete()
 	c.engines[engine.ID] = engine
-	c.pendingEngineCh <- engine
 
 	log.Infof("Registered Engine %s at %s", engine.Name, engine.Addr)
 	return true

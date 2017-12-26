@@ -1166,15 +1166,12 @@ func (node *Node) distribute() (err error) {
 }
 
 // RegisterNodes register Nodes
-func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Duration) error {
-	entry := logrus.WithField("DC", name)
-
-	dc, err := gd.Datacenter(name)
-	if err != nil || dc == nil {
-		entry.WithError(err).Error("not found Dataceneter")
-
-		return err
+func (gd *Gardener) RegisterNodes(dc *Datacenter, nodes []*Node, timeout time.Duration) error {
+	if dc == nil {
+		return errors.New("Datacenter is nil")
 	}
+
+	entry := logrus.WithField("DC", dc.Name)
 
 	config, err := gd.systemConfig()
 	if err != nil {
@@ -1211,6 +1208,8 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 				continue
 			}
 
+			_entry.Debugf("Engine %s status %s", eng.ID, eng.Status())
+
 			err = initNodeStores(dc, nodes[i], eng)
 			if err == nil {
 				err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, statusNodeEnable, statusTaskDone, eng.ID, "")
@@ -1222,14 +1221,15 @@ func (gd *Gardener) RegisterNodes(name string, nodes []*Node, timeout time.Durat
 				nodes[i].engine = eng
 				nodes[i].EngineID = eng.ID
 
+				_entry.Infof("%s:Node registerd", eng.ID)
+
 			} else {
 
 				_entry.Error(err)
 
 				err = database.TxUpdateNodeRegister(nodes[i].Node, nodes[i].task, statusNodeRegisterFailed, statusTaskFailed, "", err.Error())
-				if err != nil {
-					_entry.WithError(err).Error("Node register Failed")
-				}
+
+				_entry.WithError(err).Error("Node register Failed")
 			}
 		}
 	}
@@ -1306,13 +1306,12 @@ func initNodeStores(dc *Datacenter, node *Node, eng *cluster.Engine) error {
 	node.localStore = localStore
 
 	dc.RLock()
-	if dc.store == nil || dc.store.Driver() != storage.SANStoreDriver {
-		dc.RUnlock()
-		return err
-	}
-
 	store := dc.store
 	dc.RUnlock()
+
+	if store == nil || store.Driver() != storage.SANStoreDriver {
+		return err
+	}
 
 	wwn := eng.Labels[_SAN_HBA_WWN_Lable]
 	if strings.TrimSpace(wwn) != "" {
