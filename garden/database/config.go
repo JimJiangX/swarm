@@ -49,7 +49,7 @@ type SSHDeliver struct {
 	CleanScriptName string `db:"clean_script_name" json:"clean_script_name"`
 }
 
-// DestPath returns destination abs path,pkg\script\CA
+// DestPath returns destination abs path,pkg\CA\script
 func (d SSHDeliver) DestPath() (string, string, string) {
 	base := filepath.Base(d.SourceDir)
 
