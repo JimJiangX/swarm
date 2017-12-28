@@ -40,16 +40,19 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 	var old, news baseContainer
 	var cms structs.ConfigsMap
 
-	units, err := svc.getUnits()
+	// the assigned unit being migrating
+	got, err := svc.getUnit(nameOrID)
+	if err != nil || got == nil {
+		return errors.Errorf("unit %s isnot belongs to Service %s,%+v", nameOrID, svc.Name(), err)
+	}
+
+	add, err := svc.addNewUnit(1)
 	if err != nil {
 		return err
 	}
+	news.unit = *(newUnit(add[0], svc.so, svc.cluster))
+
 	{
-		// the assigned unit being migrating
-		got := getUnit(units, nameOrID)
-		if got == nil {
-			return errors.Errorf("unit %s isnot belongs to Service %s", nameOrID, svc.Name())
-		}
 
 		lvs, err := got.uo.ListVolumesByUnitID(got.u.ID)
 		if err != nil {
@@ -91,7 +94,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 
 		actor := alloc.NewAllocator(gd.ormer, gd.Cluster)
 		adds, pendings, err := gd.scaleAllocation(ctx, svc, actor, vr, false,
-			len(units)+1, candidates, nil)
+			add, candidates, nil)
 		defer func() {
 			if err != nil {
 				_err := svc.removeUnits(ctx, adds, nil)
@@ -102,10 +105,6 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 		}()
 		if err != nil {
 			return err
-		}
-
-		if len(adds) > 0 {
-			news.unit = *adds[0]
 		}
 
 		defer func() {

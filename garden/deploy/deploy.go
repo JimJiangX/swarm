@@ -391,10 +391,10 @@ func (d *Deployment) freshServicesLink(links structs.ServicesLink) (structs.Serv
 }
 
 // ServiceScale scale service.
-func (d *Deployment) ServiceScale(ctx context.Context, nameOrID string, scale structs.ServiceScaleRequest) (string, error) {
+func (d *Deployment) ServiceScale(ctx context.Context, nameOrID string, scale structs.ServiceScaleRequest) (structs.ServiceScaleResponse, error) {
 	svc, err := d.gd.Service(nameOrID)
 	if err != nil {
-		return "", err
+		return structs.ServiceScaleResponse{}, err
 	}
 
 	actor := alloc.NewAllocator(d.gd.Ormer(), d.gd.Cluster)
