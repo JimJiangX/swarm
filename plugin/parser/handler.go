@@ -264,17 +264,26 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		}
 
 		for i := range req.Keysets {
+
 			req.Keysets[i].Value = parser.get(req.Keysets[i].Key)
+			if req.Keysets[i].Default == "" {
+				req.Keysets[i].Default = req.Keysets[i].Value
+			}
 		}
 	} else {
 		for i, ks := range req.Keysets {
-			err = parser.set(ks.Key, ks.Default)
+
+			value := ks.Value
+			if value == "" && ks.Default != "" {
+				value = ks.Default
+				req.Keysets[i].Value = req.Keysets[i].Default
+			}
+
+			err = parser.set(ks.Key, value)
 			if err != nil {
 				httpError(w, err, http.StatusInternalServerError)
 				return
 			}
-
-			req.Keysets[i].Value = req.Keysets[i].Default
 		}
 
 		out, err := parser.Marshal()
