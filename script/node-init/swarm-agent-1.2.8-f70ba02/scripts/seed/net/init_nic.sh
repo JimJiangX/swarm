@@ -204,7 +204,7 @@ then
     for vf in $VF_LIST
     do
       VF_NAME=`ls /sys/class/net/$PF_NAME/device/$vf/net/ 2>/dev/null | tr -d "\n"`
-      if [ "$VF_NAME" = $slave ]; then
+      if [ "$VF_NAME" = $IFNAME ]; then
         VF_NUM=`echo $vf | cut -c 7-`
         ip link set $PF_NAME vf $VF_NUM rate $BANDWIDTH || {
           warn "Set $IFNAME bandwidth faild"
