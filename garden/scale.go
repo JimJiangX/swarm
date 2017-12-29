@@ -25,13 +25,32 @@ import (
 //
 // 增加节点：
 //      调试准备 -- 调度 -- 分配资源 -- 创建容器 -- 启动容器与服务
-func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator, req structs.ServiceScaleRequest, async bool) (string, error) {
-	scale := func() error {
-		units, err := svc.getUnits()
+func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator, req structs.ServiceScaleRequest, async bool) (structs.ServiceScaleResponse, error) {
+	var add []database.Unit
+	resp := structs.ServiceScaleResponse{}
+
+	units, err := svc.getUnits()
+	if err != nil {
+		return resp, err
+	}
+
+	if n := req.Arch.Replicas - len(units); n > 0 {
+		add, err = svc.addNewUnit(n)
 		if err != nil {
-			return err
+			return resp, err
 		}
 
+		resp.Add = make([]structs.UnitNameID, 0, len(add))
+
+		for i := range add {
+			resp.Add = append(resp.Add, structs.UnitNameID{
+				ID:   add[i].ID,
+				Name: add[i].Name,
+			})
+		}
+	}
+
+	scale := func() error {
 		if req.Arch.Replicas == 0 || req.Arch.Replicas == len(units) {
 			return nil
 		}
@@ -39,7 +58,10 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 		if len(units) > req.Arch.Replicas {
 			err = svc.scaleDown(ctx, units, req.Arch.Replicas, gd.KVClient())
 		} else {
-			_, err = gd.scaleUp(ctx, svc, actor, req, nil, true, true, true)
+			_, err = gd.scaleUp(ctx, svc, actor, serviceScaleRequest{
+				ServiceScaleRequest: req,
+				Units:               add,
+			}, nil, true, true, true)
 		}
 		if err != nil {
 			return err
@@ -72,9 +94,11 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 	sl := tasklock.NewServiceTask(svc.ID(), svc.so, &task,
 		statusServiceScaling, statusServiceScaled, statusServiceScaleFailed)
 
-	err := sl.Run(isnotInProgress, scale, async)
+	err = sl.Run(isnotInProgress, scale, async)
 
-	return task.ID, err
+	resp.Task = task.ID
+
+	return resp, err
 }
 
 func (svc *Service) scaleDown(ctx context.Context, units []*unit, replicas int, reg kvstore.Register) error {
@@ -84,6 +108,11 @@ func (svc *Service) scaleDown(ctx context.Context, units []*unit, replicas int, 
 	rm := out[:len(units)-replicas]
 
 	return svc.removeUnits(ctx, rm, reg)
+}
+
+type serviceScaleRequest struct {
+	structs.ServiceScaleRequest
+	Units []database.Unit
 }
 
 type unitStatus struct {
@@ -151,20 +180,10 @@ func sortUnitsByContainers(units []*unit, containers cluster.Containers) []*unit
 }
 
 func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, actor alloc.Allocator,
-	vr, nr bool, replicas int, candidates []string,
+	vr, nr bool, add []database.Unit, candidates []string,
 	options map[string]interface{}) ([]*unit, []pendingUnit, error) {
 
 	err := svc.prepareSchedule(candidates, options)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	units, err := svc.getUnits()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	add, err := svc.addNewUnit(replicas - len(units))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -187,10 +206,10 @@ func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, actor alloc
 }
 
 func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocator,
-	scale structs.ServiceScaleRequest, networkings [][]database.IP, vr, nr, register bool) ([]*unit, error) {
+	scale serviceScaleRequest, networkings [][]database.IP, vr, nr, register bool) ([]*unit, error) {
 
 	units, pendings, err := gd.scaleAllocation(ctx, svc, actor, vr, nr,
-		scale.Arch.Replicas, scale.Candidates, scale.Options)
+		scale.Units, scale.Candidates, scale.Options)
 	defer func() {
 		if err != nil {
 			_err := svc.removeUnits(ctx, units, gd.kvClient)

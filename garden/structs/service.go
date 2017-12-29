@@ -165,6 +165,12 @@ type ServiceScaleRequest struct {
 	Options    map[string]interface{} `json:"opts"`
 }
 
+type ServiceScaleResponse struct {
+	Task   string       `json:"task_id"`
+	Add    []UnitNameID `json:"add_units,omitempty"`
+	Remove []UnitNameID `json:"remove_units,omitempty"`
+}
+
 type UnitRebuildRequest PostUnitMigrate
 
 type PostServiceResponse struct {

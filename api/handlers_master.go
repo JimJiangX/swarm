@@ -1820,14 +1820,14 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	d := deploy.New(gd)
 
-	id, err := d.ServiceScale(ctx, name, scale)
+	resp, err := d.ServiceScale(ctx, name, scale)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 43, "fail to scale service", "服务水平扩展错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
+	writeJSON(w, resp, http.StatusCreated)
 }
 
 func validPostServiceLinkRequest(v structs.ServicesLink) error {
