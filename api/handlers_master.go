@@ -2437,11 +2437,21 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 }
 
 func validPostServiceRestoreRequest(v structs.ServiceRestoreRequest) error {
-	if v.File != "" {
+	errs := make([]string, 0, 2)
+
+	if v.File == "" {
+		errs = append(errs, "restore file is required")
+	}
+
+	if len(v.Units) == 0 {
+		errs = append(errs, "restore unit without assigned")
+	}
+
+	if len(errs) == 0 {
 		return nil
 	}
 
-	return fmt.Errorf("ServiceRestoreRequest:%v,restore file is required", v)
+	return fmt.Errorf("ServiceRestoreRequest:%v,%s", v, errs)
 }
 
 func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
