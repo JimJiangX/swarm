@@ -24,7 +24,7 @@ import (
 // 		not exist -- removing -- dead -- exited -- created -- running
 //
 // 增加节点：
-//      调试准备 -- 调度 -- 分配资源 -- 创建容器 -- 启动容器与服务
+//      调度准备 -- 调度 -- 分配资源 -- 创建容器 -- 启动容器与服务
 func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator, req structs.ServiceScaleRequest, async bool) (structs.ServiceScaleResponse, error) {
 	var add []database.Unit
 	resp := structs.ServiceScaleResponse{}

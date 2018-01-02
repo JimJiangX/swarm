@@ -31,14 +31,17 @@ func (svc *Service) Backup(ctx context.Context, local string, config structs.Ser
 			return err
 		}
 
-		cmds, err := svc.generateUnitsCmd(ctx)
-		if err != nil {
-			return err
-		}
-
-		cmd := cmds.GetCmd(u.u.ID, structs.BackupCmd)
+		cmd := config.Cmd
 		if len(cmd) == 0 {
-			return errors.Errorf("%s:%s unsupport backup yet", u.u.Name, u.u.Type)
+			cmds, err := svc.generateUnitsCmd(ctx)
+			if err != nil {
+				return err
+			}
+
+			cmd = cmds.GetCmd(u.u.ID, structs.BackupCmd)
+			if len(cmd) == 0 {
+				return errors.Errorf("%s:%s unsupport backup yet", u.u.Name, u.u.Type)
+			}
 		}
 
 		cmd = append(cmd, local+"/v1.0/tasks/backup/callback", task.ID, u.u.ID, config.Type, config.BackupDir,

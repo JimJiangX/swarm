@@ -207,7 +207,8 @@ type ServiceBackupConfig struct {
 	BackupDir   string `json:"backup_dir"`
 	MaxSizeByte int    `json:"max_backup_space"`
 	// count by Day,used in swarm.BackupTaskCallback(),calculate BackupFile.Retention
-	FilesRetention int `json:"backup_files_retention"`
+	FilesRetention int      `json:"backup_files_retention"`
+	Cmd            []string `json:"cmd,omitempty"`
 }
 
 type ServiceRestoreRequest struct {
