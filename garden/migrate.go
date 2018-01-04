@@ -207,20 +207,22 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 	}
 	{
 		// remove old unit container & volume
+		healthy := old.engine.IsHealthy()
 		rmUnits := []*unit{&old.unit}
 
 		err = svc.removeContainers(ctx, rmUnits, false, true)
-		if err != nil {
+		if err != nil && healthy {
 			return err
 		}
 
 		if !migrate {
 			err = svc.removeVolumes(ctx, rmUnits)
-			if err != nil {
+			if err != nil && healthy {
 				return err
 			}
 		}
 	}
+
 	{
 		// rename new container name as old unit name
 		err = renameContainer(&news.unit, old.unit.u.Name)
