@@ -68,32 +68,35 @@ func (at allocator) ExpandVolumes(engine *cluster.Engine, uid string, stores []s
 }
 
 func (at allocator) MigrateVolumes(uid string, old, new *cluster.Engine, lvs []database.Volume) ([]database.Volume, error) {
-	drivers, err := driver.FindEngineVolumeDrivers(at.ormer, old)
-	if err != nil {
-		logrus.Warnf("engine:%s find volume drivers,%+v", old.Name, err)
+	if old != nil && old.IsHealthy() {
 
-		if len(drivers) == 0 {
-			return nil, err
-		}
-	}
-
-	for i := range lvs {
-		d := drivers.Get(lvs[i].DriverType)
-		if d == nil {
-			return nil, errors.New("not found the assigned volumeDriver:" + lvs[i].DriverType)
-		}
-
-		err := d.DeactivateVG(lvs[i])
+		drivers, err := driver.FindEngineVolumeDrivers(at.ormer, old)
 		if err != nil {
-			return nil, err
+			logrus.Warnf("engine:%s find volume drivers,%+v", old.Name, err)
+
+			if len(drivers) == 0 {
+				return nil, err
+			}
+		}
+
+		for i := range lvs {
+			d := drivers.Get(lvs[i].DriverType)
+			if d == nil {
+				return nil, errors.New("not found the assigned volumeDriver:" + lvs[i].DriverType)
+			}
+
+			err := d.DeactivateVG(lvs[i])
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	ndrivers, err := driver.FindEngineVolumeDrivers(at.ormer, new)
+	drivers, err := driver.FindEngineVolumeDrivers(at.ormer, new)
 	if err != nil {
 		logrus.Warnf("engine:%s find volume drivers,%+v", new.Name, err)
 
-		if len(ndrivers) == 0 {
+		if len(drivers) == 0 {
 			return nil, err
 		}
 	}
@@ -101,7 +104,7 @@ func (at allocator) MigrateVolumes(uid string, old, new *cluster.Engine, lvs []d
 	out := make([]database.Volume, 0, len(lvs))
 
 	for _, v := range lvs {
-		d := ndrivers.Get(v.DriverType)
+		d := drivers.Get(v.DriverType)
 		if d == nil {
 			return out, errors.New("not found the assigned volumeDriver:" + v.DriverType)
 		}
