@@ -458,7 +458,7 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 				}
 			}
 
-			err := actor.ExpandVolumes(pu.eng, pu.u.u.ID, pu.add)
+			err := actor.ExpandVolumes(pu.eng, pu.add)
 			if err != nil {
 				return err
 			}

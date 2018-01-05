@@ -1,8 +1,6 @@
 package alloc
 
 import (
-	"fmt"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
@@ -47,12 +45,7 @@ func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n
 	return lvs, err
 }
 
-func (at allocator) ExpandVolumes(engine *cluster.Engine, uid string, stores []structs.VolumeRequire) error {
-	sys, err := at.ormer.GetSysConfig()
-	if err != nil {
-		return err
-	}
-
+func (at allocator) ExpandVolumes(engine *cluster.Engine, stores []structs.VolumeRequire) error {
 	drivers, err := driver.FindEngineVolumeDrivers(at.ormer, engine)
 	if err != nil {
 		logrus.Warnf("engine:%s find volume drivers,%+v", engine.Name, err)
@@ -62,9 +55,7 @@ func (at allocator) ExpandVolumes(engine *cluster.Engine, uid string, stores []s
 		}
 	}
 
-	agent := fmt.Sprintf("%s:%d", engine.IP, sys.SwarmAgent)
-
-	return drivers.ExpandVolumes(uid, agent, stores)
+	return drivers.ExpandVolumes(stores)
 }
 
 func (at allocator) MigrateVolumes(uid string, old, new *cluster.Engine, lvs []database.Volume) ([]database.Volume, error) {

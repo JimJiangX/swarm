@@ -24,6 +24,7 @@ type Service struct {
 }
 
 type VolumeRequire struct {
+	ID     string `json:"-"` // used by volume expansion,Volume ID
 	From   string `json:"from,omitempty"`
 	Name   string `json:"name"`
 	Type   string `json:"type"`

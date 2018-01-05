@@ -78,7 +78,7 @@ func (nd _NFSDriver) Alloc(config *cluster.ContainerConfig, uid string, req stru
 	return nil, nil
 }
 
-func (nd _NFSDriver) Expand(dv database.Volume, size int64) error {
+func (nd _NFSDriver) Expand(_ string, size int64) error {
 	return nil
 }
 

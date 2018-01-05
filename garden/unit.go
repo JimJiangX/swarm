@@ -157,12 +157,27 @@ func (u unit) prepareExpandVolume(eng *cluster.Engine, target []structs.VolumeRe
 			}
 
 			if volumes.Get(lvs[v].Name) == nil {
+
+				// check volume size mayby changes
+				if lvs[v].Size != target[i].Size &&
+					strings.Contains(lvs[v].Name, target[i].Name) {
+
+					lvs[v].Size = target[i].Size
+
+					err := u.uo.SetVolume(lvs[v])
+					if err != nil {
+						return nil, nil, err
+					}
+				}
+
 				pending = append(pending, lvs[v])
+				continue
 			}
 
 			if strings.Contains(lvs[v].Name, target[i].Name) {
 				found = true
 
+				add[i].ID = lvs[v].ID
 				add[i].Size = target[i].Size - lvs[v].Size
 
 				if target[i].Type == "" {
