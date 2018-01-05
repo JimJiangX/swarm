@@ -520,9 +520,12 @@ func (db dbBase) GetServiceInfo(nameOrID string) (info ServiceInfo, err error) {
 			return info, err
 		}
 
-		node, err := db.GetNode(units[i].EngineID)
-		if err != nil {
-			return info, err
+		node := Node{}
+		if units[i].EngineID != "" {
+			node, err = db.GetNode(units[i].EngineID)
+			if err != nil {
+				return info, err
+			}
 		}
 
 		ips, err := db.ListIPByUnitID(units[i].ID)
