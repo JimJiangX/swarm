@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"context"
+	"golang.org/x/net/context"
 	"testing"
 
 	"github.com/docker/swarm/garden/kvstore"

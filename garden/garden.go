@@ -1,7 +1,7 @@
 package garden
 
 import (
-	"context"
+	"golang.org/x/net/context"
 	"crypto/tls"
 	"fmt"
 	"io"

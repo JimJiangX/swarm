@@ -139,6 +139,9 @@ func getImages(c *context, w http.ResponseWriter, r *http.Request) {
 
 	// Look for an engine that has all the images we need.
 	for engine, images := range engineImages {
+		if !engine.IsHealthy() {
+			continue
+		}
 		matchedImages := 0
 
 		// Count how many images we need it has.
@@ -159,7 +162,7 @@ func getImages(c *context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	httpError(w, fmt.Sprintf("Unable to find an engine containing all images: %s", names), http.StatusNotFound)
+	httpError(w, fmt.Sprintf("Unable to find a healthy engine containing all images: %s", names), http.StatusNotFound)
 }
 
 // GET /images/json
@@ -198,7 +201,21 @@ func getImagesJSON(c *context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, image := range c.cluster.Images().Filter(opts) {
+	imagesToFilter := c.cluster.Images()
+
+	// This piece of code validates that the before and since fields for the filtering
+	for _, filterType := range [2]string{"before", "since"} {
+		if opts.Filters.Include(filterType) && imagesToFilter.GetImageFromField(filterType, opts) == nil {
+			httpError(
+				w,
+				fmt.Sprintf("Invalid filter: 'type'='%s': no such image found: '%s'", filterType, opts.GetIDOrName(filterType)),
+				http.StatusBadRequest,
+			)
+			return
+		}
+	}
+
+	for _, image := range imagesToFilter.Filter(opts) {
 		if len(accepteds) != 0 {
 			found := false
 			for _, accepted := range accepteds {
@@ -467,6 +484,18 @@ func getContainersJSON(c *context, w http.ResponseWriter, r *http.Request) {
 		}
 		if !filters.Match("node", container.Engine.Name) {
 			continue
+		}
+		if !filters.ExactMatch("health", cluster.HealthString(container.Info.State)) {
+			continue
+		}
+		if filters.Include("is-task") {
+			_, isTask := container.Config.Labels["com.docker.swarm.task"]
+			if filters.ExactMatch("is-task", "true") && !isTask {
+				continue
+			}
+			if filters.ExactMatch("is-task", "false") && isTask {
+				continue
+			}
 		}
 		if filters.Include("volume") {
 			volumeExist := fmt.Errorf("volume mounted in container")

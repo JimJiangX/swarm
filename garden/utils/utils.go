@@ -2,7 +2,7 @@ package utils
 
 import (
 	"bytes"
-	"context"
+	"golang.org/x/net/context"
 	crand "crypto/rand"
 	"encoding/base64"
 	"encoding/binary"

@@ -1,7 +1,7 @@
 package alloc
 
 import (
-	"context"
+	"golang.org/x/net/context"
 	"net"
 	"strconv"
 	"strings"
