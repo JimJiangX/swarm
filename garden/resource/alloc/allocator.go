@@ -1,7 +1,7 @@
 package alloc
 
 import (
-	"context"
+	"golang.org/x/net/context"
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
