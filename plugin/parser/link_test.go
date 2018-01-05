@@ -1,11 +1,11 @@
 package parser
 
 import (
-	"golang.org/x/net/context"
 	"testing"
 
 	"github.com/docker/swarm/garden/kvstore"
 	"github.com/docker/swarm/garden/structs"
+	"golang.org/x/net/context"
 )
 
 func TestLinkFactory(t *testing.T) {

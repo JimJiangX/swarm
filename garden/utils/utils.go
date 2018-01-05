@@ -2,7 +2,6 @@ package utils
 
 import (
 	"bytes"
-	"golang.org/x/net/context"
 	crand "crypto/rand"
 	"encoding/base64"
 	"encoding/binary"
@@ -18,6 +17,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 // Generate8UUID is used to generate a random UUID,lenth of string is 8

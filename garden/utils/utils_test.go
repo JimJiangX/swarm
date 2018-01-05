@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"golang.org/x/net/context"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -9,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 func TestGenerateUUID(t *testing.T) {

@@ -1,7 +1,6 @@
 package garden
 
 import (
-	"golang.org/x/net/context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -21,6 +20,7 @@ import (
 	"github.com/docker/swarm/scheduler"
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 type notFoundError struct {

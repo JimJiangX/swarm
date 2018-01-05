@@ -1,7 +1,6 @@
 package alloc
 
 import (
-	"golang.org/x/net/context"
 	"net"
 	"strconv"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/docker/swarm/garden/utils"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 type engineCluster interface {

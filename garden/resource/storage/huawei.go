@@ -44,7 +44,7 @@ func (h huaweiStore) scriptPath(file string) (string, error) {
 // NewHuaweiStore returns a new huawei store
 func newHuaweiStore(orm database.StorageOrmer, script string, san database.SANStorage) Store {
 	hw := huawei{
-	// TODO:
+		// TODO:
 	}
 	return &huaweiStore{
 		lock:   new(sync.RWMutex),
@@ -84,7 +84,7 @@ func (h *huaweiStore) ping() error {
 
 func (h *huaweiStore) insert() error {
 	san := database.SANStorage{
-	// TODO:
+		// TODO:
 	}
 	h.lock.Lock()
 	err := h.orm.InsertSANStorage(san)
