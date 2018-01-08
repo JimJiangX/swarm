@@ -35,6 +35,7 @@ const (
 	clusterLabel          = "cluster"
 	serviceTagLabel       = "service.tag"
 	sanLabel              = "SAN_ID"
+	maxContainerLable     = "containerslots" // scheduler/filter/slots.go
 	networkPartitionLable = "network_partition"
 )
 
@@ -202,6 +203,7 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 				n.Labels[roomLabel] = out[o].Room
 				n.Labels[seatLabel] = out[o].Seat
 				n.Labels[sanLabel] = out[o].Storage
+				//	n.Labels[maxContainerLable] = strconv.Itoa(out[o].MaxContainer)
 
 				if out[o].ClusterID != clusterID {
 					for c := range clusters {

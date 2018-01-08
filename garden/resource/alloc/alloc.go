@@ -62,12 +62,23 @@ nodes:
 			}
 		}
 
-		engine := at.ec.Engine(nodes[i].EngineID)
-		if engine == nil || !engine.IsHealthy() {
+		eng := at.ec.Engine(nodes[i].EngineID)
+		if eng == nil {
+			logrus.Debugf("node:%s not found Engine,%s", nodes[i].Addr, nodes[i].EngineID)
 			continue nodes
 		}
 
-		err := at.IsNodeStoreEnough(engine, stores)
+		if !eng.IsHealthy() {
+			logrus.Debugf("node:%s Engine unhealthy", nodes[i].EngineID)
+			continue nodes
+		}
+
+		if n := len(eng.Containers()); n >= nodes[i].MaxContainer {
+			logrus.Debugf("node:%s container num limit(%d>=%d)", nodes[i].EngineID, n, nodes[i].MaxContainer)
+			continue nodes
+		}
+
+		err := at.IsNodeStoreEnough(eng, stores)
 		if err != nil {
 			logrus.Debugf("node %s %+v", nodes[i].Addr, err)
 			continue
