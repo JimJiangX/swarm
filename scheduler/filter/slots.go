@@ -48,5 +48,5 @@ func (f *SlotsFilter) Filter(_ *cluster.ContainerConfig, nodes []*node.Node, _ b
 
 // GetFilters returns just the info that this node failed, because there where no free slots
 func (f *SlotsFilter) GetFilters(config *cluster.ContainerConfig) ([]string, error) {
-	return []string{"available container slots"}, nil
+	return nil, nil
 }
