@@ -494,6 +494,7 @@ func engineCreateVolume(eng *cluster.Engine, lv database.Volume) error {
 }
 
 // InitStart start container & exec start service command,exec init-start service command if the first start.
+// unitID is the specified unit ID or name which is going to start.
 // register services to consul or other third part auto-service discovery server.
 func (svc *Service) InitStart(ctx context.Context, unitID string, kvc kvstore.Client, configs structs.ConfigsMap, task *database.Task, async bool, args map[string]interface{}) error {
 	var units []*unit
@@ -760,10 +761,21 @@ func (svc *Service) UpdateUnitConfig(ctx context.Context, nameOrID, path, conten
 }
 
 // Stop stop units services,stop container if containers is true.
-func (svc *Service) Stop(ctx context.Context, containers, async bool, task *database.Task) error {
+// unitID is the specified unit ID or name which is going to start.
+func (svc *Service) Stop(ctx context.Context, unitID string, containers, async bool, task *database.Task) error {
+	var units []*unit
+
+	if unitID != "" {
+		u, err := svc.getUnit(unitID)
+		if err != nil {
+			return err
+		}
+
+		units = []*unit{u}
+	}
 
 	stop := func() error {
-		return svc.stop(ctx, nil, containers)
+		return svc.stop(ctx, units, containers)
 	}
 
 	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,

@@ -2291,7 +2291,14 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 }
 
 func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Service, urlParamError, 111, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
 	name := mux.Vars(r)["name"]
+	unit := mux.Vars(r)["unit"]
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
@@ -2303,7 +2310,7 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	svc, err := gd.Service(name)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 111, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 112, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2317,9 +2324,9 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	task := database.NewTask(svc.Name(), database.ServiceStopTask, svc.ID(), "", nil, 300)
 
-	err = svc.Stop(ctx, true, true, &task)
+	err = svc.Stop(ctx, unit, true, true, &task)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 112, "fail to stop service", "服务关闭错误")
+		ec := errCodeV1(_Service, internalError, 113, "fail to stop service", "服务关闭错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
