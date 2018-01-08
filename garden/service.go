@@ -495,7 +495,15 @@ func engineCreateVolume(eng *cluster.Engine, lv database.Volume) error {
 
 // InitStart start container & exec start service command,exec init-start service command if the first start.
 // register services to consul or other third part auto-service discovery server.
-func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs structs.ConfigsMap, task *database.Task, async bool, args map[string]interface{}) error {
+func (svc *Service) InitStart(ctx context.Context, unitID string, kvc kvstore.Client, configs structs.ConfigsMap, task *database.Task, async bool, args map[string]interface{}) error {
+	var units []*unit
+	if unitID != "" {
+		u, err := svc.getUnit(unitID)
+		if err != nil {
+			return err
+		}
+		units = []*unit{u}
+	}
 
 	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
 		statusInitServiceStarting, statusInitServiceStarted, statusInitServiceStartFailed)
@@ -503,7 +511,7 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 	val, err := sl.Load()
 	if err == nil {
 		if val > statusInitServiceStartFailed {
-			return svc.Start(ctx, task, async, configs.Commands())
+			return svc.Start(ctx, units, task, async, configs.Commands())
 		}
 	}
 
@@ -515,7 +523,7 @@ func (svc *Service) InitStart(ctx context.Context, kvc kvstore.Client, configs s
 	}
 
 	return sl.Run(check, func() error {
-		return svc.initStart(ctx, nil, kvc, configs, args)
+		return svc.initStart(ctx, units, kvc, configs, args)
 	}, async)
 }
 
@@ -665,9 +673,9 @@ func (svc *Service) start(ctx context.Context, units []*unit, cmds structs.Comma
 }
 
 // Start start containers and services
-func (svc *Service) Start(ctx context.Context, task *database.Task, detach bool, cmds structs.Commands) error {
+func (svc *Service) Start(ctx context.Context, units []*unit, task *database.Task, detach bool, cmds structs.Commands) error {
 	start := func() error {
-		return svc.start(ctx, nil, cmds)
+		return svc.start(ctx, units, cmds)
 	}
 
 	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,

@@ -154,7 +154,7 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bo
 		return err
 	}
 
-	err = svc.InitStart(ctx, d.gd.KVClient(), nil, nil, false, nil)
+	err = svc.InitStart(ctx, "", d.gd.KVClient(), nil, nil, false, nil)
 	if err != nil {
 		return err
 	}

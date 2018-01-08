@@ -2000,7 +2000,14 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 }
 
 func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Service, urlParamError, 81, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
 	name := mux.Vars(r)["name"]
+	unit := mux.Vars(r)["unit"]
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
@@ -2012,7 +2019,7 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	svc, err := gd.Service(name)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 81, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 82, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2026,9 +2033,9 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	task := database.NewTask(svc.Name(), database.ServiceStartTask, svc.ID(), "", nil, 300)
 
-	err = svc.InitStart(ctx, gd.KVClient(), nil, &task, true, nil)
+	err = svc.InitStart(ctx, unit, gd.KVClient(), nil, &task, true, nil)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 82, "fail to init start service", "服务初始化启动错误")
+		ec := errCodeV1(_Service, internalError, 83, "fail to init start service", "服务初始化启动错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
