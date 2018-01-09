@@ -274,6 +274,40 @@ func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	return
 }
 
+func addContainerConfigConstraint(config *cluster.ContainerConfig, opts scheduleOption, isSAN bool) {
+	for i := range opts.Nodes.Constraints {
+		if opts.Nodes.Constraints[i] != "" {
+			config.AddConstraint(opts.Nodes.Constraints[i])
+		}
+	}
+
+	if len(opts.Nodes.Filters) > 0 {
+		tmp := make([]string, 0, len(opts.Nodes.Filters))
+		for i := range opts.Nodes.Filters {
+			if opts.Nodes.Filters[i] != "" {
+				tmp = append(tmp, opts.Nodes.Filters[i])
+			}
+		}
+
+		config.AddConstraint(nodeLabel + "!=" + strings.Join(tmp, "|"))
+	}
+
+	if len(opts.Nodes.Clusters) > 0 {
+		tmp := make([]string, 0, len(opts.Nodes.Clusters))
+		for i := range opts.Nodes.Clusters {
+			if opts.Nodes.Clusters[i] != "" {
+				tmp = append(tmp, opts.Nodes.Clusters[i])
+			}
+		}
+
+		config.AddConstraint(clusterLabel + "==" + strings.Join(tmp, "|"))
+	}
+
+	if isSAN {
+		config.AddConstraint(sanLabel + `!=""`)
+	}
+}
+
 func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Service,
 	units []database.Unit, vr, nr bool) (ready []pendingUnit, err error) {
 
@@ -302,20 +336,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	config.Config.Labels["mgm.image.id"] = svc.spec.Image.ID
 	config.Config.Labels[serviceTagLabel] = svc.svc.Tag
 
-	{
-		for i := range opts.Nodes.Constraints {
-			config.AddConstraint(opts.Nodes.Constraints[i])
-		}
-		if len(opts.Nodes.Filters) > 0 {
-			config.AddConstraint(nodeLabel + "!=" + strings.Join(opts.Nodes.Filters, "|"))
-		}
-		if out := opts.Nodes.Clusters; len(out) > 0 {
-			config.AddConstraint(clusterLabel + "==" + strings.Join(out, "|"))
-		}
-		if isSAN {
-			config.AddConstraint(sanLabel + `!=""`)
-		}
-	}
+	addContainerConfigConstraint(config, opts, isSAN)
 
 	gd.Lock()
 	defer gd.Unlock()

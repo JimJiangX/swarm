@@ -342,7 +342,14 @@ func (svc *Service) scheduleOptionsByUnits(opts scheduleOption, refer string, ca
 	var unit *unit
 
 	if len(candidates) > 0 {
-		constraints := fmt.Sprintf("%s==%s", engineLabel, strings.Join(candidates, "|"))
+		tmp := make([]string, 0, len(candidates))
+		for i := range candidates {
+			if candidates[i] != "" {
+				tmp = append(tmp, candidates[i])
+			}
+		}
+
+		constraints := fmt.Sprintf("%s==%s", engineLabel, strings.Join(tmp, "|"))
 		opts.Nodes.Constraints = append(opts.Nodes.Constraints, constraints)
 		opts.Nodes.Filters = nil
 	} else {
