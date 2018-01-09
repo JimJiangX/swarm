@@ -361,8 +361,12 @@ func (svc *Service) scheduleOptionsByUnits(opts scheduleOption, refer string, ca
 		opts.Nodes.Filters = append(opts.Nodes.Filters, filters...)
 	}
 
-	if unit == nil || unit.u.EngineID == "" {
+	if unit == nil && refer == "" {
 		return opts, nil
+	}
+
+	if unit == nil || unit.u.EngineID == "" {
+		return opts, errors.Errorf("not found unit or engine by '%s'", refer)
 	}
 
 	node, err := unit.uo.GetNode(unit.u.EngineID)
