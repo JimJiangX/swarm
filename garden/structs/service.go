@@ -218,6 +218,7 @@ type ServiceRestoreRequest struct {
 }
 
 type PostUnitMigrate struct {
+	Compose    bool     `json:"compose"`
 	NameOrID   string   `json:"nameOrID"`
 	Candidates []string `json:"candidates,omitempty"`
 }

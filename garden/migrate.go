@@ -24,7 +24,7 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, req structs.
 		statusServiceUnitMigrating, statusServiceUnitMigrated, statusServiceUnitMigrateFailed)
 
 	err := sl.Run(isnotInProgress, func() error {
-		return gd.rebuildUnit(ctx, svc, req.NameOrID, req.Candidates, true)
+		return gd.rebuildUnit(ctx, svc, req.NameOrID, req.Candidates, true, req.Compose)
 	}, async)
 
 	return task.ID, err
@@ -80,7 +80,7 @@ func getUnitBaseContainer(ctx context.Context, svc *Service, unit string, kvc kv
 	return base, err
 }
 
-func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string, candidates []string, migrate bool) error {
+func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string, candidates []string, migrate, compose bool) error {
 	var news baseContainer
 	var cms structs.ConfigsMap
 
@@ -254,7 +254,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 		}
 	}
 
-	// 10.register to third-part system,compose
+	// 10.register to third-part system
 	{
 		u, err := svc.getUnit(old.unit.u.ID)
 		if err != nil {
@@ -270,7 +270,10 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 		if err != nil {
 			return err
 		}
+	}
 
+	// 11.compose
+	if compose {
 		err = svc.Compose(ctx, gd.pluginClient)
 		if err != nil {
 			return err

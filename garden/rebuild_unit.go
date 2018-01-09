@@ -20,7 +20,7 @@ func (gd *Garden) RebuildUnits(ctx context.Context, actor alloc.Allocator, svc *
 		statusServiceUnitRebuilding, statusServiceUnitRebuilt, statusServiceUnitRebuildFailed)
 
 	err := sl.Run(isnotInProgress, func() error {
-		return gd.rebuildUnit(ctx, svc, req.NameOrID, req.Candidates, false)
+		return gd.rebuildUnit(ctx, svc, req.NameOrID, req.Candidates, false, req.Compose)
 	}, async)
 
 	return task.ID, err
