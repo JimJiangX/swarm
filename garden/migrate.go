@@ -128,6 +128,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 		if len(pendings) == 0 {
 			return errors.New("scaleAlloc:allocation failed")
 		} else {
+			news.unit = *adds[0]
 			news.unit.u = pendings[0].Unit
 			news.engine = news.unit.getEngine()
 		}
