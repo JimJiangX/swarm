@@ -280,20 +280,8 @@ func (svc *Service) prevSchedule(candidates []string, refer string, options map[
 		return err
 	}
 
-	if len(candidates) > 0 {
-		constraints := fmt.Sprintf("%s==%s", engineLabel, strings.Join(candidates, "|"))
-		svc.options.Nodes.Constraints = append(svc.options.Nodes.Constraints, constraints)
-	}
-
-	units, err := svc.getUnits()
-	if err != nil {
-		return err
-	}
-
-	u := getUnit(units, refer)
-
 	// adjust scheduleOption by unit
-	svc.options, err = scheduleOptionsByUnits(opts, units, u, len(candidates) <= 0)
+	svc.options, err = svc.scheduleOptionsByUnits(opts, refer, candidates)
 	if err != nil {
 		logrus.WithField("Service preSchedule", svc.Name()).Warnf("%+v", err)
 	}
@@ -350,27 +338,27 @@ func (svc *Service) getScheduleOption() (scheduleOption, error) {
 
 // scheduleOptionsByUnits adjust opts value by reference unit
 // recommend ignore errors
-func scheduleOptionsByUnits(opts scheduleOption, units []*unit, unit *unit, filter bool) (scheduleOption, error) {
-	if len(units) == 0 {
-		return opts, nil
-	}
+func (svc *Service) scheduleOptionsByUnits(opts scheduleOption, refer string, candidates []string) (scheduleOption, error) {
+	var unit *unit
 
-	if filter {
+	if len(candidates) > 0 {
+		constraints := fmt.Sprintf("%s==%s", engineLabel, strings.Join(candidates, "|"))
+		opts.Nodes.Constraints = append(opts.Nodes.Constraints, constraints)
+		opts.Nodes.Filters = nil
+	} else {
+		units, err := svc.getUnits()
+		if err != nil {
+			return opts, err
+		}
+
+		unit = getUnit(units, refer)
+
 		filters := make([]string, 0, len(units))
 		for i := range units {
 			filters = append(filters, units[i].u.EngineID)
 		}
 
 		opts.Nodes.Filters = append(opts.Nodes.Filters, filters...)
-	}
-
-	if unit == nil || unit.u.EngineID == "" {
-		for i := range units {
-			if units[i].u.EngineID != "" {
-				unit = units[i]
-				break
-			}
-		}
 	}
 
 	if unit == nil || unit.u.EngineID == "" {
