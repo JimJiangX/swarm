@@ -1,7 +1,6 @@
 package garden
 
 import (
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/structs"
@@ -27,6 +26,7 @@ func (gd *Garden) RebuildUnits(ctx context.Context, actor alloc.Allocator, svc *
 	return task.ID, err
 }
 
+/*
 func migrateUnits(adds, rm []*unit, networkings [][]database.IP) error {
 	type migrate struct {
 		src, dest *unit
@@ -77,6 +77,7 @@ high:
 
 	return nil
 }
+*/
 
 func renameContainer(u *unit, name string) error {
 	e := u.getEngine()

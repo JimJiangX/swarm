@@ -183,14 +183,14 @@ func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, actor alloc
 	vr, nr bool, add []database.Unit, candidates []string,
 	options map[string]interface{}) ([]*unit, []pendingUnit, error) {
 
-	err := svc.prepareSchedule(candidates, options)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	adds := make([]*unit, len(add))
 	for i := range add {
 		adds[i] = newUnit(add[i], svc.so, svc.cluster)
+	}
+
+	err := svc.prepareSchedule(candidates, options)
+	if err != nil {
+		return adds, nil, err
 	}
 
 	pendings, err := gd.allocation(ctx, actor, svc, add, vr, nr)
