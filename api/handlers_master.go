@@ -1776,12 +1776,23 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func validPostServiceScaledRequest(v structs.ServiceScaleRequest) error {
+	errs := make([]string, 0, 2)
 
 	if v.Arch.Code == "" || v.Arch.Mode == "" || v.Arch.Replicas == 0 {
-		return fmt.Errorf("Arch invalid,%+v", v.Arch)
+		errs = append(errs, fmt.Sprintf("Arch invalid,%+v", v.Arch))
 	}
 
-	return nil
+	for i := range v.Candidates {
+		if v.Candidates[i] == "" {
+			errs = append(errs, "Candidate value is null")
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("ServiceScaleRequest:%v,%s", v, errs)
 }
 
 func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2518,11 +2529,23 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 }
 
 func validPostUnitRebuildRequest(v structs.UnitRebuildRequest) error {
+	errs := make([]string, 0, 2)
+
 	if v.NameOrID == "" {
-		return stderr.New("Unit name or ID is required")
+		errs = append(errs, "Unit name or ID is required")
 	}
 
-	return nil
+	for i := range v.Candidates {
+		if v.Candidates[i] == "" {
+			errs = append(errs, "Candidate value is null")
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("UnitRebuildRequest:%v,%s", v, errs)
 }
 
 func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2577,11 +2600,23 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 }
 
 func validPostUnitMigrateRequest(v structs.PostUnitMigrate) error {
+	errs := make([]string, 0, 2)
+
 	if v.NameOrID == "" {
-		return stderr.New("Unit name or ID is required")
+		errs = append(errs, "Unit name or ID is required")
 	}
 
-	return nil
+	for i := range v.Candidates {
+		if v.Candidates[i] == "" {
+			errs = append(errs, "Candidate value is null")
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("PostUnitMigrate:%v,%s", v, errs)
 }
 
 func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
