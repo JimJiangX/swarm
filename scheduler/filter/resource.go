@@ -1,11 +1,17 @@
 package filter
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
+)
+
+var (
+	// ErrNoNodeWithFreeSlotsAvailable is exported
+	ErrNoNodeWithFreeResourceAvailable = errors.New("No node with enough resource available in the cluster")
 )
 
 // ResourceFilter selects only nodes have enough CPU & memory resource.
@@ -35,6 +41,10 @@ func (f *ResourceFilter) Filter(config *cluster.ContainerConfig, nodes []*node.N
 		}
 
 		out = append(out, n)
+	}
+
+	if len(out) == 0 {
+		return nil, ErrNoNodeWithFreeResourceAvailable
 	}
 
 	return out, nil
