@@ -1,5 +1,4 @@
 #!/bin/bash
-ip=146.32.33.17
 root_user=cup_dba
 root_pwd=AN8uRFhY
 mon_user=db_aasmn
