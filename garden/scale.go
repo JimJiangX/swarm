@@ -179,7 +179,8 @@ func sortUnitsByContainers(units []*unit, containers cluster.Containers) []*unit
 	return out
 }
 
-func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, actor alloc.Allocator,
+func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, refer string,
+	actor alloc.Allocator,
 	vr, nr bool, add []database.Unit, candidates []string,
 	options map[string]interface{}) ([]*unit, []pendingUnit, error) {
 
@@ -188,7 +189,7 @@ func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, actor alloc
 		adds[i] = newUnit(add[i], svc.so, svc.cluster)
 	}
 
-	err := svc.prepareSchedule(candidates, options)
+	err := svc.prepareSchedule(candidates, refer, options)
 	if err != nil {
 		return adds, nil, err
 	}
@@ -208,7 +209,7 @@ func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, actor alloc
 func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocator,
 	scale serviceScaleRequest, networkings [][]database.IP, vr, nr, register bool) ([]*unit, error) {
 
-	units, pendings, err := gd.scaleAllocation(ctx, svc, actor, vr, nr,
+	units, pendings, err := gd.scaleAllocation(ctx, svc, "", actor, vr, nr,
 		scale.Units, scale.Candidates, scale.Options)
 	defer func() {
 		if err != nil {
@@ -267,7 +268,7 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 	return units, err
 }
 
-func (svc *Service) prepareSchedule(candidates []string, options map[string]interface{}) error {
+func (svc *Service) prepareSchedule(candidates []string, refer string, options map[string]interface{}) error {
 	spec, err := svc.RefreshSpec()
 	if err != nil {
 		return err
@@ -288,8 +289,10 @@ func (svc *Service) prepareSchedule(candidates []string, options map[string]inte
 		return err
 	}
 
+	u := getUnit(units, refer)
+
 	// adjust scheduleOption by unit
-	svc.options, err = scheduleOptionsByUnits(opts, units, len(candidates) <= 0)
+	svc.options, err = scheduleOptionsByUnits(opts, units, u, len(candidates) <= 0)
 	if err != nil {
 		return err
 	}
@@ -344,12 +347,18 @@ func (svc *Service) getScheduleOption() (scheduleOption, error) {
 	return svc.options, err
 }
 
-func scheduleOptionsByUnits(opts scheduleOption, units []*unit, filter bool) (scheduleOption, error) {
+func scheduleOptionsByUnits(opts scheduleOption, units []*unit, unit *unit, filter bool) (scheduleOption, error) {
 	if len(units) == 0 {
 		return opts, nil
 	}
 
-	unit := units[0]
+	if unit == nil {
+		for i := range units {
+			if units[i].u.EngineID != "" {
+				unit = units[i]
+			}
+		}
+	}
 
 	node, err := unit.uo.GetNode(unit.u.EngineID)
 	if err != nil {

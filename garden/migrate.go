@@ -105,7 +105,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 
 		// 3.alloc new node for new unit
 		actor := alloc.NewAllocator(gd.ormer, gd.Cluster)
-		adds, pendings, err := gd.scaleAllocation(ctx, svc, actor, vr, false,
+		adds, pendings, err := gd.scaleAllocation(ctx, svc, nameOrID, actor, vr, false,
 			add, candidates, nil)
 
 		defer func() {
