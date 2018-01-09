@@ -355,7 +355,9 @@ func (svc *Service) scheduleOptionsByUnits(opts scheduleOption, refer string, ca
 
 		filters := make([]string, 0, len(units))
 		for i := range units {
-			filters = append(filters, units[i].u.EngineID)
+			if units[i].u.EngineID != "" {
+				filters = append(filters, units[i].u.EngineID)
+			}
 		}
 
 		opts.Nodes.Filters = append(opts.Nodes.Filters, filters...)
