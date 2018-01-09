@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
@@ -189,7 +190,7 @@ func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, refer strin
 		adds[i] = newUnit(add[i], svc.so, svc.cluster)
 	}
 
-	err := svc.prepareSchedule(candidates, refer, options)
+	err := svc.prevSchedule(candidates, refer, options)
 	if err != nil {
 		return adds, nil, err
 	}
@@ -268,7 +269,7 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 	return units, err
 }
 
-func (svc *Service) prepareSchedule(candidates []string, refer string, options map[string]interface{}) error {
+func (svc *Service) prevSchedule(candidates []string, refer string, options map[string]interface{}) error {
 	spec, err := svc.RefreshSpec()
 	if err != nil {
 		return err
@@ -294,7 +295,7 @@ func (svc *Service) prepareSchedule(candidates []string, refer string, options m
 	// adjust scheduleOption by unit
 	svc.options, err = scheduleOptionsByUnits(opts, units, u, len(candidates) <= 0)
 	if err != nil {
-		return err
+		logrus.WithField("Service preSchedule", svc.Name()).Warnf("%+v", err)
 	}
 
 	if spec.Options == nil && options != nil {
@@ -347,17 +348,33 @@ func (svc *Service) getScheduleOption() (scheduleOption, error) {
 	return svc.options, err
 }
 
+// scheduleOptionsByUnits adjust opts value by reference unit
+// recommend ignore errors
 func scheduleOptionsByUnits(opts scheduleOption, units []*unit, unit *unit, filter bool) (scheduleOption, error) {
 	if len(units) == 0 {
 		return opts, nil
 	}
 
-	if unit == nil {
+	if filter {
+		filters := make([]string, 0, len(units))
+		for i := range units {
+			filters = append(filters, units[i].u.EngineID)
+		}
+
+		opts.Nodes.Filters = append(opts.Nodes.Filters, filters...)
+	}
+
+	if unit == nil || unit.u.EngineID == "" {
 		for i := range units {
 			if units[i].u.EngineID != "" {
 				unit = units[i]
+				break
 			}
 		}
+	}
+
+	if unit == nil || unit.u.EngineID == "" {
+		return opts, nil
 	}
 
 	node, err := unit.uo.GetNode(unit.u.EngineID)
@@ -390,15 +407,6 @@ func scheduleOptionsByUnits(opts scheduleOption, units []*unit, unit *unit, filt
 		}
 
 		opts.Nodes.Networkings = map[string][]string{node.ClusterID: ids}
-	}
-
-	if filter {
-		filters := make([]string, 0, len(units))
-		for i := range units {
-			filters = append(filters, units[i].u.EngineID)
-		}
-
-		opts.Nodes.Filters = append(opts.Nodes.Filters, filters...)
 	}
 
 	return opts, err
