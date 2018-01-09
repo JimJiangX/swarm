@@ -97,17 +97,6 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			return err
 		}
 
-		// required alloc new volume
-		vr := true
-		if migrate {
-			vr = false
-		}
-
-		// 3.alloc new node for new unit
-		actor := alloc.NewAllocator(gd.ormer, gd.Cluster)
-		adds, pendings, err := gd.scaleAllocation(ctx, svc, nameOrID, actor, vr, false,
-			add, candidates, nil)
-
 		defer func() {
 			if err != nil {
 				_err := svc.removeUnits(ctx, adds, nil)
@@ -121,6 +110,17 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 				}
 			}
 		}()
+
+		// required alloc new volume
+		vr := true
+		if migrate {
+			vr = false
+		}
+
+		// 3.alloc new node for new unit
+		actor := alloc.NewAllocator(gd.ormer, gd.Cluster)
+		adds, pendings, err := gd.scaleAllocation(ctx, svc, nameOrID, actor, vr, false,
+			add, candidates, nil)
 		if err != nil {
 			return err
 		}
