@@ -274,7 +274,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 
 	// 11.compose
 	if compose {
-		err = svc.Compose(ctx, gd.pluginClient)
+		err := svc.Compose(ctx, gd.pluginClient)
 		if err != nil {
 			return err
 		}
