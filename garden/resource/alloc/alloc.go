@@ -48,6 +48,11 @@ func (at allocator) ListCandidates(clusters, filters []string, stores []structs.
 		return nil, err
 	}
 
+	filterMap := make(map[string]struct{}, len(filters))
+	for i := range filters {
+		filterMap[filters[i]] = struct{}{}
+	}
+
 	out := make([]database.Node, 0, len(nodes))
 
 nodes:
@@ -56,10 +61,12 @@ nodes:
 			continue
 		}
 
-		for f := range filters {
-			if nodes[i].ID == filters[f] || nodes[i].EngineID == filters[f] {
-				continue nodes
-			}
+		if _, ok := filterMap[nodes[i].ID]; ok {
+			continue nodes
+		}
+
+		if _, ok := filterMap[nodes[i].EngineID]; ok {
+			continue nodes
 		}
 
 		eng := at.ec.Engine(nodes[i].EngineID)

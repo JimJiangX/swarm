@@ -171,57 +171,13 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 		return nil, errors.New("no one node that satisfies")
 	}
 
-	engines := make([]string, 0, len(out))
-	for i := range out {
-		if out[i].EngineID != "" {
-			engines = append(engines, out[i].EngineID)
-		}
-	}
-
-	clusters, err := gd.Ormer().ListClusters()
+	nodes, err := setNodesWithLable(out, gd.Cluster, gd.Ormer())
 	if err != nil {
 		return nil, err
 	}
-	if len(clusters) == 0 {
-		return nil, errors.New("List Cluster result empty")
-	}
 
-	clusterID, partition := clusters[0].ID, clusters[0].NetworkPartition
-	list := gd.Cluster.ListEngines(engines...)
-	nodes := make([]*node.Node, 0, len(list))
-	for i := range list {
-		n := node.NewNode(list[i])
-
-		for o := range out {
-			if out[o].EngineID == n.ID {
-				if n.Labels == nil {
-					n.Labels = make(map[string]string, 5)
-				}
-
-				n.Labels[clusterLabel] = out[o].ClusterID
-				n.Labels[nodeLabel] = out[o].ID
-				n.Labels[roomLabel] = out[o].Room
-				n.Labels[seatLabel] = out[o].Seat
-				n.Labels[sanLabel] = out[o].Storage
-				//	n.Labels[maxContainerLable] = strconv.Itoa(out[o].MaxContainer)
-
-				if out[o].ClusterID != clusterID {
-					for c := range clusters {
-						if clusters[c].ID == out[o].ClusterID {
-							partition = clusters[c].NetworkPartition
-							clusterID = clusters[c].ID
-							break
-						}
-					}
-				}
-
-				n.Labels[networkPartitionLable] = partition
-
-				break
-			}
-		}
-
-		nodes = append(nodes, n)
+	if len(nodes) == 0 {
+		return nil, errors.New("no one node that satisfies")
 	}
 
 	select {
@@ -233,6 +189,59 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 	nodes, err = _scheduler.SelectNodesForContainer(nodes, config)
 	if err != nil {
 		return nil, errors.WithStack(err)
+	}
+
+	return nodes, nil
+}
+
+func setNodesWithLable(out []database.Node, cl cluster.Cluster, iface database.ClusterIface) ([]*node.Node, error) {
+	clusters, err := iface.ListClusters()
+	if err != nil {
+		return nil, err
+	}
+	if len(clusters) == 0 {
+		return nil, errors.New("List Cluster result empty")
+	}
+
+	clusterMap := make(map[string]string, len(clusters))
+	for i := range clusters {
+		clusterMap[clusters[i].ID] = clusters[i].NetworkPartition
+	}
+
+	nodeMap := make(map[string]database.Node, len(out))
+	ids := make([]string, 0, len(out))
+	for i := range out {
+		if out[i].EngineID == "" {
+			continue
+		}
+
+		nodeMap[out[i].EngineID] = out[i]
+		ids = append(ids, out[i].EngineID)
+	}
+
+	engines := cl.ListEngines(ids...)
+	nodes := make([]*node.Node, 0, len(engines))
+
+	for i := range engines {
+		n := node.NewNode(engines[i])
+		nt, ok := nodeMap[n.ID]
+		if !ok {
+			continue
+		}
+
+		if n.Labels == nil {
+			n.Labels = make(map[string]string, 5)
+		}
+
+		n.Labels[clusterLabel] = nt.ClusterID
+		n.Labels[nodeLabel] = nt.ID
+		n.Labels[roomLabel] = nt.Room
+		n.Labels[seatLabel] = nt.Seat
+		n.Labels[sanLabel] = nt.Storage
+		n.Labels[networkPartitionLable] = clusterMap[nt.ClusterID]
+		//	n.Labels[maxContainerLable] = strconv.Itoa(nt.MaxContainer)
+
+		nodes = append(nodes, n)
 	}
 
 	return nodes, nil
