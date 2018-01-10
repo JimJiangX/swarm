@@ -62,7 +62,7 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 			_, err = gd.scaleUp(ctx, svc, actor, serviceScaleRequest{
 				ServiceScaleRequest: req,
 				Units:               add,
-			}, nil, true, true, true)
+			})
 		}
 		if err != nil {
 			return err
@@ -207,10 +207,10 @@ func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, refer strin
 	return adds, pendings, err
 }
 
-func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocator,
-	scale serviceScaleRequest, networkings [][]database.IP, vr, nr, register bool) ([]*unit, error) {
+func (gd *Garden) scaleUp(ctx context.Context, svc *Service,
+	actor alloc.Allocator, scale serviceScaleRequest) ([]*unit, error) {
 
-	units, pendings, err := gd.scaleAllocation(ctx, svc, "", actor, vr, nr,
+	units, pendings, err := gd.scaleAllocation(ctx, svc, "", actor, true, true,
 		scale.Units, scale.Candidates, scale.Options)
 	defer func() {
 		if err != nil {
@@ -223,31 +223,6 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 	if err != nil {
 		return units, err
 	}
-	if !nr && len(networkings) > 0 {
-		if len(pendings) > len(networkings) {
-			return units, errors.Errorf("not enough networkings for addition units")
-		}
-
-		defer func() {
-			if err != nil {
-				list := make([]database.IP, 0, len(networkings)*2)
-				for i := range networkings {
-					list = append(list, networkings[i]...)
-				}
-				_err := svc.so.SetIPs(list)
-				if _err != nil {
-					err = errors.Errorf("%+v recover networking settings error:%+v", err, _err)
-				}
-			}
-		}()
-
-		for i, pu := range pendings {
-			pendings[i].networkings, err = actor.AllocDevice(pu.Unit.EngineID, pu.Unit.ID, networkings[i])
-			if err != nil {
-				return units, err
-			}
-		}
-	}
 
 	auth, err := gd.AuthConfig()
 	if err != nil {
@@ -259,12 +234,7 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 		return units, err
 	}
 
-	kvc := gd.KVClient()
-	if !register {
-		kvc = nil
-	}
-
-	err = svc.initStart(ctx, units, kvc, nil, nil)
+	err = svc.initStart(ctx, units, gd.KVClient(), nil, nil)
 
 	return units, err
 }
