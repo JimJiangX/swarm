@@ -45,7 +45,7 @@ func (svc *Service) Backup(ctx context.Context, local string, config structs.Ser
 		}
 
 		cmd = append(cmd, local+"/v1.0/tasks/backup/callback", task.ID, u.u.ID, config.Type, config.BackupDir,
-			strconv.Itoa(config.FilesRetention), config.Remark, config.Tag)
+			strconv.Itoa(config.FilesRetention), config.Remark, config.Tag, config.Tables)
 
 		_, err = u.containerExec(ctx, cmd, config.Detach)
 

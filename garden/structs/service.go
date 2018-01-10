@@ -202,14 +202,16 @@ type ServiceExecConfig struct {
 type ServiceBackupConfig struct {
 	Container   string `json:"nameOrID"`
 	Type        string `json:"type"`
+	Tables      string `json:"tables"` // full or incremental or tables
 	Remark      string `json:"remark"`
 	Tag         string `json:"tag"`
 	Detach      bool   `json:"detach"`
 	BackupDir   string `json:"backup_dir"`
 	MaxSizeByte int    `json:"max_backup_space"`
 	// count by Day,used in swarm.BackupTaskCallback(),calculate BackupFile.Retention
-	FilesRetention int      `json:"backup_files_retention"`
-	Cmd            []string `json:"cmd,omitempty"`
+	FilesRetention int `json:"backup_files_retention"`
+
+	Cmd []string `json:"cmd,omitempty"`
 }
 
 type ServiceRestoreRequest struct {

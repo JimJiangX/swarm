@@ -312,6 +312,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		UnitID:     req.UnitID,
 		Tag:        req.Tag,
 		Type:       req.Type,
+		Tables:     req.Tables,
 		Path:       req.Path,
 		Remark:     req.Remark,
 		SizeByte:   req.Size,

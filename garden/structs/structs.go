@@ -12,6 +12,7 @@ type BackupTaskCallback struct {
 	TaskID    string `json:"task_id"`
 	UnitID    string `json:"unit_id"`
 	Type      string `json:"type,omitempty"`
+	Tables    string `json:"tables,omitempty"`
 	Path      string `json:"path,omitempty"`
 	Remark    string `json:"remark,omitempty"`
 	Tag       string `json:"tag,omitempty"`
