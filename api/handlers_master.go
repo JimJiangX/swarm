@@ -2019,7 +2019,7 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	}
 
 	name := mux.Vars(r)["name"]
-	unit := mux.Vars(r)["unit"]
+	unit := r.FormValue("unit")
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
@@ -2310,7 +2310,7 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	}
 
 	name := mux.Vars(r)["name"]
-	unit := mux.Vars(r)["unit"]
+	unit := r.FormValue("unit")
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
