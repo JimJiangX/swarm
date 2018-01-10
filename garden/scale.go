@@ -212,14 +212,14 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 
 	units, pendings, err := gd.scaleAllocation(ctx, svc, "", actor, vr, nr,
 		scale.Units, scale.Candidates, scale.Options)
-	//	defer func() {
-	//		if err != nil {
-	//			_err := svc.removeUnits(ctx, units, gd.kvClient)
-	//			if _err != nil {
-	//				err = errors.Errorf("%+v\nremove new addition units:%+v", err, _err)
-	//			}
-	//		}
-	//	}()
+	defer func() {
+		if err != nil {
+			_err := svc.removeUnits(ctx, units, gd.kvClient)
+			if _err != nil {
+				err = errors.Errorf("%+v\nremove new addition units:%+v", err, _err)
+			}
+		}
+	}()
 	if err != nil {
 		return units, err
 	}
