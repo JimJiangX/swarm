@@ -2432,6 +2432,9 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	if config.Type == "" {
 		config.Type = "full"
 	}
+	if config.Tables == "" {
+		config.Tables = "null"
+	}
 	if config.FilesRetention == 0 {
 		config.FilesRetention = 7
 	}
