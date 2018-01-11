@@ -31,6 +31,8 @@ script:
   - go test -v -race `go list ./... | grep -v /vendor/`
 
 notifications:
-  slack:bsgtech:7MhzSaCYgiUSvsTvkQqqZ65O
+  slack:
+    rooms:
+      - bsgtech:7MhzSaCYgiUSvsTvkQqqZ65O#github-dbscale
     on_success: always # default: always
     on_failure: always # default: always
