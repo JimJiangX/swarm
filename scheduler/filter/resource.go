@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	// ErrNoNodeWithFreeSlotsAvailable is exported
+	// ErrNoNodeWithFreeResourceAvailable is exported
 	ErrNoNodeWithFreeResourceAvailable = errors.New("No node with enough resource available in the cluster")
 )
 
