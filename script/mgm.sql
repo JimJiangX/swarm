@@ -30,6 +30,7 @@ CREATE TABLE `tbl_backup_files` (
   `task_id` varchar(128) NOT NULL COMMENT '关联tbl_dbaas_task.id',
   `unit_id` varchar(128) NOT NULL COMMENT '所属容器的id',
   `type` varchar(45) DEFAULT NULL COMMENT '全量／增量\n\nfull/incremental',
+  `tables` varchar(1024) DEFAULT NULL,
   `path` varchar(1024) DEFAULT NULL COMMENT '备份文件路径(包含文件名)',
   `size` bigint(128) unsigned DEFAULT NULL COMMENT '备份文件大小，单位：byte',
   `retention` datetime DEFAULT NULL COMMENT '到期日期',
@@ -39,7 +40,7 @@ CREATE TABLE `tbl_backup_files` (
   `finished_at` datetime DEFAULT NULL COMMENT '完成时间',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -148,7 +149,7 @@ CREATE TABLE `tbl_san_raid_group` (
   `enabled` tinyint(1) unsigned NOT NULL DEFAULT '1' COMMENT '是否启用\n0:停用\n1:启用',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`storage_system_id`,`storage_rg_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -365,4 +366,4 @@ SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2017-12-21 17:26:21
+-- Dump completed on 2018-01-11 16:47:16
