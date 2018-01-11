@@ -29,3 +29,8 @@ script:
   - GOOS=windows go build
   - GOOS=linux go build
   - go test -v -race `go list ./... | grep -v /vendor/`
+
+notifications:
+  slack:bsgtech:7MhzSaCYgiUSvsTvkQqqZ65O
+    on_success: always # default: always
+    on_failure: always # default: always
