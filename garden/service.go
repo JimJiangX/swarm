@@ -85,8 +85,8 @@ func (svc Service) getUnit(nameOrID string) (*unit, error) {
 		return nil, err
 	}
 
-	if u.ServiceID != svc.ID() {
-		return nil, nil
+	if sid := svc.ID(); u.ServiceID != sid {
+		return nil, errors.Errorf("unit '%s' is not belongs to Service '%s'", nameOrID, sid)
 	}
 
 	return newUnit(u, svc.so, svc.cluster), nil
