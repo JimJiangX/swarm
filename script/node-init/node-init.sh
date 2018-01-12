@@ -72,12 +72,13 @@ fi
 
 PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
 
-docker_version=17.09.0
+docker_version=17.12.0
 consul_version=1.0.2
 swarm_agent_version=1.2.8-f70ba02
 logicalVolume_volume_plugin_version=3.0.0
 
 platform="$(uname -s)"
+yum --nogpgcheck -y install lsb
 release=""
 if [ "${platform}" = "Linux" ]; then
 	kernel="$(uname -r)"
@@ -272,6 +273,7 @@ install_consul() {
   "node_name": "${HOSTNAME}",
   "disable_update_check": true,
   "log_level": "INFO",
+  "protocol": 3,
   "addresses": {
     "http": "${adm_ip}"
   },
