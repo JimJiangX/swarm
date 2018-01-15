@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"bytes"
@@ -356,6 +357,58 @@ func (db dbBase) delTasks(tasks []Task) error {
 	}
 
 	stmt.Close()
+
+	return nil
+}
+
+func (db dbBase) MarkRunningTasks() error {
+	do := func(tx *sqlx.Tx) error {
+
+		tasks, err := db.txListTasks(tx, TaskRunningStatus)
+		if err != nil {
+			return err
+		}
+
+		svcTasks := make([]Task, 0, len(tasks)/2)
+
+		table := db.serviceTable()
+		for i := range tasks {
+			if tasks[i].LinkTable == table {
+				svcTasks = append(svcTasks, tasks[i])
+			}
+		}
+
+		err = incServiceStatus(tx, table, svcTasks, 1)
+		if err != nil {
+			return err
+		}
+
+		now := time.Now()
+		for i := range tasks {
+			tasks[i].Status = TaskUnknownStatus
+			tasks[i].FinishedAt = now
+			tasks[i].Errors = "set task status by replication,status is unknown,task maybe running and real value is seting later"
+
+			err := db.txSetTask(tx, tasks[i])
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	return db.txFrame(do)
+}
+
+func incServiceStatus(tx *sqlx.Tx, table string, tasks []Task, inc int) error {
+	query := fmt.Sprintf("UPDATE %s SET action_status=action_status+%d WHERE id=?", table, inc)
+	for i := range tasks {
+		_, err := tx.Exec(query, tasks[i].Linkto)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
 
 	return nil
 }
