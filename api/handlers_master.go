@@ -2394,6 +2394,9 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx, cancel := goctx.WithTimeout(ctx, time.Minute*5)
+	defer cancel()
+
 	svc := gd.NewService(nil, &table)
 	err = svc.Remove(ctx, gd.KVClient(), force)
 	if err != nil {
