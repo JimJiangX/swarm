@@ -356,6 +356,7 @@ func (c *switchManagerConfigV120) GenerateConfig(id string, desc structs.Service
 	if c.template != nil {
 		m["SwarmSocketPath"] = filepath.Join(c.template.DataMount, "/upsql.sock")
 		m["SwarmHealthCheckConfigFile"] = filepath.Join(c.template.DataMount, "/my.cnf")
+		m["ProxyUserSharedFile"] = filepath.Join(c.template.DataMount, "virtual-database.xml")
 	}
 
 	m["SwarmHealthCheckUser"] = vars.Check.User
