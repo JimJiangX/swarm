@@ -498,4 +498,3 @@ func (db dbBase) DelUnitsRelated(units []Unit, volume bool) error {
 
 	return db.txFrame(do)
 }
-
