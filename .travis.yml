@@ -34,5 +34,5 @@ notifications:
   slack:
     rooms:
       - bsgtech:7MhzSaCYgiUSvsTvkQqqZ65O#github-dbscale
-    on_success: always # default: always
+    on_success: change # default: always
     on_failure: always # default: always
