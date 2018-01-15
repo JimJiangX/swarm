@@ -75,6 +75,8 @@ type TaskOrmer interface {
 	ListTasks(link string, status int) ([]Task, error)
 
 	SetTask(t Task) error
+
+	SetTaskFail(id string) error
 }
 
 // NewTask new a Task
@@ -411,4 +413,46 @@ func incServiceStatus(tx *sqlx.Tx, table string, tasks []Task, inc int) error {
 	}
 
 	return nil
+}
+
+func (db dbBase) SetTaskFail(id string) error {
+	do := func(tx *sqlx.Tx) error {
+		tk := task{}
+		query := "SELECT id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM " + db.taskTable() + " WHERE id=?"
+
+		err := tx.Get(&tk, query, id)
+		if err != nil {
+			return err
+		}
+
+		task := Task{task: tk}
+
+		if task.Status == TaskFailedStatus {
+			return nil
+		}
+
+		table := db.serviceTable()
+
+		if task.LinkTable == table {
+			err = incServiceStatus(tx, table, []Task{task}, 1)
+			if err != nil {
+				return err
+			}
+		}
+
+		{
+			task.Status = TaskFailedStatus
+			task.FinishedAt = time.Now()
+			task.Errors = "set task status by replication,status set canceled,task maybe running and real value is seting later"
+
+			err = db.txSetTask(tx, task)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	return db.txFrame(do)
 }
