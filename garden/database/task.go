@@ -407,7 +407,7 @@ func incServiceStatus(tx *sqlx.Tx, table string, tasks []Task, inc int) error {
 	query := fmt.Sprintf("UPDATE %s SET action_status=action_status+%d WHERE id=?", table, inc)
 	for i := range tasks {
 		_, err := tx.Exec(query, tasks[i].Linkto)
-		if err != nil {
+		if err != nil && err != sql.ErrNoRows {
 			return errors.WithStack(err)
 		}
 	}
@@ -422,6 +422,10 @@ func (db dbBase) SetTaskFail(id string) error {
 
 		err := tx.Get(&tk, query, id)
 		if err != nil {
+			if err == sql.ErrNoRows {
+				return nil
+			}
+
 			return err
 		}
 
