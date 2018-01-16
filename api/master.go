@@ -162,8 +162,6 @@ func setupMasterRouter(r *mux.Router, context *context, debug, enableCors bool) 
 						"uri":    r.RequestURI,
 						"since":  time.Since(start).String()},
 					).Errorf("Panic\n:%s\n%s", msg, debugstd.Stack())
-
-					panic(msg)
 				}
 			}()
 
