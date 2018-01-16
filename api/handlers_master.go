@@ -334,6 +334,25 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusCreated)
 }
 
+func setTaskFailed(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil {
+		httpJSONNilGarden(w)
+		return
+	}
+
+	name := mux.Vars(r)["name"]
+
+	err := gd.Ormer().SetTaskFail(name)
+	if err != nil {
+		ec := errCodeV1(_Task, dbQueryError, 41, "fail to update database", "数据库更新错误（任务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // -----------------/datacenter handler-----------------
 func validDatacenter(v structs.RegisterDC) error {
 	// TODO:
@@ -2374,6 +2393,9 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
+
+	ctx, cancel := goctx.WithTimeout(ctx, time.Minute*5)
+	defer cancel()
 
 	svc := gd.NewService(nil, &table)
 	err = svc.Remove(ctx, gd.KVClient(), force)

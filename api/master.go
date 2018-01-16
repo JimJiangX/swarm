@@ -111,6 +111,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	},
 
 	http.MethodPut: {
+		"/tasks/{name}/cancel": setTaskFailed,
+
 		"/clusters/{name}": putClusterParams,
 
 		"/softwares/images/{name:.*}": putImageTemplate,
