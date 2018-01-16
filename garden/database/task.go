@@ -427,7 +427,7 @@ func (db dbBase) SetTaskFail(id string) error {
 
 		task := Task{task: tk}
 
-		if task.Status == TaskFailedStatus {
+		if task.Status == TaskFailedStatus || task.Status == TaskDoneStatus {
 			return nil
 		}
 
