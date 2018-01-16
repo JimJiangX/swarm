@@ -11,6 +11,7 @@
 100202032 _Task invalidParamsError  "Body parameters are invalid"  "Body参数校验错误，包含无效参数"
 100207033 _Task dbExecError  "fail to exec records into database"  "数据库更新错误（任务表）"
 100208034 _Task dbTxError  "fail to exec records in into database in a Tx"  "数据库事务处理错误（备份文件表）"
+100207041 _Task dbExecError  "fail to update database"  "数据库更新错误（任务表）"
 100304011 _DC decodeError  "JSON Decode Request Body error"  "JSON解析请求Body错误"
 100302012 _DC invalidParamsError  "Body parameters are invalid"  "Body参数校验错误，包含无效参数"
 100300013 _DC internalError  "fail to register datacenter"  "注册数据中心错误"

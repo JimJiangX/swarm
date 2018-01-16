@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"database/sql"
 	"encoding/json"
 	stderr "errors"
@@ -14,7 +13,6 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden"
 	"github.com/docker/swarm/garden/database"
@@ -345,7 +343,7 @@ func setTaskFailed(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	err := gd.Ormer().SetTaskFail(name)
 	if err != nil {
-		ec := errCodeV1(_Task, dbQueryError, 41, "fail to update database", "数据库更新错误（任务表）")
+		ec := errCodeV1(_Task, dbExecError, 41, "fail to update database", "数据库更新错误（任务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2271,16 +2269,10 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	if boolValue(r, "sync") {
 
-		buf := bytes.NewBuffer(nil)
-		inspect := types.ContainerExecInspect{}
+		var resp []structs.ContainerExecOutput
 
 		execFunc := func() error {
-			u, err := svc.GetUnit(config.Container)
-			if err != nil {
-				return err
-			}
-
-			inspect, err = u.ContainerExec(ctx, config.Cmd, config.Detach, buf)
+			resp, err = svc.ContainerExec(ctx, config.Container, config.Cmd, config.Detach)
 
 			return err
 		}
@@ -2291,11 +2283,6 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 			httpJSONError(w, err, ec, http.StatusInternalServerError)
 			return
 		}
-
-		resp := struct {
-			Code   int    `json:"code"`
-			Output string `json:"output"`
-		}{inspect.ExitCode, buf.String()}
 
 		writeJSON(w, resp, http.StatusCreated)
 

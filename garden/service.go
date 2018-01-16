@@ -856,13 +856,6 @@ func (svc *Service) Exec(ctx context.Context, config structs.ServiceExecConfig, 
 	return sl.Run(isnotInProgress, exec, async)
 }
 
-func (svc *Service) ExecLock(exec func() error, async bool, task *database.Task) error {
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
-		statusServiceExecStart, statusServiceExecDone, statusServiceExecFailed)
-
-	return sl.Run(isnotInProgress, exec, async)
-}
-
 // Remove remove Service,
 // 1) deregiste services
 // 2) remove containers

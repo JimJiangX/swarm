@@ -199,6 +199,12 @@ type ServiceExecConfig struct {
 	Cmd       []string `json:"cmd"`
 }
 
+type ContainerExecOutput struct {
+	Code   int    `json:"exitCode"`
+	Unit   string `json:"nameOrID"`
+	Output string `json:"output"`
+}
+
 type ServiceBackupConfig struct {
 	Container   string `json:"nameOrID"`
 	Type        string `json:"type"`
