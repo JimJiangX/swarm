@@ -2284,7 +2284,11 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		writeJSON(w, resp, http.StatusCreated)
+		if config.Container != "" && len(resp) == 1 {
+			writeJSON(w, resp[0], http.StatusCreated)
+		} else {
+			writeJSON(w, resp, http.StatusCreated)
+		}
 
 		return
 	}
