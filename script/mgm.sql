@@ -218,7 +218,7 @@ CREATE TABLE `tbl_service_description` (
   `image_version` varchar(128) NOT NULL,
   `volumes` longtext NOT NULL,
   `networks` longtext NOT NULL,
-  `cluster_id` varchar(128) NOT NULL,
+  `cluster_id` varchar(2048) NOT NULL,
   `options` varchar(128) DEFAULT NULL,
   `previous_version` varchar(128) DEFAULT NULL,
   PRIMARY KEY (`id`)
