@@ -2,7 +2,9 @@ package api
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net/http"
+	debugstd "runtime/debug"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -149,6 +151,21 @@ func setupMasterRouter(r *mux.Router, context *context, debug, enableCors bool) 
 	wrap := func(fct ctxHandler) func(w http.ResponseWriter, r *http.Request) {
 		return func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
+
+			defer func() {
+				if msg := recover(); msg != nil {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					fmt.Fprintf(w, "%s", msg)
+
+					logrus.WithFields(logrus.Fields{
+						"method": r.Method,
+						"uri":    r.RequestURI,
+						"since":  time.Since(start).String()},
+					).Errorf("Panic\n:%s\n%s", msg, debugstd.Stack())
+
+					panic(msg)
+				}
+			}()
 
 			if enableCors {
 				writeCorsHeaders(w, r)
