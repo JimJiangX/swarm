@@ -59,13 +59,13 @@ func UserMin() User {
 func AuthInfoFull() AuthInfo {
 	proxyModeInfo := ProxyModeInfoFull()
 	authInfo := AuthInfo{
-		Password:      "password",
-		ConnectionMax: 9,
-		ConnectionMin: 1,
-		DbpmName:      "dbpm_name",
-		WhiteList:     []string{"white_list1", "white_list2"},
-		BlackList:     []string{"black_list1", "black_list2"},
-		ProxyMode:     &proxyModeInfo,
+		Password:  "password",
+		Max:       9,
+		Min:       1,
+		DbpmName:  "dbpm_name",
+		WhiteList: []string{"white_list1", "white_list2"},
+		BlackList: []string{"black_list1", "black_list2"},
+		Mode:      proxyModeInfo,
 	}
 	return authInfo
 }
@@ -78,11 +78,11 @@ func AuthInfoMin() AuthInfo {
 func DatabaseAuthFull() DatabaseAuth {
 	databaseAuth := DatabaseAuth{}
 
-	databaseUsers := make(map[string]*AuthInfo)
+	databaseUsers := make(map[string]*DatabaseAuthInfo)
 	authInfo1 := AuthInfoFull()
-	databaseUsers["key1"] = &authInfo1
+	databaseUsers["key1"] = &DatabaseAuthInfo{AuthInfo: authInfo1}
 	authInfo2 := AuthInfoFull()
-	databaseUsers["key2"] = &authInfo2
+	databaseUsers["key2"] = &DatabaseAuthInfo{AuthInfo: authInfo2}
 	databaseAuth.DatabaseUsers = databaseUsers
 
 	proxyDatabaseUserMap := make(map[string]string)
@@ -156,11 +156,11 @@ func ProxyModeInfoMin() ProxyModeInfo {
 func TopologyFull() Topology {
 	proxyModeInfo := ProxyModeInfoFull()
 
-	proxyUsers := make(map[string]*AuthInfo)
+	proxyUsers := make(map[string]*ProxyAuthInfo)
 	authInfo1 := AuthInfoFull()
-	proxyUsers["key1"] = &authInfo1
+	proxyUsers["key1"] = &ProxyAuthInfo{AuthInfo: authInfo1}
 	authInfo2 := AuthInfoFull()
-	proxyUsers["key2"] = &authInfo2
+	proxyUsers["key2"] = &ProxyAuthInfo{AuthInfo: authInfo2}
 
 	proxyGroups := make(map[string]*ProxyInfo)
 	proxyInfo1 := ProxyInfoFull()

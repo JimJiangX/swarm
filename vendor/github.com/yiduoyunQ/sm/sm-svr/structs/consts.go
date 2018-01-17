@@ -108,4 +108,8 @@ const (
 	Slave     = "slave"
 	Normal    = "normal"
 	Abnormal  = "abnormal"
+	SuperUser = "super"
+
+	PwdType  = "password"
+	DbpmType = "DBPM"
 )
