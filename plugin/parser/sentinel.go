@@ -108,7 +108,7 @@ func (c *sentinelConfig) GenerateConfig(id string, desc structs.ServiceSpec) err
 
 	if c.template != nil {
 		c.config["dir"] = c.template.DataMount
-		c.config["logfile"] = filepath.Join(c.template.DataMount, "sentinel.log")
+		c.config["logfile"] = filepath.Join(c.template.LogMount, "sentinel.log")
 	}
 
 	return nil
