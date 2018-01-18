@@ -18,8 +18,16 @@ func init() {
 	register("mysql", "5.7", &mysqlConfig{})
 
 	register("upsql", "1.0", &upsqlConfig{})
+	register("upsql", "1.1", &upsqlConfig{})
+	register("upsql", "1.2", &upsqlConfig{})
+
 	register("upsql", "2.0", &upsqlConfig{})
+	register("upsql", "2.1", &upsqlConfig{})
+	register("upsql", "2.2", &upsqlConfig{})
+
 	register("upsql", "3.0", &upsqlConfig{})
+	register("upsql", "3.1", &upsqlConfig{})
+	register("upsql", "3.2", &upsqlConfig{})
 }
 
 const (

@@ -19,7 +19,12 @@ func init() {
 	register("upredis", "1.0", &upredisConfig{})
 	register("upredis", "1.1", &upredisConfig{})
 	register("upredis", "1.2", &upredisConfig{})
+	register("upredis", "1.3", &upredisConfig{})
+
 	register("upredis", "2.0", &upredisConfig{})
+	register("upredis", "2.1", &upredisConfig{})
+	register("upredis", "2.2", &upredisConfig{})
+	register("upredis", "2.3", &upredisConfig{})
 }
 
 type redisConfig struct {

@@ -23,9 +23,15 @@ func init() {
 	register("upproxy", "1.1", &upproxyConfigV100{})
 	register("upproxy", "1.2", &upproxyConfigV100{})
 	register("upproxy", "1.3", &upproxyConfigV100{})
+	register("upproxy", "1.4", &upproxyConfigV100{})
+	register("upproxy", "1.5", &upproxyConfigV100{})
 
 	register("upproxy", "2.0", &upproxyConfigV100{})
 	register("upproxy", "2.1", &upproxyConfigV100{})
+	register("upproxy", "2.2", &upproxyConfigV100{})
+	register("upproxy", "2.3", &upproxyConfigV100{})
+	register("upproxy", "2.4", &upproxyConfigV100{})
+	register("upproxy", "2.5", &upproxyConfigV100{})
 }
 
 type proxyConfig struct {

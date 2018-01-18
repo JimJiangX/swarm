@@ -16,6 +16,11 @@ func init() {
 	register("sentinel", "1.1", &sentinelConfig{})
 	register("sentinel", "1.2", &sentinelConfig{})
 	register("sentinel", "1.3", &sentinelConfig{})
+
+	register("sentinel", "2.0", &sentinelConfig{})
+	register("sentinel", "2.1", &sentinelConfig{})
+	register("sentinel", "2.2", &sentinelConfig{})
+	register("sentinel", "2.3", &sentinelConfig{})
 }
 
 type sentinelConfig struct {
