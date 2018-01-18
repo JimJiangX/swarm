@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/astaxie/beego/config"
@@ -416,27 +415,15 @@ func (c *upproxyConfigV100) GenerateConfig(id string, desc structs.ServiceSpec) 
 		return err
 	}
 
-	var (
-		seq, exist = 0, false
-		spec       structs.UnitSpec
-	)
-
-	for seq = range desc.Units {
-		if id == desc.Units[seq].ID {
-			spec = desc.Units[seq]
-			exist = true
-			break
-		}
-	}
-	if !exist {
-		return errors.Errorf("not found unit '%s'", id)
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return err
 	}
 
 	m := make(map[string]interface{}, 10)
 
 	m["upsql-proxy::proxy-domain"] = desc.Tag
 	m["upsql-proxy::proxy-name"] = spec.Name
-	m["upsql-proxy::proxy-id"] = strconv.Itoa(seq)
 
 	addr := "127.0.0.1"
 	if len(spec.Networking) > 0 {
