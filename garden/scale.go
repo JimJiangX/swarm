@@ -328,7 +328,9 @@ func (svc *Service) scheduleOptionsByUnits(opts scheduleOption, refer string, ca
 			return opts, err
 		}
 
-		unit = getUnit(units, refer)
+		if refer != "" {
+			unit = getUnit(units, refer)
+		}
 
 		filters := make([]string, 0, len(units))
 		for i := range units {

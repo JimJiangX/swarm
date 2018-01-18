@@ -55,34 +55,33 @@ func (at allocator) ListCandidates(clusters, filters []string, stores []structs.
 
 	out := make([]database.Node, 0, len(nodes))
 
-nodes:
 	for i := range nodes {
 		if !nodes[i].Enabled || nodes[i].EngineID == "" {
 			continue
 		}
 
 		if _, ok := filterMap[nodes[i].ID]; ok {
-			continue nodes
+			continue
 		}
 
 		if _, ok := filterMap[nodes[i].EngineID]; ok {
-			continue nodes
+			continue
 		}
 
 		eng := at.ec.Engine(nodes[i].EngineID)
 		if eng == nil {
 			logrus.Debugf("node:%s not found Engine,%s", nodes[i].Addr, nodes[i].EngineID)
-			continue nodes
+			continue
 		}
 
 		if !eng.IsHealthy() {
 			logrus.Debugf("node:%s Engine unhealthy", nodes[i].EngineID)
-			continue nodes
+			continue
 		}
 
 		if n := len(eng.Containers()); n >= nodes[i].MaxContainer {
 			logrus.Debugf("node:%s container num limit(%d>=%d)", nodes[i].EngineID, n, nodes[i].MaxContainer)
-			continue nodes
+			continue
 		}
 
 		err := at.IsNodeStoreEnough(eng, stores)
