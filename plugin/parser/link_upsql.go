@@ -203,12 +203,13 @@ func swmInitTopology(ctx context.Context, kvc kvstore.Store,
 		proxyPr = proxyPr.clone(nil)
 		proxyPr.ParseData([]byte(cc.Content))
 
+		name := proxyPr.get("upsql-proxy::proxy-name")
 		addr := proxyPr.get("upsql-proxy::proxy-address") // proxy-address = <proxy_ip_addr>:<proxy_data_port>
 		parts := strings.SplitN(addr, ":", 2)
 
-		proxyGroup[u.Name] = &swm_structs.ProxyInfo{
+		proxyGroup[name] = &swm_structs.ProxyInfo{
 			Id:   strconv.Itoa(int(utils.IPToUint32(parts[0]))),
-			Name: u.Name,
+			Name: name,
 			Ip:   parts[0],
 			Port: parts[1],
 		}

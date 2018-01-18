@@ -133,7 +133,7 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 	}
 
 	if spec.Config != nil {
-		if n := spec.Config.HostConfig.Memory; n>>33 > 0 {
+		if n := spec.Config.HostConfig.Memory; n>>33 > 0 { // 8G
 			m["mysqld::innodb_buffer_pool_size"] = int(float64(n) * 0.70)
 		} else {
 			m["mysqld::innodb_buffer_pool_size"] = int(float64(n) * 0.5)

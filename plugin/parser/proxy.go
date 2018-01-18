@@ -26,12 +26,12 @@ func init() {
 	register("upproxy", "1.4", &upproxyConfigV100{})
 	register("upproxy", "1.5", &upproxyConfigV100{})
 
-	register("upproxy", "2.0", &upproxyConfigV100{})
-	register("upproxy", "2.1", &upproxyConfigV100{})
-	register("upproxy", "2.2", &upproxyConfigV100{})
-	register("upproxy", "2.3", &upproxyConfigV100{})
-	register("upproxy", "2.4", &upproxyConfigV100{})
-	register("upproxy", "2.5", &upproxyConfigV100{})
+	register("upproxy", "2.0", &upproxyConfigV200{})
+	register("upproxy", "2.1", &upproxyConfigV200{})
+	register("upproxy", "2.2", &upproxyConfigV200{})
+	register("upproxy", "2.3", &upproxyConfigV200{})
+	register("upproxy", "2.4", &upproxyConfigV200{})
+	register("upproxy", "2.5", &upproxyConfigV200{})
 }
 
 type proxyConfig struct {
@@ -486,4 +486,82 @@ func (c upproxyConfigV100) GenerateCommands(id string, desc structs.ServiceSpec)
 	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
 
 	return cmds, nil
+}
+
+type upproxyConfigV200 struct {
+	upproxyConfigV100
+}
+
+func (upproxyConfigV200) clone(t *structs.ConfigTemplate) parser {
+	pr := &upproxyConfigV200{}
+	pr.template = t
+
+	return pr
+}
+
+func (c *upproxyConfigV200) GenerateConfig(id string, desc structs.ServiceSpec) error {
+	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
+
+	var (
+		seq, exist = 0, false
+		spec       structs.UnitSpec
+	)
+
+	for seq = range desc.Units {
+		if id == desc.Units[seq].ID {
+			spec = desc.Units[seq]
+			exist = true
+			break
+		}
+	}
+	if !exist {
+		return errors.Errorf("not found unit '%s'", id)
+	}
+
+	m := make(map[string]interface{}, 10)
+
+	m["upsql-proxy::proxy-domain"] = desc.Tag
+	m["upsql-proxy::proxy-name"] = fmt.Sprintf("%s-%d", desc.Tag, seq)
+	m["upsql-proxy::proxy-id"] = strconv.Itoa(seq)
+
+	addr := "127.0.0.1"
+	if len(spec.Networking) > 0 {
+		addr = spec.Networking[0].IP
+	}
+
+	{
+		val, ok := desc.Options["upsql-proxy::proxy_data_port"]
+		if !ok {
+			return errors.New("miss upsql-proxy::proxy_data_port")
+		}
+		port, err := atoi(val)
+		if err != nil || port == 0 {
+			return errors.Wrap(err, "miss upsql-proxy::proxy_data_port")
+		}
+
+		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", addr, port)
+	}
+
+	m["upsql-proxy::event-threads-count"] = 1
+	if spec.Config != nil {
+		ncpu, err := spec.Config.CountCPU()
+		if err == nil {
+			m["upsql-proxy::event-threads-count"] = ncpu
+		}
+	}
+
+	if c.template != nil {
+		m["upsql-proxy::topology-config"] = filepath.Join(c.template.DataMount, "/topology.json")
+
+		m["log::log-dir"] = c.template.LogMount
+	}
+
+	for key, val := range m {
+		err = c.set(key, val)
+	}
+
+	return err
 }
