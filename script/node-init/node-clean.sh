@@ -56,7 +56,7 @@ remove_check_script() {
 dereg_to_consul() {
 	local component_type=$1
 
-	stat_code=`curl -o /dev/null -s -w %{http_code} -X POST -H "Content-Type: application/json" http://${adm_ip}:${consul_port}/v1/agent/service/deregister/${node_id}':'${component_type}`
+	stat_code=`curl -o /dev/null -s -w %{http_code} -X PUT -H "Content-Type: application/json" http://${adm_ip}:${consul_port}/v1/agent/service/deregister/${node_id}':'${component_type}`
 	if [ "${stat_code}" != "200" ]; then
 		echo "${component_type} deregister to consul failed"
 	fi
