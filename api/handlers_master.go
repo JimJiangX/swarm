@@ -90,7 +90,7 @@ func writeJSONFprintf(w http.ResponseWriter, status int, format string, args ...
 }
 
 // -----------------/nfs_backups handlers-----------------
-func vaildNFSParams(nfs database.NFS) error {
+func validNFSParams(nfs database.NFS) error {
 	errs := make([]string, 0, 4)
 
 	if nfs.Addr == "" {
@@ -130,9 +130,9 @@ func getNFSSPace(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	nfs.MountDir = r.FormValue("nfs_mount_dir")
 	nfs.Options = r.FormValue("nfs_mount_opts")
 
-	err := vaildNFSParams(nfs)
+	err := validNFSParams(nfs)
 	if err != nil {
-		ec := errCodeV1(_NFS, invaildParamsError, 12, "URL parameters are invaild", "URL参数校验错误，包含无效参数")
+		ec := errCodeV1(_NFS, invalidParamsError, 12, "URL parameters are invalid", "URL参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -237,7 +237,7 @@ func getTasks(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusOK)
 }
 
-func vaildBackupTaskCallback(bt structs.BackupTaskCallback) error {
+func validBackupTaskCallback(bt structs.BackupTaskCallback) error {
 	errs := make([]string, 0, 3)
 
 	if bt.UnitID == "" {
@@ -269,9 +269,9 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = vaildBackupTaskCallback(req)
+	err = validBackupTaskCallback(req)
 	if err != nil {
-		ec := errCodeV1(_Task, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		ec := errCodeV1(_Task, invalidParamsError, 32, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -293,7 +293,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 		err := orm.SetTask(t)
 		if err != nil {
-			ec := errCodeV1(_Task, dbExecError, 34, "fail to exec records into database", "数据库更新错误（任务表）")
+			ec := errCodeV1(_Task, dbExecError, 33, "fail to exec records into database", "数据库更新错误（任务表）")
 			httpJSONError(w, err, ec, http.StatusInternalServerError)
 		}
 		return
@@ -310,6 +310,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		UnitID:     req.UnitID,
 		Tag:        req.Tag,
 		Type:       req.Type,
+		Tables:     req.Tables,
 		Path:       req.Path,
 		Remark:     req.Remark,
 		SizeByte:   req.Size,
@@ -323,7 +324,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	err = orm.InsertBackupFileWithTask(bf, t)
 	if err != nil {
-		ec := errCodeV1(_Task, dbTxError, 35, "fail to exec records in into database in a Tx", "数据库事务处理错误（备份文件表）")
+		ec := errCodeV1(_Task, dbTxError, 34, "fail to exec records in into database in a Tx", "数据库事务处理错误（备份文件表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -331,8 +332,27 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusCreated)
 }
 
+func setTaskFailed(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil {
+		httpJSONNilGarden(w)
+		return
+	}
+
+	name := mux.Vars(r)["name"]
+
+	err := gd.Ormer().SetTaskFail(name)
+	if err != nil {
+		ec := errCodeV1(_Task, dbExecError, 41, "fail to update database", "数据库更新错误（任务表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // -----------------/datacenter handler-----------------
-func vaildDatacenter(v structs.RegisterDC) error {
+func validDatacenter(v structs.RegisterDC) error {
 	// TODO:
 	return nil
 }
@@ -347,8 +367,8 @@ func postRegisterDC(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := vaildDatacenter(req); err != nil {
-		ec := errCodeV1(_DC, invaildParamsError, 12, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validDatacenter(req); err != nil {
+		ec := errCodeV1(_DC, invalidParamsError, 12, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -413,11 +433,12 @@ func listImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	for i := range images {
 		out[i] = structs.ImageResponse{
 			ImageVersion: structs.ImageVersion{
+				ID:    images[i].ID,
 				Name:  images[i].Name,
 				Major: images[i].Major,
 				Minor: images[i].Minor,
 				Patch: images[i].Patch,
-				Build: images[i].Build,
+				Dev:   images[i].Dev,
 			},
 			Size:     images[i].Size,
 			ID:       images[i].ID,
@@ -450,12 +471,12 @@ func getSupportImages(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	writeJSON(w, out, http.StatusOK)
 }
 
-func vaildLoadImageRequest(v structs.PostLoadImageRequest) error {
+func validLoadImageRequest(v structs.PostLoadImageRequest) error {
 	errs := make([]string, 0, 2)
 
 	if v.Name == "" ||
 		(v.Major == 0 && v.Minor == 0 &&
-			v.Patch == 0 && v.Build == 0) {
+			v.Patch == 0 && v.Dev == 0) {
 		errs = append(errs, "ImageVersion is required")
 	}
 
@@ -487,8 +508,8 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := vaildLoadImageRequest(req); err != nil {
-		ec := errCodeV1(_Image, invaildParamsError, 33, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validLoadImageRequest(req); err != nil {
+		ec := errCodeV1(_Image, invalidParamsError, 33, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -520,8 +541,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	for _, version := range supports {
 		if version.Name == req.Name &&
 			version.Major == req.Major &&
-			version.Minor == req.Minor &&
-			version.Build == req.Build {
+			version.Minor == req.Minor {
 
 			found = true
 			break
@@ -529,7 +549,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !found {
-		ec := errCodeV1(_Image, objectNotExist, 35, "unsupported image:"+req.Version(), "不支持镜像:"+req.Version())
+		ec := errCodeV1(_Image, objectNotExist, 35, "unsupported image:"+req.Image(), "不支持镜像:"+req.Image())
 		httpJSONError(w, stderr.New(ec.comment), ec, http.StatusInternalServerError)
 		return
 	}
@@ -597,11 +617,12 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	imResp := structs.ImageResponse{
 		ImageVersion: structs.ImageVersion{
+			ID:    im.ID,
 			Name:  im.Name,
 			Major: im.Major,
 			Minor: im.Minor,
 			Patch: im.Patch,
-			Build: im.Build,
+			Dev:   im.Dev,
 		},
 		Size:     im.Size,
 		ID:       im.ID,
@@ -610,7 +631,7 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		UploadAt: utils.TimeToString(im.UploadAt),
 	}
 
-	t, err := gd.PluginClient().GetImage(ctx, im.Version())
+	t, err := gd.PluginClient().GetImage(ctx, im.Image())
 	if err != nil {
 		ec := errCodeV1(_Image, internalError, 52, "fail to query image", "获取镜像错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -685,10 +706,11 @@ func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	}
 
 	resp := structs.GetClusterResponse{
-		ID:         c.ID,
-		MaxNode:    c.MaxNode,
-		UsageLimit: c.UsageLimit,
-		NodeNum:    n,
+		ID:               c.ID,
+		NetworkPartition: c.NetworkPartition,
+		MaxNode:          c.MaxNode,
+		UsageLimit:       c.UsageLimit,
+		NodeNum:          n,
 	}
 
 	writeJSON(w, resp, http.StatusOK)
@@ -721,17 +743,18 @@ func getClusters(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 
 		out[i] = structs.GetClusterResponse{
-			ID:         list[i].ID,
-			MaxNode:    list[i].MaxNode,
-			UsageLimit: list[i].UsageLimit,
-			NodeNum:    n,
+			ID:               list[i].ID,
+			MaxNode:          list[i].MaxNode,
+			UsageLimit:       list[i].UsageLimit,
+			NetworkPartition: list[i].NetworkPartition,
+			NodeNum:          n,
 		}
 	}
 
 	writeJSON(w, out, http.StatusOK)
 }
 
-func vaildPostClusterRequest(v structs.PostClusterRequest) error {
+func validPostClusterRequest(v structs.PostClusterRequest) error {
 	return nil
 }
 
@@ -744,8 +767,8 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := vaildPostClusterRequest(req); err != nil {
-		ec := errCodeV1(_Cluster, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostClusterRequest(req); err != nil {
+		ec := errCodeV1(_Cluster, invalidParamsError, 32, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -759,9 +782,10 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := database.Cluster{
-		ID:         utils.Generate32UUID(),
-		MaxNode:    req.Max,
-		UsageLimit: req.UsageLimit,
+		ID:               utils.Generate32UUID(),
+		NetworkPartition: req.NetworkPartition,
+		MaxNode:          req.Max,
+		UsageLimit:       req.UsageLimit,
 	}
 
 	err = gd.Ormer().InsertCluster(c)
@@ -774,9 +798,17 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "id", c.ID)
 }
 
+func validPutClusterRequest(v structs.PutClusterRequest) error {
+	if v.Max == nil && v.UsageLimit == nil {
+		return errors.Errorf("neither MaxNode nor UsageLimit is non-nil")
+	}
+
+	return nil
+}
+
 func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
-	req := structs.PostClusterRequest{}
+	req := structs.PutClusterRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		ec := errCodeV1(_Cluster, decodeError, 41, "JSON Decode Request Body error", "JSON解析请求Body错误")
@@ -784,8 +816,8 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := vaildPostClusterRequest(req); err != nil {
-		ec := errCodeV1(_Cluster, invaildParamsError, 42, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPutClusterRequest(req); err != nil {
+		ec := errCodeV1(_Cluster, invalidParamsError, 42, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -798,15 +830,24 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	c := database.Cluster{
-		ID:         name,
-		MaxNode:    req.Max,
-		UsageLimit: req.UsageLimit,
+	c, err := gd.Ormer().GetCluster(name)
+	if err != nil {
+		ec := errCodeV1(_Cluster, dbQueryError, 43, "fail to query records from database", "数据库查询记录错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	if req.Max != nil {
+		c.MaxNode = *req.Max
+	}
+
+	if req.UsageLimit != nil {
+		c.UsageLimit = *req.UsageLimit
 	}
 
 	err = gd.Ormer().SetClusterParams(c)
 	if err != nil {
-		ec := errCodeV1(_Cluster, dbExecError, 43, "fail to update records into database", "数据库更新记录错误")
+		ec := errCodeV1(_Cluster, dbExecError, 44, "fail to update records into database", "数据库更新记录错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -839,13 +880,14 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 // -----------------/hosts handlers-----------------
 func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.NodeInfo {
 	info := structs.NodeInfo{
-		ID:           n.ID,
-		Cluster:      n.ClusterID,
-		Room:         n.Room,
-		Seat:         n.Seat,
-		MaxContainer: n.MaxContainer,
-		Enabled:      n.Enabled,
-		RegisterAt:   utils.TimeToString(n.RegisterAt),
+		ID:            n.ID,
+		Cluster:       n.ClusterID,
+		Room:          n.Room,
+		Seat:          n.Seat,
+		MaxContainer:  n.MaxContainer,
+		Enabled:       n.Enabled,
+		RegisterAt:    utils.TimeToString(n.RegisterAt),
+		VolumeDrivers: []structs.VolumeDriver{},
 	}
 
 	info.SetByEngine(e)
@@ -885,7 +927,9 @@ func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.
 			})
 		}
 
-		info.VolumeDrivers = vds
+		if len(vds) > 0 {
+			info.VolumeDrivers = vds
+		}
 	}
 
 	return info
@@ -971,7 +1015,7 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusOK)
 }
 
-func vaildNodeRequest(node structs.Node) error {
+func validNodeRequest(node structs.Node) error {
 	errs := make([]string, 0, 3)
 
 	if node.Cluster == "" {
@@ -982,7 +1026,7 @@ func vaildNodeRequest(node structs.Node) error {
 		errs = append(errs, "Addr is required")
 	}
 
-	// vaild ssh config
+	// valid ssh config
 	if node.SSHConfig.Username == "" {
 		errs = append(errs, "SSHConfig.Username is required")
 	}
@@ -1003,8 +1047,8 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := vaildNodeRequest(n); err != nil {
-		ec := errCodeV1(_Host, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validNodeRequest(n); err != nil {
+		ec := errCodeV1(_Host, invalidParamsError, 32, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1019,17 +1063,30 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	orm := gd.Ormer()
 
-	_, err = orm.GetCluster(n.Cluster)
+	cl, err := orm.GetCluster(n.Cluster)
 	if err != nil {
 		ec := errCodeV1(_Host, dbQueryError, 33, "fail to query database", "数据库查询错误（集群表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
+	num, err := orm.CountNodeByCluster(cl.ID)
+	if err != nil {
+		ec := errCodeV1(_Host, dbQueryError, 34, "fail to query database", "数据库查询错误（物理主机表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	if num >= cl.MaxNode {
+		ec := errCodeV1(_Host, invalidParamsError, 35, fmt.Sprintf("Exceeded cluster max node limit,%d>=%d", num, cl.MaxNode), fmt.Sprintf("超出集群数量限制，%d>%d", num, cl.MaxNode))
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
 	if n.Storage != "" {
 		_, err = orm.GetStorageByID(n.Storage)
 		if err != nil {
-			ec := errCodeV1(_Host, dbQueryError, 34, "fail to query database", "数据库查询错误（外部存储表）")
+			ec := errCodeV1(_Host, dbQueryError, 36, "fail to query database", "数据库查询错误（外部存储表）")
 			httpJSONError(w, err, ec, http.StatusInternalServerError)
 			return
 		}
@@ -1059,7 +1116,7 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	horus, err := gd.KVClient().GetHorusAddr(ctx)
 	if err != nil {
-		ec := errCodeV1(_Host, internalError, 35, "fail to query third-part monitor server addr", "获取第三方监控服务地址错误")
+		ec := errCodeV1(_Host, internalError, 37, "fail to query third-part monitor server addr", "获取第三方监控服务地址错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -1074,7 +1131,7 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	master := resource.NewHostManager(orm, gd.Cluster, nodes)
 	err = master.InstallNodes(ctx, horus, gd.KVClient())
 	if err != nil {
-		ec := errCodeV1(_Host, internalError, 36, "fail to install host", "主机入库错误")
+		ec := errCodeV1(_Host, internalError, 38, "fail to install host", "主机入库错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -1134,12 +1191,18 @@ func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
 	var max = struct {
-		N int `json:"max_container"`
+		N *int `json:"max_container"`
 	}{}
 
 	err := json.NewDecoder(r.Body).Decode(&max)
 	if err != nil {
 		ec := errCodeV1(_Host, decodeError, 61, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	if max.N == nil {
+		ec := errCodeV1(_Host, invalidParamsError, 62, "URL parameters are invalid", "URL参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1152,9 +1215,9 @@ func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = gd.Ormer().SetNodeParam(name, max.N)
+	err = gd.Ormer().SetNodeParam(name, *max.N)
 	if err != nil {
-		ec := errCodeV1(_Host, dbExecError, 62, "fail to update records into database", "数据库更新记录错误")
+		ec := errCodeV1(_Host, dbExecError, 63, "fail to update records into database", "数据库更新记录错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -1162,7 +1225,7 @@ func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func vaildDelNodesRequest(name, user string) error {
+func validDelNodesRequest(name, user string) error {
 	errs := make([]string, 0, 2)
 
 	if name == "" {
@@ -1203,8 +1266,8 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
-	if err := vaildDelNodesRequest(node, username); err != nil {
-		ec := errCodeV1(_Host, invaildParamsError, 72, "URL parameters are invaild", "URL参数校验错误，包含无效参数")
+	if err := validDelNodesRequest(node, username); err != nil {
+		ec := errCodeV1(_Host, invalidParamsError, 72, "URL parameters are invalid", "URL参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1283,7 +1346,7 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := vailPostNetworkingRequest(req); err != nil {
-		ec := errCodeV1(_Networking, invaildParamsError, 12, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+		ec := errCodeV1(_Networking, invalidParamsError, 12, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1366,7 +1429,7 @@ func setNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request, en
 				}
 			}
 			if !exist {
-				ec := errCodeV1(_Networking, invaildParamsError, 24, fmt.Sprintf("IP %s is not in networking %s", body[i], name), fmt.Sprintf("IP %s 不属于指定网络集群(%s)", body[i], name))
+				ec := errCodeV1(_Networking, invalidParamsError, 24, fmt.Sprintf("IP %s is not in networking %s", body[i], name), fmt.Sprintf("IP %s 不属于指定网络集群(%s)", body[i], name))
 				httpJSONError(w, stderr.New(ec.comment), ec, http.StatusInternalServerError)
 				return
 			}
@@ -1515,11 +1578,17 @@ func getNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, "{}", http.StatusOK)
+	writeJSONNull(w, http.StatusOK)
 }
 
 // -----------------/services handlers-----------------
 func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Service, urlParamError, 11, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil || gd.Ormer() == nil || gd.Cluster == nil {
 		httpJSONNilGarden(w)
@@ -1528,12 +1597,64 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	services, err := gd.ListServices(ctx)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 11, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 12, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	writeJSON(w, services, http.StatusOK)
+	if len(services) == 0 {
+		writeJSON(w, services, http.StatusOK)
+		return
+	}
+
+	var out []structs.ServiceSpec
+	name := r.FormValue("image_name")
+
+	if name == "" {
+		out = services
+	} else {
+		images := strings.Split(name, ",")
+		out = make([]structs.ServiceSpec, 0, len(services))
+
+		for i := range images {
+
+			for k := range services {
+				if services[k].Image.Name == images[i] {
+					out = append(out, services[k])
+				}
+			}
+		}
+	}
+
+	bfs, err := gd.Ormer().ListBackupFiles()
+	if err != nil {
+		ec := errCodeV1(_Service, dbQueryError, 13, "fail to query database", "数据库查询错误（备份表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	resp := make([]structs.ServiceResponse, 0, len(out))
+
+	for i := range out {
+		sum := 0
+		for j := range bfs {
+
+		units:
+			for k := range out[i].Units {
+				if bfs[j].UnitID == out[i].Units[k].ID {
+					sum += bfs[j].SizeByte
+					break units
+				}
+			}
+		}
+
+		resp = append(resp, structs.ServiceResponse{
+			ServiceSpec:   out[i],
+			BuckupFileSum: sum,
+		})
+	}
+
+	writeJSON(w, resp, http.StatusOK)
 }
 
 func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1557,17 +1678,47 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	writeJSON(w, spec, http.StatusOK)
-}
-
-func vaildPostServiceRequest(spec structs.ServiceSpec) error {
-	errs := make([]string, 0, 4)
-
-	if spec.Arch.Code == "" || spec.Arch.Mode == "" || spec.Arch.Replicas == 0 {
-		errs = append(errs, fmt.Sprintf("Arch invaild,%+v", spec.Arch))
+	sum, err := getBackupFileSumByService(gd.Ormer(), spec.ID)
+	if err != nil {
+		ec := errCodeV1(_Service, dbQueryError, 22, "fail to query database", "数据库查询错误（备份表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
 	}
 
-	if spec.Require == nil || spec.Require.Require.CPU == 0 || spec.Require.Require.Memory == 0 {
+	resp := structs.ServiceResponse{
+		ServiceSpec:   spec,
+		BuckupFileSum: sum,
+	}
+
+	writeJSON(w, resp, http.StatusOK)
+}
+
+func getBackupFileSumByService(biface database.BackupFileIface, id string) (int, error) {
+	files, err := biface.ListBackupFilesByService(id)
+	if err != nil {
+		return 0, err
+	}
+
+	sum := 0
+	for i := range files {
+		sum += files[i].SizeByte
+	}
+
+	return sum, nil
+}
+
+func validPostServiceRequest(spec structs.ServiceSpec) error {
+	errs := make([]string, 0, 5)
+
+	if spec.Image.ID == "" {
+		errs = append(errs, fmt.Sprintf("Image ID is required,%+v", spec.Image))
+	}
+
+	if spec.Arch.Code == "" || spec.Arch.Mode == "" || spec.Arch.Replicas == 0 {
+		errs = append(errs, fmt.Sprintf("Arch invalid,%+v", spec.Arch))
+	}
+
+	if spec.Require == nil {
 		errs = append(errs, "unit require is nil")
 	}
 
@@ -1593,6 +1744,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	compose := boolValue(r, "compose")
 	timeout := intValueOrZero(r, "timeout")
 
 	spec := structs.ServiceSpec{}
@@ -1603,8 +1755,8 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := vaildPostServiceRequest(spec); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 33, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceRequest(spec); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 33, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1631,7 +1783,7 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	d := deploy.New(gd)
 
-	out, err := d.Deploy(ctx, spec)
+	out, err := d.Deploy(ctx, spec, compose)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 34, "fail to deploy service", "创建服务错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -1641,13 +1793,24 @@ func postService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, out, http.StatusCreated)
 }
 
-func vaildPostServiceScaledRequest(v structs.ServiceScaleRequest) error {
+func validPostServiceScaledRequest(v structs.ServiceScaleRequest) error {
+	errs := make([]string, 0, 2)
 
 	if v.Arch.Code == "" || v.Arch.Mode == "" || v.Arch.Replicas == 0 {
-		return fmt.Errorf("Arch invaild,%+v", v.Arch)
+		errs = append(errs, fmt.Sprintf("Arch invalid,%+v", v.Arch))
 	}
 
-	return nil
+	for i := range v.Candidates {
+		if v.Candidates[i] == "" {
+			errs = append(errs, "Candidate value is null")
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("ServiceScaleRequest:%v,%s", v, errs)
 }
 
 func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -1661,8 +1824,8 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := vaildPostServiceScaledRequest(scale); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 42, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceScaledRequest(scale); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 42, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1686,19 +1849,19 @@ func postServiceScaled(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	d := deploy.New(gd)
 
-	id, err := d.ServiceScale(ctx, name, scale)
+	resp, err := d.ServiceScale(ctx, name, scale)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 43, "fail to scale service", "服务水平扩展错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
+	writeJSON(w, resp, http.StatusCreated)
 }
 
-func vaildPostServiceLinkRequest(v structs.ServicesLink) error {
+func validPostServiceLinkRequest(v structs.ServicesLink) error {
 	if v.Len() == 0 {
-		return fmt.Errorf("invaild params")
+		return fmt.Errorf("invalid params")
 	}
 
 	errs := make([]string, 0, 3)
@@ -1725,8 +1888,8 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := vaildPostServiceLinkRequest(links); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 52, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceLinkRequest(links); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 52, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1743,7 +1906,7 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	// new Context with deadline
 	if deadline, ok := ctx.Deadline(); !ok {
-		ctx = goctx.Background()
+		ctx, _ = goctx.WithTimeout(goctx.Background(), 5*time.Minute)
 	} else {
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
@@ -1798,8 +1961,10 @@ func postServiceVersionUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
-func vaildPostServiceUpdateRequest(v structs.UnitRequire) error {
-	if v.Require.CPU == 0 && v.Require.Memory == 0 && len(v.Volumes) == 0 {
+func validPostServiceUpdateRequest(v structs.UpdateUnitRequire) error {
+	if v.Require.CPU == nil && v.Require.Memory == nil &&
+		len(v.Volumes) == 0 && len(v.Networks) == 0 {
+
 		return fmt.Errorf("UnitRequire:%v,%s", v, "no resource update required")
 	}
 
@@ -1807,7 +1972,7 @@ func vaildPostServiceUpdateRequest(v structs.UnitRequire) error {
 
 	for _, vr := range v.Volumes {
 		if vr.Name == "" && vr.Type == "" {
-			errs = append(errs, fmt.Sprintf("VolumeRequire is invaild,%+v", vr))
+			errs = append(errs, fmt.Sprintf("VolumeRequire is invalid,%+v", vr))
 		}
 	}
 
@@ -1821,17 +1986,17 @@ func vaildPostServiceUpdateRequest(v structs.UnitRequire) error {
 func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
-	var update structs.UnitRequire
+	config := structs.UpdateUnitRequire{}
 
-	err := json.NewDecoder(r.Body).Decode(&update)
+	err := json.NewDecoder(r.Body).Decode(&config)
 	if err != nil {
 		ec := errCodeV1(_Service, decodeError, 71, "JSON Decode Request Body error", "JSON解析请求Body错误")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
-	if err := vaildPostServiceUpdateRequest(update); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 72, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceUpdateRequest(config); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 72, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1853,7 +2018,7 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	d := deploy.New(gd)
 
-	id, err := d.ServiceUpdate(ctx, name, update)
+	id, err := d.ServiceUpdate(ctx, name, config)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 73, "fail to update service containers", "服务垂直扩容错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -1864,7 +2029,14 @@ func postServiceUpdate(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 }
 
 func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Service, urlParamError, 81, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
 	name := mux.Vars(r)["name"]
+	unit := r.FormValue("unit")
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
@@ -1874,14 +2046,7 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	svc, err := gd.GetService(name)
-	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 81, "fail to query database", "数据库查询错误（服务表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	spec, err := svc.Spec()
+	svc, err := gd.Service(name)
 	if err != nil {
 		ec := errCodeV1(_Service, dbQueryError, 82, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -1895,9 +2060,9 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceStartTask, spec.ID, spec.Desc, nil, 300)
+	task := database.NewTask(svc.Name(), database.ServiceStartTask, svc.ID(), "", nil, 300)
 
-	err = svc.InitStart(ctx, gd.KVClient(), nil, &task, true, nil)
+	err = svc.InitStart(ctx, unit, gd.KVClient(), nil, &task, true, nil)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 83, "fail to init start service", "服务初始化启动错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -1907,15 +2072,21 @@ func postServiceStart(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
-func vaildPostServiceUpdateConfigsRequest(req structs.UnitConfig) error {
-	if len(req.Keysets) == 0 {
+func validPostServiceUpdateConfigsRequest(req structs.ModifyUnitConfig) error {
+	if len(req.Keysets) == 0 &&
+		req.ConfigFile == nil &&
+		req.DataMount == nil &&
+		req.LogMount == nil &&
+		req.Content == nil &&
+		len(req.Cmds) == 0 {
+
 		return stderr.New("nothing new for update for service configs")
 	}
 
 	return nil
 }
 
-func mergeServiceConfigsChange(ctx goctx.Context, svc *garden.Service, change structs.UnitConfig) (structs.ServiceConfigs, bool, error) {
+func mergeServiceConfigsChange(ctx goctx.Context, svc *garden.Service, change structs.ModifyUnitConfig) (structs.ServiceConfigs, bool, error) {
 	restart := false
 
 	configs, err := svc.GetUnitsConfigs(ctx)
@@ -1939,15 +2110,18 @@ func mergeServiceConfigsChange(ctx goctx.Context, svc *garden.Service, change st
 	return configs, restart, nil
 }
 
-func mergeUnitConfigChange(cc, change structs.UnitConfig) (structs.UnitConfig, bool, error) {
-	if change.LogMount != "" {
-		cc.LogMount = change.LogMount
+func mergeUnitConfigChange(cc structs.UnitConfig, change structs.ModifyUnitConfig) (structs.UnitConfig, bool, error) {
+	if change.LogMount != nil {
+		cc.LogMount = *change.LogMount
 	}
-	if change.DataMount != "" {
-		cc.DataMount = change.DataMount
+	if change.DataMount != nil {
+		cc.DataMount = *change.DataMount
 	}
-	if change.ConfigFile != "" {
-		cc.ConfigFile = change.ConfigFile
+	if change.ConfigFile != nil {
+		cc.ConfigFile = *change.ConfigFile
+	}
+	if change.Content != nil {
+		cc.Content = *change.Content
 	}
 
 	m := make(map[string]structs.Keyset, len(cc.Keysets))
@@ -1991,7 +2165,7 @@ func mergeUnitConfigChange(cc, change structs.UnitConfig) (structs.UnitConfig, b
 func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
-	change := structs.UnitConfig{}
+	change := structs.ModifyUnitConfig{}
 
 	err := json.NewDecoder(r.Body).Decode(&change)
 	if err != nil {
@@ -2000,8 +2174,8 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
-	if err := vaildPostServiceUpdateConfigsRequest(change); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 92, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceUpdateConfigsRequest(change); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 92, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -2014,23 +2188,16 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
-	svc, err := gd.GetService(name)
+	svc, err := gd.Service(name)
 	if err != nil {
 		ec := errCodeV1(_Service, dbQueryError, 93, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	spec, err := svc.Spec()
-	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 94, "fail to query database", "数据库查询错误（服务表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
 	configs, restart, err := mergeServiceConfigsChange(ctx, svc, change)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 95, "fail to update config file", "数据合并错误")
+		ec := errCodeV1(_Service, dbQueryError, 94, "fail to update config file", "数据合并错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2042,11 +2209,11 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceUpdateConfigTask, spec.ID, spec.Desc, nil, 300)
+	task := database.NewTask(svc.Name(), database.ServiceUpdateConfigTask, svc.ID(), "", nil, 300)
 
 	err = svc.UpdateUnitsConfigs(ctx, configs, &task, restart, true)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 96, "fail to update service config files", "服务配置文件更新错误")
+		ec := errCodeV1(_Service, internalError, 95, "fail to update service config files", "服务配置文件更新错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2054,7 +2221,7 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
-func vaildPostServiceExecRequest(v structs.ServiceExecConfig) error {
+func validPostServiceExecRequest(v structs.ServiceExecConfig) error {
 	if len(v.Cmd) == 0 {
 		return stderr.New("ServiceExecConfig.Cmd is required")
 	}
@@ -2063,18 +2230,24 @@ func vaildPostServiceExecRequest(v structs.ServiceExecConfig) error {
 }
 
 func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Service, urlParamError, 101, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
 	name := mux.Vars(r)["name"]
 
 	config := structs.ServiceExecConfig{}
 	err := json.NewDecoder(r.Body).Decode(&config)
 	if err != nil {
-		ec := errCodeV1(_Service, decodeError, 101, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		ec := errCodeV1(_Service, decodeError, 102, "JSON Decode Request Body error", "JSON解析请求Body错误")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
 
-	if err := vaildPostServiceExecRequest(config); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 102, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceExecRequest(config); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 103, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -2087,17 +2260,36 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	svc, err := gd.GetService(name)
+	svc, err := gd.Service(name)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 103, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 104, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	spec, err := svc.Spec()
-	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 104, "fail to query database", "数据库查询错误（服务表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
+	if boolValue(r, "sync") {
+
+		var resp []structs.ContainerExecOutput
+
+		execFunc := func() error {
+			resp, err = svc.ContainerExec(ctx, config.Container, config.Cmd, config.Detach)
+
+			return err
+		}
+
+		err = svc.ExecLock(execFunc, false, nil)
+		if err != nil {
+			ec := errCodeV1(_Service, internalError, 105, "fail to exec command in service containers", "服务容器远程命令执行错误（container exec）")
+			httpJSONError(w, err, ec, http.StatusInternalServerError)
+			return
+		}
+
+		if config.Container != "" && len(resp) == 1 {
+			writeJSON(w, resp[0], http.StatusCreated)
+		} else {
+			writeJSON(w, resp, http.StatusCreated)
+		}
+
 		return
 	}
 
@@ -2108,11 +2300,11 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceExecTask, spec.ID, spec.Desc, nil, 300)
+	task := database.NewTask(svc.Name(), database.ServiceExecTask, svc.ID(), "", nil, 300)
 
 	err = svc.Exec(ctx, config, true, &task)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 105, "fail to exec command in service containers", "服务容器远程命令执行错误（container exec）")
+		ec := errCodeV1(_Service, internalError, 106, "fail to exec command in service containers", "服务容器远程命令执行错误（container exec）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2121,7 +2313,14 @@ func postServiceExec(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 }
 
 func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		ec := errCodeV1(_Service, urlParamError, 111, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
 	name := mux.Vars(r)["name"]
+	unit := r.FormValue("unit")
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
@@ -2131,14 +2330,7 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	svc, err := gd.GetService(name)
-	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 111, "fail to query database", "数据库查询错误（服务表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	spec, err := svc.Spec()
+	svc, err := gd.Service(name)
 	if err != nil {
 		ec := errCodeV1(_Service, dbQueryError, 112, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -2152,9 +2344,9 @@ func postServiceStop(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceStopTask, spec.ID, spec.Desc, nil, 300)
+	task := database.NewTask(svc.Name(), database.ServiceStopTask, svc.ID(), "", nil, 300)
 
-	err = svc.Stop(ctx, true, true, &task)
+	err = svc.Stop(ctx, unit, true, true, &task)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 113, "fail to stop service", "服务关闭错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -2182,7 +2374,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svc, err := gd.GetService(name)
+	table, err := gd.Ormer().GetService(name)
 	if err != nil {
 		if errors.Cause(err) == sql.ErrNoRows {
 			w.WriteHeader(http.StatusNoContent)
@@ -2193,6 +2385,10 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx, cancel := goctx.WithTimeout(ctx, time.Minute*5)
+	defer cancel()
+
+	svc := gd.NewService(nil, &table)
 	err = svc.Remove(ctx, gd.KVClient(), force)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 123, "fail to remove service", "删除服务错误")
@@ -2203,7 +2399,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func vaildPostServiceBackupRequest(v structs.ServiceBackupConfig) error {
+func validPostServiceBackupRequest(v structs.ServiceBackupConfig) error {
 	if v.Container == "" {
 		return stderr.New("not assigned unit nameOrID")
 	}
@@ -2222,8 +2418,8 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := vaildPostServiceBackupRequest(config); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 132, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceBackupRequest(config); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 132, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -2249,20 +2445,16 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	if config.Type == "" {
 		config.Type = "full"
 	}
+	if config.Tables == "" {
+		config.Tables = "null"
+	}
 	if config.FilesRetention == 0 {
 		config.FilesRetention = 7
 	}
 
-	svc, err := gd.GetService(name)
+	svc, err := gd.Service(name)
 	if err != nil {
 		ec := errCodeV1(_Service, dbQueryError, 134, "fail to query database", "数据库查询错误（服务表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	spec, err := svc.Spec()
-	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 135, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2274,11 +2466,11 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	task := database.NewTask(spec.Name, database.ServiceBackupTask, spec.ID, spec.Desc, nil, 300)
+	task := database.NewTask(svc.Name(), database.ServiceBackupTask, svc.ID(), "", nil, 300)
 
 	err = svc.Backup(ctx, r.Host, config, true, &task)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 136, "fail to back service", "服务备份错误")
+		ec := errCodeV1(_Service, internalError, 135, "fail to back service", "服务备份错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2286,12 +2478,22 @@ func postServiceBackup(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", task.ID)
 }
 
-func vaildPostServiceRestoreRequest(v structs.ServiceRestoreRequest) error {
-	if v.File != "" {
+func validPostServiceRestoreRequest(v structs.ServiceRestoreRequest) error {
+	errs := make([]string, 0, 2)
+
+	if v.File == "" {
+		errs = append(errs, "restore file is required")
+	}
+
+	if len(v.Units) == 0 {
+		errs = append(errs, "restore unit without assigned")
+	}
+
+	if len(errs) == 0 {
 		return nil
 	}
 
-	return fmt.Errorf("ServiceRestoreRequest:%v,restore file is required", v)
+	return fmt.Errorf("ServiceRestoreRequest:%v,%s", v, errs)
 }
 
 func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2305,8 +2507,8 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := vaildPostServiceRestoreRequest(req); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 142, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostServiceRestoreRequest(req); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 142, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -2319,15 +2521,6 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	orm := gd.Ormer()
-
-	bf, err := orm.GetBackupFile(req.File)
-	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 143, "fail to query database", "数据库查询错误（备份文件表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
 	// new Context with deadline
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx = goctx.Background()
@@ -2335,16 +2528,16 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	svc, err := gd.GetService(name)
+	svc, err := gd.Service(name)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 144, "fail to query database", "数据库查询错误（服务表）")
+		ec := errCodeV1(_Service, dbQueryError, 143, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
 
-	id, err := svc.UnitRestore(ctx, req.Units, bf.Path, true)
+	id, err := svc.UnitRestore(ctx, req.Units, req.File, true)
 	if err != nil {
-		ec := errCodeV1(_Service, internalError, 145, "fail to restore unit data", "服务单元数据恢复错误")
+		ec := errCodeV1(_Service, internalError, 144, "fail to restore unit data", "服务单元数据恢复错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2352,12 +2545,24 @@ func postServiceRestore(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
-func vaildPostUnitRebuildRequest(v structs.UnitRebuildRequest) error {
-	if len(v.Units) < 1 {
-		return stderr.New("Units is required")
+func validPostUnitRebuildRequest(v structs.UnitRebuildRequest) error {
+	errs := make([]string, 0, 2)
+
+	if v.NameOrID == "" {
+		errs = append(errs, "Unit name or ID is required")
 	}
 
-	return nil
+	for i := range v.Candidates {
+		if v.Candidates[i] == "" {
+			errs = append(errs, "Candidate value is null")
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("UnitRebuildRequest:%v,%s", v, errs)
 }
 
 func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2371,8 +2576,8 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := vaildPostUnitRebuildRequest(req); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 152, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostUnitRebuildRequest(req); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 152, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -2411,12 +2616,24 @@ func postUnitRebuild(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	writeJSONFprintf(w, http.StatusCreated, "{%q:%q}", "task_id", id)
 }
 
-func vaildPostUnitMigrateRequest(v structs.PostUnitMigrate) error {
+func validPostUnitMigrateRequest(v structs.PostUnitMigrate) error {
+	errs := make([]string, 0, 2)
+
 	if v.NameOrID == "" {
-		return stderr.New("Unit name or ID is required")
+		errs = append(errs, "Unit name or ID is required")
 	}
 
-	return nil
+	for i := range v.Candidates {
+		if v.Candidates[i] == "" {
+			errs = append(errs, "Candidate value is null")
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("PostUnitMigrate:%v,%s", v, errs)
 }
 
 func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
@@ -2430,8 +2647,8 @@ func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := vaildPostUnitMigrateRequest(req); err != nil {
-		ec := errCodeV1(_Service, invaildParamsError, 162, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostUnitMigrateRequest(req); err != nil {
+		ec := errCodeV1(_Service, invalidParamsError, 162, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -2460,7 +2677,7 @@ func postUnitMigrate(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
-	id, err := gd.ServiceMigrate(ctx, svc, req.NameOrID, req.Candidates, true)
+	id, err := gd.ServiceMigrate(ctx, svc, req, true)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 164, "fail to scale service", "服务水平扩展错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -2488,7 +2705,7 @@ func getServiceConfigFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	svc, err := gd.GetService(name)
+	svc, err := gd.Service(name)
 	if err != nil {
 		ec := errCodeV1(_Service, dbQueryError, 172, "fail to query database", "数据库查询错误（服务表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -2663,15 +2880,15 @@ func getSanStoreInfo(store storage.Store) (structs.SANStorageResponse, error) {
 	}, nil
 }
 
-func vaildPostSanStorageRequest(v structs.PostSANStoreRequest) error {
+func validPostSanStorageRequest(v structs.PostSANStoreRequest) error {
 	errs := make([]string, 0, 2)
 
 	if v.Vendor == "" {
 		errs = append(errs, "Vendor is required")
 	}
 
-	if v.HostLunStart < v.HostLunEnd || v.HostLunEnd < 0 {
-		errs = append(errs, "host_lun_end or host_lun_start is invaild")
+	if v.HostLunStart > v.HostLunEnd || v.HostLunEnd < 0 {
+		errs = append(errs, "host_lun_end or host_lun_start is invalid")
 
 	}
 
@@ -2692,8 +2909,8 @@ func postSanStorage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := vaildPostSanStorageRequest(req); err != nil {
-		ec := errCodeV1(_Storage, invaildParamsError, 32, "Body parameters are invaild", "Body参数校验错误，包含无效参数")
+	if err := validPostSanStorageRequest(req); err != nil {
+		ec := errCodeV1(_Storage, invalidParamsError, 32, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -2830,7 +3047,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	id := r.FormValue("id")
 	tag := r.FormValue("tag")
-	service := r.FormValue("serivce")
+	service := r.FormValue("service")
 	deadline := r.FormValue("expired")
 	nfs := r.FormValue("nfs_mount")
 
@@ -2865,7 +3082,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 		err = removeBackupFiles(orm, nfs, files)
 		if err != nil {
-			ec := errCodeV1(_Backup, dbExecError, 15, "fail to remove backup files", "删除备份文件错误")
+			ec := errCodeV1(_Backup, dbExecError, 14, "fail to remove backup files", "删除备份文件错误")
 			httpJSONError(w, err, ec, http.StatusInternalServerError)
 		}
 
@@ -2881,7 +3098,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	}
 
 	if err != nil {
-		ec := errCodeV1(_Backup, dbQueryError, 13, "fail to query database", "数据库查询错误（备份文件表）")
+		ec := errCodeV1(_Backup, dbQueryError, 15, "fail to query database", "数据库查询错误（备份文件表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2908,7 +3125,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 
 	err = removeBackupFiles(orm, nfs, expired)
 	if err != nil {
-		ec := errCodeV1(_Backup, dbExecError, 15, "fail to remove backup files", "删除备份文件错误")
+		ec := errCodeV1(_Backup, dbExecError, 16, "fail to remove backup files", "删除备份文件错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -2956,14 +3173,12 @@ func getBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag := r.FormValue("tag")
-	service := r.FormValue("serivce")
+	service := r.FormValue("service")
 	start := r.FormValue("start")
 	end := r.FormValue("end")
 
 	ok, _, gd := fromContext(ctx, _Garden)
-	if !ok || gd == nil ||
-		gd.Ormer() == nil {
-
+	if !ok || gd == nil || gd.Ormer() == nil {
 		httpJSONNilGarden(w)
 		return
 	}
@@ -3040,4 +3255,23 @@ func filterBackupFilesByTime(files []database.BackupFile, start, end string) []d
 	}
 
 	return out
+}
+
+func getBackupFile(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil || gd.Ormer() == nil {
+		httpJSONNilGarden(w)
+		return
+	}
+
+	bf, err := gd.Ormer().GetBackupFile(id)
+	if err != nil {
+		ec := errCodeV1(_Backup, dbQueryError, 31, "fail to query database", "数据库查询错误（备份文件表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, bf, http.StatusOK)
 }

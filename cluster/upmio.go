@@ -15,6 +15,16 @@ import (
 	"golang.org/x/net/context"
 )
 
+// IsErrVolumeNotFound returns true if the error is caused
+// when a volume is not found in the docker host.
+func IsErrVolumeNotFound(err error) bool {
+	if client.IsErrVolumeNotFound(err) {
+		return true
+	}
+
+	return strings.Contains(strings.ToLower(err.Error()), "no such volume")
+}
+
 // IsErrContainerNotFound returns true if the error is caused
 // when a container is not found in the docker host.
 func IsErrContainerNotFound(err error) bool {
@@ -130,12 +140,12 @@ func (e *Engine) UpdateContainer(ctx context.Context, name string, config contai
 }
 
 // Exec returns the container exec command result
-func (c Container) Exec(ctx context.Context, cmd []string, detach bool) (types.ContainerExecInspect, error) {
+func (c Container) Exec(ctx context.Context, cmd []string, detach bool, w io.Writer) (types.ContainerExecInspect, error) {
 	if c.Engine == nil {
 		return types.ContainerExecInspect{}, errors.Errorf("Engine of Container:%s is required", c.Names)
 	}
 
-	return c.Engine.containerExec(ctx, c.ID, cmd, detach)
+	return c.Engine.containerExec(ctx, c.ID, cmd, detach, w)
 }
 
 // checkTtyInput checks if we are trying to attach to a container tty
@@ -151,7 +161,7 @@ func checkTtyInput(attachStdin, ttyMode bool) error {
 }
 
 // containerExec exec cmd in containeID,It returns ContainerExecInspect.
-func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []string, detach bool) (types.ContainerExecInspect, error) {
+func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []string, detach bool, w io.Writer) (types.ContainerExecInspect, error) {
 	inspect := types.ContainerExecInspect{}
 
 	execConfig := types.ExecConfig{
@@ -168,10 +178,28 @@ func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []st
 		execConfig.AttachStdout = false
 	}
 
+	// We need to check the tty _before_ we do the ContainerExecCreate, because
+	// otherwise if we error out we will leak execIDs on the server (and
+	// there's no easy way to clean those up). But also in order to make "not
+	// exist" errors take precedence we do a dummy inspect first.
+	c, err := e.apiClient.ContainerInspect(ctx, containerID)
+	e.CheckConnectionErr(err)
+	if err != nil {
+		return inspect, errors.WithStack(err)
+	}
+
+	containerID = c.ID
+
 	exec, err := e.apiClient.ContainerExecCreate(ctx, containerID, execConfig)
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return inspect, errors.Wrapf(err, "Container %s exec create", containerID)
+	}
+
+	{
+		// add execID to the container, so the later exec/start will work
+		container := e.Containers().Get(containerID)
+		container.Info.ExecIDs = append(container.Info.ExecIDs, exec.ID)
 	}
 
 	// TODO: remove
@@ -193,8 +221,7 @@ func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []st
 			logrus.Warn(err)
 		}
 
-		err = e.containerExecAttch(ctx, exec.ID, execConfig)
-		e.CheckConnectionErr(err)
+		err = e.containerExecAttch(ctx, exec.ID, execConfig, w)
 		if err != nil {
 			return inspect, err
 		}
@@ -212,16 +239,22 @@ func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []st
 	return inspect, err
 }
 
-func (e *Engine) containerExecAttch(ctx context.Context, execID string, execConfig types.ExecConfig) error {
+func (e *Engine) containerExecAttch(ctx context.Context, execID string, execConfig types.ExecConfig, w io.Writer) error {
 	var (
 		out, stderr io.Writer     = os.Stdout, os.Stderr
 		in          io.ReadCloser = os.Stdin
 	)
+
 	resp, err := e.apiClient.ContainerExecAttach(ctx, execID, execConfig)
+	e.CheckConnectionErr(err)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 	defer resp.Close()
+
+	if w != nil {
+		out, stderr = w, w
+	}
 
 	err = holdHijackedConnection(ctx, execConfig.Tty, in, out, stderr, resp)
 	if err != nil {
@@ -234,6 +267,7 @@ func (e *Engine) containerExecAttch(ctx context.Context, execID string, execConf
 // getExecExitCode perform an inspect on the exec command. It returns ContainerExecInspect.
 func (e *Engine) getExecExitCode(ctx context.Context, execID string) (types.ContainerExecInspect, int, error) {
 	resp, err := e.apiClient.ContainerExecInspect(ctx, execID)
+	e.CheckConnectionErr(err)
 	if err != nil {
 		// If we can't connect, then the daemon probably died.
 		if client.IsErrConnectionFailed(err) {

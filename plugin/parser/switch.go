@@ -10,6 +10,7 @@ import (
 
 	"github.com/astaxie/beego/config"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/vars"
 	"github.com/pkg/errors"
 )
 
@@ -19,10 +20,17 @@ func init() {
 	register("switch_manager", "1.1.23", &switchManagerConfigV1123{})
 	//	register("switch_manager", "1.1.47", &switchManagerConfigV1147{})
 	register("switch_manager", "1.2.0", &switchManagerConfigV120{})
+	register("switch_manager", "1.3.0", &switchManagerConfigV120{})
+
+	register("switch_manager", "2.0", &switchManagerConfigV120{})
+	register("switch_manager", "2.1", &switchManagerConfigV120{})
+	register("switch_manager", "2.2", &switchManagerConfigV120{})
+	register("switch_manager", "2.3", &switchManagerConfigV120{})
 }
 
 var (
 	consulPort         = "8500"
+	consulPrefix       = ""
 	leaderElectionPath = "docker/swarm/leader"
 )
 
@@ -43,6 +51,12 @@ func setLeaderElectionPath(path string) {
 
 	// A custom prefix to the path can be optionally used.
 	if len(parts) == 2 {
+
+		end := strings.Index(parts[1], leaderElectionPath)
+		if end > 0 {
+			consulPrefix = filepath.Clean(string(parts[1][:end]))
+		}
+
 		leaderElectionPath = filepath.Join("/", parts[1])
 
 		_, port, err := net.SplitHostPort(parts[0])
@@ -131,15 +145,10 @@ func (c switchManagerConfig) HealthCheck(id string, desc structs.ServiceSpec) (s
 		return structs.ServiceRegistration{}, err
 	}
 
-	im, err := structs.ParseImage(c.template.Image)
-	if err != nil {
-		return structs.ServiceRegistration{}, err
-	}
-
 	reg := structs.HorusRegistration{}
 	reg.Service.Select = true
 	reg.Service.Name = spec.ID
-	reg.Service.Type = "unit_" + im.Name
+	reg.Service.Type = "unit_" + desc.Image.Name
 	reg.Service.Tag = desc.ID
 	reg.Service.Container.Name = spec.Name
 	reg.Service.Container.HostName = spec.Engine.Node
@@ -270,7 +279,7 @@ type switchManagerConfigV1147 struct {
 }
 
 func (switchManagerConfigV1147) clone(t *structs.ConfigTemplate) parser {
-	pr := &switchManagerConfigV1123{}
+	pr := &switchManagerConfigV1147{}
 	pr.template = t
 
 	return pr
@@ -332,7 +341,7 @@ func (c *switchManagerConfigV120) GenerateConfig(id string, desc structs.Service
 
 	m := make(map[string]interface{}, 10)
 
-	m["domain"] = desc.ID
+	m["domain"] = desc.Tag
 	m["name"] = spec.Name
 
 	if port, ok := desc.Options["Port"]; ok {
@@ -344,13 +353,19 @@ func (c *switchManagerConfigV120) GenerateConfig(id string, desc structs.Service
 	m["ConsulIP"] = spec.Engine.Addr
 
 	m["ConsulPort"] = consulPort
+	m["ConsulPrefix"] = consulPrefix
+	m["ConsulDatacenter"] = strings.ToLower(os.Getenv("CONSUL_HTTP_DATACENTER"))
 	m["SwarmHostKey"] = leaderElectionPath
 	m["SwarmUserAgent"] = "1.31"
 
 	if c.template != nil {
 		m["SwarmSocketPath"] = filepath.Join(c.template.DataMount, "/upsql.sock")
 		m["SwarmHealthCheckConfigFile"] = filepath.Join(c.template.DataMount, "/my.cnf")
+		m["ProxyUserSharedFile"] = filepath.Join(c.template.DataMount, "virtual-database.xml")
 	}
+
+	m["SwarmHealthCheckUser"] = vars.Check.User
+	m["SwarmHealthCheckPassword"] = vars.Check.Password
 
 	for key, val := range m {
 		err = c.set(key, val)

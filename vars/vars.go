@@ -4,13 +4,13 @@ import (
 	"errors"
 )
 
-var errUserInvaild = errors.New("invaild user")
+var errUserInvalid = errors.New("invalid user")
 
 type User struct {
-	Role      string
-	User      string
-	Password  string
-	Privilege string
+	Role     string
+	User     string
+	Password string
+	//	Privilege string
 }
 
 var (
@@ -20,8 +20,8 @@ var (
 	// root_password=123.com
 	// root_privilege="ALL"
 	Root = User{
-		Role:      "root",
-		Privilege: "ALL",
+		Role: "root",
+		//	Privilege: "ALL",
 	}
 
 	mon     = ""
@@ -30,8 +30,8 @@ var (
 	// mon_password=111111
 	// mon_privilege="SELECT,PROCESS,REPLICATION CLENT"
 	Monitor = User{
-		Role:      "monitor",
-		Privilege: "SELECT,PROCESS,REPLICATION CLENT",
+		Role: "monitor",
+		//	Privilege: "SELECT,PROCESS,REPLICATION CLENT",
 	}
 
 	repl     = ""
@@ -40,8 +40,15 @@ var (
 	// repl_password=111111
 	// repl_privilege="REPLICATION SLAVE"
 	Replication = User{
-		Role:      "replication",
-		Privilege: "REPLICATION SLAVE",
+		Role: "replication",
+		//	Privilege: "REPLICATION SLAVE",
+	}
+
+	check     = ""
+	check_pwd = ""
+	Check     = User{
+		Role: "check",
+		//	Privilege: "ALL",
 	}
 )
 
@@ -54,23 +61,18 @@ func init() {
 
 	Replication.User = repl
 	Replication.Password = repl_pwd
+
+	Check.User = check
+	Check.Password = check_pwd
 }
 
 func Validate() error {
 	if Root.User == "" || Root.Password == "" ||
+		Check.User == "" || Check.Password == "" ||
 		Monitor.User == "" || Monitor.Password == "" ||
 		Replication.User == "" || Replication.Password == "" {
 
-		return errUserInvaild
-	}
-
-	return nil
-}
-
-func ValidateReplication() error {
-	if Replication.User == "" || Replication.Password == "" {
-
-		return errUserInvaild
+		return errUserInvalid
 	}
 
 	return nil

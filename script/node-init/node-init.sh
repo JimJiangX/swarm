@@ -18,13 +18,12 @@ consul_port=${14}
 node_id=${15}
 horus_server_ip=${16}
 horus_server_port=${17}
-docker_plugin_port=${18}
-swarm_agent_port=${19}
-nfs_ip=${20}
-nfs_dir=${21}
-nfs_mount_dir=${22}
-nfs_mount_opts=${23}
-san_id=${24}
+swarm_agent_port=${18}
+nfs_ip=${19}
+nfs_dir=${20}
+nfs_mount_dir=${21}
+nfs_mount_opts=${22}
+san_id=${23}
 if [ "$san_id" == "null" ]; then
 	san_id=''
 fi
@@ -36,7 +35,7 @@ ssd_vgname=${HOSTNAME}_SSD_VG
 
 bond_dev=bond0
 
-bond_mode=`cat cat /sys/class/net/${bond_dev}/bonding/mode`
+bond_mode=`cat /sys/class/net/${bond_dev}/bonding/mode`
 
 bond_slaves=`cat /sys/class/net/${bond_dev}/bonding/slaves`
 if [ ! -n "${bond_slaves}" ]; then
@@ -48,14 +47,18 @@ pf_dev_bw_num=0
 if [ "${bond_mode}" == "balance-xor 2" ]; then
 	for d in ${bond_slaves}
 	do
-		d_bw=`ethtool enp130s0f0| grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}'`	
-		pf_dev_bw_num=`expr ${pf_dev_bw_num} + ${d_bw}`
+		#d_bw=`ethtool enp130s0f0| grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}'`	
+		#pf_dev_bw_num=`expr ${pf_dev_bw_num} + ${d_bw}`
+                d_bw=`ethtool ${d} | grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}' | sed s/[[:space:]]//g`    
+		if [ ${d_bw} -gt ${pf_dev_bw_num} ]; then
+                	pf_dev_bw_num=${d_bw}
+		fi
 	done
 	pf_dev_bw=${pf_dev_bw_num}M
 elif [ "${bond_mode}" == "active-backup 1" ]; then
 	for d in ${bond_slaves}
         do
-                d_bw=`ethtool enp130s0f0| grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}'`    
+                d_bw=`ethtool ${d} | grep Speed | awk -F: '{print $2}' | awk -FMb '{print $1}' | sed s/[[:space:]]//g`    
 		if [ ${d_bw} -gt ${pf_dev_bw_num} ]; then
                 	pf_dev_bw_num=${d_bw}
 		fi
@@ -69,12 +72,13 @@ fi
 
 PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
 
-docker_version=1.12.6
-consul_version=0.9.2
-swarm_agent_version=1.2.8-bf351e2
+docker_version=17.12.0
+consul_version=1.0.2
+swarm_agent_version=1.2.8-f70ba02
 logicalVolume_volume_plugin_version=3.0.0
 
 platform="$(uname -s)"
+yum --nogpgcheck -y install lsb
 release=""
 if [ "${platform}" = "Linux" ]; then
 	kernel="$(uname -r)"
@@ -91,6 +95,39 @@ if [ ${container_nic} = '' ]; then
 	exit 2
 fi
 
+set_sysctl() {
+	cat << EOF > /etc/sysctl.conf
+net.ipv4.ip_forward = 0
+net.ipv6.conf.all.forwarding = 0
+net.ipv4.tcp_tw_recycle = 1
+net.ipv4.tcp_tw_reuse = 1
+vm.dirty_ratio = 1
+vm.dirty_background_ratio = 1
+vm.dirty_writeback_centisecs = 10
+vm.dirty_expire_centisecs = 3
+vm.drop_caches = 1
+vm.swappiness = 0
+vm.vfs_cache_pressure = 200
+vm.pagecache_limit_mb = 10240
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.all.secure_redirects = 0
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.accept_redirects = 0
+net.ipv4.conf.default.accept_source_route = 0
+net.ipv4.conf.default.rp_filter = 1
+net.ipv4.conf.default.secure_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.icmp_ignore_bogus_error_responses = 1
+net.ipv4.tcp_max_syn_backlog = 4096
+net.ipv4.tcp_syncookies = 1
+fs.aio-max-nr = 262144
+EOF
+	sysctl -p
+}
+
 rpm_install() {
 	if [ "${release}" == "SUSE LINUX" ]; then
 		zypper --no-gpg-checks --non-interactive install nfs-utils curl sysstat mariadb-client ${PT}
@@ -105,6 +142,7 @@ rpm_install() {
 			exit 2
 		fi
 	fi	
+	cp ${cur_dir}/rpm/jq /usr/bin/
 }
 
 nfs_mount() {
@@ -146,7 +184,7 @@ reg_to_consul() {
 	local component_type=$1
 	local component_port=$2
 
-	stat_code=`curl -o /dev/null -s -w %{http_code} -X POST -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Port": '${component_port}', "Check": { "tcp": "'${adm_ip}':'${component_port}'", "Interval": "10s", "timeout": "3s" }}' http://${adm_ip}:${consul_port}/v1/agent/service/register`
+	stat_code=`curl -o /dev/null -s -w %{http_code} -X PUT -H "Content-Type: application/json" -d '{"ID": "'${node_id}':'${component_type}'","Name": "'${node_id}':'${component_type}'", "Tags": [], "Address": "'${adm_ip}'", "Port": '${component_port}', "Check": { "tcp": "'${adm_ip}':'${component_port}'", "Interval": "10s", "timeout": "3s" }}' http://${adm_ip}:${consul_port}/v1/agent/service/register`
 	if [ "${stat_code}" != "200" ]; then
 		echo "${component_type} register to consul failed"
 		exit 2
@@ -235,9 +273,9 @@ install_consul() {
   "node_name": "${HOSTNAME}",
   "disable_update_check": true,
   "log_level": "INFO",
+  "protocol": 3,
   "addresses": {
-    "http": "${adm_ip}",
-    "rpc": "${adm_ip}"
+    "http": "${adm_ip}"
   },
   "start_join": ${cs_list}
 }
@@ -311,67 +349,7 @@ install_docker() {
 	
 	wwn=${wwn:1}
 
-
-	if [ "${release}" == "SUSE LINUX" ]; then
-		if [ "${san_id}" != '' ]; then
-			systemctl enable multipathd.service
-			systemctl start multipathd.service
-			systemctl status multipathd.service
-			if [ $? -ne 0 ]; then
-				echo "start multipathd failed!"
-				exit 2
-			fi
-		fi
-
-		zypper --no-gpg-checks --non-interactive install ${cur_dir}/rpm/docker-${docker_version}.sles/*.rpm
-		if [ $? -ne 0 ]; then
-			echo "docker rpm install faild"
-			exit 2
-		fi
-		cat << EOF > /etc/sysconfig/docker
-## Path           : System/Management
-## Description    : Extra cli switches for docker daemon
-## Type           : string
-## Default        : ""
-## ServiceRestart : docker
-
-#
-DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label NODE_ID=${node_id} --label HBA_WWN=${wwn} --label HDD_VG=${hdd_vgname} --label HDD_VG_SIZE=${hdd_vg_size} --label SSD_VG=${ssd_vgname} --label SSD_VG_SIZE=${ssd_vg_size} --label CONTAINER_NIC=${container_nic} --label PF_DEV_BW=${pf_dev_bw} --label SAN_ID=${san_id}
-
-DOCKER_NETWORK_OPTIONS=""
-
-EOF
-
-		cat << EOF > /usr/lib/systemd/system/docker.service
-[Unit]
-Description=Docker Application Container Engine
-Documentation=https://docs.docker.com
-After=network.target docker.socket containerd.socket
-Requires=docker.socket containerd.socket
-
-[Service]
-EnvironmentFile=/etc/sysconfig/docker
-ExecStart=/usr/bin/dockerd --containerd /run/containerd/containerd.sock \$DOCKER_NETWORK_OPTIONS \$DOCKER_OPTS
-ExecReload=/bin/kill -s HUP \$MAINPID
-# Having non-zero Limit*s causes performance problems due to accounting overhead
-# in the kernel. We recommend using cgroups to do container-local accounting.
-LimitNOFILE=infinity
-LimitNPROC=infinity
-LimitCORE=infinity
-# Uncomment TasksMax if your systemd version supports it.
-# Only systemd 226 and above support this property.
-#TasksMax=infinity
-# Set delegate yes so that systemd does not reset the cgroups of docker containers
-# Only systemd 218 and above support this property.
-#Delegate=yes
-# KillMode=process is not necessary because of how we set up containerd.
-
-[Install]
-WantedBy=multi-user.target
-
-EOF
-
-	elif [ "${release}" == "RedHatEnterpriseServer" ] || [ "${release}" == "CentOS" ]; then
+	if [ "${release}" == "RedHatEnterpriseServer" ] || [ "${release}" == "CentOS" ]; then
 		if [ "${san_id}" != '' ]; then
 			systemctl enable multipathd.service
 			systemctl start multipathd.service
@@ -382,7 +360,7 @@ EOF
 			fi
 		fi
 		
-		yum --nogpgcheck -y install ${cur_dir}/rpm/docker-${docker_version}.el7/*.rpm
+		yum --nogpgcheck -y install ${cur_dir}/rpm/docker-ce-${docker_version}.el7/*.rpm
 		if [ $? -ne 0 ]; then
 			echo "docker rpm install faild"
 			exit 2
@@ -395,15 +373,17 @@ EOF
 ## ServiceRestart : docker
 
 #
-DOCKER_OPTS=-H tcp://0.0.0.0:${docker_port} -H unix:///var/run/docker.sock --label="NODE_ID=${node_id}" --label="HBA_WWN=${wwn}" --label="HDD_VG=${hdd_vgname}" --label="HDD_VG_SIZE=${hdd_vg_size}" --label="SSD_VG=${ssd_vgname}" --label="SSD_VG_SIZE=${ssd_vg_size}" --label="CONTAINER_NIC=${container_nic}" --label PF_DEV_BW=${pf_dev_bw}
+DOCKER_OPTS=--host=tcp://0.0.0.0:${docker_port} --host=unix:///var/run/docker.sock --label="NODE_ID=${node_id}" --label="HBA_WWN=${wwn}" --label="HDD_VG=${hdd_vgname}" --label="HDD_VG_SIZE=${hdd_vg_size}" --label="SSD_VG=${ssd_vgname}" --label="SSD_VG_SIZE=${ssd_vg_size}" --label="CONTAINER_NIC=${container_nic}" --label PF_DEV_BW=${pf_dev_bw}
 
 EOF
 
 		cat << EOF > /usr/lib/systemd/system/docker.service
+
 [Unit]
 Description=Docker Application Container Engine
 Documentation=https://docs.docker.com
-After=network.target
+After=network-online.target firewalld.service
+Wants=network-online.target
 
 [Service]
 Type=notify
@@ -413,25 +393,30 @@ Type=notify
 EnvironmentFile=/etc/sysconfig/docker
 ExecStart=/usr/bin/dockerd \$DOCKER_OPTS
 ExecReload=/bin/kill -s HUP \$MAINPID
-MountFlags=slave
-# Uncomment TasksMax if your systemd version supports it.
-# Only systemd 226 and above support this version.
-#TasksMax=infinity
 # Having non-zero Limit*s causes performance problems due to accounting overhead
 # in the kernel. We recommend using cgroups to do container-local accounting.
 LimitNOFILE=infinity
 LimitNPROC=infinity
 LimitCORE=infinity
+# Uncomment TasksMax if your systemd version supports it.
+# Only systemd 226 and above support this version.
+#TasksMax=infinity
 TimeoutStartSec=0
 # set delegate yes so that systemd does not reset the cgroups of docker containers
 Delegate=yes
 # kill only the docker process, not all processes in the cgroup
 KillMode=process
+# restart the docker process if it exits prematurely
+Restart=on-failure
+StartLimitBurst=3
+StartLimitInterval=60s
 
 [Install]
 WantedBy=multi-user.target
 EOF
-
+	else 
+		echo "only support Centos and RHEL"
+		exit 2
 	fi
 
 	# reload
@@ -521,6 +506,7 @@ EOF
 install_swarm_agent() {
 	local base_dir=/usr/local/swarm-agent
 	local script_dir=${base_dir}/scripts
+	local bin_dir=${base_dir}/bin
 
 	# stop swarm-agent
 	pkill -9 swarm >/dev/null 2>&1
@@ -531,8 +517,9 @@ install_swarm_agent() {
 	chmod +x ${script_dir}/seed/net/* ${script_dir}/seed/san/*
 
 	# copy binary file
-	cp ${cur_dir}/swarm-agent-${swarm_agent_version}/bin/swarm ${base_dir}/swarm
-	chmod 755 ${base_dir}/swarm
+	mkdir -p ${bin_dir}
+	cp ${cur_dir}/swarm-agent-${swarm_agent_version}/bin/swarm ${bin_dir}
+	chmod 755 ${bin_dir}/swarm
 
 	# create systemd config file
 	cat << EOF > /etc/sysconfig/swarm-agent
@@ -543,7 +530,7 @@ install_swarm_agent() {
 ## ServiceRestart : swarm
 
 #
-SWARM_AGENT_OPTS="seedjoin --seedAddr ${adm_ip}:${swarm_agent_port} --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/${swarm_key}"
+SWARM_AGENT_OPTS="seedjoin --seedAddr ${adm_ip}:${swarm_agent_port} --script=${script_dir}/seed/ --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/${swarm_key}"
 
 EOF
 
@@ -556,7 +543,7 @@ After=network.target consul.service
 [Service]
 Environment=CONSUL_HTTP_DATACENTER=${cs_datacenter}
 EnvironmentFile=/etc/sysconfig/swarm-agent
-ExecStart=${base_dir}/swarm  \$SWARM_AGENT_OPTS
+ExecStart=${bin_dir}/swarm  \$SWARM_AGENT_OPTS
 
 [Install]
 WantedBy=multi-user.target
@@ -579,6 +566,7 @@ EOF
 	fi
 }
 
+set_sysctl
 rpm_install
 nfs_mount
 init_hdd_vg
@@ -586,7 +574,7 @@ init_ssd_vg
 install_consul
 
 install_docker_plugin
-reg_to_consul DockerPlugin ${docker_plugin_port}
+#reg_to_consul DockerPlugin ${docker_plugin_port}
 #reg_to_horus_server DockerPlugin 
 
 install_docker

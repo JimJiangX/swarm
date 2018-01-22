@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 5.7.17, for macos10.12 (x86_64)
+-- MySQL dump 10.13  Distrib 5.7.17, for Linux (x86_64)
 --
--- Host: 192.168.4.130    Database: mgm
+-- Host: localhost    Database: mgm
 -- ------------------------------------------------------
--- Server version	5.7.17-enterprise-commercial-advanced-log
+-- Server version	5.7.17-upsql-2.0.0-log
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -27,62 +27,21 @@ DROP TABLE IF EXISTS `tbl_backup_files`;
 CREATE TABLE `tbl_backup_files` (
   `ai` int(24) NOT NULL AUTO_INCREMENT COMMENT '自增字段,与业务无关',
   `id` varchar(128) NOT NULL,
-  `strategy_id` varchar(128) NOT NULL COMMENT '关联的备份策略id',
   `task_id` varchar(128) NOT NULL COMMENT '关联tbl_dbaas_task.id',
   `unit_id` varchar(128) NOT NULL COMMENT '所属容器的id',
   `type` varchar(45) DEFAULT NULL COMMENT '全量／增量\n\nfull/incremental',
+  `tables` varchar(1024) DEFAULT NULL,
   `path` varchar(1024) DEFAULT NULL COMMENT '备份文件路径(包含文件名)',
   `size` bigint(128) unsigned DEFAULT NULL COMMENT '备份文件大小，单位：byte',
   `retention` datetime DEFAULT NULL COMMENT '到期日期',
+  `remark` varchar(256) DEFAULT NULL COMMENT '备注',
+  `tag` varchar(256) DEFAULT NULL,
   `created_at` datetime NOT NULL COMMENT '创建时间',
   `finished_at` datetime DEFAULT NULL COMMENT '完成时间',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `tbl_backup_files`
---
-
-LOCK TABLES `tbl_backup_files` WRITE;
-/*!40000 ALTER TABLE `tbl_backup_files` DISABLE KEYS */;
-/*!40000 ALTER TABLE `tbl_backup_files` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `tbl_backup_strategy`
---
-
-DROP TABLE IF EXISTS `tbl_backup_strategy`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_backup_strategy` (
-  `ai` int(24) NOT NULL AUTO_INCREMENT COMMENT '自增字段,与业务无关',
-  `id` varchar(128) NOT NULL COMMENT '备份策略ID',
-  `name` varchar(128) NOT NULL COMMENT '备份策略名称',
-  `service_id` varchar(128) NOT NULL COMMENT '所属服务ID',
-  `spec` varchar(45) NOT NULL COMMENT '触发规则描述，cron语法',
-  `next` datetime DEFAULT NULL COMMENT '下次执行时间',
-  `valid` datetime NOT NULL COMMENT '到期日期',
-  `timeout` bigint(255) unsigned DEFAULT NULL COMMENT '执行备份的超时时长,time.Unix()值',
-  `backup_dir` varchar(128) NOT NULL COMMENT '实例单元存放备份目录',
-  `type` varchar(64) DEFAULT NULL COMMENT '备份类型\n全量／增量\nfull／incremental\n',
-  `enabled` tinyint(1) unsigned DEFAULT '1' COMMENT '0:停用\n1:启用',
-  `created_at` datetime DEFAULT NULL COMMENT '创建时间',
-  PRIMARY KEY (`ai`),
-  UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `tbl_backup_strategy`
---
-
-LOCK TABLES `tbl_backup_strategy` WRITE;
-/*!40000 ALTER TABLE `tbl_backup_strategy` DISABLE KEYS */;
-/*!40000 ALTER TABLE `tbl_backup_strategy` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `tbl_cluster`
@@ -95,19 +54,11 @@ CREATE TABLE `tbl_cluster` (
   `id` varchar(128) NOT NULL COMMENT '主键',
   `max_host` int(11) unsigned NOT NULL DEFAULT '500' COMMENT '最大物理机数量',
   `usage_limit` int(11) NOT NULL DEFAULT '80' COMMENT ' 集群中物理机资源使用上限比例百分比, 0-100',
+  `ha_network_tag` varchar(128) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id_UNIQUE` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='集群表';
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `tbl_cluster`
---
-
-LOCK TABLES `tbl_cluster` WRITE;
-/*!40000 ALTER TABLE `tbl_cluster` DISABLE KEYS */;
-/*!40000 ALTER TABLE `tbl_cluster` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `tbl_host`
@@ -139,15 +90,6 @@ CREATE TABLE `tbl_host` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `tbl_host`
---
-
-LOCK TABLES `tbl_host` WRITE;
-/*!40000 ALTER TABLE `tbl_host` DISABLE KEYS */;
-/*!40000 ALTER TABLE `tbl_host` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
 -- Table structure for table `tbl_ip`
 --
 
@@ -171,15 +113,6 @@ CREATE TABLE `tbl_ip` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `tbl_ip`
---
-
-LOCK TABLES `tbl_ip` WRITE;
-/*!40000 ALTER TABLE `tbl_ip` DISABLE KEYS */;
-/*!40000 ALTER TABLE `tbl_ip` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
 -- Table structure for table `tbl_san`
 --
 
@@ -190,6 +123,7 @@ CREATE TABLE `tbl_san` (
   `ai` int(24) NOT NULL AUTO_INCREMENT COMMENT '自增字段,与业务无关',
   `id` varchar(128) NOT NULL COMMENT 'storage_system_ID',
   `vendor` varchar(128) NOT NULL COMMENT '厂商:HUAWEI / HITACHI',
+  `version` varchar(255) NOT NULL,
   `admin_unit` varchar(128) NOT NULL COMMENT '管理域名称,HDS专有',
   `lun_start` int(11) unsigned NOT NULL COMMENT '起始位,HDS专有',
   `lun_end` int(11) unsigned NOT NULL COMMENT '结束位,HDS专有',
@@ -197,17 +131,8 @@ CREATE TABLE `tbl_san` (
   `hlu_end` int(11) unsigned NOT NULL COMMENT 'host_un_end',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `tbl_san`
---
-
-LOCK TABLES `tbl_san` WRITE;
-/*!40000 ALTER TABLE `tbl_san` DISABLE KEYS */;
-/*!40000 ALTER TABLE `tbl_san` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `tbl_san_raid_group`
@@ -224,17 +149,8 @@ CREATE TABLE `tbl_san_raid_group` (
   `enabled` tinyint(1) unsigned NOT NULL DEFAULT '1' COMMENT '是否启用\n0:停用\n1:启用',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`storage_system_id`,`storage_rg_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `tbl_san_raid_group`
---
-
-LOCK TABLES `tbl_san_raid_group` WRITE;
-/*!40000 ALTER TABLE `tbl_san_raid_group` DISABLE KEYS */;
-/*!40000 ALTER TABLE `tbl_san_raid_group` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `tbl_san_raid_group_lun`
@@ -260,15 +176,6 @@ CREATE TABLE `tbl_san_raid_group_lun` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `tbl_san_raid_group_lun`
---
-
-LOCK TABLES `tbl_san_raid_group_lun` WRITE;
-/*!40000 ALTER TABLE `tbl_san_raid_group_lun` DISABLE KEYS */;
-/*!40000 ALTER TABLE `tbl_san_raid_group_lun` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
 -- Table structure for table `tbl_service`
 --
 
@@ -283,8 +190,6 @@ CREATE TABLE `tbl_service` (
   `high_available` tinyint(1) NOT NULL,
   `auto_healing` tinyint(1) unsigned NOT NULL DEFAULT '0' COMMENT '服务自动愈合\n0:停用\n1:启用',
   `auto_scaling` tinyint(1) unsigned NOT NULL DEFAULT '0' COMMENT '自动扩缩\n0	停用\n1	启用',
-  `backup_max_size` bigint(128) unsigned DEFAULT NULL COMMENT '备份文件总大小,单位:byte',
-  `backup_files_retention` bigint(128) DEFAULT NULL COMMENT '文件保存时间,单位:Hour',
   `action_status` int(10) unsigned DEFAULT NULL COMMENT '操作动作状态\n',
   `created_at` datetime NOT NULL COMMENT '创建日期',
   `finished_at` datetime DEFAULT NULL COMMENT '创建完成日期',
@@ -295,26 +200,17 @@ CREATE TABLE `tbl_service` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `tbl_service`
+-- Table structure for table `tbl_service_description`
 --
 
-LOCK TABLES `tbl_service` WRITE;
-/*!40000 ALTER TABLE `tbl_service` DISABLE KEYS */;
-/*!40000 ALTER TABLE `tbl_service` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `tbl_service_decription`
---
-
-DROP TABLE IF EXISTS `tbl_service_decription`;
+DROP TABLE IF EXISTS `tbl_service_description`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `tbl_service_decription` (
+CREATE TABLE `tbl_service_description` (
   `id` varchar(128) NOT NULL,
   `service_id` varchar(128) NOT NULL,
   `architecture` varchar(128) NOT NULL COMMENT '服务结构描述\n例如：m:1#sb:1#sl:1\n	  m:3',
-  `schedule_opts` varchar(512) NOT NULL,
+  `schedule_opts` text NOT NULL,
   `unit_num` int(11) NOT NULL,
   `cpu_num` int(11) NOT NULL,
   `mem_size` bigint(20) NOT NULL,
@@ -322,21 +218,12 @@ CREATE TABLE `tbl_service_decription` (
   `image_version` varchar(128) NOT NULL,
   `volumes` longtext NOT NULL,
   `networks` longtext NOT NULL,
-  `cluster_id` varchar(128) NOT NULL,
+  `cluster_id` varchar(2048) NOT NULL,
   `options` varchar(128) DEFAULT NULL,
   `previous_version` varchar(128) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `tbl_service_decription`
---
-
-LOCK TABLES `tbl_service_decription` WRITE;
-/*!40000 ALTER TABLE `tbl_service_decription` DISABLE KEYS */;
-/*!40000 ALTER TABLE `tbl_service_decription` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `tbl_software_image`
@@ -351,24 +238,16 @@ CREATE TABLE `tbl_software_image` (
   `major_version` int(11) NOT NULL COMMENT '主版本号',
   `minor_version` int(11) NOT NULL COMMENT '次版本号',
   `patch_version` int(11) NOT NULL COMMENT '修订版本号',
+  `build_version` int(11) NOT NULL DEFAULT '0',
   `docker_image_id` varchar(128) DEFAULT NULL COMMENT 'docker image id',
   `size` int(11) DEFAULT NULL,
   `label` varchar(4096) DEFAULT NULL COMMENT '预留备注',
   `upload_at` datetime NOT NULL COMMENT '上传日期',
   PRIMARY KEY (`id`),
   UNIQUE KEY `id_UNIQUE` (`id`),
-  UNIQUE KEY `index3` (`software_name`,`major_version`,`minor_version`,`patch_version`)
+  UNIQUE KEY `index3` (`software_name`,`major_version`,`minor_version`,`patch_version`,`build_version`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='软件镜像表';
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `tbl_software_image`
---
-
-LOCK TABLES `tbl_software_image` WRITE;
-/*!40000 ALTER TABLE `tbl_software_image` DISABLE KEYS */;
-/*!40000 ALTER TABLE `tbl_software_image` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `tbl_system_config`
@@ -386,7 +265,6 @@ CREATE TABLE `tbl_system_config` (
   `consul_token` varchar(45) DEFAULT NULL COMMENT 'Consul Token,可以为空',
   `consul_wait_time` int(10) DEFAULT NULL,
   `docker_port` int(10) unsigned NOT NULL COMMENT 'docker Port',
-  `plugin_port` int(6) NOT NULL COMMENT 'docker volume plugin port',
   `swarm_agent_port` int(11) NOT NULL,
   `registry_os_username` varchar(45) NOT NULL COMMENT 'registry 操作系统用户',
   `registry_domain` varchar(45) NOT NULL COMMENT 'registry 域名',
@@ -408,16 +286,6 @@ CREATE TABLE `tbl_system_config` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `tbl_system_config`
---
-
-LOCK TABLES `tbl_system_config` WRITE;
-/*!40000 ALTER TABLE `tbl_system_config` DISABLE KEYS */;
-INSERT INTO `tbl_system_config` VALUES (1,0,'<CONSUL_SERVER1>,<CONSUL_SERVER2>,<CONSUL_SERVER3>',<CONSUL_PORT>,'dc1',NULL,0,2375,<MGM_PLUGIN_PORT>,4123,'root','<DOCKER_REG_DOMAIN>','<DOCKER_REG_IP>',<REG_PORT>,'<DOCKER_REG_USER>','<DOCKER_REG_PASSWORD>','@bsgchina.com','-----BEGIN CERTIFICATE-----\nMIIFNjCCAx4CCQDfgDH4S2oKJzANBgkqhkiG9w0BAQUFADBdMQswCQYDVQQGEwJD\nTjERMA8GA1UECAwIc2hhbmdoYWkxDzANBgNVBAcMBnB1ZG9uZzEMMAoGA1UECgwD\nQlNHMRwwGgYDVQQDDBNyZWdpc3RyeS5kYnNjYWxlLm1lMB4XDTE3MDYwODAxNDAz\nNVoXDTI3MDYwNjAxNDAzNVowXTELMAkGA1UEBhMCQ04xETAPBgNVBAgMCHNoYW5n\naGFpMQ8wDQYDVQQHDAZwdWRvbmcxDDAKBgNVBAoMA0JTRzEcMBoGA1UEAwwTcmVn\naXN0cnkuZGJzY2FsZS5tZTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIB\nANgMAVIeD/+QjIzSE0APrlzbTsn7K51fBoix0rgkzTNi26PYhrRumQDv5gKhtKgM\nxp9EAIT+tj2JKjgfe40MQIpjy4DNqwAC0KGanY0gYa9WudeNleGuGfke4QZ6shhS\nkHQYCcDxudXB1zge+dQQVTm6KTphxAIxKJucmKZygTpWDHzK2PuwrPFMc00DiyeQ\nv/h3fuJN60+HfRoWOCfw0BdiIuL5pVjYxc0wYpBVo8r6FIstC3mhowpneBV5L/C+\nlUZ2cRbE+qh4IjQDNeabCESuTsDi/SW+KdOJ13A/usurNJmhyH3rDQNllGRjygJH\neyL5WDGNeoLkOt3WYOKbIijGvBVdXd2VKt0z1rL7CMjEFe8S4yzyoPKwr4CI+YYw\nZcWQSgAO5QxlLU8pksOI65StEXF82d93UjeHaA1eMhwxHIG+wh7ZTMDeNWIUnF9g\n9fp2sEIQX1MXtZiH1Pp9H6tCqESZCajT3XXKbFVdIOjA5nfDp8lLr6PFEhR3k0wu\nbz1CFGxFrxLpctbi3IqdjyA/xskBmrJ/NYcMipskiTwzefmWjPpSYwHOfP8uqxCu\nB7N+5+2f1XUIUhI33B5dGLvc3lXnxJCSS2PqOxTKc0LP3eb1BnxSlYdIA4WeyNqi\n2WDH6Lt+hS04WBmmyGY0tUJBRi1R3us077cwKD5wKj4/AgMBAAEwDQYJKoZIhvcN\nAQEFBQADggIBAHXjIn4itrS9A2OkccyN0VSsUdyHxOmnEozZX0/hYbAf2HfcrEc4\nLcwnckEc+RbPQvDKR+Bnilkm+2/hpXottMHtrhyWrCz8p3Lr/S6jvh++qgL17kIs\nGJYuvkjTK0dxQZMvRpgQ2/SkIrfXmgVIFQwVSzqJZ4x0NNQ6GcBcjqwcineRyinX\n4lIqWMirXr26tKcDIRSlt36DXoVCMkpXNTVonwmOymB1Y8izn4XCnh8+Z6I4t9QY\nIOcQVhgx9LAO+eP0qUndUAvZIw3YSRhS11iX10RVqg6ShtRPApHBlc3TVu/l9kOM\nF3TEawMRSAeuLMHaxQ4bbhjt2DRNyQkLy8bsGsxBXhLxUM+TkV2uYlMMaJoHIw+7\n6OOGHwmxVJ8YLqxHtg3rbuw7h0dCwZhtS3noAyK+FWBvjqUrMOUmEn6D7VHHhBev\nxUUfy9asV/8Bh7mP87G36gmtAceTSvoZLaZ/lHcrmSyyYUuUuG0FpOG67INRUHWY\nHqQvpaWyhvh6XTOvBNwnkSHdBR4z3aICsSwxvmF+gC7yXhOCvUUAmC+q5hFG5I2b\ntiZb5cic6I7gRqAbiZouZ6o6Otj7D5XALb/L8zisj7hgQtl43pmnKCoPMOLbwVYm\neKwB7j7UEFZijv1i2g4pRq37LsnfSaGW909nJEuP26FrodAkclVZXjuD\n-----END CERTIFICATE-----',NULL,'./script/node-init','/tmp','node-init.sh','node-clean.sh','registery-ca.crt','/BACKUP');
-/*!40000 ALTER TABLE `tbl_system_config` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
 -- Table structure for table `tbl_task`
 --
 
@@ -430,7 +298,7 @@ CREATE TABLE `tbl_task` (
   `related` varchar(128) NOT NULL COMMENT '关联表名称或者对象',
   `link_to` varchar(128) NOT NULL COMMENT '关联ID',
   `link_table` varchar(45) DEFAULT NULL,
-  `description` varchar(128) DEFAULT NULL COMMENT '描述',
+  `description` varchar(2000) DEFAULT NULL COMMENT '描述',
   `labels` varchar(512) DEFAULT NULL,
   `errors` longtext,
   `timeout` bigint(128) unsigned DEFAULT NULL,
@@ -442,15 +310,6 @@ CREATE TABLE `tbl_task` (
   UNIQUE KEY `id_UNIQUE` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `tbl_task`
---
-
-LOCK TABLES `tbl_task` WRITE;
-/*!40000 ALTER TABLE `tbl_task` DISABLE KEYS */;
-/*!40000 ALTER TABLE `tbl_task` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `tbl_unit`
@@ -476,15 +335,6 @@ CREATE TABLE `tbl_unit` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `tbl_unit`
---
-
-LOCK TABLES `tbl_unit` WRITE;
-/*!40000 ALTER TABLE `tbl_unit` DISABLE KEYS */;
-/*!40000 ALTER TABLE `tbl_unit` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
 -- Table structure for table `tbl_volume`
 --
 
@@ -505,15 +355,6 @@ CREATE TABLE `tbl_volume` (
   UNIQUE KEY `id_UNIQUE` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `tbl_volume`
---
-
-LOCK TABLES `tbl_volume` WRITE;
-/*!40000 ALTER TABLE `tbl_volume` DISABLE KEYS */;
-/*!40000 ALTER TABLE `tbl_volume` ENABLE KEYS */;
-UNLOCK TABLES;
 SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -525,4 +366,4 @@ SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2017-06-12 11:09:48
+-- Dump completed on 2018-01-11 16:47:16

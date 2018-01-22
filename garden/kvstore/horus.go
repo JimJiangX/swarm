@@ -56,17 +56,50 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj structs.HorusRegistr
 	}
 
 	if obj.Node.Select {
-		uri := fmt.Sprintf("http://%s/v1/%s", addr, hostType)
-		err := postRegister(ctx, uri, obj.Node)
-		if err != nil {
-			return err
+		{
+			uri := fmt.Sprintf("http://%s/v1/%s", addr, agentType)
+			body := struct {
+				Name       string `json:"name"`
+				IPAddr     string `json:"ip_addr"`
+				OSUser     string `json:"os_user"`
+				OSPassword string `json:"os_pwd"`
+				CheckType  string `json:"check_type"`
+			}{
+				Name:       obj.Node.Name,
+				IPAddr:     obj.Node.IPAddr,
+				OSUser:     obj.Node.OSUser,
+				OSPassword: obj.Node.OSPassword,
+				CheckType:  obj.Node.CheckType,
+			}
+			err := postRegister(ctx, uri, body)
+			if err != nil {
+				return err
+			}
+		}
+		{
+			uri := fmt.Sprintf("http://%s/v1/%s", addr, hostType)
+			body := struct {
+				Name      string   `json:"name"`
+				IPAddr    string   `json:"ip_addr"`
+				CheckType string   `json:"check_type"`
+				NetDevice []string `json:"net_dev"`
+			}{
+				Name:      obj.Node.Name,
+				IPAddr:    obj.Node.IPAddr,
+				CheckType: obj.Node.CheckType,
+				NetDevice: obj.Node.NetDevice,
+			}
+			err := postRegister(ctx, uri, body)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	if obj.Service.Select {
 		// add monitor user
-		obj.Service.MonitorUser = vars.Replication.User
-		obj.Service.MonitorPassword = vars.Replication.Password
+		obj.Service.MonitorUser = vars.Monitor.User
+		obj.Service.MonitorPassword = vars.Monitor.Password
 
 		uri := fmt.Sprintf("http://%s/v1/%s", addr, unitType)
 
@@ -138,6 +171,19 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 		return ctx.Err()
 	}
 
+	err := delHost(ctx, addr, config, force)
+	if err != nil {
+		return err
+	}
+
+	if config.Addr != "" {
+		err = delHostAgent(ctx, addr, config)
+	}
+
+	return err
+}
+
+func delHost(ctx context.Context, addr string, config structs.ServiceDeregistration, force bool) error {
 	uri := fmt.Sprintf("http://%s/v1/%s/%s", addr, config.Type, config.Key)
 
 	del := false
@@ -176,7 +222,43 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 	if resp.StatusCode != http.StatusNoContent {
 		err := readResponseError(resp)
 		if err != nil {
-			return errors.Wrapf(err, "%s code=%d,error=%s", uri, resp.StatusCode, err)
+			return errors.Wrapf(err, "%s code=%d,error=%s", req.RequestURI, resp.StatusCode, err)
+		}
+	}
+
+	return nil
+}
+
+func delHostAgent(ctx context.Context, addr string, config structs.ServiceDeregistration) error {
+	uri := fmt.Sprintf("http://%s/v1/agent", addr)
+
+	req, err := http.NewRequest(http.MethodDelete, uri, nil)
+	if err != nil {
+		return errors.Wrap(err, "deregister to Horus")
+	}
+	req = req.WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+
+	if config.Addr != "" {
+		params := make(url.Values)
+
+		params.Set("ip_addr", config.Addr)
+		params.Set("os_user", config.User)
+		params.Set("os_pwd", config.Password)
+
+		req.URL.RawQuery = params.Encode()
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return errors.Wrap(err, "deregister to Horus response")
+	}
+	defer ensureReaderClosed(resp)
+
+	if resp.StatusCode != http.StatusNoContent {
+		err := readResponseError(resp)
+		if err != nil {
+			return errors.Wrapf(err, "%s code=%d,error=%s", req.RequestURI, resp.StatusCode, err)
 		}
 	}
 
@@ -227,9 +309,7 @@ func (c *kvClient) GetHorusAddr(ctx context.Context) (string, error) {
 
 	var q *api.QueryOptions
 	if ctx != nil {
-		q = &api.QueryOptions{
-			Context: ctx,
-		}
+		q = q.WithContext(ctx)
 	}
 
 	checks, _, err := client.Health().State(api.HealthPassing, q)

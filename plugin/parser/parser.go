@@ -49,6 +49,10 @@ func factory(name string) (parser, error) {
 		return nil, err
 	}
 
+	return factoryByImage(im)
+}
+
+func factoryByImage(im structs.ImageVersion) (parser, error) {
 	if pr, ok := images[im]; ok && pr != nil {
 		return pr, nil
 	}
@@ -71,5 +75,5 @@ func factory(name string) (parser, error) {
 		return temp, nil
 	}
 
-	return nil, errors.Errorf("Unsupported image %s yet", name)
+	return nil, errors.Errorf("Unsupported image %s yet", im.Image())
 }

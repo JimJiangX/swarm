@@ -50,11 +50,11 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 		Major:    req.Major,
 		Minor:    req.Minor,
 		Patch:    req.Patch,
-		Build:    req.Build,
+		Dev:      req.Dev,
 		Labels:   labels,
 		UploadAt: time.Now(),
 	}
-	task := database.NewTask(req.Version(), database.ImageLoadTask, image.ID, "load image", nil, timeout)
+	task := database.NewTask(req.Image(), database.ImageLoadTask, image.ID, "load image", nil, timeout)
 
 	before := func(key string, new int, t *database.Task, f func(val int) bool) (bool, int, error) {
 		err = ormer.InsertImageWithTask(image, *t)
@@ -78,7 +78,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 
 		go func(ch chan<- error) {
 			err := func() error {
-				oldName := req.Version()
+				oldName := req.Image()
 				newName := fmt.Sprintf("%s:%d/%s", registry.Domain, registry.Port, oldName)
 				script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
 				logrus.WithField("Image", req.Name).Infof("ssh exec:'%s'", script)

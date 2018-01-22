@@ -1,6 +1,7 @@
 package alloc
 
 import (
+	"net"
 	"strconv"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/docker/swarm/garden/utils"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 type engineCluster interface {
@@ -46,26 +48,43 @@ func (at allocator) ListCandidates(clusters, filters []string, stores []structs.
 		return nil, err
 	}
 
+	filterMap := make(map[string]struct{}, len(filters))
+	for i := range filters {
+		filterMap[filters[i]] = struct{}{}
+	}
+
 	out := make([]database.Node, 0, len(nodes))
 
-nodes:
 	for i := range nodes {
 		if !nodes[i].Enabled || nodes[i].EngineID == "" {
 			continue
 		}
 
-		for f := range filters {
-			if nodes[i].ID == filters[f] || nodes[i].EngineID == filters[f] {
-				continue nodes
-			}
+		if _, ok := filterMap[nodes[i].ID]; ok {
+			continue
 		}
 
-		engine := at.ec.Engine(nodes[i].EngineID)
-		if engine == nil || !engine.IsHealthy() {
-			continue nodes
+		if _, ok := filterMap[nodes[i].EngineID]; ok {
+			continue
 		}
 
-		err := at.IsNodeStoreEnough(engine, stores)
+		eng := at.ec.Engine(nodes[i].EngineID)
+		if eng == nil {
+			logrus.Debugf("node:%s not found Engine,%s", nodes[i].Addr, nodes[i].EngineID)
+			continue
+		}
+
+		if !eng.IsHealthy() {
+			logrus.Debugf("node:%s Engine unhealthy", nodes[i].EngineID)
+			continue
+		}
+
+		if n := len(eng.Containers()); n >= nodes[i].MaxContainer {
+			logrus.Debugf("node:%s container num limit(%d>=%d)", nodes[i].EngineID, n, nodes[i].MaxContainer)
+			continue
+		}
+
+		err := at.IsNodeStoreEnough(eng, stores)
 		if err != nil {
 			logrus.Debugf("node %s %+v", nodes[i].Addr, err)
 			continue
@@ -192,4 +211,34 @@ func (at allocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, 
 	}
 
 	return nator.AlloctNetworking(config, engineID, unitID, networkings, requires)
+}
+
+func (at allocator) AllocDevice(engineID, unitID string, ips []database.IP) ([]database.IP, error) {
+	nator := netAllocator{
+		ec:    at.ec,
+		ormer: at.ormer,
+	}
+
+	return nator.AllocDevice(engineID, unitID, ips)
+}
+
+func (at allocator) UpdateNetworking(ctx context.Context, engineID string, ips []database.IP, width int) error {
+	eng := at.ec.Engine(engineID)
+	if eng == nil {
+		return errors.Errorf("Engine not found:%s", engineID)
+	}
+
+	sys, err := at.ormer.GetSysConfig()
+	if err != nil {
+		return err
+	}
+
+	addr := net.JoinHostPort(eng.IP, strconv.Itoa(sys.Ports.SwarmAgent))
+
+	nator := netAllocator{
+		ec:    at.ec,
+		ormer: at.ormer,
+	}
+
+	return nator.UpdateNetworking(ctx, engineID, addr, ips, width)
 }

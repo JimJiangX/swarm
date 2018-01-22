@@ -1,7 +1,7 @@
 language: go
 
 go:
-  - 1.7.1
+  - 1.9.2
 
 # let us have speedy Docker-based Travis workers
 sudo: false
@@ -29,3 +29,10 @@ script:
   - GOOS=windows go build
   - GOOS=linux go build
   - go test -v -race `go list ./... | grep -v /vendor/`
+
+notifications:
+  slack:
+    rooms:
+      - bsgtech:7MhzSaCYgiUSvsTvkQqqZ65O#github-dbscale
+    on_success: change # default: always
+    on_failure: always # default: always

@@ -27,9 +27,8 @@ type NetworkCfg struct {
 
 func networkCreateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	opt := &NetworkCfg{}
-	dec := json.NewDecoder(req.Body)
 
-	if err := dec.Decode(opt); err != nil {
+	if err := json.NewDecoder(req.Body).Decode(opt); err != nil {
 		errCommonHanlde(w, req, err)
 		return
 	}
@@ -39,17 +38,12 @@ func networkCreateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request
 		return
 	}
 
-	if err := createNetwork(opt); err != nil {
+	if err := createNetwork(ctx.scriptDir, opt); err != nil {
 		errCommonHanlde(w, req, err)
 		return
 	}
 
-	res := &CommonRes{
-		Err: "",
-	}
-	response, _ := json.Marshal(res)
-	w.Write(response)
-
+	writeJSON(w, CommonRes{}, http.StatusOK)
 }
 
 func valicateNetworkCfg(cfg *NetworkCfg) error {
@@ -64,7 +58,7 @@ func valicateNetworkCfg(cfg *NetworkCfg) error {
 	return nil
 }
 
-func createNetwork(cfg *NetworkCfg) error {
+func createNetwork(scriptDir string, cfg *NetworkCfg) error {
 	if cfg.ContainerDevice == "" {
 		cfg.ContainerDevice = "eth0"
 	}
@@ -79,6 +73,40 @@ func createNetwork(cfg *NetworkCfg) error {
 	}
 
 	file := filepath.Join(scriptDir, "net/", "init_nic.sh")
+
+	_, err := execShellFile(file, args...)
+
+	return err
+}
+
+func networkUpdateHandle(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	opt := &NetworkCfg{}
+
+	if err := json.NewDecoder(r.Body).Decode(opt); err != nil {
+		errCommonHanlde(w, r, err)
+		return
+	}
+
+	if err := updateNetwork(ctx.scriptDir, opt); err != nil {
+		errCommonHanlde(w, r, err)
+		return
+	}
+
+	writeJSON(w, CommonRes{}, http.StatusOK)
+}
+
+// update_nic_bw.sh -h 设备名称 -b 升级后的带宽值
+func updateNetwork(scriptDir string, cfg *NetworkCfg) error {
+	if cfg.HostDevice == "" {
+		return errors.New("HostDevice is required")
+	}
+
+	args := []string{
+		"-h", cfg.HostDevice,
+		"-b", strconv.Itoa(cfg.BandWidth),
+	}
+
+	file := filepath.Join(scriptDir, "net/", "update_nic_bw.sh")
 
 	_, err := execShellFile(file, args...)
 

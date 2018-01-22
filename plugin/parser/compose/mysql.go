@@ -5,8 +5,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 )
+
+const defaultTimeout = time.Minute
 
 type mysqlUser struct {
 	user     string
@@ -37,15 +41,15 @@ func (m Mysql) GetKey() string {
 }
 
 func (m Mysql) Clear() error {
-	filepath := filepath.Join(m.scriptDir, "mysql-replication-reset.sh")
-	timeout := time.Second * 60
 	args := []string{
+		filepath.Join(m.scriptDir, "mysql-replication-reset.sh"),
 		m.Instance,
 		m.MgmIP,
 		strconv.Itoa(m.MgmPort),
 	}
 
-	_, err := ExecShellFileTimeout(filepath, timeout, args...)
+	out, err := utils.ExecContextTimeout(nil, defaultTimeout, args...)
+	logrus.Debugf("exec:%s,output:%s", args, out)
 
 	return err
 }
@@ -59,10 +63,8 @@ func (m Mysql) ChangeMaster(master Mysql) error {
 		return errors.New(string(m.GetType()) + ":should not call the func")
 	}
 
-	filepath := filepath.Join(m.scriptDir, "mysql-replication-set.sh")
-	timeout := time.Second * 60
-
 	args := []string{
+		filepath.Join(m.scriptDir, "mysql-replication-set.sh"),
 		m.Instance,
 		m.MgmIP,
 		strconv.Itoa(m.MgmPort),
@@ -75,16 +77,18 @@ func (m Mysql) ChangeMaster(master Mysql) error {
 		strconv.Itoa(m.Port),
 	}
 
-	_, err := ExecShellFileTimeout(filepath, timeout, args...)
+	out, err := utils.ExecContextTimeout(nil, defaultTimeout, args...)
+
+	logrus.Debugf("exec:%s,output:%s", args, out)
 
 	return err
 }
 
 func (m Mysql) CheckStatus() error {
-	filepath := filepath.Join(m.scriptDir, "mysqlcheck.sh")
-	timeout := time.Second * 60
+	args := filepath.Join(m.scriptDir, "mysqlcheck.sh")
+	out, err := utils.ExecContextTimeout(nil, defaultTimeout, args)
 
-	_, err := ExecShellFileTimeout(filepath, timeout)
+	logrus.Debugf("exec:%s,output:%s", args, out)
 
 	return err
 }

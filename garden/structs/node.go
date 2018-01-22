@@ -3,15 +3,22 @@ package structs
 import "github.com/docker/swarm/cluster"
 
 type PostClusterRequest struct {
-	Max        int     `json:"max_host"`
-	UsageLimit float32 `json:"usage_limit"`
+	NetworkPartition string  `json:"ha_network_tag"`
+	Max              int     `json:"max_host"`
+	UsageLimit       float32 `json:"usage_limit"`
+}
+
+type PutClusterRequest struct {
+	Max        *int     `json:"max_host"`
+	UsageLimit *float32 `json:"usage_limit"`
 }
 
 type GetClusterResponse struct {
-	ID         string  `json:"id"`
-	MaxNode    int     `json:"max_host"`
-	NodeNum    int     `json:"host_num"`
-	UsageLimit float32 `json:"usage_limit"`
+	ID               string  `json:"id"`
+	NetworkPartition string  `json:"ha_network_tag"`
+	MaxNode          int     `json:"max_host"`
+	NodeNum          int     `json:"host_num"`
+	UsageLimit       float32 `json:"usage_limit"`
 }
 
 type Node struct {
@@ -92,12 +99,16 @@ type VolumeDriver struct {
 }
 
 type container struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Image   string `json:"image"`
-	Command string `json:"command"`
-	Created string `json:"created"`
-	Status  string `json:"status"`
+	NCPU    int64             `json:"ncpu"`
+	Memory  int64             `json:"memory"`
+	ID      string            `json:"id"`
+	Name    string            `json:"name"`
+	Image   string            `json:"image"`
+	Command string            `json:"command"`
+	Created string            `json:"created"`
+	Status  string            `json:"status"`
+	State   string            `json:"state"`
+	Labels  map[string]string `json:"labels"`
 }
 
 func convertToContainer(c *cluster.Container) container {
@@ -117,11 +128,14 @@ func convertToContainer(c *cluster.Container) container {
 		Command: c.Command,
 		Created: c.Info.Created,
 		Status:  c.Status,
+		State:   c.State,
+		Labels:  c.Labels,
 	}
 }
 
 func (n *NodeInfo) SetByEngine(e *cluster.Engine) {
 	if e == nil {
+		n.Containers = []container{}
 		return
 	}
 	n.Engine.ID = e.ID
@@ -146,7 +160,10 @@ func (n *NodeInfo) SetByEngine(e *cluster.Engine) {
 			num, err := c.Config.CountCPU()
 			if err == nil {
 				ncpu += num
+				n.Containers[i].NCPU = num
 			}
+
+			n.Containers[i].Memory = c.Config.HostConfig.Memory
 			memory += c.Config.HostConfig.Memory
 		}
 	}

@@ -1,7 +1,7 @@
 package driver
 
 import (
-	"fmt"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
@@ -31,7 +31,7 @@ type Driver interface {
 
 	Alloc(config *cluster.ContainerConfig, uid string, req structs.VolumeRequire) (*database.Volume, error)
 
-	Expand(database.Volume, int64) error
+	Expand(volumeID string, size int64) error
 
 	Recycle(database.Volume) error
 }
@@ -170,28 +170,22 @@ func (vds VolumeDrivers) AllocVolumes(config *cluster.ContainerConfig, uid strin
 }
 
 // ExpandVolumes expand required space for exist volumes
-func (vds VolumeDrivers) ExpandVolumes(uid, agent string, stores []structs.VolumeRequire) error {
+func (vds VolumeDrivers) ExpandVolumes(stores []structs.VolumeRequire) error {
 	for i := range stores {
 		driver := vds.Get(stores[i].Type)
 		if driver == nil {
 			return errors.New("not found the assigned volumeDriver:" + stores[i].Type)
 		}
 
-		space, err := driver.Space()
-		if err != nil {
-			return err
-		}
-
-		// Volume generated as same as Driver.Alloc
-		lv := database.Volume{
-			Name: fmt.Sprintf("%s_%s_%s_LV", uid[:8], space.VG, stores[i].Name),
-		}
-
-		err = driver.Expand(lv, stores[i].Size)
+		err := driver.Expand(stores[i].ID, stores[i].Size)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func generateVolumeName(uid, tag, name string) string {
+	return strings.Join([]string{uid[:8], tag, name}, "_")
 }

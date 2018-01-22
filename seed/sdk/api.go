@@ -124,11 +124,35 @@ type ClientAPI interface {
 	SanVgCreate(opt VgConfig) error
 	SanVgExtend(opt VgConfig) error
 	CreateNetwork(ctx context.Context, opt NetworkConfig) error
+	UpdateNetwork(ctx context.Context, opt NetworkConfig) error
 }
 
-//create network for contianer(use pipewrok),which network mode is none
+//create network for container(use pipework),which network mode is none
 func (c client) CreateNetwork(ctx context.Context, opt NetworkConfig) error {
 	return c.postWrap(ctx, "/network/create", opt)
+}
+
+func (c client) UpdateNetwork(ctx context.Context, opt NetworkConfig) error {
+	const url = "/network/update"
+
+	resp, err := httpclient.RequireOK(c.c.Put(ctx, url, opt))
+	if err != nil {
+		return err
+	}
+
+	defer httpclient.EnsureBodyClose(resp)
+
+	res := commonResonse{}
+	err = decodeBody(resp, &res)
+	if err != nil {
+		return errors.Errorf("%s:%s%s,%s", http.MethodPut, c.addr, url, err)
+	}
+
+	if len(res.Err) > 0 {
+		return errors.Errorf("%s:%s%s,%s", http.MethodPut, c.addr, url, res.Err)
+	}
+
+	return nil
 }
 
 // GetVgList returns remote host VG list
@@ -136,8 +160,9 @@ func (c client) CreateNetwork(ctx context.Context, opt NetworkConfig) error {
 func (c client) GetVgList() ([]VgInfo, error) {
 
 	var res vgListResonse
+	const uri = "/san/vglist"
 
-	resp, err := httpclient.RequireOK(c.c.Get(nil, "/san/vglist"))
+	resp, err := httpclient.RequireOK(c.c.Get(nil, uri))
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +171,7 @@ func (c client) GetVgList() ([]VgInfo, error) {
 
 	err = decodeBody(resp, &res)
 	if len(res.Err) > 0 {
-		return nil, errors.Errorf("%s:%s/%s,%s", http.MethodGet, c.addr, "/san/vglist", res.Err)
+		return nil, errors.Errorf("%s:%s%s,%s", http.MethodGet, c.addr, uri, res.Err)
 	}
 
 	return res.Vgs, nil
@@ -226,11 +251,11 @@ func (c client) postWrap(ctx context.Context, url string, opt interface{}) error
 
 	err = decodeBody(resp, &res)
 	if err != nil {
-		return errors.Errorf("%s:%s/%s,%s", http.MethodPost, c.addr, url, err)
+		return errors.Errorf("%s:%s%s,%s", http.MethodPost, c.addr, url, err)
 	}
 
 	if len(res.Err) > 0 {
-		return errors.Errorf("%s:%s/%s,%s", http.MethodPost, c.addr, url, res.Err)
+		return errors.Errorf("%s:%s%s,%s", http.MethodPost, c.addr, url, res.Err)
 	}
 
 	return nil

@@ -89,7 +89,7 @@ func loadTLSConfig(ca, cert, key string, verify bool) (*tls.Config, error) {
 
 	config := &tls.Config{
 		Certificates: []tls.Certificate{c},
-		MinVersion:   tls.VersionTLS10,
+		MinVersion:   tls.VersionTLS12,
 	}
 
 	if verify {
@@ -190,7 +190,7 @@ func getCandidateAndFollower(discovery discovery.Backend, addr string, leaderTTL
 
 func setupReplication(c *cli.Context, cluster cluster.Cluster, server *api.Server, candidate *leadership.Candidate, follower *leadership.Follower, addr string, tlsConfig *tls.Config, ormer database.Ormer) {
 	primary := api.NewPrimary(cluster, tlsConfig, &statusHandler{cluster, candidate, follower}, c.GlobalBool("debug"), c.Bool("cors"))
-	replica := api.NewReplica(primary, tlsConfig)
+	replica := api.NewReplica(primary, tlsConfig, addr)
 
 	go func() {
 		for {
@@ -261,9 +261,6 @@ func follow(follower *leadership.Follower, replica *api.Replica, addr string) {
 		case leader := <-leaderCh:
 			if leader == "" {
 				continue
-			}
-			if leader == addr {
-				replica.SetPrimary("")
 			} else {
 				log.Infof("New leader elected: %s", leader)
 				replica.SetPrimary(leader)

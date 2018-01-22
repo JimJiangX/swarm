@@ -244,6 +244,10 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !strings.HasPrefix(req.ConfigFile, req.DataMount) {
+		req.ConfigFile = filepath.Join(req.DataMount, req.ConfigFile)
+	}
+
 	parser, err := factory(req.Image)
 	if err != nil {
 		httpError(w, err, http.StatusNotImplemented)
@@ -260,17 +264,26 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		}
 
 		for i := range req.Keysets {
+
 			req.Keysets[i].Value = parser.get(req.Keysets[i].Key)
+			if req.Keysets[i].Default == "" {
+				req.Keysets[i].Default = req.Keysets[i].Value
+			}
 		}
 	} else {
 		for i, ks := range req.Keysets {
-			err = parser.set(ks.Key, ks.Default)
+
+			value := ks.Value
+			if value == "" && ks.Default != "" {
+				value = ks.Default
+				req.Keysets[i].Value = req.Keysets[i].Default
+			}
+
+			err = parser.set(ks.Key, value)
 			if err != nil {
 				httpError(w, err, http.StatusInternalServerError)
 				return
 			}
-
-			req.Keysets[i].Value = req.Keysets[i].Default
 		}
 
 		out, err := parser.Marshal()
@@ -300,9 +313,7 @@ func generateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logrus.Debugf("%+v", req)
-
-	out, err := generateServiceConfigs(ctx.context, ctx.client, req, "")
+	out, err := generateServiceConfigs(ctx.context, ctx.client, req, "", nil)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -323,7 +334,7 @@ func generateConfig(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	out, err := generateServiceConfigs(ctx.context, ctx.client, req, name)
+	out, err := generateServiceConfigs(ctx.context, ctx.client, req, name, nil)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -470,6 +481,29 @@ func composeService(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func linkServices(ctx *_Context, w http.ResponseWriter, r *http.Request) {
+	req := structs.ServicesLink{}
+
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	lf, err := linkFactory(req.Mode, req.NameOrID, req.Links)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	resp, err := lf.generateLinkConfig(ctx.context, ctx.client)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
 }
 
 // Emit an HTTP error and log it.
@@ -483,12 +517,17 @@ func httpError(w http.ResponseWriter, err error, status int) {
 	w.WriteHeader(status)
 }
 
-func generateServiceConfigs(ctx context.Context, kvc kvstore.Store, req structs.ServiceSpec, unitID string) (structs.ConfigsMap, error) {
+func generateServiceConfigs(ctx context.Context,
+	kvc kvstore.Store,
+	spec structs.ServiceSpec,
+	unitID string,
+	opts map[string]map[string]interface{}) (structs.ConfigsMap, error) {
+
 	if unitID != "" {
 		found := false
-		for i := range req.Units {
-			if unitID == req.Units[i].ID || unitID == req.Units[i].Name {
-				unitID = req.Units[i].ID
+		for i := range spec.Units {
+			if unitID == spec.Units[i].ID || unitID == spec.Units[i].Name {
+				unitID = spec.Units[i].ID
 				found = true
 				break
 			}
@@ -499,46 +538,51 @@ func generateServiceConfigs(ctx context.Context, kvc kvstore.Store, req structs.
 		}
 	}
 
-	parser, err := factory(req.Service.Image)
+	parser, err := factoryByImage(spec.Service.Image)
 	if err != nil {
 		return nil, err
 	}
 
-	var image, version string
-	parts := strings.SplitN(req.Service.Image, ":", 2)
-	if len(parts) == 2 {
-		image, version = parts[0], parts[1]
-	} else {
-		image = parts[0]
-	}
+	image, version := spec.Service.Image.Name, spec.Service.Image.Version()
 
 	template, err := getTemplateFromStore(ctx, kvc, image, version)
 	if err != nil {
 		return nil, err
 	}
 
-	cm, err := getConfigMapFromStore(ctx, kvc, req.Service.ID)
+	cm, err := getConfigMapFromStore(ctx, kvc, spec.Service.ID)
 	if err != nil {
 		// ignore error
 	}
 
-	resp := make(structs.ConfigsMap, len(req.Units))
+	resp := make(structs.ConfigsMap, len(spec.Units))
 
-	for i := range req.Units {
-		if unitID != "" && req.Units[i].ID != unitID {
+	for i := range spec.Units {
+		if unitID != "" && spec.Units[i].ID != unitID {
 			continue
 		}
 
 		t := template
 
-		if cc, ok := cm[req.Units[i].ID]; ok {
+		if cc, ok := cm[spec.Units[i].ID]; ok {
 			t.ConfigFile = cc.ConfigFile
 			t.Content = cc.Content
 			t.DataMount = cc.DataMount
 			t.LogMount = cc.LogMount
 		}
 
-		cc, err := generateUnitConfig(req.Units[i].ID, parser, t, req)
+		opt := opts[spec.Units[i].ID]
+		if m := opts[allUnitsEffect]; len(m) > 0 {
+			if len(opt) == 0 {
+				opt = m
+			} else {
+				for k, v := range m {
+					opt[k] = v
+				}
+			}
+		}
+
+		cc, err := generateUnitConfig(spec.Units[i].ID, parser, t, spec, opt)
 		if err != nil {
 			return nil, err
 		}
@@ -546,10 +590,10 @@ func generateServiceConfigs(ctx context.Context, kvc kvstore.Store, req structs.
 		cc.Name = image
 		cc.Version = version
 
-		resp[req.Units[i].ID] = cc
+		resp[spec.Units[i].ID] = cc
 	}
 
-	err = putConfigsToStore(ctx, kvc, req.ID, resp)
+	err = putConfigsToStore(ctx, kvc, spec.ID, resp)
 	if err != nil {
 		return nil, err
 	}
@@ -557,39 +601,52 @@ func generateServiceConfigs(ctx context.Context, kvc kvstore.Store, req structs.
 	return resp, nil
 }
 
-func generateUnitConfig(unitID string, pr parser, t structs.ConfigTemplate, spec structs.ServiceSpec) (structs.ConfigCmds, error) {
+func generateUnitConfig(unitID string, pr parser, t structs.ConfigTemplate, spec structs.ServiceSpec, args map[string]interface{}) (structs.ConfigCmds, error) {
+	cc := structs.ConfigCmds{}
 	pr = pr.clone(&t)
 
-	err := pr.ParseData([]byte(t.Content))
+	err := pr.Validate(args)
 	if err != nil {
-		return structs.ConfigCmds{}, err
+		return cc, err
+	}
+
+	err = pr.ParseData([]byte(t.Content))
+	if err != nil {
+		return cc, err
 	}
 
 	err = pr.GenerateConfig(unitID, spec)
 	if err != nil {
-		return structs.ConfigCmds{}, err
+		return cc, err
+	}
+
+	for k, v := range args {
+		err := pr.set(k, v)
+		if err != nil {
+			return cc, err
+		}
 	}
 
 	text, err := pr.Marshal()
 	if err != nil {
-		return structs.ConfigCmds{}, err
+		return cc, err
 	}
 
 	cmds, err := pr.GenerateCommands(unitID, spec)
 	if err != nil {
-		return structs.ConfigCmds{}, err
+		return cc, err
 	}
 
 	r, err := pr.HealthCheck(unitID, spec)
 	if err != nil {
-		return structs.ConfigCmds{}, err
+		return cc, err
 	}
 
 	return structs.ConfigCmds{
 		ID:           unitID,
 		LogMount:     t.LogMount,
 		DataMount:    t.DataMount,
-		ConfigFile:   filepath.Join(t.DataMount, t.ConfigFile),
+		ConfigFile:   t.ConfigFile,
 		Content:      string(text),
 		Cmds:         cmds,
 		Timestamp:    time.Now().Unix(),

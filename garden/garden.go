@@ -1,7 +1,6 @@
 package garden
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -21,6 +20,7 @@ import (
 	"github.com/docker/swarm/scheduler"
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 type notFoundError struct {
@@ -105,18 +105,6 @@ func (gd *Garden) NewService(spec *structs.ServiceSpec, svc *database.Service) *
 	return newService(spec, svc, gd.ormer, gd.Cluster, gd.pluginClient)
 }
 
-// GetService get Service by name or id from db,without ServiceSpec.
-func (gd *Garden) GetService(nameOrID string) (*Service, error) {
-	s, err := gd.ormer.GetService(nameOrID)
-	if err != nil {
-		return nil, err
-	}
-
-	svc := gd.NewService(nil, &s)
-
-	return svc, nil
-}
-
 // Service get ServiceInfo from db,convert to ServiceSpec
 func (gd *Garden) Service(nameOrID string) (*Service, error) {
 	info, err := gd.ormer.GetServiceInfo(nameOrID)
@@ -175,7 +163,6 @@ func (gd *Garden) Register(req structs.RegisterDC) error {
 		Retry:     req.Retry,
 		Ports: database.Ports{
 			Docker:     req.DockerPort,
-			Plugin:     req.PluginPort,
 			SwarmAgent: req.SwarmAgentPort,
 		},
 		ConsulConfig: database.ConsulConfig{

@@ -61,6 +61,7 @@ type ServiceRegistration struct {
 type ServiceDeregistration struct {
 	Type     string
 	Key      string
+	Addr     string
 	User     string
 	Password string
 }

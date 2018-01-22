@@ -21,10 +21,10 @@
 			"revisionTime": "2017-02-15T13:41:42Z"
 		},
 		{
-			"checksumSHA1": "LoYojhUneS1nEBnYaw5pl7f+h3g=",
+			"checksumSHA1": "+EuthzfoGE5ffmRgeMYbh7XmStw=",
 			"path": "github.com/go-sql-driver/mysql",
-			"revision": "2e00b5cd70399450106cec6431c2e2ce3cae5034",
-			"revisionTime": "2016-12-24T12:10:19Z"
+			"revision": "cd4cb909ce1a31435164be29bf3682031f61539a",
+			"revisionTime": "2017-11-17T11:51:24Z"
 		},
 		{
 			"checksumSHA1": "VhMKLZ8ZiW48kC1PQp3iowtwBe8=",
@@ -33,10 +33,10 @@
 			"revisionTime": "2017-01-18T13:43:44Z"
 		},
 		{
-			"checksumSHA1": "2myCs9n7qOplRnVkFx9KcXg7KE0=",
+			"checksumSHA1": "LI3hlsEyHSxRUNj1mxmCmO3tShQ=",
 			"path": "github.com/hashicorp/consul/api",
-			"revision": "fb0e4d531bae853eb935c8cede33e4e5254949b9",
-			"revisionTime": "2017-06-29T23:27:17Z"
+			"revision": "9564c2978b59c060aed0657e662a4eb1c6f35356",
+			"revisionTime": "2017-11-20T21:58:08Z"
 		},
 		{
 			"checksumSHA1": "b8F628srIitj5p7Y130xc9k0QWs=",
@@ -57,16 +57,16 @@
 			"revisionTime": "2017-03-01T10:06:11Z"
 		},
 		{
-			"checksumSHA1": "E+9sVfX/j5igRjdP71q9eGeKRvk=",
+			"checksumSHA1": "QkTDjw30dSDcNXCQHoR3BZ4ViTk=",
 			"path": "github.com/jmoiron/sqlx",
-			"revision": "f4076845477b10ac2453a16377a8383467aafe72",
-			"revisionTime": "2017-02-21T04:34:47Z"
+			"revision": "3379e5993990b1f927fc8db926485e6f6becf2d2",
+			"revisionTime": "2017-10-20T20:55:21Z"
 		},
 		{
-			"checksumSHA1": "XpXIoKr9mdaog+CuDmSgVZk6LdY=",
+			"checksumSHA1": "qzt9nT3655sixQvMZetz/MW9GeA=",
 			"path": "github.com/jmoiron/sqlx/reflectx",
-			"revision": "f980a91bdc37abef88269b8f122d7de6352102f5",
-			"revisionTime": "2017-01-21T10:35:19Z"
+			"revision": "3379e5993990b1f927fc8db926485e6f6becf2d2",
+			"revisionTime": "2017-10-20T20:55:21Z"
 		},
 		{
 			"checksumSHA1": "9VnGHaNfB7VQcYf2INovZvXu7NU=",
@@ -79,6 +79,12 @@
 			"path": "github.com/pkg/errors",
 			"revision": "248dadf4e9068a0b3e79f02ed0a610d935de5302",
 			"revisionTime": "2016-10-29T09:36:37Z"
+		},
+		{
+			"checksumSHA1": "MRiEVHxEeCWVmSnjfOy9vm1ciG4=",
+			"path": "github.com/yiduoyunQ/sm/sm-svr/structs",
+			"revision": "eadc6d00ed5c310429c6df07bbf79c9d3a7aaed4",
+			"revisionTime": "2018-01-17T07:01:03Z"
 		},
 		{
 			"checksumSHA1": "LzlSlifCUTtWAJHqQJPRSsjaeTQ=",
@@ -115,6 +121,12 @@
 			"path": "golang.org/x/net/context/ctxhttp",
 			"revision": "6b27048ae5e6ad1ef927e72e437531493de612fe",
 			"revisionTime": "2017-02-17T08:49:01Z"
+		},
+		{
+			"checksumSHA1": "UhL+LmSkOZ8Vb8EDX3fW3DCp68g=",
+			"path": "gopkg.in/yaml.v2",
+			"revision": "eb3733d160e74a9c7e442f435eb3bea458e1d19f",
+			"revisionTime": "2017-08-12T16:00:11Z"
 		}
 	],
 	"rootPath": "github.com/docker/swarm"

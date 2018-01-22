@@ -18,8 +18,16 @@ func init() {
 	register("mysql", "5.7", &mysqlConfig{})
 
 	register("upsql", "1.0", &upsqlConfig{})
+	register("upsql", "1.1", &upsqlConfig{})
+	register("upsql", "1.2", &upsqlConfig{})
+
 	register("upsql", "2.0", &upsqlConfig{})
+	register("upsql", "2.1", &upsqlConfig{})
+	register("upsql", "2.2", &upsqlConfig{})
+
 	register("upsql", "3.0", &upsqlConfig{})
+	register("upsql", "3.1", &upsqlConfig{})
+	register("upsql", "3.2", &upsqlConfig{})
 }
 
 const (
@@ -95,10 +103,17 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		m["mysqld::character_set_server"] = v
 	}
 
-	if port, ok := desc.Options["mysqld::port"]; ok {
+	{
+		val, ok := desc.Options["mysqld::port"]
+		if !ok {
+			return errors.New("miss mysqld::port")
+		}
+		port, err := atoi(val)
+		if err != nil || port == 0 {
+			return errors.Wrap(err, "miss mysqld::port")
+		}
+
 		m["mysqld::port"] = port
-	} else {
-		return errors.New("miss mysqld::port")
 	}
 
 	if c.template != nil {
@@ -118,7 +133,7 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 	}
 
 	if spec.Config != nil {
-		if n := spec.Config.HostConfig.Memory; n>>33 > 0 {
+		if n := spec.Config.HostConfig.Memory; n>>33 > 0 { // 8G
 			m["mysqld::innodb_buffer_pool_size"] = int(float64(n) * 0.70)
 		} else {
 			m["mysqld::innodb_buffer_pool_size"] = int(float64(n) * 0.5)
@@ -188,15 +203,10 @@ func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 		return structs.ServiceRegistration{}, err
 	}
 
-	im, err := structs.ParseImage(c.template.Image)
-	if err != nil {
-		return structs.ServiceRegistration{}, err
-	}
-
 	reg := structs.HorusRegistration{}
 	reg.Service.Select = true
 	reg.Service.Name = spec.ID
-	reg.Service.Type = "unit_" + im.Name
+	reg.Service.Type = "unit_" + desc.Image.Name
 	reg.Service.Tag = desc.ID
 	reg.Service.Container.Name = spec.Name
 	reg.Service.Container.HostName = spec.Engine.Node

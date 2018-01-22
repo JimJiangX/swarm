@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
@@ -31,7 +32,7 @@ func New(gd *garden.Garden) *Deployment {
 }
 
 // Deploy build and run Service,task run in a goroutine.
-func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec) (structs.PostServiceResponse, error) {
+func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec, compose bool) (structs.PostServiceResponse, error) {
 	resp := structs.PostServiceResponse{}
 	auth, err := d.gd.AuthConfig()
 	if err != nil {
@@ -59,13 +60,13 @@ func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec) (stru
 		}
 	}
 
-	go d.deploy(ctx, svc, task, auth)
+	go d.deploy(ctx, svc, compose, task, auth)
 
 	return resp, nil
 }
 
-// DeployServices deploy slice of Service if serivce not exist,tasks run in goroutines.
-func (d *Deployment) DeployServices(ctx context.Context, services []structs.ServiceSpec) ([]structs.PostServiceResponse, error) {
+// DeployServices deploy slice of Service if service not exist,tasks run in goroutines.
+func (d *Deployment) DeployServices(ctx context.Context, services []structs.ServiceSpec, compose bool) ([]structs.PostServiceResponse, error) {
 	list, err := d.gd.ListServices(ctx)
 	if err != nil && !database.IsNotFound(err) {
 		return nil, err
@@ -107,13 +108,14 @@ func (d *Deployment) DeployServices(ctx context.Context, services []structs.Serv
 			TaskID: task.ID,
 		})
 
-		go d.deploy(ctx, service, task, auth)
+		go d.deploy(ctx, service, compose, task, auth)
 	}
 
 	return out, nil
 }
 
-func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *database.Task, auth *types.AuthConfig) (err error) {
+func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bool,
+	t *database.Task, auth *types.AuthConfig) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.Errorf("deploy:%v", r)
@@ -152,47 +154,33 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, t *databas
 		return err
 	}
 
-	err = svc.InitStart(ctx, d.gd.KVClient(), nil, nil, false, nil)
+	err = svc.InitStart(ctx, "", d.gd.KVClient(), nil, nil, false, nil)
 	if err != nil {
 		return err
 	}
 
-	err = svc.Compose(ctx, d.gd.PluginClient())
+	if compose {
+		err = svc.Compose(ctx, d.gd.PluginClient())
+	}
 
 	return err
 }
 
 // Link is exported,not done yet.
 func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (string, error) {
-	err := d.freshServicesLink(links)
+	links, err := d.freshServicesLink(links)
 	if err != nil {
 		return "", err
 	}
 
 	// TODO:better task info
 	task := database.NewTask("deploy link", database.ServiceLinkTask, "", "", nil, 300)
+	err = d.gd.Ormer().InsertTask(task)
+	if err != nil {
+		return "", err
+	}
 
-	go func() (err error) {
-		defer func() {
-			if r := recover(); r != nil {
-				err = errors.Errorf("deploy link,panic:%v", r)
-			}
-			if err == nil {
-				task.Status = database.TaskDoneStatus
-			} else {
-				task.Status = database.TaskFailedStatus
-
-				logrus.Errorf("deploy link and start,%+v", err)
-			}
-
-			task.SetErrors(err)
-
-			_err := d.gd.Ormer().SetTask(task)
-			if _err != nil {
-				logrus.Errorf("deploy link and start,%+v", _err)
-			}
-		}()
-
+	runLink := func() error {
 		// generate new units config and commands,and sorted
 		resp, err := d.gd.PluginClient().ServicesLink(ctx, links)
 		if err != nil {
@@ -206,7 +194,7 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 
 		// update units config file.
 		for _, ul := range resp.Links {
-			if ul.ServiceID == "" || ul.NameOrID == "" {
+			if ul.ServiceID == "" || ul.NameOrID == "" || ul.ConfigFile == "" {
 				continue
 			}
 
@@ -228,7 +216,7 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 
 		// start units service
 		for _, ul := range resp.Links {
-			if ul.ServiceID == "" || ul.NameOrID == "" {
+			if ul.ServiceID == "" || ul.NameOrID == "" || len(ul.Commands) == 0 {
 				continue
 			}
 
@@ -265,6 +253,58 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 			}
 		}
 
+		// service interval requests
+		for _, ul := range resp.Links {
+			if ul.Request == nil {
+				continue
+			}
+
+			logrus.Debugf("LINK:%s %s\nBody:%s", ul.Request.Method, ul.Request.URL, ul.Request.Body)
+		retry:
+			for i := 3; i > 0; i-- {
+				err = ul.Request.Send(ctx)
+				if err == nil {
+					break retry
+				}
+				time.Sleep(time.Second)
+			}
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	go func() (err error) {
+		d.gd.Lock()
+		defer func() {
+			d.gd.Unlock()
+
+			if r := recover(); r != nil {
+				err = errors.Errorf("deploy link,panic:%v", r)
+			}
+
+			if err == nil {
+				task.Status = database.TaskDoneStatus
+			} else {
+				task.Status = database.TaskFailedStatus
+
+				logrus.Errorf("deploy link failed,%+v", err)
+			}
+
+			task.SetErrors(err)
+
+			_err := d.gd.Ormer().SetTask(task)
+			if _err != nil {
+				logrus.Errorf("deploy link and start,%+v", _err)
+				return
+			}
+
+			logrus.Info("deploy link and done!")
+		}()
+
+		err = runLink()
 		return err
 	}()
 
@@ -282,31 +322,31 @@ func (d *Deployment) serviceFromLinks(links structs.ServicesLink, nameOrID strin
 	return nil
 }
 
-func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
+func (d *Deployment) freshServicesLink(links structs.ServicesLink) (structs.ServicesLink, error) {
 	ids := links.LinkIDs()
 
 	switch len(ids) {
 	case 0:
-		return nil
+		return links, nil
 	case 1:
 		svc, err := d.gd.Service(ids[0])
 		if err != nil {
-			return err
+			return links, err
 		}
 
 		spec, err := svc.Spec()
 		if err != nil {
-			return err
+			return links, err
 		}
 
 		links.Links[0].Spec = spec
 
-		return nil
+		return links, nil
 	}
 
 	out, err := d.gd.Ormer().ListServicesInfo()
 	if err != nil {
-		return err
+		return links, err
 	}
 
 	m := make(map[string]database.ServiceInfo, len(ids))
@@ -320,37 +360,41 @@ func (d *Deployment) freshServicesLink(links structs.ServicesLink) error {
 		}
 	}
 
-	links.Sort()
-
 	containers := d.gd.Cluster.Containers()
+	linkSlice := make([]*structs.ServiceLink, len(links.Links), len(ids))
+	copy(linkSlice, links.Links)
 
-	for l := range links.Links {
+	for l := range linkSlice {
 
-		info, ok := m[links.Links[l].ID]
+		info, ok := m[linkSlice[l].ID]
 		if ok {
 			spec := garden.ConvertServiceInfo(info, containers)
-			links.Links[l].Spec = &spec
+			linkSlice[l].Spec = &spec
 		}
 
-		delete(m, links.Links[l].ID)
+		delete(m, linkSlice[l].ID)
 	}
 
 	for _, val := range m {
 		spec := garden.ConvertServiceInfo(val, containers)
-		links.Links = append(links.Links, &structs.ServiceLink{
+		linkSlice = append(linkSlice, &structs.ServiceLink{
 			ID:   spec.ID,
 			Spec: &spec,
 		})
 	}
 
-	return nil
+	links.Links = linkSlice
+
+	links.Sort()
+
+	return links, nil
 }
 
 // ServiceScale scale service.
-func (d *Deployment) ServiceScale(ctx context.Context, nameOrID string, scale structs.ServiceScaleRequest) (string, error) {
+func (d *Deployment) ServiceScale(ctx context.Context, nameOrID string, scale structs.ServiceScaleRequest) (structs.ServiceScaleResponse, error) {
 	svc, err := d.gd.Service(nameOrID)
 	if err != nil {
-		return "", err
+		return structs.ServiceScaleResponse{}, err
 	}
 
 	actor := alloc.NewAllocator(d.gd.Ormer(), d.gd.Cluster)
@@ -367,7 +411,7 @@ func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version strin
 		return "", err
 	}
 
-	svc, err := d.gd.GetService(name)
+	svc, err := d.gd.Service(name)
 	if err != nil {
 		return "", err
 	}
@@ -378,7 +422,7 @@ func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version strin
 	}
 
 	if im1.Name != im.Name || im1.Major != im.Major {
-		return "", errors.Errorf("Service:%s unsupported image update from %s to %s", name, im1.Version(), im.Version())
+		return "", errors.Errorf("Service:%s unsupported image update from %s to %s", name, im1.Image(), im.Image())
 	}
 
 	authConfig, err := d.gd.AuthConfig()
@@ -386,12 +430,7 @@ func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version strin
 		return "", err
 	}
 
-	spec, err := svc.Spec()
-	if err != nil {
-		return "", err
-	}
-
-	t := database.NewTask(spec.Name, database.ServiceUpdateImageTask, spec.ID, "", nil, 300)
+	t := database.NewTask(svc.Name(), database.ServiceUpdateImageTask, svc.ID(), "", nil, 300)
 
 	err = svc.UpdateImage(ctx, d.gd.KVClient(), im, &t, async, authConfig)
 
@@ -399,7 +438,7 @@ func (d *Deployment) ServiceUpdateImage(ctx context.Context, name, version strin
 }
 
 // ServiceUpdate update service CPU & memory & volume resource,task run in goroutine.
-func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config structs.UnitRequire) (string, error) {
+func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config structs.UpdateUnitRequire) (string, error) {
 	svc, err := d.gd.Service(name)
 	if err != nil {
 		return "", err
@@ -449,7 +488,7 @@ func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config stru
 			d.gd.Lock()
 			defer d.gd.Unlock()
 
-			return svc.UpdateResource(ctx, actor, int64(config.Require.CPU), config.Require.Memory)
+			return svc.UpdateResource(ctx, actor, config.Require.CPU, config.Require.Memory)
 		}()
 		if err != nil {
 			return err
@@ -467,6 +506,24 @@ func (d *Deployment) ServiceUpdate(ctx context.Context, name string, config stru
 				defer d.gd.Unlock()
 
 				return svc.VolumeExpansion(actor, config.Volumes)
+			}()
+		}
+		if err != nil {
+			return err
+		}
+
+		select {
+		default:
+		case <-ctx.Done():
+			return errors.WithStack(ctx.Err())
+		}
+
+		if len(config.Networks) > 0 {
+			err = func() error {
+				d.gd.Lock()
+				defer d.gd.Unlock()
+
+				return svc.UpdateNetworking(ctx, actor, config.Networks)
 			}()
 		}
 

@@ -3,7 +3,6 @@ package structs
 type RegisterDC struct {
 	ID             int          `json:"dc_id"`
 	DockerPort     int          `json:"docker_port"`
-	PluginPort     int          `json:"plugin_port"`
 	SwarmAgentPort int          `json:"swarm_agent_port"`
 	BackupDir      string       `json:"backup_dir"`
 	Retry          int64        `json:"retry"`

@@ -47,7 +47,7 @@ func configruation(c *cli.Context) {
 		log.Fatal(err)
 	}
 
-	if err := vars.ValidateReplication(); err != nil {
+	if err := vars.Validate(); err != nil {
 		log.Warn(err)
 	}
 

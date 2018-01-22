@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
@@ -24,14 +25,33 @@ import (
 // 		not exist -- removing -- dead -- exited -- created -- running
 //
 // 增加节点：
-//      调试准备 -- 调度 -- 分配资源 -- 创建容器 -- 启动容器与服务
-func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator, req structs.ServiceScaleRequest, async bool) (string, error) {
-	scale := func() error {
-		units, err := svc.getUnits()
+//      调度准备 -- 调度 -- 分配资源 -- 创建容器 -- 启动容器与服务
+func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator, req structs.ServiceScaleRequest, async bool) (structs.ServiceScaleResponse, error) {
+	var add []database.Unit
+	resp := structs.ServiceScaleResponse{}
+
+	units, err := svc.getUnits()
+	if err != nil {
+		return resp, err
+	}
+
+	if n := req.Arch.Replicas - len(units); n > 0 {
+		add, err = svc.addNewUnit(n)
 		if err != nil {
-			return err
+			return resp, err
 		}
 
+		resp.Add = make([]structs.UnitNameID, 0, len(add))
+
+		for i := range add {
+			resp.Add = append(resp.Add, structs.UnitNameID{
+				ID:   add[i].ID,
+				Name: add[i].Name,
+			})
+		}
+	}
+
+	scale := func() error {
 		if req.Arch.Replicas == 0 || req.Arch.Replicas == len(units) {
 			return nil
 		}
@@ -39,7 +59,10 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 		if len(units) > req.Arch.Replicas {
 			err = svc.scaleDown(ctx, units, req.Arch.Replicas, gd.KVClient())
 		} else {
-			_, err = gd.scaleUp(ctx, svc, actor, req, nil, true)
+			_, err = gd.scaleUp(ctx, svc, actor, serviceScaleRequest{
+				ServiceScaleRequest: req,
+				Units:               add,
+			})
 		}
 		if err != nil {
 			return err
@@ -47,22 +70,12 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 
 		{
 			// update Service.Desc
-			table, err := svc.so.GetService(svc.svc.ID)
+			table, err := svc.so.GetService(svc.ID())
 			if err != nil {
 				return err
 			}
-			desc := *table.Desc
-			desc.ID = utils.Generate32UUID()
-			desc.Replicas = req.Arch.Replicas
-			desc.Previous = table.DescID
 
-			out, err := json.Marshal(req.Arch)
-			if err == nil {
-				desc.Architecture = string(out)
-			}
-
-			table.DescID = desc.ID
-			table.Desc = &desc
+			table = updateDescByArch(table, req.Arch)
 
 			err = svc.so.SetServiceDesc(table)
 			if err != nil {
@@ -70,17 +83,23 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 			}
 		}
 
-		return svc.Compose(ctx, gd.PluginClient())
+		if req.Compose {
+			err = svc.Compose(ctx, gd.PluginClient())
+		}
+
+		return err
 	}
 
-	task := database.NewTask(svc.svc.Name, database.ServiceScaleTask, svc.svc.ID, fmt.Sprintf("replicas=%d", req.Arch.Replicas), nil, 300)
+	task := database.NewTask(svc.Name(), database.ServiceScaleTask, svc.ID(), fmt.Sprintf("replicas=%d", req.Arch.Replicas), nil, 300)
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, &task,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, &task,
 		statusServiceScaling, statusServiceScaled, statusServiceScaleFailed)
 
-	err := sl.Run(isnotInProgress, scale, async)
+	err = sl.Run(isnotInProgress, scale, async)
 
-	return task.ID, err
+	resp.Task = task.ID
+
+	return resp, err
 }
 
 func (svc *Service) scaleDown(ctx context.Context, units []*unit, replicas int, reg kvstore.Register) error {
@@ -90,6 +109,11 @@ func (svc *Service) scaleDown(ctx context.Context, units []*unit, replicas int, 
 	rm := out[:len(units)-replicas]
 
 	return svc.removeUnits(ctx, rm, reg)
+}
+
+type serviceScaleRequest struct {
+	structs.ServiceScaleRequest
+	Units []database.Unit
 }
 
 type unitStatus struct {
@@ -156,43 +180,38 @@ func sortUnitsByContainers(units []*unit, containers cluster.Containers) []*unit
 	return out
 }
 
-func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, actor alloc.Allocator,
-	skipVolume bool, replicas int, candidates []string,
-	users []structs.User, options map[string]interface{}) ([]*unit, []pendingUnit, error) {
-
-	err := svc.prepareSchedule(candidates, users, options)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	units, err := svc.getUnits()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	add, err := svc.addNewUnit(replicas - len(units))
-	if err != nil {
-		return nil, nil, err
-	}
+func (gd *Garden) scaleAllocation(ctx context.Context, svc *Service, refer string,
+	actor alloc.Allocator,
+	vr, nr bool, add []database.Unit, candidates []string,
+	options map[string]interface{}) ([]*unit, []pendingUnit, error) {
 
 	adds := make([]*unit, len(add))
 	for i := range add {
 		adds[i] = newUnit(add[i], svc.so, svc.cluster)
 	}
+
+	err := svc.prevSchedule(candidates, refer, options)
 	if err != nil {
 		return adds, nil, err
 	}
 
-	pendings, err := gd.allocation(ctx, actor, svc, add, skipVolume)
+	pendings, err := gd.allocation(ctx, actor, svc, add, vr, nr)
+	if err != nil {
+		return adds, nil, err
+	}
+
+	for i := range add {
+		adds[i] = newUnit(pendings[i].Unit, svc.so, svc.cluster)
+	}
 
 	return adds, pendings, err
 }
 
-func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocator,
-	scale structs.ServiceScaleRequest, networkings [][]database.IP, register bool) ([]*unit, error) {
+func (gd *Garden) scaleUp(ctx context.Context, svc *Service,
+	actor alloc.Allocator, scale serviceScaleRequest) ([]*unit, error) {
 
-	units, pendings, err := gd.scaleAllocation(ctx, svc, actor, false,
-		scale.Arch.Replicas, scale.Candidates, scale.Users, scale.Options)
+	units, pendings, err := gd.scaleAllocation(ctx, svc, "", actor, true, true,
+		scale.Units, scale.Candidates, scale.Options)
 	defer func() {
 		if err != nil {
 			_err := svc.removeUnits(ctx, units, gd.kvClient)
@@ -203,9 +222,6 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 	}()
 	if err != nil {
 		return units, err
-	}
-	if len(pendings) > len(networkings) {
-		return units, errors.Errorf("not enough networkings for addition units")
 	}
 
 	auth, err := gd.AuthConfig()
@@ -218,39 +234,12 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service, actor alloc.Allocat
 		return units, err
 	}
 
-	{
-		// migrate networkings
-		defer func() {
-			if err != nil {
-				list := make([]database.IP, 0, len(networkings)*2)
-				for i := range networkings {
-					list = append(list, networkings[i]...)
-				}
-				_err := svc.so.SetIPs(list)
-				if _err != nil {
-					err = errors.Errorf("%+v recover networking settings error:%+v", err, _err)
-				}
-			}
-		}()
-		for i := range pendings {
-			_, err = migrateNetworking(svc.so, networkings[i], pendings[i].networkings)
-			if err != nil {
-				return units, err
-			}
-		}
-	}
-
-	kvc := gd.KVClient()
-	if !register {
-		kvc = nil
-	}
-
-	err = svc.initStart(ctx, units, kvc, nil, nil)
+	err = svc.initStart(ctx, units, gd.KVClient(), nil, nil)
 
 	return units, err
 }
 
-func (svc *Service) prepareSchedule(candidates []string, users []structs.User, options map[string]interface{}) error {
+func (svc *Service) prevSchedule(candidates []string, refer string, options map[string]interface{}) error {
 	spec, err := svc.RefreshSpec()
 	if err != nil {
 		return err
@@ -261,26 +250,10 @@ func (svc *Service) prepareSchedule(candidates []string, users []structs.User, o
 		return err
 	}
 
-	if len(candidates) > 0 {
-		constraints := fmt.Sprintf("%s==%s", engineLabel, strings.Join(candidates, "|"))
-		svc.options.Nodes.Constraints = append(svc.options.Nodes.Constraints, constraints)
-	}
-
-	units, err := svc.getUnits()
-	if err != nil {
-		return err
-	}
-
 	// adjust scheduleOption by unit
-	svc.options, err = scheduleOptionsByUnits(opts, units, len(candidates) <= 0)
+	svc.options, err = svc.scheduleOptionsByUnits(opts, refer, candidates)
 	if err != nil {
-		return err
-	}
-
-	if spec.Users == nil {
-		spec.Users = users
-	} else {
-		spec.Users = append(spec.Users, users...)
+		logrus.WithField("Service preSchedule", svc.Name()).Warnf("%+v", err)
 	}
 
 	if spec.Options == nil && options != nil {
@@ -298,10 +271,6 @@ func (svc *Service) prepareSchedule(candidates []string, users []structs.User, o
 
 func (svc *Service) addNewUnit(num int) ([]database.Unit, error) {
 	spec := svc.spec
-	im, err := svc.so.GetImageVersion(spec.Image)
-	if err != nil {
-		return nil, err
-	}
 
 	now := time.Now()
 	add := make([]database.Unit, num)
@@ -311,7 +280,7 @@ func (svc *Service) addNewUnit(num int) ([]database.Unit, error) {
 		add[i] = database.Unit{
 			ID:          uid,
 			Name:        fmt.Sprintf("%s_%s", uid[:8], spec.Tag), // <unit_id_8bit>_<service_tag>
-			Type:        im.Name,
+			Type:        spec.Image.Name,
 			ServiceID:   spec.ID,
 			NetworkMode: "none",
 			Status:      0,
@@ -319,26 +288,67 @@ func (svc *Service) addNewUnit(num int) ([]database.Unit, error) {
 		}
 	}
 
-	err = svc.so.InsertUnits(add)
+	err := svc.so.InsertUnits(add)
 
 	return add, err
 }
 
 func (svc *Service) getScheduleOption() (scheduleOption, error) {
 	// decode scheduleOption
-	var opts scheduleOption
+	opts := scheduleOption{}
+
 	r := strings.NewReader(svc.svc.Desc.ScheduleOptions)
 	err := json.NewDecoder(r).Decode(&opts)
+	if err == nil {
+		svc.options = opts
+	}
 
 	return svc.options, err
 }
 
-func scheduleOptionsByUnits(opts scheduleOption, units []*unit, filter bool) (scheduleOption, error) {
-	if len(units) == 0 {
+// scheduleOptionsByUnits adjust opts value by reference unit
+// recommend ignore errors
+func (svc *Service) scheduleOptionsByUnits(opts scheduleOption, refer string, candidates []string) (scheduleOption, error) {
+	var unit *unit
+
+	if len(candidates) > 0 {
+		tmp := make([]string, 0, len(candidates))
+		for i := range candidates {
+			if candidates[i] != "" {
+				tmp = append(tmp, candidates[i])
+			}
+		}
+
+		constraints := fmt.Sprintf("%s==%s", engineLabel, strings.Join(tmp, "|"))
+		opts.Nodes.Constraints = append(opts.Nodes.Constraints, constraints)
+		opts.Nodes.Filters = nil
+	} else {
+		units, err := svc.getUnits()
+		if err != nil {
+			return opts, err
+		}
+
+		if refer != "" {
+			unit = getUnit(units, refer)
+		}
+
+		filters := make([]string, 0, len(units))
+		for i := range units {
+			if units[i].u.EngineID != "" {
+				filters = append(filters, units[i].u.EngineID)
+			}
+		}
+
+		opts.Nodes.Filters = append(opts.Nodes.Filters, filters...)
+	}
+
+	if unit == nil && refer == "" {
 		return opts, nil
 	}
 
-	unit := units[0]
+	if unit == nil || unit.u.EngineID == "" {
+		return opts, errors.Errorf("not found unit or engine by '%s'", refer)
+	}
 
 	node, err := unit.uo.GetNode(unit.u.EngineID)
 	if err != nil {
@@ -370,15 +380,6 @@ func scheduleOptionsByUnits(opts scheduleOption, units []*unit, filter bool) (sc
 		}
 
 		opts.Nodes.Networkings = map[string][]string{node.ClusterID: ids}
-	}
-
-	if filter {
-		filters := make([]string, 0, len(units))
-		for i := range units {
-			filters = append(filters, units[i].u.EngineID)
-		}
-
-		opts.Nodes.Filters = append(opts.Nodes.Filters, filters...)
 	}
 
 	return opts, err

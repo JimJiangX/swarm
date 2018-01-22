@@ -3,6 +3,7 @@ package garden
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -13,9 +14,8 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
+	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/structs"
-	"github.com/docker/swarm/garden/utils"
-	"github.com/docker/swarm/seed/sdk"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -157,12 +157,27 @@ func (u unit) prepareExpandVolume(eng *cluster.Engine, target []structs.VolumeRe
 			}
 
 			if volumes.Get(lvs[v].Name) == nil {
+
+				// check volume size mayby changes
+				if lvs[v].Size != target[i].Size &&
+					strings.Contains(lvs[v].Name, target[i].Name) {
+
+					lvs[v].Size = target[i].Size
+
+					err := u.uo.SetVolume(lvs[v])
+					if err != nil {
+						return nil, nil, err
+					}
+				}
+
 				pending = append(pending, lvs[v])
+				continue
 			}
 
 			if strings.Contains(lvs[v].Name, target[i].Name) {
 				found = true
 
+				add[i].ID = lvs[v].ID
 				add[i].Size = target[i].Size - lvs[v].Size
 
 				if target[i].Type == "" {
@@ -214,6 +229,7 @@ func (u unit) startContainer(ctx context.Context) error {
 	}
 
 	state := c.Info.State
+	u.u.ContainerID = c.ID
 
 	select {
 	default:
@@ -227,29 +243,18 @@ func (u unit) startContainer(ctx context.Context) error {
 	}
 
 	// start networking
-
-	sys, err := u.uo.GetSysConfig()
+	err = u.startNetworking(ctx, c.Engine.IP, nil)
 	if err != nil {
-		return err
-	}
+		logrus.WithFields(logrus.Fields{
+			"Engine": c.Engine.ID,
+			"Unit":   u.u.Name}).Warnf("[skip] start networking error:%+v", err)
 
-	ips, err := u.uo.ListIPByUnitID(u.u.ID)
-	if err != nil {
-		return err
-	}
-	if len(ips) > 0 {
-		addr := net.JoinHostPort(c.Engine.IP, strconv.Itoa(sys.Ports.SwarmAgent))
-		err := u.startNetwork(ctx, addr, c.ID, ips, nil)
-		if err != nil {
-			if state != nil && state.Running {
-				return nil
-			}
-
-			return err
+		if state != nil && state.Running {
+			return nil
 		}
 	}
 
-	return nil
+	return err
 }
 
 func (u unit) startService(ctx context.Context, cmd []string) error {
@@ -343,7 +348,7 @@ func (u unit) removeVolumes(ctx context.Context) error {
 	select {
 	default:
 	case <-ctx.Done():
-		return ctx.Err()
+		return errors.WithStack(ctx.Err())
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -373,6 +378,23 @@ func (u unit) removeVolumes(ctx context.Context) error {
 	return nil
 }
 
+// ContainerExec returns the container exec command result,message of exec print into write
+func (u unit) ContainerExec(ctx context.Context, cmd []string, detach bool, w io.Writer) (types.ContainerExecInspect, error) {
+	if len(cmd) == 0 {
+		return types.ContainerExecInspect{}, nil
+	}
+	c := u.getContainer()
+	if c == nil {
+		return types.ContainerExecInspect{}, errors.WithStack(newContainerError(u.u.Name, notFound))
+	}
+
+	if !c.Info.State.Running {
+		return types.ContainerExecInspect{}, errors.WithStack(newContainerError(u.u.Name, notRunning))
+	}
+
+	return c.Exec(ctx, cmd, detach, w)
+}
+
 func (u unit) containerExec(ctx context.Context, cmd []string, detach bool) (types.ContainerExecInspect, error) {
 	if len(cmd) == 0 {
 		return types.ContainerExecInspect{}, nil
@@ -386,7 +408,7 @@ func (u unit) containerExec(ctx context.Context, cmd []string, detach bool) (typ
 		return types.ContainerExecInspect{}, errors.WithStack(newContainerError(u.u.Name, notRunning))
 	}
 
-	return c.Exec(ctx, cmd, detach)
+	return c.Exec(ctx, cmd, detach, nil)
 }
 
 func (u unit) updateServiceConfig(ctx context.Context, path, context string) error {
@@ -411,36 +433,28 @@ func (u *unit) update(ctx context.Context, config container.UpdateConfig) error 
 	return err
 }
 
-func (u unit) startNetwork(ctx context.Context, addr, container string, ips []database.IP, tlsConfig *tls.Config) error {
-	return createNetworkDevice(ctx, addr, container, ips, tlsConfig)
-}
-
-func createNetworkDevice(ctx context.Context, addr, container string, ips []database.IP, tlsConfig *tls.Config) error {
-	for i := range ips {
-		config := sdk.NetworkConfig{
-			Container:  container,
-			HostDevice: ips[i].Bond,
-			// ContainerDevice: ips[i].Bond,
-			IPCIDR:    fmt.Sprintf("%s/%d", utils.Uint32ToIP(ips[i].IPAddr), ips[i].Prefix),
-			Gateway:   ips[i].Gateway,
-			VlanID:    ips[i].VLAN,
-			BandWidth: ips[i].Bandwidth,
-		}
-
-		err := postCreateNetwork(ctx, addr, config, tlsConfig)
-		if err != nil {
-			return errors.WithStack(err)
-		}
+func (u unit) startNetworking(ctx context.Context, host string, tlsConfig *tls.Config) error {
+	ips, err := u.uo.ListIPByUnitID(u.u.ID)
+	if err != nil {
+		return err
+	}
+	if len(ips) == 0 {
+		return nil
 	}
 
-	return nil
-}
-
-func postCreateNetwork(ctx context.Context, addr string, config sdk.NetworkConfig, tlsConfig *tls.Config) error {
-	cli, err := sdk.NewClient(addr, 30*time.Second, tlsConfig)
+	sys, err := u.uo.GetSysConfig()
 	if err != nil {
 		return err
 	}
 
-	return cli.CreateNetwork(ctx, config)
+	addr := net.JoinHostPort(host, strconv.Itoa(sys.Ports.SwarmAgent))
+
+	for i := range ips {
+		err := alloc.CreateNetworkDevice(ctx, addr, u.u.ContainerID, ips[i], tlsConfig)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

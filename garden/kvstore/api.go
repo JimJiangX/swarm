@@ -25,11 +25,12 @@ const (
 	hostType      = "hosts"
 	unitType      = "units"
 	containerType = "containers"
+	agentType     = "agent/install"
 )
 
 // Register is a client for register service
 type Register interface {
-	HealthChecks(state string, q *api.QueryOptions) (map[string]api.HealthCheck, error)
+	//	HealthChecks(ctx context.Context, state string) (map[string]api.HealthCheck, error)
 
 	RegisterService(ctx context.Context, host string, config structs.ServiceRegistration) error
 

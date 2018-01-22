@@ -15,6 +15,10 @@ import (
 const seedversion = "1.0.0"
 
 func seedServer(c *cli.Context) {
+	script := c.String("script")
+	if script == "" {
+		log.Fatal("missing mandatory --script flag")
+	}
 
 	addr := c.String("seedAddr")
 	if addr == "" {
@@ -32,7 +36,7 @@ func seedServer(c *cli.Context) {
 
 	server := api.NewServer([]string{addr}, tlsConfig)
 
-	server.SetHandler(seed.NewRouter(seedversion))
+	server.SetHandler(seed.NewRouter(seedversion, script))
 
 	log.Infof("STARTING SEED SERVER ON : %s", addr)
 	log.Fatal(server.ListenAndServe())

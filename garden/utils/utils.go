@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"context"
+	"bytes"
 	crand "crypto/rand"
 	"encoding/base64"
 	"encoding/binary"
@@ -17,6 +17,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 // Generate8UUID is used to generate a random UUID,lenth of string is 8
@@ -194,7 +196,11 @@ func ExecContextTimeout(ctx context.Context, timeout time.Duration, args ...stri
 		defer cancel()
 	}
 
+	buf := bytes.NewBuffer(nil)
+
 	cmd := ExecContext(ctx, args...)
+	cmd.Stdout = buf
+	cmd.Stderr = buf
 
 	err := cmd.Start()
 	if err != nil {
@@ -207,13 +213,15 @@ func ExecContextTimeout(ctx context.Context, timeout time.Duration, args ...stri
 		close(wait)
 	}()
 
+	var out []byte
 	select {
 	case err = <-wait:
+		out = buf.Bytes()
 	case <-ctx.Done():
 		err = ctx.Err()
 	}
 
-	return nil, err
+	return out, err
 }
 
 // GetPrivateIP is used to return the first private IP address

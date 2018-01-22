@@ -43,9 +43,9 @@ func (h huaweiStore) scriptPath(file string) (string, error) {
 
 // NewHuaweiStore returns a new huawei store
 func newHuaweiStore(orm database.StorageOrmer, script string, san database.SANStorage) Store {
-	hw := huawei{
 	// TODO:
-	}
+	hw := huawei{}
+
 	return &huaweiStore{
 		lock:   new(sync.RWMutex),
 		orm:    orm,
@@ -83,9 +83,9 @@ func (h *huaweiStore) ping() error {
 }
 
 func (h *huaweiStore) insert() error {
-	san := database.SANStorage{
 	// TODO:
-	}
+	san := database.SANStorage{}
+
 	h.lock.Lock()
 	err := h.orm.InsertSANStorage(san)
 	h.lock.Unlock()
@@ -498,11 +498,15 @@ func (h *huaweiStore) list(rg ...string) ([]Space, error) {
 		return nil, errors.Errorf("Exec %s:%s", cmd.Args, err)
 	}
 
-	spaces := parseSpace(r)
+	spaces, warnings := parseSpace(r)
+
+	if len(warnings) > 0 {
+		logrus.Warningf("parse SAN RG warinings:%s", warnings)
+	}
 
 	err = cmd.Wait()
 	if err != nil {
-		return nil, errors.Errorf("Wait %s:%s", cmd.Args, err)
+		return nil, errors.Errorf("Wait %s:%s,warnings:%s", cmd.Args, err, warnings)
 	}
 
 	if len(spaces) == 0 {

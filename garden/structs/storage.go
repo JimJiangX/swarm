@@ -24,7 +24,7 @@ type SANStorageResponse struct {
 }
 
 type Space struct {
-	Enable bool   `json:"ebable"`
+	Enable bool   `json:"enable"`
 	ID     string `json:"id"`
 	Total  int64  `json:"total"`
 	Free   int64  `json:"free"`

@@ -9,21 +9,22 @@ import (
 
 // Service if table structure
 type Service struct {
-	ID            string `db:"id" json:"id"`
-	Name          string `db:"name" json:"name"`
-	Image         string `json:"image_version"`
-	Desc          string `db:"description" json:"description"` // short for Description
-	Architecture  string `db:"architecture" json:"architecture"`
-	Tag           string `db:"tag" json:"tag"` // part of business
-	AutoHealing   bool   `db:"auto_healing" json:"auto_healing"`
-	AutoScaling   bool   `db:"auto_scaling" json:"auto_scaling"`
-	HighAvailable bool   `db:"high_available" json:"high_available"`
-	Status        int    `db:"status" json:"status"`
-	CreatedAt     string `db:"created_at" json:"created_at"`
-	FinishedAt    string `db:"finished_at" json:"finished_at"`
+	ID            string       `json:"id"`
+	Name          string       `json:"name"`
+	Image         ImageVersion `json:"image"`
+	Desc          string       `json:"description"` // short for Description
+	Architecture  string       `json:"architecture"`
+	Tag           string       `json:"tag"` // part of business
+	AutoHealing   bool         `json:"auto_healing"`
+	AutoScaling   bool         `json:"auto_scaling"`
+	HighAvailable bool         `json:"high_available"`
+	Status        int          `json:"status"`
+	CreatedAt     string       `json:"created_at"`
+	FinishedAt    string       `json:"finished_at"`
 }
 
 type VolumeRequire struct {
+	ID     string `json:"-"` // used by volume expansion,Volume ID
 	From   string `json:"from,omitempty"`
 	Name   string `json:"name"`
 	Type   string `json:"type"`
@@ -133,23 +134,45 @@ type UnitRequire struct {
 	Networks []NetDeviceRequire `json:"networks"`
 }
 
+type ServiceResponse struct {
+	ServiceSpec
+	BuckupFileSum int `json:"backup_file_sum"`
+}
+
+type UpdateUnitRequire struct {
+	Require struct {
+		CPU    *int64 `json:"ncpu,omitempty"`
+		Memory *int64 `json:"memory,omitempty"`
+	} `json:"require"`
+
+	Limit *struct {
+		CPU    int   `json:"ncpu"`
+		Memory int64 `json:"memory"`
+	} `json:"limit,omitempty"`
+
+	Volumes  []VolumeRequire    `json:"volumes"`
+	Networks []NetDeviceRequire `json:"networks"`
+}
+
 type NetDeviceRequire struct {
 	Device    int `json:"device,omitempty"`
 	Bandwidth int `json:"bandwidth"` // M/s
 }
 
 type ServiceScaleRequest struct {
+	Compose    bool                   `json:"compose"`
 	Arch       Arch                   `json:"architecture"`
 	Candidates []string               `json:"candidates,omitempty"`
-	Users      []User                 `json:"users,omitempty"`
 	Options    map[string]interface{} `json:"opts"`
 }
 
-type UnitRebuildRequest struct {
-	Units      []string `json:"units"`
-	Candidates []string `json:"candidates,omitempty"`
-	Users      []User   `json:"users,omitempty"`
+type ServiceScaleResponse struct {
+	Task   string       `json:"task_id"`
+	Add    []UnitNameID `json:"add_units,omitempty"`
+	Remove []UnitNameID `json:"remove_units,omitempty"`
 }
+
+type UnitRebuildRequest PostUnitMigrate
 
 type PostServiceResponse struct {
 	ID     string       `json:"id"`
@@ -176,9 +199,16 @@ type ServiceExecConfig struct {
 	Cmd       []string `json:"cmd"`
 }
 
+type ContainerExecOutput struct {
+	Code   int    `json:"exitCode"`
+	Unit   string `json:"nameOrID"`
+	Output string `json:"output"`
+}
+
 type ServiceBackupConfig struct {
 	Container   string `json:"nameOrID"`
 	Type        string `json:"type"`
+	Tables      string `json:"tables"` // full or incremental or tables
 	Remark      string `json:"remark"`
 	Tag         string `json:"tag"`
 	Detach      bool   `json:"detach"`
@@ -186,6 +216,8 @@ type ServiceBackupConfig struct {
 	MaxSizeByte int    `json:"max_backup_space"`
 	// count by Day,used in swarm.BackupTaskCallback(),calculate BackupFile.Retention
 	FilesRetention int `json:"backup_files_retention"`
+
+	Cmd []string `json:"cmd,omitempty"`
 }
 
 type ServiceRestoreRequest struct {
@@ -194,6 +226,7 @@ type ServiceRestoreRequest struct {
 }
 
 type PostUnitMigrate struct {
+	Compose    bool     `json:"compose"`
 	NameOrID   string   `json:"nameOrID"`
 	Candidates []string `json:"candidates,omitempty"`
 }

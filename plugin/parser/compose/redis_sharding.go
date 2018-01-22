@@ -4,7 +4,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/garden/utils"
 )
 
 //master-slave redis manager
@@ -26,12 +28,12 @@ func newRedisShardingManager(dbs []Redis, master int, slave int, dir string) Com
 	}
 
 	for _, db := range dbs {
-		db.scriptDir = dir
 		rs.RedisMap[db.GetKey()] = db
 	}
 
 	return rs
 }
+
 func (r *RedisShardingManager) getRedisAddrs() string {
 	addrs := []string{}
 	for _, redis := range r.RedisMap {
@@ -44,11 +46,12 @@ func (r *RedisShardingManager) getRedisAddrs() string {
 
 func (r *RedisShardingManager) ClearCluster() error {
 	filepath := filepath.Join(r.scriptDir, "redis-sharding_replication-reset.sh")
-	timeout := time.Second * 120
 	addrs := r.getRedisAddrs()
-	args := []string{addrs}
+	args := []string{filepath, addrs}
 
-	_, err := ExecShellFileTimeout(filepath, timeout, args...)
+	out, err := utils.ExecContextTimeout(nil, defaultTimeout*2, args...)
+
+	logrus.Debugf("exec:%s,output:%s", args, out)
 
 	return err
 }
@@ -64,12 +67,13 @@ func (r *RedisShardingManager) ComposeCluster() error {
 	}
 
 	filepath := filepath.Join(r.scriptDir, "redis-sharding_replication-set.sh")
-	timeout := time.Second * 120
 
 	addrs := r.getRedisAddrs()
-	args := []string{strconv.Itoa(r.Slave), addrs}
+	args := []string{filepath, strconv.Itoa(r.Slave), addrs}
 
-	_, err = ExecShellFileTimeout(filepath, timeout, args...)
+	out, err := utils.ExecContextTimeout(nil, defaultTimeout*2, args...)
+
+	logrus.Debugf("exec:%s,output:%s", args, out)
 
 	return err
 }

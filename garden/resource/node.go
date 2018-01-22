@@ -353,16 +353,18 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 	}
 	/*
 		#!/bin/bash
-		swarm_key=$1
-		adm_ip=$2
-		cs_datacenter=$3
-		cs_list=$4
-		registry_domain=$5
-		registry_ip=$6
-		registry_port=$7
-		registry_username=$8
-		registry_passwd=$9
-		regstry_ca_file=${10}
+		set -o nounset
+
+		swarm_key=${1}
+		adm_ip=${2}
+		cs_datacenter=${3}
+		cs_list=${4}
+		registry_domain=${5}
+		registry_ip=${6}
+		registry_port=${7}
+		registry_username=${8}
+		registry_passwd=${9}
+		registry_ca_file=${10}
 		docker_port=${11}
 		hdd_dev=${12}
 		ssd_dev=${13}
@@ -370,13 +372,12 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 		node_id=${15}
 		horus_server_ip=${16}
 		horus_server_port=${17}
-		docker_plugin_port=${18}
-		swarm_agent_port=${19}
-		nfs_ip=${20}
-		nfs_dir=${21}
-		nfs_mount_dir=${22}
-		nfs_mount_opts=${23}
-		san_storage_id=${24}
+		swarm_agent_port=${18}
+		nfs_ip=${19}
+		nfs_dir=${20}
+		nfs_mount_dir=${21}
+		nfs_mount_opts=${22}
+		san_id=${23}
 	*/
 	hdd, ssd, store := "null", "null", "null"
 	if len(nt.hdd) > 0 {
@@ -389,12 +390,12 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 		nt.Node.Storage = store
 	}
 
-	script := fmt.Sprintf(`chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %s %s %s %d %d %s %s %s %s %s`,
+	script := fmt.Sprintf(`chmod 755 %s && %s %s %s %s '%s' %s %s %d %s %s %s %d %s %s %d %s %s %s %d %s %s %s %s %s`,
 		path, path, dockerNodesKVPath, nt.Node.Addr, config.ConsulDatacenter, string(buf),
 		config.Registry.Domain, config.Registry.Address, config.Registry.Port,
 		config.Registry.Username, config.Registry.Password, caFile,
 		config.Ports.Docker, hdd, ssd, config.ConsulPort,
-		nt.Node.ID, horusIP, horusPort, config.Ports.Plugin, config.Ports.SwarmAgent,
+		nt.Node.ID, horusIP, horusPort, config.Ports.SwarmAgent,
 		nt.Node.NFS.Addr, nt.Node.NFS.Dir, nt.Node.NFS.MountDir, nt.Node.NFS.Options, store)
 
 	return script, nil
@@ -627,9 +628,10 @@ func (m hostManager) RemoveNode(ctx context.Context, horus, nameOrID, user, pass
 	err = reg.DeregisterService(ctx, structs.ServiceDeregistration{
 		Type:     "hosts",
 		Key:      node.node.ID,
+		Addr:     node.node.Addr,
 		User:     user,
 		Password: password,
-	}, false)
+	}, true)
 	if err != nil {
 		return err
 	}

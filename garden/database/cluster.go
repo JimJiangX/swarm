@@ -26,9 +26,10 @@ type ClusterOrmer interface {
 
 // Cluster table  structure,correspod with a group of computers
 type Cluster struct {
-	ID         string  `db:"id"`
-	MaxNode    int     `db:"max_host"`
-	UsageLimit float32 `db:"usage_limit"`
+	ID               string  `db:"id"`
+	NetworkPartition string  `db:"ha_network_tag"`
+	MaxNode          int     `db:"max_host"`
+	UsageLimit       float32 `db:"usage_limit"`
 }
 
 func (db dbBase) clusterTable() string {
@@ -37,7 +38,7 @@ func (db dbBase) clusterTable() string {
 
 // InsertCluster insert a new record.
 func (db dbBase) InsertCluster(c Cluster) error {
-	query := "INSERT INTO " + db.clusterTable() + " (id,max_host,usage_limit) VALUES (:id,:max_host,:usage_limit)"
+	query := "INSERT INTO " + db.clusterTable() + " (id,ha_network_tag,max_host,usage_limit) VALUES (:id,:ha_network_tag,:max_host,:usage_limit)"
 
 	_, err := db.NamedExec(query, &c)
 	if err == nil {
@@ -51,7 +52,7 @@ func (db dbBase) InsertCluster(c Cluster) error {
 func (db dbBase) GetCluster(ID string) (Cluster, error) {
 	var (
 		c     Cluster
-		query = "SELECT id,max_host,usage_limit FROM " + db.clusterTable() + " WHERE id=?"
+		query = "SELECT id,ha_network_tag,max_host,usage_limit FROM " + db.clusterTable() + " WHERE id=?"
 	)
 
 	err := db.Get(&c, query, ID)
@@ -69,7 +70,7 @@ func (db dbBase) GetCluster(ID string) (Cluster, error) {
 func (db dbBase) ListClusters() ([]Cluster, error) {
 	var (
 		clusters []Cluster
-		query    = "SELECT id,max_host,usage_limit FROM " + db.clusterTable()
+		query    = "SELECT id,ha_network_tag,max_host,usage_limit FROM " + db.clusterTable()
 	)
 
 	err := db.Select(&clusters, query)

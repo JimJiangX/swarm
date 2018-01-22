@@ -1,23 +1,33 @@
 package structs
 
-import "sort"
+import (
+	"bytes"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"sort"
+
+	"github.com/pkg/errors"
+	"golang.org/x/net/context"
+)
 
 type ServiceLink struct {
 	priority int
-	Spec     *ServiceSpec `json:"-"`
+	Spec     *ServiceSpec
 
 	Arch Arch     `json:"architecture"`
-	ID   string   `json:"from_service_name"`
-	Deps []string `json:"to_services_name"`
+	ID   string   `json:"id"`
+	Deps []string `json:"deps"`
 }
 
 type ServicesLink struct {
-	Mode  string
-	Links []*ServiceLink
+	Mode     string
+	NameOrID string // service id or name,unit id or name or containerID
+	Links    []*ServiceLink
 }
 
 func (sl ServicesLink) Less(i, j int) bool {
-	return sl.Links[i].priority > sl.Links[j].priority
+	return sl.Links[i].priority < sl.Links[j].priority
 }
 
 // Len is the number of elements in the collection.
@@ -92,9 +102,65 @@ type UnitLink struct {
 	ConfigFile    string
 	ConfigContent string
 	Commands      []string
+	Request       *HTTPRequest `json:"request,omitempty"`
 }
 
 type ServiceLinkResponse struct {
 	Links   []UnitLink
 	Compose []string
+}
+
+type HTTPRequest struct {
+	Method string
+	URL    string `json:"url"`
+	Body   []byte
+	Header map[string][]string
+}
+
+// Send send request to remote server
+func (r HTTPRequest) Send(ctx context.Context) error {
+	req, err := http.NewRequest(r.Method, r.URL, bytes.NewReader(r.Body))
+	if err != nil {
+		return err
+	}
+
+	if ctx != nil {
+		req = req.WithContext(ctx)
+	}
+
+	for key, val := range r.Header {
+		for i := range val {
+			req.Header.Add(key, val[i])
+		}
+	}
+
+	resp, err := requireOK(http.DefaultClient.Do(req))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	io.CopyN(ioutil.Discard, resp.Body, 512)
+
+	return err
+}
+
+func requireOK(resp *http.Response, e error) (*http.Response, error) {
+	if e != nil {
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
+		return nil, e
+	}
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusBadRequest {
+		buf := bytes.NewBuffer(nil)
+
+		io.Copy(buf, resp.Body)
+		resp.Body.Close()
+
+		return nil, errors.Errorf("%s,Unexpected response code: %d (%s)", resp.Request.URL.String(), resp.StatusCode, buf.Bytes())
+	}
+
+	return resp, nil
 }

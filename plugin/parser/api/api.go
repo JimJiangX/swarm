@@ -260,7 +260,7 @@ func (p plugin) ServicesLink(ctx context.Context, links structs.ServicesLink) (s
 	const uri = "/services/link"
 	obj := structs.ServiceLinkResponse{}
 
-	resp, err := requireOK(p.c.Post(ctx, uri, links))
+	resp, err := requireOK(p.c.Put(ctx, uri, links))
 	if err != nil {
 		return obj, err
 	}
@@ -284,7 +284,7 @@ func decodeBody(resp *http.Response, out interface{}) error {
 // requireOK is used to wrap doRequest and check for a 200
 func requireOK(resp *http.Response, e error) (*http.Response, error) {
 	if e != nil {
-		if resp != nil {
+		if resp != nil && resp.Body != nil {
 			resp.Body.Close()
 		}
 		return nil, e

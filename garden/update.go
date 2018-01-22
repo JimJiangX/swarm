@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/swarm/cluster"
@@ -32,9 +33,29 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 			return err
 		}
 
-		_, version, err := getImage(svc.so, im.ID)
+		version, err := getImage(svc.so, im.ID)
 		if err != nil {
 			return err
+		}
+
+		changes := make([]*unit, 0, len(units))
+
+		for _, u := range units {
+
+			c := u.getContainer()
+			if c == nil || c.Engine == nil {
+				return errors.WithStack(newContainerError(u.u.Name, notFound))
+			}
+
+			if c.Config.Image == version {
+				continue
+			}
+
+			changes = append(changes, u)
+		}
+
+		if len(changes) == 0 {
+			return nil
 		}
 
 		err = svc.stop(ctx, units, true)
@@ -47,9 +68,9 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 		containers := make([]struct {
 			u  database.Unit
 			nc *cluster.Container
-		}, 0, len(units))
+		}, 0, len(changes))
 
-		for _, u := range units {
+		for _, u := range changes {
 			c := u.getContainer()
 			if c == nil || c.Engine == nil {
 				return errors.WithStack(newContainerError(u.u.Name, notFound))
@@ -63,6 +84,8 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 			// set new swarmID
 			swarmID := utils.Generate32UUID()
 			c.Config.SetSwarmID(swarmID)
+			c.Config.Config.Labels["mgm.unit.type"] = im.Name
+			c.Config.Config.Labels["mgm.image.id"] = im.ID
 
 			nc, err := c.Engine.CreateContainer(c.Config, swarmID, true, authConfig)
 			if err != nil {
@@ -131,18 +154,12 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 		}
 
 		{
-			table, err := svc.so.GetService(svc.svc.ID)
+			table, err := svc.so.GetService(svc.ID())
 			if err != nil {
 				return err
 			}
-			desc := *table.Desc
-			desc.ID = utils.Generate32UUID()
-			desc.Image = im.Version()
-			desc.ImageID = im.ImageID
-			desc.Previous = table.DescID
 
-			table.DescID = desc.ID
-			table.Desc = &desc
+			table = updateDescByImage(table, im)
 
 			err = svc.so.SetServiceDesc(table)
 			if err == nil {
@@ -153,7 +170,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 		}
 	}
 
-	tl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
+	tl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
 		statusServiceImageUpdating,
 		statusServiceImageUpdated,
 		statusServiceImageUpdateFailed)
@@ -161,16 +178,31 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 	return tl.Run(isnotInProgress, update, async)
 }
 
+func updateDescByImage(table database.Service, im database.Image) database.Service {
+	desc := *table.Desc
+	desc.ID = utils.Generate32UUID()
+	desc.Image = im.Image()
+	desc.ImageID = im.ImageID
+	desc.Previous = table.DescID
+
+	table.DescID = desc.ID
+	table.Desc = &desc
+
+	return table
+
+}
+
 // UpdateResource udpate service containers CPU & memory settings.
-func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, ncpu, memory int64) error {
+func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, ncpu, memory *int64) error {
 	desc := svc.svc.Desc
 
-	if ncpu == 0 {
-		ncpu = int64(desc.NCPU)
+	if ncpu == nil {
+		n := int64(desc.NCPU)
+		ncpu = &n
 	}
 
-	if memory == 0 {
-		memory = desc.Memory
+	if memory == nil {
+		memory = &desc.Memory
 	}
 
 	update := func() error {
@@ -190,40 +222,50 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 		pendings := make([]pending, 0, len(units))
 
 		for _, u := range units {
+			var nccpu int64   // container HostConfig.CpusetCpus
+			countCPU := false // set true after called CountCPU
 
 			c := u.getContainer()
 			if c == nil || c.Engine == nil {
 				return errors.WithStack(newContainerError(u.u.Name, notFound))
 			}
 
-			if c.Config.HostConfig.Memory == memory {
-				if n, err := c.Config.CountCPU(); err == nil && n == ncpu {
+			if c.Config.HostConfig.Memory == *memory {
+				nccpu, err = c.Config.CountCPU()
+				if err != nil {
+					return errors.WithStack(err)
+				}
+
+				if nccpu == *ncpu {
 					continue
 				}
+				countCPU = true
 			}
 
 			pu := pending{
 				u:      u,
-				memory: memory,
+				memory: *memory,
 				cpuset: c.Config.HostConfig.CpusetCpus,
 			}
 
-			n, err := c.Config.CountCPU()
-			if err != nil {
-				return errors.WithStack(err)
+			if !countCPU {
+				nccpu, err = c.Config.CountCPU()
+				if err != nil {
+					return errors.WithStack(err)
+				}
 			}
 
-			if n > ncpu {
-				pu.cpuset, err = reduceCPUset(c.Config.HostConfig.CpusetCpus, int(ncpu))
+			if nccpu > *ncpu {
+				pu.cpuset, err = reduceCPUset(c.Config.HostConfig.CpusetCpus, int(*ncpu))
 				if err != nil {
 					return err
 				}
 			}
 
-			if c.Config.HostConfig.Memory < memory || n < ncpu {
+			if c.Config.HostConfig.Memory < *memory || nccpu < *ncpu {
 				node := node.NewNode(c.Engine)
 
-				cpuset, err := actor.AlloctCPUMemory(c.Config, node, ncpu-n, memory-c.Config.HostConfig.Memory, nil)
+				cpuset, err := actor.AlloctCPUMemory(c.Config, node, *ncpu-nccpu, *memory-c.Config.HostConfig.Memory, nil)
 				if err != nil {
 					return err
 				}
@@ -246,6 +288,11 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 			pendings = append(pendings, pu)
 		}
 
+		if len(pendings) == 0 {
+			// no cpu&memory update
+			return nil
+		}
+
 		for _, pu := range pendings {
 			err = pu.u.update(ctx, pu.config)
 			if err != nil {
@@ -253,22 +300,26 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 			}
 		}
 
-		// units config file updated by user
+		{
+			// update units config file but whether start by user
+			err := svc.updateConfigs(ctx, units, nil, nil)
+			if err != nil {
+				logrus.Errorf("%+v", err)
+			}
+
+		}
 
 		{
 			// update Service.Desc
-			table, err := svc.so.GetService(svc.svc.ID)
+			table, err := svc.so.GetService(svc.ID())
 			if err != nil {
 				return err
 			}
-			desc := *table.Desc
-			desc.ID = utils.Generate32UUID()
-			desc.NCPU = int(ncpu)
-			desc.Memory = memory
-			desc.Previous = table.DescID
 
-			table.DescID = desc.ID
-			table.Desc = &desc
+			table, err = updateDescByResource(table, *ncpu, *memory)
+			if err != nil {
+				return err
+			}
 
 			err = svc.so.SetServiceDesc(table)
 			if err == nil {
@@ -279,10 +330,40 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 		}
 	}
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
 		statusServiceResourceUpdating, statusServiceResourceUpdated, statusServiceResourceUpdateFailed)
 
 	return sl.Run(isnotInProgress, update, false)
+}
+
+func updateDescByResource(table database.Service, ncpu, memory int64) (database.Service, error) {
+	desc := *table.Desc
+	desc.ID = utils.Generate32UUID()
+	desc.NCPU = int(ncpu)
+	desc.Memory = memory
+
+	schedOpts := scheduleOption{}
+	r := strings.NewReader(table.Desc.ScheduleOptions)
+	err := json.NewDecoder(r).Decode(&schedOpts)
+	if err != nil && table.Desc.ScheduleOptions != "" {
+		return table, errors.WithStack(err)
+	}
+
+	schedOpts.Require.Require.CPU = desc.NCPU
+	schedOpts.Require.Require.Memory = desc.Memory
+
+	sr, err := json.Marshal(schedOpts)
+	if err != nil {
+		return table, errors.WithStack(err)
+	}
+
+	desc.ScheduleOptions = string(sr)
+	desc.Previous = table.DescID
+
+	table.DescID = desc.ID
+	table.Desc = &desc
+
+	return table, nil
 }
 
 func reduceCPUset(cpusetCpus string, need int) (string, error) {
@@ -319,6 +400,16 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 	}
 
 	expansion := func() error {
+		opts, err := svc.getScheduleOption()
+		if err != nil {
+			return err
+		}
+
+		target, err = mergeVolumeRequire(opts.Require.Volumes, target)
+		if err != nil {
+			return err
+		}
+
 		type pending struct {
 			u        *unit
 			eng      *cluster.Engine
@@ -337,7 +428,7 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 		for _, u := range units {
 			eng := u.getEngine()
 			if eng == nil {
-				return errors.Errorf("")
+				return errors.WithStack(newNotFound("Engine", u.u.EngineID))
 			}
 
 			add, creating, err := u.prepareExpandVolume(eng, target)
@@ -367,7 +458,7 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 				}
 			}
 
-			err := actor.ExpandVolumes(pu.eng, pu.u.u.ID, pu.add)
+			err := actor.ExpandVolumes(pu.eng, pu.add)
 			if err != nil {
 				return err
 			}
@@ -375,66 +466,205 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 
 		{
 			// update Service.Desc
-			table, err := svc.so.GetService(svc.svc.ID)
+			table, err := svc.so.GetService(svc.ID())
 			if err != nil {
 				return err
 			}
 
-			var old []structs.VolumeRequire
-			r := strings.NewReader(table.Desc.Volumes)
-			err = json.NewDecoder(r).Decode(&old)
+			table, err = updateDescByVolumeReuires(table, &opts, target)
 			if err != nil {
-				old = []structs.VolumeRequire{}
+				return err
 			}
 
-			out := mergeVolumeRequire(old, target)
-			vb, err := json.Marshal(out)
-			if err != nil {
-				return errors.WithStack(err)
+			err = svc.so.SetServiceDesc(table)
+			if err == nil {
+				svc.svc = &table
 			}
 
-			desc := *table.Desc
-			desc.ID = utils.Generate32UUID()
-			desc.Volumes = string(vb)
-			desc.Previous = table.DescID
-
-			table.DescID = desc.ID
-			table.Desc = &desc
-
-			return svc.so.SetServiceDesc(table)
+			return err
 		}
-
 	}
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
 		statusServiceVolumeExpanding, statusServiceVolumeExpanded, statusServiceVolumeExpandFailed)
 
 	return sl.Run(isnotInProgress, expansion, false)
 }
 
-func mergeVolumeRequire(old, update []structs.VolumeRequire) []structs.VolumeRequire {
-	if len(old) == 0 {
-		return update
+func updateDescByVolumeReuires(table database.Service, opts *scheduleOption, target []structs.VolumeRequire) (database.Service, error) {
+	if opts == nil {
+		opts = &scheduleOption{}
+	}
+	opts.Require.Volumes = target
+
+	sr, err := json.Marshal(opts)
+	if err != nil {
+		return table, errors.WithStack(err)
 	}
 
-	out := make([]structs.VolumeRequire, 0, len(old))
+	vb, err := json.Marshal(target)
+	if err != nil {
+		return table, errors.WithStack(err)
+	}
 
-	for i := range old {
-		found := false
+	desc := *table.Desc
+	desc.ID = utils.Generate32UUID()
+	desc.Volumes = string(vb)
+	desc.ScheduleOptions = string(sr)
+	desc.Previous = table.DescID
 
-	loop:
+	table.DescID = desc.ID
+	table.Desc = &desc
+
+	return table, nil
+}
+
+func mergeVolumeRequire(old, update []structs.VolumeRequire) ([]structs.VolumeRequire, error) {
+	if len(old) == 0 {
+
 		for v := range update {
-			if old[i].Name == update[v].Name && old[i].Type == update[v].Type {
-				out = append(out, update[v])
-				found = true
-				break loop
+			if update[v].Name == "" || update[v].Type == "" {
+				return nil, errors.Errorf("invalid volume require,%v", update[v])
 			}
 		}
 
-		if !found {
-			out = append(out, old[i])
+		return update, nil
+	}
+
+	out := make([]structs.VolumeRequire, len(old))
+	copy(out, old)
+
+loop:
+	for v := range update {
+
+		for i := range out {
+			if out[i].Name == update[v].Name {
+
+				out[i].Size = update[v].Size
+
+				continue loop
+			}
+		}
+
+		if update[v].Name == "" || update[v].Type == "" {
+			return nil, errors.Errorf("invalid volume require,%v", update[v])
+		}
+
+		out = append(out, update[v])
+	}
+
+	return out, nil
+}
+
+func (svc *Service) UpdateNetworking(ctx context.Context, actor alloc.Allocator, require []structs.NetDeviceRequire) error {
+	if len(require) == 0 {
+		return nil
+	}
+
+	width := 0
+	for i := range require {
+		if require[i].Bandwidth > width {
+			width = require[i].Bandwidth
 		}
 	}
 
-	return out
+	update := func() error {
+		units, err := svc.getUnits()
+		if err != nil {
+			return err
+		}
+
+		for _, u := range units {
+			eng := u.getEngine()
+			if eng == nil {
+				return errors.WithStack(newNotFound("Engine", u.u.EngineID))
+			}
+
+			ips, err := u.uo.ListIPByUnitID(u.u.ID)
+			if err != nil {
+				return err
+			}
+
+			err = actor.UpdateNetworking(ctx, eng.ID, ips, width)
+			if err != nil {
+				return err
+			}
+		}
+
+		{
+			// update Service.Desc
+			table, err := svc.so.GetService(svc.ID())
+			if err != nil {
+				return err
+			}
+
+			table, err = updateDescByNetworkReuires(table, nil, require)
+			if err != nil {
+				return err
+			}
+
+			err = svc.so.SetServiceDesc(table)
+			if err == nil {
+				svc.svc = &table
+			}
+
+			return err
+		}
+	}
+
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
+		statusServiceNetworkUpdating, statusServiceNetworkUpdated, statusServiceNetworkUpdateFailed)
+
+	return sl.Run(isnotInProgress, update, false)
+}
+
+func updateDescByArch(table database.Service, arch structs.Arch) database.Service {
+	desc := *table.Desc
+	desc.ID = utils.Generate32UUID()
+	desc.Replicas = arch.Replicas
+	desc.Previous = table.DescID
+
+	out, err := json.Marshal(arch)
+	if err == nil {
+		desc.Architecture = string(out)
+	}
+
+	table.DescID = desc.ID
+	table.Desc = &desc
+
+	return table
+}
+
+func updateDescByNetworkReuires(table database.Service, opts *scheduleOption, target []structs.NetDeviceRequire) (database.Service, error) {
+	if opts == nil {
+		opts = &scheduleOption{}
+		r := strings.NewReader(table.Desc.ScheduleOptions)
+		err := json.NewDecoder(r).Decode(opts)
+		if err != nil && table.Desc.ScheduleOptions != "" {
+			return table, errors.WithStack(err)
+		}
+	}
+
+	opts.Require.Networks = target
+
+	sr, err := json.Marshal(opts)
+	if err != nil {
+		return table, errors.WithStack(err)
+	}
+
+	nb, err := json.Marshal(target)
+	if err != nil {
+		return table, errors.WithStack(err)
+	}
+
+	desc := *table.Desc
+	desc.ID = utils.Generate32UUID()
+	desc.Networks = string(nb)
+	desc.ScheduleOptions = string(sr)
+	desc.Previous = table.DescID
+
+	table.DescID = desc.ID
+	table.Desc = &desc
+
+	return table, nil
 }

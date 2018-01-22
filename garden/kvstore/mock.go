@@ -65,7 +65,7 @@ func (c *mockClient) DeleteKVTree(ctx context.Context, key string) error {
 	return nil
 }
 
-func (c mockClient) HealthChecks(state string, q *api.QueryOptions) (map[string]api.HealthCheck, error) {
+func (c mockClient) HealthChecks(ctx context.Context, state string) (map[string]api.HealthCheck, error) {
 	return nil, nil
 }
 

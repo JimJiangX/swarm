@@ -117,7 +117,7 @@ func TestDeregisterService(t *testing.T) {
 			Key:  "unit_jfajfoafajofjaof",
 		}, {
 			Type: containerType,
-			Key:  "contianer_jfajfoafajofjaof",
+			Key:  "container_jfajfoafajofjaof",
 		}, {
 			Type:     hostType,
 			Key:      "host_jfajfoafajofjaof",

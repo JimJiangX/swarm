@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"bytes"
@@ -74,6 +75,8 @@ type TaskOrmer interface {
 	ListTasks(link string, status int) ([]Task, error)
 
 	SetTask(t Task) error
+
+	SetTaskFail(id string) error
 }
 
 // NewTask new a Task
@@ -358,4 +361,102 @@ func (db dbBase) delTasks(tasks []Task) error {
 	stmt.Close()
 
 	return nil
+}
+
+func (db dbBase) MarkRunningTasks() error {
+	do := func(tx *sqlx.Tx) error {
+
+		tasks, err := db.txListTasks(tx, TaskRunningStatus)
+		if err != nil {
+			return err
+		}
+
+		svcTasks := make([]Task, 0, len(tasks)/2)
+
+		table := db.serviceTable()
+		for i := range tasks {
+			if tasks[i].LinkTable == table {
+				svcTasks = append(svcTasks, tasks[i])
+			}
+		}
+
+		err = incServiceStatus(tx, table, svcTasks, 1)
+		if err != nil {
+			return err
+		}
+
+		now := time.Now()
+		for i := range tasks {
+			tasks[i].Status = TaskUnknownStatus
+			tasks[i].FinishedAt = now
+			tasks[i].Errors = "set task status by replication,status is unknown,task maybe running and real value is seting later"
+
+			err := db.txSetTask(tx, tasks[i])
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	return db.txFrame(do)
+}
+
+func incServiceStatus(tx *sqlx.Tx, table string, tasks []Task, inc int) error {
+	query := fmt.Sprintf("UPDATE %s SET action_status=action_status+%d WHERE id=?", table, inc)
+	for i := range tasks {
+		_, err := tx.Exec(query, tasks[i].Linkto)
+		if err != nil && err != sql.ErrNoRows {
+			return errors.WithStack(err)
+		}
+	}
+
+	return nil
+}
+
+func (db dbBase) SetTaskFail(id string) error {
+	do := func(tx *sqlx.Tx) error {
+		tk := task{}
+		query := "SELECT id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM " + db.taskTable() + " WHERE id=?"
+
+		err := tx.Get(&tk, query, id)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return nil
+			}
+
+			return err
+		}
+
+		task := Task{task: tk}
+
+		if task.Status == TaskFailedStatus || task.Status == TaskDoneStatus {
+			return nil
+		}
+
+		table := db.serviceTable()
+
+		if task.LinkTable == table {
+			err = incServiceStatus(tx, table, []Task{task}, 1)
+			if err != nil {
+				return err
+			}
+		}
+
+		{
+			task.Status = TaskFailedStatus
+			task.FinishedAt = time.Now()
+			task.Errors = "set task status by replication,status set canceled,task maybe running and real value is seting later"
+
+			err = db.txSetTask(tx, task)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	return db.txFrame(do)
 }

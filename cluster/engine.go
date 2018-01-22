@@ -18,19 +18,17 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/context"
-
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/filters"
 	networktypes "github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/versions"
 	"github.com/docker/docker/api/types/volume"
 	engineapi "github.com/docker/docker/client"
 	engineapinop "github.com/docker/swarm/api/nopclient"
 	"github.com/docker/swarm/swarmclient"
+	"golang.org/x/net/context"
 )
 
 const (
@@ -39,9 +37,6 @@ const (
 
 	// Threshold of delta duration between swarm manager and engine's systime
 	thresholdTime = 2 * time.Second
-
-	// Minimum docker engine version supported by swarm.
-	minSupportedVersion = "1.8.0"
 )
 
 type engineState int
@@ -319,9 +314,11 @@ func (e *Engine) HealthIndicator() int64 {
 }
 
 // setState sets engine state
-func (e *Engine) setState(state engineState) {
-	e.Lock()
-	defer e.Unlock()
+func (e *Engine) setState(state engineState, lockSet bool) {
+	if !lockSet {
+		e.Lock()
+		defer e.Unlock()
+	}
 	e.state = state
 }
 
@@ -358,9 +355,11 @@ func (e *Engine) ValidationComplete() {
 }
 
 // setErrMsg sets error message for the engine
-func (e *Engine) setErrMsg(errMsg string) {
-	e.Lock()
-	defer e.Unlock()
+func (e *Engine) setErrMsg(errMsg string, lockSet bool) {
+	if !lockSet {
+		e.Lock()
+		defer e.Unlock()
+	}
 	e.lastError = strings.TrimSpace(errMsg)
 	e.updatedAt = time.Now()
 }
@@ -374,7 +373,7 @@ func (e *Engine) ErrMsg() string {
 
 // HandleIDConflict handles ID duplicate with existing engine
 func (e *Engine) HandleIDConflict(otherAddr string) {
-	e.setErrMsg(fmt.Sprintf("ID duplicated. %s shared by this node %s and another node %s", e.ID, e.Addr, otherAddr))
+	e.setErrMsg(fmt.Sprintf("ID duplicated. %s shared by this node %s and another node %s", e.ID, e.Addr, otherAddr), false)
 }
 
 // Status returns the health status of the Engine: Healthy or Unhealthy
@@ -385,9 +384,11 @@ func (e *Engine) Status() string {
 }
 
 // incFailureCount increases engine's failure count, and sets engine as unhealthy if threshold is crossed
-func (e *Engine) incFailureCount() {
-	e.Lock()
-	defer e.Unlock()
+func (e *Engine) incFailureCount(lockSet bool) {
+	if !lockSet {
+		e.Lock()
+		defer e.Unlock()
+	}
 	e.failureCount++
 	if e.state == stateHealthy && e.failureCount >= e.opts.FailureRetry {
 		e.state = stateUnhealthy
@@ -410,23 +411,29 @@ func (e *Engine) UpdatedAt() time.Time {
 	return e.updatedAt
 }
 
-func (e *Engine) resetFailureCount() {
-	e.Lock()
-	defer e.Unlock()
+func (e *Engine) resetFailureCount(lockSet bool) {
+	if !lockSet {
+		e.Lock()
+		defer e.Unlock()
+	}
 	e.failureCount = 0
 }
 
-// CheckConnectionErr checks error from client response and adjusts engine healthy indicators
 func (e *Engine) CheckConnectionErr(err error) {
+	e.checkConnectionErr(err, false)
+}
+
+// CheckConnectionErr checks error from client response and adjusts engine healthy indicators
+func (e *Engine) checkConnectionErr(err error, lockSet bool) {
 	if err == nil {
-		e.setErrMsg("")
+		e.setErrMsg("", lockSet)
 		// If current state is unhealthy, change it to healthy
 		if e.state == stateUnhealthy {
 			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Infof("Engine came back to life after %d retries. Hooray!", e.getFailureCount())
 			e.emitEvent("engine_reconnect")
-			e.setState(stateHealthy)
+			e.setState(stateHealthy, lockSet)
 		}
-		e.resetFailureCount()
+		e.resetFailureCount(lockSet)
 		return
 	}
 
@@ -436,9 +443,9 @@ func (e *Engine) CheckConnectionErr(err error) {
 		// in engine marked as unhealthy. If this causes unnecessary failure, engine
 		// can track last error time. Only increase failure count if last error is
 		// not too recent, e.g., last error is at least 1 seconds ago.
-		e.incFailureCount()
+		e.incFailureCount(lockSet)
 		// update engine error message
-		e.setErrMsg(err.Error())
+		e.setErrMsg(err.Error(), lockSet)
 		return
 	}
 	// other errors may be ambiguous.
@@ -477,12 +484,6 @@ func (e *Engine) updateSpecs() error {
 		return err
 	}
 
-	// Older versions of Docker don't expose the ID field, Labels and are not supported
-	// by Swarm.  Catch the error ASAP and refuse to connect.
-	if versions.LessThan(v.Version, minSupportedVersion) {
-		err = fmt.Errorf("engine %s is running an unsupported version of Docker Engine. Please upgrade to at least %s", e.Addr, minSupportedVersion)
-		return err
-	}
 	// update server version
 	e.Version = v.Version
 	// update client version. docker/api handles backward compatibility where needed
@@ -629,7 +630,7 @@ func (e *Engine) AddNetwork(network *Network) {
 func (e *Engine) RemoveVolume(name string) error {
 	err := e.apiClient.VolumeRemove(context.Background(), name, false)
 	e.CheckConnectionErr(err)
-	if err != nil {
+	if err != nil && !IsErrVolumeNotFound(err) {
 		return err
 	}
 
@@ -738,19 +739,23 @@ func (e *Engine) refreshVolume(IDOrName string) error {
 // true, each container will be inspected.
 // FIXME: unexport this method after mesos scheduler stops using it directly
 func (e *Engine) RefreshContainers(full bool) error {
+	e.Lock()
+	defer e.Unlock()
 	opts := types.ContainerListOptions{
 		All:  true,
 		Size: false,
 	}
-	containers, err := e.apiClient.ContainerList(context.Background(), opts)
-	e.CheckConnectionErr(err)
+	ctx, cancel := context.WithTimeout(context.TODO(), requestTimeout)
+	defer cancel()
+	containers, err := e.apiClient.ContainerList(ctx, opts)
+	e.checkConnectionErr(err, true)
 	if err != nil {
 		return err
 	}
 
 	merged := make(map[string]*Container)
 	for _, c := range containers {
-		mergedUpdate, err := e.updateContainer(c, merged, full)
+		mergedUpdate, err := e.updateContainer(c, merged, full, true)
 		if err != nil {
 			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Errorf("Unable to update state of container %q: %v", c.ID, err)
 		} else {
@@ -758,8 +763,6 @@ func (e *Engine) RefreshContainers(full bool) error {
 		}
 	}
 
-	e.Lock()
-	defer e.Unlock()
 	e.containers = merged
 
 	return nil
@@ -796,17 +799,19 @@ func (e *Engine) refreshContainer(ID string, full bool) (*Container, error) {
 		return nil, nil
 	}
 
-	_, err = e.updateContainer(containers[0], e.containers, full)
+	_, err = e.updateContainer(containers[0], e.containers, full, false)
 	e.RLock()
 	container := e.containers[containers[0].ID]
 	e.RUnlock()
 	return container, err
 }
 
-func (e *Engine) updateContainer(c types.Container, containers map[string]*Container, full bool) (map[string]*Container, error) {
+func (e *Engine) updateContainer(c types.Container, containers map[string]*Container, full bool, lockSet bool) (map[string]*Container, error) {
 	var container *Container
 
-	e.RLock()
+	if !lockSet {
+		e.RLock()
+	}
 	if current, exists := e.containers[c.ID]; exists {
 		// The container is already known.
 		container = current
@@ -826,14 +831,16 @@ func (e *Engine) updateContainer(c types.Container, containers map[string]*Conta
 	// Trade-off: If updateContainer() is called concurrently for the same
 	// container, we will end up doing a full refresh twice and the original
 	// container (containers[container.Id]) will get replaced.
-	e.RUnlock()
+	if !lockSet {
+		e.RUnlock()
+	}
 
 	c.Created = time.Unix(c.Created, 0).Add(e.DeltaDuration).Unix()
 
 	// Update ContainerInfo.
 	if full {
 		info, err := e.apiClient.ContainerInspect(context.Background(), c.ID)
-		e.CheckConnectionErr(err)
+		e.checkConnectionErr(err, lockSet)
 		if err != nil {
 			return nil, err
 		}
@@ -860,10 +867,14 @@ func (e *Engine) updateContainer(c types.Container, containers map[string]*Conta
 	}
 
 	// Update its internal state.
-	e.Lock()
+	if !lockSet {
+		e.Lock()
+	}
 	container.Container = c
 	containers[container.ID] = container
-	e.Unlock()
+	if !lockSet {
+		e.Unlock()
+	}
 
 	return containers, nil
 }
@@ -941,6 +952,11 @@ func (e *Engine) UpdateNetworkContainers(containerID string, full bool) error {
 		ctr, err := e.refreshContainer(containerID, full)
 		if err != nil {
 			return err
+		}
+		// in case the container doesn't exist on the engine
+		if ctr == nil {
+			log.Warnf("container %s doesn't exist on the engine %s, so terminate updating network for it", containerID, e.Name)
+			return nil
 		}
 		containerMap[containerID] = ctr
 	}

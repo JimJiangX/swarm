@@ -31,32 +31,35 @@ func (svc *Service) Backup(ctx context.Context, local string, config structs.Ser
 			return err
 		}
 
-		cmds, err := svc.generateUnitsCmd(ctx)
-		if err != nil {
-			return err
-		}
-
-		cmd := cmds.GetCmd(u.u.ID, structs.BackupCmd)
+		cmd := config.Cmd
 		if len(cmd) == 0 {
-			return errors.Errorf("%s:%s unsupport backup yet", u.u.Name, u.u.Type)
+			cmds, err := svc.generateUnitsCmd(ctx)
+			if err != nil {
+				return err
+			}
+
+			cmd = cmds.GetCmd(u.u.ID, structs.BackupCmd)
+			if len(cmd) == 0 {
+				return errors.Errorf("%s:%s unsupport backup yet", u.u.Name, u.u.Type)
+			}
 		}
 
 		cmd = append(cmd, local+"/v1.0/tasks/backup/callback", task.ID, u.u.ID, config.Type, config.BackupDir,
-			strconv.Itoa(config.FilesRetention), config.Remark, config.Tag)
+			strconv.Itoa(config.FilesRetention), config.Remark, config.Tag, config.Tables)
 
 		_, err = u.containerExec(ctx, cmd, config.Detach)
 
 		return err
 	}
 
-	sl := tasklock.NewServiceTask(svc.svc.ID, svc.so, task,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
 		statusServiceBackuping, statusServiceBackupDone, statusServiceBackupFailed)
 
 	return sl.Run(isnotInProgress, backup, async)
 }
 
 func (svc *Service) checkBackupFiles(ctx context.Context, maxSize int) error {
-	_, expired, err := checkBackupFilesByService(svc.svc.ID, svc.so, maxSize)
+	_, expired, err := checkBackupFilesByService(svc.ID(), svc.so, maxSize)
 	if len(expired) > 0 {
 		_err := svc.removeExpiredBackupFiles(ctx, expired)
 		if _err != nil {
@@ -98,7 +101,7 @@ func checkBackupFilesByService(service string, iface database.BackupFileIface, m
 	expired := make([]database.BackupFile, 0, len(files))
 
 	for i := range files {
-		if now.After(files[i].Retention) {
+		if now.Sub(files[i].Retention) > -time.Minute {
 			expired = append(expired, files[i])
 		} else {
 			valid = append(valid, files[i])

@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/astaxie/beego/config"
@@ -22,6 +23,15 @@ func init() {
 	register("upproxy", "1.1", &upproxyConfigV100{})
 	register("upproxy", "1.2", &upproxyConfigV100{})
 	register("upproxy", "1.3", &upproxyConfigV100{})
+	register("upproxy", "1.4", &upproxyConfigV100{})
+	register("upproxy", "1.5", &upproxyConfigV100{})
+
+	register("upproxy", "2.0", &upproxyConfigV200{})
+	register("upproxy", "2.1", &upproxyConfigV200{})
+	register("upproxy", "2.2", &upproxyConfigV200{})
+	register("upproxy", "2.3", &upproxyConfigV200{})
+	register("upproxy", "2.4", &upproxyConfigV200{})
+	register("upproxy", "2.5", &upproxyConfigV200{})
 }
 
 type proxyConfig struct {
@@ -101,15 +111,10 @@ func (c proxyConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 		return structs.ServiceRegistration{}, err
 	}
 
-	im, err := structs.ParseImage(c.template.Image)
-	if err != nil {
-		return structs.ServiceRegistration{}, err
-	}
-
 	reg := structs.HorusRegistration{}
 	reg.Service.Select = true
 	reg.Service.Name = spec.ID
-	reg.Service.Type = "unit_" + im.Name
+	reg.Service.Type = "unit_" + desc.Image.Name
 	reg.Service.Tag = desc.ID
 	reg.Service.Container.Name = spec.Name
 	reg.Service.Container.HostName = spec.Engine.Node
@@ -154,12 +159,35 @@ func (c *proxyConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		addr = spec.Networking[0].IP
 	}
 
-	dataPort := desc.Options["proxy_data_port"]
-	adminPort := desc.Options["proxy_admin_port"]
+	{
+		val, ok := desc.Options["proxy_data_port"]
+		if !ok {
+			return errors.New("miss proxy_data_port")
+		}
+		port, err := atoi(val)
+		if err != nil || port == 0 {
+			return errors.Wrap(err, "miss proxy_data_port")
+		}
+
+		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", addr, port)
+	}
+
+	adminPort := 0
+	{
+		val, ok := desc.Options["proxy_admin_port"]
+		if !ok {
+			return errors.New("miss proxy_admin_port")
+		}
+		port, err := atoi(val)
+		if err != nil || port == 0 {
+			return errors.Wrap(err, "miss proxy_admin_port")
+		}
+
+		adminPort = port
+	}
 
 	m["adm-cli::proxy_admin_port"] = adminPort
 	m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%v", addr, adminPort)
-	m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%v", addr, dataPort)
 
 	m["upsql-proxy::event-threads-count"] = 1
 	if spec.Config != nil {
@@ -207,7 +235,7 @@ type proxyConfigV110 struct {
 }
 
 func (proxyConfigV110) clone(t *structs.ConfigTemplate) parser {
-	pr := &proxyConfigV102{}
+	pr := &proxyConfigV110{}
 	pr.template = t
 
 	return pr
@@ -226,7 +254,7 @@ func (c *proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) er
 
 	m := make(map[string]interface{}, 10)
 
-	m["upsql-proxy::proxy-domain"] = desc.ID
+	m["upsql-proxy::proxy-domain"] = desc.Tag
 	m["upsql-proxy::proxy-name"] = spec.Name
 
 	addr := "localhost"
@@ -234,13 +262,30 @@ func (c *proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) er
 		addr = spec.Networking[0].IP
 	}
 
-	dataPort := desc.Options["proxy_data_port"]
-	adminPort := desc.Options["proxy_admin_port"]
+	{
+		val, ok := desc.Options["proxy_data_port"]
+		if !ok {
+			return errors.New("miss proxy_data_port")
+		}
+		port, err := atoi(val)
+		if err != nil || port == 0 {
+			return errors.Wrap(err, "miss proxy_data_port")
+		}
 
-	m["adm-cli::proxy_admin_port"] = adminPort
-	m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%v", addr, adminPort)
-	m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%v", addr, dataPort)
-	m["supervise::supervise-address"] = fmt.Sprintf("%s:%v", addr, adminPort)
+		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", addr, port)
+	}
+
+	val, ok := desc.Options["proxy_admin_port"]
+	if ok {
+		adminPort, err := atoi(val)
+		if err != nil || adminPort == 0 {
+			return errors.Wrap(err, "miss proxy_admin_port")
+		}
+
+		m["adm-cli::proxy_admin_port"] = adminPort
+		m["adm-cli::adm-cli-address"] = fmt.Sprintf("%s:%v", addr, adminPort)
+		m["supervise::supervise-address"] = fmt.Sprintf("%s:%v", addr, adminPort)
+	}
 
 	m["upsql-proxy::event-threads-count"] = 1
 	if spec.Config != nil {
@@ -338,15 +383,10 @@ func (c upproxyConfigV100) HealthCheck(id string, desc structs.ServiceSpec) (str
 		return structs.ServiceRegistration{}, err
 	}
 
-	im, err := structs.ParseImage(c.template.Image)
-	if err != nil {
-		return structs.ServiceRegistration{}, err
-	}
-
 	reg := structs.HorusRegistration{}
 	reg.Service.Select = true
 	reg.Service.Name = spec.ID
-	reg.Service.Type = "unit_" + im.Name
+	reg.Service.Type = "unit_" + desc.Image.Name
 	reg.Service.Tag = desc.ID
 	reg.Service.Container.Name = spec.Name
 	reg.Service.Container.HostName = spec.Engine.Node
@@ -383,7 +423,7 @@ func (c *upproxyConfigV100) GenerateConfig(id string, desc structs.ServiceSpec) 
 
 	m := make(map[string]interface{}, 10)
 
-	m["upsql-proxy::proxy-domain"] = desc.ID
+	m["upsql-proxy::proxy-domain"] = desc.Tag
 	m["upsql-proxy::proxy-name"] = spec.Name
 
 	addr := "127.0.0.1"
@@ -391,10 +431,17 @@ func (c *upproxyConfigV100) GenerateConfig(id string, desc structs.ServiceSpec) 
 		addr = spec.Networking[0].IP
 	}
 
-	if dataPort, ok := desc.Options["upsql-proxy::proxy_data_port"]; !ok {
-		return errors.New("miss key:upsql-proxy::proxy_data_port")
-	} else {
-		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%v", addr, dataPort)
+	{
+		val, ok := desc.Options["upsql-proxy::proxy_data_port"]
+		if !ok {
+			return errors.New("miss upsql-proxy::proxy_data_port")
+		}
+		port, err := atoi(val)
+		if err != nil || port == 0 {
+			return errors.Wrap(err, "miss upsql-proxy::proxy_data_port")
+		}
+
+		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", addr, port)
 	}
 
 	m["upsql-proxy::event-threads-count"] = 1
@@ -427,4 +474,82 @@ func (c upproxyConfigV100) GenerateCommands(id string, desc structs.ServiceSpec)
 	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
 
 	return cmds, nil
+}
+
+type upproxyConfigV200 struct {
+	upproxyConfigV100
+}
+
+func (upproxyConfigV200) clone(t *structs.ConfigTemplate) parser {
+	pr := &upproxyConfigV200{}
+	pr.template = t
+
+	return pr
+}
+
+func (c *upproxyConfigV200) GenerateConfig(id string, desc structs.ServiceSpec) error {
+	err := c.Validate(desc.Options)
+	if err != nil {
+		return err
+	}
+
+	var (
+		seq, exist = 0, false
+		spec       structs.UnitSpec
+	)
+
+	for seq = range desc.Units {
+		if id == desc.Units[seq].ID {
+			spec = desc.Units[seq]
+			exist = true
+			break
+		}
+	}
+	if !exist {
+		return errors.Errorf("not found unit '%s'", id)
+	}
+
+	m := make(map[string]interface{}, 10)
+
+	m["upsql-proxy::proxy-domain"] = desc.Tag
+	m["upsql-proxy::proxy-name"] = fmt.Sprintf("%s-%d", desc.Tag, seq)
+	m["upsql-proxy::proxy-id"] = strconv.Itoa(seq)
+
+	addr := "127.0.0.1"
+	if len(spec.Networking) > 0 {
+		addr = spec.Networking[0].IP
+	}
+
+	{
+		val, ok := desc.Options["upsql-proxy::proxy_data_port"]
+		if !ok {
+			return errors.New("miss upsql-proxy::proxy_data_port")
+		}
+		port, err := atoi(val)
+		if err != nil || port == 0 {
+			return errors.Wrap(err, "miss upsql-proxy::proxy_data_port")
+		}
+
+		m["upsql-proxy::proxy-address"] = fmt.Sprintf("%s:%d", addr, port)
+	}
+
+	m["upsql-proxy::event-threads-count"] = 1
+	if spec.Config != nil {
+		ncpu, err := spec.Config.CountCPU()
+		if err == nil {
+			m["upsql-proxy::event-threads-count"] = ncpu
+		}
+	}
+
+	if c.template != nil {
+		m["upsql-proxy::topology-config"] = filepath.Join(c.template.DataMount, "/topology.json")
+
+		m["log::log-dir"] = c.template.LogMount
+	}
+
+	for key, val := range m {
+		err = c.set(key, val)
+	}
+
+	return err
 }

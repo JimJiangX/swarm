@@ -66,7 +66,7 @@ func (svc *Service) UnitRestore(ctx context.Context, assigned []string, path str
 			for i := range assigned {
 				u := getUnit(out, assigned[i])
 				if u == nil {
-					return errors.Errorf("%s isnot belongs to Service %s", assigned[i], svc.svc.Name)
+					return errors.Errorf("%s isnot belongs to Service %s", assigned[i], svc.Name())
 				}
 
 				units = append(units, u)
@@ -93,8 +93,8 @@ func (svc *Service) UnitRestore(ctx context.Context, assigned []string, path str
 		return err
 	}
 
-	t := database.NewTask(svc.svc.Name, database.UnitRestoreTask, svc.svc.ID, strings.Join(assigned, "&&"), nil, 300)
-	tl := tasklock.NewServiceTask(svc.svc.ID, svc.so, &t,
+	t := database.NewTask(svc.Name(), database.UnitRestoreTask, svc.ID(), strings.Join(assigned, "&&"), nil, 300)
+	tl := tasklock.NewServiceTask(svc.ID(), svc.so, &t,
 		statusServiceRestoring,
 		statusServiceRestored,
 		statusServiceRestoreFailed)

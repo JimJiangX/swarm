@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/vars"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,7 +44,12 @@ func getRedisSpecTest() *structs.ServiceSpec {
 			},
 		},
 	}
-	req.Image = "redis:12.3.3"
+	req.Image = structs.ImageVersion{
+		Name:  "redis",
+		Major: 12,
+		Minor: 3,
+		Patch: 3,
+	}
 
 	return req
 }
@@ -81,7 +87,7 @@ func getMysqlSpecTest() *structs.ServiceSpec {
 		Arch: structs.Arch{
 			Mode:     "replication",
 			Replicas: 3,
-			Code:     "M:1#S:2",
+			Code:     "M:1#SB:1#S:1",
 		},
 
 		Options: map[string]interface{}{"port": float64(6379)},
@@ -94,7 +100,12 @@ func getMysqlSpecTest() *structs.ServiceSpec {
 		},
 		Units: []structs.UnitSpec{db1, db2, db3},
 	}
-	req.Image = "mysql:5.7.17"
+	req.Image = structs.ImageVersion{
+		Name:  "mysql",
+		Major: 5,
+		Minor: 7,
+		Patch: 17,
+	}
 
 	return req
 }
@@ -140,6 +151,9 @@ func TestMysql(t *testing.T) {
 	mgmip := "127.0.0.1"
 	mgmport := 123
 	dir := "."
+	vars.Replication.User = "user"
+	vars.Replication.Password = "password"
+
 	composer, err := NewCompserBySpec(spec, dir, mgmip, mgmport)
 	//	assert.Nil(t, err)
 	if err != nil {

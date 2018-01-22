@@ -27,7 +27,8 @@ type BackupFile struct {
 	ID         string    `db:"id" json:"id"`
 	TaskID     string    `db:"task_id" json:"task_id"`
 	UnitID     string    `db:"unit_id" json:"unit_id"`
-	Type       string    `db:"type" json:"type"` // full or incremental
+	Type       string    `db:"type" json:"type"` // full or incremental or tables
+	Tables     string    `db:"tables" json:"tables"`
 	Path       string    `db:"path" json:"path"`
 	Remark     string    `db:"remark" json:"remark"`
 	Tag        string    `db:"tag" json:"tag"`
@@ -45,7 +46,7 @@ func (db dbBase) backupFileTable() string {
 func (db dbBase) ListBackupFiles() ([]BackupFile, error) {
 	var (
 		out   []BackupFile
-		query = "SELECT id,task_id,unit_id,type,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " ORDER BY finished_at DESC"
+		query = "SELECT id,task_id,unit_id,type,tables,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " ORDER BY finished_at DESC"
 	)
 
 	err := db.Select(&out, query)
@@ -62,7 +63,7 @@ func (db dbBase) ListBackupFiles() ([]BackupFile, error) {
 func (db dbBase) ListBackupFilesByTag(tag string) ([]BackupFile, error) {
 	var (
 		out   []BackupFile
-		query = "SELECT id,task_id,unit_id,type,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " WHERE tag=? ORDER BY finished_at DESC"
+		query = "SELECT id,task_id,unit_id,type,tables,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " WHERE tag=? ORDER BY finished_at DESC"
 	)
 
 	err := db.Select(&out, query, tag)
@@ -92,7 +93,7 @@ func (db dbBase) ListBackupFilesByService(service string) ([]BackupFile, error) 
 		return nil, nil
 	}
 
-	query = "SELECT id,task_id,unit_id,type,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " WHERE unit_id IN (?);"
+	query = "SELECT id,task_id,unit_id,type,tables,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " WHERE unit_id IN (?);"
 
 	query, args, err := sqlx.In(query, units)
 	if err != nil {
@@ -111,7 +112,7 @@ func (db dbBase) ListBackupFilesByService(service string) ([]BackupFile, error) 
 func (db dbBase) GetBackupFile(id string) (BackupFile, error) {
 	var (
 		row   BackupFile
-		query = "SELECT id,task_id,unit_id,type,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " WHERE id=?"
+		query = "SELECT id,task_id,unit_id,type,tables,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " WHERE id=?"
 	)
 	err := db.Get(&row, query, id)
 	if err == nil {
@@ -122,7 +123,7 @@ func (db dbBase) GetBackupFile(id string) (BackupFile, error) {
 }
 
 func (db dbBase) txInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
-	query := "INSERT INTO " + db.backupFileTable() + " (id,task_id,unit_id,type,path,remark,tag,size,retention,created_at,finished_at) VALUES (:id,:task_id,:unit_id,:type,:path,:remark,:tag,:size,:retention,:created_at,:finished_at)"
+	query := "INSERT INTO " + db.backupFileTable() + " (id,task_id,unit_id,type,tables,path,remark,tag,size,retention,created_at,finished_at) VALUES (:id,:task_id,:unit_id,:type,:tables,:path,:remark,:tag,:size,:retention,:created_at,:finished_at)"
 
 	_, err := tx.NamedExec(query, bf)
 	if err == nil {
