@@ -299,15 +299,18 @@ func (u unit) removeContainer(ctx context.Context, rmVolumes, force bool) error 
 
 	c := u.getContainer()
 	if c == nil {
-		err := engine.RemoveContainer(&cluster.Container{
-			Container: types.Container{ID: u.containerIDOrName()}}, force, rmVolumes)
-		if err != nil {
-			if cluster.IsErrContainerNotFound(err) || (force && !engine.IsHealthy()) {
-				return nil
-			}
+		// TODO：这里是冗余设计，是考虑到event事件处理可能会有延迟问题
+		//		err := engine.RemoveContainer(&cluster.Container{
+		//			Container: types.Container{ID: u.containerIDOrName()}}, force, rmVolumes)
+		//		if err != nil {
+		//			if cluster.IsErrContainerNotFound(err) || (force && !engine.IsHealthy()) {
+		//				return nil
+		//			}
 
-			return err
-		}
+		//			return err
+		//		}
+
+		return nil
 	}
 
 	if !force {
