@@ -228,8 +228,11 @@ func (u unit) startContainer(ctx context.Context) error {
 		return errors.WithStack(newNotFound("Container", u.u.Name))
 	}
 
-	state := c.Info.State
 	u.u.ContainerID = c.ID
+
+	if c.Info.State != nil && c.Info.State.Running {
+		return nil
+	}
 
 	select {
 	default:
@@ -244,15 +247,6 @@ func (u unit) startContainer(ctx context.Context) error {
 
 	// start networking
 	err = u.startNetworking(ctx, c.Engine.IP, nil)
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"Engine": c.Engine.ID,
-			"Unit":   u.u.Name}).Warnf("[skip] start networking error:%+v", err)
-
-		if state != nil && state.Running {
-			return nil
-		}
-	}
 
 	return err
 }
