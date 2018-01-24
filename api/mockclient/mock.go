@@ -81,7 +81,7 @@ func (client *MockClient) ContainerDiff(ctx context.Context, ctr string) ([]cont
 }
 
 // ContainerExecAttach attaches a connection to an exec process in the server
-func (client *MockClient) ContainerExecAttach(ctx context.Context, execID string, config types.ExecConfig) (types.HijackedResponse, error) {
+func (client *MockClient) ContainerExecAttach(ctx context.Context, execID string, config types.ExecStartCheck) (types.HijackedResponse, error) {
 	args := client.Mock.Called(ctx, execID, config)
 	return args.Get(0).(types.HijackedResponse), args.Error(1)
 }
