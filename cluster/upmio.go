@@ -18,7 +18,7 @@ import (
 // IsErrVolumeNotFound returns true if the error is caused
 // when a volume is not found in the docker host.
 func IsErrVolumeNotFound(err error) bool {
-	if client.IsErrVolumeNotFound(err) {
+	if client.IsErrNotFound(err) {
 		return true
 	}
 
@@ -32,7 +32,7 @@ func IsErrContainerNotFound(err error) bool {
 		return false
 	}
 
-	if client.IsErrContainerNotFound(err) {
+	if client.IsErrNotFound(err) {
 		return true
 	}
 
@@ -164,7 +164,7 @@ func checkTtyInput(attachStdin, ttyMode bool) error {
 func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []string, detach bool, w io.Writer) (types.ContainerExecInspect, error) {
 	inspect := types.ContainerExecInspect{}
 
-	execConfig := types.ExecConfig{
+	config := types.ExecConfig{
 		AttachStdin:  false,
 		AttachStdout: true,
 		AttachStderr: true,
@@ -174,8 +174,8 @@ func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []st
 	}
 
 	if detach {
-		execConfig.AttachStderr = false
-		execConfig.AttachStdout = false
+		config.AttachStderr = false
+		config.AttachStdout = false
 	}
 
 	// We need to check the tty _before_ we do the ContainerExecCreate, because
@@ -190,7 +190,7 @@ func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []st
 
 	containerID = c.ID
 
-	exec, err := e.apiClient.ContainerExecCreate(ctx, containerID, execConfig)
+	exec, err := e.apiClient.ContainerExecCreate(ctx, containerID, config)
 	e.CheckConnectionErr(err)
 	if err != nil {
 		return inspect, errors.Wrapf(err, "Container %s exec create", containerID)
@@ -207,21 +207,26 @@ func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []st
 		"Container": containerID,
 		"Engine":    e.Addr,
 		"ExecID":    exec.ID,
-		"Detach":    execConfig.Detach,
+		"Detach":    config.Detach,
 	}).Debugf("start exec:%s", cmd)
 
-	if execConfig.Detach {
-		err := e.apiClient.ContainerExecStart(ctx, exec.ID, types.ExecStartCheck{Detach: detach})
+	esCheck := types.ExecStartCheck{
+		Detach: detach,
+		Tty:    config.Tty,
+	}
+
+	if config.Detach {
+		err := e.apiClient.ContainerExecStart(ctx, exec.ID, esCheck)
 		e.CheckConnectionErr(err)
 		if err != nil {
 			return inspect, errors.Wrapf(err, "Container %s exec start %s", containerID, exec.ID)
 		}
 	} else {
-		if err = checkTtyInput(execConfig.AttachStdin, execConfig.Tty); err != nil {
+		if err = checkTtyInput(config.AttachStdin, config.Tty); err != nil {
 			logrus.Warn(err)
 		}
 
-		err = e.containerExecAttch(ctx, exec.ID, execConfig, w)
+		err = e.containerExecAttch(ctx, exec.ID, esCheck, w)
 		if err != nil {
 			return inspect, err
 		}
@@ -239,7 +244,7 @@ func (e *Engine) containerExec(ctx context.Context, containerID string, cmd []st
 	return inspect, err
 }
 
-func (e *Engine) containerExecAttch(ctx context.Context, execID string, execConfig types.ExecConfig, w io.Writer) error {
+func (e *Engine) containerExecAttch(ctx context.Context, execID string, execConfig types.ExecStartCheck, w io.Writer) error {
 	var (
 		out, stderr io.Writer     = os.Stdout, os.Stderr
 		in          io.ReadCloser = os.Stdin

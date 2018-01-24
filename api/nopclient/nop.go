@@ -76,7 +76,7 @@ func (client *NopClient) ContainerDiff(ctx context.Context, container string) ([
 }
 
 // ContainerExecAttach attaches a connection to an exec process in the server
-func (client *NopClient) ContainerExecAttach(ctx context.Context, execID string, config types.ExecConfig) (types.HijackedResponse, error) {
+func (client *NopClient) ContainerExecAttach(ctx context.Context, execID string, config types.ExecStartCheck) (types.HijackedResponse, error) {
 	return types.HijackedResponse{}, errNoEngine
 }
 

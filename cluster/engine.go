@@ -1091,7 +1091,7 @@ func (e *Engine) CreateContainer(config *ContainerConfig, name string, pullImage
 	e.CheckConnectionErr(err)
 	if err != nil {
 		// If the error is other than not found, abort immediately.
-		if (err != testErrImageNotFound && !engineapi.IsErrImageNotFound(err)) || !pullImage {
+		if (err != testErrImageNotFound && !engineapi.IsErrNotFound(err)) || !pullImage {
 			return nil, err
 		}
 		// Otherwise, try to pull the image...
@@ -1498,7 +1498,7 @@ func (e *Engine) StartContainer(container *Container) error {
 	// the HostConfig.AutoRemove field is set to true. This could also occur
 	// during race conditions where a third-party client removes the container
 	// immediately after it's started.
-	if container.Info.HostConfig.AutoRemove && engineapi.IsErrContainerNotFound(err) {
+	if container.Info.HostConfig.AutoRemove && engineapi.IsErrNotFound(err) {
 		delete(e.containers, container.ID)
 		log.Debugf("container %s was not detected shortly after ContainerStart, indicating a daemon-side removal", container.ID)
 		return nil
