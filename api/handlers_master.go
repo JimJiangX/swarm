@@ -3204,6 +3204,10 @@ func getBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if files == nil {
+		files = []database.BackupFile{}
+	}
+
 	writeJSON(w, files, http.StatusOK)
 }
 
