@@ -1,7 +1,6 @@
 package driver
 
 import (
-	"database/sql"
 	"fmt"
 	"strconv"
 	"strings"
@@ -97,7 +96,7 @@ func (lvm localVolumeMap) GetVolume(nameOrID string) (database.Volume, error) {
 		}
 	}
 
-	return database.Volume{}, sql.ErrNoRows
+	return database.Volume{}, errors.New("sql: no rows in result set")
 }
 
 func (lvm localVolumeMap) ListVolumeByVG(vg string) ([]database.Volume, error) {

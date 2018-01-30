@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
 	stderr "errors"
 	"fmt"
@@ -185,7 +184,7 @@ func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	t, err := gd.Ormer().GetTask(name)
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			writeJSONNull(w, http.StatusOK)
 			return
 		}
@@ -398,7 +397,7 @@ func getSystemConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	sys, err := gd.Ormer().GetSysConfig()
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			writeJSONNull(w, http.StatusOK)
 			return
 		}
@@ -605,7 +604,7 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	im, err := gd.Ormer().GetImageVersion(name)
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			writeJSONNull(w, http.StatusOK)
 			return
 		}
@@ -688,7 +687,7 @@ func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	orm := gd.Ormer()
 	c, err := orm.GetCluster(name)
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			writeJSONNull(w, http.StatusOK)
 			return
 		}
@@ -947,7 +946,7 @@ func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	n, err := gd.Ormer().GetNode(name)
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			writeJSONNull(w, http.StatusOK)
 			return
 		}
@@ -1092,8 +1091,6 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	nodes := resource.NewNodeWithTaskList(1)
-
 	node := database.Node{
 		ID:           utils.Generate32UUID(),
 		ClusterID:    n.Cluster,
@@ -1112,6 +1109,7 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	nodes := resource.NewNodeWithTaskList(1)
 	nodes[0] = resource.NewNodeWithTask(node, n.HDD, n.SSD, n.SSHConfig)
 
 	horus, err := gd.KVClient().GetHorusAddr(ctx)
@@ -1668,7 +1666,7 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	spec, err := gd.ServiceSpec(name)
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			writeJSONNull(w, http.StatusOK)
 			return
 		}
@@ -2376,7 +2374,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	table, err := gd.Ormer().GetService(name)
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -2830,7 +2828,7 @@ func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	ds := storage.DefaultStores()
 	store, err := ds.Get(name)
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			writeJSONNull(w, http.StatusOK)
 			return
 		}
