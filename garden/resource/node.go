@@ -1,7 +1,6 @@
 package resource
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -403,7 +402,6 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 
 // registerNodes register Nodes
 func (m hostManager) registerNodesLoop(ctx context.Context, cancel context.CancelFunc, sys database.SysConfig, reg kvstore.Register) {
-
 	defer cancel()
 
 	t := time.NewTicker(time.Second * 30)
@@ -426,17 +424,17 @@ func (m hostManager) registerNodesLoop(ctx context.Context, cancel context.Cance
 	}
 }
 
-func (m *hostManager) removeNodeTask(id string) {
-	list := make([]nodeWithTask, 0, len(m.nodes))
+//func (m *hostManager) removeNodeTask(id string) {
+//	list := make([]nodeWithTask, 0, len(m.nodes))
 
-	for i := range m.nodes {
-		if m.nodes[i].Node.ID != id {
-			list = append(list, m.nodes[i])
-		}
-	}
+//	for i := range m.nodes {
+//		if m.nodes[i].Node.ID != id {
+//			list = append(list, m.nodes[i])
+//		}
+//	}
 
-	m.nodes = list
-}
+//	m.nodes = list
+//}
 
 func (m hostManager) registerNodes(ctx context.Context, sys database.SysConfig, reg kvstore.Register) {
 	for _, node := range m.nodes {
@@ -447,24 +445,24 @@ func (m hostManager) registerNodes(ctx context.Context, sys database.SysConfig, 
 		if err != nil {
 			field.Warnf("%+v", err)
 
-			if errors.Cause(err) == sql.ErrNoRows {
-				t := node.Task
-				t.Status = database.TaskFailedStatus
-				t.FinishedAt = time.Now()
-				t.SetErrors(err)
+			//			if database.IsNotFound(err) {
+			//				t := node.Task
+			//				t.Status = database.TaskFailedStatus
+			//				t.FinishedAt = time.Now()
+			//				t.SetErrors(err)
 
-				err = m.dco.RegisterNode(nil, &t)
-				if err != nil {
-					field.Errorf("%+v", err)
-				}
+			//				err = m.dco.RegisterNode(nil, &t)
+			//				if err != nil {
+			//					field.Errorf("%+v", err)
+			//				}
 
-				m.removeNodeTask(n.ID)
-			}
+			//				m.removeNodeTask(n.ID)
+			//			}
 
 			continue
 		}
 
-		node.Node = n
+		// node.Node = n
 
 		if n.Status != statusNodeInstalled {
 			if n.Status > statusNodeInstalled {
@@ -492,7 +490,7 @@ func (m hostManager) registerNodes(ctx context.Context, sys database.SysConfig, 
 			wwn := eng.Labels[_SAN_HBA_WWN_Lable]
 			list := strings.Split(wwn, ",")
 
-			if err = san.AddHost(n.EngineID, list...); err != nil {
+			if err = san.AddHost(eng.ID, list...); err != nil {
 				field.Errorf("register to SAN,WWN:%s,%+v", wwn, err)
 				continue
 			}
@@ -517,9 +515,9 @@ func (m hostManager) registerNodes(ctx context.Context, sys database.SysConfig, 
 		err = m.dco.RegisterNode(&n, &t)
 		if err != nil {
 			field.Errorf("%+v", err)
-		} else {
+		} /*else {
 			m.removeNodeTask(n.ID)
-		}
+		}*/
 	}
 }
 
@@ -553,7 +551,7 @@ func (m hostManager) registerNodesTimeout(err error) error {
 		if err != nil {
 			logrus.WithField("host", n.Addr).Errorf("%+v", err)
 
-			if errors.Cause(err) == sql.ErrNoRows {
+			if database.IsNotFound(err) {
 				t.Status = database.TaskFailedStatus
 				t.FinishedAt = time.Now()
 				t.SetErrors(err)
