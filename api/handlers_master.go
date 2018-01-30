@@ -1098,6 +1098,7 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		EngineID:     "",
 		Room:         n.Room,
 		Seat:         n.Seat,
+		Storage:      n.Storage,
 		MaxContainer: n.MaxContainer,
 		Status:       0,
 		Enabled:      false,
