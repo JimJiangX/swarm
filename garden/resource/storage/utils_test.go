@@ -74,3 +74,10 @@ func TestScriptPath(t *testing.T) {
 		}
 	}
 }
+
+func TestFindIdleNum(t *testing.T) {
+	ok, got := findIdleNum(5, 10, []int{6, 9, 1, 0, 5, 88, 3, 4, 2, 40})
+	if !ok || got != 7 {
+		t.Error(ok, got)
+	}
+}
