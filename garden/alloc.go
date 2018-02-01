@@ -232,12 +232,14 @@ func setNodesWithLable(out []database.Node, cl cluster.Cluster, iface database.C
 		if n.Labels == nil {
 			n.Labels = make(map[string]string, 5)
 		}
+		if nt.Storage != "" {
+			n.Labels[sanLabel] = nt.Storage
+		}
 
 		n.Labels[clusterLabel] = nt.ClusterID
 		n.Labels[nodeLabel] = nt.ID
 		n.Labels[roomLabel] = nt.Room
 		n.Labels[seatLabel] = nt.Seat
-		n.Labels[sanLabel] = nt.Storage
 		n.Labels[networkPartitionLable] = clusterMap[nt.ClusterID]
 		//	n.Labels[maxContainerLable] = strconv.Itoa(nt.MaxContainer)
 
@@ -274,7 +276,7 @@ func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	return
 }
 
-func addContainerConfigConstraint(config *cluster.ContainerConfig, opts scheduleOption, isSAN bool) {
+func addContainerConfigConstraint(config *cluster.ContainerConfig, opts scheduleOption) {
 	for i := range opts.Nodes.Constraints {
 		if opts.Nodes.Constraints[i] != "" {
 			config.AddConstraint(opts.Nodes.Constraints[i])
@@ -301,10 +303,6 @@ func addContainerConfigConstraint(config *cluster.ContainerConfig, opts schedule
 		}
 
 		config.AddConstraint(clusterLabel + "==" + strings.Join(tmp, "|"))
-	}
-
-	if isSAN {
-		config.AddConstraint(sanLabel + `!=""`)
 	}
 }
 
@@ -336,7 +334,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	config.Config.Labels["mgm.image.id"] = svc.spec.Image.ID
 	config.Config.Labels[serviceTagLabel] = svc.svc.Tag
 
-	addContainerConfigConstraint(config, opts, isSAN)
+	addContainerConfigConstraint(config, opts)
 
 	gd.Lock()
 	defer gd.Unlock()
@@ -405,6 +403,11 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 			!selectNodeInDiffNetworkPartition(opts.HighAvailable, replicas, candidates[i], usedNodes) {
 			continue
 		}
+
+		if isSAN && !filterNodeByStorage(candidates[i]) {
+			continue
+		}
+
 		if isSAN && opts.HighAvailable &&
 			!selectNodeInDiffStorage(opts.HighAvailable, replicas, candidates[i], usedNodes) {
 			continue
@@ -547,7 +550,21 @@ loop:
 	return out
 }
 
+func filterNodeByStorage(n *node.Node) bool {
+	name, ok := n.Labels[sanLabel]
+	if !ok || name == "" {
+		return false
+	}
+
+	return true
+}
+
 func selectNodeInDiffStorage(highAvailable bool, num int, n *node.Node, used []*node.Node) bool {
+	name, ok := n.Labels[sanLabel]
+	if !ok || name == "" {
+		return false
+	}
+
 	if !highAvailable {
 		return true
 	}
@@ -560,11 +577,6 @@ func selectNodeInDiffStorage(highAvailable bool, num int, n *node.Node, used []*
 	for i := range used {
 		name := used[i].Labels[sanLabel]
 		sans[name] = sans[name] + 1
-	}
-
-	name, ok := n.Labels[sanLabel]
-	if !ok {
-		return false
 	}
 
 	sum := sans[name]
@@ -749,6 +761,9 @@ func (gd *Garden) allocationV2(ctx context.Context, actor alloc.Allocator, svc *
 		}
 
 		for i := range nodes {
+			if isSAN && !filterNodeByStorage(candidates[i]) {
+				continue
+			}
 			if isSAN && opts.HighAvailable {
 				if !selectNodeInDiffStorage(opts.HighAvailable, replicas, nodes[i], usedNodes) {
 					continue
