@@ -72,7 +72,7 @@ func createNetwork(scriptDir string, cfg *NetworkCfg) error {
 		"-b", strconv.Itoa(cfg.BandWidth),
 	}
 
-	file := filepath.Join(scriptDir, "net/", "init_nic.sh")
+	file := filepath.Join(scriptDir, "net", "init_nic.sh")
 
 	_, err := execShellFile(file, args...)
 
@@ -106,7 +106,7 @@ func updateNetwork(scriptDir string, cfg *NetworkCfg) error {
 		"-b", strconv.Itoa(cfg.BandWidth),
 	}
 
-	file := filepath.Join(scriptDir, "net/", "update_nic_bw.sh")
+	file := filepath.Join(scriptDir, "net", "update_nic_bw.sh")
 
 	_, err := execShellFile(file, args...)
 

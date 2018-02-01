@@ -200,7 +200,7 @@ func checkDeactConfig(scriptDir string, opt *DeactConfig) error {
 		return errors.New("HostLunID must  be set")
 	}
 
-	script := filepath.Join(scriptDir, "sanDeviceBlock.sh")
+	script := filepath.Join(scriptDir, "san", "block_device.sh")
 	_, err := os.Lstat(script)
 	if os.IsNotExist(err) {
 		return errors.New("not find the shell: " + script)
@@ -347,7 +347,7 @@ func lvDeActivate(vg, lv string) error {
 }
 
 func sanBlock(scriptDir, vendor string, ids []int) error {
-	script := filepath.Join(scriptDir, "sanDeviceBlock.sh")
+	script := filepath.Join(scriptDir, "san", "block_device.sh")
 	_, err := os.Lstat(script)
 	if os.IsNotExist(err) {
 		return errors.New("not find the shell: " + script)

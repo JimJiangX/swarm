@@ -221,7 +221,7 @@ func vgList() ([]VgInfo, error) {
 }
 
 func scanSanDisk(scriptDir string) error {
-	script := filepath.Join(scriptDir, "sanscandisk.sh")
+	script := filepath.Join(scriptDir, "san", "scan_device.sh")
 	_, err := os.Lstat(script)
 	if os.IsNotExist(err) {
 		return errors.New("not find the file:" + script)
@@ -242,7 +242,7 @@ func scanSanDisk(scriptDir string) error {
 }
 
 func getDevicePath(scriptDir, santype string, id int) (string, error) {
-	script := filepath.Join(scriptDir, "getsandevice.sh")
+	script := filepath.Join(scriptDir, "san", "get_device_path.sh")
 	_, err := os.Lstat(script)
 	if os.IsNotExist(err) {
 		return "", errors.New("not find the file:" + script)
