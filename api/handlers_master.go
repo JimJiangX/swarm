@@ -906,7 +906,8 @@ func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.
 		vds := make([]structs.VolumeDriver, 0, len(drivers))
 
 		for _, d := range drivers {
-			if d == nil || d.Type() == "NFS" {
+			if d == nil || d.Type() == "NFS" ||
+				d.Type() == storage.SANStore {
 				continue
 			}
 
