@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/docker/swarm/garden/structs"
@@ -338,20 +339,22 @@ func parseIPFromHealthCheck(serviceID, output string) string {
 	index := strings.Index(serviceID, key)
 	addr := serviceID[index+len(key):]
 
-	if net.ParseIP(addr) == nil {
+	if !strings.Contains(output, addr) {
 		return ""
 	}
 
-	index = strings.Index(output, addr)
+	ip, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return ""
+	}
 
-	parts := strings.Split(string(output[index:]), ":")
-	if len(parts) >= 2 {
+	if net.ParseIP(ip) == nil {
+		return ""
+	}
 
-		addr = parts[0] + ":" + parts[1]
-		_, _, err := net.SplitHostPort(addr)
-		if err == nil {
-			return addr
-		}
+	n, err := strconv.Atoi(port)
+	if err == nil && n > 0 && n <= 65535 {
+		return addr
 	}
 
 	return ""

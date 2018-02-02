@@ -28,7 +28,7 @@ func init() {
 	r.HandleFunc("/v1/health/state/", func(w http.ResponseWriter, r *http.Request) {
 		ck := api.HealthCheck{
 			Output:      "TCP connect 127.0.0.1:8000: Success",
-			ServiceName: "HS-127.0.0.1",
+			ServiceName: "HS-127.0.0.1:8000",
 		}
 		checks := []*api.HealthCheck{&ck}
 		json.NewEncoder(w).Encode(checks)
@@ -136,12 +136,10 @@ func TestDeregisterService(t *testing.T) {
 
 func TestParseIPFromHealthCheck(t *testing.T) {
 	output := "TCP connect 192.168.4.123:8000: Success"
-	id := "HS-192.168.4.123"
+	id := "HS-192.168.4.123:8000"
 
 	addr := parseIPFromHealthCheck(id, output)
-	if addr == "" {
-		t.Error("Unexpected")
+	if addr != "192.168.4.123:8000" {
+		t.Errorf("want %s but got '%s'", "192.168.4.123:8000", addr)
 	}
-
-	t.Logf("'%s'", addr)
 }
