@@ -40,7 +40,7 @@ CREATE TABLE `tbl_backup_files` (
   `finished_at` datetime DEFAULT NULL COMMENT '完成时间',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=94 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -131,7 +131,7 @@ CREATE TABLE `tbl_san` (
   `hlu_end` int(11) unsigned NOT NULL COMMENT 'host_un_end',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -149,7 +149,7 @@ CREATE TABLE `tbl_san_raid_group` (
   `enabled` tinyint(1) unsigned NOT NULL DEFAULT '1' COMMENT '是否启用\n0:停用\n1:启用',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`storage_system_id`,`storage_rg_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -164,6 +164,7 @@ CREATE TABLE `tbl_san_raid_group_lun` (
   `id` varchar(128) NOT NULL COMMENT 'LUN ID',
   `san_lun_id` int(11) NOT NULL COMMENT '在存储系统上的LUN ID',
   `name` varchar(128) NOT NULL COMMENT 'LUN 名称',
+  `san_id` varchar(128) NOT NULL COMMENT '所属SAN ID',
   `raid_group_id` varchar(128) NOT NULL COMMENT '所属Raid Group ID(平台分配的ID)',
   `size` bigint(128) NOT NULL COMMENT 'LUN 容量大小,单位为byte',
   `vg_name` varchar(128) DEFAULT NULL COMMENT '所属Volume Group 名称',
@@ -172,7 +173,7 @@ CREATE TABLE `tbl_san_raid_group_lun` (
   `created_at` datetime NOT NULL COMMENT '创建日期',
   PRIMARY KEY (`ai`),
   UNIQUE KEY `id_UNIQUE` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -366,4 +367,4 @@ SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2018-01-11 16:47:16
+-- Dump completed on 2018-02-02  8:47:05
