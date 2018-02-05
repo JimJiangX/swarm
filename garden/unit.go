@@ -371,6 +371,11 @@ func (u unit) removeVolumes(ctx context.Context) error {
 		}
 	}
 
+	logrus.WithFields(logrus.Fields{
+		"Unit":   u.u.Name,
+		"Engine": u.u.EngineID,
+	}).Info("recycle SAN source...")
+
 	return u.recycleSANSource(lvs)
 }
 
