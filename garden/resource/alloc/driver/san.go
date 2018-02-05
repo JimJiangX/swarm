@@ -225,7 +225,7 @@ func (sv sanVolume) createSanVG(vg string) error {
 	return createSanVG(agent, sv.san.Vendor(), list)
 }
 
-const defaultTimeout = 30 * time.Second
+const defaultTimeout = 90 * time.Second
 
 func createSanVG(addr, vendor string, luns []database.LUN) error {
 	if len(luns) == 0 {
