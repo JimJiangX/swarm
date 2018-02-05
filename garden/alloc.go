@@ -427,15 +427,14 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		}
 
 		used = append(used, pu)
-		bad = append(bad, pu)
 		usedNodes = append(usedNodes, candidates[i])
 
 		if count--; count == 0 {
-			bad = nil
-
 			return used, nil
 		}
 	}
+
+	bad = append(bad, used...)
 
 	return nil, errors.Errorf("not enough nodes for allocation,%d units waiting", replicas)
 }
