@@ -139,7 +139,11 @@ fi
 # check interface up
 ifdown ${IFNAME}
 sleep 2
-ifup ${IFNAME}
+# check interface up
+if ! ifup ${IFNAME}
+then
+  die 1 "ifup ${IFNAME} failed"
+fi
 
 # Second step: find the container and get container pid
 getContainerPID
