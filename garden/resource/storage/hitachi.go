@@ -84,7 +84,7 @@ func (h hitachiStore) ping() error {
 		return err
 	}
 
-	logrus.Debug(path, h.hs.AdminUnit)
+	logrus.Debugf("%s %s", path, h.hs.AdminUnit)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit)
 	if err != nil {
@@ -290,7 +290,7 @@ func (h *hitachiStore) RecycleLUN(id string, lun int) error {
 		return err
 	}
 
-	logrus.Debug(path, h.hs.AdminUnit, l.StorageLunID)
+	logrus.Debugf("%s %s %d", path, h.hs.AdminUnit, l.StorageLunID)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit, strconv.Itoa(l.StorageLunID))
 	if err != nil {
@@ -357,7 +357,7 @@ func (h *hitachiStore) list(rg ...string) ([]Space, error) {
 		return nil, err
 	}
 
-	logrus.Debug(path, h.hs.AdminUnit, list)
+	logrus.Debugf("%s %s %s", path, h.hs.AdminUnit, list)
 
 	cmd := utils.ExecScript(path, h.hs.AdminUnit, list)
 
@@ -508,7 +508,7 @@ func (h *hitachiStore) Mapping(host, vg, lun, unit string) error {
 		host = host[:maxHostLen]
 	}
 
-	logrus.Debug(path, h.hs.AdminUnit, l.StorageLunID, host, val)
+	logrus.Debugf("%s %s %s %s %d", path, h.hs.AdminUnit, l.StorageLunID, host, val)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit,
 		strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val))
@@ -531,7 +531,7 @@ func (h *hitachiStore) DelMapping(lun database.LUN) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	logrus.Debug(path, h.hs.AdminUnit, lun.StorageLunID)
+	logrus.Debugf("%s %s %s", path, h.hs.AdminUnit, lun.StorageLunID)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit,
 		strconv.Itoa(lun.StorageLunID))

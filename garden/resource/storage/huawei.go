@@ -72,7 +72,7 @@ func (h *huaweiStore) ping() error {
 		return err
 	}
 
-	logrus.Debug(path, h.hs.IPAddr, h.hs.Username, h.hs.Password)
+	logrus.Debugf("%s %s %s %s", path, h.hs.IPAddr, h.hs.Username, h.hs.Password)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.IPAddr, h.hs.Username, h.hs.Password)
 	if err != nil {
@@ -259,7 +259,7 @@ func (h *huaweiStore) RecycleLUN(id string, lun int) error {
 		return err
 	}
 
-	logrus.Debug(path, h.hs.IPAddr, h.hs.Username, h.hs.Password, l.StorageLunID)
+	logrus.Debugf("%s %s %s %s %s", path, h.hs.IPAddr, h.hs.Username, h.hs.Password, l.StorageLunID)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID))
 	if err != nil {
@@ -484,7 +484,7 @@ func (h *huaweiStore) list(rg ...string) ([]Space, error) {
 		return nil, err
 	}
 
-	logrus.Debug(path, h.hs.IPAddr, h.hs.Username, h.hs.Password, list)
+	logrus.Debugf("%s %s %s %s %s", path, h.hs.IPAddr, h.hs.Username, h.hs.Password, list)
 
 	cmd := utils.ExecScript(path, h.hs.IPAddr, h.hs.Username, h.hs.Password, list)
 
