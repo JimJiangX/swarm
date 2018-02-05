@@ -131,3 +131,15 @@ func parseSpace(r io.Reader) ([]Space, []error) {
 
 	return spaces, errs
 }
+
+func generateHostName(name string) string {
+
+	name = strings.Replace(name, ":", "", -1)
+	name = strings.Replace(name, "|", "", -1)
+
+	if len(name) >= maxHostLen {
+		return name[:maxHostLen]
+	}
+
+	return name
+}

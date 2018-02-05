@@ -81,3 +81,19 @@ func TestFindIdleNum(t *testing.T) {
 		t.Error(ok, got)
 	}
 }
+
+func TestGenerateHostName(t *testing.T) {
+	got := generateHostName("2ORZ:K2GD:XRUH:KVEQ:EMEA:RGWM:UC7Q:WE2J:HDX4:KUIU:ZPEA:L6UP|192.168.1.1")
+
+	if len(got) > maxHostLen {
+		t.Error(got)
+	}
+
+	if strings.ContainsAny(got, ":") {
+		t.Error(got)
+	}
+
+	if got != "2ORZK2GDXRUHKVEQEMEARGWMUC7QWE" {
+		t.Error(got)
+	}
+}

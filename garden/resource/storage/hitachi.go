@@ -414,9 +414,7 @@ func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
 		return err
 	}
 
-	if len(name) >= maxHostLen {
-		name = name[:maxHostLen]
-	}
+	name = generateHostName(name)
 
 	time.Sleep(time.Second)
 	h.lock.Lock()
@@ -442,9 +440,7 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 		return err
 	}
 
-	if len(name) >= maxHostLen {
-		name = name[:maxHostLen]
-	}
+	name = generateHostName(name)
 
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -504,9 +500,7 @@ func (h *hitachiStore) Mapping(host, vg, lun, unit string) error {
 		return err
 	}
 
-	if len(host) >= maxHostLen {
-		host = host[:maxHostLen]
-	}
+	host = generateHostName(host)
 
 	logrus.Debugf("%s %s %d %s %d", path, h.hs.AdminUnit, l.StorageLunID, host, val)
 

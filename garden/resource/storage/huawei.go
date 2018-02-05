@@ -297,9 +297,7 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 		return err
 	}
 
-	if len(name) >= maxHostLen {
-		name = name[:maxHostLen]
-	}
+	name = generateHostName(name)
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, name}
 
@@ -326,9 +324,7 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 		return err
 	}
 
-	if len(name) >= maxHostLen {
-		name = name[:maxHostLen]
-	}
+	name = generateHostName(name)
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, name}
 
@@ -386,9 +382,7 @@ func (h *huaweiStore) Mapping(host, vg, lun, unit string) error {
 		return err
 	}
 
-	if len(host) >= maxHostLen {
-		host = host[:maxHostLen]
-	}
+	host = generateHostName(host)
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val)}
 
