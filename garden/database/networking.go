@@ -283,6 +283,10 @@ func (db dbBase) SetIPs(ips []IP) error {
 }
 
 func (db dbBase) txResetIPs(tx *sqlx.Tx, ips []IP) error {
+	if len(ips) == 0 {
+		return nil
+	}
+
 	for i := range ips {
 		ips[i].UnitID = ""
 		ips[i].Engine = ""

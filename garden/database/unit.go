@@ -47,6 +47,8 @@ type UnitOrmer interface {
 	NetworkingOrmer
 
 	GetSysConfigIface
+
+	RecycleResource(ips []IP, lvs []Volume) error
 }
 
 // Unit is table structure
