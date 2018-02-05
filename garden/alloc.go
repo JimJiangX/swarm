@@ -374,6 +374,8 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 			return nil
 		}
 
+		field.Info("allocation recycle volume resource:%d", len(bad))
+
 		ids := make([]string, len(bad))
 		for i := range bad {
 			ids[i] = bad[i].swarmID
@@ -416,8 +418,11 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		pu, err := pendingAlloc(actor, units[count-1], candidates[i], opts, config, vr, nr)
 		if err != nil {
 			bad = append(bad, pu)
-			field.Debugf("pending alloc:node=%s,%+v", candidates[i].Name, err)
-			continue
+			bad = append(bad, used...)
+
+			field.Errorf("pending alloc:node=%s,%+v", candidates[i].Name, err)
+
+			return nil, err
 		}
 
 		err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, candidates[i].ID, pu.config)
