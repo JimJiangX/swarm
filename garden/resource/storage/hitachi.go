@@ -508,7 +508,7 @@ func (h *hitachiStore) Mapping(host, vg, lun, unit string) error {
 		host = host[:maxHostLen]
 	}
 
-	logrus.Debugf("%s %s %s %s %d", path, h.hs.AdminUnit, l.StorageLunID, host, val)
+	logrus.Debugf("%s %s %d %s %d", path, h.hs.AdminUnit, l.StorageLunID, host, val)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit,
 		strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val))
