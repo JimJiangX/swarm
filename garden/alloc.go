@@ -382,18 +382,20 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		}
 		gd.Cluster.RemovePendingContainer(ids...)
 
-		ips := make([]database.IP, 0, len(bad))
-		lvs := make([]database.Volume, 0, len(bad)*2)
-		for i := range bad {
-			ips = append(ips, bad[i].networkings...)
-			lvs = append(lvs, bad[i].volumes...)
-		}
-		_err := actor.RecycleResource(ips, lvs)
-		if _err != nil {
-			err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
-		}
+		return err
 
-		return _err
+		//		ips := make([]database.IP, 0, len(bad))
+		//		lvs := make([]database.Volume, 0, len(bad)*2)
+		//		for i := range bad {
+		//			ips = append(ips, bad[i].networkings...)
+		//			lvs = append(lvs, bad[i].volumes...)
+		//		}
+		//		_err := actor.RecycleResource(ips, lvs)
+		//		if _err != nil {
+		//			err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
+		//		}
+
+		//		return _err
 	}()
 
 	count := replicas
