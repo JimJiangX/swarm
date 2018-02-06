@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/storage"
@@ -196,8 +195,6 @@ func (sv sanVolume) DeactivateVG(v database.Volume) error {
 }
 
 func (sv sanVolume) Recycle(lv database.Volume) error {
-	logrus.Debugf("SAN recycle %v", lv)
-
 	luns, err := sv.san.ListLUN(lv.Name)
 	if err != nil {
 		return err
