@@ -201,6 +201,9 @@ func (sv sanVolume) Recycle(lv database.Volume) error {
 	}
 
 	for i := range luns {
+		if luns[i].MappingTo == "" && luns[i].HostLunID == 0 {
+			continue
+		}
 		err := sv.san.DelMapping(luns[i])
 		if err != nil {
 			return err

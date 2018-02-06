@@ -517,7 +517,6 @@ func (h *hitachiStore) Mapping(host, vg, lun, unit string) error {
 
 // DelMapping disassociate of the lun from host,calls del_lunmap.sh
 func (h *hitachiStore) DelMapping(lun database.LUN) error {
-
 	path, err := h.scriptPath("del_lunmap.sh")
 	if err != nil {
 		return err

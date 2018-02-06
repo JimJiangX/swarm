@@ -374,7 +374,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 			return nil
 		}
 
-		field.Info("allocation recycle volume resource:%d", len(bad))
+		field.Infof("allocation recycle volume resource:%d", len(bad))
 
 		ids := make([]string, len(bad))
 		for i := range bad {

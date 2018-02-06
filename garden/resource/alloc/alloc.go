@@ -131,9 +131,12 @@ func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.
 }
 
 func (at allocator) RecycleResource(ips []database.IP, lvs []database.Volume) error {
+	keep := make([]string, 0, len(lvs))
+
 	for i := range lvs {
 		eng := at.ec.Engine(lvs[i].EngineID)
 		if eng == nil {
+			keep = append(keep, lvs[i].ID)
 			continue
 		}
 
@@ -142,17 +145,41 @@ func (at allocator) RecycleResource(ips []database.IP, lvs []database.Volume) er
 			logrus.Warnf("engine:%s find volume drivers,%+v", eng.Name, err)
 
 			if len(drivers) == 0 {
+				keep = append(keep, lvs[i].ID)
 				continue
 			}
 		}
 
 		d := drivers.Get(lvs[i].DriverType)
-		if d != nil {
+		if d == nil {
+			keep = append(keep, lvs[i].ID)
+		} else {
 			err := d.Recycle(lvs[i])
 			if err != nil {
-				return err
+				keep = append(keep, lvs[i].ID)
+
+				logrus.Errorf("Driver recycle failed,%v,\n%+v", lvs[i], err)
 			}
 		}
+	}
+
+	if len(keep) > 0 {
+		tmp := make([]database.Volume, 0, len(lvs)-len(keep))
+		for i := range lvs {
+			skip := false
+			for k := range keep {
+				if lvs[i].ID == keep[k] {
+					skip = true
+					break
+				}
+			}
+
+			if !skip {
+				tmp = append(tmp, lvs[i])
+			}
+		}
+
+		lvs = tmp
 	}
 
 	return at.ormer.RecycleResource(ips, lvs)
