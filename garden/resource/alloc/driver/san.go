@@ -85,12 +85,15 @@ func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req struc
 	vg := uid + "_SAN_VG"
 	name := generateVolumeName(uid, config.Config.Labels["service.tag"], req.Name)
 
-	lun, lv, err := sv.san.Alloc(name, uid, vg, req.Size)
+	lun, lv, err := sv.san.Alloc(name, vg, req.Size)
 	if err != nil {
 		return nil, err
 	}
 
-	err = sv.san.Mapping(sv.engine.ID, vg, lun.ID, lv.UnitID)
+	lv.EngineID = sv.engine.ID
+	lv.UnitID = uid
+
+	err = sv.san.Mapping(sv.engine.ID, vg, lun.ID, uid)
 	if err != nil {
 		return &lv, err
 	}

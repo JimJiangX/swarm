@@ -116,7 +116,7 @@ func (h *hitachiStore) insert() error {
 // Alloc list hitachiStore's RG idle space,alloc a new LUN in free space,
 // the allocated LUN is used to creating a volume.
 // alloction calls create_lun.sh
-func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, database.Volume, error) {
+func (h *hitachiStore) Alloc(name, vg string, size int64) (database.LUN, database.Volume, error) {
 	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -165,7 +165,6 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 		ID:         utils.Generate64UUID(),
 		Name:       name,
 		Size:       size,
-		UnitID:     unit,
 		VG:         vg,
 		Driver:     h.Driver(),
 		DriverType: SANStore,
