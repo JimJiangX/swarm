@@ -200,6 +200,12 @@ func (sv sanVolume) Recycle(lv database.Volume) error {
 		return err
 	}
 
+	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
+	err = removeSanVG(sv.san.Vendor(), agent, lv.VG, luns)
+	if err != nil {
+		return err
+	}
+
 	for i := range luns {
 		if luns[i].MappingTo == "" && luns[i].HostLunID == 0 {
 			continue
@@ -335,6 +341,29 @@ func sanDeactivate(vendor, addr, vg string, luns []database.LUN) error {
 	}
 
 	return cli.SanDeActivate(opt)
+}
+
+func removeSanVG(vendor, addr, vg string, luns []database.LUN) error {
+	names := make([]string, len(luns))
+	hls := make([]int, len(luns))
+
+	for i := range luns {
+		names[i] = luns[i].Name
+		hls[i] = luns[i].HostLunID
+	}
+
+	opt := sdk.RmVGConfig{
+		VgName:    vg,
+		HostLunID: hls,
+		Vendor:    vendor,
+	}
+
+	cli, err := sdk.NewClient(addr, defaultTimeout, nil)
+	if err != nil {
+		return err
+	}
+
+	return cli.SanVgRemove(opt)
 }
 
 //func removeSCSI(vendor, addr string, luns []database.LUN) error {
