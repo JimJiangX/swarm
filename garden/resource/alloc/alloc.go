@@ -138,7 +138,6 @@ func (at allocator) RecycleResource(ips []database.IP, lvs []database.Volume) er
 
 		eng := at.ec.Engine(lvs[i].EngineID)
 		if eng == nil {
-			field.Debug("skip by engine", lvs[i].EngineID)
 			continue
 		}
 
@@ -147,12 +146,10 @@ func (at allocator) RecycleResource(ips []database.IP, lvs []database.Volume) er
 			field.Warnf("engine:%s find volume drivers,%+v", eng.Name, err)
 
 			if len(drivers) == 0 {
-				field.Debug("skip by volume drivers")
 				continue
 			}
 		}
 
-		field.Debug(lvs[i].DriverType)
 		d := drivers.Get(lvs[i].DriverType)
 		if d != nil {
 			field.Debugf("recycle volume")
@@ -163,9 +160,7 @@ func (at allocator) RecycleResource(ips []database.IP, lvs []database.Volume) er
 		}
 	}
 
-	return nil
-
-	//	return at.ormer.RecycleResource(ips, lvs)
+	return at.ormer.RecycleResource(ips, lvs)
 }
 
 func findIdleCPUs(used []string, total, ncpu int) (string, error) {
