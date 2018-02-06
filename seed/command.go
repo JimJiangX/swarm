@@ -58,7 +58,7 @@ func execWithTimeout(_Type execType, shell string, timeout time.Duration, args .
 
 	if errStr != "" {
 		for _, datastr := range strings.Split(errStr, "\n") {
-			if strings.HasPrefix(datastr, "Warning:") {
+			if strings.HasPrefix(strings.ToLower(datastr), "warning:") {
 				log.WithFields(log.Fields{
 					"cmd":  cmd,
 					"warn": datastr,
@@ -67,7 +67,6 @@ func execWithTimeout(_Type execType, shell string, timeout time.Duration, args .
 				return "", errors.New("exec error:" + datastr)
 			}
 		}
-
 	}
 
 	if isTimeout {
@@ -75,6 +74,14 @@ func execWithTimeout(_Type execType, shell string, timeout time.Duration, args .
 	}
 
 	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok && exitError.Success() {
+			return stdout.String(), nil
+
+		} else if cmd.ProcessState != nil && cmd.ProcessState.Success() {
+
+			return stdout.String(), nil
+		}
+
 		return "", errors.New("exec error:" + err.Error())
 	}
 

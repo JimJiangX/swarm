@@ -55,7 +55,7 @@ func execWithTimeout(_Type execType, shell string, timeout time.Duration, args .
 
 	if errStr != "" {
 		for _, datastr := range strings.Split(errStr, "\n") {
-			if strings.HasPrefix(datastr, "Warning:") {
+			if strings.HasPrefix(strings.ToLower(datastr), "warning:") {
 				log.WithFields(log.Fields{
 					"cmd":  cmd,
 					"warn": datastr,
