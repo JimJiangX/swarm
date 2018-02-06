@@ -602,7 +602,7 @@ func (m hostManager) removeNode(ID string) error {
 }
 
 // RemoveNode
-func (m hostManager) RemoveNode(ctx context.Context, addr, horus, nameOrID, user, password string, force bool, timeout time.Duration, reg kvstore.Register) error {
+func (m hostManager) RemoveNode(ctx context.Context, port, horus, nameOrID, user, password string, force bool, timeout time.Duration, reg kvstore.Register) error {
 	node, err := m.getNode(nameOrID)
 	if err != nil {
 		if database.IsNotFound(err) {
@@ -645,8 +645,9 @@ func (m hostManager) RemoveNode(ctx context.Context, addr, horus, nameOrID, user
 		return err
 	}
 
-	if addr == "" {
-		addr = node.node.Addr
+	addr := node.node.Addr
+	if port != "" {
+		addr = net.JoinHostPort(node.node.Addr, port)
 	}
 	client, err := scplib.NewScpClient(addr, user, password, timeout)
 	if err != nil {

@@ -1265,7 +1265,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	t := intValueOrZero(r, "timeout")
 	timeout := time.Duration(t) * time.Second
 
-	addr := r.FormValue("ssh")
+	port := r.FormValue("port")
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
@@ -1292,7 +1292,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	m := resource.NewHostManager(gd.Ormer(), gd.Cluster, nil)
-	err = m.RemoveNode(ctx, addr, horus, node, username, password, force, timeout, gd.KVClient())
+	err = m.RemoveNode(ctx, port, horus, node, username, password, force, timeout, gd.KVClient())
 	if err != nil {
 		ec := errCodeV1(_Host, internalError, 74, "fail to uninstall host agents", "主机出库错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
