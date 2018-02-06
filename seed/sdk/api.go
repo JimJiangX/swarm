@@ -66,6 +66,13 @@ type DeactivateConfig struct {
 	Vendor    string   `json:"Vendor"`
 }
 
+//RmVGConfig used in removeVG
+type RmVGConfig struct {
+	VgName    string `json:"VgName"`
+	Vendor    string `json:"Vendor"`
+	HostLunID []int  `json:"HostLunId"`
+}
+
 // VolumeFileConfig contains file infomation and volume placed
 // used in CopyFileToVolume
 type VolumeFileConfig struct {
@@ -123,6 +130,8 @@ type ClientAPI interface {
 	SanActivate(opt ActiveConfig) error
 	SanVgCreate(opt VgConfig) error
 	SanVgExtend(opt VgConfig) error
+	SanVgRemove(opt RmVGConfig) error
+
 	CreateNetwork(ctx context.Context, opt NetworkConfig) error
 	UpdateNetwork(ctx context.Context, opt NetworkConfig) error
 }
@@ -205,6 +214,10 @@ func (c client) SanActivate(opt ActiveConfig) error {
 // addr is the remote host server agent bind address
 func (c client) SanDeActivate(opt DeactivateConfig) error {
 	return c.postWrap(nil, "/san/deactivate", opt)
+}
+
+func (c client) SanVgRemove(opt RmVGConfig) error {
+	return c.postWrap(nil, "/san/vg/remove", opt)
 }
 
 // CopyFileToVolume Post file to the specified LV on remote host
