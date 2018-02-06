@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -269,7 +270,12 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 	})
 
 	if nt.client == nil {
-		nt.client, err = scplib.NewScpClient(nt.Node.Addr, nt.config.Username, nt.config.Password, nt.timeout)
+		addr := nt.Node.Addr
+		if nt.config.Port > 0 {
+			addr = net.JoinHostPort(nt.Node.Addr, strconv.Itoa(nt.config.Port))
+		}
+
+		nt.client, err = scplib.NewScpClient(addr, nt.config.Username, nt.config.Password, nt.timeout)
 		if err != nil {
 			entry.WithError(err).Error("ssh dial error")
 
@@ -596,7 +602,7 @@ func (m hostManager) removeNode(ID string) error {
 }
 
 // RemoveNode
-func (m hostManager) RemoveNode(ctx context.Context, horus, nameOrID, user, password string, force bool, timeout time.Duration, reg kvstore.Register) error {
+func (m hostManager) RemoveNode(ctx context.Context, addr, horus, nameOrID, user, password string, force bool, timeout time.Duration, reg kvstore.Register) error {
 	node, err := m.getNode(nameOrID)
 	if err != nil {
 		if database.IsNotFound(err) {
@@ -639,7 +645,10 @@ func (m hostManager) RemoveNode(ctx context.Context, horus, nameOrID, user, pass
 		return err
 	}
 
-	client, err := scplib.NewScpClient(node.node.Addr, user, password, timeout)
+	if addr == "" {
+		addr = node.node.Addr
+	}
+	client, err := scplib.NewScpClient(addr, user, password, timeout)
 	if err != nil {
 		return err
 	}
