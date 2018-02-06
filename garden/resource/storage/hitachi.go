@@ -150,21 +150,6 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 		return lun, lv, errors.New("no available LUN ID in store:" + h.Vendor())
 	}
 
-	path, err := h.scriptPath("create_lun.sh")
-	if err != nil {
-		return lun, lv, err
-	}
-	// size:byte-->MB
-	param := []string{path, h.hs.AdminUnit,
-		rg.StorageRGID, strconv.Itoa(id), strconv.Itoa(int(size)>>20 + 100)}
-
-	logrus.Debug(param)
-
-	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
-	if err != nil {
-		return lun, lv, errors.WithStack(err)
-	}
-
 	lun = database.LUN{
 		ID:              utils.Generate64UUID(),
 		Name:            name,
@@ -190,6 +175,21 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 	err = h.orm.InsertLunVolume(lun, lv)
 	if err != nil {
 		return lun, lv, err
+	}
+
+	path, err := h.scriptPath("create_lun.sh")
+	if err != nil {
+		return lun, lv, err
+	}
+	// size:byte-->MB
+	param := []string{path, h.hs.AdminUnit,
+		rg.StorageRGID, strconv.Itoa(id), strconv.Itoa(int(size)>>20 + 100)}
+
+	logrus.Debug(param)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
+	if err != nil {
+		return lun, lv, errors.WithStack(err)
 	}
 
 	return lun, lv, nil
@@ -228,6 +228,24 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (database.LUN, dat
 		return lun, lv, errors.New("no available LUN ID in store:" + h.Vendor())
 	}
 
+	lun = database.LUN{
+		ID:              utils.Generate64UUID(),
+		Name:            lv.Name,
+		VG:              lv.VG,
+		RaidGroupID:     rg.ID,
+		StorageSystemID: h.ID(),
+		SizeByte:        int(size),
+		StorageLunID:    id,
+		CreatedAt:       time.Now(),
+	}
+
+	lv.Size += size
+
+	err = h.orm.InsertLunSetVolume(lun, lv)
+	if err != nil {
+		return lun, lv, err
+	}
+
 	path, err := h.scriptPath("create_lun.sh")
 	if err != nil {
 		return lun, lv, err
@@ -243,22 +261,7 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (database.LUN, dat
 		return lun, lv, errors.WithStack(err)
 	}
 
-	lun = database.LUN{
-		ID:              utils.Generate64UUID(),
-		Name:            lv.Name,
-		VG:              lv.VG,
-		RaidGroupID:     rg.ID,
-		StorageSystemID: h.ID(),
-		SizeByte:        int(size),
-		StorageLunID:    id,
-		CreatedAt:       time.Now(),
-	}
-
-	lv.Size += size
-
-	err = h.orm.InsertLunSetVolume(lun, lv)
-
-	return lun, lv, err
+	return lun, lv, nil
 }
 
 func (h hitachiStore) ListLUN(nameOrVG string) ([]database.LUN, error) {

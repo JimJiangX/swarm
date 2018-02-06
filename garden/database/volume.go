@@ -56,7 +56,7 @@ func (db dbBase) txInsertVolume(tx *sqlx.Tx, lv Volume) error {
 
 	query := "INSERT INTO " + db.volumeTable() + " (id,name,unit_id,size,vg,engine_id,driver_type,driver,fstype) VALUES (:id,:name,:unit_id,:size,:vg,:engine_id,:driver_type,:driver,:fstype)"
 
-	_, err := tx.NamedExec(query, lv)
+	_, err := tx.NamedExec(query, &lv)
 	if err == nil {
 		return nil
 	}

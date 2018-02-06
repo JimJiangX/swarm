@@ -105,12 +105,12 @@ func (db dbBase) InsertLunSetVolume(lun LUN, lv Volume) error {
 func (db dbBase) InsertLunVolume(lun LUN, lv Volume) error {
 	do := func(tx *sqlx.Tx) error {
 
-		err := db.txInsertLun(tx, lun)
+		err := db.txInsertVolume(tx, lv)
 		if err != nil {
 			return err
 		}
 
-		return db.txInsertVolume(tx, lv)
+		return db.txInsertLun(tx, lun)
 	}
 
 	return db.txFrame(do)
