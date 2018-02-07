@@ -157,8 +157,10 @@ func (sv sanVolume) Expand(ID string, size int64) (err error) {
 		return err
 	}
 
-	lun.MappingTo = sv.engine.ID
-	lun.VG = lv.VG
+	lun, err = sv.getLunByVG(lv.VG, lun.ID)
+	if err != nil {
+		return err
+	}
 
 	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
 
@@ -168,6 +170,22 @@ func (sv sanVolume) Expand(ID string, size int64) (err error) {
 	}
 
 	return updateVolume(agent, lv)
+}
+
+func (sv sanVolume) getLunByVG(vg, lunID string) (database.LUN, error) {
+	luns, err := sv.san.ListLUN(vg)
+	if err != nil {
+		return database.LUN{}, err
+	}
+
+	for i := range luns {
+		if luns[i].ID == lunID {
+			return luns[i], nil
+
+		}
+	}
+
+	return database.LUN{}, errors.Errorf("not found LUN:%s", lunID)
 }
 
 func (sv sanVolume) ActivateVG(v database.Volume) error {
@@ -181,6 +199,11 @@ func (sv sanVolume) ActivateVG(v database.Volume) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	luns, err = sv.san.ListLUN(v.VG)
+	if err != nil {
+		return err
 	}
 
 	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
