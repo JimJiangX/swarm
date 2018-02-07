@@ -93,7 +93,7 @@ func (h *huaweiStore) insert() error {
 	return err
 }
 
-func (h *huaweiStore) Alloc(name, vg string, size int64) (database.LUN, database.Volume, error) {
+func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, database.Volume, error) {
 	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -151,6 +151,7 @@ func (h *huaweiStore) Alloc(name, vg string, size int64) (database.LUN, database
 	lv = database.Volume{
 		ID:         utils.Generate64UUID(),
 		Name:       name,
+		UnitID:     unit,
 		Size:       size,
 		VG:         vg,
 		Driver:     h.Driver(),
