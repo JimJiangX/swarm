@@ -219,6 +219,18 @@ func ExecContextTimeout(ctx context.Context, timeout time.Duration, args ...stri
 		out = buf.Bytes()
 	case <-ctx.Done():
 		err = ctx.Err()
+		go func() {
+			for range wait {
+			}
+		}()
+	}
+
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok && exitError.Success() {
+			return out, nil
+		} else if cmd.ProcessState != nil && cmd.ProcessState.Success() {
+			return out, nil
+		}
 	}
 
 	return out, err
