@@ -126,8 +126,6 @@ func (sv sanVolume) Expand(ID string, size int64) (err error) {
 		return errors.Errorf("node %s local volume driver has no enough space for expansion:%d<%d", sv.engine.IP, space.Free, size)
 	}
 
-	lv.Size += size
-
 	lun, lv, err := sv.san.Extend(lv, size)
 	if err != nil {
 		return err
@@ -139,7 +137,7 @@ func (sv sanVolume) Expand(ID string, size int64) (err error) {
 		}
 
 		_err := sv.recycleLUNs([]database.LUN{lun})
-		if err != nil {
+		if _err != nil {
 			err = errors.Errorf("recycleLUNs failed,%+v\n%+v", _err, err)
 			return
 		}
@@ -147,7 +145,7 @@ func (sv sanVolume) Expand(ID string, size int64) (err error) {
 		lv.Size -= size
 
 		_err = sv.iface.SetVolume(lv)
-		if err != nil {
+		if _err != nil {
 			err = errors.Errorf("recycleLUN success,SetVolume failed\n%+v\n%+v", _err, err)
 		}
 	}()
