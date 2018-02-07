@@ -123,6 +123,11 @@ func vgCreateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		devices = devices + "  " + path
 	}
 
+	if err := pvCreate(devices); err != nil {
+		errCommonHanlde(w, req, err)
+		return
+	}
+
 	if err := vgCreate(opt.VgName, devices); err != nil {
 		errCommonHanlde(w, req, err)
 		return
@@ -263,6 +268,21 @@ func getDevicePath(scriptDir, santype string, id int) (string, error) {
 
 	log.Println("getDevicePath: ", devstr)
 	return devstr, nil
+}
+
+func pvCreate(devices string) error {
+	pvcreatesctript := fmt.Sprintf("pvcreate -ff -y %s ", devices)
+	_, err := execCommand(pvcreatesctript)
+
+	if err != nil {
+		log.WithFields(log.Fields{
+			"cript": pvcreatesctript,
+			"err":   err.Error(),
+		}).Error("pvCreate fail")
+		return err
+	}
+
+	return nil
 }
 
 func vgCreate(name, devices string) error {
