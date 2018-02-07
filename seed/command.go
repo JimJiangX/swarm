@@ -5,8 +5,8 @@ package seed
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os/exec"
-	"strings"
 	"syscall"
 	"time"
 
@@ -43,31 +43,30 @@ func execWithTimeout(_Type execType, shell string, timeout time.Duration, args .
 	}
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
+	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 	err := cmd.Start()
 	if err != nil {
-		return "", errors.New("cmd start err:" + err.Error())
+		return "", fmt.Errorf("cmd start err:%s", err)
 	}
 
 	isTimeout, err := cmdRunWithTimeout(cmd, timeout)
 
-	errStr := stderr.String()
+	//	errStr := stderr.String()
 
-	if errStr != "" {
-		for _, datastr := range strings.Split(errStr, "\n") {
-			if strings.HasPrefix(strings.ToLower(datastr), "warning:") {
-				log.WithFields(log.Fields{
-					"cmd":  cmd,
-					"warn": datastr,
-				}).Debug("get warning info")
-			} else if datastr != "" {
-				return "", errors.New("exec error:" + datastr)
-			}
-		}
-	}
+	//	if errStr != "" {
+	//		for _, datastr := range strings.Split(errStr, "\n") {
+	//			if strings.HasPrefix(strings.ToLower(datastr), "warning:") {
+	//				log.WithFields(log.Fields{
+	//					"cmd":  cmd,
+	//					"warn": datastr,
+	//				}).Debug("get warning info")
+	//			} else if datastr != "" {
+	//				return "", errors.New("exec error:" + datastr)
+	//			}
+	//		}
+	//	}
 
 	if isTimeout {
 		return "", errors.New("Timeout")
@@ -82,12 +81,12 @@ func execWithTimeout(_Type execType, shell string, timeout time.Duration, args .
 			return stdout.String(), nil
 		}
 
-		return "", errors.New("exec error:" + err.Error())
+		return "", fmt.Errorf("exec error:%s", err)
 	}
 
 	// exec successfully
-	data := stdout.Bytes()
-	return string(data), nil
+
+	return fmt.Sprintf("%s\n%s", stdout.Bytes(), stderr.Bytes()), nil
 }
 
 func cmdRunWithTimeout(cmd *exec.Cmd, timeout time.Duration) (bool, error) {
