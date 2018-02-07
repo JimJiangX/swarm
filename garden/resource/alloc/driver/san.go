@@ -138,7 +138,7 @@ func (sv sanVolume) Expand(ID string, size int64) (err error) {
 			return
 		}
 
-		_err := sv.recycleLUNs(lv.VG, []database.LUN{lun})
+		_err := sv.recycleLUNs([]database.LUN{lun})
 		if err != nil {
 			err = errors.Errorf("recycleLUNs failed,%+v\n%+v", _err, err)
 			return
@@ -216,13 +216,7 @@ func (sv sanVolume) DeactivateVG(v database.Volume) error {
 	return nil
 }
 
-func (sv sanVolume) recycleLUNs(vg string, luns []database.LUN) error {
-	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
-	err := removeSanVG(sv.san.Vendor(), agent, vg, luns)
-	if err != nil {
-		return err
-	}
-
+func (sv sanVolume) recycleLUNs(luns []database.LUN) error {
 	for i := range luns {
 		if luns[i].MappingTo == "" && luns[i].HostLunID == 0 {
 			continue
@@ -249,7 +243,13 @@ func (sv sanVolume) Recycle(lv database.Volume) error {
 		return err
 	}
 
-	return sv.recycleLUNs(lv.VG, luns)
+	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
+	err = removeSanVG(sv.san.Vendor(), agent, lv.VG, luns)
+	if err != nil {
+		return err
+	}
+
+	return sv.recycleLUNs(luns)
 }
 
 func (sv sanVolume) createSanVG(vg string) error {
