@@ -3,6 +3,7 @@ package seed
 import (
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/garden/utils"
 )
 
@@ -31,6 +32,8 @@ func execWithTimeout(_Type execType, shell string, timeout time.Duration, args .
 	copy(script[1:], args)
 
 	out, err := utils.ExecContextTimeout(nil, timeout, script...)
+
+	logrus.Debug("exec:%s,%s", script, err)
 
 	return string(out), err
 }
