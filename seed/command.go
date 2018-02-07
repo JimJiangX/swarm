@@ -1,16 +1,9 @@
-// +build darwin linux
-
 package seed
 
 import (
-	"bytes"
-	"errors"
-	"fmt"
-	"os/exec"
-	"syscall"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/garden/utils"
 )
 
 type execType string
@@ -32,6 +25,17 @@ func execShellFile(fpath string, args ...string) (string, error) {
 	return execWithTimeout(shellFileType, fpath, defaultTimeout*12, args...)
 }
 
+func execWithTimeout(_Type execType, shell string, timeout time.Duration, args ...string) (string, error) {
+	script := make([]string, len(args)+1)
+	script[0] = shell
+	copy(script[1:], args)
+
+	out, err := utils.ExecContextTimeout(nil, timeout, script...)
+
+	return string(out), err
+}
+
+/*
 func execWithTimeout(_Type execType, shell string, timeout time.Duration, args ...string) (string, error) {
 	var cmd *exec.Cmd
 	if _Type == commandType {
@@ -124,3 +128,4 @@ func cmdRunWithTimeout(cmd *exec.Cmd, timeout time.Duration) (bool, error) {
 		return false, err
 	}
 }
+*/
