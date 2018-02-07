@@ -22,6 +22,7 @@ type StorageIface interface {
 	CountLunByRaidGroupID(rg string) (int, error)
 
 	DelLUN(id string) error
+	DelLunVolume(lunID, volume string) error
 
 	ListHostLunIDByMapping(host string) ([]int, error)
 	ListLunIDBySystemID(id string) ([]int, error)
@@ -111,6 +112,21 @@ func (db dbBase) InsertLunVolume(lun LUN, lv Volume) error {
 		}
 
 		return db.txInsertLun(tx, lun)
+	}
+
+	return db.txFrame(do)
+}
+
+func (db dbBase) DelLunVolume(lunID, volume string) error {
+	do := func(tx *sqlx.Tx) error {
+
+		query := "DELETE FROM " + db.lunTable() + " WHERE id=?"
+		_, err := tx.Exec(query, lunID)
+		if err != nil {
+			return errors.Wrap(err, "delete LUN by ID")
+		}
+
+		return db.txDelVolume(tx, volume)
 	}
 
 	return db.txFrame(do)

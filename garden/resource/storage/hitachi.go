@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -175,6 +176,17 @@ func (h *hitachiStore) Alloc(name, vg string, size int64) (database.LUN, databas
 	if err != nil {
 		return lun, lv, err
 	}
+
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		_err := h.orm.DelLunVolume(lun.ID, lv.ID)
+		if _err != nil {
+			err = fmt.Errorf("%+v\n%+v", _err, err)
+		}
+	}()
 
 	path, err := h.scriptPath("create_lun.sh")
 	if err != nil {
