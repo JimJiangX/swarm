@@ -107,7 +107,7 @@ func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req struc
 	return &lv, nil
 }
 
-func (sv sanVolume) Expand(ID string, size int64) error {
+func (sv sanVolume) Expand(ID string, size int64) (err error) {
 	if size <= 0 {
 		return nil
 	}
@@ -133,10 +133,32 @@ func (sv sanVolume) Expand(ID string, size int64) error {
 		return err
 	}
 
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		_err := sv.recycleLUNs(lv.VG, []database.LUN{lun})
+		if err != nil {
+			err = errors.Errorf("recycleLUNs failed,%+v\n%+v", _err, err)
+			return
+		}
+
+		lv.Size -= size
+
+		_err = sv.iface.SetVolume(lv)
+		if err != nil {
+			err = errors.Errorf("recycleLUN success,SetVolume failed\n%+v\n%+v", _err, err)
+		}
+	}()
+
 	err = sv.san.Mapping(sv.engine.ID, lv.VG, lun.ID, lv.UnitID)
 	if err != nil {
 		return err
 	}
+
+	lun.MappingTo = sv.engine.ID
+	lun.VG = lv.VG
 
 	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
 
@@ -194,14 +216,9 @@ func (sv sanVolume) DeactivateVG(v database.Volume) error {
 	return nil
 }
 
-func (sv sanVolume) Recycle(lv database.Volume) error {
-	luns, err := sv.san.ListLUN(lv.Name)
-	if err != nil {
-		return err
-	}
-
+func (sv sanVolume) recycleLUNs(vg string, luns []database.LUN) error {
 	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
-	err = removeSanVG(sv.san.Vendor(), agent, lv.VG, luns)
+	err := removeSanVG(sv.san.Vendor(), agent, vg, luns)
 	if err != nil {
 		return err
 	}
@@ -224,6 +241,15 @@ func (sv sanVolume) Recycle(lv database.Volume) error {
 	}
 
 	return nil
+}
+
+func (sv sanVolume) Recycle(lv database.Volume) error {
+	luns, err := sv.san.ListLUN(lv.Name)
+	if err != nil {
+		return err
+	}
+
+	return sv.recycleLUNs(lv.VG, luns)
 }
 
 func (sv sanVolume) createSanVG(vg string) error {
