@@ -33,7 +33,7 @@ func execWithTimeout(_Type execType, shell string, timeout time.Duration, args .
 
 	out, err := utils.ExecContextTimeout(nil, timeout, script...)
 
-	logrus.Debugf("exec:%s,%s", script, err)
+	logrus.Debugf("exec:%s,%v", script, err)
 
 	return string(out), err
 }
