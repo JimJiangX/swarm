@@ -81,6 +81,11 @@ func vgExtendHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if err := pvCreate(device); err != nil {
+		errCommonHanlde(w, req, err)
+		return
+	}
+
 	if err := vgExtend(opt.VgName, device); err != nil {
 		errCommonHanlde(w, req, err)
 		return
