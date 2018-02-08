@@ -208,9 +208,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 	return lun, lv, nil
 }
 
-func (h *hitachiStore) Extend(lv database.Volume, size int64) (database.LUN, database.Volume, error) {
-	lun := database.LUN{}
-
+func (h *hitachiStore) Extend(lv database.Volume, size int64) (lun database.LUN, v database.Volume, err error) {
 	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -258,6 +256,25 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (database.LUN, dat
 	if err != nil {
 		return lun, lv, err
 	}
+
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		_err := h.orm.DelLUN(lun.ID)
+		if _err != nil {
+			err = errors.Errorf("expand lun failed,DelLUN failed\n%+v\n%+v", _err, err)
+		}
+
+		lv.Size -= size
+
+		_err = h.orm.SetVolume(lv)
+		if _err != nil {
+			lv.Size += size
+			err = errors.Errorf("expand lun failed,SetVolume failed\n%+v\n%+v", _err, err)
+		}
+	}()
 
 	path, err := h.scriptPath("create_lun.sh")
 	if err != nil {

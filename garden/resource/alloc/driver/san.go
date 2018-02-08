@@ -118,52 +118,55 @@ func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req struc
 	return &lv, nil
 }
 
-func (sv sanVolume) Expand(ID string, size int64) (lv database.Volume, lun database.LUN, err error) {
+func (sv sanVolume) Expand(ID string, size int64) (result volumeExpandResult, err error) {
 	if size <= 0 {
-		return lv, database.LUN{}, nil
+		return result, nil
 	}
 
-	lv, err = sv.iface.GetVolume(ID)
+	result.lv, err = sv.iface.GetVolume(ID)
 	if err != nil {
-		return lv, database.LUN{}, err
+		return result, err
 	}
 
 	space, err := sv.Space()
 	if err != nil {
-		return lv, database.LUN{}, err
+		return result, err
 	}
 
 	if space.Free < size {
-		return lv, database.LUN{}, errors.Errorf("node %s local volume driver has no enough space for expansion:%d<%d", sv.engine.IP, space.Free, size)
+		return result, errors.Errorf("node %s local volume driver has no enough space for expansion:%d<%d", sv.engine.IP, space.Free, size)
 	}
 
-	lun, lv, err = sv.san.Extend(lv, size)
+	result.lun, result.lv, err = sv.san.Extend(result.lv, size)
 	if err != nil {
-		return lv, lun, err
+		return result, err
 	}
 
-	defer func() {
-		if err == nil {
-			return
-		}
+	result.lun, err = sv.san.Mapping(sv.engine.ID, result.lv.VG, result.lun.ID, result.lv.UnitID)
 
-		_err := sv.recycleLUNs([]database.LUN{lun})
+	result.recycle = func() error {
+		_err := sv.recycleLUNs([]database.LUN{result.lun})
 		if _err != nil {
 			err = errors.Errorf("recycleLUNs failed,%+v\n%+v", _err, err)
-			return
+			return err
 		}
 
-		lv.Size -= size
+		result.lv.Size -= size
 
-		_err = sv.iface.SetVolume(lv)
+		_err = sv.iface.SetVolume(result.lv)
 		if _err != nil {
 			err = errors.Errorf("recycleLUN success,SetVolume failed\n%+v\n%+v", _err, err)
+			return err
 		}
-	}()
 
-	lun, err = sv.san.Mapping(sv.engine.ID, lv.VG, lun.ID, lv.UnitID)
+		return err
+	}
 
-	return lv, lun, err
+	if err != nil {
+		err = result.recycle()
+	}
+
+	return result, err
 }
 
 func (sv sanVolume) expandVG(luns []database.LUN) error {

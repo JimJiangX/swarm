@@ -322,30 +322,34 @@ func (lv *localVolume) Alloc(config *cluster.ContainerConfig, uid string, req st
 	return &v, nil
 }
 
-func (lv *localVolume) Expand(ID string, size int64) (database.Volume, database.LUN, error) {
+func (lv *localVolume) Expand(ID string, size int64) (volumeExpandResult, error) {
+	result := volumeExpandResult{}
+
 	if size <= 0 {
-		return database.Volume{}, database.LUN{}, nil
+		return result, nil
 	}
 
 	dv, err := lv.vo.GetVolume(ID)
 	if err != nil {
-		return dv, database.LUN{}, err
+		return result, err
 	}
+
+	result.lv = dv
 
 	space, err := lv.Space()
 	if err != nil {
-		return dv, database.LUN{}, err
+		return result, err
 	}
 
 	if space.Free < size {
-		return dv, database.LUN{}, errors.Errorf("node %s local volume driver has no enough space for expansion:%d<%d", lv.engine.IP, space.Free, size)
+		return result, errors.Errorf("node %s local volume driver has no enough space for expansion:%d<%d", lv.engine.IP, space.Free, size)
 	}
 
 	dv.Size += size
 
 	err = lv.vo.SetVolume(dv)
 	if err != nil {
-		return dv, database.LUN{}, err
+		return result, err
 	}
 
 	lv.space.Free -= size
@@ -354,7 +358,7 @@ func (lv *localVolume) Expand(ID string, size int64) (database.Volume, database.
 
 	err = updateVolume(agent, dv)
 
-	return dv, database.LUN{}, err
+	return result, err
 }
 
 func (lv *localVolume) Recycle(v database.Volume) (err error) {

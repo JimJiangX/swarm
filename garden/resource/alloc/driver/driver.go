@@ -19,6 +19,12 @@ type VolumeIface interface {
 	GetNode(nameOrID string) (database.Node, error)
 }
 
+type volumeExpandResult struct {
+	lv      database.Volume
+	lun     database.LUN
+	recycle func() error
+}
+
 // Driver for volume manage
 type Driver interface {
 	vgIface
@@ -31,7 +37,7 @@ type Driver interface {
 
 	Alloc(config *cluster.ContainerConfig, uid string, req structs.VolumeRequire) (*database.Volume, error)
 
-	Expand(volumeID string, size int64) (database.Volume, database.LUN, error)
+	Expand(volumeID string, size int64) (volumeExpandResult, error)
 
 	Recycle(lv database.Volume) error
 }
@@ -140,7 +146,7 @@ func (vds VolumeDrivers) AllocVolumes(config *cluster.ContainerConfig, uid strin
 }
 
 // ExpandVolumes expand required space for exist volumes
-func (vds VolumeDrivers) ExpandVolumes(stores []structs.VolumeRequire) error {
+func (vds VolumeDrivers) ExpandVolumes(stores []structs.VolumeRequire) (err error) {
 	lvs := make([]database.Volume, 0, len(stores))
 	luns := make([]database.LUN, 0, len(stores))
 
@@ -150,21 +156,32 @@ func (vds VolumeDrivers) ExpandVolumes(stores []structs.VolumeRequire) error {
 			return errors.New("not found the assigned volumeDriver:" + stores[i].Type)
 		}
 
-		lv, lun, err := driver.Expand(stores[i].ID, stores[i].Size)
-		if err != nil {
-			return err
+		result, _err := driver.Expand(stores[i].ID, stores[i].Size)
+		if _err != nil {
+			return _err
 		}
 
-		if lv.ID != "" {
-			lvs = append(lvs, lv)
+		defer func(f func() error) {
+			if err == nil {
+				return
+			}
+
+			_err := f()
+			if _err != nil {
+				err = errors.Errorf("%+v\n%+v", _err, err)
+			}
+		}(result.recycle)
+
+		if result.lv.ID != "" {
+			lvs = append(lvs, result.lv)
 		}
-		if lun.ID != "" {
-			luns = append(luns, lun)
+		if result.lun.ID != "" {
+			luns = append(luns, result.lun)
 		}
 	}
 
 	for i := range vds {
-		err := vds[i].expandVG(luns)
+		err = vds[i].expandVG(luns)
 		if err != nil {
 			return err
 		}
@@ -172,7 +189,7 @@ func (vds VolumeDrivers) ExpandVolumes(stores []structs.VolumeRequire) error {
 
 	for i := range lvs {
 		d := vds.Get(lvs[i].DriverType)
-		err := d.updateVolume(lvs[i])
+		err = d.updateVolume(lvs[i])
 		if err != nil {
 			return err
 		}
