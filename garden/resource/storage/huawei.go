@@ -341,33 +341,33 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 	return nil
 }
 
-func (h *huaweiStore) Mapping(host, vg, lun, unit string) error {
+func (h *huaweiStore) Mapping(host, vg, lun, unit string) (database.LUN, error) {
 	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
 	l, err := h.orm.GetLUN(lun)
 	if err != nil {
-		return err
+		return l, err
 	}
 	lv, err := h.orm.GetVolume(l.Name)
 	if err != nil {
-		return err
+		return l, err
 	}
 
 	out, err := h.orm.ListHostLunIDByMapping(host)
 	if err != nil {
-		return err
+		return l, err
 	}
 
 	find, val := findIdleNum(h.hs.HluStart, h.hs.HluEnd, out)
 	if !find {
-		return errors.Errorf("%s:no available Host LUN ID", h.Vendor())
+		return l, errors.Errorf("%s:no available Host LUN ID", h.Vendor())
 	}
 
 	err = h.orm.LunMapping(lun, host, vg, val)
 	if err != nil {
-		return err
+		return l, err
 	}
 
 	lv.EngineID = host
@@ -375,11 +375,11 @@ func (h *huaweiStore) Mapping(host, vg, lun, unit string) error {
 
 	err = h.orm.SetVolume(lv)
 	if err != nil {
-		return err
+		return l, err
 	}
 	path, err := h.scriptPath("create_lunmap.sh")
 	if err != nil {
-		return err
+		return l, err
 	}
 
 	host = generateHostName(host)
@@ -390,10 +390,14 @@ func (h *huaweiStore) Mapping(host, vg, lun, unit string) error {
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
 	if err != nil {
-		return errors.WithStack(err)
+		return l, errors.WithStack(err)
 	}
 
-	return nil
+	l.MappingTo = host
+	l.HostLunID = val
+	l.VG = vg
+
+	return l, nil
 }
 
 func (h *huaweiStore) DelMapping(lun database.LUN) error {

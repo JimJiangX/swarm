@@ -474,33 +474,33 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 }
 
 // Mapping calls create_lunmap.sh,associate LUN with host.
-func (h *hitachiStore) Mapping(host, vg, lun, unit string) error {
+func (h *hitachiStore) Mapping(host, vg, lun, unit string) (database.LUN, error) {
 	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
 	l, err := h.orm.GetLUN(lun)
 	if err != nil {
-		return err
+		return l, err
 	}
 	lv, err := h.orm.GetVolume(l.Name)
 	if err != nil {
-		return err
+		return l, err
 	}
 
 	out, err := h.orm.ListHostLunIDByMapping(host)
 	if err != nil {
-		return err
+		return l, err
 	}
 
 	find, val := findIdleNum(h.hs.HluStart, h.hs.HluEnd, out)
 	if !find {
-		return errors.Errorf("%s:no available host LUN ID", h.Vendor())
+		return l, errors.Errorf("%s:no available host LUN ID", h.Vendor())
 	}
 
 	err = h.orm.LunMapping(lun, host, vg, val)
 	if err != nil {
-		return err
+		return l, err
 	}
 
 	lv.EngineID = host
@@ -508,12 +508,12 @@ func (h *hitachiStore) Mapping(host, vg, lun, unit string) error {
 
 	err = h.orm.SetVolume(lv)
 	if err != nil {
-		return err
+		return l, err
 	}
 
 	path, err := h.scriptPath("create_lunmap.sh")
 	if err != nil {
-		return err
+		return l, err
 	}
 
 	host = generateHostName(host)
@@ -523,10 +523,14 @@ func (h *hitachiStore) Mapping(host, vg, lun, unit string) error {
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit,
 		strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val))
 	if err != nil {
-		return errors.WithStack(err)
+		return l, errors.WithStack(err)
 	}
 
-	return nil
+	l.MappingTo = host
+	l.VG = vg
+	l.HostLunID = val
+
+	return l, nil
 }
 
 // DelMapping disassociate of the lun from host,calls del_lunmap.sh

@@ -64,7 +64,7 @@ type Store interface {
 	Extend(lv database.Volume, size int64) (database.LUN, database.Volume, error)
 	RecycleLUN(id string, lun int) error // delete LUN
 
-	Mapping(host, vgName, lun, unit string) error
+	Mapping(host, vgName, lun, unit string) (database.LUN, error)
 	DelMapping(lun database.LUN) error
 
 	AddSpace(id string) (Space, error)

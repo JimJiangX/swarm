@@ -92,12 +92,13 @@ func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req struc
 	lv.EngineID = sv.engine.ID
 	lv.UnitID = uid
 
-	err = sv.san.Mapping(sv.engine.ID, vg, lun.ID, uid)
+	lun, err = sv.san.Mapping(sv.engine.ID, vg, lun.ID, uid)
 	if err != nil {
 		return &lv, err
 	}
 
-	err = sv.createSanVG(lv.Name)
+	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
+	err = createSanVG(agent, sv.san.Vendor(), []database.LUN{lun})
 	if err != nil {
 		return &lv, err
 	}
@@ -150,40 +151,18 @@ func (sv sanVolume) Expand(ID string, size int64) (err error) {
 		}
 	}()
 
-	err = sv.san.Mapping(sv.engine.ID, lv.VG, lun.ID, lv.UnitID)
-	if err != nil {
-		return err
-	}
-
-	lun, err = sv.getLunByName(lv.Name, lun.ID)
+	lun, err = sv.san.Mapping(sv.engine.ID, lv.VG, lun.ID, lv.UnitID)
 	if err != nil {
 		return err
 	}
 
 	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
-
 	err = expandSanVG(agent, sv.san.Vendor(), lun)
 	if err != nil {
 		return err
 	}
 
 	return updateVolume(agent, lv)
-}
-
-func (sv sanVolume) getLunByName(name, lunID string) (database.LUN, error) {
-	luns, err := sv.san.ListLUN(name)
-	if err != nil {
-		return database.LUN{}, err
-	}
-
-	for i := range luns {
-		if luns[i].ID == lunID {
-			return luns[i], nil
-
-		}
-	}
-
-	return database.LUN{}, errors.Errorf("not found LUN:%s", lunID)
 }
 
 func (sv sanVolume) ActivateVG(v database.Volume) error {
@@ -193,15 +172,10 @@ func (sv sanVolume) ActivateVG(v database.Volume) error {
 	}
 
 	for i := range luns {
-		err = sv.san.Mapping(sv.engine.ID, v.VG, luns[i].ID, v.UnitID)
+		luns[i], err = sv.san.Mapping(sv.engine.ID, v.VG, luns[i].ID, v.UnitID)
 		if err != nil {
 			return err
 		}
-	}
-
-	luns, err = sv.san.ListLUN(v.Name)
-	if err != nil {
-		return err
 	}
 
 	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
@@ -271,17 +245,6 @@ func (sv sanVolume) Recycle(lv database.Volume) error {
 	}
 
 	return sv.recycleLUNs(luns)
-}
-
-func (sv sanVolume) createSanVG(name string) error {
-	list, err := sv.san.ListLUN(name)
-	if err != nil {
-		return err
-	}
-
-	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
-
-	return createSanVG(agent, sv.san.Vendor(), list)
 }
 
 const defaultTimeout = 90 * time.Second
