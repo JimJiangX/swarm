@@ -161,16 +161,18 @@ func (vds VolumeDrivers) ExpandVolumes(stores []structs.VolumeRequire) (err erro
 			return _err
 		}
 
-		defer func(f func() error) {
-			if err == nil {
-				return
-			}
+		if result.recycle != nil {
+			defer func(f func() error) {
+				if err == nil {
+					return
+				}
 
-			_err := f()
-			if _err != nil {
-				err = errors.Errorf("%+v\n%+v", _err, err)
-			}
-		}(result.recycle)
+				_err := f()
+				if _err != nil {
+					err = errors.Errorf("%+v\n%+v", _err, err)
+				}
+			}(result.recycle)
+		}
 
 		if result.lv.ID != "" {
 			lvs = append(lvs, result.lv)
