@@ -239,7 +239,7 @@ func (sv sanVolume) DeactivateVG(v database.Volume) error {
 
 func (sv sanVolume) recycleLUNs(luns []database.LUN) error {
 	for i := range luns {
-		if luns[i].MappingTo == "" && luns[i].HostLunID == 0 {
+		if luns[i].MappingTo == "" {
 			continue
 		}
 		err := sv.san.DelMapping(luns[i])

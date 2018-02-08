@@ -135,7 +135,14 @@ func (db dbBase) DelLunVolume(lunID, volume string) error {
 // DelLunMapping delete a mapping record,set LUN VG、MappingTo and HostLunID to be null
 func (db dbBase) DelLunMapping(lun string) error {
 
-	return db.LunMapping(lun, "", "", 0)
+	query := "UPDATE " + db.lunTable() + " SET vg_name=?,mapping_hostname=? WHERE id=?"
+
+	_, err := db.Exec(query, "", "", lun)
+	if err == nil {
+		return nil
+	}
+
+	return errors.WithStack(err)
 }
 
 // LunMapping sets LUN VG、MappingTo、HostLunID value
