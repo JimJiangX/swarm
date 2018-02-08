@@ -150,6 +150,11 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 
 		// 5.migrate volume for new unit
 		if migrate {
+			// stop container before migrate volume
+			err = old.unit.stopContainer(ctx)
+			if err != nil {
+				return err
+			}
 			// migrate volumes
 			news.volumes, err = actor.MigrateVolumes(news.unit.u.ID, old.engine, news.engine, old.volumes)
 			if err != nil {
