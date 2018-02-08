@@ -2,6 +2,7 @@ package driver
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/docker/swarm/cluster"
@@ -15,6 +16,9 @@ import (
 type vgIface interface {
 	ActivateVG(v database.Volume) error
 	DeactivateVG(v database.Volume) error
+	createVG(lvs []database.Volume) error
+	expandVG(luns []database.LUN) error
+	updateVolume(v database.Volume) error
 }
 
 type unsupportSAN struct{}
@@ -27,6 +31,18 @@ func (unsupportSAN) ActivateVG(v database.Volume) error {
 
 func (unsupportSAN) DeactivateVG(v database.Volume) error {
 	return errUnsupportSAN
+}
+
+func (unsupportSAN) createVG(v []database.Volume) error {
+	return nil
+}
+
+func (unsupportSAN) expandVG(luns []database.LUN) error {
+	return nil
+}
+
+func (unsupportSAN) updateVolume(v database.Volume) error {
+	return nil
 }
 
 type sanVolume struct {
@@ -97,39 +113,33 @@ func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req struc
 		return &lv, err
 	}
 
-	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
-	err = createSanVG(agent, sv.san.Vendor(), []database.LUN{lun})
-	if err != nil {
-		return &lv, err
-	}
-
 	setVolumeBind(config, lv.Name, req.Name)
 
 	return &lv, nil
 }
 
-func (sv sanVolume) Expand(ID string, size int64) (err error) {
+func (sv sanVolume) Expand(ID string, size int64) (lv database.Volume, lun database.LUN, err error) {
 	if size <= 0 {
-		return nil
+		return lv, database.LUN{}, nil
 	}
 
-	lv, err := sv.iface.GetVolume(ID)
+	lv, err = sv.iface.GetVolume(ID)
 	if err != nil {
-		return err
+		return lv, database.LUN{}, err
 	}
 
 	space, err := sv.Space()
 	if err != nil {
-		return err
+		return lv, database.LUN{}, err
 	}
 
 	if space.Free < size {
-		return errors.Errorf("node %s local volume driver has no enough space for expansion:%d<%d", sv.engine.IP, space.Free, size)
+		return lv, database.LUN{}, errors.Errorf("node %s local volume driver has no enough space for expansion:%d<%d", sv.engine.IP, space.Free, size)
 	}
 
-	lun, lv, err := sv.san.Extend(lv, size)
+	lun, lv, err = sv.san.Extend(lv, size)
 	if err != nil {
-		return err
+		return lv, lun, err
 	}
 
 	defer func() {
@@ -152,23 +162,78 @@ func (sv sanVolume) Expand(ID string, size int64) (err error) {
 	}()
 
 	lun, err = sv.san.Mapping(sv.engine.ID, lv.VG, lun.ID, lv.UnitID)
-	if err != nil {
-		return err
-	}
 
+	return lv, lun, err
+}
+
+func (sv sanVolume) expandVG(luns []database.LUN) error {
 	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
-	err = expandSanVG(agent, sv.san.Vendor(), lun)
-	if err != nil {
-		return err
+
+	m := make(map[string][]database.LUN)
+	for i := range luns {
+
+		list, ok := m[luns[i].VG]
+		if ok {
+			list = append(list, luns[i])
+		} else {
+			list = make([]database.LUN, 1, len(luns)/2+1)
+			list[0] = luns[i]
+		}
+
+		m[luns[i].VG] = list
 	}
 
-	return updateVolume(agent, lv)
+	for vg, list := range m {
+		if len(list) == 0 {
+			continue
+		}
+
+		err := expandSanVG(agent, sv.san.Vendor(), vg, list)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (sv sanVolume) createVG(lvs []database.Volume) error {
+	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
+	vgs := make(map[string]struct{})
+
+	for i := range lvs {
+		if strings.HasSuffix(lvs[i].VG, "_SAN_VG") {
+			vgs[lvs[i].VG] = struct{}{}
+		}
+	}
+
+	for vg := range vgs {
+		luns, err := sv.san.ListLUN(vg)
+		if err != nil {
+			return err
+		}
+
+		if len(luns) == 0 {
+			return nil
+		}
+
+		err = createSanVG(agent, sv.san.Vendor(), luns)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (sv sanVolume) ActivateVG(v database.Volume) error {
-	luns, err := sv.san.ListLUN(v.Name)
+	luns, err := sv.san.ListLUN(v.VG)
 	if err != nil {
 		return err
+	}
+
+	if len(luns) == 0 {
+		return nil
 	}
 
 	for i := range luns {
@@ -194,6 +259,10 @@ func (sv sanVolume) DeactivateVG(v database.Volume) error {
 		return err
 	}
 
+	if len(luns) == 0 {
+		return nil
+	}
+
 	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
 
 	err = sanDeactivate(sv.san.Vendor(), agent, v.VG, luns)
@@ -211,11 +280,18 @@ func (sv sanVolume) DeactivateVG(v database.Volume) error {
 	return nil
 }
 
+func (sv sanVolume) updateVolume(v database.Volume) error {
+	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
+
+	return updateVolume(agent, v)
+}
+
 func (sv sanVolume) recycleLUNs(luns []database.LUN) error {
 	for i := range luns {
 		if luns[i].MappingTo == "" {
 			continue
 		}
+
 		err := sv.san.DelMapping(luns[i])
 		if err != nil {
 			return err
@@ -233,9 +309,13 @@ func (sv sanVolume) recycleLUNs(luns []database.LUN) error {
 }
 
 func (sv sanVolume) Recycle(lv database.Volume) error {
-	luns, err := sv.san.ListLUN(lv.Name)
+	luns, err := sv.san.ListLUN(lv.VG)
 	if err != nil {
 		return err
+	}
+
+	if len(luns) == 0 {
+		return nil
 	}
 
 	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
@@ -276,10 +356,15 @@ func createSanVG(addr, vendor string, luns []database.LUN) error {
 	return client.SanVgCreate(config)
 }
 
-func expandSanVG(addr, vendor string, lun database.LUN) error {
+func expandSanVG(addr, vendor, vg string, luns []database.LUN) error {
+	l := make([]int, len(luns))
+	for i := range luns {
+		l[i] = luns[i].HostLunID
+	}
+
 	config := sdk.VgConfig{
-		HostLunID: []int{lun.HostLunID},
-		VgName:    lun.VG,
+		HostLunID: l,
+		VgName:    vg,
 		Type:      vendor,
 	}
 

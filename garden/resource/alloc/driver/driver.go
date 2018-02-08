@@ -31,9 +31,9 @@ type Driver interface {
 
 	Alloc(config *cluster.ContainerConfig, uid string, req structs.VolumeRequire) (*database.Volume, error)
 
-	Expand(volumeID string, size int64) error
+	Expand(volumeID string, size int64) (database.Volume, database.LUN, error)
 
-	Recycle(database.Volume) error
+	Recycle(lv database.Volume) error
 }
 
 // Space is VG status
@@ -112,35 +112,67 @@ func (vds VolumeDrivers) Get(_type string) Driver {
 
 // AllocVolumes alloc required volume space.
 func (vds VolumeDrivers) AllocVolumes(config *cluster.ContainerConfig, uid string, stores []structs.VolumeRequire) ([]database.Volume, error) {
-	volumes := make([]database.Volume, 0, len(stores))
+	lvs := make([]database.Volume, 0, len(stores))
 
 	for i := range stores {
 		driver := vds.Get(stores[i].Type)
 		if driver == nil {
-			return volumes, errors.New("not found the assigned volumeDriver:" + stores[i].Type)
+			return lvs, errors.New("not found the assigned volumeDriver:" + stores[i].Type)
 		}
 
 		v, err := driver.Alloc(config, uid, stores[i])
 		if v != nil {
-			volumes = append(volumes, *v)
+			lvs = append(lvs, *v)
 		}
 		if err != nil {
-			return volumes, err
+			return lvs, err
 		}
 	}
 
-	return volumes, nil
+	for i := range vds {
+		err := vds[i].createVG(lvs)
+		if err != nil {
+			return lvs, err
+		}
+	}
+
+	return lvs, nil
 }
 
 // ExpandVolumes expand required space for exist volumes
 func (vds VolumeDrivers) ExpandVolumes(stores []structs.VolumeRequire) error {
+	lvs := make([]database.Volume, 0, len(stores))
+	luns := make([]database.LUN, 0, len(stores))
+
 	for i := range stores {
 		driver := vds.Get(stores[i].Type)
 		if driver == nil {
 			return errors.New("not found the assigned volumeDriver:" + stores[i].Type)
 		}
 
-		err := driver.Expand(stores[i].ID, stores[i].Size)
+		lv, lun, err := driver.Expand(stores[i].ID, stores[i].Size)
+		if err != nil {
+			return err
+		}
+
+		if lv.ID != "" {
+			lvs = append(lvs, lv)
+		}
+		if lun.ID != "" {
+			luns = append(luns, lun)
+		}
+	}
+
+	for i := range vds {
+		err := vds[i].expandVG(luns)
+		if err != nil {
+			return err
+		}
+	}
+
+	for i := range lvs {
+		d := vds.Get(lvs[i].DriverType)
+		err := d.updateVolume(lvs[i])
 		if err != nil {
 			return err
 		}

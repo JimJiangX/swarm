@@ -277,8 +277,8 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (database.LUN, dat
 	return lun, lv, nil
 }
 
-func (h hitachiStore) ListLUN(name string) ([]database.LUN, error) {
-	return h.orm.ListLunByName(name)
+func (h hitachiStore) ListLUN(nameOrVG string) ([]database.LUN, error) {
+	return h.orm.ListLunByNameVG(nameOrVG)
 }
 
 // Recycle calls del_lun.sh,make the lun available for alloction.

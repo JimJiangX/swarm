@@ -17,7 +17,7 @@ type StorageIface interface {
 	GetLUN(nameOrID string) (LUN, error)
 	GetLunByLunID(systemID string, id int) (LUN, error)
 
-	ListLunByName(name string) ([]LUN, error)
+	ListLunByNameVG(name string) ([]LUN, error)
 
 	CountLunByRaidGroupID(rg string) (int, error)
 
@@ -135,9 +135,9 @@ func (db dbBase) DelLunVolume(lunID, volume string) error {
 // DelLunMapping delete a mapping record,set LUN VG、MappingTo and HostLunID to be null
 func (db dbBase) DelLunMapping(lun string) error {
 
-	query := "UPDATE " + db.lunTable() + " SET vg_name=?,mapping_hostname=? WHERE id=?"
+	query := "UPDATE " + db.lunTable() + " SET mapping_hostname=? WHERE id=?"
 
-	_, err := db.Exec(query, "", "", lun)
+	_, err := db.Exec(query, "", lun)
 	if err == nil {
 		return nil
 	}
@@ -172,13 +172,13 @@ func (db dbBase) GetLUN(nameOrID string) (LUN, error) {
 }
 
 // ListLunByNameOrVG returns []LUN select by Name or VG
-func (db dbBase) ListLunByName(name string) ([]LUN, error) {
+func (db dbBase) ListLunByNameVG(nameOrVG string) ([]LUN, error) {
 	var (
 		list  []LUN
-		query = "SELECT id,name,vg_name,raid_group_id,san_id,mapping_hostname,size,host_lun_id,san_lun_id,created_at FROM " + db.lunTable() + " WHERE name=?"
+		query = "SELECT id,name,vg_name,raid_group_id,san_id,mapping_hostname,size,host_lun_id,san_lun_id,created_at FROM " + db.lunTable() + " WHERE name=? OR vg_name=?"
 	)
 
-	err := db.Select(&list, query, name)
+	err := db.Select(&list, query, nameOrVG, nameOrVG)
 	if err == nil {
 		return list, nil
 	}

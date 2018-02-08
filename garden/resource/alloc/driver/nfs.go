@@ -78,11 +78,11 @@ func (nd _NFSDriver) Alloc(config *cluster.ContainerConfig, uid string, req stru
 	return nil, nil
 }
 
-func (nd _NFSDriver) Expand(_ string, size int64) error {
-	return nil
+func (nd _NFSDriver) Expand(_ string, size int64) (database.Volume, database.LUN, error) {
+	return database.Volume{}, database.LUN{}, nil
 }
 
-func (nd _NFSDriver) Recycle(database.Volume) error {
+func (nd _NFSDriver) Recycle(lv database.Volume) error {
 	return nil
 }
 
