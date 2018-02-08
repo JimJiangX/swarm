@@ -352,13 +352,17 @@ func (lv *localVolume) Expand(ID string, size int64) (volumeExpandResult, error)
 		return result, err
 	}
 
+	result.lv.Size += size
 	lv.space.Free -= size
+
+	return result, err
+}
+
+func (lv localVolume) updateVolume(dv database.Volume) error {
 
 	agent := fmt.Sprintf("%s:%d", lv.engine.IP, lv.port)
 
-	err = updateVolume(agent, dv)
-
-	return result, err
+	return updateVolume(agent, dv)
 }
 
 func (lv *localVolume) Recycle(v database.Volume) (err error) {

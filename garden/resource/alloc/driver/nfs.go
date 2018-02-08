@@ -82,6 +82,10 @@ func (nd _NFSDriver) Expand(_ string, size int64) (volumeExpandResult, error) {
 	return volumeExpandResult{}, nil
 }
 
+func (nd _NFSDriver) updateVolume(lv database.Volume) error {
+	return nil
+}
+
 func (nd _NFSDriver) Recycle(lv database.Volume) error {
 	return nil
 }

@@ -39,6 +39,8 @@ type Driver interface {
 
 	Expand(volumeID string, size int64) (volumeExpandResult, error)
 
+	updateVolume(v database.Volume) error
+
 	Recycle(lv database.Volume) error
 }
 
