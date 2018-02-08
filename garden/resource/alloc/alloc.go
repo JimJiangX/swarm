@@ -164,15 +164,13 @@ func (at *allocator) RecycleResource(ips []database.IP, lvs []database.Volume) e
 
 		drivers, err := at.findEngineVolumeDrivers(eng)
 		if err != nil {
-			logrus.Warnf("engine:%s find volume drivers,%+v", eng.Name, err)
-
-			if len(drivers) == 0 {
-				continue
-			}
+			return err
 		}
 
 		d := drivers.Get(lvs[i].DriverType)
-		if d != nil {
+		if d == nil {
+			return errors.New("not found volumeDriver by type:" + lvs[i].DriverType)
+		} else {
 			err := d.Recycle(lvs[i])
 			if err != nil {
 				return err
