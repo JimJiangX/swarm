@@ -203,15 +203,29 @@ func (sv sanVolume) ActivateVG(v database.Volume) error {
 		return err
 	}
 
-	if len(luns) == 0 {
-		return nil
-	}
+	mapping := false
 
 	for i := range luns {
+		if luns[i].MappingTo == sv.engine.ID {
+			continue
+		}
+
 		luns[i], err = sv.san.Mapping(sv.engine.ID, v.VG, luns[i].ID, v.UnitID)
 		if err != nil {
 			return err
 		}
+
+		mapping = true
+	}
+
+	v.EngineID = sv.engine.ID
+	err = sv.iface.SetVolume(v)
+	if err != nil {
+		return err
+	}
+
+	if !mapping {
+		return nil
 	}
 
 	agent := fmt.Sprintf("%s:%d", sv.engine.IP, sv.port)
@@ -230,7 +244,15 @@ func (sv sanVolume) DeactivateVG(v database.Volume) error {
 		return err
 	}
 
-	if len(luns) == 0 {
+	del := false
+
+	for i := range luns {
+		if luns[i].MappingTo == sv.engine.ID {
+			del = true
+		}
+	}
+
+	if !del {
 		return nil
 	}
 

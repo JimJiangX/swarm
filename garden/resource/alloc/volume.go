@@ -107,6 +107,10 @@ func (at *allocator) ExpandVolumes(engine *cluster.Engine, stores []structs.Volu
 }
 
 func (at *allocator) MigrateVolumes(uid string, old, new *cluster.Engine, lvs []database.Volume) ([]database.Volume, error) {
+	if old != nil && old.ID == new.ID {
+		return lvs, nil
+	}
+
 	vgs := make(map[string]database.Volume)
 	for i := range lvs {
 		vgs[lvs[i].VG] = lvs[i]
@@ -139,17 +143,17 @@ func (at *allocator) MigrateVolumes(uid string, old, new *cluster.Engine, lvs []
 
 	out := make([]database.Volume, 0, len(lvs))
 
-	for _, lv := range vgs {
-		d := drivers.Get(lv.DriverType)
+	for i := range lvs {
+		d := drivers.Get(lvs[i].DriverType)
 		if d == nil {
-			return out, errors.New("not found the assigned volumeDriver:" + lv.DriverType)
+			return out, errors.New("not found the assigned volumeDriver:" + lvs[i].DriverType)
 		}
 
-		lv.UnitID = uid
-		lv.EngineID = new.ID
-		out = append(out, lv)
+		lvs[i].UnitID = uid
+		lvs[i].EngineID = new.ID
+		out = append(out, lvs[i])
 
-		err := d.ActivateVG(lv)
+		err := d.ActivateVG(lvs[i])
 		if err != nil {
 			return out, err
 		}
