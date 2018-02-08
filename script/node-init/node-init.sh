@@ -530,7 +530,7 @@ install_swarm_agent() {
 ## ServiceRestart : swarm
 
 #
-SWARM_AGENT_OPTS="seedjoin --seedAddr ${adm_ip}:${swarm_agent_port} --script=${script_dir}/seed/ --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/${swarm_key}"
+SWARM_AGENT_OPTS="--debug seedjoin --seedAddr ${adm_ip}:${swarm_agent_port} --script=${script_dir}/seed/ --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/${swarm_key}"
 
 EOF
 
