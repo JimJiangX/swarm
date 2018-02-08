@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/api"
 	"github.com/gorilla/mux"
 	"golang.org/x/net/context"
 )
@@ -100,8 +101,13 @@ func NewRouter(version, script string) *mux.Router {
 			}
 			localMethod := method
 
-			r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(wrap)
-			r.Path(localRoute).Methods(localMethod).HandlerFunc(wrap)
+			if log.GetLevel() == log.DebugLevel {
+				r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(api.DebugRequestMiddleware(wrap))
+				r.Path(localRoute).Methods(localMethod).HandlerFunc(api.DebugRequestMiddleware(wrap))
+			} else {
+				r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(wrap)
+				r.Path(localRoute).Methods(localMethod).HandlerFunc(wrap)
+			}
 		}
 	}
 
