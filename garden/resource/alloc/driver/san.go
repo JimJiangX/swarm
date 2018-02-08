@@ -97,7 +97,7 @@ func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req struc
 		return &lv, err
 	}
 
-	err = sv.createSanVG(vg)
+	err = sv.createSanVG(lv.Name)
 	if err != nil {
 		return &lv, err
 	}
@@ -155,7 +155,7 @@ func (sv sanVolume) Expand(ID string, size int64) (err error) {
 		return err
 	}
 
-	lun, err = sv.getLunByVG(lv.VG, lun.ID)
+	lun, err = sv.getLunByName(lv.Name, lun.ID)
 	if err != nil {
 		return err
 	}
@@ -170,8 +170,8 @@ func (sv sanVolume) Expand(ID string, size int64) (err error) {
 	return updateVolume(agent, lv)
 }
 
-func (sv sanVolume) getLunByVG(vg, lunID string) (database.LUN, error) {
-	luns, err := sv.san.ListLUN(vg)
+func (sv sanVolume) getLunByName(name, lunID string) (database.LUN, error) {
+	luns, err := sv.san.ListLUN(name)
 	if err != nil {
 		return database.LUN{}, err
 	}
@@ -187,7 +187,7 @@ func (sv sanVolume) getLunByVG(vg, lunID string) (database.LUN, error) {
 }
 
 func (sv sanVolume) ActivateVG(v database.Volume) error {
-	luns, err := sv.san.ListLUN(v.VG)
+	luns, err := sv.san.ListLUN(v.Name)
 	if err != nil {
 		return err
 	}
@@ -199,7 +199,7 @@ func (sv sanVolume) ActivateVG(v database.Volume) error {
 		}
 	}
 
-	luns, err = sv.san.ListLUN(v.VG)
+	luns, err = sv.san.ListLUN(v.Name)
 	if err != nil {
 		return err
 	}
@@ -215,7 +215,7 @@ func (sv sanVolume) ActivateVG(v database.Volume) error {
 }
 
 func (sv sanVolume) DeactivateVG(v database.Volume) error {
-	luns, err := sv.san.ListLUN(v.VG)
+	luns, err := sv.san.ListLUN(v.Name)
 	if err != nil {
 		return err
 	}
@@ -273,8 +273,8 @@ func (sv sanVolume) Recycle(lv database.Volume) error {
 	return sv.recycleLUNs(luns)
 }
 
-func (sv sanVolume) createSanVG(vg string) error {
-	list, err := sv.san.ListLUN(vg)
+func (sv sanVolume) createSanVG(name string) error {
+	list, err := sv.san.ListLUN(name)
 	if err != nil {
 		return err
 	}

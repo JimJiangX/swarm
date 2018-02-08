@@ -17,7 +17,7 @@ type StorageIface interface {
 	GetLUN(nameOrID string) (LUN, error)
 	GetLunByLunID(systemID string, id int) (LUN, error)
 
-	ListLunByNameOrVG(name string) ([]LUN, error)
+	ListLunByName(name string) ([]LUN, error)
 
 	CountLunByRaidGroupID(rg string) (int, error)
 
@@ -165,13 +165,13 @@ func (db dbBase) GetLUN(nameOrID string) (LUN, error) {
 }
 
 // ListLunByNameOrVG returns []LUN select by Name or VG
-func (db dbBase) ListLunByNameOrVG(nameOrVG string) ([]LUN, error) {
+func (db dbBase) ListLunByName(name string) ([]LUN, error) {
 	var (
 		list  []LUN
-		query = "SELECT id,name,vg_name,raid_group_id,san_id,mapping_hostname,size,host_lun_id,san_lun_id,created_at FROM " + db.lunTable() + " WHERE name=? OR vg_name=?"
+		query = "SELECT id,name,vg_name,raid_group_id,san_id,mapping_hostname,size,host_lun_id,san_lun_id,created_at FROM " + db.lunTable() + " WHERE name=?"
 	)
 
-	err := db.Select(&list, query, nameOrVG, nameOrVG)
+	err := db.Select(&list, query, name)
 	if err == nil {
 		return list, nil
 	}

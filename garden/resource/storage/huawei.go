@@ -231,8 +231,8 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 	return lun, lv, nil
 }
 
-func (h huaweiStore) ListLUN(nameOrVG string) ([]database.LUN, error) {
-	return h.orm.ListLunByNameOrVG(nameOrVG)
+func (h huaweiStore) ListLUN(name string) ([]database.LUN, error) {
+	return h.orm.ListLunByName(name)
 }
 
 func (h *huaweiStore) RecycleLUN(id string, lun int) error {

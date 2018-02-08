@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -276,8 +277,8 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (database.LUN, dat
 	return lun, lv, nil
 }
 
-func (h hitachiStore) ListLUN(nameOrVG string) ([]database.LUN, error) {
-	return h.orm.ListLunByNameOrVG(nameOrVG)
+func (h hitachiStore) ListLUN(name string) ([]database.LUN, error) {
+	return h.orm.ListLunByName(name)
 }
 
 // Recycle calls del_lun.sh,make the lun available for alloction.
@@ -539,7 +540,7 @@ func (h *hitachiStore) DelMapping(lun database.LUN) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	logrus.Debugf("%s %s %d", path, h.hs.AdminUnit, lun.StorageLunID)
+	logrus.Debugf("%s %s %d\n%s", path, h.hs.AdminUnit, lun.StorageLunID, debug.Stack())
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit,
 		strconv.Itoa(lun.StorageLunID))
