@@ -254,7 +254,7 @@ func (sv sanVolume) ActivateVG(v database.Volume) error {
 }
 
 func (sv sanVolume) DeactivateVG(v database.Volume) error {
-	luns, err := sv.san.ListLUN(v.Name)
+	luns, err := sv.san.ListLUN(v.VG)
 	if err != nil {
 		return err
 	}
