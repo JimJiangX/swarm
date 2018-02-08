@@ -31,7 +31,3 @@ func (unsupportSAN) createVG(v []database.Volume) error {
 func (unsupportSAN) expandVG(luns []database.LUN) error {
 	return nil
 }
-
-func (unsupportSAN) updateVolume(v database.Volume) error {
-	return nil
-}

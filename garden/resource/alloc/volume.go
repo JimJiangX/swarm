@@ -108,7 +108,9 @@ func (at *allocator) ExpandVolumes(engine *cluster.Engine, stores []structs.Volu
 
 func (at *allocator) MigrateVolumes(uid string, old, new *cluster.Engine, lvs []database.Volume) ([]database.Volume, error) {
 	if old != nil && old.ID == new.ID {
-		return lvs, nil
+		out := make([]database.Volume, len(lvs))
+		copy(out, lvs)
+		return out, nil
 	}
 
 	vgs := make(map[string]database.Volume)
