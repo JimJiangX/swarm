@@ -8,7 +8,7 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 )
 
-var _ Allocator = allocator{}
+var _ Allocator = &allocator{}
 
 type engines []*cluster.Engine
 

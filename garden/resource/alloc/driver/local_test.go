@@ -322,10 +322,6 @@ func TestLocalVolumeAlloc(t *testing.T) {
 	}
 
 	vds := VolumeDrivers(drivers)
-	err = vds.IsSpaceEnough(requires)
-	if err != nil {
-		t.Error(err)
-	}
 
 	{
 		config := &cluster.ContainerConfig{}
