@@ -3,7 +3,6 @@ package storage
 import (
 	"fmt"
 	"path/filepath"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -561,7 +560,7 @@ func (h *hitachiStore) DelMapping(lun database.LUN) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	logrus.Debugf("%s %s %d\n%s", path, h.hs.AdminUnit, lun.StorageLunID, debug.Stack())
+	logrus.Debugf("%s %s %d", path, h.hs.AdminUnit, lun.StorageLunID)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit,
 		strconv.Itoa(lun.StorageLunID))
