@@ -242,7 +242,7 @@ func (upsqlConfig) clone(t *structs.ConfigTemplate) parser {
 }
 
 func (upsqlConfig) GenerateCommands(id string, desc structs.ServiceSpec) (structs.CmdsMap, error) {
-	cmds := make(structs.CmdsMap, 6)
+	cmds := make(structs.CmdsMap, 7)
 
 	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
 
