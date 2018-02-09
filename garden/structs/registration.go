@@ -10,6 +10,7 @@ const (
 	RestoreCmd        = "restore_cmd"
 	BackupCmd         = "backup_cmd"
 	HealthCheckCmd    = "health_check_cmd"
+	MigrateRebuildCmd = "migrate_rebuild_cmd"
 )
 
 //type HorusRegistration2 struct {

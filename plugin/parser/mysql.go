@@ -256,6 +256,8 @@ func (upsqlConfig) GenerateCommands(id string, desc structs.ServiceSpec) (struct
 
 	cmds[structs.BackupCmd] = []string{"/root/upsql-backup.sh"}
 
+	cmds[structs.MigrateRebuildCmd] = []string{"/root/upsql-config-init.sh"}
+
 	return cmds, nil
 }
 
