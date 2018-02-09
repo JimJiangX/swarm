@@ -8,8 +8,8 @@ shift
 check() {
 	n=`lsscsi -i *:*:*:${HLUN_ID} | awk '{print $NF}' | uniq | wc -l`	
 	if [ ${n} -ne 1 ]; then
-		echo "Please set "user_friendly_names no" in /etc/multipath.conf"
-		exit 4
+		#echo "Please set "user_friendly_names no" in /etc/multipath.conf"
+		exit 0
 	fi
 }
 
