@@ -2,17 +2,15 @@ package seed
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"path/filepath"
-	//	"log"
 	"net/http"
 	"os"
-
+	"path/filepath"
 	"strconv"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 // ActConfig active a VG,used in SanActivate
@@ -60,11 +58,6 @@ func activateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	log.WithFields(log.Fields{
-		"vgname": opt.VgName,
-		"lvname": opt.Lvname,
-	}).Info("Activate ok")
-
 	res := &CommonRes{
 		Err: "",
 	}
@@ -108,13 +101,9 @@ func deactivateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	for _, lv := range opt.Lvname {
 		mountpoint := "/" + lv
 		if err := os.Remove(mountpoint); err != nil {
-			log.Printf("try rm  %s  dir err:%s \n ", mountpoint, err.Error())
+			logrus.Printf("try rm  %s  dir err:%+v", mountpoint, err)
 		}
 	}
-
-	log.WithFields(log.Fields{
-		"DeactConfig": opt,
-	}).Info("Deactivate ok")
 
 	res := &CommonRes{
 		Err: "",
@@ -136,10 +125,6 @@ func removeVGHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		cmd := fmt.Sprintf("vgremove -f %s", opt.VgName)
 		_, err := execCommand(cmd)
 		if err != nil {
-			log.WithFields(log.Fields{
-				"err": err.Error(),
-				"cmd": cmd,
-			}).Error("VgExistexit and vgremove fail")
 			errCommonHanlde(w, req, err)
 			return
 		}
@@ -150,9 +135,6 @@ func removeVGHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		errCommonHanlde(w, req, err)
 		return
 	}
-	log.WithFields(log.Fields{
-		"RmVGConfig": opt,
-	}).Info("RemoveVG ok")
 
 	res := &CommonRes{
 		Err: "",
@@ -166,10 +148,8 @@ func isVgExist(vgname string) bool {
 	cmd := fmt.Sprintf("vgs  %s", vgname)
 	_, err := execCommand(cmd)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"err": err.Error(),
-			"cmd": cmd,
-		}).Error("tryImport fail")
+		logrus.Errorf("tryImport fail,%+v", err)
+
 		return false
 	}
 
@@ -180,10 +160,7 @@ func tryImport(vgname string) {
 	cmd := fmt.Sprintf("vgimport  %s", vgname)
 	_, err := execCommand(cmd)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"err": err.Error(),
-			"cmd": cmd,
-		}).Error("tryImport fail")
+		logrus.Errorf("tryImport fail,%+v", err)
 	}
 }
 
@@ -206,7 +183,7 @@ func checkDeactConfig(scriptDir string, opt *DeactConfig) error {
 		return errors.New("not find the shell: " + script)
 	}
 
-	return nil
+	return errors.WithStack(err)
 }
 
 func checkActConfig(opt *ActConfig) error {
@@ -222,25 +199,18 @@ func checkActConfig(opt *ActConfig) error {
 }
 
 func doActivate(vgname string, lvs []string) error {
-
 	if err := vgImport(vgname); err != nil {
-		errstr := fmt.Sprintf("  %s vgimport fail:%v", vgname, err)
-		log.Println(errstr)
-		return errors.New(errstr)
+		return err
 	}
 
 	for _, lv := range lvs {
 		if !checkLvsVolume(vgname, lv) {
-			errstr := fmt.Sprintf("the %s not find %s ", vgname, lv)
-			log.Println(errstr)
-			return errors.New(errstr)
+			return errors.Errorf("the %s not find %s ", vgname, lv)
 		}
 	}
 
 	if err := lvsActivate(vgname, lvs); err != nil {
-		errstr := fmt.Sprintf("vgimport ok,but : lvsActivate fail: %s", err.Error())
-		log.Println(errstr)
-		return errors.New(errstr)
+		return errors.Wrap(err, "vgimport ok,but : lvsActivate fail")
 	}
 
 	return nil
@@ -251,21 +221,17 @@ func doDeactivate(vgname string, lvs []string) error {
 	// for _, lv := range lvs {
 	// 	if !checkLvsVolume(vgname, lv) {
 	// 		errstr := fmt.Sprintf("the %s not find %s ", vgname, lv)
-	// 		log.Println(errstr)
+	// 		logrus.Println(errstr)
 	// 		return errors.New(errstr)
 	// 	}
 	// }
 
 	if err := lvsDeActivate(vgname, lvs); err != nil {
-		errstr := fmt.Sprintf("lvsDeActivate fail: %s", err)
-		log.Println(errstr)
-		return errors.New(errstr)
+		return err
 	}
 
 	if err := vgExport(vgname); err != nil {
-		errstr := fmt.Sprintf("vgExport %s fail: %s", vgname, err)
-		log.Println(errstr)
-		return errors.New(errstr)
+		return err
 	}
 
 	return nil
@@ -275,34 +241,28 @@ func vgImport(vg string) error {
 	cmd := fmt.Sprintf("vgimport -f %s", vg)
 	_, err := execCommand(cmd)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"err": err.Error(),
-			"cmd": cmd,
-		}).Error("vgImport fail")
 		return err
 	}
+
 	return nil
 }
 
 func vgExport(vg string) error {
 	time.Sleep(2 * time.Second)
 	cmd := fmt.Sprintf("vgexport  %s", vg)
+
 	_, err := execCommand(cmd)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"err": err.Error(),
-			"cmd": cmd,
-		}).Error("vgExport fail")
 		return err
 	}
+
 	return nil
 }
 
 func lvsActivate(vg string, lvs []string) error {
 	for _, lv := range lvs {
 		if err := lvActivate(vg, lv); err != nil {
-			errstr := fmt.Sprintf("the %s:%s activate fail: ", vg, lv)
-			return errors.New(errstr)
+			return err
 		}
 	}
 
@@ -310,12 +270,9 @@ func lvsActivate(vg string, lvs []string) error {
 }
 func lvActivate(vg, lv string) error {
 	cmd := fmt.Sprintf("lvchange -ay /dev/%s/%s ", vg, lv)
+
 	_, err := execCommand(cmd)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"err": err.Error(),
-			"cmd": cmd,
-		}).Error("lvActivate fail")
 		return err
 	}
 
@@ -325,10 +282,10 @@ func lvActivate(vg, lv string) error {
 func lvsDeActivate(vg string, lvs []string) error {
 	for _, lv := range lvs {
 		if err := lvDeActivate(vg, lv); err != nil {
-			errstr := fmt.Sprintf("the %s:%s deactivate fail.  but continue ", vg, lv)
-			return errors.New(errstr)
+			return err
 		}
 	}
+
 	return nil
 }
 
@@ -336,10 +293,6 @@ func lvDeActivate(vg, lv string) error {
 	cmd := fmt.Sprintf("lvchange -an /dev/%s/%s ", vg, lv)
 	_, err := execCommand(cmd)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"err": err.Error(),
-			"cmd": cmd,
-		}).Error("lvDeActivate fail")
 		return err
 	}
 
@@ -352,6 +305,9 @@ func sanBlock(scriptDir, vendor string, ids []int) error {
 	if os.IsNotExist(err) {
 		return errors.New("not find the shell: " + script)
 	}
+	if err != nil {
+		return errors.Wrap(err, script)
+	}
 
 	args := []string{vendor}
 	for _, id := range ids {
@@ -359,14 +315,6 @@ func sanBlock(scriptDir, vendor string, ids []int) error {
 	}
 
 	_, err = execShellFile(script, args...)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"args":       args,
-			"scriptpath": script,
-			"err":        err.Error(),
-		}).Error("SanBlock fail")
-		return err
-	}
 
-	return nil
+	return err
 }

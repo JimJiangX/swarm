@@ -5,6 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/garden/utils"
+	"github.com/pkg/errors"
 )
 
 type execType string
@@ -33,19 +34,23 @@ func execWithTimeout(_Type execType, shell string, timeout time.Duration, args .
 
 	out, err := utils.ExecContextTimeout(nil, timeout, script...)
 
-	logrus.Debugf("exec:%s,%v", script, err)
+	logrus.Debugf("exec:%s,%s %v", script, out, err)
 
-	return string(out), err
+	if err != nil {
+		return string(out), errors.Errorf("exec:%s,%s", script, err)
+	}
+
+	return string(out), nil
 }
 
 /*
 func execWithTimeout(_Type execType, shell string, timeout time.Duration, args ...string) (string, error) {
 	var cmd *exec.Cmd
 	if _Type == commandType {
-		log.Printf("command:%s", shell)
+		logrus.Printf("command:%s", shell)
 		cmd = exec.Command("/bin/bash", "-c", shell)
 	} else {
-		log.Printf("fpath:%s,args:%v", shell, args)
+		logrus.Printf("fpath:%s,args:%v", shell, args)
 		cmd = exec.Command(shell, args...)
 	}
 
@@ -65,7 +70,7 @@ func execWithTimeout(_Type execType, shell string, timeout time.Duration, args .
 	//	if errStr != "" {
 	//		for _, datastr := range strings.Split(errStr, "\n") {
 	//			if strings.HasPrefix(strings.ToLower(datastr), "warning:") {
-	//				log.WithFields(log.Fields{
+	//				logrus.WithFields(logrus.Fields{
 	//					"cmd":  cmd,
 	//					"warn": datastr,
 	//				}).Debug("get warning info")
@@ -100,7 +105,7 @@ func cmdRunWithTimeout(cmd *exec.Cmd, timeout time.Duration) (bool, error) {
 	done := make(chan error)
 	go func() {
 		done <- cmd.Wait()
-		//		log.Println("test goroute wait out")
+		//		logrus.Println("test goroute wait out")
 	}()
 
 	var err error
@@ -108,19 +113,19 @@ func cmdRunWithTimeout(cmd *exec.Cmd, timeout time.Duration) (bool, error) {
 	case <-time.After(timeout):
 		go func() {
 			<-done // allow goroutine to exit
-			//			log.Println("test goroute timeout out")
+			//			logrus.Println("test goroute timeout out")
 		}()
 
 		pgid, err := syscall.Getpgid(cmd.Process.Pid)
 		if err == nil {
 			if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil {
-				log.WithFields(log.Fields{
+				logrus.WithFields(logrus.Fields{
 					"cmd": cmd,
 					"err": err.Error(),
 				}).Warnf(" exec timeout kill fail: syscall.Kill error")
 			}
 		} else {
-			log.WithFields(log.Fields{
+			logrus.WithFields(logrus.Fields{
 				"cmd": cmd,
 				"err": err.Error(),
 			}).Warnf(" exec timeout kill  process fail")

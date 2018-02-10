@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/pkg/errors"
 )
 
@@ -148,7 +148,7 @@ func vgCreateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 func vgListHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 	vgs, err := vgList()
 	if err != nil {
-		log.Errorf("%+v", err)
+		logrus.Errorf("%+v", err)
 
 		writeJSON(w, VgListRes{
 			Err: err.Error(),
@@ -161,7 +161,6 @@ func vgListHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 		Err: "",
 		Vgs: vgs,
 	}
-	log.Debug("VGLIST:", res)
 
 	writeJSON(w, res, http.StatusOK)
 }
@@ -182,9 +181,8 @@ func vgList() ([]VgInfo, error) {
 	script := fmt.Sprintf("vgs --units b | sed '1d' | awk '{print $1,$6,$7}' ")
 
 	out, err := execCommand(script)
-	log.Debugf("%s\n%s\n%v\n", script, string(out), err)
 	if err != nil {
-		return nil, errors.Errorf("vglist exeec fail:%s", err)
+		return nil, err
 	}
 
 	lines := strings.Split(string(out), "\n")
@@ -197,7 +195,7 @@ func vgList() ([]VgInfo, error) {
 
 		slices := strings.Fields(line)
 		if len(slices) != 3 {
-			log.Debug("[warn]the line not 3 slice:", line)
+			logrus.Debug("[warn]the line not 3 slice:", line)
 			continue
 		}
 
@@ -205,14 +203,14 @@ func vgList() ([]VgInfo, error) {
 		sizeslice := strings.Split(slices[1], ".")
 		size, err := strconv.Atoi(strings.Split(sizeslice[0], "B")[0])
 		if err != nil {
-			log.Debugf("[warn]the line %s get the VSize fail: %d", line, size)
+			logrus.Debugf("[warn]the line %s get the VSize fail: %d", line, size)
 			continue
 		}
 
 		freeslice := strings.Split(slices[2], ".")
 		free, err := strconv.Atoi(strings.Split(freeslice[0], "B")[0])
 		if err != nil {
-			log.Debugf("[warn]the line %s get the VFree fail: %d", line, free)
+			logrus.Debugf("[warn]the line %s get the VFree fail: %d", line, free)
 			continue
 		}
 
@@ -236,18 +234,17 @@ func scanSanDisk(scriptDir string) error {
 	if os.IsNotExist(err) {
 		return errors.New("not find the file:" + script)
 	}
-
-	out, err := execShellFile(script)
-
-	log.Printf("%s\n%s\n%v\n", script, string(out), err)
-
 	if err != nil {
-		errstr := "scanSanDisk fail:" + err.Error()
-		log.Println(errstr)
-		return errors.New(errstr)
+		return errors.Wrap(err, script)
+	}
+
+	_, err = execShellFile(script)
+	if err != nil {
+		return err
 	}
 
 	time.Sleep(3 * time.Second)
+
 	return nil
 }
 
@@ -257,6 +254,10 @@ func getDevicePath(scriptDir, santype string, id int) (string, error) {
 	if os.IsNotExist(err) {
 		return "", errors.New("not find the file:" + script)
 	}
+	if err != nil {
+		return "", errors.Wrap(err, script)
+	}
+
 	args := []string{santype, strconv.Itoa(id)}
 
 	out, err := execShellFile(script, args...)
@@ -266,56 +267,29 @@ func getDevicePath(scriptDir, santype string, id int) (string, error) {
 
 	devstr := strings.Replace(string(out), "\n", "", -1)
 	if devstr == "" {
-		errstr := "getDevicePath fail: device name is null."
-		log.Println(errstr)
-		return "", errors.New(errstr)
+		return "", errors.New("getDevicePath fail: device name is null.")
 	}
 
-	log.Println("getDevicePath: ", devstr)
 	return devstr, nil
 }
 
 func pvCreate(devices string) error {
-	pvcreatesctript := fmt.Sprintf("pvcreate -ff -y %s ", devices)
-	_, err := execCommand(pvcreatesctript)
+	script := fmt.Sprintf("pvcreate -ff -y %s ", devices)
+	_, err := execCommand(script)
 
-	if err != nil {
-		log.WithFields(log.Fields{
-			"cript": pvcreatesctript,
-			"err":   err.Error(),
-		}).Error("pvCreate fail")
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func vgCreate(name, devices string) error {
-	vgcreatesctript := fmt.Sprintf("vgcreate %s  %s ", name, devices)
-	_, err := execCommand(vgcreatesctript)
+	script := fmt.Sprintf("vgcreate %s  %s ", name, devices)
+	_, err := execCommand(script)
 
-	if err != nil {
-		log.WithFields(log.Fields{
-			"cript": vgcreatesctript,
-			"err":   err.Error(),
-		}).Error("vgCreate fail")
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func vgExtend(name, devices string) error {
-	extendsctript := fmt.Sprintf("vgextend  -f %s  %s ", name, devices)
-	_, err := execCommand(extendsctript)
+	script := fmt.Sprintf("vgextend  -f %s  %s ", name, devices)
+	_, err := execCommand(script)
 
-	if err != nil {
-		log.WithFields(log.Fields{
-			"ctript": extendsctript,
-			"err":    err.Error(),
-		}).Error("vgExtend fail")
-		return err
-	}
-
-	return nil
+	return err
 }

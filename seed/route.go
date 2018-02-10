@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/api"
 	"github.com/gorilla/mux"
 	"golang.org/x/net/context"
@@ -32,7 +32,7 @@ func errCommonHanlde(w http.ResponseWriter, req *http.Request, err error) {
 
 	json.NewEncoder(w).Encode(CommonRes{Err: err.Error()})
 
-	log.Errorf("%s:%s,error:%s\n", req.Method, req.URL.Path, err)
+	logrus.Errorf("%s:%s\n%+v", req.Method, req.URL.Path, err)
 }
 
 func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
@@ -42,7 +42,7 @@ func writeJSON(w http.ResponseWriter, obj interface{}, status int) {
 	if obj != nil {
 		err := json.NewEncoder(w).Encode(obj)
 		if err != nil {
-			log.Errorf("write JSON:%d,%s", status, err)
+			logrus.Errorf("write JSON:%d,%s", status, err)
 		}
 	}
 }
@@ -87,13 +87,13 @@ func NewRouter(version, script string) *mux.Router {
 	r := mux.NewRouter()
 	for method, mappings := range routes {
 		for route, fct := range mappings {
-			log.WithFields(log.Fields{"method": method, "route": route}).Debug("Registering HTTP route")
+			logrus.WithFields(logrus.Fields{"method": method, "route": route}).Debug("Registering HTTP route")
 
 			localRoute := route
 			localFct := fct
 
 			wrap := func(w http.ResponseWriter, r *http.Request) {
-				log.WithFields(log.Fields{"method": r.Method, "uri": r.RequestURI}).Debug("HTTP request received")
+				logrus.WithFields(logrus.Fields{"method": r.Method, "uri": r.RequestURI}).Debug("HTTP request received")
 
 				ctx.context = r.Context()
 
@@ -101,7 +101,7 @@ func NewRouter(version, script string) *mux.Router {
 			}
 			localMethod := method
 
-			if log.GetLevel() == log.DebugLevel {
+			if logrus.GetLevel() == logrus.DebugLevel {
 				r.Path("/v{version:[0-9]+.[0-9]+}" + localRoute).Methods(localMethod).HandlerFunc(api.DebugRequestMiddleware(wrap))
 				r.Path(localRoute).Methods(localMethod).HandlerFunc(api.DebugRequestMiddleware(wrap))
 			} else {
