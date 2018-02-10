@@ -7,6 +7,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/garden/utils"
+	"github.com/pkg/errors"
 )
 
 //master-slave redis manager
@@ -54,7 +55,7 @@ func (m *RedisRepManager) ComposeCluster() error {
 
 	logrus.Debugf("exec:%s,output:%s", args, out)
 
-	return err
+	return errors.WithStack(err)
 }
 
 func (m *RedisRepManager) ClearCluster() error {
@@ -66,7 +67,7 @@ func (m *RedisRepManager) ClearCluster() error {
 
 	logrus.Debugf("exec:%s,output:%s", args, out)
 
-	return err
+	return errors.WithStack(err)
 }
 
 func (m *RedisRepManager) CheckCluster() error {

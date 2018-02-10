@@ -51,7 +51,7 @@ func (m Mysql) Clear() error {
 	out, err := utils.ExecContextTimeout(nil, defaultTimeout, args...)
 	logrus.Debugf("exec:%s,output:%s", args, out)
 
-	return err
+	return errors.WithStack(err)
 }
 
 func (m Mysql) GetType() dbRole {
@@ -81,7 +81,7 @@ func (m Mysql) ChangeMaster(master Mysql) error {
 
 	logrus.Debugf("exec:%s,output:%s", args, out)
 
-	return err
+	return errors.WithStack(err)
 }
 
 func (m Mysql) CheckStatus() error {
@@ -90,5 +90,5 @@ func (m Mysql) CheckStatus() error {
 
 	logrus.Debugf("exec:%s,output:%s", args, out)
 
-	return err
+	return errors.WithStack(err)
 }
