@@ -124,15 +124,11 @@ func (c SysConfig) GetConsulAddrs() []string {
 
 // GetSysConfig returns *SysConfig
 func (db dbBase) GetSysConfig() (SysConfig, error) {
-	var (
-		c     = SysConfig{}
-		query = "SELECT dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,swarm_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,retry,registry_os_username,backup_dir FROM " + db.sysConfigTable() + " LIMIT 1"
-	)
+	var c = SysConfig{}
+
+	query := "SELECT dc_id,consul_ip,consul_port,consul_dc,consul_token,consul_wait_time,swarm_agent_port,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt,source_dir,clean_script_name,init_script_name,ca_crt_name,destination_dir,docker_port,retry,registry_os_username,backup_dir FROM " + db.sysConfigTable() + " LIMIT 1"
 
 	err := db.Get(&c, query)
-	if err == nil {
-		return c, nil
-	}
 
 	return c, errors.Wrap(err, "get SystemConfig")
 }
@@ -147,17 +143,13 @@ func (db dbBase) GetAuthConfig() (*types.AuthConfig, error) {
 }
 
 func (db dbBase) GetRegistry() (Registry, error) {
-	var (
-		r     Registry
-		query = "SELECT registry_os_username,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt FROM " + db.sysConfigTable() + " LIMIT 1"
-	)
+	var r Registry
+
+	query := "SELECT registry_os_username,registry_domain,registry_ip,registry_port,registry_username,registry_password,registry_email,registry_token,registry_ca_crt FROM " + db.sysConfigTable() + " LIMIT 1"
 
 	err := db.Get(&r, query)
-	if err != nil {
-		return r, errors.Wrap(err, "get SysConfig.Registry")
-	}
 
-	return r, nil
+	return r, errors.Wrap(err, "get SysConfig.Registry")
 }
 
 func (r Registry) AuthConfig() *types.AuthConfig {
@@ -174,15 +166,11 @@ func newAuthConfig(username, password, email, token string) *types.AuthConfig {
 }
 
 func (db dbBase) GetPorts() (Ports, error) {
-	var (
-		p     Ports
-		query = "SELECT swarm_agent_port,docker_port FROM " + db.sysConfigTable() + " LIMIT 1"
-	)
+	var p Ports
+
+	query := "SELECT swarm_agent_port,docker_port FROM " + db.sysConfigTable() + " LIMIT 1"
 
 	err := db.Get(&p, query)
-	if err == nil {
-		return p, nil
-	}
 
 	return p, errors.Wrap(err, "get sysConfig.Ports")
 }

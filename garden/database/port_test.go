@@ -64,7 +64,7 @@ func (db dbBase) txSetPorts(tx *sqlx.Tx, ports []Port) error {
 		}
 	}
 
-	err = stmt.Close()
+	stmt.Close()
 
 	return errors.Wrap(err, "tx update []Port")
 }
@@ -116,7 +116,7 @@ func (db dbBase) insertPorts(ports []Port) error {
 
 		stmt.Close()
 
-		return errors.Wrap(err, "Tx insert []Port")
+		return nil
 	}
 
 	return db.txFrame(do)

@@ -271,11 +271,7 @@ func (c *upsqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		err = c.set("mysqld::socket", filepath.Join(c.template.DataMount, "/upsql.sock"))
 	}
 
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	return nil
+	return errors.WithStack(err)
 }
 
 func getUnitSpec(units []structs.UnitSpec, id string) (*structs.UnitSpec, error) {

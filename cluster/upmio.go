@@ -83,11 +83,8 @@ func (e *Engine) StopContainer(ctx context.Context, name string, timeout *time.D
 
 	err = e.apiClient.ContainerStop(ctx, container.ID, timeout)
 	e.CheckConnectionErr(err)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
-	return err
+	return errors.WithStack(err)
 }
 
 func (e *Engine) getContainer(name string) (*Container, error) {

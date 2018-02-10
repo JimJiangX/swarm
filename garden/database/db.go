@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/docker/swarm/garden/utils"
 	"github.com/jmoiron/sqlx"
@@ -37,7 +38,7 @@ type dbBase struct {
 }
 
 // NewOrmer connect to a database and verify with Ping.
-func NewOrmer(driver, source, prefix string, max int) (Ormer, error) {
+func NewOrmer(driver, source, prefix string, idle, open int) (Ormer, error) {
 	db, err := sqlx.Connect(driver, source)
 	if err != nil {
 		if db != nil {
@@ -47,16 +48,18 @@ func NewOrmer(driver, source, prefix string, max int) (Ormer, error) {
 		return nil, errors.Wrap(err, "DB connection")
 	}
 
-	db.SetMaxIdleConns(max)
+	db.SetMaxOpenConns(open)
+	db.SetMaxIdleConns(idle)
+	db.SetConnMaxLifetime(time.Hour)
 
 	return &dbBase{DB: db, prefix: prefix}, nil
 }
 
 // NewOrmerFromArgs args example:
-// go test -v -args dbHost=192.168.4.130 dbPort=3306 dbDriver=mysql dbName=mgm  dbAuth=cm9vdDpyb290 dbTablePrefix=tbl dbMaxIdle=10
+// go test -v -args dbHost=192.168.4.130 dbPort=3306 dbDriver=mysql dbName=mgm  dbAuth=cm9vdDpyb290 dbTablePrefix=tbl dbMaxIdle=5 dbMaxOpen=10
 func NewOrmerFromArgs(args []string) (Ormer, error) {
 	var auth, user, password, driver, name, host, port, prefix string
-	var maxIdle int
+	var maxIdle, maxOpen int
 
 	for i := range args {
 
@@ -101,6 +104,12 @@ func NewOrmerFromArgs(args []string) (Ormer, error) {
 				}
 				maxIdle, _ = strconv.Atoi(val)
 
+			case "dbMaxOpen":
+				if val == "" {
+					val = "0"
+				}
+				maxOpen, _ = strconv.Atoi(val)
+
 			case "dbTablePrefix":
 				prefix = val
 
@@ -120,7 +129,12 @@ func NewOrmerFromArgs(args []string) (Ormer, error) {
 	source := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8&loc=Asia%%2FShanghai&sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'",
 		user, password, host, port, name)
 
-	o, err := NewOrmer(driver, source, prefix, maxIdle)
+	if maxOpen == 0 {
+		maxOpen = 2 * maxIdle
+
+	}
+
+	o, err := NewOrmer(driver, source, prefix, maxIdle, maxOpen)
 
 	return o, err
 }
@@ -131,17 +145,12 @@ func (db dbBase) txFrame(do func(tx *sqlx.Tx) error) error {
 		return errors.Wrap(err, "Tx Begin")
 	}
 
-	defer tx.Rollback()
-
 	err = do(tx)
 	if err == nil {
-		err = tx.Commit()
-		if err != nil {
-			return errors.Wrap(err, "Tx Commit")
-		}
+		return errors.Wrap(tx.Commit(), "Tx Commit")
 	}
 
-	return err
+	return errors.Wrap(tx.Rollback(), "Tx Rollback")
 }
 
 // TxFrame is a frame for Tx functions.

@@ -88,11 +88,8 @@ func (h hitachiStore) ping() error {
 	logrus.Debugf("%s %s", path, h.hs.AdminUnit)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
-	return nil
+	return errors.WithStack(err)
 }
 
 // insert insert hitachiStore into DB
@@ -458,11 +455,8 @@ func (h *hitachiStore) AddHost(name string, wwwn ...string) error {
 	logrus.Debug(param)
 
 	_, err = utils.ExecContextTimeout(nil, 0, param...)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
-	return nil
+	return errors.WithStack(err)
 }
 
 // DelHost deregister host,calls del_host.sh
@@ -482,11 +476,8 @@ func (h *hitachiStore) DelHost(name string, wwwn ...string) error {
 	logrus.Debug(param)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
-	return nil
+	return errors.WithStack(err)
 }
 
 // Mapping calls create_lunmap.sh,associate LUN with host.
@@ -568,9 +559,7 @@ func (h *hitachiStore) DelMapping(lun database.LUN) error {
 		return errors.WithStack(err)
 	}
 
-	err = h.orm.DelLunMapping(lun.ID)
-
-	return err
+	return h.orm.DelLunMapping(lun.ID)
 }
 
 // AddSpace add a new RG already existed in the store,

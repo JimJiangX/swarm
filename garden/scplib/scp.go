@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/hnakamur/go-scp"
+	scp "github.com/hnakamur/go-scp"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 )
@@ -146,9 +146,6 @@ func (c *client) UploadDir(remote, local string) error {
 	cli := scp.NewSCP(c.c)
 
 	err := cli.SendDir(local, remote, nil)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "upload dir")
 }
@@ -158,9 +155,6 @@ func (c *client) UploadFile(remote, local string) error {
 	cli := scp.NewSCP(c.c)
 
 	err := cli.SendFile(local, remote)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "upload file")
 }
@@ -212,9 +206,6 @@ func (c *client) Close() error {
 	}
 
 	err := c.c.Close()
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "close ssh client error")
 }

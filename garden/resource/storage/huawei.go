@@ -75,11 +75,8 @@ func (h *huaweiStore) ping() error {
 	logrus.Debugf("%s %s %s %s", path, h.hs.IPAddr, h.hs.Username, h.hs.Password)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.IPAddr, h.hs.Username, h.hs.Password)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
-	return nil
+	return errors.WithStack(err)
 }
 
 func (h *huaweiStore) insert() error {
@@ -308,11 +305,8 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 	defer h.lock.Unlock()
 
 	_, err = utils.ExecContextTimeout(nil, 0, param...)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
-	return nil
+	return errors.WithStack(err)
 }
 
 func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
@@ -334,11 +328,8 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 	defer h.lock.Unlock()
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
-	return nil
+	return errors.WithStack(err)
 }
 
 func (h *huaweiStore) Mapping(host, vg, lun, unit string) (database.LUN, error) {

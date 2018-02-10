@@ -327,7 +327,7 @@ func (u unit) removeContainer(ctx context.Context, rmVolumes, force bool) error 
 	}
 
 	err := engine.RemoveContainer(c, force, rmVolumes)
-	if err != nil && cluster.IsErrContainerNotFound(err) {
+	if cluster.IsErrContainerNotFound(err) {
 		return nil
 	}
 

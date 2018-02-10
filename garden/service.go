@@ -486,9 +486,6 @@ func engineCreateVolume(eng *cluster.Engine, lv database.Volume) error {
 	}
 
 	_, err := eng.CreateVolume(&body)
-	if err == nil {
-		return nil
-	}
 
 	return errors.WithStack(err)
 }

@@ -178,9 +178,6 @@ func (db dbBase) InsertTask(t Task) error {
 	query := "INSERT INTO " + db.taskTable() + " (id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:link_table,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
 
 	_, err := db.NamedExec(query, tk)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "insert Task")
 
@@ -196,9 +193,6 @@ func (db dbBase) txInsertTask(tx *sqlx.Tx, t Task, linkTable string) error {
 	query := "INSERT INTO " + db.taskTable() + " (id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at) VALUES (:id,:name,:related,:link_to,:link_table,:description,:labels,:errors,:timeout,:status,:created_at,:timestamp,:finished_at)"
 
 	_, err := tx.NamedExec(query, tk)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "Tx insert Task")
 }
@@ -245,9 +239,6 @@ func (db dbBase) txSetTask(tx *sqlx.Tx, t Task) error {
 	query := "UPDATE " + db.taskTable() + " SET status=?,finished_at=?,errors=? WHERE id=?"
 
 	_, err := tx.Exec(query, tk.Status, tk.FinishedAt, tk.Errors, tk.ID)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "Tx update Task status & errors")
 }
@@ -262,9 +253,6 @@ func (db dbBase) SetTask(t Task) error {
 	query := "UPDATE " + db.taskTable() + " SET status=?,finished_at=?,errors=? WHERE id=?"
 
 	_, err := db.Exec(query, tk.Status, tk.FinishedAt, tk.Errors, tk.ID)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "update Task status & errors")
 }
@@ -274,11 +262,8 @@ func (db dbBase) GetTask(ID string) (Task, error) {
 	query := "SELECT id,name,related,link_to,link_table,description,labels,errors,timeout,status,created_at,timestamp,finished_at FROM " + db.taskTable() + " WHERE id=?"
 
 	err := db.Get(&tk, query, ID)
-	if err == nil {
-		return Task{task: tk}, nil
-	}
 
-	return Task{}, errors.Wrap(err, "get task by id:"+ID)
+	return Task{task: tk}, errors.Wrap(err, "get task by id:"+ID)
 }
 
 func (db dbBase) ListTasks(link string, status int) ([]Task, error) {
@@ -426,7 +411,7 @@ func (db dbBase) SetTaskFail(id string) error {
 				return nil
 			}
 
-			return err
+			return errors.Wrap(err, "get task")
 		}
 
 		task := Task{task: tk}
@@ -450,12 +435,9 @@ func (db dbBase) SetTaskFail(id string) error {
 			task.Errors = "set task status by replication,status set canceled,task maybe running and real value is seting later"
 
 			err = db.txSetTask(tx, task)
-			if err != nil {
-				return err
-			}
 		}
 
-		return nil
+		return err
 	}
 
 	return db.txFrame(do)
