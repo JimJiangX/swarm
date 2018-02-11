@@ -145,9 +145,6 @@ func execNFScmd(base, ip, dir, mount, opts string) ([]byte, error) {
 	cmd := utils.ExecScript(path, ip, dir, mount, opts)
 
 	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return out, errors.WithStack(err)
-	}
 
-	return out, nil
+	return out, errors.WithStack(err)
 }

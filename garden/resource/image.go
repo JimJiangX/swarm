@@ -23,6 +23,9 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 		timeout = 300
 	}
 
+	// set timeout
+	ctx, _ = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+
 	path, err := utils.GetAbsolutePath(false, req.Path)
 	if err != nil {
 		return "", "", errors.WithStack(err)
