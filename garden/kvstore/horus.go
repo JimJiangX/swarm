@@ -104,10 +104,7 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj structs.HorusRegistr
 
 		uri := fmt.Sprintf("http://%s/v1/%s", addr, unitType)
 
-		err := postRegister(ctx, uri, obj.Service)
-		if err != nil {
-			return err
-		}
+		return postRegister(ctx, uri, obj.Service)
 	}
 
 	return nil
@@ -284,22 +281,7 @@ func (c *kvClient) RegisterService(ctx context.Context, host string, config stru
 
 // DeregisterService service to consul and Horus
 func (c *kvClient) DeregisterService(ctx context.Context, config structs.ServiceDeregistration, force bool) error {
-	err := c.deregisterToHorus(ctx, config, force)
-
-	return err
-
-	//	if err != nil {
-	//		return err
-	//	}
-
-	//	select {
-	//	default:
-	//		err = c.deregisterHealthCheck(addr, key)
-	//	case <-ctx.Done():
-	//		return ctx.Err()
-	//	}
-
-	//	return err
+	return c.deregisterToHorus(ctx, config, force)
 }
 
 func (c *kvClient) GetHorusAddr(ctx context.Context) (string, error) {

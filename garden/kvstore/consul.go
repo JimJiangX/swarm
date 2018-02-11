@@ -136,11 +136,8 @@ func (c *kvClient) ListKV(ctx context.Context, key string) (api.KVPairs, error) 
 
 	val, _, err := client.KV().List(key, q)
 	c.checkConnectError(addr, err)
-	if err == nil {
-		return val, nil
-	}
 
-	return nil, errors.Wrap(err, "list KVPairs:"+key)
+	return val, errors.Wrap(err, "list KVPairs:"+key)
 }
 
 func (c *kvClient) PutKV(ctx context.Context, key string, val []byte) error {
