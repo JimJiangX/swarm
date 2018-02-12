@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	sshAddr  = "127.0.0.1:2222"
+	sshAddr  = "127.0.0.1"
 	username = "vagrant"
 	password = "vagrant"
 	context  = `
@@ -128,7 +128,7 @@ func (c *Client) Close() error {
 func newClient() (ScpClient, error) {
 	// vagrant up first
 
-	return NewScpClient(sshAddr, username, password, 30*time.Second)
+	return NewScpClient(sshAddr, username, password, 10*time.Second)
 }
 
 func TestNewClient(t *testing.T) {
