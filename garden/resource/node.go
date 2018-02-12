@@ -539,6 +539,7 @@ func registerHost(ctx context.Context, node nodeWithTask, reg kvstore.Register, 
 	body.Node.Name = node.Node.ID
 
 	body.Node.IPAddr = node.Node.Addr
+	body.Node.Port = strconv.Itoa(node.config.Port)
 	body.Node.OSUser = node.config.Username
 	body.Node.OSPassword = node.config.Password
 	body.Node.CheckType = "health"
@@ -638,6 +639,7 @@ func (m hostManager) RemoveNode(ctx context.Context, port, horus, nameOrID, user
 		Type:     "hosts",
 		Key:      node.node.ID,
 		Addr:     node.node.Addr,
+		Port:     port,
 		User:     user,
 		Password: password,
 	}, true)
