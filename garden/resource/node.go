@@ -528,17 +528,17 @@ func (m hostManager) registerNodes(ctx context.Context, sys database.SysConfig, 
 }
 
 func registerHost(ctx context.Context, node nodeWithTask, reg kvstore.Register, dev string) error {
-	addr := node.Node.Addr
-	if node.config.Port > 0 {
-		addr = net.JoinHostPort(node.Node.Addr, strconv.Itoa(node.config.Port))
-	}
+	//	addr := node.Node.Addr
+	//	if node.config.Port > 0 {
+	//		addr = net.JoinHostPort(node.Node.Addr, strconv.Itoa(node.config.Port))
+	//	}
 
 	body := structs.HorusRegistration{}
 
 	body.Node.Select = true
 	body.Node.Name = node.Node.ID
 
-	body.Node.IPAddr = addr
+	body.Node.IPAddr = node.Node.Addr
 	body.Node.OSUser = node.config.Username
 	body.Node.OSPassword = node.config.Password
 	body.Node.CheckType = "health"
@@ -634,15 +634,10 @@ func (m hostManager) RemoveNode(ctx context.Context, port, horus, nameOrID, user
 		return m.removeNode(node.node.ID)
 	}
 
-	addr := node.node.Addr
-	if port != "" {
-		addr = net.JoinHostPort(node.node.Addr, port)
-	}
-
 	err = reg.DeregisterService(ctx, structs.ServiceDeregistration{
 		Type:     "hosts",
 		Key:      node.node.ID,
-		Addr:     addr,
+		Addr:     node.node.Addr,
 		User:     user,
 		Password: password,
 	}, true)
@@ -655,6 +650,10 @@ func (m hostManager) RemoveNode(ctx context.Context, port, horus, nameOrID, user
 		return err
 	}
 
+	addr := node.node.Addr
+	if port != "" {
+		addr = net.JoinHostPort(node.node.Addr, port)
+	}
 	client, err := scplib.NewScpClient(addr, user, password, timeout)
 	if err != nil {
 		return err
