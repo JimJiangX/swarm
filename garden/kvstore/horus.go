@@ -62,12 +62,14 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj structs.HorusRegistr
 			body := struct {
 				Name       string `json:"name"`
 				IPAddr     string `json:"ip_addr"`
+				Port       string `json:"ssh_port"`
 				OSUser     string `json:"os_user"`
 				OSPassword string `json:"os_pwd"`
 				CheckType  string `json:"check_type"`
 			}{
 				Name:       obj.Node.Name,
 				IPAddr:     obj.Node.IPAddr,
+				Port:       obj.Node.Port,
 				OSUser:     obj.Node.OSUser,
 				OSPassword: obj.Node.OSPassword,
 				CheckType:  obj.Node.CheckType,
@@ -241,6 +243,7 @@ func delHostAgent(ctx context.Context, addr string, config structs.ServiceDeregi
 		params := make(url.Values)
 
 		params.Set("ip_addr", config.Addr)
+		params.Set("ssh_port", config.Port)
 		params.Set("os_user", config.User)
 		params.Set("os_pwd", config.Password)
 

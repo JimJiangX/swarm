@@ -528,11 +528,6 @@ func (m hostManager) registerNodes(ctx context.Context, sys database.SysConfig, 
 }
 
 func registerHost(ctx context.Context, node nodeWithTask, reg kvstore.Register, dev string) error {
-	//	addr := node.Node.Addr
-	//	if node.config.Port > 0 {
-	//		addr = net.JoinHostPort(node.Node.Addr, strconv.Itoa(node.config.Port))
-	//	}
-
 	body := structs.HorusRegistration{}
 
 	body.Node.Select = true
