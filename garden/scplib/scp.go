@@ -30,7 +30,7 @@ type ScpClient interface {
 	Close() error
 }
 
-const defaultSSHPort = "22"
+const defaultSSHPort = "2222"
 
 // client contains SSH client.
 type client struct {
