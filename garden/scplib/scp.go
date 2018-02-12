@@ -30,7 +30,7 @@ type ScpClient interface {
 	Close() error
 }
 
-var _SSHPorts = []string{"2222"}
+var _SSHPorts = []string{"22", "2222"}
 
 // client contains SSH client.
 type client struct {
@@ -79,9 +79,10 @@ func makeSSHClient(addr string, config *ssh.ClientConfig) (c *ssh.Client, err er
 	}
 
 	for i := range _SSHPorts {
-		addr = net.JoinHostPort(addr, _SSHPorts[i])
+
+		ip := net.JoinHostPort(addr, _SSHPorts[i])
 		// Connect to the remote server and perform the SSH handshake.
-		c, err = ssh.Dial("tcp", addr, config)
+		c, err = ssh.Dial("tcp", ip, config)
 		if err == nil && c != nil {
 			return c, nil
 		}
@@ -89,6 +90,7 @@ func makeSSHClient(addr string, config *ssh.ClientConfig) (c *ssh.Client, err er
 		if c != nil {
 			c.Close()
 		}
+
 	}
 
 	return nil, errors.Wrap(err, "new SSH client")
