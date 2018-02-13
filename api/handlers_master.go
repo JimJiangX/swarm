@@ -2812,14 +2812,17 @@ func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	resp := make([]structs.SANStorageResponse, len(stores))
+	respCh := make(chan structs.SANStorageResponse, len(stores))
 	for i := range stores {
-		resp[i], err = getSanStoreInfo(stores[i])
-		if err != nil {
-			ec := errCodeV1(_Storage, internalError, 12, "fail to get san storage info", "外部存储查询错误")
-			httpJSONError(w, err, ec, http.StatusInternalServerError)
-			return
-		}
+		go func(store storage.Store, ch chan structs.SANStorageResponse) {
+			info, _ := getSanStoreInfo(store)
+			ch <- info
+		}(stores[i], respCh)
+	}
+
+	resp := make([]structs.SANStorageResponse, len(stores))
+	for i := 0; i < len(stores); i++ {
+		resp[i] = <-respCh
 	}
 
 	writeJSON(w, resp, http.StatusOK)
@@ -2853,9 +2856,18 @@ func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 }
 
 func getSanStoreInfo(store storage.Store) (structs.SANStorageResponse, error) {
+	if store == nil {
+		return structs.SANStorageResponse{}, nil
+	}
+
 	info, err := store.Info()
 	if err != nil {
-		return structs.SANStorageResponse{}, err
+		return structs.SANStorageResponse{
+			ID:     store.ID(),
+			Vendor: store.Vendor(),
+			Driver: store.Driver(),
+			Error:  err.Error(),
+		}, err
 	}
 
 	spaces := make([]structs.Space, 0, len(info.List))
@@ -2868,7 +2880,6 @@ func getSanStoreInfo(store storage.Store) (structs.SANStorageResponse, error) {
 			LunNum: val.LunNum,
 			State:  val.State,
 		})
-
 	}
 
 	return structs.SANStorageResponse{
