@@ -208,7 +208,7 @@ func (e *Engine) StartMonitorEvents() {
 		if err := <-ec; err != nil {
 			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).WithError(err).Error("error monitoring events, will restart")
 			// failing node reconnect should use back-off strategy to avoid frequent reconnect
-			retryInterval := e.getFailureCount() + 1
+			retryInterval := e.getFailureCount(false) + 1
 			// maximum retry interval of 10 seconds
 			if retryInterval > 10 {
 				retryInterval = 10
@@ -398,9 +398,11 @@ func (e *Engine) incFailureCount(lockSet bool) {
 }
 
 // getFailureCount returns a copy on the getFailureCount, thread-safe
-func (e *Engine) getFailureCount() int {
-	e.RLock()
-	defer e.RUnlock()
+func (e *Engine) getFailureCount(lockSet bool) int {
+	if !lockSet {
+		e.RLock()
+		defer e.RUnlock()
+	}
 	return e.failureCount
 }
 
@@ -429,7 +431,7 @@ func (e *Engine) checkConnectionErr(err error, lockSet bool) {
 		e.setErrMsg("", lockSet)
 		// If current state is unhealthy, change it to healthy
 		if e.state == stateUnhealthy {
-			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Infof("Engine came back to life after %d retries. Hooray!", e.getFailureCount())
+			log.WithFields(log.Fields{"name": e.Name, "id": e.ID}).Infof("Engine came back to life after %d retries. Hooray!", e.getFailureCount(lockSet))
 			e.emitEvent("engine_reconnect")
 			e.setState(stateHealthy, lockSet)
 		}
@@ -474,6 +476,20 @@ func (e *Engine) updateSpecs() error {
 		return err
 	}
 
+	// Get the current system time and compute the delta IMMEDIATELY after
+	// doing the info call. We won't use it for a little while, but it avoids
+	// issues if the subsequent operations take too long
+	// delta is an estimation of time difference between manager and engine
+	// with adjustment of delays (Engine response delay + network delay + manager process delay).
+	var delta time.Duration
+	if info.SystemTime != "" {
+		engineTime, _ := time.Parse(time.RFC3339Nano, info.SystemTime)
+		delta = time.Now().UTC().Sub(engineTime)
+	} else {
+		// if no SystemTime in info response, we treat delta as 0.
+		delta = time.Duration(0)
+	}
+
 	if info.NCPU == 0 || info.MemTotal == 0 {
 		return fmt.Errorf("cannot get resources for this engine, make sure %s is a Docker Engine, not a Swarm manager", e.Addr)
 	}
@@ -506,17 +522,6 @@ func (e *Engine) updateSpecs() error {
 		message := fmt.Sprintf("Engine (ID: %s, Addr: %s) shows up with another ID:%s. Please remove it from cluster, it can be added back.", e.ID, e.Addr, infoID)
 		e.lastError = message
 		return errors.New(message)
-	}
-
-	// delta is an estimation of time difference between manager and engine
-	// with adjustment of delays (Engine response delay + network delay + manager process delay).
-	var delta time.Duration
-	if info.SystemTime != "" {
-		engineTime, _ := time.Parse(time.RFC3339Nano, info.SystemTime)
-		delta = time.Now().UTC().Sub(engineTime)
-	} else {
-		// if no SystemTime in info response, we treat delta as 0.
-		delta = time.Duration(0)
 	}
 
 	// If the servers are sync up on time, this delta might be the source of error
@@ -893,7 +898,7 @@ func (e *Engine) refreshLoop() {
 
 		// Engines keep failing should backoff
 		// e.failureCount and e.opts.FailureRetry are type of int
-		backoffFactor := e.getFailureCount() - e.opts.FailureRetry
+		backoffFactor := e.getFailureCount(false) - e.opts.FailureRetry
 		if backoffFactor < 0 {
 			backoffFactor = 0
 		} else if backoffFactor > maxBackoffFactor {
@@ -975,6 +980,9 @@ func (e *Engine) UpdateNetworkContainers(containerID string, full bool) error {
 			continue
 		}
 		for _, n := range c.NetworkSettings.Networks {
+			if n.NetworkID == "" {
+				continue
+			}
 			engineNetwork, ok := e.networks[n.NetworkID]
 			if !ok {
 				// it shouldn't be the case that a network which a container is connected to wasn't
@@ -1004,13 +1012,22 @@ func (e *Engine) UpdateNetworkContainers(containerID string, full bool) error {
 			if engineNetwork.Containers == nil {
 				engineNetwork.Containers = make(map[string]types.EndpointResource)
 			}
-			engineNetwork.Containers[c.ID] = types.EndpointResource{
+			// to avoid concurrent map r/w panic, make a copy of engineNetwork.Containers,
+			// update it, and assign it back.
+			// We might need to refactor this method, on full refresh,
+			// we're processing the same engineNetwork multiple times
+			tmpContainers := make(map[string]types.EndpointResource)
+			for key, value := range engineNetwork.Containers {
+				tmpContainers[key] = value
+			}
+			tmpContainers[c.ID] = types.EndpointResource{
 				Name:        ctrName,
 				EndpointID:  n.EndpointID,
 				MacAddress:  n.MacAddress,
 				IPv4Address: ipv4address,
 				IPv6Address: ipv6address,
 			}
+			engineNetwork.Containers = tmpContainers
 		}
 	}
 	return nil
