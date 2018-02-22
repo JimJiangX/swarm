@@ -199,7 +199,7 @@ func testAlloc(s Store) (err error) {
 		}
 	}()
 
-	err = s.Mapping(engine, vg, lun.ID, lv.UnitID)
+	lun, err = s.Mapping(engine, vg, lun.ID, lv.UnitID)
 	if err != nil {
 		return err
 	}

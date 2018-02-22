@@ -78,11 +78,15 @@ func (nd _NFSDriver) Alloc(config *cluster.ContainerConfig, uid string, req stru
 	return nil, nil
 }
 
-func (nd _NFSDriver) Expand(_ string, size int64) error {
+func (nd _NFSDriver) Expand(_ string, size int64) (volumeExpandResult, error) {
+	return volumeExpandResult{}, nil
+}
+
+func (nd _NFSDriver) updateVolume(lv database.Volume) error {
 	return nil
 }
 
-func (nd _NFSDriver) Recycle(database.Volume) error {
+func (nd _NFSDriver) Recycle(lv database.Volume) error {
 	return nil
 }
 
@@ -141,9 +145,6 @@ func execNFScmd(base, ip, dir, mount, opts string) ([]byte, error) {
 	cmd := utils.ExecScript(path, ip, dir, mount, opts)
 
 	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return out, errors.WithStack(err)
-	}
 
-	return out, nil
+	return out, errors.WithStack(err)
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/alloc"
+	"github.com/docker/swarm/garden/resource/storage"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -228,8 +229,11 @@ func (u unit) startContainer(ctx context.Context) error {
 		return errors.WithStack(newNotFound("Container", u.u.Name))
 	}
 
-	state := c.Info.State
 	u.u.ContainerID = c.ID
+
+	if c.Info.State != nil && c.Info.State.Running {
+		return nil
+	}
 
 	select {
 	default:
@@ -244,15 +248,6 @@ func (u unit) startContainer(ctx context.Context) error {
 
 	// start networking
 	err = u.startNetworking(ctx, c.Engine.IP, nil)
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"Engine": c.Engine.ID,
-			"Unit":   u.u.Name}).Warnf("[skip] start networking error:%+v", err)
-
-		if state != nil && state.Running {
-			return nil
-		}
-	}
 
 	return err
 }
@@ -305,15 +300,18 @@ func (u unit) removeContainer(ctx context.Context, rmVolumes, force bool) error 
 
 	c := u.getContainer()
 	if c == nil {
-		err := engine.RemoveContainer(&cluster.Container{
-			Container: types.Container{ID: u.containerIDOrName()}}, force, rmVolumes)
-		if err != nil {
-			if cluster.IsErrContainerNotFound(err) || (force && !engine.IsHealthy()) {
-				return nil
-			}
+		// TODO：这里是冗余设计，是考虑到event事件处理可能会有延迟问题
+		//		err := engine.RemoveContainer(&cluster.Container{
+		//			Container: types.Container{ID: u.containerIDOrName()}}, force, rmVolumes)
+		//		if err != nil {
+		//			if cluster.IsErrContainerNotFound(err) || (force && !engine.IsHealthy()) {
+		//				return nil
+		//			}
 
-			return err
-		}
+		//			return err
+		//		}
+
+		return nil
 	}
 
 	if !force {
@@ -329,7 +327,7 @@ func (u unit) removeContainer(ctx context.Context, rmVolumes, force bool) error 
 	}
 
 	err := engine.RemoveContainer(c, force, rmVolumes)
-	if err != nil && cluster.IsErrContainerNotFound(err) {
+	if cluster.IsErrContainerNotFound(err) {
 		return nil
 	}
 
@@ -364,18 +362,34 @@ func (u unit) removeVolumes(ctx context.Context) error {
 				return errors.WithStack(err)
 			}
 		}
-
-		return nil
-	}
-
-	for i := range lvs {
-		err := engine.RemoveVolume(lvs[i].Name)
-		if err != nil {
-			return errors.WithStack(err)
+	} else {
+		for i := range lvs {
+			err := engine.RemoveVolume(lvs[i].Name)
+			if err != nil {
+				return errors.WithStack(err)
+			}
 		}
 	}
 
-	return nil
+	return u.recycleSANSource(lvs)
+}
+
+func (u unit) recycleSANSource(lvs []database.Volume) error {
+	san := make([]database.Volume, 0, len(lvs))
+
+	for i := range lvs {
+		if lvs[i].DriverType == storage.SANStore {
+			san = append(san, lvs[i])
+		}
+	}
+
+	if len(san) == 0 {
+		return nil
+	}
+
+	actor := alloc.NewAllocator(u.uo, u.cluster)
+
+	return actor.RecycleResource(nil, san)
 }
 
 // ContainerExec returns the container exec command result,message of exec print into write

@@ -10,6 +10,7 @@ const (
 	RestoreCmd        = "restore_cmd"
 	BackupCmd         = "backup_cmd"
 	HealthCheckCmd    = "health_check_cmd"
+	MigrateRebuildCmd = "migrate_rebuild_cmd"
 )
 
 //type HorusRegistration2 struct {
@@ -32,6 +33,7 @@ type HorusRegistration struct {
 		Select     bool     `json:"select"`
 		Name       string   `json:"name"`
 		IPAddr     string   `json:"ip_addr"`
+		Port       string   `json:"ssh_port"`
 		OSUser     string   `json:"os_user"`
 		OSPassword string   `json:"os_pwd"`
 		CheckType  string   `json:"check_type"`
@@ -62,6 +64,7 @@ type ServiceDeregistration struct {
 	Type     string
 	Key      string
 	Addr     string
+	Port     string `json:"ssh_port"`
 	User     string
 	Password string
 }

@@ -40,6 +40,6 @@ func TestNFSSpace(t *testing.T) {
 
 	_, err := nd.Space()
 	if err != nil {
-		t.Skipf("%+v", err)
+		t.Skip(err)
 	}
 }

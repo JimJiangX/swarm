@@ -1,7 +1,6 @@
 package driver
 
 import (
-	"database/sql"
 	"fmt"
 	"strconv"
 	"strings"
@@ -97,7 +96,7 @@ func (lvm localVolumeMap) GetVolume(nameOrID string) (database.Volume, error) {
 		}
 	}
 
-	return database.Volume{}, sql.ErrNoRows
+	return database.Volume{}, errors.New("sql: no rows in result set")
 }
 
 func (lvm localVolumeMap) ListVolumeByVG(vg string) ([]database.Volume, error) {
@@ -323,33 +322,43 @@ func (lv *localVolume) Alloc(config *cluster.ContainerConfig, uid string, req st
 	return &v, nil
 }
 
-func (lv *localVolume) Expand(ID string, size int64) error {
+func (lv *localVolume) Expand(ID string, size int64) (volumeExpandResult, error) {
+	result := volumeExpandResult{}
+
 	if size <= 0 {
-		return nil
+		return result, nil
 	}
 
 	dv, err := lv.vo.GetVolume(ID)
 	if err != nil {
-		return err
+		return result, err
 	}
+
+	result.lv = dv
 
 	space, err := lv.Space()
 	if err != nil {
-		return err
+		return result, err
 	}
 
 	if space.Free < size {
-		return errors.Errorf("node %s local volume driver has no enough space for expansion:%d<%d", lv.engine.IP, space.Free, size)
+		return result, errors.Errorf("node %s local volume driver has no enough space for expansion:%d<%d", lv.engine.IP, space.Free, size)
 	}
 
 	dv.Size += size
 
 	err = lv.vo.SetVolume(dv)
 	if err != nil {
-		return err
+		return result, err
 	}
 
+	result.lv.Size += size
 	lv.space.Free -= size
+
+	return result, err
+}
+
+func (lv localVolume) updateVolume(dv database.Volume) error {
 
 	agent := fmt.Sprintf("%s:%d", lv.engine.IP, lv.port)
 
@@ -361,24 +370,10 @@ func (lv *localVolume) Recycle(v database.Volume) (err error) {
 	if nameOrID == "" {
 		nameOrID = v.Name
 	}
+
 	if nameOrID == "" {
 		return nil
 	}
 
-	if v.Size <= 0 {
-		v, err = lv.vo.GetVolume(nameOrID)
-		if err != nil {
-			if database.IsNotFound(err) {
-				return nil
-			}
-			return err
-		}
-	}
-
-	err = lv.vo.DelVolume(nameOrID)
-	if err == nil {
-		lv.space.Free += v.Size
-	}
-
-	return err
+	return lv.vo.DelVolume(nameOrID)
 }

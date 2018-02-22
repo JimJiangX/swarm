@@ -222,11 +222,8 @@ func CreateNetworkDevice(ctx context.Context, addr, container string, ip databas
 	}
 
 	err := createNetwork(ctx, addr, config, tlsConfig)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
-	return nil
+	return errors.WithStack(err)
 }
 
 func updateNetworkDevice(ctx context.Context, addr string, ip database.IP, tlsConfig *tls.Config) error {
@@ -236,11 +233,8 @@ func updateNetworkDevice(ctx context.Context, addr string, ip database.IP, tlsCo
 	}
 
 	err := updateNetwork(ctx, addr, config, tlsConfig)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
-	return nil
+	return errors.WithStack(err)
 }
 
 func createNetwork(ctx context.Context, addr string, config sdk.NetworkConfig, tlsConfig *tls.Config) error {

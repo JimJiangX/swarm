@@ -101,9 +101,7 @@ func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 			stmt.Close()
 		}
 
-		err := db.InsertTasks(tx, tasks, db.nodeTable())
-
-		return err
+		return db.InsertTasks(tx, tasks, db.nodeTable())
 	}
 
 	return db.txFrame(do)
@@ -115,9 +113,6 @@ func (db dbBase) SetNodeParam(ID string, max int) error {
 	query := "UPDATE " + db.nodeTable() + " SET max_container=? WHERE id=?"
 
 	_, err := db.Exec(query, max, ID)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "update Node.MaxContainer by ID")
 }
@@ -128,9 +123,6 @@ func (db dbBase) SetNodeEnable(ID string, enabled bool) error {
 	query := "UPDATE " + db.nodeTable() + " SET enabled=? WHERE id=?"
 
 	_, err := db.Exec(query, enabled, ID)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "update Node.Enabled by ID")
 }
@@ -148,10 +140,10 @@ func (db dbBase) RegisterNode(n *Node, t *Task) error {
 		}
 
 		if t != nil {
-			err = db.txSetTask(tx, *t)
+			return db.txSetTask(tx, *t)
 		}
 
-		return err
+		return nil
 	}
 
 	return db.txFrame(do)
@@ -159,15 +151,10 @@ func (db dbBase) RegisterNode(n *Node, t *Task) error {
 
 // GetNode get Node by nameOrID.
 func (db dbBase) GetNode(nameOrID string) (Node, error) {
-	var (
-		node  Node
-		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at, nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE id=? OR engine_id=?"
-	)
+	var node Node
+	query := "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at, nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE id=? OR engine_id=?"
 
 	err := db.Get(&node, query, nameOrID, nameOrID)
-	if err == nil {
-		return node, nil
-	}
 
 	return node, errors.Wrap(err, "get Node by:"+nameOrID)
 }
@@ -185,9 +172,6 @@ func (db dbBase) GetNodeByAddr(addr string) (Node, error) {
 	}
 
 	err = db.Get(&node, query, addr)
-	if err == nil {
-		return node, nil
-	}
 
 	return node, errors.Wrap(err, "get Node by addr")
 }
@@ -200,13 +184,11 @@ func (db dbBase) ListNodes() ([]Node, error) {
 	)
 
 	err := db.Select(&nodes, query)
-	if err == nil {
-		return nodes, nil
-	} else if err == sql.ErrNoRows {
+	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return nil, errors.Wrap(err, "get all Nodes")
+	return nodes, errors.Wrap(err, "get all Nodes")
 }
 
 // ListNodeByCluster returns nodes,select by cluster
@@ -217,26 +199,19 @@ func (db dbBase) ListNodesByCluster(cluster string) ([]Node, error) {
 	)
 
 	err := db.Select(&nodes, query, cluster)
-	if err == nil {
-		return nodes, nil
-	} else if err == sql.ErrNoRows {
+	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return nil, errors.Wrap(err, "list Node by cluster")
+	return nodes, errors.Wrap(err, "list Node by cluster")
 }
 
 // CountNodeByCluster returns num of node select by cluster.
 func (db dbBase) CountNodeByCluster(cluster string) (int, error) {
-	var (
-		num   = 0
-		query = "SELECT COUNT(id) FROM " + db.nodeTable() + " WHERE cluster_id=?"
-	)
+	num := 0
+	query := "SELECT COUNT(id) FROM " + db.nodeTable() + " WHERE cluster_id=?"
 
 	err := db.Get(&num, query, cluster)
-	if err == nil {
-		return num, nil
-	}
 
 	return num, errors.Wrap(err, "count Node by cluster")
 }
@@ -258,13 +233,11 @@ func (db dbBase) ListNodesByEngines(names []string) ([]Node, error) {
 	}
 
 	err = db.Select(&nodes, query, args...)
-	if err == nil {
-		return nodes, nil
-	} else if err == sql.ErrNoRows {
+	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return nil, errors.Wrapf(err, "list Nodes by engines:%s", names)
+	return nodes, errors.Wrapf(err, "list Nodes by engines:%s", names)
 }
 
 // ListNodesByIDs returns nodes,select by ID.
@@ -284,13 +257,11 @@ func (db dbBase) ListNodesByIDs(in []string, cluster string) ([]Node, error) {
 	}
 
 	err = db.Select(&nodes, query, args...)
-	if err == nil {
-		return nodes, nil
-	} else if err == sql.ErrNoRows {
+	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return nil, errors.Wrapf(err, "list Nodes by IDs:%s", in)
+	return nodes, errors.Wrapf(err, "list Nodes by IDs:%s", in)
 }
 
 // ListNodesByClusters returns nodes,select by clusters\type\enabled.
@@ -318,13 +289,11 @@ func (db dbBase) ListNodesByClusters(clusters []string, enable bool) ([]Node, er
 
 	var nodes []Node
 	err = db.Select(&nodes, query, args...)
-	if err == nil {
-		return nodes, nil
-	} else if err == sql.ErrNoRows {
+	if err == sql.ErrNoRows {
 		return []Node{}, nil
 	}
 
-	return nil, errors.Wrap(err, "list Nodes by clusters")
+	return nodes, errors.Wrap(err, "list Nodes by clusters")
 }
 
 // DelNode delete node by ID
@@ -333,9 +302,6 @@ func (db dbBase) DelNode(ID string) error {
 	query := "DELETE FROM " + db.nodeTable() + " WHERE id=?"
 
 	_, err := db.Exec(query, ID)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "delete Node by ID")
 }

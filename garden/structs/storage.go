@@ -17,6 +17,7 @@ type SANStorageResponse struct {
 	ID     string  `json:"id"`
 	Vendor string  `json:"vendor"`
 	Driver string  `json:"driver"`
+	Error  string  `json:"error,omitempty"`
 	Total  int64   `json:"total"`
 	Free   int64   `json:"free"`
 	Used   int64   `json:"used"`

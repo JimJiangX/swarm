@@ -74,13 +74,11 @@ func (db dbBase) ListImages() ([]Image, error) {
 	)
 
 	err := db.Select(&images, query)
-	if err == nil {
-		return images, nil
-	} else if err == sql.ErrNoRows {
+	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return nil, errors.Wrap(err, "list []Image")
+	return images, errors.Wrap(err, "list []Image")
 }
 
 func (db dbBase) GetImageVersion(nameOrID string) (Image, error) {
@@ -103,10 +101,8 @@ func (db dbBase) GetImageVersion(nameOrID string) (Image, error) {
 func (db dbBase) GetImage(name string, major, minor, patch, build int) (Image, error) {
 	image := Image{}
 	query := "SELECT id,software_name,docker_image_id,major_version,minor_version,patch_version,build_version,size,label,upload_at FROM " + db.imageTable() + " WHERE software_name=? AND major_version=? AND minor_version=? AND patch_version=? AND build_version=?"
+
 	err := db.Get(&image, query, name, major, minor, patch, build)
-	if err == nil {
-		return image, nil
-	}
 
 	return image, errors.Wrap(err, "get Image")
 }
@@ -129,7 +125,6 @@ func (db dbBase) SetImageAndTask(img Image, t Task) error {
 
 // DelImage delete Image by ID in Tx.
 func (db dbBase) DelImage(ID string) error {
-
 	do := func(tx *sqlx.Tx) error {
 
 		n := 0
@@ -145,9 +140,6 @@ func (db dbBase) DelImage(ID string) error {
 		}
 
 		_, err = tx.Exec("DELETE FROM "+db.imageTable()+" WHERE id=?", ID)
-		if err == nil {
-			return nil
-		}
 
 		return errors.Wrapf(err, "Tx delete Imgage by ID:%s", ID)
 	}

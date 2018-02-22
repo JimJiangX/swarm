@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/docker/swarm/garden/structs"
@@ -61,12 +62,14 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj structs.HorusRegistr
 			body := struct {
 				Name       string `json:"name"`
 				IPAddr     string `json:"ip_addr"`
+				Port       string `json:"ssh_port"`
 				OSUser     string `json:"os_user"`
 				OSPassword string `json:"os_pwd"`
 				CheckType  string `json:"check_type"`
 			}{
 				Name:       obj.Node.Name,
 				IPAddr:     obj.Node.IPAddr,
+				Port:       obj.Node.Port,
 				OSUser:     obj.Node.OSUser,
 				OSPassword: obj.Node.OSPassword,
 				CheckType:  obj.Node.CheckType,
@@ -103,10 +106,7 @@ func (c *kvClient) registerToHorus(ctx context.Context, obj structs.HorusRegistr
 
 		uri := fmt.Sprintf("http://%s/v1/%s", addr, unitType)
 
-		err := postRegister(ctx, uri, obj.Service)
-		if err != nil {
-			return err
-		}
+		return postRegister(ctx, uri, obj.Service)
 	}
 
 	return nil
@@ -243,6 +243,7 @@ func delHostAgent(ctx context.Context, addr string, config structs.ServiceDeregi
 		params := make(url.Values)
 
 		params.Set("ip_addr", config.Addr)
+		params.Set("ssh_port", config.Port)
 		params.Set("os_user", config.User)
 		params.Set("os_pwd", config.Password)
 
@@ -283,22 +284,7 @@ func (c *kvClient) RegisterService(ctx context.Context, host string, config stru
 
 // DeregisterService service to consul and Horus
 func (c *kvClient) DeregisterService(ctx context.Context, config structs.ServiceDeregistration, force bool) error {
-	err := c.deregisterToHorus(ctx, config, force)
-
-	return err
-
-	//	if err != nil {
-	//		return err
-	//	}
-
-	//	select {
-	//	default:
-	//		err = c.deregisterHealthCheck(addr, key)
-	//	case <-ctx.Done():
-	//		return ctx.Err()
-	//	}
-
-	//	return err
+	return c.deregisterToHorus(ctx, config, force)
 }
 
 func (c *kvClient) GetHorusAddr(ctx context.Context) (string, error) {
@@ -338,20 +324,22 @@ func parseIPFromHealthCheck(serviceID, output string) string {
 	index := strings.Index(serviceID, key)
 	addr := serviceID[index+len(key):]
 
-	if net.ParseIP(addr) == nil {
+	if !strings.Contains(output, addr) {
 		return ""
 	}
 
-	index = strings.Index(output, addr)
+	ip, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return ""
+	}
 
-	parts := strings.Split(string(output[index:]), ":")
-	if len(parts) >= 2 {
+	if net.ParseIP(ip) == nil {
+		return ""
+	}
 
-		addr = parts[0] + ":" + parts[1]
-		_, _, err := net.SplitHostPort(addr)
-		if err == nil {
-			return addr
-		}
+	n, err := strconv.Atoi(port)
+	if err == nil && n > 0 && n <= 65535 {
+		return addr
 	}
 
 	return ""

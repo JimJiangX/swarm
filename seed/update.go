@@ -2,13 +2,11 @@ package seed
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	//	"log"
 	"net/http"
-	"os/exec"
-	// "strconv"
-	log "github.com/Sirupsen/logrus"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 // VolumeUpdateOpt used in VolumeUpdate
@@ -45,7 +43,6 @@ func updateHandle(ctx *_Context, w http.ResponseWriter, req *http.Request) {
 }
 
 func checkVolumeUpdateOpt(opt *VolumeUpdateOpt) error {
-
 	if opt.LvName == "" {
 		return errors.New("the volume  name must be set")
 	}
@@ -79,45 +76,37 @@ func checkVolumeUpdateOpt(opt *VolumeUpdateOpt) error {
 
 }
 
-func updateCapacity(vgname string, lvname string, size int, fstype string) error {
+func updateCapacity(vgname string, lvname string, size int, fstype string) (err error) {
 	// lvextend /dev/VG_HDD/BFJiD51R_XX_zwLjX_DAT -L 10G
 	updatescript := fmt.Sprintf("lvextend -f  /dev/%s/%s -L %dB", vgname, lvname, size)
-	log.Println(updatescript)
 
-	command := exec.Command("/bin/bash", "-c", updatescript)
-	out, err := command.Output()
-	log.Printf("%s\n%s\n%v\n", updatescript, string(out), err)
+	out, err := execCommand(updatescript)
 	if err != nil {
-		log.Println("lvextend fail: ")
-		return errors.New("lvextend fail")
+		return err
 	}
 
 	mountpoint := "/" + lvname
-	src := fmt.Sprintf("/dev/%s/%s", vgname, lvname)
 	if !checkMount(mountpoint) {
-		log.Println("try to mount for xfs_growfs")
-		if err := mount(src, mountpoint); err != nil {
-			return errors.New("lvextend success but xfs_growfs fail: try mount fail:" + err.Error())
+		src := fmt.Sprintf("/dev/%s/%s", vgname, lvname)
+
+		if err = mount(src, mountpoint); err != nil {
+			return errors.Errorf("lvextend success but xfs_growfs fail: try mount fail:%+v", err)
 		}
 
 		defer func() {
-			log.Printf("try umount %s after  xfs_growfs", mountpoint)
-			if err := unmount(mountpoint); err != nil {
-				log.Printf("umount fail:%s", err.Error())
+			if _err := unmount(mountpoint); _err != nil {
+				err = fmt.Errorf("%+v\n%+v", _err, err)
+
+				logrus.Printf("try umount %s after  xfs_growfs,%+v", mountpoint, err)
 			}
 		}()
 	}
 
 	growfsscript := fmt.Sprintf("xfs_growfs  /dev/%s/%s ", vgname, lvname)
-	growcommand := exec.Command("/bin/bash", "-c", growfsscript)
-	log.Println(growfsscript)
-	out, err = growcommand.Output()
-	log.Printf("%s\n%s\n%v\n", growfsscript, string(out), err)
+	out, err = execCommand(growfsscript)
 	if err != nil {
-		log.Println("lvextend success but xfs_growfs fail: ", string(out))
-
 		//this problem TODO later.
-		return errors.New("lvextend success but xfs_growfs fail: " + string(out))
+		return errors.Errorf("lvextend success but xfs_growfs,%s fail:%s,%s", growfsscript, out, err)
 	}
 
 	return nil

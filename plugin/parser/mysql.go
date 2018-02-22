@@ -242,7 +242,7 @@ func (upsqlConfig) clone(t *structs.ConfigTemplate) parser {
 }
 
 func (upsqlConfig) GenerateCommands(id string, desc structs.ServiceSpec) (structs.CmdsMap, error) {
-	cmds := make(structs.CmdsMap, 6)
+	cmds := make(structs.CmdsMap, 7)
 
 	cmds[structs.StartContainerCmd] = []string{"/bin/bash"}
 
@@ -255,6 +255,8 @@ func (upsqlConfig) GenerateCommands(id string, desc structs.ServiceSpec) (struct
 	cmds[structs.RestoreCmd] = []string{"/root/upsql-restore.sh"}
 
 	cmds[structs.BackupCmd] = []string{"/root/upsql-backup.sh"}
+
+	cmds[structs.MigrateRebuildCmd] = []string{"/root/upsql-config-init.sh"}
 
 	return cmds, nil
 }
@@ -269,11 +271,7 @@ func (c *upsqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		err = c.set("mysqld::socket", filepath.Join(c.template.DataMount, "/upsql.sock"))
 	}
 
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	return nil
+	return errors.WithStack(err)
 }
 
 func getUnitSpec(units []structs.UnitSpec, id string) (*structs.UnitSpec, error) {

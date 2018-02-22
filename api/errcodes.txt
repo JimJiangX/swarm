@@ -138,7 +138,6 @@
 100905013 _Unit objectNotExist fmt.Sprintf("not found the unit %s server addr", name) "找不到单元的服务地址"
 100900014 _Unit internalError  "fail to connect the special container"  "连接容器服务错误"
 101006011 _Storage dbQueryError  "fail to query database"  "数据库查询错误（外部存储表）"
-101000012 _Storage internalError  "fail to get san storage info"  "外部存储查询错误"
 101006021 _Storage dbQueryError  "fail to query database"  "数据库查询错误（外部存储表）"
 101000022 _Storage internalError  "fail to get san storage info"  "外部存储查询错误"
 101004031 _Storage decodeError  "JSON Decode Request Body error"  "JSON解析请求Body错误"

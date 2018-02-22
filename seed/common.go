@@ -1,23 +1,20 @@
 package seed
 
 import (
-	"errors"
 	"fmt"
 	"os"
-
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 func checkMount(name string) bool {
 	script := fmt.Sprintf("df -h %s", name)
 	out, err := execCommand(script)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"script": script,
-			"err":    err.Error(),
-		}).Warn("exec fail")
+		logrus.Warnf("%+v", err)
+
 		return false
 	}
 
@@ -25,23 +22,22 @@ func checkMount(name string) bool {
 }
 
 func mount(src, mountpoint string) error {
-
-	mountdatascript := fmt.Sprintf("mount  %s %s", src, mountpoint)
+	script := fmt.Sprintf("mount  %s %s", src, mountpoint)
 
 	fi, err := os.Lstat(mountpoint)
 	if os.IsNotExist(err) {
 		if err := os.MkdirAll(mountpoint, 0755); err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 	} else if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if fi != nil && !fi.IsDir() {
 		return errors.New("already exist and it's not a directory")
 	}
 
-	_, err = execCommand(mountdatascript)
+	_, err = execCommand(script)
 
 	return err
 }
@@ -49,18 +45,15 @@ func mount(src, mountpoint string) error {
 func unmount(target string) error {
 	script := fmt.Sprintf("umount  %s", target)
 	_, err := execCommand(script)
+
 	return err
 }
 
 func checkLvsVolume(vgname, name string) bool {
-
 	script := fmt.Sprintf("lvs  %s | awk '{print $1}' ", vgname)
 	out, err := execCommand(script)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"script": script,
-			"err":    err.Error(),
-		}).Warn("exec fail")
+		logrus.Warnf("%+v", err)
 
 		return false
 	}
@@ -69,14 +62,10 @@ func checkLvsVolume(vgname, name string) bool {
 }
 
 func checkLvsByName(name string) bool {
-
 	script := fmt.Sprintf("lvs | awk '{print $1}'")
 	out, err := execCommand(script)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"script": script,
-			"err":    err.Error(),
-		}).Warn("exec fail")
+		logrus.Warnf("%+v", err)
 
 		return false
 	}
@@ -88,10 +77,7 @@ func checkVg(vgname string) bool {
 	script := fmt.Sprintf("vgs | awk '{print $1}'")
 	out, err := execCommand(script)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"script": script,
-			"err":    err.Error(),
-		}).Warn("exec fail")
+		logrus.Warnf("%+v", err)
 
 		return false
 	}
@@ -125,16 +111,17 @@ func getVgName(lvsname string) (string, error) {
 	}
 
 	if len(out) == 0 {
-		return "", errors.New(" get vgname by lvsnaem fail: null")
+		return "", errors.Errorf("%s,get vgname by lvsnaem fail: null", script)
 	}
+
 	datastr := strings.Replace(out, "\n", "", -1)
+
 	return datastr, nil
 }
 
 func getComonVolumePath(vgname, lvsname string) (string, error) {
 
-	volumepath := fmt.Sprintf("/dev/%s/%s", vgname, lvsname)
-	return volumepath, nil
+	return fmt.Sprintf("/dev/%s/%s", vgname, lvsname), nil
 }
 
 func getMountPoint(vname string) string {

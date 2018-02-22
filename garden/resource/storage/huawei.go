@@ -72,14 +72,11 @@ func (h *huaweiStore) ping() error {
 		return err
 	}
 
-	logrus.Debug(path, h.hs.IPAddr, h.hs.Username, h.hs.Password)
+	logrus.Debugf("%s %s %s %s", path, h.hs.IPAddr, h.hs.Username, h.hs.Password)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.IPAddr, h.hs.Username, h.hs.Password)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
-	return nil
+	return errors.WithStack(err)
 }
 
 func (h *huaweiStore) insert() error {
@@ -151,8 +148,8 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 	lv = database.Volume{
 		ID:         utils.Generate64UUID(),
 		Name:       name,
-		Size:       size,
 		UnitID:     unit,
+		Size:       size,
 		VG:         vg,
 		Driver:     h.Driver(),
 		DriverType: SANStore,
@@ -232,7 +229,7 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 }
 
 func (h huaweiStore) ListLUN(nameOrVG string) ([]database.LUN, error) {
-	return h.orm.ListLunByNameOrVG(nameOrVG)
+	return h.orm.ListLunByNameVG(nameOrVG)
 }
 
 func (h *huaweiStore) RecycleLUN(id string, lun int) error {
@@ -259,7 +256,7 @@ func (h *huaweiStore) RecycleLUN(id string, lun int) error {
 		return err
 	}
 
-	logrus.Debug(path, h.hs.IPAddr, h.hs.Username, h.hs.Password, l.StorageLunID)
+	logrus.Debugf("%s %s %s %s %s", path, h.hs.IPAddr, h.hs.Username, h.hs.Password, l.StorageLunID)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID))
 	if err != nil {
@@ -297,9 +294,7 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 		return err
 	}
 
-	if len(name) >= maxHostLen {
-		name = name[:maxHostLen]
-	}
+	name = generateHostName(name)
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, name}
 
@@ -310,11 +305,8 @@ func (h *huaweiStore) AddHost(name string, wwwn ...string) error {
 	defer h.lock.Unlock()
 
 	_, err = utils.ExecContextTimeout(nil, 0, param...)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
-	return nil
+	return errors.WithStack(err)
 }
 
 func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
@@ -326,9 +318,7 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 		return err
 	}
 
-	if len(name) >= maxHostLen {
-		name = name[:maxHostLen]
-	}
+	name = generateHostName(name)
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, name}
 
@@ -338,40 +328,37 @@ func (h *huaweiStore) DelHost(name string, wwwn ...string) error {
 	defer h.lock.Unlock()
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
-	return nil
+	return errors.WithStack(err)
 }
 
-func (h *huaweiStore) Mapping(host, vg, lun, unit string) error {
+func (h *huaweiStore) Mapping(host, vg, lun, unit string) (database.LUN, error) {
 	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
 	l, err := h.orm.GetLUN(lun)
 	if err != nil {
-		return err
+		return l, err
 	}
 	lv, err := h.orm.GetVolume(l.Name)
 	if err != nil {
-		return err
+		return l, err
 	}
 
 	out, err := h.orm.ListHostLunIDByMapping(host)
 	if err != nil {
-		return err
+		return l, err
 	}
 
 	find, val := findIdleNum(h.hs.HluStart, h.hs.HluEnd, out)
 	if !find {
-		return errors.Errorf("%s:no available Host LUN ID", h.Vendor())
+		return l, errors.Errorf("%s:no available Host LUN ID", h.Vendor())
 	}
 
 	err = h.orm.LunMapping(lun, host, vg, val)
 	if err != nil {
-		return err
+		return l, err
 	}
 
 	lv.EngineID = host
@@ -379,16 +366,14 @@ func (h *huaweiStore) Mapping(host, vg, lun, unit string) error {
 
 	err = h.orm.SetVolume(lv)
 	if err != nil {
-		return err
+		return l, err
 	}
 	path, err := h.scriptPath("create_lunmap.sh")
 	if err != nil {
-		return err
+		return l, err
 	}
 
-	if len(host) >= maxHostLen {
-		host = host[:maxHostLen]
-	}
+	host = generateHostName(host)
 
 	param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID), host, strconv.Itoa(val)}
 
@@ -396,10 +381,14 @@ func (h *huaweiStore) Mapping(host, vg, lun, unit string) error {
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
 	if err != nil {
-		return errors.WithStack(err)
+		return l, errors.WithStack(err)
 	}
 
-	return nil
+	l.MappingTo = host
+	l.HostLunID = val
+	l.VG = vg
+
+	return l, nil
 }
 
 func (h *huaweiStore) DelMapping(lun database.LUN) error {
@@ -484,7 +473,7 @@ func (h *huaweiStore) list(rg ...string) ([]Space, error) {
 		return nil, err
 	}
 
-	logrus.Debug(path, h.hs.IPAddr, h.hs.Username, h.hs.Password, list)
+	logrus.Debugf("%s %s %s %s %s", path, h.hs.IPAddr, h.hs.Username, h.hs.Password, list)
 
 	cmd := utils.ExecScript(path, h.hs.IPAddr, h.hs.Username, h.hs.Password, list)
 

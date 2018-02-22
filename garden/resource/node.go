@@ -1,10 +1,10 @@
 package resource
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -270,7 +270,12 @@ func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer data
 	})
 
 	if nt.client == nil {
-		nt.client, err = scplib.NewScpClient(nt.Node.Addr, nt.config.Username, nt.config.Password, nt.timeout)
+		addr := nt.Node.Addr
+		if nt.config.Port > 0 {
+			addr = net.JoinHostPort(nt.Node.Addr, strconv.Itoa(nt.config.Port))
+		}
+
+		nt.client, err = scplib.NewScpClient(addr, nt.config.Username, nt.config.Password, nt.timeout)
 		if err != nil {
 			entry.WithError(err).Error("ssh dial error")
 
@@ -403,7 +408,6 @@ func (nt *nodeWithTask) modifyProfile(horus string, config *database.SysConfig) 
 
 // registerNodes register Nodes
 func (m hostManager) registerNodesLoop(ctx context.Context, cancel context.CancelFunc, sys database.SysConfig, reg kvstore.Register) {
-
 	defer cancel()
 
 	t := time.NewTicker(time.Second * 30)
@@ -426,17 +430,17 @@ func (m hostManager) registerNodesLoop(ctx context.Context, cancel context.Cance
 	}
 }
 
-func (m *hostManager) removeNodeTask(id string) {
-	list := make([]nodeWithTask, 0, len(m.nodes))
+//func (m *hostManager) removeNodeTask(id string) {
+//	list := make([]nodeWithTask, 0, len(m.nodes))
 
-	for i := range m.nodes {
-		if m.nodes[i].Node.ID != id {
-			list = append(list, m.nodes[i])
-		}
-	}
+//	for i := range m.nodes {
+//		if m.nodes[i].Node.ID != id {
+//			list = append(list, m.nodes[i])
+//		}
+//	}
 
-	m.nodes = list
-}
+//	m.nodes = list
+//}
 
 func (m hostManager) registerNodes(ctx context.Context, sys database.SysConfig, reg kvstore.Register) {
 	for _, node := range m.nodes {
@@ -447,24 +451,24 @@ func (m hostManager) registerNodes(ctx context.Context, sys database.SysConfig, 
 		if err != nil {
 			field.Warnf("%+v", err)
 
-			if errors.Cause(err) == sql.ErrNoRows {
-				t := node.Task
-				t.Status = database.TaskFailedStatus
-				t.FinishedAt = time.Now()
-				t.SetErrors(err)
+			//			if database.IsNotFound(err) {
+			//				t := node.Task
+			//				t.Status = database.TaskFailedStatus
+			//				t.FinishedAt = time.Now()
+			//				t.SetErrors(err)
 
-				err = m.dco.RegisterNode(nil, &t)
-				if err != nil {
-					field.Errorf("%+v", err)
-				}
+			//				err = m.dco.RegisterNode(nil, &t)
+			//				if err != nil {
+			//					field.Errorf("%+v", err)
+			//				}
 
-				m.removeNodeTask(n.ID)
-			}
+			//				m.removeNodeTask(n.ID)
+			//			}
 
 			continue
 		}
 
-		node.Node = n
+		// node.Node = n
 
 		if n.Status != statusNodeInstalled {
 			if n.Status > statusNodeInstalled {
@@ -492,7 +496,7 @@ func (m hostManager) registerNodes(ctx context.Context, sys database.SysConfig, 
 			wwn := eng.Labels[_SAN_HBA_WWN_Lable]
 			list := strings.Split(wwn, ",")
 
-			if err = san.AddHost(n.EngineID, list...); err != nil {
+			if err = san.AddHost(eng.ID, list...); err != nil {
 				field.Errorf("register to SAN,WWN:%s,%+v", wwn, err)
 				continue
 			}
@@ -517,9 +521,9 @@ func (m hostManager) registerNodes(ctx context.Context, sys database.SysConfig, 
 		err = m.dco.RegisterNode(&n, &t)
 		if err != nil {
 			field.Errorf("%+v", err)
-		} else {
+		} /*else {
 			m.removeNodeTask(n.ID)
-		}
+		}*/
 	}
 }
 
@@ -530,6 +534,7 @@ func registerHost(ctx context.Context, node nodeWithTask, reg kvstore.Register, 
 	body.Node.Name = node.Node.ID
 
 	body.Node.IPAddr = node.Node.Addr
+	body.Node.Port = strconv.Itoa(node.config.Port)
 	body.Node.OSUser = node.config.Username
 	body.Node.OSPassword = node.config.Password
 	body.Node.CheckType = "health"
@@ -553,7 +558,7 @@ func (m hostManager) registerNodesTimeout(err error) error {
 		if err != nil {
 			logrus.WithField("host", n.Addr).Errorf("%+v", err)
 
-			if errors.Cause(err) == sql.ErrNoRows {
+			if database.IsNotFound(err) {
 				t.Status = database.TaskFailedStatus
 				t.FinishedAt = time.Now()
 				t.SetErrors(err)
@@ -598,7 +603,7 @@ func (m hostManager) removeNode(ID string) error {
 }
 
 // RemoveNode
-func (m hostManager) RemoveNode(ctx context.Context, horus, nameOrID, user, password string, force bool, timeout time.Duration, reg kvstore.Register) error {
+func (m hostManager) RemoveNode(ctx context.Context, port, horus, nameOrID, user, password string, force bool, timeout time.Duration, reg kvstore.Register) error {
 	node, err := m.getNode(nameOrID)
 	if err != nil {
 		if database.IsNotFound(err) {
@@ -629,6 +634,7 @@ func (m hostManager) RemoveNode(ctx context.Context, horus, nameOrID, user, pass
 		Type:     "hosts",
 		Key:      node.node.ID,
 		Addr:     node.node.Addr,
+		Port:     port,
 		User:     user,
 		Password: password,
 	}, true)
@@ -641,7 +647,11 @@ func (m hostManager) RemoveNode(ctx context.Context, horus, nameOrID, user, pass
 		return err
 	}
 
-	client, err := scplib.NewScpClient(node.node.Addr, user, password, timeout)
+	addr := node.node.Addr
+	if port != "" {
+		addr = net.JoinHostPort(node.node.Addr, port)
+	}
+	client, err := scplib.NewScpClient(addr, user, password, timeout)
 	if err != nil {
 		return err
 	}

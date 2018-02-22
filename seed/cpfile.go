@@ -2,13 +2,12 @@ package seed
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	//	"log"
 	"net/http"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 //VolumeFileCfg contains file infomation and volume placed
@@ -44,16 +43,14 @@ func volumeFileCpHandle(ctx *_Context, w http.ResponseWriter, req *http.Request)
 			return
 		}
 
-		log.Println("try to mount for VolumeFileCp")
 		if err := mount(src, mountpoint); err != nil {
 			errCommonHanlde(w, req, err)
 			return
 		}
 
 		defer func() {
-			log.Info("try umount %s after copy complete", mountpoint)
 			if err := unmount(mountpoint); err != nil {
-				log.Errorf("umount fail:%s", err.Error())
+				logrus.Errorf("umount fail:%+v", err)
 			}
 		}()
 	}
@@ -65,16 +62,7 @@ func volumeFileCpHandle(ctx *_Context, w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	log.WithFields(log.Fields{
-		"data_len": len(opt.Data),
-		"Mode":     opt.Mode,
-		"filedes":  filedes,
-	}).Info("VolumeFileCp ok")
-
-	res := &CommonRes{
-		Err: "",
-	}
-	response, _ := json.Marshal(res)
+	response, _ := json.Marshal(CommonRes{})
 	w.Write(response)
 }
 
@@ -116,7 +104,7 @@ func checkVolumeFileCfg(opt *VolumeFileCfg) error {
 func writeToTmpfile(data, tempfile string) error {
 	fi, err := os.OpenFile(tempfile, os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
-		return errors.New("try open tempfile fail: " + err.Error())
+		return errors.Wrap(err, tempfile)
 	}
 
 	defer fi.Close()
@@ -128,9 +116,9 @@ func writeToTmpfile(data, tempfile string) error {
 
 	sendlen := len(data)
 	if num != sendlen {
-		return fmt.Errorf("data len :%d ;just write to file: %d ", sendlen, num)
-
+		return errors.Errorf("data len :%d ;just write to file: %d ", sendlen, num)
 	}
+
 	return nil
 }
 
@@ -140,30 +128,19 @@ func doFileRepalce(data, mode, filedes, tempfile string) error {
 	}
 
 	if err := writeToTmpfile(data, tempfile); err != nil {
-		log.WithFields(log.Fields{
-			"err": err.Error(),
-		}).Error("repalce fail : WriteToTmpfile fail")
-		return errors.New("write to tmp file err:" + err.Error())
+		return errors.Errorf("write to tmp file err:%s", err)
 	}
 
 	mvcript := fmt.Sprintf("mv -f  %s %s", tempfile, filedes)
 	_, err := execCommand(mvcript)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"err":    err.Error(),
-			"script": mvcript,
-		}).Error("repalce fail : mv fail:")
-		return errors.New("repalce fail : mv fail:" + err.Error())
+		return err
 	}
 
 	chmodscript := fmt.Sprintf("chmod  %s %s", mode, filedes)
 	_, err = execCommand(chmodscript)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"err":    err.Error(),
-			"script": chmodscript,
-		}).Error("repalce fail : chmod fail:")
-		return errors.New("repalce fail : chmod fail:" + err.Error())
+		return err
 	}
 
 	return nil

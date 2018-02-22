@@ -37,7 +37,6 @@ func (u unit) restore(ctx context.Context, path, backupDir string, cmds structs.
 	_, err = u.containerExec(ctx, cmd, false)
 
 	return err
-
 }
 
 // UnitRestore resotore an unit volume data by the assigned backup file.

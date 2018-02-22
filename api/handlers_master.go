@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"encoding/json"
 	stderr "errors"
 	"fmt"
@@ -185,7 +184,7 @@ func getTask(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	t, err := gd.Ormer().GetTask(name)
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			writeJSONNull(w, http.StatusOK)
 			return
 		}
@@ -398,7 +397,7 @@ func getSystemConfig(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	sys, err := gd.Ormer().GetSysConfig()
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			writeJSONNull(w, http.StatusOK)
 			return
 		}
@@ -605,7 +604,7 @@ func getImage(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	im, err := gd.Ormer().GetImageVersion(name)
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			writeJSONNull(w, http.StatusOK)
 			return
 		}
@@ -688,7 +687,7 @@ func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 	orm := gd.Ormer()
 	c, err := orm.GetCluster(name)
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			writeJSONNull(w, http.StatusOK)
 			return
 		}
@@ -907,7 +906,8 @@ func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.
 		vds := make([]structs.VolumeDriver, 0, len(drivers))
 
 		for _, d := range drivers {
-			if d == nil || d.Type() == "NFS" {
+			if d == nil || d.Type() == "NFS" ||
+				d.Type() == storage.SANStore {
 				continue
 			}
 
@@ -947,7 +947,7 @@ func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	n, err := gd.Ormer().GetNode(name)
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			writeJSONNull(w, http.StatusOK)
 			return
 		}
@@ -1024,6 +1024,8 @@ func validNodeRequest(node structs.Node) error {
 
 	if node.Addr == "" {
 		errs = append(errs, "Addr is required")
+	} else if net.ParseIP(node.Addr) == nil {
+		errs = append(errs, "parse Addr error")
 	}
 
 	// valid ssh config
@@ -1092,8 +1094,6 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	nodes := resource.NewNodeWithTaskList(1)
-
 	node := database.Node{
 		ID:           utils.Generate32UUID(),
 		ClusterID:    n.Cluster,
@@ -1101,6 +1101,7 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		EngineID:     "",
 		Room:         n.Room,
 		Seat:         n.Seat,
+		Storage:      n.Storage,
 		MaxContainer: n.MaxContainer,
 		Status:       0,
 		Enabled:      false,
@@ -1112,6 +1113,7 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	nodes := resource.NewNodeWithTaskList(1)
 	nodes[0] = resource.NewNodeWithTask(node, n.HDD, n.SSD, n.SSHConfig)
 
 	horus, err := gd.KVClient().GetHorusAddr(ctx)
@@ -1263,6 +1265,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	t := intValueOrZero(r, "timeout")
 	timeout := time.Duration(t) * time.Second
 
+	port := r.FormValue("port")
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
@@ -1289,8 +1292,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	m := resource.NewHostManager(gd.Ormer(), gd.Cluster, nil)
-
-	err = m.RemoveNode(ctx, horus, node, username, password, force, timeout, gd.KVClient())
+	err = m.RemoveNode(ctx, port, horus, node, username, password, force, timeout, gd.KVClient())
 	if err != nil {
 		ec := errCodeV1(_Host, internalError, 74, "fail to uninstall host agents", "主机出库错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -1668,7 +1670,7 @@ func getServicesByNameOrID(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 
 	spec, err := gd.ServiceSpec(name)
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			writeJSONNull(w, http.StatusOK)
 			return
 		}
@@ -2376,7 +2378,7 @@ func deleteService(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	table, err := gd.Ormer().GetService(name)
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -2810,14 +2812,17 @@ func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	resp := make([]structs.SANStorageResponse, len(stores))
+	respCh := make(chan structs.SANStorageResponse, len(stores))
 	for i := range stores {
-		resp[i], err = getSanStoreInfo(stores[i])
-		if err != nil {
-			ec := errCodeV1(_Storage, internalError, 12, "fail to get san storage info", "外部存储查询错误")
-			httpJSONError(w, err, ec, http.StatusInternalServerError)
-			return
-		}
+		go func(store storage.Store, ch chan structs.SANStorageResponse) {
+			info, _ := getSanStoreInfo(store)
+			ch <- info
+		}(stores[i], respCh)
+	}
+
+	resp := make([]structs.SANStorageResponse, len(stores))
+	for i := 0; i < len(stores); i++ {
+		resp[i] = <-respCh
 	}
 
 	writeJSON(w, resp, http.StatusOK)
@@ -2830,7 +2835,7 @@ func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	ds := storage.DefaultStores()
 	store, err := ds.Get(name)
 	if err != nil {
-		if errors.Cause(err) == sql.ErrNoRows {
+		if database.IsNotFound(err) {
 			writeJSONNull(w, http.StatusOK)
 			return
 		}
@@ -2851,9 +2856,18 @@ func getSANStorageInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 }
 
 func getSanStoreInfo(store storage.Store) (structs.SANStorageResponse, error) {
+	if store == nil {
+		return structs.SANStorageResponse{}, nil
+	}
+
 	info, err := store.Info()
 	if err != nil {
-		return structs.SANStorageResponse{}, err
+		return structs.SANStorageResponse{
+			ID:     store.ID(),
+			Vendor: store.Vendor(),
+			Driver: store.Driver(),
+			Error:  err.Error(),
+		}, err
 	}
 
 	spaces := make([]structs.Space, 0, len(info.List))
@@ -2866,7 +2880,6 @@ func getSanStoreInfo(store storage.Store) (structs.SANStorageResponse, error) {
 			LunNum: val.LunNum,
 			State:  val.State,
 		})
-
 	}
 
 	return structs.SANStorageResponse{
@@ -3191,7 +3204,7 @@ func getBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	)
 
 	if tag != "" {
-		orm.ListBackupFilesByTag(tag)
+		files, err = orm.ListBackupFilesByTag(tag)
 	} else if service != "" {
 		files, err = orm.ListBackupFilesByService(service)
 	} else {
@@ -3202,6 +3215,10 @@ func getBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		ec := errCodeV1(_Backup, dbQueryError, 22, "fail to query database", "数据库查询错误（备份文件表）")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
+	}
+
+	if files == nil {
+		files = []database.BackupFile{}
 	}
 
 	writeJSON(w, files, http.StatusOK)

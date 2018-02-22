@@ -121,7 +121,7 @@ func valicateCommonSpec(req *structs.ServiceSpec) error {
 		return nil
 	}
 
-	return fmt.Errorf("%s", strings.Join(errs, "\n"))
+	return errors.Errorf("%s", strings.Join(errs, "\n"))
 }
 
 func valicateMysqlSpec(req *structs.ServiceSpec) error {

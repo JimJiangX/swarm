@@ -91,9 +91,6 @@ func renameContainer(u *unit, name string) error {
 	}
 
 	err := e.RenameContainer(c, name)
-	if err != nil {
-		return errors.WithStack(err)
-	}
 
-	return nil
+	return errors.WithStack(err)
 }

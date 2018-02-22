@@ -82,9 +82,6 @@ func (c *kvClient) registerHealthCheck(host string, config api.AgentServiceRegis
 
 	err = client.Agent().ServiceRegister(&config)
 	c.checkConnectError(addr, err)
-	if err == nil {
-		return nil
-	}
 
 	return errors.WithStack(err)
 }
@@ -97,9 +94,6 @@ func (c *kvClient) deregisterHealthCheck(host, ID string) error {
 
 	err = client.Agent().ServiceDeregister(ID)
 	c.checkConnectError(addr, err)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "deregister healthCheck")
 }
@@ -142,11 +136,8 @@ func (c *kvClient) ListKV(ctx context.Context, key string) (api.KVPairs, error) 
 
 	val, _, err := client.KV().List(key, q)
 	c.checkConnectError(addr, err)
-	if err == nil {
-		return val, nil
-	}
 
-	return nil, errors.Wrap(err, "list KVPairs:"+key)
+	return val, errors.Wrap(err, "list KVPairs:"+key)
 }
 
 func (c *kvClient) PutKV(ctx context.Context, key string, val []byte) error {
@@ -167,9 +158,6 @@ func (c *kvClient) PutKV(ctx context.Context, key string, val []byte) error {
 
 	_, err = client.KV().Put(pair, wo)
 	c.checkConnectError(addr, err)
-	if err == nil {
-		return nil
-	}
 
 	return errors.WithStack(err)
 }
@@ -189,9 +177,6 @@ func (c *kvClient) DeleteKVTree(ctx context.Context, key string) error {
 
 	_, err = client.KV().DeleteTree(key, wo)
 	c.checkConnectError(addr, err)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "delete KV Tree:"+key)
 }

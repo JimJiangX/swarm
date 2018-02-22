@@ -74,3 +74,26 @@ func TestScriptPath(t *testing.T) {
 		}
 	}
 }
+
+func TestFindIdleNum(t *testing.T) {
+	ok, got := findIdleNum(5, 10, []int{6, 9, 1, 0, 5, 88, 3, 4, 2, 40})
+	if !ok || got != 7 {
+		t.Error(ok, got)
+	}
+}
+
+func TestGenerateHostName(t *testing.T) {
+	got := generateHostName("2ORZ:K2GD:XRUH:KVEQ:EMEA:RGWM:UC7Q:WE2J:HDX4:KUIU:ZPEA:L6UP|192.168.1.1")
+
+	if len(got) > maxHostLen {
+		t.Error(got)
+	}
+
+	if strings.ContainsAny(got, ":") {
+		t.Error(got)
+	}
+
+	if got != "2ORZK2GDXRUHKVEQEMEARGWMUC7QWE" {
+		t.Error(got)
+	}
+}

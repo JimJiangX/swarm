@@ -74,7 +74,7 @@ PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
 
 docker_version=17.12.0
 consul_version=1.0.2
-swarm_agent_version=1.2.8-f70ba02
+swarm_agent_version=1.2.8-3ceb431
 logicalVolume_volume_plugin_version=3.0.0
 
 platform="$(uname -s)"
@@ -530,7 +530,7 @@ install_swarm_agent() {
 ## ServiceRestart : swarm
 
 #
-SWARM_AGENT_OPTS="seedjoin --seedAddr ${adm_ip}:${swarm_agent_port} --script=${script_dir}/seed/ --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/${swarm_key}"
+SWARM_AGENT_OPTS="--debug seedjoin --seedAddr ${adm_ip}:${swarm_agent_port} --script=${script_dir}/seed/ --advertise=${adm_ip}:${docker_port} consul://${adm_ip}:${consul_port}/${swarm_key}"
 
 EOF
 

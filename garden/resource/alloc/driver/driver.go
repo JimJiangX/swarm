@@ -19,6 +19,12 @@ type VolumeIface interface {
 	GetNode(nameOrID string) (database.Node, error)
 }
 
+type volumeExpandResult struct {
+	lv      database.Volume
+	lun     database.LUN
+	recycle func() error
+}
+
 // Driver for volume manage
 type Driver interface {
 	vgIface
@@ -31,9 +37,11 @@ type Driver interface {
 
 	Alloc(config *cluster.ContainerConfig, uid string, req structs.VolumeRequire) (*database.Volume, error)
 
-	Expand(volumeID string, size int64) error
+	Expand(volumeID string, size int64) (volumeExpandResult, error)
 
-	Recycle(database.Volume) error
+	updateVolume(v database.Volume) error
+
+	Recycle(lv database.Volume) error
 }
 
 // Space is VG status
@@ -110,74 +118,82 @@ func (vds VolumeDrivers) Get(_type string) Driver {
 	return nil
 }
 
-// IsSpaceEnough decide is there enough space for required.
-func (vds VolumeDrivers) IsSpaceEnough(stores []structs.VolumeRequire) error {
-	if len(vds) == 0 {
-		return errors.New("not found volume Driver")
-	}
-
-	need := make(map[string]int64, len(stores))
-
-	for i := range stores {
-		need[stores[i].Type] += stores[i].Size
-	}
-
-	for typ, size := range need {
-
-		driver := vds.Get(typ)
-		if driver == nil {
-			return errors.New("not found volumeDriver by type:" + typ)
-		}
-
-		space, err := driver.Space()
-		if err != nil {
-			return err
-		}
-
-		if space.Free < size {
-			return errors.Errorf("volumeDriver %s:%s is not enough free space %d<%d", driver.Name(), typ, space.Free, size)
-		}
-	}
-
-	return nil
-}
-
 // AllocVolumes alloc required volume space.
 func (vds VolumeDrivers) AllocVolumes(config *cluster.ContainerConfig, uid string, stores []structs.VolumeRequire) ([]database.Volume, error) {
-	err := vds.IsSpaceEnough(stores)
-	if err != nil {
-		return nil, err
-	}
-
-	volumes := make([]database.Volume, 0, len(stores))
+	lvs := make([]database.Volume, 0, len(stores))
 
 	for i := range stores {
 		driver := vds.Get(stores[i].Type)
 		if driver == nil {
-			return volumes, errors.New("not found the assigned volumeDriver:" + stores[i].Type)
+			return lvs, errors.New("not found the assigned volumeDriver:" + stores[i].Type)
 		}
 
 		v, err := driver.Alloc(config, uid, stores[i])
 		if v != nil {
-			volumes = append(volumes, *v)
+			lvs = append(lvs, *v)
 		}
 		if err != nil {
-			return volumes, err
+			return lvs, err
 		}
 	}
 
-	return volumes, nil
+	for i := range vds {
+		err := vds[i].createVG(lvs)
+		if err != nil {
+			return lvs, err
+		}
+	}
+
+	return lvs, nil
 }
 
 // ExpandVolumes expand required space for exist volumes
-func (vds VolumeDrivers) ExpandVolumes(stores []structs.VolumeRequire) error {
+func (vds VolumeDrivers) ExpandVolumes(stores []structs.VolumeRequire) (err error) {
+	lvs := make([]database.Volume, 0, len(stores))
+	luns := make([]database.LUN, 0, len(stores))
+
 	for i := range stores {
 		driver := vds.Get(stores[i].Type)
 		if driver == nil {
 			return errors.New("not found the assigned volumeDriver:" + stores[i].Type)
 		}
 
-		err := driver.Expand(stores[i].ID, stores[i].Size)
+		result, _err := driver.Expand(stores[i].ID, stores[i].Size)
+		if _err != nil {
+			return _err
+		}
+
+		if result.recycle != nil {
+			defer func(f func() error) {
+				if err == nil {
+					return
+				}
+
+				_err := f()
+				if _err != nil {
+					err = errors.Errorf("%+v\n%+v", _err, err)
+				}
+			}(result.recycle)
+		}
+
+		if result.lv.ID != "" {
+			lvs = append(lvs, result.lv)
+		}
+		if result.lun.ID != "" {
+			luns = append(luns, result.lun)
+		}
+	}
+
+	for i := range vds {
+		err = vds[i].expandVG(luns)
+		if err != nil {
+			return err
+		}
+	}
+
+	for i := range lvs {
+		d := vds.Get(lvs[i].DriverType)
+		err = d.updateVolume(lvs[i])
 		if err != nil {
 			return err
 		}

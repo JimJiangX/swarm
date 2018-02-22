@@ -50,13 +50,11 @@ func (db dbBase) ListBackupFiles() ([]BackupFile, error) {
 	)
 
 	err := db.Select(&out, query)
-	if err == nil {
-		return out, nil
-	} else if err == sql.ErrNoRows {
+	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return nil, errors.Wrap(err, "list []BackupFile")
+	return out, errors.Wrap(err, "list []BackupFile")
 }
 
 // ListBackupFilesByTag return all []BackupFile by tag
@@ -67,13 +65,11 @@ func (db dbBase) ListBackupFilesByTag(tag string) ([]BackupFile, error) {
 	)
 
 	err := db.Select(&out, query, tag)
-	if err == nil {
-		return out, nil
-	} else if err == sql.ErrNoRows {
+	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return nil, errors.Wrap(err, "list []BackupFile")
+	return out, errors.Wrap(err, "list []BackupFile")
 }
 
 // ListBackupFilesByService returns []BackupFile select by name or ID
@@ -110,14 +106,11 @@ func (db dbBase) ListBackupFilesByService(service string) ([]BackupFile, error) 
 
 // GetBackupFile returns BackupFile select by ID
 func (db dbBase) GetBackupFile(id string) (BackupFile, error) {
-	var (
-		row   BackupFile
-		query = "SELECT id,task_id,unit_id,type,tables,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " WHERE id=?"
-	)
+	var row BackupFile
+
+	query := "SELECT id,task_id,unit_id,type,tables,path,remark,tag,size,retention,created_at,finished_at FROM " + db.backupFileTable() + " WHERE id=?"
+
 	err := db.Get(&row, query, id)
-	if err == nil {
-		return row, nil
-	}
 
 	return row, errors.Wrap(err, "get Backup File by ID")
 }
@@ -126,9 +119,6 @@ func (db dbBase) txInsertBackupFile(tx *sqlx.Tx, bf BackupFile) error {
 	query := "INSERT INTO " + db.backupFileTable() + " (id,task_id,unit_id,type,tables,path,remark,tag,size,retention,created_at,finished_at) VALUES (:id,:task_id,:unit_id,:type,:tables,:path,:remark,:tag,:size,:retention,:created_at,:finished_at)"
 
 	_, err := tx.NamedExec(query, bf)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "Tx insert BackupFile")
 }
@@ -137,7 +127,7 @@ func (db dbBase) InsertBackupFileWithTask(bf BackupFile, t Task) error {
 	do := func(tx *sqlx.Tx) error {
 		err := db.txInsertBackupFile(tx, bf)
 		if err != nil {
-			return nil
+			return err
 		}
 
 		return db.txSetTask(tx, t)

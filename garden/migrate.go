@@ -11,6 +11,7 @@ import (
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/tasklock"
 	"github.com/docker/swarm/garden/utils"
+	"github.com/docker/swarm/vars"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -150,6 +151,11 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 
 		// 5.migrate volume for new unit
 		if migrate {
+			// stop container before migrate volume
+			err = old.unit.stopContainer(ctx)
+			if err != nil {
+				return err
+			}
 			// migrate volumes
 			news.volumes, err = actor.MigrateVolumes(news.unit.u.ID, old.engine, news.engine, old.volumes)
 			if err != nil {
@@ -217,6 +223,19 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			}
 			if err != nil {
 				return err
+			}
+
+			for i := range adds {
+				cmd := cms.GetCmd(adds[i].u.ID, structs.MigrateRebuildCmd)
+				if len(cmd) == 0 {
+					continue
+				}
+
+				cmd = append(cmd, vars.Root.Role, vars.Root.User, vars.Root.Password)
+				_, err := adds[i].ContainerExec(ctx, cmd, false, nil)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}

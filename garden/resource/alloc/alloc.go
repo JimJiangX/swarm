@@ -32,17 +32,42 @@ type allocatorOrmer interface {
 type allocator struct {
 	ormer allocatorOrmer
 	ec    engineCluster
+
+	vdsMap map[string]driver.VolumeDrivers
+	spaces map[string]driver.Space
 }
 
 // NewAllocator is exported.
 func NewAllocator(ormer allocatorOrmer, ec engineCluster) Allocator {
-	return allocator{
-		ormer: ormer,
-		ec:    ec,
+	return &allocator{
+		ormer:  ormer,
+		ec:     ec,
+		vdsMap: make(map[string]driver.VolumeDrivers, 20),
+		spaces: make(map[string]driver.Space),
 	}
 }
 
-func (at allocator) ListCandidates(clusters, filters []string, stores []structs.VolumeRequire) ([]database.Node, error) {
+func (at *allocator) findEngineVolumeDrivers(eng *cluster.Engine) (driver.VolumeDrivers, error) {
+	if eng == nil || eng.ID == "" {
+		return nil, errors.Errorf("engine is required")
+	}
+
+	vds, ok := at.vdsMap[eng.ID]
+	if ok && len(vds) > 0 {
+		return vds, nil
+	}
+
+	vds, err := driver.FindEngineVolumeDrivers(at.ormer, eng)
+	if err != nil && len(vds) == 0 {
+		return nil, errors.Errorf("engine %s volume drivers error,\n%+v", eng.Name, err)
+	}
+
+	at.vdsMap[eng.ID] = vds
+
+	return vds, nil
+}
+
+func (at *allocator) ListCandidates(clusters, filters []string, stores []structs.VolumeRequire) ([]database.Node, error) {
 	nodes, err := at.ormer.ListNodesByClusters(clusters, true)
 	if err != nil {
 		return nil, err
@@ -130,24 +155,22 @@ func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.
 	return cpuset, nil
 }
 
-func (at allocator) RecycleResource(ips []database.IP, lvs []database.Volume) error {
+func (at *allocator) RecycleResource(ips []database.IP, lvs []database.Volume) error {
 	for i := range lvs {
 		eng := at.ec.Engine(lvs[i].EngineID)
 		if eng == nil {
 			continue
 		}
 
-		drivers, err := driver.FindEngineVolumeDrivers(at.ormer, eng)
+		drivers, err := at.findEngineVolumeDrivers(eng)
 		if err != nil {
-			logrus.Warnf("engine:%s find volume drivers,%+v", eng.Name, err)
-
-			if len(drivers) == 0 {
-				continue
-			}
+			return err
 		}
 
 		d := drivers.Get(lvs[i].DriverType)
-		if d != nil {
+		if d == nil {
+			return errors.New("not found volumeDriver by type:" + lvs[i].DriverType)
+		} else {
 			err := d.Recycle(lvs[i])
 			if err != nil {
 				return err

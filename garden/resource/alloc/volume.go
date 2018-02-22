@@ -1,43 +1,95 @@
 package alloc
 
 import (
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/alloc/driver"
+	"github.com/docker/swarm/garden/resource/storage"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/pkg/errors"
 )
 
-func (at allocator) IsNodeStoreEnough(engine *cluster.Engine, stores []structs.VolumeRequire) error {
-	drivers, err := driver.FindEngineVolumeDrivers(at.ormer, engine)
+func (at *allocator) IsNodeStoreEnough(engine *cluster.Engine, stores []structs.VolumeRequire) error {
+	drivers, err := at.findEngineVolumeDrivers(engine)
 	if err != nil {
-		logrus.Warnf("engine:%s find volume drivers,%+v", engine.Name, err)
+		return err
+	}
 
-		if len(drivers) == 0 {
+	return at.isSpaceEnough(drivers, stores)
+}
+
+func (at *allocator) findSpace(dv driver.Driver) (driver.Space, error) {
+	if dv.Type() != storage.SANStore {
+		return dv.Space()
+	}
+
+	id := dv.Name()
+
+	if space, ok := at.spaces[id]; ok {
+		return space, nil
+	}
+
+	space, err := dv.Space()
+	if err != nil {
+		return space, err
+	}
+
+	at.spaces[id] = space
+
+	return space, nil
+}
+
+// IsSpaceEnough decide is there enough space for required.
+func (at *allocator) isSpaceEnough(vds driver.VolumeDrivers, stores []structs.VolumeRequire) error {
+	if len(vds) == 0 {
+		return errors.New("not found volume Driver")
+	}
+
+	need := make(map[string]int64, len(stores))
+
+	for i := range stores {
+		need[stores[i].Type] += stores[i].Size
+	}
+
+	for typ, size := range need {
+
+		driver := vds.Get(typ)
+		if driver == nil {
+			return errors.New("not found volumeDriver by type:" + typ)
+		}
+
+		if size == 0 {
+			continue
+		}
+
+		space, err := at.findSpace(driver)
+		if err != nil {
 			return err
+		}
+
+		if space.Free < size {
+			return errors.Errorf("volumeDriver %s:%s is not enough free space %d<%d", driver.Name(), typ, space.Free, size)
 		}
 	}
 
-	err = drivers.IsSpaceEnough(stores)
-
-	return err
+	return nil
 }
 
-func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n *node.Node, stores []structs.VolumeRequire) ([]database.Volume, error) {
+func (at *allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n *node.Node, stores []structs.VolumeRequire) ([]database.Volume, error) {
 	engine := at.ec.Engine(n.ID)
 	if engine == nil {
 		return nil, errors.Errorf("not found Engine by ID:%s from cluster", n.Addr)
 	}
 
-	drivers, err := driver.FindEngineVolumeDrivers(at.ormer, engine)
+	drivers, err := at.findEngineVolumeDrivers(engine)
 	if err != nil {
-		logrus.Warnf("engine:%s find volume drivers,%+v", engine.Name, err)
+		return nil, err
+	}
 
-		if len(drivers) == 0 {
-			return nil, err
-		}
+	err = at.isSpaceEnough(drivers, stores)
+	if err != nil {
+		return nil, err
 	}
 
 	lvs, err := drivers.AllocVolumes(config, uid, stores)
@@ -45,65 +97,65 @@ func (at allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n
 	return lvs, err
 }
 
-func (at allocator) ExpandVolumes(engine *cluster.Engine, stores []structs.VolumeRequire) error {
-	drivers, err := driver.FindEngineVolumeDrivers(at.ormer, engine)
+func (at *allocator) ExpandVolumes(engine *cluster.Engine, stores []structs.VolumeRequire) error {
+	drivers, err := at.findEngineVolumeDrivers(engine)
 	if err != nil {
-		logrus.Warnf("engine:%s find volume drivers,%+v", engine.Name, err)
-
-		if len(drivers) == 0 {
-			return err
-		}
+		return err
 	}
 
 	return drivers.ExpandVolumes(stores)
 }
 
-func (at allocator) MigrateVolumes(uid string, old, new *cluster.Engine, lvs []database.Volume) ([]database.Volume, error) {
+func (at *allocator) MigrateVolumes(uid string, old, new *cluster.Engine, lvs []database.Volume) ([]database.Volume, error) {
+	if old != nil && old.ID == new.ID {
+		out := make([]database.Volume, len(lvs))
+		copy(out, lvs)
+		return out, nil
+	}
+
+	vgs := make(map[string]database.Volume)
+	for i := range lvs {
+		vgs[lvs[i].VG] = lvs[i]
+	}
+
 	if old != nil && old.IsHealthy() {
 
-		drivers, err := driver.FindEngineVolumeDrivers(at.ormer, old)
+		drivers, err := at.findEngineVolumeDrivers(old)
 		if err != nil {
-			logrus.Warnf("engine:%s find volume drivers,%+v", old.Name, err)
-
-			if len(drivers) == 0 {
-				return nil, err
-			}
+			return nil, err
 		}
 
-		for i := range lvs {
-			d := drivers.Get(lvs[i].DriverType)
+		for _, lv := range vgs {
+			d := drivers.Get(lv.DriverType)
 			if d == nil {
-				return nil, errors.New("not found the assigned volumeDriver:" + lvs[i].DriverType)
+				return nil, errors.New("not found the assigned volumeDriver:" + lv.DriverType)
 			}
 
-			err := d.DeactivateVG(lvs[i])
+			err := d.DeactivateVG(lv)
 			if err != nil {
 				return nil, err
 			}
 		}
 	}
 
-	drivers, err := driver.FindEngineVolumeDrivers(at.ormer, new)
+	drivers, err := at.findEngineVolumeDrivers(new)
 	if err != nil {
-		logrus.Warnf("engine:%s find volume drivers,%+v", new.Name, err)
-
-		if len(drivers) == 0 {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	out := make([]database.Volume, 0, len(lvs))
 
-	for _, v := range lvs {
-		d := drivers.Get(v.DriverType)
+	for i := range lvs {
+		d := drivers.Get(lvs[i].DriverType)
 		if d == nil {
-			return out, errors.New("not found the assigned volumeDriver:" + v.DriverType)
+			return out, errors.New("not found the assigned volumeDriver:" + lvs[i].DriverType)
 		}
 
-		v.UnitID = uid
-		out = append(out, v)
+		lvs[i].UnitID = uid
+		lvs[i].EngineID = new.ID
+		out = append(out, lvs[i])
 
-		err := d.ActivateVG(v)
+		err := d.ActivateVG(lvs[i])
 		if err != nil {
 			return out, err
 		}

@@ -170,7 +170,7 @@ func getOrmer(c *cli.Context) (database.Ormer, error) {
 	source := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&charset=utf8&loc=Asia%%2FShanghai&sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'",
 		user, password, host, port, name)
 
-	o, err := database.NewOrmer(driver, source, prefix, maxIdle)
+	o, err := database.NewOrmer(driver, source, prefix, maxIdle, maxIdle*2)
 
 	return o, err
 }

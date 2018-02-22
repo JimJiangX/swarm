@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/hnakamur/go-scp"
+	scp "github.com/hnakamur/go-scp"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 )
@@ -30,7 +30,7 @@ type ScpClient interface {
 	Close() error
 }
 
-const defaultSSHPort = "22"
+var _SSHPorts = []string{"22", "2222"}
 
 // client contains SSH client.
 type client struct {
@@ -39,15 +39,6 @@ type client struct {
 
 // NewScpClient returns ScpClient.
 func NewScpClient(addr, user, password string, timeout time.Duration) (ScpClient, error) {
-	_, _, err := net.SplitHostPort(addr)
-	if err != nil {
-		if net.ParseIP(addr) != nil {
-			addr = net.JoinHostPort(addr, defaultSSHPort)
-		} else {
-			return nil, errors.Wrap(err, "parse addr error:"+addr)
-		}
-	}
-
 	config := &ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{
@@ -59,29 +50,55 @@ func NewScpClient(addr, user, password string, timeout time.Duration) (ScpClient
 		Timeout:         timeout,
 	}
 
-	c, err := ssh.Dial("tcp", addr, config)
+	c, err := makeSSHClient(addr, config)
 	if err != nil {
-		if c != nil {
-			c.Close()
-		}
-		return nil, errors.Wrap(err, "new SSH client")
+		return nil, err
 	}
 
 	return &client{c}, nil
 }
 
+func makeSSHClient(addr string, config *ssh.ClientConfig) (c *ssh.Client, err error) {
+	_, _, err = net.SplitHostPort(addr)
+	if err == nil {
+		// Connect to the remote server and perform the SSH handshake.
+		c, err = ssh.Dial("tcp", addr, config)
+		if err == nil && c != nil {
+			return c, nil
+		}
+
+		if c != nil {
+			c.Close()
+		}
+
+		return nil, errors.Wrap(err, "new SSH client")
+	}
+
+	if net.ParseIP(addr) == nil {
+		return nil, errors.Wrap(err, "parse addr error:"+addr)
+	}
+
+	for i := range _SSHPorts {
+
+		ip := net.JoinHostPort(addr, _SSHPorts[i])
+		// Connect to the remote server and perform the SSH handshake.
+		c, err = ssh.Dial("tcp", ip, config)
+		if err == nil && c != nil {
+			return c, nil
+		}
+
+		if c != nil {
+			c.Close()
+		}
+
+	}
+
+	return nil, errors.Wrap(err, "new SSH client")
+}
+
 // NewClientByPublicKeys returns ScpClient,ssh client with authenticate.
 // rsa default "$HOME/.ssh/id_rsa"
 func NewClientByPublicKeys(addr, user, rsa string, timeout time.Duration) (ScpClient, error) {
-	_, _, err := net.SplitHostPort(addr)
-	if err != nil {
-		if net.ParseIP(addr) != nil {
-			addr = net.JoinHostPort(addr, defaultSSHPort)
-		} else {
-			return nil, errors.Wrap(err, "parse addr error:"+addr)
-		}
-	}
-
 	if rsa == "" {
 		home := os.Getenv("HOME")
 		rsa = filepath.Join(home, "/.ssh/id_rsa")
@@ -113,14 +130,9 @@ func NewClientByPublicKeys(addr, user, rsa string, timeout time.Duration) (ScpCl
 		Timeout:         timeout,
 	}
 
-	// Connect to the remote server and perform the SSH handshake.
-	c, err := ssh.Dial("tcp", addr, config)
+	c, err := makeSSHClient(addr, config)
 	if err != nil {
-		if c != nil {
-			c.Close()
-		}
-
-		return nil, errors.Wrap(err, "unable to connect")
+		return nil, err
 	}
 
 	return &client{c}, nil
@@ -146,9 +158,6 @@ func (c *client) UploadDir(remote, local string) error {
 	cli := scp.NewSCP(c.c)
 
 	err := cli.SendDir(local, remote, nil)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "upload dir")
 }
@@ -158,9 +167,6 @@ func (c *client) UploadFile(remote, local string) error {
 	cli := scp.NewSCP(c.c)
 
 	err := cli.SendFile(local, remote)
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "upload file")
 }
@@ -212,9 +218,6 @@ func (c *client) Close() error {
 	}
 
 	err := c.c.Close()
-	if err == nil {
-		return nil
-	}
 
 	return errors.Wrap(err, "close ssh client error")
 }
