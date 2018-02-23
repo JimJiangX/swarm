@@ -96,6 +96,7 @@ func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineI
 		}
 
 		config.Config.Env = append(config.Config.Env, "IPADDR="+ip.String())
+		config.Config.Env = append(config.Config.Env, "NET_DEV="+out[i].Bond)
 		break
 	}
 	return out, nil

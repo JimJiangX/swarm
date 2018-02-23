@@ -144,7 +144,13 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			if len(pendings) > 0 {
 				for i := range news.networkings {
 					ip := utils.Uint32ToIP(news.networkings[i].IPAddr)
+					if ip == nil {
+						continue
+					}
+
 					pendings[0].config.Config.Env = append(pendings[0].config.Config.Env, "IPADDR="+ip.String())
+					pendings[0].config.Config.Env = append(pendings[0].config.Config.Env, "NET_DEV="+news.networkings[i].Bond)
+					break
 				}
 			}
 		}
