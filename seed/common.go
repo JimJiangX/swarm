@@ -31,10 +31,6 @@ func checkMount(name string) bool {
 			return false
 		}
 	}
-
-	logrus.Warnf("%+v", errors.Errorf("%s is not exist in file /proc/mounts", name))
-
-	return false
 }
 
 func mount(src, mountpoint string) error {
