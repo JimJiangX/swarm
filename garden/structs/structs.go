@@ -14,6 +14,7 @@ type BackupTaskCallback struct {
 	Type      string `json:"type,omitempty"`
 	Tables    string `json:"tables,omitempty"`
 	Path      string `json:"path,omitempty"`
+	Mount     string `json:"nfs_mount_src,omitempty"`
 	Remark    string `json:"remark,omitempty"`
 	Tag       string `json:"tag,omitempty"`
 	Msg       string `json:"msg,omitempty"`

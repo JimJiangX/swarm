@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	stderr "errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -311,6 +312,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		Type:       req.Type,
 		Tables:     req.Tables,
 		Path:       req.Path,
+		Mount:      req.Mount,
 		Remark:     req.Remark,
 		SizeByte:   req.Size,
 		Retention:  now.AddDate(0, 0, req.Retention),
@@ -3062,13 +3064,6 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	tag := r.FormValue("tag")
 	service := r.FormValue("service")
 	deadline := r.FormValue("expired")
-	nfs := r.FormValue("nfs_mount")
-
-	if nfs == "" {
-		ec := errCodeV1(_Backup, urlParamError, 12, "Request URL parameter error", "请求URL参数错误,miss nfs_mount")
-		httpJSONError(w, errors.New("miss nfs_mount"), ec, http.StatusBadRequest)
-		return
-	}
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil || gd.Ormer() == nil {
@@ -3086,16 +3081,16 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	if id != "" {
 		bf, err := orm.GetBackupFile(id)
 		if err != nil {
-			ec := errCodeV1(_Backup, dbQueryError, 13, "fail to query database", "数据库查询错误（备份文件表）")
+			ec := errCodeV1(_Backup, dbQueryError, 12, "fail to query database", "数据库查询错误（备份文件表）")
 			httpJSONError(w, err, ec, http.StatusInternalServerError)
 			return
 		}
 
 		files = []database.BackupFile{bf}
 
-		err = removeBackupFiles(orm, nfs, files)
+		err = removeBackupFiles(orm, files)
 		if err != nil {
-			ec := errCodeV1(_Backup, dbExecError, 14, "fail to remove backup files", "删除备份文件错误")
+			ec := errCodeV1(_Backup, dbExecError, 13, "fail to remove backup files", "删除备份文件错误")
 			httpJSONError(w, err, ec, http.StatusInternalServerError)
 		}
 
@@ -3136,7 +3131,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err = removeBackupFiles(orm, nfs, expired)
+	err = removeBackupFiles(orm, expired)
 	if err != nil {
 		ec := errCodeV1(_Backup, dbExecError, 16, "fail to remove backup files", "删除备份文件错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -3151,15 +3146,21 @@ type rmBackupFilesIface interface {
 	DelBackupFiles(files []database.BackupFile) error
 }
 
-func removeBackupFiles(orm rmBackupFilesIface, nfs string, files []database.BackupFile) error {
+func removeBackupFiles(orm rmBackupFilesIface, files []database.BackupFile) error {
 	sys, err := orm.GetSysConfig()
 	if err != nil {
 		return err
 	}
 
+	out, err := ioutil.ReadFile("/proc/mounts")
+	if err != nil {
+		return err
+	}
+	mounts := string(out)
+
 	rm := make([]database.BackupFile, 0, len(files))
 	for i := range files {
-		path := getNFSBackupFile(files[i].Path, sys.BackupDir, nfs)
+		path := getNFSBackupFile(files[i].Path, sys.BackupDir, files[i].Mount, mounts)
 
 		err := os.RemoveAll(path)
 		if err == nil {
@@ -3172,8 +3173,19 @@ func removeBackupFiles(orm rmBackupFilesIface, nfs string, files []database.Back
 	return orm.DelBackupFiles(rm)
 }
 
-func getNFSBackupFile(file, backup, nfs string) string {
-	file = strings.Replace(file, backup, nfs, 1)
+func getNFSBackupFile(file, backup, mount, mounts string) string {
+	index := strings.Index(mounts, mount)
+	if index != -1 {
+		parts := strings.SplitN(mounts[index:], "\n", 2)
+		mounts = parts[0]
+	}
+
+	parts := strings.Split(mounts, " ")
+	if len(parts) > 1 {
+		mount = parts[1]
+	}
+
+	file = strings.Replace(file, backup, mount, 1)
 
 	return filepath.Clean(file)
 }
