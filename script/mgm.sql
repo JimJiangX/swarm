@@ -32,6 +32,7 @@ CREATE TABLE `tbl_backup_files` (
   `type` varchar(45) DEFAULT NULL COMMENT '全量／增量\n\nfull/incremental',
   `tables` varchar(1024) DEFAULT NULL,
   `path` varchar(1024) DEFAULT NULL COMMENT '备份文件路径(包含文件名)',
+  `nfs_mount_src` varchar(512) DEFAULT NULL COMMENT '备份文件nfs源目录',
   `size` bigint(128) unsigned DEFAULT NULL COMMENT '备份文件大小，单位：byte',
   `retention` datetime DEFAULT NULL COMMENT '到期日期',
   `remark` varchar(256) DEFAULT NULL COMMENT '备注',
