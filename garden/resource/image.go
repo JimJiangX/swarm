@@ -86,9 +86,10 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 				script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
 				logrus.WithField("Image", req.Name).Infof("ssh exec:'%s'", script)
 
-				scp, err := scplib.NewClientByPublicKeys(registry.Address, registry.OsUsername, "", time.Duration(timeout)*time.Second)
+				addr := fmt.Sprintf("%s:%d", registry.Address, registry.SSHPort)
+				scp, err := scplib.NewClientByPublicKeys(addr, registry.OsUsername, "", time.Duration(timeout)*time.Second)
 				if err != nil {
-					logrus.WithField("Image", req.Name).Errorf("load image,'%s@%s',exec:'%s'", registry.OsUsername, registry.Address, script)
+					logrus.WithField("Image", req.Name).Errorf("load image,'%s@%s',exec:'%s'", registry.OsUsername, addr, script)
 					return err
 				}
 				defer scp.Close()
