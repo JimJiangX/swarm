@@ -11,7 +11,7 @@ import (
 type execType string
 
 const (
-	defaultTimeout = 5 * time.Second
+	defaultTimeout = time.Minute
 
 	commandType   execType = "command"
 	shellFileType execType = "file"

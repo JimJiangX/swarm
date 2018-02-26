@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	defaultTimeout = 30 * time.Second
+	defaultTimeout = 5 * time.Minute
 
 	defaultScriptPath = "./script"
 	// HITACHI store vendor name
