@@ -3103,7 +3103,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	}
 
 	if tag != "" {
-		orm.ListBackupFilesByTag(tag)
+		files, err = orm.ListBackupFilesByTag(tag)
 	} else if service != "" {
 		files, err = orm.ListBackupFilesByService(service)
 	} else {
