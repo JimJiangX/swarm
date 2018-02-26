@@ -271,6 +271,7 @@ CREATE TABLE `tbl_system_config` (
   `registry_domain` varchar(45) NOT NULL COMMENT 'registry 域名',
   `registry_ip` varchar(45) NOT NULL COMMENT 'registry IP地址',
   `registry_port` int(6) NOT NULL COMMENT 'registry 端口',
+  `registry_ssh_port` int(6) NOT NULL COMMENT 'registry SSH 端口',
   `registry_username` varchar(45) NOT NULL COMMENT 'registry 用户名',
   `registry_password` varchar(45) NOT NULL COMMENT 'registry 用户密码',
   `registry_email` varchar(128) NOT NULL COMMENT 'registry 邮箱',
