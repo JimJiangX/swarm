@@ -1,6 +1,8 @@
 package seed
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"strings"
@@ -10,15 +12,29 @@ import (
 )
 
 func checkMount(name string) bool {
-	script := fmt.Sprintf("df -h %s", name)
-	out, err := execCommand(script)
+	f, err := os.Open("/proc/mounts")
 	if err != nil {
-		logrus.Warnf("%+v", err)
-
+		logrus.Warnf("%+v", errors.WithStack(err))
 		return false
 	}
+	defer f.Close()
 
-	return strings.Contains(out, name)
+	for r, t := bufio.NewReader(f), []byte(name); ; {
+		line, _, err := r.ReadLine()
+
+		if bytes.Contains(line, t) {
+			return true
+		}
+
+		if err != nil {
+			logrus.Warnf("%+v", errors.WithStack(err))
+			return false
+		}
+	}
+
+	logrus.Warnf("%+v", errors.Errorf("%s is not exist in file /proc/mounts", name))
+
+	return false
 }
 
 func mount(src, mountpoint string) error {
