@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -13,17 +15,17 @@ import (
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/tasklock"
 	"github.com/docker/swarm/garden/utils"
+	"github.com/docker/swarm/plugin/parser/api"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
 // LoadImage load a new Image
-func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostLoadImageRequest, timeout int) (string, string, error) {
-	// set timeout
-	if timeout == 0 {
-		timeout = 300
-	}
-	ctx, _ = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+func LoadImage(ctx context.Context,
+	ormer database.ImageOrmer,
+	pc api.PluginAPI,
+	req structs.PostLoadImageRequest,
+	timeout time.Duration) (string, string, error) {
 
 	path, err := utils.GetAbsolutePath(false, req.Path)
 	if err != nil {
@@ -52,7 +54,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 		UploadAt: time.Now(),
 	}
 
-	task := database.NewTask(req.Image(), database.ImageLoadTask, image.ID, "load image", nil, timeout)
+	task := database.NewTask(req.Image(), database.ImageLoadTask, image.ID, "load image", nil, int(timeout/time.Second))
 
 	before := func(key string, new int, t *database.Task, f func(val int) bool) (bool, int, error) {
 		err = ormer.InsertImageWithTask(image, *t)
@@ -75,7 +77,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 		ch := make(chan error)
 
 		go func(ch chan<- error) {
-			ch <- loadImage(ormer, image, task, path, time.Duration(timeout)*time.Second)
+			ch <- loadImage(ctx, ormer, pc, image, task, path, timeout)
 		}(ch)
 
 		select {
@@ -101,7 +103,13 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 	return image.ID, task.ID, nil
 }
 
-func loadImage(ormer database.ImageOrmer, image database.Image, task database.Task, path string, timeout time.Duration) error {
+func loadImage(ctx context.Context,
+	ormer database.ImageOrmer,
+	pc api.PluginAPI,
+	image database.Image,
+	task database.Task,
+	path string, timeout time.Duration) error {
+
 	registry, err := ormer.GetRegistry()
 	if err != nil {
 		return err
@@ -110,6 +118,7 @@ func loadImage(ormer database.ImageOrmer, image database.Image, task database.Ta
 	oldName := image.Image()
 	newName := fmt.Sprintf("%s:%d/%s", registry.Domain, registry.Port, oldName)
 	script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", path, oldName, newName, newName)
+
 	field := logrus.WithField("Image", oldName)
 	field.Infof("ssh exec:'%s'", script)
 
@@ -132,16 +141,34 @@ func loadImage(ormer database.ImageOrmer, image database.Image, task database.Ta
 		field.Errorf("parse output:%s", out)
 		return err
 	}
+	{
+		// post image template to plugin
+		tmpl, err := readImageTemplateFile(path)
+		if err != nil {
+			return err
+		}
 
-	image.ImageID = imageID
-	image.Size = size
-	image.UploadAt = time.Now()
+		if tmpl.Image == "" {
+			tmpl.Image = oldName
+		}
 
-	task.FinishedAt = image.UploadAt
-	task.Status = database.TaskDoneStatus
-	task.SetErrors(nil)
+		err = pc.PostImageTemplate(ctx, tmpl)
+		if err != nil {
+			return err
+		}
+	}
+	{
+		// update image & task
+		image.ImageID = imageID
+		image.Size = size
+		image.UploadAt = time.Now()
 
-	err = ormer.SetImageAndTask(image, task)
+		task.FinishedAt = image.UploadAt
+		task.Status = database.TaskDoneStatus
+		task.SetErrors(nil)
+
+		err = ormer.SetImageAndTask(image, task)
+	}
 
 	return err
 }
@@ -152,9 +179,7 @@ func parsePushImageOutput(in []byte) (string, int, error) {
 		return "", 0, errors.New("not found ImageID:" + string(in))
 	}
 
-	output := in[index:]
-
-	parts := bytes.Split(output, []byte{' '})
+	parts := bytes.Split(in[index:], []byte{' '})
 
 	if len(parts) == 4 && bytes.Equal(parts[2], []byte("size:")) {
 		id := bytes.TrimSpace(parts[1])
@@ -168,4 +193,47 @@ func parsePushImageOutput(in []byte) (string, int, error) {
 	}
 
 	return "", 0, errors.Errorf("parse output error:%s", in)
+}
+
+func readImageTemplateFile(path string) (ct structs.ConfigTemplate, err error) {
+	ext := filepath.Ext(path)
+	index := 1 + len(path) - len(ext)
+
+	{
+		// read ConfigTemplate,xxxxx.json
+		name := path[:index] + "json"
+
+		dat, err := ioutil.ReadFile(name)
+		if err != nil {
+			return ct, errors.Wrap(err, name)
+		}
+
+		err = json.Unmarshal(dat, &ct)
+		if err != nil {
+			return ct, errors.Wrap(err, name)
+		}
+	}
+	{
+		// read template content,xxxxx.tmpl
+		name := path[:index] + "tmpl"
+
+		content, err := ioutil.ReadFile(name)
+		if err != nil {
+			return ct, errors.Wrap(err, name)
+		}
+
+		ct.Content = string(content)
+	}
+
+	if ct.Timestamp == 0 {
+		ct.Timestamp = time.Now().Unix()
+	}
+
+	return ct, nil
+}
+
+func walkPath(path, ext string) string {
+	e := filepath.Ext(path)
+
+	return path[:1+len(path)-len(e)] + ext
 }

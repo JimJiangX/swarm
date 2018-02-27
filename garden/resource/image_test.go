@@ -63,3 +63,17 @@ cfdcf31598b4: Pushed
 		t.Error("Unexpect ", id, size)
 	}
 }
+
+func TestWalkPath(t *testing.T) {
+	want := "/a/b/c/d.text.txt/e.ini.tmpl"
+	got := walkPath("/a/b/c/d.text.txt/e.ini.conf", "tmpl")
+	if want != got {
+		t.Errorf("want %s but got %s", want, got)
+	}
+
+	want = "/a/b/c/d.text.txt/e.ini.json"
+	got = walkPath("/a/b/c/d.text.txt/e.ini.conf", "json")
+	if want != got {
+		t.Errorf("want %s but got %s", want, got)
+	}
+}

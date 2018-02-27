@@ -523,10 +523,14 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if timeout > 0 {
-		var cancel goctx.CancelFunc
-		ctx, cancel = goctx.WithTimeout(ctx, time.Duration(timeout)*time.Second)
-		defer cancel()
+	// default timeout 300s
+	if timeout == 0 {
+		timeout = 300
+	}
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx, _ = goctx.WithTimeout(goctx.Background(), time.Duration(timeout)*time.Second)
+	} else {
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	pc := gd.PluginClient()
@@ -554,15 +558,8 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// new context with deadline
-	if deadline, ok := ctx.Deadline(); !ok {
-		ctx = goctx.Background()
-	} else {
-		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
-	}
-
 	// database.Image.ID
-	id, taskID, err := resource.LoadImage(ctx, gd.Ormer(), req, timeout)
+	id, taskID, err := resource.LoadImage(ctx, gd.Ormer(), pc, req, time.Duration(timeout)*time.Second)
 	if err != nil {
 		ec := errCodeV1(_Image, internalError, 36, "fail to load image", "镜像入库失败")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
