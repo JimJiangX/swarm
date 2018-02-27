@@ -3093,6 +3093,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 			httpJSONError(w, err, ec, http.StatusInternalServerError)
 		}
 
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
