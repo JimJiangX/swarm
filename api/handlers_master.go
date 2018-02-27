@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -3162,11 +3161,11 @@ func removeBackupFiles(orm rmBackupFilesIface, files []database.BackupFile) erro
 	for i := range files {
 		path := getNFSBackupFile(files[i].Path, sys.BackupDir, files[i].Mount, mounts)
 
-		err := os.RemoveAll(path)
+		out, err := utils.ExecContextTimeout(nil, 0, "sudo rm -rf", path)
 		if err == nil {
 			rm = append(rm, files[i])
 		} else {
-			logrus.Warnf("fail to delete backup file:%s", path)
+			logrus.Warnf("fail to delete backup file:%s,%s,%s", path, out, err)
 		}
 	}
 
