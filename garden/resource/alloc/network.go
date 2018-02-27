@@ -108,12 +108,16 @@ func (at netAllocator) availableDevice(engineID string) ([]string, int, error) {
 		return nil, 0, errors.Errorf("Engine not found:%s", engineID)
 	}
 
+	return EngineIdleNetworkDevice(at.ormer, engine)
+}
+
+func EngineIdleNetworkDevice(ormer networkAllocOrmer, engine *cluster.Engine) ([]string, int, error) {
 	devices, width, err := nic.ParseEngineDevice(engine)
 	if err != nil {
 		return nil, width, err
 	}
 
-	used, err := at.ormer.ListIPByEngine(engine.ID)
+	used, err := ormer.ListIPByEngine(engine.ID)
 	if err != nil {
 		return nil, width, err
 	}

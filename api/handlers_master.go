@@ -17,6 +17,7 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/deploy"
 	"github.com/docker/swarm/garden/resource"
+	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/resource/alloc/driver"
 	"github.com/docker/swarm/garden/resource/storage"
 	"github.com/docker/swarm/garden/structs"
@@ -875,7 +876,7 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // -----------------/hosts handlers-----------------
-func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.NodeInfo {
+func getNodeInfo(ormer database.Ormer, n database.Node, e *cluster.Engine) structs.NodeInfo {
 	info := structs.NodeInfo{
 		ID:            n.ID,
 		Cluster:       n.ClusterID,
@@ -897,7 +898,15 @@ func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.
 		return info
 	}
 
-	drivers, err := driver.FindEngineVolumeDrivers(gd.Ormer(), e)
+	idle, width, err := alloc.EngineIdleNetworkDevice(ormer, e)
+	if err != nil {
+		logrus.WithField("Node", n.Addr).Errorf("engine available network device,%+v", err)
+	} else {
+		info.Engine.IdleBonds = idle
+		info.Engine.IdleBandWidth = width
+	}
+
+	drivers, err := driver.FindEngineVolumeDrivers(ormer, e)
 	if err != nil && len(drivers) == 0 {
 		logrus.WithField("Node", n.Addr).Errorf("find Node VolumeDrivers error,%+v", err)
 	} else {
@@ -957,7 +966,7 @@ func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	e := gd.Cluster.Engine(n.EngineID)
 
-	info := getNodeInfo(gd, n, e)
+	info := getNodeInfo(gd.Ormer(), n, e)
 
 	writeJSON(w, info, http.StatusOK)
 }
@@ -1007,7 +1016,7 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		out = append(out, getNodeInfo(gd, nodes[i], engine))
+		out = append(out, getNodeInfo(gd.Ormer(), nodes[i], engine))
 	}
 
 	writeJSON(w, out, http.StatusOK)
