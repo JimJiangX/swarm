@@ -19,6 +19,7 @@ import (
 	"github.com/docker/swarm/garden/resource"
 	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/resource/alloc/driver"
+	"github.com/docker/swarm/garden/resource/alloc/nic"
 	"github.com/docker/swarm/garden/resource/storage"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
@@ -897,13 +898,17 @@ func getNodeInfo(ormer database.Ormer, n database.Node, e *cluster.Engine) struc
 	if e == nil {
 		return info
 	}
+	{
+		var err error
+		_, info.Engine.Bandwidth, err = nic.ParseEngineDevice(e)
+		if err != nil {
+			logrus.WithField("Node", n.Addr).Errorf("%+v", err)
+		}
 
-	idle, width, err := alloc.EngineIdleNetworkDevice(ormer, e)
-	if err != nil {
-		logrus.WithField("Node", n.Addr).Errorf("engine available network device,%+v", err)
-	} else {
-		info.Engine.IdleBonds = idle
-		info.Engine.IdleBandWidth = width
+		info.Engine.IdleBonds, info.Engine.IdleBandwidth, err = alloc.EngineIdleNetworkDevice(ormer, e)
+		if err != nil {
+			logrus.WithField("Node", n.Addr).Errorf("engine available network device,%+v", err)
+		}
 	}
 
 	drivers, err := driver.FindEngineVolumeDrivers(ormer, e)

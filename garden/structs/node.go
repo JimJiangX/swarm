@@ -75,7 +75,8 @@ type NodeInfo struct {
 		FreeCPUs   int  `json:"free_cpus"`
 		FreeMemory int  `json:"free_memory"`
 
-		IdleBandWidth int      `json:"idle_bandwidth"` // M/s
+		Bandwidth     int      `json:"bandwidth"`      // M/s
+		IdleBandwidth int      `json:"idle_bandwidth"` // M/s
 		IdleBonds     []string `json:"idle_bonds"`
 
 		ID           string `json:"id"`
