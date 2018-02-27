@@ -19,11 +19,10 @@ import (
 
 // LoadImage load a new Image
 func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostLoadImageRequest, timeout int) (string, string, error) {
+	// set timeout
 	if timeout == 0 {
 		timeout = 300
 	}
-
-	// set timeout
 	ctx, _ = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 
 	path, err := utils.GetAbsolutePath(false, req.Path)
@@ -42,11 +41,6 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 		labels = buf.String()
 	}
 
-	registry, err := ormer.GetRegistry()
-	if err != nil {
-		return "", "", err
-	}
-
 	image := database.Image{
 		ID:       utils.Generate32UUID(),
 		Name:     req.Name,
@@ -57,6 +51,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 		Labels:   labels,
 		UploadAt: time.Now(),
 	}
+
 	task := database.NewTask(req.Image(), database.ImageLoadTask, image.ID, "load image", nil, timeout)
 
 	before := func(key string, new int, t *database.Task, f func(val int) bool) (bool, int, error) {
@@ -80,46 +75,7 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 		ch := make(chan error)
 
 		go func(ch chan<- error) {
-			err := func() error {
-				oldName := req.Image()
-				newName := fmt.Sprintf("%s:%d/%s", registry.Domain, registry.Port, oldName)
-				script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", req.Path, oldName, newName, newName)
-				logrus.WithField("Image", req.Name).Infof("ssh exec:'%s'", script)
-
-				addr := fmt.Sprintf("%s:%d", registry.Address, registry.SSHPort)
-				scp, err := scplib.NewClientByPublicKeys(addr, registry.OsUsername, "", time.Duration(timeout)*time.Second)
-				if err != nil {
-					logrus.WithField("Image", req.Name).Errorf("load image,'%s@%s',exec:'%s'", registry.OsUsername, addr, script)
-					return err
-				}
-				defer scp.Close()
-
-				out, err := scp.Exec(script)
-				if err != nil {
-					logrus.WithField("Image", req.Name).Errorf("load image,exec:'%s',output:%s", script, out)
-					return err
-				}
-
-				imageID, size, err := parsePushImageOutput(out)
-				if err != nil {
-					logrus.WithField("Image", req.Name).Errorf("parse output:%s", out)
-					return err
-				}
-
-				image.ImageID = imageID
-				image.Size = size
-				image.UploadAt = time.Now()
-
-				task.FinishedAt = image.UploadAt
-				task.Status = database.TaskDoneStatus
-				task.SetErrors(nil)
-
-				err = ormer.SetImageAndTask(image, task)
-
-				return err
-			}()
-
-			ch <- err
+			ch <- loadImage(ormer, image, task, path, time.Duration(timeout)*time.Second)
 		}(ch)
 
 		select {
@@ -143,6 +99,51 @@ func LoadImage(ctx context.Context, ormer database.ImageOrmer, req structs.PostL
 	}
 
 	return image.ID, task.ID, nil
+}
+
+func loadImage(ormer database.ImageOrmer, image database.Image, task database.Task, path string, timeout time.Duration) error {
+	registry, err := ormer.GetRegistry()
+	if err != nil {
+		return err
+	}
+
+	oldName := image.Image()
+	newName := fmt.Sprintf("%s:%d/%s", registry.Domain, registry.Port, oldName)
+	script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", path, oldName, newName, newName)
+	field := logrus.WithField("Image", oldName)
+	field.Infof("ssh exec:'%s'", script)
+
+	addr := fmt.Sprintf("%s:%d", registry.Address, registry.SSHPort)
+	scp, err := scplib.NewClientByPublicKeys(addr, registry.OsUsername, "", time.Duration(timeout)*time.Second)
+	if err != nil {
+		field.Errorf("load image,'%s@%s',exec:'%s'", registry.OsUsername, addr, script)
+		return err
+	}
+	defer scp.Close()
+
+	out, err := scp.Exec(script)
+	if err != nil {
+		field.Errorf("load image,exec:'%s',output:%s", script, out)
+		return err
+	}
+
+	imageID, size, err := parsePushImageOutput(out)
+	if err != nil {
+		field.Errorf("parse output:%s", out)
+		return err
+	}
+
+	image.ImageID = imageID
+	image.Size = size
+	image.UploadAt = time.Now()
+
+	task.FinishedAt = image.UploadAt
+	task.Status = database.TaskDoneStatus
+	task.SetErrors(nil)
+
+	err = ormer.SetImageAndTask(image, task)
+
+	return err
 }
 
 func parsePushImageOutput(in []byte) (string, int, error) {
