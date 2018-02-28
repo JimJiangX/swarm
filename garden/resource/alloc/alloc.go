@@ -151,6 +151,7 @@ func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.
 
 	config.HostConfig.Resources.CpusetCpus = cpuset
 	config.HostConfig.Resources.Memory = memory
+	config.HostConfig.Resources.MemorySwap = int64(float64(memory) * 1.5)
 
 	return cpuset, nil
 }

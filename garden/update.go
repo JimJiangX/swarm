@@ -282,6 +282,7 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 				Resources: container.Resources{
 					CpusetCpus: pu.cpuset,
 					Memory:     pu.memory,
+					MemorySwap: int64(float64(pu.memory) * 1.5),
 				},
 			}
 
