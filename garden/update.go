@@ -222,12 +222,18 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 		pendings := make([]pending, 0, len(units))
 
 		for _, u := range units {
-			var nccpu int64   // container HostConfig.CpusetCpus
-			countCPU := false // set true after called CountCPU
+			var (
+				nccpu    int64 // container HostConfig.CpusetCpus
+				countCPU bool  // set true after called CountCPU
+			)
 
 			c := u.getContainer()
 			if c == nil || c.Engine == nil {
 				return errors.WithStack(newContainerError(u.u.Name, notFound))
+			}
+
+			if c.Config.HostConfig.Memory == 0 && *memory != 0 {
+				return errors.Errorf("Forbid updating container memory from unlimited 0 to %d", *memory)
 			}
 
 			if c.Config.HostConfig.Memory == *memory {
@@ -239,6 +245,7 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 				if nccpu == *ncpu {
 					continue
 				}
+
 				countCPU = true
 			}
 
