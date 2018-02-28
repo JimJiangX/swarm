@@ -32,6 +32,8 @@ type hitachiStore struct {
 
 	orm database.StorageOrmer
 	hs  hitachi
+
+	rgList map[string]Space // cache rg spaces
 }
 
 // NewHitachiStore returns a new Store
@@ -52,6 +54,7 @@ func newHitachiStore(orm database.StorageOrmer, script string, san database.SANS
 		orm:    orm,
 		script: filepath.Join(script, hs.Vendor, hs.Version),
 		hs:     hs,
+		rgList: make(map[string]Space),
 	}
 }
 
@@ -128,12 +131,6 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 		return lun, lv, err
 	}
 
-	for key := range out {
-		if !key.Enabled {
-			delete(out, key)
-		}
-	}
-
 	rg := maxIdleSizeRG(out)
 	if out[rg].Free < size {
 		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
@@ -202,6 +199,12 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 		return lun, lv, errors.WithStack(err)
 	}
 
+	{
+		space := out[rg]
+		space.Free -= size
+		h.updateRGCache(space)
+	}
+
 	return lun, lv, nil
 }
 
@@ -213,12 +216,6 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (lun database.LUN,
 	out, err := h.Size()
 	if err != nil {
 		return lun, lv, err
-	}
-
-	for key := range out {
-		if !key.Enabled {
-			delete(out, key)
-		}
 	}
 
 	rg := maxIdleSizeRG(out)
@@ -288,6 +285,12 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (lun database.LUN,
 		return lun, lv, errors.WithStack(err)
 	}
 
+	{
+		space := out[rg]
+		space.Free -= size
+		h.updateRGCache(space)
+	}
+
 	return lun, lv, nil
 }
 
@@ -314,6 +317,8 @@ func (h *hitachiStore) RecycleLUN(id string, lun int) error {
 	if err != nil {
 		return err
 	}
+
+	h.invalidRGCache(l.RaidGroupID)
 
 	path, err := h.scriptPath("del_lun.sh")
 	if err != nil {
@@ -367,6 +372,14 @@ func (h hitachiStore) Size() (map[database.RaidGroup]Space, error) {
 
 // list store RGs info,calls listrg.sh
 func (h *hitachiStore) list(rg ...string) (map[string]Space, error) {
+	if len(rg) > 0 {
+		// find hitachiStore rg list in rgList cache
+		spaces := h.getRGSpacesFromCache(rg...)
+		if spaces != nil {
+			return spaces, nil
+		}
+	}
+
 	list := ""
 	if len(rg) == 0 {
 		return nil, nil
@@ -406,8 +419,11 @@ func (h *hitachiStore) list(rg ...string) (map[string]Space, error) {
 		return nil, errors.Errorf("Wait %s:%s,warnings:%s", cmd.Args, err, warnings)
 	}
 
+	// cache hitachiStore rg list spaces
 	if len(spaces) == 0 {
-		return nil, nil
+		h.invalidRGCache(rg...)
+	} else {
+		h.updateRGListCache(spaces)
 	}
 
 	return spaces, nil
@@ -595,7 +611,10 @@ func (h *hitachiStore) AddSpace(id string) (Space, error) {
 // EnableSpace signed RG enabled
 func (h *hitachiStore) EnableSpace(id string) error {
 	h.lock.Lock()
+
+	h.invalidRGCache(id)
 	err := h.orm.SetRaidGroupStatus(h.ID(), id, true)
+
 	h.lock.Unlock()
 
 	return err
@@ -604,7 +623,10 @@ func (h *hitachiStore) EnableSpace(id string) error {
 // DisableSpace signed RG disabled
 func (h *hitachiStore) DisableSpace(id string) error {
 	h.lock.Lock()
+
+	h.invalidRGCache(id)
 	err := h.orm.SetRaidGroupStatus(h.ID(), id, false)
+
 	h.lock.Unlock()
 
 	return err
@@ -612,7 +634,10 @@ func (h *hitachiStore) DisableSpace(id string) error {
 
 func (h *hitachiStore) removeSpace(id string) error {
 	h.lock.Lock()
+
+	h.invalidRGCache(id)
 	err := h.orm.DelRaidGroup(h.ID(), id)
+
 	h.lock.Unlock()
 
 	return err
@@ -642,4 +667,38 @@ func (h hitachiStore) Info() (Info, error) {
 	}
 
 	return info, nil
+}
+
+func (h hitachiStore) getRGSpacesFromCache(rg ...string) map[string]Space {
+	spaces := make(map[string]Space, len(rg))
+
+	for i := range rg {
+		val, ok := h.rgList[rg[i]]
+
+		if !ok || val.ID == "" {
+			return nil
+		}
+
+		spaces[rg[i]] = val
+	}
+
+	return spaces
+}
+
+func (h *hitachiStore) invalidRGCache(rg ...string) {
+	for i := range rg {
+		delete(h.rgList, rg[i])
+	}
+}
+
+func (h *hitachiStore) updateRGCache(space Space) {
+	h.rgList[space.ID] = space
+}
+
+func (h *hitachiStore) updateRGListCache(spaces map[string]Space) {
+	for id, val := range spaces {
+		if id == val.ID {
+			h.rgList[id] = val
+		}
+	}
 }
