@@ -457,7 +457,7 @@ func (h *huaweiStore) AddSpace(id string) (Space, error) {
 	return Space{}, errors.Errorf("%s:Space %s is not exist", h.ID(), id)
 }
 
-func (h *huaweiStore) list(rg ...string) ([]Space, error) {
+func (h *huaweiStore) list(rg ...string) (map[string]Space, error) {
 	list := ""
 	if len(rg) == 0 {
 		return nil, nil
@@ -552,14 +552,9 @@ func (h huaweiStore) Size() (map[database.RaidGroup]Space, error) {
 		info = make(map[database.RaidGroup]Space)
 
 		for i := range out {
-		loop:
-			for s := range spaces {
-				if out[i].StorageRGID == spaces[s].ID {
-					spaces[s].Enable = out[i].Enabled
-					info[out[i]] = spaces[s]
-					break loop
-				}
-			}
+			space := spaces[out[i].StorageRGID]
+			space.Enable = out[i].Enabled
+			info[out[i]] = space
 		}
 	}
 
@@ -582,7 +577,10 @@ func (h huaweiStore) Info() (Info, error) {
 	for rg, val := range list {
 		info.List[rg.StorageRGID] = val
 		info.Total += val.Total
-		info.Free += val.Free
+
+		if rg.Enabled {
+			info.Free += val.Free
+		}
 	}
 
 	return info, nil

@@ -69,13 +69,11 @@ type Space struct {
 	LunNum int
 }
 
-func parseSpace(r io.Reader) ([]Space, []error) {
-	spaces := make([]Space, 0, 10)
+func parseSpace(r io.Reader) (map[string]Space, []error) {
+	spaces := make(map[string]Space)
 	errs := make([]error, 0, 10)
 
-	br := bufio.NewReader(r)
-
-	for {
+	for br := bufio.NewReader(r); ; {
 		line, _, err := br.ReadLine()
 		if err != nil {
 			if err != io.EOF {
@@ -101,7 +99,7 @@ func parseSpace(r io.Reader) ([]Space, []error) {
 
 			space.ID = string(bytes.TrimSpace(parts[0]))
 
-			if len(space.ID) == 0 {
+			if space.ID == "" {
 				errs = append(errs, errors.Errorf("RG ID is required,'%s'", line))
 				continue
 			}
@@ -125,7 +123,7 @@ func parseSpace(r io.Reader) ([]Space, []error) {
 				errs = append(errs, errors.Errorf("parse '%s':'%s' error,%s", line, parts[4], err))
 			}
 
-			spaces = append(spaces, space)
+			spaces[space.ID] = space
 		}
 	}
 

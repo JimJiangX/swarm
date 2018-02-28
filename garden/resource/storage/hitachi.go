@@ -46,6 +46,7 @@ func newHitachiStore(orm database.StorageOrmer, script string, san database.SANS
 		HluStart:  san.HluStart,
 		HluEnd:    san.HluEnd,
 	}
+
 	return &hitachiStore{
 		lock:   new(sync.RWMutex),
 		orm:    orm,
@@ -355,14 +356,9 @@ func (h hitachiStore) Size() (map[database.RaidGroup]Space, error) {
 		info = make(map[database.RaidGroup]Space)
 
 		for i := range out {
-		loop:
-			for s := range spaces {
-				if out[i].StorageRGID == spaces[s].ID {
-					spaces[s].Enable = out[i].Enabled
-					info[out[i]] = spaces[s]
-					break loop
-				}
-			}
+			space := spaces[out[i].StorageRGID]
+			space.Enable = out[i].Enabled
+			info[out[i]] = space
 		}
 	}
 
@@ -370,7 +366,7 @@ func (h hitachiStore) Size() (map[database.RaidGroup]Space, error) {
 }
 
 // list store RGs info,calls listrg.sh
-func (h *hitachiStore) list(rg ...string) ([]Space, error) {
+func (h *hitachiStore) list(rg ...string) (map[string]Space, error) {
 	list := ""
 	if len(rg) == 0 {
 		return nil, nil
@@ -589,16 +585,8 @@ func (h *hitachiStore) AddSpace(id string) (Space, error) {
 		return Space{}, err
 	}
 
-	for i := range spaces {
-		if spaces[i].ID == id {
-
-			if err = insert(); err == nil {
-
-				return spaces[i], nil
-			}
-
-			return Space{}, err
-		}
+	if val, ok := spaces[id]; ok {
+		return val, insert()
 	}
 
 	return Space{}, errors.Errorf("%s:Space %s is not exist", h.ID(), id)
@@ -647,7 +635,10 @@ func (h hitachiStore) Info() (Info, error) {
 	for rg, val := range list {
 		info.List[rg.StorageRGID] = val
 		info.Total += val.Total
-		info.Free += val.Free
+
+		if rg.Enabled {
+			info.Free += val.Free
+		}
 	}
 
 	return info, nil
