@@ -596,6 +596,8 @@ func (h *hitachiStore) AddSpace(id string) (Space, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
+	h.invalidRGCache(id)
+
 	spaces, err := h.list(id)
 	if err != nil {
 		return Space{}, err

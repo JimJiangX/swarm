@@ -444,21 +444,15 @@ func (h *huaweiStore) AddSpace(id string) (Space, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
+	h.invalidRGCache(id)
+
 	spaces, err := h.list(id)
 	if err != nil {
 		return Space{}, err
 	}
 
-	for i := range spaces {
-		if spaces[i].ID == id {
-
-			if err = insert(); err == nil {
-				return spaces[i], nil
-			}
-
-			return Space{}, err
-
-		}
+	if val, ok := spaces[id]; ok {
+		return val, insert()
 	}
 
 	return Space{}, errors.Errorf("%s:Space %s is not exist", h.ID(), id)
