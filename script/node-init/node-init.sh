@@ -75,7 +75,7 @@ PT=${cur_dir}/rpm/percona-toolkit-2.2.20-1.noarch.rpm
 docker_version=17.12.0
 consul_version=1.0.2
 swarm_agent_version=1.2.8-3ceb431
-logicalVolume_volume_plugin_version=3.0.0
+logicalVolume_volume_plugin_version=4.0.0
 
 platform="$(uname -s)"
 yum --nogpgcheck -y install lsb
@@ -456,20 +456,14 @@ init_docker() {
 # install docker plugin
 install_docker_plugin() {
 	local base_dir=/usr/local/logicalVolume-volume-plugin
-	local script_dir=${base_dir}/scripts
 
 	mkdir -p ${base_dir}/bin
-	mkdir -p ${script_dir}
 
 	pkill -9 local-volume-plugin > /dev/null 2>&1
 
 	# copy binary file
 	cp ${cur_dir}/logicalVolume-volume-plugin-${logicalVolume_volume_plugin_version}/bin/logicalVolume_volume_plugin ${base_dir}/bin/logicalVolume_volume_plugin
 	chmod +x /usr/bin/logicalVolume_volume_plugin
-
-	# copy script
-	cp ${cur_dir}/logicalVolume-volume-plugin-${logicalVolume_volume_plugin_version}/scripts/*.sh ${script_dir}
-	chmod +x ${script_dir}/*.sh
 
 	cat << EOF > /usr/lib/systemd/system/logicalVolume-volume-plugin.service
 [Unit]
