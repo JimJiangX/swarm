@@ -319,7 +319,7 @@ func (svc *Service) scheduleOptionsByUnits(opts scheduleOption, refer string, ca
 			}
 		}
 
-		constraints := fmt.Sprintf("%s==%s", engineLabel, strings.Join(tmp, "|"))
+		constraints := fmt.Sprintf("%s==%s", nodeLabel, strings.Join(tmp, "|"))
 		opts.Nodes.Constraints = append(opts.Nodes.Constraints, constraints)
 		opts.Nodes.Filters = nil
 	} else {
