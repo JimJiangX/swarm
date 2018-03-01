@@ -632,11 +632,13 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		return nil, err
 	}
 
+	opts := svc.options
+
 	gd.Lock()
 	defer gd.Unlock()
 
 	gd.scheduler.Lock()
-	candidates, err := gd.schedule(ctx, actor, config, svc.options)
+	candidates, err := gd.schedule(ctx, actor, config, opts)
 	if err != nil {
 		gd.scheduler.Unlock()
 		return nil, err
@@ -696,8 +698,8 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	used := make([]pendingUnit, 0, count)
 	usedNodes := make([]*node.Node, 0, count)
 
-	ns := newNodeSelectStrategy(isSANStorage(svc.options.Require.Volumes),
-		svc.options.HighAvailable, replicas, candidates)
+	ns := newNodeSelectStrategy(isSANStorage(opts.Require.Volumes),
+		opts.HighAvailable, replicas, candidates)
 
 	for {
 		candidate := ns.selectNode(usedNodes)
@@ -705,7 +707,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 			break
 		}
 
-		pu, err := pendingAlloc(actor, units[count-1], candidate, svc.options, config, vr, nr)
+		pu, err := pendingAlloc(actor, units[count-1], candidate, opts, config, vr, nr)
 		if err != nil {
 			bad = append(bad, pu)
 			bad = append(bad, used...)
@@ -737,30 +739,12 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 func (gd *Garden) allocationV2(ctx context.Context, actor alloc.Allocator, svc *Service,
 	units []database.Unit, vr, nr bool) (ready []pendingUnit, err error) {
 
-	version, err := getImage(gd.Ormer(), svc.spec.Image.Image())
+	config, err := buildServiceContainerConfig(svc)
 	if err != nil {
 		return nil, err
 	}
 
 	opts := svc.options
-	config := cluster.BuildContainerConfig(container.Config{
-		Tty:       true,
-		OpenStdin: true,
-		Image:     version,
-	}, container.HostConfig{
-		NetworkMode: "none",
-		Binds:       []string{"/etc/localtime:/etc/localtime:ro"},
-		Resources: container.Resources{
-			CpusetCpus: strconv.Itoa(opts.Require.Require.CPU),
-			Memory:     opts.Require.Require.Memory,
-		},
-	}, network.NetworkingConfig{})
-
-	config.Config.Labels["mgm.unit.type"] = svc.spec.Image.Name
-	config.Config.Labels["mgm.image.id"] = svc.spec.Image.ID
-	config.Config.Labels[serviceTagLabel] = svc.svc.Tag
-
-	addContainerConfigConstraint(config, opts)
 
 	gd.Lock()
 	defer gd.Unlock()
@@ -868,30 +852,12 @@ func (gd *Garden) allocationV2(ctx context.Context, actor alloc.Allocator, svc *
 func (gd *Garden) allocationV3(ctx context.Context, actor alloc.Allocator, svc *Service,
 	units []database.Unit, vr, nr bool) (ready []pendingUnit, err error) {
 
-	version, err := getImage(gd.Ormer(), svc.spec.Image.Image())
+	config, err := buildServiceContainerConfig(svc)
 	if err != nil {
 		return nil, err
 	}
 
 	opts := svc.options
-	config := cluster.BuildContainerConfig(container.Config{
-		Tty:       true,
-		OpenStdin: true,
-		Image:     version,
-	}, container.HostConfig{
-		NetworkMode: "none",
-		Binds:       []string{"/etc/localtime:/etc/localtime:ro"},
-		Resources: container.Resources{
-			CpusetCpus: strconv.Itoa(opts.Require.Require.CPU),
-			Memory:     opts.Require.Require.Memory,
-		},
-	}, network.NetworkingConfig{})
-
-	config.Config.Labels["mgm.unit.type"] = svc.spec.Image.Name
-	config.Config.Labels["mgm.image.id"] = svc.spec.Image.ID
-	config.Config.Labels[serviceTagLabel] = svc.svc.Tag
-
-	addContainerConfigConstraint(config, opts)
 
 	gd.Lock()
 	defer gd.Unlock()
