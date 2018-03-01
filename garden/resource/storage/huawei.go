@@ -30,6 +30,8 @@ type huaweiStore struct {
 
 	orm database.StorageOrmer
 	hs  huawei
+
+	rgList map[string]Space // cache rg spaces
 }
 
 func (h huaweiStore) scriptPath(file string) (string, error) {
@@ -51,6 +53,7 @@ func newHuaweiStore(orm database.StorageOrmer, script string, san database.SANSt
 		orm:    orm,
 		script: filepath.Join(script, hw.Vendor, hw.Version),
 		hs:     hw,
+		rgList: make(map[string]Space),
 	}
 }
 
@@ -102,11 +105,6 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 	if err != nil {
 		return lun, lv, err
 	}
-	for key := range out {
-		if !key.Enabled {
-			delete(out, key)
-		}
-	}
 
 	rg := maxIdleSizeRG(out)
 	if out[rg].Free < size {
@@ -127,6 +125,12 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 	output, err := cmd.Output()
 	if err != nil {
 		return lun, lv, errors.Errorf("exec:%s,Output:%s,%s", cmd.Args, output, err)
+	}
+
+	{
+		space := out[rg]
+		space.Free -= size
+		h.updateRGCache(space)
 	}
 
 	storageLunID, err := strconv.Atoi(strings.TrimSpace(string(output)))
@@ -175,11 +179,6 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 	if err != nil {
 		return lun, lv, err
 	}
-	for key := range out {
-		if !key.Enabled {
-			delete(out, key)
-		}
-	}
 
 	rg := maxIdleSizeRG(out)
 	if out[rg].Free < size {
@@ -200,6 +199,12 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 	output, err := cmd.Output()
 	if err != nil {
 		return lun, lv, errors.Errorf("exec:%s,Output:%s,%s", cmd.Args, output, err)
+	}
+
+	{
+		space := out[rg]
+		space.Free -= size
+		h.updateRGCache(space)
 	}
 
 	storageLunID, err := strconv.Atoi(strings.TrimSpace(string(output)))
@@ -255,6 +260,8 @@ func (h *huaweiStore) RecycleLUN(id string, lun int) error {
 	if err != nil {
 		return err
 	}
+
+	h.invalidRGCache(l.RaidGroupID)
 
 	logrus.Debugf("%s %s %s %s %s", path, h.hs.IPAddr, h.hs.Username, h.hs.Password, l.StorageLunID)
 
@@ -437,27 +444,32 @@ func (h *huaweiStore) AddSpace(id string) (Space, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
+	h.invalidRGCache(id)
+
 	spaces, err := h.list(id)
 	if err != nil {
 		return Space{}, err
 	}
 
-	for i := range spaces {
-		if spaces[i].ID == id {
-
-			if err = insert(); err == nil {
-				return spaces[i], nil
-			}
-
-			return Space{}, err
-
-		}
+	if val, ok := spaces[id]; ok {
+		return val, insert()
 	}
 
 	return Space{}, errors.Errorf("%s:Space %s is not exist", h.ID(), id)
 }
 
-func (h *huaweiStore) list(rg ...string) ([]Space, error) {
+func (h *huaweiStore) list(rg ...string) (map[string]Space, error) {
+	if len(rg) > 0 {
+		// find huaweiStore rg list in rgList cache
+		if len(rg) > 0 {
+			// find hitachiStore rg list in rgList cache
+			spaces := h.getRGSpacesFromCache(rg...)
+			if spaces != nil {
+				return spaces, nil
+			}
+		}
+	}
+
 	list := ""
 	if len(rg) == 0 {
 		return nil, nil
@@ -498,8 +510,11 @@ func (h *huaweiStore) list(rg ...string) ([]Space, error) {
 		return nil, errors.Errorf("Wait %s:%s,warnings:%s", cmd.Args, err, warnings)
 	}
 
+	// cache huaweiStore rg list spaces
 	if len(spaces) == 0 {
-		return nil, nil
+		h.invalidRGCache(rg...)
+	} else {
+		h.updateRGListCache(spaces)
 	}
 
 	return spaces, nil
@@ -507,7 +522,10 @@ func (h *huaweiStore) list(rg ...string) ([]Space, error) {
 
 func (h *huaweiStore) EnableSpace(id string) error {
 	h.lock.Lock()
+
+	h.invalidRGCache(id)
 	err := h.orm.SetRaidGroupStatus(h.ID(), id, true)
+
 	h.lock.Unlock()
 
 	return err
@@ -515,7 +533,10 @@ func (h *huaweiStore) EnableSpace(id string) error {
 
 func (h *huaweiStore) DisableSpace(id string) error {
 	h.lock.Lock()
+
+	h.invalidRGCache(id)
 	err := h.orm.SetRaidGroupStatus(h.ID(), id, false)
+
 	h.lock.Unlock()
 
 	return err
@@ -523,7 +544,10 @@ func (h *huaweiStore) DisableSpace(id string) error {
 
 func (h *huaweiStore) removeSpace(id string) error {
 	h.lock.Lock()
+
+	h.invalidRGCache(id)
 	err := h.orm.DelRaidGroup(h.ID(), id)
+
 	h.lock.Unlock()
 
 	return err
@@ -552,14 +576,9 @@ func (h huaweiStore) Size() (map[database.RaidGroup]Space, error) {
 		info = make(map[database.RaidGroup]Space)
 
 		for i := range out {
-		loop:
-			for s := range spaces {
-				if out[i].StorageRGID == spaces[s].ID {
-					spaces[s].Enable = out[i].Enabled
-					info[out[i]] = spaces[s]
-					break loop
-				}
-			}
+			space := spaces[out[i].StorageRGID]
+			space.Enable = out[i].Enabled
+			info[out[i]] = space
 		}
 	}
 
@@ -582,8 +601,45 @@ func (h huaweiStore) Info() (Info, error) {
 	for rg, val := range list {
 		info.List[rg.StorageRGID] = val
 		info.Total += val.Total
-		info.Free += val.Free
+
+		if rg.Enabled {
+			info.Free += val.Free
+		}
 	}
 
 	return info, nil
+}
+
+func (h huaweiStore) getRGSpacesFromCache(rg ...string) map[string]Space {
+	spaces := make(map[string]Space, len(rg))
+
+	for i := range rg {
+		val, ok := h.rgList[rg[i]]
+
+		if !ok || val.ID == "" {
+			return nil
+		}
+
+		spaces[rg[i]] = val
+	}
+
+	return spaces
+}
+
+func (h *huaweiStore) invalidRGCache(rg ...string) {
+	for i := range rg {
+		delete(h.rgList, rg[i])
+	}
+}
+
+func (h *huaweiStore) updateRGCache(space Space) {
+	h.rgList[space.ID] = space
+}
+
+func (h *huaweiStore) updateRGListCache(spaces map[string]Space) {
+	for id, val := range spaces {
+		if id == val.ID {
+			h.rgList[id] = val
+		}
+	}
 }
