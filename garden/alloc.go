@@ -39,7 +39,7 @@ const (
 	networkPartitionLable = "network_partition"
 )
 
-func getImage(orm database.ImageOrmer, version string) (string, error) {
+func getImage(orm database.SysConfigOrmer, version string) (string, error) {
 	reg, err := orm.GetRegistry()
 	if err != nil {
 		return "", err
@@ -276,6 +276,34 @@ func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	return
 }
 
+func buildServiceContainerConfig(svc *Service) (*cluster.ContainerConfig, error) {
+	version, err := getImage(svc.so, svc.spec.Image.Image())
+	if err != nil {
+		return nil, err
+	}
+
+	config := cluster.BuildContainerConfig(container.Config{
+		Tty:       true,
+		OpenStdin: true,
+		Image:     version,
+	}, container.HostConfig{
+		NetworkMode: "none",
+		Binds:       []string{"/etc/localtime:/etc/localtime:ro"},
+		Resources: container.Resources{
+			CpusetCpus: strconv.Itoa(svc.options.Require.Require.CPU),
+			Memory:     svc.options.Require.Require.Memory,
+		},
+	}, network.NetworkingConfig{})
+
+	config.Config.Labels["mgm.unit.type"] = svc.spec.Image.Name
+	config.Config.Labels["mgm.image.id"] = svc.spec.Image.ID
+	config.Config.Labels[serviceTagLabel] = svc.svc.Tag
+
+	addContainerConfigConstraint(config, svc.options)
+
+	return config, nil
+}
+
 func addContainerConfigConstraint(config *cluster.ContainerConfig, opts scheduleOption) {
 	for i := range opts.Nodes.Constraints {
 		if opts.Nodes.Constraints[i] != "" {
@@ -355,17 +383,17 @@ func pendingAlloc(actor alloc.Allocator, unit database.Unit,
 	return pu, err
 }
 
-func sortByCluster(nodes []*node.Node, clusters []string) [][]*node.Node {
+func sortByLabel(nodes []*node.Node, labelName string) map[string][]*node.Node {
 	if len(nodes) == 0 {
 		return nil
 	}
 
 	type set struct {
-		cluster string
-		nodes   []*node.Node
+		label string
+		nodes []*node.Node
 	}
 
-	sets := make([]set, 0, len(clusters))
+	sets := make([]set, 0, 10)
 
 loop:
 	for i := range nodes {
@@ -373,24 +401,13 @@ loop:
 			continue
 		}
 
-		label := nodes[i].Labels[clusterLabel]
-
-		if len(clusters) > 0 {
-			exist := false
-		cluster:
-			for c := range clusters {
-				if clusters[c] == label {
-					exist = true
-					break cluster
-				}
-			}
-			if !exist {
-				continue loop
-			}
+		label, ok := nodes[i].Labels[labelName]
+		if !ok || label == "" {
+			continue
 		}
 
 		for k := range sets {
-			if sets[k].cluster == label {
+			if sets[k].label == label {
 				sets[k].nodes = append(sets[k].nodes, nodes[i])
 
 				continue loop
@@ -402,15 +419,15 @@ loop:
 		list[0] = nodes[i]
 
 		sets = append(sets, set{
-			cluster: label,
-			nodes:   list,
+			label: label,
+			nodes: list,
 		})
 	}
 
-	out := make([][]*node.Node, len(sets))
+	out := make(map[string][]*node.Node, len(sets))
 
 	for i := range sets {
-		out[i] = sets[i].nodes
+		out[sets[i].label] = sets[i].nodes
 	}
 
 	return out
@@ -499,12 +516,21 @@ func isSANStorage(vrs []structs.VolumeRequire) bool {
 	return false
 }
 
-func isNodeMatch(isSAN, highAvailable bool, num int, n *node.Node, used, attempt []*node.Node) bool {
+func isNodeAttempted(n *node.Node, attempt []*node.Node) bool {
+	if n == nil || n.ID == "" {
+		return true
+	}
+
 	for i := range attempt {
-		if n == nil || n.ID == "" || n.ID == attempt[i].ID {
-			return false
+		if n.ID == attempt[i].ID {
+			return true
 		}
 	}
+
+	return false
+}
+
+func isNodeMatch(isSAN, highAvailable bool, num int, n *node.Node, used []*node.Node) bool {
 
 	if highAvailable &&
 		!selectNodeInDiffNetworkPartition(highAvailable, num, n, used) {
@@ -523,40 +549,94 @@ func isNodeMatch(isSAN, highAvailable bool, num int, n *node.Node, used, attempt
 	return true
 }
 
+type nodeSelectStrategy struct {
+	isSAN         bool
+	highAvailable bool
+	num           int
+	nodes         []*node.Node
+	attemptNodes  []*node.Node
+	category      map[string][]*node.Node
+}
+
+func newNodeSelectStrategy(isSAN, highAvailable bool, num int, nodes []*node.Node) *nodeSelectStrategy {
+	ns := &nodeSelectStrategy{
+		isSAN:         isSAN,
+		highAvailable: highAvailable,
+		num:           num,
+		nodes:         nodes,
+		attemptNodes:  make([]*node.Node, 0, len(nodes)),
+	}
+
+	if isSAN && highAvailable {
+		// cache sort by storage
+		ns.category = sortByLabel(nodes, sanLabel)
+	}
+
+	return ns
+}
+
+func (cs *nodeSelectStrategy) selectNode(used []*node.Node) *node.Node {
+	if cs.isSAN && cs.highAvailable &&
+		len(cs.category) > 1 && len(used) < len(cs.category) {
+		// 均匀分配至各个SAN集群中
+		sans := make(map[string]int, len(used))
+		for i := range used {
+			name := used[i].Labels[sanLabel]
+			sans[name] = sans[name] + 1
+		}
+
+		for label, nodes := range cs.category {
+			if sans[label] > 0 {
+				continue
+			}
+
+			for i := range nodes {
+
+				if isNodeAttempted(nodes[i], cs.attemptNodes) {
+					continue
+				}
+
+				if !isNodeMatch(cs.isSAN, cs.highAvailable, cs.num, nodes[i], used) {
+					continue
+				}
+
+				cs.attemptNodes = append(cs.attemptNodes, nodes[i])
+
+				return nodes[i]
+			}
+		}
+	}
+
+	for i := range cs.nodes {
+		if isNodeAttempted(cs.nodes[i], cs.attemptNodes) {
+			continue
+		}
+
+		if !isNodeMatch(cs.isSAN, cs.highAvailable, cs.num, cs.nodes[i], used) {
+			continue
+		}
+
+		cs.attemptNodes = append(cs.attemptNodes, cs.nodes[i])
+
+		return cs.nodes[i]
+	}
+
+	return nil
+}
+
 func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Service,
 	units []database.Unit, vr, nr bool) (ready []pendingUnit, err error) {
 
-	version, err := getImage(gd.Ormer(), svc.spec.Image.Image())
+	config, err := buildServiceContainerConfig(svc)
 	if err != nil {
 		return nil, err
 	}
-
-	opts := svc.options
-
-	config := cluster.BuildContainerConfig(container.Config{
-		Tty:       true,
-		OpenStdin: true,
-		Image:     version,
-	}, container.HostConfig{
-		NetworkMode: "none",
-		Binds:       []string{"/etc/localtime:/etc/localtime:ro"},
-		Resources: container.Resources{
-			CpusetCpus: strconv.Itoa(opts.Require.Require.CPU),
-			Memory:     opts.Require.Require.Memory,
-		},
-	}, network.NetworkingConfig{})
-
-	config.Config.Labels["mgm.unit.type"] = svc.spec.Image.Name
-	config.Config.Labels["mgm.image.id"] = svc.spec.Image.ID
-	config.Config.Labels[serviceTagLabel] = svc.svc.Tag
-
-	addContainerConfigConstraint(config, opts)
 
 	gd.Lock()
 	defer gd.Unlock()
 
 	gd.scheduler.Lock()
-	candidates, err := gd.schedule(ctx, actor, config, opts)
+	candidates, err := gd.schedule(ctx, actor, config, svc.options)
 	if err != nil {
 		gd.scheduler.Unlock()
 		return nil, err
@@ -613,36 +693,36 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	}()
 
 	count := replicas
-	isSAN := isSANStorage(opts.Require.Volumes)
 	used := make([]pendingUnit, 0, count)
 	usedNodes := make([]*node.Node, 0, count)
-	attemptNodes := make([]*node.Node, 0, len(candidates))
 
-	for i := range candidates {
-		if !isNodeMatch(isSAN, opts.HighAvailable, replicas, candidates[i], usedNodes, attemptNodes) {
-			continue
+	ns := newNodeSelectStrategy(isSANStorage(svc.options.Require.Volumes),
+		svc.options.HighAvailable, replicas, candidates)
+
+	for {
+		candidate := ns.selectNode(usedNodes)
+		if candidate == nil {
+			break
 		}
 
-		attemptNodes = append(attemptNodes, candidates[i])
-
-		pu, err := pendingAlloc(actor, units[count-1], candidates[i], opts, config, vr, nr)
+		pu, err := pendingAlloc(actor, units[count-1], candidate, svc.options, config, vr, nr)
 		if err != nil {
 			bad = append(bad, pu)
 			bad = append(bad, used...)
 
-			field.Errorf("pending alloc:node=%s,%+v", candidates[i].Name, err)
+			field.Errorf("pending alloc:node=%s,%+v", candidate.Name, err)
 
 			return nil, err
 		}
 
-		err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, candidates[i].ID, pu.config)
+		err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, candidate.ID, pu.config)
 		if err != nil {
 			bad = append(bad, pu)
-			field.Debugf("AddPendingContainer:node=%s,%+v", candidates[i].Name, err)
+			field.Debugf("AddPendingContainer:node=%s,%+v", candidate.Name, err)
 			continue
 		}
 
-		usedNodes = append(usedNodes, candidates[i])
+		usedNodes = append(usedNodes, candidate)
 		used = append(used, pu)
 		if count--; count == 0 {
 			return used, nil
@@ -750,7 +830,7 @@ func (gd *Garden) allocationV2(ctx context.Context, actor alloc.Allocator, svc *
 	isSAN := isSANStorage(opts.Require.Volumes)
 
 	for i := range candidates {
-		if !isNodeMatch(isSAN, opts.HighAvailable, replicas, candidates[i], usedNodes, nil) {
+		if !isNodeMatch(isSAN, opts.HighAvailable, replicas, candidates[i], usedNodes) {
 			continue
 		}
 
@@ -876,7 +956,7 @@ func (gd *Garden) allocationV3(ctx context.Context, actor alloc.Allocator, svc *
 
 	defer recycle()
 
-	out := sortByCluster(candidates, opts.Nodes.Clusters)
+	out := sortByLabel(candidates, clusterLabel)
 	count := replicas
 	usedNodes := make([]*node.Node, 0, count)
 	isSAN := isSANStorage(opts.Require.Volumes)
@@ -896,7 +976,7 @@ func (gd *Garden) allocationV3(ctx context.Context, actor alloc.Allocator, svc *
 		used := make([]pendingUnit, 0, count)
 
 		for i := range nodes {
-			if !isNodeMatch(isSAN, opts.HighAvailable, replicas, candidates[i], usedNodes, nil) {
+			if !isNodeMatch(isSAN, opts.HighAvailable, replicas, candidates[i], usedNodes) {
 				continue
 			}
 
