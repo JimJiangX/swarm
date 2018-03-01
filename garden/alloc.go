@@ -499,6 +499,30 @@ func isSANStorage(vrs []structs.VolumeRequire) bool {
 	return false
 }
 
+func isNodeMatch(isSAN, highAvailable bool, num int, n *node.Node, used, attempt []*node.Node) bool {
+	for i := range attempt {
+		if n == nil || n.ID == "" || n.ID == attempt[i].ID {
+			return false
+		}
+	}
+
+	if highAvailable &&
+		!selectNodeInDiffNetworkPartition(highAvailable, num, n, used) {
+		return false
+	}
+
+	if isSAN && !filterNodeByStorage(n) {
+		return false
+	}
+
+	if isSAN && highAvailable &&
+		!selectNodeInDiffStorage(highAvailable, num, n, used) {
+		return false
+	}
+
+	return true
+}
+
 func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Service,
 	units []database.Unit, vr, nr bool) (ready []pendingUnit, err error) {
 
@@ -508,7 +532,6 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	}
 
 	opts := svc.options
-	isSAN := isSANStorage(opts.Require.Volumes)
 
 	config := cluster.BuildContainerConfig(container.Config{
 		Tty:       true,
@@ -575,40 +598,32 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		}
 		gd.Cluster.RemovePendingContainer(ids...)
 
+		ips := make([]database.IP, 0, len(bad))
+		lvs := make([]database.Volume, 0, len(bad)*2)
+		for i := range bad {
+			ips = append(ips, bad[i].networkings...)
+			lvs = append(lvs, bad[i].volumes...)
+		}
+		_err := actor.RecycleResource(ips, lvs)
+		if _err != nil {
+			err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
+		}
+
 		return err
-
-		//		ips := make([]database.IP, 0, len(bad))
-		//		lvs := make([]database.Volume, 0, len(bad)*2)
-		//		for i := range bad {
-		//			ips = append(ips, bad[i].networkings...)
-		//			lvs = append(lvs, bad[i].volumes...)
-		//		}
-		//		_err := actor.RecycleResource(ips, lvs)
-		//		if _err != nil {
-		//			err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
-		//		}
-
-		//		return _err
 	}()
 
 	count := replicas
+	isSAN := isSANStorage(opts.Require.Volumes)
 	used := make([]pendingUnit, 0, count)
 	usedNodes := make([]*node.Node, 0, count)
+	attemptNodes := make([]*node.Node, 0, len(candidates))
 
 	for i := range candidates {
-		if opts.HighAvailable &&
-			!selectNodeInDiffNetworkPartition(opts.HighAvailable, replicas, candidates[i], usedNodes) {
+		if !isNodeMatch(isSAN, opts.HighAvailable, replicas, candidates[i], usedNodes, attemptNodes) {
 			continue
 		}
 
-		if isSAN && !filterNodeByStorage(candidates[i]) {
-			continue
-		}
-
-		if isSAN && opts.HighAvailable &&
-			!selectNodeInDiffStorage(opts.HighAvailable, replicas, candidates[i], usedNodes) {
-			continue
-		}
+		attemptNodes = append(attemptNodes, candidates[i])
 
 		pu, err := pendingAlloc(actor, units[count-1], candidates[i], opts, config, vr, nr)
 		if err != nil {
@@ -622,13 +637,13 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 
 		err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, candidates[i].ID, pu.config)
 		if err != nil {
+			bad = append(bad, pu)
 			field.Debugf("AddPendingContainer:node=%s,%+v", candidates[i].Name, err)
 			continue
 		}
 
-		used = append(used, pu)
 		usedNodes = append(usedNodes, candidates[i])
-
+		used = append(used, pu)
 		if count--; count == 0 {
 			return used, nil
 		}
@@ -648,8 +663,6 @@ func (gd *Garden) allocationV2(ctx context.Context, actor alloc.Allocator, svc *
 	}
 
 	opts := svc.options
-	isSAN := isSANStorage(opts.Require.Volumes)
-
 	config := cluster.BuildContainerConfig(container.Config{
 		Tty:       true,
 		OpenStdin: true,
@@ -734,19 +747,10 @@ func (gd *Garden) allocationV2(ctx context.Context, actor alloc.Allocator, svc *
 	count := replicas
 	used := make([]pendingUnit, 0, count)
 	usedNodes := make([]*node.Node, 0, count)
+	isSAN := isSANStorage(opts.Require.Volumes)
 
 	for i := range candidates {
-		if opts.HighAvailable &&
-			!selectNodeInDiffNetworkPartition(opts.HighAvailable, replicas, candidates[i], usedNodes) {
-			continue
-		}
-
-		if isSAN && !filterNodeByStorage(candidates[i]) {
-			continue
-		}
-
-		if isSAN && opts.HighAvailable &&
-			!selectNodeInDiffStorage(opts.HighAvailable, replicas, candidates[i], usedNodes) {
+		if !isNodeMatch(isSAN, opts.HighAvailable, replicas, candidates[i], usedNodes, nil) {
 			continue
 		}
 
@@ -762,6 +766,7 @@ func (gd *Garden) allocationV2(ctx context.Context, actor alloc.Allocator, svc *
 
 		err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, candidates[i].ID, pu.config)
 		if err != nil {
+			bad = append(bad, pu)
 			field.Debugf("AddPendingContainer:node=%s,%+v", candidates[i].Name, err)
 			continue
 		}
@@ -789,8 +794,6 @@ func (gd *Garden) allocationV3(ctx context.Context, actor alloc.Allocator, svc *
 	}
 
 	opts := svc.options
-	isSAN := isSANStorage(opts.Require.Volumes)
-
 	config := cluster.BuildContainerConfig(container.Config{
 		Tty:       true,
 		OpenStdin: true,
@@ -876,6 +879,7 @@ func (gd *Garden) allocationV3(ctx context.Context, actor alloc.Allocator, svc *
 	out := sortByCluster(candidates, opts.Nodes.Clusters)
 	count := replicas
 	usedNodes := make([]*node.Node, 0, count)
+	isSAN := isSANStorage(opts.Require.Volumes)
 
 	for _, nodes := range out {
 		select {
@@ -892,17 +896,7 @@ func (gd *Garden) allocationV3(ctx context.Context, actor alloc.Allocator, svc *
 		used := make([]pendingUnit, 0, count)
 
 		for i := range nodes {
-			if opts.HighAvailable &&
-				!selectNodeInDiffNetworkPartition(opts.HighAvailable, replicas, nodes[i], usedNodes) {
-				continue
-			}
-
-			if isSAN && !filterNodeByStorage(nodes[i]) {
-				continue
-			}
-
-			if isSAN && opts.HighAvailable &&
-				!selectNodeInDiffStorage(opts.HighAvailable, replicas, nodes[i], usedNodes) {
+			if !isNodeMatch(isSAN, opts.HighAvailable, replicas, candidates[i], usedNodes, nil) {
 				continue
 			}
 
@@ -915,6 +909,7 @@ func (gd *Garden) allocationV3(ctx context.Context, actor alloc.Allocator, svc *
 
 			err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[i].ID, pu.config)
 			if err != nil {
+				bad = append(bad, pu)
 				field.Debugf("AddPendingContainer:node=%s,%+v", nodes[i].Name, err)
 				continue
 			}
