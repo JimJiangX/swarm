@@ -59,6 +59,7 @@ const (
 	statusUnitRestoreFailed
 
 	statusContainerCreated
+	statusContainerRenamed
 	statusContainerRunning
 	statusContainerPaused
 	statusContainerRestarted

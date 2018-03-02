@@ -1,6 +1,8 @@
 package garden
 
 import (
+	"time"
+
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/structs"
@@ -91,6 +93,24 @@ func renameContainer(u *unit, name string) error {
 	}
 
 	err := e.RenameContainer(c, name)
+	if err != nil {
+		return errors.WithStack(err)
+	}
 
-	return errors.WithStack(err)
+	// waiting for update rename container event done
+	tick := time.NewTicker(time.Second * 6)
+	for i := 0; i <= 10; i++ {
+		nc := e.Containers().Get(name)
+		if nc != nil {
+			break
+		}
+
+		<-tick.C
+	}
+	tick.Stop()
+
+	u.u.EngineID = e.ID
+	u.u.ContainerID = c.ID
+
+	return u.uo.UnitContainerCreated(u.u.Name, c.ID, e.ID, c.HostConfig.NetworkMode, statusContainerRenamed)
 }

@@ -2,7 +2,6 @@ package garden
 
 import (
 	"strings"
-	"time"
 
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
@@ -268,9 +267,6 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 		if err != nil {
 			return err
 		}
-
-		// waiting for update rename container event done
-		time.Sleep(10 * time.Second)
 
 		// 9.migrate database related old unit
 		err = svc.so.MigrateUnit(news.unit.u.ID, old.unit.u.ID, old.unit.u.Name)
