@@ -525,9 +525,9 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// default timeout 300s
+	// default timeout 500s
 	if timeout == 0 {
-		timeout = 300
+		timeout = 500
 	}
 	if deadline, ok := ctx.Deadline(); !ok {
 		ctx, _ = goctx.WithTimeout(goctx.Background(), time.Duration(timeout)*time.Second)
