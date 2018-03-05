@@ -143,18 +143,9 @@ func loadImage(ctx context.Context,
 	}
 	{
 		// post image template to plugin
-		tmpl, err := readImageTemplateFile(path)
+		err := postImageTemplate(ctx, pc, oldName, path)
 		if err != nil {
-			return err
-		}
-
-		if tmpl.Image == "" {
-			tmpl.Image = oldName
-		}
-
-		err = pc.PostImageTemplate(ctx, tmpl)
-		if err != nil {
-			return err
+			field.Errorf("post image config template,%+v", err)
 		}
 	}
 	{
@@ -193,6 +184,20 @@ func parsePushImageOutput(in []byte) (string, int, error) {
 	}
 
 	return "", 0, errors.Errorf("parse output error:%s", in)
+}
+
+// post image template to plugin
+func postImageTemplate(ctx context.Context, pc api.PluginAPI, image, path string) error {
+	tmpl, err := readImageTemplateFile(path)
+	if err != nil {
+		return err
+	}
+
+	if tmpl.Image != image {
+		tmpl.Image = image
+	}
+
+	return pc.PostImageTemplate(ctx, tmpl)
 }
 
 func readImageTemplateFile(path string) (ct structs.ConfigTemplate, err error) {
