@@ -162,7 +162,8 @@ type NetDeviceRequire struct {
 type ServiceScaleRequest struct {
 	Compose    bool                   `json:"compose"`
 	Arch       Arch                   `json:"architecture"`
-	Candidates []string               `json:"candidates,omitempty"` // Node ID
+	Candidates []string               `json:"candidates,omitempty"`   // Node ID
+	Remove     []string               `json:"remove_units,omitempty"` // remove units ID or Name
 	Options    map[string]interface{} `json:"opts"`
 }
 
