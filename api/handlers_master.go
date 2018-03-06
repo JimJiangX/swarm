@@ -2209,7 +2209,7 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
-	configs, restart, err := mergeServiceConfigsChange(ctx, svc, change)
+	configs, _, err := mergeServiceConfigsChange(ctx, svc, change)
 	if err != nil {
 		ec := errCodeV1(_Service, dbQueryError, 94, "fail to update config file", "数据合并错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -2225,7 +2225,7 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	task := database.NewTask(svc.Name(), database.ServiceUpdateConfigTask, svc.ID(), "", nil, 300)
 
-	err = svc.UpdateUnitsConfigs(ctx, configs, &task, restart, true)
+	err = svc.UpdateUnitsConfigs(ctx, configs, &task, false, true)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 95, "fail to update service config files", "服务配置文件更新错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
