@@ -8,7 +8,7 @@ fi
 
 #nodelist=192.168.2.100:6375,192.168.2.101:6375,192.168.2.102:6375
 node_list=$1
-default_pass=dbaas
+default_pass=5aiup_rd
 
 master_node="${node_list%%,*}"
 master_ip="${master_node%%:*}"
@@ -28,18 +28,25 @@ node_arr=(${node_list//,/ })
 for node in ${node_arr[@]}
 do
     ip=${node%%:*}
+    # check network
+    ping -w 6 -c 3 ${ip}
+    if [ $? -ne 0 ]; then
+        echo "ping ${ip} failed"
+        exit 4
+    fi
+
     if [ "${ip}" == "${master_ip}" ]; then
         continue
     fi
     port=${node##*:}
-    ${TOOLS_DIR}/redis-cli -h ${ip} -p ${port} -a ${default_pass} SLAVEOF ${master_ip} ${master_port}
-    if [ $? -ne 0 ]; then
+    rel=$(${TOOLS_DIR}/redis-cli -h ${ip} -p ${port} -a ${default_pass} SLAVEOF ${master_ip} ${master_port} | grep OK | wc -l)
+    if [ ${rel} -ne 1 ]; then
         echo "redis($node) set failed"
         exit 3
     fi
 
-    ${TOOLS_DIR}/redis-cli -h ${ip} -p ${port} -a ${default_pass} CONFIG REWRITE
-    if [ $? -ne 0 ]; then
+    rel=$(${TOOLS_DIR}/redis-cli -h ${ip} -p ${port} -a ${default_pass} CONFIG REWRITE | grep OK | wc -l)
+    if [ ${rel} -ne 1 ]; then
         echo "redis($node) config rewrite failed"
         exit 3
     fi
