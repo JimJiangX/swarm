@@ -683,7 +683,11 @@ func (svc *Service) Start(ctx context.Context, units []*unit, task *database.Tas
 }
 
 // UpdateUnitsConfigs generated new units configs,write to container volume.
-func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.ServiceConfigs, task *database.Task, restart, async bool) (err error) {
+func (svc *Service) UpdateUnitsConfigs(ctx context.Context,
+	configs structs.ServiceConfigs,
+	keysets []structs.Keyset,
+	task *database.Task,
+	restart, async bool) (err error) {
 
 	update := func() error {
 		units, err := svc.getUnits()
@@ -697,6 +701,17 @@ func (svc *Service) UpdateUnitsConfigs(ctx context.Context, configs structs.Serv
 		}
 
 		err = svc.updateConfigs(ctx, units, cm, nil)
+		if err != nil {
+			return err
+		}
+
+		pairs := make([]kvPair, len(keysets))
+		for i := range keysets {
+			pairs[i].key = keysets[i].Key
+			pairs[i].value = keysets[i].Value
+		}
+
+		err = effectServiceConfig(ctx, units, svc.spec.Image.Name, pairs)
 		if err != nil {
 			return err
 		}

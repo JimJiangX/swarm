@@ -2229,7 +2229,7 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	task := database.NewTask(svc.Name(), database.ServiceUpdateConfigTask, svc.ID(), "", nil, 300)
 
-	err = svc.UpdateUnitsConfigs(ctx, configs, &task, false, true)
+	err = svc.UpdateUnitsConfigs(ctx, configs, change.Keysets, &task, false, true)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 95, "fail to update service config files", "服务配置文件更新错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
