@@ -341,7 +341,7 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 }
 
 func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []*unit, memory *int64) error {
-	if memory == nil || (svc.svc.Name != "upsql" && svc.svc.Name != "upredis") {
+	if memory == nil || (svc.spec.Image.Name != "upsql" && svc.spec.Image.Name != "upredis") {
 		return nil
 	}
 
@@ -351,9 +351,13 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 		return err
 	}
 
-	var kvPair string
-	if svc.svc.Name == "upreids" {
-		kvPair = fmt.Sprintf("%s=%d", "maxmemory", int(float64(*memory)*0.5))
+	kv := kvPair{}
+
+	if svc.spec.Image.Name == "upreids" {
+
+		kv.key = "maxmemory"
+		kv.value = strconv.Itoa(int(float64(*memory) * 0.5))
+
 	} else {
 		n := *memory
 		if n>>33 > 0 { // 8G
@@ -362,13 +366,29 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 			n = int64(float64(n) * 0.5)
 		}
 
-		kvPair = fmt.Sprintf("%s=%d", "mysqld::innodb_buffer_pool_size", n)
+		kv.key = "mysqld::innodb_buffer_pool_size"
+		kv.value = strconv.Itoa(int(n))
 	}
 
-	cmd := []string{"/root/effect-config.sh", svc.svc.Name, kvPair}
+	return effectServiceConfig(ctx, units, svc.spec.Image.Name, []kvPair{kv})
+}
+
+type kvPair struct {
+	key   string
+	value string
+}
+
+func effectServiceConfig(ctx context.Context, units []*unit, imageName string, pairs []kvPair) error {
+	cmd := make([]string, 2, 2+len(pairs))
+	cmd[0] = "/root/effect-config.sh"
+	cmd[1] = imageName
+
+	for i := range pairs {
+		cmd = append(cmd, fmt.Sprintf("%s=%s", pairs[i].key, pairs[i].value))
+	}
 
 	for i := range units {
-		_, err = units[i].containerExec(ctx, cmd, false)
+		_, err := units[i].containerExec(ctx, cmd, false)
 		if err != nil {
 			return err
 		}
