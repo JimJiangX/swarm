@@ -84,11 +84,9 @@ func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineI
 		return nil, err
 	}
 
-	if len(out) < len(requires) {
-		return nil, errors.Errorf("alloc networkings failed,%d<%d", len(out), len(requires))
-	}
-
-	if n := len(requires); len(out) > n {
+	if n := len(requires); len(out) < n {
+		return nil, errors.Errorf("alloc networkings failed,%d<%d", len(out), n)
+	} else if len(out) > n {
 		recycle = append(recycle, out[n:]...)
 		out = out[:n]
 	}
