@@ -64,7 +64,7 @@ func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineI
 		}
 		_err := at.ormer.ResetIPs(recycle)
 		if _err != nil {
-			logrus.Errorf("alloc networking:%+v", _err)
+			logrus.Errorf("reset ip:%+v", _err)
 		}
 	}()
 
@@ -73,7 +73,7 @@ func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineI
 			in[l].Networking = networkings[i]
 		}
 		out, err = at.ormer.AllocNetworking(unitID, engineID, in)
-		if err == nil && len(out) == len(in) {
+		if err == nil && len(out) >= len(in) {
 			break
 		} else if len(out) > 0 {
 			recycle = append(recycle, out...)
@@ -84,11 +84,15 @@ func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineI
 		return nil, err
 	}
 
-	if len(out) != len(in) {
-		return nil, errors.New("alloc networkings failed")
+	if len(out) < len(requires) {
+		return nil, errors.Errorf("alloc networkings failed,%d<%d", len(out), len(requires))
 	}
 
-	config.HostConfig.NetworkMode = "none"
+	if n := len(requires); len(out) > n {
+		recycle = append(recycle, out[n:]...)
+		out = out[:n]
+	}
+
 	for i := range out {
 		ip := utils.Uint32ToIP(out[i].IPAddr)
 		if ip == nil {
@@ -99,6 +103,9 @@ func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineI
 		config.Config.Env = append(config.Config.Env, "NET_DEV="+out[i].Bond)
 		break
 	}
+
+	config.HostConfig.NetworkMode = "none"
+
 	return out, nil
 }
 
