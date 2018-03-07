@@ -430,6 +430,10 @@ func mergeUnitConfig(pr parser, uc structs.UnitConfig, cc structs.ConfigCmds) (s
 		cc.ConfigFile = uc.ConfigFile
 	}
 
+	for key, cmds := range uc.Cmds {
+		cc.Cmds[key] = cmds
+	}
+
 	pr = pr.clone(nil)
 	err := pr.ParseData([]byte(cc.Content))
 	if err != nil {

@@ -2138,6 +2138,10 @@ func mergeUnitConfigChange(cc structs.UnitConfig, change structs.ModifyUnitConfi
 		cc.Content = *change.Content
 	}
 
+	for key, cmds := range change.Cmds {
+		cc.Cmds[key] = cmds
+	}
+
 	m := make(map[string]structs.Keyset, len(cc.Keysets))
 
 	for i := range cc.Keysets {
