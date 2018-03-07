@@ -2,11 +2,11 @@ package garden
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/swarm/cluster"
@@ -308,13 +308,9 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 			}
 		}
 
-		{
-			// update units config file but whether start by user
-			err := svc.updateConfigs(ctx, units, nil, nil)
-			if err != nil {
-				logrus.Errorf("%+v", err)
-			}
-
+		err = updateConfigAfterUpdateResource(ctx, svc, units, memory)
+		if err != nil {
+			return err
 		}
 
 		{
@@ -342,6 +338,43 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 		statusServiceResourceUpdating, statusServiceResourceUpdated, statusServiceResourceUpdateFailed)
 
 	return sl.Run(isnotInProgress, update, false)
+}
+
+func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []*unit, memory *int64) error {
+	if memory == nil || (svc.svc.Name != "upsql" && svc.svc.Name != "upredis") {
+		return nil
+	}
+
+	// update units config file but whether start by user
+	err := svc.updateConfigs(ctx, units, nil, nil)
+	if err != nil {
+		return err
+	}
+
+	var kvPair string
+	if svc.svc.Name == "upreids" {
+		kvPair = fmt.Sprintf("%s=%d", "maxmemory", int(float64(*memory)*0.5))
+	} else {
+		n := *memory
+		if n>>33 > 0 { // 8G
+			n = int64(float64(n) * 0.70)
+		} else {
+			n = int64(float64(n) * 0.5)
+		}
+
+		kvPair = fmt.Sprintf("%s=%d", "mysqld::innodb_buffer_pool_size", n)
+	}
+
+	cmd := []string{"/root/effect-config.sh", svc.svc.Name, kvPair}
+
+	for i := range units {
+		_, err = units[i].containerExec(ctx, cmd, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func updateDescByResource(table database.Service, ncpu, memory int64) (database.Service, error) {
