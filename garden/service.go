@@ -772,19 +772,36 @@ func (svc *Service) UpdateUnitConfig(ctx context.Context, nameOrID, path, conten
 	return u.updateServiceConfig(ctx, path, content)
 }
 
-func (svc *Service) ReloadServiceConfig(ctx context.Context) error {
-	units, err := svc.getUnits()
-	if err != nil {
-		return err
+func (svc *Service) ReloadServiceConfig(ctx context.Context, unitID string) (structs.ConfigsMap, error) {
+	var (
+		err   error
+		units []*unit
+	)
+
+	if unitID == "" {
+		units, err := svc.getUnits()
+		if err != nil {
+			return nil, err
+		}
+
+		if len(units) == 0 {
+			return nil, nil
+		} else {
+			unitID = units[0].u.ID
+		}
+	} else {
+		u, err := svc.getUnit(unitID)
+		if err != nil {
+			return nil, err
+		}
+
+		units = []*unit{u}
+		unitID = u.u.ID
 	}
 
-	if len(units) == 0 {
-		return nil
-	}
-
-	cc, err := svc.getUnitConfig(ctx, units[0].u.ID)
+	cc, err := svc.getUnitConfig(ctx, unitID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	configs := make([]structs.UnitConfig, len(units))
@@ -796,7 +813,7 @@ func (svc *Service) ReloadServiceConfig(ctx context.Context) error {
 
 		_, err := units[i].ContainerExec(ctx, cmd, false, buf)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		configs[i].ID = units[i].u.ID
@@ -805,12 +822,10 @@ func (svc *Service) ReloadServiceConfig(ctx context.Context) error {
 		configs[i].Content = buf.String()
 
 		// TODO: remove
-		logrus.Debug("reload config file", units[i].u.Name, configs[i].ConfigFile, configs[i].Content)
+		logrus.Debug("reload config file", svc.ID(), units[i].u.ID, configs[i].ConfigFile, "\n", configs[i].Content)
 	}
 
-	_, err = svc.pc.UpdateConfigs(ctx, svc.ID(), configs)
-
-	return err
+	return svc.pc.UpdateConfigs(ctx, svc.ID(), configs)
 }
 
 // Stop stop units services,stop container if containers is true.

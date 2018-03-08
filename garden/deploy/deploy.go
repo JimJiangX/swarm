@@ -280,7 +280,7 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 				return errors.Errorf("not found Service '%s' from ServicesLink", name)
 			}
 
-			err := svc.ReloadServiceConfig(ctx)
+			_, err := svc.ReloadServiceConfig(ctx, "")
 			if err != nil {
 				return err
 			}
