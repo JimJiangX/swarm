@@ -17,10 +17,13 @@ import (
 )
 
 type networkAllocOrmer interface {
-	ListIPByEngine(ID string) ([]database.IP, error)
-	ResetIPs(ips []database.IP) error
-	AllocNetworking(unit, engine string, req []database.NetworkingRequire) ([]database.IP, error)
 	SetIPs([]database.IP) error
+	ResetIPs(ips []database.IP) error
+
+	ListIPByEngine(ID string) ([]database.IP, error)
+	CountIPWithCondition(networking string, allocated bool) (int, error)
+
+	AllocNetworking(unit, engine string, req []database.NetworkingRequire) ([]database.IP, error)
 }
 
 type netAllocator struct {
@@ -30,6 +33,13 @@ type netAllocator struct {
 
 func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string,
 	networkings []string, requires []structs.NetDeviceRequire) (out []database.IP, err error) {
+	if len(requires) == 0 {
+		return nil, nil
+	}
+
+	if len(networkings) == 0 {
+		return nil, errors.New("networkings is required")
+	}
 
 	idleDevs, width, err := at.availableDevice(engineID)
 	if err != nil {
@@ -42,7 +52,7 @@ func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineI
 
 	// check network device bandwidth and band
 	if width < 0 || len(idleDevs) < len(requires) {
-		return nil, errors.Errorf("Engine:%s not enough Bandwidth for require,len(bond)=%d,%d less", engineID, len(idleDevs), width)
+		return nil, errors.Errorf("Engine:%s not enough Bandwidth for require,len(bond)=%d<%d,Bandwidth %d less", engineID, len(idleDevs), len(requires), width)
 	}
 
 	in := make([]database.NetworkingRequire, 0, len(requires))

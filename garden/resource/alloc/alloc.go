@@ -67,8 +67,33 @@ func (at *allocator) findEngineVolumeDrivers(eng *cluster.Engine) (driver.Volume
 	return vds, nil
 }
 
-func (at *allocator) ListCandidates(clusters, filters []string, stores []structs.VolumeRequire) ([]database.Node, error) {
-	nodes, err := at.ormer.ListNodesByClusters(clusters, true)
+func (at *allocator) ListCandidates(clusters, filters []string, networkings map[string][]string, stores []structs.VolumeRequire) ([]database.Node, error) {
+	netClusters := make([]string, 0, len(clusters))
+
+loop:
+	for clusterID, nets := range networkings {
+
+		for i := range nets {
+
+			n, err := at.ormer.CountIPWithCondition(nets[i], false)
+			if err == nil && n > 0 {
+				netClusters = append(netClusters, clusterID)
+
+				continue loop
+			}
+		}
+	}
+
+	clist := make([]string, 0, len(clusters))
+	for i := range clusters {
+		for nc := range netClusters {
+			if netClusters[nc] == clusters[i] {
+				clist = append(clist, netClusters[nc])
+			}
+		}
+	}
+
+	nodes, err := at.ormer.ListNodesByClusters(clist, true)
 	if err != nil {
 		return nil, err
 	}

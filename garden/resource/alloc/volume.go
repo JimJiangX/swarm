@@ -77,6 +77,10 @@ func (at *allocator) isSpaceEnough(vds driver.VolumeDrivers, stores []structs.Vo
 }
 
 func (at *allocator) AlloctVolumes(config *cluster.ContainerConfig, uid string, n *node.Node, stores []structs.VolumeRequire) ([]database.Volume, error) {
+	if len(stores) == 0 {
+		return nil, nil
+	}
+
 	engine := at.ec.Engine(n.ID)
 	if engine == nil {
 		return nil, errors.Errorf("not found Engine by ID:%s from cluster", n.Addr)

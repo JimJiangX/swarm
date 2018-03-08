@@ -20,6 +20,7 @@ type NetworkingOrmer interface {
 	ListIPByEngine(ID string) ([]IP, error)
 	ListIPByUnitID(unit string) ([]IP, error)
 	ListIPByNetworking(networkingID string) ([]IP, error)
+	CountIPWithCondition(networking string, allocated bool) (int, error)
 
 	AllocNetworking(unit, engine string, req []NetworkingRequire) ([]IP, error)
 
@@ -80,7 +81,7 @@ func (db dbBase) ListIPByNetworking(networking string) ([]IP, error) {
 	return list, errors.Wrap(err, "list []IP by networking")
 }
 
-// ListIPWithCondition returns []IP select by  unit_id!=""
+// listIPsByAllocated returns []IP select by  unit_id!=""
 func (db dbBase) listIPsByAllocated(allocated bool, num int) ([]IP, error) {
 	var (
 		out   []IP
@@ -134,25 +135,23 @@ func (db dbBase) ListIPByEngine(ID string) ([]IP, error) {
 	return out, errors.Wrap(err, "list []IP by EngineID")
 }
 
-// ListIPWithCondition returns []IP select by NetworkingID and Allocated==allocated
-func (db dbBase) ListIPWithCondition(networking string, allocated bool, num int) ([]IP, error) {
-	var (
-		out []IP
-		opt = "<>"
-	)
+// CountIPWithCondition returns num select by NetworkingID and Allocated==allocated
+func (db dbBase) CountIPWithCondition(networking string, allocated bool) (int, error) {
+	n := 0
+	opt := "<>"
 
 	if !allocated {
 		opt = "="
 	}
 
-	query := fmt.Sprintf("SELECT ip_addr,prefix,networking_id,unit_id,gateway,vlan_id,enabled,engine_id,net_dev,bandwidth FROM %s WHERE networking_id=? AND unit_id%s? LIMIT %d", db.ipTable(), opt, num)
+	query := fmt.Sprintf("SELECT COUNT(ip_addr) FROM %s WHERE networking_id=? AND unit_id%s?", db.ipTable(), opt)
 
-	err := db.Select(&out, query, networking, "")
+	err := db.Select(&n, query, networking, "")
 	if err == sql.ErrNoRows {
-		return nil, nil
+		return 0, nil
 	}
 
-	return out, errors.Wrap(err, "list []IP with condition")
+	return n, errors.Wrap(err, "list []IP with condition")
 }
 
 func combin(in []NetworkingRequire) [][]NetworkingRequire {
