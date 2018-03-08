@@ -429,6 +429,9 @@ func mergeUnitConfig(pr parser, uc structs.UnitConfig, cc structs.ConfigCmds) (s
 	if uc.ConfigFile != "" && cc.ConfigFile != uc.ConfigFile {
 		cc.ConfigFile = uc.ConfigFile
 	}
+	if uc.Content != "" && cc.Content != uc.Content {
+		cc.Content = uc.Content
+	}
 
 	for key, cmds := range uc.Cmds {
 		cc.Cmds[key] = cmds

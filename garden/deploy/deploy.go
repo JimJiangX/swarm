@@ -160,7 +160,7 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bo
 	}
 
 	if compose {
-		err = svc.Compose(ctx, d.gd.PluginClient())
+		err = svc.Compose(ctx)
 	}
 
 	return err
@@ -247,7 +247,7 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 				return errors.Errorf("not found Service '%s' from ServicesLink", name)
 			}
 
-			err := svc.Compose(ctx, d.gd.PluginClient())
+			err := svc.Compose(ctx)
 			if err != nil {
 				return err
 			}
@@ -268,6 +268,19 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 				}
 				time.Sleep(time.Second)
 			}
+			if err != nil {
+				return err
+			}
+		}
+
+		// reload service config
+		for _, name := range resp.ReloadServicesConfig {
+			svc := d.serviceFromLinks(links, name)
+			if svc == nil {
+				return errors.Errorf("not found Service '%s' from ServicesLink", name)
+			}
+
+			err := svc.ReloadServiceConfig(ctx)
 			if err != nil {
 				return err
 			}

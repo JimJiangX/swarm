@@ -60,7 +60,14 @@ func newLinkRedis(nameOrID string, links []*structs.ServiceLink) (linkRedis, err
 
 func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store) (structs.ServiceLinkResponse, error) {
 	resp := structs.ServiceLinkResponse{
-		Links: make([]structs.UnitLink, 0, 6),
+		Links:                make([]structs.UnitLink, 0, 6),
+		ReloadServicesConfig: make([]string, 2+len(lr.redis)),
+	}
+
+	resp.ReloadServicesConfig[0] = lr.proxy.ID
+	resp.ReloadServicesConfig[1] = lr.sentinel.ID
+	for i := range lr.redis {
+		resp.ReloadServicesConfig[2+i] = lr.redis[i].ID
 	}
 
 	// services addr

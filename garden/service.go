@@ -772,6 +772,44 @@ func (svc *Service) UpdateUnitConfig(ctx context.Context, nameOrID, path, conten
 	return u.updateServiceConfig(ctx, path, content)
 }
 
+func (svc *Service) ReloadServiceConfig(ctx context.Context) error {
+	units, err := svc.getUnits()
+	if err != nil {
+		return err
+	}
+
+	if len(units) == 0 {
+		return nil
+	}
+
+	cc, err := svc.getUnitConfig(ctx, units[0].u.ID)
+	if err != nil {
+		return err
+	}
+
+	configs := make([]structs.UnitConfig, len(units))
+	cmd := []string{"/bin/sh", "-c", "cat", cc.ConfigFile}
+
+	for i := range units {
+		buf := bytes.NewBuffer(nil)
+
+		_, err := units[i].ContainerExec(ctx, cmd, false, buf)
+		if err != nil {
+			return err
+		}
+
+		configs[i].ID = units[i].u.ID
+		configs[i].Service = svc.ID()
+		configs[i].Content = buf.String()
+
+		logrus.Debug(units[i].u.Name, "config file:\n", configs[i].Content)
+	}
+
+	_, err = svc.pc.UpdateConfigs(ctx, svc.ID(), configs)
+
+	return err
+}
+
 // Stop stop units services,stop container if containers is true.
 // unitID is the specified unit ID or name which is going to start.
 func (svc *Service) Stop(ctx context.Context, unitID string, containers, async bool, task *database.Task) error {
@@ -1032,7 +1070,7 @@ func (svc Service) removeUnitsConfigs(ctx context.Context, kvc kvstore.Store) er
 }
 
 // Compose call plugin compose
-func (svc *Service) Compose(ctx context.Context, pc pluginapi.PluginAPI) error {
+func (svc *Service) Compose(ctx context.Context) error {
 	var opts map[string]interface{}
 
 	if svc.spec != nil {
@@ -1046,7 +1084,7 @@ func (svc *Service) Compose(ctx context.Context, pc pluginapi.PluginAPI) error {
 
 	spec.Options = opts
 
-	return pc.ServiceCompose(ctx, *spec)
+	return svc.pc.ServiceCompose(ctx, *spec)
 }
 
 // Image returns Image,query from db.
@@ -1104,5 +1142,5 @@ func (svc *Service) GetUnitsConfigs(ctx context.Context) (structs.ServiceConfigs
 }
 
 func (svc *Service) getUnitConfig(ctx context.Context, nameOrID string) (structs.ConfigCmds, error) {
-	return svc.pc.GetUnitConfig(ctx, svc.svc.ID, nameOrID)
+	return svc.pc.GetUnitConfig(ctx, svc.ID(), nameOrID)
 }

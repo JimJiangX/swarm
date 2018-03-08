@@ -121,7 +121,7 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 		}
 
 		if req.Compose {
-			err = svc.Compose(ctx, gd.PluginClient())
+			err = svc.Compose(ctx)
 		}
 
 		return err

@@ -106,8 +106,9 @@ type UnitLink struct {
 }
 
 type ServiceLinkResponse struct {
-	Links   []UnitLink
-	Compose []string
+	Links                []UnitLink
+	Compose              []string
+	ReloadServicesConfig []string
 }
 
 type HTTPRequest struct {

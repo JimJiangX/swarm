@@ -69,7 +69,14 @@ func newLinkUpSQL(nameOrID string, links []*structs.ServiceLink) (linkUpSQL, err
 
 func (lus linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Store) (structs.ServiceLinkResponse, error) {
 	resp := structs.ServiceLinkResponse{
-		Links: make([]structs.UnitLink, 0, 6),
+		Links:                make([]structs.UnitLink, 0, 6),
+		ReloadServicesConfig: make([]string, 2+len(lus.sqls)),
+	}
+
+	resp.ReloadServicesConfig[0] = lus.proxy.ID
+	resp.ReloadServicesConfig[1] = lus.swm.ID
+	for i := range lus.sqls {
+		resp.ReloadServicesConfig[2+i] = lus.sqls[i].ID
 	}
 
 	{
