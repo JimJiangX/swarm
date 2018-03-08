@@ -2091,7 +2091,7 @@ func validPostServiceUpdateConfigsRequest(req structs.ModifyUnitConfig) error {
 		req.ConfigFile == nil &&
 		req.DataMount == nil &&
 		req.LogMount == nil &&
-		req.Content == nil &&
+		//		req.Content == nil &&
 		len(req.Cmds) == 0 {
 
 		return stderr.New("nothing new for update for service configs")
@@ -2134,9 +2134,9 @@ func mergeUnitConfigChange(cc structs.UnitConfig, change structs.ModifyUnitConfi
 	if change.ConfigFile != nil {
 		cc.ConfigFile = *change.ConfigFile
 	}
-	if change.Content != nil {
-		cc.Content = *change.Content
-	}
+	//	if change.Content != nil {
+	//		cc.Content = *change.Content
+	//	}
 
 	for key, cmds := range change.Cmds {
 		cc.Cmds[key] = cmds
