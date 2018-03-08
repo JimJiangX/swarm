@@ -135,7 +135,7 @@ func (db dbBase) ListIPByEngine(ID string) ([]IP, error) {
 	return out, errors.Wrap(err, "list []IP by EngineID")
 }
 
-// CountIPWithCondition returns num select by NetworkingID and Allocated==allocated
+// CountIPWithCondition returns num select by NetworkingID and Allocated==allocated and enabled=1
 func (db dbBase) CountIPWithCondition(networking string, allocated bool) (int, error) {
 	n := 0
 	opt := "<>"
@@ -144,9 +144,9 @@ func (db dbBase) CountIPWithCondition(networking string, allocated bool) (int, e
 		opt = "="
 	}
 
-	query := fmt.Sprintf("SELECT COUNT(ip_addr) FROM %s WHERE networking_id=? AND unit_id%s?", db.ipTable(), opt)
+	query := fmt.Sprintf("SELECT COUNT(ip_addr) FROM %s WHERE networking_id=? AND enabled=? AND unit_id%s?", db.ipTable(), opt)
 
-	err := db.Select(&n, query, networking, "")
+	err := db.Get(&n, query, networking, true, "")
 	if err == sql.ErrNoRows {
 		return 0, nil
 	}
