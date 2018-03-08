@@ -3,6 +3,7 @@ package garden
 import (
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
@@ -90,8 +91,14 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 		return err
 	}
 
+	// 2.reload unit config file
+	cms, err = svc.ReloadServiceConfig(ctx, old.unit.u.ID)
+	if err != nil {
+		logrus.Warnf("reload unit %s config file error,continue\n%+v", nameOrID, err)
+	}
+
 	{
-		// 2.generate new database.Unit,insert into database
+		// 3.generate new database.Unit,insert into database
 		add, err := svc.addNewUnit(1)
 		if err != nil {
 			return err
@@ -103,7 +110,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			vr = false
 		}
 
-		// 3.alloc new node for new unit
+		// 4.alloc new node for new unit
 		actor := alloc.NewAllocator(gd.ormer, gd.Cluster)
 		adds, pendings, err := gd.scaleAllocation(ctx, svc, nameOrID, actor, vr, false,
 			add, candidates, nil)
@@ -133,7 +140,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			news.engine = news.unit.getEngine()
 		}
 
-		// 4.migrate IP for new unit
+		// 5.migrate IP for new unit
 		{
 			// migrate networkings
 			news.networkings, err = actor.AllocDevice(news.unit.u.EngineID, news.unit.u.ID, old.networkings)
@@ -154,7 +161,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			}
 		}
 
-		// 5.migrate volume for new unit
+		// 6.migrate volume for new unit
 		if migrate {
 			// stop container before migrate volume
 			err = old.unit.stopContainer(ctx)
@@ -189,7 +196,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			}()
 		}
 
-		// 6.run new unit container
+		// 7.run new unit container
 		auth, err := gd.AuthConfig()
 		if err != nil {
 			return err
@@ -200,12 +207,16 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			return err
 		}
 
-		// 7.start new unit service
+		// 8.start new unit service
 		{
 			// using old unit config as news unit
-			cc, _err := svc.getUnitConfig(ctx, old.unit.u.ID)
-			if _err != nil {
-				return _err
+			cc, ok := cms.Get(old.unit.u.ID)
+			if !ok {
+				var _err error
+				cc, _err = svc.getUnitConfig(ctx, old.unit.u.ID)
+				if _err != nil {
+					return _err
+				}
 			}
 
 			if cc.Registration.Horus != nil {
@@ -216,7 +227,6 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 				cc.Registration.Horus.Service.Container.HostName = node.ID
 			}
 
-			cms = make(structs.ConfigsMap)
 			cms[news.unit.u.ID] = cc
 			cms[old.unit.u.ID] = cc
 
@@ -245,7 +255,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 		}
 	}
 
-	// 8.remove old unit container & volume
+	// 9.remove old unit container & volume
 	{
 		healthy := old.engine.IsHealthy()
 		rmUnits := []*unit{&old.unit}
@@ -268,14 +278,14 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			return err
 		}
 
-		// 9.migrate database related old unit
+		// 10.migrate database related old unit
 		err = svc.so.MigrateUnit(news.unit.u.ID, old.unit.u.ID, old.unit.u.Name)
 		if err != nil {
 			return err
 		}
 	}
 
-	// 10.register to third-part system
+	// 11.register to third-part system
 	{
 		u, err := svc.getUnit(old.unit.u.ID)
 		if err != nil {
@@ -293,7 +303,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 		}
 	}
 
-	// 11.compose
+	// 12.compose
 	if compose {
 		err := svc.Compose(ctx)
 		if err != nil {
