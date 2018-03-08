@@ -162,7 +162,7 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 		return nil, errors.WithStack(ctx.Err())
 	}
 
-	out, err := actor.ListCandidates(opts.Nodes.Clusters, opts.Nodes.Filters, opts.Require.Volumes)
+	out, err := actor.ListCandidates(opts.Nodes.Clusters, opts.Nodes.Filters, opts.Nodes.Networkings, opts.Require.Volumes)
 	if err != nil {
 		return nil, err
 	}
@@ -663,7 +663,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		field = logrus.WithField("Service", svc.Name())
 	)
 
-	defer func() error {
+	recycle := func() error {
 		if r := recover(); r != nil {
 			err = errors.Errorf("panic:%v", r)
 		}
@@ -689,10 +689,14 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		_err := actor.RecycleResource(ips, lvs)
 		if _err != nil {
 			err = fmt.Errorf("%+v\nRecycle resources error:%+v", err, _err)
+		} else {
+			bad = make([]pendingUnit, 0, replicas)
 		}
 
 		return err
-	}()
+	}
+
+	defer recycle()
 
 	count := replicas
 	used := make([]pendingUnit, 0, count)
@@ -702,19 +706,30 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		opts.HighAvailable, replicas, candidates)
 
 	for {
+
+		select {
+		default:
+		case <-ctx.Done():
+			err = errors.Wrapf(ctx.Err(), "%+v\n", err)
+			return nil, err
+		}
+
 		candidate := ns.selectNode(usedNodes)
 		if candidate == nil {
 			break
 		}
 
+		if err = recycle(); err != nil {
+			field.Errorf("recycle resource failed,%+v", err)
+		}
+
 		pu, err := pendingAlloc(actor, units[count-1], candidate, opts, config, vr, nr)
 		if err != nil {
 			bad = append(bad, pu)
-			bad = append(bad, used...)
 
 			field.Errorf("pending alloc:node=%s,%+v", candidate.Name, err)
 
-			return nil, err
+			continue
 		}
 
 		err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, candidate.ID, pu.config)
