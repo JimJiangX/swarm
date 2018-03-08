@@ -788,7 +788,7 @@ func (svc *Service) ReloadServiceConfig(ctx context.Context) error {
 	}
 
 	configs := make([]structs.UnitConfig, len(units))
-	cmd := []string{"/bin/sh", "-c", "cat", cc.ConfigFile}
+	cmd := []string{"cat", cc.ConfigFile}
 
 	for i := range units {
 		buf := bytes.NewBuffer(nil)
