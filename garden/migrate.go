@@ -69,6 +69,10 @@ func getUnitBaseContainer(ctx context.Context, svc *Service, unit string, kvc kv
 		}
 	}
 
+	if base.engine.IsHealthy() && base.container == nil {
+		return base, errors.Errorf("Engine %s is healthy,container %s isnot exist", base.engine.Addr, base.unit.u.Name)
+	}
+
 	if base.container == nil {
 		c, err := getContainerFromKV(ctx, kvc, base.unit.u.ContainerID)
 		if err != nil {
