@@ -2103,6 +2103,12 @@ func validPostServiceUpdateConfigsRequest(req structs.ModifyUnitConfig) error {
 func mergeServiceConfigsChange(ctx goctx.Context, svc *garden.Service, change structs.ModifyUnitConfig) (structs.ServiceConfigs, bool, error) {
 	restart := false
 
+	// reload config file first
+	_, err := svc.ReloadServiceConfig(ctx, "")
+	if err != nil {
+		return nil, false, err
+	}
+
 	configs, err := svc.GetUnitsConfigs(ctx)
 	if err != nil {
 		return nil, false, err
