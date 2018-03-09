@@ -356,7 +356,7 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 	if svc.spec.Image.Name == "upreids" {
 
 		kv.key = "maxmemory"
-		kv.value = strconv.Itoa(int(float64(*memory) * 0.5))
+		kv.value = strconv.Itoa(int(float64(*memory) * 0.75))
 
 	} else {
 		n := *memory

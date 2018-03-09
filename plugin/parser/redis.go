@@ -135,7 +135,7 @@ func (c *redisConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		c.config["port"] = strconv.Itoa(port)
 	}
 
-	c.config["maxmemory"] = strconv.Itoa(int(float64(spec.Config.HostConfig.Memory) * 0.7))
+	c.config["maxmemory"] = strconv.Itoa(int(float64(spec.Config.HostConfig.Memory) * 0.75))
 
 	if c.template != nil {
 		c.config["dir"] = c.template.DataMount
@@ -230,7 +230,7 @@ func (c *upredisConfig) GenerateConfig(id string, desc structs.ServiceSpec) erro
 		c.config["port"] = strconv.Itoa(port)
 	}
 
-	c.config["maxmemory"] = strconv.Itoa(int(float64(spec.Config.HostConfig.Memory) * 0.5))
+	c.config["maxmemory"] = strconv.Itoa(int(float64(spec.Config.HostConfig.Memory) * 0.75))
 
 	if c.template != nil {
 		c.config["dir"] = c.template.DataMount
