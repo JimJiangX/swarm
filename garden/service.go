@@ -822,7 +822,7 @@ func (svc *Service) ReloadServiceConfig(ctx context.Context, unitID string) (str
 		configs[i].Content = buf.String()
 
 		// TODO: remove
-		logrus.Debug("reload config file", svc.ID(), units[i].u.ID, configs[i].ConfigFile, "\n", configs[i].Content)
+		logrus.Debugf("reload config file:%s,%s,%s\n%s", svc.ID(), units[i].u.ID, configs[i].ConfigFile, configs[i].Content)
 	}
 
 	return svc.pc.UpdateConfigs(ctx, svc.ID(), configs)
