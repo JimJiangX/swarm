@@ -370,7 +370,7 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(req) == 0 {
-		httpError(w, errors.New("no data need update"), http.StatusBadRequest)
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 

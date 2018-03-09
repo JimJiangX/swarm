@@ -779,7 +779,7 @@ func (svc *Service) ReloadServiceConfig(ctx context.Context, unitID string) (str
 	)
 
 	if unitID == "" {
-		units, err := svc.getUnits()
+		units, err = svc.getUnits()
 		if err != nil {
 			return nil, err
 		}
