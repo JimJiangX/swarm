@@ -2730,9 +2730,16 @@ func getServiceConfigFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	_, err = svc.ReloadServiceConfig(ctx, "")
+	if err != nil {
+		ec := errCodeV1(_Service, internalError, 173, "fail to reload service configs", "重载单元配置文件内容")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
 	out, err := svc.GetUnitsConfigs(ctx)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 173, "fail to query units configs from kv", "获取服务单元配置错误")
+		ec := errCodeV1(_Service, dbQueryError, 174, "fail to query units configs from kv", "获取服务单元配置错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
