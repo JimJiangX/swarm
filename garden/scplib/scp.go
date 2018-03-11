@@ -90,7 +90,6 @@ func makeSSHClient(addr string, config *ssh.ClientConfig) (c *ssh.Client, err er
 		if c != nil {
 			c.Close()
 		}
-
 	}
 
 	return nil, errors.Wrap(err, "new SSH client")

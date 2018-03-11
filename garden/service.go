@@ -329,9 +329,9 @@ func convertUnitInfoToSpec(info database.UnitInfo, container *cluster.Container)
 			Name string `json:"name"`
 			Addr string `json:"addr"`
 		}{
-			ID:   info.Engine.EngineID,
-			Node: info.Engine.ID,
-			Addr: info.Engine.Addr,
+			ID:   info.Node.EngineID,
+			Node: info.Node.ID,
+			Addr: info.Node.Addr,
 		},
 
 		Networking: covertUnitNetwork(info.Networkings),
@@ -460,7 +460,17 @@ func (svc *Service) runContainer(ctx context.Context, pendings []pendingUnit, st
 		if err != nil {
 			return err
 		}
-		pu.Unit.ContainerID = c.ID
+		{
+			// save container after created
+			pu.Unit.ContainerID = c.ID
+			pu.Unit.EngineID = eng.ID
+			pu.Unit.NetworkMode = c.HostConfig.NetworkMode
+
+			err := svc.so.UnitContainerCreated(pu.Unit.Name, c.ID, eng.ID, c.HostConfig.NetworkMode, statusContainerCreated)
+			if err != nil {
+				return err
+			}
+		}
 
 		if start {
 			err = eng.StartContainer(c)
