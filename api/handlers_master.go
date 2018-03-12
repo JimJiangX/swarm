@@ -561,7 +561,7 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	// database.Image.ID
-	id, taskID, err := resource.LoadImage(ctx, gd.Ormer(), pc, req, time.Duration(timeout)*time.Second)
+	id, taskID, err := resource.LoadImage(ctx, gd.Cluster, gd.Ormer(), pc, req, time.Duration(timeout)*time.Second)
 	if err != nil {
 		ec := errCodeV1(_Image, internalError, 36, "fail to load image", "镜像入库失败")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/scplib"
 	"github.com/docker/swarm/garden/structs"
@@ -22,6 +23,7 @@ import (
 
 // LoadImage load a new Image
 func LoadImage(ctx context.Context,
+	cluster cluster.Cluster,
 	ormer database.ImageOrmer,
 	pc api.PluginAPI,
 	req structs.PostLoadImageRequest,
@@ -77,7 +79,7 @@ func LoadImage(ctx context.Context,
 		ch := make(chan error)
 
 		go func(ch chan<- error) {
-			ch <- loadImage(ctx, ormer, pc, image, task, path, timeout)
+			ch <- loadImage(ctx, cluster, ormer, pc, image, task, path, timeout)
 		}(ch)
 
 		select {
@@ -104,6 +106,7 @@ func LoadImage(ctx context.Context,
 }
 
 func loadImage(ctx context.Context,
+	cluster cluster.Cluster,
 	ormer database.ImageOrmer,
 	pc api.PluginAPI,
 	image database.Image,
@@ -142,13 +145,6 @@ func loadImage(ctx context.Context,
 		return err
 	}
 	{
-		// post image template to plugin
-		err := postImageTemplate(ctx, pc, oldName, path)
-		if err != nil {
-			field.Errorf("post image config template,%+v", err)
-		}
-	}
-	{
 		// update image & task
 		image.ImageID = imageID
 		image.Size = size
@@ -159,9 +155,24 @@ func loadImage(ctx context.Context,
 		task.SetErrors(nil)
 
 		err = ormer.SetImageAndTask(image, task)
+		if err != nil {
+			return err
+		}
+	}
+	{
+		// post image template to plugin
+		err := postImageTemplate(ctx, pc, oldName, path)
+		if err != nil {
+			field.Errorf("post image config template,%+v", err)
+		}
+	}
+	{
+		// sync image to all engines
+		engines := cluster.ListEngines()
+		go SyncImageToEngines(engines, ormer, []string{newName})
 	}
 
-	return err
+	return nil
 }
 
 func parsePushImageOutput(in []byte) (string, int, error) {
@@ -241,4 +252,34 @@ func walkPath(path, ext string) string {
 	e := filepath.Ext(path)
 
 	return path[:1+len(path)-len(e)] + ext
+}
+
+// SyncImageToEngines all engines pull image
+func SyncImageToEngines(engines []*cluster.Engine, ormer database.SysConfigOrmer, images []string) error {
+	auth, err := ormer.GetAuthConfig()
+	if err != nil {
+		return err
+	}
+
+	ch := make(chan struct{}, 5)
+
+	for i := range engines {
+		ch <- struct{}{}
+
+		go func(eng *cluster.Engine) {
+
+			for _, image := range images {
+
+				err := eng.Pull(image, auth, nil)
+				if err != nil {
+					logrus.Warnf("Engine %s pull image failed,%s", eng.Addr, err)
+				}
+			}
+
+			<-ch
+		}(engines[i])
+
+	}
+
+	return nil
 }
