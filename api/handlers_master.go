@@ -911,15 +911,15 @@ func getNodeInfo(ormer database.Ormer, n database.Node, e *cluster.Engine) struc
 		}
 	}
 
-	drivers, err := driver.FindEngineVolumeDrivers(ormer, e)
+	// ignore swarm-agent port,because Space() can works without port.
+	drivers, err := driver.FindEngineLocalVolumeDrivers(e, ormer, 0)
 	if err != nil && len(drivers) == 0 {
-		logrus.WithField("Node", n.Addr).Warnf("find Node VolumeDrivers error,%+v", err)
+		logrus.WithField("Node", n.Addr).Warnf("find Node local VolumeDrivers error,%+v", err)
 	} else {
 		vds := make([]structs.VolumeDriver, 0, len(drivers))
 
 		for _, d := range drivers {
-			if d == nil || d.Type() == "NFS" ||
-				d.Type() == storage.SANStore {
+			if d == nil {
 				continue
 			}
 

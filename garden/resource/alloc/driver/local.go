@@ -215,9 +215,14 @@ func volumeDriverFromEngine(iface localVolumeIface, e *cluster.Engine, label str
 		vgIface: unsupportSAN{},
 	}
 
-	_, err := lv.Space()
+	return lv, nil
+}
 
-	return lv, err
+// FindEngineLocalVolumeDrivers returns local volume drivers,include _HDDVGLabel,_SSDVGLabel.
+// port is swarm-agent server port.
+func FindEngineLocalVolumeDrivers(e *cluster.Engine, iface localVolumeIface, port int) ([]Driver, error) {
+
+	return localVolumeDrivers(e, iface, port)
 }
 
 func localVolumeDrivers(e *cluster.Engine, iface localVolumeIface, port int) ([]Driver, error) {
