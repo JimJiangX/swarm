@@ -673,6 +673,78 @@ func putImageTemplate(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 }
 
+func syncImageToEngines(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		ec := errCodeV1(_Image, urlParamError, 71, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	node := r.FormValue("host")
+	image := r.FormValue("image")
+	ormer := gd.Ormer()
+
+	var (
+		images  []string
+		engines []*cluster.Engine
+		out     []database.Image
+	)
+
+	if image == "" {
+		out, err = ormer.ListImages()
+	} else {
+		im := database.Image{}
+		im, err = ormer.GetImageVersion(image)
+		out = []database.Image{im}
+	}
+
+	if err != nil {
+		ec := errCodeV1(_Image, dbQueryError, 72, "fail to query database", "数据库查询错误（镜像表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	images = make([]string, len(out))
+	for i := range out {
+		images[i] = out[i].ImageID
+	}
+
+	if node == "" {
+		engines = gd.Cluster.ListEngines()
+	} else {
+		n, err := ormer.GetNode(node)
+		if err == nil {
+			node = n.EngineID
+		}
+
+		e := gd.Cluster.Engine(node)
+		if e == nil {
+			e = gd.Cluster.EngineByAddr(node)
+		}
+
+		if e != nil {
+			engines = []*cluster.Engine{e}
+		} else {
+			ec := errCodeV1(_Image, internalError, 73, "fail to find Engine", "找不到指定Engine")
+			httpJSONError(w, errors.Errorf("not found Engine by '%s',%+v", node, err), ec, http.StatusInternalServerError)
+			return
+		}
+	}
+
+	go resource.SyncImageToEngines(engines, ormer, images)
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // -----------------/clusters handlers-----------------
 func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
