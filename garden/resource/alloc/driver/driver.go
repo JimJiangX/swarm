@@ -63,6 +63,11 @@ func FindEngineVolumeDrivers(iface VolumeIface, engine *cluster.Engine) (VolumeD
 		return nil, errors.New("Engine is required")
 	}
 
+	node, err := iface.GetNode(engine.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	sys, err := iface.GetSysConfig()
 	if err != nil {
 		return nil, err
@@ -73,7 +78,7 @@ func FindEngineVolumeDrivers(iface VolumeIface, engine *cluster.Engine) (VolumeD
 		return nil, err
 	}
 
-	nd, err := newNFSDriver(iface, engine.ID, sys.SourceDir, sys.BackupDir)
+	nd, err := newNFSDriver(node, sys.SourceDir, sys.BackupDir)
 	if err != nil {
 		return drivers, err
 	}
@@ -82,11 +87,7 @@ func FindEngineVolumeDrivers(iface VolumeIface, engine *cluster.Engine) (VolumeD
 	}
 
 	// SAN Volume Drivers
-
-	node, err := iface.GetNode(engine.ID)
-	if err != nil || node.Storage == "" {
-		logrus.Debugf("Engine:%s %+v", engine.Name, err)
-
+	if node.Storage == "" {
 		return drivers, nil
 	}
 

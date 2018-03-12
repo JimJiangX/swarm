@@ -14,12 +14,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func newNFSDriver(iface VolumeIface, engineID, sourceDir, backupDir string) (Driver, error) {
-	n, err := iface.GetNode(engineID)
-	if err != nil {
-		return nil, err
-	}
-
+func newNFSDriver(n database.Node, sourceDir, backupDir string) (Driver, error) {
 	if n.NFS.Addr == "" {
 		return nil, nil
 	}
