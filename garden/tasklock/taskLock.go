@@ -138,7 +138,7 @@ func (tl GoTaskLock) run(check func(val int) bool, do func() error, async bool) 
 				tl.task.SetErrors(err)
 				tl.task.FinishedAt = time.Now()
 
-				field.WithField("Name", tl.task.Name)
+				field = field.WithField("Name", tl.task.Name)
 
 				if err != nil {
 					tl.task.Status = database.TaskFailedStatus
