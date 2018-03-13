@@ -415,7 +415,7 @@ func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers
 
 // RunContainer create and start container on engine.
 func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, start bool, authConfig *types.AuthConfig) error {
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.ID()+"_create containers", svc.so, nil,
 		statusServiceContainerCreating, statusServiceContainerRunning, statusServiceContainerCreateFailed)
 
 	return sl.Run(
@@ -513,7 +513,7 @@ func (svc *Service) InitStart(ctx context.Context, unitID string, kvc kvstore.Cl
 		units = []*unit{u}
 	}
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
+	sl := tasklock.NewServiceTask(svc.ID()+"_init start", svc.so, task,
 		statusInitServiceStarting, statusInitServiceStarted, statusInitServiceStartFailed)
 
 	val, err := sl.Load()
