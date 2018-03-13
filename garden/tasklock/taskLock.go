@@ -128,29 +128,26 @@ func (tl GoTaskLock) run(check func(val int) bool, do func() error, async bool) 
 			if r := recover(); r != nil {
 				err = errors.Errorf("panic:%v", r)
 			}
-			now := time.Now()
 
 			field := logrus.WithFields(logrus.Fields{
-				"Key":   tl.key,
-				"Since": now.Sub(start).String(),
+				"Key": tl.key,
 			})
-
-			val := tl.expect
 
 			if tl.task != nil {
 				tl.task.Status = database.TaskDoneStatus
 				tl.task.SetErrors(err)
-				tl.task.FinishedAt = now
-			}
+				tl.task.FinishedAt = time.Now()
 
-			if err != nil {
-				val = tl.fail
+				field.WithField("Name", tl.task.Name)
 
-				if tl.task != nil {
+				if err != nil {
 					tl.task.Status = database.TaskFailedStatus
 				}
+			}
 
-				field.Errorf("go task lock:%+v", err)
+			val := tl.expect
+			if err != nil {
+				val = tl.fail
 			}
 
 			_err := tl.setStatus(val)
@@ -158,7 +155,7 @@ func (tl GoTaskLock) run(check func(val int) bool, do func() error, async bool) 
 				field.Errorf("go task lock:setStatus error,%+v", _err)
 			}
 
-			field.Info("Task Done!")
+			field.Infof("Task Done! Since=%s %+v", time.Since(start), err)
 		}()
 
 		return do()
