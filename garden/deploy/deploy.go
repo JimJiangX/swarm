@@ -116,8 +116,6 @@ func (d *Deployment) DeployServices(ctx context.Context, services []structs.Serv
 
 func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bool,
 	t *database.Task, auth *types.AuthConfig) (err error) {
-	start := time.Now()
-
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.Errorf("deploy:%v", r)
@@ -127,6 +125,8 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bo
 			t.Status = database.TaskDoneStatus
 		} else {
 			t.Status = database.TaskFailedStatus
+
+			logrus.Errorf("service deploy error %+v", err)
 		}
 
 		t.SetErrors(err)
@@ -135,8 +135,6 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bo
 		if _err != nil {
 			logrus.Errorf("deploy task error,%+v", _err)
 		}
-
-		logrus.WithField("Service", svc.ID()).Infof("deploy serivce,since=%s,%+v", time.Since(start), err)
 	}()
 
 	select {
@@ -170,15 +168,13 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bo
 
 // Link is exported,not done yet.
 func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (string, error) {
-	start := time.Now()
-
 	links, err := d.freshServicesLink(links)
 	if err != nil {
 		return "", err
 	}
 
 	// TODO:better task info
-	task := database.NewTask("deploy link:"+links.Mode, database.ServiceLinkTask, "", "", nil, 300)
+	task := database.NewTask("deploy link", database.ServiceLinkTask, "", "", nil, 300)
 	err = d.gd.Ormer().InsertTask(task)
 	if err != nil {
 		return "", err
@@ -306,16 +302,19 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 				task.Status = database.TaskDoneStatus
 			} else {
 				task.Status = database.TaskFailedStatus
+
+				logrus.Errorf("deploy link failed,%+v", err)
 			}
 
 			task.SetErrors(err)
 
 			_err := d.gd.Ormer().SetTask(task)
 			if _err != nil {
-				logrus.Errorf("link set task,%+v", _err)
+				logrus.Errorf("deploy link and start,%+v", _err)
+				return
 			}
 
-			logrus.Infof("deploy link,since=%s,%+v", time.Since(start), err)
+			logrus.Info("deploy link and done!")
 		}()
 
 		err = runLink()

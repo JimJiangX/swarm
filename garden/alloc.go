@@ -260,7 +260,7 @@ type pendingUnit struct {
 
 // Allocation alloc resources for building containers on hosts
 func (gd *Garden) Allocation(ctx context.Context, actor alloc.Allocator, svc *Service) (ready []pendingUnit, err error) {
-	sl := tasklock.NewServiceTask(svc.ID()+"_allocation", svc.so, nil,
+	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
 		statusServiceAllocating, statusServiceAllocated, statusServiceAllocateFailed)
 
 	err = sl.Run(
