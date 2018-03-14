@@ -196,6 +196,10 @@ func (gd *Garden) DeployService(ctx context.Context,
 	sl := tasklock.NewServiceTask(database.ServiceDeployTask, svc.ID(), svc.so, task,
 		statusServiceAllocating, statusInitServiceStarted, statusInitServiceStartFailed)
 
+	sl.Before = func(key string, new int, t *database.Task, f func(val int) bool) (bool, int, error) {
+		return svc.so.ServiceStatusCAS(key, new, nil, f)
+	}
+
 	return sl.Run(
 		func(val int) bool {
 			return val == statusServcieBuilding

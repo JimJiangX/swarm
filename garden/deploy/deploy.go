@@ -167,7 +167,7 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bo
 
 func (d *Deployment) deployV2(ctx context.Context,
 	svc *garden.Service, compose bool,
-	task *database.Task, auth *types.AuthConfig) (err error) {
+	task *database.Task, auth *types.AuthConfig) error {
 
 	return d.gd.DeployService(ctx, svc, compose, task, auth)
 }

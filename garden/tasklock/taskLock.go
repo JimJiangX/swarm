@@ -57,13 +57,7 @@ func (tl GoTaskLock) _CAS(f func(val int) bool) (bool, int, error) {
 			return done, value, err
 		}
 
-		if c == 1 {
-			break
-		}
-
-		if t > 0 {
-			time.Sleep(t)
-		}
+		time.Sleep(t)
 	}
 
 	return done, value, err
@@ -84,20 +78,14 @@ func (tl GoTaskLock) setStatus(val int) error {
 		tl.retries = 1
 	}
 
-	t := tl.waitTime / time.Duration(tl.retries+1)
+	t := tl.waitTime / time.Duration(tl.retries)
 
-	for c := tl.retries; c > 0; c-- {
-		if t > 0 {
-			time.Sleep(t)
-		}
+	for c := tl.retries - 1; c > 0; c-- {
+		time.Sleep(t)
 
 		err = tl.After(tl.key, val, tl.task, now)
 		if err == nil {
 			return nil
-		}
-
-		if c == 1 {
-			break
 		}
 	}
 
@@ -196,7 +184,7 @@ func NewServiceTask(action, key string, ormer database.ServiceOrmer,
 		action:   action,
 		key:      key,
 		retries:  3,
-		waitTime: time.Second * 2,
+		waitTime: time.Second * 3,
 
 		load:   ormer.GetServiceStatus,
 		After:  ormer.SetServiceWithTask,
