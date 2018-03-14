@@ -173,7 +173,7 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 	}
 
 	// TODO:better task info
-	task := database.NewTask("deploy link", database.ServiceLinkTask, "", "", nil, 300)
+	task := database.NewTask("deploy link:"+links.Mode, database.ServiceLinkTask, "", "", nil, 300)
 	err = d.gd.Ormer().InsertTask(task)
 	if err != nil {
 		return "", err
@@ -289,10 +289,9 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 	}
 
 	go func() (err error) {
-		d.gd.Lock()
-		defer func() {
-			d.gd.Unlock()
+		start := time.Now()
 
+		defer func() {
 			if r := recover(); r != nil {
 				err = errors.Errorf("deploy link,panic:%v", r)
 			}
@@ -301,19 +300,13 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 				task.Status = database.TaskDoneStatus
 			} else {
 				task.Status = database.TaskFailedStatus
-
-				logrus.Errorf("deploy link failed,%+v", err)
 			}
 
 			task.SetErrors(err)
 
 			_err := d.gd.Ormer().SetTask(task)
-			if _err != nil {
-				logrus.Errorf("deploy link and start,%+v", _err)
-				return
-			}
 
-			logrus.Info("deploy link and done!")
+			logrus.Infof("deploy link %s,since=%s,%+v %+v", time.Since(start), _err, err)
 		}()
 
 		err = runLink()
