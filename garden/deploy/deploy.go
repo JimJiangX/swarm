@@ -108,7 +108,7 @@ func (d *Deployment) DeployServices(ctx context.Context, services []structs.Serv
 			TaskID: task.ID,
 		})
 
-		go d.deploy(ctx, service, compose, task, auth)
+		go d.deployV2(ctx, service, compose, task, auth)
 	}
 
 	return out, nil
@@ -163,6 +163,13 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bo
 	}
 
 	return err
+}
+
+func (d *Deployment) deployV2(ctx context.Context,
+	svc *garden.Service, compose bool,
+	task *database.Task, auth *types.AuthConfig) (err error) {
+
+	return d.gd.DeployService(ctx, svc, compose, task, auth)
 }
 
 // Link is exported,not done yet.
