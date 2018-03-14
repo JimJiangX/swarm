@@ -52,7 +52,7 @@ func (svc *Service) Backup(ctx context.Context, local string, config structs.Ser
 		return err
 	}
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
+	sl := tasklock.NewServiceTask(database.ServiceBackupTask, svc.ID(), svc.so, task,
 		statusServiceBackuping, statusServiceBackupDone, statusServiceBackupFailed)
 
 	return sl.Run(isnotInProgress, backup, async)

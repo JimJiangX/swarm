@@ -129,7 +129,7 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 
 	task := database.NewTask(svc.Name(), database.ServiceScaleTask, svc.ID(), fmt.Sprintf("replicas=%d", req.Arch.Replicas), nil, 300)
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, &task,
+	sl := tasklock.NewServiceTask(database.ServiceScaleTask, svc.ID(), svc.so, &task,
 		statusServiceScaling, statusServiceScaled, statusServiceScaleFailed)
 
 	err = sl.Run(isnotInProgress, scale, async)

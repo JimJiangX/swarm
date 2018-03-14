@@ -116,6 +116,8 @@ func (d *Deployment) DeployServices(ctx context.Context, services []structs.Serv
 
 func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bool,
 	t *database.Task, auth *types.AuthConfig) (err error) {
+
+	start := time.Now()
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.Errorf("deploy:%v", r)
@@ -125,16 +127,13 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bo
 			t.Status = database.TaskDoneStatus
 		} else {
 			t.Status = database.TaskFailedStatus
-
-			logrus.Errorf("service deploy error %+v", err)
 		}
 
 		t.SetErrors(err)
 
 		_err := d.gd.Ormer().SetTask(*t)
-		if _err != nil {
-			logrus.Errorf("deploy task error,%+v", _err)
-		}
+
+		logrus.WithField("Service", svc.ID()).Infof("deploy service,since=%s,%+v %+v", time.Since(start), _err, err)
 	}()
 
 	select {

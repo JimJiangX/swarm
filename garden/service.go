@@ -415,7 +415,7 @@ func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers
 
 // RunContainer create and start container on engine.
 func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, start bool, authConfig *types.AuthConfig) error {
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
+	sl := tasklock.NewServiceTask(database.ServiceCreateContainerTask, svc.ID(), svc.so, nil,
 		statusServiceContainerCreating, statusServiceContainerRunning, statusServiceContainerCreateFailed)
 
 	return sl.Run(
@@ -513,7 +513,7 @@ func (svc *Service) InitStart(ctx context.Context, unitID string, kvc kvstore.Cl
 		units = []*unit{u}
 	}
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
+	sl := tasklock.NewServiceTask(database.ServiceInitStartTask, svc.ID(), svc.so, task,
 		statusInitServiceStarting, statusInitServiceStarted, statusInitServiceStartFailed)
 
 	val, err := sl.Load()
@@ -686,7 +686,7 @@ func (svc *Service) Start(ctx context.Context, units []*unit, task *database.Tas
 		return svc.start(ctx, units, cmds)
 	}
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
+	sl := tasklock.NewServiceTask(database.ServiceStartTask, svc.ID(), svc.so, task,
 		statusServiceStarting, statusServiceStarted, statusServiceStartFailed)
 
 	return sl.Run(isnotInProgress, start, detach)
@@ -733,7 +733,7 @@ func (svc *Service) UpdateUnitsConfigs(ctx context.Context,
 		return err
 	}
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
+	sl := tasklock.NewServiceTask(database.ServiceUpdateConfigTask, svc.ID(), svc.so, task,
 		statusServiceConfigUpdating, statusServiceConfigUpdated, statusServiceConfigUpdateFailed)
 
 	return sl.Run(isnotInProgress, update, async)
@@ -856,7 +856,7 @@ func (svc *Service) Stop(ctx context.Context, unitID string, containers, async b
 		return svc.stop(ctx, units, containers)
 	}
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
+	sl := tasklock.NewServiceTask(database.ServiceStopTask, svc.ID(), svc.so, task,
 		statusServiceStoping, statusServiceStoped, statusServiceStopFailed)
 
 	return sl.Run(isnotInProgress, stop, async)
@@ -928,7 +928,7 @@ func (svc *Service) Exec(ctx context.Context, config structs.ServiceExecConfig, 
 		return nil
 	}
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
+	sl := tasklock.NewServiceTask(database.ServiceExecTask, svc.ID(), svc.so, task,
 		statusServiceExecStart, statusServiceExecDone, statusServiceExecFailed)
 
 	return sl.Run(isnotInProgress, exec, async)
@@ -996,7 +996,7 @@ func (svc *Service) Remove(ctx context.Context, r kvstore.Client, force bool) (e
 		return err
 	}
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
+	sl := tasklock.NewServiceTask(database.ServiceRemoveTask, svc.ID(), svc.so, nil,
 		statusServiceDeleting, 0, statusServiceDeleteFailed)
 
 	sl.After = func(key string, val int, task *database.Task, t time.Time) (err error) {

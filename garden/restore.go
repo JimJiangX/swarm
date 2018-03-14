@@ -93,7 +93,7 @@ func (svc *Service) UnitRestore(ctx context.Context, assigned []string, path str
 	}
 
 	t := database.NewTask(svc.Name(), database.UnitRestoreTask, svc.ID(), strings.Join(assigned, "&&"), nil, 300)
-	tl := tasklock.NewServiceTask(svc.ID(), svc.so, &t,
+	tl := tasklock.NewServiceTask(database.UnitRestoreTask, svc.ID(), svc.so, &t,
 		statusServiceRestoring,
 		statusServiceRestored,
 		statusServiceRestoreFailed)

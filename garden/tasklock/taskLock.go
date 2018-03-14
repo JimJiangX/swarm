@@ -16,6 +16,7 @@ type GoTaskLock struct {
 	fail    int
 
 	task     *database.Task
+	name     string
 	key      string
 	retries  int
 	waitTime time.Duration
@@ -130,15 +131,14 @@ func (tl GoTaskLock) run(check func(val int) bool, do func() error, async bool) 
 			}
 
 			field := logrus.WithFields(logrus.Fields{
-				"Key": tl.key,
+				"Key":  tl.key,
+				"Name": tl.name,
 			})
 
 			if tl.task != nil {
 				tl.task.Status = database.TaskDoneStatus
 				tl.task.SetErrors(err)
 				tl.task.FinishedAt = time.Now()
-
-				field = field.WithField("Name", tl.task.Name)
 
 				if err != nil {
 					tl.task.Status = database.TaskFailedStatus
@@ -151,11 +151,8 @@ func (tl GoTaskLock) run(check func(val int) bool, do func() error, async bool) 
 			}
 
 			_err := tl.setStatus(val)
-			if _err != nil {
-				field.Errorf("go task lock:setStatus error,%+v", _err)
-			}
 
-			field.Infof("Task Done! Since=%s %+v", time.Since(start), err)
+			field.Infof("Task Done! Since=%s %+v %+v", time.Since(start), _err, err)
 		}()
 
 		return do()
@@ -171,12 +168,13 @@ func (tl GoTaskLock) run(check func(val int) bool, do func() error, async bool) 
 }
 
 // NewGoTask returns GoTaskLock
-func NewGoTask(key string, task *database.Task,
+func NewGoTask(name, key string, task *database.Task,
 	before func(key string, new int, t *database.Task, f func(val int) bool) (bool, int, error),
 	after func(key string, val int, task *database.Task, t time.Time) error) GoTaskLock {
 
 	return GoTaskLock{
 		task:     task,
+		name:     name,
 		key:      key,
 		retries:  3,
 		waitTime: time.Second * 2,
@@ -186,7 +184,7 @@ func NewGoTask(key string, task *database.Task,
 }
 
 // NewServiceTask returns a GoTaskLock,init by ServiceOrmer
-func NewServiceTask(key string, ormer database.ServiceOrmer,
+func NewServiceTask(name, key string, ormer database.ServiceOrmer,
 	t *database.Task, current, expect, fail int) GoTaskLock {
 
 	return GoTaskLock{
@@ -195,6 +193,7 @@ func NewServiceTask(key string, ormer database.ServiceOrmer,
 		fail:    fail,
 
 		task:     t,
+		name:     name,
 		key:      key,
 		retries:  3,
 		waitTime: time.Second * 2,

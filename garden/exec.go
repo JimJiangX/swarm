@@ -11,7 +11,7 @@ import (
 
 // ExecLock service run containers exec process with locked.
 func (svc *Service) ExecLock(exec func() error, async bool, task *database.Task) error {
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
+	sl := tasklock.NewServiceTask(database.ServiceExecTask, svc.ID(), svc.so, task,
 		statusServiceExecStart, statusServiceExecDone, statusServiceExecFailed)
 
 	return sl.Run(isnotInProgress, exec, async)

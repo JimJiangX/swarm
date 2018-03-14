@@ -95,7 +95,7 @@ func LoadImage(ctx context.Context,
 		return nil
 	}
 
-	tl := tasklock.NewGoTask(image.ID, &task, before, after)
+	tl := tasklock.NewGoTask(database.ImageLoadTask, image.ID, &task, before, after)
 
 	err = tl.Go(func(int) bool { return true }, run)
 	if err != nil {

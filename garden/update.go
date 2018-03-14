@@ -170,7 +170,9 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 		}
 	}
 
-	tl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
+	tl := tasklock.NewServiceTask(
+		database.ServiceUpdateImageTask,
+		svc.ID(), svc.so, task,
 		statusServiceImageUpdating,
 		statusServiceImageUpdated,
 		statusServiceImageUpdateFailed)
@@ -334,7 +336,7 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 		}
 	}
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
+	sl := tasklock.NewServiceTask(database.ServiceUpdateTask+"_cpu", svc.ID(), svc.so, nil,
 		statusServiceResourceUpdating, statusServiceResourceUpdated, statusServiceResourceUpdateFailed)
 
 	return sl.Run(isnotInProgress, update, false)
@@ -546,7 +548,7 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 		}
 	}
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
+	sl := tasklock.NewServiceTask(database.ServiceUpdateTask+"_lv", svc.ID(), svc.so, nil,
 		statusServiceVolumeExpanding, statusServiceVolumeExpanded, statusServiceVolumeExpandFailed)
 
 	return sl.Run(isnotInProgress, expansion, false)
@@ -673,7 +675,7 @@ func (svc *Service) UpdateNetworking(ctx context.Context, actor alloc.Allocator,
 		}
 	}
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
+	sl := tasklock.NewServiceTask(database.ServiceUpdateTask+"_net", svc.ID(), svc.so, nil,
 		statusServiceNetworkUpdating, statusServiceNetworkUpdated, statusServiceNetworkUpdateFailed)
 
 	return sl.Run(isnotInProgress, update, false)

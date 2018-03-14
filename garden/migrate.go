@@ -21,7 +21,7 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, req structs.
 
 	task := database.NewTask(svc.Name(), database.UnitMigrateTask, svc.ID(), req.NameOrID, nil, 300)
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, &task,
+	sl := tasklock.NewServiceTask(database.UnitMigrateTask, svc.ID(), svc.so, &task,
 		statusServiceUnitMigrating, statusServiceUnitMigrated, statusServiceUnitMigrateFailed)
 
 	err := sl.Run(isnotInProgress, func() error {

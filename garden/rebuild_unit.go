@@ -18,7 +18,7 @@ func (gd *Garden) RebuildUnits(ctx context.Context, actor alloc.Allocator, svc *
 
 	task := database.NewTask(svc.Name(), database.UnitRebuildTask, svc.ID(), "", nil, 300)
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, &task,
+	sl := tasklock.NewServiceTask(database.UnitRebuildTask, svc.ID(), svc.so, &task,
 		statusServiceUnitRebuilding, statusServiceUnitRebuilt, statusServiceUnitRebuildFailed)
 
 	err := sl.Run(isnotInProgress, func() error {
