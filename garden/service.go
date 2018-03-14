@@ -879,7 +879,7 @@ func (svc *Service) stop(ctx context.Context, units []*unit, containers bool) (e
 		cmd := cmds.GetCmd(units[i].u.ID, structs.StopServiceCmd)
 
 		_, err = units[i].containerExec(ctx, cmd, false)
-		if err != nil {
+		if err != nil && !isContainerNotRunning(units[i].getContainer(), err) {
 			return err
 		}
 	}
@@ -890,12 +890,28 @@ func (svc *Service) stop(ctx context.Context, units []*unit, containers bool) (e
 
 	for i := range units {
 		err = units[i].stopContainer(ctx)
-		if err != nil {
+		if err != nil && !isContainerNotRunning(units[i].getContainer(), err) {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func isContainerNotRunning(c *cluster.Container, err error) bool {
+	if c == nil {
+		return false // unknown
+	}
+
+	if !c.Info.State.Running {
+		return true
+	}
+
+	if _err, ok := err.(errContainer); ok && _err.action == notRunning {
+		return true
+	}
+
+	return false
 }
 
 // Exec exec command in Service containers,if config.Container is assigned,exec the assigned unit command
