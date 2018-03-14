@@ -167,6 +167,8 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bo
 
 // Link is exported,not done yet.
 func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (string, error) {
+	start := time.Now()
+
 	links, err := d.freshServicesLink(links)
 	if err != nil {
 		return "", err
@@ -288,8 +290,6 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 	}
 
 	go func() (err error) {
-		start := time.Now()
-
 		defer func() {
 			if r := recover(); r != nil {
 				err = errors.Errorf("deploy link,panic:%v", r)
