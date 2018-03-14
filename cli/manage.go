@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/pkg/discovery"
 	kvdiscovery "github.com/docker/docker/pkg/discovery/kv"
@@ -229,10 +228,10 @@ func run(cl cluster.Cluster, candidate *leadership.Candidate, server *api.Server
 					eh = garden.NewEventHandler(ormer)
 					cl.RegisterEventHandler(eh)
 
-					logrus.Info("mark running tasks")
+					log.Info("mark running tasks")
 					err := ormer.MarkRunningTasks()
 					if err != nil {
-						logrus.Errorf("%+v", err)
+						log.Errorf("%+v", err)
 					}
 				}
 			} else {
