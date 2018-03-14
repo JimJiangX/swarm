@@ -15,7 +15,9 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
+	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/garden/tasklock"
 	pluginapi "github.com/docker/swarm/plugin/parser/api"
 	"github.com/docker/swarm/scheduler"
 	consulapi "github.com/hashicorp/consul/api"
@@ -148,6 +150,48 @@ func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, erro
 	}
 
 	return out, nil
+}
+
+// DeployService deploy service
+func (gd *Garden) DeployService(ctx context.Context,
+	svc *Service, compose bool,
+	task *database.Task, auth *types.AuthConfig) error {
+
+	deploy := func() error {
+		actor := alloc.NewAllocator(gd.ormer, gd.Cluster)
+		pendings, err := gd.allocation(ctx, actor, svc, nil, true, true)
+		if err != nil {
+			return err
+		}
+
+		err = svc.runContainer(ctx, pendings, false, auth)
+		if err != nil {
+			return err
+		}
+
+		err = svc.initStart(ctx, nil, gd.kvClient, nil, nil)
+		if err != nil {
+			return err
+		}
+
+		if compose {
+			err = svc.Compose(ctx)
+		}
+
+		return err
+	}
+
+	sl := tasklock.NewServiceTask(database.ServiceDeployTask, svc.ID(), svc.so, task,
+		statusServiceAllocating, statusInitServiceStarted, statusInitServiceStartFailed)
+
+	return sl.Run(
+		func(val int) bool {
+			return val == statusServcieBuilding
+		},
+		func() error {
+			return deploy()
+		},
+		false)
 }
 
 // Register set Garden,returns a error if has registered in database

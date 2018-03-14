@@ -42,6 +42,7 @@ const (
 	ImageLoadTask = "image_load"
 
 	// create and run service task
+	ServiceDeployTask          = "service_deploy"
 	ServiceAllocationTask      = "service_allocation"
 	ServiceRunTask             = "service_create"
 	ServiceCreateContainerTask = "service_create_containers"
