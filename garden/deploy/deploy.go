@@ -172,7 +172,6 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 		return "", err
 	}
 
-	// TODO:better task info
 	task := database.NewTask("deploy link:"+links.Mode, database.ServiceLinkTask, "", "", nil, 300)
 	err = d.gd.Ormer().InsertTask(task)
 	if err != nil {
@@ -306,7 +305,7 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 
 			_err := d.gd.Ormer().SetTask(task)
 
-			logrus.Infof("deploy link %s,since=%s,%+v %+v", time.Since(start), _err, err)
+			logrus.Infof("deploy link %s,since=%s,%+v %+v", links.Mode, time.Since(start), _err, err)
 		}()
 
 		err = runLink()
