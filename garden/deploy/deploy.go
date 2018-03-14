@@ -60,7 +60,7 @@ func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec, compo
 		}
 	}
 
-	go d.deploy(ctx, svc, compose, task, auth)
+	go d.deployV2(ctx, svc, compose, task, auth)
 
 	return resp, nil
 }
