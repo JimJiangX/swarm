@@ -16,7 +16,7 @@ type GoTaskLock struct {
 	fail    int
 
 	task     *database.Task
-	name     string
+	action   string
 	key      string
 	retries  int
 	waitTime time.Duration
@@ -131,8 +131,8 @@ func (tl GoTaskLock) run(check func(val int) bool, do func() error, async bool) 
 			}
 
 			field := logrus.WithFields(logrus.Fields{
-				"Key":  tl.key,
-				"Name": tl.name,
+				"Key":    tl.key,
+				"Action": tl.action,
 			})
 
 			if tl.task != nil {
@@ -168,13 +168,13 @@ func (tl GoTaskLock) run(check func(val int) bool, do func() error, async bool) 
 }
 
 // NewGoTask returns GoTaskLock
-func NewGoTask(name, key string, task *database.Task,
+func NewGoTask(action, key string, task *database.Task,
 	before func(key string, new int, t *database.Task, f func(val int) bool) (bool, int, error),
 	after func(key string, val int, task *database.Task, t time.Time) error) GoTaskLock {
 
 	return GoTaskLock{
 		task:     task,
-		name:     name,
+		action:   action,
 		key:      key,
 		retries:  3,
 		waitTime: time.Second * 2,
@@ -184,7 +184,7 @@ func NewGoTask(name, key string, task *database.Task,
 }
 
 // NewServiceTask returns a GoTaskLock,init by ServiceOrmer
-func NewServiceTask(name, key string, ormer database.ServiceOrmer,
+func NewServiceTask(action, key string, ormer database.ServiceOrmer,
 	t *database.Task, current, expect, fail int) GoTaskLock {
 
 	return GoTaskLock{
@@ -193,7 +193,7 @@ func NewServiceTask(name, key string, ormer database.ServiceOrmer,
 		fail:    fail,
 
 		task:     t,
-		name:     name,
+		action:   action,
 		key:      key,
 		retries:  3,
 		waitTime: time.Second * 2,
