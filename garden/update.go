@@ -103,9 +103,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 			}
 
 			if err == nil {
-				if err = c.nc.Engine.RenameContainer(c.nc, c.u.Name); err == nil {
-					err = c.nc.Engine.StartContainer(c.nc)
-				}
+				err = c.nc.Engine.RenameContainer(c.nc, c.u.Name)
 			}
 			if err != nil {
 				return errors.WithStack(err)
