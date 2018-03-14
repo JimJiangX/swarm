@@ -15,7 +15,7 @@ import (
 
 const (
 	defaultConsulAddr = "127.0.0.1:8500"
-	defaultTimeout    = 30 * time.Second
+	defaultTimeout    = 2 * time.Minute
 )
 
 // NewClient returns a consul Client
