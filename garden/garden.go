@@ -157,38 +157,26 @@ func (gd *Garden) DeployService(ctx context.Context,
 	svc *Service, compose bool,
 	task *database.Task, auth *types.AuthConfig) error {
 
-	fd := logrus.WithField("Service", svc.Name())
-	fd.Debug("garden.DeployService...")
-
 	deploy := func() error {
-		fd.Debug("garden.DeployService...deploy...")
-
 		actor := alloc.NewAllocator(gd.ormer, gd.Cluster)
 		pendings, err := gd.allocation(ctx, actor, svc, nil, true, true)
 		if err != nil {
 			return err
 		}
 
-		fd.Debug("garden.DeployService...allocation...")
 		err = svc.runContainer(ctx, pendings, false, auth)
 		if err != nil {
 			return err
 		}
 
-		fd.Debug("garden.DeployService...runContainer...")
 		err = svc.initStart(ctx, nil, gd.kvClient, nil, nil)
 		if err != nil {
 			return err
 		}
 
-		fd.Debug("garden.DeployService...initStart...")
-
 		if compose {
 			err = svc.Compose(ctx)
-			fd.Debug("garden.DeployService...compose...")
 		}
-
-		fd.Debug("garden.DeployService...deploy...done! ", err)
 
 		return err
 	}
