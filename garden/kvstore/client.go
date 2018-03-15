@@ -42,8 +42,8 @@ func NewClient(uri string, options map[string]string) (Client, error) {
 	}
 
 	config := &api.Config{
-		Address:  addrs[0],
-		WaitTime: defaultTimeout,
+		Address: addrs[0],
+		//	WaitTime: defaultTimeout,
 	}
 
 	var tlsConfig *tls.Config
