@@ -359,7 +359,7 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 
 	kv := kvPair{}
 
-	if strings.Contains(svc.spec.Image.Name, "upreids") {
+	if svc.spec.Image.Name == "upredis" {
 
 		kv.key = "maxmemory"
 		kv.value = strconv.Itoa(int(float64(*memory) * 0.75))
@@ -374,6 +374,7 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 
 		kv.key = "mysqld::innodb_buffer_pool_size"
 		kv.value = strconv.Itoa(int(n))
+
 	}
 
 	return effectServiceConfig(ctx, units, svc.spec.Image.Name, []kvPair{kv})
