@@ -339,12 +339,17 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 }
 
 func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []*unit, memory *int64) error {
+	cms, err := svc.ReloadServiceConfig(ctx, "")
+	if err != nil {
+		return err
+	}
+
 	if memory == nil || (svc.spec.Image.Name != "upsql" && svc.spec.Image.Name != "upredis") {
 		return nil
 	}
 
 	// update units config file but whether start by user
-	err := svc.updateConfigs(ctx, units, nil, nil)
+	err = svc.updateConfigs(ctx, units, cms, nil)
 	if err != nil {
 		return err
 	}
