@@ -316,6 +316,7 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 		}()
 
 		err = runLink()
+
 		return err
 	}()
 

@@ -163,8 +163,12 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 	}
 
 	out, err := actor.ListCandidates(opts.Nodes.Clusters, opts.Nodes.Filters, opts.Nodes.Networkings, opts.Require.Volumes)
-	if err != nil {
+	if err != nil && len(out) == 0 {
 		return nil, err
+	}
+
+	if err != nil {
+		logrus.Warnf("ListCandidates:%+v", err)
 	}
 
 	if len(out) == 0 {
@@ -183,15 +187,12 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 	select {
 	default:
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return nil, errors.WithStack(ctx.Err())
 	}
 
 	nodes, err = _scheduler.SelectNodesForContainer(nodes, config)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
 
-	return nodes, nil
+	return nodes, errors.WithStack(err)
 }
 
 func setNodesWithLable(out []database.Node, cl cluster.Cluster, iface database.ClusterIface) ([]*node.Node, error) {
@@ -949,9 +950,9 @@ func (gd *Garden) allocationV3(ctx context.Context, actor alloc.Allocator, svc *
 			return nil, errors.WithStack(ctx.Err())
 		}
 
-		err := recycle()
-		if err != nil {
-			field.Debugf("Recycle resources error:%+v", err)
+		_err := recycle()
+		if _err != nil {
+			field.Errorf("Recycle resources error:%+v", _err)
 		}
 
 		used := make([]pendingUnit, 0, count)
@@ -961,17 +962,18 @@ func (gd *Garden) allocationV3(ctx context.Context, actor alloc.Allocator, svc *
 				continue
 			}
 
-			pu, err := pendingAlloc(actor, units[count-1], nodes[i], opts, config, vr, nr)
+			var pu pendingUnit
+			pu, err = pendingAlloc(actor, units[count-1], nodes[i], opts, config, vr, nr)
 			if err != nil {
 				bad = append(bad, pu)
-				field.Debugf("pending alloc:node=%s,%+v", nodes[i].Name, err)
+				field.Warnf("pending alloc:node=%s,%+v", nodes[i].Name, err)
 				continue
 			}
 
 			err = gd.Cluster.AddPendingContainer(pu.Name, pu.swarmID, nodes[i].ID, pu.config)
 			if err != nil {
 				bad = append(bad, pu)
-				field.Debugf("AddPendingContainer:node=%s,%+v", nodes[i].Name, err)
+				field.Warnf("AddPendingContainer:node=%s,%+v", nodes[i].Name, err)
 				continue
 			}
 
@@ -989,5 +991,5 @@ func (gd *Garden) allocationV3(ctx context.Context, actor alloc.Allocator, svc *
 		}
 	}
 
-	return nil, errors.Errorf("not enough nodes for allocation,%d units waiting", replicas)
+	return nil, errors.Errorf("not enough nodes for allocation,%d units waiting,%+v", replicas, err)
 }
