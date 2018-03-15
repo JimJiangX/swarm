@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/swarm/cluster"
@@ -348,6 +349,8 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 		return nil
 	}
 
+	logrus.Debugf("updateConfigAfterUpdateResource:'%s'", svc.spec.Image.Name)
+
 	// update units config file but whether start by user
 	err = svc.updateConfigs(ctx, units, cms, nil)
 	if err != nil {
@@ -356,7 +359,7 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 
 	kv := kvPair{}
 
-	if svc.spec.Image.Name == "upreids" {
+	if strings.Contains(svc.spec.Image.Name, "upreids") {
 
 		kv.key = "maxmemory"
 		kv.value = strconv.Itoa(int(float64(*memory) * 0.75))
