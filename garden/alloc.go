@@ -166,11 +166,9 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 	if err != nil && len(out) == 0 {
 		return nil, err
 	}
-
 	if err != nil {
-		logrus.Warnf("ListCandidates:%+v", err)
+		logrus.Warnf("%+v", err)
 	}
-
 	if len(out) == 0 {
 		return nil, errors.New("no one node that satisfies")
 	}

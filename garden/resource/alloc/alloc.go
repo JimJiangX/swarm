@@ -159,7 +159,13 @@ loop:
 		out = append(out, nodes[i])
 	}
 
-	return out, errors.Errorf("%s", errs)
+	if len(errs) > 0 {
+		err = errors.Errorf("ListCandidates warnings:%s", errs)
+	} else {
+		err = nil
+	}
+
+	return out, err
 }
 
 func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, ncpu, memory int64, reserved []string) (string, error) {
