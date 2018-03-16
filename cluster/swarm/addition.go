@@ -68,9 +68,14 @@ func (c *Cluster) ListEngines(list ...string) []*cluster.Engine {
 			}
 		}
 
-		for _, pc := range c.pendingContainers {
+		for swarmID, pc := range c.pendingContainers {
 			if pc.Engine.ID == n.ID {
-				n.AddContainer(pc.ToContainer())
+				c := pc.ToContainer()
+				if c.ID == "" {
+					c.ID = swarmID
+				}
+
+				n.AddContainer(c)
 			}
 		}
 
