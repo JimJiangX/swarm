@@ -722,7 +722,8 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 			field.Errorf("recycle resource failed,%+v", err)
 		}
 
-		pu, err := pendingAlloc(actor, units[count-1], candidate, opts, config, vr, nr)
+		var pu pendingUnit
+		pu, err = pendingAlloc(actor, units[count-1], candidate, opts, config, vr, nr)
 		if err != nil {
 			bad = append(bad, pu)
 
