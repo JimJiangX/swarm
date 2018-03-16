@@ -17,7 +17,7 @@ import (
 	"golang.org/x/net/context/ctxhttp"
 )
 
-const defaultTimeout = 30 * time.Second
+const defaultTimeout = 2 * time.Minute
 
 type encoder struct {
 	bodyType string

@@ -38,6 +38,7 @@ func NewRouter(c kvstore.Client, kvpath, dir, ip string, port int) *mux.Router {
 		mgmIP:     ip,
 		mgmPort:   port,
 		scriptDir: dir,
+		context:   context.Background(),
 	}
 
 	var routes = map[string]map[string]handler{
@@ -71,7 +72,7 @@ func NewRouter(c kvstore.Client, kvpath, dir, ip string, port int) *mux.Router {
 			wrap := func(w http.ResponseWriter, r *http.Request) {
 				logrus.WithFields(logrus.Fields{"method": r.Method, "uri": r.RequestURI}).Debug("HTTP request received")
 
-				ctx.context = r.Context()
+				//	ctx.context = r.Context()
 				ctx.apiVersion = mux.Vars(r)["version"]
 
 				localFct(ctx, w, r)
