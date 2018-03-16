@@ -162,6 +162,9 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 		return nil, errors.WithStack(ctx.Err())
 	}
 
+	gd.scheduler.Lock()
+	defer gd.scheduler.Unlock()
+
 	out, err := actor.ListCandidates(opts.Nodes.Clusters, opts.Nodes.Filters, opts.Nodes.Networkings, opts.Require.Volumes)
 	if err != nil && len(out) == 0 {
 		return nil, err
@@ -636,13 +639,10 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	gd.Lock()
 	defer gd.Unlock()
 
-	gd.scheduler.Lock()
 	candidates, err := gd.schedule(ctx, actor, config, opts)
 	if err != nil {
-		gd.scheduler.Unlock()
 		return nil, err
 	}
-	gd.scheduler.Unlock()
 
 	if units == nil {
 		units, err = svc.so.ListUnitByServiceID(svc.ID())

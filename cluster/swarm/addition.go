@@ -44,10 +44,6 @@ func (c *Cluster) Engine(IDOrName string) *cluster.Engine {
 // containers in pendingContainers are include.
 func (c *Cluster) ListEngines(list ...string) []*cluster.Engine {
 	c.RLock()
-	defer c.RUnlock()
-
-	c.scheduler.Lock()
-	defer c.scheduler.Unlock()
 
 	all := true
 	if len(list) > 0 {
@@ -80,6 +76,8 @@ func (c *Cluster) ListEngines(list ...string) []*cluster.Engine {
 
 		out = append(out, n)
 	}
+
+	c.RUnlock()
 
 	return out
 }
