@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/swarm/cluster"
@@ -345,11 +344,9 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 		return err
 	}
 
-	if memory == nil || (svc.spec.Image.Name != "upsql" && svc.spec.Image.Name != "upredis") {
+	if memory == nil || !(svc.spec.Image.Name == "upsql" || svc.spec.Image.Name == "upredis") {
 		return nil
 	}
-
-	logrus.Debugf("updateConfigAfterUpdateResource:'%s'", svc.spec.Image.Name)
 
 	// update units config file but whether start by user
 	err = svc.updateConfigs(ctx, units, cms, nil)
