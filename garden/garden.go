@@ -47,7 +47,7 @@ func newNotFound(elem, key string) notFoundError {
 
 // Garden is exported.
 type Garden struct {
-	sync.Mutex
+	*sync.Mutex
 	ormer        database.Ormer
 	kvClient     kvstore.Client
 	pluginClient pluginapi.PluginAPI
@@ -63,7 +63,7 @@ func NewGarden(kvc kvstore.Client, cl cluster.Cluster,
 	scheduler *scheduler.Scheduler, ormer database.Ormer,
 	pClient pluginapi.PluginAPI, tlsConfig *tls.Config) *Garden {
 	return &Garden{
-		// Mutex:       &scheduler.Mutex,
+		Mutex:        new(sync.Mutex),
 		kvClient:     kvc,
 		Cluster:      cl,
 		ormer:        ormer,
