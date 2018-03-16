@@ -84,30 +84,18 @@ loop:
 		}
 	}
 
+	var warning string
 	if len(netClusters) == 0 {
-		err = errors.Errorf("networkings %s unavailable", networkings)
+		warning = fmt.Sprintf("networkings %s unavailable", networkings)
 	}
 
-	clist := make([]string, 0, len(clusters))
-	for i := range clusters {
-		for nc := range netClusters {
-			if netClusters[nc] == clusters[i] {
-				clist = append(clist, netClusters[nc])
-			}
-		}
-	}
-
-	if len(clist) == 0 {
-		return nil, errors.Errorf("clusters %s unavailable,%v", clusters, err)
-	}
-
-	nodes, err := at.ormer.ListNodesByClusters(clist, true)
+	nodes, err := at.ormer.ListNodesByClusters(clusters, true)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(nodes) == 0 {
-		return nil, errors.Errorf("non node in clusters %s", clist)
+		return nil, errors.Errorf("Warning:%s\n non node in clusters %s", warning, clusters)
 	}
 
 	filterMap := make(map[string]struct{}, len(filters))
@@ -115,8 +103,11 @@ loop:
 		filterMap[filters[i]] = struct{}{}
 	}
 
-	errs := make([]string, 0, len(nodes))
 	out = make([]database.Node, 0, len(nodes))
+	errs := make([]string, 0, len(nodes)+1)
+	if warning != "" {
+		errs = append(errs, warning)
+	}
 
 	for i := range nodes {
 		if !nodes[i].Enabled || nodes[i].EngineID == "" {
@@ -160,7 +151,7 @@ loop:
 	}
 
 	if len(errs) > 0 {
-		err = errors.Errorf("ListCandidates warnings:%s", errs)
+		err = errors.Errorf("ListCandidates Warnings:%s", errs)
 	} else {
 		err = nil
 	}
