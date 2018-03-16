@@ -349,7 +349,6 @@ func pendingAlloc(actor alloc.Allocator, unit database.Unit,
 
 	_, err := actor.AlloctCPUMemory(pu.config, node, int64(opts.Require.Require.CPU), config.HostConfig.Memory, nil)
 	if err != nil {
-		logrus.Debugf("AlloctCPUMemory:node=%s,%s", node.Name, err)
 		return pu, err
 	}
 
@@ -361,7 +360,6 @@ func pendingAlloc(actor alloc.Allocator, unit database.Unit,
 			pu.networkings = append(pu.networkings, networkings...)
 		}
 		if err != nil {
-			logrus.Debugf("AlloctNetworking:node=%s,%s", node.Name, err)
 			return pu, err
 		}
 	}
@@ -372,7 +370,6 @@ func pendingAlloc(actor alloc.Allocator, unit database.Unit,
 			pu.volumes = append(pu.volumes, lvs...)
 		}
 		if err != nil {
-			logrus.Debugf("AlloctVolumes:node=%s,%s", node.Name, err)
 			return pu, err
 		}
 	}
@@ -715,6 +712,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 
 		candidate := ns.selectNode(usedNodes)
 		if candidate == nil {
+			err = fmt.Errorf("no more candidate for allocation,%d<%d,tried candidate:%d\n%+v", len(used), replicas, len(usedNodes), err)
 			break
 		}
 
@@ -726,9 +724,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 		pu, err = pendingAlloc(actor, units[count-1], candidate, opts, config, vr, nr)
 		if err != nil {
 			bad = append(bad, pu)
-
 			field.Errorf("pending alloc:node=%s,%+v", candidate.Name, err)
-
 			continue
 		}
 
@@ -748,7 +744,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 
 	bad = append(bad, used...)
 
-	return nil, errors.Errorf("not enough nodes for allocation,%d units waiting", replicas)
+	return nil, errors.Errorf("not enough nodes for allocation,%d units waiting\n%s", replicas, err)
 }
 
 func (gd *Garden) allocationV2(ctx context.Context, actor alloc.Allocator, svc *Service,
