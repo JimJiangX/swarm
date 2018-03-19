@@ -171,7 +171,7 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 		return ctx.Err()
 	}
 
-	err := delHost(ctx, addr, config, force)
+	err := delToHorus(ctx, addr, config, force)
 	if err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 	return err
 }
 
-func delHost(ctx context.Context, addr string, config structs.ServiceDeregistration, force bool) error {
+func delToHorus(ctx context.Context, addr string, config structs.ServiceDeregistration, force bool) error {
 	uri := fmt.Sprintf("http://%s/v1/%s/%s", addr, config.Type, config.Key)
 
 	del := false
