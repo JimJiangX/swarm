@@ -2,22 +2,24 @@ package strategy
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
-	containertypes "github.com/docker/docker/api/types/container"
-	networktypes "github.com/docker/docker/api/types/network"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/scheduler/node"
 	"github.com/stretchr/testify/assert"
 )
 
-func createContainerConfig(memory int64, cpus string) *cluster.ContainerConfig {
-	return cluster.BuildContainerConfig(containertypes.Config{}, containertypes.HostConfig{
-		Resources: containertypes.Resources{
-			Memory:     memory * 1024 * 1024 * 1024,
-			CpusetCpus: cpus,
-		},
-	}, networktypes.NetworkingConfig{})
+func createConfigV2(memory int64, cpus int64) *cluster.ContainerConfig {
+	cpuset := ""
+	if cpus != 0 {
+		cpuset = strconv.Itoa(int(cpus))
+	}
+
+	config := createConfig(memory, cpus)
+	config.HostConfig.CpusetCpus = cpuset
+
+	return config
 }
 
 func TestGroupPlaceDifferentNodeSize(t *testing.T) {
@@ -37,7 +39,7 @@ func TestGroupPlaceDifferentNodeSize(t *testing.T) {
 
 	// add 60 containers
 	for i := 0; i < 60; i++ {
-		config := createContainerConfig(0, "")
+		config := createConfigV2(0, 0)
 		node := selectTopNode(t, s, config, nodes)
 		assert.NoError(t, node.AddContainer(createContainer(fmt.Sprintf("c%d", i), config)))
 	}
@@ -61,7 +63,7 @@ func TestGroupPlaceDifferentNodeSizeCPUs(t *testing.T) {
 
 	// add 60 containers 1CPU
 	for i := 0; i < 60; i++ {
-		config := createContainerConfig(0, "1")
+		config := createConfigV2(0, 1)
 		node := selectTopNode(t, s, config, nodes)
 		assert.NoError(t, node.AddContainer(createContainer(fmt.Sprintf("c%d", i), config)))
 	}
@@ -79,18 +81,18 @@ func TestGroupPlaceEqualWeight(t *testing.T) {
 	}
 
 	// add 1 container 2G on node1
-	config := createContainerConfig(2, "")
+	config := createConfigV2(2, 0)
 	assert.NoError(t, nodes[0].AddContainer(createContainer("c1", config)))
 	assert.Equal(t, int64(2*1024*1024*1024), nodes[0].UsedMemory)
 
 	// add 2 containers 1G on node2
-	config = createContainerConfig(1, "")
+	config = createConfigV2(1, 0)
 	assert.NoError(t, nodes[1].AddContainer(createContainer("c2", config)))
 	assert.NoError(t, nodes[1].AddContainer(createContainer("c3", config)))
 	assert.Equal(t, int64(2*1024*1024*1024), nodes[1].UsedMemory)
 
 	// add another container 1G
-	config = createContainerConfig(1, "")
+	config = createConfigV2(1, 0)
 	node := selectTopNode(t, s, config, nodes)
 	assert.NoError(t, node.AddContainer(createContainer("c4", config)))
 	assert.Equal(t, int64(3*1024*1024*1024), node.UsedMemory)
@@ -110,13 +112,13 @@ func TestGroupPlaceContainerMemory(t *testing.T) {
 	}
 
 	// add 1 container 1G
-	config := createContainerConfig(1, "")
+	config := createConfigV2(1, 0)
 	node1 := selectTopNode(t, s, config, nodes)
 	assert.NoError(t, node1.AddContainer(createContainer("c1", config)))
 	assert.Equal(t, int64(1024*1024*1024), node1.UsedMemory)
 
 	// add another container 1G
-	config = createContainerConfig(1, "")
+	config = createConfigV2(1, 0)
 	node2 := selectTopNode(t, s, config, nodes)
 	assert.NoError(t, node2.AddContainer(createContainer("c2", config)))
 	assert.Equal(t, int64(1024*1024*1024), node2.UsedMemory)
@@ -135,13 +137,13 @@ func TestGroupPlaceContainerCPU(t *testing.T) {
 	}
 
 	// add 1 container 1CPU
-	config := createContainerConfig(0, "1")
+	config := createConfigV2(0, 1)
 	node1 := selectTopNode(t, s, config, nodes)
 	assert.NoError(t, node1.AddContainer(createContainer("c1", config)))
 	assert.Equal(t, int64(1), node1.UsedCpus)
 
 	// add another container 1CPU
-	config = createContainerConfig(0, "1")
+	config = createConfigV2(0, 1)
 	node2 := selectTopNode(t, s, config, nodes)
 	assert.NoError(t, node2.AddContainer(createContainer("c2", config)))
 	assert.Equal(t, int64(1), node2.UsedCpus)
@@ -161,24 +163,24 @@ func TestGroupPlaceContainerHuge(t *testing.T) {
 
 	// add 100 container 1CPU
 	for i := 0; i < 100; i++ {
-		config := createContainerConfig(0, "1")
+		config := createConfigV2(0, 1)
 		node := selectTopNode(t, s, config, nodes)
 		assert.NoError(t, node.AddContainer(createContainer(fmt.Sprintf("c%d", i), config)))
 	}
 
 	// try to add another container 1CPU
-	_, err := s.RankAndSort(createContainerConfig(0, "1"), nodes)
+	_, err := s.RankAndSort(createConfigV2(0, 1), nodes)
 	assert.Error(t, err)
 
 	// add 100 container 1G
 	for i := 100; i < 200; i++ {
-		config := createContainerConfig(1, "")
+		config := createConfigV2(1, 0)
 		node := selectTopNode(t, s, config, nodes)
 		assert.NoError(t, node.AddContainer(createContainer(fmt.Sprintf("c%d", i), config)))
 	}
 
 	// try to add another container 1G
-	_, err = s.RankAndSort(createContainerConfig(0, "1"), nodes)
+	_, err = s.RankAndSort(createConfigV2(0, 1), nodes)
 	assert.Error(t, err)
 }
 
@@ -187,7 +189,7 @@ func TestGroupPlaceContainerOvercommit(t *testing.T) {
 
 	nodes := []*node.Node{createNode("node-1", 100, 1)}
 
-	config := createContainerConfig(0, "")
+	config := createConfigV2(0, 0)
 
 	// Below limit should still work.
 	config.HostConfig.Memory = 90 * 1024 * 1024 * 1024
@@ -219,12 +221,12 @@ func TestGroupComplexPlacement(t *testing.T) {
 	}
 
 	// add one container 2G
-	config := createContainerConfig(2, "")
+	config := createConfigV2(2, 0)
 	node1 := selectTopNode(t, s, config, nodes)
 	assert.NoError(t, node1.AddContainer(createContainer("c1", config)))
 
 	// add one container 3G
-	config = createContainerConfig(3, "")
+	config = createConfigV2(3, 0)
 	node2 := selectTopNode(t, s, config, nodes)
 	assert.NoError(t, node2.AddContainer(createContainer("c2", config)))
 
@@ -232,7 +234,7 @@ func TestGroupComplexPlacement(t *testing.T) {
 	assert.NotEqual(t, node1.ID, node2.ID)
 
 	// add one container 1G
-	config = createContainerConfig(1, "")
+	config = createConfigV2(1, 0)
 	node3 := selectTopNode(t, s, config, nodes)
 	assert.NoError(t, node3.AddContainer(createContainer("c3", config)))
 
