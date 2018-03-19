@@ -37,7 +37,7 @@ func (GroupPlacementStrategy) RankAndSort(config *cluster.ContainerConfig, nodes
 
 	sort.Sort(weightedNodes)
 
-	out := byGroup(weightedNodes, healthFactor)
+	out := sortByGroup(weightedNodes, healthFactor)
 
 	return out, nil
 }
@@ -57,11 +57,10 @@ func (nodes weightedNodeList) String() string {
 }
 
 func requireOfCPU(c *cluster.ContainerConfig) int64 {
-	c.HostConfig.CpusetCpus = strings.TrimSpace(c.HostConfig.CpusetCpus)
+	cpusetCpus := strings.TrimSpace(c.HostConfig.CpusetCpus)
 
-	if c.HostConfig.CpusetCpus != "" {
-
-		n, err := strconv.ParseInt(c.HostConfig.CpusetCpus, 10, 64)
+	if cpusetCpus != "" {
+		n, err := strconv.ParseInt(cpusetCpus, 10, 64)
 		if err == nil {
 			return n
 		}
@@ -71,7 +70,7 @@ func requireOfCPU(c *cluster.ContainerConfig) int64 {
 }
 
 func scoreNodes(config *cluster.ContainerConfig, nodes []*node.Node, healthinessFactor int64) (weightedNodeList, error) {
-	weightedNodes := weightedNodeList{}
+	weightedNodes := make([]*weightedNode, 0, len(nodes))
 
 	needCpus := requireOfCPU(config)
 
@@ -115,7 +114,7 @@ func scoreNodes(config *cluster.ContainerConfig, nodes []*node.Node, healthiness
 	return weightedNodes, nil
 }
 
-func byGroup(nodes weightedNodeList, healthFactor int64) []*node.Node {
+func sortByGroup(nodes weightedNodeList, healthFactor int64) []*node.Node {
 	list := make([]groupNodes, 0, 5)
 loop:
 	for i := range nodes {
@@ -125,12 +124,13 @@ loop:
 
 		label := nodes[i].Node.Labels["cluster"]
 		if label == "" {
-			label = "&&&&&&&"
+			label = "nullCluster"
 		}
 
 		for l := range list {
 			if list[l].cluster == label {
 				list[l].list = append(list[l].list, nodes[i])
+				list[l].score += nodes[i].Weight
 
 				continue loop
 			}
@@ -143,19 +143,13 @@ loop:
 		list = append(list, groupNodes{
 			cluster: label,
 			list:    glist,
+			score:   nodes[i].Weight,
 		})
-
 	}
 
 	for _, g := range list {
-
-		for i := range g.list {
-			g.score += g.list[i].Weight
-		}
-
-		len := int64(len(g.list))
-
-		g.score = g.score/len + healthFactor*len
+		n := int64(len(g.list))
+		g.score = g.score/n + healthFactor*n
 	}
 
 	groups := byGroupList(list)
