@@ -7,11 +7,11 @@ import (
 	"github.com/docker/swarm/scheduler/node"
 )
 
-// SpreadPlacementStrategy places a container on the node with the fewest running containers.
+// SpreadPlacementV2Strategy places a container on the node with the fewest running containers.
 type SpreadPlacementV2Strategy struct {
 }
 
-// Initialize a SpreadPlacementStrategy.
+// Initialize a SpreadPlacementV2Strategy.
 func (p *SpreadPlacementV2Strategy) Initialize() error {
 	return nil
 }
@@ -21,7 +21,7 @@ func (p *SpreadPlacementV2Strategy) Name() string {
 	return "spread_v2"
 }
 
-// RankAndSort sorts nodes based on the spread strategy applied to the container config.
+// RankAndSort sorts nodes based on the spreadV2 strategy applied to the container config.
 func (p *SpreadPlacementV2Strategy) RankAndSort(config *cluster.ContainerConfig, nodes []*node.Node) ([]*node.Node, error) {
 	// for spread, a healthy node should decrease its weight to increase its chance of being selected
 	// set healthFactor to -10 to make health degree [0, 100] overpower cpu + memory (each in range [0, 100])
