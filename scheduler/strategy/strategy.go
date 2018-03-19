@@ -40,6 +40,7 @@ func init() {
 		&BinpackPlacementStrategy{},
 		&RandomPlacementStrategy{},
 		&GroupPlacementStrategy{},
+		&SpreadPlacementV2Strategy{},
 	}
 }
 
