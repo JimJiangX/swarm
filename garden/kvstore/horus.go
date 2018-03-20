@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/vars"
 	"github.com/hashicorp/consul/api"
@@ -130,11 +129,7 @@ func postRegister(ctx context.Context, uri string, obj interface{}) error {
 		return errors.Wrap(err, "encode registerService")
 	}
 
-	buf := body.Bytes()
-
-	logrus.Debugf("URL:POST %s Body:%s", uri, buf)
-
-	resp, err := ctxhttp.Post(ctx, nil, uri, "application/json", bytes.NewBuffer(buf))
+	resp, err := ctxhttp.Post(ctx, nil, uri, "application/json", body)
 	if err != nil {
 		return errors.Wrap(err, "register to Horus response")
 	}
