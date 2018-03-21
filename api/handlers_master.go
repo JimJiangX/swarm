@@ -713,9 +713,16 @@ func syncImageToEngines(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	registry, err := ormer.GetRegistry()
+	if err != nil {
+		ec := errCodeV1(_Image, dbQueryError, 73, "fail to query database", "数据库查询错误（系统配置表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
 	images = make([]string, len(out))
 	for i := range out {
-		images[i] = out[i].ImageID
+		images = append(images, fmt.Sprintf("%s:%d/%s", registry.Domain, registry.Port, out[i].Image()))
 	}
 
 	if node == "" {
@@ -734,7 +741,7 @@ func syncImageToEngines(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		if e != nil {
 			engines = []*cluster.Engine{e}
 		} else {
-			ec := errCodeV1(_Image, internalError, 73, "fail to find Engine", "找不到指定Engine")
+			ec := errCodeV1(_Image, internalError, 74, "fail to find Engine", "找不到指定Engine")
 			httpJSONError(w, errors.Errorf("not found Engine by '%s',%+v", node, err), ec, http.StatusInternalServerError)
 			return
 		}
