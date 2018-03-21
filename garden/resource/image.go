@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/scplib"
@@ -113,22 +114,22 @@ func loadImage(ctx context.Context,
 	task database.Task,
 	path string, timeout time.Duration) error {
 
-	registry, err := ormer.GetRegistry()
+	sys, err := ormer.GetSysConfig()
 	if err != nil {
 		return err
 	}
 
 	oldName := image.Image()
-	newName := fmt.Sprintf("%s:%d/%s", registry.Domain, registry.Port, oldName)
+	newName := fmt.Sprintf("%s:%d/%s", sys.Registry.Domain, sys.Registry.Port, oldName)
 	script := fmt.Sprintf("docker load -i %s && docker tag %s %s && docker push %s", path, oldName, newName, newName)
 
 	field := logrus.WithField("Image", oldName)
 	field.Infof("ssh exec:'%s'", script)
 
-	addr := fmt.Sprintf("%s:%d", registry.Address, registry.SSHPort)
-	scp, err := scplib.NewClientByPublicKeys(addr, registry.OsUsername, "", time.Duration(timeout)*time.Second)
+	addr := fmt.Sprintf("%s:%d", sys.Registry.Address, sys.Registry.SSHPort)
+	scp, err := scplib.NewClientByPublicKeys(addr, sys.Registry.OsUsername, "", time.Duration(timeout)*time.Second)
 	if err != nil {
-		field.Errorf("load image,'%s@%s',exec:'%s'", registry.OsUsername, addr, script)
+		field.Errorf("load image,'%s@%s',exec:'%s'", sys.Registry.OsUsername, addr, script)
 		return err
 	}
 	defer scp.Close()
@@ -168,8 +169,7 @@ func loadImage(ctx context.Context,
 	}
 	{
 		// sync image to all engines
-		engines := cluster.ListEngines()
-		go SyncImageToEngines(engines, ormer, []string{newName})
+		go syncEnginesImages(cluster.ListEngines(), []string{newName}, sys.AuthConfig())
 	}
 
 	return nil
@@ -254,13 +254,23 @@ func walkPath(path, ext string) string {
 	return path[:1+len(path)-len(e)] + ext
 }
 
-// SyncImageToEngines all engines pull image
-func SyncImageToEngines(engines []*cluster.Engine, ormer database.SysConfigOrmer, images []string) error {
-	auth, err := ormer.GetAuthConfig()
+// SyncEnginesImages all engines sync images
+func SyncEnginesImages(engines []*cluster.Engine, images []string, ormer database.GetSysConfigIface) error {
+	sys, err := ormer.GetSysConfig()
 	if err != nil {
 		return err
 	}
 
+	for i := range images {
+		images[i] = fmt.Sprintf("%s:%d/%s", sys.Registry.Domain, sys.Registry.Port, images[i])
+	}
+
+	syncEnginesImages(engines, images, sys.AuthConfig())
+
+	return nil
+}
+
+func syncEnginesImages(engines []*cluster.Engine, images []string, auth *types.AuthConfig) {
 	ch := make(chan struct{}, 5)
 
 	for i := range engines {
@@ -272,14 +282,34 @@ func SyncImageToEngines(engines []*cluster.Engine, ormer database.SysConfigOrmer
 
 				err := eng.Pull(image, auth, nil)
 				if err != nil {
-					logrus.Warnf("Engine %s pull image failed,%s", eng.Addr, err)
+					logrus.Warnf("Engine %s pull image %s failed,%s", eng.Addr, image, err)
 				}
 			}
 
 			<-ch
 		}(engines[i])
-
 	}
+}
+
+type lister interface {
+	ListImages() ([]database.Image, error)
+}
+
+func syncEngineImages(eng *cluster.Engine, lister lister, sys database.SysConfig) error {
+	list, err := lister.ListImages()
+	if err != nil {
+		return err
+	}
+
+	images := make([]string, 0, len(list))
+	for i := range list {
+		if list[i].Name == "" {
+			continue
+		}
+		images = append(images, fmt.Sprintf("%s:%d/%s", sys.Registry.Domain, sys.Registry.Port, list[i].Image()))
+	}
+
+	syncEnginesImages([]*cluster.Engine{eng}, images, sys.AuthConfig())
 
 	return nil
 }
