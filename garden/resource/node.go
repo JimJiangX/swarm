@@ -498,6 +498,11 @@ func (m hostManager) registerNode(ctx context.Context, node nodeWithTask, sys da
 		}
 	}
 
+	{
+		// sync engine images
+		go syncEngineImages(eng, m.dco, sys)
+	}
+
 	return nil
 }
 
