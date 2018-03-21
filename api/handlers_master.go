@@ -720,8 +720,11 @@ func syncImageToEngines(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	images = make([]string, len(out))
+	images = make([]string, 0, len(out))
 	for i := range out {
+		if out[i].Name == "" {
+			continue
+		}
 		images = append(images, fmt.Sprintf("%s:%d/%s", registry.Domain, registry.Port, out[i].Image()))
 	}
 
