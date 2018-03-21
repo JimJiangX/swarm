@@ -71,14 +71,14 @@ func (upredisProxyConfig) clone(t *structs.ConfigTemplate) parser {
 	}
 }
 
-func (c upredisProxyConfig) get(key string) string {
+func (c upredisProxyConfig) get(key string) (string, bool) {
 	if c.upredisProxy == nil {
-		return ""
+		return "", false
 	}
 
 	header, key, err := c.header(key)
 	if err != nil {
-		return ""
+		return "", false
 	}
 
 	obj := c.upredisProxy[header]
@@ -86,54 +86,54 @@ func (c upredisProxyConfig) get(key string) string {
 	switch strings.ToLower(key) {
 	case "auto_eject_hosts":
 		if obj.AutoEjectHosts {
-			return "true"
+			return "true", true
 		}
 
-		return "false"
+		return "false", true
 
 	case "distribution":
-		return obj.Distribution
+		return obj.Distribution, true
 
 	case "hash":
-		return obj.Hash
+		return obj.Hash, true
 
 	case "listen":
-		return obj.Listen
+		return obj.Listen, true
 
 	case "preconnect":
 		if obj.Preconnect {
-			return "true"
+			return "true", true
 		}
 
-		return "false"
+		return "false", true
 
 	case "redis":
 		if obj.Redis {
-			return "true"
+			return "true", true
 		}
 
-		return "false"
+		return "false", true
 
 	case "redis_auth":
-		return obj.RedisAuth
+		return obj.RedisAuth, true
 
 	case "timeout":
-		return fmt.Sprintf("%v", obj.Timeout)
+		return fmt.Sprintf("%v", obj.Timeout), true
 
 	case "server_connections":
-		return fmt.Sprintf("%v", obj.ServerConnections)
+		return fmt.Sprintf("%v", obj.ServerConnections), true
 
 	case "sentinels":
-		return strings.Join(obj.Sentinels, stringAndString)
+		return strings.Join(obj.Sentinels, stringAndString), true
 
 	case "white_list":
-		return strings.Join(obj.WhiteList, stringAndString)
+		return strings.Join(obj.WhiteList, stringAndString), true
 
 	case "black_list":
-		return strings.Join(obj.BlackList, stringAndString)
+		return strings.Join(obj.BlackList, stringAndString), true
 	}
 
-	return ""
+	return "", false
 }
 
 func (c upredisProxyConfig) header(key string) (string, string, error) {

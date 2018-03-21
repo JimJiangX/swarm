@@ -35,24 +35,24 @@ func (sentinelConfig) clone(t *structs.ConfigTemplate) parser {
 	}
 }
 
-func (c sentinelConfig) get(key string) string {
+func (c sentinelConfig) get(key string) (string, bool) {
 	if c.config == nil {
-		return ""
+		return "", false
 	}
 
 	if val, ok := c.config[key]; ok {
-		return val
+		return val, true
 	}
 
 	if c.template != nil {
 		for i := range c.template.Keysets {
 			if c.template.Keysets[i].Key == key {
-				return c.template.Keysets[i].Default
+				return c.template.Keysets[i].Default, false
 			}
 		}
 	}
 
-	return ""
+	return "", false
 }
 
 func (c *sentinelConfig) set(key string, val interface{}) error {

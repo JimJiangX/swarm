@@ -190,7 +190,7 @@ func getServiceConfigResponse(service string, cm structs.ConfigsMap, t structs.C
 		}
 
 		for i := range uc.Keysets {
-			uc.Keysets[i].Value = pr.get(uc.Keysets[i].Key)
+			uc.Keysets[i].Value, _ = pr.get(uc.Keysets[i].Key)
 		}
 
 		out = append(out, uc)
@@ -266,7 +266,7 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 		for i := range req.Keysets {
 
-			req.Keysets[i].Value = parser.get(req.Keysets[i].Key)
+			req.Keysets[i].Value, _ = parser.get(req.Keysets[i].Key)
 			if req.Keysets[i].Default == "" {
 				req.Keysets[i].Default = req.Keysets[i].Value
 			}
@@ -445,6 +445,10 @@ func mergeUnitConfig(pr parser, uc structs.UnitConfig, cc structs.ConfigCmds) (s
 	}
 
 	for _, ks := range uc.Keysets {
+		if _, ok := pr.get(ks.Key); !ok {
+			continue
+		}
+
 		err := pr.set(ks.Key, ks.Value)
 		if err != nil {
 			return cc, err

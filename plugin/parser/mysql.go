@@ -50,24 +50,46 @@ func (mysqlConfig) Validate(data map[string]interface{}) error {
 	return nil
 }
 
-func (c mysqlConfig) get(key string) string {
+func (c mysqlConfig) get(key string) (string, bool) {
 	if c.config == nil {
-		return ""
+		return "", false
 	}
 
-	if val := c.config.String(key); val != "" {
-		return val
+	if val, ok := beegoConfigString(c.config, key); ok {
+		return val, ok
 	}
 
 	if c.template != nil {
 		for i := range c.template.Keysets {
 			if c.template.Keysets[i].Key == key {
-				return c.template.Keysets[i].Default
+				return c.template.Keysets[i].Default, false
 			}
 		}
 	}
 
-	return ""
+	return "", false
+}
+
+func beegoConfigString(config config.Configer, key string) (string, bool) {
+	if val := config.String(key); val != "" {
+		return val, true
+	}
+
+	section := "default"
+	parts := strings.SplitN(key, "::", 2)
+	if len(parts) == 2 {
+		section = parts[0]
+		key = parts[1]
+	}
+
+	m, err := config.GetSection(section)
+	if err != nil || len(m) == 0 {
+		return "", false
+	}
+
+	val, ok := m[key]
+
+	return val, ok
 }
 
 func (c *mysqlConfig) set(key string, val interface{}) error {

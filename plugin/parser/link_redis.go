@@ -96,7 +96,8 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 				return resp, err
 			}
 
-			proxys = append(proxys, pr.get("listen"))
+			val, _ := pr.get("listen")
+			proxys = append(proxys, val)
 		}
 	}
 
@@ -119,8 +120,7 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 				return resp, err
 			}
 
-			port := pr.get("port")
-
+			port, _ := pr.get("port")
 			sentinels = append(sentinels, fmt.Sprintf("%s:%s", u.Networking[0].IP, port))
 		}
 	}
@@ -144,9 +144,8 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 				return resp, err
 			}
 
-			ip := pr.get("bind")
-			port := pr.get("port")
-
+			ip, _ := pr.get("bind")
+			port, _ := pr.get("port")
 			redis = append(redis, fmt.Sprintf("%s:%s", ip, port))
 		}
 
