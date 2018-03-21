@@ -117,8 +117,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 
 		"/clusters/{name}": putClusterParams,
 
-		"/softwares/images/{name:.*}": putImageTemplate,
-		"/softwares/images/sync":      syncImageToEngines,
+		"/softwares/images":      putImageTemplate,
+		"/softwares/images/sync": syncImageToEngines,
 
 		"/hosts/{name}":         putNodeParam,
 		"/hosts/{name}/enable":  putNodeEnable,
