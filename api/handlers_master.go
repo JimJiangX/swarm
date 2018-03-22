@@ -1705,22 +1705,26 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	} else {
 		out = make([]structs.ServiceSpec, 0, len(services))
 
-		if tag != "" {
+		if name == "" && tag != "" {
 			for k := range services {
 				if services[k].Tag == tag {
 					out = append(out, services[k])
 				}
 			}
-		}
+		} else {
 
-		images := strings.Split(name, ",")
-
-		for i := range images {
-
+			images := strings.Split(name, ",")
+		loop:
 			for k := range services {
-				if services[k].Image.Name == images[i] &&
-					(tag == "" || services[k].Tag != tag) {
-					out = append(out, services[k])
+				if tag != "" && services[k].Tag != tag {
+					continue
+				}
+
+				for i := range images {
+					if services[k].Image.Name == images[i] {
+						out = append(out, services[k])
+						continue loop
+					}
 				}
 			}
 		}
