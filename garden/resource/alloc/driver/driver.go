@@ -159,9 +159,10 @@ func (vds VolumeDrivers) ExpandVolumes(stores []structs.VolumeRequire) (err erro
 			return errors.New("not found the assigned volumeDriver:" + stores[i].Type)
 		}
 
-		result, _err := driver.Expand(stores[i].ID, stores[i].Size)
-		if _err != nil {
-			return _err
+		var result volumeExpandResult
+		result, err = driver.Expand(stores[i].ID, stores[i].Size)
+		if err != nil {
+			return err
 		}
 
 		if result.recycle != nil {
