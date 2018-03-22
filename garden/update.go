@@ -180,7 +180,7 @@ func updateDescByImage(table database.Service, im database.Image) database.Servi
 	desc := *table.Desc
 	desc.ID = utils.Generate32UUID()
 	desc.Image = im.Image()
-	desc.ImageID = im.ImageID
+	desc.ImageID = im.ID
 	desc.Previous = table.DescID
 
 	table.DescID = desc.ID
