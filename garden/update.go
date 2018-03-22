@@ -369,7 +369,7 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 			n = int64(float64(n) * 0.5)
 		}
 
-		kv.key = "mysqld::innodb_buffer_pool_size"
+		kv.key = "innodb_buffer_pool_size"
 		kv.value = strconv.Itoa(int(n))
 
 	}
