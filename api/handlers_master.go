@@ -2266,9 +2266,8 @@ func mergeUnitConfigChange(cc structs.UnitConfig, change structs.ModifyUnitConfi
 	}
 
 	ks := make([]structs.Keyset, 0, len(m))
-
-	for _, val := range m {
-		ks = append(ks, val)
+	for i := range change.Keysets {
+		ks = append(ks, m[change.Keysets[i].Key])
 	}
 
 	cc.Keysets = ks
