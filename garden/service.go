@@ -413,22 +413,23 @@ func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers
 	}
 }
 
-// RunContainer create and start container on engine.
-func (svc *Service) RunContainer(ctx context.Context, pendings []pendingUnit, start bool, authConfig *types.AuthConfig) error {
+// CreateContainer create container on engine.
+func (svc *Service) CreateContainer(ctx context.Context, pendings []pendingUnit, authConfig *types.AuthConfig) error {
+
 	sl := tasklock.NewServiceTask(database.ServiceCreateContainerTask, svc.ID(), svc.so, nil,
-		statusServiceContainerCreating, statusServiceContainerRunning, statusServiceContainerCreateFailed)
+		statusServiceContainerCreating, statusServiceContainerCreated, statusServiceContainerCreateFailed)
 
 	return sl.Run(
 		func(val int) bool {
 			return val == statusServiceAllocated
 		},
 		func() error {
-			return svc.runContainer(ctx, pendings, start, authConfig)
+			return svc.createContainer(ctx, pendings, authConfig)
 		},
 		false)
 }
 
-func (svc *Service) runContainer(ctx context.Context, pendings []pendingUnit, start bool, authConfig *types.AuthConfig) error {
+func (svc *Service) createContainer(ctx context.Context, pendings []pendingUnit, authConfig *types.AuthConfig) error {
 	defer func() {
 		ids := make([]string, len(pendings))
 		for i := range pendings {
@@ -469,13 +470,6 @@ func (svc *Service) runContainer(ctx context.Context, pendings []pendingUnit, st
 			err := svc.so.UnitContainerCreated(pu.Unit.Name, c.ID, eng.ID, c.HostConfig.NetworkMode, statusContainerCreated)
 			if err != nil {
 				return err
-			}
-		}
-
-		if start {
-			err = eng.StartContainer(c)
-			if err != nil {
-				return errors.Wrap(err, "start container:"+pu.Unit.Name)
 			}
 		}
 	}
@@ -524,7 +518,7 @@ func (svc *Service) InitStart(ctx context.Context, unitID string, kvc kvstore.Cl
 	}
 
 	check := func(val int) bool {
-		if val == statusServiceContainerRunning || val == statusServiceUnitMigrating {
+		if val == statusServiceContainerCreated || val == statusServiceUnitMigrating {
 			return true
 		}
 		return false

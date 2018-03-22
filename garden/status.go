@@ -38,7 +38,7 @@ const (
 	statusServiceAllocated      = statusServiceAllocating + _done
 	statusServiceAllocateFailed = statusServiceAllocating + _failed
 
-	statusServiceContainerRunning      = statusServiceContainerCreating + _done
+	statusServiceContainerCreated      = statusServiceContainerCreating + _done
 	statusServiceContainerCreateFailed = statusServiceContainerCreating + _failed
 
 	statusInitServiceStarted     = statusInitServiceStarting + _done

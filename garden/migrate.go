@@ -86,8 +86,10 @@ func getUnitBaseContainer(ctx context.Context, svc *Service, unit string, kvc kv
 }
 
 func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string, candidates []string, migrate, compose bool) error {
-	var news baseContainer
-	var cms structs.ConfigsMap
+	var (
+		news baseContainer
+		cms  structs.ConfigsMap
+	)
 
 	// 1.the assigned unit being migrating
 	old, err := getUnitBaseContainer(ctx, svc, nameOrID, gd.kvClient)
@@ -206,7 +208,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			return err
 		}
 
-		err = svc.runContainer(ctx, pendings, false, auth)
+		err = svc.createContainer(ctx, pendings, auth)
 		if err != nil {
 			return err
 		}

@@ -164,7 +164,7 @@ func (gd *Garden) DeployService(ctx context.Context,
 			return err
 		}
 
-		err = svc.runContainer(ctx, pendings, false, auth)
+		err = svc.createContainer(ctx, pendings, auth)
 		if err != nil {
 			return err
 		}

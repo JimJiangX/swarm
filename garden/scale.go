@@ -262,7 +262,7 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service,
 		return units, err
 	}
 
-	err = svc.runContainer(ctx, pendings, false, auth)
+	err = svc.createContainer(ctx, pendings, auth)
 	if err != nil {
 		return units, err
 	}
