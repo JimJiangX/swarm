@@ -719,6 +719,11 @@ func (svc *Service) UpdateUnitsConfigs(ctx context.Context,
 		for i := range keysets {
 			pairs[i].key = keysets[i].Key
 			pairs[i].value = keysets[i].Value
+
+			parts := strings.SplitN(pairs[i].key, "::", 2)
+			if len(parts) == 2 {
+				pairs[i].key = parts[1]
+			}
 		}
 
 		err = effectServiceConfig(ctx, units, svc.spec.Image.Name, pairs)
