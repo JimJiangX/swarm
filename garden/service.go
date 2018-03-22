@@ -822,9 +822,9 @@ func (svc *Service) ReloadServiceConfig(ctx context.Context, unitID string) (str
 	configs := make([]structs.UnitConfig, len(units))
 	cmd := []string{"cat", cc.ConfigFile}
 	image := svc.spec.Image.Image()
+	buf := bytes.NewBuffer(nil)
 
 	for i := range units {
-		buf := bytes.NewBuffer(nil)
 
 		_, err := units[i].ContainerExec(ctx, cmd, false, buf)
 		if err != nil {
@@ -835,6 +835,8 @@ func (svc *Service) ReloadServiceConfig(ctx context.Context, unitID string) (str
 		configs[i].Service = svc.ID()
 		configs[i].Image = image
 		configs[i].Content = buf.String()
+
+		buf.Reset()
 
 		// TODO: remove
 		logrus.Debugf("reload config file:%s,%s,%s\n%s", svc.ID(), units[i].u.ID, configs[i].ConfigFile, configs[i].Content)

@@ -152,10 +152,10 @@ func getConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func getServiceConfigResponse(service string, cm structs.ConfigsMap, t structs.ConfigTemplate) ([]structs.UnitConfig, error) {
-	out := make([]structs.UnitConfig, 0, len(cm))
 	var (
 		pr  parser
 		err error
+		out = make([]structs.UnitConfig, 0, len(cm))
 	)
 
 	for _, cc := range cm {

@@ -37,9 +37,9 @@ func (svc *Service) ContainerExec(ctx context.Context, nameOrID string, cmd []st
 	}
 
 	out := make([]structs.ContainerExecOutput, 0, len(units))
+	buf := bytes.NewBuffer(nil)
 
 	for _, u := range units {
-		buf := bytes.NewBuffer(nil)
 
 		inspect, err := u.ContainerExec(ctx, cmd, detach, buf)
 		out = append(out, structs.ContainerExecOutput{
@@ -50,6 +50,8 @@ func (svc *Service) ContainerExec(ctx context.Context, nameOrID string, cmd []st
 		if err != nil {
 			return out, err
 		}
+
+		buf.Reset()
 	}
 
 	return out, nil
