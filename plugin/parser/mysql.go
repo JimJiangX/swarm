@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync/atomic"
 
 	"github.com/astaxie/beego/config"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/garden/utils"
 	"github.com/pkg/errors"
 )
 
@@ -35,19 +35,6 @@ const (
 	monitorRole = "monitor"
 	rootRole    = "root"
 )
-
-var increased uint32 = 0
-
-// range [1,99]
-func inc() int {
-	n := atomic.AddUint32(&increased, 1)
-
-	if atomic.CompareAndSwapUint32(&increased, 100, 1) {
-		return 1
-	}
-
-	return int(n)
-}
 
 type mysqlConfig struct {
 	template *structs.ConfigTemplate
@@ -127,13 +114,15 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 
 	m := make(map[string]interface{}, 20)
 
+	ip := ""
 	if len(spec.Networking) >= 1 {
 		m["mysqld::bind_address"] = spec.Networking[0].IP
+		ip = spec.Networking[0].IP
 	} else {
 		return errors.New("miss mysqld::bind_address")
 	}
 
-	m["mysqld::server_id"] = strconv.Itoa(inc())
+	m["mysqld::server_id"] = strconv.Itoa(int(utils.IPToUint32(ip)))
 
 	if v, ok := desc.Options["mysqld::character_set_server"]; ok && v != nil {
 		m["mysqld::character_set_server"] = v

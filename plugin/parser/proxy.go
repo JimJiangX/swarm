@@ -499,10 +499,21 @@ func (c *upproxyConfigV200) GenerateConfig(id string, desc structs.ServiceSpec) 
 		return err
 	}
 
-	seq := inc()
-	spec, err := getUnitSpec(desc.Units, id)
-	if err != nil {
-		return err
+	var (
+		seq, exist = 0, false
+		spec       structs.UnitSpec
+	)
+
+	for i := range desc.Units {
+		if id == desc.Units[i].ID {
+			seq = i
+			exist = true
+			spec = desc.Units[i]
+			break
+		}
+	}
+	if !exist {
+		return errors.Errorf("not found unit '%s'", id)
 	}
 
 	m := make(map[string]interface{}, 10)
