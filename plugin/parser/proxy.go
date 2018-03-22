@@ -151,12 +151,14 @@ func (c *proxyConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 
 	m := make(map[string]interface{}, 10)
 
-	m["upsql-proxy::proxy-domain"] = desc.ID
+	m["upsql-proxy::proxy-domain"] = desc.Tag
 	m["upsql-proxy::proxy-name"] = spec.Name
 
 	addr := "localhost"
 	if len(spec.Networking) > 0 {
 		addr = spec.Networking[0].IP
+	} else {
+		return errors.New("miss ip")
 	}
 
 	{
@@ -260,6 +262,8 @@ func (c *proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) er
 	addr := "localhost"
 	if len(spec.Networking) > 0 {
 		addr = spec.Networking[0].IP
+	} else {
+		return errors.New("miss ip")
 	}
 
 	{
@@ -429,6 +433,8 @@ func (c *upproxyConfigV100) GenerateConfig(id string, desc structs.ServiceSpec) 
 	addr := "127.0.0.1"
 	if len(spec.Networking) > 0 {
 		addr = spec.Networking[0].IP
+	} else {
+		return errors.New("miss ip")
 	}
 
 	{
@@ -493,20 +499,10 @@ func (c *upproxyConfigV200) GenerateConfig(id string, desc structs.ServiceSpec) 
 		return err
 	}
 
-	var (
-		seq, exist = 0, false
-		spec       structs.UnitSpec
-	)
-
-	for seq = range desc.Units {
-		if id == desc.Units[seq].ID {
-			spec = desc.Units[seq]
-			exist = true
-			break
-		}
-	}
-	if !exist {
-		return errors.Errorf("not found unit '%s'", id)
+	seq := inc()
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return err
 	}
 
 	m := make(map[string]interface{}, 10)
@@ -518,6 +514,8 @@ func (c *upproxyConfigV200) GenerateConfig(id string, desc structs.ServiceSpec) 
 	addr := "127.0.0.1"
 	if len(spec.Networking) > 0 {
 		addr = spec.Networking[0].IP
+	} else {
+		return errors.New("miss ip")
 	}
 
 	{

@@ -400,6 +400,10 @@ func (c *upredisProxyConfig) GenerateConfig(id string, desc structs.ServiceSpec)
 		return errors.Wrap(err, "miss port")
 	}
 
+	if len(spec.Networking) == 0 {
+		return errors.New("miss ip")
+	}
+
 	obj.Listen = fmt.Sprintf("%s:%v", spec.Networking[0].IP, port)
 
 	c.upredisProxy[header] = obj

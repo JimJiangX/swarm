@@ -118,8 +118,13 @@ func (lus linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 		opts := make(map[string]map[string]interface{})
 		// set options
 		{
+			ip := ""
+			if len(lus.swm.Spec.Units[0].Networking) == 0 {
+				return resp, errors.Errorf("unit networking is required,unit=%s", lus.swm.Spec.Units[0].Name)
+			} else {
+				ip = lus.swm.Spec.Units[0].Networking[0].IP
+			}
 
-			ip := lus.swm.Spec.Units[0].Networking[0].IP
 			port, _ := swmPr.get("proxyport")
 
 			opts[allUnitsEffect] = map[string]interface{}{"adm-cli::adm-svr-address": net.JoinHostPort(ip, port)}

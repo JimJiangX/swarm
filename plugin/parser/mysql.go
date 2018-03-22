@@ -3,10 +3,11 @@ package parser
 import (
 	"fmt"
 	"io/ioutil"
-	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/astaxie/beego/config"
 	"github.com/docker/swarm/garden/structs"
@@ -34,6 +35,19 @@ const (
 	monitorRole = "monitor"
 	rootRole    = "root"
 )
+
+var increased uint32 = 0
+
+// range [1,99]
+func inc() int {
+	n := atomic.AddUint32(&increased, 1)
+
+	if atomic.CompareAndSwapUint32(&increased, 100, 1) {
+		return 1
+	}
+
+	return int(n)
+}
 
 type mysqlConfig struct {
 	template *structs.ConfigTemplate
@@ -119,7 +133,7 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		return errors.New("miss mysqld::bind_address")
 	}
 
-	m["mysqld::server_id"] = net.ParseIP(spec.Networking[0].IP).To4()[3]
+	m["mysqld::server_id"] = strconv.Itoa(inc())
 
 	if v, ok := desc.Options["mysqld::character_set_server"]; ok && v != nil {
 		m["mysqld::character_set_server"] = v

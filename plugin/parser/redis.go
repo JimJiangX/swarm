@@ -120,6 +120,8 @@ func (c *redisConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 
 	if len(spec.Networking) >= 1 {
 		c.config["bind"] = spec.Networking[0].IP
+	} else {
+		return errors.New("miss ip")
 	}
 
 	{
@@ -215,6 +217,8 @@ func (c *upredisConfig) GenerateConfig(id string, desc structs.ServiceSpec) erro
 
 	if len(spec.Networking) >= 1 {
 		c.config["bind"] = spec.Networking[0].IP
+	} else {
+		return errors.New("miss ip")
 	}
 
 	{

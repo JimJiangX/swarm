@@ -120,6 +120,10 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 				return resp, err
 			}
 
+			if len(u.Networking) == 0 {
+				return resp, errors.Errorf("unit networking is required,unit=%s", u.Name)
+			}
+
 			port, _ := pr.get("port")
 			sentinels = append(sentinels, fmt.Sprintf("%s:%s", u.Networking[0].IP, port))
 		}
