@@ -401,14 +401,12 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		}
 
 		out[cc.ID] = cc
+	}
 
-		err = putConfigsToStore(ctx.context, ctx.client, service, map[string]structs.ConfigCmds{
-			cc.ID: cc,
-		})
-		if err != nil {
-			httpError(w, err, http.StatusInternalServerError)
-			return
-		}
+	err = putConfigsToStore(ctx.context, ctx.client, service, out)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
