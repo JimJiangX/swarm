@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -93,7 +94,7 @@ func (h *huaweiStore) insert() error {
 	return err
 }
 
-func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, database.Volume, error) {
+func (h *huaweiStore) Alloc(name, unit, vg, host string, size int64) (database.LUN, database.Volume, error) {
 	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -109,6 +110,16 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 	rg := maxIdleSizeRG(out)
 	if out[rg].Free < size {
 		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
+	}
+
+	hluns, err := h.orm.ListHostLunIDByMapping(host)
+	if err != nil {
+		return lun, lv, err
+	}
+
+	find, val := findIdleNum(h.hs.HluStart, h.hs.HluEnd, hluns)
+	if !find {
+		return lun, lv, errors.Errorf("%s:no available host LUN ID", h.Vendor())
 	}
 
 	path, err := h.scriptPath("create_lun.sh")
@@ -127,13 +138,22 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 		return lun, lv, errors.Errorf("exec:%s,Output:%s,%s", cmd.Args, output, err)
 	}
 
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		lun.MappingTo = ""
+	}()
+
 	{
 		space := out[rg]
 		space.Free -= size
 		h.updateRGCache(space)
 	}
 
-	storageLunID, err := strconv.Atoi(strings.TrimSpace(string(output)))
+	lunID := strings.TrimSpace(string(output))
+	storageLunID, err := strconv.Atoi(lunID)
 	if err != nil {
 		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
 	}
@@ -144,6 +164,8 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 		VG:              vg,
 		RaidGroupID:     rg.ID,
 		StorageSystemID: h.ID(),
+		MappingTo:       host,
+		HostLunID:       val,
 		SizeByte:        int(size),
 		StorageLunID:    storageLunID,
 		CreatedAt:       time.Now(),
@@ -153,6 +175,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 		ID:         utils.Generate64UUID(),
 		Name:       name,
 		UnitID:     unit,
+		EngineID:   host,
 		Size:       size,
 		VG:         vg,
 		Driver:     h.Driver(),
@@ -163,6 +186,23 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 	err = h.orm.InsertLunVolume(lun, lv)
 	if err != nil {
 		return lun, lv, err
+	}
+
+	path, err = h.scriptPath("create_lunmap.sh")
+	if err != nil {
+		return lun, lv, err
+	}
+
+	host = generateHostName(host)
+
+	param = []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, lunID, host, strconv.Itoa(val)}
+
+	logrus.Debug(param)
+	time.Sleep(time.Second)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
+	if err != nil {
+		return lun, lv, errors.WithStack(err)
 	}
 
 	return lun, lv, nil
@@ -183,6 +223,16 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 	rg := maxIdleSizeRG(out)
 	if out[rg].Free < size {
 		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
+	}
+
+	hluns, err := h.orm.ListHostLunIDByMapping(lv.EngineID)
+	if err != nil {
+		return lun, lv, err
+	}
+
+	find, val := findIdleNum(h.hs.HluStart, h.hs.HluEnd, hluns)
+	if !find {
+		return lun, lv, errors.Errorf("%s:no available host LUN ID", h.Vendor())
 	}
 
 	path, err := h.scriptPath("create_lun.sh")
@@ -207,7 +257,54 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 		h.updateRGCache(space)
 	}
 
-	storageLunID, err := strconv.Atoi(strings.TrimSpace(string(output)))
+	keepLun := true
+	originSize := lv.Size
+
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		h.invalidRGCache(lun.RaidGroupID)
+
+		path, _err := h.scriptPath("del_lunmap.sh")
+		if _err != nil {
+			err = fmt.Errorf("%s\n%+v", _err, err)
+			return
+		}
+
+		param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(lun.StorageLunID)}
+
+		logrus.Debug(param)
+		time.Sleep(time.Second)
+
+		_, _err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
+		if _err != nil {
+			err = fmt.Errorf("%s\n%+v", _err, err)
+		} else {
+			keepLun = false
+		}
+
+		if !keepLun {
+			_err := h.orm.DelLUN(lun.ID)
+			if _err != nil {
+				err = fmt.Errorf("expand lun failed,DelLUN failed,%+v\n%+v", _err, err)
+			}
+		}
+
+		lun.MappingTo = ""
+		tmpSize := lv.Size
+		lv.Size = originSize
+
+		_err = h.orm.SetVolume(lv)
+		if _err != nil {
+			lv.Size = tmpSize
+			err = fmt.Errorf("expand lun failed,SetVolume failed,%+v\n%+v", _err, err)
+		}
+	}()
+
+	lunID := strings.TrimSpace(string(output))
+	storageLunID, err := strconv.Atoi(lunID)
 	if err != nil {
 		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
 	}
@@ -218,6 +315,8 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 		VG:              lv.VG,
 		RaidGroupID:     rg.ID,
 		StorageSystemID: h.ID(),
+		MappingTo:       lv.EngineID,
+		HostLunID:       val,
 		SizeByte:        int(size),
 		StorageLunID:    storageLunID,
 		CreatedAt:       time.Now(),
@@ -228,6 +327,23 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 	err = h.orm.InsertLunSetVolume(lun, lv)
 	if err != nil {
 		return lun, lv, err
+	}
+
+	path, err = h.scriptPath("create_lunmap.sh")
+	if err != nil {
+		return lun, lv, err
+	}
+
+	host := generateHostName(lv.EngineID)
+
+	param = []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, lunID, host, strconv.Itoa(val)}
+
+	logrus.Debug(param)
+	time.Sleep(time.Second)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
+	if err != nil {
+		return lun, lv, errors.WithStack(err)
 	}
 
 	return lun, lv, nil
@@ -270,9 +386,7 @@ func (h *huaweiStore) RecycleLUN(id string, lun int) error {
 		return errors.WithStack(err)
 	}
 
-	err = h.orm.DelLUN(l.ID)
-
-	return err
+	return h.orm.DelLUN(l.ID)
 }
 
 func (h huaweiStore) idleSize() (map[string]int64, error) {
