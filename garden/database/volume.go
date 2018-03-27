@@ -9,7 +9,7 @@ import (
 
 type VolumeOrmer interface {
 	GetVolume(nameOrID string) (Volume, error)
-	ListVolumeByVG(vg string) ([]Volume, error)
+	ListVolumeByEngine(id string) ([]Volume, error)
 	ListVolumesByUnitID(id string) ([]Volume, error)
 
 	InsertVolume(lv Volume) error
@@ -189,11 +189,11 @@ func (db dbBase) GetVolume(nameOrID string) (Volume, error) {
 	return lv, errors.Wrap(err, "get Volume by nameOrID")
 }
 
-// ListVolumeByVG returns []Volume select by VG
-func (db dbBase) ListVolumeByVG(name string) ([]Volume, error) {
+// ListVolumeByEngine returns []Volume select by engine
+func (db dbBase) ListVolumeByEngine(name string) ([]Volume, error) {
 	var (
 		lvs   []Volume
-		query = "SELECT id,name,unit_id,size,vg,engine_id,driver_type,driver,fstype FROM " + db.volumeTable() + " WHERE vg=?"
+		query = "SELECT id,name,unit_id,size,vg,engine_id,driver_type,driver,fstype FROM " + db.volumeTable() + " WHERE engine_id=?"
 	)
 
 	err := db.Select(&lvs, query, name)
@@ -201,7 +201,7 @@ func (db dbBase) ListVolumeByVG(name string) ([]Volume, error) {
 		return nil, nil
 	}
 
-	return lvs, errors.Wrap(err, "list []Volume by VG")
+	return lvs, errors.Wrap(err, "list []Volume by Engine")
 }
 
 func (db dbBase) listVolumes() ([]Volume, error) {
