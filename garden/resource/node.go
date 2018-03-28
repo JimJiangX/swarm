@@ -423,7 +423,9 @@ func (m hostManager) registerNodesLoop(ctx context.Context, cancel context.Cance
 			m.registerNodes(ctx, sys, reg)
 
 			err := m.registerNodesTimeout(ctx.Err())
-			logrus.Errorf("deal with Nodes timeout%+v", err)
+			if err != nil {
+				logrus.Errorf("deal with Nodes timeout%+v", err)
+			}
 
 			return
 		}
