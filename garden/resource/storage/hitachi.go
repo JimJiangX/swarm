@@ -346,12 +346,14 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (lun database.LUN,
 		}
 
 		logrus.Debugf("%s %s %d", path, h.hs.AdminUnit, lun.StorageLunID)
+		time.Sleep(time.Second)
 
 		_, _err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit, strconv.Itoa(lun.StorageLunID))
 		if _err != nil {
 			err = fmt.Errorf("%s\n%+v", _err, err)
 		} else {
 			keepLun = false
+			lun.MappingTo = ""
 		}
 	}()
 
@@ -364,6 +366,28 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (lun database.LUN,
 	host := generateHostName(lv.EngineID)
 
 	logrus.Debugf("%s %s %d %s %d", path, h.hs.AdminUnit, lun.StorageLunID, host, val)
+
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		path, _err := h.scriptPath("del_lunmap.sh")
+		if _err != nil {
+			err = fmt.Errorf("%s\n%+v", _err, err)
+			return
+		}
+
+		logrus.Debugf("%s %s %d", path, h.hs.AdminUnit, lun.StorageLunID)
+
+		time.Sleep(time.Second)
+
+		_, _err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit, strconv.Itoa(lun.StorageLunID))
+		if _err != nil {
+			err = fmt.Errorf("%s\n%+v", _err, err)
+			keepLun = true
+		}
+	}()
 
 	time.Sleep(time.Second)
 

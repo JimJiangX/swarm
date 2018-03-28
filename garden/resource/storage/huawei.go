@@ -335,10 +335,32 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 	}
 
 	host := generateHostName(lv.EngineID)
-
 	param = []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, lunID, host, strconv.Itoa(val)}
-
 	logrus.Debug(param)
+
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		path, _err := h.scriptPath("del_lunmap.sh")
+		if _err != nil {
+			err = fmt.Errorf("%s\n%+v", _err, err)
+			return
+		}
+
+		param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(lun.StorageLunID)}
+		logrus.Debug(param)
+
+		time.Sleep(time.Second)
+
+		_, _err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
+		if _err != nil {
+			err = fmt.Errorf("%s\n%+v", _err, err)
+			keepLun = true
+		}
+	}()
+
 	time.Sleep(time.Second)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
