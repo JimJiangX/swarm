@@ -697,34 +697,41 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 	count := replicas
 	used := make([]pendingUnit, 0, count)
 	usedNodes := make([]*node.Node, 0, count)
+	isSan := isSANStorage(opts.Require.Volumes)
+	ns := newNodeSelectStrategy(isSan, opts.HighAvailable, replicas, candidates)
 
-	ns := newNodeSelectStrategy(isSANStorage(opts.Require.Volumes),
-		opts.HighAvailable, replicas, candidates)
-
-	for {
-
+alloc:
+	for retry := 3; retry > 0; {
 		select {
 		default:
 		case <-ctx.Done():
 			err = errors.Wrapf(ctx.Err(), "%+v\n", err)
-			return nil, err
+			break alloc
 		}
 
 		candidate := ns.selectNode(usedNodes)
 		if candidate == nil {
 			err = fmt.Errorf("no more candidate for allocation,%d<%d,tried candidate:%d\n%+v", len(used), replicas, len(usedNodes), err)
-			break
+			break alloc
 		}
 
 		if err = recycle(); err != nil {
 			field.Errorf("recycle resource failed,%+v", err)
+			break alloc
 		}
 
 		var pu pendingUnit
 		pu, err = pendingAlloc(actor, units[count-1], candidate, opts, config, vr, nr)
 		if err != nil {
+
 			bad = append(bad, pu)
 			field.Errorf("pending alloc:node=%s,%+v", candidate.Name, err)
+
+			if isSan {
+				retry = 0
+			} else {
+				retry--
+			}
 			continue
 		}
 
@@ -735,6 +742,7 @@ func (gd *Garden) allocation(ctx context.Context, actor alloc.Allocator, svc *Se
 			continue
 		}
 
+		retry = 3
 		usedNodes = append(usedNodes, candidate)
 		used = append(used, pu)
 		if count--; count == 0 {
