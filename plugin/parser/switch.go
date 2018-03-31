@@ -11,6 +11,7 @@ import (
 	"github.com/astaxie/beego/config"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/vars"
+	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 )
 
@@ -153,7 +154,26 @@ func (c switchManagerConfig) HealthCheck(id string, desc structs.ServiceSpec) (s
 	reg.Service.Container.Name = spec.Name
 	reg.Service.Container.HostName = spec.Engine.Node
 
-	return structs.ServiceRegistration{Horus: &reg}, nil
+	// consul AgentServiceRegistration
+	port, err := c.config.Int("port")
+	if err != nil {
+		return structs.ServiceRegistration{}, errors.Wrap(err, "get 'Port'")
+	}
+
+	consul := api.AgentServiceRegistration{
+		ID:      spec.ID,
+		Name:    spec.Name,
+		Tags:    nil,
+		Port:    port,
+		Address: "",
+		Check: &api.AgentServiceCheck{
+			Script:            fmt.Sprintf("/opt/%s/script/check_switchmanager.sh %s", c.template.DataMount, spec.Name),
+			DockerContainerID: spec.Unit.ContainerID,
+			Interval:          "10s",
+		},
+	}
+
+	return structs.ServiceRegistration{Horus: &reg, Consul: &consul}, nil
 }
 
 func (c *switchManagerConfig) GenerateConfig(id string, desc structs.ServiceSpec) error {

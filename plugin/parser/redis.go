@@ -3,11 +3,13 @@ package parser
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/docker/swarm/garden/structs"
+	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 )
 
@@ -189,7 +191,27 @@ func (c redisConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 	reg.Service.Container.Name = spec.Name
 	reg.Service.Container.HostName = spec.Engine.Node
 
-	return structs.ServiceRegistration{Horus: &reg}, nil
+	// consul AgentServiceRegistration
+	addr := c.config["bind"]
+	port, err := strconv.Atoi(c.config["port"])
+	if err != nil {
+		return structs.ServiceRegistration{}, errors.Wrap(err, "get 'Port'")
+	}
+
+	consul := api.AgentServiceRegistration{
+		ID:      spec.ID,
+		Name:    spec.Name,
+		Tags:    nil,
+		Port:    port,
+		Address: addr,
+		Check: &api.AgentServiceCheck{
+			DockerContainerID: spec.Unit.ContainerID,
+			Interval:          "10s",
+			TCP:               net.JoinHostPort(addr, c.config["port"]),
+		},
+	}
+
+	return structs.ServiceRegistration{Horus: &reg, Consul: &consul}, nil
 }
 
 type upredisConfig struct {
