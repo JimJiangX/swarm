@@ -284,7 +284,11 @@ func (c *kvClient) RegisterService(ctx context.Context, host string, config stru
 
 // DeregisterService service to consul and Horus
 func (c *kvClient) DeregisterService(ctx context.Context, config structs.ServiceDeregistration, force bool) error {
-	return c.deregisterToHorus(ctx, config, force)
+	err := c.deregisterToHorus(ctx, config, force)
+
+	c.deregisterHealthCheck(config.Addr, config.Key)
+
+	return err
 }
 
 func (c *kvClient) GetHorusAddr(ctx context.Context) (string, error) {

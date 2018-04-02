@@ -592,8 +592,9 @@ func registerUnits(ctx context.Context, units []*unit, kvc kvstore.Client, confi
 		}
 
 		r := config.GetServiceRegistration()
+		eng := u.getEngine()
 
-		err = kvc.RegisterService(ctx, "", r)
+		err = kvc.RegisterService(ctx, eng.IP, r)
 		if err != nil {
 			return err
 		}
@@ -1058,7 +1059,8 @@ func (svc Service) deleteCondition() error {
 
 func (svc Service) deregisterServices(ctx context.Context, reg kvstore.Register, units []*unit) error {
 	for i := range units {
-		err := deregisterService(ctx, reg, "units", units[i].u.ID)
+		host, _ := units[i].getHostIP()
+		err := deregisterService(ctx, reg, "units", units[i].u.ID, host)
 		if err != nil {
 			return err
 		}
@@ -1067,10 +1069,11 @@ func (svc Service) deregisterServices(ctx context.Context, reg kvstore.Register,
 	return nil
 }
 
-func deregisterService(ctx context.Context, reg kvstore.Register, _type, key string) error {
+func deregisterService(ctx context.Context, reg kvstore.Register, _type, key, host string) error {
 	return reg.DeregisterService(ctx, structs.ServiceDeregistration{
 		Type: _type,
 		Key:  key,
+		Addr: host,
 	}, true)
 }
 
