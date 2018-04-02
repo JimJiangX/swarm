@@ -176,7 +176,7 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 		return err
 	}
 
-	if config.Addr != "" {
+	if config.Addr != "" && config.User != "" {
 		err = delHostAgent(ctx, addr, config)
 	}
 
@@ -239,16 +239,12 @@ func delHostAgent(ctx context.Context, addr string, config structs.ServiceDeregi
 	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 
-	if config.Addr != "" && config.User != "" {
-		params := make(url.Values)
-
-		params.Set("ip_addr", config.Addr)
-		params.Set("ssh_port", config.Port)
-		params.Set("os_user", config.User)
-		params.Set("os_pwd", config.Password)
-
-		req.URL.RawQuery = params.Encode()
-	}
+	params := make(url.Values)
+	params.Set("ip_addr", config.Addr)
+	params.Set("ssh_port", config.Port)
+	params.Set("os_user", config.User)
+	params.Set("os_pwd", config.Password)
+	req.URL.RawQuery = params.Encode()
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
