@@ -265,7 +265,7 @@ func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 
 	consul := api.AgentServiceRegistration{
 		ID:      spec.ID,
-		Name:    desc.Name,
+		Name:    spec.Name,
 		Tags:    nil,
 		Port:    port,
 		Address: addr,
