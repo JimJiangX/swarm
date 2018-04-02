@@ -239,7 +239,7 @@ func delHostAgent(ctx context.Context, addr string, config structs.ServiceDeregi
 	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 
-	if config.Addr != "" {
+	if config.Addr != "" && config.User != "" {
 		params := make(url.Values)
 
 		params.Set("ip_addr", config.Addr)
@@ -286,7 +286,9 @@ func (c *kvClient) RegisterService(ctx context.Context, host string, config stru
 func (c *kvClient) DeregisterService(ctx context.Context, config structs.ServiceDeregistration, force bool) error {
 	err := c.deregisterToHorus(ctx, config, force)
 
-	c.deregisterHealthCheck(config.Addr, config.Key)
+	if config.Type == "units" {
+		c.deregisterHealthCheck(config.Addr, config.Key)
+	}
 
 	return err
 }
