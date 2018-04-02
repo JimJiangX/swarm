@@ -270,7 +270,7 @@ func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 		Port:    port,
 		Address: addr,
 		Check: &api.AgentServiceCheck{
-			Args: []string{"sh", "-x", "/usr/local/swarm-agent/scripts/unit_upsql_status.sh", spec.Name},
+			Args: []string{"/usr/local/swarm-agent/scripts/unit_upsql_status.sh", spec.Name},
 			// sh -x /usr/local/swarm-agent/scripts/unit_upsql_status.sh 015dc1f7_yeumj001
 			Shell:                          "/bin/bash",
 			DockerContainerID:              spec.Unit.ContainerID,
