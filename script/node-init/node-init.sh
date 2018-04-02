@@ -272,6 +272,7 @@ install_consul() {
   "data_dir": "/usr/local/consul",
   "node_name": "${HOSTNAME}",
   "disable_update_check": true,
+  "enable_script_checks": true,
   "log_level": "INFO",
   "protocol": 3,
   "addresses": {
