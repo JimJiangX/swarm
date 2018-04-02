@@ -11,6 +11,8 @@ import (
 	"github.com/astaxie/beego/config"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
+	"github.com/docker/swarm/vars"
+	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 )
 
@@ -236,8 +238,10 @@ func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 	reg.Service.Container.Name = spec.Name
 	reg.Service.Container.HostName = spec.Engine.Node
 
-	var mon *structs.User
+	reg.Service.MonitorUser = vars.Monitor.User
+	reg.Service.MonitorPassword = vars.Monitor.Password
 
+	var mon *structs.User
 	if len(desc.Users) > 0 {
 		for i := range desc.Users {
 			if desc.Users[i].Role == monitorRole {
@@ -252,7 +256,30 @@ func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 		}
 	}
 
-	return structs.ServiceRegistration{Horus: &reg}, nil
+	// consul AgentServiceRegistration
+	addr := c.config.String("mysqld::bind_address")
+	port, err := c.config.Int("mysqld::port")
+	if err != nil {
+		return structs.ServiceRegistration{}, errors.Wrap(err, "get 'mysqld::port'")
+	}
+
+	consul := api.AgentServiceRegistration{
+		ID:      spec.ID,
+		Name:    spec.Name,
+		Tags:    nil,
+		Port:    port,
+		Address: addr,
+		Check: &api.AgentServiceCheck{
+			// sh -x /usr/local/swarm-agent/scripts/unit_upsql_status.sh 015dc1f7_yeumj001
+			Script:            fmt.Sprintf("/usr/local/swarm-agent/scripts/unit_upsql_status.sh %s", spec.Name), // TODO:
+			DockerContainerID: spec.Unit.ContainerID,
+			Interval:          "10s",
+		},
+	}
+
+	return structs.ServiceRegistration{
+		Horus:  &reg,
+		Consul: &consul}, nil
 }
 
 type upsqlConfig struct {
