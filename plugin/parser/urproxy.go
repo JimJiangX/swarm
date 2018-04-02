@@ -2,12 +2,10 @@ package parser
 
 import (
 	"fmt"
-	"net"
 	"strconv"
 	"strings"
 
 	"github.com/docker/swarm/garden/structs"
-	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 )
@@ -406,7 +404,7 @@ func (c *upredisProxyConfig) GenerateConfig(id string, desc structs.ServiceSpec)
 		return errors.New("miss ip")
 	}
 
-	obj.Listen = fmt.Sprintf("%s:%d", spec.Networking[0].IP, port)
+	obj.Listen = fmt.Sprintf("%s:%v", spec.Networking[0].IP, port)
 
 	c.upredisProxy[header] = obj
 
@@ -449,31 +447,5 @@ func (c upredisProxyConfig) HealthCheck(id string, desc structs.ServiceSpec) (st
 	reg.Service.Container.Name = spec.Name
 	reg.Service.Container.HostName = spec.Engine.Node
 
-	// consul AgentServiceRegistration
-	header, _, _ := c.header("")
-	obj := c.upredisProxy[header]
-	addr, p, err := net.SplitHostPort(obj.Listen)
-	if err != nil {
-		return structs.ServiceRegistration{}, errors.WithStack(err)
-	}
-
-	port, err := strconv.Atoi(p)
-	if err != nil {
-		return structs.ServiceRegistration{}, errors.Wrap(err, "get 'port'")
-	}
-
-	consul := api.AgentServiceRegistration{
-		ID:      spec.ID,
-		Name:    spec.Name,
-		Tags:    nil,
-		Port:    port,
-		Address: addr,
-		Check: &api.AgentServiceCheck{
-			DockerContainerID: spec.Unit.ContainerID,
-			Interval:          "10s",
-			TCP:               obj.Listen,
-		},
-	}
-
-	return structs.ServiceRegistration{Horus: &reg, Consul: &consul}, nil
+	return structs.ServiceRegistration{Horus: &reg}, nil
 }

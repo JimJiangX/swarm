@@ -3,13 +3,11 @@ package parser
 import (
 	"bytes"
 	"fmt"
-	"net"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/docker/swarm/garden/structs"
-	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 )
 
@@ -162,30 +160,5 @@ func (c sentinelConfig) HealthCheck(id string, desc structs.ServiceSpec) (struct
 	reg.Service.Container.Name = spec.Name
 	reg.Service.Container.HostName = spec.Engine.Node
 
-	// consul AgentServiceRegistration
-	addr := ""
-	if len(spec.Networking) >= 1 {
-		addr = spec.Networking[0].IP
-	} else {
-		return structs.ServiceRegistration{}, errors.New("miss ip")
-	}
-	port, err := strconv.Atoi(c.config["Port"])
-	if err != nil {
-		return structs.ServiceRegistration{}, errors.Wrap(err, "get 'Port'")
-	}
-
-	consul := api.AgentServiceRegistration{
-		ID:      spec.ID,
-		Name:    spec.Name,
-		Tags:    nil,
-		Port:    port,
-		Address: addr,
-		Check: &api.AgentServiceCheck{
-			DockerContainerID: spec.Unit.ContainerID,
-			Interval:          "10s",
-			TCP:               net.JoinHostPort(addr, c.config["Port"]),
-		},
-	}
-
-	return structs.ServiceRegistration{Horus: &reg, Consul: &consul}, nil
+	return structs.ServiceRegistration{Horus: &reg}, nil
 }

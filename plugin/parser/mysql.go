@@ -11,8 +11,6 @@ import (
 	"github.com/astaxie/beego/config"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
-	"github.com/docker/swarm/vars"
-	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 )
 
@@ -254,34 +252,7 @@ func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 		}
 	}
 
-	// consul AgentServiceRegistration
-	addr := c.config.String("mysqld::bind_address")
-	port, err := c.config.Int("mysqld::port")
-	if err != nil {
-		return structs.ServiceRegistration{}, errors.Wrap(err, "get 'mysqld::port'")
-	}
-
-	//	if u.Type == _UpsqlType {
-	//		swm, err := context.getSwithManagerUnit()
-	//		if err == nil && swm != nil {
-	//			check.Tags = []string{fmt.Sprintf("swm_key=%s/%s/Topology", context.ID, swm.Name)}
-	//		}
-	//	}
-
-	consul := api.AgentServiceRegistration{
-		ID:      spec.ID,
-		Name:    spec.Name,
-		Tags:    nil, // TODO:swm?
-		Port:    port,
-		Address: addr,
-		Check: &api.AgentServiceCheck{
-			Script:            fmt.Sprintf("/opt/%s/script/check_db.sh %s %s %s", c.template.DataMount, spec.Name, vars.Check.User, vars.Check.Password),
-			DockerContainerID: spec.Unit.ContainerID,
-			Interval:          "10s",
-		},
-	}
-
-	return structs.ServiceRegistration{Horus: &reg, Consul: &consul}, nil
+	return structs.ServiceRegistration{Horus: &reg}, nil
 }
 
 type upsqlConfig struct {
