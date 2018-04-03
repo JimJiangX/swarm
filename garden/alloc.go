@@ -302,8 +302,29 @@ func buildServiceContainerConfig(svc *Service) (*cluster.ContainerConfig, error)
 	config.Config.Labels[serviceTagLabel] = svc.svc.Tag
 
 	addContainerConfigConstraint(config, svc.options)
+	setContainerConfigPortEnv(config, svc.spec.Image.Name, svc.spec.Options)
 
 	return config, nil
+}
+
+func setContainerConfigPortEnv(config *cluster.ContainerConfig, image string, opts map[string]interface{}) {
+	var port interface{}
+
+	if val, ok := opts["port"]; ok { // upredis,urproxy,sentinel
+		port = val
+	} else if val, ok := opts["Port"]; ok { // switch_manager
+		port = val
+	} else if val, ok := opts["mysqld::port"]; ok { // upsql
+		port = val
+	} else if val, ok := opts["upsql-proxy::proxy_data_port"]; ok { // proxy
+		port = val
+	}
+
+	if config.Env == nil {
+		config.Env = make([]string, 0, 5)
+	}
+
+	config.Env = append(config.Env, fmt.Sprintf("SERVICE_PORT=%v", port))
 }
 
 func addContainerConfigConstraint(config *cluster.ContainerConfig, opts scheduleOption) {
