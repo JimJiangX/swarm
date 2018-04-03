@@ -223,7 +223,7 @@ func (m hostManager) InstallNodes(ctx context.Context, horus string, reg kvstore
 	return nil
 }
 
-func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer database.ClusterOrmer, config database.SysConfig) (err error) {
+func (nt *nodeWithTask) distribute(ctx context.Context, horus string, ormer database.NodeIface, config database.SysConfig) (err error) {
 	entry := logrus.WithFields(logrus.Fields{
 		"host": nt.Node.Addr,
 	})
@@ -423,7 +423,9 @@ func (m hostManager) registerNodesLoop(ctx context.Context, cancel context.Cance
 			m.registerNodes(ctx, sys, reg)
 
 			err := m.registerNodesTimeout(ctx.Err())
-			logrus.Errorf("deal with Nodes timeout%+v", err)
+			if err != nil {
+				logrus.Errorf("deal with Nodes timeout%+v", err)
+			}
 
 			return
 		}
@@ -442,72 +444,46 @@ func (m hostManager) registerNodesLoop(ctx context.Context, cancel context.Cance
 //	m.nodes = list
 //}
 
-func (m hostManager) registerNodes(ctx context.Context, sys database.SysConfig, reg kvstore.Register) {
-	for _, node := range m.nodes {
+func (m hostManager) registerNode(ctx context.Context, node nodeWithTask, sys database.SysConfig, reg kvstore.Register) error {
+	n, err := m.dco.GetNode(node.Node.ID)
+	if err != nil {
+		return err
+	}
 
-		field := logrus.WithField("host", node.Node.Addr)
+	if n.Status != statusNodeInstalled {
+		if n.Status > statusNodeInstalled {
+			return nil
+		}
 
-		n, err := m.dco.GetNode(node.Node.ID)
+		return errors.Errorf("status not match,%d!=%d", n.Status, statusNodeInstalled)
+	}
+
+	addr := fmt.Sprintf("%s:%d", n.Addr, sys.Docker)
+	eng := m.ec.EngineByAddr(addr)
+	if eng == nil || !eng.IsHealthy() {
+		return errors.Errorf("engine:%s is nil or unhealthy,engine=%v", addr, eng)
+	}
+
+	// register Node to SAN storage
+	if n.Storage != "" {
+		san, err := storage.DefaultStores().Get(n.Storage)
 		if err != nil {
-			field.Warnf("%+v", err)
-
-			//			if database.IsNotFound(err) {
-			//				t := node.Task
-			//				t.Status = database.TaskFailedStatus
-			//				t.FinishedAt = time.Now()
-			//				t.SetErrors(err)
-
-			//				err = m.dco.RegisterNode(nil, &t)
-			//				if err != nil {
-			//					field.Errorf("%+v", err)
-			//				}
-
-			//				m.removeNodeTask(n.ID)
-			//			}
-
-			continue
+			return err
 		}
 
-		// node.Node = n
+		wwn := eng.Labels[_SAN_HBA_WWN_Lable]
+		list := strings.Split(wwn, ",")
 
-		if n.Status != statusNodeInstalled {
-			if n.Status > statusNodeInstalled {
-				continue
-			}
-
-			field.Warnf("status not match,%d!=%d", n.Status, statusNodeInstalled)
-			continue
+		if err = san.AddHost(eng.ID, list...); err != nil {
+			return errors.Errorf("register to SAN,WWN:%s,%+v", wwn, err)
 		}
+	}
 
-		addr := fmt.Sprintf("%s:%d", n.Addr, sys.Docker)
-		eng := m.ec.EngineByAddr(addr)
-		if eng == nil || !eng.IsHealthy() {
-			field.Errorf("engine:%s is nil or unhealthy,engine=%v", addr, eng)
-			continue
-		}
-
-		// register Node to SAN storage
-		if n.Storage != "" {
-			san, err := storage.DefaultStores().Get(n.Storage)
-			if err != nil {
-				continue
-			}
-
-			wwn := eng.Labels[_SAN_HBA_WWN_Lable]
-			list := strings.Split(wwn, ",")
-
-			if err = san.AddHost(eng.ID, list...); err != nil {
-				field.Errorf("register to SAN,WWN:%s,%+v", wwn, err)
-				continue
-			}
-		}
-
-		err = registerHost(ctx, node, reg, eng.Labels["CONTAINER_NIC"])
-		if err != nil {
-			field.Errorf("%+v", err)
-			continue
-		}
-
+	err = registerHost(ctx, node, reg, eng.Labels["CONTAINER_NIC"])
+	if err != nil {
+		return err
+	}
+	{
 		n.EngineID = eng.ID
 		n.Status = statusNodeEnable
 		n.Enabled = true
@@ -520,10 +496,25 @@ func (m hostManager) registerNodes(ctx context.Context, sys database.SysConfig, 
 
 		err = m.dco.RegisterNode(&n, &t)
 		if err != nil {
-			field.Errorf("%+v", err)
-		} /*else {
-			m.removeNodeTask(n.ID)
-		}*/
+			return err
+		}
+	}
+
+	{
+		// sync engine images
+		go syncEngineImages(eng, m.dco, sys)
+	}
+
+	return nil
+}
+
+func (m hostManager) registerNodes(ctx context.Context, sys database.SysConfig, reg kvstore.Register) {
+	for i := range m.nodes {
+
+		err := m.registerNode(ctx, m.nodes[i], sys, reg)
+		if err != nil {
+			logrus.WithField("host", m.nodes[i].Node.Addr).Errorf("%+v", err)
+		}
 	}
 }
 

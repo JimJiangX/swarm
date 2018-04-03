@@ -49,10 +49,15 @@ func (eh eventHander) Handle(event *cluster.Event) (err error) {
 		switch action {
 		case "create", "rename":
 			engine := event.Engine
+			state := statusContainerCreated
+			if action == "rename" {
+				state = statusContainerRenamed
+			}
+
 			c := engine.Containers().Get(msg.ID)
 			if c != nil {
 				name := getContainerNameFromInfo(c.Info)
-				err = eh.ci.UnitContainerCreated(name, c.ID, engine.ID, c.HostConfig.NetworkMode, statusContainerCreated)
+				err = eh.ci.UnitContainerCreated(name, c.ID, engine.ID, c.HostConfig.NetworkMode, state)
 			}
 		default:
 			err = handleContainerEvent(eh.ci, action, msg.ID)
@@ -64,10 +69,15 @@ func (eh eventHander) Handle(event *cluster.Event) (err error) {
 		case "create", "rename":
 			engine := event.Engine
 
+			state := statusContainerCreated
+			if msg.Status == "rename" {
+				state = statusContainerRenamed
+			}
+
 			c := engine.Containers().Get(msg.ID)
 			if c != nil {
 				name := getContainerNameFromInfo(c.Info)
-				err = eh.ci.UnitContainerCreated(name, c.ID, engine.ID, c.HostConfig.NetworkMode, statusContainerCreated)
+				err = eh.ci.UnitContainerCreated(name, c.ID, engine.ID, c.HostConfig.NetworkMode, state)
 			}
 
 		default:

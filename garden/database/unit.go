@@ -294,9 +294,9 @@ func (db dbBase) txSetUnitStatus(tx *sqlx.Tx, u *Unit, msg string, status int) e
 // txDelUnit delete Unit by name or ID or ServiceID in Tx
 func (db dbBase) txDelUnit(tx *sqlx.Tx, nameOrID string) error {
 
-	query := "DELETE FROM " + db.unitTable() + " WHERE id=? OR name=? OR service_id=?"
+	query := "DELETE FROM " + db.unitTable() + " WHERE id=? OR service_id=?"
 
-	_, err := tx.Exec(query, nameOrID, nameOrID, nameOrID)
+	_, err := tx.Exec(query, nameOrID, nameOrID)
 
 	return errors.Wrap(err, "Tx delete Unit by nameOrID or ServiceID")
 }

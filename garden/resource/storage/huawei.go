@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -30,6 +31,8 @@ type huaweiStore struct {
 
 	orm database.StorageOrmer
 	hs  huawei
+
+	rgList map[string]Space // cache rg spaces
 }
 
 func (h huaweiStore) scriptPath(file string) (string, error) {
@@ -51,6 +54,7 @@ func newHuaweiStore(orm database.StorageOrmer, script string, san database.SANSt
 		orm:    orm,
 		script: filepath.Join(script, hw.Vendor, hw.Version),
 		hs:     hw,
+		rgList: make(map[string]Space),
 	}
 }
 
@@ -90,7 +94,7 @@ func (h *huaweiStore) insert() error {
 	return err
 }
 
-func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, database.Volume, error) {
+func (h *huaweiStore) Alloc(name, unit, vg, host string, size int64) (database.LUN, database.Volume, error) {
 	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -102,15 +106,20 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 	if err != nil {
 		return lun, lv, err
 	}
-	for key := range out {
-		if !key.Enabled {
-			delete(out, key)
-		}
-	}
 
 	rg := maxIdleSizeRG(out)
 	if out[rg].Free < size {
 		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
+	}
+
+	hluns, err := h.orm.ListHostLunIDByMapping(host)
+	if err != nil {
+		return lun, lv, err
+	}
+
+	find, val := findIdleNum(h.hs.HluStart, h.hs.HluEnd, hluns)
+	if !find {
+		return lun, lv, errors.Errorf("%s:no available host LUN ID", h.Vendor())
 	}
 
 	path, err := h.scriptPath("create_lun.sh")
@@ -129,7 +138,22 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 		return lun, lv, errors.Errorf("exec:%s,Output:%s,%s", cmd.Args, output, err)
 	}
 
-	storageLunID, err := strconv.Atoi(strings.TrimSpace(string(output)))
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		lun.MappingTo = ""
+	}()
+
+	{
+		space := out[rg]
+		space.Free -= size
+		h.updateRGCache(space)
+	}
+
+	lunID := strings.TrimSpace(string(output))
+	storageLunID, err := strconv.Atoi(lunID)
 	if err != nil {
 		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
 	}
@@ -140,6 +164,8 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 		VG:              vg,
 		RaidGroupID:     rg.ID,
 		StorageSystemID: h.ID(),
+		MappingTo:       host,
+		HostLunID:       val,
 		SizeByte:        int(size),
 		StorageLunID:    storageLunID,
 		CreatedAt:       time.Now(),
@@ -149,6 +175,7 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 		ID:         utils.Generate64UUID(),
 		Name:       name,
 		UnitID:     unit,
+		EngineID:   host,
 		Size:       size,
 		VG:         vg,
 		Driver:     h.Driver(),
@@ -159,6 +186,23 @@ func (h *huaweiStore) Alloc(name, unit, vg string, size int64) (database.LUN, da
 	err = h.orm.InsertLunVolume(lun, lv)
 	if err != nil {
 		return lun, lv, err
+	}
+
+	path, err = h.scriptPath("create_lunmap.sh")
+	if err != nil {
+		return lun, lv, err
+	}
+
+	host = generateHostName(host)
+
+	param = []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, lunID, host, strconv.Itoa(val)}
+
+	logrus.Debug(param)
+	time.Sleep(time.Second)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
+	if err != nil {
+		return lun, lv, errors.WithStack(err)
 	}
 
 	return lun, lv, nil
@@ -175,15 +219,20 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 	if err != nil {
 		return lun, lv, err
 	}
-	for key := range out {
-		if !key.Enabled {
-			delete(out, key)
-		}
-	}
 
 	rg := maxIdleSizeRG(out)
 	if out[rg].Free < size {
 		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
+	}
+
+	hluns, err := h.orm.ListHostLunIDByMapping(lv.EngineID)
+	if err != nil {
+		return lun, lv, err
+	}
+
+	find, val := findIdleNum(h.hs.HluStart, h.hs.HluEnd, hluns)
+	if !find {
+		return lun, lv, errors.Errorf("%s:no available host LUN ID", h.Vendor())
 	}
 
 	path, err := h.scriptPath("create_lun.sh")
@@ -202,7 +251,60 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 		return lun, lv, errors.Errorf("exec:%s,Output:%s,%s", cmd.Args, output, err)
 	}
 
-	storageLunID, err := strconv.Atoi(strings.TrimSpace(string(output)))
+	{
+		space := out[rg]
+		space.Free -= size
+		h.updateRGCache(space)
+	}
+
+	keepLun := true
+	originSize := lv.Size
+
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		h.invalidRGCache(lun.RaidGroupID)
+
+		path, _err := h.scriptPath("del_lunmap.sh")
+		if _err != nil {
+			err = fmt.Errorf("%s\n%+v", _err, err)
+			return
+		}
+
+		param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(lun.StorageLunID)}
+
+		logrus.Debug(param)
+		time.Sleep(time.Second)
+
+		_, _err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
+		if _err != nil {
+			err = fmt.Errorf("%s\n%+v", _err, err)
+		} else {
+			keepLun = false
+		}
+
+		if !keepLun {
+			_err := h.orm.DelLUN(lun.ID)
+			if _err != nil {
+				err = fmt.Errorf("expand lun failed,DelLUN failed,%+v\n%+v", _err, err)
+			}
+		}
+
+		lun.MappingTo = ""
+		tmpSize := lv.Size
+		lv.Size = originSize
+
+		_err = h.orm.SetVolume(lv)
+		if _err != nil {
+			lv.Size = tmpSize
+			err = fmt.Errorf("expand lun failed,SetVolume failed,%+v\n%+v", _err, err)
+		}
+	}()
+
+	lunID := strings.TrimSpace(string(output))
+	storageLunID, err := strconv.Atoi(lunID)
 	if err != nil {
 		return lun, lv, errors.Wrap(err, h.Vendor()+" alloc LUN")
 	}
@@ -213,6 +315,8 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 		VG:              lv.VG,
 		RaidGroupID:     rg.ID,
 		StorageSystemID: h.ID(),
+		MappingTo:       lv.EngineID,
+		HostLunID:       val,
 		SizeByte:        int(size),
 		StorageLunID:    storageLunID,
 		CreatedAt:       time.Now(),
@@ -223,6 +327,45 @@ func (h *huaweiStore) Extend(lv database.Volume, size int64) (database.LUN, data
 	err = h.orm.InsertLunSetVolume(lun, lv)
 	if err != nil {
 		return lun, lv, err
+	}
+
+	path, err = h.scriptPath("create_lunmap.sh")
+	if err != nil {
+		return lun, lv, err
+	}
+
+	host := generateHostName(lv.EngineID)
+	param = []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, lunID, host, strconv.Itoa(val)}
+	logrus.Debug(param)
+
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		path, _err := h.scriptPath("del_lunmap.sh")
+		if _err != nil {
+			err = fmt.Errorf("%s\n%+v", _err, err)
+			return
+		}
+
+		param := []string{path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(lun.StorageLunID)}
+		logrus.Debug(param)
+
+		time.Sleep(time.Second)
+
+		_, _err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
+		if _err != nil {
+			err = fmt.Errorf("%s\n%+v", _err, err)
+			keepLun = true
+		}
+	}()
+
+	time.Sleep(time.Second)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
+	if err != nil {
+		return lun, lv, errors.WithStack(err)
 	}
 
 	return lun, lv, nil
@@ -256,6 +399,8 @@ func (h *huaweiStore) RecycleLUN(id string, lun int) error {
 		return err
 	}
 
+	h.invalidRGCache(l.RaidGroupID)
+
 	logrus.Debugf("%s %s %s %s %s", path, h.hs.IPAddr, h.hs.Username, h.hs.Password, l.StorageLunID)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.IPAddr, h.hs.Username, h.hs.Password, strconv.Itoa(l.StorageLunID))
@@ -263,9 +408,7 @@ func (h *huaweiStore) RecycleLUN(id string, lun int) error {
 		return errors.WithStack(err)
 	}
 
-	err = h.orm.DelLUN(l.ID)
-
-	return err
+	return h.orm.DelLUN(l.ID)
 }
 
 func (h huaweiStore) idleSize() (map[string]int64, error) {
@@ -437,27 +580,32 @@ func (h *huaweiStore) AddSpace(id string) (Space, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
+	h.invalidRGCache(id)
+
 	spaces, err := h.list(id)
 	if err != nil {
 		return Space{}, err
 	}
 
-	for i := range spaces {
-		if spaces[i].ID == id {
-
-			if err = insert(); err == nil {
-				return spaces[i], nil
-			}
-
-			return Space{}, err
-
-		}
+	if val, ok := spaces[id]; ok {
+		return val, insert()
 	}
 
 	return Space{}, errors.Errorf("%s:Space %s is not exist", h.ID(), id)
 }
 
-func (h *huaweiStore) list(rg ...string) ([]Space, error) {
+func (h *huaweiStore) list(rg ...string) (map[string]Space, error) {
+	if len(rg) > 0 {
+		// find huaweiStore rg list in rgList cache
+		if len(rg) > 0 {
+			// find hitachiStore rg list in rgList cache
+			spaces := h.getRGSpacesFromCache(rg...)
+			if spaces != nil {
+				return spaces, nil
+			}
+		}
+	}
+
 	list := ""
 	if len(rg) == 0 {
 		return nil, nil
@@ -498,8 +646,11 @@ func (h *huaweiStore) list(rg ...string) ([]Space, error) {
 		return nil, errors.Errorf("Wait %s:%s,warnings:%s", cmd.Args, err, warnings)
 	}
 
+	// cache huaweiStore rg list spaces
 	if len(spaces) == 0 {
-		return nil, nil
+		h.invalidRGCache(rg...)
+	} else {
+		h.updateRGListCache(spaces)
 	}
 
 	return spaces, nil
@@ -507,7 +658,10 @@ func (h *huaweiStore) list(rg ...string) ([]Space, error) {
 
 func (h *huaweiStore) EnableSpace(id string) error {
 	h.lock.Lock()
+
+	h.invalidRGCache(id)
 	err := h.orm.SetRaidGroupStatus(h.ID(), id, true)
+
 	h.lock.Unlock()
 
 	return err
@@ -515,7 +669,10 @@ func (h *huaweiStore) EnableSpace(id string) error {
 
 func (h *huaweiStore) DisableSpace(id string) error {
 	h.lock.Lock()
+
+	h.invalidRGCache(id)
 	err := h.orm.SetRaidGroupStatus(h.ID(), id, false)
+
 	h.lock.Unlock()
 
 	return err
@@ -523,7 +680,10 @@ func (h *huaweiStore) DisableSpace(id string) error {
 
 func (h *huaweiStore) removeSpace(id string) error {
 	h.lock.Lock()
+
+	h.invalidRGCache(id)
 	err := h.orm.DelRaidGroup(h.ID(), id)
+
 	h.lock.Unlock()
 
 	return err
@@ -552,14 +712,9 @@ func (h huaweiStore) Size() (map[database.RaidGroup]Space, error) {
 		info = make(map[database.RaidGroup]Space)
 
 		for i := range out {
-		loop:
-			for s := range spaces {
-				if out[i].StorageRGID == spaces[s].ID {
-					spaces[s].Enable = out[i].Enabled
-					info[out[i]] = spaces[s]
-					break loop
-				}
-			}
+			space := spaces[out[i].StorageRGID]
+			space.Enable = out[i].Enabled
+			info[out[i]] = space
 		}
 	}
 
@@ -582,8 +737,45 @@ func (h huaweiStore) Info() (Info, error) {
 	for rg, val := range list {
 		info.List[rg.StorageRGID] = val
 		info.Total += val.Total
-		info.Free += val.Free
+
+		if rg.Enabled {
+			info.Free += val.Free
+		}
 	}
 
 	return info, nil
+}
+
+func (h huaweiStore) getRGSpacesFromCache(rg ...string) map[string]Space {
+	spaces := make(map[string]Space, len(rg))
+
+	for i := range rg {
+		val, ok := h.rgList[rg[i]]
+
+		if !ok || val.ID == "" {
+			return nil
+		}
+
+		spaces[rg[i]] = val
+	}
+
+	return spaces
+}
+
+func (h *huaweiStore) invalidRGCache(rg ...string) {
+	for i := range rg {
+		delete(h.rgList, rg[i])
+	}
+}
+
+func (h *huaweiStore) updateRGCache(space Space) {
+	h.rgList[space.ID] = space
+}
+
+func (h *huaweiStore) updateRGListCache(spaces map[string]Space) {
+	for id, val := range spaces {
+		if id == val.ID {
+			h.rgList[id] = val
+		}
+	}
 }

@@ -59,6 +59,7 @@ const (
 	statusUnitRestoreFailed
 
 	statusContainerCreated
+	statusContainerRenamed
 	statusContainerRunning
 	statusContainerPaused
 	statusContainerRestarted
@@ -209,14 +210,13 @@ func (u unit) getHostIP() (string, error) {
 	}
 
 	if u.u.EngineID != "" {
-		n, err := u.uo.GetNode(u.u.EngineID)
-		if err != nil {
-			return "", err
+		parts := strings.SplitN(u.u.EngineID, "|", 2)
+		if len(parts) == 2 {
+			host, _, err := net.SplitHostPort(parts[1])
+			if err == nil {
+				return host, nil
+			}
 		}
-
-		parts := strings.SplitN(n.Addr, ":", 2)
-
-		return parts[0], nil
 	}
 
 	return "", errors.WithStack(newContainerError(u.u.Name, "host IP is required"))

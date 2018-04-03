@@ -32,7 +32,7 @@ type localVolumeIface interface {
 
 	GetVolume(nameOrID string) (database.Volume, error)
 
-	ListVolumeByVG(string) ([]database.Volume, error)
+	ListVolumeByEngine(string) ([]database.Volume, error)
 
 	DelVolume(nameOrID string) error
 }
@@ -99,11 +99,11 @@ func (lvm localVolumeMap) GetVolume(nameOrID string) (database.Volume, error) {
 	return database.Volume{}, errors.New("sql: no rows in result set")
 }
 
-func (lvm localVolumeMap) ListVolumeByVG(vg string) ([]database.Volume, error) {
+func (lvm localVolumeMap) ListVolumeByEngine(id string) ([]database.Volume, error) {
 	out := make([]database.Volume, 0, 5)
 
 	for _, v := range lvm.m {
-		if v.VG == vg {
+		if v.VG == id {
 			out = append(out, v)
 		}
 	}
@@ -215,9 +215,14 @@ func volumeDriverFromEngine(iface localVolumeIface, e *cluster.Engine, label str
 		vgIface: unsupportSAN{},
 	}
 
-	_, err := lv.Space()
+	return lv, nil
+}
 
-	return lv, err
+// FindEngineLocalVolumeDrivers returns local volume drivers,include _HDDVGLabel,_SSDVGLabel.
+// port is swarm-agent server port.
+func FindEngineLocalVolumeDrivers(e *cluster.Engine, iface localVolumeIface, port int) ([]Driver, error) {
+
+	return localVolumeDrivers(e, iface, port)
 }
 
 func localVolumeDrivers(e *cluster.Engine, iface localVolumeIface, port int) ([]Driver, error) {
@@ -242,12 +247,12 @@ func localVolumeDrivers(e *cluster.Engine, iface localVolumeIface, port int) ([]
 
 type localVolume struct {
 	vgIface
+	vo     localVolumeIface
 	engine *cluster.Engine
 	driver string
 	_type  string
 	port   int
 	space  Space
-	vo     localVolumeIface
 }
 
 func (lv localVolume) Name() string {
@@ -263,7 +268,7 @@ func (lv localVolume) Driver() string {
 }
 
 func (lv localVolume) Space() (Space, error) {
-	lvs, err := lv.vo.ListVolumeByVG(lv.space.VG)
+	lvs, err := lv.vo.ListVolumeByEngine(lv.engine.ID)
 	if err != nil {
 		return Space{}, err
 	}

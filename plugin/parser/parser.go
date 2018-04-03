@@ -14,7 +14,7 @@ type parser interface {
 	clone(*structs.ConfigTemplate) parser
 
 	set(key string, val interface{}) error
-	get(key string) string
+	get(key string) (string, bool)
 
 	Validate(data map[string]interface{}) error
 

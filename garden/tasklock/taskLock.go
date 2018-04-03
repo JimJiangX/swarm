@@ -16,6 +16,7 @@ type GoTaskLock struct {
 	fail    int
 
 	task     *database.Task
+	action   string
 	key      string
 	retries  int
 	waitTime time.Duration
@@ -56,13 +57,7 @@ func (tl GoTaskLock) _CAS(f func(val int) bool) (bool, int, error) {
 			return done, value, err
 		}
 
-		if c == 1 {
-			break
-		}
-
-		if t > 0 {
-			time.Sleep(t)
-		}
+		time.Sleep(t)
 	}
 
 	return done, value, err
@@ -83,20 +78,14 @@ func (tl GoTaskLock) setStatus(val int) error {
 		tl.retries = 1
 	}
 
-	t := tl.waitTime / time.Duration(tl.retries+1)
+	t := tl.waitTime / time.Duration(tl.retries)
 
-	for c := tl.retries; c > 0; c-- {
-		if t > 0 {
-			time.Sleep(t)
-		}
+	for c := tl.retries - 1; c > 0; c-- {
+		time.Sleep(t)
 
 		err = tl.After(tl.key, val, tl.task, now)
 		if err == nil {
 			return nil
-		}
-
-		if c == 1 {
-			break
 		}
 	}
 
@@ -128,37 +117,30 @@ func (tl GoTaskLock) run(check func(val int) bool, do func() error, async bool) 
 			if r := recover(); r != nil {
 				err = errors.Errorf("panic:%v", r)
 			}
-			now := time.Now()
 
 			field := logrus.WithFields(logrus.Fields{
-				"Key":   tl.key,
-				"Since": now.Sub(start).String(),
+				"Key":    tl.key,
+				"Action": tl.action,
 			})
-
-			val := tl.expect
 
 			if tl.task != nil {
 				tl.task.Status = database.TaskDoneStatus
 				tl.task.SetErrors(err)
-				tl.task.FinishedAt = now
-			}
+				tl.task.FinishedAt = time.Now()
 
-			if err != nil {
-				val = tl.fail
-
-				if tl.task != nil {
+				if err != nil {
 					tl.task.Status = database.TaskFailedStatus
 				}
+			}
 
-				field.Errorf("go task lock:%+v", err)
+			val := tl.expect
+			if err != nil {
+				val = tl.fail
 			}
 
 			_err := tl.setStatus(val)
-			if _err != nil {
-				field.Errorf("go task lock:setStatus error,%+v", _err)
-			}
 
-			field.Info("Task Done!")
+			field.Infof("Task Done! Since=%s %+v %+v", time.Since(start), _err, err)
 		}()
 
 		return do()
@@ -174,12 +156,13 @@ func (tl GoTaskLock) run(check func(val int) bool, do func() error, async bool) 
 }
 
 // NewGoTask returns GoTaskLock
-func NewGoTask(key string, task *database.Task,
+func NewGoTask(action, key string, task *database.Task,
 	before func(key string, new int, t *database.Task, f func(val int) bool) (bool, int, error),
 	after func(key string, val int, task *database.Task, t time.Time) error) GoTaskLock {
 
 	return GoTaskLock{
 		task:     task,
+		action:   action,
 		key:      key,
 		retries:  3,
 		waitTime: time.Second * 2,
@@ -189,7 +172,7 @@ func NewGoTask(key string, task *database.Task,
 }
 
 // NewServiceTask returns a GoTaskLock,init by ServiceOrmer
-func NewServiceTask(key string, ormer database.ServiceOrmer,
+func NewServiceTask(action, key string, ormer database.ServiceOrmer,
 	t *database.Task, current, expect, fail int) GoTaskLock {
 
 	return GoTaskLock{
@@ -198,9 +181,10 @@ func NewServiceTask(key string, ormer database.ServiceOrmer,
 		fail:    fail,
 
 		task:     t,
+		action:   action,
 		key:      key,
 		retries:  3,
-		waitTime: time.Second * 2,
+		waitTime: time.Second * 3,
 
 		load:   ormer.GetServiceStatus,
 		After:  ormer.SetServiceWithTask,

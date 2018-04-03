@@ -32,6 +32,8 @@ type hitachiStore struct {
 
 	orm database.StorageOrmer
 	hs  hitachi
+
+	rgList map[string]Space // cache rg spaces
 }
 
 // NewHitachiStore returns a new Store
@@ -46,11 +48,13 @@ func newHitachiStore(orm database.StorageOrmer, script string, san database.SANS
 		HluStart:  san.HluStart,
 		HluEnd:    san.HluEnd,
 	}
+
 	return &hitachiStore{
 		lock:   new(sync.RWMutex),
 		orm:    orm,
 		script: filepath.Join(script, hs.Vendor, hs.Version),
 		hs:     hs,
+		rgList: make(map[string]Space),
 	}
 }
 
@@ -114,7 +118,7 @@ func (h *hitachiStore) insert() error {
 // Alloc list hitachiStore's RG idle space,alloc a new LUN in free space,
 // the allocated LUN is used to creating a volume.
 // alloction calls create_lun.sh
-func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, database.Volume, error) {
+func (h *hitachiStore) Alloc(name, unit, vg, host string, size int64) (database.LUN, database.Volume, error) {
 	time.Sleep(time.Second)
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -125,12 +129,6 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 	out, err := h.Size()
 	if err != nil {
 		return lun, lv, err
-	}
-
-	for key := range out {
-		if !key.Enabled {
-			delete(out, key)
-		}
 	}
 
 	rg := maxIdleSizeRG(out)
@@ -148,6 +146,16 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 		return lun, lv, errors.New("no available LUN ID in store:" + h.Vendor())
 	}
 
+	hluns, err := h.orm.ListHostLunIDByMapping(host)
+	if err != nil {
+		return lun, lv, err
+	}
+
+	find, val := findIdleNum(h.hs.HluStart, h.hs.HluEnd, hluns)
+	if !find {
+		return lun, lv, errors.Errorf("%s:no available host LUN ID", h.Vendor())
+	}
+
 	lun = database.LUN{
 		ID:              utils.Generate64UUID(),
 		Name:            name,
@@ -156,6 +164,8 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 		StorageSystemID: h.ID(),
 		SizeByte:        int(size),
 		StorageLunID:    id,
+		MappingTo:       host,
+		HostLunID:       val,
 		CreatedAt:       time.Now(),
 	}
 
@@ -163,6 +173,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 		ID:         utils.Generate64UUID(),
 		Name:       name,
 		UnitID:     unit,
+		EngineID:   host,
 		Size:       size,
 		VG:         vg,
 		Driver:     h.Driver(),
@@ -180,10 +191,7 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 			return
 		}
 
-		_err := h.orm.DelLunVolume(lun.ID, lv.ID)
-		if _err != nil {
-			err = fmt.Errorf("%+v\n%+v", _err, err)
-		}
+		lun.MappingTo = ""
 	}()
 
 	path, err := h.scriptPath("create_lun.sh")
@@ -197,6 +205,29 @@ func (h *hitachiStore) Alloc(name, unit, vg string, size int64) (database.LUN, d
 	logrus.Debug(param)
 
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
+	if err != nil {
+		return lun, lv, errors.WithStack(err)
+	}
+
+	{
+		space := out[rg]
+		space.Free -= size
+		h.updateRGCache(space)
+	}
+
+	path, err = h.scriptPath("create_lunmap.sh")
+	if err != nil {
+		return lun, lv, err
+	}
+
+	host = generateHostName(host)
+
+	logrus.Debugf("%s %s %d %s %d", path, h.hs.AdminUnit, lun.StorageLunID, host, val)
+
+	time.Sleep(time.Second)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit,
+		strconv.Itoa(lun.StorageLunID), host, strconv.Itoa(val))
 	if err != nil {
 		return lun, lv, errors.WithStack(err)
 	}
@@ -214,12 +245,6 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (lun database.LUN,
 		return lun, lv, err
 	}
 
-	for key := range out {
-		if !key.Enabled {
-			delete(out, key)
-		}
-	}
-
 	rg := maxIdleSizeRG(out)
 	if out[rg].Free < size {
 		return lun, lv, errors.Errorf("%s hasn't enough space for alloction,max:%d < need:%d", h.Vendor(), out[rg].Free, size)
@@ -235,10 +260,22 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (lun database.LUN,
 		return lun, lv, errors.New("no available LUN ID in store:" + h.Vendor())
 	}
 
+	hluns, err := h.orm.ListHostLunIDByMapping(lv.EngineID)
+	if err != nil {
+		return lun, lv, err
+	}
+
+	find, val := findIdleNum(h.hs.HluStart, h.hs.HluEnd, hluns)
+	if !find {
+		return lun, lv, errors.Errorf("%s:no available host LUN ID", h.Vendor())
+	}
+
 	lun = database.LUN{
 		ID:              utils.Generate64UUID(),
 		Name:            lv.Name,
 		VG:              lv.VG,
+		MappingTo:       lv.EngineID,
+		HostLunID:       val,
 		RaidGroupID:     rg.ID,
 		StorageSystemID: h.ID(),
 		SizeByte:        int(size),
@@ -253,25 +290,31 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (lun database.LUN,
 		return lun, lv, err
 	}
 
+	keepLun := false
+
 	defer func() {
 		if err == nil {
 			return
 		}
 
-		_err := h.orm.DelLUN(lun.ID)
-		if _err != nil {
-			err = errors.Errorf("expand lun failed,DelLUN failed\n%+v\n%+v", _err, err)
+		if !keepLun {
+			_err := h.orm.DelLUN(lun.ID)
+			if _err != nil {
+				err = fmt.Errorf("expand lun failed,DelLUN failed,%+v\n%+v", _err, err)
+			}
 		}
 
+		lun.MappingTo = ""
 		lv.Size -= size
 
-		_err = h.orm.SetVolume(lv)
+		_err := h.orm.SetVolume(lv)
 		if _err != nil {
 			lv.Size += size
-			err = errors.Errorf("expand lun failed,SetVolume failed\n%+v\n%+v", _err, err)
+			err = fmt.Errorf("expand lun failed,SetVolume failed,%+v\n%+v", _err, err)
 		}
 	}()
 
+	// create lun
 	path, err := h.scriptPath("create_lun.sh")
 	if err != nil {
 		return lun, lv, err
@@ -285,6 +328,79 @@ func (h *hitachiStore) Extend(lv database.Volume, size int64) (lun database.LUN,
 	_, err = utils.ExecContextTimeout(nil, defaultTimeout, param...)
 	if err != nil {
 		return lun, lv, errors.WithStack(err)
+	}
+
+	keepLun = true
+
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		h.invalidRGCache(lun.RaidGroupID)
+
+		path, _err := h.scriptPath("del_lun.sh")
+		if _err != nil {
+			err = fmt.Errorf("%s\n%+v", _err, err)
+			return
+		}
+
+		logrus.Debugf("%s %s %d", path, h.hs.AdminUnit, lun.StorageLunID)
+		time.Sleep(time.Second)
+
+		_, _err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit, strconv.Itoa(lun.StorageLunID))
+		if _err != nil {
+			err = fmt.Errorf("%s\n%+v", _err, err)
+		} else {
+			keepLun = false
+			lun.MappingTo = ""
+		}
+	}()
+
+	// lun mapping
+	path, err = h.scriptPath("create_lunmap.sh")
+	if err != nil {
+		return lun, lv, err
+	}
+
+	host := generateHostName(lv.EngineID)
+
+	logrus.Debugf("%s %s %d %s %d", path, h.hs.AdminUnit, lun.StorageLunID, host, val)
+
+	defer func() {
+		if err == nil {
+			return
+		}
+
+		path, _err := h.scriptPath("del_lunmap.sh")
+		if _err != nil {
+			err = fmt.Errorf("%s\n%+v", _err, err)
+			return
+		}
+
+		logrus.Debugf("%s %s %d", path, h.hs.AdminUnit, lun.StorageLunID)
+
+		time.Sleep(time.Second)
+
+		_, _err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit, strconv.Itoa(lun.StorageLunID))
+		if _err != nil {
+			err = fmt.Errorf("%s\n%+v", _err, err)
+			keepLun = true
+		}
+	}()
+
+	time.Sleep(time.Second)
+
+	_, err = utils.ExecContextTimeout(nil, defaultTimeout, path, h.hs.AdminUnit,
+		strconv.Itoa(lun.StorageLunID), host, strconv.Itoa(val))
+	if err != nil {
+		return lun, lv, errors.WithStack(err)
+	}
+
+	{
+		space := out[rg]
+		space.Free -= size
+		h.updateRGCache(space)
 	}
 
 	return lun, lv, nil
@@ -314,6 +430,8 @@ func (h *hitachiStore) RecycleLUN(id string, lun int) error {
 		return err
 	}
 
+	h.invalidRGCache(l.RaidGroupID)
+
 	path, err := h.scriptPath("del_lun.sh")
 	if err != nil {
 		return err
@@ -326,9 +444,7 @@ func (h *hitachiStore) RecycleLUN(id string, lun int) error {
 		return errors.WithStack(err)
 	}
 
-	err = h.orm.DelLUN(l.ID)
-
-	return err
+	return h.orm.DelLUN(l.ID)
 }
 
 // Size list store's RGs infomation
@@ -355,14 +471,9 @@ func (h hitachiStore) Size() (map[database.RaidGroup]Space, error) {
 		info = make(map[database.RaidGroup]Space)
 
 		for i := range out {
-		loop:
-			for s := range spaces {
-				if out[i].StorageRGID == spaces[s].ID {
-					spaces[s].Enable = out[i].Enabled
-					info[out[i]] = spaces[s]
-					break loop
-				}
-			}
+			space := spaces[out[i].StorageRGID]
+			space.Enable = out[i].Enabled
+			info[out[i]] = space
 		}
 	}
 
@@ -370,7 +481,15 @@ func (h hitachiStore) Size() (map[database.RaidGroup]Space, error) {
 }
 
 // list store RGs info,calls listrg.sh
-func (h *hitachiStore) list(rg ...string) ([]Space, error) {
+func (h *hitachiStore) list(rg ...string) (map[string]Space, error) {
+	if len(rg) > 0 {
+		// find hitachiStore rg list in rgList cache
+		spaces := h.getRGSpacesFromCache(rg...)
+		if spaces != nil {
+			return spaces, nil
+		}
+	}
+
 	list := ""
 	if len(rg) == 0 {
 		return nil, nil
@@ -410,8 +529,11 @@ func (h *hitachiStore) list(rg ...string) ([]Space, error) {
 		return nil, errors.Errorf("Wait %s:%s,warnings:%s", cmd.Args, err, warnings)
 	}
 
+	// cache hitachiStore rg list spaces
 	if len(spaces) == 0 {
-		return nil, nil
+		h.invalidRGCache(rg...)
+	} else {
+		h.updateRGListCache(spaces)
 	}
 
 	return spaces, nil
@@ -584,21 +706,15 @@ func (h *hitachiStore) AddSpace(id string) (Space, error) {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 
+	h.invalidRGCache(id)
+
 	spaces, err := h.list(id)
 	if err != nil {
 		return Space{}, err
 	}
 
-	for i := range spaces {
-		if spaces[i].ID == id {
-
-			if err = insert(); err == nil {
-
-				return spaces[i], nil
-			}
-
-			return Space{}, err
-		}
+	if val, ok := spaces[id]; ok {
+		return val, insert()
 	}
 
 	return Space{}, errors.Errorf("%s:Space %s is not exist", h.ID(), id)
@@ -607,7 +723,10 @@ func (h *hitachiStore) AddSpace(id string) (Space, error) {
 // EnableSpace signed RG enabled
 func (h *hitachiStore) EnableSpace(id string) error {
 	h.lock.Lock()
+
+	h.invalidRGCache(id)
 	err := h.orm.SetRaidGroupStatus(h.ID(), id, true)
+
 	h.lock.Unlock()
 
 	return err
@@ -616,7 +735,10 @@ func (h *hitachiStore) EnableSpace(id string) error {
 // DisableSpace signed RG disabled
 func (h *hitachiStore) DisableSpace(id string) error {
 	h.lock.Lock()
+
+	h.invalidRGCache(id)
 	err := h.orm.SetRaidGroupStatus(h.ID(), id, false)
+
 	h.lock.Unlock()
 
 	return err
@@ -624,7 +746,10 @@ func (h *hitachiStore) DisableSpace(id string) error {
 
 func (h *hitachiStore) removeSpace(id string) error {
 	h.lock.Lock()
+
+	h.invalidRGCache(id)
 	err := h.orm.DelRaidGroup(h.ID(), id)
+
 	h.lock.Unlock()
 
 	return err
@@ -647,8 +772,45 @@ func (h hitachiStore) Info() (Info, error) {
 	for rg, val := range list {
 		info.List[rg.StorageRGID] = val
 		info.Total += val.Total
-		info.Free += val.Free
+
+		if rg.Enabled {
+			info.Free += val.Free
+		}
 	}
 
 	return info, nil
+}
+
+func (h hitachiStore) getRGSpacesFromCache(rg ...string) map[string]Space {
+	spaces := make(map[string]Space, len(rg))
+
+	for i := range rg {
+		val, ok := h.rgList[rg[i]]
+
+		if !ok || val.ID == "" {
+			return nil
+		}
+
+		spaces[rg[i]] = val
+	}
+
+	return spaces
+}
+
+func (h *hitachiStore) invalidRGCache(rg ...string) {
+	for i := range rg {
+		delete(h.rgList, rg[i])
+	}
+}
+
+func (h *hitachiStore) updateRGCache(space Space) {
+	h.rgList[space.ID] = space
+}
+
+func (h *hitachiStore) updateRGListCache(spaces map[string]Space) {
+	for id, val := range spaces {
+		if id == val.ID {
+			h.rgList[id] = val
+		}
+	}
 }

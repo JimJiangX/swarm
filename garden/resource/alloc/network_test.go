@@ -12,6 +12,18 @@ type network struct {
 	ips []database.IP
 }
 
+func (n network) CountIPWithCondition(networking string, allocated bool) (int, error) {
+	num := 0
+
+	for _, ip := range n.ips {
+		if ip.Networking == networking && ip.UnitID == "" {
+			num++
+		}
+	}
+
+	return num, nil
+}
+
 func (n network) ListIPByEngine(engine string) ([]database.IP, error) {
 	out := make([]database.IP, 0, 5)
 
@@ -170,8 +182,8 @@ func TestAlloctNetworking(t *testing.T) {
 
 	{
 		out, err := at.AlloctNetworking(&config, "", "", nil, nil)
-		if err == nil {
-			t.Error("error expected,but got:", len(out))
+		if err != nil {
+			t.Errorf("%+v", err)
 		} else {
 			t.Log(len(out), err)
 		}

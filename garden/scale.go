@@ -21,14 +21,18 @@ import (
 
 // Scale is exported.
 // 服务水平扩展，增加或者减少节点。
-// 减少节点，移除的顺序排列，按容器顺序：
-// 		not exist -- removing -- dead -- exited -- created -- running
+// 减少节点按指定要移除的单元移除
+//    未指定要移除单元，移除的顺序排列，按容器状态顺序：
+// 	  not exist -- removing -- dead -- exited -- created -- running
 //
 // 增加节点：
 //      调度准备 -- 调度 -- 分配资源 -- 创建容器 -- 启动容器与服务
 func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator, req structs.ServiceScaleRequest, async bool) (structs.ServiceScaleResponse, error) {
-	var add []database.Unit
-	resp := structs.ServiceScaleResponse{}
+	var (
+		add    []database.Unit
+		remove []*unit
+		resp   structs.ServiceScaleResponse
+	)
 
 	units, err := svc.getUnits()
 	if err != nil {
@@ -49,6 +53,39 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 				Name: add[i].Name,
 			})
 		}
+	} else if n < 0 {
+		rn := len(req.Remove)
+		if rn > 0 && rn != -n {
+			return resp, errors.Errorf("Service %s %d require remove,but %d units have assigned,%s", svc.Name(), -n, rn, req.Remove)
+		}
+
+		if rn > 0 {
+			remove = make([]*unit, rn)
+			for i := range req.Remove {
+				u := getUnit(units, req.Remove[i])
+				if u == nil {
+					u, err = svc.getUnit(req.Remove[i])
+					if err != nil {
+						return resp, err
+					}
+				}
+
+				remove[i] = u
+			}
+		} else {
+			containers := svc.cluster.Containers()
+			out := sortUnitsByContainers(units, containers)
+
+			remove = out[:rn]
+		}
+
+		resp.Remove = make([]structs.UnitNameID, 0, len(remove))
+		for i := range remove {
+			resp.Add = append(resp.Add, structs.UnitNameID{
+				ID:   remove[i].u.ID,
+				Name: remove[i].u.Name,
+			})
+		}
 	}
 
 	scale := func() error {
@@ -57,7 +94,7 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 		}
 
 		if len(units) > req.Arch.Replicas {
-			err = svc.scaleDown(ctx, units, req.Arch.Replicas, gd.KVClient())
+			err = svc.scaleDown(ctx, remove, gd.KVClient())
 		} else {
 			_, err = gd.scaleUp(ctx, svc, actor, serviceScaleRequest{
 				ServiceScaleRequest: req,
@@ -84,7 +121,7 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 		}
 
 		if req.Compose {
-			err = svc.Compose(ctx, gd.PluginClient())
+			err = svc.Compose(ctx)
 		}
 
 		return err
@@ -92,7 +129,7 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 
 	task := database.NewTask(svc.Name(), database.ServiceScaleTask, svc.ID(), fmt.Sprintf("replicas=%d", req.Arch.Replicas), nil, 300)
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, &task,
+	sl := tasklock.NewServiceTask(database.ServiceScaleTask, svc.ID(), svc.so, &task,
 		statusServiceScaling, statusServiceScaled, statusServiceScaleFailed)
 
 	err = sl.Run(isnotInProgress, scale, async)
@@ -102,11 +139,7 @@ func (gd *Garden) Scale(ctx context.Context, svc *Service, actor alloc.Allocator
 	return resp, err
 }
 
-func (svc *Service) scaleDown(ctx context.Context, units []*unit, replicas int, reg kvstore.Register) error {
-	containers := svc.cluster.Containers()
-	out := sortUnitsByContainers(units, containers)
-
-	rm := out[:len(units)-replicas]
+func (svc *Service) scaleDown(ctx context.Context, rm []*unit, reg kvstore.Register) error {
 
 	return svc.removeUnits(ctx, rm, reg)
 }
@@ -229,7 +262,7 @@ func (gd *Garden) scaleUp(ctx context.Context, svc *Service,
 		return units, err
 	}
 
-	err = svc.runContainer(ctx, pendings, false, auth)
+	err = svc.createContainer(ctx, pendings, auth)
 	if err != nil {
 		return units, err
 	}
@@ -319,7 +352,7 @@ func (svc *Service) scheduleOptionsByUnits(opts scheduleOption, refer string, ca
 			}
 		}
 
-		constraints := fmt.Sprintf("%s==%s", engineLabel, strings.Join(tmp, "|"))
+		constraints := fmt.Sprintf("%s==%s", nodeLabel, strings.Join(tmp, "|"))
 		opts.Nodes.Constraints = append(opts.Nodes.Constraints, constraints)
 		opts.Nodes.Filters = nil
 	} else {

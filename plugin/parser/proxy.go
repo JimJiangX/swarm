@@ -45,24 +45,24 @@ func (proxyConfig) clone(t *structs.ConfigTemplate) parser {
 
 func (proxyConfig) Validate(data map[string]interface{}) error { return nil }
 
-func (c proxyConfig) get(key string) string {
+func (c proxyConfig) get(key string) (string, bool) {
 	if c.config == nil {
-		return ""
+		return "", false
 	}
 
-	if val := c.config.String(key); val != "" {
-		return val
+	if val, ok := beegoConfigString(c.config, key); ok {
+		return val, ok
 	}
 
 	if c.template != nil {
 		for i := range c.template.Keysets {
 			if c.template.Keysets[i].Key == key {
-				return c.template.Keysets[i].Default
+				return c.template.Keysets[i].Default, false
 			}
 		}
 	}
 
-	return ""
+	return "", false
 }
 
 func (c *proxyConfig) set(key string, val interface{}) error {
@@ -151,12 +151,14 @@ func (c *proxyConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 
 	m := make(map[string]interface{}, 10)
 
-	m["upsql-proxy::proxy-domain"] = desc.ID
+	m["upsql-proxy::proxy-domain"] = desc.Tag
 	m["upsql-proxy::proxy-name"] = spec.Name
 
 	addr := "localhost"
 	if len(spec.Networking) > 0 {
 		addr = spec.Networking[0].IP
+	} else {
+		return errors.New("miss ip")
 	}
 
 	{
@@ -260,6 +262,8 @@ func (c *proxyConfigV110) GenerateConfig(id string, desc structs.ServiceSpec) er
 	addr := "localhost"
 	if len(spec.Networking) > 0 {
 		addr = spec.Networking[0].IP
+	} else {
+		return errors.New("miss ip")
 	}
 
 	{
@@ -317,24 +321,24 @@ func (upproxyConfigV100) clone(t *structs.ConfigTemplate) parser {
 
 func (upproxyConfigV100) Validate(data map[string]interface{}) error { return nil }
 
-func (c upproxyConfigV100) get(key string) string {
+func (c upproxyConfigV100) get(key string) (string, bool) {
 	if c.config == nil {
-		return ""
+		return "", false
 	}
 
-	if val := c.config.String(key); val != "" {
-		return val
+	if val, ok := beegoConfigString(c.config, key); ok {
+		return val, ok
 	}
 
 	if c.template != nil {
 		for i := range c.template.Keysets {
 			if c.template.Keysets[i].Key == key {
-				return c.template.Keysets[i].Default
+				return c.template.Keysets[i].Default, false
 			}
 		}
 	}
 
-	return ""
+	return "", false
 }
 
 func (c *upproxyConfigV100) set(key string, val interface{}) error {
@@ -429,6 +433,8 @@ func (c *upproxyConfigV100) GenerateConfig(id string, desc structs.ServiceSpec) 
 	addr := "127.0.0.1"
 	if len(spec.Networking) > 0 {
 		addr = spec.Networking[0].IP
+	} else {
+		return errors.New("miss ip")
 	}
 
 	{
@@ -498,10 +504,11 @@ func (c *upproxyConfigV200) GenerateConfig(id string, desc structs.ServiceSpec) 
 		spec       structs.UnitSpec
 	)
 
-	for seq = range desc.Units {
-		if id == desc.Units[seq].ID {
-			spec = desc.Units[seq]
+	for i := range desc.Units {
+		if id == desc.Units[i].ID {
+			seq = i
 			exist = true
+			spec = desc.Units[i]
 			break
 		}
 	}
@@ -518,6 +525,8 @@ func (c *upproxyConfigV200) GenerateConfig(id string, desc structs.ServiceSpec) 
 	addr := "127.0.0.1"
 	if len(spec.Networking) > 0 {
 		addr = spec.Networking[0].IP
+	} else {
+		return errors.New("miss ip")
 	}
 
 	{

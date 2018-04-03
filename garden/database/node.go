@@ -278,7 +278,7 @@ func (db dbBase) ListNodesByClusters(clusters []string, enable bool) ([]Node, er
 	clusters = list
 
 	if len(clusters) == 0 {
-		return []Node{}, nil
+		return []Node{}, errors.New("clusters is required")
 	}
 
 	query := "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE cluster_id IN (?) AND enabled=?;"
@@ -289,9 +289,6 @@ func (db dbBase) ListNodesByClusters(clusters []string, enable bool) ([]Node, er
 
 	var nodes []Node
 	err = db.Select(&nodes, query, args...)
-	if err == sql.ErrNoRows {
-		return []Node{}, nil
-	}
 
 	return nodes, errors.Wrap(err, "list Nodes by clusters")
 }

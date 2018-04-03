@@ -144,7 +144,7 @@ type ModifyUnitConfig struct {
 	LogMount   *string `json:"log_mount,omitempty"`
 	DataMount  *string `json:"data_mount,omitempty"`
 	ConfigFile *string `json:"config_file,omitempty"`
-	Content    *string `json:"content,omitempty"`
+	// Content    *string `json:"content,omitempty"` // TODO:remove
 
 	Keysets   []Keyset `json:"keysets,omitempty"`
 	Timestamp int64    `json:"timestamp,omitempty"`

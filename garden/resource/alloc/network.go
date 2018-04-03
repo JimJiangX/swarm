@@ -17,10 +17,13 @@ import (
 )
 
 type networkAllocOrmer interface {
-	ListIPByEngine(ID string) ([]database.IP, error)
-	ResetIPs(ips []database.IP) error
-	AllocNetworking(unit, engine string, req []database.NetworkingRequire) ([]database.IP, error)
 	SetIPs([]database.IP) error
+	ResetIPs(ips []database.IP) error
+
+	ListIPByEngine(ID string) ([]database.IP, error)
+	CountIPWithCondition(networking string, allocated bool) (int, error)
+
+	AllocNetworking(unit, engine string, req []database.NetworkingRequire) ([]database.IP, error)
 }
 
 type netAllocator struct {
@@ -30,6 +33,13 @@ type netAllocator struct {
 
 func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineID, unitID string,
 	networkings []string, requires []structs.NetDeviceRequire) (out []database.IP, err error) {
+	if len(requires) == 0 {
+		return nil, nil
+	}
+
+	if len(networkings) == 0 {
+		return nil, errors.New("networkings is required")
+	}
 
 	idleDevs, width, err := at.availableDevice(engineID)
 	if err != nil {
@@ -42,7 +52,7 @@ func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineI
 
 	// check network device bandwidth and band
 	if width < 0 || len(idleDevs) < len(requires) {
-		return nil, errors.Errorf("Engine:%s not enough Bandwidth for require,len(bond)=%d,%d less", engineID, len(idleDevs), width)
+		return nil, errors.Errorf("Engine:%s not enough Bandwidth for require,len(bond)=%d<%d,Bandwidth %d less", engineID, len(idleDevs), len(requires), width)
 	}
 
 	in := make([]database.NetworkingRequire, 0, len(requires))
@@ -64,7 +74,7 @@ func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineI
 		}
 		_err := at.ormer.ResetIPs(recycle)
 		if _err != nil {
-			logrus.Errorf("alloc networking:%+v", _err)
+			logrus.Errorf("reset ip:%+v", _err)
 		}
 	}()
 
@@ -73,7 +83,7 @@ func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineI
 			in[l].Networking = networkings[i]
 		}
 		out, err = at.ormer.AllocNetworking(unitID, engineID, in)
-		if err == nil && len(out) == len(in) {
+		if err == nil && len(out) >= len(in) {
 			break
 		} else if len(out) > 0 {
 			recycle = append(recycle, out...)
@@ -84,11 +94,13 @@ func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineI
 		return nil, err
 	}
 
-	if len(out) != len(in) {
-		return nil, errors.New("alloc networkings failed")
+	if n := len(requires); len(out) < n {
+		return nil, errors.Errorf("alloc networkings failed,%d<%d", len(out), n)
+	} else if len(out) > n {
+		recycle = append(recycle, out[n:]...)
+		out = out[:n]
 	}
 
-	config.HostConfig.NetworkMode = "none"
 	for i := range out {
 		ip := utils.Uint32ToIP(out[i].IPAddr)
 		if ip == nil {
@@ -96,8 +108,12 @@ func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineI
 		}
 
 		config.Config.Env = append(config.Config.Env, "IPADDR="+ip.String())
+		config.Config.Env = append(config.Config.Env, "NET_DEV="+out[i].Bond)
 		break
 	}
+
+	config.HostConfig.NetworkMode = "none"
+
 	return out, nil
 }
 
@@ -107,12 +123,16 @@ func (at netAllocator) availableDevice(engineID string) ([]string, int, error) {
 		return nil, 0, errors.Errorf("Engine not found:%s", engineID)
 	}
 
+	return EngineIdleNetworkDevice(at.ormer, engine)
+}
+
+func EngineIdleNetworkDevice(ormer networkAllocOrmer, engine *cluster.Engine) ([]string, int, error) {
 	devices, width, err := nic.ParseEngineDevice(engine)
 	if err != nil {
 		return nil, width, err
 	}
 
-	used, err := at.ormer.ListIPByEngine(engine.ID)
+	used, err := ormer.ListIPByEngine(engine.ID)
 	if err != nil {
 		return nil, width, err
 	}

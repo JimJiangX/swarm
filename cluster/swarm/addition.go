@@ -44,14 +44,13 @@ func (c *Cluster) Engine(IDOrName string) *cluster.Engine {
 // containers in pendingContainers are include.
 func (c *Cluster) ListEngines(list ...string) []*cluster.Engine {
 	c.RLock()
-	defer c.RUnlock()
 
 	all := true
 	if len(list) > 0 {
 		all = false
 	}
 
-	out := make([]*cluster.Engine, 0, len(c.engines)+len(c.pendingEngines))
+	out := make([]*cluster.Engine, 0, len(c.engines))
 
 	for _, n := range c.engines {
 		if !all {
@@ -69,58 +68,23 @@ func (c *Cluster) ListEngines(list ...string) []*cluster.Engine {
 			}
 		}
 
-		for _, pc := range c.pendingContainers {
-			if pc.Engine.ID == n.ID && n.Containers().Get(pc.Config.SwarmID()) == nil {
-				n.AddContainer(pc.ToContainer())
-			}
-		}
-
-		out = append(out, n)
-	}
-
-	for _, n := range c.pendingEngines {
-		if !all {
-			found := false
-		pendingEngines:
-			for i := range list {
-				if list[i] == n.ID || list[i] == n.Name {
-					found = true
-					break pendingEngines
+		for swarmID, pc := range c.pendingContainers {
+			if pc.Engine.ID == n.ID {
+				c := pc.ToContainer()
+				if c.ID == "" {
+					c.ID = swarmID
 				}
-			}
 
-			if !found {
-				continue
-			}
-		}
-
-		for _, pc := range c.pendingContainers {
-			if pc.Engine.ID == n.ID && n.Containers().Get(pc.Config.SwarmID()) == nil {
-				n.AddContainer(pc.ToContainer())
+				n.AddContainer(c)
 			}
 		}
 
 		out = append(out, n)
 	}
 
-	engines := make([]*cluster.Engine, 0, len(out))
+	c.RUnlock()
 
-	for i := range out {
-		exist := false
-
-		for _, e := range engines {
-			if out[i].ID == e.ID {
-				exist = true
-				break
-			}
-		}
-
-		if !exist {
-			engines = append(engines, out[i])
-		}
-	}
-
-	return engines
+	return out
 }
 
 // AddPendingContainer add a pending container to Cluster

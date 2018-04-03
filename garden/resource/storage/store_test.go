@@ -171,7 +171,7 @@ func testAlloc(s Store) (err error) {
 	}()
 
 	vg := utils.Generate64UUID()
-	lun, lv, err := s.Alloc(utils.Generate64UUID(), utils.Generate64UUID(), vg, 2<<30)
+	lun, lv, err := s.Alloc(utils.Generate64UUID(), utils.Generate64UUID(), vg, engine, 2<<30)
 	if err != nil {
 		return err
 	}

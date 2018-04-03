@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	stderr "errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -17,7 +17,9 @@ import (
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/deploy"
 	"github.com/docker/swarm/garden/resource"
+	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/resource/alloc/driver"
+	"github.com/docker/swarm/garden/resource/alloc/nic"
 	"github.com/docker/swarm/garden/resource/storage"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/docker/swarm/garden/utils"
@@ -311,6 +313,7 @@ func postBackupCallback(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		Type:       req.Type,
 		Tables:     req.Tables,
 		Path:       req.Path,
+		Mount:      req.Mount,
 		Remark:     req.Remark,
 		SizeByte:   req.Size,
 		Retention:  now.AddDate(0, 0, req.Retention),
@@ -522,10 +525,14 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if timeout > 0 {
-		var cancel goctx.CancelFunc
-		ctx, cancel = goctx.WithTimeout(ctx, time.Duration(timeout)*time.Second)
-		defer cancel()
+	// default timeout 500s
+	if timeout == 0 {
+		timeout = 500
+	}
+	if deadline, ok := ctx.Deadline(); !ok {
+		ctx, _ = goctx.WithTimeout(goctx.Background(), time.Duration(timeout)*time.Second)
+	} else {
+		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
 
 	pc := gd.PluginClient()
@@ -553,15 +560,8 @@ func postImageLoad(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// new context with deadline
-	if deadline, ok := ctx.Deadline(); !ok {
-		ctx = goctx.Background()
-	} else {
-		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
-	}
-
 	// database.Image.ID
-	id, taskID, err := resource.LoadImage(ctx, gd.Ormer(), req, timeout)
+	id, taskID, err := resource.LoadImage(ctx, gd.Cluster, gd.Ormer(), pc, req, time.Duration(timeout)*time.Second)
 	if err != nil {
 		ec := errCodeV1(_Image, internalError, 36, "fail to load image", "镜像入库失败")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -669,6 +669,81 @@ func putImageTemplate(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func syncImageToEngines(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		ec := errCodeV1(_Image, urlParamError, 71, "parse Request URL parameter error", "解析请求URL参数错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil ||
+		gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	node := r.FormValue("host")
+	image := r.FormValue("image")
+	ormer := gd.Ormer()
+
+	var (
+		images  []string
+		engines []*cluster.Engine
+		out     []database.Image
+	)
+
+	if image == "" {
+		out, err = ormer.ListImages()
+	} else {
+		im := database.Image{}
+		im, err = ormer.GetImageVersion(image)
+		out = []database.Image{im}
+	}
+
+	if err != nil {
+		ec := errCodeV1(_Image, dbQueryError, 72, "fail to query database", "数据库查询错误（镜像表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	images = make([]string, 0, len(out))
+	for i := range out {
+		if out[i].Name == "" {
+			continue
+		}
+		images = append(images, out[i].Image())
+	}
+
+	if node == "" {
+		engines = gd.Cluster.ListEngines()
+	} else {
+		n, err := ormer.GetNode(node)
+		if err == nil {
+			node = n.EngineID
+		}
+
+		e := gd.Cluster.Engine(node)
+		if e == nil {
+			e = gd.Cluster.EngineByAddr(node)
+		}
+
+		if e != nil {
+			engines = []*cluster.Engine{e}
+		} else {
+			ec := errCodeV1(_Image, internalError, 73, "fail to find Engine", "找不到指定Engine")
+			httpJSONError(w, errors.Errorf("not found Engine by '%s',%+v", node, err), ec, http.StatusInternalServerError)
+			return
+		}
+	}
+
+	go resource.SyncEnginesImages(engines, images, ormer)
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -877,7 +952,7 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // -----------------/hosts handlers-----------------
-func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.NodeInfo {
+func getNodeInfo(ormer database.Ormer, n database.Node, e *cluster.Engine) structs.NodeInfo {
 	info := structs.NodeInfo{
 		ID:            n.ID,
 		Cluster:       n.ClusterID,
@@ -898,16 +973,28 @@ func getNodeInfo(gd *garden.Garden, n database.Node, e *cluster.Engine) structs.
 	if e == nil {
 		return info
 	}
+	{
+		var err error
+		_, info.Engine.Bandwidth, err = nic.ParseEngineDevice(e)
+		if err != nil {
+			logrus.WithField("Node", n.Addr).Errorf("%+v", err)
+		}
 
-	drivers, err := driver.FindEngineVolumeDrivers(gd.Ormer(), e)
+		info.Engine.IdleBonds, info.Engine.IdleBandwidth, err = alloc.EngineIdleNetworkDevice(ormer, e)
+		if err != nil {
+			logrus.WithField("Node", n.Addr).Errorf("engine available network device,%+v", err)
+		}
+	}
+
+	// ignore swarm-agent port,because Space() can works without port.
+	drivers, err := driver.FindEngineLocalVolumeDrivers(e, ormer, 0)
 	if err != nil && len(drivers) == 0 {
-		logrus.WithField("Node", n.Addr).Errorf("find Node VolumeDrivers error,%+v", err)
+		logrus.WithField("Node", n.Addr).Warnf("find Node local VolumeDrivers error,%+v", err)
 	} else {
 		vds := make([]structs.VolumeDriver, 0, len(drivers))
 
 		for _, d := range drivers {
-			if d == nil || d.Type() == "NFS" ||
-				d.Type() == storage.SANStore {
+			if d == nil {
 				continue
 			}
 
@@ -959,7 +1046,7 @@ func getNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	e := gd.Cluster.Engine(n.EngineID)
 
-	info := getNodeInfo(gd, n, e)
+	info := getNodeInfo(gd.Ormer(), n, e)
 
 	writeJSON(w, info, http.StatusOK)
 }
@@ -1009,7 +1096,7 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		out = append(out, getNodeInfo(gd, nodes[i], engine))
+		out = append(out, getNodeInfo(gd.Ormer(), nodes[i], engine))
 	}
 
 	writeJSON(w, out, http.StatusOK)
@@ -1611,18 +1698,33 @@ func getServices(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	var out []structs.ServiceSpec
 	name := r.FormValue("image_name")
+	tag := r.FormValue("tag")
 
-	if name == "" {
+	if name == "" && tag == "" {
 		out = services
 	} else {
-		images := strings.Split(name, ",")
 		out = make([]structs.ServiceSpec, 0, len(services))
 
-		for i := range images {
-
+		if name == "" && tag != "" {
 			for k := range services {
-				if services[k].Image.Name == images[i] {
+				if services[k].Tag == tag {
 					out = append(out, services[k])
+				}
+			}
+		} else {
+
+			images := strings.Split(name, ",")
+		loop:
+			for k := range services {
+				if tag != "" && services[k].Tag != tag {
+					continue
+				}
+
+				for i := range images {
+					if services[k].Image.Name == images[i] {
+						out = append(out, services[k])
+						continue loop
+					}
 				}
 			}
 		}
@@ -1908,7 +2010,7 @@ func postServiceLink(ctx goctx.Context, w http.ResponseWriter, r *http.Request) 
 
 	// new Context with deadline
 	if deadline, ok := ctx.Deadline(); !ok {
-		ctx, _ = goctx.WithTimeout(goctx.Background(), 5*time.Minute)
+		ctx = goctx.Background()
 	} else {
 		ctx, _ = goctx.WithDeadline(goctx.Background(), deadline)
 	}
@@ -2079,7 +2181,7 @@ func validPostServiceUpdateConfigsRequest(req structs.ModifyUnitConfig) error {
 		req.ConfigFile == nil &&
 		req.DataMount == nil &&
 		req.LogMount == nil &&
-		req.Content == nil &&
+		//		req.Content == nil &&
 		len(req.Cmds) == 0 {
 
 		return stderr.New("nothing new for update for service configs")
@@ -2090,6 +2192,12 @@ func validPostServiceUpdateConfigsRequest(req structs.ModifyUnitConfig) error {
 
 func mergeServiceConfigsChange(ctx goctx.Context, svc *garden.Service, change structs.ModifyUnitConfig) (structs.ServiceConfigs, bool, error) {
 	restart := false
+
+	// reload config file first
+	_, err := svc.ReloadServiceConfig(ctx, "")
+	if err != nil {
+		return nil, false, err
+	}
 
 	configs, err := svc.GetUnitsConfigs(ctx)
 	if err != nil {
@@ -2122,8 +2230,12 @@ func mergeUnitConfigChange(cc structs.UnitConfig, change structs.ModifyUnitConfi
 	if change.ConfigFile != nil {
 		cc.ConfigFile = *change.ConfigFile
 	}
-	if change.Content != nil {
-		cc.Content = *change.Content
+	//	if change.Content != nil {
+	//		cc.Content = *change.Content
+	//	}
+
+	for key, cmds := range change.Cmds {
+		cc.Cmds[key] = cmds
 	}
 
 	m := make(map[string]structs.Keyset, len(cc.Keysets))
@@ -2154,9 +2266,8 @@ func mergeUnitConfigChange(cc structs.UnitConfig, change structs.ModifyUnitConfi
 	}
 
 	ks := make([]structs.Keyset, 0, len(m))
-
-	for _, val := range m {
-		ks = append(ks, val)
+	for i := range change.Keysets {
+		ks = append(ks, m[change.Keysets[i].Key])
 	}
 
 	cc.Keysets = ks
@@ -2197,7 +2308,7 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
-	configs, restart, err := mergeServiceConfigsChange(ctx, svc, change)
+	configs, _, err := mergeServiceConfigsChange(ctx, svc, change)
 	if err != nil {
 		ec := errCodeV1(_Service, dbQueryError, 94, "fail to update config file", "数据合并错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -2213,7 +2324,7 @@ func postServiceUpdateConfigs(ctx goctx.Context, w http.ResponseWriter, r *http.
 
 	task := database.NewTask(svc.Name(), database.ServiceUpdateConfigTask, svc.ID(), "", nil, 300)
 
-	err = svc.UpdateUnitsConfigs(ctx, configs, &task, restart, true)
+	err = svc.UpdateUnitsConfigs(ctx, configs, change.Keysets, &task, false, true)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 95, "fail to update service config files", "服务配置文件更新错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -2714,9 +2825,16 @@ func getServiceConfigFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	_, err = svc.ReloadServiceConfig(ctx, "")
+	if err != nil {
+		ec := errCodeV1(_Service, internalError, 173, "fail to reload service configs", "重载单元配置文件内容")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
 	out, err := svc.GetUnitsConfigs(ctx)
 	if err != nil {
-		ec := errCodeV1(_Service, dbQueryError, 173, "fail to query units configs from kv", "获取服务单元配置错误")
+		ec := errCodeV1(_Service, dbQueryError, 174, "fail to query units configs from kv", "获取服务单元配置错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -3062,13 +3180,6 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	tag := r.FormValue("tag")
 	service := r.FormValue("service")
 	deadline := r.FormValue("expired")
-	nfs := r.FormValue("nfs_mount")
-
-	if nfs == "" {
-		ec := errCodeV1(_Backup, urlParamError, 12, "Request URL parameter error", "请求URL参数错误,miss nfs_mount")
-		httpJSONError(w, errors.New("miss nfs_mount"), ec, http.StatusBadRequest)
-		return
-	}
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil || gd.Ormer() == nil {
@@ -3086,24 +3197,25 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 	if id != "" {
 		bf, err := orm.GetBackupFile(id)
 		if err != nil {
-			ec := errCodeV1(_Backup, dbQueryError, 13, "fail to query database", "数据库查询错误（备份文件表）")
+			ec := errCodeV1(_Backup, dbQueryError, 12, "fail to query database", "数据库查询错误（备份文件表）")
 			httpJSONError(w, err, ec, http.StatusInternalServerError)
 			return
 		}
 
 		files = []database.BackupFile{bf}
 
-		err = removeBackupFiles(orm, nfs, files)
+		err = removeBackupFiles(orm, files)
 		if err != nil {
-			ec := errCodeV1(_Backup, dbExecError, 14, "fail to remove backup files", "删除备份文件错误")
+			ec := errCodeV1(_Backup, dbExecError, 13, "fail to remove backup files", "删除备份文件错误")
 			httpJSONError(w, err, ec, http.StatusInternalServerError)
 		}
 
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
 	if tag != "" {
-		orm.ListBackupFilesByTag(tag)
+		files, err = orm.ListBackupFilesByTag(tag)
 	} else if service != "" {
 		files, err = orm.ListBackupFilesByService(service)
 	} else {
@@ -3136,7 +3248,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err = removeBackupFiles(orm, nfs, expired)
+	err = removeBackupFiles(orm, expired)
 	if err != nil {
 		ec := errCodeV1(_Backup, dbExecError, 16, "fail to remove backup files", "删除备份文件错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
@@ -3151,29 +3263,46 @@ type rmBackupFilesIface interface {
 	DelBackupFiles(files []database.BackupFile) error
 }
 
-func removeBackupFiles(orm rmBackupFilesIface, nfs string, files []database.BackupFile) error {
+func removeBackupFiles(orm rmBackupFilesIface, files []database.BackupFile) error {
 	sys, err := orm.GetSysConfig()
 	if err != nil {
 		return err
 	}
 
+	out, err := ioutil.ReadFile("/proc/mounts")
+	if err != nil {
+		return err
+	}
+	mounts := string(out)
+
 	rm := make([]database.BackupFile, 0, len(files))
 	for i := range files {
-		path := getNFSBackupFile(files[i].Path, sys.BackupDir, nfs)
+		path := getNFSBackupFile(files[i].Path, sys.BackupDir, files[i].Mount, mounts)
 
-		err := os.RemoveAll(path)
+		out, err := utils.ExecContextTimeout(nil, 0, "sudo rm -rf", path)
 		if err == nil {
 			rm = append(rm, files[i])
 		} else {
-			logrus.Warnf("fail to delete backup file:%s", path)
+			logrus.Warnf("fail to delete backup file:%s,%s,%s", path, out, err)
 		}
 	}
 
 	return orm.DelBackupFiles(rm)
 }
 
-func getNFSBackupFile(file, backup, nfs string) string {
-	file = strings.Replace(file, backup, nfs, 1)
+func getNFSBackupFile(file, backup, mount, mounts string) string {
+	index := strings.Index(mounts, mount)
+	if index != -1 {
+		parts := strings.SplitN(mounts[index:], "\n", 2)
+		mounts = parts[0]
+	}
+
+	parts := strings.Split(mounts, " ")
+	if len(parts) > 1 {
+		mount = parts[1]
+	}
+
+	file = strings.Replace(file, backup, mount, 1)
 
 	return filepath.Clean(file)
 }

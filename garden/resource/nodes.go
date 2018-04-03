@@ -11,14 +11,19 @@ type engineCluster interface {
 	EngineByAddr(addr string) *cluster.Engine
 }
 
+type nodeOrmer interface {
+	lister
+	database.NodeOrmer
+}
+
 type hostManager struct {
 	ec    engineCluster
-	dco   database.NodeOrmer
+	dco   nodeOrmer
 	nodes []nodeWithTask
 }
 
 // NewHostManager returns host manager
-func NewHostManager(dco database.NodeOrmer, ec engineCluster, nodes []nodeWithTask) hostManager {
+func NewHostManager(dco nodeOrmer, ec engineCluster, nodes []nodeWithTask) hostManager {
 	return hostManager{
 		dco:   dco,
 		ec:    ec,

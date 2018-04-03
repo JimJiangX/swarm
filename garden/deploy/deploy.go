@@ -60,7 +60,7 @@ func (d *Deployment) Deploy(ctx context.Context, spec structs.ServiceSpec, compo
 		}
 	}
 
-	go d.deploy(ctx, svc, compose, task, auth)
+	go d.deployV2(ctx, svc, compose, task, auth)
 
 	return resp, nil
 }
@@ -108,7 +108,7 @@ func (d *Deployment) DeployServices(ctx context.Context, services []structs.Serv
 			TaskID: task.ID,
 		})
 
-		go d.deploy(ctx, service, compose, task, auth)
+		go d.deployV2(ctx, service, compose, task, auth)
 	}
 
 	return out, nil
@@ -116,6 +116,8 @@ func (d *Deployment) DeployServices(ctx context.Context, services []structs.Serv
 
 func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bool,
 	t *database.Task, auth *types.AuthConfig) (err error) {
+
+	start := time.Now()
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.Errorf("deploy:%v", r)
@@ -125,16 +127,13 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bo
 			t.Status = database.TaskDoneStatus
 		} else {
 			t.Status = database.TaskFailedStatus
-
-			logrus.Errorf("service deploy error %+v", err)
 		}
 
 		t.SetErrors(err)
 
 		_err := d.gd.Ormer().SetTask(*t)
-		if _err != nil {
-			logrus.Errorf("deploy task error,%+v", _err)
-		}
+
+		logrus.WithField("Service", svc.ID()).Infof("deploy service,since=%s,%+v %+v", time.Since(start), _err, err)
 	}()
 
 	select {
@@ -149,7 +148,7 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bo
 		return err
 	}
 
-	err = svc.RunContainer(ctx, pendings, false, auth)
+	err = svc.CreateContainer(ctx, pendings, auth)
 	if err != nil {
 		return err
 	}
@@ -160,21 +159,29 @@ func (d *Deployment) deploy(ctx context.Context, svc *garden.Service, compose bo
 	}
 
 	if compose {
-		err = svc.Compose(ctx, d.gd.PluginClient())
+		err = svc.Compose(ctx)
 	}
 
 	return err
 }
 
+func (d *Deployment) deployV2(ctx context.Context,
+	svc *garden.Service, compose bool,
+	task *database.Task, auth *types.AuthConfig) error {
+
+	return d.gd.DeployService(ctx, svc, compose, task, auth)
+}
+
 // Link is exported,not done yet.
 func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (string, error) {
+	start := time.Now()
+
 	links, err := d.freshServicesLink(links)
 	if err != nil {
 		return "", err
 	}
 
-	// TODO:better task info
-	task := database.NewTask("deploy link", database.ServiceLinkTask, "", "", nil, 300)
+	task := database.NewTask("deploy link:"+links.Mode, database.ServiceLinkTask, "", "", nil, 300)
 	err = d.gd.Ormer().InsertTask(task)
 	if err != nil {
 		return "", err
@@ -247,7 +254,7 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 				return errors.Errorf("not found Service '%s' from ServicesLink", name)
 			}
 
-			err := svc.Compose(ctx, d.gd.PluginClient())
+			err := svc.Compose(ctx)
 			if err != nil {
 				return err
 			}
@@ -273,14 +280,24 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 			}
 		}
 
+		// reload service config
+		for _, name := range resp.ReloadServicesConfig {
+			svc := d.serviceFromLinks(links, name)
+			if svc == nil {
+				return errors.Errorf("not found Service '%s' from ServicesLink", name)
+			}
+
+			_, err := svc.ReloadServiceConfig(ctx, "")
+			if err != nil {
+				return err
+			}
+		}
+
 		return nil
 	}
 
 	go func() (err error) {
-		d.gd.Lock()
 		defer func() {
-			d.gd.Unlock()
-
 			if r := recover(); r != nil {
 				err = errors.Errorf("deploy link,panic:%v", r)
 			}
@@ -289,22 +306,17 @@ func (d *Deployment) Link(ctx context.Context, links structs.ServicesLink) (stri
 				task.Status = database.TaskDoneStatus
 			} else {
 				task.Status = database.TaskFailedStatus
-
-				logrus.Errorf("deploy link failed,%+v", err)
 			}
 
 			task.SetErrors(err)
 
 			_err := d.gd.Ormer().SetTask(task)
-			if _err != nil {
-				logrus.Errorf("deploy link and start,%+v", _err)
-				return
-			}
 
-			logrus.Info("deploy link and done!")
+			logrus.Infof("deploy link %s,since=%s,%+v %+v", links.Mode, time.Since(start), _err, err)
 		}()
 
 		err = runLink()
+
 		return err
 	}()
 

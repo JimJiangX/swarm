@@ -15,7 +15,7 @@ import (
 
 const (
 	defaultConsulAddr = "127.0.0.1:8500"
-	defaultTimeout    = 30 * time.Second
+	defaultTimeout    = 2 * time.Minute
 )
 
 // NewClient returns a consul Client
@@ -42,8 +42,8 @@ func NewClient(uri string, options map[string]string) (Client, error) {
 	}
 
 	config := &api.Config{
-		Address:  addrs[0],
-		WaitTime: defaultTimeout,
+		Address: addrs[0],
+		//	WaitTime: defaultTimeout,
 	}
 
 	var tlsConfig *tls.Config

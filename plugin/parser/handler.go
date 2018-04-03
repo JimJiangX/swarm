@@ -38,6 +38,7 @@ func NewRouter(c kvstore.Client, kvpath, dir, ip string, port int) *mux.Router {
 		mgmIP:     ip,
 		mgmPort:   port,
 		scriptDir: dir,
+		context:   context.Background(),
 	}
 
 	var routes = map[string]map[string]handler{
@@ -71,7 +72,7 @@ func NewRouter(c kvstore.Client, kvpath, dir, ip string, port int) *mux.Router {
 			wrap := func(w http.ResponseWriter, r *http.Request) {
 				logrus.WithFields(logrus.Fields{"method": r.Method, "uri": r.RequestURI}).Debug("HTTP request received")
 
-				ctx.context = r.Context()
+				//	ctx.context = r.Context()
 				ctx.apiVersion = mux.Vars(r)["version"]
 
 				localFct(ctx, w, r)
@@ -151,10 +152,10 @@ func getConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func getServiceConfigResponse(service string, cm structs.ConfigsMap, t structs.ConfigTemplate) ([]structs.UnitConfig, error) {
-	out := make([]structs.UnitConfig, 0, len(cm))
 	var (
 		pr  parser
 		err error
+		out = make([]structs.UnitConfig, 0, len(cm))
 	)
 
 	for _, cc := range cm {
@@ -189,7 +190,7 @@ func getServiceConfigResponse(service string, cm structs.ConfigsMap, t structs.C
 		}
 
 		for i := range uc.Keysets {
-			uc.Keysets[i].Value = pr.get(uc.Keysets[i].Key)
+			uc.Keysets[i].Value, _ = pr.get(uc.Keysets[i].Key)
 		}
 
 		out = append(out, uc)
@@ -265,7 +266,7 @@ func postTemplate(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 
 		for i := range req.Keysets {
 
-			req.Keysets[i].Value = parser.get(req.Keysets[i].Key)
+			req.Keysets[i].Value, _ = parser.get(req.Keysets[i].Key)
 			if req.Keysets[i].Default == "" {
 				req.Keysets[i].Default = req.Keysets[i].Value
 			}
@@ -370,7 +371,7 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(req) == 0 {
-		httpError(w, errors.New("no data need update"), http.StatusBadRequest)
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 
@@ -400,14 +401,12 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		}
 
 		out[cc.ID] = cc
+	}
 
-		err = putConfigsToStore(ctx.context, ctx.client, service, map[string]structs.ConfigCmds{
-			cc.ID: cc,
-		})
-		if err != nil {
-			httpError(w, err, http.StatusInternalServerError)
-			return
-		}
+	err = putConfigsToStore(ctx.context, ctx.client, service, out)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -429,6 +428,13 @@ func mergeUnitConfig(pr parser, uc structs.UnitConfig, cc structs.ConfigCmds) (s
 	if uc.ConfigFile != "" && cc.ConfigFile != uc.ConfigFile {
 		cc.ConfigFile = uc.ConfigFile
 	}
+	if uc.Content != "" && cc.Content != uc.Content {
+		cc.Content = uc.Content
+	}
+
+	for key, cmds := range uc.Cmds {
+		cc.Cmds[key] = cmds
+	}
 
 	pr = pr.clone(nil)
 	err := pr.ParseData([]byte(cc.Content))
@@ -437,6 +443,10 @@ func mergeUnitConfig(pr parser, uc structs.UnitConfig, cc structs.ConfigCmds) (s
 	}
 
 	for _, ks := range uc.Keysets {
+		if _, ok := pr.get(ks.Key); !ok {
+			continue
+		}
+
 		err := pr.set(ks.Key, ks.Value)
 		if err != nil {
 			return cc, err

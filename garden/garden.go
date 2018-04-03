@@ -15,7 +15,9 @@ import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
+	"github.com/docker/swarm/garden/resource/alloc"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/garden/tasklock"
 	pluginapi "github.com/docker/swarm/plugin/parser/api"
 	"github.com/docker/swarm/scheduler"
 	consulapi "github.com/hashicorp/consul/api"
@@ -45,7 +47,7 @@ func newNotFound(elem, key string) notFoundError {
 
 // Garden is exported.
 type Garden struct {
-	sync.Mutex
+	*sync.Mutex
 	ormer        database.Ormer
 	kvClient     kvstore.Client
 	pluginClient pluginapi.PluginAPI
@@ -61,7 +63,7 @@ func NewGarden(kvc kvstore.Client, cl cluster.Cluster,
 	scheduler *scheduler.Scheduler, ormer database.Ormer,
 	pClient pluginapi.PluginAPI, tlsConfig *tls.Config) *Garden {
 	return &Garden{
-		// Mutex:       &scheduler.Mutex,
+		Mutex:        new(sync.Mutex),
 		kvClient:     kvc,
 		Cluster:      cl,
 		ormer:        ormer,
@@ -148,6 +150,52 @@ func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, erro
 	}
 
 	return out, nil
+}
+
+// DeployService deploy service
+func (gd *Garden) DeployService(ctx context.Context,
+	svc *Service, compose bool,
+	task *database.Task, auth *types.AuthConfig) error {
+
+	deploy := func() error {
+		actor := alloc.NewAllocator(gd.ormer, gd.Cluster)
+		pendings, err := gd.allocation(ctx, actor, svc, nil, true, true)
+		if err != nil {
+			return err
+		}
+
+		err = svc.createContainer(ctx, pendings, auth)
+		if err != nil {
+			return err
+		}
+
+		err = svc.initStart(ctx, nil, gd.kvClient, nil, nil)
+		if err != nil {
+			return err
+		}
+
+		if compose {
+			err = svc.Compose(ctx)
+		}
+
+		return err
+	}
+
+	sl := tasklock.NewServiceTask(database.ServiceDeployTask, svc.ID(), svc.so, task,
+		statusServiceAllocating, statusInitServiceStarted, statusInitServiceStartFailed)
+
+	sl.Before = func(key string, new int, t *database.Task, f func(val int) bool) (bool, int, error) {
+		return svc.so.ServiceStatusCAS(key, new, nil, f)
+	}
+
+	return sl.Run(
+		func(val int) bool {
+			return val == statusServcieBuilding
+		},
+		func() error {
+			return deploy()
+		},
+		false)
 }
 
 // Register set Garden,returns a error if has registered in database

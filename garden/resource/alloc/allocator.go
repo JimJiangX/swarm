@@ -15,7 +15,7 @@ type Allocator interface {
 
 	NetworkingAllocator
 
-	ListCandidates(clusters, filters []string, stores []structs.VolumeRequire) ([]database.Node, error)
+	ListCandidates(clusters, filters []string, networkings map[string][]string, sstores []structs.VolumeRequire) ([]database.Node, error)
 
 	AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, ncpu, memory int64, reserved []string) (string, error)
 

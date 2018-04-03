@@ -461,7 +461,7 @@ type ServiceInfo struct {
 
 type UnitInfo struct {
 	Unit        Unit
-	Engine      Node
+	Node        Node
 	Volumes     []Volume
 	Networkings []IP
 }
@@ -502,7 +502,7 @@ func (db dbBase) GetServiceInfo(nameOrID string) (info ServiceInfo, err error) {
 
 		list[i] = UnitInfo{
 			Unit:        units[i],
-			Engine:      node,
+			Node:        node,
 			Volumes:     lvs,
 			Networkings: ips,
 		}
@@ -575,7 +575,7 @@ func (db dbBase) ListServicesInfo() ([]ServiceInfo, error) {
 
 			unitsInfo = append(unitsInfo, UnitInfo{
 				Unit:        units[u],
-				Engine:      node,
+				Node:        node,
 				Volumes:     lvs,
 				Networkings: nets,
 			})

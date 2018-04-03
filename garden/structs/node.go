@@ -69,11 +69,16 @@ type NodeInfo struct {
 	RegisterAt   string `json:"register_at"`
 
 	Engine struct {
-		IsHealthy    bool   `json:"is_healthy"`
-		CPUs         int    `json:"cpus"`
-		Memory       int    `json:"memory"`
-		FreeCPUs     int    `json:"free_cpus"`
-		FreeMemory   int    `json:"free_memory"`
+		IsHealthy  bool `json:"is_healthy"`
+		CPUs       int  `json:"cpus"`
+		Memory     int  `json:"memory"`
+		FreeCPUs   int  `json:"free_cpus"`
+		FreeMemory int  `json:"free_memory"`
+
+		Bandwidth     int      `json:"bandwidth"`      // M/s
+		IdleBandwidth int      `json:"idle_bandwidth"` // M/s
+		IdleBonds     []string `json:"idle_bonds"`
+
 		ID           string `json:"id"`
 		Name         string `json:"name"`
 		IP           string `json:"ip"`

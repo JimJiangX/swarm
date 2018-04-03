@@ -69,7 +69,14 @@ func newLinkUpSQL(nameOrID string, links []*structs.ServiceLink) (linkUpSQL, err
 
 func (lus linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Store) (structs.ServiceLinkResponse, error) {
 	resp := structs.ServiceLinkResponse{
-		Links: make([]structs.UnitLink, 0, 6),
+		Links:                make([]structs.UnitLink, 0, 6),
+		ReloadServicesConfig: make([]string, 2+len(lus.sqls)),
+	}
+
+	resp.ReloadServicesConfig[0] = lus.proxy.ID
+	resp.ReloadServicesConfig[1] = lus.swm.ID
+	for i := range lus.sqls {
+		resp.ReloadServicesConfig[2+i] = lus.sqls[i].ID
 	}
 
 	{
@@ -111,13 +118,19 @@ func (lus linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 		opts := make(map[string]map[string]interface{})
 		// set options
 		{
+			ip := ""
+			if len(lus.swm.Spec.Units[0].Networking) == 0 {
+				return resp, errors.Errorf("unit networking is required,unit=%s", lus.swm.Spec.Units[0].Name)
+			} else {
+				ip = lus.swm.Spec.Units[0].Networking[0].IP
+			}
 
-			ip := lus.swm.Spec.Units[0].Networking[0].IP
-			port := swmPr.get("proxyport")
+			port, _ := swmPr.get("proxyport")
 
 			opts[allUnitsEffect] = map[string]interface{}{"adm-cli::adm-svr-address": net.JoinHostPort(ip, port)}
 
-			swmAddr = net.JoinHostPort(ip, swmPr.get("port"))
+			p, _ := swmPr.get("port")
+			swmAddr = net.JoinHostPort(ip, p)
 		}
 
 		if isDesignated(lus.nameOrID, "", lus.proxy.Spec) {
@@ -203,8 +216,8 @@ func swmInitTopology(ctx context.Context, kvc kvstore.Store,
 		proxyPr = proxyPr.clone(nil)
 		proxyPr.ParseData([]byte(cc.Content))
 
-		name := proxyPr.get("upsql-proxy::proxy-name")
-		addr := proxyPr.get("upsql-proxy::proxy-address") // proxy-address = <proxy_ip_addr>:<proxy_data_port>
+		name, _ := proxyPr.get("upsql-proxy::proxy-name")
+		addr, _ := proxyPr.get("upsql-proxy::proxy-address") // proxy-address = <proxy_ip_addr>:<proxy_data_port>
 		parts := strings.SplitN(addr, ":", 2)
 
 		proxyGroup[name] = &swm_structs.ProxyInfo{
@@ -230,14 +243,15 @@ func swmInitTopology(ctx context.Context, kvc kvstore.Store,
 			sqlPr = sqlPr.clone(nil)
 			sqlPr.ParseData([]byte(cc.Content))
 
-			port := sqlPr.get("mysqld::port")
+			port, _ := sqlPr.get("mysqld::port")
 			p, err := strconv.Atoi(port)
 			if err != nil {
 				return nil, errors.WithStack(err)
 			}
 
+			addr, _ := sqlPr.get("mysqld::bind_address")
 			dataNodes[u.Name] = swm_structs.DatabaseInfo{
-				Ip:   sqlPr.get("mysqld::bind_address"),
+				Ip:   addr,
 				Port: p,
 			}
 		}

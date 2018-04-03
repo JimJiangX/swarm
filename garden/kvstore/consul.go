@@ -1,9 +1,7 @@
 package kvstore
 
 import (
-	"encoding/json"
 	stderr "errors"
-	"fmt"
 	"net"
 
 	"github.com/hashicorp/consul/api"
@@ -63,7 +61,7 @@ func (c *kvClient) HealthChecks(ctx context.Context, state string) (map[string]a
 	checks, _, err := client.Health().Checks(state, q)
 	c.checkConnectError(addr, err)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	m := make(map[string]api.HealthCheck, len(checks))
@@ -114,11 +112,8 @@ func (c *kvClient) GetKV(ctx context.Context, key string) (*api.KVPair, error) {
 
 	val, _, err := client.KV().Get(key, q)
 	c.checkConnectError(addr, err)
-	if err == nil {
-		return val, nil
-	}
 
-	return nil, errors.Wrap(err, "get KVPair:"+key)
+	return val, errors.Wrap(err, "get KVPair:"+key)
 }
 
 func (c *kvClient) ListKV(ctx context.Context, key string) (api.KVPairs, error) {
@@ -179,27 +174,4 @@ func (c *kvClient) DeleteKVTree(ctx context.Context, key string) error {
 	c.checkConnectError(addr, err)
 
 	return errors.Wrap(err, "delete KV Tree:"+key)
-}
-
-func rolesJSONUnmarshal(data []byte) (map[string]string, error) {
-	roles := struct {
-		Units struct {
-			Default map[string]struct {
-				Type   string
-				Status string
-			}
-		} `json:"datanode_group"`
-	}{}
-
-	err := json.Unmarshal(data, &roles)
-	if err != nil {
-		return nil, err
-	}
-
-	m := make(map[string]string, len(roles.Units.Default))
-	for key, val := range roles.Units.Default {
-		m[key] = fmt.Sprintf("%s(%s)", val.Type, val.Status)
-	}
-
-	return m, nil
 }

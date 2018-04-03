@@ -1,11 +1,11 @@
 package alloc
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/resource/alloc/driver"
@@ -67,10 +67,35 @@ func (at *allocator) findEngineVolumeDrivers(eng *cluster.Engine) (driver.Volume
 	return vds, nil
 }
 
-func (at *allocator) ListCandidates(clusters, filters []string, stores []structs.VolumeRequire) ([]database.Node, error) {
+func (at *allocator) ListCandidates(clusters, filters []string, networkings map[string][]string, stores []structs.VolumeRequire) (out []database.Node, err error) {
+	netClusters := make([]string, 0, len(clusters))
+
+loop:
+	for clusterID, nets := range networkings {
+
+		for i := range nets {
+
+			n, err := at.ormer.CountIPWithCondition(nets[i], false)
+			if err == nil && n > 0 {
+				netClusters = append(netClusters, clusterID)
+
+				continue loop
+			}
+		}
+	}
+
+	var warning string
+	if len(netClusters) == 0 {
+		warning = fmt.Sprintf("networkings %s unavailable", networkings)
+	}
+
 	nodes, err := at.ormer.ListNodesByClusters(clusters, true)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(nodes) == 0 {
+		return nil, errors.Errorf("Warning:%s\n non node in clusters %s", warning, clusters)
 	}
 
 	filterMap := make(map[string]struct{}, len(filters))
@@ -78,47 +103,60 @@ func (at *allocator) ListCandidates(clusters, filters []string, stores []structs
 		filterMap[filters[i]] = struct{}{}
 	}
 
-	out := make([]database.Node, 0, len(nodes))
+	out = make([]database.Node, 0, len(nodes))
+	errs := make([]string, 0, len(nodes)+1)
+	if warning != "" {
+		errs = append(errs, warning)
+	}
 
 	for i := range nodes {
 		if !nodes[i].Enabled || nodes[i].EngineID == "" {
+			errs = append(errs, fmt.Sprintf("node %s enable=%t,engineID=%s", nodes[i].Addr, nodes[i].Enabled, nodes[i].EngineID))
 			continue
 		}
 
 		if _, ok := filterMap[nodes[i].ID]; ok {
+			errs = append(errs, fmt.Sprintf("node %s is one of filters %s", nodes[i].ID, filters))
 			continue
 		}
 
 		if _, ok := filterMap[nodes[i].EngineID]; ok {
+			errs = append(errs, fmt.Sprintf("node %s is one of filters %s", nodes[i].EngineID, filters))
 			continue
 		}
 
 		eng := at.ec.Engine(nodes[i].EngineID)
 		if eng == nil {
-			logrus.Debugf("node:%s not found Engine,%s", nodes[i].Addr, nodes[i].EngineID)
+			errs = append(errs, fmt.Sprintf("node:%s not found Engine,%s", nodes[i].Addr, nodes[i].EngineID))
 			continue
 		}
 
 		if !eng.IsHealthy() {
-			logrus.Debugf("node:%s Engine unhealthy", nodes[i].EngineID)
+			errs = append(errs, fmt.Sprintf("node:%s Engine unhealthy", nodes[i].EngineID))
 			continue
 		}
 
 		if n := len(eng.Containers()); n >= nodes[i].MaxContainer {
-			logrus.Debugf("node:%s container num limit(%d>=%d)", nodes[i].EngineID, n, nodes[i].MaxContainer)
+			errs = append(errs, fmt.Sprintf("node:%s container num limit(%d>=%d)", nodes[i].EngineID, n, nodes[i].MaxContainer))
 			continue
 		}
 
 		err := at.IsNodeStoreEnough(eng, stores)
 		if err != nil {
-			logrus.Debugf("node %s %+v", nodes[i].Addr, err)
+			errs = append(errs, fmt.Sprintf("node %s %+v", nodes[i].EngineID, err))
 			continue
 		}
 
 		out = append(out, nodes[i])
 	}
 
-	return out, nil
+	if len(errs) > 0 {
+		err = errors.Errorf("ListCandidates Warnings:%s", errs)
+	} else {
+		err = nil
+	}
+
+	return out, err
 }
 
 func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.Node, ncpu, memory int64, reserved []string) (string, error) {
@@ -151,6 +189,7 @@ func (at allocator) AlloctCPUMemory(config *cluster.ContainerConfig, node *node.
 
 	config.HostConfig.Resources.CpusetCpus = cpuset
 	config.HostConfig.Resources.Memory = memory
+	config.HostConfig.Resources.MemorySwap = int64(float64(memory) * 1.5)
 
 	return cpuset, nil
 }

@@ -3,13 +3,16 @@ package parser
 import (
 	"fmt"
 	"io/ioutil"
-	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/astaxie/beego/config"
 	"github.com/docker/swarm/garden/structs"
+	"github.com/docker/swarm/garden/utils"
+	"github.com/docker/swarm/vars"
+	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 )
 
@@ -50,24 +53,46 @@ func (mysqlConfig) Validate(data map[string]interface{}) error {
 	return nil
 }
 
-func (c mysqlConfig) get(key string) string {
+func (c mysqlConfig) get(key string) (string, bool) {
 	if c.config == nil {
-		return ""
+		return "", false
 	}
 
-	if val := c.config.String(key); val != "" {
-		return val
+	if val, ok := beegoConfigString(c.config, key); ok {
+		return val, ok
 	}
 
 	if c.template != nil {
 		for i := range c.template.Keysets {
 			if c.template.Keysets[i].Key == key {
-				return c.template.Keysets[i].Default
+				return c.template.Keysets[i].Default, false
 			}
 		}
 	}
 
-	return ""
+	return "", false
+}
+
+func beegoConfigString(config config.Configer, key string) (string, bool) {
+	if val := config.String(key); val != "" {
+		return val, true
+	}
+
+	section := "default"
+	parts := strings.SplitN(key, "::", 2)
+	if len(parts) == 2 {
+		section = parts[0]
+		key = parts[1]
+	}
+
+	m, err := config.GetSection(section)
+	if err != nil || len(m) == 0 {
+		return "", false
+	}
+
+	val, ok := m[key]
+
+	return val, ok
 }
 
 func (c *mysqlConfig) set(key string, val interface{}) error {
@@ -91,13 +116,15 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 
 	m := make(map[string]interface{}, 20)
 
+	ip := ""
 	if len(spec.Networking) >= 1 {
 		m["mysqld::bind_address"] = spec.Networking[0].IP
+		ip = spec.Networking[0].IP
 	} else {
 		return errors.New("miss mysqld::bind_address")
 	}
 
-	m["mysqld::server_id"] = net.ParseIP(spec.Networking[0].IP).To4()[3]
+	m["mysqld::server_id"] = strconv.Itoa(int(utils.IPToUint32(ip)))
 
 	if v, ok := desc.Options["mysqld::character_set_server"]; ok && v != nil {
 		m["mysqld::character_set_server"] = v
@@ -211,8 +238,10 @@ func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 	reg.Service.Container.Name = spec.Name
 	reg.Service.Container.HostName = spec.Engine.Node
 
-	var mon *structs.User
+	reg.Service.MonitorUser = vars.Monitor.User
+	reg.Service.MonitorPassword = vars.Monitor.Password
 
+	var mon *structs.User
 	if len(desc.Users) > 0 {
 		for i := range desc.Users {
 			if desc.Users[i].Role == monitorRole {
@@ -227,7 +256,32 @@ func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 		}
 	}
 
-	return structs.ServiceRegistration{Horus: &reg}, nil
+	// consul AgentServiceRegistration
+	addr := c.config.String("mysqld::bind_address")
+	port, err := c.config.Int("mysqld::port")
+	if err != nil {
+		return structs.ServiceRegistration{}, errors.Wrap(err, "get 'mysqld::port'")
+	}
+
+	consul := api.AgentServiceRegistration{
+		ID:      spec.Name,
+		Name:    spec.Name,
+		Tags:    nil,
+		Port:    port,
+		Address: addr,
+		Check: &api.AgentServiceCheck{
+			Args: []string{"/usr/local/swarm-agent/scripts/unit_upsql_status.sh", spec.Name},
+			// sh -x /usr/local/swarm-agent/scripts/unit_upsql_status.sh 015dc1f7_yeumj001
+			// Shell: "/bin/bash",
+			// DockerContainerID:           spec.Unit.ContainerID,
+			Interval:                       "30s",
+			DeregisterCriticalServiceAfter: "30m",
+		},
+	}
+
+	return structs.ServiceRegistration{
+		Horus:  &reg,
+		Consul: &consul}, nil
 }
 
 type upsqlConfig struct {

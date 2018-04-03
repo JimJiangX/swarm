@@ -20,6 +20,7 @@ type NetworkingOrmer interface {
 	ListIPByEngine(ID string) ([]IP, error)
 	ListIPByUnitID(unit string) ([]IP, error)
 	ListIPByNetworking(networkingID string) ([]IP, error)
+	CountIPWithCondition(networking string, allocated bool) (int, error)
 
 	AllocNetworking(unit, engine string, req []NetworkingRequire) ([]IP, error)
 
@@ -80,7 +81,7 @@ func (db dbBase) ListIPByNetworking(networking string) ([]IP, error) {
 	return list, errors.Wrap(err, "list []IP by networking")
 }
 
-// ListIPWithCondition returns []IP select by  unit_id!=""
+// listIPsByAllocated returns []IP select by  unit_id!=""
 func (db dbBase) listIPsByAllocated(allocated bool, num int) ([]IP, error) {
 	var (
 		out   []IP
@@ -134,25 +135,23 @@ func (db dbBase) ListIPByEngine(ID string) ([]IP, error) {
 	return out, errors.Wrap(err, "list []IP by EngineID")
 }
 
-// ListIPWithCondition returns []IP select by NetworkingID and Allocated==allocated
-func (db dbBase) ListIPWithCondition(networking string, allocated bool, num int) ([]IP, error) {
-	var (
-		out []IP
-		opt = "<>"
-	)
+// CountIPWithCondition returns num select by NetworkingID and Allocated==allocated and enabled=1
+func (db dbBase) CountIPWithCondition(networking string, allocated bool) (int, error) {
+	n := 0
+	opt := "<>"
 
 	if !allocated {
 		opt = "="
 	}
 
-	query := fmt.Sprintf("SELECT ip_addr,prefix,networking_id,unit_id,gateway,vlan_id,enabled,engine_id,net_dev,bandwidth FROM %s WHERE networking_id=? AND unit_id%s? LIMIT %d", db.ipTable(), opt, num)
+	query := fmt.Sprintf("SELECT COUNT(ip_addr) FROM %s WHERE networking_id=? AND enabled=? AND unit_id%s?", db.ipTable(), opt)
 
-	err := db.Select(&out, query, networking, "")
+	err := db.Get(&n, query, networking, true, "")
 	if err == sql.ErrNoRows {
-		return nil, nil
+		return 0, nil
 	}
 
-	return out, errors.Wrap(err, "list []IP with condition")
+	return n, errors.Wrap(err, "list []IP with condition")
 }
 
 func combin(in []NetworkingRequire) [][]NetworkingRequire {
@@ -197,13 +196,14 @@ func (db dbBase) AllocNetworking(unit, engine string, requires []NetworkingRequi
 		in := combin(requires)
 
 		for _, list := range in {
-			if len(list) == 0 {
+			num := len(list)
+			if num <= 0 {
 				continue
 			}
 
 			key := list[0].Networking
 
-			query := fmt.Sprintf("SELECT ip_addr,prefix,gateway,vlan_id,networking_id FROM %s WHERE networking_id=? AND enabled=? AND unit_id=? AND ip_addr <> ? LIMIT %d FOR UPDATE;", db.ipTable(), len(list))
+			query := fmt.Sprintf("SELECT ip_addr,prefix,gateway,vlan_id,networking_id FROM %s WHERE networking_id=? AND enabled=? AND unit_id=? AND ip_addr <> ? LIMIT %d FOR UPDATE;", db.ipTable(), num)
 			query = tx.Rebind(query)
 
 			var ips []IP
@@ -212,8 +212,8 @@ func (db dbBase) AllocNetworking(unit, engine string, requires []NetworkingRequi
 				return errors.Wrap(err, "Tx get available IP")
 			}
 
-			if len(ips) < len(list) {
-				return errors.Errorf("not enough available []IP for allocation in Networking %s,%d<%d", key, len(ips), len(list))
+			if len(ips) < num {
+				return errors.Errorf("not enough available []IP for allocation in Networking %s,%d<%d", key, len(ips), num)
 			}
 
 			for i := range list {
@@ -223,7 +223,7 @@ func (db dbBase) AllocNetworking(unit, engine string, requires []NetworkingRequi
 				ips[i].Bandwidth = list[i].Bandwidth
 			}
 
-			out = append(out, ips...)
+			out = append(out, ips[:num]...)
 		}
 
 		return db.txSetIPs(tx, out)

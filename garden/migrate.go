@@ -2,8 +2,8 @@ package garden
 
 import (
 	"strings"
-	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
 	"github.com/docker/swarm/garden/kvstore"
@@ -21,7 +21,7 @@ func (gd *Garden) ServiceMigrate(ctx context.Context, svc *Service, req structs.
 
 	task := database.NewTask(svc.Name(), database.UnitMigrateTask, svc.ID(), req.NameOrID, nil, 300)
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, &task,
+	sl := tasklock.NewServiceTask(database.UnitMigrateTask, svc.ID(), svc.so, &task,
 		statusServiceUnitMigrating, statusServiceUnitMigrated, statusServiceUnitMigrateFailed)
 
 	err := sl.Run(isnotInProgress, func() error {
@@ -69,6 +69,10 @@ func getUnitBaseContainer(ctx context.Context, svc *Service, unit string, kvc kv
 		}
 	}
 
+	if base.engine.IsHealthy() && base.container == nil {
+		return base, errors.Errorf("Engine %s is healthy,container %s isnot exist", base.engine.Addr, base.unit.u.Name)
+	}
+
 	if base.container == nil {
 		c, err := getContainerFromKV(ctx, kvc, base.unit.u.ContainerID)
 		if err != nil {
@@ -82,8 +86,10 @@ func getUnitBaseContainer(ctx context.Context, svc *Service, unit string, kvc kv
 }
 
 func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string, candidates []string, migrate, compose bool) error {
-	var news baseContainer
-	var cms structs.ConfigsMap
+	var (
+		news baseContainer
+		cms  structs.ConfigsMap
+	)
 
 	// 1.the assigned unit being migrating
 	old, err := getUnitBaseContainer(ctx, svc, nameOrID, gd.kvClient)
@@ -91,8 +97,14 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 		return err
 	}
 
+	// 2.reload unit config file
+	cms, err = svc.ReloadServiceConfig(ctx, old.unit.u.ID)
+	if err != nil {
+		logrus.Warnf("reload unit %s config file error,continue\n%+v", nameOrID, err)
+	}
+
 	{
-		// 2.generate new database.Unit,insert into database
+		// 3.generate new database.Unit,insert into database
 		add, err := svc.addNewUnit(1)
 		if err != nil {
 			return err
@@ -104,7 +116,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			vr = false
 		}
 
-		// 3.alloc new node for new unit
+		// 4.alloc new node for new unit
 		actor := alloc.NewAllocator(gd.ormer, gd.Cluster)
 		adds, pendings, err := gd.scaleAllocation(ctx, svc, nameOrID, actor, vr, false,
 			add, candidates, nil)
@@ -134,7 +146,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			news.engine = news.unit.getEngine()
 		}
 
-		// 4.migrate IP for new unit
+		// 5.migrate IP for new unit
 		{
 			// migrate networkings
 			news.networkings, err = actor.AllocDevice(news.unit.u.EngineID, news.unit.u.ID, old.networkings)
@@ -144,12 +156,18 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			if len(pendings) > 0 {
 				for i := range news.networkings {
 					ip := utils.Uint32ToIP(news.networkings[i].IPAddr)
+					if ip == nil {
+						continue
+					}
+
 					pendings[0].config.Config.Env = append(pendings[0].config.Config.Env, "IPADDR="+ip.String())
+					pendings[0].config.Config.Env = append(pendings[0].config.Config.Env, "NET_DEV="+news.networkings[i].Bond)
+					break
 				}
 			}
 		}
 
-		// 5.migrate volume for new unit
+		// 6.migrate volume for new unit
 		if migrate {
 			// stop container before migrate volume
 			err = old.unit.stopContainer(ctx)
@@ -184,23 +202,27 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			}()
 		}
 
-		// 6.run new unit container
+		// 7.run new unit container
 		auth, err := gd.AuthConfig()
 		if err != nil {
 			return err
 		}
 
-		err = svc.runContainer(ctx, pendings, false, auth)
+		err = svc.createContainer(ctx, pendings, auth)
 		if err != nil {
 			return err
 		}
 
-		// 7.start new unit service
+		// 8.start new unit service
 		{
 			// using old unit config as news unit
-			cc, _err := svc.getUnitConfig(ctx, old.unit.u.ID)
-			if _err != nil {
-				return _err
+			cc, ok := cms.Get(old.unit.u.ID)
+			if !ok {
+				var _err error
+				cc, _err = svc.getUnitConfig(ctx, old.unit.u.ID)
+				if _err != nil {
+					return _err
+				}
 			}
 
 			if cc.Registration.Horus != nil {
@@ -211,7 +233,6 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 				cc.Registration.Horus.Service.Container.HostName = node.ID
 			}
 
-			cms = make(structs.ConfigsMap)
 			cms[news.unit.u.ID] = cc
 			cms[old.unit.u.ID] = cc
 
@@ -240,7 +261,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 		}
 	}
 
-	// 8.remove old unit container & volume
+	// 9.remove old unit container & volume
 	{
 		healthy := old.engine.IsHealthy()
 		rmUnits := []*unit{&old.unit}
@@ -263,17 +284,14 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			return err
 		}
 
-		// waiting for update rename container event done
-		time.Sleep(10 * time.Second)
-
-		// 9.migrate database related old unit
+		// 10.migrate database related old unit
 		err = svc.so.MigrateUnit(news.unit.u.ID, old.unit.u.ID, old.unit.u.Name)
 		if err != nil {
 			return err
 		}
 	}
 
-	// 10.register to third-part system
+	// 11.register to third-part system
 	{
 		u, err := svc.getUnit(old.unit.u.ID)
 		if err != nil {
@@ -291,9 +309,9 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 		}
 	}
 
-	// 11.compose
+	// 12.compose
 	if compose {
-		err := svc.Compose(ctx, gd.pluginClient)
+		err := svc.Compose(ctx)
 		if err != nil {
 			return err
 		}

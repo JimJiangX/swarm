@@ -171,19 +171,19 @@ func (c *kvClient) deregisterToHorus(ctx context.Context, config structs.Service
 		return ctx.Err()
 	}
 
-	err := delHost(ctx, addr, config, force)
+	err := delToHorus(ctx, addr, config, force)
 	if err != nil {
 		return err
 	}
 
-	if config.Addr != "" {
+	if config.Addr != "" && config.User != "" {
 		err = delHostAgent(ctx, addr, config)
 	}
 
 	return err
 }
 
-func delHost(ctx context.Context, addr string, config structs.ServiceDeregistration, force bool) error {
+func delToHorus(ctx context.Context, addr string, config structs.ServiceDeregistration, force bool) error {
 	uri := fmt.Sprintf("http://%s/v1/%s/%s", addr, config.Type, config.Key)
 
 	del := false
@@ -239,16 +239,12 @@ func delHostAgent(ctx context.Context, addr string, config structs.ServiceDeregi
 	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 
-	if config.Addr != "" {
-		params := make(url.Values)
-
-		params.Set("ip_addr", config.Addr)
-		params.Set("ssh_port", config.Port)
-		params.Set("os_user", config.User)
-		params.Set("os_pwd", config.Password)
-
-		req.URL.RawQuery = params.Encode()
-	}
+	params := make(url.Values)
+	params.Set("ip_addr", config.Addr)
+	params.Set("ssh_port", config.Port)
+	params.Set("os_user", config.User)
+	params.Set("os_pwd", config.Password)
+	req.URL.RawQuery = params.Encode()
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -284,7 +280,13 @@ func (c *kvClient) RegisterService(ctx context.Context, host string, config stru
 
 // DeregisterService service to consul and Horus
 func (c *kvClient) DeregisterService(ctx context.Context, config structs.ServiceDeregistration, force bool) error {
-	return c.deregisterToHorus(ctx, config, force)
+	err := c.deregisterToHorus(ctx, config, force)
+
+	if config.Type == "units" {
+		c.deregisterHealthCheck(config.Addr, config.Key)
+	}
+
+	return err
 }
 
 func (c *kvClient) GetHorusAddr(ctx context.Context) (string, error) {

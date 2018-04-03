@@ -23,6 +23,7 @@ const (
 	statusServiceNetworkUpdating                    // 19
 	statusServiceComposing                          // 20
 	statusServiceDeleting                           // 21
+	statusServiceDeploying                          // 22
 
 	_ing    = 0
 	_failed = 1
@@ -37,7 +38,7 @@ const (
 	statusServiceAllocated      = statusServiceAllocating + _done
 	statusServiceAllocateFailed = statusServiceAllocating + _failed
 
-	statusServiceContainerRunning      = statusServiceContainerCreating + _done
+	statusServiceContainerCreated      = statusServiceContainerCreating + _done
 	statusServiceContainerCreateFailed = statusServiceContainerCreating + _failed
 
 	statusInitServiceStarted     = statusInitServiceStarting + _done
@@ -86,6 +87,9 @@ const (
 	statusServiceNetworkUpdateFailed = statusServiceNetworkUpdating + _failed
 
 	statusServiceDeleteFailed = statusServiceDeleting + _failed
+
+	statusServiceDeployed     = statusServiceDeploying + _done
+	statusServiceDeployFailed = statusServiceDeploying + _failed
 )
 
 func isInProgress(val int) bool {

@@ -39,24 +39,24 @@ func (redisConfig) clone(t *structs.ConfigTemplate) parser {
 	}
 }
 
-func (c redisConfig) get(key string) string {
+func (c redisConfig) get(key string) (string, bool) {
 	if c.config == nil {
-		return ""
+		return "", false
 	}
 
 	if val, ok := c.config[key]; ok {
-		return val
+		return val, true
 	}
 
 	if c.template != nil {
 		for i := range c.template.Keysets {
 			if c.template.Keysets[i].Key == key {
-				return c.template.Keysets[i].Default
+				return c.template.Keysets[i].Default, false
 			}
 		}
 	}
 
-	return ""
+	return "", false
 }
 
 func (c *redisConfig) set(key string, val interface{}) error {
@@ -120,6 +120,8 @@ func (c *redisConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 
 	if len(spec.Networking) >= 1 {
 		c.config["bind"] = spec.Networking[0].IP
+	} else {
+		return errors.New("miss ip")
 	}
 
 	{
@@ -135,7 +137,7 @@ func (c *redisConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		c.config["port"] = strconv.Itoa(port)
 	}
 
-	c.config["maxmemory"] = strconv.Itoa(int(float64(spec.Config.HostConfig.Memory) * 0.7))
+	c.config["maxmemory"] = strconv.Itoa(int(float64(spec.Config.HostConfig.Memory) * 0.75))
 
 	if c.template != nil {
 		c.config["dir"] = c.template.DataMount
@@ -215,6 +217,8 @@ func (c *upredisConfig) GenerateConfig(id string, desc structs.ServiceSpec) erro
 
 	if len(spec.Networking) >= 1 {
 		c.config["bind"] = spec.Networking[0].IP
+	} else {
+		return errors.New("miss ip")
 	}
 
 	{
@@ -230,7 +234,7 @@ func (c *upredisConfig) GenerateConfig(id string, desc structs.ServiceSpec) erro
 		c.config["port"] = strconv.Itoa(port)
 	}
 
-	c.config["maxmemory"] = strconv.Itoa(int(float64(spec.Config.HostConfig.Memory) * 0.5))
+	c.config["maxmemory"] = strconv.Itoa(int(float64(spec.Config.HostConfig.Memory) * 0.75))
 
 	if c.template != nil {
 		c.config["dir"] = c.template.DataMount

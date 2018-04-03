@@ -68,17 +68,9 @@ func (sv sanVolume) Alloc(config *cluster.ContainerConfig, uid string, req struc
 	vg := uid + "_SAN_VG"
 	name := generateVolumeName(uid, config.Config.Labels["service.tag"], req.Name)
 
-	lun, lv, err := sv.san.Alloc(name, uid, vg, req.Size)
+	_, lv, err := sv.san.Alloc(name, uid, vg, sv.engine.ID, req.Size)
 	if err != nil {
 		return nil, err
-	}
-
-	lv.EngineID = sv.engine.ID
-	lv.UnitID = uid
-
-	lun, err = sv.san.Mapping(sv.engine.ID, vg, lun.ID, uid)
-	if err != nil {
-		return &lv, err
 	}
 
 	setVolumeBind(config, lv.Name, req.Name)
@@ -109,8 +101,6 @@ func (sv sanVolume) Expand(ID string, size int64) (result volumeExpandResult, er
 	if err != nil {
 		return result, err
 	}
-
-	result.lun, err = sv.san.Mapping(sv.engine.ID, result.lv.VG, result.lun.ID, result.lv.UnitID)
 
 	result.recycle = func() error {
 		_err := sv.recycleLUNs([]database.LUN{result.lun})

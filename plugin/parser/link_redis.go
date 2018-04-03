@@ -60,7 +60,14 @@ func newLinkRedis(nameOrID string, links []*structs.ServiceLink) (linkRedis, err
 
 func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store) (structs.ServiceLinkResponse, error) {
 	resp := structs.ServiceLinkResponse{
-		Links: make([]structs.UnitLink, 0, 6),
+		Links:                make([]structs.UnitLink, 0, 6),
+		ReloadServicesConfig: make([]string, 2+len(lr.redis)),
+	}
+
+	resp.ReloadServicesConfig[0] = lr.proxy.ID
+	resp.ReloadServicesConfig[1] = lr.sentinel.ID
+	for i := range lr.redis {
+		resp.ReloadServicesConfig[2+i] = lr.redis[i].ID
 	}
 
 	// services addr
@@ -89,7 +96,8 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 				return resp, err
 			}
 
-			proxys = append(proxys, pr.get("listen"))
+			val, _ := pr.get("listen")
+			proxys = append(proxys, val)
 		}
 	}
 
@@ -112,8 +120,11 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 				return resp, err
 			}
 
-			port := pr.get("port")
+			if len(u.Networking) == 0 {
+				return resp, errors.Errorf("unit networking is required,unit=%s", u.Name)
+			}
 
+			port, _ := pr.get("port")
 			sentinels = append(sentinels, fmt.Sprintf("%s:%s", u.Networking[0].IP, port))
 		}
 	}
@@ -137,9 +148,8 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 				return resp, err
 			}
 
-			ip := pr.get("bind")
-			port := pr.get("port")
-
+			ip, _ := pr.get("bind")
+			port, _ := pr.get("port")
 			redis = append(redis, fmt.Sprintf("%s:%s", ip, port))
 		}
 

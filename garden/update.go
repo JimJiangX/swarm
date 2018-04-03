@@ -2,11 +2,11 @@ package garden
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/swarm/cluster"
@@ -33,7 +33,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 			return err
 		}
 
-		version, err := getImage(svc.so, im.ID)
+		version, err := getImage(svc.so, im.Image())
 		if err != nil {
 			return err
 		}
@@ -60,9 +60,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 
 		err = svc.stop(ctx, units, true)
 		if err != nil {
-			if _err, ok := err.(errContainer); !ok || _err.action != notRunning {
-				return err
-			}
+			return err
 		}
 
 		containers := make([]struct {
@@ -105,9 +103,7 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 			}
 
 			if err == nil {
-				if err = c.nc.Engine.RenameContainer(c.nc, c.u.Name); err == nil {
-					err = c.nc.Engine.StartContainer(c.nc)
-				}
+				err = c.nc.Engine.RenameContainer(c.nc, c.u.Name)
 			}
 			if err != nil {
 				return errors.WithStack(err)
@@ -170,7 +166,9 @@ func (svc *Service) UpdateImage(ctx context.Context, kvc kvstore.Client,
 		}
 	}
 
-	tl := tasklock.NewServiceTask(svc.ID(), svc.so, task,
+	tl := tasklock.NewServiceTask(
+		database.ServiceUpdateImageTask,
+		svc.ID(), svc.so, task,
 		statusServiceImageUpdating,
 		statusServiceImageUpdated,
 		statusServiceImageUpdateFailed)
@@ -182,7 +180,7 @@ func updateDescByImage(table database.Service, im database.Image) database.Servi
 	desc := *table.Desc
 	desc.ID = utils.Generate32UUID()
 	desc.Image = im.Image()
-	desc.ImageID = im.ImageID
+	desc.ImageID = im.ID
 	desc.Previous = table.DescID
 
 	table.DescID = desc.ID
@@ -222,12 +220,18 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 		pendings := make([]pending, 0, len(units))
 
 		for _, u := range units {
-			var nccpu int64   // container HostConfig.CpusetCpus
-			countCPU := false // set true after called CountCPU
+			var (
+				nccpu    int64 // container HostConfig.CpusetCpus
+				countCPU bool  // set true after called CountCPU
+			)
 
 			c := u.getContainer()
 			if c == nil || c.Engine == nil {
 				return errors.WithStack(newContainerError(u.u.Name, notFound))
+			}
+
+			if c.Config.HostConfig.Memory == 0 && *memory != 0 {
+				return errors.Errorf("Forbid updating container memory from unlimited 0 to %d", *memory)
 			}
 
 			if c.Config.HostConfig.Memory == *memory {
@@ -239,6 +243,7 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 				if nccpu == *ncpu {
 					continue
 				}
+
 				countCPU = true
 			}
 
@@ -282,6 +287,7 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 				Resources: container.Resources{
 					CpusetCpus: pu.cpuset,
 					Memory:     pu.memory,
+					MemorySwap: int64(float64(pu.memory) * 1.5),
 				},
 			}
 
@@ -300,13 +306,9 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 			}
 		}
 
-		{
-			// update units config file but whether start by user
-			err := svc.updateConfigs(ctx, units, nil, nil)
-			if err != nil {
-				logrus.Errorf("%+v", err)
-			}
-
+		err = updateConfigAfterUpdateResource(ctx, svc, units, memory)
+		if err != nil {
+			return err
 		}
 
 		{
@@ -330,10 +332,73 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 		}
 	}
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
+	sl := tasklock.NewServiceTask(database.ServiceUpdateTask+"_cpu", svc.ID(), svc.so, nil,
 		statusServiceResourceUpdating, statusServiceResourceUpdated, statusServiceResourceUpdateFailed)
 
 	return sl.Run(isnotInProgress, update, false)
+}
+
+func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []*unit, memory *int64) error {
+	cms, err := svc.ReloadServiceConfig(ctx, "")
+	if err != nil {
+		return err
+	}
+
+	if memory == nil || !(svc.spec.Image.Name == "upsql" || svc.spec.Image.Name == "upredis") {
+		return nil
+	}
+
+	// update units config file but whether start by user
+	err = svc.updateConfigs(ctx, units, cms, nil)
+	if err != nil {
+		return err
+	}
+
+	kv := kvPair{}
+
+	if svc.spec.Image.Name == "upredis" {
+
+		kv.key = "maxmemory"
+		kv.value = strconv.Itoa(int(float64(*memory) * 0.75))
+
+	} else {
+		n := *memory
+		if n>>33 > 0 { // 8G
+			n = int64(float64(n) * 0.70)
+		} else {
+			n = int64(float64(n) * 0.5)
+		}
+
+		kv.key = "innodb_buffer_pool_size"
+		kv.value = strconv.Itoa(int(n))
+
+	}
+
+	return effectServiceConfig(ctx, units, svc.spec.Image.Name, []kvPair{kv})
+}
+
+type kvPair struct {
+	key   string
+	value string
+}
+
+func effectServiceConfig(ctx context.Context, units []*unit, imageName string, pairs []kvPair) error {
+	cmd := make([]string, 2, 2+len(pairs))
+	cmd[0] = "/root/effect-config.sh"
+	cmd[1] = imageName
+
+	for i := range pairs {
+		cmd = append(cmd, fmt.Sprintf("%s=%s", pairs[i].key, pairs[i].value))
+	}
+
+	for i := range units {
+		_, err := units[i].containerExec(ctx, cmd, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func updateDescByResource(table database.Service, ncpu, memory int64) (database.Service, error) {
@@ -485,7 +550,7 @@ func (svc *Service) VolumeExpansion(actor alloc.Allocator, target []structs.Volu
 		}
 	}
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
+	sl := tasklock.NewServiceTask(database.ServiceUpdateTask+"_lv", svc.ID(), svc.so, nil,
 		statusServiceVolumeExpanding, statusServiceVolumeExpanded, statusServiceVolumeExpandFailed)
 
 	return sl.Run(isnotInProgress, expansion, false)
@@ -612,7 +677,7 @@ func (svc *Service) UpdateNetworking(ctx context.Context, actor alloc.Allocator,
 		}
 	}
 
-	sl := tasklock.NewServiceTask(svc.ID(), svc.so, nil,
+	sl := tasklock.NewServiceTask(database.ServiceUpdateTask+"_net", svc.ID(), svc.so, nil,
 		statusServiceNetworkUpdating, statusServiceNetworkUpdated, statusServiceNetworkUpdateFailed)
 
 	return sl.Run(isnotInProgress, update, false)

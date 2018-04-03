@@ -44,11 +44,11 @@ func TestParseSize(t *testing.T) {
 
 func testLocalVolumeMap(lvm *localVolumeMap, t *testing.T) {
 	base := lvm.len()
-	hdd, err := lvm.ListVolumeByVG("_HDDVGLabel")
+	hdd, err := lvm.ListVolumeByEngine("_HDDVGLabel")
 	if err != nil {
 		t.Error(err)
 	}
-	ssd, err := lvm.ListVolumeByVG("_SSDVGLabel")
+	ssd, err := lvm.ListVolumeByEngine("_SSDVGLabel")
 	if err != nil {
 		t.Error(err)
 	}
@@ -100,11 +100,11 @@ func testLocalVolumeMap(lvm *localVolumeMap, t *testing.T) {
 		}
 
 		// test ListVolumeByVG
-		hdd1, err := lvm.ListVolumeByVG("_HDDVGLabel")
+		hdd1, err := lvm.ListVolumeByEngine("_HDDVGLabel")
 		if err != nil {
 			t.Error(err)
 		}
-		ssd1, err := lvm.ListVolumeByVG("_SSDVGLabel")
+		ssd1, err := lvm.ListVolumeByEngine("_SSDVGLabel")
 		if err != nil {
 			t.Error(err)
 		}
