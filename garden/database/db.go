@@ -150,7 +150,11 @@ func (db dbBase) txFrame(do func(tx *sqlx.Tx) error) error {
 		return errors.Wrap(tx.Commit(), "Tx Commit")
 	}
 
-	return errors.Wrap(tx.Rollback(), "Tx Rollback")
+	if _err := tx.Rollback(); _err != nil {
+		return fmt.Errorf("%s\n%+v", _err, err)
+	}
+
+	return err
 }
 
 // TxFrame is a frame for Tx functions.
