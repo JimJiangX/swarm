@@ -42,44 +42,50 @@ func (c *Cluster) Engine(IDOrName string) *cluster.Engine {
 // ListEngines returns all the engines in the cluster.
 // This is for reporting, scheduling, hence pendingEngines are included.
 // containers in pendingContainers are include.
-func (c *Cluster) ListEngines(list ...string) []*cluster.Engine {
+func (c *Cluster) ListEngines(list ...string) map[string]*cluster.Engine {
 	c.RLock()
 
-	all := true
 	if len(list) > 0 {
-		all = false
-	}
+		out := make(map[string]*cluster.Engine, len(list))
 
-	out := make([]*cluster.Engine, 0, len(c.engines))
+		for i := range list {
+			eng, ok := c.engines[list[i]]
+			if ok {
+				for swarmID, pc := range c.pendingContainers {
+					if pc.Engine.ID == eng.ID {
 
-	for _, n := range c.engines {
-		if !all {
-			found := false
-		engines:
-			for i := range list {
-				if list[i] == n.ID || list[i] == n.Name {
-					found = true
-					break engines
+						c := pc.ToContainer()
+						if c.ID == "" {
+							c.ID = swarmID
+						}
+
+						eng.AddContainer(c)
+					}
 				}
-			}
 
-			if !found {
-				continue
+				out[eng.IP] = eng
 			}
 		}
 
+		return out
+	}
+
+	out := make(map[string]*cluster.Engine, len(c.engines))
+
+	for _, eng := range c.engines {
+
 		for swarmID, pc := range c.pendingContainers {
-			if pc.Engine.ID == n.ID {
+			if pc.Engine.ID == eng.ID {
 				c := pc.ToContainer()
 				if c.ID == "" {
 					c.ID = swarmID
 				}
 
-				n.AddContainer(c)
+				eng.AddContainer(c)
 			}
 		}
 
-		out = append(out, n)
+		out[eng.IP] = eng
 	}
 
 	c.RUnlock()

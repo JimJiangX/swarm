@@ -23,6 +23,7 @@ func TestListEngines(t *testing.T) {
 		c.engines[id] = &cluster.Engine{
 			ID:   id,
 			Name: name,
+			IP:   "192.168.3." + s,
 		}
 	}
 
@@ -33,6 +34,7 @@ func TestListEngines(t *testing.T) {
 		c.pendingEngines[s] = &cluster.Engine{
 			ID:   id,
 			Name: name,
+			IP:   "192.168.3." + s,
 		}
 	}
 
@@ -41,20 +43,26 @@ func TestListEngines(t *testing.T) {
 		t.Errorf("expect %d but got %d", 10, len(engines))
 	}
 
-	engines = c.ListEngines("host3")
+	engines = c.ListEngines("engineID3")
 	if len(engines) != 1 {
 		t.Errorf("expect %d but got %d", 1, len(engines))
 	}
-	if engines[0].ID != "engineID3" || engines[0].Name != "host3" {
-		t.Errorf("got unexpected engine,%v", engines[0])
+
+	var e *cluster.Engine
+	for _, n := range engines {
+		e = n
 	}
 
-	engines = c.ListEngines("host13")
+	if e.ID != "engineID3" || e.Name != "host3" {
+		t.Errorf("got unexpected engine,%v", e)
+	}
+
+	engines = c.ListEngines("engineID13")
 	if len(engines) != 0 {
 		t.Errorf("expect %d but got %d", 0, len(engines))
 	}
 
-	list := []string{"host0", "host5", "host10", "host20", "engineID1", "engineID10", "engineID11", "engineID19"}
+	list := []string{"engineID0", "engineID5", "engineID10", "engineID20", "engineID1", "engineID10", "engineID11", "engineID19"}
 	engines = c.ListEngines(list...)
 	if len(engines) != 3 {
 		t.Errorf("expect %d but got %d", 3, len(engines))

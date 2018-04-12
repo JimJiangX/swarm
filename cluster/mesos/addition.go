@@ -13,7 +13,7 @@ func (c *Cluster) Engine(IDOrName string) *cluster.Engine {
 }
 
 // ListEngines is exported,not implement yet
-func (c *Cluster) ListEngines(list ...string) []*cluster.Engine {
+func (c *Cluster) ListEngines(list ...string) map[string]*cluster.Engine {
 	return nil
 }
 
