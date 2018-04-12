@@ -695,7 +695,7 @@ func syncImageToEngines(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 
 	var (
 		images  []string
-		engines []*cluster.Engine
+		engines map[string]*cluster.Engine
 		out     []database.Image
 	)
 
@@ -735,7 +735,7 @@ func syncImageToEngines(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		}
 
 		if e != nil {
-			engines = []*cluster.Engine{e}
+			engines = map[string]*cluster.Engine{e.IP: e}
 		} else {
 			ec := errCodeV1(_Image, internalError, 73, "fail to find Engine", "找不到指定Engine")
 			httpJSONError(w, errors.Errorf("not found Engine by '%s',%+v", node, err), ec, http.StatusInternalServerError)
@@ -1074,13 +1074,15 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var nodes []database.Node
-	engines := gd.Cluster.ListEngines()
+	var (
+		nodes []database.Node
+		ormer = gd.Ormer()
+	)
 
 	if name == "" {
-		nodes, err = gd.Ormer().ListNodes()
+		nodes, err = ormer.ListNodes()
 	} else {
-		nodes, err = gd.Ormer().ListNodesByCluster(name)
+		nodes, err = ormer.ListNodesByCluster(name)
 	}
 	if err != nil {
 		ec := errCodeV1(_Host, dbQueryError, 22, "fail to query database", "数据库查询错误（主机表）")
@@ -1088,20 +1090,24 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ch := make(chan structs.NodeInfo, 10)
 	out := make([]structs.NodeInfo, 0, len(nodes))
+	engines := gd.Cluster.ListEngines()
 
 	for i := range nodes {
-		var engine *cluster.Engine
 
-		for _, e := range engines {
-			if e.IP == nodes[i].Addr {
-				engine = e
-				break
-			}
-		}
+		go func(n database.Node) {
 
-		out = append(out, getNodeInfo(gd.Ormer(), nodes[i], engine))
+			ch <- getNodeInfo(ormer, n, engines[n.Addr])
+
+		}(nodes[i])
 	}
+
+	for i := len(nodes); i > 0; i-- {
+		out = append(out, <-ch)
+	}
+
+	close(ch)
 
 	writeJSON(w, out, http.StatusOK)
 }

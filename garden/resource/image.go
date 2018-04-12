@@ -255,7 +255,7 @@ func walkPath(path, ext string) string {
 }
 
 // SyncEnginesImages all engines sync images
-func SyncEnginesImages(engines []*cluster.Engine, images []string, ormer database.GetSysConfigIface) error {
+func SyncEnginesImages(engines map[string]*cluster.Engine, images []string, ormer database.GetSysConfigIface) error {
 	sys, err := ormer.GetSysConfig()
 	if err != nil {
 		return err
@@ -270,10 +270,10 @@ func SyncEnginesImages(engines []*cluster.Engine, images []string, ormer databas
 	return nil
 }
 
-func syncEnginesImages(engines []*cluster.Engine, images []string, auth *types.AuthConfig) {
+func syncEnginesImages(engines map[string]*cluster.Engine, images []string, auth *types.AuthConfig) {
 	ch := make(chan struct{}, 5)
 
-	for i := range engines {
+	for _, e := range engines {
 		ch <- struct{}{}
 
 		go func(eng *cluster.Engine) {
@@ -287,7 +287,7 @@ func syncEnginesImages(engines []*cluster.Engine, images []string, auth *types.A
 			}
 
 			<-ch
-		}(engines[i])
+		}(e)
 	}
 }
 
@@ -309,7 +309,9 @@ func syncEngineImages(eng *cluster.Engine, lister lister, sys database.SysConfig
 		images = append(images, fmt.Sprintf("%s:%d/%s", sys.Registry.Domain, sys.Registry.Port, list[i].Image()))
 	}
 
-	syncEnginesImages([]*cluster.Engine{eng}, images, sys.AuthConfig())
+	m := map[string]*cluster.Engine{eng.IP: eng}
+
+	syncEnginesImages(m, images, sys.AuthConfig())
 
 	return nil
 }
