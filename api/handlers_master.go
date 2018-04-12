@@ -873,8 +873,8 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func validPutClusterRequest(v structs.PutClusterRequest) error {
-	if v.Max == nil && v.UsageLimit == nil {
-		return errors.Errorf("neither MaxNode nor UsageLimit is non-nil")
+	if v.Max == nil && v.UsageLimit == nil || v.NetworkPartition == nil {
+		return errors.Errorf("MaxNode,UsageLimit and NetworkPartition are nil")
 	}
 
 	return nil
@@ -917,6 +917,10 @@ func putClusterParams(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	if req.UsageLimit != nil {
 		c.UsageLimit = *req.UsageLimit
+	}
+
+	if req.NetworkPartition != nil {
+		c.NetworkPartition = *req.NetworkPartition
 	}
 
 	err = gd.Ormer().SetClusterParams(c)

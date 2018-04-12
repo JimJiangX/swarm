@@ -78,9 +78,9 @@ func (db dbBase) ListClusters() ([]Cluster, error) {
 // SetClusterParams updates MaxNode\UsageLimit
 func (db dbBase) SetClusterParams(c Cluster) error {
 
-	query := "UPDATE " + db.clusterTable() + " SET max_host=?,usage_limit=? WHERE id=?"
+	query := "UPDATE " + db.clusterTable() + " SET max_host=?,usage_limit=?,ha_network_tag=? WHERE id=?"
 
-	_, err := db.Exec(query, c.MaxNode, c.UsageLimit, c.ID)
+	_, err := db.Exec(query, c.MaxNode, c.UsageLimit, c.NetworkPartition, c.ID)
 
 	return errors.Wrap(err, "update Cluster MaxNode or UsageLimit")
 }
