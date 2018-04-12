@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/docker/swarm/garden/structs"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
@@ -109,8 +108,6 @@ func (p plugin) GetServiceConfig(ctx context.Context, service string) (structs.S
 	if err != nil {
 		return nil, errors.Errorf("%s %s%s,%v", http.MethodGet, p.host, uri, err)
 	}
-
-	logrus.Debugf("%s %s %v", "GET", uri, obj)
 
 	return obj, err
 }
@@ -242,8 +239,6 @@ func (p plugin) UpdateConfigs(ctx context.Context, service string, configs struc
 	if err != nil {
 		return nil, errors.Errorf("%s %s%s,%v", http.MethodPost, p.host, uri, err)
 	}
-
-	logrus.Debugf("%s %s\nbody:%v\nresponse:%v", "PUT", uri, configs, m)
 
 	return m, err
 }
