@@ -873,7 +873,7 @@ func postCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func validPutClusterRequest(v structs.PutClusterRequest) error {
-	if v.Max == nil && v.UsageLimit == nil || v.NetworkPartition == nil {
+	if v.Max == nil && v.UsageLimit == nil && v.NetworkPartition == nil {
 		return errors.Errorf("MaxNode,UsageLimit and NetworkPartition are nil")
 	}
 
@@ -1075,6 +1075,7 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	var (
+		ids   []string
 		nodes []database.Node
 		ormer = gd.Ormer()
 	)
@@ -1083,6 +1084,12 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		nodes, err = ormer.ListNodes()
 	} else {
 		nodes, err = ormer.ListNodesByCluster(name)
+		ids = make([]string, 0, len(nodes))
+		for i := range nodes {
+			if nodes[i].EngineID != "" {
+				ids = append(ids, nodes[i].EngineID)
+			}
+		}
 	}
 	if err != nil {
 		ec := errCodeV1(_Host, dbQueryError, 22, "fail to query database", "数据库查询错误（主机表）")
@@ -1092,7 +1099,7 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	ch := make(chan structs.NodeInfo, 10)
 	out := make([]structs.NodeInfo, 0, len(nodes))
-	engines := gd.Cluster.ListEngines()
+	engines := gd.Cluster.ListEngines(ids...)
 
 	for i := range nodes {
 
