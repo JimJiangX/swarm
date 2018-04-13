@@ -1086,9 +1086,7 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		nodes, err = ormer.ListNodesByCluster(name)
 		ids = make([]string, 0, len(nodes))
 		for i := range nodes {
-			if nodes[i].EngineID != "" {
-				ids = append(ids, nodes[i].EngineID)
-			}
+			ids = append(ids, nodes[i].EngineID)
 		}
 	}
 	if err != nil {
