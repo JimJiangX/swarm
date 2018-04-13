@@ -27,7 +27,8 @@ var urproxyTemplate = structs.ConfigTemplate{
   - <S2>:<S_PORT>
   - <S3>:<S_PORT>
   black_list:
-  - 0.0.0.0`,
+  - 0.0.0.0
+  separate_read_write: off`,
 }
 
 func TestUrproxyParser(t *testing.T) {
@@ -45,6 +46,11 @@ func TestUrproxyParser(t *testing.T) {
 	}
 
 	err = pr.set("white_list", "0.0.0.3&&&*.*.*.*&&&0.0.0.0")
+	if err != nil {
+		t.Errorf("%+v", err)
+	}
+
+	err = pr.set("separate_read_write", "read_slaves")
 	if err != nil {
 		t.Errorf("%+v", err)
 	}

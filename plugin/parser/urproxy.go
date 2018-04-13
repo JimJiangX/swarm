@@ -58,6 +58,7 @@ type upredisProxy struct {
 	Sentinels         []string `yaml:"sentinels"`
 	WhiteList         []string `yaml:"white_list"`
 	BlackList         []string `yaml:"black_list"`
+	SeparateReadWrite string   `yaml:"separate_read_write,omitempty"` // v1.3.0+
 }
 
 type upredisProxyConfig struct {
@@ -131,6 +132,9 @@ func (c upredisProxyConfig) get(key string) (string, bool) {
 
 	case "black_list":
 		return strings.Join(obj.BlackList, stringAndString), true
+
+	case "separate_read_write":
+		return obj.SeparateReadWrite, true
 	}
 
 	return "", false
@@ -339,6 +343,19 @@ func (c *upredisProxyConfig) set(key string, val interface{}) error {
 		}
 
 		obj.BlackList = out
+
+	case "separate_read_write":
+		v, ok := val.(string)
+		if !ok {
+			return errors.Errorf("separate_read_write set non-string type,%#v", val)
+		}
+
+		if v == "off" || v == "read_slaves" || v == "read_both" {
+			obj.SeparateReadWrite = v
+		} else {
+			return errors.Errorf("set separate_read_write as '%s',but want %s/%s/%s",
+				v, "off", "read_slaves", "read_both")
+		}
 	}
 
 	c.upredisProxy[header] = obj
