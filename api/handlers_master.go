@@ -2958,6 +2958,8 @@ func getSANStoragesInfo(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 		resp[i] = <-respCh
 	}
 
+	close(respCh)
+
 	writeJSON(w, resp, http.StatusOK)
 }
 
