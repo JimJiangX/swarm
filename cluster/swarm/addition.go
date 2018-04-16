@@ -67,6 +67,8 @@ func (c *Cluster) ListEngines(list ...string) map[string]*cluster.Engine {
 			}
 		}
 
+		c.RUnlock()
+
 		return out
 	}
 
