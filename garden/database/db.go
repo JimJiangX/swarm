@@ -163,7 +163,5 @@ func (db dbBase) TxFrame(do func(tx *sqlx.Tx) error) error {
 }
 
 func IsNotFound(err error) bool {
-	_err := errors.Cause(err)
-
-	return _err == sql.ErrNoRows
+	return errors.Cause(err) == sql.ErrNoRows
 }
