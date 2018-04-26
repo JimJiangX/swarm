@@ -15,11 +15,15 @@ func init() {
 	register("urproxy", "1.1", &upredisProxyConfig{})
 	register("urproxy", "1.2", &upredisProxyConfig{})
 	register("urproxy", "1.3", &upredisProxyConfig{})
+	register("urproxy", "1.4", &upredisProxyConfig{})
+	register("urproxy", "1.5", &upredisProxyConfig{})
 
 	register("urproxy", "2.0", &upredisProxyConfig{})
 	register("urproxy", "2.1", &upredisProxyConfig{})
 	register("urproxy", "2.2", &upredisProxyConfig{})
 	register("urproxy", "2.3", &upredisProxyConfig{})
+	register("urproxy", "2.4", &upredisProxyConfig{})
+	register("urproxy", "2.5", &upredisProxyConfig{})
 }
 
 /*
