@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -425,12 +426,32 @@ func (u unit) containerExec(ctx context.Context, cmd []string, detach bool) (typ
 	return c.Exec(ctx, cmd, detach, nil)
 }
 
+// updateServiceConfig update new service config context,backup file first.
 func (u unit) updateServiceConfig(ctx context.Context, path, context string) error {
+	err := u.backupServiceConfig(ctx, path)
+	if err != nil {
+		return err
+	}
+
 	cmd := []string{"/bin/sh", "-c", fmt.Sprintf(`echo "%s" > %s`, context, path)}
 
 	inspect, err := u.containerExec(ctx, cmd, false)
 	if err != nil {
 		logrus.WithField("Container", u.u.Name).Errorf("update config file %s,%#v,%+v", path, inspect, err)
+	}
+
+	return err
+}
+
+func (u unit) backupServiceConfig(ctx context.Context, path string) error {
+	ext := filepath.Ext(path)
+	dst := strings.Replace(path, ext, "-"+time.Now().Format("2006-01-02T15:04:05")+ext, 1)
+
+	cmd := []string{"/bin/sh", "-c", "cp", path, dst}
+
+	inspect, err := u.containerExec(ctx, cmd, false)
+	if err != nil {
+		logrus.WithField("Container", u.u.Name).Errorf("backup config file %s-->%s,%#v,%+v", path, dst, inspect, err)
 	}
 
 	return err
