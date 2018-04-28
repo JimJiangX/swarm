@@ -447,7 +447,7 @@ func (u unit) backupServiceConfig(ctx context.Context, path string) error {
 	ext := filepath.Ext(path)
 	dst := strings.Replace(path, ext, "-"+time.Now().Format("2006-01-02T15:04:05")+ext, 1)
 
-	cmd := []string{"/bin/sh", "-c", "cp", path, dst}
+	cmd := []string{"cp", path, dst}
 
 	inspect, err := u.containerExec(ctx, cmd, false)
 	if err != nil {
