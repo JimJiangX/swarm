@@ -427,10 +427,12 @@ func (u unit) containerExec(ctx context.Context, cmd []string, detach bool) (typ
 }
 
 // updateServiceConfig update new service config context,backup file first.
-func (u unit) updateServiceConfig(ctx context.Context, path, context string) error {
-	err := u.backupServiceConfig(ctx, path)
-	if err != nil {
-		return err
+func (u unit) updateServiceConfig(ctx context.Context, path, context string, backup bool) error {
+	if backup {
+		err := u.backupServiceConfig(ctx, path)
+		if err != nil {
+			return err
+		}
 	}
 
 	cmd := []string{"/bin/sh", "-c", fmt.Sprintf(`echo "%s" > %s`, context, path)}

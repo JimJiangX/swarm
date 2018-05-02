@@ -545,7 +545,7 @@ func (svc *Service) initStart(ctx context.Context, units []*unit, kvc kvstore.Cl
 	}
 
 	// start containers and update configs
-	err = svc.updateConfigs(ctx, units, configs, args)
+	err = svc.updateConfigs(ctx, units, configs, args, false)
 	if err != nil {
 		return err
 	}
@@ -705,7 +705,7 @@ func (svc *Service) UpdateUnitsConfigs(ctx context.Context,
 			return err
 		}
 
-		err = svc.updateConfigs(ctx, units, cm, nil)
+		err = svc.updateConfigs(ctx, units, cm, nil, true)
 		if err != nil {
 			return err
 		}
@@ -742,7 +742,7 @@ func (svc *Service) UpdateUnitsConfigs(ctx context.Context,
 // updateConfigs update units configurationFile,
 // generate units configs if configs is nil,
 // start units containers before update container configurationFile.
-func (svc *Service) updateConfigs(ctx context.Context, units []*unit, configs structs.ConfigsMap, args map[string]interface{}) (err error) {
+func (svc *Service) updateConfigs(ctx context.Context, units []*unit, configs structs.ConfigsMap, args map[string]interface{}, backup bool) (err error) {
 	if configs == nil {
 		configs, err = svc.generateUnitsConfigs(ctx, args)
 		if err != nil {
@@ -763,7 +763,7 @@ func (svc *Service) updateConfigs(ctx context.Context, units []*unit, configs st
 			continue
 		}
 
-		err := units[i].updateServiceConfig(ctx, config.ConfigFile, config.Content)
+		err := units[i].updateServiceConfig(ctx, config.ConfigFile, config.Content, backup)
 		if err != nil {
 			return err
 		}
@@ -779,7 +779,7 @@ func (svc *Service) UpdateUnitConfig(ctx context.Context, nameOrID, path, conten
 		return err
 	}
 
-	return u.updateServiceConfig(ctx, path, content)
+	return u.updateServiceConfig(ctx, path, content, true)
 }
 
 func (svc *Service) ReloadServiceConfig(ctx context.Context, unitID string) (structs.ConfigsMap, error) {

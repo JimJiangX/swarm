@@ -349,7 +349,7 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 	}
 
 	// update units config file but whether start by user
-	err = svc.updateConfigs(ctx, units, cms, nil)
+	err = svc.updateConfigs(ctx, units, cms, nil, true)
 	if err != nil {
 		return err
 	}
