@@ -38,6 +38,22 @@ const (
 	rootRole    = "root"
 )
 
+const (
+	units_prefix    = "units_for_generate_config_"
+	units_init_once = "units_init"
+	units_add       = "units_add"
+	unit_exist      = "unit_exit"
+)
+
+var primes = [...]int{11, 13, 17, 19, 23, 29, 31,
+	37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79,
+	83, 89, 97, 101, 103, 107, 109, 113, 127, 131,
+	137, 139, 149, 151, 157, 163, 167, 173, 179,
+	181, 191, 193, 197, 199, 211, 223, 227, 229,
+	233, 239, 241, 251, 257, 263, 269, 271, 277,
+	281, 283, 293, 307, 311, 313, 317, 331, 337,
+	347, 349, 353, 359}
+
 type mysqlConfig struct {
 	template *structs.ConfigTemplate
 	config   config.Configer
@@ -109,12 +125,43 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 		return err
 	}
 
-	spec, err := getUnitSpec(desc.Units, id)
-	if err != nil {
-		return err
+	var (
+		found = false
+		spec  = structs.UnitSpec{}
+		m     = make(map[string]interface{}, 20)
+	)
+
+	for i := range desc.Units {
+		if id == desc.Units[i].ID {
+			spec = desc.Units[i]
+			found = true
+			// units init once
+			m["mysqld::auto_increment_increment"] = i + 1
+			break
+		}
 	}
 
-	m := make(map[string]interface{}, 20)
+	if !found {
+		return errors.Errorf("not found unit '%s'", id)
+	}
+
+	typ, ok := desc.Options[units_prefix+id].(string)
+	if ok && typ == unit_exist {
+		delete(m, "mysqld::auto_increment_increment")
+	} else if !ok {
+		// add new unit
+		n, ok := desc.Options[units_prefix+id].(int)
+		if ok && n > 1 && n <= len(desc.Units) {
+			m["mysqld::auto_increment_increment"] = n
+		}
+	}
+
+	for i, n, max := 0, len(desc.Units), len(primes); i < max; i++ {
+		if primes[i] > n {
+			m["mysqld::auto_increment_offset"] = primes[i]
+			break
+		}
+	}
 
 	ip := ""
 	if len(spec.Networking) >= 1 {
@@ -328,12 +375,12 @@ func (c *upsqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 	return errors.WithStack(err)
 }
 
-func getUnitSpec(units []structs.UnitSpec, id string) (*structs.UnitSpec, error) {
+func getUnitSpec(units []structs.UnitSpec, id string) (structs.UnitSpec, error) {
 	for i := range units {
 		if id == units[i].ID {
-			return &units[i], nil
+			return units[i], nil
 		}
 	}
 
-	return nil, errors.Errorf("not found unit '%s'", id)
+	return structs.UnitSpec{}, errors.Errorf("not found unit '%s'", id)
 }

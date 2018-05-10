@@ -565,11 +565,27 @@ func generateServiceConfigs(ctx context.Context,
 		// ignore error
 	}
 
+	seq := 0
 	resp := make(structs.ConfigsMap, len(spec.Units))
 
 	for i := range spec.Units {
 		if unitID != "" && spec.Units[i].ID != unitID {
 			continue
+		}
+
+		opt := opts[spec.Units[i].ID]
+
+		if m := opts[allUnitsEffect]; len(m) > 0 {
+			if opt == nil {
+				opt = make(map[string]interface{})
+			}
+			for k, v := range m {
+				opt[k] = v
+			}
+		}
+
+		if len(spec.Options) == 0 {
+			spec.Options = make(map[string]interface{})
 		}
 
 		t := template
@@ -579,17 +595,13 @@ func generateServiceConfigs(ctx context.Context,
 			t.Content = cc.Content
 			t.DataMount = cc.DataMount
 			t.LogMount = cc.LogMount
-		}
 
-		opt := opts[spec.Units[i].ID]
-		if m := opts[allUnitsEffect]; len(m) > 0 {
-			if len(opt) == 0 {
-				opt = m
-			} else {
-				for k, v := range m {
-					opt[k] = v
-				}
-			}
+			spec.Options[units_prefix+spec.Units[i].ID] = unit_exist
+		} else if len(cm) == 0 {
+			spec.Options[units_prefix+spec.Units[i].ID] = units_init_once
+		} else {
+			spec.Options[units_prefix+spec.Units[i].ID] = len(spec.Units) - seq
+			seq--
 		}
 
 		cc, err := generateUnitConfig(spec.Units[i].ID, parser, t, spec, opt)
