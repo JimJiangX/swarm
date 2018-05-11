@@ -45,7 +45,7 @@ const (
 	unit_exist      = "unit_exit"
 )
 
-var primes = [...]int{11, 13, 17, 19, 23, 29, 31,
+var primes = [...]int{10, 13, 17, 19, 23, 29, 31,
 	37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79,
 	83, 89, 97, 101, 103, 107, 109, 113, 127, 131,
 	137, 139, 149, 151, 157, 163, 167, 173, 179,
@@ -136,7 +136,7 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 			spec = desc.Units[i]
 			found = true
 			// units init once
-			m["mysqld::auto_increment_increment"] = i + 1
+			m["mysqld::auto_increment_offset"] = i + 1
 			break
 		}
 	}
@@ -147,19 +147,25 @@ func (c *mysqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 
 	typ, ok := desc.Options[units_prefix+id].(string)
 	if ok && typ == unit_exist {
-		delete(m, "mysqld::auto_increment_increment")
+		delete(m, "mysqld::auto_increment_offset")
 	} else if !ok {
 		// add new unit
 		n, ok := desc.Options[units_prefix+id].(int)
 		if ok && n > 1 && n <= len(desc.Units) {
-			m["mysqld::auto_increment_increment"] = n
+			m["mysqld::auto_increment_offset"] = n
 		}
 	}
 
-	for i, n, max := 0, len(desc.Units), len(primes); i < max; i++ {
-		if primes[i] > n {
-			m["mysqld::auto_increment_offset"] = primes[i]
-			break
+	increment := 0
+	if c.config != nil {
+		increment, _ = c.config.Int("mysqld::auto_increment_increment")
+	}
+	if increment < len(desc.Units) {
+		for i, n, max := 0, len(desc.Units), len(primes); i < max; i++ {
+			if primes[i] > n {
+				m["mysqld::auto_increment_increment"] = primes[i]
+				break
+			}
 		}
 	}
 
