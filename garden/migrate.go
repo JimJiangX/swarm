@@ -128,6 +128,10 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			add, candidates, nil)
 
 		defer func() {
+			if r := recover(); r != nil {
+				err = errors.Errorf("panic:%v", r)
+			}
+
 			if err != nil {
 				_err := svc.removeUnits(ctx, adds, nil)
 				if _err != nil {
@@ -198,6 +202,9 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			}
 
 			defer func() {
+				if r := recover(); r != nil {
+					err = errors.Errorf("panic:%v", r)
+				}
 				if err != nil {
 					// migrate volumes
 					_, _err := actor.MigrateVolumes(old.unit.u.ID, news.engine, old.engine, news.volumes)
