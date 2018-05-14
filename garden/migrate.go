@@ -101,6 +101,12 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 	cms, err = svc.ReloadServiceConfig(ctx, old.unit.u.ID)
 	if err != nil {
 		logrus.Warnf("reload unit %s config file error,continue\n%+v", nameOrID, err)
+
+		// get service config map from kv store
+		cms, err = svc.pc.UpdateConfigs(ctx, svc.ID(), structs.ServiceConfigs{})
+		if err != nil {
+			return errors.Wrap(err, "get service configsMap error")
+		}
 	}
 
 	{
