@@ -2,6 +2,9 @@ package api
 
 import (
 	"testing"
+	"time"
+
+	"github.com/docker/swarm/garden/database"
 )
 
 func TestGetNFSBackupFile(t *testing.T) {
@@ -30,5 +33,33 @@ xxxxxxx
 	got := getNFSBackupFile(file, "/BACKUP", "146.240.104.26:/DBAASNFS", mounts)
 	if got != want {
 		t.Errorf("expected %s but got %s", want, got)
+	}
+}
+
+func TestExpiredFiles(t *testing.T) {
+	now := time.Now()
+	files := []database.BackupFile{
+		{ID: "0", Retention: now.Add(-48 * time.Hour)},
+		{ID: "1", Retention: now.Add(-24 * time.Hour)},
+		{ID: "2", Retention: now.Add(-time.Hour)},
+		{ID: "3", Retention: now.Add(time.Hour)},
+		{ID: "4", Retention: now.Add(24 * time.Hour)},
+	}
+
+	ex0 := expiredFiles(files, "")
+	if got := len(ex0); got != 3 {
+		t.Errorf("%s,got %d files but want %d", now, got, 3)
+	}
+
+	date := now.Add(-25 * time.Hour).Format(dateLayout)
+	ex1 := expiredFiles(files, date)
+	if got := len(ex1); got != 1 {
+		t.Errorf("%s,got %d files but want %d", date, got, 1)
+	}
+
+	date = now.Add(24 * time.Hour).Format(dateLayout)
+	ex2 := expiredFiles(files, date)
+	if got := len(ex2); got != 3 {
+		t.Errorf("%s,got %d files but want %d", date, got, 3)
 	}
 }

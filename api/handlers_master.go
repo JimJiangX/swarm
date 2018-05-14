@@ -3245,21 +3245,7 @@ func deleteBackupFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	t := time.Now()
-	if deadline != "" {
-		d, err := time.Parse(dateLayout, deadline)
-		if err == nil && d.Before(t) {
-			t = d
-		}
-	}
-
-	expired := make([]database.BackupFile, 0, len(files))
-	for i := range files {
-		if t.After(files[i].Retention) {
-			expired = append(expired, files[i])
-		}
-	}
-
+	expired := expiredFiles(files, deadline)
 	if len(expired) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -3280,6 +3266,25 @@ type rmBackupFilesIface interface {
 	DelBackupFiles(files []database.BackupFile) error
 }
 
+func expiredFiles(files []database.BackupFile, rt string) []database.BackupFile {
+	now := time.Now()
+	if rt != "" {
+		d, err := time.Parse(dateLayout, rt)
+		if err == nil && d.Before(now) {
+			now = d
+		}
+	}
+
+	expired := make([]database.BackupFile, 0, len(files))
+	for i := range files {
+		if now.After(files[i].Retention) {
+			expired = append(expired, files[i])
+		}
+	}
+
+	return expired
+}
+
 func removeBackupFiles(orm rmBackupFilesIface, files []database.BackupFile) error {
 	sys, err := orm.GetSysConfig()
 	if err != nil {
@@ -3290,11 +3295,22 @@ func removeBackupFiles(orm rmBackupFilesIface, files []database.BackupFile) erro
 	if err != nil {
 		return err
 	}
-	mounts := string(out)
 
+	mounts := string(out)
 	rm := make([]database.BackupFile, 0, len(files))
+
 	for i := range files {
 		path := getNFSBackupFile(files[i].Path, sys.BackupDir, files[i].Mount, mounts)
+
+		logrus.WithFields(logrus.Fields{
+			"file":      path,
+			"epiration": files[i].Retention,
+		}).Info("force remove backup file")
+
+		if path == "." || path == "/" || path == "*" {
+			rm = append(rm, files[i])
+			continue
+		}
 
 		out, err := utils.ExecContextTimeout(nil, 0, "sudo rm -rf", path)
 		if err == nil {
