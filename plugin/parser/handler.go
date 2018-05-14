@@ -370,14 +370,18 @@ func updateConfigs(ctx *_Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req) == 0 {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
 	configs, err := getConfigMapFromStore(ctx.context, ctx.client, service)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	if len(req) == 0 {
+		// response service original configs map
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(configs)
+
 		return
 	}
 
