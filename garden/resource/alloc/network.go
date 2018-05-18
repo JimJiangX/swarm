@@ -52,7 +52,7 @@ func (at netAllocator) AlloctNetworking(config *cluster.ContainerConfig, engineI
 
 	// check network device bandwidth and band
 	if width < 0 || len(idleDevs) < len(requires) {
-		return nil, errors.Errorf("Engine:%s not enough Bandwidth for require,len(bond)=%d<%d,Bandwidth %d less", engineID, len(idleDevs), len(requires), width)
+		return nil, errors.Errorf("Engine:%s not enough Bandwidth for require,len(bond)=%d<%d,Bandwidth %d last", engineID, len(idleDevs), len(requires), width)
 	}
 
 	in := make([]database.NetworkingRequire, 0, len(requires))
