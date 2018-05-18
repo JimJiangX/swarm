@@ -133,14 +133,14 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 			}
 
 			if err != nil {
-				_err := svc.removeUnits(ctx, adds, nil)
-				if _err != nil {
-					err = errors.Errorf("%+v\nremove new addition units:%+v", err, _err)
-				}
-
-				_err = svc.so.SetIPs(old.networkings)
+				_err := svc.so.SetIPs(old.networkings)
 				if _err != nil {
 					err = errors.Errorf("%+v\nmgirate networkings:%+v", err, _err)
+				}
+
+				_err = svc.removeUnits(ctx, adds, nil)
+				if _err != nil {
+					err = errors.Errorf("%+v\nremove new addition units:%+v", err, _err)
 				}
 			}
 		}()
