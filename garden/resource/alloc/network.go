@@ -177,7 +177,7 @@ func (at netAllocator) AllocDevice(engineID, unitID string, ips []database.IP) (
 	}
 
 	if width < 0 {
-		return ips, errors.Errorf("Engine:%s not enough Bandwidth for require,%d less", engineID, width)
+		return ips, errors.Errorf("Engine:%s not enough Bandwidth for require,%d last", engineID, width)
 	}
 
 	out := make([]database.IP, len(ips))
@@ -208,7 +208,7 @@ func (at netAllocator) UpdateNetworking(ctx context.Context, engineID, addr stri
 	}
 
 	if free < len(ips)*width {
-		return errors.Errorf("Engine:%s not enough Bandwidth for require,%d less", engineID, free)
+		return errors.Errorf("Engine:%s not enough Bandwidth for require,%d last", engineID, free)
 	}
 
 	for i := range ips {
