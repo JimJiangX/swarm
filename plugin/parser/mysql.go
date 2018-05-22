@@ -18,7 +18,7 @@ import (
 
 func init() {
 	register("mysql", "5.6", &mysqlConfig{})
-	register("mysql", "5.7", &mysqlConfig{})
+	register("mysql", "5.7", &mysqlConfigV570{})
 
 	register("upsql", "1.0", &upsqlConfig{})
 	register("upsql", "1.1", &upsqlConfig{})
@@ -335,6 +335,30 @@ func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 	return structs.ServiceRegistration{
 		Horus:  &reg,
 		Consul: &consul}, nil
+}
+
+type mysqlConfigV570 struct {
+	mysqlConfig
+}
+
+func (mysqlConfigV570) clone(t *structs.ConfigTemplate) parser {
+	pr := &mysqlConfigV570{}
+	pr.template = t
+
+	return pr
+}
+
+func (c *mysqlConfigV570) GenerateConfig(id string, desc structs.ServiceSpec) error {
+	err := c.mysqlConfig.GenerateConfig(id, desc)
+	if err != nil {
+		return err
+	}
+
+	if c.template != nil {
+		err = c.set("mysqld::socket", filepath.Join(c.template.DataMount, "/mysql.sock"))
+	}
+
+	return errors.WithStack(err)
 }
 
 type upsqlConfig struct {
