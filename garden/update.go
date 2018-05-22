@@ -344,7 +344,10 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 		return err
 	}
 
-	if memory == nil || !(svc.spec.Image.Name == "upsql" || svc.spec.Image.Name == "upredis") {
+	if memory == nil ||
+		!(svc.spec.Image.Name == "upsql" ||
+			svc.spec.Image.Name == "mysql" ||
+			svc.spec.Image.Name == "upredis") {
 		return nil
 	}
 
