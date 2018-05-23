@@ -31,7 +31,7 @@ func TestExecShellFile(t *testing.T) {
 	if err != nil {
 		t.Log(err)
 	}
-	fmt.Println("test data:", data)
+	t.Log("test data:", data)
 
 	//	#!/bin/bash
 	//     echo "testargs :$1,$@"
@@ -41,7 +41,7 @@ func TestExecShellFile(t *testing.T) {
 	if err != nil {
 		t.Log(err)
 	}
-	fmt.Println("testargs data:", data)
+	t.Log("testargs data:", data)
 
 	//	#!/bin/bash
 	//      sleep 120
