@@ -143,8 +143,12 @@ func (c *redisConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 	if c.template != nil {
 		c.config["dir"] = c.template.DataMount
 		c.config["pidfile"] = filepath.Join(c.template.DataMount, "redis.pid")
-		c.config["logfile"] = filepath.Join(c.template.DataMount, "redis.log")
+		c.config["logfile"] = filepath.Join(c.template.LogMount, "redis.log")
+		c.config["unixsocket"] = filepath.Join(c.template.DataMount, "redis.sock")
 	}
+
+	c.config["dbfilename"] = spec.Name + "-dump.rdb"
+	c.config["appendfilename"] = spec.Name + "-appendonly.aof"
 
 	return nil
 }
