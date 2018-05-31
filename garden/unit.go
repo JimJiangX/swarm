@@ -225,6 +225,16 @@ func (u unit) getHostIP() (string, error) {
 
 // create networking after start container
 func (u unit) startContainer(ctx context.Context) error {
+	eng := u.getEngine()
+	if eng == nil {
+		return errors.WithStack(newNotFound("Engine by unit", u.u.Name))
+	}
+
+	err := u.cluster.RefreshEngine(eng.Name)
+	if err != nil {
+		return errors.Wrapf(err, "refresh engine:%s", eng.ID)
+	}
+
 	c := u.getContainer()
 	if c == nil {
 		return errors.WithStack(newNotFound("Container", u.u.Name))
@@ -242,7 +252,7 @@ func (u unit) startContainer(ctx context.Context) error {
 		return ctx.Err()
 	}
 
-	err := c.Engine.StartContainer(c)
+	err = c.Engine.StartContainer(c)
 	if err != nil {
 		return errors.Wrap(err, "start container:"+u.u.Name)
 	}
