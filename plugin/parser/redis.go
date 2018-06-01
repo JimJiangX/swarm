@@ -14,7 +14,7 @@ import (
 const redisConfigLine = 100
 
 func init() {
-	register("redis", "2.0", &redisConfigV200{})
+	register("redis", "2.0", &redisConfig{})
 	register("redis", "3.2", &redisConfig{})
 
 	register("upredis", "1.0", &upredisConfig{})
@@ -195,63 +195,6 @@ func (c redisConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 	reg.Service.Container.HostName = spec.Engine.Node
 
 	return structs.ServiceRegistration{Horus: &reg}, nil
-}
-
-type redisConfigV200 struct {
-	redisConfig
-}
-
-func (redisConfigV200) clone(t *structs.ConfigTemplate) parser {
-	pr := &redisConfigV200{}
-	pr.template = t
-	pr.config = make(map[string]string, redisConfigLine)
-
-	return pr
-}
-
-func (c *redisConfigV200) GenerateConfig(id string, desc structs.ServiceSpec) error {
-	err := c.Validate(desc.Options)
-	if err != nil {
-		return err
-	}
-
-	spec, err := getUnitSpec(desc.Units, id)
-	if err != nil {
-		return err
-	}
-
-	if len(spec.Networking) >= 1 {
-		c.config["bind"] = spec.Networking[0].IP
-	} else {
-		return errors.New("miss ip")
-	}
-
-	{
-		val, ok := desc.Options["port"]
-		if !ok {
-			return errors.New("miss port")
-		}
-		port, err := atoi(val)
-		if err != nil || port == 0 {
-			return errors.Wrap(err, "miss port")
-		}
-
-		c.config["port"] = strconv.Itoa(port)
-	}
-
-	c.config["maxmemory"] = strconv.Itoa(int(float64(spec.Config.HostConfig.Memory) * 0.75))
-
-	if c.template != nil {
-		c.config["dir"] = c.template.DataMount
-		c.config["pidfile"] = filepath.Join(c.template.DataMount, "redis.pid")
-		c.config["logfile"] = filepath.Join(c.template.LogMount, "redis.log")
-		c.config["unixsocket"] = filepath.Join(c.template.DataMount, "redis.sock")
-	}
-
-	c.config["dbfilename"] = spec.Name + "-dump.rdb"
-	c.config["appendfilename"] = spec.Name + "-appendonly.aof"
-
-	return nil
 }
 
 type upredisConfig struct {

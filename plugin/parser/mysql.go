@@ -18,7 +18,7 @@ import (
 
 func init() {
 	register("mysql", "5.6", &mysqlConfig{})
-	register("mysql", "5.7", &mysqlConfigV570{})
+	register("mysql", "5.7", &mysqlConfig{})
 
 	register("upsql", "1.0", &upsqlConfig{})
 	register("upsql", "1.1", &upsqlConfig{})
@@ -323,8 +323,8 @@ func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 		Port:    port,
 		Address: addr,
 		Check: &api.AgentServiceCheck{
-			Args: []string{"/usr/local/swarm-agent/scripts/unit_upsql_status.sh", spec.Name},
-			// sh -x /usr/local/swarm-agent/scripts/unit_upsql_status.sh 015dc1f7_yeumj001
+			Args: []string{"/usr/local/swarm-agent/scripts/unit_mysql_status.sh", spec.Name},
+			// sh -x /usr/local/swarm-agent/scripts/unit_mysql_status.sh 015dc1f7_yeumj001
 			// Shell: "/bin/bash",
 			// DockerContainerID:           spec.Unit.ContainerID,
 			Interval:                       "30s",
@@ -335,30 +335,6 @@ func (c mysqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 	return structs.ServiceRegistration{
 		Horus:  &reg,
 		Consul: &consul}, nil
-}
-
-type mysqlConfigV570 struct {
-	mysqlConfig
-}
-
-func (mysqlConfigV570) clone(t *structs.ConfigTemplate) parser {
-	pr := &mysqlConfigV570{}
-	pr.template = t
-
-	return pr
-}
-
-func (c *mysqlConfigV570) GenerateConfig(id string, desc structs.ServiceSpec) error {
-	err := c.mysqlConfig.GenerateConfig(id, desc)
-	if err != nil {
-		return err
-	}
-
-	if c.template != nil {
-		err = c.set("mysqld::socket", filepath.Join(c.template.DataMount, "/mysql.sock"))
-	}
-
-	return errors.WithStack(err)
 }
 
 type upsqlConfig struct {
@@ -403,6 +379,66 @@ func (c *upsqlConfig) GenerateConfig(id string, desc structs.ServiceSpec) error 
 	}
 
 	return errors.WithStack(err)
+}
+
+func (c upsqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.ServiceRegistration, error) {
+	spec, err := getUnitSpec(desc.Units, id)
+	if err != nil {
+		return structs.ServiceRegistration{}, err
+	}
+
+	reg := structs.HorusRegistration{}
+	reg.Service.Select = true
+	reg.Service.Name = spec.ID
+	reg.Service.Type = "unit_" + desc.Image.Name
+	reg.Service.Tag = desc.ID
+	reg.Service.Container.Name = spec.Name
+	reg.Service.Container.HostName = spec.Engine.Node
+
+	reg.Service.MonitorUser = vars.Monitor.User
+	reg.Service.MonitorPassword = vars.Monitor.Password
+
+	var mon *structs.User
+	if len(desc.Users) > 0 {
+		for i := range desc.Users {
+			if desc.Users[i].Role == monitorRole {
+				mon = &desc.Users[i]
+				break
+			}
+		}
+
+		if mon != nil {
+			reg.Service.MonitorUser = mon.Name
+			reg.Service.MonitorPassword = mon.Password
+		}
+	}
+
+	// consul AgentServiceRegistration
+	addr := c.config.String("mysqld::bind_address")
+	port, err := c.config.Int("mysqld::port")
+	if err != nil {
+		return structs.ServiceRegistration{}, errors.Wrap(err, "get 'mysqld::port'")
+	}
+
+	consul := api.AgentServiceRegistration{
+		ID:      spec.Name,
+		Name:    spec.Name,
+		Tags:    nil,
+		Port:    port,
+		Address: addr,
+		Check: &api.AgentServiceCheck{
+			Args: []string{"/usr/local/swarm-agent/scripts/unit_upsql_status.sh", spec.Name},
+			// sh -x /usr/local/swarm-agent/scripts/unit_upsql_status.sh 015dc1f7_yeumj001
+			// Shell: "/bin/bash",
+			// DockerContainerID:           spec.Unit.ContainerID,
+			Interval:                       "30s",
+			DeregisterCriticalServiceAfter: "30m",
+		},
+	}
+
+	return structs.ServiceRegistration{
+		Horus:  &reg,
+		Consul: &consul}, nil
 }
 
 func getUnitSpec(units []structs.UnitSpec, id string) (structs.UnitSpec, error) {
