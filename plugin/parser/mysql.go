@@ -432,7 +432,7 @@ func (c upsqlConfig) HealthCheck(id string, desc structs.ServiceSpec) (structs.S
 			// Shell: "/bin/bash",
 			// DockerContainerID:           spec.Unit.ContainerID,
 			Interval:                       "30s",
-			DeregisterCriticalServiceAfter: "30m",
+			DeregisterCriticalServiceAfter: "72h",
 		},
 	}
 
