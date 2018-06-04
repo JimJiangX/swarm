@@ -65,6 +65,11 @@ func NewCompserBySpec(req *structs.ServiceSpec, script, mgmip string, mgmport in
 
 		return newUpredisRepManager(dbs, script), nil
 
+	case redisRepArch:
+		dbs := getRedis(req)
+
+		return newRedisRepManager(dbs, script), nil
+
 	case cloneArch:
 		return newCloneManager(script), nil
 	}
