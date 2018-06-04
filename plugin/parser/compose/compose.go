@@ -19,8 +19,10 @@ const (
 	noneArch  dbArch = "None"
 	cloneArch dbArch = "clone"
 
-	redisShardingArch dbArch = "redis_sharding_replication"
-	redisRepArch      dbArch = "redis_replication"
+	upredisShardingArch dbArch = "upredis_sharding_replication"
+	upredisRepArch      dbArch = "upredis_replication"
+	redisShardingArch   dbArch = "redis_sharding_replication"
+	redisRepArch        dbArch = "redis_replication"
 
 	mysqlRepArch   dbArch = "MYsqlMSlave"
 	mysqlGroupArch dbArch = "MysqlGroup"
@@ -53,15 +55,15 @@ func NewCompserBySpec(req *structs.ServiceSpec, script, mgmip string, mgmport in
 		dbs := getMysqls(req)
 		return newMysqlRepManager(dbs, script, mgmip, mgmport), nil
 
-	case redisShardingArch:
+	case redisShardingArch, upredisShardingArch:
 		dbs := getRedis(req)
 		master, slave, _ := getmasterAndSlave(req)
 		return newRedisShardingManager(dbs, master, slave, script), nil
 
-	case redisRepArch:
+	case upredisRepArch:
 		dbs := getRedis(req)
 
-		return newRedisRepManager(dbs, script), nil
+		return newUpredisRepManager(dbs, script), nil
 
 	case cloneArch:
 		return newCloneManager(script), nil
@@ -240,7 +242,15 @@ func getmasterAndSlave(req *structs.ServiceSpec) (int, int, error) {
 func getDbType(req *structs.ServiceSpec) dbArch {
 	arch := req.Arch.Mode
 
-	if req.Image.Name == "redis" || req.Image.Name == "upredis" {
+	if req.Image.Name == "upredis" {
+		if arch == "sharding_replication" {
+			return upredisShardingArch
+		} else if arch == "replication" {
+			return upredisRepArch
+		}
+	}
+
+	if req.Image.Name == "redis" {
 		if arch == "sharding_replication" {
 			return redisShardingArch
 		} else if arch == "replication" {
