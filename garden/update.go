@@ -347,6 +347,7 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 	if memory == nil ||
 		!(svc.spec.Image.Name == "upsql" ||
 			svc.spec.Image.Name == "mysql" ||
+			svc.spec.Image.Name == "redis" ||
 			svc.spec.Image.Name == "upredis") {
 		return nil
 	}
@@ -359,11 +360,9 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 
 	kv := kvPair{}
 
-	if svc.spec.Image.Name == "upredis" {
-
+	if svc.spec.Image.Name == "redis" || svc.spec.Image.Name == "upredis" {
 		kv.key = "maxmemory"
 		kv.value = strconv.Itoa(int(float64(*memory) * 0.75))
-
 	} else {
 		n := *memory
 		if n>>33 > 0 { // 8G
@@ -374,7 +373,6 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 
 		kv.key = "innodb_buffer_pool_size"
 		kv.value = strconv.Itoa(int(n))
-
 	}
 
 	return effectServiceConfig(ctx, units, svc.spec.Image.Name, []kvPair{kv})
