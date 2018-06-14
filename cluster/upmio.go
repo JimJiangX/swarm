@@ -139,10 +139,15 @@ func (e *Engine) UpdateContainer(ctx context.Context, name string, config contai
 // Exec returns the container exec command result
 func (c Container) Exec(ctx context.Context, cmd []string, detach bool, w io.Writer) (types.ContainerExecInspect, error) {
 	if c.Engine == nil {
-		return types.ContainerExecInspect{}, errors.Errorf("Engine of Container:%s is required", c.Names)
+		return types.ContainerExecInspect{}, errors.Errorf("Engine of Container:%s is required,command=%s", c.Names, cmd)
 	}
 
-	return c.Engine.containerExec(ctx, c.ID, cmd, detach, w)
+	inspect, err := c.Engine.containerExec(ctx, c.ID, cmd, detach, w)
+	if err == nil {
+		return inspect, nil
+	}
+
+	return inspect, errors.Wrapf(err, "command=%s", cmd)
 }
 
 // checkTtyInput checks if we are trying to attach to a container tty
