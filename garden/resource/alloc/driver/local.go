@@ -274,7 +274,13 @@ func (lv localVolume) Space() (Space, error) {
 	}
 
 	var used int64
+
 	for i := range lvs {
+		// distinguish SSD and HDD VG
+		if lvs[i].VG != lv.space.VG {
+			continue
+		}
+
 		used += lvs[i].Size
 	}
 
