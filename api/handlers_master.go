@@ -3300,6 +3300,7 @@ func removeBackupFiles(orm rmBackupFilesIface, files []database.BackupFile) erro
 
 	mounts := string(out)
 	rm := make([]database.BackupFile, 0, len(files))
+	errs := make([]string, 0, len(files))
 
 	for i := range files {
 		path := getNFSBackupFile(files[i].Path, sys.BackupDir, files[i].Mount, mounts)
@@ -3318,11 +3319,20 @@ func removeBackupFiles(orm rmBackupFilesIface, files []database.BackupFile) erro
 		if err == nil {
 			rm = append(rm, files[i])
 		} else {
-			logrus.Warnf("fail to delete backup file:%s,%s,%s", path, out, err)
+			errs = append(errs, fmt.Sprintf("fail to delete backup file:%s,%s,%s", path, out, err))
 		}
 	}
 
-	return orm.DelBackupFiles(rm)
+	err = orm.DelBackupFiles(rm)
+	if err != nil {
+		errs = append(errs, fmt.Sprintf("%+v", err))
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "\n"))
+	}
+
+	return nil
 }
 
 func getNFSBackupFile(file, backup, mount, mounts string) string {
