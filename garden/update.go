@@ -389,7 +389,12 @@ func effectServiceConfig(ctx context.Context, units []*unit, imageName string, p
 	cmd[1] = imageName
 
 	for i := range pairs {
-		cmd = append(cmd, fmt.Sprintf("%s=%s", pairs[i].key, pairs[i].value))
+		val := strings.TrimSpace(pairs[i].value)
+		if strings.Contains(val, " ") {
+			cmd = append(cmd, fmt.Sprintf("%s='%s'", pairs[i].key, val))
+		} else {
+			cmd = append(cmd, fmt.Sprintf("%s=%s", pairs[i].key, val))
+		}
 	}
 
 	for i := range units {
