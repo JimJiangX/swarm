@@ -1862,7 +1862,7 @@ func validPutNetworkingRequest(v structs.PutNetworkingRequest) error {
 		modify = true
 
 		if ip := net.ParseIP(*v.Gateway); ip == nil {
-			errs = append(errs, fmt.Sprintf("illegal Gateway:'%s' error", v.Gateway))
+			errs = append(errs, fmt.Sprintf("illegal Gateway:'%s' error", *v.Gateway))
 		}
 	}
 
