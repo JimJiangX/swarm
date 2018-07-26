@@ -41,6 +41,7 @@ const (
 	// badConnection
 
 	resourcesLack
+	othersError
 )
 
 type errCode struct {

@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -1405,7 +1406,7 @@ func deleteNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 // -----------------/networkings handlers-----------------
-func vailPostNetworkingRequest(v structs.PostNetworkingRequest) error {
+func validPostNetworkingRequest(v structs.PostNetworkingRequest) error {
 	errs := make([]string, 0, 5)
 
 	if v.Prefix < 0 || v.Prefix > 32 {
@@ -1449,7 +1450,7 @@ func postNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := vailPostNetworkingRequest(req); err != nil {
+	if err := validPostNetworkingRequest(req); err != nil {
 		ec := errCodeV1(_Networking, invalidParamsError, 12, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
@@ -1683,6 +1684,197 @@ func getNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSONNull(w, http.StatusOK)
+}
+
+func putNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+
+	ok, _, gd := fromContext(ctx, _Garden)
+	if !ok || gd == nil || gd.Ormer() == nil {
+
+		httpJSONNilGarden(w)
+		return
+	}
+
+	no := gd.Ormer()
+
+	n, err := no.CountIPWithCondition(name, true)
+	if err != nil {
+		ec := errCodeV1(_Networking, dbQueryError, 71, "fail to query database", "数据库查询错误（网络IP表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	if n > 0 {
+		ec := errCodeV1(_Networking, othersError, 72, "object in used", "资源被使用中")
+		httpJSONError(w, fmt.Errorf("Networking %s has used:%d", name, n), ec, http.StatusInternalServerError)
+		return
+	}
+
+	var req structs.PutNetworkingRequest
+
+	err = json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		ec := errCodeV1(_Networking, decodeError, 73, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	if err := validPutNetworkingRequest(req); err != nil {
+		ec := errCodeV1(_Networking, invalidParamsError, 74, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	out, err := no.ListIPByNetworking(name)
+	if err != nil {
+		ec := errCodeV1(_Networking, dbQueryError, 75, "fail to query database", "数据库查询错误（网络IP表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	nws := convertNetworking(out)
+	if len(nws) != 1 {
+		ec := errCodeV1(_Networking, dbQueryError, 76, "database data conflict", "网络表数据混乱（网络IP表）")
+		httpJSONError(w, fmt.Errorf("database data conflict,got %d networkings", len(nws)), ec, http.StatusInternalServerError)
+		return
+	}
+
+	post := mergeNetworking(nws[0], req)
+	if err := validPostNetworkingRequest(post); err != nil {
+		ec := errCodeV1(_Networking, invalidParamsError, 77, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
+		httpJSONError(w, err, ec, http.StatusBadRequest)
+		return
+	}
+
+	err = no.DelNetworking(name)
+	if err != nil {
+		ec := errCodeV1(_Networking, dbExecError, 78, "fail to delete records into database", "数据库删除记录错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	nw := resource.NewNetworks(no)
+	n, err = nw.AddNetworking(post.Start, post.End, post.Gateway, name, post.VLAN, post.Prefix)
+	if err != nil {
+		ec := errCodeV1(_Networking, dbExecError, 79, "fail to insert records into database", "数据库新增记录错误")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSONFprintf(w, http.StatusOK, "{%q:%d}", "num", n)
+}
+
+func mergeNetworking(info structs.NetworkingInfo, update structs.PutNetworkingRequest) structs.PostNetworkingRequest {
+	req := structs.PostNetworkingRequest{
+		Prefix:     info.Prefix,
+		VLAN:       info.VLAN,
+		Networking: info.Networking,
+		Gateway:    info.Gateway,
+	}
+
+	if update.Prefix != nil {
+		req.Prefix = *update.Prefix
+	}
+	if update.VLAN != nil {
+		req.VLAN = *update.VLAN
+	}
+	if update.Gateway != nil {
+		req.Gateway = *update.Gateway
+	}
+
+	req.Start, req.End = filterStartEndIP(info.IPs, update.Start, update.End)
+
+	return req
+}
+
+func filterStartEndIP(ips []structs.IP, start, end *string) (_start, _end string) {
+	if len(ips) == 0 {
+		if start != nil && end != nil {
+			return *start, *end
+		} else {
+			return "", ""
+		}
+	}
+
+	list := make([]int, len(ips))
+	for i := range ips {
+		list[i] = int(utils.IPToUint32(ips[i].IPAddr))
+	}
+
+	sort.Ints(list)
+
+	if start != nil {
+		_start = *start
+	} else {
+		_start = utils.Uint32ToIP(uint32(list[0])).String()
+	}
+
+	if end != nil {
+		_end = *end
+	} else {
+		_end = utils.Uint32ToIP(uint32(list[len(list)-1])).String()
+	}
+
+	return
+}
+
+func validPutNetworkingRequest(v structs.PutNetworkingRequest) error {
+	var (
+		start, end net.IP
+		modify     = false
+		errs       = make([]string, 0, 5)
+	)
+
+	if v.Start != nil {
+		modify = true
+
+		start = net.ParseIP(*v.Start)
+		if start == nil {
+			errs = append(errs, fmt.Sprintf("illegal IP:'%s' error", *v.Start))
+		}
+	}
+
+	if v.End != nil {
+		modify = true
+
+		end = net.ParseIP(*v.End)
+		if end == nil {
+			errs = append(errs, fmt.Sprintf("illegal IP:'%s' error", *v.End))
+		}
+
+	}
+
+	if v.Prefix != nil {
+		modify = true
+
+		if *v.Prefix < 0 || *v.Prefix > 32 {
+			errs = append(errs, fmt.Sprintf("illegal Prefix:%d not in 1~32", *v.Prefix))
+		}
+
+		mask := net.CIDRMask(*v.Prefix, 32)
+		if start != nil && end != nil && !start.Mask(mask).Equal(end.Mask(mask)) {
+			errs = append(errs, fmt.Sprintf("%s-%s is different network segments", start, end))
+		}
+	}
+
+	if v.Gateway != nil {
+		modify = true
+
+		if ip := net.ParseIP(*v.Gateway); ip == nil {
+			errs = append(errs, fmt.Sprintf("illegal Gateway:'%s' error", v.Gateway))
+		}
+	}
+
+	if !modify {
+		errs = append(errs, fmt.Sprint("nothing is modified"))
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("PutNetworkingRequest:%v,%s", v, errs)
 }
 
 // -----------------/services handlers-----------------

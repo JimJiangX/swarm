@@ -126,6 +126,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 
 		"/networkings/{name}/ips/enable":  putNetworkingEnable,
 		"/networkings/{name}/ips/disable": putNetworkingDisable,
+		"/networkings/{name}/ips":         putNetworking,
 
 		"/storage/san/{name}/raid_group/{rg:.*}/enable":  putEnableRaidGroup,
 		"/storage/san/{name}/raid_group/{rg:.*}/disable": putDisableRaidGroup,

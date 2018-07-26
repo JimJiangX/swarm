@@ -9,6 +9,14 @@ type PostNetworkingRequest struct {
 	Networking string `json:"networking_id"`
 }
 
+type PutNetworkingRequest struct {
+	Prefix  *int    `json:"prefix"`
+	VLAN    *int    `json:"vlan_id"`
+	Start   *string `json:"start"`
+	End     *string `json:"end"`
+	Gateway *string `json:"gateway"`
+}
+
 type NetworkingInfo struct {
 	Prefix     int    `json:"prefix"`
 	VLAN       int    `json:"vlan_id"`
