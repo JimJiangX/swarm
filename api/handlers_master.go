@@ -1740,9 +1740,9 @@ func putNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	post := mergeNetworking(nws[0], req)
-	if err := validPostNetworkingRequest(post); err != nil {
-		ec := errCodeV1(_Networking, invalidParamsError, 77, "Body parameters are invalid", "Body参数校验错误，包含无效参数")
+	post, err := mergeNetworking(nws[0], req)
+	if err != nil {
+		ec := errCodeV1(_Networking, invalidParamsError, 77, "Body parameters are invalid", "参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -1765,7 +1765,7 @@ func putNetworking(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	writeJSONFprintf(w, http.StatusOK, "{%q:%d}", "num", n)
 }
 
-func mergeNetworking(info structs.NetworkingInfo, update structs.PutNetworkingRequest) structs.PostNetworkingRequest {
+func mergeNetworking(info structs.NetworkingInfo, update structs.PutNetworkingRequest) (structs.PostNetworkingRequest, error) {
 	req := structs.PostNetworkingRequest{
 		Prefix:     info.Prefix,
 		VLAN:       info.VLAN,
@@ -1785,16 +1785,18 @@ func mergeNetworking(info structs.NetworkingInfo, update structs.PutNetworkingRe
 
 	req.Start, req.End = filterStartEndIP(info.IPs, update.Start, update.End)
 
-	return req
+	err := validPostNetworkingRequest(req)
+
+	return req, err
 }
 
 func filterStartEndIP(ips []structs.IP, start, end *string) (_start, _end string) {
+	if start != nil && end != nil {
+		return *start, *end
+	}
+
 	if len(ips) == 0 {
-		if start != nil && end != nil {
-			return *start, *end
-		} else {
-			return "", ""
-		}
+		return "", ""
 	}
 
 	list := make([]int, len(ips))
