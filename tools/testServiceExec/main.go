@@ -11,7 +11,7 @@ import (
 func main() {
 	resp, err := http.Post(
 		"http://146.4.71.11:20152/v1.0/services/943525cf5bd6fcfe2122774759d53ef4/exec",
-		"Content-Type:application/json",
+		"application/json",
 		bytes.NewReader([]byte(`{"nameOrID": "624a245d_abcde001", "cmd":["sh","-x","/root/effect-config.sh","upredis","save='100 1000'"]}`)),
 	)
 	if err != nil {
@@ -46,19 +46,19 @@ func main() {
 }
 
 type Task struct {
-	ID         string        `db:"id" json:"id"`
-	Name       string        `db:"name" json:"name"` //Related-Object
-	Related    string        `db:"related" json:"related"`
-	Linkto     string        `db:"link_to" json:"link_to"`
-	LinkTable  string        `db:"link_table" json:"-"`
-	Desc       string        `db:"description" json:"description"`
-	Labels     string        `db:"labels" json:"labels"`
-	Errors     string        `db:"errors" json:"errors"`
-	Status     int           `db:"status" json:"status"`
-	Timestamp  int64         `db:"timestamp" json:"timestamp"` // time.Time.Unix()
-	Timeout    time.Duration `db:"timeout" json:"timeout"`
-	CreatedAt  time.Time     `db:"created_at" json:"created_at"`
-	FinishedAt time.Time     `db:"finished_at" json:"finished_at"`
+	ID         string `db:"id" json:"id"`
+	Name       string `db:"name" json:"name"` //Related-Object
+	Related    string `db:"related" json:"related"`
+	Linkto     string `db:"link_to" json:"link_to"`
+	LinkTable  string `db:"link_table" json:"-"`
+	Desc       string `db:"description" json:"description"`
+	Labels     string `db:"labels" json:"labels"`
+	Errors     string `db:"errors" json:"errors"`
+	Status     int    `db:"status" json:"status"`
+	Timestamp  int64  `db:"timestamp" json:"timestamp"` // time.Time.Unix()
+	Timeout    int64  `db:"timeout" json:"timeout"`
+	CreatedAt  string `db:"created_at" json:"created_at"`
+	FinishedAt string `db:"finished_at" json:"finished_at"`
 }
 
 func getTask(task string) (Task, error) {
