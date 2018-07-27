@@ -10,7 +10,7 @@ import (
 
 func main() {
 	resp, err := http.Post(
-		"146.4.71.11:20152/v1.0/services/943525cf5bd6fcfe2122774759d53ef4/exec",
+		"http://146.4.71.11:20152/v1.0/services/943525cf5bd6fcfe2122774759d53ef4/exec",
 		"Content-Type:application/json",
 		bytes.NewReader([]byte(`{"nameOrID": "624a245d_abcde001", "cmd":["sh","-x","/root/effect-config.sh","upredis","save='100 1000'"]}`)),
 	)
@@ -62,7 +62,7 @@ type Task struct {
 }
 
 func getTask(task string) (Task, error) {
-	resp, err := http.Get("146.4.71.11:20152/v1.0/tasks/" + task)
+	resp, err := http.Get("http://146.4.71.11:20152/v1.0/tasks/" + task)
 	if err != nil {
 		return Task{}, err
 	}
