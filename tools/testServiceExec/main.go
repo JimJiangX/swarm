@@ -8,11 +8,29 @@ import (
 	"time"
 )
 
+type Exec struct {
+	Name string   `json:"nameOrID"`
+	Cmd  []string `json:"cmd"`
+}
+
 func main() {
+	exec := Exec{
+		Name: "624a245d_abcde001",
+		Cmd: []string{
+			"/root/effect-config.sh", "upredis", `save="100 1000"`,
+		},
+	}
+
+	buf := bytes.NewBuffer(nil)
+	err := json.NewEncoder(buf).Encode(exec)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	resp, err := http.Post(
 		"http://146.4.71.11:20152/v1.0/services/943525cf5bd6fcfe2122774759d53ef4/exec",
 		"application/json",
-		bytes.NewReader([]byte(`{"nameOrID": "624a245d_abcde001", "cmd":["sh","-x","/root/effect-config.sh","upredis","save='100 1000'"]}`)),
+		buf,
 	)
 	if err != nil {
 		log.Fatal(err)
