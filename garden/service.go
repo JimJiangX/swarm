@@ -782,7 +782,7 @@ func (svc *Service) UpdateUnitConfig(ctx context.Context, nameOrID, path, conten
 	return u.updateServiceConfig(ctx, path, content, true)
 }
 
-func (svc *Service) ReloadServiceConfig(ctx context.Context, unitID string, kvs []string) (structs.ConfigsMap, error) {
+func (svc *Service) ReloadServiceConfig(ctx context.Context, unitID string) (structs.ConfigsMap, error) {
 	var (
 		err   error
 		units []*unit
@@ -832,19 +832,6 @@ func (svc *Service) ReloadServiceConfig(ctx context.Context, unitID string, kvs 
 		configs[i].Content = buf.String()
 
 		buf.Reset()
-
-		for i := range kvs {
-			kv := strings.SplitN(kvs[i], "=", 2)
-			if len(kv) == 2 {
-				if configs[i].Keysets == nil {
-					configs[i].Keysets = make([]structs.Keyset, 0, len(kvs))
-				}
-				configs[i].Keysets = append(configs[i].Keysets, structs.Keyset{
-					Key:   kv[0],
-					Value: kv[1],
-				})
-			}
-		}
 
 		// TODO: remove
 		logrus.Debugf("reload config file:%s,%s,%s\n%s", svc.ID(), units[i].u.ID, configs[i].ConfigFile, configs[i].Content)
