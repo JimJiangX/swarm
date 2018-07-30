@@ -783,6 +783,15 @@ func (svc *Service) UpdateUnitConfig(ctx context.Context, nameOrID, path, conten
 }
 
 func (svc *Service) ReloadServiceConfig(ctx context.Context, unitID string) (structs.ConfigsMap, error) {
+	configs, err := svc.reloadServiceConfig(ctx, unitID)
+	if err != nil {
+		return nil, err
+	}
+
+	return svc.pc.UpdateConfigs(ctx, svc.ID(), configs)
+}
+
+func (svc *Service) reloadServiceConfig(ctx context.Context, unitID string) ([]structs.UnitConfig, error) {
 	var (
 		err   error
 		units []*unit
@@ -837,7 +846,7 @@ func (svc *Service) ReloadServiceConfig(ctx context.Context, unitID string) (str
 		logrus.Debugf("reload config file:%s,%s,%s\n%s", svc.ID(), units[i].u.ID, configs[i].ConfigFile, configs[i].Content)
 	}
 
-	return svc.pc.UpdateConfigs(ctx, svc.ID(), configs)
+	return configs, nil
 }
 
 // Stop stop units services,stop container if containers is true.
