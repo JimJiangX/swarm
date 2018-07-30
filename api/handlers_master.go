@@ -2209,7 +2209,7 @@ func mergeServiceConfigsChange(ctx goctx.Context, svc *garden.Service, change st
 	restart := false
 
 	// reload config file first
-	_, err := svc.ReloadServiceConfig(ctx, "")
+	_, err := svc.ReloadServiceConfig(ctx, "", nil)
 	if err != nil {
 		return nil, false, err
 	}
@@ -2842,7 +2842,7 @@ func getServiceConfigFiles(ctx goctx.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	_, err = svc.ReloadServiceConfig(ctx, "")
+	_, err = svc.ReloadServiceConfig(ctx, "", nil)
 	if err != nil {
 		ec := errCodeV1(_Service, internalError, 173, "fail to reload service configs", "重载单元配置文件内容")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)

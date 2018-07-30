@@ -339,11 +339,6 @@ func (svc *Service) UpdateResource(ctx context.Context, actor alloc.Allocator, n
 }
 
 func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []*unit, memory *int64) error {
-	cms, err := svc.ReloadServiceConfig(ctx, "")
-	if err != nil {
-		return err
-	}
-
 	if memory == nil ||
 		!(svc.spec.Image.Name == "upsql" ||
 			svc.spec.Image.Name == "mysql" ||
@@ -352,16 +347,11 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 		return nil
 	}
 
-	// update units config file but whether start by user
-	err = svc.updateConfigs(ctx, units, cms, nil, true)
-	if err != nil {
-		return err
-	}
-
 	kv := kvPair{}
 
 	if svc.spec.Image.Name == "redis" || svc.spec.Image.Name == "upredis" {
 		kv.key = "maxmemory"
+		kv.fullName = kv.key
 		kv.value = strconv.Itoa(int(float64(*memory) * 0.75))
 	} else {
 		n := *memory
@@ -372,15 +362,28 @@ func updateConfigAfterUpdateResource(ctx context.Context, svc *Service, units []
 		}
 
 		kv.key = "innodb_buffer_pool_size"
+		kv.fullName = "mysqld::innodb_buffer_pool_size"
 		kv.value = strconv.Itoa(int(n))
+	}
+
+	cms, err := svc.ReloadServiceConfig(ctx, "", []string{fmt.Sprintf("%s=%s", kv.fullName, kv.value)})
+	if err != nil {
+		return err
+	}
+
+	// update units config file but whether start by user
+	err = svc.updateConfigs(ctx, units, cms, nil, true)
+	if err != nil {
+		return err
 	}
 
 	return effectServiceConfig(ctx, units, svc.spec.Image.Name, []kvPair{kv})
 }
 
 type kvPair struct {
-	key   string
-	value string
+	fullName string
+	key      string
+	value    string
 }
 
 func effectServiceConfig(ctx context.Context, units []*unit, imageName string, pairs []kvPair) error {

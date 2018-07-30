@@ -98,7 +98,7 @@ func (gd *Garden) rebuildUnit(ctx context.Context, svc *Service, nameOrID string
 	}
 
 	// 2.reload unit config file
-	cms, err = svc.ReloadServiceConfig(ctx, old.unit.u.ID)
+	cms, err = svc.ReloadServiceConfig(ctx, old.unit.u.ID, nil)
 	if err != nil {
 		logrus.Warnf("reload unit %s config file error,continue\n%+v", nameOrID, err)
 
