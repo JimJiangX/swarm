@@ -350,7 +350,9 @@ func convertUnitInfoToSpec(info database.UnitInfo, container *cluster.Container)
 	return spec
 }
 
-func getUnitContainer(clu cluster.Cluster, containers cluster.Containers, u database.Unit) *cluster.Container {
+func findUnitContainer(clu cluster.Cluster, csp *cluster.Containers, u database.Unit) *cluster.Container {
+	containers := *csp
+
 	if len(containers) == 0 {
 		return nil
 	}
@@ -372,7 +374,7 @@ func getUnitContainer(clu cluster.Cluster, containers cluster.Containers, u data
 	if c == nil {
 		c = getContainer(clu, u.ContainerID, u.Name, u.EngineID)
 
-		containers = clu.Containers()
+		*csp = clu.Containers()
 	}
 
 	if c == nil {
@@ -387,7 +389,7 @@ func ConvertServiceInfo(cluster cluster.Cluster, info database.ServiceInfo, cont
 	units := make([]structs.UnitSpec, 0, len(info.Units))
 
 	for u := range info.Units {
-		c := getUnitContainer(cluster, containers, info.Units[u].Unit)
+		c := findUnitContainer(cluster, &containers, info.Units[u].Unit)
 
 		units = append(units, convertUnitInfoToSpec(info.Units[u], c))
 	}
