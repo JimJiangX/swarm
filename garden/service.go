@@ -351,29 +351,40 @@ func convertUnitInfoToSpec(info database.UnitInfo, container *cluster.Container)
 }
 
 func findUnitContainer(clu cluster.Cluster, csp *cluster.Containers, u database.Unit) *cluster.Container {
-	containers := *csp
+	var (
+		c          *cluster.Container
+		containers cluster.Containers
+	)
 
-	if len(containers) == 0 {
+	if csp != nil {
+		containers = *csp
+	}
+
+	if len(containers) == 0 && clu == nil {
 		return nil
 	}
 
-	var c *cluster.Container
-
 	if u.ContainerID != "" {
-		c = containers.Get(u.ContainerID)
+		if c = containers.Get(u.ContainerID); c != nil {
+			return c
+		}
 	}
 
-	if c == nil {
-		c = containers.Get(u.Name)
+	if u.Name != "" {
+		if c = containers.Get(u.Name); c != nil {
+			return c
+		}
 	}
 
-	if c == nil {
-		c = containers.Get(u.ID)
+	if u.ID != "" {
+		if c = containers.Get(u.ID); c != nil {
+			return c
+		}
 	}
 
-	if c == nil {
-		c = getContainer(clu, u.ContainerID, u.Name, u.EngineID)
+	c = getContainer(clu, u.ContainerID, u.Name, u.EngineID)
 
+	if csp != nil {
 		*csp = clu.Containers()
 	}
 
