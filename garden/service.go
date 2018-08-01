@@ -138,7 +138,7 @@ func (svc *Service) Spec() (*structs.ServiceSpec, error) {
 			return nil, err
 		}
 
-		spec := ConvertServiceInfo(info, containers)
+		spec := ConvertServiceInfo(svc.cluster, info, containers)
 		svc.spec = &spec
 
 		return svc.spec, nil
@@ -177,7 +177,7 @@ func (svc *Service) RefreshSpec() (*structs.ServiceSpec, error) {
 		return nil, err
 	}
 
-	spec := ConvertServiceInfo(info, containers)
+	spec := ConvertServiceInfo(svc.cluster, info, containers)
 	svc.spec = &spec
 	svc.svc = &info.Service
 
@@ -350,7 +350,7 @@ func convertUnitInfoToSpec(info database.UnitInfo, container *cluster.Container)
 	return spec
 }
 
-func getUnitContainer(containers cluster.Containers, u database.Unit) *cluster.Container {
+func getUnitContainer(clu cluster.Cluster, containers cluster.Containers, u database.Unit) *cluster.Container {
 	if len(containers) == 0 {
 		return nil
 	}
@@ -370,6 +370,12 @@ func getUnitContainer(containers cluster.Containers, u database.Unit) *cluster.C
 	}
 
 	if c == nil {
+		c = getContainer(clu, u.ContainerID, u.Name, u.EngineID)
+
+		containers = clu.Containers()
+	}
+
+	if c == nil {
 		logrus.Warnf("not found Container by '%s' & '%s' & '%s'", u.ContainerID, u.Name, u.ID)
 	}
 
@@ -377,11 +383,11 @@ func getUnitContainer(containers cluster.Containers, u database.Unit) *cluster.C
 }
 
 // ConvertServiceInfo returns ServiceSpec,covert by ServiceInfo and Containers
-func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers) structs.ServiceSpec {
+func ConvertServiceInfo(cluster cluster.Cluster, info database.ServiceInfo, containers cluster.Containers) structs.ServiceSpec {
 	units := make([]structs.UnitSpec, 0, len(info.Units))
 
 	for u := range info.Units {
-		c := getUnitContainer(containers, info.Units[u].Unit)
+		c := getUnitContainer(cluster, containers, info.Units[u].Unit)
 
 		units = append(units, convertUnitInfoToSpec(info.Units[u], c))
 	}

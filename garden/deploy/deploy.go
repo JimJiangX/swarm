@@ -380,7 +380,7 @@ func (d *Deployment) freshServicesLink(links structs.ServicesLink) (structs.Serv
 
 		info, ok := m[linkSlice[l].ID]
 		if ok {
-			spec := garden.ConvertServiceInfo(info, containers)
+			spec := garden.ConvertServiceInfo(d.gd.Cluster, info, containers)
 			linkSlice[l].Spec = &spec
 		}
 
@@ -388,7 +388,7 @@ func (d *Deployment) freshServicesLink(links structs.ServicesLink) (structs.Serv
 	}
 
 	for _, val := range m {
-		spec := garden.ConvertServiceInfo(val, containers)
+		spec := garden.ConvertServiceInfo(d.gd.Cluster, val, containers)
 		linkSlice = append(linkSlice, &structs.ServiceLink{
 			ID:   spec.ID,
 			Spec: &spec,
