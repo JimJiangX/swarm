@@ -105,10 +105,32 @@ func newUnit(u database.Unit, uo database.UnitOrmer, cluster cluster.Cluster) *u
 
 func (u unit) getContainer() *cluster.Container {
 	if u.u.ContainerID != "" {
-		return u.cluster.Container(u.u.ContainerID)
+		c := u.cluster.Container(u.u.ContainerID)
+		if c != nil {
+			return c
+		}
 	}
 
-	return u.cluster.Container(u.u.Name)
+	c := u.cluster.Container(u.u.Name)
+	if c != nil {
+		return c
+	}
+
+	if u.u.EngineID == "" {
+		return nil
+	}
+
+	eng := u.cluster.Engine(u.u.EngineID)
+	if eng == nil {
+		return nil
+	}
+
+	err := eng.RefreshContainers(true)
+	if err != nil {
+		return nil
+	}
+
+	return eng.Containers().Get(u.u.Name)
 }
 
 func (u unit) containerIDOrName() string {
