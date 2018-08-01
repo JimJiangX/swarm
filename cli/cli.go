@@ -18,7 +18,7 @@ func Run() {
 	app := cli.NewApp()
 	app.Name = path.Base(os.Args[0])
 	app.Usage = "A Docker-native clustering system"
-	app.Version = version.VERSION + " (" + version.GITCOMMIT + ")"
+	app.Version = version.VERSION + " " + version.GITCOMMIT
 
 	app.Author = ""
 	app.Email = ""
