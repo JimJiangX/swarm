@@ -138,7 +138,7 @@ func (svc *Service) Spec() (*structs.ServiceSpec, error) {
 			return nil, err
 		}
 
-		spec := ConvertServiceInfo(info, containers)
+		spec := ConvertServiceInfo(svc.cluster, info, containers)
 		svc.spec = &spec
 
 		return svc.spec, nil
@@ -177,7 +177,7 @@ func (svc *Service) RefreshSpec() (*structs.ServiceSpec, error) {
 		return nil, err
 	}
 
-	spec := ConvertServiceInfo(info, containers)
+	spec := ConvertServiceInfo(svc.cluster, info, containers)
 	svc.spec = &spec
 	svc.svc = &info.Service
 
@@ -350,23 +350,42 @@ func convertUnitInfoToSpec(info database.UnitInfo, container *cluster.Container)
 	return spec
 }
 
-func getUnitContainer(containers cluster.Containers, u database.Unit) *cluster.Container {
-	if len(containers) == 0 {
+func findUnitContainer(clu cluster.Cluster, csp *cluster.Containers, u database.Unit) *cluster.Container {
+	var (
+		c          *cluster.Container
+		containers cluster.Containers
+	)
+
+	if csp != nil {
+		containers = *csp
+	}
+
+	if len(containers) == 0 && clu == nil {
 		return nil
 	}
 
-	var c *cluster.Container
-
 	if u.ContainerID != "" {
-		c = containers.Get(u.ContainerID)
+		if c = containers.Get(u.ContainerID); c != nil {
+			return c
+		}
 	}
 
-	if c == nil {
-		c = containers.Get(u.Name)
+	if u.Name != "" {
+		if c = containers.Get(u.Name); c != nil {
+			return c
+		}
 	}
 
-	if c == nil {
-		c = containers.Get(u.ID)
+	if u.ID != "" {
+		if c = containers.Get(u.ID); c != nil {
+			return c
+		}
+	}
+
+	c = getContainer(clu, u.ContainerID, u.Name, u.EngineID)
+
+	if csp != nil {
+		*csp = clu.Containers()
 	}
 
 	if c == nil {
@@ -377,11 +396,11 @@ func getUnitContainer(containers cluster.Containers, u database.Unit) *cluster.C
 }
 
 // ConvertServiceInfo returns ServiceSpec,covert by ServiceInfo and Containers
-func ConvertServiceInfo(info database.ServiceInfo, containers cluster.Containers) structs.ServiceSpec {
+func ConvertServiceInfo(cluster cluster.Cluster, info database.ServiceInfo, containers cluster.Containers) structs.ServiceSpec {
 	units := make([]structs.UnitSpec, 0, len(info.Units))
 
 	for u := range info.Units {
-		c := getUnitContainer(containers, info.Units[u].Unit)
+		c := findUnitContainer(cluster, &containers, info.Units[u].Unit)
 
 		units = append(units, convertUnitInfoToSpec(info.Units[u], c))
 	}
@@ -783,6 +802,15 @@ func (svc *Service) UpdateUnitConfig(ctx context.Context, nameOrID, path, conten
 }
 
 func (svc *Service) ReloadServiceConfig(ctx context.Context, unitID string) (structs.ConfigsMap, error) {
+	configs, err := svc.reloadServiceConfig(ctx, unitID)
+	if err != nil {
+		return nil, err
+	}
+
+	return svc.pc.UpdateConfigs(ctx, svc.ID(), configs)
+}
+
+func (svc *Service) reloadServiceConfig(ctx context.Context, unitID string) ([]structs.UnitConfig, error) {
 	var (
 		err   error
 		units []*unit
@@ -837,7 +865,7 @@ func (svc *Service) ReloadServiceConfig(ctx context.Context, unitID string) (str
 		logrus.Debugf("reload config file:%s,%s,%s\n%s", svc.ID(), units[i].u.ID, configs[i].ConfigFile, configs[i].Content)
 	}
 
-	return svc.pc.UpdateConfigs(ctx, svc.ID(), configs)
+	return configs, nil
 }
 
 // Stop stop units services,stop container if containers is true.

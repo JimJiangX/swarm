@@ -106,6 +106,8 @@ func NewTask(object, relate, linkto, desc string, label map[string]string, timeo
 // Task
 
 type Task struct {
+	Done    bool `db:"-" json:"done"`
+	Success bool `db:"-" json:"success"`
 	task
 	errs  []error
 	label map[string]string
@@ -268,7 +270,9 @@ func (db dbBase) GetTask(ID string) (Task, error) {
 
 	err := db.Get(&tk, query, ID)
 
-	return Task{task: tk}, errors.Wrap(err, "get task by id:"+ID)
+	return Task{task: tk,
+		Success: tk.Status == TaskDoneStatus,
+		Done:    tk.Status > TaskRunningStatus}, errors.Wrap(err, "get task by id:"+ID)
 }
 
 func (db dbBase) ListTasks(link string, status int) ([]Task, error) {
@@ -298,7 +302,9 @@ func (db dbBase) ListTasks(link string, status int) ([]Task, error) {
 	if err == nil {
 		out := make([]Task, 0, len(tks))
 		for i := range tks {
-			out = append(out, Task{task: tks[i]})
+			out = append(out, Task{task: tks[i],
+				Success: tks[i].Status == TaskDoneStatus,
+				Done:    tks[i].Status > TaskRunningStatus})
 		}
 
 		return out, nil
@@ -322,7 +328,9 @@ func (db dbBase) txListTasks(tx *sqlx.Tx, status int) ([]Task, error) {
 	if err == nil {
 		out := make([]Task, 0, len(tks))
 		for i := range tks {
-			out = append(out, Task{task: tks[i]})
+			out = append(out, Task{task: tks[i],
+				Success: tks[i].Status == TaskDoneStatus,
+				Done:    tks[i].Status > TaskRunningStatus})
 		}
 
 		return out, nil

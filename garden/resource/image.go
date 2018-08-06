@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -30,11 +31,11 @@ func LoadImage(ctx context.Context,
 	req structs.PostLoadImageRequest,
 	timeout time.Duration) (string, string, error) {
 
-	path, err := utils.GetAbsolutePath(false, req.Path)
-	if err != nil {
-		return "", "", errors.WithStack(err)
-	}
-	req.Path = path
+	//	path, err := utils.GetAbsolutePath(false, req.Path)
+	//	if err != nil {
+	//		return "", "", errors.WithStack(err)
+	//	}
+	//	req.Path = path
 
 	var labels string
 	if len(req.Labels) > 0 {
@@ -60,7 +61,7 @@ func LoadImage(ctx context.Context,
 	task := database.NewTask(req.Image(), database.ImageLoadTask, image.ID, "load image", nil, int(timeout/time.Second))
 
 	before := func(key string, new int, t *database.Task, f func(val int) bool) (bool, int, error) {
-		err = ormer.InsertImageWithTask(image, *t)
+		err := ormer.InsertImageWithTask(image, *t)
 		if err != nil {
 			return false, 0, err
 		}
@@ -80,7 +81,7 @@ func LoadImage(ctx context.Context,
 		ch := make(chan error)
 
 		go func(ch chan<- error) {
-			ch <- loadImage(ctx, cluster, ormer, pc, image, task, path, timeout)
+			ch <- loadImage(ctx, cluster, ormer, pc, image, task, req.Path, timeout)
 		}(ch)
 
 		select {
@@ -98,7 +99,7 @@ func LoadImage(ctx context.Context,
 
 	tl := tasklock.NewGoTask(database.ImageLoadTask, image.ID, &task, before, after)
 
-	err = tl.Go(func(int) bool { return true }, run)
+	err := tl.Go(func(int) bool { return true }, run)
 	if err != nil {
 		return "", "", err
 	}
@@ -162,7 +163,7 @@ func loadImage(ctx context.Context,
 	}
 	{
 		// post image template to plugin
-		err := postImageTemplate(ctx, pc, oldName, path)
+		err := postImageTemplate(ctx, scp, pc, oldName, path)
 		if err != nil {
 			field.Errorf("post image config template,%+v", err)
 		}
@@ -198,8 +199,11 @@ func parsePushImageOutput(in []byte) (string, int, error) {
 }
 
 // post image template to plugin
-func postImageTemplate(ctx context.Context, pc api.PluginAPI, image, path string) error {
+func postImageTemplate(ctx context.Context, scp scplib.ScpClient, pc api.PluginAPI, image, path string) error {
 	tmpl, err := readImageTemplateFile(path)
+	if errors.Cause(err) == os.ErrNotExist {
+		tmpl, err = readRemoteImageTemplateFile(scp, path)
+	}
 	if err != nil {
 		return err
 	}
@@ -236,6 +240,45 @@ func readImageTemplateFile(path string) (ct structs.ConfigTemplate, err error) {
 		content, err := ioutil.ReadFile(name)
 		if err != nil {
 			return ct, errors.Wrap(err, name)
+		}
+
+		ct.Content = string(content)
+	}
+
+	if ct.Timestamp == 0 {
+		ct.Timestamp = time.Now().Unix()
+	}
+
+	return ct, nil
+}
+
+func readRemoteImageTemplateFile(scp scplib.ScpClient, path string) (ct structs.ConfigTemplate, err error) {
+	ext := filepath.Ext(path)
+	index := 1 + len(path) - len(ext)
+
+	{
+		// read ConfigTemplate,xxxxx.json
+		name := path[:index] + "json"
+
+		cmd := "cat " + name
+		dat, err := scp.Exec(cmd)
+		if err != nil {
+			return ct, errors.Wrap(err, cmd)
+		}
+
+		err = json.Unmarshal(dat, &ct)
+		if err != nil {
+			return ct, errors.Wrap(err, name)
+		}
+	}
+	{
+		// read template content,xxxxx.tmpl
+		name := path[:index] + "tmpl"
+
+		cmd := "cat " + name
+		content, err := scp.Exec(cmd)
+		if err != nil {
+			return ct, errors.Wrap(err, cmd)
 		}
 
 		ct.Content = string(content)

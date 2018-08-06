@@ -114,7 +114,7 @@ func (gd *Garden) Service(nameOrID string) (*Service, error) {
 		return nil, err
 	}
 
-	spec := ConvertServiceInfo(info, gd.Cluster.Containers())
+	spec := ConvertServiceInfo(gd.Cluster, info, gd.Cluster.Containers())
 
 	svc := gd.NewService(&spec, &info.Service)
 
@@ -128,7 +128,7 @@ func (gd *Garden) ServiceSpec(nameOrID string) (structs.ServiceSpec, error) {
 		return structs.ServiceSpec{}, err
 	}
 
-	spec := ConvertServiceInfo(info, gd.Cluster.Containers())
+	spec := ConvertServiceInfo(gd.Cluster, info, gd.Cluster.Containers())
 
 	return spec, nil
 }
@@ -145,7 +145,7 @@ func (gd *Garden) ListServices(ctx context.Context) ([]structs.ServiceSpec, erro
 	out := make([]structs.ServiceSpec, 0, len(list))
 
 	for i := range list {
-		spec := ConvertServiceInfo(list[i], containers)
+		spec := ConvertServiceInfo(gd.Cluster, list[i], containers)
 		out = append(out, spec)
 	}
 

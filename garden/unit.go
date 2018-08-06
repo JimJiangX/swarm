@@ -103,12 +103,53 @@ func newUnit(u database.Unit, uo database.UnitOrmer, cluster cluster.Cluster) *u
 	}
 }
 
-func (u unit) getContainer() *cluster.Container {
-	if u.u.ContainerID != "" {
-		return u.cluster.Container(u.u.ContainerID)
+func getContainer(clu cluster.Cluster, cID, cName, engine string) *cluster.Container {
+	var (
+		c          *cluster.Container
+		containers = clu.Containers()
+	)
+
+	if cID != "" {
+		if c = containers.Get(cID); c != nil {
+			return c
+		}
 	}
 
-	return u.cluster.Container(u.u.Name)
+	if cName != "" {
+		if c = containers.Get(cName); c != nil {
+			return c
+		}
+	}
+
+	if engine != "" {
+
+		eng := clu.Engine(engine)
+		if eng == nil {
+			return nil
+		}
+
+		eng.RefreshContainers(true)
+
+		containers = eng.Containers()
+
+		if cID != "" {
+			if c = containers.Get(cID); c != nil {
+				return c
+			}
+		}
+
+		if cName != "" {
+			if c = containers.Get(cName); c != nil {
+				return c
+			}
+		}
+	}
+
+	return c
+}
+
+func (u unit) getContainer() *cluster.Container {
+	return getContainer(u.cluster, u.u.ContainerID, u.u.Name, u.u.EngineID)
 }
 
 func (u unit) containerIDOrName() string {
