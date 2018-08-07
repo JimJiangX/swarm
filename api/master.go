@@ -57,8 +57,8 @@ var masterRoutes = map[string]map[string]ctxHandler{
 
 		"/nfs_backups/space": getNFSSPace,
 
-		"/clusters":        getClusters,
-		"/clusters/{name}": getClustersByID,
+		//		"/clusters":        getClusters,
+		//		"/clusters/{name}": getClustersByID,
 		"/hosts":           getAllNodes,
 		"/hosts/{name:.*}": getNode,
 
@@ -83,7 +83,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 		"/backupfiles/{name}": getBackupFile,
 	},
 	http.MethodPost: {
-		"/clusters": postCluster,
+		//	"/clusters": postCluster,
 
 		"/hosts": postNode,
 
@@ -115,7 +115,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	http.MethodPut: {
 		"/tasks/{name}/cancel": setTaskFailed,
 
-		"/clusters/{name}": putClusterParams,
+		//	"/clusters/{name}": putClusterParams,
 
 		"/softwares/images":      putImageTemplate,
 		"/softwares/images/sync": syncImageToEngines,
@@ -135,7 +135,7 @@ var masterRoutes = map[string]map[string]ctxHandler{
 	http.MethodDelete: {
 		"/services/{name}": deleteService,
 
-		"/clusters/{name}": deleteCluster,
+		//	"/clusters/{name}": deleteCluster,
 		"/hosts/{node:.*}": deleteNode,
 
 		"/networkings/{name}/ips": deleteNetworking,

@@ -659,7 +659,7 @@ func putImageTemplate(ctx goctx.Context, w http.ResponseWriter, r *http.Request)
 
 	err := json.NewDecoder(r.Body).Decode(&ct)
 	if err != nil {
-		ec := errCodeV1(_Cluster, decodeError, 61, "JSON Decode Request Body error", "JSON解析请求Body错误")
+		ec := errCodeV1(_Image, decodeError, 61, "JSON Decode Request Body error", "JSON解析请求Body错误")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
 	}
@@ -749,6 +749,7 @@ func syncImageToEngines(ctx goctx.Context, w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 }
 
+/*
 // -----------------/clusters handlers-----------------
 func getClustersByID(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
@@ -955,16 +956,20 @@ func deleteCluster(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+*/
 
 // -----------------/hosts handlers-----------------
 func getNodeInfo(ormer database.Ormer, n database.Node, e *cluster.Engine) structs.NodeInfo {
 	info := structs.NodeInfo{
-		ID:            n.ID,
-		Cluster:       n.ClusterID,
-		Room:          n.Room,
-		Seat:          n.Seat,
-		MaxContainer:  n.MaxContainer,
-		Enabled:       n.Enabled,
+		ID:               n.ID,
+		Tag:              n.Tag,
+		Room:             n.Room,
+		Seat:             n.Seat,
+		NetworkPartition: n.NetworkPartition,
+		ContainerMax:     n.ContainerMax,
+		UsageMax:         n.UsageMax,
+		Enabled:          n.Enabled,
+
 		RegisterAt:    utils.TimeToString(n.RegisterAt),
 		VolumeDrivers: []structs.VolumeDriver{},
 	}
@@ -1065,7 +1070,7 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	name := r.FormValue("cluster")
+	tag := r.FormValue("tag")
 
 	ok, _, gd := fromContext(ctx, _Garden)
 	if !ok || gd == nil ||
@@ -1081,10 +1086,10 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		ormer = gd.Ormer()
 	)
 
-	if name == "" {
+	if tag == "" {
 		nodes, err = ormer.ListNodes()
 	} else {
-		nodes, err = ormer.ListNodesByCluster(name)
+		nodes, err = ormer.ListNodesByTag(tag)
 		ids = make([]string, 0, len(nodes))
 		for i := range nodes {
 			ids = append(ids, nodes[i].EngineID)
@@ -1121,8 +1126,8 @@ func getAllNodes(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 func validNodeRequest(node structs.Node) error {
 	errs := make([]string, 0, 3)
 
-	if node.Cluster == "" {
-		errs = append(errs, "Cluster is required")
+	if node.Tag == "" {
+		errs = append(errs, "Tag is required")
 	}
 
 	if node.Addr == "" {
@@ -1168,46 +1173,41 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	orm := gd.Ormer()
 
-	cl, err := orm.GetCluster(n.Cluster)
-	if err != nil {
-		ec := errCodeV1(_Host, dbQueryError, 33, "fail to query database", "数据库查询错误（集群表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
+	//	num, err := orm.CountNodeByTag(n.Tag)
+	//	if err != nil {
+	//		ec := errCodeV1(_Host, dbQueryError, 34, "fail to query database", "数据库查询错误（物理主机表）")
+	//		httpJSONError(w, err, ec, http.StatusInternalServerError)
+	//		return
+	//	}
 
-	num, err := orm.CountNodeByCluster(cl.ID)
-	if err != nil {
-		ec := errCodeV1(_Host, dbQueryError, 34, "fail to query database", "数据库查询错误（物理主机表）")
-		httpJSONError(w, err, ec, http.StatusInternalServerError)
-		return
-	}
-
-	if num >= cl.MaxNode {
-		ec := errCodeV1(_Host, invalidParamsError, 35, fmt.Sprintf("Exceeded cluster max node limit,%d>=%d", num, cl.MaxNode), fmt.Sprintf("超出集群数量限制，%d>%d", num, cl.MaxNode))
-		httpJSONError(w, err, ec, http.StatusBadRequest)
-		return
-	}
+	//	if num >= cl.MaxNode {
+	//		ec := errCodeV1(_Host, invalidParamsError, 35, fmt.Sprintf("Exceeded cluster max node limit,%d>=%d", num, cl.MaxNode), fmt.Sprintf("超出集群数量限制，%d>%d", num, cl.MaxNode))
+	//		httpJSONError(w, err, ec, http.StatusBadRequest)
+	//		return
+	//	}
 
 	if n.Storage != "" {
 		_, err = orm.GetStorageByID(n.Storage)
 		if err != nil {
-			ec := errCodeV1(_Host, dbQueryError, 36, "fail to query database", "数据库查询错误（外部存储表）")
+			ec := errCodeV1(_Host, dbQueryError, 33, "fail to query database", "数据库查询错误（外部存储表）")
 			httpJSONError(w, err, ec, http.StatusInternalServerError)
 			return
 		}
 	}
 
 	node := database.Node{
-		ID:           utils.Generate32UUID(),
-		ClusterID:    n.Cluster,
-		Addr:         n.Addr,
-		EngineID:     "",
-		Room:         n.Room,
-		Seat:         n.Seat,
-		Storage:      n.Storage,
-		MaxContainer: n.MaxContainer,
-		Status:       0,
-		Enabled:      false,
+		ID:               utils.Generate32UUID(),
+		Tag:              n.Tag,
+		Addr:             n.Addr,
+		EngineID:         "",
+		Room:             n.Room,
+		Seat:             n.Seat,
+		Storage:          n.Storage,
+		ContainerMax:     n.ContainerMax,
+		UsageMax:         n.UsageMax,
+		NetworkPartition: n.NetworkPartition,
+		Status:           0,
+		Enabled:          false,
 		NFS: database.NFS{
 			Addr:     n.NFS.Address,
 			Dir:      n.NFS.Dir,
@@ -1221,7 +1221,7 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 
 	horus, err := gd.KVClient().GetHorusAddr(ctx)
 	if err != nil {
-		ec := errCodeV1(_Host, internalError, 37, "fail to query third-part monitor server addr", "获取第三方监控服务地址错误")
+		ec := errCodeV1(_Host, internalError, 34, "fail to query third-part monitor server addr", "获取第三方监控服务地址错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -1236,7 +1236,7 @@ func postNode(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	master := resource.NewHostManager(orm, gd.Cluster, nodes)
 	err = master.InstallNodes(ctx, horus, gd.KVClient())
 	if err != nil {
-		ec := errCodeV1(_Host, internalError, 38, "fail to install host", "主机入库错误")
+		ec := errCodeV1(_Host, internalError, 35, "fail to install host", "主机入库错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}
@@ -1296,7 +1296,8 @@ func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 
 	var max = struct {
-		N *int `json:"max_container"`
+		Container *int     `json:"max_container,omitempty"`
+		Usage     *float32 `json:"usage_max,omitempty"`
 	}{}
 
 	err := json.NewDecoder(r.Body).Decode(&max)
@@ -1306,7 +1307,7 @@ func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if max.N == nil {
+	if max.Container == nil && max.Usage == nil {
 		ec := errCodeV1(_Host, invalidParamsError, 62, "URL parameters are invalid", "URL参数校验错误，包含无效参数")
 		httpJSONError(w, err, ec, http.StatusBadRequest)
 		return
@@ -1320,9 +1321,26 @@ func putNodeParam(ctx goctx.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = gd.Ormer().SetNodeParam(name, *max.N)
+	orm := gd.Ormer()
+
+	node, err := orm.GetNode(name)
 	if err != nil {
-		ec := errCodeV1(_Host, dbExecError, 63, "fail to update records into database", "数据库更新记录错误")
+		ec := errCodeV1(_Host, dbQueryError, 63, "fail to query database", "数据库查询错误（物理主机表）")
+		httpJSONError(w, err, ec, http.StatusInternalServerError)
+		return
+	}
+
+	if max.Container != nil {
+		node.ContainerMax = *max.Container
+	}
+
+	if max.Usage != nil {
+		node.UsageMax = *max.Usage
+	}
+
+	err = orm.SetNodeParam(node.ID, node.ContainerMax, node.UsageMax)
+	if err != nil {
+		ec := errCodeV1(_Host, dbExecError, 64, "fail to update records into database", "数据库更新记录错误")
 		httpJSONError(w, err, ec, http.StatusInternalServerError)
 		return
 	}

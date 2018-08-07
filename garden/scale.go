@@ -388,7 +388,7 @@ func (svc *Service) scheduleOptionsByUnits(opts scheduleOption, refer string, ca
 		return opts, err
 	}
 
-	opts.Nodes.Clusters = []string{node.ClusterID}
+	opts.Nodes.Clusters = []string{node.Tag}
 
 	ips, err := unit.uo.ListIPByUnitID(unit.u.ID)
 	if err != nil {
@@ -396,7 +396,7 @@ func (svc *Service) scheduleOptionsByUnits(opts scheduleOption, refer string, ca
 	}
 
 	if len(ips) == 1 {
-		opts.Nodes.Networkings = map[string][]string{node.ClusterID: {ips[0].Networking}}
+		opts.Nodes.Networkings = map[string][]string{node.Tag: {ips[0].Networking}}
 	} else {
 		ids := make([]string, 0, len(ips))
 
@@ -412,7 +412,7 @@ func (svc *Service) scheduleOptionsByUnits(opts scheduleOption, refer string, ca
 			ids = append(ids, ips[i].Networking)
 		}
 
-		opts.Nodes.Networkings = map[string][]string{node.ClusterID: ids}
+		opts.Nodes.Networkings = map[string][]string{node.Tag: ids}
 	}
 
 	return opts, err

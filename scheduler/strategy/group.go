@@ -122,9 +122,9 @@ loop:
 			continue
 		}
 
-		label := nodes[i].Node.Labels["cluster"]
+		label := nodes[i].Node.Labels["tag_label"]
 		if label == "" {
-			label = "nullCluster"
+			label = "nullTag"
 		}
 
 		for l := range list {

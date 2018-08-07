@@ -3,7 +3,6 @@ package database
 import (
 	"database/sql"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -11,7 +10,6 @@ import (
 )
 
 type NodeOrmer interface {
-	ClusterIface
 	NodeIface
 	GetSysConfigIface
 	VolumeOrmer
@@ -25,15 +23,15 @@ type NodeIface interface {
 
 	ListNodes() ([]Node, error)
 
-	ListNodesByCluster(cluster string) ([]Node, error)
+	ListNodesByTag(tag string) ([]Node, error)
 
-	ListNodesByClusters(clusters []string, enable bool) ([]Node, error)
+	ListNodesByTags(tags []string, enable bool) ([]Node, error)
 
-	CountNodeByCluster(cluster string) (int, error)
+	//	CountNodeByTag(tag string) (int, error)
 	CountUnitByEngine(id string) (int, error)
 
 	SetNodeEnable(string, bool) error
-	SetNodeParam(string, int) error
+	SetNodeParam(ID string, max int, usage float32) error
 
 	RegisterNode(n *Node, t *Task) error
 
@@ -42,16 +40,19 @@ type NodeIface interface {
 
 // Node table structure,correspod with mainframe computer.
 type Node struct {
-	ID           string `db:"id"`
-	ClusterID    string `db:"cluster_id"`
-	Addr         string `db:"admin_ip"`
-	EngineID     string `db:"engine_id"`
-	Room         string `db:"room"`
-	Seat         string `db:"seat"`
-	Storage      string `db:"storage"`
-	MaxContainer int    `db:"max_container"`
-	Status       int    `db:"status"`
-	Enabled      bool   `db:"enabled"`
+	Enabled      bool    `db:"enabled"`
+	UsageMax     float32 `db:"usage_max"`
+	ContainerMax int     `db:"max_container"`
+	Status       int     `db:"status"`
+
+	ID               string `db:"id"`
+	Tag              string `db:"tag"`
+	Addr             string `db:"admin_ip"`
+	EngineID         string `db:"engine_id"`
+	Room             string `db:"room"`
+	Seat             string `db:"seat"`
+	Storage          string `db:"storage"`
+	NetworkPartition string `db:"ha_network_tag"`
 
 	NFS
 
@@ -74,7 +75,7 @@ func (db dbBase) nodeTable() string {
 func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 	do := func(tx *sqlx.Tx) error {
 
-		query := "INSERT INTO " + db.nodeTable() + " (id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts) VALUES (:id,:cluster_id,:admin_ip,:engine_id,:room,:seat,:storage,:max_container,:status,:enabled,:register_at,:nfs_ip,:nfs_dir,:nfs_mount_dir,:nfs_mount_opts)"
+		query := "INSERT INTO " + db.nodeTable() + " (id,tag,admin_ip,engine_id,room,seat,storage,ha_network_tag,usage_max,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts) VALUES (:id,:tag,:admin_ip,:engine_id,:room,:seat,:storage,:ha_network_tag,:usage_max,:max_container,:status,:enabled,:register_at,:nfs_ip,:nfs_dir,:nfs_mount_dir,:nfs_mount_opts)"
 
 		if len(nodes) == 1 {
 			_, err := tx.NamedExec(query, &nodes[0])
@@ -107,14 +108,14 @@ func (db dbBase) InsertNodesAndTask(nodes []Node, tasks []Task) error {
 	return db.txFrame(do)
 }
 
-// SetNodeParams returns error when Node update status and max_container.
-func (db dbBase) SetNodeParam(ID string, max int) error {
+// SetNodeParams returns error when Node update usage_max and max_container.
+func (db dbBase) SetNodeParam(ID string, max int, usage float32) error {
 
-	query := "UPDATE " + db.nodeTable() + " SET max_container=? WHERE id=?"
+	query := "UPDATE " + db.nodeTable() + " SET max_container=?,usage_max=? WHERE id=?"
 
-	_, err := db.Exec(query, max, ID)
+	_, err := db.Exec(query, max, usage, ID)
 
-	return errors.Wrap(err, "update Node.MaxContainer by ID")
+	return errors.Wrap(err, "update Node MaxContainer & UsageMax by ID")
 }
 
 // SetNodeParams returns error when Node update enabled.
@@ -152,7 +153,7 @@ func (db dbBase) RegisterNode(n *Node, t *Task) error {
 // GetNode get Node by nameOrID.
 func (db dbBase) GetNode(nameOrID string) (Node, error) {
 	var node Node
-	query := "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at, nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE id=? OR engine_id=?"
+	query := "SELECT id,tag,admin_ip,engine_id,room,seat,storage,ha_network_tag,usage_max,max_container,status,enabled,register_at, nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE id=? OR engine_id=?"
 
 	err := db.Get(&node, query, nameOrID, nameOrID)
 
@@ -163,7 +164,7 @@ func (db dbBase) GetNode(nameOrID string) (Node, error) {
 func (db dbBase) GetNodeByAddr(addr string) (Node, error) {
 	var (
 		node  Node
-		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE admin_ip=?"
+		query = "SELECT id,tag,admin_ip,engine_id,room,seat,storage,ha_network_tag,usage_max,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE admin_ip=?"
 	)
 
 	addr, _, err := net.SplitHostPort(addr)
@@ -180,7 +181,7 @@ func (db dbBase) GetNodeByAddr(addr string) (Node, error) {
 func (db dbBase) ListNodes() ([]Node, error) {
 	var (
 		nodes []Node
-		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable()
+		query = "SELECT id,tag,admin_ip,engine_id,room,seat,storage,ha_network_tag,usage_max,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable()
 	)
 
 	err := db.Select(&nodes, query)
@@ -191,29 +192,29 @@ func (db dbBase) ListNodes() ([]Node, error) {
 	return nodes, errors.Wrap(err, "get all Nodes")
 }
 
-// ListNodeByCluster returns nodes,select by cluster
-func (db dbBase) ListNodesByCluster(cluster string) ([]Node, error) {
+// ListNodeByTag returns nodes,select by tag
+func (db dbBase) ListNodesByTag(tag string) ([]Node, error) {
 	var (
 		nodes []Node
-		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE cluster_id=?"
+		query = "SELECT id,tag,admin_ip,engine_id,room,seat,storage,ha_network_tag,usage_max,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE tag=?"
 	)
 
-	err := db.Select(&nodes, query, cluster)
+	err := db.Select(&nodes, query, tag)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 
-	return nodes, errors.Wrap(err, "list Node by cluster")
+	return nodes, errors.Wrap(err, "list Node by tag")
 }
 
-// CountNodeByCluster returns num of node select by cluster.
-func (db dbBase) CountNodeByCluster(cluster string) (int, error) {
+// CountNodeByTag returns num of node select by tag.
+func (db dbBase) CountNodeByTag(tag string) (int, error) {
 	num := 0
-	query := "SELECT COUNT(id) FROM " + db.nodeTable() + " WHERE cluster_id=?"
+	query := "SELECT COUNT(id) FROM " + db.nodeTable() + " WHERE tag=?"
 
-	err := db.Get(&num, query, cluster)
+	err := db.Get(&num, query, tag)
 
-	return num, errors.Wrap(err, "count Node by cluster")
+	return num, errors.Wrap(err, "count Node by Tag")
 }
 
 // ListNodesByEngines returns nodes,select by engines ID.
@@ -224,7 +225,7 @@ func (db dbBase) ListNodesByEngines(names []string) ([]Node, error) {
 
 	var (
 		nodes []Node
-		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE engine_id IN (?);"
+		query = "SELECT id,tag,admin_ip,engine_id,room,seat,storage,ha_network_tag,usage_max,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE engine_id IN (?);"
 	)
 
 	query, args, err := sqlx.In(query, names)
@@ -241,14 +242,14 @@ func (db dbBase) ListNodesByEngines(names []string) ([]Node, error) {
 }
 
 // ListNodesByIDs returns nodes,select by ID.
-func (db dbBase) ListNodesByIDs(in []string, cluster string) ([]Node, error) {
+func (db dbBase) ListNodesByIDs(in []string, tag string) ([]Node, error) {
 	if len(in) == 0 {
-		return db.ListNodesByCluster(cluster)
+		return db.ListNodesByTag(tag)
 	}
 
 	var (
 		nodes []Node
-		query = "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE id IN (?);"
+		query = "SELECT id,tag,admin_ip,engine_id,room,seat,storage,ha_network_tag,usage_max,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE id IN (?);"
 	)
 
 	query, args, err := sqlx.In(query, in)
@@ -264,33 +265,22 @@ func (db dbBase) ListNodesByIDs(in []string, cluster string) ([]Node, error) {
 	return nodes, errors.Wrapf(err, "list Nodes by IDs:%s", in)
 }
 
-// ListNodesByClusters returns nodes,select by clusters\type\enabled.
-func (db dbBase) ListNodesByClusters(clusters []string, enable bool) ([]Node, error) {
-	list := make([]string, 0, len(clusters))
-
-	for _, c := range clusters {
-		if len(c) == 0 || strings.TrimSpace(c) == "" {
-			continue
-		}
-		list = append(list, c)
+// ListNodesByTags returns nodes,select by tags\type\enabled.
+func (db dbBase) ListNodesByTags(tags []string, enable bool) ([]Node, error) {
+	if len(tags) == 0 {
+		return []Node{}, errors.New("tag is required")
 	}
 
-	clusters = list
-
-	if len(clusters) == 0 {
-		return []Node{}, errors.New("clusters is required")
-	}
-
-	query := "SELECT id,cluster_id,admin_ip,engine_id,room,seat,storage,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE cluster_id IN (?) AND enabled=?;"
-	query, args, err := sqlx.In(query, clusters, enable)
+	query := "SELECT id,tag,admin_ip,engine_id,room,seat,storage,ha_network_tag,usage_max,max_container,status,enabled,register_at,nfs_ip,nfs_dir,nfs_mount_dir,nfs_mount_opts FROM " + db.nodeTable() + " WHERE tag IN (?) AND enabled=?;"
+	query, args, err := sqlx.In(query, tags, enable)
 	if err != nil {
-		return nil, errors.Wrap(err, "select []Node IN clusterIDs")
+		return nil, errors.Wrap(err, "select []Node IN tags")
 	}
 
 	var nodes []Node
 	err = db.Select(&nodes, query, args...)
 
-	return nodes, errors.Wrap(err, "list Nodes by clusters")
+	return nodes, errors.Wrap(err, "list Nodes by tags")
 }
 
 // DelNode delete node by ID

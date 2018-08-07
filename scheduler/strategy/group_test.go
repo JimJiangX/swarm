@@ -32,10 +32,10 @@ func TestGroupPlaceDifferentNodeSize(t *testing.T) {
 		createNode(fmt.Sprintf("node-3"), 128, 42),
 	}
 
-	nodes[0].Labels["cluster"] = "cluster0"
-	nodes[1].Labels["cluster"] = "cluster0"
-	nodes[2].Labels["cluster"] = "cluster1"
-	nodes[3].Labels["cluster"] = "cluster1"
+	nodes[0].Labels["tag_label"] = "cluster0"
+	nodes[1].Labels["tag_label"] = "cluster0"
+	nodes[2].Labels["tag_label"] = "cluster1"
+	nodes[3].Labels["tag_label"] = "cluster1"
 
 	// add 60 containers
 	for i := 0; i < 60; i++ {
@@ -58,8 +58,8 @@ func TestGroupPlaceDifferentNodeSizeCPUs(t *testing.T) {
 		createNode(fmt.Sprintf("node-1"), 128, 42),
 	}
 
-	nodes[0].Labels["cluster"] = "cluster0"
-	nodes[1].Labels["cluster"] = "cluster1"
+	nodes[0].Labels["tag_label"] = "cluster0"
+	nodes[1].Labels["tag_label"] = "cluster1"
 
 	// add 60 containers 1CPU
 	for i := 0; i < 60; i++ {

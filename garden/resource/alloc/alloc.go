@@ -25,7 +25,7 @@ type allocatorOrmer interface {
 
 	driver.VolumeIface
 
-	ListNodesByClusters(clusters []string, enable bool) ([]database.Node, error)
+	ListNodesByTags(tag []string, enable bool) ([]database.Node, error)
 	RecycleResource(ips []database.IP, lvs []database.Volume) error
 }
 
@@ -67,17 +67,17 @@ func (at *allocator) findEngineVolumeDrivers(eng *cluster.Engine) (driver.Volume
 	return vds, nil
 }
 
-func (at *allocator) ListCandidates(clusters, filters []string, networkings map[string][]string, stores []structs.VolumeRequire) (out []database.Node, err error) {
-	netClusters := make([]string, 0, len(clusters))
+func (at *allocator) ListCandidates(tags, filters []string, networkings map[string][]string, stores []structs.VolumeRequire) (out []database.Node, err error) {
+	netTags := make([]string, 0, len(tags))
 
 loop:
-	for clusterID, nets := range networkings {
+	for tag, nets := range networkings {
 
 		for i := range nets {
 
 			n, err := at.ormer.CountIPWithCondition(nets[i], false)
 			if err == nil && n > 0 {
-				netClusters = append(netClusters, clusterID)
+				netTags = append(netTags, tag)
 
 				continue loop
 			}
@@ -85,17 +85,17 @@ loop:
 	}
 
 	var warning string
-	if len(netClusters) == 0 {
+	if len(netTags) == 0 {
 		warning = fmt.Sprintf("networkings %s unavailable", networkings)
 	}
 
-	nodes, err := at.ormer.ListNodesByClusters(clusters, true)
+	nodes, err := at.ormer.ListNodesByTags(tags, true)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(nodes) == 0 {
-		return nil, errors.Errorf("Warning:%s\n non node in clusters %s", warning, clusters)
+		return nil, errors.Errorf("Warning:%s\n non node in tags %s", warning, tags)
 	}
 
 	filterMap := make(map[string]struct{}, len(filters))
@@ -136,8 +136,8 @@ loop:
 			continue
 		}
 
-		if n := len(eng.Containers()); n >= nodes[i].MaxContainer {
-			errs = append(errs, fmt.Sprintf("node:%s container num limit(%d>=%d)", nodes[i].EngineID, n, nodes[i].MaxContainer))
+		if n := len(eng.Containers()); n >= nodes[i].ContainerMax {
+			errs = append(errs, fmt.Sprintf("node:%s container num limit(%d>=%d)", nodes[i].EngineID, n, nodes[i].ContainerMax))
 			continue
 		}
 

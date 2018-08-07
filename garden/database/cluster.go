@@ -1,11 +1,6 @@
 package database
 
-import (
-	"database/sql"
-
-	"github.com/pkg/errors"
-)
-
+/*
 type ClusterIface interface {
 	InsertCluster(c Cluster) error
 
@@ -94,3 +89,4 @@ func (db dbBase) DelCluster(ID string) error {
 
 	return errors.Wrap(err, "delete Cluster")
 }
+*/

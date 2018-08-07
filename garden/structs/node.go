@@ -23,17 +23,19 @@ type GetClusterResponse struct {
 }
 
 type Node struct {
-	Cluster string `json:"cluster_id"`
-	Addr    string `json:"addr"`
-	Storage string `json:"storage"`
+	ContainerMax int     `json:"max_container"`
+	UsageMax     float32 `json:"usage_max"`
+
+	Tag              string `json:"tag"`
+	Addr             string `json:"addr"`
+	Storage          string `json:"storage"`
+	NetworkPartition string `json:"ha_network_tag"`
 
 	SSHConfig
 	NFS
 
 	HDD []string `json:"hdd"`
 	SSD []string `json:"ssd"`
-
-	MaxContainer int `json:"max_container"`
 
 	Room string `json:"room,omitempty"`
 	Seat string `json:"seat,omitempty"`
@@ -61,13 +63,17 @@ type PostNodeResponse struct {
 }
 
 type NodeInfo struct {
-	ID           string `json:"id"`
-	Cluster      string `json:"cluster_id"`
-	Room         string `json:"room"`
-	Seat         string `json:"seat"`
-	MaxContainer int    `json:"max_container"`
-	Enabled      bool   `json:"enabled"`
-	RegisterAt   string `json:"register_at"`
+	Enabled      bool    `json:"enabled"`
+	UsageMax     float32 `json:"usage_max"`
+	ContainerMax int     `json:"max_container"`
+
+	ID               string `json:"id"`
+	Tag              string `json:"tag"`
+	Room             string `json:"room"`
+	Seat             string `json:"seat"`
+	NetworkPartition string `json:"ha_network_tag"`
+
+	RegisterAt string `json:"register_at"`
 
 	Engine struct {
 		IsHealthy  bool `json:"is_healthy"`

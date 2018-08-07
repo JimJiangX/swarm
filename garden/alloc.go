@@ -28,15 +28,15 @@ const containerKV = "/containers/"
 
 // add engine labels for schedule
 const (
-	roomLabel             = "room"
-	seatLabel             = "seat"
-	nodeLabel             = "nodeID"
-	engineLabel           = "node"
-	clusterLabel          = "cluster"
+	roomLabel             = "room_label"
+	seatLabel             = "seat_label"
+	nodeLabel             = "nodeID_label"
+	engineLabel           = "node_label"
+	tagLabel              = "tag_label"
 	serviceTagLabel       = "service.tag"
-	sanLabel              = "SAN_ID"
+	sanLabel              = "SAN_ID_label"
 	maxContainerLable     = "containerslots" // scheduler/filter/slots.go
-	networkPartitionLable = "network_partition"
+	networkPartitionLable = "network_partition_label"
 )
 
 func getImage(orm database.SysConfigOrmer, version string) (string, error) {
@@ -176,7 +176,7 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 		return nil, errors.New("no one node that satisfies")
 	}
 
-	nodes, err := setNodesWithLable(out, gd.Cluster, gd.Ormer())
+	nodes, err := setNodesWithLable(out, gd.Cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -196,22 +196,10 @@ func (gd *Garden) schedule(ctx context.Context, actor alloc.Allocator, config *c
 	return nodes, errors.WithStack(err)
 }
 
-func setNodesWithLable(out []database.Node, cl cluster.Cluster, iface database.ClusterIface) ([]*node.Node, error) {
-	clusters, err := iface.ListClusters()
-	if err != nil {
-		return nil, err
-	}
-	if len(clusters) == 0 {
-		return nil, errors.New("List Cluster result empty")
-	}
-
-	clusterMap := make(map[string]string, len(clusters))
-	for i := range clusters {
-		clusterMap[clusters[i].ID] = clusters[i].NetworkPartition
-	}
-
+func setNodesWithLable(out []database.Node, cl cluster.Cluster) ([]*node.Node, error) {
 	nodeMap := make(map[string]database.Node, len(out))
 	ids := make([]string, 0, len(out))
+
 	for i := range out {
 		if out[i].EngineID == "" {
 			continue
@@ -238,12 +226,12 @@ func setNodesWithLable(out []database.Node, cl cluster.Cluster, iface database.C
 			n.Labels[sanLabel] = nt.Storage
 		}
 
-		n.Labels[clusterLabel] = nt.ClusterID
+		n.Labels[tagLabel] = nt.Tag
 		n.Labels[nodeLabel] = nt.ID
 		n.Labels[roomLabel] = nt.Room
 		n.Labels[seatLabel] = nt.Seat
-		n.Labels[networkPartitionLable] = clusterMap[nt.ClusterID]
-		//	n.Labels[maxContainerLable] = strconv.Itoa(nt.MaxContainer)
+		n.Labels[networkPartitionLable] = nt.NetworkPartition
+		//	n.Labels[maxContainerLable] = strconv.Itoa(nt.ContainerMax)
 
 		nodes = append(nodes, n)
 	}
@@ -353,7 +341,7 @@ func addContainerConfigConstraint(config *cluster.ContainerConfig, opts schedule
 			}
 		}
 
-		config.AddConstraint(clusterLabel + "==" + strings.Join(tmp, "|"))
+		config.AddConstraint(tagLabel + "==" + strings.Join(tmp, "|"))
 	}
 }
 
@@ -374,7 +362,7 @@ func pendingAlloc(actor alloc.Allocator, unit database.Unit,
 	}
 
 	if nr {
-		netlist := opts.Nodes.Networkings[node.Labels[clusterLabel]]
+		netlist := opts.Nodes.Networkings[node.Labels[tagLabel]]
 
 		networkings, err := actor.AlloctNetworking(pu.config, node.ID, pu.Unit.ID, netlist, opts.Require.Networks)
 		if len(networkings) > 0 {
@@ -962,7 +950,7 @@ func (gd *Garden) allocationV3(ctx context.Context, actor alloc.Allocator, svc *
 
 	defer recycle()
 
-	out := sortByLabel(candidates, clusterLabel)
+	out := sortByLabel(candidates, tagLabel)
 	count := replicas
 	usedNodes := make([]*node.Node, 0, count)
 	isSAN := isSANStorage(opts.Require.Volumes)

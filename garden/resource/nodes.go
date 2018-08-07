@@ -3,7 +3,6 @@ package resource
 import (
 	"github.com/docker/swarm/cluster"
 	"github.com/docker/swarm/garden/database"
-	"github.com/pkg/errors"
 )
 
 type engineCluster interface {
@@ -31,6 +30,7 @@ func NewHostManager(dco nodeOrmer, ec engineCluster, nodes []nodeWithTask) hostM
 	}
 }
 
+/*
 func (m hostManager) getCluster(ID string) (database.Cluster, error) {
 
 	return m.dco.GetCluster(ID)
@@ -54,3 +54,4 @@ func (m hostManager) RemoveCluster(ID string) error {
 
 	return m.dco.DelCluster(cl.ID)
 }
+*/

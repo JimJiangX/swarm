@@ -32,9 +32,9 @@ func TestErrCode(t *testing.T) {
 
 var (
 	modelMap = map[string]model{
-		"_DC":         _DC,
-		"_NFS":        _NFS,
-		"_Cluster":    _Cluster,
+		"_DC":  _DC,
+		"_NFS": _NFS,
+		//	"_Cluster":    _Cluster,
 		"_Host":       _Host,
 		"_Task":       _Task,
 		"_Unit":       _Unit,

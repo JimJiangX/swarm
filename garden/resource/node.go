@@ -74,10 +74,10 @@ func SetNodesKVPath(path string) {
 
 // Node represents a host
 type Node struct {
-	node   database.Node
-	belong *database.Cluster
-	eng    *cluster.Engine
-	no     database.NodeOrmer
+	node database.Node
+	//	belong *database.Cluster
+	eng *cluster.Engine
+	no  database.NodeOrmer
 }
 
 func newNode(n database.Node, eng *cluster.Engine, no database.NodeOrmer) Node {
@@ -88,6 +88,7 @@ func newNode(n database.Node, eng *cluster.Engine, no database.NodeOrmer) Node {
 	}
 }
 
+/*
 func (n Node) getCluster() (*database.Cluster, error) {
 	if n.belong != nil {
 		return n.belong, nil
@@ -100,6 +101,7 @@ func (n Node) getCluster() (*database.Cluster, error) {
 
 	return n.belong, err
 }
+*/
 
 func (n Node) removeCondition() error {
 	errs := make([]string, 0, 3)
