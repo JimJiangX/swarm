@@ -12,7 +12,6 @@ const (
 	_Task
 	_DC
 	_Image
-	//	_Cluster
 	_Host
 	_Networking
 	_Service

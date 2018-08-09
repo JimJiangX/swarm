@@ -15,7 +15,6 @@ import (
 type Ormer interface {
 	ServiceIface
 	ServiceInfoIface
-	//	ClusterIface
 	UnitIface
 	ContainerIface
 	ImageIface

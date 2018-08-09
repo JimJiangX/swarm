@@ -2,26 +2,6 @@ package structs
 
 import "github.com/docker/swarm/cluster"
 
-type PostClusterRequest struct {
-	NetworkPartition string  `json:"ha_network_tag"`
-	Max              int     `json:"max_host"`
-	UsageLimit       float32 `json:"usage_limit"`
-}
-
-type PutClusterRequest struct {
-	Max              *int     `json:"max_host,omitempty"`
-	UsageLimit       *float32 `json:"usage_limit,omitempty"`
-	NetworkPartition *string  `json:"ha_network_tag,omitempty"`
-}
-
-type GetClusterResponse struct {
-	ID               string  `json:"id"`
-	NetworkPartition string  `json:"ha_network_tag"`
-	MaxNode          int     `json:"max_host"`
-	NodeNum          int     `json:"host_num"`
-	UsageLimit       float32 `json:"usage_limit"`
-}
-
 type Node struct {
 	ContainerMax int     `json:"max_container"`
 	UsageMax     float32 `json:"usage_max"`

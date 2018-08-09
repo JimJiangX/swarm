@@ -72,6 +72,31 @@ func SetNodesKVPath(path string) {
 	dockerNodesKVPath = path
 }
 
+type engineCluster interface {
+	Engine(IDOrName string) *cluster.Engine
+	EngineByAddr(addr string) *cluster.Engine
+}
+
+type nodeOrmer interface {
+	lister
+	database.NodeOrmer
+}
+
+type hostManager struct {
+	ec    engineCluster
+	dco   nodeOrmer
+	nodes []nodeWithTask
+}
+
+// NewHostManager returns host manager
+func NewHostManager(dco nodeOrmer, ec engineCluster, nodes []nodeWithTask) hostManager {
+	return hostManager{
+		dco:   dco,
+		ec:    ec,
+		nodes: nodes,
+	}
+}
+
 // Node represents a host
 type Node struct {
 	node database.Node
@@ -87,21 +112,6 @@ func newNode(n database.Node, eng *cluster.Engine, no database.NodeOrmer) Node {
 		no:   no,
 	}
 }
-
-/*
-func (n Node) getCluster() (*database.Cluster, error) {
-	if n.belong != nil {
-		return n.belong, nil
-	}
-
-	c, err := n.no.GetCluster(n.node.ClusterID)
-	if err == nil {
-		n.belong = &c
-	}
-
-	return n.belong, err
-}
-*/
 
 func (n Node) removeCondition() error {
 	errs := make([]string, 0, 3)
@@ -433,18 +443,6 @@ func (m hostManager) registerNodesLoop(ctx context.Context, cancel context.Cance
 		}
 	}
 }
-
-//func (m *hostManager) removeNodeTask(id string) {
-//	list := make([]nodeWithTask, 0, len(m.nodes))
-
-//	for i := range m.nodes {
-//		if m.nodes[i].Node.ID != id {
-//			list = append(list, m.nodes[i])
-//		}
-//	}
-
-//	m.nodes = list
-//}
 
 func (m hostManager) registerNode(ctx context.Context, node nodeWithTask, sys database.SysConfig, reg kvstore.Register) error {
 	n, err := m.dco.GetNode(node.Node.ID)
