@@ -79,27 +79,7 @@ func (lus linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 		resp.ReloadServicesConfig[2+i] = lus.sqls[i].ID
 	}
 
-	{
-		// sqls
-		for _, sql := range lus.sqls {
-			if !isDesignated(lus.nameOrID, "", sql.Spec) {
-				continue
-			}
-
-			for _, u := range sql.Spec.Units {
-				if !isDesignated(lus.nameOrID, u.ID, sql.Spec) {
-					continue
-				}
-
-				resp.Links = append(resp.Links, structs.UnitLink{
-					NameOrID:  u.ID,
-					ServiceID: sql.Spec.ID,
-					Commands:  []string{"/root/serv", "start"}, // TODO:
-				})
-			}
-		}
-	}
-
+	// swm
 	swmCM, swmPr, err := getServiceConfigParser(ctx, client, lus.swm.Spec.ID, lus.swm.Spec.Image)
 	if err != nil {
 		return resp, err
@@ -111,6 +91,36 @@ func (lus linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 	err = swmPr.ParseData([]byte(swmc.Content))
 	if err != nil {
 		return resp, err
+	}
+
+	{
+		// sqls
+		ips := make([]string, 0, len(lus.proxy.Spec.Units))
+		for _, u := range lus.proxy.Spec.Units {
+			if len(u.Networking) > 0 {
+				ips = append(ips, u.Networking[0].IP)
+			}
+		}
+
+		opts := make(map[string]map[string]interface{})
+		opts[allUnitsEffect] = map[string]interface{}{"mysqld::upsql_ee_chat_iplist ": strings.Join(ips, ",")}
+
+		for _, sql := range lus.sqls {
+			if !isDesignated(lus.nameOrID, "", sql.Spec) {
+				continue
+			}
+
+			ulinks, err := generateServiceLink(ctx, client, *sql.Spec, opts)
+			if err != nil {
+				return resp, err
+			}
+
+			for i := range ulinks {
+				if isDesignated(lus.nameOrID, ulinks[i].NameOrID, lus.proxy.Spec) {
+					resp.Links = append(resp.Links, ulinks...)
+				}
+			}
+		}
 	}
 
 	{

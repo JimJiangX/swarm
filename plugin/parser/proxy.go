@@ -522,6 +522,22 @@ func (c *upproxyConfigV200) GenerateConfig(id string, desc structs.ServiceSpec) 
 	m["upsql-proxy::proxy-name"] = fmt.Sprintf("%s-%d", desc.Tag, seq)
 	m["upsql-proxy::proxy-id"] = strconv.Itoa(seq)
 
+	{
+		typ, ok := desc.Options[units_prefix+id].(string)
+		if ok && typ == unit_exist {
+			delete(m, "upsql-proxy::proxy-domain")
+			delete(m, "upsql-proxy::proxy-name")
+			delete(m, "upsql-proxy::proxy-id")
+		} else if !ok {
+			// add new unit
+			n, ok := desc.Options[units_prefix+id].(int)
+			if ok && n > 1 && n <= len(desc.Units) {
+				m["upsql-proxy::proxy-name"] = fmt.Sprintf("%s-%d", desc.Tag, n)
+				m["upsql-proxy::proxy-id"] = strconv.Itoa(n)
+			}
+		}
+	}
+
 	addr := "127.0.0.1"
 	if len(spec.Networking) > 0 {
 		addr = spec.Networking[0].IP
