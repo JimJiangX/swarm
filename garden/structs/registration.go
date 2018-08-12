@@ -6,6 +6,7 @@ const (
 	StartContainerCmd = "start_container_cmd"
 	InitServiceCmd    = "init_service_cmd"
 	StartServiceCmd   = "start_service_cmd"
+	RestartServiceCmd = "restart_service_cmd"
 	StopServiceCmd    = "stop_service_cmd"
 	RestoreCmd        = "restore_cmd"
 	BackupCmd         = "backup_cmd"

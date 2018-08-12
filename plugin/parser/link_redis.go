@@ -215,7 +215,7 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 			ul := structs.UnitLink{
 				NameOrID:  u.ID,
 				ServiceID: u.ServiceID,
-				Commands:  proxyCMS[u.ID].GetCmd(structs.StartServiceCmd),
+				Commands:  proxyCMS[u.ID].GetCmd(structs.RestartServiceCmd),
 			}
 
 			resp.Links = append(resp.Links, ul)
@@ -232,7 +232,7 @@ func (lr linkRedis) generateLinkConfig(ctx context.Context, client kvstore.Store
 			ul := structs.UnitLink{
 				NameOrID:  u.ID,
 				ServiceID: u.ServiceID,
-				Commands:  sentinelCMS[u.ID].GetCmd(structs.StartServiceCmd),
+				Commands:  sentinelCMS[u.ID].GetCmd(structs.RestartServiceCmd),
 			}
 
 			resp.Links = append(resp.Links, ul)

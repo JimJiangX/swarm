@@ -236,6 +236,8 @@ func (c mysqlConfig) GenerateCommands(id string, desc structs.ServiceSpec) (stru
 
 	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
 
+	cmds[structs.RestartServiceCmd] = []string{"/root/serv", "restart"}
+
 	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
 
 	cmds[structs.RestoreCmd] = []string{"/root/mysql-restore.sh"}
@@ -356,6 +358,8 @@ func (upsqlConfig) GenerateCommands(id string, desc structs.ServiceSpec) (struct
 	cmds[structs.InitServiceCmd] = []string{"/root/upsql-init.sh"}
 
 	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
+
+	cmds[structs.RestartServiceCmd] = []string{"/root/serv", "restart"}
 
 	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
 

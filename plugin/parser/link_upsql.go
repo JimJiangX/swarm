@@ -103,7 +103,7 @@ func (lus linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 
 			for i := range ulinks {
 				if isDesignated(lus.nameOrID, ulinks[i].NameOrID, lus.proxy.Spec) {
-					resp.Links = append(resp.Links, ulinks...)
+					resp.Links = append(resp.Links, ulinks[i])
 				}
 			}
 		}
@@ -152,7 +152,7 @@ func (lus linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 
 			for i := range ulinks {
 				if isDesignated(lus.nameOrID, ulinks[i].NameOrID, lus.proxy.Spec) {
-					resp.Links = append(resp.Links, ulinks...)
+					resp.Links = append(resp.Links, ulinks[i])
 				}
 			}
 		}
@@ -174,7 +174,7 @@ func (lus linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 				resp.Links = append(resp.Links, structs.UnitLink{
 					NameOrID:  lus.swm.Spec.Units[i].ID,
 					ServiceID: lus.swm.Spec.ID,
-					Commands:  swmc.Cmds[structs.StartServiceCmd],
+					Commands:  swmc.Cmds[structs.RestartServiceCmd],
 					Request: &structs.HTTPRequest{
 						Method: http.MethodPost,
 						URL:    "http://" + swmAddr + "/init",
@@ -312,12 +312,16 @@ func generateServiceLink(ctx context.Context,
 	ulinks := make([]structs.UnitLink, 0, len(spec.Units))
 
 	for _, cc := range cm {
+		//		cmd := make([]string, len(cc.Cmds[structs.StopServiceCmd]), len(cc.Cmds[structs.StopServiceCmd])+1+len(cc.Cmds[structs.StartServiceCmd]))
+		//		copy(cmd, cc.Cmds[structs.StopServiceCmd])
+		//		cmd = append(cmd, "&&")
+		//		cmd = append(cmd, cc.Cmds[structs.StopServiceCmd])
 		ulinks = append(ulinks, structs.UnitLink{
 			NameOrID:      cc.ID,
 			ServiceID:     spec.ID,
 			ConfigFile:    cc.ConfigFile,
 			ConfigContent: cc.Content,
-			Commands:      cc.Cmds[structs.StartServiceCmd], // TODO:
+			Commands:      cc.Cmds[structs.RestartServiceCmd], // TODO:
 		})
 	}
 

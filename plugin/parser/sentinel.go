@@ -128,6 +128,8 @@ func (sentinelConfig) GenerateCommands(id string, desc structs.ServiceSpec) (str
 
 	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
 
+	cmds[structs.RestartServiceCmd] = []string{"/root/serv", "restart"}
+
 	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
 
 	return cmds, nil

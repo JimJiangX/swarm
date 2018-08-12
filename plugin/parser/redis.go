@@ -162,6 +162,8 @@ func (redisConfig) GenerateCommands(id string, desc structs.ServiceSpec) (struct
 
 	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
 
+	cmds[structs.RestartServiceCmd] = []string{"/root/serv", "restart"}
+
 	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
 
 	return cmds, nil
@@ -264,6 +266,8 @@ func (upredisConfig) GenerateCommands(id string, desc structs.ServiceSpec) (stru
 	cmds[structs.InitServiceCmd] = []string{"/root/upredis-init.sh"}
 
 	cmds[structs.StartServiceCmd] = []string{"/root/serv", "start"}
+
+	cmds[structs.RestartServiceCmd] = []string{"/root/serv", "restart"}
 
 	cmds[structs.StopServiceCmd] = []string{"/root/serv", "stop"}
 
