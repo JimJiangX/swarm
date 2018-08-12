@@ -89,7 +89,7 @@ func (lus linkUpSQL) generateLinkConfig(ctx context.Context, client kvstore.Stor
 		}
 
 		opts := make(map[string]map[string]interface{})
-		opts[allUnitsEffect] = map[string]interface{}{"mysqld::upsql_ee_chat_iplist": strings.Join(ips, ",")}
+		opts[allUnitsEffect] = map[string]interface{}{"mysqld::upsql_ee_cheat_iplist": strings.Join(ips, ",")}
 
 		for _, sql := range lus.sqls {
 			if !isDesignated(lus.nameOrID, "", sql.Spec) {
